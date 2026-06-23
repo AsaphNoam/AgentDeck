@@ -1,0 +1,365 @@
+# Product Requirements Document — Local Multi-Agent Dashboard
+
+**Working name:** AgentDeck (rename freely)
+**Document type:** Feature-focused PRD intended to brief a coding agent and to serve as a reference for the product's full feature set.
+**Status:** v1 — buildable spec derived from a reference implementation, flavor-neutral.
+
+---
+
+## 1. Summary
+
+AgentDeck is a **local-first desktop tool for running and supervising many AI coding-agent sessions in parallel**. It wraps existing agent CLIs (Claude Code, OpenAI Codex) and gives every session a persistent identity, live status, full chat history, file/command tracking, and a messaging channel so agents can coordinate with each other. Everything runs on `localhost`; all state is plain files on the user's disk; there is no cloud component and no account.
+
+The product is for a developer who delegates several concurrent tasks to AI agents and needs one place to see what each is doing, intervene when needed, and resume past work — without juggling a dozen terminal tabs.
+
+---
+
+## 2. Goals and non-goals
+
+### Goals
+- Run N agent sessions concurrently, each addressable as `role@project`.
+- Show live status of every agent at a glance (busy / idle / waiting / done).
+- Provide a full streaming chat view per agent with tool calls, diffs, and permission prompts.
+- Persist every session and allow search + resume with full history.
+- Let agents message each other programmatically (no manual copy-paste relay).
+- Support multiple backends/models, switchable on a live agent without losing history.
+- Keep all data local; bind the server to `127.0.0.1` only.
+
+### Non-goals (v1)
+- No cloud sync, no remote/multi-user access, no auth layer.
+- No built-in code editor — the tool observes and orchestrates, it does not replace the IDE.
+- No support for agent runtimes that are not CLI/ACP-compatible.
+- No billing, telemetry, or analytics.
+
+---
+
+## 3. Core concepts and data model
+
+These four objects are the backbone. Everything in the UI is a view over them.
+
+### 3.1 Agent (session)
+A running or historical session. Has a **stable identity** that survives resume, clone, and backend swaps, separate from the **ephemeral runtime session id** assigned by the underlying CLI.
+
+```jsonc
+// agents/{agent_id}.json — stable identity
+{
+  "agent_id": "a_8f3c12",        // stable, never changes
+  "name": "Atlas",                // human-friendly display name, user-editable
+  "role": "implementer",          // references a role definition
+  "project": "my-app",            // references a project definition
+  "backend": "claude",            // references a backend
+  "model": "sonnet-4-6",
+  "interface": "chat",            // "chat" | "terminal"
+  "created_at": "2026-06-22T10:00:00Z",
+  "group": "auth-migration"       // optional task-group label
+}
+```
+
+```jsonc
+// running/{agent_id}.json — active session registry (deleted when stopped)
+{
+  "agent_id": "a_8f3c12",
+  "pid": 48213,                   // process group id of the CLI
+  "session_id": "claude-sess-xyz",// ephemeral, changes on fork/resume
+  "interface": "chat",
+  "tty": "/dev/ttys004",          // only for terminal interface
+  "started_at": "2026-06-22T10:00:01Z"
+}
+```
+
+```jsonc
+// status/{agent_id}.json — structured live state (written by hooks/runtime)
+{
+  "agent_id": "a_8f3c12",
+  "state": "busy",                // "busy" | "idle" | "waiting_input" | "done" | "error"
+  "detail": "Editing src/auth.ts",
+  "last_trace": "PostToolUse: Edit",
+  "busy_since": "2026-06-22T10:04:11Z",
+  "context_pct": 0.42             // context window usage 0..1
+}
+```
+
+### 3.2 Role
+A reusable persona: system prompt + display metadata + permission policy. Defines *how* an agent behaves, independent of where it works.
+
+```jsonc
+// roles/{role}.json
+{
+  "title": "Reviewer",
+  "system_prompt": "Review changes for correctness, edge cases, and consistency.",
+  "skip_permissions": null         // null = inherit global; true/false = override
+}
+```
+Seed roles to ship: `implementer`, `reviewer`, `researcher`, `pm`.
+
+### 3.3 Project
+A reusable workspace: working directory + injected context + extra dirs + display metadata. Defines *where* and *on what* an agent works.
+
+```jsonc
+// projects/{project}.json
+{
+  "title": "My App",
+  "color": [100, 180, 255],        // display accent
+  "cwd": "~/Projects/my-app",
+  "add_dirs": [],                  // extra directories the agent may access
+  "context_prompt": "Project-specific context injected into every agent here."
+}
+```
+
+### 3.4 Backend
+A provider runtime. Each backend exposes multiple models, each optionally with its own API key/endpoint.
+
+```jsonc
+// backends.json
+{
+  "version": 2,
+  "backends": {
+    "claude": {
+      "name": "Claude",
+      "type": "claude-acp",
+      "default": true,
+      "default_model": "sonnet-4-6",
+      "models": {
+        "sonnet-4-6": { "name": "Sonnet 4.6", "model": "claude-sonnet-4-6" },
+        "opus-4-7":   { "name": "Opus 4.7",   "model": "claude-opus-4-7" }
+      }
+    },
+    "codex": {
+      "name": "Codex",
+      "type": "codex-acp",
+      "default_model": "gpt-5.5",
+      "models": {
+        "gpt-5.5": { "name": "GPT 5.5", "model": "gpt-5.5" },
+        "gpt-4o":  { "name": "GPT-4o",  "model": "gpt-4o",
+                     "env": { "OPENAI_API_KEY": "sk-...", "OPENAI_BASE_URL": "https://..." } }
+      },
+      "env": { "CODEX_HOME": "/path/to/sessions" }
+    }
+  }
+}
+```
+Backend-level `env` applies to all its models; per-model `env` overrides it. Composition at launch: `project.cwd` + `project.context_prompt` + `role.system_prompt` + `backend/model` → CLI invocation.
+
+### 3.5 On-disk layout (single source of truth — no database)
+```
+~/.agentdeck/
+  agents/{agent_id}.json      stable identity
+  running/{agent_id}.json     active session registry (pid, tty, session_id)
+  status/{agent_id}.json      live state (busy/idle/done, detail, context_pct)
+  roles/{role}.json           role definitions
+  projects/{project}.json     project definitions
+  backends.json               provider + model config
+  messages/{agent_id}/        per-agent mailbox, one .json per message
+  sessions/{agent_id}/        persisted transcript history for resume
+  layout.json                 dashboard card order + density
+  config.json                 port, default_project, default_role, skip_permissions
+```
+
+---
+
+## 4. System architecture
+
+Three processes, all local:
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ WEB DASHBOARD  (React + Vite, runs in local browser)        │
+│  Agent cards · Chat panel · Session archive · Settings      │
+└───────────────┬────────────────────────────────────────────┘
+                │ REST (commands) + SSE (live state stream)
+                ▼
+┌────────────────────────────────────────────────────────────┐
+│ LOCAL SERVER  (Go single binary, binds 127.0.0.1)          │
+│  • SSE event bus (per-client buffer, drop-oldest, keepalive)│
+│  • State manager (file watcher over running/ + status/)     │
+│  • Runtime registry (dispatches by agent.interface)         │
+│       ├─ Chat runtime  → ACP JSON-RPC / NDJSON over stdio   │
+│       └─ Terminal runtime → drives a terminal emulator      │
+│  • Nudger (wakes idle agents that have pending messages)    │
+│  • Hosts/launches the MCP messaging server                  │
+└───────────────┬────────────────────────────────────────────┘
+                │ both runtimes wrap the same agent CLI
+                ▼
+┌────────────────────────────────────────────────────────────┐
+│ AGENT CLI  (Claude Code / Codex)                            │
+│  launched with: resume <session_id>, system-prompt append,  │
+│  cwd, model, MCP server registration                        │
+│  hooks fire on lifecycle events → write status/running files│
+└────────────────────────────────────────────────────────────┘
+```
+
+### 4.1 Runtime abstraction
+Define a `Runtime` interface the server programs against, with two implementations:
+
+- **Chat runtime (default):** speaks ACP (Agent Communication Protocol) to the CLI over stdio as JSON-RPC / NDJSON. Streams the transcript (assistant text, tool calls, tool results, diffs, permission requests) back to the server, which republishes over SSE.
+- **Terminal runtime:** launches the CLI inside a real terminal emulator (e.g. iTerm2 on macOS via AppleScript), writing prompts to the TTY and managing tab title/color/focus. Status comes from hooks rather than the ACP stream.
+
+The registry dispatches each agent to a runtime based on `agent.interface`. Both wrap the **same** CLI and the **same** stable identity, which is what makes interface/backend/model switching non-destructive.
+
+Interface methods (minimum): `Start(agent)`, `SendPrompt(agent, text)`, `Cancel(agent)`, `Stop(agent)`, `Resume(agent, session_id)`, `CheckMessages(pid)`.
+
+### 4.2 State manager
+A file watcher (e.g. fsnotify) subscribes to `running/` and `status/`. When a hook or runtime writes a status file, the watcher fires, the server recomputes the affected agent's state, and emits an SSE `state_update`. This decouples status production (hooks, any interface) from status consumption (the UI).
+
+### 4.3 SSE event bus
+One event stream per connected browser client. Per-client bounded buffer with drop-oldest backpressure, plus a periodic keepalive ping (~10s). Event types:
+- `state_update` — an agent's status/identity changed.
+- `new_message` — chat transcript delta for an agent.
+- `notification` — agent finished / needs input / permission required.
+- `ping` — keepalive.
+
+### 4.4 Hooks
+Lifecycle hook scripts registered with the agent CLI. They fire on `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, and write `status/{id}.json` and `running/{id}.json`. Terminal-interface agents rely on hooks for status; chat-interface agents derive most status from the ACP stream and may skip redundant hook writes (gate by interface).
+
+### 4.5 MCP messaging server
+A small MCP server (Node.js) registered with each launched agent, exposing three tools:
+- `list_agents` — discover other live agents (name, role, project, state).
+- `send_message(to, body)` — drop a message into the recipient's mailbox (`messages/{recipient_id}/`).
+- `check_messages` — read + flag/delete the caller's pending messages.
+
+Delivery model: messages land as files in the recipient mailbox. Delivery happens either by the recipient agent polling `check_messages`, or by the **Nudger** — a server loop that detects an idle agent with pending mail and wakes it (calls `Runtime.CheckMessages(pid)`) so it processes the message without user intervention. Apply a per-turn message budget (e.g. 15 messages/turn) to prevent runaway agent-to-agent loops.
+
+---
+
+## 5. Feature requirements
+
+Each feature below is written so it can be built and verified independently.
+
+### F1 — Multi-agent dashboard (card grid)
+**What:** The home view lists every active agent as a card. Card shows: name, role, project, backend/model, live state badge (color-coded), context-usage indicator, and a preview of the most recent output line.
+**Behavior:**
+- Cards update in real time from SSE `state_update`.
+- Cards are drag-reorderable; order + density (cards per row, gap) persist to `layout.json`.
+- Right-click a card → context menu: Open chat, Switch runtime, Rename, Clone, Stop, Move to group.
+**Acceptance:** Launching an agent adds a card within 1s; status badge reflects busy/idle/done live; reload preserves card order.
+
+### F2 — Task groups
+**What:** Agents can be assigned a `group` label (e.g. "auth-migration"). The dashboard renders groups as collapsible sections.
+**Behavior:** Collapse/expand persists. A group can be "released" (all its agents stopped) in one action.
+**Acceptance:** Creating two agents in the same group renders them under one collapsible header; releasing the group stops all of them.
+
+### F3 — Streaming chat panel
+**What:** Clicking a card opens the full conversation for that agent.
+**Behavior:**
+- Renders assistant markdown, tool calls (with arguments), tool results, file diffs, and inline permission prompts (Approve / Deny) sourced from the ACP stream.
+- User can send a prompt from the panel; streams the response token-by-token via SSE.
+- Cancel button interrupts the current turn (`/cancel`).
+- Shows context-window usage and current model.
+**Acceptance:** Sending a prompt streams output incrementally; a tool call that needs permission surfaces an Approve/Deny control that gates execution.
+
+### F4 — Launch an agent
+**What:** "New Agent" flow (modal + CLI).
+**Behavior:**
+- Modal fields: name (auto-suggested), role, project, backend, model, interface.
+- CLI equivalent: `agentdeck implementer@my-app`, `agentdeck reviewer@my-app --backend codex`.
+- On launch, server composes config (cwd, context, system prompt, model), starts the runtime, registers the MCP messaging server, writes identity + running files.
+**Acceptance:** Both modal and CLI produce an identical running agent with a card and an open-able chat.
+
+### F5 — Projects & roles management
+**What:** CRUD for projects and roles via Settings UI and/or direct JSON edit.
+**Behavior:** Editing a role/project changes future launches; existing agents keep their composed config until restarted. Files live in `roles/` and `projects/`.
+**Acceptance:** Adding a custom role makes it selectable in the New Agent modal without restart.
+
+### F6 — Backend & model configuration
+**What:** Settings UI over `backends.json`. Per-model API key + endpoint overrides.
+**Behavior:** Validate credentials on save where possible. Mark one backend default; mark one model default per backend.
+**Acceptance:** Configuring a second model with a custom endpoint routes that model's calls to the override URL.
+
+### F7 — Switch runtime on a live agent
+**What:** Change interface (chat ↔ terminal), backend (Claude ↔ Codex), or model on a running agent, preserving conversation history.
+**Behavior:** Right-click → Switch runtime. Server stops the current runtime, re-launches with new params using the stable `agent_id` and resumes the session.
+**Acceptance:** Switching model mid-session keeps the full prior transcript and continues the same logical session.
+
+### F8 — Agent-to-agent messaging
+**What:** Agents coordinate via the MCP messaging server (F in §4.5).
+**Behavior:** `list_agents` / `send_message` / `check_messages`; nudger auto-wakes idle recipients; per-turn budget caps loops. Dashboard shows a message indicator on sender/recipient cards.
+**Acceptance:** An implementer can `send_message` a review request to a reviewer agent; the reviewer (if idle) is nudged and processes it without user action.
+
+### F9 — Session history, search & resume (archive)
+**What:** A browsable archive of all sessions, active and inactive.
+**Behavior:**
+- List every session with name, role, project, timestamps.
+- Full-text search across name, role, project, and transcript content.
+- Resume any session → restores full history and config and re-attaches a runtime.
+**Acceptance:** A stopped agent appears in the archive, is findable by a phrase from its transcript, and resumes with history intact.
+
+### F10 — File & command tracking
+**What:** Per-agent tabs listing every file the agent edited and every shell command it ran.
+**Behavior:** Captured from tool calls / hooks. Searchable and copyable. Files link to diffs where available.
+**Acceptance:** After an agent edits three files and runs two commands, all five appear in the respective tabs and are copyable.
+
+### F11 — Notifications
+**What:** Desktop/in-app notifications on significant state transitions.
+**Behavior:** Fire on: task complete (`done`), `waiting_input`, and permission-required. Driven by SSE `notification` events. User can mute per type.
+**Acceptance:** Backgrounding the dashboard and letting an agent finish produces a "task complete" notification.
+
+### F12 — Onboarding
+**What:** Guided first-run flow.
+**Behavior:** Steps: (1) configure ≥1 backend with valid credentials, (2) create first project, (3) launch first agent. Blocks the main dashboard until a minimum viable config exists.
+**Acceptance:** A fresh install with empty `~/.agentdeck/` walks the user to a first running agent.
+
+### F13 — Activity map *(optional / lower priority)*
+**What:** A spatial visualization of agents — a 2D map where each agent is a marker that moves between "idle" and "busy" zones and animates when it sends a message.
+**Behavior:** Purely a visualization layer over existing state; no new data. Zones are paintable in a config file. This is an ambient-awareness nicety, not core.
+**Acceptance:** Markers reflect live state and animate on message delivery. Safe to ship in a later milestone.
+
+---
+
+## 6. REST API (representative)
+
+All under `http://127.0.0.1:{port}/api`. Commands are REST; live updates come over SSE at `/api/events`.
+
+```
+GET    /sessions                       list active agents
+POST   /sessions                       launch agent {role, project, backend, model, interface}
+GET    /sessions/{id}                   agent detail + status
+POST   /sessions/{id}/prompt            send a prompt {text}
+POST   /sessions/{id}/cancel            interrupt current turn
+POST   /sessions/{id}/stop              stop session
+POST   /sessions/{id}/rename            {name}
+POST   /sessions/{id}/switch-runtime    {interface?, backend?, model?}
+POST   /sessions/{id}/resume            resume from archive
+GET    /sessions/{id}/files             tracked files
+GET    /sessions/{id}/commands          tracked commands
+GET    /archive?q=...                   search historical sessions
+GET    /roles  POST /roles  ...         role CRUD
+GET    /projects POST /projects ...     project CRUD
+GET    /backends  PUT /backends         backend config
+GET    /layout    PUT /layout           card order + density
+GET    /events                          SSE stream (state_update, new_message, notification, ping)
+```
+
+---
+
+## 7. Tech stack & constraints
+
+- **Server:** Go, compiled to a single binary. Binds `127.0.0.1` by default; never expose publicly.
+- **UI:** React + Vite + TypeScript, runs in the local browser, talks to the local server only.
+- **MCP messaging server:** Node.js, launched/managed by the Go server.
+- **Hooks:** small shell scripts registered with the agent CLI.
+- **Platforms:** macOS and Linux. Terminal runtime (iTerm2) is macOS-only and optional; chat runtime is the cross-platform default.
+- **Prereqs:** `python3`; at least one authenticated agent CLI (Claude Code and/or Codex); for source builds Go 1.22+, Node 18+, npm.
+- **State:** plain JSON files under `~/.agentdeck/`. No database. User owns all data.
+- **Distribution:** `install.sh` builds binaries + UI and installs an `agentdeck` CLI; `agentdeck dashboard start && agentdeck dashboard open` launches and opens the UI.
+
+---
+
+## 8. Suggested build milestones
+
+1. **Core loop:** Go server + ACP chat runtime + one backend; launch one agent, send prompts, stream responses (F4, F3 minimal).
+2. **State & dashboard:** file-watcher state manager + SSE bus + React card grid with live status (F1).
+3. **Config:** projects/roles/backends CRUD + onboarding (F5, F6, F12).
+4. **Persistence:** session save + archive search + resume (F9), file/command tracking (F10).
+5. **Coordination:** MCP messaging server + nudger + budgets (F8); notifications (F11).
+6. **Flexibility:** terminal runtime + switch-runtime (F7); task groups (F2).
+7. **Polish:** activity map and any ambient visualizations (F13).
+
+---
+
+## 9. Open questions to resolve before/while building
+
+- Exact ACP message schema for the target CLI versions (tool-call, diff, permission-request shapes).
+- Permission model: global skip vs per-role vs per-tool prompting — how granular?
+- Concurrency limits: max simultaneous agents before resource pressure; do you queue launches?
+- Message-loop safety: is a 15/turn budget enough, or do you also need loop detection across turns?
+- Cross-platform terminal runtime: is a non-iTerm2 fallback (tmux, OS terminal) in scope?

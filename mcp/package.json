@@ -1,0 +1,10 @@
+{
+  "name": "agentdeck-mcp",
+  "private": true,
+  "version": "0.1.0",
+  "description": "AgentDeck MCP messaging server — scaffold only; implemented in Phase 5.",
+  "type": "module",
+  "scripts": {
+    "start": "node -e \"console.error('agentdeck-mcp: not implemented until Phase 5'); process.exit(1)\""
+  }
+}
