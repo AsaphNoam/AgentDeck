@@ -2,7 +2,7 @@
 
 **Mirrors:** `docs/phases/phase-2-state-dashboard.md`
 **Features:** F1 (multi-agent dashboard, full), F3 (streaming chat panel, full)
-**Depends on:** Phase 0 (file store, server skeleton), Phase 1 (Runtime, transcript events, status/running files, per-agent SSE)
+**Depends on:** Phase 0 (file store, server skeleton), Phase 1 (Runtime, transcript events, hook reporting, per-agent SSE)
 **Enables:** Phases 3–7 (the UI shell + multiplexed event bus they all plug into)
 **Audience:** implementing engineer. This is prescriptive — pin every version, name every component, leave no design decisions open.
 
@@ -14,15 +14,16 @@
 
 Phase 1 produced a single agent that runs, streams a transcript, and gates permissions over an **interim per-agent SSE stream** (`GET /api/sessions/{id}/events`). Phase 2 turns that single-agent vertical into a **multi-agent supervisable dashboard**:
 
-1. **State manager** (Go): an fsnotify watcher over `~/.agentdeck/running/` and `~/.agentdeck/status/` that recomputes an *effective* `AgentState` (identity ⊕ running ⊕ status) on every file change and pushes it into the event bus.
-2. **SSE event bus** (Go): one multiplexed stream per browser client at `GET /api/events`, with a bounded per-client buffer (drop-oldest backpressure) and a ~10s keepalive ping. This **supersedes** the Phase 1 per-agent stream. Transcript deltas now flow as `new_message` events keyed by `agent_id`.
+1. **State manager** (Go): a **SQLite-backed** store (`state.db`) of which the Go server is the sole writer. Status arrives over HTTP via **`POST /api/hook`** (token-authed); the manager applies each update to `state.db`, recomputes an *effective* `AgentState` (identity ⊕ running ⊕ status, joined from `state.db` rows), and pushes it into the event bus.
+2. **SSE event bus** (Go): one multiplexed stream per browser client at `GET /api/events`, with a bounded per-client buffer (drop-oldest backpressure) and a ~10s keepalive ping. This is the dashboard's event channel. Transcript deltas flow as `new_message` events keyed by `agent_id`.
 3. **React dashboard shell** (React + Vite + TS): app shell, global store, SSE client with reconnect, and routing between the card grid and the chat panel.
 4. **Card grid (F1)**: a live card per running agent (name, role, project, backend/model, color-coded state badge, context-usage indicator, last-output-line preview), drag-reorder + density persisted to `layout.json`, right-click context menu.
 5. **Chat panel (F3, full)**: assistant markdown, tool calls with args, tool results, file diffs, inline Approve/Deny gating, prompt send with streaming, cancel, context/model display.
 
 ### 1.2 In scope
 
-- fsnotify watcher + debounce + startup full scan + effective-state recompute.
+- SQLite `state.db` store (server sole writer) + the `POST /api/hook` ingest endpoint + effective-state recompute (join identity+running+status rows).
+- A reconciliation sweep over `sessions/` (fsnotify-backed) as a fallback for out-of-band transcript files.
 - Multiplexed `GET /api/events` bus; removal of `GET /api/sessions/{id}/events`.
 - `GET /api/layout` and `PUT /api/layout`.
 - Full React app (store, SSE client, router, grid, chat panel).
@@ -54,10 +55,11 @@ Config-editing UI (Phase 3), launch modal (Phase 3 — Phase 2 ships only a mini
 
 | Concern | Choice | Version | Rationale |
 |---|---|---|---|
-| File watching | `github.com/fsnotify/fsnotify` | `v1.7.0` | The PRD names it (§4.2). Cross-platform (kqueue on macOS, inotify on Linux), mature, no cgo. |
+| State store | SQLite via `modernc.org/sqlite` (pure-Go, no cgo) | `1.29.x` | `state.db` holds identity/running/status rows; the server is the sole writer, so there is no multi-process contention. Pure-Go keeps the single-binary, cgo-free build. |
+| HTTP ingest | **stdlib `net/http`** | Go 1.22+ | `POST /api/hook` is an ordinary JSON handler on the server that already serves the UI — no new transport. |
 | SSE | **stdlib `net/http` only** — no SSE framework | Go 1.22+ | SSE is trivially a `text/event-stream` response with `http.Flusher`. A dependency adds nothing. Per-client goroutine + buffered channel. |
-| JSON | stdlib `encoding/json` | — | State files are tiny; no need for a faster codec. |
-| Debounce | hand-rolled per-path timer (`time.AfterFunc`) | — | Trivial; avoids a dependency for a 10-line concern. |
+| JSON | stdlib `encoding/json` | — | Payloads are tiny; no need for a faster codec. |
+| File watching (reconciliation only) | `github.com/fsnotify/fsnotify` | `v1.7.0` | Used solely to notice out-of-band transcript files under `sessions/` (§3.8). Cross-platform (kqueue on macOS, inotify on Linux), mature, no cgo. |
 
 **SSE implementation approach.** Each `GET /api/events` request:
 1. Sets `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `Connection: keep-alive`, `X-Accel-Buffering: no`.
@@ -91,16 +93,56 @@ No `Server-Sent-Events` library; the entire bus is ~150 lines of stdlib Go.
 
 ## 3. State manager design
 
-Package: `internal/state` (Go). Type: `Manager`.
+Package: `internal/state` (Go). Type: `Manager`. Backing store: `state.db` (SQLite). The Go server is the **sole writer** to `state.db`; nothing else opens it for writing.
 
-### 3.1 Effective AgentState (the merge)
+### 3.1 `state.db` schema
 
-The dashboard renders **one** object per agent, computed by merging the three source files. Producers (hooks, runtime) and consumers (UI) stay decoupled through disk.
+`state.db` lives under `~/.agentdeck/` (resolve `AGENTDECK_HOME` first). Three tables carry the live state the dashboard needs; the effective `AgentState` is a join across them.
+
+```sql
+-- identity: written at launch and on rename
+CREATE TABLE IF NOT EXISTS agents (
+    agent_id   TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    role       TEXT NOT NULL,
+    project    TEXT NOT NULL,
+    backend    TEXT NOT NULL,
+    model      TEXT NOT NULL,
+    interface  TEXT NOT NULL,
+    grp        TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
+
+-- running registry: a row exists only while the agent is live
+CREATE TABLE IF NOT EXISTS running (
+    agent_id   TEXT PRIMARY KEY REFERENCES agents(agent_id),
+    pid        INTEGER NOT NULL,
+    session_id TEXT NOT NULL,
+    started_at TEXT NOT NULL
+);
+
+-- live status: last reported status per agent
+CREATE TABLE IF NOT EXISTS status (
+    agent_id    TEXT PRIMARY KEY REFERENCES agents(agent_id),
+    state       TEXT NOT NULL,          -- busy|idle|waiting_input|done|error
+    detail      TEXT NOT NULL DEFAULT '', -- last-output-line source (see §13)
+    last_trace  TEXT NOT NULL DEFAULT '',
+    busy_since  TEXT NOT NULL DEFAULT '',
+    context_pct REAL NOT NULL DEFAULT 0, -- 0..1
+    updated_at  INTEGER NOT NULL         -- unix ms
+);
+```
+
+Open the DB with `PRAGMA journal_mode=WAL` and `PRAGMA busy_timeout=5000`. Because there is a single writer process, a single serialized writer connection (plus a read pool) is sufficient; wrap each applied update in a transaction.
+
+### 3.2 Effective AgentState (the merge)
+
+The dashboard renders **one** object per agent, computed by joining the `agents`, `running`, and `status` rows for that id. Producers (hooks, runtime) and the consumer (UI) stay decoupled through `state.db`.
 
 ```go
 // internal/state/types.go
 type AgentState struct {
-    // identity (from agents/{id}.json)
+    // identity (from agents row)
     AgentID   string `json:"agent_id"`
     Name      string `json:"name"`
     Role      string `json:"role"`
@@ -111,14 +153,14 @@ type AgentState struct {
     Group     string `json:"group,omitempty"`
     CreatedAt string `json:"created_at"`
 
-    // running (from running/{id}.json) — present only while live
+    // running (from running row) — present only while live
     Running   bool   `json:"running"`
     PID       int    `json:"pid,omitempty"`
     SessionID string `json:"session_id,omitempty"`
     StartedAt string `json:"started_at,omitempty"`
 
-    // status (from status/{id}.json)
-    State      string  `json:"state"`       // busy|idle|waiting_input|done|error; "unknown" if no status file
+    // status (from status row)
+    State      string  `json:"state"`       // busy|idle|waiting_input|done|error; "unknown" if no status row
     Detail     string  `json:"detail"`      // last-output-line source (see §13)
     LastTrace  string  `json:"last_trace,omitempty"`
     BusySince  string  `json:"busy_since,omitempty"`
@@ -129,74 +171,114 @@ type AgentState struct {
 }
 ```
 
-**Recompute rule for `recompute(agentID)`:**
-1. Read `agents/{id}.json` → identity. If missing, the agent does not exist → emit nothing (or a removal if it was previously known; see §3.5).
-2. Read `running/{id}.json` → set `Running=true` + pid/session/started. If missing → `Running=false`.
-3. Read `status/{id}.json` → state/detail/etc. If missing → `State="unknown"`, `ContextPct=0`.
+**Recompute rule for `recompute(agentID)`** — a single `LEFT JOIN` query over `state.db`:
+1. Select the `agents` row → identity. If missing, the agent does not exist → emit nothing (or a removal if it was previously known; see §3.5).
+2. `LEFT JOIN running` → if a row exists set `Running=true` + pid/session/started; else `Running=false`.
+3. `LEFT JOIN status` → state/detail/etc. If no status row → `State="unknown"`, `ContextPct=0`.
 4. `UpdatedAt = time.Now().UnixMilli()`.
 5. Build the `AgentState`, hand to the bus as a `state_update` event (§4).
 
-A read of a status file that is **mid-write** (empty or invalid JSON) is treated as a transient error: log at debug, **do not** emit, and rely on the next fsnotify event (writers do create→write→rename or at least a final write that re-triggers). To be robust we also re-read once after a 20ms delay if JSON parse fails (covers non-atomic writers).
+Because the join runs inside the single-writer process against a transactionally consistent `state.db`, there are no partial-write races to defend against here — an update is applied in one transaction, then the recompute reads a committed, consistent snapshot.
 
-### 3.2 What is watched
+### 3.3 `POST /api/hook` — the status ingest
 
-- `~/.agentdeck/running/` (resolve `AGENTDECK_HOME` first).
-- `~/.agentdeck/status/`.
+This is the primary channel by which agents report status. Lifecycle hooks (a thin shell `curl`) POST to the server, which validates the token, applies the update to `state.db`, and emits a `state_update`. The chat runtime also writes status to `state.db` directly from the ACP stream (in-process, not over HTTP), through the same `Manager.Apply*` methods.
 
-We watch the **directories**, not individual files, so create/delete of `{id}.json` is captured. `agents/` is **not** watched for live updates (identity is written once at launch and on rename; rename goes through REST which can directly poke the manager — see §3.6). On a `running/` or `status/` event we always re-read `agents/` too, so a rename followed by any status tick repaints correctly even without watching `agents/`.
+**Token.** Each launched agent's hooks receive a **one-time per-launch token** at launch time (issued by the launch path, stored alongside the `running` row). Every hook POST carries it. The server rejects any POST whose token does not match a live launch — this closes the gap that any local process could otherwise spoof status. The token is sent in the **`X-AgentDeck-Token` header** (a body field `token` is accepted as a fallback for hook environments that cannot set headers; if both are present the header wins).
 
-Map the agent id from the filename: `running/a_8f3c12.json` → `a_8f3c12`. Ignore non-`.json` files and editor temp files (`*.tmp`, `*~`, dotfiles).
-
-### 3.3 fsnotify event handling
+**Request.**
 
 ```
-watcher events on running/ or status/:
-  CREATE / WRITE  → debounce(agentID)
-  REMOVE / RENAME → debounce(agentID)   // removal of running/ = agent stopped → recompute
+POST /api/hook
+Content-Type: application/json
+X-AgentDeck-Token: <per-launch token>
 ```
 
-A single logical status update can fire multiple raw events (CREATE then WRITE; or several WRITEs as the writer flushes). All collapse into one recompute via debounce.
-
-### 3.4 Debounce strategy
-
-Per-agent-id debounce, **trailing edge**, window **50ms**:
-
-```go
-// pseudo
-func (m *Manager) debounce(agentID string) {
-    m.mu.Lock()
-    if t, ok := m.timers[agentID]; ok { t.Stop() }
-    m.timers[agentID] = time.AfterFunc(50*time.Millisecond, func() {
-        m.mu.Lock(); delete(m.timers, agentID); m.mu.Unlock()
-        m.recomputeAndEmit(agentID)
-    })
-    m.mu.Unlock()
+```jsonc
+{
+  "agent_id": "a_8f3c12",        // required
+  "event": "status",             // status | running | stopped   (lifecycle phase)
+  "state": "busy",               // for event=status: busy|idle|waiting_input|done|error
+  "detail": "Editing src/auth.ts",
+  "last_trace": "PostToolUse: Edit",
+  "context_pct": 0.42,           // 0..1, optional
+  "pid": 48213,                  // for event=running
+  "session_id": "claude-sess-xyz", // for event=running
+  "ts": 1750579200123            // optional client unix ms; server stamps its own updated_at regardless
 }
 ```
 
-- 50ms is below the F1 "within 1s" acceptance budget by a wide margin and absorbs multi-event bursts from a single write.
-- Debounce is **per agent id**, so a busy agent A does not delay updates for agent B.
-- Recompute runs on the `AfterFunc` goroutine; reads are independent per agent, so concurrency is fine. The bus publish is thread-safe (§4.2).
+**Per-event effect on `state.db`:**
+
+| `event` | Effect (single transaction) |
+|---|---|
+| `running` | Upsert the `running` row (`pid`, `session_id`, `started_at=now`). Mark the agent live. |
+| `status` | Upsert the `status` row (`state`, `detail`, `last_trace`, `busy_since` set when transitioning into `busy`, `context_pct`, `updated_at=now`). |
+| `stopped` | Delete the `running` row. Leaves identity + last status intact (card stays as `done`/`idle`, dimmed — see §3.5). |
+
+After the transaction commits, the handler calls `recompute(agent_id)` and publishes the resulting `state_update` (§3.7).
+
+**Responses.**
+
+| Code | When | Body |
+|---|---|---|
+| `204 No Content` | Update applied and emitted. | empty |
+| `400 Bad Request` | Malformed JSON, missing `agent_id`, unknown `event`, or out-of-range `state`/`context_pct`. | `{"error":"bad_request","message":"…"}` |
+| `401 Unauthorized` | Missing or unparseable token. | `{"error":"unauthorized","message":"missing token"}` |
+| `403 Forbidden` | Token does not match a live launch for this `agent_id`. | `{"error":"forbidden","message":"token mismatch"}` |
+| `404 Not Found` | `agent_id` has no identity row in `state.db`. | `{"error":"not_found","message":"unknown agent"}` |
+| `500 Internal Server Error` | `state.db` write failed. | `{"error":"internal","message":"…"}` |
+
+Error envelope shape is fixed: `{ "error": <code-string>, "message": <human string> }`. Hooks are fire-and-forget shell `curl`s; they do not retry on `4xx` (a `4xx` means the request is wrong, not transient), and may retry once on `5xx`.
+
+### 3.4 Apply path & emit
+
+`Manager.ApplyHook(token, payload)` (called by the HTTP handler) and the runtime's in-process `Manager.ApplyStatus(...)` both funnel into one serialized writer:
+
+```go
+// pseudo
+func (m *Manager) apply(agentID string, mutate func(tx *sql.Tx) error) error {
+    m.writeMu.Lock()
+    defer m.writeMu.Unlock()
+    tx, _ := m.db.Begin()
+    if err := mutate(tx); err != nil { tx.Rollback(); return err }
+    if err := tx.Commit(); err != nil { return err }
+    m.recomputeAndEmit(agentID) // read committed snapshot, publish state_update
+    return nil
+}
+```
+
+A single serialized writer keeps `state.db` simple and correct under the single-writer invariant. Recompute reads can use a separate read connection.
 
 ### 3.5 Removal semantics
 
-The manager keeps a `known map[string]bool` of agent ids it has emitted. When a recompute finds **no `agents/{id}.json`** (identity gone — only happens on hard delete, not on stop) it emits a `state_update` with a tombstone form: `{"agent_id": id, "removed": true}` and drops the id from `known`. The frontend deletes the card on `removed:true`.
+The manager keeps a `known map[string]bool` of agent ids it has emitted. When a recompute finds **no `agents` row** (identity gone — only happens on a hard delete, not on stop) it emits a `state_update` with a tombstone form: `{"agent_id": id, "removed": true}` and drops the id from `known`. The frontend deletes the card on `removed:true`.
 
-A **stop** (running/ deleted, status/ may show `done`) is *not* a removal — the agent still has identity and stays as a card with `Running=false` until the user clears it or this phase's scope ends. (Archive/cleanup is Phase 4.) In practice Phase 1's stop deletes `running/` and leaves a final `status` of `done`/`idle`; the card stays visible showing `done`.
+A **stop** (`event:"stopped"` → `running` row deleted, `status` may show `done`) is *not* a removal — the agent still has its identity row and stays as a card with `Running=false` until the user clears it or this phase's scope ends. (Archive/cleanup is Phase 4.) In practice Phase 1's stop emits a `stopped` hook (or the runtime applies it directly) and a final `status` of `done`/`idle`; the card stays visible showing `done`.
 
-### 3.6 Startup full scan + rename hook
+### 3.6 Startup full scan + rename
 
-- **Startup:** `Manager.Start()` lists `agents/*.json`, and for each id calls `recomputeAndEmit`. This seeds the bus's *current snapshot* (§4.4) so a client connecting at any time gets every already-running agent. The scan must complete before the HTTP server starts accepting `/api/events` (or the snapshot must be marked ready) to avoid an empty first frame.
-- **Rename / direct pokes:** REST handlers that write identity (`/rename`) call `Manager.Touch(agentID)` after writing, which schedules a debounce. This makes renames live without watching `agents/`.
+- **Startup:** `Manager.Start()` queries `SELECT agent_id FROM agents`, and for each id calls `recomputeAndEmit`. This seeds the bus's *current snapshot* (§4.4) so a client connecting at any time gets every already-known agent — including any still running from a prior server process, since `state.db` survived the restart. The scan must complete before the HTTP server starts accepting `/api/events` (or the snapshot must be marked ready) to avoid an empty first frame.
+- **Rename / direct pokes:** REST handlers that write identity (`/rename`) update the `agents` row in the same serialized writer, then call `Manager.Touch(agentID)`, which schedules a `recomputeAndEmit`. Renames go live immediately.
 
 ### 3.7 How it feeds the bus
 
 The manager holds a reference to the `Bus`. `recomputeAndEmit`:
-1. builds `AgentState`,
+1. runs the join query against `state.db` to build `AgentState`,
 2. updates the bus's **snapshot map** (`bus.SetSnapshot(state)`) so future connections resync,
 3. calls `bus.Publish(Event{Type: "state_update", AgentID: id, Data: state})`.
 
-Transcript `new_message` events do **not** flow through the state manager — they come from the runtime (Phase 1) which now publishes directly to the same bus (§4.3).
+Transcript `new_message` events do **not** flow through the state manager — they come from the runtime (Phase 1) which publishes directly to the same bus (§4.3).
+
+### 3.8 Reconciliation sweep (fallback)
+
+`state.db` is the authoritative state store and `POST /api/hook` is how status reaches it. As a **fallback only**, a reconciliation sweep watches the agent CLI's own transcript directory:
+
+- The agent CLI (Claude Code / Codex) writes its transcript files under `~/.agentdeck/sessions/`, outside our control. An fsnotify watch over `sessions/` (plus a periodic timer, e.g. every 30s) notices new or grown transcript files.
+- When the sweep observes activity for a session whose `state.db` status looks stale (e.g. a `running` row with no recent `updated_at`, suggesting a missed hook), it derives a minimal status correction (at most: the agent is alive, and the last transcript line for the last-output-line fallback) and applies it through the same serialized writer, then recompute emits as usual.
+- The sweep never *competes* with hooks: hook updates are immediate and authoritative; the sweep only fills gaps when a hook was missed. It watches `sessions/` exclusively — it does not watch any state directory, because state lives in `state.db`, not on loose files.
+
+This keeps the dashboard correct even if a hook is dropped, without making file-watching the status channel.
 
 ---
 
@@ -227,7 +309,7 @@ data: {"type":"state_update","seq":10428,"ts":1750579200123,"agent_id":"a_8f3c12
 
 ```
 
-(Blank line terminates the frame. `id:` carries `seq` so the browser sends `Last-Event-ID` on reconnect — we accept it but, since the file store is the source of truth, reconnect always triggers a **full resync** rather than replay; see §4.5.)
+(Blank line terminates the frame. `id:` carries `seq` so the browser sends `Last-Event-ID` on reconnect — we accept it but, since `state.db` is the source of truth, reconnect always triggers a **full resync** rather than replay; see §4.5.)
 
 ### 4.2 Per-client bounded buffer + drop-oldest
 
@@ -259,7 +341,7 @@ Drop-oldest (not drop-newest) because the **newest** state is the truest — a s
 
 `bufSize = 256` envelopes per client (see §13).
 
-### 4.3 How transcript deltas flow (supersede Phase 1)
+### 4.3 How transcript deltas flow (replacing Phase 1's per-agent stream)
 
 Phase 1 streamed transcript events on `GET /api/sessions/{id}/events` (single agent, one connection per agent). **Phase 2 removes that endpoint.** The chat runtime, which already normalizes ACP into transcript events (`assistant_text`, `tool_call`, `tool_result`, `diff`, `permission_request`, `turn_end`, `error`), now calls `bus.Publish(Event{Type:"new_message", AgentID: id, Data: <transcript event>})` instead.
 
@@ -277,7 +359,7 @@ The bus owns `snapshot map[string]AgentState` (written by the state manager, §3
 
 - The browser `EventSource` auto-reconnects on drop (default ~3s; we set the server `retry:` hint to `2000`).
 - On reconnect the server treats it as a brand-new connection: **replays the full snapshot** (hydration burst) then live. We do **not** replay missed `new_message` deltas from a ring — instead, the client, on the `open` event of a reconnect, **refetches the transcript** for any chat panel currently open (`GET /api/sessions/{id}/transcript` — see note) and clears stale agents not present in the new hydration burst.
-- "No stale cards on reconnect" (acceptance) is satisfied because the hydration burst is the authoritative current set; the client replaces its agent map with it (any agent id present in the store but absent from a *completed* hydration burst is removed). To know when the burst is complete, the bus sends a synthetic `state_update` with `agent_id: "__hydrated__"` and `data: {"hydrated": true}` as the final hydration frame; the client uses it as the "snapshot complete" marker.
+- The snapshot is rebuilt from `state.db` (the source of truth), so a client reconnecting after any downtime resyncs to current committed state. "No stale cards on reconnect" (acceptance) is satisfied because the hydration burst is the authoritative current set; the client replaces its agent map with it (any agent id present in the store but absent from a *completed* hydration burst is removed). To know when the burst is complete, the bus sends a synthetic `state_update` with `agent_id: "__hydrated__"` and `data: {"hydrated": true}` as the final hydration frame; the client uses it as the "snapshot complete" marker.
 
 > **Transcript refetch endpoint.** Phase 1 streamed transcript but the persisted history endpoint is Phase 4. For Phase 2, add a minimal read-only `GET /api/sessions/{id}/transcript` that returns the **in-memory** transcript buffer the runtime already holds for the live turn(s) this session (bounded to the current process's retained events). This is enough to repaint an open chat panel after reconnect without waiting on Phase 4 persistence. If the runtime retains nothing, it returns an empty array and the panel shows only live deltas going forward.
 
@@ -458,7 +540,7 @@ Clicking the card body → `navigate('/agent/'+id)`. Right-click → context men
 | `waiting_input` | Waiting | `--badge-waiting` | blue `#2563EB` (attention) |
 | `done` | Done | `--badge-done` | green `#16A34A` |
 | `error` | Error | `--badge-error` | red `#DC2626` |
-| `unknown` | — | `--badge-unknown` | gray `#9CA3AF` (no status file yet) |
+| `unknown` | — | `--badge-unknown` | gray `#9CA3AF` (no status row yet) |
 
 `busy` gets an animated pulsing dot; `waiting_input` and `error` get a subtle highlighted card border to draw the eye (these are the actionable states). Colors are CSS variables so Phase 3 theming can override.
 
@@ -521,7 +603,7 @@ Route `/agent/:id` → `ChatPanel`. Consumes `transcriptStore.byAgent[id]` (live
 ### 7.2 Streaming send + cancel (`Composer`)
 
 - **Send:** textarea + Send (Enter to send, Shift+Enter newline). On send: `POST /api/sessions/{id}/prompt {text}`, optimistically append a user bubble, disable Send while the turn is busy. The response streams back as `new_message` events over the shared SSE bus (no per-request stream). Composer re-enables on `turn_end`.
-- **Cancel:** while busy, Send becomes/【exposes a Cancel button → `POST /api/sessions/{id}/cancel`. The runtime interrupts the turn and emits `turn_end`/`error`.
+- **Cancel:** while busy, Send becomes/exposes a Cancel button → `POST /api/sessions/{id}/cancel`. The runtime interrupts the turn and emits `turn_end`/`error`.
 
 ### 7.3 Inline Approve / Deny gating (`PermissionPrompt`)
 
@@ -543,7 +625,22 @@ Acceptance: a tool needing permission surfaces an Approve/Deny that gates execut
 
 All under `http://127.0.0.1:4317/api` (port from `config.json`, default placeholder `4317`).
 
-### 8.1 `GET /api/events` (multiplexed SSE) — **added; supersedes Phase 1 per-agent stream**
+### 8.1 `POST /api/hook` (status ingest) — added
+
+The primary status channel (§3.3). Token-authed (`X-AgentDeck-Token` header, body `token` fallback). Applies the update to `state.db`, then recompute emits a `state_update`.
+
+**Request:**
+```jsonc
+{ "agent_id":"a_8f3c12", "event":"status",
+  "state":"busy", "detail":"Editing src/auth.ts", "last_trace":"PostToolUse: Edit",
+  "context_pct":0.42 }
+// event=running:  { "agent_id":"...", "event":"running", "pid":48213, "session_id":"claude-sess-xyz" }
+// event=stopped:  { "agent_id":"...", "event":"stopped" }
+```
+
+**Responses:** `204` applied · `400` bad request · `401` missing token · `403` token mismatch · `404` unknown agent · `500` write failed. Error body: `{ "error": <code>, "message": <string> }` (§3.3).
+
+### 8.2 `GET /api/events` (multiplexed SSE) — added; replaces Phase 1 per-agent stream
 
 **Response headers:** `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `Connection: keep-alive`, `X-Accel-Buffering: no`.
 
@@ -555,13 +652,13 @@ All under `http://127.0.0.1:4317/api` (port from `config.json`, default placehol
 
 **Connect sequence:**
 1. `retry: 2000` line.
-2. Hydration burst: one `state_update` per current agent (snapshot).
+2. Hydration burst: one `state_update` per current agent (snapshot, built from `state.db`).
 3. Final hydration marker: `state_update` with `agent_id:"__hydrated__"`, `data:{ "hydrated": true }`.
 4. Live frames + `ping` every 10s.
 
 **Payloads per `type`:**
 
-`state_update` — `data` is `AgentState` (§3.1), or a control form:
+`state_update` — `data` is `AgentState` (§3.2), or a control form:
 ```jsonc
 // normal
 { "type":"state_update","seq":N,"ts":T,"agent_id":"a_8f3c12",
@@ -600,18 +697,18 @@ All under `http://127.0.0.1:4317/api` (port from `config.json`, default placehol
 { "type":"ping","seq":N,"ts":T,"agent_id":null,"data":{} }
 ```
 
-### 8.2 `GET /api/layout` — added
+### 8.3 `GET /api/layout` — added
 
 ```jsonc
 // 200 OK ; if layout.json missing, return defaults (do not 404)
 { "order": ["a_8f3c12","a_99aa01"], "density": { "perRow": 4, "gap": 16 } }
 ```
 
-### 8.3 `PUT /api/layout` — added
+### 8.4 `PUT /api/layout` — added
 
 Request body = same shape. Server validates (`perRow` 1–8, `gap` 0–48; `order` is string[]) and writes `~/.agentdeck/layout.json` atomically (temp+rename). Returns `200` with the stored object. Unknown agent ids in `order` are kept (harmless; they're filtered against live agents on the client).
 
-### 8.4 `GET /api/sessions/{id}/transcript` — added (minimal, for reconnect repaint)
+### 8.5 `GET /api/sessions/{id}/transcript` — added (minimal, for reconnect repaint)
 
 ```jsonc
 // 200 OK : the in-memory transcript events the runtime currently retains for this live session
@@ -620,11 +717,11 @@ Request body = same shape. Server validates (`perRow` 1–8, `gap` 0–48; `orde
 // 404 if no such agent
 ```
 
-### 8.5 Removed
+### 8.6 Removed
 
 `GET /api/sessions/{id}/events` (Phase 1 interim per-agent stream) — **deleted**. All transcript flow moves to `new_message` on `/api/events`.
 
-### 8.6 Reused unchanged from Phase 1
+### 8.7 Reused unchanged from Phase 1
 
 `POST /api/sessions`, `GET /api/sessions`, `GET /api/sessions/{id}`, `POST /api/sessions/{id}/prompt`, `/cancel`, `/stop`, `/rename`, `/permission`.
 
@@ -634,17 +731,19 @@ Request body = same shape. Server validates (`perRow` 1–8, `gap` 0–48; `orde
 
 **Backpressure tuning.** Per-client buffer = **256 envelopes**. Reasoning: a fast turn emits assistant-text deltas at perhaps 20–80/s; with, say, 10 concurrent busy agents that's up to ~800 envelopes/s peak. A correctly-behaving browser drains far faster than that; 256 absorbs a multi-hundred-ms render stall without dropping. If the buffer does fill (a tab throttled in the background), drop-oldest keeps the connection alive and `state_update`s self-heal (full state each time). `dropped` counter per client is exposed for debugging.
 
-**Many fast agents.** State updates are coalesced by the **per-agent 50ms debounce**, capping `state_update` rate at ~20/s/agent regardless of how fast hooks rewrite the status file. `new_message` is not debounced (deltas must stream), but each is small. The bus's `Publish` holds only an `RLock` and does non-blocking sends, so one slow client never blocks publishing to others or the manager.
+**Many fast agents.** Hook POSTs are applied to `state.db` one transaction at a time through the single serialized writer; the recompute after each commit emits at most one `state_update` per applied change. `new_message` is not throttled (deltas must stream), but each is small. The bus's `Publish` holds only an `RLock` and does non-blocking sends, so one slow client never blocks publishing to others or the manager. If hooks ever fire faster than is useful, the handler can coalesce same-`agent_id` status updates within a short window before committing — not needed this phase.
 
-**Status file mid-write.** Recompute tolerates empty/invalid JSON: skip-emit + one delayed retry (§3.1). The next fsnotify event will recompute correctly regardless.
+**`POST /api/hook` validation.** Bad/missing token → `401`/`403`; unknown agent → `404`; malformed body or out-of-range fields → `400` (§3.3). The write is one transaction; a failed write returns `500` and emits nothing (the prior committed state stands), so the dashboard never shows a half-applied update.
 
-**Dropped SSE connection.** `EventSource` auto-reconnects; the watchdog (25s no-ping) force-reconnects half-open sockets. On reconnect: full hydration burst → client replaces its agent set (`hydrateComplete` removes stale) → open chat panel refetches transcript. No manual refresh needed (acceptance).
+**Missed hook / status drift.** If a hook POST is lost, `state.db` simply doesn't change for that update. The reconciliation sweep over `sessions/` (§3.8) is the safety net: it notices transcript activity for an agent whose status looks stale and applies a minimal correction, which recompute then emits. This is a fallback — the steady-state channel is `POST /api/hook`.
 
-**Stale cards on reconnect.** Solved by hydration-complete marker (`__hydrated__`): any agent in the store but absent from the just-completed burst is removed. A stopped-then-restarted agent reappears with a fresh `AgentState`.
+**Dropped SSE connection.** `EventSource` auto-reconnects; the watchdog (25s no-ping) force-reconnects half-open sockets. On reconnect: full hydration burst (rebuilt from `state.db`) → client replaces its agent set (`hydrateComplete` removes stale) → open chat panel refetches transcript. No manual refresh needed (acceptance).
+
+**Stale cards on reconnect.** Solved by hydration-complete marker (`__hydrated__`): any agent in the store but absent from the just-completed burst is removed. Because the burst comes from `state.db`, a stopped-then-restarted agent reappears with a fresh `AgentState`.
 
 **`new_message` gap after a drop.** Client tracks last `seq` per type; if a `new_message` arrives with a `seq` gap **and** that agent's chat panel is open, it refetches `GET /api/sessions/{id}/transcript`. If the panel is closed, the gap is ignored (transcript will be correct next time it's opened or on next reconnect). Cards are unaffected (they rely on `state_update`).
 
-**fsnotify watcher death** (rare: too many open files, dir removed). Manager logs an error, attempts to re-add the watch with backoff, and on success does a fresh full scan to resync the snapshot.
+**Reconciliation watcher death** (rare: too many open files, `sessions/` removed). The sweep logs an error, attempts to re-add the watch with backoff, and on success does a fresh pass. State correctness does not depend on it — `state.db` + hooks remain authoritative.
 
 **Slow consumer detection.** If a client's `dropped` exceeds a threshold (e.g. 1000) the server may close that connection to force a clean reconnect/resync; the client reconnects and rehydrates.
 
@@ -654,34 +753,38 @@ Request body = same shape. Server validates (`perRow` 1–8, `gap` 0–48; `orde
 
 ## 10. Implementation task breakdown (ordered)
 
-**Backend — bus first, then state manager:**
-1. `internal/bus`: `Event`, `Bus`, `client`; `Subscribe/Unsubscribe`, `Publish` (drop-oldest), `SetSnapshot`, global `seq` counter. Unit-testable with no HTTP.
-2. `internal/api`: `GET /api/events` handler — headers, hydration burst + `__hydrated__` marker, live loop, 10s ping ticker, context-cancel cleanup.
-3. `internal/state`: `Manager` — fsnotify on `running/`+`status/`, per-agent 50ms debounce, `recompute` (merge identity+running+status), startup full scan, `Touch`, removal tombstones; wire into bus snapshot + publish.
-4. Re-point the chat runtime's transcript emission from the Phase 1 per-agent stream to `bus.Publish("new_message", …)`; **delete** `GET /api/sessions/{id}/events`.
-5. `GET/PUT /api/layout` (read defaults if missing; validate; atomic write).
-6. `GET /api/sessions/{id}/transcript` (in-memory retained events).
+**Backend — store + ingest, bus, then wiring:**
+1. `internal/state`: open/migrate `state.db` (`agents`/`running`/`status` tables, WAL); serialized writer; `recompute` (join identity+running+status); `known` map + removal tombstones; startup scan; `Touch`.
+2. `internal/bus`: `Event`, `Bus`, `client`; `Subscribe/Unsubscribe`, `Publish` (drop-oldest), `SetSnapshot`, global `seq` counter. Unit-testable with no HTTP.
+3. `internal/api`: `POST /api/hook` — token validation, body validation, apply to `state.db`, recompute+publish; the response-code matrix in §3.3.
+4. `internal/api`: `GET /api/events` handler — headers, hydration burst + `__hydrated__` marker, live loop, 10s ping ticker, context-cancel cleanup.
+5. Re-point the chat runtime's transcript emission from the Phase 1 per-agent stream to `bus.Publish("new_message", …)`; have the runtime apply status to `state.db` in-process; **delete** `GET /api/sessions/{id}/events`.
+6. Reconciliation sweep: fsnotify + periodic timer over `sessions/`; apply minimal corrections for missed hooks (fallback only).
+7. `GET/PUT /api/layout` (read defaults if missing; validate; atomic write).
+8. `GET /api/sessions/{id}/transcript` (in-memory retained events).
 
 **Frontend — store, then SSE, then grid, then chat:**
-7. Vite + TS scaffold; `vite.config.ts` proxy to `:4317`; tokens/global CSS; router skeleton (`/`, `/agent/:id`).
-8. `api/types.ts` (mirror Go); Zustand stores (`agentStore`, `transcriptStore`, `uiStore`).
-9. `api/sse.ts` singleton: connect, named-event listeners, hydration handling, watchdog, dispatch to stores; `api/client.ts` REST wrappers.
-10. Grid: `CardGrid` (CSS grid + density), `AgentCard`, `StateBadge`, `ContextBar`, last-output-line; `EmptyState` with minimal New Agent trigger.
-11. Drag-reorder (`@dnd-kit`) + `DensityControl`; load/save `layout.json` (debounced).
-12. `CardContextMenu` (wired: Open/Rename/Stop; stubbed: Switch/Clone/Move, disabled + tooltip).
-13. Chat: `ChatPanel`, `ChatHeader` (context/model), `TranscriptView` + renderers (`AssistantText`, `ToolCall`, `ToolResult`, `DiffBlock`, `PermissionPrompt`, `TurnError`), autoscroll.
-14. `Composer` (send/cancel streaming) + Approve/Deny wiring + reconnect transcript refetch.
-15. Polish: connection indicator, error toasts, empty/loading states.
+9. Vite + TS scaffold; `vite.config.ts` proxy to `:4317`; tokens/global CSS; router skeleton (`/`, `/agent/:id`).
+10. `api/types.ts` (mirror Go); Zustand stores (`agentStore`, `transcriptStore`, `uiStore`).
+11. `api/sse.ts` singleton: connect, named-event listeners, hydration handling, watchdog, dispatch to stores; `api/client.ts` REST wrappers.
+12. Grid: `CardGrid` (CSS grid + density), `AgentCard`, `StateBadge`, `ContextBar`, last-output-line; `EmptyState` with minimal New Agent trigger.
+13. Drag-reorder (`@dnd-kit`) + `DensityControl`; load/save `layout.json` (debounced).
+14. `CardContextMenu` (wired: Open/Rename/Stop; stubbed: Switch/Clone/Move, disabled + tooltip).
+15. Chat: `ChatPanel`, `ChatHeader` (context/model), `TranscriptView` + renderers (`AssistantText`, `ToolCall`, `ToolResult`, `DiffBlock`, `PermissionPrompt`, `TurnError`), autoscroll.
+16. `Composer` (send/cancel streaming) + Approve/Deny wiring + reconnect transcript refetch.
+17. Polish: connection indicator, error toasts, empty/loading states.
 
 ---
 
 ## 11. Testing strategy
 
 **Backend (Go, `testing`):**
+- *State store unit:* point at a temp `AGENTDECK_HOME`; open `state.db`; apply an identity insert + `running` + `status` and assert the recomputed `AgentState` reflects the join; delete the `running` row (`event:"stopped"`) → `running:false`; delete the `agents` row → `removed` tombstone; startup scan emits one event per existing agent.
+- *Hook endpoint (httptest):* valid token + `event:"status"` → `204` and a `state_update` is published with the merged state; missing token → `401`; wrong token → `403`; unknown `agent_id` → `404`; malformed body / bad `context_pct` → `400`; forced `state.db` write error → `500` with the error envelope and nothing published.
 - *Bus unit:* publish to N subscribers; assert all receive in order. Fill one client's buffer past 256 and assert drop-oldest (newest retained, oldest gone, others unaffected, connection alive).
 - *Bus concurrency:* `go test -race` with concurrent publishers + subscribe/unsubscribe churn; no deadlock, no data race.
-- *State manager:* point at a temp `AGENTDECK_HOME`; write `agents/`, `running/`, `status/` files and assert the emitted `state_update` reflects the merge; rapid successive writes collapse to one emit (debounce); deleting `running/` flips `running:false`; deleting `agents/` emits a `removed` tombstone; startup scan emits one event per existing agent.
 - *SSE handler (httptest):* connect, assert hydration burst + `__hydrated__` marker, then a published event arrives as a well-formed frame; ping appears (use a shortened ticker in test); client disconnect deregisters.
+- *Reconciliation sweep:* with a stale `running` row and no recent hook, drop a grown transcript file under `sessions/` and assert the sweep applies a correction and a `state_update` is emitted; assert it does not override a fresh hook update.
 - *Layout:* GET defaults when missing; PUT validates bounds and round-trips; atomic write leaves no temp file.
 
 **Frontend (Vitest + React Testing Library):**
@@ -690,16 +793,16 @@ Request body = same shape. Server validates (`perRow` 1–8, `gap` 0–48; `orde
 - *SSE integration (mock EventSource):* feed a hydration burst + deltas → grid renders N cards; a `state_update` flips a single card's badge without re-rendering others (selector isolation); reconnect (re-fire `onopen` + new burst) removes a stale agent and refetches transcript.
 
 **Multi-agent live-update test (integration / manual+scripted):**
-- Launch 3 agents; drive status files (or real turns) so they cycle idle→busy→done; assert all three cards update independently from the single `/api/events` connection within ~1s, and the chat panel for one streams while the others keep updating in the grid. Reload preserves order + density; kill+restart the SSE connection and assert no stale cards.
+- Launch 3 agents; drive status via `POST /api/hook` (or real turns) so they cycle idle→busy→done; assert all three cards update independently from the single `/api/events` connection within ~1s, and the chat panel for one streams while the others keep updating in the grid. Reload preserves order + density; close and reopen the dashboard and assert state resyncs from `state.db` with no stale cards; kill+restart the SSE connection and assert no stale cards.
 
 ---
 
 ## 12. Interfaces produced for later phases
 
-**The SSE envelope (§4.1, §8.1) is the cross-phase contract.** Every later phase emits into / consumes from `/api/events`:
+**The SSE envelope (§4.1, §8.2) is the cross-phase contract.** Every later phase emits into / consumes from `/api/events`:
 - **Phase 3 (config/onboarding):** consumes `state_update` for the dashboard it gates; the launch modal replaces this phase's minimal New Agent trigger (same `POST /api/sessions`). Reuses `tokens.css` theming hooks and the App shell + `Header`.
-- **Phase 4 (persistence/archive):** adds REST archive/search/resume; `GET /api/sessions/{id}/transcript` (added here, in-memory) is upgraded to read persisted history; resume produces normal `state_update`/`new_message` flow — no bus change.
-- **Phase 5 (coordination/notifications):** emits `notification` events (type + payload pinned in §8.1) and message indicators via `state_update` (e.g. a future `has_messages` field on `AgentState`). The Nudger does not touch the bus directly; status changes flow through the state manager.
+- **Phase 4 (persistence/archive):** adds REST archive/search/resume over `state.db` (FTS5 full-text index); `GET /api/sessions/{id}/transcript` (added here, in-memory) is upgraded to read persisted history; resume produces normal `state_update`/`new_message` flow — no bus change.
+- **Phase 5 (coordination/notifications):** emits `notification` events (type + payload pinned in §8.2) and message indicators via `state_update` (e.g. a future `has_messages` field on `AgentState`). The in-process messaging MCP server reads/writes `state.db`; the Nudger does not touch the bus directly; status changes flow through the state manager.
 - **Phase 6 (terminal runtime / switch-runtime / groups):** enables the **stubbed** menu items (Switch runtime, Move to group); F2 group sections extend `CardGrid` (the `AgentState.group` field already rides the envelope). Switch-runtime re-launch surfaces as ordinary `state_update`s.
 - **Phase 7 (activity map):** pure consumer of existing `state_update` + `new_message` — no new server data.
 
@@ -707,14 +810,14 @@ Request body = same shape. Server validates (`perRow` 1–8, `gap` 0–48; `orde
 
 ---
 
-## 13. Resolved decisions (answers to the phase's open questions)
+## 13. Resolved decisions
 
-1. **Per-client buffer size:** **256 envelopes.** Rationale in §9 — absorbs multi-hundred-ms render stalls under ~10 concurrent fast agents while keeping memory trivial (~tens of KB/client).
-2. **Drop policy / threshold:** **drop-oldest**, applied as soon as the 256-slot buffer is full (no separate threshold). Optional hard cutoff: if cumulative `dropped > 1000` for a client, close it to force a clean rehydrate (§9). Newest frame always wins because `state_update` carries full state and is self-correcting.
-3. **Debounce window:** **50ms per-agent, trailing edge** (§3.4) — well under the 1s acceptance budget; coalesces multi-event write bursts.
+1. **Status channel:** **`POST /api/hook`** (token-authed) is the primary ingest; the server is the sole writer to `state.db` and emits `state_update` after each applied change. This adds zero new transport (the server already serves the UI over localhost HTTP) and keeps updates ordered and race-free. The reconciliation sweep over `sessions/` is a fallback for missed hooks and out-of-band transcript files only — never the channel. See the architecture rationale in `docs/architecture-decisions.md` (D1, D2).
+2. **Per-client buffer size:** **256 envelopes.** Rationale in §9 — absorbs multi-hundred-ms render stalls under ~10 concurrent fast agents while keeping memory trivial (~tens of KB/client).
+3. **Drop policy / threshold:** **drop-oldest**, applied as soon as the 256-slot buffer is full (no separate threshold). Optional hard cutoff: if cumulative `dropped > 1000` for a client, close it to force a clean rehydrate (§9). Newest frame always wins because `state_update` carries full state and is self-correcting.
 4. **Keepalive:** **10s ping**; client watchdog force-reconnects after **25s** without ping/message.
 5. **"Last output line" source:** **`status.detail`** is primary (cheap, already on `AgentState`); **fallback** to the latest `assistant_text` delta tracked client-side; render nothing if both empty (§6.4).
-6. **Reconnect resync:** **full hydration burst** (file store is source of truth) terminated by an `__hydrated__` marker; client removes any agent absent from the completed burst (no stale cards) and refetches transcript for the open chat panel. No server-side delta replay ring.
-7. **State-manager watch surface:** watch **`running/` and `status/` directories** (not `agents/`); identity changes (rename) are pushed via `Manager.Touch` from the REST handler (§3.6).
-8. **Per-agent SSE supersession:** Phase 1's `GET /api/sessions/{id}/events` is **deleted**; transcript deltas flow as `new_message` keyed by `agent_id` on the multiplexed bus (§4.3, §8.5).
+6. **Reconnect resync:** **full hydration burst** rebuilt from `state.db` (the source of truth) terminated by an `__hydrated__` marker; client removes any agent absent from the completed burst (no stale cards) and refetches transcript for the open chat panel. No server-side delta replay ring.
+7. **Effective-state computation:** join the `agents`, `running`, and `status` rows in `state.db` per recompute; identity changes (rename) update the `agents` row and are pushed via `Manager.Touch` from the REST handler (§3.6).
+8. **Per-agent SSE replacement:** Phase 1's `GET /api/sessions/{id}/events` is **deleted**; transcript deltas flow as `new_message` keyed by `agent_id` on the multiplexed bus (§4.3, §8.6).
 9. **Stubbed menu items:** rendered **visible but disabled** with a phase tooltip, not hidden (§1.3, §6.6).

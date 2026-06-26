@@ -9,16 +9,18 @@
 
 ## 1. Goal
 
-Let agents coordinate with each other without manual relay, and keep the human informed of the moments that matter. Build the Node.js **MCP messaging server** (registered with every launched agent), the **nudger** that wakes idle recipients with pending mail, per-turn message budgets to prevent runaway loops, and desktop/in-app notifications on significant state transitions.
+Let agents coordinate with each other without manual relay, and keep the human informed of the moments that matter. Build the **in-process MCP messaging server** (hosted in the Go binary, registered with every launched agent), the **nudger** that wakes idle recipients with pending mail, per-turn message budgets to prevent runaway loops, and desktop/in-app notifications on significant state transitions.
+
+Begin with the **SDK handshake spike** (~1h): confirm `modelcontextprotocol/go-sdk` registers cleanly over stdio with **both** Claude Code and Codex before building on it.
 
 ---
 
 ## 2. Scope
 
 ### In scope
-- MCP messaging server (Node.js), launched/managed by the Go server, registered with each agent at launch.
+- In-process MCP messaging server (Go, `modelcontextprotocol/go-sdk`, stdio), hosted by the server and registered with each agent at launch.
 - Three MCP tools: `list_agents`, `send_message(to, body)`, `check_messages`.
-- File-based mailbox delivery to `messages/{recipient_id}/` (one `.json` per message).
+- Message delivery as **rows in `state.db`** (server is sole writer); one row per message keyed to the recipient.
 - Nudger: server loop detecting an idle agent with pending mail and waking it via `Runtime.CheckMessages(pid)`.
 - Per-turn message budget (default 15/turn) to cap agent-to-agent loops.
 - Dashboard message indicators on sender/recipient cards.
@@ -33,11 +35,11 @@ Let agents coordinate with each other without manual relay, and keep the human i
 ## 3. Detailed requirements
 
 ### 3.1 MCP messaging server (master PRD §4.5)
-- Small Node.js MCP server, launched and supervised by the Go server; registered with each agent CLI at launch (Phase 1 launch composition gains an MCP registration step).
-- Tools:
-  - `list_agents` → live agents (name, role, project, state) sourced from the file store / state manager.
-  - `send_message(to, body)` → write a message file into `messages/{recipient_id}/`.
-  - `check_messages` → read + flag/delete the caller's pending messages.
+- In-process Go MCP server (`modelcontextprotocol/go-sdk`, stdio), registered with each agent CLI at launch (the Phase 1 launch composition already includes the MCP registration step). Caller identity is the registered stdio session, not a spoofable argument.
+- Tools (in-process operations on `state.db`):
+  - `list_agents` → live agents (name, role, project, state) read from `state.db`.
+  - `send_message(to, body)` → insert a message row for the recipient.
+  - `check_messages` → read + flag/delete the caller's pending message rows.
 - Resolve `to` by `role@project` and/or agent name → `agent_id`.
 
 ### 3.2 Delivery + nudger
@@ -46,7 +48,7 @@ Let agents coordinate with each other without manual relay, and keep the human i
 - Per-turn budget: cap messages processed/sent per turn (default 15) to prevent runaway loops; budget breach is logged and surfaced.
 
 ### 3.3 Dashboard indicators
-- Sender and recipient cards show a message indicator (e.g. unread count / "mail" badge) driven by mailbox state via SSE.
+- Sender and recipient cards show a message indicator (e.g. unread count / "mail" badge) driven by message state (`state.db`) via SSE.
 
 ### 3.4 Notifications (F11)
 - Emit SSE `notification` events on: task complete (`done`), `waiting_input`, and permission-required.
@@ -61,7 +63,7 @@ Let agents coordinate with each other without manual relay, and keep the human i
 SSE notification        (done | waiting_input | permission_required)
 ```
 
-Messaging itself flows through the MCP server + mailbox files, not REST; the dashboard reads mailbox/indicator state via `state_update`/`new_message` on the existing `/api/events` bus. Optionally add `GET /api/sessions/{id}/messages` for an inbox view.
+Messaging itself flows through the in-process MCP server + `state.db` message rows, not REST; the dashboard reads message/indicator state via `state_update`/`new_message` on the existing `/api/events` bus. Optionally add `GET /api/sessions/{id}/messages` for an inbox view.
 
 ---
 
@@ -78,5 +80,5 @@ Messaging itself flows through the MCP server + mailbox files, not REST; the das
 
 ## 6. Open questions (master PRD §9)
 - Is a 15/turn budget enough, or is cross-turn loop detection also needed?
-- Mailbox cleanup/retention policy for read messages.
-- MCP registration mechanics per CLI (Claude Code vs. Codex) — confirm both register the same server cleanly.
+- Retention policy for read message rows in `state.db`.
+- **SDK handshake spike (do first):** confirm `modelcontextprotocol/go-sdk` (stdio) registers cleanly with both Claude Code and Codex.

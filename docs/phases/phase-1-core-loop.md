@@ -20,14 +20,14 @@ This phase proves the hardest integration risk (ACP wire format + permission gat
 ### In scope
 - The `Runtime` interface and the **Chat runtime** implementation (ACP JSON-RPC / NDJSON over stdio).
 - Config composition at launch: `project.cwd` + `project.context_prompt` + `role.system_prompt` + `backend/model` → CLI invocation.
-- Launch flow (REST + CLI), writing `agents/`, `running/`, initial `status/`.
+- Launch flow (REST + CLI): insert identity + running rows and an initial status row in `state.db`; mint a per-launch hook token; register the in-process MCP server (stdio) with the agent.
 - Send prompt, stream response, cancel turn, stop session.
 - Inline permission request/response over the wire.
 - One backend end to end (Claude Code / `claude-acp`).
 
 ### Out of scope
 - Dashboard UI (Phase 2) — verify this phase via a thin test page or `curl`/SSE client.
-- File watcher / SSE event bus (Phase 2). This phase may stream over a single direct SSE/long-poll connection for the launching client; the multiplexed bus is Phase 2.
+- Hook ingest endpoint / multiplexed SSE event bus (Phase 2). This phase may stream over a single direct SSE/long-poll connection for the launching client; the multiplexed bus is Phase 2.
 - Persistence/archive (Phase 4), messaging (Phase 5), terminal runtime & switching (Phase 6).
 - Second backend (Codex) — design the interface for it but only Claude need work.
 
@@ -39,10 +39,10 @@ Define the interface the server programs against (master PRD §4.1):
 
 ```
 Runtime:
-  Start(agent)                  // spawn CLI, register session, write running/ + status/
+  Start(agent)                  // spawn CLI, register session, insert running + status rows
   SendPrompt(agent, text)       // submit a user turn
   Cancel(agent)                 // interrupt current turn (/cancel)
-  Stop(agent)                   // terminate process group, delete running/
+  Stop(agent)                   // terminate process group, remove running row
   Resume(agent, session_id)     // (stub this phase; full in Phase 4)
   CheckMessages(pid)            // (stub this phase; full in Phase 5)
 ```
@@ -59,7 +59,7 @@ A **runtime registry** dispatches by `agent.interface`. Only `interface: "chat"`
   - `permission_request` (tool + reason → expects approve/deny)
   - `turn_end` / `error`
 - Map ACP permission requests to a pending state; the launching client approves/denies; relay the decision back over the ACP channel and unblock execution.
-- On each lifecycle transition, update `status/{agent_id}.json` (`state`, `detail`, `last_trace`, `busy_since`, `context_pct`).
+- On each lifecycle transition, update the agent's status in `state.db` (`state`, `detail`, `last_trace`, `busy_since`, `context_pct`). Chat agents derive status from the ACP stream directly; the `POST /api/hook` ingest path (Phase 2) carries lifecycle for terminal agents.
 
 ---
 
@@ -68,9 +68,9 @@ A **runtime registry** dispatches by `agent.interface`. Only `interface: "chat"`
 Composition order at launch: `project.cwd` (working dir) + `project.context_prompt` + `role.system_prompt` + selected `backend`/`model` → CLI invocation. Apply backend-level `env` then per-model `env` overrides.
 
 **REST:** `POST /api/sessions {role, project, backend, model, interface}` →
-1. Generate `agent_id`, write `agents/{id}.json`.
-2. Compose config, `Runtime.Start`.
-3. Write `running/{id}.json` (pid, session_id, interface, started_at) and initial `status/{id}.json` (`state: "idle"`).
+1. Generate `agent_id`, insert the identity row in `state.db`.
+2. Compose config, mint the per-launch hook token, register the in-process MCP server, `Runtime.Start`.
+3. Insert the running row (pid, session_id, interface, started_at) and an initial status row (`state: "idle"`) in `state.db`.
 4. Return the agent identity + status.
 
 **CLI:** `agentdeck implementer@my-app`, `agentdeck reviewer@my-app --backend codex --model gpt-5.5 --interface chat`. The CLI form calls the same REST endpoint so both paths produce an identical agent. Name is auto-suggested when omitted.
@@ -95,12 +95,12 @@ GET  /api/sessions/{id}/events     transcript stream for this agent (interim, si
 
 ## 6. Acceptance criteria
 
-- [ ] `agentdeck implementer@my-app` and `POST /api/sessions` with the same params produce an identical running agent (matching identity files, both startable/stoppable).
+- [ ] `agentdeck implementer@my-app` and `POST /api/sessions` with the same params produce an identical running agent (matching identity in `state.db`, both startable/stoppable).
 - [ ] Sending a prompt streams the response incrementally (token/delta level), not all-at-once.
 - [ ] A tool call requiring permission surfaces a permission_request event and **gates execution** until approve/deny is sent; deny prevents the tool from running.
 - [ ] Tool calls, tool results, and file diffs appear in the stream with their arguments/patches.
-- [ ] Cancel interrupts an in-progress turn; Stop terminates the process group and removes `running/{id}.json`.
-- [ ] `status/{id}.json` transitions idle → busy → idle across a turn, including `context_pct`.
+- [ ] Cancel interrupts an in-progress turn; Stop terminates the process group and removes the running row.
+- [ ] The agent's status in `state.db` transitions idle → busy → idle across a turn, including `context_pct`.
 
 ---
 

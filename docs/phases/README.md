@@ -1,11 +1,11 @@
 # AgentDeck — Phased Delivery Plan
 
-This folder breaks the [master PRD](../agent-dashboard-prd.md) into **dependency-ordered, independently buildable phases**. Each phase has its own PRD with scope, deliverables, detailed requirements, and acceptance criteria. A phase is considered "done" only when its acceptance criteria pass and it leaves a working, demoable slice of the product.
+This folder breaks the [master PRD](../agent-dashboard-prd.md) into **dependency-ordered, independently buildable phases**. Each phase has its own PRD with scope, deliverables, detailed requirements, and acceptance criteria. A phase is considered "done" only when its acceptance criteria pass and it leaves a working, demoable slice of the product. The architecture these phases build toward is recorded in [../architecture-decisions.md](../architecture-decisions.md).
 
 ## Guiding principles
 
 - **Vertical slices, not horizontal layers.** Every phase from 1 onward ends with something a user can run and see, not just an internal layer.
-- **The file store is the contract.** All four core objects live as plain JSON under `~/.agentdeck/`. Phases communicate through that on-disk layout, which keeps producers (hooks, runtimes) decoupled from consumers (UI).
+- **The server is the contract.** Human-edited config lives as plain JSON files; machine state lives in a single SQLite `state.db` the server solely writes. Producers (hooks via `/api/hook`, runtimes) and consumers (UI via SSE) are decoupled through the server, not a shared file layout.
 - **Stable identity first.** `agent_id` never changes; everything that "swaps" (model, backend, interface, resume) is layered on top of it. Getting this right in Phase 0/1 is what makes Phases 6 cheap.
 - **Defer the optional.** Terminal runtime and the activity map are explicitly last; the cross-platform chat runtime is the spine.
 
