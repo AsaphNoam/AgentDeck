@@ -42,19 +42,19 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 - [x] **1.3** `ChatRuntime.Start` + ACP→normalized mapping + hub/Subscribe (stream a turn end-to-end) ✅
 - [x] **1.4** Permission gating (withhold response + timeout + skip_permissions) and Cancel ✅
 - [x] **1.5** Launch flow, composition, REST + interim SSE, CLI parity ✅
-- [ ] **1.6** Real-CLI acceptance (credential-gated) + manual verification ← **active**
+- [~] **1.6** Real-CLI acceptance — **code/docs done; credentialed run BLOCKED on human** (see below)
 
-> ⚠️ **1.6 is a known STOP point** — it needs real `claude-code-acp` credentials. If no logged-in CLI is
-> available, record it under "Blocked on human" and stop rather than fake it.
+**1.6 status:** the credential-independent deliverables are complete and committed:
+- Gated acceptance test [`internal/runtime/acceptance_test.go`](../../internal/runtime/acceptance_test.go)
+  behind `//go:build acceptance` — excluded from default `go test ./...` (CI stays green); run with
+  `go test -tags acceptance ./internal/runtime -run TestRealCLIAcceptance -v` (skips if adapter absent).
+- Adapter pin in [`install.sh`](../../install.sh) (`CLAUDE_ACP_PKG`/`CLAUDE_ACP_VERSION`, optional
+  `INSTALL_ACP=1` install step).
+- curl+SSE recipe + Appendix A checklist: [`phase-1-acceptance.md`](phase-1-acceptance.md).
 
-**Active step (1.6):** validate the §12.1 ACP wire assumptions against the real `claude-code-acp`.
-Read §12.1 (pinned adapter + assumed wire shapes), §10.1 (acceptance layer), Appendix A. Deliverables:
-one scripted acceptance test against `claude-code-acp` behind a build tag / env flag so credential-less
-CI stays green (the test is skipped/tagged off by default); pin the adapter version in `install.sh`/a
-lockfile; a documented `curl`+SSE recipe (or tiny static page) driving a real turn. Keep any real-wire
-drift fixes inside `acpmap.go` (§12.1 isolation rule). Done-when: full suite stays green WITHOUT
-credentials; with credentials the gated test drives prompt→stream→permission→cancel/stop per Appendix A.
-The runtime/REST/SSE surface needs no changes — this is verification + the adapter pin only.
+The **actual run against the real adapter** can't be done in this environment — see "Blocked on human".
+Once a human runs it green, mark `1.6 ✅`, collapse Phase 1 to one line in "Phase status", and delete
+this subphase breakdown (workflow §5).
 
 > ⚠️ **1.6 is a known STOP point** — it needs real `claude-code-acp` credentials. When you reach it,
 > if you don't have a logged-in CLI, record it under "Blocked on human" and stop rather than fake it.
@@ -99,7 +99,14 @@ The runtime/REST/SSE surface needs no changes — this is verification + the ada
 
 ## Blocked on human
 
-_(empty — nothing blocking. Add items here per workflow §3, then stop.)_
+- **1.6 credentialed acceptance run.** `claude-code-acp` is **not installed** on this machine and there
+  are **no Claude credentials** for it, so the real-adapter acceptance (techspec §10.1, Appendix A) cannot
+  be executed here. Everything else in Phase 1 is built, tested (against the fake CLI), and green.
+  **To unblock:** on a machine with a logged-in Claude account, run `INSTALL_ACP=1 ./install.sh` (or
+  `npm i -g @zed-industries/claude-code-acp@<pinned>`), then either run the gated test
+  (`go test -tags acceptance ./internal/runtime -run TestRealCLIAcceptance -v`) or follow
+  [`phase-1-acceptance.md`](phase-1-acceptance.md). If the real wire shapes differ from §12.1, fix only
+  `acpmap.go`. **Also verify the pinned `CLAUDE_ACP_VERSION` in `install.sh`** — see autonomous decision below.
 
 ## Autonomous decisions (please review)
 
@@ -136,11 +143,19 @@ _(empty — nothing blocking. Add items here per workflow §3, then stop.)_
   "--token",T]`. §6.4 says the registration "re-execs the AgentDeck binary in a hidden mcp-stdio mode";
   the `mcp-stdio` subcommand/handler does not exist yet (Phase 5). The fake CLI ignores `mcpServers`, so
   this is registration-only as specified. **To reverse:** Phase 5 adds the real `mcp-stdio` command.
+- **2026-06-27 — `CLAUDE_ACP_VERSION=0.4.1` in `install.sh` is an UNVERIFIED placeholder.** The exact
+  released version of `@zed-industries/claude-code-acp` could not be confirmed offline (no npm access /
+  no adapter installed). The pin is a best guess. **To resolve:** check `npm view
+  @zed-industries/claude-code-acp version`, set the real latest-stable pin, and confirm the negotiated ACP
+  protocol version is within the runtime's expectations during the 1.6 credentialed run.
 
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-27 — **1.6 code/docs done; credentialed run blocked.** Gated `acceptance` build-tag test +
+  `install.sh` adapter pin + `phase-1-acceptance.md` curl/SSE recipe. Default suite green (test excluded);
+  compiles under `-tags acceptance`. Real-adapter run needs credentials → Blocked on human.
 - 2026-06-27 — **1.5 green** (incl. `-race`). Launch composition + REST (`POST /api/sessions`, detail,
   prompt/cancel/stop/permission) + interim SSE + CLI launch. Tests: composeEnv/joinSystemPrompt/resolveSkip
   units, CLI parseLaunch + parity, full HTTP integration (launch→SSE→prompt→permission_request→approve→
