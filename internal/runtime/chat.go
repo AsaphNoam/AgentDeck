@@ -91,6 +91,7 @@ type agentState struct {
 	turnActive bool
 	toolNames  map[string]string       // toolCallID -> normalized name (for status detail)
 	pending    map[string]*pendingPerm // toolCallID -> withheld permission request
+	transcript []Event
 	stopped    bool
 }
 
@@ -310,6 +311,18 @@ func (c *ChatRuntime) Subscribe(agentID string) (<-chan Event, func(), error) {
 	return ch, cancel, nil
 }
 
+func (c *ChatRuntime) Transcript(agentID string) ([]Event, error) {
+	as, err := c.lookup(agentID)
+	if err != nil {
+		return nil, err
+	}
+	as.mu.Lock()
+	defer as.mu.Unlock()
+	out := make([]Event, len(as.transcript))
+	copy(out, as.transcript)
+	return out, nil
+}
+
 // Cancel and Permission live in permission.go.
 
 // --- still-stubbed methods (later phases) ---
@@ -412,6 +425,9 @@ func (c *ChatRuntime) emit(as *agentState, typ string, data any) {
 		Data:    raw,
 		Ts:      time.Now().UTC().Format(time.RFC3339),
 	}
+	as.mu.Lock()
+	as.transcript = append(as.transcript, ev)
+	as.mu.Unlock()
 	as.hub.Publish(ev)
 	c.mu.Lock()
 	sink := c.sink

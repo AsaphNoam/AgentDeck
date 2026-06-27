@@ -9,9 +9,9 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 ## Current position
 
 - **Active phase:** 2 — State manager, SSE bus, dashboard card grid — **in progress**
-- **Active subphase:** 2.4 — Layout + transcript-refetch endpoints; React shell + store + SSE client
+- **Active subphase:** 2.5 — Card grid (F1) + drag-reorder + density + context menu
 - **Spec:** [`tech/phase-2-state-dashboard-techspec.md`](tech/phase-2-state-dashboard-techspec.md)
-- **Last GREEN checkpoint:** Subphase 2.3 @ `impl/phase-2`: `go build ./...` + `go test ./...` + `go test -race ./internal/bus`
+- **Last GREEN checkpoint:** Subphase 2.4 @ `impl/phase-2`: `go build ./...` + `go test ./...` + `cd ui && npm test` + `cd ui && npm run build`
 - **Branch:** `impl/phase-2` (do not commit to `main`; do not push unless asked).
 
 ---
@@ -20,7 +20,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 
 - [x] Phase 0 — Foundation (data model, file store, server & CLI skeleton) ✅
 - [x] Phase 1 — Core loop (ACP chat runtime, launch, streaming chat) ✅ — verified against real `claude-code-acp` v0.16.2
-- [ ] Phase 2 — State manager, SSE bus, dashboard card grid — **2.1 ✅; 2.2 ✅; 2.3 ✅; 2.4 next**
+- [ ] Phase 2 — State manager, SSE bus, dashboard card grid — **2.1 ✅; 2.2 ✅; 2.3 ✅; 2.4 ✅; 2.5 next**
 - [ ] Phase 3 — Config CRUD & onboarding
 - [ ] Phase 4 — Persistence: archive, search, resume, file/command tracking
 - [ ] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications
@@ -41,13 +41,16 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 **Subphase 2.3 — SSE event bus + `GET /api/events` + runtime re-point ✅**
 
-**Subphase 2.4 — Layout + transcript-refetch endpoints; React shell + store + SSE client**
+**Subphase 2.4 — Layout + transcript-refetch endpoints; React shell + store + SSE client ✅**
 
-- [ ] Backend: add `GET/PUT /api/layout` Phase 2 shape/validation/atomic write (existing Phase 0 `GET /api/layout` is read-only/default-only).
-- [ ] Backend: add `GET /api/sessions/{id}/transcript` returning in-memory retained runtime events, empty if none, 404 for unknown agent.
-- [ ] Frontend: scaffold `ui/` Vite + React 18.3 + TS with proxy to `:4317`, routes (`/`, `/agent/:id`, fallback), shell, tokens/global CSS.
-- [ ] Add `api/types.ts`, Zustand stores (`agentStore`, `transcriptStore`, `uiStore`), REST client wrappers, and singleton EventSource SSE client with hydration/watchdog/reconnect dispatch.
-- [ ] Tests: Go endpoint tests; `cd ui && npm run build`; Vitest store tests for apply/hydrate/transcript concat; `go build ./...` + `go test ./...` green.
+**Subphase 2.5 — Card grid (F1) + drag-reorder + density + context menu**
+
+- [ ] Build `components/grid/`: `CardGrid`, `AgentCard`, `StateBadge`, `ContextBar`, `EmptyState`, `DensityControl`, `CardContextMenu`.
+- [ ] Load/save layout via `GET/PUT /api/layout`; debounce saves; append new agents not yet in order.
+- [ ] Add drag-reorder (`@dnd-kit/core` + `@dnd-kit/sortable`) and install deps if needed.
+- [ ] Render card fields: name, role/project, backend/model, state badge, context bar, last-output line from `detail` with transcript fallback, stopped dimming.
+- [ ] Context menu: wired Open chat/Rename/Stop; disabled Switch runtime/Clone/Move with phase tooltips.
+- [ ] Tests/build: component/store tests for badge/context/card/menu and SSE hydration rendering; `cd ui && npm test`; `cd ui && npm run build`; `go build ./...` + `go test ./...` green.
 
 ---
 
@@ -129,11 +132,18 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 - **Phase 2.3 kept runtime Hub internally.** The HTTP route `GET /api/sessions/{id}/events` is deleted and
   transcript deltas now publish as bus `new_message`, but `Runtime.Subscribe`/per-agent `Hub` still exist for
   runtime tests and local internal compatibility. To reverse: remove the hub API once no tests/internal callers need it.
+- **Phase 2.4 replaced the walkthrough UI source.** The repo had a product-demo React app, not the dashboard shell
+  scaffold described by the spec. I replaced `ui/src` with the Phase 2 shell/stores/SSE foundation and refreshed
+  `internal/server/ui/dist`. To reverse: recover the demo from git history, but it is no longer the Phase 2 target UI.
 
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-28 — **2.4 green.** Added `GET/PUT /api/layout` Phase 2 API shape, `GET /api/sessions/{id}/transcript`,
+  retained in-memory runtime transcript events, React Router shell, Zustand stores, SSE singleton, REST/types modules,
+  Vitest store tests, and refreshed embedded UI assets. Checkpoint: `go build ./...`, `go test ./...`, `cd ui && npm test`,
+  `cd ui && npm run build`.
 - 2026-06-28 — **2.3 green.** Added `internal/bus` with global-seq envelopes, snapshot hydration, drop-oldest
   clients, and state/runtime publishers; replaced per-agent HTTP SSE with `GET /api/events`; runtime now mirrors
   transcript events as bus `new_message` and touches state manager after status writes. Checkpoint: `go build ./...`,

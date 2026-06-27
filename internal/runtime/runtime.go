@@ -84,4 +84,7 @@ type Runtime interface {
 	// Subscribe returns a channel of normalized events for an agent and an
 	// unsubscribe func. Buffered, drop-oldest.
 	Subscribe(agentID string) (<-chan Event, func(), error)
+
+	// Transcript returns the in-memory retained transcript events for a live agent.
+	Transcript(agentID string) ([]Event, error)
 }
