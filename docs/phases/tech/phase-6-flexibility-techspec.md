@@ -427,6 +427,66 @@ Request (per-launch token in `X-AgentDeck-Token`):
 
 ---
 
+## Subphase plan (incremental / quota-limited implementation)
+
+The invariant: every subphase ends at a GREEN checkpoint — `go build ./...` passes (and `npm run build` for UI subphases) and all existing tests pass — so work is never half-done and a fresh agent can resume cold at the next subphase without inheriting partial state.
+
+### Subphase 6.1 — Hook ingest + backend adapter + Codex (chat)
+- **Goal:** Harden the `/api/hook` ingest path and land `codex-acp` as a real second backend behind a per-backend adapter, all on the existing chat runtime.
+- **Deliverables:** Hardened `POST /api/hook` ingest with per-launch-token validation and running-row refresh/clear on SessionStart/Stop (§4.4, §8.6, task 1); `internal/backend/adapter.go` with `BackendAdapter` interface + `claude-acp` impl extracted from existing code, carrying capability flags, `hookMap`, `resolveResumeId` (§6.3, task 2); `codex-acp` adapter + per-model env in the launch composer (§6.1–6.2, task 3).
+- **Depends on:** Phase 1 (Runtime, chat runtime, launch composition), Phase 2 (state manager, SSE, existing hook endpoint), Phase 4 (resume, transcript persistence). First subphase — no prior subphase.
+- **Done when (checkpoint):** `go build ./...` and existing tests pass; hook-ingest unit tests (valid token applies status + emits `state_update`; stale token → `401`) pass; a Codex chat agent runs launch → prompt → stream → stop → native resume green (§6 acceptance gate).
+- **Resume note:** At start, the chat runtime and Phase 2 hook endpoint exist with Claude-only logic inline. Begin by extracting `BackendAdapter`, then add Codex, then harden `/api/hook` token validation.
+- **Size:** M
+
+### Subphase 6.2 — Hook scripts + registration + interface gate
+- **Goal:** Ship the shell hook script set and wire CLI-settings registration so terminal-bound status can flow over `POST /api/hook`, with chat agents self-gating.
+- **Deliverables:** `~/.agentdeck/hooks/` script set — `_post.sh` helper + `session-start.sh`, `user-prompt-submit.sh`, `pre-tool-use.sh`, `post-tool-use.sh`, `stop.sh` (shell `curl` → `/api/hook`, `jq`-encoded); install/refresh on server startup; CLI-settings registration injecting `AGENTDECK_HOOK_URL`/`AGENTDECK_HOOK_TOKEN`/`AGENTDECK_AGENT_ID`/`AGENTDECK_INTERFACE` per launch via the per-backend `hookMap`; interface gate in `_post.sh` (§4.1–4.3, task 4).
+- **Depends on:** Subphase 6.1 (hardened ingest + adapter `hookMap`).
+- **Done when (checkpoint):** `go build ./...` and existing tests pass; interface-gate test green (`AGENTDECK_INTERFACE=chat` → no POST for covered events; `terminal` → POSTs); scripts install on startup and a chat agent shows no redundant hook POSTs.
+- **Resume note:** At start, `/api/hook` ingest and `hookMap` exist but no scripts are installed and no registration happens. Begin by writing `_post.sh` + event scripts, then the startup installer, then launch-time settings injection.
+- **Size:** M
+
+### Subphase 6.3 — Terminal runtime (xterm/PTY default + tmux)
+- **Goal:** Implement the `terminal` Runtime behind the `TerminalDriver` seam with the cross-platform xterm.js/PTY default (and tmux), deriving status from hooks.
+- **Deliverables:** `internal/runtime/terminal` implementing `Start/SendPrompt/Cancel/Stop/Resume/CheckMessages`; `TerminalDriver` seam (`StartTab`, `WriteText`, `ReadTTY`, `CloseTab`, `RevealTab`); xterm.js/PTY driver (`github.com/creack/pty`) + PTY↔WebSocket bridge at `/api/sessions/{id}/terminal/ws`; tmux driver; `terminal.Capabilities()` + `GET /api/capabilities`; `tty`/`driver`/`driver_ids` in the running row (§3.1–3.5, §8.5, task 5).
+- **Depends on:** Subphase 6.2 (hooks are the terminal status producer).
+- **Done when (checkpoint):** `go build ./...` and existing tests pass; PTY-bridge unit tests (keystroke→master write, output→frame, resize→`Setsize`) pass; `GET /api/capabilities` returns `xterm: true` with `default_driver: "xterm"`; a terminal agent launches, records `tty`, and transitions idle→busy→idle via hook POSTs.
+- **Resume note:** At start, hooks POST status but `interface == "terminal"` still returns "not implemented" in the registry. Begin with the `TerminalDriver` interface, then the PTY driver + WS bridge, then capabilities.
+- **Size:** M
+
+### Subphase 6.4 — Switch-runtime: same-backend (interface/model swap)
+- **Goal:** Land the switch-runtime endpoint for the non-risky path — interface and/or model swap on the same backend via native `Runtime.Resume`.
+- **Deliverables:** `POST /api/sessions/{id}/switch-runtime`; per-agent switch lock; cancel→stop→identity-update→resume algorithm; `resolveResumeId` returning the existing native `session_id` for same-backend model swap; chat↔terminal interface swap; rollback on Resume failure (§5.1–5.2, §5.4, §8.1, task 7 partial). Primer/backend-swap path explicitly deferred to 6.5 (`resolveResumeId` may return empty + a TODO guard for cross-backend, not yet wired to a primer).
+- **Depends on:** Subphase 6.3 (terminal runtime exists so chat↔terminal swap is real).
+- **Done when (checkpoint):** `go build ./...` and existing tests pass; same-backend model-swap integration test green (same `agent_id`, prior transcript intact, new `session_id`, turn continues); chat↔terminal swap test green; rollback test green (`Resume` failure after `Stop` → previous runtime restored, identity reverted, `500 switch_failed_rolled_back`).
+- **Resume note:** At start, terminal + chat runtimes and adapters exist; no switch endpoint. Begin with the lock + core algorithm + native `resolveResumeId`; leave cross-backend returning empty without a primer.
+- **Size:** M
+
+### Subphase 6.5 — Switch-runtime: backend-swap history primer (riskiest)
+- **Goal:** Complete F7 by wiring the cross-backend (Claude↔Codex) history-primer hand-off — the riskiest path, isolated so a quota-limited agent can stop cleanly after 6.4.
+- **Deliverables:** `resolveResumeId` returns empty for cross-backend; bounded history-primer synthesis appended to launch composition (running summary of older turns + last N=6 verbatim turns, capped at `switch.primer_token_budget` = 8k; one-shot target-model summary call with truncation fallback); `{type:"backend_switch", from, to, at}` transcript marker; `history_handoff` field in the `200` response; `CanSwitchModelOnResume` gating native-vs-primer for model swaps (§5.3, §8.1, task 7 remainder).
+- **Depends on:** Subphase 6.4 (switch endpoint + lock + same-backend resume).
+- **Done when (checkpoint):** `go build ./...` and existing tests pass; primer-synthesis unit tests (respects token budget; truncation fallback when summary call fails; emits `backend_switch` marker) pass; Claude→Codex backend-swap integration test green (handoff=primer, marker in transcript, new Codex session runs, archive shows one continuous session).
+- **Resume note:** At start, switch-runtime works for same-backend; cross-backend returns empty with no primer. Begin with primer synthesis + budget, wire it into Resume's launch composition, then the marker + response field.
+- **Size:** M
+
+### Subphase 6.6 — Task groups + remaining endpoints + UI
+- **Goal:** Land task groups end-to-end plus the remaining identity/rename/release endpoints, liveness sweep, and the switch/terminal UI affordances.
+- **Deliverables:** `POST /api/sessions/{id}/rename` (if absent) + `POST /api/sessions/{id}/identity` (group) with direct `state_update` (§8.2–8.3, task 8); `POST /api/groups/{group}/release` bounded worker pool (§8.4, task 9); liveness sweep pruning stale running rows (§9, task 10); UI — collapsible group sections with `layout.json` collapse persistence, Move-to-group picker, Release-group, group state summary (§7, task 11); UI — switch-runtime dialog with capability-gated drivers + handoff note (task 12); UI — xterm.js panel attaching to the PTY WebSocket + "terminal" badge + "Reveal terminal" (task 13).
+- **Depends on:** Subphase 6.5 (full switch path) and Subphase 6.3 (terminal/PTY WS for the UI panel).
+- **Done when (checkpoint):** `go build ./...` and `npm run build` pass; existing tests pass; group-collapse-persists e2e green (collapse, reload, still collapsed); Move-to-group and Release-group e2e green; terminal panel attaches to the PTY WS and shows hook-driven badges.
+- **Resume note:** At start, all backend switch/terminal/hook machinery is green; groups still stubbed and no switch/terminal UI. Begin with identity/group endpoints, then UI sections, then the switch dialog and terminal panel.
+- **Size:** M
+
+### Subphase 6.7 — OPTIONAL iTerm2/AppleScript driver
+- **Goal:** Add the optional macOS-only iTerm2 driver behind the capability probe — isolated and fully skippable without affecting any prior checkpoint.
+- **Deliverables:** iTerm2 `TerminalDriver` impl via `osascript`; AppleScript templates (create-tab, set-appearance, write-text) rendered with `text/template`; the mandatory escaping + shell-quote helper; capability-probe wiring so an explicit unavailable-driver request returns `422 terminal_unavailable` (§2.2, §3.6, task 6).
+- **Depends on:** Subphase 6.3 (`TerminalDriver` seam + capability probe). Independent of 6.4–6.6.
+- **Done when (checkpoint):** `go build ./...` and existing tests pass; AppleScript-escaping helper unit tests (quotes, backslashes, newlines, argv shell-quoting) pass; on a non-macOS host an explicit `driver:"iterm2"` request returns `422` with a reason.
+- **Resume note:** At start, the xterm/tmux drivers and `Capabilities()` exist. Begin with the escaping helper + templates, then the driver impl, then probe registration. Fully skippable if quota is tight.
+- **Size:** S
+
 ## 10. Implementation task breakdown (ordered)
 
 1. **`POST /api/hook` ingest:** confirm Phase 2's hook endpoint applies status to `state.db` and emits `state_update`; add per-launch-token validation and running-row refresh/clear on SessionStart/Stop. (Prereq for hook flow.)
