@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/server"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
@@ -110,6 +111,12 @@ func newDashboardStartCmd() *cobra.Command {
 			}
 			defer stateStore.Close()
 
+			// Reconcile stale running rows left by a crashed prior run (§8.5).
+			if err := runtime.ReconcileStale(stateStore); err != nil {
+				log.Warn("reconcile stale sessions", "err", err)
+			}
+			registry := runtime.NewRegistry(stateStore)
+
 			ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 			defer stop()
 
@@ -118,7 +125,7 @@ func newDashboardStartCmd() *cobra.Command {
 			}
 			defer removePidfile(cfgStore.Home())
 
-			srv := server.New(cfgStore, stateStore, cfg, log)
+			srv := server.New(cfgStore, stateStore, registry, cfg, log)
 			return srv.Start(ctx)
 		},
 	}

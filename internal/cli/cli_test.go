@@ -39,9 +39,38 @@ func TestIsLaunchArg(t *testing.T) {
 	}
 }
 
-func TestLaunchStubExitsZero(t *testing.T) {
-	if code := Execute([]string{"implementer@my-app"}); code != 0 {
-		t.Fatalf("launch stub exit = %d, want 0", code)
+func TestParseLaunch(t *testing.T) {
+	la, err := parseLaunch([]string{"implementer@my-app", "--backend", "claude", "--model", "sonnet-4-6", "--name", "Atlas", "--group", "auth"})
+	if err != nil {
+		t.Fatalf("parseLaunch: %v", err)
+	}
+	if la.Role != "implementer" || la.Project != "my-app" {
+		t.Fatalf("role/project = %q/%q", la.Role, la.Project)
+	}
+	if la.Backend != "claude" || la.Model != "sonnet-4-6" || la.Name != "Atlas" || la.Group != "auth" {
+		t.Fatalf("flags parsed wrong: %+v", la)
+	}
+	if la.Interface != "chat" {
+		t.Fatalf("default interface = %q, want chat", la.Interface)
+	}
+	// Parity: the CLI body carries exactly the fields the REST launch endpoint
+	// reads, so CLI and modal produce an identical agent (techspec §6.5).
+	b := la.body()
+	if b.Role != "implementer" || b.Project != "my-app" || b.Backend != "claude" || b.Group != "auth" {
+		t.Fatalf("launch body mismatch: %+v", b)
+	}
+}
+
+func TestParseLaunchErrors(t *testing.T) {
+	for _, bad := range []string{"@my-app", "implementer@", "noatsign", ""} {
+		if _, err := parseLaunch([]string{bad}); err == nil {
+			t.Errorf("parseLaunch(%q) expected error", bad)
+		}
+	}
+	// Last-@ split: a role with no @ and a project keeps the form unambiguous.
+	la, err := parseLaunch([]string{"impl@my-app"})
+	if err != nil || la.Role != "impl" || la.Project != "my-app" {
+		t.Fatalf("parseLaunch impl@my-app = %+v err=%v", la, err)
 	}
 }
 
