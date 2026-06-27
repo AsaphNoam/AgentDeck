@@ -8,12 +8,11 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 
 ## Current position
 
-- **Active phase:** 2 — State manager, SSE bus, dashboard card grid — **not started**
-- **Active subphase:** start at Phase 2's first subphase (read `tech/phase-2-*-techspec.md` → `## Subphase plan`)
-- **Spec:** Phase 2 techspec (TBD path under `tech/`)
-- **Last GREEN checkpoint:** `go build ./...` + `go test ./...` (and `-race`) pass @ `impl/phase-1`; real-CLI
-  acceptance PASSED against `claude-code-acp` v0.16.2 (Phase 1 complete)
-- **Branch:** `impl/phase-1` (Phase 1 work; do not commit to `main`). Start Phase 2 on a new branch.
+- **Active phase:** 2 — State manager, SSE bus, dashboard card grid — **in progress**
+- **Active subphase:** 2.2 — `POST /api/hook` ingest + reconciliation sweep
+- **Spec:** [`tech/phase-2-state-dashboard-techspec.md`](tech/phase-2-state-dashboard-techspec.md)
+- **Last GREEN checkpoint:** Subphase 2.1 @ `impl/phase-2`: `go build ./...` + `go test ./...`
+- **Branch:** `impl/phase-2` (do not commit to `main`; do not push unless asked).
 
 ---
 
@@ -21,7 +20,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 
 - [x] Phase 0 — Foundation (data model, file store, server & CLI skeleton) ✅
 - [x] Phase 1 — Core loop (ACP chat runtime, launch, streaming chat) ✅ — verified against real `claude-code-acp` v0.16.2
-- [ ] Phase 2 — State manager, SSE bus, dashboard card grid — **next**, start here
+- [ ] Phase 2 — State manager, SSE bus, dashboard card grid — **2.1 ✅; 2.2 next**
 - [ ] Phase 3 — Config CRUD & onboarding
 - [ ] Phase 4 — Persistence: archive, search, resume, file/command tracking
 - [ ] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications
@@ -34,11 +33,18 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 ## Active subphase detail
 
-> The ONLY place granular steps live. Phase 1 is complete and collapsed (workflow §5).
-> **Phase 2 has not started** — read its techspec's `## Subphase plan`, expand the first
-> subphase's steps here, branch off `main` (or continue a fresh `impl/phase-2`), and begin.
+> The ONLY place granular steps live.
 
-_(Phase 2 subphases go here once its techspec is opened.)_
+**Subphase 2.1 — State manager + SQLite store ✅**
+
+**Subphase 2.2 — `POST /api/hook` ingest + reconciliation sweep**
+
+- [ ] Add `POST /api/hook` route/handler with `X-AgentDeck-Token` header and body `token` fallback.
+- [ ] Persist/validate per-launch tokens keyed to live `running` rows (Phase 1 currently stores tokens in-memory on `Server.hookTokens`; replace or bridge it here).
+- [ ] Implement `Manager.ApplyHook` for `running` / `status` / `stopped`, using one serialized transaction and publishing the recomputed `state_update`.
+- [ ] Return the fixed hook error envelope `{error,message}` with required `204/400/401/403/404/500` behavior.
+- [ ] Add reconciliation sweep over `sessions/` with fsnotify + periodic fallback; only apply minimal stale-running corrections and do not override fresh hook updates.
+- [ ] Tests: httptest valid/missing/wrong/unknown/bad hook cases; sweep stale transcript correction; `go build ./...` + `go test ./...` green.
 
 ---
 
@@ -109,11 +115,21 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
   exposes its own modelIds (`default`/`sonnet`/`haiku`/`opus`) + permission `modes`
   (incl. `bypassPermissions`/`acceptEdits`). Phase 1 doesn't assert the model, so this is fine; a future
   phase wanting real model/mode selection should map our model→adapter modelId in `acpmap.go`/`sessionNewParams`.
+- **Phase 2.1 manager contract:** `state.Manager` wraps the existing Phase 0 `Store`; it does not replace
+  typed CRUD. It emits `AgentStateUpdate` through `StatePublisher`, a small interface intended for the
+  Phase 2.3 bus. `status.updated_at` is migration v2 and `Store.WriteStatus` stamps it when callers omit it.
+- **Phase 2.1 transcript mirror kept generic.** The spec asked for transcript types in `internal/state/types.go`
+  but Phase 1's concrete normalized event shapes already live in `internal/runtime/event.go`. I added only
+  `state.TranscriptEvent {Kind, Data}` as a storage/UI-facing mirror to avoid duplicating runtime structs.
+  To reverse: replace it with concrete state-owned transcript structs when 2.4/2.6 needs them.
 
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-28 — **2.1 green.** Added `state.Manager`, `AgentState`/`AgentStateUpdate`, migration v2
+  (`status.updated_at`), `busy_timeout=5000`, effective identity+running+status recompute, startup scan,
+  tombstone removal semantics, and focused manager tests. Checkpoint: `go build ./...` + `go test ./...`.
 - 2026-06-28 — **Review fix: full Appendix A real-adapter coverage.** Added 4 gated tests
   (permission deny/approve, cancel, stop) alongside the stream test — all 5 PASS against
   `claude-code-acp` v0.16.2. Real option kinds confirmed (`allow_once`/`reject_once`/`allow_always`).

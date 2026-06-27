@@ -51,4 +51,10 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE INDEX IF NOT EXISTS idx_messages_to ON messages(to_agent, read_at);
 `,
 	},
+	{
+		version: 2,
+		sql: `
+ALTER TABLE status ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0;
+`,
+	},
 }
