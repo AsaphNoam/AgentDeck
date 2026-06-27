@@ -15,17 +15,25 @@ green without credentials. This recipe drives the **real** adapter end-to-end.
 2. **Log in** so the adapter has Claude credentials (per the adapter's own auth flow).
 3. Confirm it is on PATH: `which claude-code-acp`.
 
-## Option A — the gated Go acceptance test
+## Option A — the gated Go acceptance test (covers the whole checklist)
 
 ```bash
 # Uses the real adapter; skips automatically if claude-code-acp is not on PATH.
-go test -tags acceptance ./internal/runtime -run TestRealCLIAcceptance -v
+go test -tags acceptance ./internal/runtime -run TestRealCLI -v
 # Override the binary if needed:
-ACP_CMD=/path/to/claude-code-acp go test -tags acceptance ./internal/runtime -run TestRealCLIAcceptance -v
+ACP_CMD=/path/to/claude-code-acp go test -tags acceptance ./internal/runtime -run TestRealCLI -v
 ```
 
-Asserts: handshake succeeds, the prompt streams **incremental** `assistant_text`, a `turn_end`
-arrives, and the status row returns to `idle`. If the adapter gates a tool, the test approves it.
+Five tests, each mapping to an Appendix A row (all green against `claude-code-acp` v0.16.2):
+- `TestRealCLIAcceptance` — handshake + **incremental** `assistant_text` stream + `turn_end` + idle status.
+- `TestRealCLIPermissionDeny` — a Bash-tool prompt gates on a real permission request; **deny prevents the
+  tool's side effect** (the sentinel file never appears).
+- `TestRealCLIPermissionApprove` — **approve runs the tool** (the sentinel file is created).
+- `TestRealCLICancel` — **Cancel interrupts** an in-flight turn; the agent returns to idle.
+- `TestRealCLIStop` — **Stop** terminates the process group and removes the running row (status `done`).
+
+Confirmed real permission option kinds: `allow_once` / `reject_once` / `allow_always` — `selectOption`
+(§5.3) maps approve→`allow_once`, deny→`reject_once`.
 
 ## Option B — curl + SSE by hand
 
