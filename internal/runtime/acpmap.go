@@ -52,6 +52,77 @@ type acpUsage struct {
 	Window int `json:"window"`
 }
 
+// acpPermissionRequest is the params of a server→client `session/request_permission`
+// request (techspec §12.1). The runtime withholds its response to pause the agent.
+type acpPermissionRequest struct {
+	SessionID string             `json:"sessionId"`
+	Reason    string             `json:"reason"`
+	ToolCall  acpPermToolCall    `json:"toolCall"`
+	Options   []acpPermissionOpt `json:"options"`
+}
+
+type acpPermToolCall struct {
+	ToolCallID string          `json:"toolCallId"`
+	Title      string          `json:"title"`
+	Kind       string          `json:"kind"`
+	RawInput   json.RawMessage `json:"rawInput"`
+}
+
+type acpPermissionOpt struct {
+	OptionID string `json:"optionId"`
+	Name     string `json:"name"`
+	Kind     string `json:"kind"` // allow_once | allow_always | reject_once | reject_always
+}
+
+// mapPermissionRequest converts the ACP permission request into normalized
+// PermissionRequestData plus a kind→optionId table for choosing the reply option
+// (techspec §5.3). expiresAt is RFC3339; autoApproved reflects skip_permissions.
+func mapPermissionRequest(params json.RawMessage, expiresAt string, autoApproved bool) (PermissionRequestData, map[string]string) {
+	var pr acpPermissionRequest
+	_ = json.Unmarshal(params, &pr)
+
+	name := firstNonEmpty(pr.ToolCall.Kind, pr.ToolCall.Title, "tool")
+	opts := make([]PermOption, 0, len(pr.Options))
+	byKind := make(map[string]string, len(pr.Options))
+	for _, o := range pr.Options {
+		opts = append(opts, PermOption{OptionID: o.OptionID, Label: o.Name, Kind: o.Kind})
+		if _, dup := byKind[o.Kind]; !dup {
+			byKind[o.Kind] = o.OptionID
+		}
+	}
+	data := PermissionRequestData{
+		ToolCallID:   pr.ToolCall.ToolCallID,
+		Name:         name,
+		Reason:       pr.Reason,
+		Args:         nonNullRaw(pr.ToolCall.RawInput),
+		Options:      opts,
+		AutoApproved: autoApproved,
+		ExpiresAt:    expiresAt,
+	}
+	return data, byKind
+}
+
+// selectOption picks the ACP optionId for an approve/deny decision (techspec
+// §5.3): approve prefers allow_once then allow_always; deny prefers reject_once
+// then reject_always. ok is false when no usable option exists.
+func selectOption(byKind map[string]string, decision string) (string, bool) {
+	var order []string
+	switch decision {
+	case "approve":
+		order = []string{"allow_once", "allow_always"}
+	case "deny":
+		order = []string{"reject_once", "reject_always"}
+	default:
+		return "", false
+	}
+	for _, k := range order {
+		if id, ok := byKind[k]; ok {
+			return id, true
+		}
+	}
+	return "", false
+}
+
 // mappedEvent pairs a normalized event type with its typed payload. The runtime
 // stamps seq/agent_id/ts and marshals Data into the Event envelope.
 type mappedEvent struct {

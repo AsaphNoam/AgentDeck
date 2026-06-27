@@ -18,6 +18,8 @@ var (
 	ErrTurnInFlight = errors.New("runtime: a turn is already in flight")
 	// ErrNoPendingPermission: no pending permission for the given tool_call_id.
 	ErrNoPendingPermission = errors.New("runtime: no pending permission request")
+	// ErrInvalidDecision: a permission decision other than approve/deny.
+	ErrInvalidDecision = errors.New("runtime: invalid permission decision")
 )
 
 // Error code vocabulary (techspec §7.7). These are the project-wide error codes

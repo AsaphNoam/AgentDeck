@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os/exec"
@@ -56,12 +57,23 @@ type agentState struct {
 	ctx    context.Context // turn-scoped base context, cancelled on Stop
 	cancel context.CancelFunc
 
+	skipPerms bool // auto-approve every permission request (techspec §5.2)
+
 	mu         sync.Mutex
 	seq        int64
 	contextPct float64
 	turnActive bool
-	toolNames  map[string]string // toolCallID -> normalized name (for status detail)
+	toolNames  map[string]string       // toolCallID -> normalized name (for status detail)
+	pending    map[string]*pendingPerm // toolCallID -> withheld permission request
 	stopped    bool
+}
+
+// pendingPerm is a withheld session/request_permission awaiting a decision.
+type pendingPerm struct {
+	req       *IncomingRequest
+	name      string
+	optByKind map[string]string // kind -> optionId
+	timer     *time.Timer
 }
 
 func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, error) {
@@ -103,11 +115,13 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 		stderr:    newRingBuffer(16 * 1024),
 		ctx:       actx,
 		cancel:    acancel,
+		skipPerms: spec.SkipPerms,
 		toolNames: map[string]string{},
+		pending:   map[string]*pendingPerm{},
 	}
 	as.transport = NewTransport(stdin,
 		func(method string, params json.RawMessage) { c.onNotification(as, method, params) },
-		nil, // permission requests handled in 1.4
+		func(req *IncomingRequest) { c.onRequest(as, req) },
 	)
 
 	go as.stderr.copyFrom(stderr)
@@ -196,10 +210,15 @@ func (c *ChatRuntime) SendPrompt(ctx context.Context, agentID, text string) erro
 			as.mu.Lock()
 			as.turnActive = false
 			as.mu.Unlock()
-			// A failed prompt while not stopping surfaces as an error event.
-			if !as.isStopped() {
-				c.emit(as, EvError, ErrorData{Scope: "protocol", Message: err.Error(), Fatal: false})
+			// Transport closed (crash/stop) is owned by onTransportClosed / Stop.
+			// A genuine RPC error while the process lives surfaces here.
+			if errors.Is(err, errTransportClosed) || as.isStopped() {
+				return
 			}
+			c.emit(as, EvError, ErrorData{Scope: "protocol", Message: err.Error(), Fatal: false})
+			td := TurnEndData{StopReason: "error", ContextPct: as.lastPct()}
+			c.applyTurnEndStatus(as, td)
+			c.emit(as, EvTurnEnd, td)
 			return
 		}
 		td, hasPct := mapPromptResult(res)
@@ -257,15 +276,9 @@ func (c *ChatRuntime) Subscribe(agentID string) (<-chan Event, func(), error) {
 	return ch, cancel, nil
 }
 
-// --- still-stubbed methods (later subphases) ---
+// Cancel and Permission live in permission.go.
 
-func (c *ChatRuntime) Cancel(ctx context.Context, agentID string) error {
-	return fmt.Errorf("%w: ChatRuntime.Cancel (subphase 1.4)", ErrNotImplemented)
-}
-
-func (c *ChatRuntime) Permission(ctx context.Context, agentID, toolCallID, decision string) error {
-	return fmt.Errorf("%w: ChatRuntime.Permission (subphase 1.4)", ErrNotImplemented)
-}
+// --- still-stubbed methods (later phases) ---
 
 func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID string) (*Handle, error) {
 	return nil, fmt.Errorf("%w: Resume (Phase 4)", ErrNotImplemented)
@@ -299,13 +312,50 @@ func (c *ChatRuntime) onNotification(as *agentState, method string, params json.
 	}
 }
 
-// onTransportClosed handles the read loop ending (EOF or scanner error). Full
-// crash handling (error{fatal:true} + row cleanup) lands in 1.4; this phase just
-// frees the turn flag so a hung Call does not leak.
+// onTransportClosed handles the read loop ending (EOF or scanner error). If we
+// initiated shutdown (Stop), the rows are already handled. Otherwise the process
+// crashed mid-session: emit error{fatal:true} + turn_end{error}, set the status
+// row to error, delete the running row, and tear down (techspec §8.2).
 func (c *ChatRuntime) onTransportClosed(as *agentState) {
 	as.mu.Lock()
+	if as.stopped {
+		as.turnActive = false
+		as.mu.Unlock()
+		return
+	}
+	as.stopped = true
 	as.turnActive = false
+	pend := as.pending
+	as.pending = map[string]*pendingPerm{}
 	as.mu.Unlock()
+
+	// Abandon any held permission (the process is gone; the request can't be answered).
+	for _, p := range pend {
+		if p.timer != nil {
+			p.timer.Stop()
+		}
+	}
+
+	_ = as.cmd.Wait() // reap the exited process
+
+	tail := as.stderr.Tail()
+	c.emit(as, EvError, ErrorData{Scope: "process", Message: firstNonEmpty(tail, "process exited"), Fatal: true})
+
+	// Settle state.db before emitting turn_end so a client reacting to turn_end
+	// never observes a stale running row or busy status.
+	c.updateStatus(as, "error", clip(tail, 120), "Error", clearBusySince)
+	_ = c.store.DeleteRunning(as.agentID)
+	c.removeAgent(as.agentID)
+
+	c.emit(as, EvTurnEnd, TurnEndData{StopReason: "error", ContextPct: as.lastPct()})
+	as.cancel()
+	as.hub.Close()
+}
+
+func (c *ChatRuntime) removeAgent(agentID string) {
+	c.mu.Lock()
+	delete(c.agents, agentID)
+	c.mu.Unlock()
 }
 
 // emit stamps seq/agent_id/ts, marshals the payload, and publishes to the hub.
@@ -350,6 +400,8 @@ func (c *ChatRuntime) applyTurnEndStatus(as *agentState, td TurnEndData) {
 	switch td.StopReason {
 	case "cancelled":
 		c.updateStatus(as, "idle", "cancelled", "Cancelled", clearBusySince)
+	case "error":
+		c.updateStatus(as, "error", "turn failed", "Error", clearBusySince)
 	default:
 		c.updateStatus(as, "idle", "", "Stop", clearBusySince)
 	}
@@ -383,6 +435,14 @@ func (c *ChatRuntime) updateStatus(as *agentState, st, detail, trace string, mod
 // writeStatus writes a fully-specified status row.
 func (c *ChatRuntime) writeStatus(as *agentState, st state.Status) error {
 	return c.store.WriteStatus(st)
+}
+
+// clip truncates s to at most n bytes (for status detail fields, ≤120 chars).
+func clip(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n]
 }
 
 func (as *agentState) lastPct() float64 {
