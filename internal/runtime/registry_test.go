@@ -76,21 +76,13 @@ func TestTerminalStubReturnsNotImplemented(t *testing.T) {
 }
 
 // TestChatRuntimeCodexBackendNotImplemented asserts the codex backend path on
-// the real chat runtime returns ErrNotImplemented while claude-acp proceeds past
-// the backend gate (it still errors in 1.1 because Start is a stub, but with a
-// different message). Both are ErrNotImplemented this phase (techspec §3.3).
+// the real chat runtime returns ErrNotImplemented at the backend gate, before
+// any process spawn (techspec §3.3). The claude-acp path passes the gate and is
+// exercised end-to-end (against the fake CLI) in chat_test.go.
 func TestChatRuntimeCodexBackendNotImplemented(t *testing.T) {
 	c := NewChatRuntime(nil)
-	ctx := context.Background()
-
-	_, err := c.Start(ctx, LaunchSpec{BackendType: "codex-acp"})
+	_, err := c.Start(context.Background(), LaunchSpec{BackendType: "codex-acp"})
 	if !errors.Is(err, ErrNotImplemented) {
 		t.Fatalf("codex Start err = %v, want ErrNotImplemented", err)
-	}
-
-	// claude-acp passes the backend gate but Start is still a stub in 1.1.
-	_, err = c.Start(ctx, LaunchSpec{BackendType: "claude-acp"})
-	if !errors.Is(err, ErrNotImplemented) {
-		t.Fatalf("claude Start err = %v, want ErrNotImplemented (stub) this phase", err)
 	}
 }
