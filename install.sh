@@ -26,7 +26,7 @@ EMBED_DIR="internal/server/ui/dist"
 # deliberately and re-run the gated acceptance test (see docs/phases/phase-1-acceptance.md).
 # Install it (Node required) with: INSTALL_ACP=1 ./install.sh
 CLAUDE_ACP_PKG="@zed-industries/claude-code-acp"
-CLAUDE_ACP_VERSION="0.4.1"
+CLAUDE_ACP_VERSION="0.16.2"
 
 VERSION="${VERSION:-0.1.0}"
 COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo none)"
