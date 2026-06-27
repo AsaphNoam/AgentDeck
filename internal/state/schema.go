@@ -57,4 +57,10 @@ CREATE INDEX IF NOT EXISTS idx_messages_to ON messages(to_agent, read_at);
 ALTER TABLE status ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0;
 `,
 	},
+	{
+		version: 3,
+		sql: `
+ALTER TABLE running ADD COLUMN hook_token TEXT NOT NULL DEFAULT '';
+`,
+	},
 }

@@ -4,7 +4,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
+	"time"
 )
 
 // StatePublisher receives effective-state updates from Manager. Subphase 2.3
@@ -23,6 +25,8 @@ type Manager struct {
 	knownMu sync.Mutex
 	known   map[string]bool
 }
+
+var errNoStateChange = errors.New("state: no state change")
 
 // NewManager wraps an opened Store. publisher may be nil.
 func NewManager(store *Store, publisher StatePublisher) *Manager {
@@ -79,6 +83,134 @@ func (m *Manager) Touch(agentID string) (AgentStateUpdate, error) {
 	return m.recomputeAndPublish(agentID)
 }
 
+// ApplyHook validates a per-launch token, applies one lifecycle/status update,
+// and publishes the recomputed AgentState.
+func (m *Manager) ApplyHook(token string, payload HookPayload) (AgentStateUpdate, error) {
+	if strings.TrimSpace(token) == "" {
+		return AgentStateUpdate{}, fmt.Errorf("%w: missing token", ErrTokenMismatch)
+	}
+	if err := validateHookPayload(payload); err != nil {
+		return AgentStateUpdate{}, err
+	}
+	now := timeNow()
+	return m.apply(payload.AgentID, func(tx *sql.Tx) error {
+		if err := hookAgentExists(tx, payload.AgentID); err != nil {
+			return err
+		}
+		current, err := hookRunning(tx, payload.AgentID)
+		if err != nil {
+			return err
+		}
+		if current.HookToken == "" || current.HookToken != token {
+			return ErrTokenMismatch
+		}
+
+		switch payload.Event {
+		case "running":
+			pid := payload.PID
+			if pid == 0 {
+				pid = current.PID
+			}
+			sessionID := payload.SessionID
+			if sessionID == "" {
+				sessionID = current.SessionID
+			}
+			_, err := tx.Exec(`
+INSERT INTO running(agent_id, pid, session_id, interface, tty, hook_token, started_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(agent_id) DO UPDATE SET
+    pid = excluded.pid,
+    session_id = excluded.session_id,
+    interface = excluded.interface,
+    tty = excluded.tty,
+    hook_token = excluded.hook_token,
+    started_at = excluded.started_at`,
+				payload.AgentID, pid, sessionID, current.Interface, current.TTY, current.HookToken, formatTime(now),
+			)
+			if err != nil {
+				return fmt.Errorf("state: apply running hook: %w", err)
+			}
+		case "status":
+			return applyStatusHook(tx, payload, now)
+		case "stopped":
+			if _, err := tx.Exec(`DELETE FROM running WHERE agent_id = ?`, payload.AgentID); err != nil {
+				return fmt.Errorf("state: apply stopped hook: %w", err)
+			}
+		}
+		return nil
+	})
+}
+
+// ApplyStaleCorrection applies a conservative status detail update for a live
+// agent only when the current status row predates staleBefore.
+func (m *Manager) ApplyStaleCorrection(agentID, detail string, staleBefore time.Time) (AgentStateUpdate, bool, error) {
+	if strings.TrimSpace(agentID) == "" {
+		return AgentStateUpdate{}, false, fmt.Errorf("%w: agent_id is required", ErrInvalidHook)
+	}
+	applied := false
+	update, err := m.apply(agentID, func(tx *sql.Tx) error {
+		if err := hookAgentExists(tx, agentID); err != nil {
+			return err
+		}
+		if _, err := hookRunning(tx, agentID); err != nil {
+			if errors.Is(err, ErrTokenMismatch) {
+				return ErrNotFound
+			}
+			return err
+		}
+
+		var curState, curDetail, curTrace string
+		var curBusy sql.NullString
+		var curPct sql.NullFloat64
+		var curUpdated sql.NullInt64
+		err := tx.QueryRow(`
+SELECT state, detail, last_trace, busy_since, context_pct, updated_at
+FROM status
+WHERE agent_id = ?`, agentID).Scan(&curState, &curDetail, &curTrace, &curBusy, &curPct, &curUpdated)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("state: stale correction read status: %w", err)
+		}
+		if curUpdated.Valid && curUpdated.Int64 >= staleBefore.UnixMilli() {
+			return errNoStateChange
+		}
+		if curState == "" {
+			curState = "idle"
+		}
+		if strings.TrimSpace(detail) != "" {
+			curDetail = detail
+		}
+		contextPct := 0.0
+		if curPct.Valid {
+			contextPct = curPct.Float64
+		}
+		var busySince any
+		if curBusy.Valid {
+			busySince = curBusy.String
+		}
+		_, err = tx.Exec(`
+INSERT INTO status(agent_id, state, detail, last_trace, busy_since, context_pct, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(agent_id) DO UPDATE SET
+    state = excluded.state,
+    detail = excluded.detail,
+    last_trace = excluded.last_trace,
+    busy_since = excluded.busy_since,
+    context_pct = excluded.context_pct,
+    updated_at = excluded.updated_at`,
+			agentID, curState, curDetail, "ReconcileSweep", busySince, contextPct, timeNow().UnixMilli(),
+		)
+		if err != nil {
+			return fmt.Errorf("state: apply stale correction: %w", err)
+		}
+		applied = true
+		return nil
+	})
+	if err != nil {
+		return AgentStateUpdate{}, false, err
+	}
+	return update, applied, nil
+}
+
 func (m *Manager) apply(agentID string, mutate func(*sql.Tx) error) (AgentStateUpdate, error) {
 	if m == nil || m.store == nil {
 		return AgentStateUpdate{}, errors.New("state: manager has no store")
@@ -92,12 +224,121 @@ func (m *Manager) apply(agentID string, mutate func(*sql.Tx) error) (AgentStateU
 	}
 	if err := mutate(tx); err != nil {
 		_ = tx.Rollback()
+		if errors.Is(err, errNoStateChange) {
+			return AgentStateUpdate{}, nil
+		}
 		return AgentStateUpdate{}, err
 	}
 	if err := tx.Commit(); err != nil {
 		return AgentStateUpdate{}, fmt.Errorf("state: commit apply: %w", err)
 	}
 	return m.recomputeAndPublish(agentID)
+}
+
+func validateHookPayload(payload HookPayload) error {
+	if strings.TrimSpace(payload.AgentID) == "" {
+		return fmt.Errorf("%w: agent_id is required", ErrInvalidHook)
+	}
+	switch payload.Event {
+	case "running":
+		if payload.PID < 0 {
+			return fmt.Errorf("%w: pid must be positive", ErrInvalidHook)
+		}
+	case "status":
+		switch payload.State {
+		case "busy", "idle", "waiting_input", "done", "error":
+		default:
+			return fmt.Errorf("%w: invalid state", ErrInvalidHook)
+		}
+	case "stopped":
+	default:
+		return fmt.Errorf("%w: invalid event", ErrInvalidHook)
+	}
+	if payload.ContextPct != nil && (*payload.ContextPct < 0 || *payload.ContextPct > 1) {
+		return fmt.Errorf("%w: context_pct out of range", ErrInvalidHook)
+	}
+	return nil
+}
+
+func hookAgentExists(tx *sql.Tx, agentID string) error {
+	var exists int
+	err := tx.QueryRow(`SELECT 1 FROM agents WHERE agent_id = ?`, agentID).Scan(&exists)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("state: hook read agent: %w", err)
+	}
+	return nil
+}
+
+func hookRunning(tx *sql.Tx, agentID string) (RunningEntry, error) {
+	var r RunningEntry
+	var startedAt string
+	err := tx.QueryRow(`
+SELECT agent_id, pid, session_id, interface, tty, hook_token, started_at
+FROM running
+WHERE agent_id = ?`, agentID).Scan(
+		&r.AgentID, &r.PID, &r.SessionID, &r.Interface, &r.TTY, &r.HookToken, &startedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return RunningEntry{}, ErrTokenMismatch
+	}
+	if err != nil {
+		return RunningEntry{}, fmt.Errorf("state: hook read running: %w", err)
+	}
+	started, err := parseTime(startedAt)
+	if err != nil {
+		return RunningEntry{}, wrapTimeErr("running.started_at", err)
+	}
+	r.StartedAt = started
+	return r, nil
+}
+
+func applyStatusHook(tx *sql.Tx, payload HookPayload, now time.Time) error {
+	var curState string
+	var curBusy sql.NullString
+	var curPct sql.NullFloat64
+	err := tx.QueryRow(`
+SELECT state, busy_since, context_pct
+FROM status
+WHERE agent_id = ?`, payload.AgentID).Scan(&curState, &curBusy, &curPct)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("state: hook read status: %w", err)
+	}
+
+	var busySince any
+	if payload.State == "busy" {
+		if curState == "busy" && curBusy.Valid {
+			busySince = curBusy.String
+		} else {
+			busySince = formatTime(now)
+		}
+	}
+	contextPct := 0.0
+	if curPct.Valid {
+		contextPct = curPct.Float64
+	}
+	if payload.ContextPct != nil {
+		contextPct = *payload.ContextPct
+	}
+
+	_, err = tx.Exec(`
+INSERT INTO status(agent_id, state, detail, last_trace, busy_since, context_pct, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(agent_id) DO UPDATE SET
+    state = excluded.state,
+    detail = excluded.detail,
+    last_trace = excluded.last_trace,
+    busy_since = excluded.busy_since,
+    context_pct = excluded.context_pct,
+    updated_at = excluded.updated_at`,
+		payload.AgentID, payload.State, payload.Detail, payload.LastTrace, busySince, contextPct, now.UnixMilli(),
+	)
+	if err != nil {
+		return fmt.Errorf("state: apply status hook: %w", err)
+	}
+	return nil
 }
 
 func (m *Manager) recomputeAndPublish(agentID string) (AgentStateUpdate, error) {

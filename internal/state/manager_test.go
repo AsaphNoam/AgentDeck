@@ -1,6 +1,7 @@
 package state
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 	"time"
@@ -136,5 +137,61 @@ func TestManagerStartPublishesExistingAgents(t *testing.T) {
 	}
 	if pub.updates[0].AgentID != "a_8f3c12" || pub.updates[1].AgentID != "a_123abc" {
 		t.Fatalf("published order = %+v, want created_at order", pub.updates)
+	}
+}
+
+func TestManagerApplyHookStatusAndStopped(t *testing.T) {
+	now := mustTime(t, "2026-06-22T10:01:00Z")
+	withFixedNow(t, now)
+	st, _ := newTestStore(t)
+	pub := &capturePublisher{}
+	mgr := NewManager(st, pub)
+
+	agent := testAgent("a_8f3c12", mustTime(t, "2026-06-22T10:00:00Z"))
+	if err := st.WriteAgent(agent); err != nil {
+		t.Fatalf("WriteAgent: %v", err)
+	}
+	if err := st.WriteRunning(RunningEntry{
+		AgentID: agent.AgentID, PID: 48213, SessionID: "claude-sess-xyz",
+		Interface: "chat", HookToken: "tok_live",
+		StartedAt: mustTime(t, "2026-06-22T10:00:01Z"),
+	}); err != nil {
+		t.Fatalf("WriteRunning: %v", err)
+	}
+	pct := 0.42
+	update, err := mgr.ApplyHook("tok_live", HookPayload{
+		AgentID: agent.AgentID, Event: "status", State: "busy",
+		Detail: "Editing src/auth.ts", LastTrace: "PostToolUse: Edit", ContextPct: &pct,
+	})
+	if err != nil {
+		t.Fatalf("ApplyHook status: %v", err)
+	}
+	if update.State != "busy" || update.Detail != "Editing src/auth.ts" || update.ContextPct != 0.42 {
+		t.Fatalf("status update = %+v", update)
+	}
+	if update.BusySince != formatTime(now) {
+		t.Fatalf("BusySince = %q, want %q", update.BusySince, formatTime(now))
+	}
+
+	status, err := st.ReadStatus(agent.AgentID)
+	if err != nil {
+		t.Fatalf("ReadStatus: %v", err)
+	}
+	if status.UpdatedAt != now.UnixMilli() {
+		t.Fatalf("status.UpdatedAt = %d, want %d", status.UpdatedAt, now.UnixMilli())
+	}
+
+	stopped, err := mgr.ApplyHook("tok_live", HookPayload{AgentID: agent.AgentID, Event: "stopped"})
+	if err != nil {
+		t.Fatalf("ApplyHook stopped: %v", err)
+	}
+	if stopped.Running {
+		t.Fatalf("stopped update Running = true")
+	}
+	if _, err := st.ReadRunning(agent.AgentID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("ReadRunning after stopped err = %v, want ErrNotFound", err)
+	}
+	if len(pub.updates) != 2 {
+		t.Fatalf("published updates = %d, want 2", len(pub.updates))
 	}
 }
