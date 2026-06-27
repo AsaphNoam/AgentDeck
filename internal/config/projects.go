@@ -1,4 +1,4 @@
-package store
+package config
 
 import (
 	"errors"
@@ -42,7 +42,7 @@ func (s *Store) ListProjects() (map[string]Project, error) {
 // DeleteProject removes projects/{id}.json; a missing file is tolerated.
 func (s *Store) DeleteProject(id string) error {
 	if err := os.Remove(s.projectPath(id)); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("store: delete project %s: %w", id, err)
+		return fmt.Errorf("config: delete project %s: %w", id, err)
 	}
 	return nil
 }

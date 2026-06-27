@@ -1,4 +1,4 @@
-package store
+package config
 
 import (
 	"os"
@@ -23,7 +23,11 @@ const envHome = "AGENTDECK_HOME"
 // not create anything on disk.
 func resolveHome() (string, error) {
 	if h := os.Getenv(envHome); h != "" {
-		return ExpandTilde(h)
+		expanded, err := ExpandTilde(h)
+		if err != nil {
+			return "", err
+		}
+		return filepath.Abs(expanded)
 	}
 	u, err := os.UserHomeDir()
 	if err != nil {
@@ -53,12 +57,8 @@ func ExpandTilde(p string) (string, error) {
 // Subdirectory and file names under the home directory. Centralised so every
 // path builder and EnsureLayout agree on the layout.
 const (
-	dirAgents   = "agents"
-	dirRunning  = "running"
-	dirStatus   = "status"
 	dirRoles    = "roles"
 	dirProjects = "projects"
-	dirMessages = "messages"
 	dirSessions = "sessions"
 
 	fileBackends = "backends.json"
@@ -68,12 +68,8 @@ const (
 
 // dataDirs is every directory EnsureLayout creates under home.
 var dataDirs = []string{
-	dirAgents,
-	dirRunning,
-	dirStatus,
 	dirRoles,
 	dirProjects,
-	dirMessages,
 	dirSessions,
 }
 
@@ -92,9 +88,6 @@ func (s *Store) filePath(name string) string {
 	return filepath.Join(s.home, name)
 }
 
-func (s *Store) agentPath(id string) string   { return s.objPath(dirAgents, id) }
-func (s *Store) runningPath(id string) string { return s.objPath(dirRunning, id) }
-func (s *Store) statusPath(id string) string  { return s.objPath(dirStatus, id) }
 func (s *Store) rolePath(id string) string    { return s.objPath(dirRoles, id) }
 func (s *Store) projectPath(id string) string { return s.objPath(dirProjects, id) }
 

@@ -1,4 +1,4 @@
-package store
+package config
 
 // Config single-file object: config.json.
 

@@ -1,4 +1,4 @@
-package store
+package config
 
 import (
 	"encoding/json"
@@ -19,19 +19,19 @@ import (
 func writeJSONAtomic(path string, v any) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("store: mkdir %s: %w", dir, err)
+		return fmt.Errorf("config: mkdir %s: %w", dir, err)
 	}
 
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
-		return fmt.Errorf("store: marshal %s: %w", path, err)
+		return fmt.Errorf("config: marshal %s: %w", path, err)
 	}
 	// Trailing newline for POSIX-friendly files and clean diffs.
 	data = append(data, '\n')
 
 	tmp, err := os.CreateTemp(dir, ".tmp-*")
 	if err != nil {
-		return fmt.Errorf("store: create temp in %s: %w", dir, err)
+		return fmt.Errorf("config: create temp in %s: %w", dir, err)
 	}
 	tmpName := tmp.Name()
 
@@ -39,20 +39,20 @@ func writeJSONAtomic(path string, v any) error {
 	if _, err := tmp.Write(data); err != nil {
 		tmp.Close()
 		os.Remove(tmpName)
-		return fmt.Errorf("store: write temp %s: %w", tmpName, err)
+		return fmt.Errorf("config: write temp %s: %w", tmpName, err)
 	}
 	if err := tmp.Sync(); err != nil {
 		tmp.Close()
 		os.Remove(tmpName)
-		return fmt.Errorf("store: sync temp %s: %w", tmpName, err)
+		return fmt.Errorf("config: sync temp %s: %w", tmpName, err)
 	}
 	if err := tmp.Close(); err != nil {
 		os.Remove(tmpName)
-		return fmt.Errorf("store: close temp %s: %w", tmpName, err)
+		return fmt.Errorf("config: close temp %s: %w", tmpName, err)
 	}
 	if err := os.Rename(tmpName, path); err != nil {
 		os.Remove(tmpName)
-		return fmt.Errorf("store: rename %s -> %s: %w", tmpName, path, err)
+		return fmt.Errorf("config: rename %s -> %s: %w", tmpName, path, err)
 	}
 	return nil
 }
@@ -65,10 +65,10 @@ func readJSON(path string, v any) error {
 		if errors.Is(err, os.ErrNotExist) {
 			return ErrNotFound
 		}
-		return fmt.Errorf("store: read %s: %w", path, err)
+		return fmt.Errorf("config: read %s: %w", path, err)
 	}
 	if err := json.Unmarshal(data, v); err != nil {
-		slog.Warn("store: corrupt file, treating as unreadable", "path", path, "err", err)
+		slog.Warn("config: corrupt file, treating as unreadable", "path", path, "err", err)
 		return ErrCorrupt
 	}
 	return nil
@@ -84,7 +84,7 @@ func listJSON(dir string, perFile func(path string) error) error {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil // empty layout: nothing listed yet
 		}
-		return fmt.Errorf("store: readdir %s: %w", dir, err)
+		return fmt.Errorf("config: readdir %s: %w", dir, err)
 	}
 	for _, e := range entries {
 		if e.IsDir() {

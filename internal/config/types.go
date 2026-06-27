@@ -1,52 +1,8 @@
-package store
+package config
 
-import "time"
-
-// All data structures persisted under ~/.agentdeck/. JSON tags match master
-// PRD §3 exactly. Pointers are used for nullable/override fields so that a JSON
+// Config file data structures persisted under ~/.agentdeck/. JSON tags match
+// master PRD §3 exactly. Pointers are used for nullable/override fields so JSON
 // null (inherit) is distinguishable from an explicit value.
-
-// ---- Agent identity: agents/{agent_id}.json (PRD §3.1) ----
-
-// Agent is the stable identity of an agent. The AgentID never changes for the
-// life of the agent; everything that "switches" (model/backend/interface)
-// re-launches against the same AgentID.
-type Agent struct {
-	AgentID   string    `json:"agent_id"`        // stable, never changes ("a_8f3c12")
-	Name      string    `json:"name"`            // human display name, user-editable
-	Role      string    `json:"role"`            // references roles/{role}.json
-	Project   string    `json:"project"`         // references projects/{project}.json
-	Backend   string    `json:"backend"`         // references a backend key in backends.json
-	Model     string    `json:"model"`           // model key within the backend
-	Interface string    `json:"interface"`       // "chat" | "terminal"
-	CreatedAt time.Time `json:"created_at"`      // RFC3339
-	Group     string    `json:"group,omitempty"` // optional task-group label
-}
-
-// ---- Active session registry: running/{agent_id}.json (PRD §3.1) ----
-
-// RunningEntry records an active session for an agent. SessionID is ephemeral
-// and changes on fork/resume; PID is the process group id of the CLI.
-type RunningEntry struct {
-	AgentID   string    `json:"agent_id"`
-	PID       int       `json:"pid"`           // process group id of the CLI
-	SessionID string    `json:"session_id"`    // ephemeral, changes on fork/resume
-	Interface string    `json:"interface"`     // "chat" | "terminal"
-	TTY       string    `json:"tty,omitempty"` // only for terminal interface
-	StartedAt time.Time `json:"started_at"`    // RFC3339
-}
-
-// ---- Live state: status/{agent_id}.json (PRD §3.1) ----
-
-// Status is the live, frequently-updated state of an agent.
-type Status struct {
-	AgentID    string     `json:"agent_id"`
-	State      string     `json:"state"`            // "busy"|"idle"|"waiting_input"|"done"|"error"
-	Detail     string     `json:"detail,omitempty"` // "Editing src/auth.ts"
-	LastTrace  string     `json:"last_trace,omitempty"`
-	BusySince  *time.Time `json:"busy_since,omitempty"`
-	ContextPct float64    `json:"context_pct"` // 0..1
-}
 
 // ---- Role: roles/{role}.json (PRD §3.2) ----
 
@@ -64,8 +20,8 @@ type Role struct {
 // expand via ExpandTilde; the store itself stores paths verbatim.
 type Project struct {
 	Title         string   `json:"title"`
-	Color         [3]int   `json:"color"`   // RGB display accent, e.g. [100,180,255]
-	Cwd           string   `json:"cwd"`     // "~/Projects/my-app"
+	Color         [3]int   `json:"color"`    // RGB display accent, e.g. [100,180,255]
+	Cwd           string   `json:"cwd"`      // "~/Projects/my-app"
 	AddDirs       []string `json:"add_dirs"` // extra accessible directories
 	ContextPrompt string   `json:"context_prompt"`
 }

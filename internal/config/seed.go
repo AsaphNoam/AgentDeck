@@ -1,4 +1,4 @@
-package store
+package config
 
 import (
 	"fmt"
@@ -140,7 +140,7 @@ func (s *Store) seedFileIfAbsent(path string, v any) error {
 	if _, err := os.Stat(path); err == nil {
 		return nil // exists: never clobber
 	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("store: stat seed target %s: %w", path, err)
+		return fmt.Errorf("config: stat seed target %s: %w", path, err)
 	}
 	return writeJSONAtomic(path, v)
 }
