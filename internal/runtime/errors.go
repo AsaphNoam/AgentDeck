@@ -10,6 +10,16 @@ import (
 // layer maps it to HTTP 501 / code "not_implemented" (techspec §3.2, §7.7).
 var ErrNotImplemented = errors.New("not implemented")
 
+// Runtime-state sentinels. The API layer maps these to 404/409 (techspec §7).
+var (
+	// ErrNoHandle: no live handle for the agent (not started / already stopped).
+	ErrNoHandle = errors.New("runtime: agent not started")
+	// ErrTurnInFlight: a turn is already running for the agent (no queue, §12.3).
+	ErrTurnInFlight = errors.New("runtime: a turn is already in flight")
+	// ErrNoPendingPermission: no pending permission for the given tool_call_id.
+	ErrNoPendingPermission = errors.New("runtime: no pending permission request")
+)
+
 // Error code vocabulary (techspec §7.7). These are the project-wide error codes
 // surfaced in the API error envelope; each maps to a fixed HTTP status.
 const (
