@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -140,12 +141,39 @@ func TestLayoutDefault(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("layout status = %d, want 200", rec.Code)
 	}
-	var l config.Layout
+	var l layoutResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &l); err != nil {
 		t.Fatalf("layout body: %v", err)
 	}
-	if l.Density.CardsPerRow != 3 || l.Density.Gap != 16 {
+	if l.Density.PerRow != 3 || l.Density.Gap != 16 {
 		t.Fatalf("default layout wrong: %+v", l)
+	}
+}
+
+func TestPutLayoutValidatesAndPersists(t *testing.T) {
+	srv := testServer(t, false)
+	h := srv.routes()
+	body := bytes.NewBufferString(`{"order":["a_1","a_2"],"density":{"perRow":4,"gap":20}}`)
+	req := httptest.NewRequest(http.MethodPut, "/api/layout", body)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT layout status = %d body=%s, want 200", rec.Code, rec.Body.String())
+	}
+	got, err := srv.configStore.ReadLayout()
+	if err != nil {
+		t.Fatalf("ReadLayout: %v", err)
+	}
+	if got.Density.CardsPerRow != 4 || got.Density.Gap != 20 || len(got.Order) != 2 {
+		t.Fatalf("persisted layout = %+v", got)
+	}
+
+	req = httptest.NewRequest(http.MethodPut, "/api/layout", bytes.NewBufferString(`{"order":[],"density":{"perRow":9,"gap":20}}`))
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("bad layout status = %d, want 400", rec.Code)
 	}
 }
 

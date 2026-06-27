@@ -225,6 +225,20 @@ func TestLaunchPromptPermissionFlow(t *testing.T) {
 		t.Fatal("sentinel missing after approve — tool did not run")
 	}
 
+	resp, body = func() (*http.Response, []byte) {
+		r, _ := http.Get(ts.URL + "/api/sessions/" + agentID + "/transcript")
+		defer r.Body.Close()
+		b := make([]byte, 8192)
+		n, _ := r.Body.Read(b)
+		return r, b[:n]
+	}()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("transcript status = %d: %s", resp.StatusCode, body)
+	}
+	if !bytes.Contains(body, []byte(`"events"`)) || !bytes.Contains(body, []byte(`"permission_request"`)) {
+		t.Fatalf("transcript body missing retained events: %s", body)
+	}
+
 	// GET detail reflects the agent.
 	resp, body = func() (*http.Response, []byte) {
 		r, _ := http.Get(ts.URL + "/api/sessions/" + agentID)

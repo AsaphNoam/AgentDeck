@@ -21,6 +21,7 @@ func (s *Server) routes() http.Handler {
 	api("GET /api/projects", s.handleProjects)
 	api("GET /api/backends", s.handleBackends)
 	api("GET /api/layout", s.handleLayout)
+	api("PUT /api/layout", s.handlePutLayout)
 	api("POST /api/hook", s.handleHook)
 	api("GET /api/events", s.handleEvents)
 
@@ -28,6 +29,7 @@ func (s *Server) routes() http.Handler {
 	// are more specific than the GET /api/ catch-all and win via mux precedence.
 	api("POST /api/sessions", s.handleLaunch)
 	api("GET /api/sessions/{id}", s.handleSessionDetail)
+	api("GET /api/sessions/{id}/transcript", s.handleTranscript)
 	api("POST /api/sessions/{id}/prompt", s.handlePrompt)
 	api("POST /api/sessions/{id}/cancel", s.handleCancel)
 	api("POST /api/sessions/{id}/stop", s.handleStop)
