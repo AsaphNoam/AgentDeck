@@ -44,6 +44,22 @@ func NewRegistry(s *state.Store) *Registry {
 // in tests, the fake CLI).
 func (r *Registry) Chat() *ChatRuntime { return r.chat }
 
+// SetEventSink mirrors runtime transcript events into an external bus.
+func (r *Registry) SetEventSink(sink func(Event)) {
+	if r == nil || r.chat == nil {
+		return
+	}
+	r.chat.SetEventSink(sink)
+}
+
+// SetStateTouch wires runtime state writes to the dashboard state manager.
+func (r *Registry) SetStateTouch(touch func(string)) {
+	if r == nil || r.chat == nil {
+		return
+	}
+	r.chat.SetStateTouch(touch)
+}
+
 // runtimeFor dispatches by agent.interface. An unknown interface yields
 // ErrNotImplemented (techspec §3.2), which the API layer maps to 501.
 func (r *Registry) runtimeFor(iface string) (Runtime, error) {
