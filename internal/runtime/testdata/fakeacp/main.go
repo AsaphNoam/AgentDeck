@@ -69,7 +69,10 @@ func handle(msg *rpcMessage) {
 		respond(*msg.ID, map[string]any{"sessionId": sessionID})
 	case "session/prompt":
 		runScenario(os.Getenv("FAKEACP_SCENARIO"))
-		respond(*msg.ID, map[string]any{"stopReason": "end_turn"})
+		respond(*msg.ID, map[string]any{
+			"stopReason": "end_turn",
+			"usage":      map[string]any{"used": 4200, "window": 200000},
+		})
 	default:
 		respondErr(*msg.ID, -32601, "method not found: "+msg.Method)
 	}
@@ -86,6 +89,28 @@ func runScenario(name string) {
 			})
 			time.Sleep(time.Millisecond)
 		}
+	case "tool_flow":
+		// A tool call, then its completion carrying a diff block — asserts
+		// correlated tool_call + tool_result + diff (techspec §10.2).
+		emitUpdate(map[string]any{
+			"sessionUpdate": "tool_call",
+			"toolCallId":    "tc_1",
+			"title":         "Edit main.go",
+			"kind":          "edit",
+			"status":        "in_progress",
+			"rawInput":      map[string]any{"path": "main.go"},
+		})
+		emitUpdate(map[string]any{
+			"sessionUpdate": "tool_call_update",
+			"toolCallId":    "tc_1",
+			"status":        "completed",
+			"content": []any{map[string]any{
+				"type":    "diff",
+				"path":    "main.go",
+				"oldText": "a",
+				"newText": "b",
+			}},
+		})
 	case "big_frame":
 		// A single tool_call_update whose content exceeds 64 KiB, locking in the
 		// transport's enlarged scanner buffer end-to-end (techspec §2, §10.2).

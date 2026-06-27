@@ -2,43 +2,269 @@ package runtime
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log/slog"
+	"os/exec"
+	"sync"
+	"syscall"
+	"time"
 
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
-// ChatRuntime drives one Claude Code agent over the ACP stdio protocol. Phase
-// 1.1 lands the type and the Runtime-interface surface as stubs returning
-// ErrNotImplemented; the real spawn/handshake/stream/gating logic arrives in
-// subphases 1.3–1.4. ChatRuntime.Start checks spec.BackendType — only
-// "claude-acp" proceeds; anything else (e.g. "codex-acp") returns
-// ErrNotImplemented (techspec §3.3).
+// defaultChatBinary is the ACP adapter invoked for the claude-acp backend
+// (techspec §12.1). Tests inject the fake CLI by overriding command/args.
+const defaultChatBinary = "claude-code-acp"
+
+// stopGrace is how long Stop waits after SIGTERM before SIGKILL (techspec §8.5).
+const stopGrace = 5 * time.Second
+
+// ChatRuntime drives Claude Code agents over the ACP stdio protocol. It owns one
+// agentState per live agent. ALL ACP wire decoding is isolated in acpmap.go;
+// this file orchestrates process lifecycle, the hub, and status writes.
 type ChatRuntime struct {
-	store *state.Store
+	store   *state.Store
+	command string   // adapter binary (injectable for tests)
+	cmdArgs []string // adapter args
+
+	mu     sync.Mutex
+	agents map[string]*agentState
 }
 
-// NewChatRuntime constructs the chat runtime bound to the state store.
+// NewChatRuntime constructs the chat runtime bound to the state store, targeting
+// the real claude-code-acp adapter.
 func NewChatRuntime(s *state.Store) *ChatRuntime {
-	return &ChatRuntime{store: s}
+	return &ChatRuntime{
+		store:   s,
+		command: defaultChatBinary,
+		agents:  map[string]*agentState{},
+	}
+}
+
+// agentState is the live, in-memory state for one running agent.
+type agentState struct {
+	agentID   string
+	cmd       *exec.Cmd
+	pgid      int
+	sessionID string
+	transport *Transport
+	hub       *Hub
+	stdin     interface{ Close() error }
+	stderr    *ringBuffer
+
+	ctx    context.Context // turn-scoped base context, cancelled on Stop
+	cancel context.CancelFunc
+
+	mu         sync.Mutex
+	seq        int64
+	contextPct float64
+	turnActive bool
+	toolNames  map[string]string // toolCallID -> normalized name (for status detail)
+	stopped    bool
 }
 
 func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, error) {
 	if spec.BackendType != "claude-acp" {
 		return nil, fmt.Errorf("%w: backend %q", ErrNotImplemented, spec.BackendType)
 	}
-	return nil, fmt.Errorf("%w: ChatRuntime.Start (subphase 1.3)", ErrNotImplemented)
+
+	cmd := exec.Command(c.command, c.cmdArgs...)
+	cmd.Dir = spec.Cwd
+	if len(spec.Env) > 0 {
+		cmd.Env = spec.Env
+	}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, fmt.Errorf("runtime: stdin pipe: %w", err)
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, fmt.Errorf("runtime: stdout pipe: %w", err)
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, fmt.Errorf("runtime: stderr pipe: %w", err)
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("runtime: start %s: %w", c.command, err)
+	}
+	pgid := cmd.Process.Pid // the child is the group leader (Setpgid)
+
+	actx, acancel := context.WithCancel(context.Background())
+	as := &agentState{
+		agentID:   spec.Agent.AgentID,
+		cmd:       cmd,
+		pgid:      pgid,
+		hub:       NewHub(),
+		stdin:     stdin,
+		stderr:    newRingBuffer(16 * 1024),
+		ctx:       actx,
+		cancel:    acancel,
+		toolNames: map[string]string{},
+	}
+	as.transport = NewTransport(stdin,
+		func(method string, params json.RawMessage) { c.onNotification(as, method, params) },
+		nil, // permission requests handled in 1.4
+	)
+
+	go as.stderr.copyFrom(stderr)
+	go func() {
+		_ = as.transport.Run(stdout)
+		c.onTransportClosed(as)
+	}()
+
+	// ACP handshake: initialize then session/new (techspec §4.1).
+	if _, err := as.transport.Call(ctx, "initialize", map[string]any{
+		"protocolVersion":    1,
+		"clientCapabilities": map[string]any{},
+	}); err != nil {
+		as.shutdown()
+		return nil, fmt.Errorf("runtime: initialize: %w", err)
+	}
+	newRes, err := as.transport.Call(ctx, "session/new", sessionNewParams(spec))
+	if err != nil {
+		as.shutdown()
+		return nil, fmt.Errorf("runtime: session/new: %w", err)
+	}
+	var sess struct {
+		SessionID string `json:"sessionId"`
+	}
+	if err := json.Unmarshal(newRes, &sess); err != nil || sess.SessionID == "" {
+		as.shutdown()
+		return nil, fmt.Errorf("runtime: session/new returned no sessionId")
+	}
+	as.sessionID = sess.SessionID
+
+	// Persist running + initial status rows (state.db is the sole writer).
+	now := time.Now().UTC()
+	if err := c.store.WriteRunning(state.RunningEntry{
+		AgentID: as.agentID, PID: pgid, SessionID: sess.SessionID,
+		Interface: "chat", StartedAt: now,
+	}); err != nil {
+		as.shutdown()
+		return nil, fmt.Errorf("runtime: write running: %w", err)
+	}
+	if err := c.writeStatus(as, state.Status{
+		AgentID: as.agentID, State: "idle", Detail: "ready",
+		LastTrace: "SessionStart", ContextPct: 0,
+	}); err != nil {
+		as.shutdown()
+		_ = c.store.DeleteRunning(as.agentID)
+		return nil, fmt.Errorf("runtime: write status: %w", err)
+	}
+
+	c.mu.Lock()
+	c.agents[as.agentID] = as
+	c.mu.Unlock()
+
+	return &Handle{AgentID: as.agentID, Pid: pgid, SessionID: sess.SessionID}, nil
 }
 
 func (c *ChatRuntime) SendPrompt(ctx context.Context, agentID, text string) error {
-	return fmt.Errorf("%w: ChatRuntime.SendPrompt (subphase 1.3)", ErrNotImplemented)
+	as, err := c.lookup(agentID)
+	if err != nil {
+		return err
+	}
+
+	as.mu.Lock()
+	if as.turnActive {
+		as.mu.Unlock()
+		return ErrTurnInFlight
+	}
+	as.turnActive = true
+	as.mu.Unlock()
+
+	// busy / thinking (techspec §4.4).
+	now := time.Now().UTC()
+	_ = c.writeStatus(as, state.Status{
+		AgentID: as.agentID, State: "busy", Detail: "thinking",
+		LastTrace: "UserPromptSubmit", BusySince: &now, ContextPct: as.lastPct(),
+	})
+
+	// Drive the turn asynchronously: notifications stream over the hub while the
+	// prompt Call blocks for the result. SendPrompt itself returns immediately.
+	go func() {
+		params := map[string]any{
+			"sessionId": as.sessionID,
+			"prompt":    []map[string]any{{"type": "text", "text": text}},
+		}
+		res, err := as.transport.Call(as.ctx, "session/prompt", params)
+		if err != nil {
+			as.mu.Lock()
+			as.turnActive = false
+			as.mu.Unlock()
+			// A failed prompt while not stopping surfaces as an error event.
+			if !as.isStopped() {
+				c.emit(as, EvError, ErrorData{Scope: "protocol", Message: err.Error(), Fatal: false})
+			}
+			return
+		}
+		td, hasPct := mapPromptResult(res)
+		as.mu.Lock()
+		as.turnActive = false
+		if hasPct {
+			as.contextPct = td.ContextPct
+		} else {
+			td.ContextPct = as.contextPct
+		}
+		as.mu.Unlock()
+
+		// Write the idle status row before emitting turn_end so a client that
+		// reacts to turn_end never observes a stale busy row.
+		c.applyTurnEndStatus(as, td)
+		c.emit(as, EvTurnEnd, td)
+	}()
+
+	return nil
 }
+
+func (c *ChatRuntime) Stop(ctx context.Context, agentID string) error {
+	c.mu.Lock()
+	as, ok := c.agents[agentID]
+	if ok {
+		delete(c.agents, agentID)
+	}
+	c.mu.Unlock()
+	if !ok {
+		// Idempotent: ensure no stale rows remain.
+		_ = c.store.DeleteRunning(agentID)
+		return nil
+	}
+
+	as.shutdown()
+	_ = c.store.DeleteRunning(agentID)
+	// Keep the status row so the archive/UI can show a final state (§7.5).
+	st, err := c.store.ReadStatus(agentID)
+	if err != nil {
+		st = state.Status{AgentID: agentID, ContextPct: as.lastPct()}
+	}
+	st.State = "done"
+	st.BusySince = nil
+	_ = c.store.WriteStatus(st)
+	as.hub.Close()
+	return nil
+}
+
+func (c *ChatRuntime) Subscribe(agentID string) (<-chan Event, func(), error) {
+	as, err := c.lookup(agentID)
+	if err != nil {
+		return nil, nil, err
+	}
+	ch, cancel := as.hub.Subscribe()
+	return ch, cancel, nil
+}
+
+// --- still-stubbed methods (later subphases) ---
 
 func (c *ChatRuntime) Cancel(ctx context.Context, agentID string) error {
 	return fmt.Errorf("%w: ChatRuntime.Cancel (subphase 1.4)", ErrNotImplemented)
 }
 
-func (c *ChatRuntime) Stop(ctx context.Context, agentID string) error {
-	return fmt.Errorf("%w: ChatRuntime.Stop (subphase 1.4)", ErrNotImplemented)
+func (c *ChatRuntime) Permission(ctx context.Context, agentID, toolCallID, decision string) error {
+	return fmt.Errorf("%w: ChatRuntime.Permission (subphase 1.4)", ErrNotImplemented)
 }
 
 func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID string) (*Handle, error) {
@@ -49,10 +275,179 @@ func (c *ChatRuntime) CheckMessages(ctx context.Context, pid int) error {
 	return fmt.Errorf("%w: CheckMessages (Phase 5)", ErrNotImplemented)
 }
 
-func (c *ChatRuntime) Permission(ctx context.Context, agentID, toolCallID, decision string) error {
-	return fmt.Errorf("%w: ChatRuntime.Permission (subphase 1.4)", ErrNotImplemented)
+// --- internals ---
+
+func (c *ChatRuntime) lookup(agentID string) (*agentState, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	as, ok := c.agents[agentID]
+	if !ok {
+		return nil, ErrNoHandle
+	}
+	return as, nil
 }
 
-func (c *ChatRuntime) Subscribe(agentID string) (<-chan Event, func(), error) {
-	return nil, nil, fmt.Errorf("%w: ChatRuntime.Subscribe (subphase 1.3)", ErrNotImplemented)
+// onNotification dispatches a server→client notification. session/update frames
+// are mapped to normalized events; everything else is ignored this phase.
+func (c *ChatRuntime) onNotification(as *agentState, method string, params json.RawMessage) {
+	if method != "session/update" {
+		return
+	}
+	for _, m := range mapSessionUpdate(params) {
+		c.emit(as, m.Type, m.Data)
+		c.applyEventStatus(as, m)
+	}
+}
+
+// onTransportClosed handles the read loop ending (EOF or scanner error). Full
+// crash handling (error{fatal:true} + row cleanup) lands in 1.4; this phase just
+// frees the turn flag so a hung Call does not leak.
+func (c *ChatRuntime) onTransportClosed(as *agentState) {
+	as.mu.Lock()
+	as.turnActive = false
+	as.mu.Unlock()
+}
+
+// emit stamps seq/agent_id/ts, marshals the payload, and publishes to the hub.
+func (c *ChatRuntime) emit(as *agentState, typ string, data any) {
+	raw, err := json.Marshal(data)
+	if err != nil {
+		slog.Error("runtime: marshal event payload", "type", typ, "err", err)
+		return
+	}
+	as.mu.Lock()
+	as.seq++
+	seq := as.seq
+	as.mu.Unlock()
+
+	as.hub.Publish(Event{
+		AgentID: as.agentID,
+		Seq:     seq,
+		Type:    typ,
+		Data:    raw,
+		Ts:      time.Now().UTC().Format(time.RFC3339),
+	})
+}
+
+// applyEventStatus writes the §4.4 status transition implied by a streamed event.
+func (c *ChatRuntime) applyEventStatus(as *agentState, m mappedEvent) {
+	switch m.Type {
+	case EvToolCall:
+		d := m.Data.(ToolCallData)
+		as.mu.Lock()
+		as.toolNames[d.ToolCallID] = d.Name
+		as.mu.Unlock()
+		c.updateStatus(as, "busy", "Running "+d.Name, "PreToolUse: "+d.Name, keepBusySince)
+	case EvToolResult:
+		d := m.Data.(ToolResultData)
+		name := as.toolNameFor(d.ToolCallID)
+		c.updateStatus(as, "busy", name+" done", "PostToolUse: "+name, keepBusySince)
+	}
+	// assistant_text / diff carry no status transition (agent stays busy).
+}
+
+func (c *ChatRuntime) applyTurnEndStatus(as *agentState, td TurnEndData) {
+	switch td.StopReason {
+	case "cancelled":
+		c.updateStatus(as, "idle", "cancelled", "Cancelled", clearBusySince)
+	default:
+		c.updateStatus(as, "idle", "", "Stop", clearBusySince)
+	}
+}
+
+type busySinceMode int
+
+const (
+	keepBusySince busySinceMode = iota
+	clearBusySince
+)
+
+// updateStatus reads the current row, applies the transition, and writes it back.
+func (c *ChatRuntime) updateStatus(as *agentState, st, detail, trace string, mode busySinceMode) {
+	cur, err := c.store.ReadStatus(as.agentID)
+	if err != nil {
+		cur = state.Status{AgentID: as.agentID}
+	}
+	cur.State = st
+	cur.Detail = detail
+	cur.LastTrace = trace
+	cur.ContextPct = as.lastPct()
+	if mode == clearBusySince {
+		cur.BusySince = nil
+	}
+	if err := c.store.WriteStatus(cur); err != nil {
+		slog.Error("runtime: write status", "agent", as.agentID, "err", err)
+	}
+}
+
+// writeStatus writes a fully-specified status row.
+func (c *ChatRuntime) writeStatus(as *agentState, st state.Status) error {
+	return c.store.WriteStatus(st)
+}
+
+func (as *agentState) lastPct() float64 {
+	as.mu.Lock()
+	defer as.mu.Unlock()
+	return as.contextPct
+}
+
+func (as *agentState) toolNameFor(id string) string {
+	as.mu.Lock()
+	defer as.mu.Unlock()
+	if n, ok := as.toolNames[id]; ok && n != "" {
+		return n
+	}
+	return "tool"
+}
+
+func (as *agentState) isStopped() bool {
+	as.mu.Lock()
+	defer as.mu.Unlock()
+	return as.stopped
+}
+
+// shutdown terminates the process group (SIGTERM→grace→SIGKILL) and cancels the
+// turn context. Idempotent.
+func (as *agentState) shutdown() {
+	as.mu.Lock()
+	if as.stopped {
+		as.mu.Unlock()
+		return
+	}
+	as.stopped = true
+	as.mu.Unlock()
+
+	as.cancel()
+	_ = as.stdin.Close()
+
+	if as.cmd.Process == nil {
+		return
+	}
+	_ = syscall.Kill(-as.pgid, syscall.SIGTERM)
+
+	waited := make(chan struct{})
+	go func() { _ = as.cmd.Wait(); close(waited) }()
+	select {
+	case <-waited:
+	case <-time.After(stopGrace):
+		_ = syscall.Kill(-as.pgid, syscall.SIGKILL)
+		<-waited
+	}
+}
+
+// sessionNewParams builds the session/new params from the launch spec (§4.1).
+func sessionNewParams(spec LaunchSpec) map[string]any {
+	mcp := make([]map[string]any, 0, len(spec.MCPServers))
+	for _, m := range spec.MCPServers {
+		mcp = append(mcp, map[string]any{
+			"name": m.Name, "command": m.Command, "args": m.Args, "env": m.Env,
+		})
+	}
+	return map[string]any{
+		"cwd":                   spec.Cwd,
+		"mcpServers":            mcp,
+		"model":                 spec.ModelID,
+		"systemPrompt":          spec.SystemPrompt,
+		"additionalDirectories": spec.AddDirs,
+	}
 }
