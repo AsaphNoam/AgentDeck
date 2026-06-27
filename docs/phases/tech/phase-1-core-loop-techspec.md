@@ -634,6 +634,60 @@ data: {"agent_id":"a_8f3c12","seq":7,"type":"assistant_text","ts":"2026-06-22T10
 
 ---
 
+## Subphase plan (incremental / quota-limited implementation)
+
+**Invariant:** every subphase ends at a GREEN checkpoint — `go build ./...` passes and all existing tests pass — so work is never left half-done and a fresh agent can resume at the next subphase cold, inheriting only compilable, committed code.
+
+These subphases chunk the §9 task list (and front-load the risky, testable pieces) without changing any design. Order is strict by dependency. Each is sized so a quota-limited agent can finish one, stop at the green checkpoint, and hand off.
+
+### Subphase 1.1 — Foundations: sentinels, event types, Runtime interface + Registry skeleton
+- **Goal:** lay down the pure-data and interface scaffolding (no process work yet) so everything downstream compiles against stable types.
+- **Deliverables:** `ErrNotImplemented` sentinel + HTTP error helper / `code` vocabulary (§7.7, task 1); the `Event` envelope, `EventType` constants, and all `*Data` payload structs (§3.1, §4.2, task 2); the `Runtime` interface, `LaunchSpec`, `MCPServerSpec`, `Handle` structs (§3.1); the `Registry` with `byIface` dispatch and `notImplementedRuntime` stubs for `terminal`/Resume/CheckMessages returning `ErrNotImplemented` (§3.2, task 10). `ChatRuntime` may be a stub type whose methods return `ErrNotImplemented` for now so the registry wires up.
+- **Depends on:** Phase 0 (`internal/store` config + `state.db` rows; `agent_id` generator).
+- **Done when (checkpoint):** `go build ./...` passes; `go test ./internal/runtime` green with JSON round-trip tests for every `*Data` payload (task 2) and a table test asserting `runtimeFor("terminal")` / `runtimeFor("codex")`-path returns `ErrNotImplemented`; existing Phase 0 tests still pass.
+- **Resume note:** Start here right after Phase 0. Read §3 (interface + registry) and §4.2 (event payloads) and §7.7 (error shape). Nothing of the runtime is wired yet; you are only producing compilable types + the dispatch shell.
+- **Size:** M.
+
+### Subphase 1.2 — Fake ACP CLI + JSON-RPC stdio transport (deterministic test harness)
+- **Goal:** make the risky protocol code testable before writing the real runtime: a scripted fake CLI plus the NDJSON/JSON-RPC framing layer.
+- **Deliverables:** `testdata/fakeacp/main.go` — a standalone Go binary that answers `initialize`/`session/new` and replays `FAKEACP_SCENARIO`-named NDJSON scenarios (§10.2, task 3), shipping at least `stream_text`, `big_frame`, and `malformed_then_valid`; the JSON-RPC stdio transport — frame reader (`bufio.Scanner` with the 8 MiB buffer, §2), serialized mutex-guarded stdin writer, request/response correlation map (`map[int64]chan json.RawMessage`), notification dispatch hook (§8.1, task 4). The CLI binary path is injectable for tests.
+- **Depends on:** 1.1 (event types compile; nothing here emits normalized `Event`s yet — transport is byte-level).
+- **Done when (checkpoint):** `go build ./...` passes; the fake CLI builds; `go test ./internal/runtime` green with transport tests against a raw NDJSON fixture including a > 64 KiB frame (locks in the §2 buffer enlargement) and a malformed-then-valid line proving resync (§8.3).
+- **Resume note:** 1.1 types exist. Read §2 (transport choices), §8.1/§8.3 (framing/resync), §10.2 (fake CLI scenarios). The transport is standalone — wire it to `ChatRuntime` in 1.3. Build the fake CLI first; you cannot deterministically test anything after this without it.
+- **Size:** M.
+
+### Subphase 1.3 — ChatRuntime.Start + ACP→normalized mapping + hub/Subscribe (streaming a turn end-to-end)
+- **Goal:** spawn the CLI, do the handshake, stream one prompt turn end-to-end as normalized events over the in-process hub.
+- **Deliverables:** `ChatRuntime.Start` — process-group spawn (`Setpgid`, §2.1), `initialize` + `session/new` handshake (incl. the messaging MCP server registration entry passed through, but no handler), capture `sessionId`, insert running + initial status rows in `state.db` (§4.1, task 5); `acpmap.go` — the isolated ACP→normalized `dispatch` for each `session/update` kind → `Event`s with per-agent monotonic `Seq` (§4.3, task 6); the in-process `Hub` + `Subscribe` with bounded buffered channels and drop-oldest (§2, §7.8 backpressure); `SendPrompt` driving `session/prompt`, mapping the result to `turn_end`, and the §4.4 status-row transitions in `state.db` (task 7).
+- **Depends on:** 1.2 (transport + fake CLI).
+- **Done when (checkpoint):** `go build ./...` passes; `go test ./internal/runtime` green: the `stream_text` scenario yields multiple incremental `assistant_text` events then `turn_end`; the `tool_flow` scenario yields correlated `tool_call` + `tool_result` + `diff`; status row transitions `idle → busy → idle` with `context_pct` written. Add the `tool_flow` scenario to the fake CLI here if not already present.
+- **Resume note:** 1.2 transport + fake CLI exist; `Start` is still a stub from 1.1. Read §4.1 (spawn/handshake), §4.3 (mapping table), §4.4 (status transitions), §2.1 (process group). Keep ALL ACP decoding inside `acpmap.go` (§12.1 isolation rule). Permission requests are not handled yet — leave `session/request_permission` unhandled or logged; 1.4 adds gating.
+- **Size:** M.
+
+### Subphase 1.4 — Permission gating (withhold response + timeout + skip_permissions) and Cancel/Stop
+- **Goal:** the acceptance-critical pause: hold the `session/request_permission` response until a decision arrives; plus turn cancel and process-group stop.
+- **Deliverables:** pending-permission map keyed by `toolCallID`; emit `permission_request`, set status `waiting_input`, and **withhold** the JSON-RPC response (§5.1, task 8); `Permission` relay mapping approve/deny → ACP option kind (§5.3); 180s timeout auto-deny (§5.4); `skip_permissions` auto-approve path with `AutoApproved:true` (§5.2); `Cancel` (ACP `session/cancel`, resolve any pending permission as cancelled first, §8.4) and `Stop` (SIGTERM→SIGKILL to `-pgid`, delete running row, set status `done`, §8.5, task 9); server-shutdown + start-time stale-running-row reconciliation (§8.5).
+- **Depends on:** 1.3 (streaming + status writes).
+- **Done when (checkpoint):** `go build ./...` passes; `go test ./internal/runtime` green for `permission_approve` (sentinel file created), `permission_deny` (sentinel absent), `permission_timeout` (auto-deny + `error` event, shortened `PERMISSION_TIMEOUT`), `crash_midturn` (`error{fatal:true}` + running row deleted), and cancel-during-pending-permission (§10.3/§10.4). Add those scenarios to the fake CLI here.
+- **Resume note:** 1.3 streaming exists; `session/request_permission` was previously unhandled. Read §5 (gating flow), §8.4/§8.5 (cancel/stop/reconcile), §10.2/§10.3 (sentinel-file scenarios). The withhold-the-response pattern IS the pause — do not add a separate pause command.
+- **Size:** M.
+
+### Subphase 1.5 — Launch flow, composition, REST + interim SSE, CLI parity
+- **Goal:** expose the runtime over HTTP and the CLI: compose config, mint the hook token, register the MCP server, write identity rows, and serve the endpoints.
+- **Deliverables:** `composeEnv` layering + system-prompt join + name auto-suggest + hook-token mint (`crypto/rand`) + `messagingServer` `MCPServerSpec` builder + `LaunchSpec` builder + failure rollback (§6.1–§6.4, task 11); REST handlers `POST /sessions`, `GET /sessions/{id}`, `prompt`, `cancel`, `stop`, `permission` with the §7.7 error mapping (§7, task 12); interim SSE `GET /sessions/{id}/events` — subscribe, stream `Event`s with `id:`/`event:`, 10s keepalive, status replay (§7.8, task 13); CLI `agentdeck <role>@<project>` parsing that POSTs to the same REST endpoint (§6.5, task 14).
+- **Depends on:** 1.4 (full runtime: Start/SendPrompt/Cancel/Stop/Permission/Subscribe).
+- **Done when (checkpoint):** `go build ./...` passes; `go test ./...` green including handler tests driving the fake CLI through `POST /sessions → prompt → /events until permission_request → permission` (§10.3), and a CLI-vs-REST parity test producing an identical agent (§6.5, Appendix A). All existing tests still pass.
+- **Resume note:** 1.4 runtime is complete and unit-tested. Read §6 (launch/composition), §7 (API contracts), §7.8 (SSE wire), §6.5 (CLI). The runtime needs no changes — you are wiring composition + transport in front of it. The `data:` SSE object must be byte-identical to the `Event` struct for Phase 2 forward-compat.
+- **Size:** M.
+
+### Subphase 1.6 — Real-CLI acceptance (credential-gated) + manual verification
+- **Goal:** validate the §12.1 ACP wire assumptions against the real `claude-code-acp` and confirm the end-to-end acceptance checklist.
+- **Deliverables:** one scripted acceptance test against `claude-code-acp` behind a build tag / env flag so CI without credentials still passes (§10.1, task 15); the pinned adapter version recorded in `install.sh`/lockfile (§12.1); a documented `curl` + SSE recipe or tiny static test page driving a real turn (task 15); fixes localized to `acpmap.go` if real wire shapes drift from §4.3.
+- **Depends on:** 1.5 (full REST + SSE surface).
+- **Done when (checkpoint):** `go build ./...` passes; the full suite stays green **without** credentials (the real-CLI test is skipped/tagged off); when run with credentials, the gated acceptance test drives a real prompt → incremental stream → permission gate → cancel/stop and matches the Appendix A checklist. This is the last/optional checkpoint — green CI never depends on it.
+- **Resume note:** 1.1–1.5 deliver a fully fake-CLI-tested system. Read §12.1 (pinned adapter + assumed wire shapes), §10.1 (acceptance layer), Appendix A. Keep all real-CLI drift fixes inside `acpmap.go` (§12.1 isolation rule) so the blast radius stays localized.
+- **Size:** S.
+
 ## 9. Implementation task breakdown
 
 Ordered; each step is small and independently testable. Steps 1–3 build the fake-CLI test harness *first* so the risky protocol code is TDD'd.

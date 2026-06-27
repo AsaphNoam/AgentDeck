@@ -735,6 +735,58 @@ The decisions in §2 and §8 are sized for the realistic local-tool scale, state
 
 ---
 
+## Subphase plan (incremental / quota-limited implementation)
+
+The invariant for every subphase below: it ends at a GREEN checkpoint — `go build ./...` passes (with the `sqlite_fts5` build tag once §2.3 lands) and all existing tests pass — so work is never half-done and a fresh agent can resume cold at the next subphase without inheriting an in-progress change.
+
+### Subphase 4.1 — Raw NDJSON transcript writer + reader
+- **Goal:** Stand up the durable `transcript.ndjson` append log and its replay reader in isolation, before any DB or runtime wiring.
+- **Deliverables:** `internal/transcript` package — `Writer` (`Open`/`Append`/`Sync`/`Close`, `O_APPEND` single-Write, fsync on `turn_end`/`error`), `session_meta` first record + `seq` recovery on reopen (§2.1, §3.2, §3.5), and `Reader`/replay (stream → `[]Event`, `since_seq` filter, skip `seq:0` by default, 8 MiB scanner cap §2.6). Adds the `permission_resolved` event type as an additive `Event` type only (§3.2, §12.3). Maps to tech-spec tasks 1, 2, and the type half of 3.
+- **Depends on:** Phase 1 `runtime.Event` type + 8 MiB framing convention. No prior subphase.
+- **Done when (checkpoint):** `go test ./internal/transcript/...` passes covering append→read round-trip, reopen-continues-seq, partial-trailing-line dropped, mid-file bad line skipped, and a > 64 KiB line round-trips (§11.1, §11.5). `go build ./...` passes; no runtime hot-path code touched yet, so all existing tests still pass.
+- **Resume note:** Starts from Phase 1 with `Runtime.Resume` still stubbed and no persistence. Begin by creating `internal/transcript/writer.go` + `reader.go` against fixture transcripts; do not wire into the runtime here.
+- **Size:** M
+
+### Subphase 4.2 — `state.db` Phase-4 migration + indexer + reindex
+- **Goal:** Add the Phase-4 schema and the indexer/backfill that upsert `state.db` from the raw logs, still without touching the runtime hot path.
+- **Deliverables:** Phase-4 migration creating `sessions`, `sessions_fts` (FTS5), `tracked_files`, `tracked_commands`, opened in WAL with `synchronous=NORMAL` (§2.3, §2.5), built with the `sqlite_fts5` tag (`mattn/go-sqlite3`). `internal/index.Indexer` — `UpsertSessionMeta`, `OnEvent`, `OnTurnEnd` (§3.5, §4.6, §6). `agentdeck reindex` + first-run migration that truncates Phase-4 tables and replays every raw log (§2.4, §4.6). Maps to tech-spec tasks 4, 5, 6.
+- **Depends on:** Subphase 4.1 (reader/replay + fixture transcripts feed the indexer and reindex).
+- **Done when (checkpoint):** `go test ./internal/index/...` (built with `-tags sqlite_fts5`) passes: an FTS5 `MATCH` query returns the seeded session row from indexed fixture events; `OnTurnEnd` advances `sessions` counts/`updated_at`/`last_seq`; `tracked_files`/`tracked_commands` rows match fixtures; drop-DB → `reindex` → identical query results. `go build -tags sqlite_fts5 ./...` passes; existing tests still pass.
+- **Resume note:** Starts with `internal/transcript` complete and tested; `state.db` has only the Phase 1/2 tables. Begin with the migration, then the indexer reading normalized events from the 4.1 reader, then the reindex command.
+- **Size:** M
+
+### Subphase 4.3 — Wire writer + indexer into the runtime; persisted-backed transcript endpoint
+- **Goal:** Make live chat turns durable: feed every event to the raw log and the indexer in lockstep, and serve history from disk.
+- **Deliverables:** `ChatRuntime.Start` opens the writer (`session_meta`) + upserts the `sessions` row; `dispatch` does **append → publish → index upsert**; `turn_end`/`error` → `Sync` + `OnTurnEnd` (§3.5). `ChatRuntime.Stop` `Sync`+`Close`+flush before removing the `running` row, leaving `sessions/` + rows intact (§3.5, §8.6). Emit + persist `permission_resolved` on resolve (runtime half of task 3). Upgrade `GET /api/sessions/{id}/transcript` to read the persisted NDJSON with `since_seq`/`include_meta` (§7.5). Maps to tech-spec tasks 7, 8, 15, runtime half of 3.
+- **Depends on:** Subphases 4.1 + 4.2 (writer + indexer must exist and pass).
+- **Done when (checkpoint):** crash-mid-turn integration test (reuse Phase 1 `crash_midturn` fake-ACP) asserts persisted ⊇ delivered events (§11.1); `GET /api/sessions/{id}/transcript` returns the full persisted stream for a stopped agent (§11.1, §11.5). `go build -tags sqlite_fts5 ./...` and the full existing suite pass.
+- **Resume note:** Starts with `transcript` + `index` packages done but not called from the runtime; the transcript endpoint is still the Phase 2 in-memory stopgap. Begin in `ChatRuntime.dispatch`/`Start`/`Stop`, then swap the endpoint impl.
+- **Size:** M
+
+### Subphase 4.4 — Archive list + FTS5 search API
+- **Goal:** Expose the durable, searchable archive over `state.db`.
+- **Deliverables:** `internal/archive.Archive` — listing (metadata join to `running` for `active`, sort, paginate §4.2) and search (sanitized FTS query, `MATCH` join, `bm25()` weights, `snippet`, `matched_in` §4.3–4.4). `GET /api/archive?q=...&limit&offset&active` handler (§7.1). Maps to tech-spec tasks 12, 13.
+- **Depends on:** Subphases 4.2 + 4.3 (the indexer populates the tables that this queries; live sessions must be indexing for active/inactive listing).
+- **Done when (checkpoint):** archive tests pass — a session is findable by a distinctive transcript-only phrase with `matched_in:["transcript"]` + snippet; metadata hit yields `["metadata"]`; whitespace-AND semantics; active+inactive both listed with correct `active`; pagination; negative query → `total:0`; reindex-equivalence (§11.2). `go build -tags sqlite_fts5 ./...` and existing tests pass.
+- **Resume note:** Starts with live turns persisting + indexing and the transcript endpoint reading from disk. Begin with `internal/archive` queries, then the HTTP handler.
+- **Size:** M
+
+### Subphase 4.5 — Resume (`ChatRuntime.Resume` + endpoint + CLI)
+- **Goal:** Restore an inactive session to a live card on the same `agent_id` with a fresh `session_id` and intact history.
+- **Deliverables:** real `ChatRuntime.Resume` (spawn + handshake; `session/load` with fallback to `session/new`; reopen transcript in append mode + new `session_meta`(resumed_at); upsert `running` row with fresh `session_id` + status row with restored `last_context_pct`; register in-process MCP server) replacing the Phase 1 stub (§5.3, §5.4, §5.7). `POST /api/sessions/{id}/resume` handler with identity/already-running/snapshot checks and the optional `{interface,backend,model}` override seam validated but only the empty-body path exercised (§5.1, §5.5, §7.2). CLI resume-not-duplicate (`--resume`/`resume <id>`/bare-form most-recent-inactive-match/`--new`) (§5.6). Maps to tech-spec tasks 9, 10, 11.
+- **Depends on:** Subphase 4.3 (persisted transcript + `sessions` snapshot) and 4.4 (archive surface to resume from); the in-process MCP-server *registration* hook (messaging tools remain Phase 5).
+- **Done when (checkpoint):** resume tests pass — `200` with unchanged `agent_id`, a `running.session_id` that differs from pre-stop, a reappearing card via `state_update`, full prior transcript plus the new resumed `session_meta`, a subsequent prompt continuing `seq` monotonically; `409` already-running; `422` no persisted session; CLI bare-form resume vs `--new` (§11.3). `go build -tags sqlite_fts5 ./...` and existing tests pass.
+- **Resume note:** Starts with archive/search live and `Resume` still stubbed. Begin in `ChatRuntime.Resume` (mirror `Start` minus identity-minting), then the endpoint, then CLI resolution.
+- **Size:** M
+
+### Subphase 4.6 — File/command endpoints, hook capture, and UI
+- **Goal:** Surface the tracked Files/Commands and ship the minimal archive + read-only/resume UI.
+- **Deliverables:** `GET /api/sessions/{id}/files` + `GET /api/sessions/{id}/commands` over `tracked_files`/`tracked_commands` with configurable tool-name sets; `POST /api/hook` file/command capture into the same tables (§6, §7.3–7.4). Frontend: `/archive` route (search box + result list + snippet + state chip), read-only transcript view (reuse `TranscriptView`, disabled composer, Resume button → `POST .../resume`), and **Files**/**Commands** tabs (lists, per-row copy, filter, diff link → scroll to `diff` block by `seq` §6.5). Final wiring + manual verification against a real `claude-code-acp` (§11.4 + task 17). Maps to tech-spec tasks 14, 16, 17.
+- **Depends on:** Subphase 4.5 (the read-only view's Resume button calls the resume endpoint; archive route lists what 4.4 serves).
+- **Done when (checkpoint):** files/commands tests pass — 3 edits roll into 2 `tracked_files` rows with correct `has_diff`/`diff_refs`; 2 `tracked_commands` rows with `exit_status` from correlated results; `POST /api/hook` command inserts a queryable row (§11.4); frontend Vitest/RTL: tabs render, copy works, filter narrows, diff link targets the right `seq`. `go build -tags sqlite_fts5 ./...`, the full Go suite, and the UI test suite pass.
+- **Resume note:** Starts with all server-side persistence/archive/resume complete and tested; only file/command endpoints, hook capture, and the frontend remain. Begin with the two Go endpoints + hook capture, then the React `/archive` route and tabs.
+- **Size:** M
+
 ## 10. Implementation task breakdown (ordered)
 
 Each step is small and independently testable. The transcript writer/reader and a fixture transcript come first so everything downstream is TDD'd against deterministic data.

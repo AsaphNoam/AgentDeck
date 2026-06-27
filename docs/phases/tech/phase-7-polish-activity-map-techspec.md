@@ -187,6 +187,43 @@ No routes are added. The only network reads the map performs are: (a) the shared
 
 ---
 
+## Subphase plan (incremental / quota-limited implementation)
+
+Every subphase ends at a GREEN checkpoint — `npm run build` (in `ui/`) passes and all existing tests pass — so work is never half-done and a fresh agent can resume cold; Phase 7 is a pure frontend consumer of the existing `/api/events` SSE bus and adds no server changes.
+
+### Subphase 7.1 — Map scaffold, zone config load, and static SVG map
+- **Goal:** Stand up the `MapView` shell with a `Grid | Map` toggle and a static SVG map whose zones are painted from `zones.json` (markers not yet live).
+- **Deliverables:** `MapView` component + `Grid | Map` header toggle defaulting to Grid (§6 task 1; §4.2); bundled `ui/src/views/map/defaultZones.json` plus the `zones.json` static fetch with §3.4 validation/fallback and a typed `ZoneConfig` (§6 task 2; §3.4); SVG rendered with `viewBox="0 0 1000 600"`, `width="100%"`, `preserveAspectRatio="xMidYMid meet"`, drawing each zone rect + label + accent color from config (§3.1). Toggle persistence to `localStorage` may be a minimal in-session state here or wired now (see 7.4). No store wiring, no live data.
+- **Depends on:** Phase 2 (React app shell, dashboard header) + Phase 2's static-asset serving of `~/.agentdeck/` for the `zones.json` read.
+- **Done when (checkpoint):** `npm run build` passes and existing tests pass; selecting Map renders the five default zones (rects + labels + accent) from `defaultZones.json`; the `zones.json` validation unit tests (§7: `version != 1`, malformed JSON, missing fallback, out-of-bounds clamp) pass.
+- **Resume note:** Starts from the Phase 2 dashboard shell with no map. Begin by adding `MapView` + the empty SVG and the toggle (§6 task 1), then the zone config loader/validator (§6 task 2).
+- **Size:** M
+
+### Subphase 7.2 — Live markers from the store (state → zone)
+- **Goal:** Render one marker per live agent placed in its `stateToZone` zone, driven by the existing Phase 2 agent store, with full marker visuals and interaction.
+- **Deliverables:** Subscribe `MapView` to the existing global agent store; one marker per live agent keyed by `agent_id`, placed via the deterministic packed-grid seat layout sorted by `agent_id` (§6 task 3; §3.3); marker visuals — `project.color` fill (zone-accent fallback), zone-tinted ring, truncated `name` label, state dot, hover tooltip, click-to-open-chat (reuse existing action), a11y attributes (§6 task 4). Markers re-place on store change (no glide animation yet).
+- **Depends on:** 7.1 + Phase 2 global agent store (the same store the card grid renders from); no second `EventSource`.
+- **Done when (checkpoint):** `npm run build` passes and existing tests pass; the `stateToZone` mapping + seat-layout unit tests (§7: five states resolve, unmapped/dangling → fallback, deterministic seats within rect, overflow `+N`) pass; pushing a `state_update` into the mocked store re-places the marker in the target zone on next render.
+- **Depends on:** 7.1.
+- **Resume note:** Starts with a static zone map but no markers. Begin by wiring the store subscription and seat layout (§6 task 3), then layer on visuals/interaction (§6 task 4).
+- **Size:** M
+
+### Subphase 7.3 — Zone-move glide + transient message/notification animation
+- **Goal:** Add the cross-zone glide (with debounce) and the one-shot pulse / attention / travel-dot animations driven by `new_message` and `notification`.
+- **Deliverables:** CSS transform transition for cross-zone glide, ~250ms per-marker move debounce, marker add fade-in / remove fade-out (§6 task 5; §5); extend the SSE client with an `onEvent(type, handler)` subscribe hook if not already present and register `new_message`/`notification` handlers in `MapView` (§6 task 6; §4.1); Web Animations API pulse on `new_message` and per-type attention pulse on `notification` (§6 task 7); sender→recipient travel dot along the connecting line with degrade-to-pulse for unresolvable/off-map endpoints (§6 task 8; §3.3, §8). Reuses the existing event bus — no new SSE event, no new server call.
+- **Depends on:** 7.2 + Phase 5 (`new_message` / `notification` event payloads) + Phase 2 SSE client.
+- **Done when (checkpoint):** `npm run build` passes and existing tests pass; integration tests (§7) pass — a mocked `state_update` (busy→idle) moves the marker after debounce; a mocked `new_message` invokes the marker's `element.animate` (spy) and renders a travel-dot element for a resolvable sender→recipient pair; one-endpoint-off-map degrades to pulse-only.
+- **Resume note:** Starts with static live markers that re-place without animation. Begin with the glide transition + debounce (§6 task 5), then the `onEvent` hook (§6 task 6) before the pulse/travel-dot work (§6 tasks 7–8).
+- **Size:** M
+
+### Subphase 7.4 — Persisted toggle, edge-case hardening, and acceptance pass
+- **Goal:** Finalize `localStorage`-persisted Grid/Map selection and harden all edge cases, then run the acceptance pass confirming zero new `/api/...` calls.
+- **Deliverables:** `localStorage` persistence of the view toggle (key `agentdeck.dashboardView`), surviving reload and view remount without tearing down the store/SSE (§4.2; §8 decision 4); zone-overflow shrink + `+N` badge, animation pile-up caps + coalescing, `prefers-reduced-motion` branch (snap moves, flash), empty-state caption, malformed color/config fallbacks (§6 task 9; §5); tests + acceptance pass per §7, including the network-tab assertion of zero new `/api/...` calls (only the one-time static `zones.json` read) and the "edit `zones.json` re-lays-out without rebuild" check (§6 task 10).
+- **Depends on:** 7.3 (toggle scaffolded in 7.1 is promoted to `localStorage` here).
+- **Done when (checkpoint):** `npm run build` passes and all existing + new tests pass; the four PRD acceptance criteria are green, including the no-new-server-data spy (no new `/api/...` request, no second `EventSource` on a Grid→Map switch) and the config-drives-layout test (config A → config B re-routes zones with no component code change).
+- **Resume note:** Starts with a fully animated map but an in-session toggle and unhardened edges. Begin by promoting the toggle to `localStorage`, then work through §6 task 9 edge cases, then the §7 acceptance assertions (§6 task 10).
+- **Size:** M
+
 ## 6. Implementation task breakdown (ordered)
 
 1. **View scaffolding + toggle.** Add `MapView` component and a `Grid | Map` toggle in the dashboard header; persist selection to `localStorage`; default to Grid. Map renders an empty SVG (`viewBox 0 0 1000 600`) for now. *(No store wiring yet.)*

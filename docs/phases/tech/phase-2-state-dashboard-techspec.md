@@ -751,6 +751,58 @@ Request body = same shape. Server validates (`perRow` 1–8, `gap` 0–48; `orde
 
 ---
 
+## Subphase plan (incremental / quota-limited implementation)
+
+Every subphase ends at a GREEN checkpoint — `go build ./...` passes (and `npm run build` for UI subphases) and all existing tests pass — so work is never left half-done and a fresh agent can resume at the next subphase cold.
+
+### Subphase 2.1 — State manager + SQLite store
+- **Goal:** Stand up `state.db` and the effective-`AgentState` join, fully unit-testable, with no HTTP or bus wiring yet.
+- **Deliverables:** `internal/state` package — `Manager` type; open/migrate `state.db` with `agents`/`running`/`status` tables in WAL mode + `busy_timeout=5000` (§3.1); `AgentState` struct + transcript types in `internal/state/types.go` (§3.2); serialized writer `apply(agentID, mutate)` with `writeMu` + per-update transaction (§3.4); `recompute(agentID)` as a `LEFT JOIN` over the three tables (§3.2); `known map[string]bool` + removal-tombstone derivation (§3.5); `Start()` startup scan over `SELECT agent_id FROM agents` (§3.6); `Touch(agentID)`. Emit target is a small injectable interface (a no-op/stub publisher this subphase) so the bus can be wired in 2.3. Maps to task-breakdown item 1.
+- **Depends on:** Phase 0 SQLite substrate (existing `state.db` driver/handle); Phase 1 transcript-event shapes (for `types.go` mirrors).
+- **Done when (checkpoint):** `go build ./...` passes and `go test ./internal/state` passes — a test points at a temp `AGENTDECK_HOME`, inserts identity + `running` + `status`, asserts the recomputed `AgentState` reflects the join; deletes the `running` row → `Running:false`; deletes the `agents` row → removal tombstone; startup scan emits one recompute per existing agent. Existing tests still pass.
+- **Resume note:** Start fresh — nothing of `internal/state` exists yet. Begin with the schema + migration, then `types.go`, then the writer + recompute, then the startup scan. Leave the emit hook behind a stub interface; do not touch `internal/bus` or `internal/api`.
+- **Size:** M.
+
+### Subphase 2.2 — `POST /api/hook` ingest + reconciliation sweep
+- **Goal:** Make status reach `state.db` over HTTP (token-authed) and add the fallback sweep, while the emit target is still a stub (bus arrives in 2.3).
+- **Deliverables:** `internal/api` — `POST /api/hook` handler with `X-AgentDeck-Token` header (body `token` fallback), per-event effect table (`running`/`status`/`stopped`) applied in one transaction via `Manager.ApplyHook`, then `recompute` (§3.3); the full response-code matrix `204/400/401/403/404/500` with the fixed `{error,message}` envelope (§3.3); per-launch token store keyed to the `running` row. Reconciliation sweep (§3.8): `github.com/fsnotify/fsnotify` watch over `sessions/` + a periodic timer (~30s) applying minimal corrections for stale `running` rows through the same serialized writer; re-add-on-error backoff (§9). Maps to task-breakdown items 3 and 6.
+- **Depends on:** Subphase 2.1 (`Manager`, `apply`, `recompute`, token/running rows).
+- **Done when (checkpoint):** `go build ./...` passes and `go test ./internal/api ./internal/state` passes — httptest covers: valid token + `event:"status"` → `204` and the stub publisher observed a merged `state_update`; missing token → `401`; wrong token → `403`; unknown `agent_id` → `404`; malformed body / bad `context_pct` → `400`. A sweep test drops a grown transcript file under a temp `sessions/` with a stale `running` row and asserts a correction is applied (and does not override a fresh hook). Existing tests still pass.
+- **Resume note:** `internal/state` is complete and tested; the emit path is still a stub. Begin by adding the `/api/hook` route + token validation, then the sweep. Do not build `/api/events` yet.
+- **Size:** M.
+
+### Subphase 2.3 — SSE event bus + `GET /api/events` + runtime re-point
+- **Goal:** Replace Phase 1's per-agent stream with the multiplexed bus, wire the manager's emit into it, and route transcript deltas as `new_message`.
+- **Deliverables:** `internal/bus` — `Event`, `Bus`, `client` (buffered `ch`, `bufSize=256`); `Subscribe/Unsubscribe`, `Publish` with drop-oldest (§4.2), `SetSnapshot`, global `seq` counter (§4.1). `internal/api` — `GET /api/events`: SSE headers, `retry:2000`, hydration burst (one `state_update` per snapshot agent) + `__hydrated__` marker, live loop, 10s ping ticker, `r.Context().Done()` cleanup (§4.4–§4.6). Replace the 2.1 stub publisher with the real `Bus`; re-point the chat runtime's transcript emission to `bus.Publish("new_message", …)` and have it apply status to `state.db` in-process; **delete** `GET /api/sessions/{id}/events` (§4.3, §8.6). Maps to task-breakdown items 2, 4, 5.
+- **Depends on:** Subphase 2.2 (`/api/hook` + manager) and Subphase 2.1's emit interface; Phase 1 runtime transcript emission.
+- **Done when (checkpoint):** `go build ./...` passes and `go test ./internal/bus ./internal/api ./internal/state` passes (including `go test -race ./internal/bus`) — bus unit asserts N subscribers receive in order and a full 256-buffer drops oldest (newest retained, connection alive); SSE httptest asserts the hydration burst + `__hydrated__` marker, a published event arriving as a well-formed frame, and a ping (shortened ticker); manual sanity: `curl -N http://127.0.0.1:4317/api/events` shows the hydration burst then live frames. The deleted per-agent stream no longer compiles in any caller. Existing tests still pass.
+- **Resume note:** `internal/state` + `/api/hook` + sweep are done. Build `internal/bus` first (pure, testable), then `/api/events`, then swap the stub for the real bus and re-point the runtime. This is the last backend-only checkpoint.
+- **Size:** M.
+
+### Subphase 2.4 — Layout + transcript-refetch endpoints; React shell + store + SSE client
+- **Goal:** Finish the small REST surface and stand up the UI foundation (build green, no grid/chat yet) so a fresh agent resumes into a working shell that connects and hydrates.
+- **Deliverables:** Backend — `GET/PUT /api/layout` (defaults if missing, validate `perRow` 1–8 / `gap` 0–48, atomic temp+rename write; §8.3–§8.4) and `GET /api/sessions/{id}/transcript` (in-memory retained events; §4.5, §8.5). Maps to task-breakdown items 7, 8. Frontend — Vite + React 18.3 + TS scaffold under `ui/` with `vite.config.ts` proxy to `:4317`; `styles/tokens.css` (incl. state-badge palette) + `global.css`; `routes.tsx` (`/`, `/agent/:id`, `*`→`/`) + `App.tsx` shell (`Header` + `<Outlet/>`) + `main.tsx`; `api/types.ts` mirroring Go (`AgentState`, `Event`, transcript kinds); Zustand stores `agentStore`/`transcriptStore`/`uiStore` (§5.2); `api/sse.ts` singleton (`EventSource`, named-event listeners, hydration handling, 25s watchdog, dispatch via `getState()`; §5.3–§5.4); `api/client.ts` REST wrappers. Maps to task-breakdown items 9, 10, 11.
+- **Depends on:** Subphase 2.3 (`/api/events` envelope + hydration marker contract for the SSE client to consume).
+- **Done when (checkpoint):** `go build ./...` passes; `cd ui && npm run build` passes; `go test ./...` passes and a Vitest store test passes — `applyStateUpdate` upserts + orders, `hydrateComplete` removes stale agents, `appendMessage` concatenates same-`message_id` assistant text. Manual: `npm run dev` loads the shell, connects to `/api/events`, and hydrates without rendering a grid yet. Existing tests still pass.
+- **Resume note:** All backend endpoints exist. The UI scaffold renders an empty shell wired to the store + SSE; `CardGrid`/`AgentCard`/`ChatPanel` are still placeholders. Begin building the grid in 2.5.
+- **Size:** M.
+
+### Subphase 2.5 — Card grid (F1) + drag-reorder + density + context menu
+- **Goal:** Render the live card grid with persisted layout and the right-click menu.
+- **Deliverables:** `components/grid/` — `CardGrid` (CSS grid + density), `AgentCard` (name, role·project, backend/model pill, badge, context bar, last-output line, dimmed-when-stopped), `StateBadge` (§6.2 palette + busy pulse), `ContextBar` (§6.3 ramp + label), `EmptyState` with minimal "New Agent" trigger posting `POST /api/sessions` defaults (§6.7); last-output-line source = `status.detail` with client-tracked `assistant_text` fallback (§6.4, §13). Drag-reorder via `@dnd-kit/core` + `@dnd-kit/sortable` (`SortableContext` + `rectSortingStrategy`, `arrayMove` on `onDragEnd`) and `DensityControl`, both persisted to `layout.json` via `GET/PUT /api/layout` debounced 400ms (§6.5). `CardContextMenu` (portal): wired Open/Rename/Stop, stubbed-disabled Switch runtime/Clone/Move with phase tooltips (§6.6, §1.3). Maps to task-breakdown items 12, 13, 14.
+- **Depends on:** Subphase 2.4 (stores, SSE client, layout endpoints, tokens).
+- **Done when (checkpoint):** `cd ui && npm run build` passes; `go build ./...` passes; Vitest component tests pass — `StateBadge` color per state, `ContextBar` ramp+label, `AgentCard` fields + last-output-line (detail vs fallback), `CardContextMenu` wired-vs-disabled items; an SSE-integration test (mock `EventSource`) renders N cards from a hydration burst and flips one card's badge without re-rendering others. Existing tests still pass.
+- **Resume note:** Shell + store + SSE + layout endpoints are live; the grid renders, reorders, and persists. The `/agent/:id` route still shows a placeholder `ChatPanel`. Build the full chat panel in 2.6.
+- **Size:** M.
+
+### Subphase 2.6 — Chat panel (F3, full)
+- **Goal:** Deliver the full streaming chat panel with gating, send/cancel, and reconnect repaint.
+- **Deliverables:** `components/chat/` — `ChatPanel` (route `/agent/:id`), `ChatHeader` (name, backend·model, live `ContextBar`, back; §7.4), `TranscriptView` with autoscroll + jump-to-latest and a `kind`→renderer registry, and renderers `AssistantText` (react-markdown + remark-gfm + rehype-sanitize + react-syntax-highlighter, same-`message_id` concatenation), `ToolCall`, `ToolResult`, `DiffBlock` (react-diff-viewer-continued), `PermissionPrompt` (Approve/Deny → `POST /api/sessions/{id}/permission`), `TurnError` (§7.1, §7.3). `Composer` send (`POST …/prompt`, optimistic user bubble, disable-while-busy, Enter/Shift+Enter) + cancel (`POST …/cancel`); reconnect transcript refetch via `GET /api/sessions/{id}/transcript` → `setTranscript` (§7.2, §4.5). Polish: connection indicator, error toasts, loading/empty states. Maps to task-breakdown items 15, 16, 17.
+- **Depends on:** Subphase 2.5 (grid navigates to `/agent/:id`); Subphase 2.4 transcript endpoint + stores.
+- **Done when (checkpoint):** `cd ui && npm run build` passes; `go build ./...` passes; `go test ./...` passes; Vitest passes — `PermissionPrompt` calls the permission endpoint with the correct decision, `DiffBlock` renders old/new, and an SSE-integration test streams `assistant_text` deltas into a growing bubble and re-enables the composer on `turn_end`. Manual: open a card → stream a turn → Approve/Deny gates a tool → cancel works. Existing tests still pass.
+- **Resume note:** Everything before this is shippable; this subphase completes Phase 2 (F1 + F3). If quota runs out mid-renderer, the `kind`→renderer registry lets unimplemented kinds fall back to a raw render so the build stays green between renderers.
+- **Size:** M.
+
 ## 10. Implementation task breakdown (ordered)
 
 **Backend — store + ingest, bus, then wiring:**

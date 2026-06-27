@@ -347,6 +347,58 @@ Any 400 from a CRUD/PUT handler:
 
 ---
 
+## Subphase plan (incremental / quota-limited implementation)
+
+**Invariant:** every subphase ends at a GREEN checkpoint — `go build ./...` passes (and `npm run build` in `web/` for UI subphases) and all existing tests pass — so work is never half-done and a fresh agent can resume cold at the next subphase without inheriting partial work.
+
+### Subphase 3.1 — Validators + Roles & Projects write paths
+- **Goal:** Ship CRUD write endpoints for roles and projects over the config file store, reading from disk on demand.
+- **Deliverables:** `internal/config/validate.go` (`ValidSlug` per §3.1/§3.2, `FieldError`, role/project validators — task 1); `POST/PUT/DELETE /api/roles[/{role}]` with the in-use guard against `running/` (§3.1, §5.1 — task 2); `POST/PUT/DELETE /api/projects[/{p}]` with the non-blocking `cwd_not_found` warning + in-use guard (§3.2, §5.2 — task 3); routes wired; all reads hit disk per request (§3.4). Shared `validation_failed` error shape per §5.6.
+- **Depends on:** Phase 0 file store (atomic temp+rename, `AGENTDECK_HOME`) and its `GET` stubs for `roles/`/`projects/`.
+- **Done when (checkpoint):** `go build ./...` passes; new Go unit tests for validators and a roles+projects POST→GET→PUT→DELETE round-trip pass (§8 CRUD + validation-failure + in-use-guard cases); existing tests green.
+- **Resume note:** start from Phase 0 file store with only `GET` roles/projects/backends stubs. Begin at `validate.go`, then roles handlers, then projects handlers.
+- **Size:** M.
+
+### Subphase 3.2 — credcheck package + Backends PUT with invariants
+- **Goal:** Persist the whole `backends.json` document through `PUT /api/backends`, enforcing default-backend/default-model invariants and running best-effort auth-ping credential validation.
+- **Deliverables:** `internal/backend/credcheck/` — `credcheck.go` dispatch, `claude.go` (auth-status probe), `codex.go` (`/v1/models` auth ping), 6s context timeout, `CredResult{ok|failed|skipped}` (§3.5 — task 4); `internal/config/backends.go` `PUT /api/backends`: parse → invariants 1–6 → auto-promote defaults → cred-check default models → persist normalized doc regardless of cred outcome → return doc + `credentials` map (§3.3, §5.3 — task 5); backends validators in `validate.go`; per-model env merge (`merge(backend.env, model.env)`, model wins) documented + unit-tested.
+- **Depends on:** Subphase 3.1 (`validate.go`, `FieldError`, file-store write pattern).
+- **Done when (checkpoint):** `go build ./...` passes; invariant tests (zero-default auto-promote, multiple-default 400, unknown/empty model 400, unknown type 400, unsupported version 400-nothing-written), env-merge test, and cred-check tests with a mocked probe transport (ok/failed/skipped; doc persisted on `failed`) pass; existing tests green.
+- **Resume note:** start with 3.1's roles/projects endpoints live and `validate.go` present. Begin at `credcheck/`, then `backends.go` PUT.
+- **Size:** M.
+
+### Subphase 3.3 — Config endpoints + disk-on-demand audit (backend close-out)
+- **Goal:** Expose the onboarding gate data and config completion write, and confirm no stale in-memory config cache defeats disk-on-demand.
+- **Deliverables:** `internal/config/config.go` — extend `GET /api/config` with the computed `onboarding` block (min-viable check §3.6, ~60s cred-check memo) and add `PUT /api/config` partial merge for `onboarding_complete`/defaults, rejecting `version`/`port` changes (§3.6, §5.4, §5.5 — task 6); disk-on-demand audit removing/invalidating any Phase 0 in-memory config cache on the CRUD + launch-composition read paths (§3.4 — task 7).
+- **Depends on:** Subphase 3.2 (cred-check used by the min-viable backend step) and 3.1 (roles/projects existence checks).
+- **Done when (checkpoint):** `go build ./...` passes; min-viable tests (empty store `satisfied:false` with correct per-step `done`; backend-ok-creds+project+role → `satisfied:true`; bad-creds default model → `backend.done:false`), `PUT /api/config` immutable-field 400, and selectable-without-restart tests (POST role then same-process GET returns it) pass; existing tests green. Backend surface complete.
+- **Resume note:** start with all roles/projects/backends write endpoints live. Begin at `config.go` `GET` onboarding block, then `PUT /api/config`, then the cache audit.
+- **Size:** S.
+
+### Subphase 3.4 — Frontend scaffolding + Settings (Roles & Projects editors)
+- **Goal:** Stand up the config API/query layer and ship the Roles and Projects Settings tabs.
+- **Deliverables:** `web/src/schemas/` Zod schemas (role/project/backends/config) + `web/src/api/config.ts` typed fetchers/mutations + TanStack Query keys & invalidation wiring (§2.1, §4 — task 8); `SettingsPage.tsx` tabs, `RolesEditor`/`RoleForm` (create-only slug, tri-state `skip_permissions`), `ProjectsEditor`/`ProjectForm` (RGB color trio + swatch, `cwd_not_found` warning render) routed into the Phase 2 shell (§4.1 — task 9).
+- **Depends on:** Subphases 3.1 & 3.3 (roles/projects endpoints + `GET /api/config`); Phase 2 shell (routing, agent store).
+- **Done when (checkpoint):** `npm run build` in `web/` passes; `go build ./...` still passes; Vitest+MSW tests for the Roles/Projects editors (create invalidates query so the entity appears) pass; existing tests green.
+- **Resume note:** backend endpoints are all live and tested. Begin at `schemas/` + `api/config.ts`, then the Settings tabs; reuse Phase 2 routing.
+- **Size:** M.
+
+### Subphase 3.5 — Backends editor + New Agent modal
+- **Goal:** Ship the full backends editor and the New Agent modal (the UI front-end to the Phase 1 launch).
+- **Deliverables:** `BackendsEditor`/`ModelRow` — exactly-one-default radios (UI-enforced, re-enforced server-side), backend/per-model `env` editors with masked `*_KEY`/`*_TOKEN` + reveal, per-backend validate + cred chip, full-document `PUT /api/backends` re-rendering from the normalized response (§4.1 — task 10); `NewAgentModal` + `useSuggestedName`, backend-filtered model select resetting on backend change, disabled terminal interface, submit to `POST /api/sessions` (§4.2 — task 11).
+- **Depends on:** Subphase 3.4 (schemas, API layer, Settings shell) and 3.2 (`PUT /api/backends`); Phase 1 `POST /api/sessions`.
+- **Done when (checkpoint):** `npm run build` passes; `go build ./...` passes; Vitest tests (model filters to backend + resets on backend change; name auto-suggests until edited; terminal disabled; failed cred-check renders chip without data-loss toast; secret masking) pass; existing tests green.
+- **Resume note:** Settings shell, schemas, and API layer exist from 3.4. Begin at `BackendsEditor`, then `NewAgentModal`.
+- **Size:** M.
+
+### Subphase 3.6 — Onboarding wizard gate + wire-up/polish
+- **Goal:** Gate the dashboard behind the onboarding wizard until min-viable-config exists, reusing the editors and modal.
+- **Deliverables:** `OnboardingGate` (reads `GET /api/config` `onboarding.satisfied`, blocks dashboard, non-dismissible) + `OnboardingWizard` 3 steps (BackendStep / ProjectStep / LaunchStep) reusing the editors/modal, resume-from-first-not-done-step, set `onboarding_complete` via `PUT /api/config` on first launch (§4.3 — task 12); empty states, toasts, error surfacing (§4 — task 13); remaining frontend tests (§8 — task 14).
+- **Depends on:** Subphases 3.4 & 3.5 (editors + modal reused as wizard steps) and 3.3 (`GET /api/config` onboarding block).
+- **Done when (checkpoint):** `npm run build` passes; `go build ./...` passes; Vitest gating tests (`satisfied:false` → wizard renders & dashboard blocked, Esc/overlay-click no-op; `satisfied:true` → dashboard, no wizard; backend-done/project-not-done → resumes on project step) and remaining §8 frontend tests pass; existing tests green. Phase 3 acceptance criteria (phase PRD §5) met.
+- **Resume note:** all backend endpoints and Settings/modal UI exist. Begin at `OnboardingGate`, then `OnboardingWizard` steps, then polish/tests.
+- **Size:** M.
+
 ## 7. Implementation task breakdown (ordered)
 
 1. **Shared validators** — `internal/config/validate.go`: `ValidSlug`, `FieldError`, role/project/backends validators with the rules in §3. Unit-test in isolation.

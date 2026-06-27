@@ -517,6 +517,42 @@ Sorted `created_at` descending (newest first) for display. Read-only; this endpo
 
 ---
 
+## Subphase plan (incremental / quota-limited implementation)
+
+Every subphase ends at a GREEN checkpoint — `go build ./...` passes (and `npm run build` for UI subphases) and all existing tests pass — so work is never half-done and a fresh agent can resume cold at the next subphase without inheriting half-finished state.
+
+### Subphase 5.1 — Go-MCP-SDK handshake spike
+- **Goal:** prove `github.com/modelcontextprotocol/go-sdk` registers with BOTH Claude Code and Codex, and decide the transport per CLI.
+- **Deliverables:** a throwaway-or-keep spike that constructs an `mcp.Server` (no real tools needed — a trivial ping/echo handler suffices), exposes it over the streamable HTTP transport on the localhost listener (§2.2 (A)) and, if needed, via the stdio-subcommand shape (§2.2 (B)); a recorded per-CLI decision (HTTP-in-process vs stdio-subcommand fallback) wired toward `RegisterMessagingMCP` (§3.6). Maps onto Task 1 (§10).
+- **Depends on:** Phase 1 launch composition + dashboard localhost listener (Phase 2); the pinned go-sdk v1.x dependency added to `go.mod`.
+- **Done when (checkpoint):** registration confirmed for both CLIs — each CLI's MCP client connects to the spike server and a trivial tool call round-trips; the HTTP-vs-stdio outcome is recorded per CLI in the spec/notes. `go build ./...` passes and existing tests pass.
+- **Resume note:** at start only the Phase 1/2 server exists with a stubbed MCP registration; begin by adding the go-sdk dependency and standing up the spike server against the existing localhost listener.
+- **Size:** S.
+
+### Subphase 5.2 — Message store + the three MCP tools
+- **Goal:** persist messages in `state.db` and wire `list_agents`/`send_message`/`check_messages` to the in-process server.
+- **Deliverables:** `messages` + `turn_budget` tables/indexes in the `state.db` migration (§4.1, §6.1); `Store` messaging methods (§3.2: `LiveAgents`, `InsertMessage`, `ListMessages`, `MarkRead`, `DeleteMessages`, `UnreadCount`, `ResolveRecipient`); the in-process MCP server skeleton with `token → agent_id` session registry (§3.1); the three typed tool handlers (§3.3–§3.5) closing over `*Store`, identity from the session. `to`-resolution + error shapes (§9). Maps onto Tasks 2–6 (§10).
+- **Depends on:** Subphase 5.1 (transport decision + server construction pattern).
+- **Done when (checkpoint):** `go build ./...` passes; unit tests for `to`-resolution (agent_id / role@project / name / ambiguous / not-found) and session identity (`from` always = session agent_id; unknown token → `session_unknown`) pass alongside all existing tests. Budget is read but enforcement-at-turn-boundary lands in 5.3.
+- **Resume note:** at start the spike server exists; begin by adding the migration + `Store` methods, then attach the three handlers to the server from 5.1.
+- **Size:** M.
+
+### Subphase 5.3 — Registration, nudger, turn budget, janitor
+- **Goal:** close the loop — register messaging per agent, reset budgets per turn, and wake idle recipients automatically within the 15/turn cap.
+- **Deliverables:** `RegisterMessagingMCP(agent, backendType)` minting per-agent token + emitting `.mcp.json` (HTTP or stdio per 5.1), wired into Phase 1 launch composition for `claude-acp` and `codex-acp` (§3.6, Task 8); chat-runtime `CheckMessages(pid)` replacing the Phase 1 stub with idle re-check (§5.2, Task 9); runtime turn-boundary `turn_id` reset of the `turn_budget` row (§6.2, Task 10); budget breach handling in the handlers (§6.3); the nudger loop with in-flight/cooldown guards (§5, Task 11); the janitor retention `DELETE`s (§4.3, Task 12). Locked constants per §13.
+- **Depends on:** Subphase 5.2 (tools + store + budget table).
+- **Done when (checkpoint):** `go build ./...` passes; the F8 send→nudge→process-without-user-action integration test and the budget-caps-a-loop test (16th `send_message` → `message_budget_exceeded`, `breached=1`) pass, plus janitor retention + registration unit tests, alongside all existing tests.
+- **Resume note:** at start the three tools work but nothing wakes a recipient or resets budgets; begin with `RegisterMessagingMCP` + the runtime turn boundary, then the nudger and janitor loops.
+- **Size:** M.
+
+### Subphase 5.4 — Notifications + dashboard message indicators (UI)
+- **Goal:** surface notifications and message state to the user.
+- **Deliverables:** state-manager extensions — `unread_messages` recompute on message-row change + `last_sent_at` outbound pulse field on `state_update`, edge-triggered `notification` SSE emission on done/waiting_input/permission_required/budget_exceeded (§7.1–§7.2, §8.1, Task 13); notification settings endpoint + optional inbox endpoint (§7.4–§7.5, Task 14); UI notification client — SSE handler, Web Notifications API permission flow, `visibilityState`-based desktop-vs-toast, per-type mute filtering (§7.3, Task 15); Settings notifications panel (Task 16); card unread badge + outbound pulse (Task 17); optional inbox view (Task 18). Maps onto Tasks 13–18 (§10).
+- **Depends on:** Subphase 5.3 (messages flowing + budget breaches emitting).
+- **Done when (checkpoint):** `go build ./...` AND `npm run build` pass; the mute-suppresses-one-type and backgrounded-`done`→Web Notification client tests pass, alongside all existing Go and UI tests.
+- **Resume note:** at start messaging + nudger work end-to-end server-side but nothing is shown in the UI; begin with the state-manager `notification`/indicator emission, then the React notification client and Settings panel.
+- **Size:** M.
+
 ## 10. Implementation task breakdown (ordered)
 
 1. **MCP handshake spike (Task 1, §2.2)** — register the go-sdk server with **Claude Code** and **Codex**; determine per CLI whether the HTTP-transport entry works or the stdio-subcommand fallback is needed. Record the per-backend outcome; it drives task 8.
