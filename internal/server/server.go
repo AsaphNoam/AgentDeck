@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/agentdeck/agentdeck/internal/bus"
 	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
@@ -22,6 +23,7 @@ type Server struct {
 	configStore *config.Store
 	stateStore  *state.Store
 	stateMgr    *state.Manager
+	eventBus    *bus.Bus
 	registry    *runtime.Registry
 	cfg         config.Config
 	log         *slog.Logger
@@ -36,10 +38,21 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	if log == nil {
 		log = slog.Default()
 	}
+	eventBus := bus.New()
+	stateMgr := state.NewManager(stateStore, eventBus)
+	if registry != nil {
+		registry.SetEventSink(eventBus.PublishRuntimeEvent)
+		registry.SetStateTouch(func(agentID string) {
+			if _, err := stateMgr.Touch(agentID); err != nil {
+				log.Debug("state touch failed", "agent", agentID, "err", err)
+			}
+		})
+	}
 	return &Server{
 		configStore: cfgStore,
 		stateStore:  stateStore,
-		stateMgr:    state.NewManager(stateStore, nil),
+		stateMgr:    stateMgr,
+		eventBus:    eventBus,
 		registry:    registry,
 		cfg:         cfg,
 		log:         log,
@@ -51,6 +64,9 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 // until ctx is cancelled, then shuts down gracefully. It blocks until shutdown
 // completes or a fatal serve error occurs.
 func (s *Server) Start(ctx context.Context) error {
+	if err := s.stateMgr.Start(); err != nil {
+		return err
+	}
 	addr, err := LocalAddr(s.cfg.Port)
 	if err != nil {
 		return err
