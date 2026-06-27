@@ -22,6 +22,7 @@ type RunningEntry struct {
 	SessionID string    `json:"session_id"`
 	Interface string    `json:"interface"`
 	TTY       string    `json:"tty,omitempty"`
+	HookToken string    `json:"-"`
 	StartedAt time.Time `json:"started_at"`
 }
 
@@ -77,6 +78,19 @@ type AgentStateUpdate struct {
 type TranscriptEvent struct {
 	Kind string `json:"kind"`
 	Data any    `json:"data,omitempty"`
+}
+
+// HookPayload is the POST /api/hook body after token extraction.
+type HookPayload struct {
+	AgentID    string   `json:"agent_id"`
+	Event      string   `json:"event"`
+	State      string   `json:"state,omitempty"`
+	Detail     string   `json:"detail,omitempty"`
+	LastTrace  string   `json:"last_trace,omitempty"`
+	ContextPct *float64 `json:"context_pct,omitempty"`
+	PID        int      `json:"pid,omitempty"`
+	SessionID  string   `json:"session_id,omitempty"`
+	TS         int64    `json:"ts,omitempty"`
 }
 
 // Message is one agent-to-agent mailbox entry.

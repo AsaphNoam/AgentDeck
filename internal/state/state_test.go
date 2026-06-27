@@ -90,8 +90,8 @@ func TestOpenMigratesAndConfiguresSQLite(t *testing.T) {
 	if err := st.DB().QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil {
 		t.Fatalf("schema_migrations version: %v", err)
 	}
-	if version != 2 {
-		t.Fatalf("migration version = %d, want 2", version)
+	if version != 3 {
+		t.Fatalf("migration version = %d, want 3", version)
 	}
 }
 
@@ -122,8 +122,8 @@ func TestOpenIsIdempotentAndPreservesRows(t *testing.T) {
 	if err := reopened.DB().QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatalf("count migration: %v", err)
 	}
-	if count != 2 {
-		t.Fatalf("migration version rows = %d, want 2", count)
+	if count != 3 {
+		t.Fatalf("migration version rows = %d, want 3", count)
 	}
 }
 
@@ -146,6 +146,7 @@ func TestRoundTripStateObjects(t *testing.T) {
 		SessionID: "claude-sess-xyz",
 		Interface: "chat",
 		TTY:       "/dev/ttys001",
+		HookToken: "tok_live",
 		StartedAt: mustTime(t, "2026-06-22T10:00:01Z"),
 	}
 	if err := st.WriteRunning(run); err != nil {

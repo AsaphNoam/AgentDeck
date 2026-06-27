@@ -21,6 +21,7 @@ const shutdownTimeout = 5 * time.Second
 type Server struct {
 	configStore *config.Store
 	stateStore  *state.Store
+	stateMgr    *state.Manager
 	registry    *runtime.Registry
 	cfg         config.Config
 	log         *slog.Logger
@@ -38,6 +39,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	return &Server{
 		configStore: cfgStore,
 		stateStore:  stateStore,
+		stateMgr:    state.NewManager(stateStore, nil),
 		registry:    registry,
 		cfg:         cfg,
 		log:         log,
@@ -67,6 +69,10 @@ func (s *Server) Start(ctx context.Context) error {
 	s.log.Info("dashboard listening", "addr", "http://"+ln.Addr().String())
 
 	serveErr := make(chan error, 1)
+	sweepCtx, stopSweep := context.WithCancel(ctx)
+	defer stopSweep()
+	s.startReconciliationSweep(sweepCtx)
+
 	go func() {
 		if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
 			serveErr <- err
