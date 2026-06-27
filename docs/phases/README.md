@@ -60,3 +60,5 @@ The master PRD §8 milestones map 1:1 onto Phases 1–7 here, with Phase 0 added
 ## How to use these docs with a coding agent
 
 Brief one agent per phase. Each phase PRD is self-contained: it restates the relevant data shapes, the REST/SSE surface it adds, and a verifiable acceptance checklist. Point the agent at the master PRD for the full picture and the phase PRD for the slice to build.
+
+For **autonomous, quota-limited delivery** across many short sessions (Claude Code ⇄ Codex, one at a time), don't brief by hand — point the agent at [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and [`HANDOFF.md`](HANDOFF.md). Claude Code: run the `/work-phase` skill. Codex: repo-root [`AGENTS.md`](../../AGENTS.md) routes there. The agent builds subphase by subphase to GREEN checkpoints and keeps the handoff current so the next session resumes cold.
