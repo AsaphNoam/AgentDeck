@@ -22,6 +22,16 @@ func (s *Server) routes() http.Handler {
 	api("GET /api/backends", s.handleBackends)
 	api("GET /api/layout", s.handleLayout)
 
+	// Phase 1 session lifecycle (launch, control, interim SSE). The {id} routes
+	// are more specific than the GET /api/ catch-all and win via mux precedence.
+	api("POST /api/sessions", s.handleLaunch)
+	api("GET /api/sessions/{id}", s.handleSessionDetail)
+	api("POST /api/sessions/{id}/prompt", s.handlePrompt)
+	api("POST /api/sessions/{id}/cancel", s.handleCancel)
+	api("POST /api/sessions/{id}/stop", s.handleStop)
+	api("POST /api/sessions/{id}/permission", s.handlePermission)
+	api("GET /api/sessions/{id}/events", s.handleEvents)
+
 	// Catch-all for any other /api/* path → 404 JSON (more specific GET routes
 	// above win via the 1.22 mux precedence rules). Registered GET-only on
 	// purpose: a non-GET request to a known route then matches no pattern's

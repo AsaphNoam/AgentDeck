@@ -28,7 +28,7 @@ func NewRootCmd() *cobra.Command {
 func Execute(args []string) int {
 	// Reserved launch syntax: first positional arg of the form role@project.
 	if len(args) > 0 && isLaunchArg(args[0]) {
-		return runLaunchStub(args[0])
+		return runLaunch(args)
 	}
 
 	root := NewRootCmd()
