@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -90,8 +92,14 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 
 	cmd := exec.Command(c.command, c.cmdArgs...)
 	cmd.Dir = spec.Cwd
-	if len(spec.Env) > 0 {
-		cmd.Env = spec.Env
+	// Strip CLAUDECODE: the claude-code-acp adapter refuses to start a "nested"
+	// session when this is set (true when AgentDeck itself was launched from a
+	// Claude Code terminal). AgentDeck spawns independent agent processes, so the
+	// nested-session guard must never apply to them.
+	if env := spec.Env; len(env) > 0 {
+		cmd.Env = stripEnv(env, "CLAUDECODE")
+	} else {
+		cmd.Env = stripEnv(os.Environ(), "CLAUDECODE")
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
@@ -442,6 +450,19 @@ func (c *ChatRuntime) updateStatus(as *agentState, st, detail, trace string, mod
 // writeStatus writes a fully-specified status row.
 func (c *ChatRuntime) writeStatus(as *agentState, st state.Status) error {
 	return c.store.WriteStatus(st)
+}
+
+// stripEnv returns env without any "KEY=..." entries for the given key.
+func stripEnv(env []string, key string) []string {
+	prefix := key + "="
+	out := make([]string, 0, len(env))
+	for _, kv := range env {
+		if strings.HasPrefix(kv, prefix) {
+			continue
+		}
+		out = append(out, kv)
+	}
+	return out
 }
 
 // clip truncates s to at most n bytes (for status detail fields, ≤120 chars).
