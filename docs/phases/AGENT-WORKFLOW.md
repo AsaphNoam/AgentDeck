@@ -1,0 +1,155 @@
+# AgentDeck — Spaced-Session Implementation Workflow
+
+**Canonical protocol for autonomous, quota-limited phase work.** Both Claude Code
+and Codex follow this exact loop (the human runs one at a time). The goal is **fire-and-forget**:
+you are handed a phase, you build subphase by subphase until the phase is done or your
+quota runs out, and you keep [`HANDOFF.md`](HANDOFF.md) so accurate that the next agent
+(possibly a different CLI) can resume cold without you explaining anything.
+
+> Claude Code reaches this loop via the `/work-phase` skill. Codex reaches it via the
+> repo-root [`AGENTS.md`](../../AGENTS.md). Both land here. This file is the single source
+> of truth — if the skill and this doc ever disagree, this doc wins.
+
+---
+
+## 0. The map (read once, then trust the handoff)
+
+- [`HANDOFF.md`](HANDOFF.md) — **live state.** Where we are, what's next, decisions, blockers. Read first, every session.
+- [`README.md`](README.md) — phase plan, dependency graph, build order.
+- `phase-N-*.md` — phase PRD (the *what* + acceptance criteria).
+- `tech/phase-N-*-techspec.md` — tech spec (the *how*). Each ends in a **`## Subphase plan`** section — this is your task list.
+- [`../../MAP.md`](../../MAP.md) — top-level index. [`../agent-dashboard-prd.md`](../agent-dashboard-prd.md) — master PRD.
+
+A **phase** is split into **subphases** (e.g. `5.1`, `5.2`). Each subphase is a single
+quota-sized step that ends at a **GREEN checkpoint** so work is never left half-done.
+
+---
+
+## 1. The loop
+
+```
+1. ORIENT  → read HANDOFF.md; find the active phase + next incomplete subphase; open its spec section.
+2. BUILD   → implement that subphase's steps yourself (no coding subagents — see §4).
+3. VERIFY  → run the GREEN checkpoint (§2). Not green → fix. Can't fix → STOP (§3).
+4. RECORD  → update HANDOFF.md, condense (§5), commit at the checkpoint (§6).
+5. REPEAT  → next subphase. Phase done? Roll to the next phase per the build order.
+6. EXIT    → on stop/quota/blocker: leave HANDOFF green and accurate, summarize what's next.
+```
+
+**Keep going.** Do not stop just because one subphase finished — a finished subphase at a
+GREEN checkpoint is the *ideal* place to be cut off, not a reason to quit. Continue until
+the phase is complete, you hit a STOP condition (§3), or your quota is exhausted.
+
+---
+
+## 2. GREEN checkpoint (the definition of "safe to stop")
+
+A checkpoint is GREEN when **all** of these pass:
+
+```bash
+go build ./...                 # whole module compiles
+go test ./...                  # all existing + new tests pass
+cd ui && npm run build         # ONLY for subphases that touch ui/
+```
+
+`make build` / `make test` / `make dist` wrap these. Each subphase's **"Done when
+(checkpoint)"** line in the tech spec may add specific tests that must pass — treat those
+as part of green. Never record a subphase as done, and never commit, on a red checkpoint.
+
+---
+
+## 3. STOP conditions — when to surface to the human instead of pushing on
+
+Fire-and-forget means: **only stop for things genuinely outside your authority or ability.**
+When you hit one, append it to **`## Blocked on human`** in `HANDOFF.md` with enough context
+to answer cold, leave the checkpoint green, and end your turn with a one-line summary of what's blocking.
+
+Stop when:
+
+- **Ambiguity the specs don't resolve.** The PRD/techspec genuinely doesn't say, and guessing
+  would be expensive to undo. (First *try* to resolve it from the docs — most "ambiguities" are answered in the tech spec.)
+- **A checkpoint won't go green** after a reasonable, honest effort, and the fix needs a decision or info you don't have.
+- **Missing credentials / external input** (e.g. a real CLI login for a credential-gated acceptance subphase).
+- **A destructive or irreversible action** would be required (force-push, deleting user data, rewriting history, anything outward-facing).
+- **Scope conflict** — the spec contradicts itself or contradicts already-shipped code in a way that needs a human call.
+
+Do **not** stop for: a subphase finishing, a normal failing test you can fix, a design choice the
+tech spec already makes for you, or routine multi-step work.
+
+### Judgment calls you made anyway — always flag them
+
+Sometimes an issue doesn't rise to a STOP (it wasn't blocking, or stopping would waste a whole
+session) but it still forced **you** to make a design or implementation decision the specs didn't
+dictate — you resolved an ambiguity, picked between reasonable options, worked around a spec gap or
+a contradiction, or named/structured something the spec left open. **Never let those pass silently.**
+
+For each such call:
+
+- Record it under **`## Autonomous decisions (please review)`** in `HANDOFF.md`: what was ambiguous/
+  missing, the options, **what you chose and why**, and how to reverse it if the human disagrees.
+- Call it out **explicitly in your end-of-turn summary** to the human — don't bury it in the handoff
+  and assume they'll find it. The human should never discover a self-made decision by reading the diff.
+
+When in doubt about whether a choice is "obvious" or a real judgment call, flag it. Over-reporting a
+decision costs a sentence; an unflagged wrong assumption costs a rebuild.
+
+---
+
+## 4. Do the work yourself — no coding subagents
+
+Implement directly in this session. **Do not delegate the build to subagents:** delegated
+agents in this environment have Bash denied, so they cannot run `go build`, `go test`, or
+`npm run build` — they can write code but can't reach a GREEN checkpoint, which defeats the
+whole protocol. You are the one who must verify. (Read-only research via the Explore agent is fine.)
+
+---
+
+## 5. Keeping `HANDOFF.md` lean — condensation rules
+
+The handoff must always reflect *current* truth and nothing stale. Condense as you go:
+
+- **A step finishes** → tick it. The active subphase is the **only** place granular steps live.
+- **A subphase reaches GREEN and is fully done** → delete its per-step list, mark it done in the
+  phase line (`5.2 ✅`), and expand the next subphase's steps in the "Active subphase detail" block.
+- **A whole phase is done** (all subphases green, acceptance criteria met) → collapse it to a single
+  line in "Phase status" (`[x] Phase 5 — Coordination ✅`) and **delete its subphase breakdown entirely.**
+- **Decisions / blockers** that still matter → keep them, tersely, in their sections. Drop ones that no longer apply.
+- **Autonomous decisions** → keep each until the human has clearly acknowledged it; only then fold the durable
+  ones into "Decisions & notes" and drop the rest. Never silently delete one the human hasn't seen.
+- **Changelog** → keep only the last ~10 entries; older history lives in git.
+
+What survives long-term: the one-line-per-phase status, the *active* subphase detail, durable
+decisions, open blockers, a short recent changelog. Everything else is junk — remove it.
+
+---
+
+## 6. Commit at every GREEN checkpoint
+
+Commits are the recovery anchor across spaced sessions, so the work survives a hard quota cut-off.
+
+- Work on a branch (e.g. `impl/phase-N`), **never commit straight to `main`** unless the human said to.
+- At each GREEN checkpoint, commit the code **and** the updated `HANDOFF.md` together.
+- Message: `phase N.M: <subphase title> — green checkpoint`. End the body with:
+
+  ```
+  Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+  ```
+
+  (Codex: use your own co-author trailer.)
+- **Pushing** is a STOP-style action — don't push unless the human has asked for it.
+
+---
+
+## 7. Start-of-session checklist
+
+1. Read `HANDOFF.md` top to bottom.
+2. Confirm the tree is green *before* you touch anything: `go build ./... && go test ./...`.
+   Red on arrival → that's the first thing to fix (or a STOP if you can't).
+3. Open the active subphase's tech-spec section. Build. Verify. Record. Repeat.
+
+## End-of-session checklist (every exit, including quota cut-off mid-work)
+
+1. Tree at a GREEN checkpoint (or, if cut off mid-step, handoff clearly says what's half-done and how to finish it).
+2. `HANDOFF.md` updated + condensed; `Last GREEN checkpoint` and changelog current.
+3. Committed (if green). Summary to the human of what moved and what's next — and **explicitly list any
+   autonomous decisions** (§3) you made, or state plainly that there were none.
