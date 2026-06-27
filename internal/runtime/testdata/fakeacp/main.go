@@ -5,18 +5,22 @@
 // FAKEACP_SCENARIO env var, emitting `session/update` notifications and then a
 // prompt result.
 //
+// Permission scenarios send a `session/request_permission` request back to the
+// client and block until the client replies (or cancels) — exactly the gating
+// pause under test. The sentinel file (FAKEACP_SENTINEL) is created iff the tool
+// is approved, giving tests a side effect that proves the tool "ran".
+//
 // It is intentionally standalone (no internal imports) so it builds and behaves
-// like an external CLI. Scenarios grow across subphases; 1.2 ships stream_text,
-// big_frame, and malformed_then_valid. Permission/tool/crash scenarios are added
-// in 1.3–1.4.
+// like an external CLI.
 package main
 
 import (
 	"bufio"
 	"encoding/json"
-	"fmt"
 	"os"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -36,9 +40,20 @@ type rpcError struct {
 	Message string `json:"message"`
 }
 
-var out = bufio.NewWriter(os.Stdout)
+var (
+	out     = bufio.NewWriter(os.Stdout)
+	writeMu sync.Mutex
+
+	pendingMu sync.Mutex
+	pending   = map[int64]chan rpcMessage{}
+	reqSeq    atomic.Int64
+
+	cancelOnce sync.Once
+	cancelCh   = make(chan struct{})
+)
 
 func main() {
+	reqSeq.Store(1000)
 	sc := bufio.NewScanner(os.Stdin)
 	sc.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
 	for sc.Scan() {
@@ -48,99 +63,182 @@ func main() {
 		}
 		var msg rpcMessage
 		if err := json.Unmarshal(line, &msg); err != nil {
-			continue // ignore malformed input
+			continue
+		}
+		// A response to one of our (server→client) requests.
+		if msg.ID != nil && msg.Method == "" {
+			routeResponse(*msg.ID, msg)
+			continue
 		}
 		handle(&msg)
 	}
 }
 
 func handle(msg *rpcMessage) {
-	// Notifications (no id) — e.g. session/cancel. Nothing to reply.
-	if msg.ID == nil {
+	if msg.ID == nil { // notification
+		if msg.Method == "session/cancel" {
+			cancelOnce.Do(func() { close(cancelCh) })
+		}
 		return
 	}
 	switch msg.Method {
 	case "initialize":
-		respond(*msg.ID, map[string]any{
-			"protocolVersion":   1,
-			"agentCapabilities": map[string]any{},
-		})
+		respond(*msg.ID, map[string]any{"protocolVersion": 1, "agentCapabilities": map[string]any{}})
 	case "session/new":
 		respond(*msg.ID, map[string]any{"sessionId": sessionID})
 	case "session/prompt":
-		runScenario(os.Getenv("FAKEACP_SCENARIO"))
-		respond(*msg.ID, map[string]any{
-			"stopReason": "end_turn",
-			"usage":      map[string]any{"used": 4200, "window": 200000},
-		})
+		id := *msg.ID
+		// Run the scenario asynchronously so the read loop keeps handling the
+		// client's permission reply / cancel while the scenario blocks.
+		go func() {
+			stop := runScenario(os.Getenv("FAKEACP_SCENARIO"))
+			respond(id, map[string]any{
+				"stopReason": stop,
+				"usage":      map[string]any{"used": 4200, "window": 200000},
+			})
+		}()
 	default:
 		respondErr(*msg.ID, -32601, "method not found: "+msg.Method)
 	}
 }
 
-// runScenario replays a named NDJSON sequence of session/update notifications.
-func runScenario(name string) {
+// runScenario replays a named sequence and returns the prompt stopReason.
+func runScenario(name string) string {
 	switch name {
 	case "", "stream_text":
 		for _, chunk := range []string{"Sure, ", "I'll ", "do that."} {
-			emitUpdate(map[string]any{
-				"sessionUpdate": "agent_message_chunk",
-				"content":       map[string]any{"type": "text", "text": chunk},
-			})
+			emitChunk(chunk)
 			time.Sleep(time.Millisecond)
 		}
+		return "end_turn"
+
 	case "tool_flow":
-		// A tool call, then its completion carrying a diff block — asserts
-		// correlated tool_call + tool_result + diff (techspec §10.2).
 		emitUpdate(map[string]any{
-			"sessionUpdate": "tool_call",
-			"toolCallId":    "tc_1",
-			"title":         "Edit main.go",
-			"kind":          "edit",
-			"status":        "in_progress",
-			"rawInput":      map[string]any{"path": "main.go"},
+			"sessionUpdate": "tool_call", "toolCallId": "tc_1",
+			"title": "Edit main.go", "kind": "edit", "status": "in_progress",
+			"rawInput": map[string]any{"path": "main.go"},
 		})
 		emitUpdate(map[string]any{
-			"sessionUpdate": "tool_call_update",
-			"toolCallId":    "tc_1",
-			"status":        "completed",
-			"content": []any{map[string]any{
-				"type":    "diff",
-				"path":    "main.go",
-				"oldText": "a",
-				"newText": "b",
-			}},
+			"sessionUpdate": "tool_call_update", "toolCallId": "tc_1", "status": "completed",
+			"content": []any{map[string]any{"type": "diff", "path": "main.go", "oldText": "a", "newText": "b"}},
 		})
+		return "end_turn"
+
 	case "big_frame":
-		// A single tool_call_update whose content exceeds 64 KiB, locking in the
-		// transport's enlarged scanner buffer end-to-end (techspec §2, §10.2).
 		big := strings.Repeat("x", 100*1024)
 		emitUpdate(map[string]any{
-			"sessionUpdate": "tool_call_update",
-			"toolCallId":    "tc_big",
-			"status":        "completed",
-			"content":       []any{map[string]any{"type": "text", "text": big}},
+			"sessionUpdate": "tool_call_update", "toolCallId": "tc_big", "status": "completed",
+			"content": []any{map[string]any{"type": "text", "text": big}},
 		})
+		return "end_turn"
+
 	case "malformed_then_valid":
-		// Emit a deliberately broken line, then a valid chunk; the runtime must
-		// resync and surface only the valid frame (techspec §8.3).
 		writeRaw("{ this is not valid json }")
-		emitUpdate(map[string]any{
-			"sessionUpdate": "agent_message_chunk",
-			"content":       map[string]any{"type": "text", "text": "recovered"},
-		})
+		emitChunk("recovered")
+		return "end_turn"
+
+	case "permission", "permission_approve", "permission_deny", "permission_timeout":
+		return permissionScenario()
+
+	case "crash_midturn":
+		emitChunk("about to crash")
+		_ = out.Flush()
+		os.Exit(1)
+		return "" // unreachable
+
 	default:
-		// Unknown scenario: behave like stream_text with a single marker chunk.
-		emitUpdate(map[string]any{
-			"sessionUpdate": "agent_message_chunk",
-			"content":       map[string]any{"type": "text", "text": "unknown scenario: " + name},
-		})
+		emitChunk("unknown scenario: " + name)
+		return "end_turn"
 	}
 }
 
-func emitUpdate(update map[string]any) {
-	params := map[string]any{"sessionId": sessionID, "update": update}
+// permissionScenario requests permission for a tool and blocks until the client
+// decides or cancels. On approval it creates the sentinel file.
+func permissionScenario() string {
+	id := reqSeq.Add(1)
+	ch := registerPending(id)
+	sendRequest(id, "session/request_permission", map[string]any{
+		"sessionId": sessionID,
+		"reason":    "run a shell command",
+		"toolCall": map[string]any{
+			"toolCallId": "tc_p", "title": "Run ls", "kind": "execute",
+			"rawInput": map[string]any{"command": "ls"},
+		},
+		"options": []any{
+			map[string]any{"optionId": "opt_allow", "name": "Allow", "kind": "allow_once"},
+			map[string]any{"optionId": "opt_reject", "name": "Reject", "kind": "reject_once"},
+		},
+	})
+
+	select {
+	case resp := <-ch:
+		switch outcome, optID := parseOutcome(resp.Result); outcome {
+		case "selected":
+			if optID == "opt_allow" {
+				writeSentinel()
+			}
+			return "end_turn"
+		default: // "cancelled"
+			return "cancelled"
+		}
+	case <-cancelCh:
+		return "cancelled"
+	}
+}
+
+func parseOutcome(result json.RawMessage) (string, string) {
+	var r struct {
+		Outcome struct {
+			Outcome  string `json:"outcome"`
+			OptionID string `json:"optionId"`
+		} `json:"outcome"`
+	}
+	_ = json.Unmarshal(result, &r)
+	return r.Outcome.Outcome, r.Outcome.OptionID
+}
+
+func writeSentinel() {
+	if path := os.Getenv("FAKEACP_SENTINEL"); path != "" {
+		_ = os.WriteFile(path, []byte("ran"), 0o644)
+	}
+}
+
+// --- request/response plumbing ---
+
+func registerPending(id int64) chan rpcMessage {
+	ch := make(chan rpcMessage, 1)
+	pendingMu.Lock()
+	pending[id] = ch
+	pendingMu.Unlock()
+	return ch
+}
+
+func routeResponse(id int64, msg rpcMessage) {
+	pendingMu.Lock()
+	ch, ok := pending[id]
+	if ok {
+		delete(pending, id)
+	}
+	pendingMu.Unlock()
+	if ok {
+		ch <- msg
+	}
+}
+
+func sendRequest(id int64, method string, params map[string]any) {
 	raw, _ := json.Marshal(params)
+	writeMessage(rpcMessage{JSONRPC: "2.0", ID: &id, Method: method, Params: raw})
+}
+
+func emitChunk(text string) {
+	emitUpdate(map[string]any{
+		"sessionUpdate": "agent_message_chunk",
+		"content":       map[string]any{"type": "text", "text": text},
+	})
+}
+
+func emitUpdate(update map[string]any) {
+	raw, _ := json.Marshal(map[string]any{"sessionId": sessionID, "update": update})
 	writeMessage(rpcMessage{JSONRPC: "2.0", Method: "session/update", Params: raw})
 }
 
@@ -159,6 +257,9 @@ func writeMessage(msg rpcMessage) {
 }
 
 func writeRaw(s string) {
-	fmt.Fprint(out, s, "\n")
-	out.Flush()
+	writeMu.Lock()
+	defer writeMu.Unlock()
+	_, _ = out.WriteString(s)
+	_ = out.WriteByte('\n')
+	_ = out.Flush()
 }

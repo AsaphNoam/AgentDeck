@@ -9,9 +9,9 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 ## Current position
 
 - **Active phase:** 1 — Core loop (ACP chat runtime, launch, streaming chat) · F4, F3(min)
-- **Active subphase:** 1.4 — Permission gating (withhold response + timeout + skip_permissions) and Cancel
+- **Active subphase:** 1.5 — Launch flow, composition, REST + interim SSE, CLI parity
 - **Spec:** [`tech/phase-1-core-loop-techspec.md`](tech/phase-1-core-loop-techspec.md) → `## Subphase plan`
-- **Last GREEN checkpoint:** `go build ./...` + `go test ./...` (and `-race`) pass @ `impl/phase-1` (1.3 complete)
+- **Last GREEN checkpoint:** `go build ./...` + `go test ./...` (and `-race`) pass @ `impl/phase-1` (1.4 complete)
 - **Branch:** `impl/phase-1` (do not commit to `main`)
 
 ---
@@ -40,23 +40,27 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 - [x] **1.1** Foundations: sentinels, event types, `Runtime` interface + Registry skeleton ✅
 - [x] **1.2** Fake ACP CLI + JSON-RPC stdio transport (deterministic test harness) ✅
 - [x] **1.3** `ChatRuntime.Start` + ACP→normalized mapping + hub/Subscribe (stream a turn end-to-end) ✅
-- [ ] **1.4** Permission gating (withhold response + timeout + skip_permissions) and Cancel ← **active**
-- [ ] **1.5** Launch flow, composition, REST + interim SSE, CLI parity
+- [x] **1.4** Permission gating (withhold response + timeout + skip_permissions) and Cancel ✅
+- [ ] **1.5** Launch flow, composition, REST + interim SSE, CLI parity ← **active**
 - [ ] **1.6** Real-CLI acceptance (credential-gated) + manual verification
 
-**Active step (1.4):** wire `onRequest` in `ChatRuntime.Start` (currently `nil`) to handle
-`session/request_permission`: emit `permission_request` (status `waiting_input`), keep the
-`IncomingRequest` in a pending map keyed by `toolCallID`, and **withhold** its response (the pause).
-`Permission(agentID, toolCallID, decision)` maps approve→`allow_once`/deny→`reject_once` (§5.3) and
-calls `req.Respond({outcome:{outcome:"selected",optionId}})`. Add 180s timeout auto-deny
-(`PERMISSION_TIMEOUT` env, shortenable in tests) and the `skip_permissions` auto-approve path
-(`AutoApproved:true`, no `waiting_input`, §5.2). Implement `Cancel` (ACP `session/cancel` notify;
-resolve any pending permission as cancelled first, §8.4) and crash handling in `onTransportClosed`
-(`error{fatal:true}` + delete running row + status `error`, §8.2). Add fakeacp scenarios
-`permission_approve`/`permission_deny`/`permission_timeout`/`crash_midturn` (sentinel-file trick §10.2).
-Done-when: `go test ./internal/runtime` green for those + cancel-during-pending-permission.
-NOTE: `Stop` (process-group SIGTERM→SIGKILL, delete running row, status `done`) was already
-implemented in 1.3 for test teardown — 1.4 only adds start-time/shutdown stale-row reconciliation.
+**Active step (1.5):** build the launch composition + transport in front of the (now complete) runtime.
+Read §6 (launch/composition), §7 (API contracts), §7.8 (SSE wire), §6.5 (CLI). Deliverables:
+`composeEnv` (os.Environ → backend env → per-model env override), system-prompt join
+(`context_prompt`\n\n`role.system_prompt`, skip empties), `resolveSkip` (role.skip_permissions ?? global,
+§12.2), name auto-suggest (wordlist, first unused vs live running rows, §6.3), hook-token mint
+(`crypto/rand`), `messagingServer` `MCPServerSpec` builder, `LaunchSpec` builder, failure rollback (§6.1);
+REST handlers `POST /api/sessions`, `GET /api/sessions/{id}`, `prompt`, `cancel`, `stop`, `permission`
+with §7.7 error mapping (use runtime `APIError`/code vocab + `runtime.runtimeFor`); interim SSE
+`GET /api/sessions/{id}/events` (subscribe, `id:`=seq, `event: message`/`ping`, 10s keepalive, status
+replay, §7.8); CLI `agentdeck <role>@<project>` parsing → POST to the same REST endpoint (§6.5).
+Wire `ReconcileStale` on server start + `ChatRuntime.StopAll` on shutdown. Done-when: `go test ./...`
+green incl. a handler test driving fakeacp `POST /sessions→prompt→/events until permission_request→
+permission`, and a CLI-vs-REST parity test (Appendix A). The SSE `data:` object MUST be byte-identical
+to the `Event` struct (Phase 2 forward-compat). Phase-0 launch stub at
+[`internal/cli/launch_stub.go`](../../internal/cli/launch_stub.go) is replaced here.
+Server wiring needs a `*runtime.Registry` (or `*ChatRuntime`) reachable from the server — see how
+`internal/server` is constructed in Phase 0 and thread the registry through.
 
 > ⚠️ **1.6 is a known STOP point** — it needs real `claude-code-acp` credentials. When you reach it,
 > if you don't have a logged-in CLI, record it under "Blocked on human" and stop rather than fake it.
@@ -79,8 +83,14 @@ implemented in 1.3 for test teardown — 1.4 only adds start-time/shutdown stale
 - 1.3 added: `hub.go` (per-agent fan-out, drop-oldest, cap 256), `acpmap.go` (ALL ACP decoding —
   `mapSessionUpdate`/`mapPromptResult`), `ringbuffer.go` (stderr tail), real `chat.go` (`ChatRuntime`
   with `agentState` per agent: process-group spawn, handshake, hub, async `SendPrompt` turn, §4.4 status
-  writes, working `Stop`). `command` field is injectable (tests point it at fakeacp). Permission
-  `onRequest` is still `nil` (1.4). `c.command` defaults to `claude-code-acp`.
+  writes, working `Stop`). `command` field is injectable (tests point it at fakeacp). `c.command`
+  defaults to `claude-code-acp`.
+- 1.4 added: `permission.go` (`onRequest` withhold-the-response gate, `Permission` relay, 180s
+  `permissionTimeout` auto-deny, `skip_permissions` auto-approve, `Cancel` via `session/cancel` notify +
+  pending resolution, `StopAll`), crash handling in `onTransportClosed` (`error{fatal}` + delete running +
+  status `error`, §8.2), `reconcile.go` (`ReconcileStale` for stale running rows on startup). fakeacp
+  rewritten with concurrent request/response routing + sentinel-file trick; scenarios `permission*` and
+  `crash_midturn`. The full `Runtime` interface is now real for the claude-acp chat path.
 
 ## Blocked on human
 
@@ -112,6 +122,9 @@ _(empty — nothing blocking. Add items here per workflow §3, then stop.)_
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-27 — **1.4 green** (incl. `-race`). Permission gating (withhold/approve/deny/timeout/skip),
+  Cancel, crash handling, stale-row reconcile. Tests: approve→sentinel, deny→no sentinel, timeout auto-deny,
+  skip auto-approve, unknown-tool 409, cancel-during-pending, crash (fatal err + running row deleted), reconcile.
 - 2026-06-27 — **1.3 green.** Real `ChatRuntime`: process-group spawn + ACP handshake, isolated
   `acpmap.go`, per-agent `Hub` (drop-oldest), async `SendPrompt` streaming a turn end-to-end, §4.4 status
   writes, working `Stop`. Tests (incl. `-race`): `stream_text` (multi-delta + monotonic seq + context_pct),
