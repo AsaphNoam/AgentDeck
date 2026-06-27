@@ -9,9 +9,9 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 ## Current position
 
 - **Active phase:** 1 — Core loop (ACP chat runtime, launch, streaming chat) · F4, F3(min)
-- **Active subphase:** 1.2 — Fake ACP CLI + JSON-RPC stdio transport (deterministic test harness)
+- **Active subphase:** 1.3 — `ChatRuntime.Start` + ACP→normalized mapping + hub/Subscribe (stream a turn)
 - **Spec:** [`tech/phase-1-core-loop-techspec.md`](tech/phase-1-core-loop-techspec.md) → `## Subphase plan`
-- **Last GREEN checkpoint:** `go build ./...` + `go test ./...` pass @ `impl/phase-1` (1.1 complete)
+- **Last GREEN checkpoint:** `go build ./...` + `go test ./...` pass @ `impl/phase-1` (1.2 complete)
 - **Branch:** `impl/phase-1` (do not commit to `main`)
 
 ---
@@ -38,17 +38,20 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 ### Phase 1 subphases (from the tech spec — tick as each goes green)
 - [x] **1.1** Foundations: sentinels, event types, `Runtime` interface + Registry skeleton ✅
-- [ ] **1.2** Fake ACP CLI + JSON-RPC stdio transport (deterministic test harness) ← **active**
-- [ ] **1.3** `ChatRuntime.Start` + ACP→normalized mapping + hub/Subscribe (stream a turn end-to-end)
+- [x] **1.2** Fake ACP CLI + JSON-RPC stdio transport (deterministic test harness) ✅
+- [ ] **1.3** `ChatRuntime.Start` + ACP→normalized mapping + hub/Subscribe (stream a turn end-to-end) ← **active**
 - [ ] **1.4** Permission gating (withhold response + timeout + skip_permissions) and Cancel/Stop
 - [ ] **1.5** Launch flow, composition, REST + interim SSE, CLI parity
 - [ ] **1.6** Real-CLI acceptance (credential-gated) + manual verification
 
-**Active step (1.2):** build `testdata/fakeacp/main.go` (scenarios `stream_text`, `big_frame`,
-`malformed_then_valid`) + the JSON-RPC stdio transport (8 MiB scanner, serialized writer,
-request/response correlation map, notification dispatch hook). Read §2, §8.1/§8.3, §10.2.
-Done-when: `go build ./...` + fake CLI builds; `go test ./internal/runtime` green with a >64 KiB
-frame test and a malformed-then-valid resync test.
+**Active step (1.3):** implement `ChatRuntime.Start` (process-group spawn `Setpgid`, `initialize` +
+`session/new` handshake, capture `sessionId`, insert running+status rows), `acpmap.go` (ACP
+`session/update` → normalized `Event` with per-agent monotonic `Seq`, ALL ACP decoding isolated here),
+the in-process `Hub`+`Subscribe` (bounded buffered chans, drop-oldest), and `SendPrompt` driving
+`session/prompt`→`turn_end` + §4.4 status transitions. Read §4.1, §4.3, §4.4, §2.1. Add a `tool_flow`
+scenario to fakeacp. Done-when: `go test ./internal/runtime` green: `stream_text` yields multiple
+`assistant_text` then `turn_end`; `tool_flow` yields correlated `tool_call`+`tool_result`+`diff`;
+status row `idle→busy→idle` with `context_pct` written. Leave `session/request_permission` unhandled (1.4).
 
 > ⚠️ **1.6 is a known STOP point** — it needs real `claude-code-acp` credentials. When you reach it,
 > if you don't have a logged-in CLI, record it under "Blocked on human" and stop rather than fake it.
@@ -63,6 +66,11 @@ frame test and a malformed-then-valid resync test.
   (Event envelope + `*Data` payloads), `runtime.go` (Runtime iface, LaunchSpec, MCPServerSpec, Handle),
   `registry.go` (byIface dispatch + terminal stub), `chat.go` (ChatRuntime stub). All methods return
   `ErrNotImplemented` until later subphases.
+- 1.2 added: `jsonrpc.go` (rpcMessage union + `kind()` classifier), `transport.go` (`Transport`:
+  8 MiB scanner, serialized writer, `Call`/`Notify`, request/response correlation map, `IncomingRequest`
+  with withhold-then-`Respond` for permission gating), `testdata/fakeacp/main.go` (standalone fake ACP
+  CLI: scenarios `stream_text`, `big_frame`, `malformed_then_valid`). fakeacp is under `testdata/` so
+  `go build ./...` skips it — build explicitly: `go build -o /dev/null ./internal/runtime/testdata/fakeacp`.
 
 ## Blocked on human
 
@@ -85,6 +93,9 @@ _(empty — nothing blocking. Add items here per workflow §3, then stop.)_
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-27 — **1.2 green.** Added JSON-RPC stdio transport (8 MiB scanner, serialized writer, Call/Notify,
+  correlation map, IncomingRequest withhold/Respond) + standalone fakeacp CLI (stream_text/big_frame/
+  malformed_then_valid). Tests: >64 KiB frame, malformed-then-valid resync, Call/response, incoming-request reply.
 - 2026-06-27 — **1.1 green.** Created `internal/runtime`: sentinel + APIError/code vocab, Event envelope +
   payload structs, Runtime interface, Registry dispatch + terminal/ChatRuntime stubs. Tests: payload JSON
   round-trips, code→status map, dispatch table. `go build ./...` + `go test ./...` green.
