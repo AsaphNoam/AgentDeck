@@ -1,4 +1,4 @@
-package store
+package config
 
 import (
 	"fmt"
@@ -11,19 +11,19 @@ import (
 func (s *Store) EnsureLayout() error {
 	if fi, err := os.Stat(s.home); err == nil {
 		if !fi.IsDir() {
-			return fmt.Errorf("store: home %q exists but is not a directory", s.home)
+			return fmt.Errorf("config: home %q exists but is not a directory", s.home)
 		}
 	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("store: stat home %q: %w", s.home, err)
+		return fmt.Errorf("config: stat home %q: %w", s.home, err)
 	}
 
 	if err := os.MkdirAll(s.home, 0o755); err != nil {
-		return fmt.Errorf("store: create home %q: %w", s.home, err)
+		return fmt.Errorf("config: create home %q: %w", s.home, err)
 	}
 	for _, d := range dataDirs {
 		p := s.dirPath(d)
 		if err := os.MkdirAll(p, 0o755); err != nil {
-			return fmt.Errorf("store: create dir %q: %w", p, err)
+			return fmt.Errorf("config: create dir %q: %w", p, err)
 		}
 	}
 	return nil

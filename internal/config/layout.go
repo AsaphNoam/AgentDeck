@@ -1,4 +1,4 @@
-package store
+package config
 
 // Layout single-file object: layout.json.
 

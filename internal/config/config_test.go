@@ -1,18 +1,14 @@
-package store
+package config
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"testing"
-	"time"
 )
 
-// newTestStore returns a Store rooted at a fresh temp dir and ensures the layout
-// exists. AGENTDECK_HOME is set to the temp dir so any New()-based code path in
-// the same test stays isolated and never touches the real ~/.agentdeck.
 func newTestStore(t *testing.T) *Store {
 	t.Helper()
 	dir := t.TempDir()
@@ -30,54 +26,8 @@ func newTestStore(t *testing.T) *Store {
 	return s
 }
 
-func mustTime(t *testing.T, s string) time.Time {
-	t.Helper()
-	tm, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		t.Fatalf("parse time %q: %v", s, err)
-	}
-	return tm
-}
-
-// ---- Round-trip every object ----
-
-func TestRoundTrip(t *testing.T) {
+func TestRoundTripConfigObjects(t *testing.T) {
 	s := newTestStore(t)
-	busy := mustTime(t, "2026-06-22T10:00:05Z")
-
-	agent := Agent{
-		AgentID: "a_8f3c12", Name: "Atlas", Role: "implementer", Project: "my-app",
-		Backend: "claude", Model: "sonnet-4-6", Interface: "chat",
-		CreatedAt: mustTime(t, "2026-06-22T10:00:00Z"), Group: "auth-migration",
-	}
-	if err := s.WriteAgent(agent); err != nil {
-		t.Fatalf("WriteAgent: %v", err)
-	}
-	if got, err := s.ReadAgent(agent.AgentID); err != nil || !reflect.DeepEqual(got, agent) {
-		t.Fatalf("Agent round-trip: got %+v err %v", got, err)
-	}
-
-	run := RunningEntry{
-		AgentID: "a_8f3c12", PID: 48213, SessionID: "claude-sess-xyz",
-		Interface: "chat", StartedAt: mustTime(t, "2026-06-22T10:00:01Z"),
-	}
-	if err := s.WriteRunning(run); err != nil {
-		t.Fatalf("WriteRunning: %v", err)
-	}
-	if got, err := s.ReadRunning(run.AgentID); err != nil || !reflect.DeepEqual(got, run) {
-		t.Fatalf("RunningEntry round-trip: got %+v err %v", got, err)
-	}
-
-	st := Status{
-		AgentID: "a_8f3c12", State: "busy", Detail: "Editing src/auth.ts",
-		LastTrace: "tool: edit", BusySince: &busy, ContextPct: 0.42,
-	}
-	if err := s.WriteStatus(st); err != nil {
-		t.Fatalf("WriteStatus: %v", err)
-	}
-	if got, err := s.ReadStatus(st.AgentID); err != nil || !reflect.DeepEqual(got, st) {
-		t.Fatalf("Status round-trip: got %+v err %v", got, err)
-	}
 
 	role := Role{Title: "Reviewer", SystemPrompt: "Review.", SkipPermissions: boolPtr(true)}
 	if err := s.WriteRole("reviewer", role); err != nil {
@@ -87,14 +37,17 @@ func TestRoundTrip(t *testing.T) {
 		t.Fatalf("Role round-trip: got %+v err %v", got, err)
 	}
 
-	proj := Project{
-		Title: "My App", Color: [3]int{100, 180, 255}, Cwd: "~/Projects/my-app",
-		AddDirs: []string{"~/shared"}, ContextPrompt: "ctx",
+	project := Project{
+		Title:         "My App",
+		Color:         [3]int{100, 180, 255},
+		Cwd:           "~/Projects/my-app",
+		AddDirs:       []string{"~/shared"},
+		ContextPrompt: "ctx",
 	}
-	if err := s.WriteProject("my-app", proj); err != nil {
+	if err := s.WriteProject("my-app", project); err != nil {
 		t.Fatalf("WriteProject: %v", err)
 	}
-	if got, err := s.ReadProject("my-app"); err != nil || !reflect.DeepEqual(got, proj) {
+	if got, err := s.ReadProject("my-app"); err != nil || !reflect.DeepEqual(got, project) {
 		t.Fatalf("Project round-trip: got %+v err %v", got, err)
 	}
 
@@ -123,24 +76,52 @@ func TestRoundTrip(t *testing.T) {
 	}
 }
 
-// ---- Not found ----
+func TestDeleteRoleAndProjectTolerateMissing(t *testing.T) {
+	s := newTestStore(t)
+
+	if err := s.WriteRole("reviewer", Role{Title: "Reviewer"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DeleteRole("reviewer"); err != nil {
+		t.Fatalf("DeleteRole existing: %v", err)
+	}
+	if _, err := s.ReadRole("reviewer"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("ReadRole deleted: err = %v, want ErrNotFound", err)
+	}
+	if err := s.DeleteRole("reviewer"); err != nil {
+		t.Fatalf("DeleteRole missing: %v", err)
+	}
+
+	if err := s.WriteProject("my-app", Project{Title: "My App"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DeleteProject("my-app"); err != nil {
+		t.Fatalf("DeleteProject existing: %v", err)
+	}
+	if _, err := s.ReadProject("my-app"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("ReadProject deleted: err = %v, want ErrNotFound", err)
+	}
+	if err := s.DeleteProject("my-app"); err != nil {
+		t.Fatalf("DeleteProject missing: %v", err)
+	}
+}
 
 func TestReadNotFound(t *testing.T) {
 	s := newTestStore(t)
-	if _, err := s.ReadAgent("nope"); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("ReadAgent missing: err = %v, want ErrNotFound", err)
+	if _, err := s.ReadRole("nope"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("ReadRole missing: err = %v, want ErrNotFound", err)
+	}
+	if _, err := s.ReadProject("nope"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("ReadProject missing: err = %v, want ErrNotFound", err)
 	}
 	if _, err := s.ReadConfig(); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("ReadConfig missing: err = %v, want ErrNotFound", err)
 	}
 }
 
-// ---- Corrupt-file survival ----
-
 func TestCorruptFileSurvival(t *testing.T) {
 	s := newTestStore(t)
 
-	// Seed a couple of good roles plus one corrupt one (from testdata).
 	if err := s.WriteRole("good1", Role{Title: "Good 1"}); err != nil {
 		t.Fatal(err)
 	}
@@ -155,24 +136,20 @@ func TestCorruptFileSurvival(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// ReadRole on the corrupt one → ErrCorrupt (not panic, not NotFound).
 	if _, err := s.ReadRole("bad"); !errors.Is(err, ErrCorrupt) {
 		t.Fatalf("ReadRole corrupt: err = %v, want ErrCorrupt", err)
 	}
-
-	// ListRoles skips the corrupt one and returns the two good ones.
 	roles, err := s.ListRoles()
 	if err != nil {
 		t.Fatalf("ListRoles: %v", err)
 	}
 	if len(roles) != 2 {
-		t.Fatalf("ListRoles len = %d, want 2 (corrupt skipped): %v", len(roles), roles)
+		t.Fatalf("ListRoles len = %d, want 2: %v", len(roles), roles)
 	}
 	if _, ok := roles["bad"]; ok {
 		t.Fatal("ListRoles included corrupt role")
 	}
 
-	// Single-file corrupt backends → ErrCorrupt from the reader.
 	cb, err := os.ReadFile(filepath.Join("testdata", "corrupt_backends.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -185,10 +162,29 @@ func TestCorruptFileSurvival(t *testing.T) {
 	}
 }
 
-// ---- AGENTDECK_HOME isolation + unset resolution ----
+func TestListProjectsSkipsCorruptFiles(t *testing.T) {
+	s := newTestStore(t)
+
+	if err := s.WriteProject("good", Project{Title: "Good"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(s.projectPath("bad"), []byte("{"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	projects, err := s.ListProjects()
+	if err != nil {
+		t.Fatalf("ListProjects: %v", err)
+	}
+	if len(projects) != 1 {
+		t.Fatalf("ListProjects len = %d, want 1: %v", len(projects), projects)
+	}
+	if _, ok := projects["bad"]; ok {
+		t.Fatal("ListProjects included corrupt project")
+	}
+}
 
 func TestHomeResolution(t *testing.T) {
-	// Override path is honored exactly.
 	dir := t.TempDir()
 	t.Setenv(envHome, dir)
 	s, err := New()
@@ -199,20 +195,50 @@ func TestHomeResolution(t *testing.T) {
 		t.Fatalf("Home() = %q, want %q", s.Home(), dir)
 	}
 
-	// Unset → resolves under the user's home dir (assert path only; no writes).
 	t.Setenv(envHome, "")
 	s2, err := New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	uh, _ := os.UserHomeDir()
+	uh, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
 	want := filepath.Join(uh, ".agentdeck")
 	if s2.Home() != want {
 		t.Fatalf("default Home() = %q, want %q", s2.Home(), want)
 	}
 }
 
-// ---- Tilde expansion ----
+func TestHomeResolutionExpandsTildeOverride(t *testing.T) {
+	uh, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(envHome, "~/agentdeck-test-home")
+	s, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(uh, "agentdeck-test-home")
+	if s.Home() != want {
+		t.Fatalf("tilde Home() = %q, want %q", s.Home(), want)
+	}
+}
+
+func TestHomeResolutionMakesRelativeOverrideAbsolute(t *testing.T) {
+	t.Setenv(envHome, "relative-agentdeck-home")
+	s, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !filepath.IsAbs(s.Home()) {
+		t.Fatalf("Home() = %q, want absolute path", s.Home())
+	}
+	if got := filepath.Base(s.Home()); got != "relative-agentdeck-home" {
+		t.Fatalf("Home() base = %q, want relative-agentdeck-home", got)
+	}
+}
 
 func TestExpandTilde(t *testing.T) {
 	uh, err := os.UserHomeDir()
@@ -224,7 +250,7 @@ func TestExpandTilde(t *testing.T) {
 		{"~", uh},
 		{"/abs/path", "/abs/path"},
 		{"relative/path", "relative/path"},
-		{"~user/x", "~user/x"}, // ~user form not supported, returned unchanged
+		{"~user/x", "~user/x"},
 	}
 	for _, c := range cases {
 		got, err := ExpandTilde(c.in)
@@ -237,56 +263,12 @@ func TestExpandTilde(t *testing.T) {
 	}
 }
 
-// ---- NewAgentID format + uniqueness ----
-
-func TestNewAgentID(t *testing.T) {
+func TestAtomicWriteNoTempAndValidJSON(t *testing.T) {
 	s := newTestStore(t)
-	re := regexp.MustCompile(`^a_[0-9a-f]{6}$`)
-	seen := make(map[string]bool, 1000)
-	for i := 0; i < 1000; i++ {
-		id, err := s.NewAgentID()
-		if err != nil {
-			t.Fatalf("NewAgentID: %v", err)
-		}
-		if !re.MatchString(id) {
-			t.Fatalf("NewAgentID format = %q, want ^a_[0-9a-f]{6}$", id)
-		}
-		if seen[id] {
-			t.Fatalf("NewAgentID returned duplicate %q", id)
-		}
-		seen[id] = true
-	}
-}
-
-func TestNewAgentIDCollisionRetry(t *testing.T) {
-	s := newTestStore(t)
-	// Pre-create an agent, then confirm NewAgentID never returns that id.
-	existing, err := s.NewAgentID()
-	if err != nil {
+	if err := s.WriteRole("reviewer", Role{Title: "Reviewer"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.WriteAgent(Agent{AgentID: existing}); err != nil {
-		t.Fatal(err)
-	}
-	for i := 0; i < 50; i++ {
-		id, err := s.NewAgentID()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if id == existing {
-			t.Fatalf("NewAgentID returned a colliding id %q", id)
-		}
-	}
-}
-
-// ---- Atomic write leaves no .tmp file ----
-
-func TestAtomicWriteNoTemp(t *testing.T) {
-	s := newTestStore(t)
-	if err := s.WriteAgent(Agent{AgentID: "a_abc123", Name: "x"}); err != nil {
-		t.Fatal(err)
-	}
-	entries, err := os.ReadDir(s.dirPath(dirAgents))
+	entries, err := os.ReadDir(s.dirPath(dirRoles))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,24 +277,36 @@ func TestAtomicWriteNoTemp(t *testing.T) {
 			t.Fatalf("leftover temp file after atomic write: %s", e.Name())
 		}
 	}
-	// And the real file parses back.
-	if _, err := s.ReadAgent("a_abc123"); err != nil {
-		t.Fatalf("ReadAgent after atomic write: %v", err)
+	data, err := os.ReadFile(s.rolePath("reviewer"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !json.Valid(data) {
+		t.Fatalf("role file is invalid JSON: %s", data)
+	}
+	if _, err := s.ReadRole("reviewer"); err != nil {
+		t.Fatalf("ReadRole after atomic write: %v", err)
 	}
 }
 
-// ---- EnsureLayout idempotency + file-as-home failure ----
-
-func TestEnsureLayoutIdempotent(t *testing.T) {
+func TestEnsureLayoutCreatesOnlyConfigAndTranscriptDirs(t *testing.T) {
 	s := newTestStore(t)
 	if err := s.EnsureLayout(); err != nil {
 		t.Fatalf("EnsureLayout second call: %v", err)
 	}
-	for _, d := range dataDirs {
+	for _, d := range []string{dirRoles, dirProjects, dirSessions} {
 		fi, err := os.Stat(s.dirPath(d))
 		if err != nil || !fi.IsDir() {
 			t.Fatalf("dir %q missing after EnsureLayout: %v", d, err)
 		}
+	}
+	for _, d := range []string{"agents", "running", "status", "messages"} {
+		if _, err := os.Stat(s.dirPath(d)); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("unexpected state dir %q exists or stat failed: %v", d, err)
+		}
+	}
+	if _, err := os.Stat(s.filePath("state.db")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("unexpected state.db exists or stat failed: %v", err)
 	}
 }
 
@@ -328,16 +322,16 @@ func TestEnsureLayoutHomeIsFile(t *testing.T) {
 	}
 }
 
-// ---- Seed idempotency / no-clobber ----
-
 func TestSeedIfAbsentNoClobber(t *testing.T) {
 	s := newTestStore(t)
 	if err := s.SeedIfAbsent(); err != nil {
 		t.Fatalf("SeedIfAbsent: %v", err)
 	}
 
-	// All 4 roles + project + single files present.
-	roles, _ := s.ListRoles()
+	roles, err := s.ListRoles()
+	if err != nil {
+		t.Fatalf("ListRoles: %v", err)
+	}
 	if len(roles) != 4 {
 		t.Fatalf("seeded roles = %d, want 4", len(roles))
 	}
@@ -347,8 +341,13 @@ func TestSeedIfAbsentNoClobber(t *testing.T) {
 	if _, err := s.ReadConfig(); err != nil {
 		t.Fatalf("seeded config: %v", err)
 	}
+	if _, err := s.ReadBackends(); err != nil {
+		t.Fatalf("seeded backends: %v", err)
+	}
+	if _, err := s.ReadLayout(); err != nil {
+		t.Fatalf("seeded layout: %v", err)
+	}
 
-	// Mutate reviewer, re-seed, assert preserved (no clobber).
 	mutated := Role{Title: "MUTATED", SystemPrompt: "changed", SkipPermissions: boolPtr(false)}
 	if err := s.WriteRole("reviewer", mutated); err != nil {
 		t.Fatal(err)
@@ -365,19 +364,17 @@ func TestSeedIfAbsentNoClobber(t *testing.T) {
 	}
 }
 
-// ---- List on empty/missing dir returns empty, not error ----
-
 func TestListEmpty(t *testing.T) {
 	s := newTestStore(t)
-	agents, err := s.ListAgents()
+	roles, err := s.ListRoles()
 	if err != nil {
-		t.Fatalf("ListAgents empty: %v", err)
+		t.Fatalf("ListRoles empty: %v", err)
 	}
-	if len(agents) != 0 {
-		t.Fatalf("ListAgents empty len = %d, want 0", len(agents))
+	if len(roles) != 0 {
+		t.Fatalf("ListRoles empty len = %d, want 0", len(roles))
 	}
-	running, err := s.ListRunning()
-	if err != nil || len(running) != 0 {
-		t.Fatalf("ListRunning empty: len %d err %v", len(running), err)
+	projects, err := s.ListProjects()
+	if err != nil || len(projects) != 0 {
+		t.Fatalf("ListProjects empty: len %d err %v", len(projects), err)
 	}
 }

@@ -10,7 +10,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/agentdeck/agentdeck/internal/store"
+	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/agentdeck/agentdeck/internal/state"
 )
 
 // testServer builds a Server backed by a seeded temp-home store. AGENTDECK_HOME
@@ -19,20 +20,25 @@ func testServer(t *testing.T, seed bool) *Server {
 	t.Helper()
 	dir := t.TempDir()
 	t.Setenv("AGENTDECK_HOME", dir)
-	st, err := store.New()
+	cfgStore, err := config.New()
 	if err != nil {
-		t.Fatalf("store.New: %v", err)
+		t.Fatalf("config.New: %v", err)
 	}
-	if err := st.EnsureLayout(); err != nil {
+	if err := cfgStore.EnsureLayout(); err != nil {
 		t.Fatalf("EnsureLayout: %v", err)
 	}
 	if seed {
-		if err := st.SeedIfAbsent(); err != nil {
+		if err := cfgStore.SeedIfAbsent(); err != nil {
 			t.Fatalf("SeedIfAbsent: %v", err)
 		}
 	}
+	stateStore, err := state.Open(cfgStore.Home())
+	if err != nil {
+		t.Fatalf("state.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = stateStore.Close() })
 	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	return New(st, store.DefaultConfig(), log)
+	return New(cfgStore, stateStore, config.DefaultConfig(), log)
 }
 
 func doGET(t *testing.T, h http.Handler, path string) *httptest.ResponseRecorder {
@@ -81,7 +87,7 @@ func TestRolesSeeded(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("roles status = %d, want 200", rec.Code)
 	}
-	var roles map[string]store.Role
+	var roles map[string]config.Role
 	if err := json.Unmarshal(rec.Body.Bytes(), &roles); err != nil {
 		t.Fatalf("roles body: %v", err)
 	}
@@ -101,7 +107,7 @@ func TestProjectsSeeded(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("projects status = %d, want 200", rec.Code)
 	}
-	var projects map[string]store.Project
+	var projects map[string]config.Project
 	if err := json.Unmarshal(rec.Body.Bytes(), &projects); err != nil {
 		t.Fatalf("projects body: %v", err)
 	}
@@ -116,7 +122,7 @@ func TestBackendsSeeded(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("backends status = %d, want 200", rec.Code)
 	}
-	var b store.BackendsConfig
+	var b config.BackendsConfig
 	if err := json.Unmarshal(rec.Body.Bytes(), &b); err != nil {
 		t.Fatalf("backends body: %v", err)
 	}
@@ -132,7 +138,7 @@ func TestLayoutDefault(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("layout status = %d, want 200", rec.Code)
 	}
-	var l store.Layout
+	var l config.Layout
 	if err := json.Unmarshal(rec.Body.Bytes(), &l); err != nil {
 		t.Fatalf("layout body: %v", err)
 	}
@@ -144,7 +150,7 @@ func TestLayoutDefault(t *testing.T) {
 func TestBackendsCorruptFallsBackTo200(t *testing.T) {
 	srv := testServer(t, true)
 	// Overwrite backends.json with garbage.
-	bp := srv.store.Home() + "/backends.json"
+	bp := srv.configStore.Home() + "/backends.json"
 	if err := os.WriteFile(bp, []byte("{ not json,,,"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +159,7 @@ func TestBackendsCorruptFallsBackTo200(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("corrupt backends status = %d, want 200", rec.Code)
 	}
-	var b store.BackendsConfig
+	var b config.BackendsConfig
 	if err := json.Unmarshal(rec.Body.Bytes(), &b); err != nil {
 		t.Fatalf("fallback backends body: %v", err)
 	}

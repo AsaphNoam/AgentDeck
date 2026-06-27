@@ -5,7 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/store"
+	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/agentdeck/agentdeck/internal/state"
 	"github.com/agentdeck/agentdeck/internal/version"
 )
 
@@ -31,7 +32,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 // sessionEntry is one element of GET /api/sessions: an agent identity with its
 // matched running entry (omitted if the agent has none).
 type sessionEntry struct {
-	store.Agent
+	state.Agent
 	Running *runningView `json:"running,omitempty"`
 }
 
@@ -45,22 +46,22 @@ type runningView struct {
 	StartedAt time.Time `json:"started_at"`
 }
 
-// handleSessions joins running/*.json with agents/*.json. Only agents that have a
+// handleSessions joins running rows with agent identity rows. Only agents that have a
 // running entry are returned. An empty store yields [] (never null).
 func (s *Server) handleSessions(w http.ResponseWriter, _ *http.Request) {
-	running, err := s.store.ListRunning()
+	running, err := s.stateStore.ListRunning()
 	if err != nil {
 		s.log.Error("sessions: list running", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	agents, err := s.store.ListAgents()
+	agents, err := s.stateStore.ListAgents()
 	if err != nil {
 		s.log.Error("sessions: list agents", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	byID := make(map[string]store.Agent, len(agents))
+	byID := make(map[string]state.Agent, len(agents))
 	for _, a := range agents {
 		byID[a.AgentID] = a
 	}
@@ -88,7 +89,7 @@ func (s *Server) handleSessions(w http.ResponseWriter, _ *http.Request) {
 
 // handleRoles returns the role map. Corrupt entries are already skipped by the store.
 func (s *Server) handleRoles(w http.ResponseWriter, _ *http.Request) {
-	roles, err := s.store.ListRoles()
+	roles, err := s.configStore.ListRoles()
 	if err != nil {
 		s.log.Error("roles: list", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
@@ -99,7 +100,7 @@ func (s *Server) handleRoles(w http.ResponseWriter, _ *http.Request) {
 
 // handleProjects returns the project map.
 func (s *Server) handleProjects(w http.ResponseWriter, _ *http.Request) {
-	projects, err := s.store.ListProjects()
+	projects, err := s.configStore.ListProjects()
 	if err != nil {
 		s.log.Error("projects: list", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
@@ -111,11 +112,11 @@ func (s *Server) handleProjects(w http.ResponseWriter, _ *http.Request) {
 // handleBackends returns backends.json, falling back to the in-memory default on
 // missing/corrupt (still 200), per §6/§7.
 func (s *Server) handleBackends(w http.ResponseWriter, _ *http.Request) {
-	b, err := s.store.ReadBackends()
+	b, err := s.configStore.ReadBackends()
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) || errors.Is(err, store.ErrCorrupt) {
+		if errors.Is(err, config.ErrNotFound) || errors.Is(err, config.ErrCorrupt) {
 			s.log.Warn("backends: falling back to default", "err", err)
-			writeJSON(w, http.StatusOK, store.DefaultBackends())
+			writeJSON(w, http.StatusOK, config.DefaultBackends())
 			return
 		}
 		s.log.Error("backends: read", "err", err)
@@ -127,11 +128,11 @@ func (s *Server) handleBackends(w http.ResponseWriter, _ *http.Request) {
 
 // handleLayout returns layout.json, falling back to the default on missing/corrupt.
 func (s *Server) handleLayout(w http.ResponseWriter, _ *http.Request) {
-	l, err := s.store.ReadLayout()
+	l, err := s.configStore.ReadLayout()
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) || errors.Is(err, store.ErrCorrupt) {
+		if errors.Is(err, config.ErrNotFound) || errors.Is(err, config.ErrCorrupt) {
 			s.log.Warn("layout: falling back to default", "err", err)
-			writeJSON(w, http.StatusOK, store.DefaultLayout())
+			writeJSON(w, http.StatusOK, config.DefaultLayout())
 			return
 		}
 		s.log.Error("layout: read", "err", err)

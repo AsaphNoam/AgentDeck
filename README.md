@@ -1,17 +1,18 @@
 # AgentDeck
 
 A local dashboard for launching and orchestrating coding agents (Claude Code,
-Codex) from one place. All state lives in plain JSON files under `~/.agentdeck/`;
-a Go single binary serves a React UI and a `127.0.0.1`-only REST API.
+Codex) from one place. Human-editable config lives as JSON files under
+`~/.agentdeck/`; machine state lives in `state.db`. A Go single binary serves a
+React UI and a `127.0.0.1`-only REST API.
 
-This repository is at **Phase 0 — Foundation**: the data substrate, file store,
-HTTP server skeleton, and CLI. No agents run yet (that is Phase 1+).
+This repository is at **Phase 0 — Foundation**: the data substrate, config file
+store, SQLite state store, HTTP server skeleton, and CLI. No agents run yet
+(that is Phase 1+).
 
 ## Prerequisites
 
 - **Go 1.22+** — server / single binary
-- **Node 18+ and npm** — UI build (and the Phase 5 MCP server)
-- **python3** — used by later phases (hooks/runtimes)
+- **Node 18+ and npm** — UI build only
 - macOS or Linux (the terminal runtime is macOS-only, Phase 6)
 
 ## Quickstart
@@ -61,16 +62,13 @@ cd ui && npm install && npm run dev   # http://localhost:5173
 ## Layout (`~/.agentdeck/`)
 
 ```
-agents/{id}.json      stable identity
-running/{id}.json     active session registry
-status/{id}.json      live state
 roles/{role}.json     personas (seeded: implementer, reviewer, researcher, pm)
 projects/{p}.json     workspaces (seeded: my-app)
 backends.json         providers + models (version 2)
-messages/{id}/        per-agent mailbox
-sessions/{id}/        transcript history
 layout.json           card order + density
 config.json           port, defaults (version 1)
+state.db              agent identity, running registry, status, messages
+sessions/{id}/        transcript history
 ```
 
 `AGENTDECK_HOME` overrides `~/.agentdeck/` (used by tests/CI).

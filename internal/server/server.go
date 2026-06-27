@@ -8,7 +8,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/store"
+	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/agentdeck/agentdeck/internal/state"
 )
 
 // shutdownTimeout bounds graceful shutdown after the context is cancelled.
@@ -16,18 +17,19 @@ const shutdownTimeout = 5 * time.Second
 
 // Server owns the HTTP lifecycle and its dependencies.
 type Server struct {
-	store *store.Store
-	cfg   store.Config
-	log   *slog.Logger
+	configStore *config.Store
+	stateStore  *state.Store
+	cfg         config.Config
+	log         *slog.Logger
 }
 
 // New constructs a Server. The config supplies the port; the store backs all
 // data handlers; the logger is used by middleware and handlers.
-func New(st *store.Store, cfg store.Config, log *slog.Logger) *Server {
+func New(cfgStore *config.Store, stateStore *state.Store, cfg config.Config, log *slog.Logger) *Server {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Server{store: st, cfg: cfg, log: log}
+	return &Server{configStore: cfgStore, stateStore: stateStore, cfg: cfg, log: log}
 }
 
 // Start binds 127.0.0.1:{cfg.Port}, asserts the listener is loopback, serves

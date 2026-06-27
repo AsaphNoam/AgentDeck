@@ -14,8 +14,9 @@ import (
 	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
 
+	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/server"
-	"github.com/agentdeck/agentdeck/internal/store"
+	"github.com/agentdeck/agentdeck/internal/state"
 )
 
 // stopTimeout bounds how long `stop` waits for graceful SIGTERM exit before
@@ -48,24 +49,24 @@ func newLogger() *slog.Logger {
 
 // resolveConfig opens the store, ensures the layout, seeds defaults, and returns
 // the effective config (falling back to defaults on corrupt config.json).
-func resolveConfig(log *slog.Logger) (*store.Store, store.Config, error) {
-	st, err := store.New()
+func resolveConfig(log *slog.Logger) (*config.Store, config.Config, error) {
+	cfgStore, err := config.New()
 	if err != nil {
-		return nil, store.Config{}, err
+		return nil, config.Config{}, err
 	}
-	if err := st.EnsureLayout(); err != nil {
-		return nil, store.Config{}, err
+	if err := cfgStore.EnsureLayout(); err != nil {
+		return nil, config.Config{}, err
 	}
-	if err := st.SeedIfAbsent(); err != nil {
-		return nil, store.Config{}, err
+	if err := cfgStore.SeedIfAbsent(); err != nil {
+		return nil, config.Config{}, err
 	}
-	cfg, err := st.ReadConfig()
+	cfg, err := cfgStore.ReadConfig()
 	if err != nil {
 		// Corrupt/missing config → default (do not rewrite the corrupt file).
 		log.Warn("config unreadable; using default", "err", err)
-		cfg = store.DefaultConfig()
+		cfg = config.DefaultConfig()
 	}
-	return st, cfg, nil
+	return cfgStore, cfg, nil
 }
 
 func newDashboardStartCmd() *cobra.Command {
@@ -78,7 +79,7 @@ func newDashboardStartCmd() *cobra.Command {
 		Short: "Start the dashboard server",
 		RunE: func(_ *cobra.Command, _ []string) error {
 			log := newLogger()
-			st, cfg, err := resolveConfig(log)
+			cfgStore, cfg, err := resolveConfig(log)
 			if err != nil {
 				return err
 			}
@@ -88,7 +89,7 @@ func newDashboardStartCmd() *cobra.Command {
 
 			// Detached parent: re-exec self as a daemon child and exit.
 			if detach && !daemon {
-				return startDetached(st.Home(), cfg.Port)
+				return startDetached(cfgStore.Home(), cfg.Port)
 			}
 
 			// Refuse to start if a live instance already holds the pidfile.
@@ -97,21 +98,27 @@ func newDashboardStartCmd() *cobra.Command {
 			// so the liveness check would otherwise match the child itself and
 			// make it exit immediately ("already running" against itself).
 			if !daemon {
-				if info, ok, _ := readPidfile(st.Home()); ok && processAlive(info.PID) {
+				if info, ok, _ := readPidfile(cfgStore.Home()); ok && processAlive(info.PID) {
 					fmt.Printf("already running pid=%d http://127.0.0.1:%d\n", info.PID, info.Port)
 					return nil
 				}
 			}
 
+			stateStore, err := state.Open(cfgStore.Home())
+			if err != nil {
+				return err
+			}
+			defer stateStore.Close()
+
 			ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 			defer stop()
 
-			if err := writePidfile(st.Home(), pidInfo{PID: os.Getpid(), Port: cfg.Port}); err != nil {
+			if err := writePidfile(cfgStore.Home(), pidInfo{PID: os.Getpid(), Port: cfg.Port}); err != nil {
 				return err
 			}
-			defer removePidfile(st.Home())
+			defer removePidfile(cfgStore.Home())
 
-			srv := server.New(st, cfg, log)
+			srv := server.New(cfgStore, stateStore, cfg, log)
 			return srv.Start(ctx)
 		},
 	}
@@ -160,11 +167,11 @@ func newDashboardStopCmd() *cobra.Command {
 		Use:   "stop",
 		Short: "Stop the dashboard server",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			st, err := store.New()
+			cfgStore, err := config.New()
 			if err != nil {
 				return err
 			}
-			info, ok, err := readPidfile(st.Home())
+			info, ok, err := readPidfile(cfgStore.Home())
 			if err != nil {
 				return err
 			}
@@ -173,7 +180,7 @@ func newDashboardStopCmd() *cobra.Command {
 				return nil
 			}
 			if !processAlive(info.PID) {
-				_ = removePidfile(st.Home())
+				_ = removePidfile(cfgStore.Home())
 				fmt.Println("not running (removed stale pidfile)")
 				return nil
 			}
@@ -183,14 +190,14 @@ func newDashboardStopCmd() *cobra.Command {
 			deadline := time.Now().Add(stopTimeout)
 			for time.Now().Before(deadline) {
 				if !processAlive(info.PID) {
-					_ = removePidfile(st.Home())
+					_ = removePidfile(cfgStore.Home())
 					fmt.Printf("stopped pid=%d\n", info.PID)
 					return nil
 				}
 				time.Sleep(100 * time.Millisecond)
 			}
 			_ = syscall.Kill(info.PID, syscall.SIGKILL)
-			_ = removePidfile(st.Home())
+			_ = removePidfile(cfgStore.Home())
 			fmt.Printf("killed pid=%d (did not exit gracefully)\n", info.PID)
 			return nil
 		},
@@ -202,14 +209,14 @@ func newDashboardOpenCmd() *cobra.Command {
 		Use:   "open",
 		Short: "Open the dashboard UI in the default browser",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			st, err := store.New()
+			cfgStore, err := config.New()
 			if err != nil {
 				return err
 			}
-			port := store.DefaultConfig().Port
-			if info, ok, _ := readPidfile(st.Home()); ok && info.Port > 0 {
+			port := config.DefaultConfig().Port
+			if info, ok, _ := readPidfile(cfgStore.Home()); ok && info.Port > 0 {
 				port = info.Port
-			} else if cfg, err := st.ReadConfig(); err == nil && cfg.Port > 0 {
+			} else if cfg, err := cfgStore.ReadConfig(); err == nil && cfg.Port > 0 {
 				port = cfg.Port
 			}
 			url := fmt.Sprintf("http://127.0.0.1:%d/", port)

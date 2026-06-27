@@ -1,4 +1,4 @@
-package store
+package config
 
 import (
 	"errors"
@@ -42,7 +42,7 @@ func (s *Store) ListRoles() (map[string]Role, error) {
 // DeleteRole removes roles/{id}.json; a missing file is tolerated.
 func (s *Store) DeleteRole(id string) error {
 	if err := os.Remove(s.rolePath(id)); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("store: delete role %s: %w", id, err)
+		return fmt.Errorf("config: delete role %s: %w", id, err)
 	}
 	return nil
 }

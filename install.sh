@@ -9,7 +9,7 @@
 #   4. Install the binary into an on-PATH bin dir.
 #   5. Seed ~/.agentdeck on first run (the binary seeds lazily on `dashboard start`).
 #
-# Prereqs: Go 1.22+, Node 18+, npm. (python3 is needed by later phases.)
+# Prereqs: Go 1.22+, Node 18+, npm. Node is build-time only.
 
 set -euo pipefail
 
@@ -57,6 +57,7 @@ if [ -z "${INSTALL_DIR}" ]; then
 fi
 
 echo "==> Installing to ${INSTALL_DIR}/${BINARY}"
+mkdir -p "${INSTALL_DIR}"
 if [ -w "${INSTALL_DIR}" ]; then
   install -m 0755 "bin/${BINARY}" "${INSTALL_DIR}/${BINARY}"
 else

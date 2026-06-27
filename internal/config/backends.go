@@ -1,4 +1,4 @@
-package store
+package config
 
 // Backends single-file object: backends.json.
 

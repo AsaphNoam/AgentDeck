@@ -1,8 +1,8 @@
-package store
+package config
 
-// Store is the typed file-store over ~/.agentdeck/. It holds only the resolved,
-// absolute home directory; all state lives on disk. A *Store is safe for
-// concurrent use to the extent the filesystem is: writes are atomic
+// Store is the typed config file store over ~/.agentdeck/. It holds only the
+// resolved, absolute home directory; all config data lives on disk. A *Store is
+// safe for concurrent use to the extent the filesystem is: writes are atomic
 // (write-temp-then-rename) so readers never observe partial files.
 type Store struct {
 	home string // absolute, resolved from AGENTDECK_HOME or ~/.agentdeck

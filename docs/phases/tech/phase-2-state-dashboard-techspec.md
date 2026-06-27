@@ -55,7 +55,7 @@ Config-editing UI (Phase 3), launch modal (Phase 3 — Phase 2 ships only a mini
 
 | Concern | Choice | Version | Rationale |
 |---|---|---|---|
-| State store | SQLite via `modernc.org/sqlite` (pure-Go, no cgo) | `1.29.x` | `state.db` holds identity/running/status rows; the server is the sole writer, so there is no multi-process contention. Pure-Go keeps the single-binary, cgo-free build. |
+| State store | SQLite via `github.com/mattn/go-sqlite3` (WAL mode) | `1.14.x` | `state.db` holds identity/running/status rows; the server is the sole writer, so there is no multi-process contention. The Phase 0 substrate already opens this driver; reuse the same handle. |
 | HTTP ingest | **stdlib `net/http`** | Go 1.22+ | `POST /api/hook` is an ordinary JSON handler on the server that already serves the UI — no new transport. |
 | SSE | **stdlib `net/http` only** — no SSE framework | Go 1.22+ | SSE is trivially a `text/event-stream` response with `http.Flusher`. A dependency adds nothing. Per-client goroutine + buffered channel. |
 | JSON | stdlib `encoding/json` | — | Payloads are tiny; no need for a faster codec. |

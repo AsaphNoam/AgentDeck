@@ -2,13 +2,13 @@
 
 **Working name:** AgentDeck (rename freely)
 **Document type:** Feature-focused PRD intended to brief a coding agent and to serve as a reference for the product's full feature set.
-**Status:** v1 — buildable spec derived from a reference implementation, flavor-neutral.
+**Status:** buildable spec. Architecture decisions and their rationale are recorded in [architecture-decisions.md](architecture-decisions.md); this PRD states the resulting design as fact.
 
 ---
 
 ## 1. Summary
 
-AgentDeck is a **local-first desktop tool for running and supervising many AI coding-agent sessions in parallel**. It wraps existing agent CLIs (Claude Code, OpenAI Codex) and gives every session a persistent identity, live status, full chat history, file/command tracking, and a messaging channel so agents can coordinate with each other. Everything runs on `localhost`; all state is plain files on the user's disk; there is no cloud component and no account.
+AgentDeck is a **local-first desktop tool for running and supervising many AI coding-agent sessions in parallel**. It wraps existing agent CLIs (Claude Code, OpenAI Codex) and gives every session a persistent identity, live status, full chat history, file/command tracking, and a messaging channel so agents can coordinate with each other. Everything runs on `localhost`; all data is local (config as plain files, machine state in a local SQLite database); there is no cloud component and no account.
 
 The product is for a developer who delegates several concurrent tasks to AI agents and needs one place to see what each is doing, intervene when needed, and resume past work — without juggling a dozen terminal tabs.
 
@@ -40,8 +40,10 @@ These four objects are the backbone. Everything in the UI is a view over them.
 ### 3.1 Agent (session)
 A running or historical session. Has a **stable identity** that survives resume, clone, and backend swaps, separate from the **ephemeral runtime session id** assigned by the underlying CLI.
 
+The four backbone objects below are shown as JSON for their logical shape. Roles and projects are stored as config files; agent identity, the running registry, and live status are rows in `state.db` (see §3.5).
+
 ```jsonc
-// agents/{agent_id}.json — stable identity
+// agent identity — state.db (logical shape shown as JSON)
 {
   "agent_id": "a_8f3c12",        // stable, never changes
   "name": "Atlas",                // human-friendly display name, user-editable
@@ -56,7 +58,7 @@ A running or historical session. Has a **stable identity** that survives resume,
 ```
 
 ```jsonc
-// running/{agent_id}.json — active session registry (deleted when stopped)
+// running registry — state.db (row removed when stopped)
 {
   "agent_id": "a_8f3c12",
   "pid": 48213,                   // process group id of the CLI
@@ -68,7 +70,7 @@ A running or historical session. Has a **stable identity** that survives resume,
 ```
 
 ```jsonc
-// status/{agent_id}.json — structured live state (written by hooks/runtime)
+// live status — state.db (written by the server from hook POSTs / the ACP stream)
 {
   "agent_id": "a_8f3c12",
   "state": "busy",                // "busy" | "idle" | "waiting_input" | "done" | "error"
@@ -140,26 +142,34 @@ A provider runtime. Each backend exposes multiple models, each optionally with i
 ```
 Backend-level `env` applies to all its models; per-model `env` overrides it. Composition at launch: `project.cwd` + `project.context_prompt` + `role.system_prompt` + `backend/model` → CLI invocation.
 
-### 3.5 On-disk layout (single source of truth — no database)
+### 3.5 On-disk layout (storage split by writer)
+
+Storage is split by *who writes the data*: human-edited **config is plain JSON files**; machine-generated **state lives in SQLite** (the Go server is the sole writer). Fully local-first: one SQLite file, no server process, no cloud.
+
 ```
 ~/.agentdeck/
-  agents/{agent_id}.json      stable identity
-  running/{agent_id}.json     active session registry (pid, tty, session_id)
-  status/{agent_id}.json      live state (busy/idle/done, detail, context_pct)
+  # --- Human-edited config: plain JSON files (git-friendly, hand-editable) ---
   roles/{role}.json           role definitions
   projects/{project}.json     project definitions
   backends.json               provider + model config
-  messages/{agent_id}/        per-agent mailbox, one .json per message
-  sessions/{agent_id}/        persisted transcript history for resume
   layout.json                 dashboard card order + density
   config.json                 port, default_project, default_role, skip_permissions
+
+  # --- Machine-generated state: SQLite (server is sole writer) ---
+  state.db                    SQLite: agent identity, running registry, live status,
+                              messages, session/transcript metadata + FTS5 search index
+
+  # --- Agent-CLI-owned transcripts (written by Claude Code / Codex), indexed into state.db ---
+  sessions/{agent_id}/        raw transcript history for resume (source for the FTS5 index)
 ```
+
+Rationale for the split: config is tiny, rarely written, and genuinely better as hand-editable / `git`-tracked text; state is queried, searched, and machine-written at high frequency, where SQLite's transactions and FTS5 win. Because the server is the only writer to `state.db`, there is no multi-process contention and the DB is authoritative (no derived-index drift).
 
 ---
 
 ## 4. System architecture
 
-Three processes, all local:
+Two runtime processes (plus the agent CLIs), all local. The messaging MCP server is hosted in-process in the Go binary (no Node at runtime); hooks report to the server over localhost HTTP (+ per-launch token).
 
 ```
 ┌────────────────────────────────────────────────────────────┐
@@ -171,12 +181,14 @@ Three processes, all local:
 ┌────────────────────────────────────────────────────────────┐
 │ LOCAL SERVER  (Go single binary, binds 127.0.0.1)          │
 │  • SSE event bus (per-client buffer, drop-oldest, keepalive)│
-│  • State manager (file watcher over running/ + status/)     │
+│  • State manager (SQLite state.db; server is sole writer)   │
+│       └─ reconciliation watcher over sessions/ as fallback  │
+│  • Hook ingest endpoint  POST /api/hook (token-authed)      │
 │  • Runtime registry (dispatches by agent.interface)         │
 │       ├─ Chat runtime  → ACP JSON-RPC / NDJSON over stdio   │
 │       └─ Terminal runtime → drives a terminal emulator      │
 │  • Nudger (wakes idle agents that have pending messages)    │
-│  • Hosts/launches the MCP messaging server                  │
+│  • In-process MCP messaging server (Go MCP SDK, stdio)      │
 └───────────────┬────────────────────────────────────────────┘
                 │ both runtimes wrap the same agent CLI
                 ▼
@@ -184,7 +196,7 @@ Three processes, all local:
 │ AGENT CLI  (Claude Code / Codex)                            │
 │  launched with: resume <session_id>, system-prompt append,  │
 │  cwd, model, MCP server registration                        │
-│  hooks fire on lifecycle events → write status/running files│
+│  hooks fire on lifecycle events → POST /api/hook (+ token)  │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -199,7 +211,7 @@ The registry dispatches each agent to a runtime based on `agent.interface`. Both
 Interface methods (minimum): `Start(agent)`, `SendPrompt(agent, text)`, `Cancel(agent)`, `Stop(agent)`, `Resume(agent, session_id)`, `CheckMessages(pid)`.
 
 ### 4.2 State manager
-A file watcher (e.g. fsnotify) subscribes to `running/` and `status/`. When a hook or runtime writes a status file, the watcher fires, the server recomputes the affected agent's state, and emits an SSE `state_update`. This decouples status production (hooks, any interface) from status consumption (the UI).
+The state manager owns `state.db` (agent identity, running registry, live status, messages, session/transcript metadata + FTS5 index) and is the **sole writer**. Status production is decoupled from consumption via two ingest paths: the **hook ingest endpoint** (`POST /api/hook`, the primary channel — see §4.4) and the **chat runtime** (which derives status from the ACP stream directly). A reconciliation watcher over `sessions/` exists only as a fallback to pick up transcript files written out-of-band by the agent CLI. Every applied change emits an SSE `state_update`.
 
 ### 4.3 SSE event bus
 One event stream per connected browser client. Per-client bounded buffer with drop-oldest backpressure, plus a periodic keepalive ping (~10s). Event types:
@@ -209,15 +221,15 @@ One event stream per connected browser client. Per-client bounded buffer with dr
 - `ping` — keepalive.
 
 ### 4.4 Hooks
-Lifecycle hook scripts registered with the agent CLI. They fire on `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, and write `status/{id}.json` and `running/{id}.json`. Terminal-interface agents rely on hooks for status; chat-interface agents derive most status from the ACP stream and may skip redundant hook writes (gate by interface).
+Lifecycle hook scripts registered with the agent CLI. They fire on `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, and **POST the event to `POST /api/hook`** including the per-launch token they were given at start. The server validates the token and applies the update to `state.db`. Hooks stay thin (a small shell `curl`), keeping the channel language-agnostic. Terminal-interface agents rely on hooks for status; chat-interface agents derive most status from the ACP stream and may skip redundant hook POSTs (gate by interface).
 
 ### 4.5 MCP messaging server
-A small MCP server (Node.js) registered with each launched agent, exposing three tools:
-- `list_agents` — discover other live agents (name, role, project, state).
-- `send_message(to, body)` — drop a message into the recipient's mailbox (`messages/{recipient_id}/`).
+An **in-process MCP server** registered with each launched agent (stdio), exposing three tools:
+- `list_agents` — discover other live agents (name, role, project, state) — an in-process read of `state.db`.
+- `send_message(to, body)` — enqueue a message for the recipient (messages table in `state.db`).
 - `check_messages` — read + flag/delete the caller's pending messages.
 
-Delivery model: messages land as files in the recipient mailbox. Delivery happens either by the recipient agent polling `check_messages`, or by the **Nudger** — a server loop that detects an idle agent with pending mail and wakes it (calls `Runtime.CheckMessages(pid)`) so it processes the message without user intervention. Apply a per-turn message budget (e.g. 15 messages/turn) to prevent runaway agent-to-agent loops.
+Delivery model: messages are rows in `state.db` (server is sole writer). Delivery happens either by the recipient agent polling `check_messages`, or by the **Nudger** — a server loop that detects an idle agent with pending mail and wakes it (calls `Runtime.CheckMessages(pid)`) so it processes the message without user intervention. Apply a per-turn message budget (e.g. 15 messages/turn) to prevent runaway agent-to-agent loops. Because the MCP server shares the server's process and state, `list_agents`/messaging are in-process operations with no serialization boundary.
 
 ---
 
@@ -326,6 +338,7 @@ GET    /roles  POST /roles  ...         role CRUD
 GET    /projects POST /projects ...     project CRUD
 GET    /backends  PUT /backends         backend config
 GET    /layout    PUT /layout           card order + density
+POST   /hook                            hook lifecycle ingest {event, ...} (per-launch token)
 GET    /events                          SSE stream (state_update, new_message, notification, ping)
 ```
 
@@ -333,24 +346,23 @@ GET    /events                          SSE stream (state_update, new_message, n
 
 ## 7. Tech stack & constraints
 
-- **Server:** Go, compiled to a single binary. Binds `127.0.0.1` by default; never expose publicly.
-- **UI:** React + Vite + TypeScript, runs in the local browser, talks to the local server only.
-- **MCP messaging server:** Node.js, launched/managed by the Go server.
-- **Hooks:** small shell scripts registered with the agent CLI.
-- **Platforms:** macOS and Linux. Terminal runtime (iTerm2) is macOS-only and optional; chat runtime is the cross-platform default.
-- **Prereqs:** `python3`; at least one authenticated agent CLI (Claude Code and/or Codex); for source builds Go 1.22+, Node 18+, npm.
-- **State:** plain JSON files under `~/.agentdeck/`. No database. User owns all data.
-- **Distribution:** `install.sh` builds binaries + UI and installs an `agentdeck` CLI; `agentdeck dashboard start && agentdeck dashboard open` launches and opens the UI.
+- **Server:** Go, compiled to a single binary. Binds `127.0.0.1` by default; never expose publicly. Hosts the messaging MCP server in-process (official Go MCP SDK).
+- **UI:** React + Vite + TypeScript, runs in the local browser, talks to the local server only. (Node is a **build-time** dependency only — the built UI is embedded in the Go binary; end users need no Node.)
+- **Hooks:** thin shell scripts registered with the agent CLI that `POST /api/hook` with a per-launch token.
+- **Platforms:** macOS and Linux. Terminal runtime is optional and deferred; when built, prefer a cross-platform path (embedded xterm.js / tmux) over macOS-only iTerm2/AppleScript. Chat runtime is the cross-platform default.
+- **Prereqs:** at least one authenticated agent CLI (Claude Code and/or Codex). For source builds: Go 1.22+, Node 18+, npm. No runtime Node and no python3.
+- **State:** human-edited **config as plain JSON files**; machine state in a single **SQLite** file (`state.db`, FTS5 search), server is sole writer — under `~/.agentdeck/`. No cloud, no account; user owns all data.
+- **Distribution:** `install.sh` builds binary + UI (UI embedded) and installs an `agentdeck` CLI; `agentdeck dashboard start && agentdeck dashboard open` launches and opens the UI. Prebuilt binary needs no Node/python at runtime.
 
 ---
 
 ## 8. Suggested build milestones
 
 1. **Core loop:** Go server + ACP chat runtime + one backend; launch one agent, send prompts, stream responses (F4, F3 minimal).
-2. **State & dashboard:** file-watcher state manager + SSE bus + React card grid with live status (F1).
+2. **State & dashboard:** SQLite state manager + `POST /api/hook` ingest + SSE bus + React card grid with live status (F1).
 3. **Config:** projects/roles/backends CRUD + onboarding (F5, F6, F12).
-4. **Persistence:** session save + archive search + resume (F9), file/command tracking (F10).
-5. **Coordination:** MCP messaging server + nudger + budgets (F8); notifications (F11).
+4. **Persistence:** session save + SQLite FTS5 archive search + resume (F9), file/command tracking (F10).
+5. **Coordination:** in-process Go MCP messaging server (begin with the SDK handshake spike) + nudger + budgets (F8); notifications (F11).
 6. **Flexibility:** terminal runtime + switch-runtime (F7); task groups (F2).
 7. **Polish:** activity map and any ambient visualizations (F13).
 
@@ -362,4 +374,7 @@ GET    /events                          SSE stream (state_update, new_message, n
 - Permission model: global skip vs per-role vs per-tool prompting — how granular?
 - Concurrency limits: max simultaneous agents before resource pressure; do you queue launches?
 - Message-loop safety: is a 15/turn budget enough, or do you also need loop detection across turns?
-- Cross-platform terminal runtime: is a non-iTerm2 fallback (tmux, OS terminal) in scope?
+- Terminal runtime: embedded xterm.js vs tmux as the cross-platform default — which first?
+- **Go MCP SDK handshake:** confirm `modelcontextprotocol/go-sdk` (stdio) registers cleanly with **both** Claude Code and Codex — resolve with a ~1h Phase 5 spike before committing the in-process server.
+- **SQLite schema:** finalize `state.db` tables (identity, running, status, messages, transcript metadata) + the FTS5 index shape; how transcripts (CLI-owned files) are attributed to `agent_id` on index.
+- **Hook token:** where the per-launch token is stored/passed to hooks and rotated on resume.

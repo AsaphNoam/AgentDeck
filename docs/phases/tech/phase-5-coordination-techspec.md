@@ -89,7 +89,7 @@ If a tool call arrives on a session whose token is unknown (e.g. after the agent
 
 ### 3.2 Store access helpers
 
-A `Store` type (the same `state.db` handle the rest of the server uses) gains messaging methods. All run on the Go server's single writer connection (SQLite in WAL mode, `mattn/go-sqlite3`):
+A `Store` type (the same `state.db` handle the rest of the server uses) gains messaging methods. All run on the Go server's single writer connection (SQLite in WAL mode, `github.com/mattn/go-sqlite3`):
 
 - `LiveAgents() ([]LiveAgent, error)` — agents currently running (a row in the running registry), joined with identity + latest status.
 - `InsertMessage(m Message) error` — insert one message row (within a transaction; sets `created_at`, `read=false`, `delivered_via="pending"`).
