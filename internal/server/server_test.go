@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
@@ -38,7 +39,8 @@ func testServer(t *testing.T, seed bool) *Server {
 	}
 	t.Cleanup(func() { _ = stateStore.Close() })
 	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	return New(cfgStore, stateStore, config.DefaultConfig(), log)
+	registry := runtime.NewRegistry(stateStore)
+	return New(cfgStore, stateStore, registry, config.DefaultConfig(), log)
 }
 
 func doGET(t *testing.T, h http.Handler, path string) *httptest.ResponseRecorder {

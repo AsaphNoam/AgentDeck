@@ -43,6 +43,13 @@ func NewChatRuntime(s *state.Store) *ChatRuntime {
 	}
 }
 
+// SetCommand overrides the adapter binary + args. Used to point at a pinned
+// adapter path (1.6) or, in tests, the fake ACP CLI.
+func (c *ChatRuntime) SetCommand(bin string, args ...string) {
+	c.command = bin
+	c.cmdArgs = args
+}
+
 // agentState is the live, in-memory state for one running agent.
 type agentState struct {
 	agentID   string

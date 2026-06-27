@@ -9,6 +9,8 @@ Central index of the planning docs: what each file is, the build order, and the 
 | [docs/agent-dashboard-prd.md](docs/agent-dashboard-prd.md) | **Master PRD.** Full product spec: concepts, data model, architecture, all features (F1–F13), REST/SSE surface, tech stack, open questions. Source of truth. |
 | [docs/architecture-decisions.md](docs/architecture-decisions.md) | **Architecture decisions & rationale.** Why config=files/state=SQLite, hooks→HTTP, in-process Go MCP. The "why" behind the PRD's design. |
 | [docs/phases/README.md](docs/phases/README.md) | Phase plan overview: phase map, dependency graph, milestone mapping, how to brief an agent per phase. |
+| [docs/phases/HANDOFF.md](docs/phases/HANDOFF.md) | **Live implementation state.** Where the build is, what's next, decisions, blockers. Agents read/update this every session. |
+| [docs/phases/AGENT-WORKFLOW.md](docs/phases/AGENT-WORKFLOW.md) | **Spaced-session build protocol.** The fire-and-forget loop both Claude Code & Codex follow, one at a time. Drives `HANDOFF.md`. |
 | [docs/phases/phase-0-foundation.md](docs/phases/phase-0-foundation.md) | Data model, file store, server & CLI skeleton. Substrate. |
 | [docs/phases/phase-1-core-loop.md](docs/phases/phase-1-core-loop.md) | ACP chat runtime, launch, streaming chat. (F4, F3 min) |
 | [docs/phases/phase-2-state-dashboard.md](docs/phases/phase-2-state-dashboard.md) | State manager, SSE bus, dashboard card grid. (F1) |

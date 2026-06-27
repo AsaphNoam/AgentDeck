@@ -9,9 +9,9 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 ## Current position
 
 - **Active phase:** 1 — Core loop (ACP chat runtime, launch, streaming chat) · F4, F3(min)
-- **Active subphase:** 1.5 — Launch flow, composition, REST + interim SSE, CLI parity
+- **Active subphase:** 1.6 — Real-CLI acceptance (credential-gated) + manual verification
 - **Spec:** [`tech/phase-1-core-loop-techspec.md`](tech/phase-1-core-loop-techspec.md) → `## Subphase plan`
-- **Last GREEN checkpoint:** `go build ./...` + `go test ./...` (and `-race`) pass @ `impl/phase-1` (1.4 complete)
+- **Last GREEN checkpoint:** `go build ./...` + `go test ./...` (and `-race`) pass @ `impl/phase-1` (1.5 complete)
 - **Branch:** `impl/phase-1` (do not commit to `main`)
 
 ---
@@ -41,26 +41,20 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 - [x] **1.2** Fake ACP CLI + JSON-RPC stdio transport (deterministic test harness) ✅
 - [x] **1.3** `ChatRuntime.Start` + ACP→normalized mapping + hub/Subscribe (stream a turn end-to-end) ✅
 - [x] **1.4** Permission gating (withhold response + timeout + skip_permissions) and Cancel ✅
-- [ ] **1.5** Launch flow, composition, REST + interim SSE, CLI parity ← **active**
-- [ ] **1.6** Real-CLI acceptance (credential-gated) + manual verification
+- [x] **1.5** Launch flow, composition, REST + interim SSE, CLI parity ✅
+- [ ] **1.6** Real-CLI acceptance (credential-gated) + manual verification ← **active**
 
-**Active step (1.5):** build the launch composition + transport in front of the (now complete) runtime.
-Read §6 (launch/composition), §7 (API contracts), §7.8 (SSE wire), §6.5 (CLI). Deliverables:
-`composeEnv` (os.Environ → backend env → per-model env override), system-prompt join
-(`context_prompt`\n\n`role.system_prompt`, skip empties), `resolveSkip` (role.skip_permissions ?? global,
-§12.2), name auto-suggest (wordlist, first unused vs live running rows, §6.3), hook-token mint
-(`crypto/rand`), `messagingServer` `MCPServerSpec` builder, `LaunchSpec` builder, failure rollback (§6.1);
-REST handlers `POST /api/sessions`, `GET /api/sessions/{id}`, `prompt`, `cancel`, `stop`, `permission`
-with §7.7 error mapping (use runtime `APIError`/code vocab + `runtime.runtimeFor`); interim SSE
-`GET /api/sessions/{id}/events` (subscribe, `id:`=seq, `event: message`/`ping`, 10s keepalive, status
-replay, §7.8); CLI `agentdeck <role>@<project>` parsing → POST to the same REST endpoint (§6.5).
-Wire `ReconcileStale` on server start + `ChatRuntime.StopAll` on shutdown. Done-when: `go test ./...`
-green incl. a handler test driving fakeacp `POST /sessions→prompt→/events until permission_request→
-permission`, and a CLI-vs-REST parity test (Appendix A). The SSE `data:` object MUST be byte-identical
-to the `Event` struct (Phase 2 forward-compat). Phase-0 launch stub at
-[`internal/cli/launch_stub.go`](../../internal/cli/launch_stub.go) is replaced here.
-Server wiring needs a `*runtime.Registry` (or `*ChatRuntime`) reachable from the server — see how
-`internal/server` is constructed in Phase 0 and thread the registry through.
+> ⚠️ **1.6 is a known STOP point** — it needs real `claude-code-acp` credentials. If no logged-in CLI is
+> available, record it under "Blocked on human" and stop rather than fake it.
+
+**Active step (1.6):** validate the §12.1 ACP wire assumptions against the real `claude-code-acp`.
+Read §12.1 (pinned adapter + assumed wire shapes), §10.1 (acceptance layer), Appendix A. Deliverables:
+one scripted acceptance test against `claude-code-acp` behind a build tag / env flag so credential-less
+CI stays green (the test is skipped/tagged off by default); pin the adapter version in `install.sh`/a
+lockfile; a documented `curl`+SSE recipe (or tiny static page) driving a real turn. Keep any real-wire
+drift fixes inside `acpmap.go` (§12.1 isolation rule). Done-when: full suite stays green WITHOUT
+credentials; with credentials the gated test drives prompt→stream→permission→cancel/stop per Appendix A.
+The runtime/REST/SSE surface needs no changes — this is verification + the adapter pin only.
 
 > ⚠️ **1.6 is a known STOP point** — it needs real `claude-code-acp` credentials. When you reach it,
 > if you don't have a logged-in CLI, record it under "Blocked on human" and stop rather than fake it.
@@ -70,7 +64,8 @@ Server wiring needs a `*runtime.Registry` (or `*ChatRuntime`) reachable from the
 ## Decisions & notes
 
 - Phase 0 substrate is in place: `internal/{config,state,store,server,cli,version}`, seed data, `127.0.0.1` bind, GET-only routes.
-- Launch (`role@project`) is currently a stub: [`internal/cli/launch_stub.go`](../../internal/cli/launch_stub.go) — Phase 1 replaces it with the real runtime.
+- Launch (`role@project`) is real as of 1.5: [`internal/cli/launch.go`](../../internal/cli/launch.go) POSTs to
+  `/api/sessions`. `launch_stub.go` now only holds `isLaunchArg`.
 - `internal/runtime` created in 1.1: `errors.go` (sentinel + APIError/code vocab §7.7), `event.go`
   (Event envelope + `*Data` payloads), `runtime.go` (Runtime iface, LaunchSpec, MCPServerSpec, Handle),
   `registry.go` (byIface dispatch + terminal stub), `chat.go` (ChatRuntime stub). All methods return
@@ -91,6 +86,16 @@ Server wiring needs a `*runtime.Registry` (or `*ChatRuntime`) reachable from the
   status `error`, §8.2), `reconcile.go` (`ReconcileStale` for stale running rows on startup). fakeacp
   rewritten with concurrent request/response routing + sentinel-file trick; scenarios `permission*` and
   `crash_midturn`. The full `Runtime` interface is now real for the claude-acp chat path.
+- 1.5 added: `Registry` exported surface (`Launch`/`SendPrompt`/`Cancel`/`Stop`/`Permission`/`Subscribe`/
+  `Shutdown`, dispatch by interface + double-start guard + `rtByAgent` routing; `Chat()` accessor;
+  `ChatRuntime.SetCommand` to inject the adapter/fake binary). Server: `launch.go` (composition: `composeEnv`,
+  `joinSystemPrompt`, `resolveSkip`, `suggestName` wordlist, `mintHookToken`, `messagingServer`,
+  `LaunchSpec` builder + rollback), `sessions.go` (prompt/cancel/stop/permission), `sse.go` (interim
+  events stream), `apierror.go` (§7.7 nested envelope). Routes: `POST /api/sessions`,
+  `GET/POST /api/sessions/{id}[/prompt|cancel|stop|permission|events]`. `server.New` now takes a
+  `*runtime.Registry`. `statusRecorder` got a `Flush()` passthrough (SSE needs `http.Flusher`); CORS
+  allows POST. CLI: `launch.go` (`parseLaunch` + POST to `/api/sessions`) replaced the Phase-0 stub.
+  Dashboard start wires `ReconcileStale` + the registry; shutdown calls `registry.Shutdown` (StopAll).
 
 ## Blocked on human
 
@@ -117,11 +122,29 @@ _(empty — nothing blocking. Add items here per workflow §3, then stop.)_
   `kind` (e.g. `edit`) as the most stable discriminator, falling back to `title` then `"tool"`. Isolated
   in `acpmap.go::toolName`. **To reverse:** if the real adapter (1.6) surfaces a cleaner tool name field,
   change only `toolName` — blast radius is one function (§12.1 isolation rule).
+- **2026-06-27 — Hook token stored in-memory, not persisted.** §6.4 says "record the token against the
+  agent" but there is no `state.db` column for it yet (Phase 2 owns the `POST /api/hook` ingest). Stored
+  in a `Server.hookTokens` in-memory map keyed by agent_id. **To reverse / complete:** Phase 2 should add
+  a persistent column (e.g. on `running` or a `launch_tokens` table) and have launch write it there; then
+  drop the in-memory map.
+- **2026-06-27 — Two error-envelope shapes coexist.** New Phase-1 session routes use the §7.7 nested
+  `{"error":{"code","message","details"}}`; the Phase-0 GET routes (`/api/roles`,`/api/sessions` list, …)
+  keep their flat `{"error":"msg"}`. I did **not** migrate the old routes to avoid breaking Phase-0
+  tests/clients. **To reverse:** if §7.7 is meant to be truly project-wide, migrate the Phase-0 handlers
+  to `writeAPIError` and update their tests — out of scope for Phase 1.
+- **2026-06-27 — `messagingServer.Command = os.Executable()`** with args `["mcp-stdio","--agent",ID,
+  "--token",T]`. §6.4 says the registration "re-execs the AgentDeck binary in a hidden mcp-stdio mode";
+  the `mcp-stdio` subcommand/handler does not exist yet (Phase 5). The fake CLI ignores `mcpServers`, so
+  this is registration-only as specified. **To reverse:** Phase 5 adds the real `mcp-stdio` command.
 
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-27 — **1.5 green** (incl. `-race`). Launch composition + REST (`POST /api/sessions`, detail,
+  prompt/cancel/stop/permission) + interim SSE + CLI launch. Tests: composeEnv/joinSystemPrompt/resolveSkip
+  units, CLI parseLaunch + parity, full HTTP integration (launch→SSE→prompt→permission_request→approve→
+  sentinel→turn_end), §7.7 validation/404 envelopes. Replaced the Phase-0 CLI launch stub.
 - 2026-06-27 — **1.4 green** (incl. `-race`). Permission gating (withhold/approve/deny/timeout/skip),
   Cancel, crash handling, stale-row reconcile. Tests: approve→sentinel, deny→no sentinel, timeout auto-deny,
   skip auto-approve, unknown-tool 409, cancel-during-pending, crash (fatal err + running row deleted), reconcile.
