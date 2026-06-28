@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { TranscriptEvent } from "../../api/types";
+import { ErrorBoundary } from "../ErrorBoundary";
 import { AssistantText } from "./renderers/AssistantText";
 import { DiffBlock } from "./renderers/DiffBlock";
 import { PermissionPrompt } from "./renderers/PermissionPrompt";
@@ -34,7 +35,13 @@ export function TranscriptView({ agentId, events }: { agentId: string; events: T
     <div className="transcript-wrap">
       <div className="transcript-view" ref={scrollRef} onScroll={onScroll}>
         {events.map((event, index) => (
-          <TranscriptItem key={keyOf(event, index)} agentId={agentId} event={event} />
+          <ErrorBoundary
+            key={keyOf(event, index)}
+            label="message"
+            fallback={<pre className="tool-block tool-result-error">Failed to render this event.</pre>}
+          >
+            <TranscriptItem agentId={agentId} event={event} />
+          </ErrorBoundary>
         ))}
       </div>
       {!atBottom && (
