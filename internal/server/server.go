@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/agentdeck/agentdeck/internal/backend/credcheck"
 	"github.com/agentdeck/agentdeck/internal/bus"
 	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/runtime"
@@ -30,6 +31,10 @@ type Server struct {
 
 	hookMu     sync.Mutex
 	hookTokens map[string]string // agent_id -> per-launch hook token (Phase 2 persists these)
+
+	// credCheck is the credential probe function; defaults to credcheck.Check.
+	// Tests inject a stub so real network/CLI calls are avoided.
+	credCheck func(ctx context.Context, bk config.Backend, model config.Model, mergedEnv map[string]string) credcheck.CredResult
 }
 
 // New constructs a Server. The config supplies the port; the stores back the data
@@ -57,6 +62,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		cfg:         cfg,
 		log:         log,
 		hookTokens:  map[string]string{},
+		credCheck:   credcheck.Check,
 	}
 }
 
