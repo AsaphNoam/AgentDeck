@@ -111,6 +111,7 @@ type SessionMetaData struct {
 	Interface       string   `json:"interface"`
 	Group           string   `json:"group,omitempty"`
 	Cwd             string   `json:"cwd"`
+	SystemPrompt    string   `json:"system_prompt,omitempty"`
 	SystemPromptSHA string   `json:"system_prompt_sha"`
 	EnvKeys         []string `json:"env_keys,omitempty"`
 	CreatedAt       string   `json:"created_at"`

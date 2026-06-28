@@ -37,6 +37,32 @@ type MCPServerSpec struct {
 	Env     []string // "K=V"
 }
 
+// TurnRollup is the per-turn summary the runtime gives to the persistence
+// indexer after emitting a terminal turn event.
+type TurnRollup struct {
+	LastSeq        int64
+	LastContextPct float64
+	UpdatedAt      string
+}
+
+// PersistenceIndexer is implemented by internal/index. It lives here to avoid
+// an import cycle: the indexer consumes runtime.Event, while runtime only needs
+// this narrow sink interface.
+type PersistenceIndexer interface {
+	UpsertSessionMeta(agentID string, meta SessionMetaData) error
+	OnEvent(agentID string, ev Event) error
+	OnTurnEnd(agentID string, rollup TurnRollup) error
+}
+
+type TranscriptWriter interface {
+	Append(Event) error
+	Sync() error
+	Close() error
+	NextSeq() int64
+}
+
+type TranscriptOpener func(home, agentID string, meta *SessionMetaData) (TranscriptWriter, error)
+
 // Handle is the live, in-memory representation of a started runtime. Returned by
 // Start and held by the Registry keyed by agent_id. Not persisted.
 type Handle struct {

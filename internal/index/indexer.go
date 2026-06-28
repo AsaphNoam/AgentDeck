@@ -17,12 +17,6 @@ type Indexer struct {
 	content map[string]string
 }
 
-type TurnRollup struct {
-	LastSeq        int64
-	LastContextPct float64
-	UpdatedAt      string
-}
-
 func New(db *sql.DB) *Indexer {
 	return &Indexer{db: db, content: map[string]string{}}
 }
@@ -41,7 +35,7 @@ func (ix *Indexer) UpsertSessionMeta(agentID string, meta runtime.SessionMetaDat
 	}
 	_, err = ix.db.Exec(`
 INSERT INTO sessions(agent_id, name, role, project, backend, model, interface, grp, cwd, system_prompt, env_keys, last_session_id, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(agent_id) DO UPDATE SET
   name=excluded.name,
   role=excluded.role,
@@ -55,7 +49,7 @@ ON CONFLICT(agent_id) DO UPDATE SET
   last_session_id=excluded.last_session_id,
   updated_at=excluded.updated_at`,
 		agentID, meta.Name, meta.Role, meta.Project, meta.Backend, meta.Model, meta.Interface,
-		meta.Group, meta.Cwd, string(envKeys), meta.SessionID, now, now)
+		meta.Group, meta.Cwd, meta.SystemPrompt, string(envKeys), meta.SessionID, now, now)
 	if err != nil {
 		return fmt.Errorf("index: upsert session meta: %w", err)
 	}
@@ -101,11 +95,11 @@ WHERE agent_id = ?`, ev.Seq, ev.Seq, ev.Ts, ev.Ts, agentID)
 	return nil
 }
 
-func (ix *Indexer) OnTurnEnd(agentID string, rollup TurnRollup) error {
+func (ix *Indexer) OnTurnEnd(agentID string, rollup runtime.TurnRollup) error {
 	return ix.flush(agentID, rollup, true)
 }
 
-func (ix *Indexer) flush(agentID string, rollup TurnRollup, countTurn bool) error {
+func (ix *Indexer) flush(agentID string, rollup runtime.TurnRollup, countTurn bool) error {
 	if agentID == "" {
 		return fmt.Errorf("index: agent id is required")
 	}

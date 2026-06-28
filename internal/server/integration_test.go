@@ -235,8 +235,11 @@ func TestLaunchPromptPermissionFlow(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("transcript status = %d: %s", resp.StatusCode, body)
 	}
-	if !bytes.Contains(body, []byte(`"events"`)) || !bytes.Contains(body, []byte(`"permission_request"`)) {
+	if !bytes.Contains(body, []byte(`"events"`)) || !bytes.Contains(body, []byte(`"permission_request"`)) || !bytes.Contains(body, []byte(`"permission_resolved"`)) {
 		t.Fatalf("transcript body missing retained events: %s", body)
+	}
+	if _, err := os.Stat(filepath.Join(srv.configStore.Home(), "sessions", agentID, "transcript.ndjson")); err != nil {
+		t.Fatalf("persisted transcript missing: %v", err)
 	}
 
 	// GET detail reflects the agent.
@@ -249,6 +252,66 @@ func TestLaunchPromptPermissionFlow(t *testing.T) {
 	}()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("detail status = %d: %s", resp.StatusCode, body)
+	}
+}
+
+func TestCrashMidTurnPersistsDeliveredTranscript(t *testing.T) {
+	fake := buildFakeACP(t)
+	t.Setenv("FAKEACP_SCENARIO", "crash_midturn")
+
+	srv := testServer(t, true)
+	srv.registry.Chat().SetCommand(fake)
+	if err := srv.configStore.WriteProject("tmpproj", config.Project{Title: "Tmp", Cwd: t.TempDir()}); err != nil {
+		t.Fatalf("WriteProject: %v", err)
+	}
+	if err := srv.configStore.WriteRole("impl", config.Role{Title: "Impl", SystemPrompt: "be helpful"}); err != nil {
+		t.Fatalf("WriteRole: %v", err)
+	}
+
+	ts := httptest.NewServer(srv.routes())
+	defer ts.Close()
+	t.Cleanup(func() { srv.registry.Shutdown(context.Background()) })
+
+	resp, body := post(t, ts.URL+"/api/sessions", map[string]string{"role": "impl", "project": "tmpproj"})
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("launch status = %d: %s", resp.StatusCode, body)
+	}
+	var launched sessionResponse
+	json.Unmarshal(body, &launched)
+	agentID := launched.Agent.AgentID
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	frames := streamSSE(t, ctx, ts.URL+"/api/events")
+	<-frames // initial state_update replay
+
+	resp, body = post(t, ts.URL+"/api/sessions/"+agentID+"/prompt", map[string]string{"text": "crash"})
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("prompt status = %d: %s", resp.StatusCode, body)
+	}
+	waitForEventType(t, frames, "assistant_text")
+	waitForEventType(t, frames, "turn_end")
+
+	r, err := http.Get(ts.URL + "/api/sessions/" + agentID + "/transcript")
+	if err != nil {
+		t.Fatalf("GET transcript: %v", err)
+	}
+	defer r.Body.Close()
+	data := make([]byte, 8192)
+	n, _ := r.Body.Read(data)
+	body = data[:n]
+	if r.StatusCode != http.StatusOK {
+		t.Fatalf("transcript status = %d: %s", r.StatusCode, body)
+	}
+	if !bytes.Contains(body, []byte("about to crash")) {
+		t.Fatalf("transcript missing pre-crash delivered text: %s", body)
+	}
+	raw, err := os.ReadFile(filepath.Join(srv.configStore.Home(), "sessions", agentID, "transcript.ndjson"))
+	if err != nil {
+		t.Fatalf("read raw transcript: %v", err)
+	}
+	if !bytes.Contains(raw, []byte("about to crash")) {
+		t.Fatalf("raw transcript missing pre-crash delivered text: %s", raw)
 	}
 }
 
