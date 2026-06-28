@@ -9,9 +9,9 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 ## Current position
 
 - **Active phase:** 2 — State manager, SSE bus, dashboard card grid — **in progress**
-- **Active subphase:** 2.2 — `POST /api/hook` ingest + reconciliation sweep
+- **Active subphase:** 2.3 — SSE event bus + `GET /api/events` + runtime re-point
 - **Spec:** [`tech/phase-2-state-dashboard-techspec.md`](tech/phase-2-state-dashboard-techspec.md)
-- **Last GREEN checkpoint:** Subphase 2.1 @ `impl/phase-2`: `go build ./...` + `go test ./...`
+- **Last GREEN checkpoint:** Subphase 2.2 @ `impl/phase-2`: `go build ./...` + `go test ./...`
 - **Branch:** `impl/phase-2` (do not commit to `main`; do not push unless asked).
 
 ---
@@ -20,7 +20,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 
 - [x] Phase 0 — Foundation (data model, file store, server & CLI skeleton) ✅
 - [x] Phase 1 — Core loop (ACP chat runtime, launch, streaming chat) ✅ — verified against real `claude-code-acp` v0.16.2
-- [ ] Phase 2 — State manager, SSE bus, dashboard card grid — **2.1 ✅; 2.2 next**
+- [ ] Phase 2 — State manager, SSE bus, dashboard card grid — **2.1 ✅; 2.2 ✅; 2.3 next**
 - [ ] Phase 3 — Config CRUD & onboarding
 - [ ] Phase 4 — Persistence: archive, search, resume, file/command tracking
 - [ ] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications
@@ -37,14 +37,16 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 **Subphase 2.1 — State manager + SQLite store ✅**
 
-**Subphase 2.2 — `POST /api/hook` ingest + reconciliation sweep**
+**Subphase 2.2 — `POST /api/hook` ingest + reconciliation sweep ✅**
 
-- [ ] Add `POST /api/hook` route/handler with `X-AgentDeck-Token` header and body `token` fallback.
-- [ ] Persist/validate per-launch tokens keyed to live `running` rows (Phase 1 currently stores tokens in-memory on `Server.hookTokens`; replace or bridge it here).
-- [ ] Implement `Manager.ApplyHook` for `running` / `status` / `stopped`, using one serialized transaction and publishing the recomputed `state_update`.
-- [ ] Return the fixed hook error envelope `{error,message}` with required `204/400/401/403/404/500` behavior.
-- [ ] Add reconciliation sweep over `sessions/` with fsnotify + periodic fallback; only apply minimal stale-running corrections and do not override fresh hook updates.
-- [ ] Tests: httptest valid/missing/wrong/unknown/bad hook cases; sweep stale transcript correction; `go build ./...` + `go test ./...` green.
+**Subphase 2.3 — SSE event bus + `GET /api/events` + runtime re-point**
+
+- [ ] Add `internal/bus` with `Event`, `Bus`, clients, `bufSize=256`, global seq, snapshot map, and drop-oldest publish.
+- [ ] Add `GET /api/events`: SSE headers, `retry:2000`, hydration burst, `__hydrated__` marker, live frames, 10s ping, disconnect cleanup.
+- [ ] Wire `state.Manager` publisher to the real bus and keep snapshot current.
+- [ ] Re-point runtime transcript deltas from per-agent SSE/hub to multiplexed `new_message` events on the bus.
+- [ ] Delete `GET /api/sessions/{id}/events` and remove any remaining callers.
+- [ ] Tests: bus ordering/drop-oldest + race, SSE hydration/publish/ping httptest, existing suites green; manual `curl -N /api/events` sanity if running locally.
 
 ---
 
@@ -97,8 +99,8 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 - **`Stop` implemented in 1.3** (spec slots it in 1.4) for test teardown — matches §8.5 exactly; no reversal needed.
 - **Tool `Name` ← ACP `kind`** (fallback `title`, then `"tool"`); §4.3 didn't pin the field. Isolated in
   `acpmap.go::toolName`. Verified against the real adapter (turn streamed cleanly).
-- **Hook token stored in-memory** (`Server.hookTokens`) — no `state.db` column yet. **Phase 2 should
-  persist it** (it owns `POST /api/hook` ingest) and drop the in-memory map.
+- **RESOLVED in 2.2: hook token persisted in `running.hook_token`.** `Server.hookTokens` still exists as
+  Phase 1 launch scaffolding but hook validation now reads the live `running` row, not the map.
 - **Two error-envelope shapes coexist** — new session routes use the §7.7 nested shape; Phase-0 GET routes
   keep flat `{"error":"msg"}` (not migrated, to avoid breaking Phase-0 tests). Migrate later if §7.7 is meant
   to be truly project-wide.
@@ -117,7 +119,8 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
   phase wanting real model/mode selection should map our model→adapter modelId in `acpmap.go`/`sessionNewParams`.
 - **Phase 2.1 manager contract:** `state.Manager` wraps the existing Phase 0 `Store`; it does not replace
   typed CRUD. It emits `AgentStateUpdate` through `StatePublisher`, a small interface intended for the
-  Phase 2.3 bus. `status.updated_at` is migration v2 and `Store.WriteStatus` stamps it when callers omit it.
+  Phase 2.3 bus. `status.updated_at` is migration v2, `running.hook_token` is migration v3, and
+  `Store.WriteStatus` stamps `updated_at` when callers omit it.
 - **Phase 2.1 transcript mirror kept generic.** The spec asked for transcript types in `internal/state/types.go`
   but Phase 1's concrete normalized event shapes already live in `internal/runtime/event.go`. I added only
   `state.TranscriptEvent {Kind, Data}` as a storage/UI-facing mirror to avoid duplicating runtime structs.
@@ -127,6 +130,10 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-28 — **2.2 green.** Added `POST /api/hook` with header/body token support and fixed
+  `{error,message}` envelope; persisted hook tokens in `running.hook_token`; added `Manager.ApplyHook`
+  for `running`/`status`/`stopped`; added fsnotify + periodic sessions reconciliation that only corrects
+  stale status rows. Checkpoint: `go build ./...` + `go test ./...`.
 - 2026-06-28 — **2.1 green.** Added `state.Manager`, `AgentState`/`AgentStateUpdate`, migration v2
   (`status.updated_at`), `busy_timeout=5000`, effective identity+running+status recompute, startup scan,
   tombstone removal semantics, and focused manager tests. Checkpoint: `go build ./...` + `go test ./...`.

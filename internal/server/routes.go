@@ -21,6 +21,7 @@ func (s *Server) routes() http.Handler {
 	api("GET /api/projects", s.handleProjects)
 	api("GET /api/backends", s.handleBackends)
 	api("GET /api/layout", s.handleLayout)
+	api("POST /api/hook", s.handleHook)
 
 	// Phase 1 session lifecycle (launch, control, interim SSE). The {id} routes
 	// are more specific than the GET /api/ catch-all and win via mux precedence.
