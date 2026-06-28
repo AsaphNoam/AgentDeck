@@ -12,8 +12,10 @@ import (
 	"github.com/agentdeck/agentdeck/internal/backend/credcheck"
 	"github.com/agentdeck/agentdeck/internal/bus"
 	"github.com/agentdeck/agentdeck/internal/config"
+	persistindex "github.com/agentdeck/agentdeck/internal/index"
 	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/agentdeck/agentdeck/internal/transcript"
 )
 
 // onboardingCacheEntry caches a cred-check result for the default backend/model
@@ -61,6 +63,9 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	eventBus := bus.New()
 	stateMgr := state.NewManager(stateStore, eventBus)
 	if registry != nil {
+		registry.SetPersistence(cfgStore.Home(), func(home, agentID string, meta *runtime.SessionMetaData) (runtime.TranscriptWriter, error) {
+			return transcript.Open(home, agentID, meta)
+		}, persistindex.New(stateStore.DB()))
 		registry.SetEventSink(eventBus.PublishRuntimeEvent)
 		registry.SetStateTouch(func(agentID string) {
 			if _, err := stateMgr.Touch(agentID); err != nil {

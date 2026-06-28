@@ -60,6 +60,14 @@ func (r *Registry) SetStateTouch(touch func(string)) {
 	r.chat.SetStateTouch(touch)
 }
 
+// SetPersistence wires durable transcript/index sinks into the chat runtime.
+func (r *Registry) SetPersistence(home string, open TranscriptOpener, ix PersistenceIndexer) {
+	if r == nil || r.chat == nil {
+		return
+	}
+	r.chat.SetPersistence(home, open, ix)
+}
+
 // runtimeFor dispatches by agent.interface. An unknown interface yields
 // ErrNotImplemented (techspec §3.2), which the API layer maps to 501.
 func (r *Registry) runtimeFor(iface string) (Runtime, error) {

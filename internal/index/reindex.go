@@ -54,13 +54,13 @@ func Reindex(home string, db *sql.DB) error {
 				_ = json.Unmarshal(ev.Data, &d)
 				lastContext = d.ContextPct
 				sawTurnEnd = true
-				if err := ix.OnTurnEnd(agentID, TurnRollup{LastSeq: ev.Seq, LastContextPct: d.ContextPct, UpdatedAt: ev.Ts}); err != nil {
+				if err := ix.OnTurnEnd(agentID, runtime.TurnRollup{LastSeq: ev.Seq, LastContextPct: d.ContextPct, UpdatedAt: ev.Ts}); err != nil {
 					return fmt.Errorf("index: turn_end %s seq %d: %w", agentID, ev.Seq, err)
 				}
 			}
 		}
 		if lastSeq > 0 && updatedAt != "" && !sawTurnEnd {
-			if err := ix.flush(agentID, TurnRollup{LastSeq: lastSeq, LastContextPct: lastContext, UpdatedAt: updatedAt}, false); err != nil {
+			if err := ix.flush(agentID, runtime.TurnRollup{LastSeq: lastSeq, LastContextPct: lastContext, UpdatedAt: updatedAt}, false); err != nil {
 				return fmt.Errorf("index: final flush %s: %w", agentID, err)
 			}
 		}

@@ -40,6 +40,7 @@ func (c *ChatRuntime) onRequest(as *agentState, req *IncomingRequest) {
 			return
 		}
 		_ = req.Respond(selectedOutcome(optID))
+		c.emit(as, EvPermissionResolved, PermissionResolvedData{ToolCallID: data.ToolCallID, Decision: "auto_approve"})
 		return
 	}
 
@@ -87,6 +88,7 @@ func (c *ChatRuntime) Permission(ctx context.Context, agentID, toolCallID, decis
 	}
 
 	c.resolvePending(as, toolCallID, "selected", optID)
+	c.emit(as, EvPermissionResolved, PermissionResolvedData{ToolCallID: toolCallID, Decision: decision})
 	c.updateStatus(as, "busy", "thinking", "PermissionResolved", keepBusySince)
 	return nil
 }
@@ -105,6 +107,7 @@ func (c *ChatRuntime) onPermissionTimeout(as *agentState, toolCallID string) {
 	} else {
 		c.resolvePending(as, toolCallID, "cancelled", "")
 	}
+	c.emit(as, EvPermissionResolved, PermissionResolvedData{ToolCallID: toolCallID, Decision: "timeout"})
 	c.emit(as, EvError, ErrorData{Scope: "tool", Message: "permission timed out"})
 	c.updateStatus(as, "busy", "thinking", "PermissionResolved", keepBusySince)
 }
