@@ -8,10 +8,10 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 
 ## Current position
 
-- **Active phase:** 3 — Config CRUD & onboarding
-- **Active subphase:** 4.1 — Archive + search (Phase 4 first subphase)
-- **Spec:** Phase 3 complete ✅. See Phase 4 spec when available.
-- **Last GREEN checkpoint:** review-fix @ `impl/phase-3`: 26 Vitest + go tests green (path-traversal fix + cache invalidation + force-delete UI)
+- **Active phase:** 4 — Persistence: archive, search, resume, file/command tracking
+- **Active subphase:** 4.2 — `state.db` Phase-4 migration + indexer + reindex
+- **Spec:** [`phase-4-persistence-archive.md`](phase-4-persistence-archive.md), [`tech/phase-4-persistence-archive-techspec.md`](tech/phase-4-persistence-archive-techspec.md)
+- **Last GREEN checkpoint:** 4.1 @ `impl/phase-3`: `go test ./internal/transcript/...`, `go build ./...`, `go test ./...`
 - **Branch:** `impl/phase-3` (do not commit to `main`; do not push unless asked).
 
 ---
@@ -35,21 +35,15 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 > The ONLY place granular steps live.
 
-**Phase 2 complete ✅** (2.1–2.6 green; details in git history).
-
-**Subphase 3.1 ✅** — `internal/config/validate.go` (`ValidSlug`, `FieldError`, role/project validators); `POST/PUT/DELETE /api/roles/{role}` + `POST/PUT/DELETE /api/projects/{project}` with `validation_failed` shape, `cwd_not_found` warning, in-use guard (`?force=true`); disk-on-demand confirmed; all tests green.
-
-**Subphase 3.2 ✅** — `internal/backend/credcheck/` (dispatch, claude.go auth-status probe, codex.go /v1/models ping, 6s timeout, CredResult); `ValidateBackendsConfig` in validate.go (invariants 1–6, auto-promote zero-default backend + model); `PUT /api/backends` handler with cred-check injection for tests; env merge tested. All tests green.
-
-**Subphase 3.3 ✅** — `GET /api/config` with computed `onboarding` block (min-viable check: backend ok-creds + project + role, ~60s cred-check cache); `PUT /api/config` partial merge (onboarding_complete, defaults; rejects version/port); `Config.OnboardingComplete` field added to types.go; disk-on-demand audit: all reads hit disk per request, only the cred-check memo is cached. Tests green.
-
-**Subphase 3.4 ✅** — Zod schemas (role/project/backends/config); TanStack Query hooks (`useRoles`/`useProjects`/`useBackends`/`useConfig` + mutations); `SettingsPage` tabs; `RolesEditor`+`RoleForm` (tri-state skip_permissions); `ProjectsEditor`+`ProjectForm` (RGB swatch, cwd_not_found warning); Settings route wired; Vitest+MSW tests (11 green); embedded dist refreshed.
-
-**Subphase 3.5 ✅** — `BackendsEditor`+`ModelRow` (default radios, env editor with masked secrets, cred chip on save); `useSuggestedName` (auto-suggests until user edits); `NewAgentModal` (role/project/backend/model selects, auto-name, terminal disabled, submits `POST /api/sessions`); `CardGrid` wires "New agent" button + `EmptyState` CTA; 20 Vitest+MSW tests green; embedded dist refreshed.
-
-**Subphase 3.6 ✅** — `OnboardingGate` (reads `GET /api/config` onboarding.satisfied, blocks dashboard); `OnboardingWizard` 3 steps (BackendStep: validate & continue on ok creds; ProjectStep: POST /api/projects; LaunchStep: POST /api/sessions + PUT /api/config onboarding_complete); resume-from-first-not-done-step; non-dismissible (Esc/overlay blocked); 26 Vitest tests green; embedded dist refreshed. **Phase 3 COMPLETE.**
-
 **Phase 3 complete ✅** (3.1–3.6 all green; details in git history).
+
+**Subphase 4.1 ✅** — `internal/transcript` package added: append-only `transcript.ndjson` writer (`Open`/`Append`/`Sync`/`Close`, `O_APPEND`, one JSON record write per event, fsync on `turn_end`/`error`), `session_meta` first record for new logs, max-seq recovery on reopen, `NextSeq()`, and replay reader with `since_seq`, `include_meta`, default meta skip, malformed-line tolerance, and 8 MiB scanner cap. Added additive runtime event types/payloads: `session_meta`, `permission_resolved`. Tests cover append→read, reopen seq continuation, bad middle line, partial trailing line, and >64 KiB line replay. No runtime hot-path wiring yet.
+
+**Subphase 4.2 — `state.db` Phase-4 migration + indexer + reindex (next)**
+- Add Phase-4 migration: `sessions`, `sessions_fts` (FTS5), `tracked_files`, `tracked_commands`; open DB in WAL with `synchronous=NORMAL`; build/check with `sqlite_fts5` tag per spec.
+- Add `internal/index.Indexer`: `UpsertSessionMeta`, `OnEvent`, `OnTurnEnd`; accumulate FTS content, update session counts/last seq/context, derive file/command rows from normalized events.
+- Add `agentdeck reindex`/backfill path that truncates Phase-4 derived tables and replays every raw transcript log.
+- Checkpoint: `go test ./internal/index/...` with `-tags sqlite_fts5`, `go build -tags sqlite_fts5 ./...`, plus full existing tests.
 
 ---
 
@@ -147,11 +141,19 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 - **Phase 2.4 replaced the walkthrough UI source.** The repo had a product-demo React app, not the dashboard shell
   scaffold described by the spec. I replaced `ui/src` with the Phase 2 shell/stores/SSE foundation and refreshed
   `internal/server/ui/dist`. To reverse: recover the demo from git history, but it is no longer the Phase 2 target UI.
+- **Phase 4.1 writer API takes optional metadata.** The tech spec pseudo-signature said `Open(home, agentID)` but also
+  requires the writer to create the first `session_meta` record. I implemented `transcript.Open(home, agentID, meta)`
+  so runtime wiring can pass the frozen launch snapshot at creation; `nil` skips meta for tests/recovery cases. To
+  reverse: split this into `Open` + explicit `AppendSessionMeta` before 4.3 runtime wiring.
 
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-28 — **4.1 green.** Added `internal/transcript` raw NDJSON writer/reader with `session_meta`
+  first record, max-seq recovery/`NextSeq`, `since_seq`/`include_meta` replay, malformed-line tolerance,
+  and 8 MiB scanner cap. Added additive `runtime` event types/payloads for `session_meta` and
+  `permission_resolved`. Checkpoint: `go test ./internal/transcript/...`, `go build ./...`, `go test ./...`.
 - 2026-06-28 — **Phase 3 COMPLETE / 3.6 green.** `OnboardingGate` + `OnboardingWizard` (3 steps: BackendStep/ProjectStep/LaunchStep); resume-from-step logic; non-dismissible (Esc/overlay blocked); sets `onboarding_complete` on first launch; 26 Vitest+MSW tests; embedded dist refreshed. Checkpoint: all Vitest tests + `go build ./...` + `go test ./...`.
 - 2026-06-28 — **3.5 green.** `BackendsEditor`+`ModelRow` (default radios, masked env editor, cred chip); `useSuggestedName`; `NewAgentModal` (role/project/backend/model, terminal disabled); "New agent" CTA in CardGrid/EmptyState; 20 Vitest+MSW tests; embedded dist refreshed. Checkpoint: all Vitest tests + `go build ./...` + `go test ./...`.
 - 2026-06-28 — **3.4 green.** Zod schemas; TanStack Query hooks; SettingsPage tabs; RolesEditor/RoleForm + ProjectsEditor/ProjectForm (RGB swatch, cwd_not_found); Settings route; 11 Vitest+MSW tests green; embedded dist refreshed. Checkpoint: all Vitest tests + `go build ./...` + `go test ./...`.
