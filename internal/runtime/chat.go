@@ -609,9 +609,10 @@ func (c *ChatRuntime) emit(as *agentState, typ string, data any) {
 	}
 	as.transcript = append(as.transcript, ev)
 	as.mu.Unlock()
-	if !c.persistEvent(as, ev) {
-		return
-	}
+	// Durability is best-effort: a transcript write failure is logged inside
+	// persistEvent but must NOT suppress live delivery, or subscribers' in-memory
+	// view would silently diverge from Transcript() on a disk error.
+	c.persistEvent(as, ev)
 	as.hub.Publish(ev)
 	c.mu.Lock()
 	sink := c.sink

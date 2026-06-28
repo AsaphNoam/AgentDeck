@@ -5,9 +5,9 @@ const LIMIT = 600;
 
 export function ToolResult({ event }: { event: TranscriptEvent }) {
   const [expanded, setExpanded] = useState(false);
-  const raw = event.result ?? event.status ?? "";
+  const raw = event.content ?? event.error ?? event.result ?? "";
   const text = typeof raw === "string" ? raw : JSON.stringify(raw, null, 2);
-  const isError = event.is_error === true;
+  const isError = event.status === "failed" || event.error != null || event.is_error === true;
   const long = text.length > LIMIT;
   const shown = long && !expanded ? `${text.slice(0, LIMIT)}…` : text;
   return (

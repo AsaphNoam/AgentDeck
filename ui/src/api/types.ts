@@ -32,12 +32,31 @@ export interface BusEvent<T = unknown> {
   data: T;
 }
 
+// RuntimeEvent is the raw wire shape emitted by the Go runtime (event.go) and
+// delivered both over SSE `new_message` and by GET /api/sessions/{id}/transcript.
+// The type-specific payload lives nested under `data` — it is NOT flattened on
+// the wire. The UI must normalize this into a flat TranscriptEvent before render.
+export interface RuntimeEvent {
+  agent_id: string;
+  seq: number;
+  type: string;
+  ts: string;
+  data: Record<string, unknown>;
+}
+
+// TranscriptEvent is the flat, render-ready shape the store and renderers consume:
+// `kind` plus the payload fields spread to the top level. normalizeEvent() maps a
+// RuntimeEvent into this; locally-created events (e.g. the optimistic user message)
+// are authored directly in this shape.
 export interface TranscriptEvent {
   kind?: string;
   type?: string;
+  seq?: number;
+  ts?: string;
   message_id?: string;
   text?: string;
   delta?: string;
+  resolved?: "approve" | "deny";
   data?: unknown;
   [key: string]: unknown;
 }

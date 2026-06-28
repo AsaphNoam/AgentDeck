@@ -34,7 +34,7 @@ export function TranscriptView({ agentId, events }: { agentId: string; events: T
     <div className="transcript-wrap">
       <div className="transcript-view" ref={scrollRef} onScroll={onScroll}>
         {events.map((event, index) => (
-          <TranscriptItem key={index} agentId={agentId} event={event} />
+          <TranscriptItem key={keyOf(event, index)} agentId={agentId} event={event} />
         ))}
       </div>
       {!atBottom && (
@@ -46,14 +46,25 @@ export function TranscriptView({ agentId, events }: { agentId: string; events: T
   );
 }
 
+// Stable React key: prefer the runtime seq, then a local message_id, then index.
+function keyOf(event: TranscriptEvent, index: number) {
+  if (event.seq != null) return `s${event.seq}`;
+  if (event.message_id) return `m${event.message_id}`;
+  return `i${index}`;
+}
+
 function TranscriptItem({ agentId, event }: { agentId: string; event: TranscriptEvent }) {
   const kind = String(event.kind ?? event.type ?? "");
   if (kind === "assistant_text") return <AssistantText event={event} />;
+  if (kind === "user_text")
+    return <article className="message user-message">{String(event.text ?? "")}</article>;
   if (kind === "permission_request") return <PermissionPrompt agentId={agentId} event={event} />;
   if (kind === "diff") return <DiffBlock event={event} />;
   if (kind === "tool_call") return <ToolCall event={event} />;
   if (kind === "tool_result") return <ToolResult event={event} />;
   if (kind === "error") return <TurnError event={event} />;
   if (kind === "turn_end") return <hr className="turn-end" />;
+  // permission_resolved is folded into its prompt by the store; nothing to render.
+  if (kind === "permission_resolved" || kind === "session_meta") return null;
   return <pre className="tool-block">{JSON.stringify(event, null, 2)}</pre>;
 }

@@ -18,6 +18,12 @@ LDFLAGS := -X $(VERSION_PKG).Version=$(VERSION) \
 
 EMBED_DIR := internal/server/ui/dist
 
+# Build tags. sqlite_fts5 compiles FTS5 into the SQLite driver; the archive
+# search path (MATCH/snippet/bm25) requires it, so every shipped binary must
+# carry it. Untagged builds degrade to a plain sessions_fts table on which
+# MATCH errors at runtime — fine for the no-tag test checkpoint, not for release.
+TAGS := sqlite_fts5
+
 .PHONY: all build ui embed run test vet clean
 
 all: build
@@ -34,7 +40,7 @@ embed: ui
 
 ## build: build the agentdeck binary (assumes embed dir is populated)
 build:
-	go build -ldflags "$(LDFLAGS)" -o bin/$(BINARY) ./cmd/agentdeck
+	go build -tags "$(TAGS)" -ldflags "$(LDFLAGS)" -o bin/$(BINARY) ./cmd/agentdeck
 
 ## dist: full release build — UI + embed + binary
 dist: embed build
