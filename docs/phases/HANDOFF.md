@@ -9,9 +9,9 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 ## Current position
 
 - **Active phase:** 3 — Config CRUD & onboarding
-- **Active subphase:** 3.5 — Backends editor + New Agent modal
+- **Active subphase:** 3.6 — Onboarding wizard gate + wire-up/polish
 - **Spec:** [`tech/phase-3-config-onboarding-techspec.md`](tech/phase-3-config-onboarding-techspec.md)
-- **Last GREEN checkpoint:** 3.4 @ `impl/phase-3`: all 11 Vitest tests + `go build ./...` + `go test ./...`
+- **Last GREEN checkpoint:** 3.5 @ `impl/phase-3`: 20 Vitest tests + `go build ./...` + `go test ./...`
 - **Branch:** `impl/phase-3` (do not commit to `main`; do not push unless asked).
 
 ---
@@ -21,7 +21,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - [x] Phase 0 — Foundation (data model, file store, server & CLI skeleton) ✅
 - [x] Phase 1 — Core loop (ACP chat runtime, launch, streaming chat) ✅ — verified against real `claude-code-acp` v0.16.2
 - [x] Phase 2 — State manager, SSE bus, dashboard card grid ✅
-- [ ] Phase 3 — Config CRUD & onboarding — **active, 3.4 ✅**
+- [ ] Phase 3 — Config CRUD & onboarding — **active, 3.5 ✅**
 - [ ] Phase 4 — Persistence: archive, search, resume, file/command tracking
 - [ ] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications
 - [ ] Phase 6 — Flexibility: terminal runtime, switch-runtime, task groups
@@ -45,13 +45,14 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 **Subphase 3.4 ✅** — Zod schemas (role/project/backends/config); TanStack Query hooks (`useRoles`/`useProjects`/`useBackends`/`useConfig` + mutations); `SettingsPage` tabs; `RolesEditor`+`RoleForm` (tri-state skip_permissions); `ProjectsEditor`+`ProjectForm` (RGB swatch, cwd_not_found warning); Settings route wired; Vitest+MSW tests (11 green); embedded dist refreshed.
 
-**Subphase 3.5 — Backends editor + New Agent modal**
+**Subphase 3.5 ✅** — `BackendsEditor`+`ModelRow` (default radios, env editor with masked secrets, cred chip on save); `useSuggestedName` (auto-suggests until user edits); `NewAgentModal` (role/project/backend/model selects, auto-name, terminal disabled, submits `POST /api/sessions`); `CardGrid` wires "New agent" button + `EmptyState` CTA; 20 Vitest+MSW tests green; embedded dist refreshed.
 
-- [ ] `BackendsEditor.tsx` — show backend list with credcheck status badge; expandable model rows; `PUT /api/backends` save.
-- [ ] `ModelRow.tsx` — model.model, env overrides display.
-- [ ] `NewAgentModal.tsx` / `useSuggestedName` — role + project selectors, backend/model selectors; posts `POST /api/sessions`.
-- [ ] Wire "New agent" CTA from CardGrid into the modal.
-- [ ] Tests: Vitest+MSW for BackendsEditor (renders backend + badge); NewAgentModal (submits correct payload).
+**Subphase 3.6 — Onboarding wizard gate + wire-up/polish**
+
+- [ ] `OnboardingGate.tsx` — reads `GET /api/config` `onboarding.satisfied`, blocks dashboard, non-dismissible.
+- [ ] `OnboardingWizard.tsx` — 3 steps (BackendStep / ProjectStep / LaunchStep) reusing editors/modal.
+- [ ] Resume-from-first-not-done-step logic, set `onboarding_complete` via `PUT /api/config` on first launch.
+- [ ] Tests: Vitest gating tests (`satisfied:false` → wizard; `satisfied:true` → dashboard; Esc no-op; resume-step).
 
 ---
 
@@ -148,6 +149,7 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-28 — **3.5 green.** `BackendsEditor`+`ModelRow` (default radios, masked env editor, cred chip); `useSuggestedName`; `NewAgentModal` (role/project/backend/model, terminal disabled); "New agent" CTA in CardGrid/EmptyState; 20 Vitest+MSW tests; embedded dist refreshed. Checkpoint: all Vitest tests + `go build ./...` + `go test ./...`.
 - 2026-06-28 — **3.4 green.** Zod schemas; TanStack Query hooks; SettingsPage tabs; RolesEditor/RoleForm + ProjectsEditor/ProjectForm (RGB swatch, cwd_not_found); Settings route; 11 Vitest+MSW tests green; embedded dist refreshed. Checkpoint: all Vitest tests + `go build ./...` + `go test ./...`.
 - 2026-06-28 — **3.3 green.** `GET /api/config` with computed onboarding block (min-viable check + ~60s cred-check cache); `PUT /api/config` partial merge; `Config.OnboardingComplete` field; disk-on-demand audit (reads clean, only cred-check cached). Checkpoint: `go build ./...` + `go test ./...`.
 - 2026-06-28 — **3.2 green.** `internal/backend/credcheck/` (claude auth-status + codex /v1/models probers, 6s timeout, CredResult, env merge); `ValidateBackendsConfig` (invariants + auto-promote); `PUT /api/backends` with injected credCheck for tests; all invariant + cred-check tests. Checkpoint: `go build ./...` + `go test ./...`.
