@@ -73,14 +73,14 @@ curl -s "http://127.0.0.1:${PORT}/api/sessions/${AGENT}" | jq .
 
 ## Appendix A checklist (techspec)
 
-| Acceptance | How to confirm here |
-|------------|---------------------|
-| CLI and REST produce identical agent | step 2 (`agentdeck role@project` POSTs the same body) |
-| Prompt streams incrementally | step 4 — multiple `assistant_text` deltas, not one block |
-| Permission gates execution; deny prevents tool | step 5 — deny, then confirm the tool's side effect did not happen |
-| Tool calls/results/diffs with args/patches in stream | `tool_call` / `tool_result` / `diff` frames during a tool turn |
-| Cancel interrupts; Stop kills group + removes running row | steps 6–7, then step 8 shows `running` absent |
-| Status row idle→busy→idle incl. `context_pct` | `GET /api/sessions/{id}` `status.state` + `status.context_pct` |
+| Acceptance                                                | How to confirm here                                               |
+| --------------------------------------------------------- | ----------------------------------------------------------------- |
+| CLI and REST produce identical agent                      | step 2 (`agentdeck role@project` POSTs the same body)             |
+| Prompt streams incrementally                              | step 4 — multiple `assistant_text` deltas, not one block          |
+| Permission gates execution; deny prevents tool            | step 5 — deny, then confirm the tool's side effect did not happen |
+| Tool calls/results/diffs with args/patches in stream      | `tool_call` / `tool_result` / `diff` frames during a tool turn    |
+| Cancel interrupts; Stop kills group + removes running row | steps 6–7, then step 8 shows `running` absent                     |
+| Status row idle→busy→idle incl. `context_pct`             | `GET /api/sessions/{id}` `status.state` + `status.context_pct`    |
 
 ## If the real wire shapes differ from §12.1
 

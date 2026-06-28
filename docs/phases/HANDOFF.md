@@ -8,19 +8,20 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 
 ## Current position
 
-- **Active phase:** 1 — Core loop (ACP chat runtime, launch, streaming chat) · F4, F3(min)
-- **Active subphase:** 1.6 — Real-CLI acceptance (credential-gated) + manual verification
-- **Spec:** [`tech/phase-1-core-loop-techspec.md`](tech/phase-1-core-loop-techspec.md) → `## Subphase plan`
-- **Last GREEN checkpoint:** `go build ./...` + `go test ./...` (and `-race`) pass @ `impl/phase-1` (1.5 complete)
-- **Branch:** `impl/phase-1` (do not commit to `main`)
+- **Active phase:** 2 — State manager, SSE bus, dashboard card grid — **not started**
+- **Active subphase:** start at Phase 2's first subphase (read `tech/phase-2-*-techspec.md` → `## Subphase plan`)
+- **Spec:** Phase 2 techspec (TBD path under `tech/`)
+- **Last GREEN checkpoint:** `go build ./...` + `go test ./...` (and `-race`) pass @ `impl/phase-1`; real-CLI
+  acceptance PASSED against `claude-code-acp` v0.16.2 (Phase 1 complete)
+- **Branch:** `impl/phase-1` (Phase 1 work; do not commit to `main`). Start Phase 2 on a new branch.
 
 ---
 
 ## Phase status
 
 - [x] Phase 0 — Foundation (data model, file store, server & CLI skeleton) ✅
-- [ ] Phase 1 — Core loop (ACP chat runtime, launch, streaming chat) — **not started**, start at 1.1
-- [ ] Phase 2 — State manager, SSE bus, dashboard card grid
+- [x] Phase 1 — Core loop (ACP chat runtime, launch, streaming chat) ✅ — verified against real `claude-code-acp` v0.16.2
+- [ ] Phase 2 — State manager, SSE bus, dashboard card grid — **next**, start here
 - [ ] Phase 3 — Config CRUD & onboarding
 - [ ] Phase 4 — Persistence: archive, search, resume, file/command tracking
 - [ ] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications
@@ -33,129 +34,79 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 ## Active subphase detail
 
-> The ONLY place granular steps live. When this subphase is fully green, collapse it
-> (mark `1.1 ✅` on the phase line above) and expand the next subphase here.
+> The ONLY place granular steps live. Phase 1 is complete and collapsed (workflow §5).
+> **Phase 2 has not started** — read its techspec's `## Subphase plan`, expand the first
+> subphase's steps here, branch off `main` (or continue a fresh `impl/phase-2`), and begin.
 
-### Phase 1 subphases (from the tech spec — tick as each goes green)
-- [x] **1.1** Foundations: sentinels, event types, `Runtime` interface + Registry skeleton ✅
-- [x] **1.2** Fake ACP CLI + JSON-RPC stdio transport (deterministic test harness) ✅
-- [x] **1.3** `ChatRuntime.Start` + ACP→normalized mapping + hub/Subscribe (stream a turn end-to-end) ✅
-- [x] **1.4** Permission gating (withhold response + timeout + skip_permissions) and Cancel ✅
-- [x] **1.5** Launch flow, composition, REST + interim SSE, CLI parity ✅
-- [~] **1.6** Real-CLI acceptance — **code/docs done; credentialed run BLOCKED on human** (see below)
-
-**1.6 status:** the credential-independent deliverables are complete and committed:
-- Gated acceptance test [`internal/runtime/acceptance_test.go`](../../internal/runtime/acceptance_test.go)
-  behind `//go:build acceptance` — excluded from default `go test ./...` (CI stays green); run with
-  `go test -tags acceptance ./internal/runtime -run TestRealCLIAcceptance -v` (skips if adapter absent).
-- Adapter pin in [`install.sh`](../../install.sh) (`CLAUDE_ACP_PKG`/`CLAUDE_ACP_VERSION`, optional
-  `INSTALL_ACP=1` install step).
-- curl+SSE recipe + Appendix A checklist: [`phase-1-acceptance.md`](phase-1-acceptance.md).
-
-The **actual run against the real adapter** can't be done in this environment — see "Blocked on human".
-Once a human runs it green, mark `1.6 ✅`, collapse Phase 1 to one line in "Phase status", and delete
-this subphase breakdown (workflow §5).
-
-> ⚠️ **1.6 is a known STOP point** — it needs real `claude-code-acp` credentials. When you reach it,
-> if you don't have a logged-in CLI, record it under "Blocked on human" and stop rather than fake it.
+_(Phase 2 subphases go here once its techspec is opened.)_
 
 ---
 
-## Decisions & notes
+## Decisions & notes (durable contracts from Phase 1)
 
-- Phase 0 substrate is in place: `internal/{config,state,store,server,cli,version}`, seed data, `127.0.0.1` bind, GET-only routes.
-- Launch (`role@project`) is real as of 1.5: [`internal/cli/launch.go`](../../internal/cli/launch.go) POSTs to
-  `/api/sessions`. `launch_stub.go` now only holds `isLaunchArg`.
-- `internal/runtime` created in 1.1: `errors.go` (sentinel + APIError/code vocab §7.7), `event.go`
-  (Event envelope + `*Data` payloads), `runtime.go` (Runtime iface, LaunchSpec, MCPServerSpec, Handle),
-  `registry.go` (byIface dispatch + terminal stub), `chat.go` (ChatRuntime stub). All methods return
-  `ErrNotImplemented` until later subphases.
-- 1.2 added: `jsonrpc.go` (rpcMessage union + `kind()` classifier), `transport.go` (`Transport`:
-  8 MiB scanner, serialized writer, `Call`/`Notify`, request/response correlation map, `IncomingRequest`
-  with withhold-then-`Respond` for permission gating), `testdata/fakeacp/main.go` (standalone fake ACP
-  CLI: scenarios `stream_text`, `big_frame`, `malformed_then_valid`). fakeacp is under `testdata/` so
-  `go build ./...` skips it — build explicitly: `go build -o /dev/null ./internal/runtime/testdata/fakeacp`.
-- 1.3 added: `hub.go` (per-agent fan-out, drop-oldest, cap 256), `acpmap.go` (ALL ACP decoding —
-  `mapSessionUpdate`/`mapPromptResult`), `ringbuffer.go` (stderr tail), real `chat.go` (`ChatRuntime`
-  with `agentState` per agent: process-group spawn, handshake, hub, async `SendPrompt` turn, §4.4 status
-  writes, working `Stop`). `command` field is injectable (tests point it at fakeacp). `c.command`
-  defaults to `claude-code-acp`.
-- 1.4 added: `permission.go` (`onRequest` withhold-the-response gate, `Permission` relay, 180s
-  `permissionTimeout` auto-deny, `skip_permissions` auto-approve, `Cancel` via `session/cancel` notify +
-  pending resolution, `StopAll`), crash handling in `onTransportClosed` (`error{fatal}` + delete running +
-  status `error`, §8.2), `reconcile.go` (`ReconcileStale` for stale running rows on startup). fakeacp
-  rewritten with concurrent request/response routing + sentinel-file trick; scenarios `permission*` and
-  `crash_midturn`. The full `Runtime` interface is now real for the claude-acp chat path.
-- 1.5 added: `Registry` exported surface (`Launch`/`SendPrompt`/`Cancel`/`Stop`/`Permission`/`Subscribe`/
-  `Shutdown`, dispatch by interface + double-start guard + `rtByAgent` routing; `Chat()` accessor;
-  `ChatRuntime.SetCommand` to inject the adapter/fake binary). Server: `launch.go` (composition: `composeEnv`,
-  `joinSystemPrompt`, `resolveSkip`, `suggestName` wordlist, `mintHookToken`, `messagingServer`,
-  `LaunchSpec` builder + rollback), `sessions.go` (prompt/cancel/stop/permission), `sse.go` (interim
-  events stream), `apierror.go` (§7.7 nested envelope). Routes: `POST /api/sessions`,
-  `GET/POST /api/sessions/{id}[/prompt|cancel|stop|permission|events]`. `server.New` now takes a
-  `*runtime.Registry`. `statusRecorder` got a `Flush()` passthrough (SSE needs `http.Flusher`); CORS
-  allows POST. CLI: `launch.go` (`parseLaunch` + POST to `/api/sessions`) replaced the Phase-0 stub.
-  Dashboard start wires `ReconcileStale` + the registry; shutdown calls `registry.Shutdown` (StopAll).
+- **Normalized `Event` is the cross-phase contract.** `internal/runtime`: `event.go` (envelope +
+  `*Data` payloads), `acpmap.go` (the ONLY place ACP wire shapes are decoded — §12.1 isolation rule).
+  Phase 2 streams these `Event`s as `new_message` payloads; the interim SSE `data:` object is already
+  byte-identical to what Phase 2 wraps. Permanent fields: `agent_id,seq,type,ts,data` (append-only).
+- **`Registry` is the server's entry to runtimes** (`Launch`/`SendPrompt`/`Cancel`/`Stop`/`Permission`/
+  `Subscribe`/`Shutdown`; dispatch by `agent.interface`; `Chat()` + `ChatRuntime.SetCommand` inject the
+  adapter binary). `chat.go` owns `agentState` per agent (process group, transport, hub, status writes);
+  `permission.go` is the withhold-the-response gate; `reconcile.go::ReconcileStale` cleans stale rows on start.
+- **Status vocabulary (§4.4)** is the dashboard contract Phase 2 reads: `state ∈
+  {busy,idle,waiting_input,done,error}`, `last_trace ∈ {SessionStart,UserPromptSubmit,PreToolUse:*,
+  PostToolUse:*,PermissionRequest:*,PermissionResolved,Stop,Cancelled,Error}`.
+- **REST surface (server pkg):** `POST /api/sessions` (launch), `GET /api/sessions/{id}`,
+  `POST .../{prompt,cancel,stop,permission}`, `GET .../events` (interim SSE). Session routes use the §7.7
+  nested error envelope via `writeAPIError`. `server.New` takes a `*runtime.Registry`. CLI launch
+  (`internal/cli/launch.go`) just POSTs to `/api/sessions` (CLI≡modal parity).
+- **fakeacp** (`internal/runtime/testdata/fakeacp`) is the deterministic test adapter — under `testdata/`
+  so `go build ./...` skips it; build explicitly with `go build -o /dev/null ./internal/runtime/testdata/fakeacp`.
+- The **real-CLI acceptance** is gated behind `//go:build acceptance`; run with
+  `go test -tags acceptance ./internal/runtime -run TestRealCLIAcceptance -v` (needs `claude-code-acp` +
+  a logged-in Claude account). Recipe + Appendix A: [`phase-1-acceptance.md`](phase-1-acceptance.md).
 
 ## Blocked on human
 
-- **1.6 credentialed acceptance run.** `claude-code-acp` is **not installed** on this machine and there
-  are **no Claude credentials** for it, so the real-adapter acceptance (techspec §10.1, Appendix A) cannot
-  be executed here. Everything else in Phase 1 is built, tested (against the fake CLI), and green.
-  **To unblock:** on a machine with a logged-in Claude account, run `INSTALL_ACP=1 ./install.sh` (or
-  `npm i -g @zed-industries/claude-code-acp@<pinned>`), then either run the gated test
-  (`go test -tags acceptance ./internal/runtime -run TestRealCLIAcceptance -v`) or follow
-  [`phase-1-acceptance.md`](phase-1-acceptance.md). If the real wire shapes differ from §12.1, fix only
-  `acpmap.go`. **Also verify the pinned `CLAUDE_ACP_VERSION` in `install.sh`** — see autonomous decision below.
+_(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` v0.16.2. Nothing blocking.)_
 
 ## Autonomous decisions (please review)
 
-> Calls an agent had to make itself because a directive was ambiguous or the spec had a gap —
-> resolved without stopping, but the human should see them. Each entry: what was unclear, what was
-> chosen and why, how to reverse it. Agents also surface these in their end-of-turn summary. Remove
-> an entry once the human has acknowledged it (workflow §3, §5).
+> Resolved without stopping; the human should still see them. Remove once acknowledged (workflow §3, §5).
 
-- **2026-06-27 — Tech spec says `internal/store` (`store.Store`/`store.Agent`); Phase 0 actually built
-  `internal/state` (`state.Store`/`state.Agent`).** The runtime package imports `internal/state`
-  throughout (`LaunchSpec.Agent state.Agent`, `Registry.store *state.Store`). The spec's `store` is just
-  the older name for the same Phase-0 package; no behavior change. **To reverse:** rename only if Phase 0
-  is ever split into separate config-`store` and state packages — then update the runtime imports.
-- **2026-06-27 — `Stop` implemented in 1.3 instead of 1.4.** The spec slots `Stop` under 1.4, but the 1.3
-  fake-CLI tests need to tear down the spawned process. Implemented the full §8.5 Stop (SIGTERM→grace→
-  SIGKILL to `-pgid`, delete running row, status→`done`) in 1.3. 1.4 now only adds stale-row
-  reconciliation + Cancel + permission. **To reverse:** none needed; it matches the §8.5 spec exactly.
-- **2026-06-27 — Tool `Name` derived from ACP `kind` (fallback `title`).** The §4.3 mapping table maps
-  `tool_call`→`tool_call` but doesn't pin which ACP field becomes the normalized `Name`. Chose ACP
-  `kind` (e.g. `edit`) as the most stable discriminator, falling back to `title` then `"tool"`. Isolated
-  in `acpmap.go::toolName`. **To reverse:** if the real adapter (1.6) surfaces a cleaner tool name field,
-  change only `toolName` — blast radius is one function (§12.1 isolation rule).
-- **2026-06-27 — Hook token stored in-memory, not persisted.** §6.4 says "record the token against the
-  agent" but there is no `state.db` column for it yet (Phase 2 owns the `POST /api/hook` ingest). Stored
-  in a `Server.hookTokens` in-memory map keyed by agent_id. **To reverse / complete:** Phase 2 should add
-  a persistent column (e.g. on `running` or a `launch_tokens` table) and have launch write it there; then
-  drop the in-memory map.
-- **2026-06-27 — Two error-envelope shapes coexist.** New Phase-1 session routes use the §7.7 nested
-  `{"error":{"code","message","details"}}`; the Phase-0 GET routes (`/api/roles`,`/api/sessions` list, …)
-  keep their flat `{"error":"msg"}`. I did **not** migrate the old routes to avoid breaking Phase-0
-  tests/clients. **To reverse:** if §7.7 is meant to be truly project-wide, migrate the Phase-0 handlers
-  to `writeAPIError` and update their tests — out of scope for Phase 1.
-- **2026-06-27 — `messagingServer.Command = os.Executable()`** with args `["mcp-stdio","--agent",ID,
-  "--token",T]`. §6.4 says the registration "re-execs the AgentDeck binary in a hidden mcp-stdio mode";
-  the `mcp-stdio` subcommand/handler does not exist yet (Phase 5). The fake CLI ignores `mcpServers`, so
-  this is registration-only as specified. **To reverse:** Phase 5 adds the real `mcp-stdio` command.
-- **2026-06-27 — `CLAUDE_ACP_VERSION=0.4.1` in `install.sh` is an UNVERIFIED placeholder.** The exact
-  released version of `@zed-industries/claude-code-acp` could not be confirmed offline (no npm access /
-  no adapter installed). The pin is a best guess. **To resolve:** check `npm view
-  @zed-industries/claude-code-acp version`, set the real latest-stable pin, and confirm the negotiated ACP
-  protocol version is within the runtime's expectations during the 1.6 credentialed run.
+- **`internal/store` (spec) → `internal/state` (Phase 0 reality).** The runtime imports `internal/state`
+  throughout; the spec's `store` is the older name for the same package. No behavior change.
+- **`Stop` implemented in 1.3** (spec slots it in 1.4) for test teardown — matches §8.5 exactly; no reversal needed.
+- **Tool `Name` ← ACP `kind`** (fallback `title`, then `"tool"`); §4.3 didn't pin the field. Isolated in
+  `acpmap.go::toolName`. Verified against the real adapter (turn streamed cleanly).
+- **Hook token stored in-memory** (`Server.hookTokens`) — no `state.db` column yet. **Phase 2 should
+  persist it** (it owns `POST /api/hook` ingest) and drop the in-memory map.
+- **Two error-envelope shapes coexist** — new session routes use the §7.7 nested shape; Phase-0 GET routes
+  keep flat `{"error":"msg"}` (not migrated, to avoid breaking Phase-0 tests). Migrate later if §7.7 is meant
+  to be truly project-wide.
+- **`messagingServer.Command = os.Executable()`** with `["mcp-stdio","--agent",ID,"--token",T]` —
+  registration-only; the `mcp-stdio` subcommand lands in Phase 5.
+- **NEW: runtime strips `CLAUDECODE` from the spawned adapter's env** (`chat.go::stripEnv`). The real
+  `claude-code-acp` refuses a "nested" session when `CLAUDECODE` is set (true when AgentDeck is launched
+  from a Claude Code terminal). AgentDeck spawns independent agents, so the nested guard must never apply.
+  Discovered during the 1.6 run. **To reverse:** drop the strip if it ever causes surprise; production
+  (standalone server) is unaffected since `CLAUDECODE` isn't set there.
+- **RESOLVED: `CLAUDE_ACP_VERSION` pinned to `0.16.2`** (was an unverified `0.4.1` placeholder; corrected
+  via `npm view` to the real latest-stable, against which acceptance passed).
+- **Wire-shape note (no fix needed):** the real adapter's `session/new` ignores our `model` param and
+  exposes its own modelIds (`default`/`sonnet`/`haiku`/`opus`) + permission `modes`
+  (incl. `bypassPermissions`/`acceptEdits`). Phase 1 doesn't assert the model, so this is fine; a future
+  phase wanting real model/mode selection should map our model→adapter modelId in `acpmap.go`/`sessionNewParams`.
 
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
 
-- 2026-06-27 — **1.6 code/docs done; credentialed run blocked.** Gated `acceptance` build-tag test +
-  `install.sh` adapter pin + `phase-1-acceptance.md` curl/SSE recipe. Default suite green (test excluded);
-  compiles under `-tags acceptance`. Real-adapter run needs credentials → Blocked on human.
+- 2026-06-28 — **Phase 1 COMPLETE.** Real-CLI acceptance PASSED against `claude-code-acp` v0.16.2
+  (`go test -tags acceptance ./internal/runtime -run TestRealCLIAcceptance`): handshake + incremental
+  stream + turn_end + idle status. Fixed: runtime strips `CLAUDECODE` from the spawned adapter env (the
+  adapter refuses nested sessions); `install.sh` pin corrected `0.4.1`→`0.16.2`. Default suite + `-race` green.
+- 2026-06-27 — **1.6 code/docs.** Gated `acceptance` build-tag test + `install.sh` adapter pin +
+  `phase-1-acceptance.md` curl/SSE recipe.
 - 2026-06-27 — **1.5 green** (incl. `-race`). Launch composition + REST (`POST /api/sessions`, detail,
   prompt/cancel/stop/permission) + interim SSE + CLI launch. Tests: composeEnv/joinSystemPrompt/resolveSkip
   units, CLI parseLaunch + parity, full HTTP integration (launch→SSE→prompt→permission_request→approve→
