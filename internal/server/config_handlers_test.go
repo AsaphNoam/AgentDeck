@@ -189,6 +189,83 @@ func TestRolesDeleteNotFound404(t *testing.T) {
 	}
 }
 
+// TestPathTraversalRejected ensures PUT and DELETE on roles/projects reject path ids
+// that would escape the config subdirectory (dots, slashes, encoded sequences).
+func TestPathTraversalRejected(t *testing.T) {
+	srv := testServer(t, false)
+	h := srv.routes()
+
+	invalidIDs := []string{
+		// Go ServeMux decodes percent-encoded path values, so these arrive decoded.
+		// We only include IDs that are valid HTTP path segments (no raw spaces/empties)
+		// but fail ValidSlug.
+		"..",
+		"../config",
+		"UPPERCASE",
+	}
+	body := map[string]any{"title": "X", "system_prompt": ""}
+
+	for _, id := range invalidIDs {
+		id := id
+		t.Run("role-PUT-"+id, func(t *testing.T) {
+			rec := doRequest(t, h, http.MethodPut, "/api/roles/"+id, body)
+			// Either 400 (invalid slug) or 404/405 from the mux rejecting the path.
+			if rec.Code == http.StatusNoContent || rec.Code == http.StatusOK {
+				t.Errorf("PUT /api/roles/%q: expected non-2xx, got %d", id, rec.Code)
+			}
+		})
+		t.Run("role-DELETE-"+id, func(t *testing.T) {
+			rec := doRequest(t, h, http.MethodDelete, "/api/roles/"+id, nil)
+			if rec.Code == http.StatusNoContent || rec.Code == http.StatusOK {
+				t.Errorf("DELETE /api/roles/%q: expected non-2xx, got %d", id, rec.Code)
+			}
+		})
+	}
+
+	projBody := map[string]any{"title": "X", "cwd": "/tmp", "add_dirs": []string{}, "context_prompt": ""}
+	for _, id := range invalidIDs {
+		id := id
+		t.Run("project-PUT-"+id, func(t *testing.T) {
+			rec := doRequest(t, h, http.MethodPut, "/api/projects/"+id, projBody)
+			if rec.Code == http.StatusNoContent || rec.Code == http.StatusOK {
+				t.Errorf("PUT /api/projects/%q: expected non-2xx, got %d", id, rec.Code)
+			}
+		})
+		t.Run("project-DELETE-"+id, func(t *testing.T) {
+			rec := doRequest(t, h, http.MethodDelete, "/api/projects/"+id, nil)
+			if rec.Code == http.StatusNoContent || rec.Code == http.StatusOK {
+				t.Errorf("DELETE /api/projects/%q: expected non-2xx, got %d", id, rec.Code)
+			}
+		})
+	}
+}
+
+// TestPathTraversalEncodedDots explicitly tests that percent-encoded dots in path IDs
+// are rejected. Go ServeMux decodes path values, so %2e%2e becomes ".." before
+// our handler sees it — ValidSlug catches it there.
+func TestPathTraversalEncodedDots(t *testing.T) {
+	srv := testServer(t, false)
+	h := srv.routes()
+	body := map[string]any{"title": "X", "system_prompt": ""}
+
+	// These percent-encoded values decode to ".." or "../config" after ServeMux processing.
+	// The mux itself may 301/404 these before our handler if they contain actual slashes,
+	// but pure dot segments still reach our handler decoded.
+	for _, raw := range []string{"%2e%2e", "%2E%2E"} {
+		rec := doRequest(t, h, http.MethodPut, "/api/roles/"+raw, body)
+		if rec.Code == http.StatusOK {
+			t.Errorf("PUT /api/roles/%s returned 200 — path traversal not blocked", raw)
+		}
+	}
+	for _, raw := range []string{"%2e%2e", "%2E%2E"} {
+		projBody := map[string]any{"title": "X", "cwd": "/tmp", "add_dirs": []string{}, "context_prompt": ""}
+		rec := doRequest(t, h, http.MethodPut, "/api/projects/"+raw, projBody)
+		if rec.Code == http.StatusOK {
+			t.Errorf("PUT /api/projects/%s returned 200 — path traversal not blocked", raw)
+		}
+	}
+}
+
 func TestRolesInUseGuard(t *testing.T) {
 	srv := testServer(t, false)
 	h := srv.routes()

@@ -150,6 +150,12 @@ func (s *Server) handlePostRole(w http.ResponseWriter, r *http.Request) {
 // handlePutRole implements PUT /api/roles/{role} (§5.1).
 func (s *Server) handlePutRole(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("role")
+	if !config.ValidSlug(id) {
+		writeValidationError(w, &config.ValidationErrors{Errors: []config.FieldError{
+			{Field: "role", Code: "invalid_slug", Message: "must match ^[a-z0-9][a-z0-9-]{0,62}$"},
+		}})
+		return
+	}
 	var body rolePutBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeValidationError(w, &config.ValidationErrors{Errors: []config.FieldError{
@@ -189,6 +195,12 @@ func (s *Server) handlePutRole(w http.ResponseWriter, r *http.Request) {
 // handleDeleteRole implements DELETE /api/roles/{role} (§5.1).
 func (s *Server) handleDeleteRole(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("role")
+	if !config.ValidSlug(id) {
+		writeValidationError(w, &config.ValidationErrors{Errors: []config.FieldError{
+			{Field: "role", Code: "invalid_slug", Message: "must match ^[a-z0-9][a-z0-9-]{0,62}$"},
+		}})
+		return
+	}
 	force := r.URL.Query().Get("force") == "true"
 	// 404 if absent.
 	if _, err := s.configStore.ReadRole(id); err != nil {
@@ -340,6 +352,12 @@ func (s *Server) handlePostProject(w http.ResponseWriter, r *http.Request) {
 // handlePutProject implements PUT /api/projects/{p} (§5.2).
 func (s *Server) handlePutProject(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("project")
+	if !config.ValidSlug(id) {
+		writeValidationError(w, &config.ValidationErrors{Errors: []config.FieldError{
+			{Field: "project", Code: "invalid_slug", Message: "must match ^[a-z0-9][a-z0-9-]{0,62}$"},
+		}})
+		return
+	}
 	var body projectPutBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeValidationError(w, &config.ValidationErrors{Errors: []config.FieldError{
@@ -380,6 +398,12 @@ func (s *Server) handlePutProject(w http.ResponseWriter, r *http.Request) {
 // handleDeleteProject implements DELETE /api/projects/{p} (§5.2).
 func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("project")
+	if !config.ValidSlug(id) {
+		writeValidationError(w, &config.ValidationErrors{Errors: []config.FieldError{
+			{Field: "project", Code: "invalid_slug", Message: "must match ^[a-z0-9][a-z0-9-]{0,62}$"},
+		}})
+		return
+	}
 	force := r.URL.Query().Get("force") == "true"
 	// 404 if absent.
 	if _, err := s.configStore.ReadProject(id); err != nil {
