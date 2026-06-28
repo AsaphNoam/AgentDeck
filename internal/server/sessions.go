@@ -30,6 +30,24 @@ func (s *Server) handlePrompt(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusAccepted, map[string]any{"accepted": true, "agent_id": id})
 }
 
+func (s *Server) handleTranscript(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if _, err := s.stateStore.ReadAgent(id); err != nil {
+		writeAPIError(w, apiError(runtime.CodeNotFound, "no such agent: "+id))
+		return
+	}
+	events, err := s.registry.Transcript(id)
+	if err != nil {
+		if errors.Is(err, runtime.ErrNoHandle) {
+			writeJSON(w, http.StatusOK, map[string]any{"agent_id": id, "events": []runtime.Event{}})
+			return
+		}
+		writeAPIError(w, sessionOpError(err))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"agent_id": id, "events": events})
+}
+
 // handleCancel implements POST /api/sessions/{id}/cancel (techspec §7.4).
 func (s *Server) handleCancel(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")

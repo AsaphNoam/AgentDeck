@@ -1,0 +1,13 @@
+:root {
+  --bg: #f8fafc;
+  --panel: #ffffff;
+  --text: #111827;
+  --muted: #64748b;
+  --line: #d7dde6;
+  --badge-busy: #d97706;
+  --badge-idle: #64748b;
+  --badge-waiting: #2563eb;
+  --badge-done: #16a34a;
+  --badge-error: #dc2626;
+  --badge-unknown: #9ca3af;
+}
