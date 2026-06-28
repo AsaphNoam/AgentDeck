@@ -11,6 +11,12 @@ import (
 	"github.com/agentdeck/agentdeck/internal/transcript"
 )
 
+// Reindex wipes and rebuilds the archive index (sessions, sessions_fts,
+// tracked_files, tracked_commands) from raw transcript.ndjson files.
+// It is NOT safe to run while the server is live: resetTables deletes all
+// sessions rows outside the replay transaction, so any agents active during
+// the wipe are permanently lost from the index. Always stop the server before
+// running reindex.
 func Reindex(home string, db *sql.DB) error {
 	if home == "" {
 		return fmt.Errorf("index: home is required")

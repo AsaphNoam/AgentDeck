@@ -42,6 +42,8 @@ export function ProjectForm({
   const [color, setColor] = useState<[number, number, number]>(
     initial?.color ?? [128, 128, 128],
   );
+  const [addDirs, setAddDirs] = useState<string[]>(initial?.add_dirs ?? []);
+  const [addDirsInput, setAddDirsInput] = useState("");
   const {
     register,
     handleSubmit,
@@ -74,7 +76,7 @@ export function ProjectForm({
       title: vals.title,
       color: [vals.colorR, vals.colorG, vals.colorB],
       cwd: vals.cwd,
-      add_dirs: initial?.add_dirs ?? [],
+      add_dirs: addDirs,
       context_prompt: vals.context_prompt,
     });
   };
@@ -132,6 +134,46 @@ export function ProjectForm({
         {cwdWarning && (
           <span className="form-warning">⚠ {cwdWarning.message} (save still succeeds)</span>
         )}
+      </div>
+      <div className="form-field">
+        <label>Additional directories (add_dirs)</label>
+        <ul className="string-list">
+          {addDirs.map((dir, i) => (
+            <li key={i}>
+              <span>{dir}</span>
+              <button
+                type="button"
+                aria-label={`Remove ${dir}`}
+                onClick={() => setAddDirs((prev) => prev.filter((_, j) => j !== i))}
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+        <div className="string-list-add">
+          <input
+            value={addDirsInput}
+            onChange={(e) => setAddDirsInput(e.target.value)}
+            placeholder="~/extra-dir"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                const v = addDirsInput.trim();
+                if (v) { setAddDirs((prev) => [...prev, v]); setAddDirsInput(""); }
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              const v = addDirsInput.trim();
+              if (v) { setAddDirs((prev) => [...prev, v]); setAddDirsInput(""); }
+            }}
+          >
+            Add
+          </button>
+        </div>
       </div>
       <div className="form-field">
         <label>Context prompt</label>

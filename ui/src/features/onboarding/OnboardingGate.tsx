@@ -17,15 +17,14 @@ export function OnboardingGate({ children }: OnboardingGateProps) {
     config?.onboarding.satisfied === true ||
     config?.onboarding_complete === true;
 
-  return (
-    <>
-      {children}
-      {config && !satisfied && (
-        <OnboardingWizard
-          steps={config.onboarding.steps}
-          onComplete={() => setDismissed(true)}
-        />
-      )}
-    </>
-  );
+  if (config && !satisfied) {
+    return (
+      <OnboardingWizard
+        steps={config.onboarding.steps}
+        onComplete={() => setDismissed(true)}
+      />
+    );
+  }
+
+  return <>{children}</>;
 }

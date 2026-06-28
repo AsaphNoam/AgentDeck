@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { decidePermission } from "../../../api/client";
 import type { TranscriptEvent } from "../../../api/types";
 import { useTranscriptStore } from "../../../store/transcriptStore";
@@ -6,9 +7,15 @@ export function PermissionPrompt({ agentId, event }: { agentId: string; event: T
   const resolve = useTranscriptStore((state) => state.resolvePermission);
   const toolCallId = String(event.tool_call_id ?? "");
   const resolved = event.resolved as "approve" | "deny" | undefined;
+  const [error, setError] = useState<string | null>(null);
   const decide = async (decision: "approve" | "deny") => {
-    resolve(agentId, toolCallId, decision);
-    await decidePermission(agentId, toolCallId, decision);
+    setError(null);
+    try {
+      await decidePermission(agentId, toolCallId, decision);
+      resolve(agentId, toolCallId, decision);
+    } catch {
+      setError("Failed to send decision — the agent may have stopped.");
+    }
   };
   const label = String(event.name ?? event.tool ?? "Permission required");
   if (resolved) {
@@ -23,6 +30,7 @@ export function PermissionPrompt({ agentId, event }: { agentId: string; event: T
     <article className="permission-prompt">
       <strong>{label}</strong>
       <p>{String(event.reason ?? "")}</p>
+      {error && <p className="permission-error">{error}</p>}
       <button type="button" onClick={() => void decide("approve")}>Approve</button>
       <button type="button" onClick={() => void decide("deny")}>Deny</button>
     </article>

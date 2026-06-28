@@ -45,7 +45,7 @@ export function ProjectsEditor() {
         {
           onSuccess: (resp) => {
             setWarnings(resp.warnings ?? []);
-            if ((resp.warnings ?? []).length === 0) setOpen(false);
+            setOpen(false);
           },
           onError: (e) => setFormError(String(e)),
         },
@@ -54,7 +54,7 @@ export function ProjectsEditor() {
       createProject.mutate(data, {
         onSuccess: (resp) => {
           setWarnings(resp.warnings ?? []);
-          if ((resp.warnings ?? []).length === 0) setOpen(false);
+          setOpen(false);
         },
         onError: (e) => setFormError(String(e)),
       });

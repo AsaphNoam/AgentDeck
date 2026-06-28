@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/agentdeck/agentdeck/internal/strutil"
 )
 
 // defaultChatBinary is the ACP adapter invoked for the claude-acp backend
@@ -178,12 +180,19 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 	}()
 
 	// ACP handshake: initialize then session/new (techspec §4.1).
-	if _, err := as.transport.Call(ctx, "initialize", map[string]any{
+	initRes, err := as.transport.Call(ctx, "initialize", map[string]any{
 		"protocolVersion":    1,
 		"clientCapabilities": map[string]any{},
-	}); err != nil {
+	})
+	if err != nil {
 		as.shutdown()
 		return nil, fmt.Errorf("runtime: initialize: %w", err)
+	}
+	var initResp struct {
+		ProtocolVersion int `json:"protocolVersion"`
+	}
+	if jsonErr := json.Unmarshal(initRes, &initResp); jsonErr == nil && initResp.ProtocolVersion != 0 && initResp.ProtocolVersion != 1 {
+		slog.Warn("runtime: adapter protocol version mismatch", "got", initResp.ProtocolVersion, "want", 1)
 	}
 	newRes, err := as.transport.Call(ctx, "session/new", sessionNewParams(spec))
 	if err != nil {
@@ -306,7 +315,8 @@ func (c *ChatRuntime) Stop(ctx context.Context, agentID string) error {
 	}
 
 	as.shutdown()
-	as.closePersistence()
+	// closePersistence is called in onTransportClosed's early-return path after
+	// the transport goroutine exits, so all in-flight emit() calls complete first.
 	_ = c.store.DeleteRunning(agentID)
 	// Keep the status row so the archive/UI can show a final state (§7.5).
 	st, err := c.store.ReadStatus(agentID)
@@ -347,7 +357,144 @@ func (c *ChatRuntime) Transcript(agentID string) ([]Event, error) {
 // --- still-stubbed methods (later phases) ---
 
 func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID string) (*Handle, error) {
-	return nil, fmt.Errorf("%w: Resume (Phase 4)", ErrNotImplemented)
+	if spec.BackendType != "claude-acp" {
+		return nil, fmt.Errorf("%w: backend %q", ErrNotImplemented, spec.BackendType)
+	}
+
+	// Spawn process (identical to Start).
+	cmd := exec.Command(c.command, c.cmdArgs...)
+	cmd.Dir = spec.Cwd
+	if env := spec.Env; len(env) > 0 {
+		cmd.Env = stripEnv(env, "CLAUDECODE")
+	} else {
+		cmd.Env = stripEnv(os.Environ(), "CLAUDECODE")
+	}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, fmt.Errorf("runtime: stdin pipe: %w", err)
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, fmt.Errorf("runtime: stdout pipe: %w", err)
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, fmt.Errorf("runtime: stderr pipe: %w", err)
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("runtime: start %s: %w", c.command, err)
+	}
+	pgid := cmd.Process.Pid
+
+	actx, acancel := context.WithCancel(context.Background())
+	as := &agentState{
+		agentID:    spec.Agent.AgentID,
+		cmd:        cmd,
+		pgid:       pgid,
+		hub:        NewHub(),
+		stdin:      stdin,
+		stderr:     newRingBuffer(16 * 1024),
+		ctx:        actx,
+		cancel:     acancel,
+		skipPerms:  spec.SkipPerms,
+		toolNames:  map[string]string{},
+		pending:    map[string]*pendingPerm{},
+		contextPct: spec.LastContextPct,
+	}
+	as.transport = NewTransport(stdin,
+		func(method string, params json.RawMessage) { c.onNotification(as, method, params) },
+		func(req *IncomingRequest) { c.onRequest(as, req) },
+	)
+
+	go as.stderr.copyFrom(stderr)
+	go func() {
+		_ = as.transport.Run(stdout)
+		c.onTransportClosed(as)
+	}()
+
+	// ACP handshake: initialize.
+	initRes, err := as.transport.Call(ctx, "initialize", map[string]any{
+		"protocolVersion":    1,
+		"clientCapabilities": map[string]any{},
+	})
+	if err != nil {
+		as.shutdown()
+		return nil, fmt.Errorf("runtime: initialize: %w", err)
+	}
+	var initResp struct {
+		ProtocolVersion int `json:"protocolVersion"`
+	}
+	if jsonErr := json.Unmarshal(initRes, &initResp); jsonErr == nil && initResp.ProtocolVersion != 0 && initResp.ProtocolVersion != 1 {
+		slog.Warn("runtime: adapter protocol version mismatch", "got", initResp.ProtocolVersion, "want", 1)
+	}
+
+	// Try session/load to restore native context; fall back to session/new.
+	newSessionID := ""
+	if sessionID != "" {
+		if loadRes, loadErr := as.transport.Call(ctx, "session/load", map[string]any{"sessionId": sessionID}); loadErr == nil {
+			var loaded struct {
+				SessionID string `json:"sessionId"`
+			}
+			if json.Unmarshal(loadRes, &loaded) == nil && loaded.SessionID != "" {
+				newSessionID = loaded.SessionID
+			}
+		}
+	}
+	if newSessionID == "" {
+		newRes, err := as.transport.Call(ctx, "session/new", sessionNewParams(spec))
+		if err != nil {
+			as.shutdown()
+			return nil, fmt.Errorf("runtime: session/new: %w", err)
+		}
+		var sess struct {
+			SessionID string `json:"sessionId"`
+		}
+		if err := json.Unmarshal(newRes, &sess); err != nil || sess.SessionID == "" {
+			as.shutdown()
+			return nil, fmt.Errorf("runtime: session/new returned no sessionId")
+		}
+		newSessionID = sess.SessionID
+	}
+	as.sessionID = newSessionID
+
+	// Re-open the existing transcript in append mode (Open skips seq:0 meta for existing files).
+	if err := c.openPersistence(as, spec, newSessionID); err != nil {
+		as.shutdown()
+		return nil, err
+	}
+
+	// Append resumed session_meta with resumed_at to the transcript so the raw
+	// log has a resume boundary marker and the archive can track the new session_id.
+	resumeNow := time.Now().UTC().Format(time.RFC3339)
+	resumedMeta := runtimeMeta(spec, newSessionID)
+	resumedMeta.ResumedAt = &resumeNow
+	c.emit(as, EvSessionMeta, resumedMeta)
+
+	// Write fresh running row + status row with restored context_pct.
+	now := time.Now().UTC()
+	if err := c.store.WriteRunning(state.RunningEntry{
+		AgentID: as.agentID, PID: pgid, SessionID: newSessionID,
+		Interface: "chat", HookToken: spec.HookToken, StartedAt: now,
+	}); err != nil {
+		as.shutdown()
+		return nil, fmt.Errorf("runtime: write running: %w", err)
+	}
+	if err := c.writeStatus(as, state.Status{
+		AgentID: as.agentID, State: "idle", Detail: "resumed",
+		LastTrace: "SessionStart", ContextPct: spec.LastContextPct,
+	}); err != nil {
+		as.shutdown()
+		_ = c.store.DeleteRunning(as.agentID)
+		return nil, fmt.Errorf("runtime: write status: %w", err)
+	}
+
+	c.mu.Lock()
+	c.agents[as.agentID] = as
+	c.mu.Unlock()
+
+	return &Handle{AgentID: as.agentID, Pid: pgid, SessionID: newSessionID}, nil
 }
 
 func (c *ChatRuntime) CheckMessages(ctx context.Context, pid int) error {
@@ -387,6 +534,9 @@ func (c *ChatRuntime) onTransportClosed(as *agentState) {
 	if as.stopped {
 		as.turnActive = false
 		as.mu.Unlock()
+		// Stop() already handled state.db cleanup; close the transcript writer now
+		// that the transport goroutine (and any in-flight emit calls) have exited.
+		as.closePersistence()
 		return
 	}
 	as.stopped = true
@@ -405,7 +555,7 @@ func (c *ChatRuntime) onTransportClosed(as *agentState) {
 	_ = as.cmd.Wait() // reap the exited process
 
 	tail := as.stderr.Tail()
-	c.emit(as, EvError, ErrorData{Scope: "process", Message: firstNonEmpty(tail, "process exited"), Fatal: true})
+	c.emit(as, EvError, ErrorData{Scope: "process", Message: strutil.FirstNonEmpty(tail, "process exited"), Fatal: true})
 
 	// Settle state.db before emitting turn_end so a client reacting to turn_end
 	// never observes a stale running row or busy status.
@@ -427,6 +577,8 @@ func (c *ChatRuntime) removeAgent(agentID string) {
 }
 
 // emit stamps seq/agent_id/ts, marshals the payload, and publishes to the hub.
+// seq increment and transcript append are done under a single as.mu acquisition
+// so concurrent emitters cannot interleave their events in the in-memory log.
 func (c *ChatRuntime) emit(as *agentState, typ string, data any) {
 	raw, err := json.Marshal(data)
 	if err != nil {
@@ -435,17 +587,13 @@ func (c *ChatRuntime) emit(as *agentState, typ string, data any) {
 	}
 	as.mu.Lock()
 	as.seq++
-	seq := as.seq
-	as.mu.Unlock()
-
 	ev := Event{
 		AgentID: as.agentID,
-		Seq:     seq,
+		Seq:     as.seq,
 		Type:    typ,
 		Data:    raw,
 		Ts:      time.Now().UTC().Format(time.RFC3339),
 	}
-	as.mu.Lock()
 	as.transcript = append(as.transcript, ev)
 	as.mu.Unlock()
 	if !c.persistEvent(as, ev) {
@@ -528,19 +676,25 @@ func (as *agentState) closePersistence() {
 }
 
 func runtimeMeta(spec LaunchSpec, sessionID string) SessionMetaData {
+	var sha string
+	if spec.SystemPrompt != "" {
+		sum := sha256sum(spec.SystemPrompt)
+		sha = fmt.Sprintf("%x", sum[:])
+	}
 	return SessionMetaData{
-		Name:         spec.Agent.Name,
-		Role:         spec.Agent.Role,
-		Project:      spec.Agent.Project,
-		Backend:      spec.Agent.Backend,
-		Model:        spec.Agent.Model,
-		Interface:    spec.Agent.Interface,
-		Group:        spec.Agent.Group,
-		Cwd:          spec.Cwd,
-		SystemPrompt: spec.SystemPrompt,
-		EnvKeys:      envKeys(spec.Env),
-		CreatedAt:    spec.Agent.CreatedAt.UTC().Format(time.RFC3339),
-		SessionID:    sessionID,
+		Name:            spec.Agent.Name,
+		Role:            spec.Agent.Role,
+		Project:         spec.Agent.Project,
+		Backend:         spec.Agent.Backend,
+		Model:           spec.Agent.Model,
+		Interface:       spec.Agent.Interface,
+		Group:           spec.Agent.Group,
+		Cwd:             spec.Cwd,
+		SystemPrompt:    spec.SystemPrompt,
+		SystemPromptSHA: sha,
+		EnvKeys:         envKeys(spec.Env),
+		CreatedAt:       spec.Agent.CreatedAt.UTC().Format(time.RFC3339),
+		SessionID:       sessionID,
 	}
 }
 
@@ -666,6 +820,11 @@ func (as *agentState) isStopped() bool {
 	as.mu.Lock()
 	defer as.mu.Unlock()
 	return as.stopped
+}
+
+func sha256sum(s string) []byte {
+	h := sha256.Sum256([]byte(s))
+	return h[:]
 }
 
 // shutdown terminates the process group (SIGTERM→grace→SIGKILL) and cancels the

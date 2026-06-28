@@ -1,6 +1,10 @@
 package runtime
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/agentdeck/agentdeck/internal/strutil"
+)
 
 // acpmap.go is the ONLY place ACP wire shapes are decoded (techspec §12.1
 // isolation rule). Everything else in the package sees normalized Events. This
@@ -81,7 +85,7 @@ func mapPermissionRequest(params json.RawMessage, expiresAt string, autoApproved
 	var pr acpPermissionRequest
 	_ = json.Unmarshal(params, &pr)
 
-	name := firstNonEmpty(pr.ToolCall.Kind, pr.ToolCall.Title, "tool")
+	name := strutil.FirstNonEmpty(pr.ToolCall.Kind, pr.ToolCall.Title, "tool")
 	opts := make([]PermOption, 0, len(pr.Options))
 	byKind := make(map[string]string, len(pr.Options))
 	for _, o := range pr.Options {
@@ -153,7 +157,7 @@ func mapSessionUpdate(params json.RawMessage) []mappedEvent {
 		return []mappedEvent{{Type: EvToolCall, Data: ToolCallData{
 			ToolCallID: u.ToolCallID,
 			Name:       name,
-			Title:      firstNonEmpty(u.Title, name),
+			Title:      strutil.FirstNonEmpty(u.Title, name),
 			Args:       nonNullRaw(u.RawInput),
 			Status:     defaultStr(u.Status, "in_progress"),
 		}}}
@@ -205,7 +209,7 @@ func mapPromptResult(result json.RawMessage) (TurnEndData, bool) {
 // (The §4.3 mapping table does not pin which ACP field becomes Name; kind is the
 // closest stable discriminator. See HANDOFF autonomous decisions.)
 func toolName(u acpUpdate) string {
-	return firstNonEmpty(u.Kind, u.Title, "tool")
+	return strutil.FirstNonEmpty(u.Kind, u.Title, "tool")
 }
 
 func decodeContentArray(raw json.RawMessage) []acpContentBlock {
@@ -217,15 +221,6 @@ func decodeContentArray(raw json.RawMessage) []acpContentBlock {
 		return nil
 	}
 	return blocks
-}
-
-func firstNonEmpty(vals ...string) string {
-	for _, v := range vals {
-		if v != "" {
-			return v
-		}
-	}
-	return ""
 }
 
 func defaultStr(v, def string) string {
