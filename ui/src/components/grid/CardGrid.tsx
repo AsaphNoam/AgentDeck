@@ -1,6 +1,6 @@
 import { DndContext, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, rectSortingStrategy } from "@dnd-kit/sortable";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { getLayout, putLayout } from "../../api/client";
 import type { TranscriptEvent } from "../../api/types";
 import { useAgentStore } from "../../store/agentStore";
@@ -19,14 +19,18 @@ export function CardGrid() {
   const setDensity = useUiStore((state) => state.setDensity);
   const transcripts = useTranscriptStore((state) => state.byAgent);
 
+  const loaded = useRef(false);
+
   useEffect(() => {
     void getLayout().then((layout) => {
       setOrder(layout.order);
       setDensity(layout.density);
+      loaded.current = true;
     });
   }, [setDensity, setOrder]);
 
   useEffect(() => {
+    if (!loaded.current) return;
     const handle = window.setTimeout(() => {
       void putLayout({ order, density });
     }, 400);
