@@ -8,6 +8,28 @@
 
 ---
 
+## 0. Codex review findings — address while building this phase
+
+> Recorded 2026-06-28 from a cross-phase Codex review. Resolve each as you build the
+> referenced subphase; delete the entry once implemented and verified green.
+
+- **Advisory — force-delete UI expects 409 detail, but the delete mutation surfaces a plain error
+  (§4.1 / §5).** The `DELETE /api/roles/{role}` (and projects) in-use response is a **structured 409**
+  (`{ error, message, hint }`, §5 lines ~236/241) whose `hint` tells the UI to retry with
+  `?force=true`. If the delete mutation hook throws a plain `Error` (message only), the structured
+  detail is lost and the force-delete affordance can't distinguish 409-in-use from other failures.
+  **Resolution:** the delete mutation must parse the 409 JSON body and propagate the status + structured
+  detail (at least `hint`) so the UI can offer the `?force=true` retry instead of a generic error toast.
+
+- **Advisory — the New Agent modal ignores configured defaults (§4.2).** §4.2 wants Project to default
+  to `config.default_project` and role to a sensible default, but the modal as specced doesn't read
+  `config.default_role` / `config.default_project` (from `GET /api/config`) to preselect — it falls back
+  to first-available / hardcoded `implementer`. **Resolution:** the modal (and the wizard's LaunchStep)
+  must read `config.default_role` and `config.default_project` and preselect them when present, only
+  falling back to first-available / `implementer` when unset.
+
+---
+
 ## 1. Overview & scope recap
 
 Phase 3 turns AgentDeck from a hand-edited-JSON tool into a configurable one and gives a fresh install a guided path to its first running agent. We add **write paths** over the file store (Phase 0 only added the `GET` reads), Settings UIs for roles / projects / backends, the full **New Agent modal** (the UI front-end to Phase 1's `POST /api/sessions`), and a **first-run onboarding wizard** that gates the dashboard until a minimum viable config exists.
