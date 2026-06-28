@@ -9,9 +9,9 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 ## Current position
 
 - **Active phase:** 4 — Persistence: archive, search, resume, file/command tracking
-- **Active subphase:** 4.2 — `state.db` Phase-4 migration + indexer + reindex
+- **Active subphase:** 4.3 — Wire writer + indexer into runtime; persisted-backed transcript endpoint
 - **Spec:** [`phase-4-persistence-archive.md`](phase-4-persistence-archive.md), [`tech/phase-4-persistence-archive-techspec.md`](tech/phase-4-persistence-archive-techspec.md)
-- **Last GREEN checkpoint:** 4.1 @ `impl/phase-3`: `go test ./internal/transcript/...`, `go build ./...`, `go test ./...`
+- **Last GREEN checkpoint:** 4.2 @ `impl/phase-3`: `go test -tags sqlite_fts5 ./internal/index/...`, `go build -tags sqlite_fts5 ./...`, `go build ./...`, `go test ./...`
 - **Branch:** `impl/phase-3` (do not commit to `main`; do not push unless asked).
 
 ---
@@ -39,11 +39,15 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 **Subphase 4.1 ✅** — `internal/transcript` package added: append-only `transcript.ndjson` writer (`Open`/`Append`/`Sync`/`Close`, `O_APPEND`, one JSON record write per event, fsync on `turn_end`/`error`), `session_meta` first record for new logs, max-seq recovery on reopen, `NextSeq()`, and replay reader with `since_seq`, `include_meta`, default meta skip, malformed-line tolerance, and 8 MiB scanner cap. Added additive runtime event types/payloads: `session_meta`, `permission_resolved`. Tests cover append→read, reopen seq continuation, bad middle line, partial trailing line, and >64 KiB line replay. No runtime hot-path wiring yet.
 
-**Subphase 4.2 — `state.db` Phase-4 migration + indexer + reindex (next)**
-- Add Phase-4 migration: `sessions`, `sessions_fts` (FTS5), `tracked_files`, `tracked_commands`; open DB in WAL with `synchronous=NORMAL`; build/check with `sqlite_fts5` tag per spec.
-- Add `internal/index.Indexer`: `UpsertSessionMeta`, `OnEvent`, `OnTurnEnd`; accumulate FTS content, update session counts/last seq/context, derive file/command rows from normalized events.
-- Add `agentdeck reindex`/backfill path that truncates Phase-4 derived tables and replays every raw transcript log.
-- Checkpoint: `go test ./internal/index/...` with `-tags sqlite_fts5`, `go build -tags sqlite_fts5 ./...`, plus full existing tests.
+**Subphase 4.2 ✅** — Phase-4 state migration added: `sessions`, `sessions_fts`, `tracked_files`, `tracked_commands`; `state.Open` now also sets `PRAGMA synchronous=NORMAL`. With `-tags sqlite_fts5`, `sessions_fts` is a real FTS5 virtual table; without the tag it degrades to a compatible plain table so the standard checkpoint remains green. Added `internal/index.Indexer` (`UpsertSessionMeta`, `OnEvent`, `OnTurnEnd`) with FTS content accumulation, session rollups, file diff rollups, command tracking/result correlation. Added `index.Reindex(home, db)` and CLI `agentdeck reindex`, which resets derived Phase-4 tables and replays `sessions/{agent_id}/transcript.ndjson`.
+
+**Subphase 4.3 — Wire writer + indexer into runtime; persisted-backed transcript endpoint (next)**
+- `ChatRuntime.Start`: open transcript writer, append `session_meta`, and upsert `sessions` row from the frozen launch snapshot.
+- Runtime dispatch order: append raw log → publish event → `Indexer.OnEvent`; on `turn_end`/`error`, sync writer and call `OnTurnEnd`.
+- `ChatRuntime.Stop`: sync/close writer and flush indexer before deleting `running`; keep raw logs and archive rows intact.
+- Emit/persist `permission_resolved` on permission decisions.
+- Upgrade `GET /api/sessions/{id}/transcript` to read `transcript.ndjson` with `since_seq`/`include_meta`, replacing the in-memory stopgap.
+- Checkpoint: crash-mid-turn/persisted transcript tests plus `go build -tags sqlite_fts5 ./...` and full existing tests.
 
 ---
 
@@ -145,11 +149,24 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
   requires the writer to create the first `session_meta` record. I implemented `transcript.Open(home, agentID, meta)`
   so runtime wiring can pass the frozen launch snapshot at creation; `nil` skips meta for tests/recovery cases. To
   reverse: split this into `Open` + explicit `AppendSessionMeta` before 4.3 runtime wiring.
+- **Phase 4.2 no-tag FTS fallback.** The Phase 4 spec requires SQLite FTS5 with `-tags sqlite_fts5`, but the canonical
+  workflow still requires ordinary `go build ./...` and `go test ./...` to pass. Migration v4 creates a real FTS5
+  virtual table when the tag is enabled and a schema-compatible plain `sessions_fts` table otherwise. Tagged builds/tests
+  cover real `MATCH`; no-tag builds keep state.Open usable. To reverse: make all checkpoints/builds always pass
+  `-tags sqlite_fts5` and remove the fallback branch in `ensureSessionsFTS`.
+- **Phase 4.2 `system_prompt` is empty during raw-log reindex.** The DB schema requires exact `system_prompt`, but the
+  4.1 `session_meta` record only has `system_prompt_sha`. `Indexer.UpsertSessionMeta` preserves the column with `''`;
+  4.3 runtime wiring should upsert the full frozen launch snapshot when it has `LaunchSpec.SystemPrompt`. To reverse:
+  add the full prompt to `session_meta` before any persisted logs are generated.
 
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-28 — **4.2 green.** Added Phase-4 state migration (`sessions`, `sessions_fts`,
+  `tracked_files`, `tracked_commands`) plus `synchronous=NORMAL`; added `internal/index.Indexer` for
+  session rollups, FTS content, file rollups, command tracking/result correlation; added `index.Reindex`
+  and CLI `agentdeck reindex`. Tagged FTS tests and standard checkpoint green.
 - 2026-06-28 — **4.1 green.** Added `internal/transcript` raw NDJSON writer/reader with `session_meta`
   first record, max-seq recovery/`NextSeq`, `since_seq`/`include_meta` replay, malformed-line tolerance,
   and 8 MiB scanner cap. Added additive `runtime` event types/payloads for `session_meta` and
