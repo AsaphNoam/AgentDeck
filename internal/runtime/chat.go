@@ -171,7 +171,7 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 	now := time.Now().UTC()
 	if err := c.store.WriteRunning(state.RunningEntry{
 		AgentID: as.agentID, PID: pgid, SessionID: sess.SessionID,
-		Interface: "chat", StartedAt: now,
+		Interface: "chat", HookToken: spec.HookToken, StartedAt: now,
 	}); err != nil {
 		as.shutdown()
 		return nil, fmt.Errorf("runtime: write running: %w", err)
