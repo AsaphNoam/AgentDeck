@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+var timeNow = func() time.Time { return time.Now().UTC() }
+
 func formatTime(t time.Time) string {
 	return t.UTC().Format(time.RFC3339)
 }

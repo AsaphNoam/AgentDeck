@@ -2,6 +2,8 @@
 package cli
 
 import (
+	"os"
+
 	"github.com/spf13/cobra"
 
 	"github.com/agentdeck/agentdeck/internal/version"
@@ -19,7 +21,21 @@ func NewRootCmd() *cobra.Command {
 	// `agentdeck --version` prints "agentdeck version <version> (commit, date)".
 	root.SetVersionTemplate("agentdeck version {{.Version}}\n")
 	root.AddCommand(newDashboardCmd())
+	root.AddCommand(newReindexCmd())
+	root.AddCommand(newResumeCmd())
 	return root
+}
+
+// newResumeCmd returns the `agentdeck resume <agent_id>` cobra command.
+func newResumeCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "resume <agent_id>",
+		Short: "Resume an inactive persisted session by agent_id",
+		Args:  cobra.ExactArgs(1),
+		Run: func(_ *cobra.Command, args []string) {
+			os.Exit(runResumeByID(args[0]))
+		},
+	}
 }
 
 // Execute is the entrypoint called by cmd/agentdeck/main.go. It intercepts the

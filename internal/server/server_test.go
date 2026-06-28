@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -83,6 +84,32 @@ func TestSessionsEmptyIsArray(t *testing.T) {
 	}
 }
 
+func TestArchiveListHandler(t *testing.T) {
+	srv := testServer(t, true)
+	if _, err := srv.stateStore.DB().Exec(`
+INSERT INTO sessions(agent_id, name, role, project, backend, model, interface, cwd, system_prompt, created_at, updated_at)
+VALUES ('a_archive','Atlas','implementer','my-app','claude','sonnet','chat','/tmp','prompt','2026-06-28T10:00:00Z','2026-06-28T10:01:00Z')`); err != nil {
+		t.Fatalf("insert archive session: %v", err)
+	}
+	rec := doGET(t, srv.routes(), "/api/archive?limit=10")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("archive status = %d: %s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Total   int `json:"total"`
+		Results []struct {
+			AgentID string `json:"agent_id"`
+			Active  bool   `json:"active"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("archive body: %v", err)
+	}
+	if body.Total != 1 || len(body.Results) != 1 || body.Results[0].AgentID != "a_archive" || body.Results[0].Active {
+		t.Fatalf("archive body = %+v", body)
+	}
+}
+
 func TestRolesSeeded(t *testing.T) {
 	h := testServer(t, true).routes()
 	rec := doGET(t, h, "/api/roles")
@@ -140,12 +167,59 @@ func TestLayoutDefault(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("layout status = %d, want 200", rec.Code)
 	}
-	var l config.Layout
+	var l layoutResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &l); err != nil {
 		t.Fatalf("layout body: %v", err)
 	}
-	if l.Density.CardsPerRow != 3 || l.Density.Gap != 16 {
+	if l.Density.PerRow != 3 || l.Density.Gap != 16 {
 		t.Fatalf("default layout wrong: %+v", l)
+	}
+}
+
+func TestPutLayoutValidatesAndPersists(t *testing.T) {
+	srv := testServer(t, false)
+	h := srv.routes()
+	body := bytes.NewBufferString(`{"order":["a_1","a_2"],"density":{"perRow":4,"gap":20}}`)
+	req := httptest.NewRequest(http.MethodPut, "/api/layout", body)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT layout status = %d body=%s, want 200", rec.Code, rec.Body.String())
+	}
+	got, err := srv.configStore.ReadLayout()
+	if err != nil {
+		t.Fatalf("ReadLayout: %v", err)
+	}
+	if got.Density.CardsPerRow != 4 || got.Density.Gap != 20 || len(got.Order) != 2 {
+		t.Fatalf("persisted layout = %+v", got)
+	}
+
+	req = httptest.NewRequest(http.MethodPut, "/api/layout", bytes.NewBufferString(`{"order":[],"density":{"perRow":9,"gap":20}}`))
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("bad layout status = %d, want 400", rec.Code)
+	}
+}
+
+func TestRenameSession(t *testing.T) {
+	srv := testServer(t, true)
+	agentID := seedHookAgent(t, srv)
+	h := srv.routes()
+	req := httptest.NewRequest(http.MethodPost, "/api/sessions/"+agentID+"/rename", bytes.NewBufferString(`{"name":"Vega"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("rename status = %d body=%s, want 200", rec.Code, rec.Body.String())
+	}
+	agent, err := srv.stateStore.ReadAgent(agentID)
+	if err != nil {
+		t.Fatalf("ReadAgent: %v", err)
+	}
+	if agent.Name != "Vega" {
+		t.Fatalf("agent name = %q, want Vega", agent.Name)
 	}
 }
 

@@ -17,6 +17,7 @@ import (
 
 	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/agentdeck/agentdeck/internal/state"
 )
 
 var (
@@ -97,11 +98,17 @@ func waitForEventType(t *testing.T, frames <-chan sseFrame, typ string) runtime.
 			if !ok {
 				t.Fatalf("SSE closed before %q", typ)
 			}
-			if f.event != "message" {
+			if f.event != "new_message" {
+				continue
+			}
+			var env struct {
+				Data json.RawMessage `json:"data"`
+			}
+			if err := json.Unmarshal(f.data, &env); err != nil {
 				continue
 			}
 			var ev runtime.Event
-			if err := json.Unmarshal(f.data, &ev); err != nil {
+			if err := json.Unmarshal(env.Data, &ev); err != nil {
 				continue
 			}
 			if ev.Type == typ {
@@ -143,7 +150,7 @@ func post(t *testing.T, url string, body any) (*http.Response, []byte) {
 }
 
 // TestLaunchPromptPermissionFlow drives the full HTTP surface against the fake
-// CLI: POST /sessions → /events → prompt → permission_request → permission
+// CLI: POST /sessions → /api/events → prompt → permission_request → permission
 // approve → sentinel created → turn_end (techspec §10.3, Appendix A).
 func TestLaunchPromptPermissionFlow(t *testing.T) {
 	fake := buildFakeACP(t)
@@ -184,7 +191,7 @@ func TestLaunchPromptPermissionFlow(t *testing.T) {
 	// subscribed before prompting.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	frames := streamSSE(t, ctx, ts.URL+"/api/sessions/"+agentID+"/events")
+	frames := streamSSE(t, ctx, ts.URL+"/api/events")
 	select {
 	case f := <-frames:
 		if f.event != "state_update" {
@@ -219,6 +226,23 @@ func TestLaunchPromptPermissionFlow(t *testing.T) {
 		t.Fatal("sentinel missing after approve — tool did not run")
 	}
 
+	resp, body = func() (*http.Response, []byte) {
+		r, _ := http.Get(ts.URL + "/api/sessions/" + agentID + "/transcript")
+		defer r.Body.Close()
+		b := make([]byte, 8192)
+		n, _ := r.Body.Read(b)
+		return r, b[:n]
+	}()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("transcript status = %d: %s", resp.StatusCode, body)
+	}
+	if !bytes.Contains(body, []byte(`"events"`)) || !bytes.Contains(body, []byte(`"permission_request"`)) || !bytes.Contains(body, []byte(`"permission_resolved"`)) {
+		t.Fatalf("transcript body missing retained events: %s", body)
+	}
+	if _, err := os.Stat(filepath.Join(srv.configStore.Home(), "sessions", agentID, "transcript.ndjson")); err != nil {
+		t.Fatalf("persisted transcript missing: %v", err)
+	}
+
 	// GET detail reflects the agent.
 	resp, body = func() (*http.Response, []byte) {
 		r, _ := http.Get(ts.URL + "/api/sessions/" + agentID)
@@ -229,6 +253,66 @@ func TestLaunchPromptPermissionFlow(t *testing.T) {
 	}()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("detail status = %d: %s", resp.StatusCode, body)
+	}
+}
+
+func TestCrashMidTurnPersistsDeliveredTranscript(t *testing.T) {
+	fake := buildFakeACP(t)
+	t.Setenv("FAKEACP_SCENARIO", "crash_midturn")
+
+	srv := testServer(t, true)
+	srv.registry.Chat().SetCommand(fake)
+	if err := srv.configStore.WriteProject("tmpproj", config.Project{Title: "Tmp", Cwd: t.TempDir()}); err != nil {
+		t.Fatalf("WriteProject: %v", err)
+	}
+	if err := srv.configStore.WriteRole("impl", config.Role{Title: "Impl", SystemPrompt: "be helpful"}); err != nil {
+		t.Fatalf("WriteRole: %v", err)
+	}
+
+	ts := httptest.NewServer(srv.routes())
+	defer ts.Close()
+	t.Cleanup(func() { srv.registry.Shutdown(context.Background()) })
+
+	resp, body := post(t, ts.URL+"/api/sessions", map[string]string{"role": "impl", "project": "tmpproj"})
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("launch status = %d: %s", resp.StatusCode, body)
+	}
+	var launched sessionResponse
+	json.Unmarshal(body, &launched)
+	agentID := launched.Agent.AgentID
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	frames := streamSSE(t, ctx, ts.URL+"/api/events")
+	<-frames // initial state_update replay
+
+	resp, body = post(t, ts.URL+"/api/sessions/"+agentID+"/prompt", map[string]string{"text": "crash"})
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("prompt status = %d: %s", resp.StatusCode, body)
+	}
+	waitForEventType(t, frames, "assistant_text")
+	waitForEventType(t, frames, "turn_end")
+
+	r, err := http.Get(ts.URL + "/api/sessions/" + agentID + "/transcript")
+	if err != nil {
+		t.Fatalf("GET transcript: %v", err)
+	}
+	defer r.Body.Close()
+	data := make([]byte, 8192)
+	n, _ := r.Body.Read(data)
+	body = data[:n]
+	if r.StatusCode != http.StatusOK {
+		t.Fatalf("transcript status = %d: %s", r.StatusCode, body)
+	}
+	if !bytes.Contains(body, []byte("about to crash")) {
+		t.Fatalf("transcript missing pre-crash delivered text: %s", body)
+	}
+	raw, err := os.ReadFile(filepath.Join(srv.configStore.Home(), "sessions", agentID, "transcript.ndjson"))
+	if err != nil {
+		t.Fatalf("read raw transcript: %v", err)
+	}
+	if !bytes.Contains(raw, []byte("about to crash")) {
+		t.Fatalf("raw transcript missing pre-crash delivered text: %s", raw)
 	}
 }
 
@@ -261,3 +345,260 @@ func TestLaunchValidationErrors(t *testing.T) {
 }
 
 func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }
+
+// launchAndWaitIdle launches an agent and waits for the idle state_update before returning.
+func launchAndWaitIdle(t *testing.T, ts *httptest.Server, role, project string) string {
+	t.Helper()
+	resp, body := post(t, ts.URL+"/api/sessions", map[string]string{"role": role, "project": project})
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("launch status = %d: %s", resp.StatusCode, body)
+	}
+	var launched sessionResponse
+	json.Unmarshal(body, &launched)
+	if launched.Agent.AgentID == "" {
+		t.Fatalf("bad launch response: %s", body)
+	}
+	return launched.Agent.AgentID
+}
+
+// TestResumeHappyPath exercises the full stop→resume lifecycle:
+//   - agent_id unchanged after resume
+//   - running.session_id is different (new ACP session)
+//   - GET /transcript?include_meta=true contains prior events + session_meta with resumed_at
+//   - resumed:true in resume response (techspec §11.3)
+func TestResumeHappyPath(t *testing.T) {
+	fake := buildFakeACP(t)
+	t.Setenv("FAKEACP_SCENARIO", "stream_text")
+
+	srv := testServer(t, true)
+	srv.registry.Chat().SetCommand(fake)
+	if err := srv.configStore.WriteProject("tmpproj", config.Project{Title: "Tmp", Cwd: t.TempDir()}); err != nil {
+		t.Fatalf("WriteProject: %v", err)
+	}
+	if err := srv.configStore.WriteRole("impl", config.Role{Title: "Impl", SystemPrompt: "be helpful"}); err != nil {
+		t.Fatalf("WriteRole: %v", err)
+	}
+
+	ts := httptest.NewServer(srv.routes())
+	defer ts.Close()
+	t.Cleanup(func() { srv.registry.Shutdown(context.Background()) })
+
+	// 1. Launch and open SSE stream.
+	agentID := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	frames := streamSSE(t, ctx, ts.URL+"/api/events")
+	select {
+	case <-frames:
+	case <-time.After(3 * time.Second):
+		t.Fatal("no initial state_update")
+	}
+
+	// 2. Send a prompt and wait for turn_end so the transcript has events.
+	resp, body := post(t, ts.URL+"/api/sessions/"+agentID+"/prompt", map[string]string{"text": "hello"})
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("prompt status = %d: %s", resp.StatusCode, body)
+	}
+	waitForEventType(t, frames, "turn_end")
+
+	// 3. Capture first running.session_id from GET /api/sessions.
+	firstSessionID := func() string {
+		r, _ := http.Get(ts.URL + "/api/sessions")
+		defer r.Body.Close()
+		var sessions []struct {
+			AgentID string `json:"agent_id"`
+			Running *struct {
+				SessionID string `json:"session_id"`
+			} `json:"running,omitempty"`
+		}
+		json.NewDecoder(r.Body).Decode(&sessions)
+		for _, s := range sessions {
+			if s.AgentID == agentID && s.Running != nil {
+				return s.Running.SessionID
+			}
+		}
+		return ""
+	}()
+	if firstSessionID == "" {
+		t.Fatal("could not get first session_id from /api/sessions")
+	}
+
+	// 4. Stop the agent.
+	resp, body = post(t, ts.URL+"/api/sessions/"+agentID+"/stop", nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("stop status = %d: %s", resp.StatusCode, body)
+	}
+
+	// 5. Resume.
+	resp, body = post(t, ts.URL+"/api/sessions/"+agentID+"/resume", nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("resume status = %d: %s", resp.StatusCode, body)
+	}
+	var resumed struct {
+		Agent   struct{ AgentID string `json:"agent_id"` } `json:"agent"`
+		Running *struct{ SessionID string `json:"session_id"` } `json:"running"`
+		Resumed bool                                           `json:"resumed"`
+	}
+	if err := json.Unmarshal(body, &resumed); err != nil {
+		t.Fatalf("resume body JSON: %v", err)
+	}
+	if resumed.Agent.AgentID != agentID {
+		t.Fatalf("resume agent_id = %q, want %q", resumed.Agent.AgentID, agentID)
+	}
+	if !resumed.Resumed {
+		t.Fatal("resume response: resumed = false, want true")
+	}
+	if resumed.Running == nil || resumed.Running.SessionID == "" {
+		t.Fatalf("resume response missing running.session_id: %s", body)
+	}
+	if resumed.Running.SessionID == firstSessionID {
+		t.Fatalf("resume running.session_id = %q, want different from first %q", resumed.Running.SessionID, firstSessionID)
+	}
+
+	// 6. GET /transcript?include_meta=true: prior events + new session_meta with resumed_at.
+	r, _ := http.Get(ts.URL + "/api/sessions/" + agentID + "/transcript?include_meta=true")
+	defer r.Body.Close()
+	var txBody []byte
+	buf := make([]byte, 32*1024)
+	for {
+		n, err := r.Body.Read(buf)
+		txBody = append(txBody, buf[:n]...)
+		if err != nil {
+			break
+		}
+	}
+	if r.StatusCode != http.StatusOK {
+		t.Fatalf("transcript status = %d: %s", r.StatusCode, txBody)
+	}
+	// Should contain two session_meta entries (launch + resume).
+	if count := bytes.Count(txBody, []byte(`"session_meta"`)); count < 2 {
+		t.Fatalf("transcript has %d session_meta events, want >=2: %s", count, txBody)
+	}
+	// The resume session_meta must carry resumed_at.
+	if !bytes.Contains(txBody, []byte(`"resumed_at"`)) {
+		t.Fatalf("transcript missing resumed_at field: %s", txBody)
+	}
+	// Prior events (assistant_text from the stream_text scenario) must be present.
+	if !bytes.Contains(txBody, []byte("Sure")) {
+		t.Fatalf("transcript missing pre-stop assistant_text content: %s", txBody)
+	}
+
+	// 7. After resume, send a prompt; seq must continue monotonically past the pre-resume max.
+	frames2 := streamSSE(t, ctx, ts.URL+"/api/events")
+	select {
+	case <-frames2:
+	case <-time.After(3 * time.Second):
+		t.Fatal("no state_update after resume SSE open")
+	}
+	resp, body = post(t, ts.URL+"/api/sessions/"+agentID+"/prompt", map[string]string{"text": "hello again"})
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("post-resume prompt status = %d: %s", resp.StatusCode, body)
+	}
+	waitForEventType(t, frames2, "turn_end")
+
+	// Read transcript again and verify seq is monotonically increasing.
+	r2, _ := http.Get(ts.URL + "/api/sessions/" + agentID + "/transcript?include_meta=true")
+	defer r2.Body.Close()
+	var txBody2 []byte
+	for {
+		n, err := r2.Body.Read(buf)
+		txBody2 = append(txBody2, buf[:n]...)
+		if err != nil {
+			break
+		}
+	}
+	var txResp struct {
+		Events []struct {
+			Seq int64 `json:"seq"`
+		} `json:"events"`
+	}
+	if err := json.Unmarshal(txBody2, &txResp); err != nil {
+		t.Fatalf("transcript JSON: %v", err)
+	}
+	for i := 1; i < len(txResp.Events); i++ {
+		if txResp.Events[i].Seq <= txResp.Events[i-1].Seq {
+			t.Fatalf("seq not monotonic at index %d: seq[%d]=%d <= seq[%d]=%d",
+				i, i, txResp.Events[i].Seq, i-1, txResp.Events[i-1].Seq)
+		}
+	}
+}
+
+// TestResumeAlreadyRunning returns 409 when the agent is still active.
+func TestResumeAlreadyRunning(t *testing.T) {
+	fake := buildFakeACP(t)
+	t.Setenv("FAKEACP_SCENARIO", "stream_text")
+
+	srv := testServer(t, true)
+	srv.registry.Chat().SetCommand(fake)
+	if err := srv.configStore.WriteProject("tmpproj", config.Project{Title: "Tmp", Cwd: t.TempDir()}); err != nil {
+		t.Fatalf("WriteProject: %v", err)
+	}
+	if err := srv.configStore.WriteRole("impl", config.Role{Title: "Impl", SystemPrompt: "be helpful"}); err != nil {
+		t.Fatalf("WriteRole: %v", err)
+	}
+
+	ts := httptest.NewServer(srv.routes())
+	defer ts.Close()
+	t.Cleanup(func() { srv.registry.Shutdown(context.Background()) })
+
+	agentID := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+
+	// Agent is still running — resume must 409.
+	resp, body := post(t, ts.URL+"/api/sessions/"+agentID+"/resume", nil)
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("resume while running: status = %d, want 409: %s", resp.StatusCode, body)
+	}
+	var errEnv struct {
+		Error struct{ Code string `json:"code"` } `json:"error"`
+	}
+	json.Unmarshal(body, &errEnv)
+	if errEnv.Error.Code != "conflict" {
+		t.Fatalf("error code = %q, want conflict", errEnv.Error.Code)
+	}
+}
+
+// TestResumeNoPersistedSession returns 422 when there is no sessions row.
+func TestResumeNoPersistedSession(t *testing.T) {
+	srv := testServer(t, true)
+
+	ts := httptest.NewServer(srv.routes())
+	defer ts.Close()
+
+	// Write an agent row but no sessions row.
+	if err := srv.stateStore.WriteAgent(mustAgent()); err != nil {
+		t.Fatalf("WriteAgent: %v", err)
+	}
+
+	resp, body := post(t, ts.URL+"/api/sessions/a_nopersist/resume", nil)
+	if resp.StatusCode != http.StatusUnprocessableEntity {
+		t.Fatalf("resume no session: status = %d, want 422: %s", resp.StatusCode, body)
+	}
+	var errEnv struct {
+		Error struct{ Code string `json:"code"` } `json:"error"`
+	}
+	json.Unmarshal(body, &errEnv)
+	if errEnv.Error.Code != "validation" {
+		t.Fatalf("error code = %q, want validation", errEnv.Error.Code)
+	}
+}
+
+// TestResumeUnknownAgent returns 404 for an unknown agent_id.
+func TestResumeUnknownAgent(t *testing.T) {
+	srv := testServer(t, true)
+	ts := httptest.NewServer(srv.routes())
+	defer ts.Close()
+
+	resp, body := post(t, ts.URL+"/api/sessions/a_ghost/resume", nil)
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("resume unknown: status = %d, want 404: %s", resp.StatusCode, body)
+	}
+}
+
+func mustAgent() state.Agent {
+	return state.Agent{
+		AgentID: "a_nopersist", Name: "Ghost", Role: "impl", Project: "tmpproj",
+		Backend: "claude", Model: "sonnet", Interface: "chat",
+		CreatedAt: time.Now(),
+	}
+}

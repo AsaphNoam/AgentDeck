@@ -3,6 +3,7 @@ package state
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -54,8 +55,58 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 		}
 	}
 
+	if err := ensureSessionsFTS(tx); err != nil {
+		return err
+	}
+
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("state: commit migration: %w", err)
+	}
+
+	// Guard against running an older binary against a schema written by a newer one.
+	// latestKnownMigration must be updated whenever a new migration is added.
+	const latestKnownMigration = 4
+	var maxApplied int
+	if err := db.QueryRow(`SELECT COALESCE(MAX(version), 0) FROM schema_migrations`).Scan(&maxApplied); err != nil {
+		return fmt.Errorf("state: check max migration: %w", err)
+	}
+	if maxApplied > latestKnownMigration {
+		return fmt.Errorf("state: database was created by a newer binary (migration %d > %d known); upgrade agentdeck", maxApplied, latestKnownMigration)
+	}
+	return nil
+}
+
+func ensureSessionsFTS(tx *sql.Tx) error {
+	_, err := tx.Exec(`
+CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
+  agent_id UNINDEXED,
+  name,
+  role,
+  project,
+  grp,
+  model,
+  backend,
+  content,
+  tokenize = 'unicode61 remove_diacritics 2'
+)`)
+	if err == nil {
+		return nil
+	}
+	if !strings.Contains(err.Error(), "no such module: fts5") {
+		return fmt.Errorf("state: create sessions_fts: %w", err)
+	}
+	if _, err := tx.Exec(`
+CREATE TABLE IF NOT EXISTS sessions_fts (
+  agent_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  role TEXT NOT NULL,
+  project TEXT NOT NULL,
+  grp TEXT NOT NULL,
+  model TEXT NOT NULL,
+  backend TEXT NOT NULL,
+  content TEXT NOT NULL
+)`); err != nil {
+		return fmt.Errorf("state: create fallback sessions_fts: %w", err)
 	}
 	return nil
 }
