@@ -106,9 +106,32 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
   `TestRealCLICancel` (cancel interrupts an in-flight turn → idle), `TestRealCLIStop` (terminates the
   process group + removes the running row + status `done`). Confirmed real option kinds are
   `allow_once`/`reject_once`/`allow_always` — `selectOption` (§5.3) maps approve/deny correctly.
-- **[R2] UI transcript renderers read the wrong event shape (BLOCKING)** `internal/bus/bus.go:109-112`, `ui/src/api/sse.ts:60-75`, `ui/src/components/chat/renderers/AssistantText.tsx:7-9`, `PermissionPrompt.tsx:8-20`, `ToolCall.tsx:6-8`, `ToolResult.tsx:8-10`, `DiffBlock.tsx:7-8`, `TurnError.tsx:4`. The server sends `new_message.data` as a nested `runtime.Event` with payload under `event.data`; persisted transcript replay returns the same shape. Renderers read payload fields at top level, so assistant text is blank, tool details disappear, and permission decisions POST an empty `tool_call_id`. Fix: normalize once at the UI boundary/store, e.g. `{kind: event.type, seq, ts, ...event.data}`, and apply `permission_resolved` to earlier prompts.
-- **[R3] FTS content can be wiped after server restart/resume (BLOCKING)** `internal/index/indexer.go:15-19`, `internal/index/indexer.go:104-120`, `internal/runtime/chat.go:654-662`. `Indexer.content` is process-local; after restart, the next resumed `turn_end` replaces the durable `sessions_fts` row using only post-restart content. Old transcript phrases become unsearchable until manual `agentdeck reindex`. Fix: seed `ix.content[agent_id]` from existing `sessions_fts.content` before first append/flush for an existing session, or append/merge from DB content during flush.
-- **[R4] Normal build/install path produces an archive search binary without FTS5 (BLOCKING)** `Makefile:35-37`, `install.sh:60-62`, `internal/state/migrate.go:79-110`, `internal/archive/archive.go:107-128`. Phase 4 archive search calls FTS-only `MATCH`, `snippet()`, and `bm25()`, but `make build` and `install.sh` use untagged `go build`; untagged migration creates a plain fallback table, so `GET /api/archive?q=...` fails in the normal installed binary. Fix: build release/install paths with `-tags sqlite_fts5`, or implement a real non-FTS fallback search path.
+- ✅ **RESOLVED — [R2] UI transcript renderers read the wrong event shape (BLOCKING).** Confirmed the
+  wire shape is *double-nested*: `bus` sends `new_message.data` = the `runtime.Event`, whose typed payload
+  lives under *its own* `data` field (so the real delta was at `envelope.data.data.delta`); the REST
+  transcript endpoint (`transcript.ReadFile` → `[]runtime.Event`) returns the same shape. Fixed by
+  normalizing at the store boundary: `transcriptStore.normalizeEvent` flattens `{type,data:{…}}` →
+  `{kind, seq, ts, …payload}` and is applied in both `appendMessage` and `setTranscript` (covers SSE,
+  gap-recovery, refetch, and ChatPanel's initial load). Consecutive `assistant_text` deltas (which carry no
+  `message_id`) now merge into one bubble; `permission_resolved` folds into its matching prompt instead of
+  rendering raw; added `user_text` rendering and a `session_meta`/`permission_resolved` no-render guard;
+  fixed `ToolResult` field reads (`content`/`status`/`error`). New regression tests cover the nested wire
+  shape, tool_call field surfacing, permission_resolved folding, and the REST path. UI 30/30 + build green.
+- ✅ **RESOLVED — [R3] FTS content could be wiped after server restart/resume (BLOCKING).** `Indexer.content`
+  is process-local, so a fresh process (server restart or resume) started with an empty buffer; the first
+  resumed `turn_end` → `flush` → `replaceFTS` would `DELETE`+`INSERT` the `sessions_fts` row using only
+  post-restart content, dropping all previously-indexed transcript text until a manual `agentdeck reindex`.
+  Fixed by lazily seeding the in-memory buffer once per agent from the durable `sessions_fts.content`
+  (`Indexer.seedLocked`, called under `ix.mu` from both `addContent` and `flush`); subsequent flushes now
+  merge old + new content. Works in both tagged and untagged builds (the plain fallback table also has a
+  `content` column). New `TestResumeAfterRestartPreservesFTSContent` reproduces the wipe (fails without the
+  fix) and asserts old + new phrases coexist after a simulated restart. Full Go suite + tagged FTS tests green.
+- ✅ **RESOLVED — [R4] Normal build/install path produced an archive search binary without FTS5 (BLOCKING).**
+  Confirmed: untagged migration creates a plain `sessions_fts` table (server boots), then `GET /api/archive?q=...`
+  errors at runtime on `MATCH` → 500. Fixed by adding `-tags sqlite_fts5` to the release/install build paths:
+  `Makefile` (new `TAGS := sqlite_fts5`, used in the `build` target) and `install.sh` (the `go build` line).
+  The untagged plain-table fallback is intentionally retained so the no-tag `go build ./...` / `go test ./...`
+  checkpoint stays green. Verified: tagged build + standard build + full Go test suite + tagged FTS tests green.
 
 ## Autonomous decisions (please review)
 
