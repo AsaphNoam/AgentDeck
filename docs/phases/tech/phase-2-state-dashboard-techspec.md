@@ -8,6 +8,39 @@
 
 ---
 
+## 0. Codex review findings — address while building this phase
+
+> Recorded 2026-06-28 from a cross-phase Codex review. Resolve each as you build the
+> referenced subphase; delete the entry once implemented and verified green.
+
+- **BLOCKING — the `new_message` event contract is double-nested (§4.3 vs §8.2/§7/§13).**
+  §4.3 says the runtime publishes `bus.Publish(Event{Type:"new_message", Data: <transcript event>})`
+  where the "transcript event" is the Phase 1 `runtime.Event` — and that envelope is
+  `{agent_id, seq, type, ts, data}` with the actual payload under its own `data`
+  (confirmed: `internal/server/sse.go` marshals the whole `runtime.Event` as the SSE `data:`).
+  Wrapped verbatim, the wire frame's `data` is a **nested `runtime.Event`** (`data.data.text`,
+  field `type` not `kind`). But §8.2 (lines ~679–686) and the §7/§13 renderers
+  (`AssistantText`, `ToolCall`, `ToolResult`, `DiffBlock`, `PermissionPrompt`) read a **flat**
+  transcript object: `data = { kind, message_id, text, … }`. As specced this breaks assistant
+  text, tool display, diffs, and permission decisions. **Resolution:** the chat runtime (or a thin
+  bus adapter) must **flatten** `runtime.Event` → `{ kind: <type>, …<payload fields hoisted out of
+  data> }` before publishing as `new_message`, so the wire `data` matches §8.2 exactly. Equivalently:
+  pin `new_message` Data ≡ the §8.2 flat shape and add the `type→kind` + hoist mapping at the publish
+  seam. Pick one and make §4.3, §8.2, and the `types.ts`/`TranscriptEvent` shape agree.
+
+- **Advisory — snapshot-before-subscribe race (§4.4).** The hydration burst reads `bus.snapshot`
+  and *then* the client enters the live loop; a `state_update` published in that gap is missed.
+  **Resolution:** add the subscriber channel to the bus **before** reading the snapshot (or take the
+  snapshot and register the client under the same bus lock), so no update can slip between the
+  hydration burst and the live stream.
+
+- **Advisory — the optimistic user bubble has no renderer (§7.5 / §13).** The composer optimistically
+  appends a user bubble on send (§7.5), but the `kind`→renderer registry (§13/§7.1) has no
+  `user_text`/`user` kind, so the optimistic prompt (and any echoed user turn) has nothing to render.
+  **Resolution:** add a `user_text` transcript kind + renderer and have the optimistic append use it.
+
+---
+
 ## 1. Overview & scope recap
 
 ### 1.1 What this phase delivers

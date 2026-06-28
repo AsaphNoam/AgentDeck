@@ -8,6 +8,43 @@
 
 ---
 
+## 0. Codex review findings — address while building this phase
+
+> Recorded 2026-06-28 from a cross-phase Codex review. Resolve each as you build the
+> referenced subphase; delete the entry once implemented and verified green.
+
+- **BLOCKING — the indexer can wipe durable FTS content from a process-local accumulator (§2.3 / §4.6).**
+  §4.6 has the indexer accumulate a session's searchable text **in memory** and replace its
+  `sessions_fts` row wholesale per `turn_end` (FTS5 updates are delete+insert, §2.3 line ~162). After a
+  **server restart or a resume**, that accumulator (`Indexer.content`) is empty/partial — it only holds
+  what the current process streamed — so the first `OnTurnEnd` **replaces the durable FTS row with only
+  the new turn's text, wiping every previously-indexed turn**. **Resolution:** never let a fresh process's
+  accumulator overwrite durable content. Either (a) on first touch after `Start`/`Resume`, hydrate the
+  per-session accumulator from the durable source — the persisted FTS `content`, or by replaying
+  `transcript.ndjson` up to `last_seq` — before the first wholesale replace; or (b) make `OnTurnEnd` a
+  read-modify-write that appends the new turn to the existing row rather than reconstructing it from
+  memory. (Treat the raw `transcript.ndjson` as authoritative, per §2.4/§2.6.)
+
+- **BLOCKING (cross-project) — the FTS5 build tag is missing from the normal build/install paths
+  (§2.5, line ~188).** This spec assumes `-tags sqlite_fts5`, but the real build/install paths do **not**
+  set it: `Makefile` (the `build:` target, `go build … ./cmd/agentdeck`) and `install.sh` (its `go build`
+  line) build untagged. Once Phase 4 lands the FTS5 schema + `MATCH` SQL, an **installed binary fails** at
+  `CREATE VIRTUAL TABLE … USING fts5` (migration) and/or at `GET /api/archive?q=…`. **Resolution when this
+  phase lands:** add `-tags sqlite_fts5` to the `Makefile` build target, `install.sh`, and any `go test`
+  invocation that exercises FTS, and document the tag as required to build AgentDeck. *(Recorded only —
+  build files left unchanged for now, since FTS5 isn't in the schema yet.)*
+
+- **Advisory — resume does not mint a fresh MCP registration (§5.1 step 4 / §5.2 / §5.7).** Resume
+  correctly rebuilds the `LaunchSpec` from the **frozen `sessions` snapshot** (§5.2, *not* from current
+  config). But the messaging-MCP seam carries a **per-launch hook token** (Phase 1 §6.4) that is
+  ephemeral/in-memory and is therefore **not** in the persisted snapshot — so §5.7's "passes the same
+  LaunchSpec MCP seam" has nothing valid to pass. **Resolution:** on resume, re-mint a fresh hook token
+  and re-inject the messaging MCP server spec (`command = os.Executable()`, args with the **new** token +
+  `agent_id`) into the rebuilt `LaunchSpec`, exactly like `Start` does — don't rely on the frozen
+  snapshot's `MCPServers`.
+
+---
+
 ## 1. Overview & scope recap
 
 ### 1.1 What this phase delivers
