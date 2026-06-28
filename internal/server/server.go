@@ -16,6 +16,17 @@ import (
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
+// onboardingCacheEntry caches a cred-check result for the default backend/model
+// to avoid re-probing on every /api/config poll. TTL is ~60s per §3.6.
+type onboardingCacheEntry struct {
+	result  credcheck.CredResult
+	backend string
+	model   string
+	expires time.Time
+}
+
+const onboardingCacheTTL = 60 * time.Second
+
 // shutdownTimeout bounds graceful shutdown after the context is cancelled.
 const shutdownTimeout = 5 * time.Second
 
@@ -35,6 +46,10 @@ type Server struct {
 	// credCheck is the credential probe function; defaults to credcheck.Check.
 	// Tests inject a stub so real network/CLI calls are avoided.
 	credCheck func(ctx context.Context, bk config.Backend, model config.Model, mergedEnv map[string]string) credcheck.CredResult
+
+	// onboardingCacheMu guards onboardingCache.
+	onboardingCacheMu sync.Mutex
+	onboardingCache   *onboardingCacheEntry
 }
 
 // New constructs a Server. The config supplies the port; the stores back the data

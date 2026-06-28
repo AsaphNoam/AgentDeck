@@ -9,9 +9,9 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 ## Current position
 
 - **Active phase:** 3 — Config CRUD & onboarding
-- **Active subphase:** 3.3 — Config endpoints + disk-on-demand audit
+- **Active subphase:** 3.4 — Frontend scaffolding + Settings (Roles & Projects editors)
 - **Spec:** [`tech/phase-3-config-onboarding-techspec.md`](tech/phase-3-config-onboarding-techspec.md)
-- **Last GREEN checkpoint:** 3.2 @ `impl/phase-3`: `go build ./...` + `go test ./...`
+- **Last GREEN checkpoint:** 3.3 @ `impl/phase-3`: `go build ./...` + `go test ./...`
 - **Branch:** `impl/phase-3` (do not commit to `main`; do not push unless asked).
 
 ---
@@ -41,12 +41,14 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 **Subphase 3.2 ✅** — `internal/backend/credcheck/` (dispatch, claude.go auth-status probe, codex.go /v1/models ping, 6s timeout, CredResult); `ValidateBackendsConfig` in validate.go (invariants 1–6, auto-promote zero-default backend + model); `PUT /api/backends` handler with cred-check injection for tests; env merge tested. All tests green.
 
-**Subphase 3.3 — Config endpoints + disk-on-demand audit**
+**Subphase 3.3 ✅** — `GET /api/config` with computed `onboarding` block (min-viable check: backend ok-creds + project + role, ~60s cred-check cache); `PUT /api/config` partial merge (onboarding_complete, defaults; rejects version/port); `Config.OnboardingComplete` field added to types.go; disk-on-demand audit: all reads hit disk per request, only the cred-check memo is cached. Tests green.
 
-- [ ] Extend `GET /api/config` with computed `onboarding` block (min-viable check §3.6, ~60s cred-check memo).
-- [ ] Add `PUT /api/config` partial merge for `onboarding_complete`/defaults, rejecting `version`/`port` changes.
-- [ ] Disk-on-demand audit: confirm no in-memory config cache defeats disk-reads on CRUD + launch paths.
-- [ ] Tests: min-viable (empty store satisfied:false; backend-ok+project+role → satisfied:true; bad creds → backend.done:false), PUT /api/config immutable-field 400, selectable-without-restart (already tested in 3.1).
+**Subphase 3.4 — Frontend scaffolding + Settings (Roles & Projects editors)**
+
+- [ ] `ui/src/schemas/` Zod schemas (role, project, backends, config) + `ui/src/api/config.ts` typed fetchers + TanStack Query keys & invalidation.
+- [ ] `SettingsPage.tsx` tabs (Roles | Projects | Backends); `RolesEditor`/`RoleForm` (create-only slug, tri-state skip_permissions); `ProjectsEditor`/`ProjectForm` (RGB color trio + swatch, cwd_not_found warning).
+- [ ] Route Settings into Phase 2 shell.
+- [ ] Tests: Vitest+MSW for Roles/Projects editors (create invalidates query so entity appears).
 
 ---
 
@@ -143,6 +145,7 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-28 — **3.3 green.** `GET /api/config` with computed onboarding block (min-viable check + ~60s cred-check cache); `PUT /api/config` partial merge; `Config.OnboardingComplete` field; disk-on-demand audit (reads clean, only cred-check cached). Checkpoint: `go build ./...` + `go test ./...`.
 - 2026-06-28 — **3.2 green.** `internal/backend/credcheck/` (claude auth-status + codex /v1/models probers, 6s timeout, CredResult, env merge); `ValidateBackendsConfig` (invariants + auto-promote); `PUT /api/backends` with injected credCheck for tests; all invariant + cred-check tests. Checkpoint: `go build ./...` + `go test ./...`.
 - 2026-06-28 — **3.1 green.** `internal/config/validate.go` (`ValidSlug`, `FieldError`, role/project validators); `POST/PUT/DELETE /api/roles/{role}` + `POST/PUT/DELETE /api/projects/{project}` in `internal/server/config_handlers.go`; in-use guard; `cwd_not_found` warning; disk-on-demand; tests. Checkpoint: `go build ./...` + `go test ./...`.
 - 2026-06-28 — **Phase 2 COMPLETE / 2.6 green.** Added full chat route/panel with live header,
