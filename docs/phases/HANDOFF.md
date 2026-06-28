@@ -8,11 +8,11 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 
 ## Current position
 
-- **Active phase:** 3 — Config CRUD & onboarding — **next**
-- **Active subphase:** 3.1 — Validators + Roles & Projects write paths
+- **Active phase:** 3 — Config CRUD & onboarding
+- **Active subphase:** 3.2 — credcheck package + Backends PUT with invariants
 - **Spec:** [`tech/phase-3-config-onboarding-techspec.md`](tech/phase-3-config-onboarding-techspec.md)
-- **Last GREEN checkpoint:** Phase 2 complete @ `impl/phase-2`: `go build ./...` + `go test ./...` + `cd ui && npm test` + `cd ui && npm run build`
-- **Branch:** current work is on `impl/phase-2`; start Phase 3 from a fresh `impl/phase-3` branch (do not commit to `main`; do not push unless asked).
+- **Last GREEN checkpoint:** 3.1 @ `impl/phase-3`: `go build ./...` + `go test ./...`
+- **Branch:** `impl/phase-3` (do not commit to `main`; do not push unless asked).
 
 ---
 
@@ -21,7 +21,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - [x] Phase 0 — Foundation (data model, file store, server & CLI skeleton) ✅
 - [x] Phase 1 — Core loop (ACP chat runtime, launch, streaming chat) ✅ — verified against real `claude-code-acp` v0.16.2
 - [x] Phase 2 — State manager, SSE bus, dashboard card grid ✅
-- [ ] Phase 3 — Config CRUD & onboarding — **start at 3.1**
+- [ ] Phase 3 — Config CRUD & onboarding — **active, 3.1 ✅**
 - [ ] Phase 4 — Persistence: archive, search, resume, file/command tracking
 - [ ] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications
 - [ ] Phase 6 — Flexibility: terminal runtime, switch-runtime, task groups
@@ -37,13 +37,14 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 **Phase 2 complete ✅** (2.1–2.6 green; details in git history).
 
-**Subphase 3.1 — Validators + Roles & Projects write paths**
+**Subphase 3.1 ✅** — `internal/config/validate.go` (`ValidSlug`, `FieldError`, role/project validators); `POST/PUT/DELETE /api/roles/{role}` + `POST/PUT/DELETE /api/projects/{project}` with `validation_failed` shape, `cwd_not_found` warning, in-use guard (`?force=true`); disk-on-demand confirmed; all tests green.
 
-- [ ] Add `internal/config/validate.go`: `ValidSlug`, `FieldError`, role/project validators.
-- [ ] Add `POST/PUT/DELETE /api/roles[/{role}]` with validation and in-use guard against live `running` rows.
-- [ ] Add `POST/PUT/DELETE /api/projects[/{project}]` with validation, non-blocking `cwd_not_found` warning, and in-use guard.
-- [ ] Ensure config reads hit disk per request and use the shared `validation_failed` error shape from Phase 3 spec §5.6.
-- [ ] Tests: validators plus roles/projects POST→GET→PUT→DELETE, validation failure, and in-use guard; `go build ./...` + `go test ./...` green.
+**Subphase 3.2 — credcheck package + Backends PUT with invariants**
+
+- [ ] `internal/backend/credcheck/` — `credcheck.go` dispatch, `claude.go` (auth-status probe), `codex.go` (`/v1/models` auth ping), 6s context timeout, `CredResult{ok|failed|skipped}`.
+- [ ] `internal/config/backends.go` `PUT /api/backends`: parse → invariants 1–6 → auto-promote defaults → cred-check default models → persist normalized doc → return doc + `credentials` map.
+- [ ] Backends validators in `validate.go`; per-model env merge (`merge(backend.env, model.env)`, model wins) documented + unit-tested.
+- [ ] Tests: invariant cases (zero-default auto-promote, multiple-default 400, unknown model 400, empty models 400, unknown type 400, unsupported version 400-nothing-written), env-merge test, cred-check tests with mock probe (ok/failed/skipped; doc persisted on failed).
 
 ---
 
@@ -140,6 +141,7 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-28 — **3.1 green.** `internal/config/validate.go` (`ValidSlug`, `FieldError`, role/project validators); `POST/PUT/DELETE /api/roles/{role}` + `POST/PUT/DELETE /api/projects/{project}` in `internal/server/config_handlers.go`; in-use guard; `cwd_not_found` warning; disk-on-demand; tests. Checkpoint: `go build ./...` + `go test ./...`.
 - 2026-06-28 — **Phase 2 COMPLETE / 2.6 green.** Added full chat route/panel with live header,
   transcript renderers (markdown + code highlight, tool/diff/error/permission), prompt send/cancel, Approve/Deny,
   reconnect transcript refetch, and refreshed embedded UI assets. Checkpoint: `go build ./...` + `go test ./...` +
