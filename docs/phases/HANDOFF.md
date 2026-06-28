@@ -61,13 +61,26 @@ _(Phase 2 subphases go here once its techspec is opened.)_
   (`internal/cli/launch.go`) just POSTs to `/api/sessions` (CLI≡modal parity).
 - **fakeacp** (`internal/runtime/testdata/fakeacp`) is the deterministic test adapter — under `testdata/`
   so `go build ./...` skips it; build explicitly with `go build -o /dev/null ./internal/runtime/testdata/fakeacp`.
-- The **real-CLI acceptance** is gated behind `//go:build acceptance`; run with
-  `go test -tags acceptance ./internal/runtime -run TestRealCLIAcceptance -v` (needs `claude-code-acp` +
-  a logged-in Claude account). Recipe + Appendix A: [`phase-1-acceptance.md`](phase-1-acceptance.md).
+- The **real-CLI acceptance** is gated behind `//go:build acceptance` (5 tests: stream, permission
+  deny/approve, cancel, stop); run with `go test -tags acceptance ./internal/runtime -run TestRealCLI -v`
+  (needs `claude-code-acp` + a logged-in Claude account). Recipe + Appendix A: [`phase-1-acceptance.md`](phase-1-acceptance.md).
 
 ## Blocked on human
 
 _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` v0.16.2. Nothing blocking.)_
+
+## Review findings (BLOCKING items from the last review)
+
+> Written by the review agent (workflow §8). Remove an entry once fixed and verified green.
+
+- ✅ **RESOLVED — full real-adapter Appendix A coverage added & PASSED.** The gated acceptance suite
+  (`internal/runtime/acceptance_test.go`, `//go:build acceptance`) now has five real-CLI tests, all green
+  against `claude-code-acp` v0.16.2 (`go test -tags acceptance ./internal/runtime -run TestRealCLI -v`):
+  `TestRealCLIAcceptance` (incremental stream + turn_end + idle), `TestRealCLIPermissionDeny` (real gate;
+  denied tool's side effect never happens), `TestRealCLIPermissionApprove` (approved tool runs),
+  `TestRealCLICancel` (cancel interrupts an in-flight turn → idle), `TestRealCLIStop` (terminates the
+  process group + removes the running row + status `done`). Confirmed real option kinds are
+  `allow_once`/`reject_once`/`allow_always` — `selectOption` (§5.3) maps approve/deny correctly.
 
 ## Autonomous decisions (please review)
 
@@ -101,10 +114,13 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 
 _(most recent first; keep ~10, older history is in git)_
 
-- 2026-06-28 — **Phase 1 COMPLETE.** Real-CLI acceptance PASSED against `claude-code-acp` v0.16.2
-  (`go test -tags acceptance ./internal/runtime -run TestRealCLIAcceptance`): handshake + incremental
-  stream + turn_end + idle status. Fixed: runtime strips `CLAUDECODE` from the spawned adapter env (the
-  adapter refuses nested sessions); `install.sh` pin corrected `0.4.1`→`0.16.2`. Default suite + `-race` green.
+- 2026-06-28 — **Review fix: full Appendix A real-adapter coverage.** Added 4 gated tests
+  (permission deny/approve, cancel, stop) alongside the stream test — all 5 PASS against
+  `claude-code-acp` v0.16.2. Real option kinds confirmed (`allow_once`/`reject_once`/`allow_always`).
+  Resolves the BLOCKING review finding. Default suite untouched (tests tagged off).
+- 2026-06-28 — **Phase 1 COMPLETE.** Real-CLI acceptance PASSED against `claude-code-acp` v0.16.2:
+  handshake + incremental stream + turn_end + idle. Fixed: runtime strips `CLAUDECODE` from the spawned
+  adapter env (adapter refuses nested sessions); `install.sh` pin corrected `0.4.1`→`0.16.2`.
 - 2026-06-27 — **1.6 code/docs.** Gated `acceptance` build-tag test + `install.sh` adapter pin +
   `phase-1-acceptance.md` curl/SSE recipe.
 - 2026-06-27 — **1.5 green** (incl. `-race`). Launch composition + REST (`POST /api/sessions`, detail,
