@@ -73,6 +73,24 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 
 > Written by the review agent (workflow §8). Remove an entry once fixed and verified green.
 
+- ✅ **RESOLVED — crash teardown left registry ownership stale (Phase 0/1, BLOCKING).** On an ACP crash,
+  `ChatRuntime.onTransportClosed` removed its handle but `Registry.rtByAgent` kept claiming the agent, so a
+  relaunch/resume was rejected with `ErrAlreadyStarted` (and control ops hit `ErrNoHandle`) until a manual
+  `Stop`. Fixed: `ChatRuntime` now carries an `onExit` callback, wired by `NewRegistry` to `Registry.forget`,
+  invoked from `onTransportClosed` before the `turn_end` emit. New `TestRegistryForgetsAgentAfterCrash`
+  (`registry_crash_test.go`) drives a crash through the registry and asserts ownership is dropped + relaunch
+  is no longer blocked. Green incl. `-race`.
+- ✅ **RESOLVED — idle cancel reported a no-op as success (Phase 1, advisory).** `Runtime.Cancel` now returns
+  `(cancelled bool, error)`; `ChatRuntime.Cancel` reports `true` only when a turn or pending permission was
+  actually interrupted, and `POST /api/sessions/{id}/cancel` returns `{cancelled:false}` for an idle no-op.
+  `TestCancelDuringPendingPermission` extended to assert the idle no-op case.
+- 📝 **RECORDED — future-phase Codex findings (Phases 2/3/4).** The remaining review items target code not
+  yet written, so they are recorded as a new **`## 0. Codex review findings`** section at the top of each
+  affected techspec, to be resolved when that phase is built: Phase 2 — `new_message` double-nesting (BLOCKING)
+  + snapshot/subscribe race + missing optimistic-user-bubble renderer; Phase 3 — 409 detail propagation +
+  default role/project preselection; Phase 4 — indexer FTS wipe-on-restart (BLOCKING) + missing
+  `sqlite_fts5` build tag in `Makefile`/`install.sh` (BLOCKING, cross-project) + fresh MCP registration on
+  resume.
 - ✅ **RESOLVED — full real-adapter Appendix A coverage added & PASSED.** The gated acceptance suite
   (`internal/runtime/acceptance_test.go`, `//go:build acceptance`) now has five real-CLI tests, all green
   against `claude-code-acp` v0.16.2 (`go test -tags acceptance ./internal/runtime -run TestRealCLI -v`):
@@ -114,6 +132,11 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-28 — **Codex review pass (branch `claude/codex-issue-review-jhrf6m`).** Fixed two implemented-code
+  issues with tests (build + `go test ./...` + `-race` green): crash-teardown registry-ownership leak
+  (BLOCKING — `chat.go`/`registry.go`, new `registry_crash_test.go`) and idle-cancel no-op reporting
+  (`Runtime.Cancel`→`(bool,error)`, `sessions.go`). Recorded the remaining future-phase findings into
+  `## 0` sections of the Phase 2/3/4 techspecs (see Review findings above).
 - 2026-06-28 — **Review fix: full Appendix A real-adapter coverage.** Added 4 gated tests
   (permission deny/approve, cancel, stop) alongside the stream test — all 5 PASS against
   `claude-code-acp` v0.16.2. Real option kinds confirmed (`allow_once`/`reject_once`/`allow_always`).

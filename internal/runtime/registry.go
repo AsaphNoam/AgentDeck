@@ -37,7 +37,19 @@ func NewRegistry(s *state.Store) *Registry {
 	}
 	r.byIface["chat"] = chat
 	r.byIface["terminal"] = notImplementedRuntime{name: "terminal"}
+	// When a runtime tears an agent down unsolicited (crash), it must clear our
+	// ownership record too — otherwise rtByAgent keeps claiming the agent and
+	// blocks relaunch/resume with ErrAlreadyStarted (techspec §8.2).
+	chat.onExit = r.forget
 	return r
+}
+
+// forget drops the ownership record for an agent. Called by an owning runtime
+// when its live handle disappears outside a Stop (crash teardown).
+func (r *Registry) forget(agentID string) {
+	r.mu.Lock()
+	delete(r.rtByAgent, agentID)
+	r.mu.Unlock()
 }
 
 // Chat returns the chat runtime (e.g. to point it at a pinned adapter binary or,
@@ -98,11 +110,12 @@ func (r *Registry) SendPrompt(ctx context.Context, agentID, text string) error {
 	return rt.SendPrompt(ctx, agentID, text)
 }
 
-// Cancel routes a cancel to the owning runtime.
-func (r *Registry) Cancel(ctx context.Context, agentID string) error {
+// Cancel routes a cancel to the owning runtime. The bool reports whether a turn
+// or pending permission was actually interrupted (false = idle no-op).
+func (r *Registry) Cancel(ctx context.Context, agentID string) (bool, error) {
 	rt, err := r.ownerFor(agentID)
 	if err != nil {
-		return err
+		return false, err
 	}
 	return rt.Cancel(ctx, agentID)
 }
@@ -161,8 +174,8 @@ func (n notImplementedRuntime) SendPrompt(context.Context, string, string) error
 	return fmt.Errorf("%w: %s runtime", ErrNotImplemented, n.name)
 }
 
-func (n notImplementedRuntime) Cancel(context.Context, string) error {
-	return fmt.Errorf("%w: %s runtime", ErrNotImplemented, n.name)
+func (n notImplementedRuntime) Cancel(context.Context, string) (bool, error) {
+	return false, fmt.Errorf("%w: %s runtime", ErrNotImplemented, n.name)
 }
 
 func (n notImplementedRuntime) Stop(context.Context, string) error {
