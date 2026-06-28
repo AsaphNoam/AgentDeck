@@ -75,8 +75,15 @@ func TestOpenMigratesAndConfiguresSQLite(t *testing.T) {
 	if busyTimeout != 5000 {
 		t.Fatalf("busy_timeout = %d, want 5000", busyTimeout)
 	}
+	var synchronous int
+	if err := st.DB().QueryRow(`PRAGMA synchronous`).Scan(&synchronous); err != nil {
+		t.Fatalf("synchronous: %v", err)
+	}
+	if synchronous != 1 {
+		t.Fatalf("synchronous = %d, want 1 (NORMAL)", synchronous)
+	}
 
-	for _, table := range []string{"schema_migrations", "agents", "running", "status", "messages"} {
+	for _, table := range []string{"schema_migrations", "agents", "running", "status", "messages", "sessions", "sessions_fts", "tracked_files", "tracked_commands"} {
 		var name string
 		err := st.DB().QueryRow(
 			`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`,
@@ -90,8 +97,8 @@ func TestOpenMigratesAndConfiguresSQLite(t *testing.T) {
 	if err := st.DB().QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil {
 		t.Fatalf("schema_migrations version: %v", err)
 	}
-	if version != 3 {
-		t.Fatalf("migration version = %d, want 3", version)
+	if version != 4 {
+		t.Fatalf("migration version = %d, want 4", version)
 	}
 }
 
@@ -122,8 +129,8 @@ func TestOpenIsIdempotentAndPreservesRows(t *testing.T) {
 	if err := reopened.DB().QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatalf("count migration: %v", err)
 	}
-	if count != 3 {
-		t.Fatalf("migration version rows = %d, want 3", count)
+	if count != 4 {
+		t.Fatalf("migration version rows = %d, want 4", count)
 	}
 }
 
