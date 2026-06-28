@@ -19,6 +19,7 @@ func NewRootCmd() *cobra.Command {
 	// `agentdeck --version` prints "agentdeck version <version> (commit, date)".
 	root.SetVersionTemplate("agentdeck version {{.Version}}\n")
 	root.AddCommand(newDashboardCmd())
+	root.AddCommand(newReindexCmd())
 	return root
 }
 

@@ -35,6 +35,10 @@ func Open(home string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("state: enable wal: %w", err)
 	}
+	if _, err := db.Exec(`PRAGMA synchronous=NORMAL`); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("state: set synchronous normal: %w", err)
+	}
 	if _, err := db.Exec(`PRAGMA foreign_keys=ON`); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("state: enable foreign keys: %w", err)
