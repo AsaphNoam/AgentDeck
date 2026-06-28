@@ -11,10 +11,10 @@ func (s *Store) ReadRunning(id string) (RunningEntry, error) {
 	var r RunningEntry
 	var startedAt string
 	err := s.db.QueryRow(`
-SELECT agent_id, pid, session_id, interface, tty, started_at
+SELECT agent_id, pid, session_id, interface, tty, hook_token, started_at
 FROM running
 WHERE agent_id = ?`, id).Scan(
-		&r.AgentID, &r.PID, &r.SessionID, &r.Interface, &r.TTY, &startedAt,
+		&r.AgentID, &r.PID, &r.SessionID, &r.Interface, &r.TTY, &r.HookToken, &startedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return RunningEntry{}, ErrNotFound
@@ -32,15 +32,16 @@ WHERE agent_id = ?`, id).Scan(
 // WriteRunning inserts or updates a running entry.
 func (s *Store) WriteRunning(r RunningEntry) error {
 	_, err := s.db.Exec(`
-INSERT INTO running(agent_id, pid, session_id, interface, tty, started_at)
-VALUES (?, ?, ?, ?, ?, ?)
+INSERT INTO running(agent_id, pid, session_id, interface, tty, hook_token, started_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(agent_id) DO UPDATE SET
     pid = excluded.pid,
     session_id = excluded.session_id,
     interface = excluded.interface,
     tty = excluded.tty,
+    hook_token = excluded.hook_token,
     started_at = excluded.started_at`,
-		r.AgentID, r.PID, r.SessionID, r.Interface, r.TTY, formatTime(r.StartedAt),
+		r.AgentID, r.PID, r.SessionID, r.Interface, r.TTY, r.HookToken, formatTime(r.StartedAt),
 	)
 	if err != nil {
 		return fmt.Errorf("state: write running: %w", err)
@@ -51,7 +52,7 @@ ON CONFLICT(agent_id) DO UPDATE SET
 // ListRunning returns all running entries.
 func (s *Store) ListRunning() ([]RunningEntry, error) {
 	rows, err := s.db.Query(`
-SELECT agent_id, pid, session_id, interface, tty, started_at
+SELECT agent_id, pid, session_id, interface, tty, hook_token, started_at
 FROM running
 ORDER BY started_at, agent_id`)
 	if err != nil {
@@ -63,7 +64,7 @@ ORDER BY started_at, agent_id`)
 	for rows.Next() {
 		var r RunningEntry
 		var startedAt string
-		if err := rows.Scan(&r.AgentID, &r.PID, &r.SessionID, &r.Interface, &r.TTY, &startedAt); err != nil {
+		if err := rows.Scan(&r.AgentID, &r.PID, &r.SessionID, &r.Interface, &r.TTY, &r.HookToken, &startedAt); err != nil {
 			return nil, fmt.Errorf("state: scan running: %w", err)
 		}
 		r.StartedAt, err = parseTime(startedAt)

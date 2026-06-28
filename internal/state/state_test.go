@@ -68,8 +68,22 @@ func TestOpenMigratesAndConfiguresSQLite(t *testing.T) {
 	if foreignKeys != 1 {
 		t.Fatalf("foreign_keys = %d, want 1", foreignKeys)
 	}
+	var busyTimeout int
+	if err := st.DB().QueryRow(`PRAGMA busy_timeout`).Scan(&busyTimeout); err != nil {
+		t.Fatalf("busy_timeout: %v", err)
+	}
+	if busyTimeout != 5000 {
+		t.Fatalf("busy_timeout = %d, want 5000", busyTimeout)
+	}
+	var synchronous int
+	if err := st.DB().QueryRow(`PRAGMA synchronous`).Scan(&synchronous); err != nil {
+		t.Fatalf("synchronous: %v", err)
+	}
+	if synchronous != 1 {
+		t.Fatalf("synchronous = %d, want 1 (NORMAL)", synchronous)
+	}
 
-	for _, table := range []string{"schema_migrations", "agents", "running", "status", "messages"} {
+	for _, table := range []string{"schema_migrations", "agents", "running", "status", "messages", "sessions", "sessions_fts", "tracked_files", "tracked_commands"} {
 		var name string
 		err := st.DB().QueryRow(
 			`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`,
@@ -80,11 +94,11 @@ func TestOpenMigratesAndConfiguresSQLite(t *testing.T) {
 		}
 	}
 	var version int
-	if err := st.DB().QueryRow(`SELECT version FROM schema_migrations`).Scan(&version); err != nil {
+	if err := st.DB().QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil {
 		t.Fatalf("schema_migrations version: %v", err)
 	}
-	if version != 1 {
-		t.Fatalf("migration version = %d, want 1", version)
+	if version != 4 {
+		t.Fatalf("migration version = %d, want 4", version)
 	}
 }
 
@@ -112,11 +126,11 @@ func TestOpenIsIdempotentAndPreservesRows(t *testing.T) {
 		t.Fatalf("agent after reopen = %+v, want %+v", got, agent)
 	}
 	var count int
-	if err := reopened.DB().QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE version = 1`).Scan(&count); err != nil {
+	if err := reopened.DB().QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatalf("count migration: %v", err)
 	}
-	if count != 1 {
-		t.Fatalf("migration version rows = %d, want 1", count)
+	if count != 4 {
+		t.Fatalf("migration version rows = %d, want 4", count)
 	}
 }
 
@@ -139,6 +153,7 @@ func TestRoundTripStateObjects(t *testing.T) {
 		SessionID: "claude-sess-xyz",
 		Interface: "chat",
 		TTY:       "/dev/ttys001",
+		HookToken: "tok_live",
 		StartedAt: mustTime(t, "2026-06-22T10:00:01Z"),
 	}
 	if err := st.WriteRunning(run); err != nil {
@@ -155,6 +170,7 @@ func TestRoundTripStateObjects(t *testing.T) {
 		LastTrace:  "tool: edit",
 		BusySince:  &busy,
 		ContextPct: 0.42,
+		UpdatedAt:  123456,
 	}
 	if err := st.WriteStatus(status); err != nil {
 		t.Fatalf("WriteStatus: %v", err)
@@ -236,6 +252,9 @@ func TestNewAgentIDFormatUniquenessAndCollisionRetry(t *testing.T) {
 			t.Fatalf("duplicate id %q", id)
 		}
 		seen[id] = true
+		if err := st.WriteAgent(testAgent(id, mustTime(t, "2026-06-22T10:00:00Z"))); err != nil {
+			t.Fatalf("WriteAgent generated %s: %v", id, err)
+		}
 	}
 
 	originalRandRead := randRead

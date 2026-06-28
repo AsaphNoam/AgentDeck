@@ -18,19 +18,34 @@ func (s *Server) routes() http.Handler {
 	api("GET /api/health", s.handleHealth)
 	api("GET /api/sessions", s.handleSessions)
 	api("GET /api/roles", s.handleRoles)
+	api("POST /api/roles", s.handlePostRole)
+	api("PUT /api/roles/{role}", s.handlePutRole)
+	api("DELETE /api/roles/{role}", s.handleDeleteRole)
 	api("GET /api/projects", s.handleProjects)
+	api("POST /api/projects", s.handlePostProject)
+	api("PUT /api/projects/{project}", s.handlePutProject)
+	api("DELETE /api/projects/{project}", s.handleDeleteProject)
 	api("GET /api/backends", s.handleBackends)
+	api("PUT /api/backends", s.handlePutBackends)
+	api("GET /api/config", s.handleGetConfig)
+	api("PUT /api/config", s.handlePutConfig)
 	api("GET /api/layout", s.handleLayout)
+	api("PUT /api/layout", s.handlePutLayout)
+	api("POST /api/hook", s.handleHook)
+	api("GET /api/events", s.handleEvents)
+	api("GET /api/archive", s.handleArchive)
 
-	// Phase 1 session lifecycle (launch, control, interim SSE). The {id} routes
+	// Phase 1 session lifecycle (launch, control). The {id} routes
 	// are more specific than the GET /api/ catch-all and win via mux precedence.
 	api("POST /api/sessions", s.handleLaunch)
 	api("GET /api/sessions/{id}", s.handleSessionDetail)
+	api("GET /api/sessions/{id}/transcript", s.handleTranscript)
 	api("POST /api/sessions/{id}/prompt", s.handlePrompt)
 	api("POST /api/sessions/{id}/cancel", s.handleCancel)
 	api("POST /api/sessions/{id}/stop", s.handleStop)
+	api("POST /api/sessions/{id}/rename", s.handleRename)
 	api("POST /api/sessions/{id}/permission", s.handlePermission)
-	api("GET /api/sessions/{id}/events", s.handleEvents)
+	api("POST /api/sessions/{id}/resume", s.handleResume)
 
 	// Catch-all for any other /api/* path → 404 JSON (more specific GET routes
 	// above win via the 1.22 mux precedence rules). Registered GET-only on

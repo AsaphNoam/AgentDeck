@@ -56,6 +56,30 @@ func (r *Registry) forget(agentID string) {
 // in tests, the fake CLI).
 func (r *Registry) Chat() *ChatRuntime { return r.chat }
 
+// SetEventSink mirrors runtime transcript events into an external bus.
+func (r *Registry) SetEventSink(sink func(Event)) {
+	if r == nil || r.chat == nil {
+		return
+	}
+	r.chat.SetEventSink(sink)
+}
+
+// SetStateTouch wires runtime state writes to the dashboard state manager.
+func (r *Registry) SetStateTouch(touch func(string)) {
+	if r == nil || r.chat == nil {
+		return
+	}
+	r.chat.SetStateTouch(touch)
+}
+
+// SetPersistence wires durable transcript/index sinks into the chat runtime.
+func (r *Registry) SetPersistence(home string, open TranscriptOpener, ix PersistenceIndexer) {
+	if r == nil || r.chat == nil {
+		return
+	}
+	r.chat.SetPersistence(home, open, ix)
+}
+
 // runtimeFor dispatches by agent.interface. An unknown interface yields
 // ErrNotImplemented (techspec §3.2), which the API layer maps to 501.
 func (r *Registry) runtimeFor(iface string) (Runtime, error) {
@@ -73,15 +97,21 @@ func (r *Registry) Launch(ctx context.Context, spec LaunchSpec) (*Handle, error)
 	if err != nil {
 		return nil, err
 	}
+	// Atomically claim the slot with a nil sentinel before releasing the lock so
+	// no concurrent Launch for the same agent can also pass the existence check.
 	r.mu.Lock()
 	if _, ok := r.rtByAgent[spec.Agent.AgentID]; ok {
 		r.mu.Unlock()
 		return nil, ErrAlreadyStarted
 	}
+	r.rtByAgent[spec.Agent.AgentID] = nil // sentinel: "launching in progress"
 	r.mu.Unlock()
 
 	h, err := rt.Start(ctx, spec)
 	if err != nil {
+		r.mu.Lock()
+		delete(r.rtByAgent, spec.Agent.AgentID)
+		r.mu.Unlock()
 		return nil, err
 	}
 	r.mu.Lock()
@@ -91,14 +121,44 @@ func (r *Registry) Launch(ctx context.Context, spec LaunchSpec) (*Handle, error)
 }
 
 // ownerFor returns the runtime that owns an agent, or ErrNoHandle.
+// A nil entry means a Launch is in progress; treat as ErrNoHandle until committed.
 func (r *Registry) ownerFor(agentID string) (Runtime, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	rt, ok := r.rtByAgent[agentID]
-	if !ok {
+	if !ok || rt == nil {
 		return nil, ErrNoHandle
 	}
 	return rt, nil
+}
+
+// Resume re-attaches to a persisted inactive agent. The spec carries LastSessionID
+// and LastContextPct from the sessions snapshot. Guards against double-resume with
+// the same nil-sentinel pattern used by Launch.
+func (r *Registry) Resume(ctx context.Context, spec LaunchSpec) (*Handle, error) {
+	rt, err := r.runtimeFor(spec.Agent.Interface)
+	if err != nil {
+		return nil, err
+	}
+	r.mu.Lock()
+	if _, ok := r.rtByAgent[spec.Agent.AgentID]; ok {
+		r.mu.Unlock()
+		return nil, ErrAlreadyStarted
+	}
+	r.rtByAgent[spec.Agent.AgentID] = nil // sentinel: "resuming in progress"
+	r.mu.Unlock()
+
+	h, err := rt.Resume(ctx, spec, spec.LastSessionID)
+	if err != nil {
+		r.mu.Lock()
+		delete(r.rtByAgent, spec.Agent.AgentID)
+		r.mu.Unlock()
+		return nil, err
+	}
+	r.mu.Lock()
+	r.rtByAgent[spec.Agent.AgentID] = rt
+	r.mu.Unlock()
+	return h, nil
 }
 
 // SendPrompt routes a prompt to the owning runtime.
@@ -121,16 +181,18 @@ func (r *Registry) Cancel(ctx context.Context, agentID string) (bool, error) {
 }
 
 // Stop routes a stop to the owning runtime and forgets the agent.
+// The agent is removed from rtByAgent before rt.Stop() so that concurrent
+// SendPrompt/Permission calls get ErrNoHandle immediately rather than racing
+// for the full stopGrace window.
 func (r *Registry) Stop(ctx context.Context, agentID string) error {
-	rt, err := r.ownerFor(agentID)
-	if err != nil {
-		return ErrNoHandle
-	}
-	err = rt.Stop(ctx, agentID)
 	r.mu.Lock()
+	rt, ok := r.rtByAgent[agentID]
 	delete(r.rtByAgent, agentID)
 	r.mu.Unlock()
-	return err
+	if !ok || rt == nil {
+		return ErrNoHandle
+	}
+	return rt.Stop(ctx, agentID)
 }
 
 // Permission routes a permission decision to the owning runtime.
@@ -149,6 +211,14 @@ func (r *Registry) Subscribe(agentID string) (<-chan Event, func(), error) {
 		return nil, nil, err
 	}
 	return rt.Subscribe(agentID)
+}
+
+func (r *Registry) Transcript(agentID string) ([]Event, error) {
+	rt, err := r.ownerFor(agentID)
+	if err != nil {
+		return nil, err
+	}
+	return rt.Transcript(agentID)
 }
 
 // Shutdown stops every live agent (server shutdown, techspec §8.5).
@@ -196,6 +266,10 @@ func (n notImplementedRuntime) Permission(context.Context, string, string, strin
 
 func (n notImplementedRuntime) Subscribe(string) (<-chan Event, func(), error) {
 	return nil, nil, fmt.Errorf("%w: %s runtime", ErrNotImplemented, n.name)
+}
+
+func (n notImplementedRuntime) Transcript(string) ([]Event, error) {
+	return nil, fmt.Errorf("%w: %s runtime", ErrNotImplemented, n.name)
 }
 
 // compile-time assertions that the stub and chat runtime satisfy Runtime.

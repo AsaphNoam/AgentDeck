@@ -25,7 +25,9 @@ type LaunchSpec struct {
 	SkipPerms    bool            // effective skip_permissions after role/global resolution
 	HookToken    string          // per-launch one-time token passed to the agent's hooks
 	MCPServers   []MCPServerSpec // messaging MCP server registration; one entry this phase
-	ExtraArgs    []string        // reserved (e.g. extra adapter flags) — empty this phase
+	ExtraArgs      []string        // reserved (e.g. extra adapter flags) — empty this phase
+	LastSessionID  string          // prior CLI session id; Resume tries session/load with this
+	LastContextPct float64         // last-known context pct; Resume restores it to the status row
 }
 
 // MCPServerSpec is one stdio MCP server the agent should connect to. This phase
@@ -36,6 +38,32 @@ type MCPServerSpec struct {
 	Args    []string // includes the hook token / agent_id so the server scopes to this agent
 	Env     []string // "K=V"
 }
+
+// TurnRollup is the per-turn summary the runtime gives to the persistence
+// indexer after emitting a terminal turn event.
+type TurnRollup struct {
+	LastSeq        int64
+	LastContextPct float64
+	UpdatedAt      string
+}
+
+// PersistenceIndexer is implemented by internal/index. It lives here to avoid
+// an import cycle: the indexer consumes runtime.Event, while runtime only needs
+// this narrow sink interface.
+type PersistenceIndexer interface {
+	UpsertSessionMeta(agentID string, meta SessionMetaData) error
+	OnEvent(agentID string, ev Event) error
+	OnTurnEnd(agentID string, rollup TurnRollup) error
+}
+
+type TranscriptWriter interface {
+	Append(Event) error
+	Sync() error
+	Close() error
+	NextSeq() int64
+}
+
+type TranscriptOpener func(home, agentID string, meta *SessionMetaData) (TranscriptWriter, error)
 
 // Handle is the live, in-memory representation of a started runtime. Returned by
 // Start and held by the Registry keyed by agent_id. Not persisted.
@@ -85,4 +113,7 @@ type Runtime interface {
 	// Subscribe returns a channel of normalized events for an agent and an
 	// unsubscribe func. Buffered, drop-oldest.
 	Subscribe(agentID string) (<-chan Event, func(), error)
+
+	// Transcript returns the in-memory retained transcript events for a live agent.
+	Transcript(agentID string) ([]Event, error)
 }

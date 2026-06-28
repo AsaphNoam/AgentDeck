@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/agentdeck/agentdeck/internal/strutil"
 )
 
 // defaultChatBinary is the ACP adapter invoked for the claude-acp backend
@@ -39,6 +41,12 @@ type ChatRuntime struct {
 
 	mu     sync.Mutex
 	agents map[string]*agentState
+	sink   func(Event)
+	touch  func(string)
+
+	transcriptHome string
+	openTranscript TranscriptOpener
+	indexer        PersistenceIndexer
 }
 
 // NewChatRuntime constructs the chat runtime bound to the state store, targeting
@@ -56,6 +64,30 @@ func NewChatRuntime(s *state.Store) *ChatRuntime {
 func (c *ChatRuntime) SetCommand(bin string, args ...string) {
 	c.command = bin
 	c.cmdArgs = args
+}
+
+// SetEventSink mirrors normalized runtime events into the Phase 2 bus.
+func (c *ChatRuntime) SetEventSink(sink func(Event)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.sink = sink
+}
+
+// SetStateTouch is called after runtime-owned state.db writes so the dashboard
+// manager can recompute and publish state_update.
+func (c *ChatRuntime) SetStateTouch(touch func(string)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.touch = touch
+}
+
+// SetPersistence enables durable transcript writes and state.db indexing.
+func (c *ChatRuntime) SetPersistence(home string, open TranscriptOpener, ix PersistenceIndexer) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.transcriptHome = home
+	c.openTranscript = open
+	c.indexer = ix
 }
 
 // agentState is the live, in-memory state for one running agent.
@@ -80,6 +112,8 @@ type agentState struct {
 	turnActive bool
 	toolNames  map[string]string       // toolCallID -> normalized name (for status detail)
 	pending    map[string]*pendingPerm // toolCallID -> withheld permission request
+	transcript []Event
+	writer     TranscriptWriter
 	stopped    bool
 }
 
@@ -152,12 +186,19 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 	}()
 
 	// ACP handshake: initialize then session/new (techspec §4.1).
-	if _, err := as.transport.Call(ctx, "initialize", map[string]any{
+	initRes, err := as.transport.Call(ctx, "initialize", map[string]any{
 		"protocolVersion":    1,
 		"clientCapabilities": map[string]any{},
-	}); err != nil {
+	})
+	if err != nil {
 		as.shutdown()
 		return nil, fmt.Errorf("runtime: initialize: %w", err)
+	}
+	var initResp struct {
+		ProtocolVersion int `json:"protocolVersion"`
+	}
+	if jsonErr := json.Unmarshal(initRes, &initResp); jsonErr == nil && initResp.ProtocolVersion != 0 && initResp.ProtocolVersion != 1 {
+		slog.Warn("runtime: adapter protocol version mismatch", "got", initResp.ProtocolVersion, "want", 1)
 	}
 	newRes, err := as.transport.Call(ctx, "session/new", sessionNewParams(spec))
 	if err != nil {
@@ -172,12 +213,16 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 		return nil, fmt.Errorf("runtime: session/new returned no sessionId")
 	}
 	as.sessionID = sess.SessionID
+	if err := c.openPersistence(as, spec, sess.SessionID); err != nil {
+		as.shutdown()
+		return nil, err
+	}
 
 	// Persist running + initial status rows (state.db is the sole writer).
 	now := time.Now().UTC()
 	if err := c.store.WriteRunning(state.RunningEntry{
 		AgentID: as.agentID, PID: pgid, SessionID: sess.SessionID,
-		Interface: "chat", StartedAt: now,
+		Interface: "chat", HookToken: spec.HookToken, StartedAt: now,
 	}); err != nil {
 		as.shutdown()
 		return nil, fmt.Errorf("runtime: write running: %w", err)
@@ -271,10 +316,13 @@ func (c *ChatRuntime) Stop(ctx context.Context, agentID string) error {
 	if !ok {
 		// Idempotent: ensure no stale rows remain.
 		_ = c.store.DeleteRunning(agentID)
+		c.touchState(agentID)
 		return nil
 	}
 
 	as.shutdown()
+	// closePersistence is called in onTransportClosed's early-return path after
+	// the transport goroutine exits, so all in-flight emit() calls complete first.
 	_ = c.store.DeleteRunning(agentID)
 	// Keep the status row so the archive/UI can show a final state (§7.5).
 	st, err := c.store.ReadStatus(agentID)
@@ -284,6 +332,7 @@ func (c *ChatRuntime) Stop(ctx context.Context, agentID string) error {
 	st.State = "done"
 	st.BusySince = nil
 	_ = c.store.WriteStatus(st)
+	c.touchState(agentID)
 	as.hub.Close()
 	return nil
 }
@@ -297,12 +346,161 @@ func (c *ChatRuntime) Subscribe(agentID string) (<-chan Event, func(), error) {
 	return ch, cancel, nil
 }
 
+func (c *ChatRuntime) Transcript(agentID string) ([]Event, error) {
+	as, err := c.lookup(agentID)
+	if err != nil {
+		return nil, err
+	}
+	as.mu.Lock()
+	defer as.mu.Unlock()
+	out := make([]Event, len(as.transcript))
+	copy(out, as.transcript)
+	return out, nil
+}
+
 // Cancel and Permission live in permission.go.
 
 // --- still-stubbed methods (later phases) ---
 
 func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID string) (*Handle, error) {
-	return nil, fmt.Errorf("%w: Resume (Phase 4)", ErrNotImplemented)
+	if spec.BackendType != "claude-acp" {
+		return nil, fmt.Errorf("%w: backend %q", ErrNotImplemented, spec.BackendType)
+	}
+
+	// Spawn process (identical to Start).
+	cmd := exec.Command(c.command, c.cmdArgs...)
+	cmd.Dir = spec.Cwd
+	if env := spec.Env; len(env) > 0 {
+		cmd.Env = stripEnv(env, "CLAUDECODE")
+	} else {
+		cmd.Env = stripEnv(os.Environ(), "CLAUDECODE")
+	}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, fmt.Errorf("runtime: stdin pipe: %w", err)
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, fmt.Errorf("runtime: stdout pipe: %w", err)
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, fmt.Errorf("runtime: stderr pipe: %w", err)
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("runtime: start %s: %w", c.command, err)
+	}
+	pgid := cmd.Process.Pid
+
+	actx, acancel := context.WithCancel(context.Background())
+	as := &agentState{
+		agentID:    spec.Agent.AgentID,
+		cmd:        cmd,
+		pgid:       pgid,
+		hub:        NewHub(),
+		stdin:      stdin,
+		stderr:     newRingBuffer(16 * 1024),
+		ctx:        actx,
+		cancel:     acancel,
+		skipPerms:  spec.SkipPerms,
+		toolNames:  map[string]string{},
+		pending:    map[string]*pendingPerm{},
+		contextPct: spec.LastContextPct,
+	}
+	as.transport = NewTransport(stdin,
+		func(method string, params json.RawMessage) { c.onNotification(as, method, params) },
+		func(req *IncomingRequest) { c.onRequest(as, req) },
+	)
+
+	go as.stderr.copyFrom(stderr)
+	go func() {
+		_ = as.transport.Run(stdout)
+		c.onTransportClosed(as)
+	}()
+
+	// ACP handshake: initialize.
+	initRes, err := as.transport.Call(ctx, "initialize", map[string]any{
+		"protocolVersion":    1,
+		"clientCapabilities": map[string]any{},
+	})
+	if err != nil {
+		as.shutdown()
+		return nil, fmt.Errorf("runtime: initialize: %w", err)
+	}
+	var initResp struct {
+		ProtocolVersion int `json:"protocolVersion"`
+	}
+	if jsonErr := json.Unmarshal(initRes, &initResp); jsonErr == nil && initResp.ProtocolVersion != 0 && initResp.ProtocolVersion != 1 {
+		slog.Warn("runtime: adapter protocol version mismatch", "got", initResp.ProtocolVersion, "want", 1)
+	}
+
+	// Try session/load to restore native context; fall back to session/new.
+	newSessionID := ""
+	if sessionID != "" {
+		if loadRes, loadErr := as.transport.Call(ctx, "session/load", map[string]any{"sessionId": sessionID}); loadErr == nil {
+			var loaded struct {
+				SessionID string `json:"sessionId"`
+			}
+			if json.Unmarshal(loadRes, &loaded) == nil && loaded.SessionID != "" {
+				newSessionID = loaded.SessionID
+			}
+		}
+	}
+	if newSessionID == "" {
+		newRes, err := as.transport.Call(ctx, "session/new", sessionNewParams(spec))
+		if err != nil {
+			as.shutdown()
+			return nil, fmt.Errorf("runtime: session/new: %w", err)
+		}
+		var sess struct {
+			SessionID string `json:"sessionId"`
+		}
+		if err := json.Unmarshal(newRes, &sess); err != nil || sess.SessionID == "" {
+			as.shutdown()
+			return nil, fmt.Errorf("runtime: session/new returned no sessionId")
+		}
+		newSessionID = sess.SessionID
+	}
+	as.sessionID = newSessionID
+
+	// Re-open the existing transcript in append mode (Open skips seq:0 meta for existing files).
+	if err := c.openPersistence(as, spec, newSessionID); err != nil {
+		as.shutdown()
+		return nil, err
+	}
+
+	// Append resumed session_meta with resumed_at to the transcript so the raw
+	// log has a resume boundary marker and the archive can track the new session_id.
+	resumeNow := time.Now().UTC().Format(time.RFC3339)
+	resumedMeta := runtimeMeta(spec, newSessionID)
+	resumedMeta.ResumedAt = &resumeNow
+	c.emit(as, EvSessionMeta, resumedMeta)
+
+	// Write fresh running row + status row with restored context_pct.
+	now := time.Now().UTC()
+	if err := c.store.WriteRunning(state.RunningEntry{
+		AgentID: as.agentID, PID: pgid, SessionID: newSessionID,
+		Interface: "chat", HookToken: spec.HookToken, StartedAt: now,
+	}); err != nil {
+		as.shutdown()
+		return nil, fmt.Errorf("runtime: write running: %w", err)
+	}
+	if err := c.writeStatus(as, state.Status{
+		AgentID: as.agentID, State: "idle", Detail: "resumed",
+		LastTrace: "SessionStart", ContextPct: spec.LastContextPct,
+	}); err != nil {
+		as.shutdown()
+		_ = c.store.DeleteRunning(as.agentID)
+		return nil, fmt.Errorf("runtime: write status: %w", err)
+	}
+
+	c.mu.Lock()
+	c.agents[as.agentID] = as
+	c.mu.Unlock()
+
+	return &Handle{AgentID: as.agentID, Pid: pgid, SessionID: newSessionID}, nil
 }
 
 func (c *ChatRuntime) CheckMessages(ctx context.Context, pid int) error {
@@ -342,6 +540,9 @@ func (c *ChatRuntime) onTransportClosed(as *agentState) {
 	if as.stopped {
 		as.turnActive = false
 		as.mu.Unlock()
+		// Stop() already handled state.db cleanup; close the transcript writer now
+		// that the transport goroutine (and any in-flight emit calls) have exited.
+		as.closePersistence()
 		return
 	}
 	as.stopped = true
@@ -360,12 +561,13 @@ func (c *ChatRuntime) onTransportClosed(as *agentState) {
 	_ = as.cmd.Wait() // reap the exited process
 
 	tail := as.stderr.Tail()
-	c.emit(as, EvError, ErrorData{Scope: "process", Message: firstNonEmpty(tail, "process exited"), Fatal: true})
+	c.emit(as, EvError, ErrorData{Scope: "process", Message: strutil.FirstNonEmpty(tail, "process exited"), Fatal: true})
 
 	// Settle state.db before emitting turn_end so a client reacting to turn_end
 	// never observes a stale running row or busy status.
 	c.updateStatus(as, "error", clip(tail, 120), "Error", clearBusySince)
 	_ = c.store.DeleteRunning(as.agentID)
+	c.touchState(as.agentID)
 	c.removeAgent(as.agentID)
 	// Tell the Registry the handle is gone so it drops ownership; otherwise a
 	// relaunch/resume on this agent_id is rejected with ErrAlreadyStarted while
@@ -376,6 +578,7 @@ func (c *ChatRuntime) onTransportClosed(as *agentState) {
 	}
 
 	c.emit(as, EvTurnEnd, TurnEndData{StopReason: "error", ContextPct: as.lastPct()})
+	as.closePersistence()
 	as.cancel()
 	as.hub.Close()
 }
@@ -387,6 +590,8 @@ func (c *ChatRuntime) removeAgent(agentID string) {
 }
 
 // emit stamps seq/agent_id/ts, marshals the payload, and publishes to the hub.
+// seq increment and transcript append are done under a single as.mu acquisition
+// so concurrent emitters cannot interleave their events in the in-memory log.
 func (c *ChatRuntime) emit(as *agentState, typ string, data any) {
 	raw, err := json.Marshal(data)
 	if err != nil {
@@ -395,16 +600,125 @@ func (c *ChatRuntime) emit(as *agentState, typ string, data any) {
 	}
 	as.mu.Lock()
 	as.seq++
-	seq := as.seq
-	as.mu.Unlock()
-
-	as.hub.Publish(Event{
+	ev := Event{
 		AgentID: as.agentID,
-		Seq:     seq,
+		Seq:     as.seq,
 		Type:    typ,
 		Data:    raw,
 		Ts:      time.Now().UTC().Format(time.RFC3339),
-	})
+	}
+	as.transcript = append(as.transcript, ev)
+	as.mu.Unlock()
+	if !c.persistEvent(as, ev) {
+		return
+	}
+	as.hub.Publish(ev)
+	c.mu.Lock()
+	sink := c.sink
+	c.mu.Unlock()
+	if sink != nil {
+		sink(ev)
+	}
+}
+
+func (c *ChatRuntime) openPersistence(as *agentState, spec LaunchSpec, sessionID string) error {
+	c.mu.Lock()
+	home := c.transcriptHome
+	open := c.openTranscript
+	ix := c.indexer
+	c.mu.Unlock()
+	if home == "" || open == nil || ix == nil {
+		return nil
+	}
+	meta := runtimeMeta(spec, sessionID)
+	w, err := open(home, spec.Agent.AgentID, &meta)
+	if err != nil {
+		return fmt.Errorf("runtime: open transcript: %w", err)
+	}
+	if err := ix.UpsertSessionMeta(spec.Agent.AgentID, meta); err != nil {
+		_ = w.Close()
+		return fmt.Errorf("runtime: index session meta: %w", err)
+	}
+	as.writer = w
+	as.seq = w.NextSeq() - 1
+	return nil
+}
+
+func (c *ChatRuntime) persistEvent(as *agentState, ev Event) bool {
+	c.mu.Lock()
+	ix := c.indexer
+	c.mu.Unlock()
+	as.mu.Lock()
+	w := as.writer
+	as.mu.Unlock()
+	if w == nil || ix == nil {
+		return true
+	}
+	if err := w.Append(ev); err != nil {
+		slog.Error("runtime: append transcript", "agent", as.agentID, "seq", ev.Seq, "err", err)
+		return false
+	}
+	if err := ix.OnEvent(as.agentID, ev); err != nil {
+		slog.Error("runtime: index event", "agent", as.agentID, "seq", ev.Seq, "err", err)
+	}
+	if ev.Type == EvError {
+		_ = w.Sync()
+	}
+	if ev.Type == EvTurnEnd {
+		_ = w.Sync()
+		rollup := TurnRollup{LastSeq: ev.Seq, UpdatedAt: ev.Ts, LastContextPct: as.lastPct()}
+		var td TurnEndData
+		if err := json.Unmarshal(ev.Data, &td); err == nil {
+			rollup.LastContextPct = td.ContextPct
+		}
+		if err := ix.OnTurnEnd(as.agentID, rollup); err != nil {
+			slog.Error("runtime: index turn end", "agent", as.agentID, "seq", ev.Seq, "err", err)
+		}
+	}
+	return true
+}
+
+func (as *agentState) closePersistence() {
+	as.mu.Lock()
+	w := as.writer
+	as.writer = nil
+	as.mu.Unlock()
+	if w != nil {
+		_ = w.Close()
+	}
+}
+
+func runtimeMeta(spec LaunchSpec, sessionID string) SessionMetaData {
+	var sha string
+	if spec.SystemPrompt != "" {
+		sum := sha256sum(spec.SystemPrompt)
+		sha = fmt.Sprintf("%x", sum[:])
+	}
+	return SessionMetaData{
+		Name:            spec.Agent.Name,
+		Role:            spec.Agent.Role,
+		Project:         spec.Agent.Project,
+		Backend:         spec.Agent.Backend,
+		Model:           spec.Agent.Model,
+		Interface:       spec.Agent.Interface,
+		Group:           spec.Agent.Group,
+		Cwd:             spec.Cwd,
+		SystemPrompt:    spec.SystemPrompt,
+		SystemPromptSHA: sha,
+		EnvKeys:         envKeys(spec.Env),
+		CreatedAt:       spec.Agent.CreatedAt.UTC().Format(time.RFC3339),
+		SessionID:       sessionID,
+	}
+}
+
+func envKeys(env []string) []string {
+	keys := make([]string, 0, len(env))
+	for _, kv := range env {
+		if i := strings.Index(kv, "="); i > 0 {
+			keys = append(keys, kv[:i])
+		}
+	}
+	return keys
 }
 
 // applyEventStatus writes the §4.4 status transition implied by a streamed event.
@@ -458,11 +772,25 @@ func (c *ChatRuntime) updateStatus(as *agentState, st, detail, trace string, mod
 	if err := c.store.WriteStatus(cur); err != nil {
 		slog.Error("runtime: write status", "agent", as.agentID, "err", err)
 	}
+	c.touchState(as.agentID)
 }
 
 // writeStatus writes a fully-specified status row.
 func (c *ChatRuntime) writeStatus(as *agentState, st state.Status) error {
-	return c.store.WriteStatus(st)
+	if err := c.store.WriteStatus(st); err != nil {
+		return err
+	}
+	c.touchState(as.agentID)
+	return nil
+}
+
+func (c *ChatRuntime) touchState(agentID string) {
+	c.mu.Lock()
+	touch := c.touch
+	c.mu.Unlock()
+	if touch != nil {
+		touch(agentID)
+	}
 }
 
 // stripEnv returns env without any "KEY=..." entries for the given key.
@@ -505,6 +833,11 @@ func (as *agentState) isStopped() bool {
 	as.mu.Lock()
 	defer as.mu.Unlock()
 	return as.stopped
+}
+
+func sha256sum(s string) []byte {
+	h := sha256.Sum256([]byte(s))
+	return h[:]
 }
 
 // shutdown terminates the process group (SIGTERM→grace→SIGKILL) and cancels the

@@ -22,6 +22,7 @@ type RunningEntry struct {
 	SessionID string    `json:"session_id"`
 	Interface string    `json:"interface"`
 	TTY       string    `json:"tty,omitempty"`
+	HookToken string    `json:"-"`
 	StartedAt time.Time `json:"started_at"`
 }
 
@@ -33,6 +34,55 @@ type Status struct {
 	LastTrace  string     `json:"last_trace,omitempty"`
 	BusySince  *time.Time `json:"busy_since,omitempty"`
 	ContextPct float64    `json:"context_pct"`
+	UpdatedAt  int64      `json:"updated_at"`
+}
+
+// AgentState is the dashboard-ready merge of agent identity, running state, and
+// latest status. Timestamps are strings because this shape is sent directly to
+// the browser over SSE.
+type AgentState struct {
+	AgentID   string `json:"agent_id"`
+	Name      string `json:"name"`
+	Role      string `json:"role"`
+	Project   string `json:"project"`
+	Backend   string `json:"backend"`
+	Model     string `json:"model"`
+	Interface string `json:"interface"`
+	Group     string `json:"group,omitempty"`
+	CreatedAt string `json:"created_at"`
+
+	Running   bool   `json:"running"`
+	PID       int    `json:"pid,omitempty"`
+	SessionID string `json:"session_id,omitempty"`
+	StartedAt string `json:"started_at,omitempty"`
+
+	State      string  `json:"state"`
+	Detail     string  `json:"detail"`
+	LastTrace  string  `json:"last_trace,omitempty"`
+	BusySince  string  `json:"busy_since,omitempty"`
+	ContextPct float64 `json:"context_pct"`
+
+	UpdatedAt int64 `json:"updated_at"`
+}
+
+// AgentStateUpdate is the payload published after Manager recomputes an agent.
+// Normal updates embed AgentState fields; hard deletes publish Removed=true.
+type AgentStateUpdate struct {
+	AgentState
+	Removed bool `json:"removed,omitempty"`
+}
+
+// HookPayload is the POST /api/hook body after token extraction.
+type HookPayload struct {
+	AgentID    string   `json:"agent_id"`
+	Event      string   `json:"event"`
+	State      string   `json:"state,omitempty"`
+	Detail     string   `json:"detail,omitempty"`
+	LastTrace  string   `json:"last_trace,omitempty"`
+	ContextPct *float64 `json:"context_pct,omitempty"`
+	PID        int      `json:"pid,omitempty"`
+	SessionID  string   `json:"session_id,omitempty"`
+	TS         int64    `json:"ts,omitempty"`
 }
 
 // Message is one agent-to-agent mailbox entry.

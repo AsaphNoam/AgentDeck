@@ -8,12 +8,11 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 
 ## Current position
 
-- **Active phase:** 2 — State manager, SSE bus, dashboard card grid — **not started**
-- **Active subphase:** start at Phase 2's first subphase (read `tech/phase-2-*-techspec.md` → `## Subphase plan`)
-- **Spec:** Phase 2 techspec (TBD path under `tech/`)
-- **Last GREEN checkpoint:** `go build ./...` + `go test ./...` (and `-race`) pass @ `impl/phase-1`; real-CLI
-  acceptance PASSED against `claude-code-acp` v0.16.2 (Phase 1 complete)
-- **Branch:** `impl/phase-1` (Phase 1 work; do not commit to `main`). Start Phase 2 on a new branch.
+- **Active phase:** 4 — Persistence: archive, search, resume, file/command tracking
+- **Active subphase:** 4.6 — File/command endpoints, hook capture, archive/read-only UI
+- **Spec:** [`phase-4-persistence-archive.md`](phase-4-persistence-archive.md), [`tech/phase-4-persistence-archive-techspec.md`](tech/phase-4-persistence-archive-techspec.md)
+- **Last GREEN checkpoint:** 4.5 @ `impl/phase-3`: `go build -tags sqlite_fts5 ./...`, `go build ./...`, `go test ./...`
+- **Branch:** `impl/phase-3` (do not commit to `main`; do not push unless asked).
 
 ---
 
@@ -21,8 +20,8 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 
 - [x] Phase 0 — Foundation (data model, file store, server & CLI skeleton) ✅
 - [x] Phase 1 — Core loop (ACP chat runtime, launch, streaming chat) ✅ — verified against real `claude-code-acp` v0.16.2
-- [ ] Phase 2 — State manager, SSE bus, dashboard card grid — **next**, start here
-- [ ] Phase 3 — Config CRUD & onboarding
+- [x] Phase 2 — State manager, SSE bus, dashboard card grid ✅
+- [x] Phase 3 — Config CRUD & onboarding ✅
 - [ ] Phase 4 — Persistence: archive, search, resume, file/command tracking
 - [ ] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications
 - [ ] Phase 6 — Flexibility: terminal runtime, switch-runtime, task groups
@@ -34,11 +33,26 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 ## Active subphase detail
 
-> The ONLY place granular steps live. Phase 1 is complete and collapsed (workflow §5).
-> **Phase 2 has not started** — read its techspec's `## Subphase plan`, expand the first
-> subphase's steps here, branch off `main` (or continue a fresh `impl/phase-2`), and begin.
+> The ONLY place granular steps live.
 
-_(Phase 2 subphases go here once its techspec is opened.)_
+**Phase 3 complete ✅** (3.1–3.6 all green; details in git history).
+
+**Subphase 4.1 ✅** — `internal/transcript` package added: append-only `transcript.ndjson` writer (`Open`/`Append`/`Sync`/`Close`, `O_APPEND`, one JSON record write per event, fsync on `turn_end`/`error`), `session_meta` first record for new logs, max-seq recovery on reopen, `NextSeq()`, and replay reader with `since_seq`, `include_meta`, default meta skip, malformed-line tolerance, and 8 MiB scanner cap. Added additive runtime event types/payloads: `session_meta`, `permission_resolved`. Tests cover append→read, reopen seq continuation, bad middle line, partial trailing line, and >64 KiB line replay. No runtime hot-path wiring yet.
+
+**Subphase 4.2 ✅** — Phase-4 state migration added: `sessions`, `sessions_fts`, `tracked_files`, `tracked_commands`; `state.Open` now also sets `PRAGMA synchronous=NORMAL`. With `-tags sqlite_fts5`, `sessions_fts` is a real FTS5 virtual table; without the tag it degrades to a compatible plain table so the standard checkpoint remains green. Added `internal/index.Indexer` (`UpsertSessionMeta`, `OnEvent`, `OnTurnEnd`) with FTS content accumulation, session rollups, file diff rollups, command tracking/result correlation. Added `index.Reindex(home, db)` and CLI `agentdeck reindex`, which resets derived Phase-4 tables and replays `sessions/{agent_id}/transcript.ndjson`.
+
+**Subphase 4.3 ✅** — Server runtime path now enables persistence via `Registry.SetPersistence(home, transcript.Open, indexer)`. `ChatRuntime.Start` opens `transcript.ndjson`, writes `session_meta`, sets seq from `Writer.NextSeq`, and upserts `sessions`; `emit` appends to raw log before hub/SSE publish and feeds `Indexer.OnEvent`; `turn_end` syncs and calls `OnTurnEnd`; `error` syncs without double-counting turns. `Stop`/crash close the writer. Permission decisions now emit/persist `permission_resolved` (`approve`/`deny`/`timeout`/`auto_approve`). `GET /api/sessions/{id}/transcript` now reads persisted NDJSON with `since_seq` and `include_meta`. Crash-mid-turn server integration asserts delivered text exists in the API response and raw log.
+
+**Subphase 4.4 ✅** — Added `internal/archive.Archive` with listing over `sessions` joined to `running`, `active` filtering, pagination, FTS5 search over `sessions_fts`, snippets, bm25 ordering, and `matched_in` labels. Added `GET /api/archive?q=&limit&offset&active` with validation. Tests cover active/inactive listing, transcript-only hit+snippet, metadata hit, pagination, negative query, and handler envelope.
+
+**Subphase 4.5 ✅** — `ChatRuntime.Resume` (spawn/handshake, best-effort `session/load→session/new`, append-mode transcript reopen, resumed `session_meta` with `resumed_at`, fresh running row + restored `context_pct`). `POST /api/sessions/{id}/resume` (404/409/422 guards; optional backend/model/interface override seam for Phase 6). `Registry.Resume` with nil-sentinel double-resume guard. `state.ReadSession`/`ListInactiveSessions`. `UpsertSessionMeta` `updated_at` max guard. CLI: `agentdeck resume <id>`, `--resume <id>`, `--new`, bare-form single-inactive auto-resume. fakeacp `session/load` handler. Integration tests: happy path (agent_id unchanged, new session_id, prior transcript + resumed_at, monotonic seq after post-resume prompt), 409 already-running, 422 no persisted session, 404 unknown agent. CLI unit tests: `--new` / `--resume` flag parsing.
+
+**Subphase 4.6 — File/command endpoints + hook capture + archive UI (next)**
+- `GET /api/sessions/{id}/files` — list tracked files from `tracked_files` table (top-N by edit count, with `path`, `edits`, `last_edited_at`).
+- `GET /api/sessions/{id}/commands` — list tracked commands from `tracked_commands` table.
+- Hook capture for file/command events: if the hook payload carries `event:"file_edit"` or `event:"command"`, write rows into `tracked_files`/`tracked_commands` via the indexer/state store.
+- Read-only archive UI: route `/archive` in the React app; lists inactive sessions with search, links to `/sessions/{id}` read-only transcript view.
+- Tests: files/commands endpoints return correct rows; archive UI renders and filters (Vitest + MSW). Checkpoint: `go build -tags sqlite_fts5 ./...` and full test suite.
 
 ---
 
@@ -84,13 +98,6 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
   `(cancelled bool, error)`; `ChatRuntime.Cancel` reports `true` only when a turn or pending permission was
   actually interrupted, and `POST /api/sessions/{id}/cancel` returns `{cancelled:false}` for an idle no-op.
   `TestCancelDuringPendingPermission` extended to assert the idle no-op case.
-- 📝 **RECORDED — future-phase Codex findings (Phases 2/3/4).** The remaining review items target code not
-  yet written, so they are recorded as a new **`## 0. Codex review findings`** section at the top of each
-  affected techspec, to be resolved when that phase is built: Phase 2 — `new_message` double-nesting (BLOCKING)
-  + snapshot/subscribe race + missing optimistic-user-bubble renderer; Phase 3 — 409 detail propagation +
-  default role/project preselection; Phase 4 — indexer FTS wipe-on-restart (BLOCKING) + missing
-  `sqlite_fts5` build tag in `Makefile`/`install.sh` (BLOCKING, cross-project) + fresh MCP registration on
-  resume.
 - ✅ **RESOLVED — full real-adapter Appendix A coverage added & PASSED.** The gated acceptance suite
   (`internal/runtime/acceptance_test.go`, `//go:build acceptance`) now has five real-CLI tests, all green
   against `claude-code-acp` v0.16.2 (`go test -tags acceptance ./internal/runtime -run TestRealCLI -v`):
@@ -99,6 +106,9 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
   `TestRealCLICancel` (cancel interrupts an in-flight turn → idle), `TestRealCLIStop` (terminates the
   process group + removes the running row + status `done`). Confirmed real option kinds are
   `allow_once`/`reject_once`/`allow_always` — `selectOption` (§5.3) maps approve/deny correctly.
+- **[R2] UI transcript renderers read the wrong event shape (BLOCKING)** `internal/bus/bus.go:109-112`, `ui/src/api/sse.ts:60-75`, `ui/src/components/chat/renderers/AssistantText.tsx:7-9`, `PermissionPrompt.tsx:8-20`, `ToolCall.tsx:6-8`, `ToolResult.tsx:8-10`, `DiffBlock.tsx:7-8`, `TurnError.tsx:4`. The server sends `new_message.data` as a nested `runtime.Event` with payload under `event.data`; persisted transcript replay returns the same shape. Renderers read payload fields at top level, so assistant text is blank, tool details disappear, and permission decisions POST an empty `tool_call_id`. Fix: normalize once at the UI boundary/store, e.g. `{kind: event.type, seq, ts, ...event.data}`, and apply `permission_resolved` to earlier prompts.
+- **[R3] FTS content can be wiped after server restart/resume (BLOCKING)** `internal/index/indexer.go:15-19`, `internal/index/indexer.go:104-120`, `internal/runtime/chat.go:654-662`. `Indexer.content` is process-local; after restart, the next resumed `turn_end` replaces the durable `sessions_fts` row using only post-restart content. Old transcript phrases become unsearchable until manual `agentdeck reindex`. Fix: seed `ix.content[agent_id]` from existing `sessions_fts.content` before first append/flush for an existing session, or append/merge from DB content during flush.
+- **[R4] Normal build/install path produces an archive search binary without FTS5 (BLOCKING)** `Makefile:35-37`, `install.sh:60-62`, `internal/state/migrate.go:79-110`, `internal/archive/archive.go:107-128`. Phase 4 archive search calls FTS-only `MATCH`, `snippet()`, and `bm25()`, but `make build` and `install.sh` use untagged `go build`; untagged migration creates a plain fallback table, so `GET /api/archive?q=...` fails in the normal installed binary. Fix: build release/install paths with `-tags sqlite_fts5`, or implement a real non-FTS fallback search path.
 
 ## Autonomous decisions (please review)
 
@@ -109,8 +119,8 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 - **`Stop` implemented in 1.3** (spec slots it in 1.4) for test teardown — matches §8.5 exactly; no reversal needed.
 - **Tool `Name` ← ACP `kind`** (fallback `title`, then `"tool"`); §4.3 didn't pin the field. Isolated in
   `acpmap.go::toolName`. Verified against the real adapter (turn streamed cleanly).
-- **Hook token stored in-memory** (`Server.hookTokens`) — no `state.db` column yet. **Phase 2 should
-  persist it** (it owns `POST /api/hook` ingest) and drop the in-memory map.
+- **RESOLVED in 2.2: hook token persisted in `running.hook_token`.** `Server.hookTokens` still exists as
+  Phase 1 launch scaffolding but hook validation now reads the live `running` row, not the map.
 - **Two error-envelope shapes coexist** — new session routes use the §7.7 nested shape; Phase-0 GET routes
   keep flat `{"error":"msg"}` (not migrated, to avoid breaking Phase-0 tests). Migrate later if §7.7 is meant
   to be truly project-wide.
@@ -127,16 +137,88 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
   exposes its own modelIds (`default`/`sonnet`/`haiku`/`opus`) + permission `modes`
   (incl. `bypassPermissions`/`acceptEdits`). Phase 1 doesn't assert the model, so this is fine; a future
   phase wanting real model/mode selection should map our model→adapter modelId in `acpmap.go`/`sessionNewParams`.
+- **Phase 2.1 manager contract:** `state.Manager` wraps the existing Phase 0 `Store`; it does not replace
+  typed CRUD. It emits `AgentStateUpdate` through `StatePublisher`, now implemented by `internal/bus`.
+  `status.updated_at` is migration v2, `running.hook_token` is migration v3, and `Store.WriteStatus` stamps
+  `updated_at` when callers omit it.
+- **Phase 2.1 transcript mirror kept generic.** The spec asked for transcript types in `internal/state/types.go`
+  but Phase 1's concrete normalized event shapes already live in `internal/runtime/event.go`. I added only
+  `state.TranscriptEvent {Kind, Data}` as a storage/UI-facing mirror to avoid duplicating runtime structs.
+  To reverse: replace it with concrete state-owned transcript structs when 2.4/2.6 needs them.
+- **Phase 2.3 kept runtime Hub internally.** The HTTP route `GET /api/sessions/{id}/events` is deleted and
+  transcript deltas now publish as bus `new_message`, but `Runtime.Subscribe`/per-agent `Hub` still exist for
+  runtime tests and local internal compatibility. To reverse: remove the hub API once no tests/internal callers need it.
+- **Phase 2.4 replaced the walkthrough UI source.** The repo had a product-demo React app, not the dashboard shell
+  scaffold described by the spec. I replaced `ui/src` with the Phase 2 shell/stores/SSE foundation and refreshed
+  `internal/server/ui/dist`. To reverse: recover the demo from git history, but it is no longer the Phase 2 target UI.
+- **Phase 4.1 writer API takes optional metadata.** The tech spec pseudo-signature said `Open(home, agentID)` but also
+  requires the writer to create the first `session_meta` record. I implemented `transcript.Open(home, agentID, meta)`
+  so runtime wiring can pass the frozen launch snapshot at creation; `nil` skips meta for tests/recovery cases. To
+  reverse: split this into `Open` + explicit `AppendSessionMeta` before 4.3 runtime wiring.
+- **Phase 4.2 no-tag FTS fallback.** The Phase 4 spec requires SQLite FTS5 with `-tags sqlite_fts5`, but the canonical
+  workflow still requires ordinary `go build ./...` and `go test ./...` to pass. Migration v4 creates a real FTS5
+  virtual table when the tag is enabled and a schema-compatible plain `sessions_fts` table otherwise. Tagged builds/tests
+  cover real `MATCH`; no-tag builds keep state.Open usable. To reverse: make all checkpoints/builds always pass
+  `-tags sqlite_fts5` and remove the fallback branch in `ensureSessionsFTS`.
+- **Phase 4.3 adds full `system_prompt` to new `session_meta` records.** The DB schema requires exact `system_prompt`,
+  but 4.1 initially only modeled `system_prompt_sha`. Runtime wiring now writes `system_prompt` into `session_meta`
+  and `sessions.system_prompt`; reindex of any older raw log without that field leaves the DB column empty. To reverse:
+  remove `SessionMetaData.SystemPrompt` and require runtime Start to upsert the DB snapshot out-of-band.
 
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-28 — **4.5 green.** Full `ChatRuntime.Resume` (spawn+handshake, best-effort `session/load→session/new`, append-mode transcript reopen, resumed `session_meta` with `resumed_at`, restored `context_pct`). `POST /api/sessions/{id}/resume` endpoint + `Registry.Resume` nil-sentinel guard. `state.ReadSession`/`ListInactiveSessions`. `UpsertSessionMeta` max(`updated_at`) guard. CLI: `agentdeck resume`, `--resume`, `--new`, bare-form auto-resume. fakeacp `session/load`. Integration+CLI tests green. Checkpoint: `go build -tags sqlite_fts5 ./...`, `go build ./...`, `go test ./...`.
+- 2026-06-28 — **Review fixes: B1–B4 resolved.** Bus `dropped` race → `atomic.Uint64`; `PermissionPrompt` now awaits POST before collapsing; `UpsertSessionMeta` ON CONFLICT now updates `system_prompt`; all server 500s unified to `writeAPIError`. Full build + tests + FTS5 green.
+- 2026-06-28 — **4.4 green.** Added `internal/archive` list/search queries and `GET /api/archive`
+  handler; FTS5 search covers transcript/content hits, metadata hits, snippets, active filters, pagination,
+  and negative queries. Checkpoint: tagged archive/index tests, tagged build, standard build, full Go tests.
+- 2026-06-28 — **4.3 green.** Wired server runtime persistence: `transcript.ndjson` writer + indexer in
+  `ChatRuntime.Start`/`emit`/`Stop`; persisted `permission_resolved`; transcript endpoint reads raw NDJSON with
+  `since_seq`/`include_meta`; crash-mid-turn integration verifies delivered text survives in the API response and raw log.
+- 2026-06-28 — **4.2 green.** Added Phase-4 state migration (`sessions`, `sessions_fts`,
+  `tracked_files`, `tracked_commands`) plus `synchronous=NORMAL`; added `internal/index.Indexer` for
+  session rollups, FTS content, file rollups, command tracking/result correlation; added `index.Reindex`
+  and CLI `agentdeck reindex`. Tagged FTS tests and standard checkpoint green.
+- 2026-06-28 — **4.1 green.** Added `internal/transcript` raw NDJSON writer/reader with `session_meta`
+  first record, max-seq recovery/`NextSeq`, `since_seq`/`include_meta` replay, malformed-line tolerance,
+  and 8 MiB scanner cap. Added additive `runtime` event types/payloads for `session_meta` and
+  `permission_resolved`. Checkpoint: `go test ./internal/transcript/...`, `go build ./...`, `go test ./...`.
 - 2026-06-28 — **Codex review pass (branch `claude/codex-issue-review-jhrf6m`).** Fixed two implemented-code
   issues with tests (build + `go test ./...` + `-race` green): crash-teardown registry-ownership leak
   (BLOCKING — `chat.go`/`registry.go`, new `registry_crash_test.go`) and idle-cancel no-op reporting
   (`Runtime.Cancel`→`(bool,error)`, `sessions.go`). Recorded the remaining future-phase findings into
   `## 0` sections of the Phase 2/3/4 techspecs (see Review findings above).
+- 2026-06-28 — **Phase 3 COMPLETE / 3.6 green.** `OnboardingGate` + `OnboardingWizard` (3 steps: BackendStep/ProjectStep/LaunchStep); resume-from-step logic; non-dismissible (Esc/overlay blocked); sets `onboarding_complete` on first launch; 26 Vitest+MSW tests; embedded dist refreshed. Checkpoint: all Vitest tests + `go build ./...` + `go test ./...`.
+- 2026-06-28 — **3.5 green.** `BackendsEditor`+`ModelRow` (default radios, masked env editor, cred chip); `useSuggestedName`; `NewAgentModal` (role/project/backend/model, terminal disabled); "New agent" CTA in CardGrid/EmptyState; 20 Vitest+MSW tests; embedded dist refreshed. Checkpoint: all Vitest tests + `go build ./...` + `go test ./...`.
+- 2026-06-28 — **3.4 green.** Zod schemas; TanStack Query hooks; SettingsPage tabs; RolesEditor/RoleForm + ProjectsEditor/ProjectForm (RGB swatch, cwd_not_found); Settings route; 11 Vitest+MSW tests green; embedded dist refreshed. Checkpoint: all Vitest tests + `go build ./...` + `go test ./...`.
+- 2026-06-28 — **3.3 green.** `GET /api/config` with computed onboarding block (min-viable check + ~60s cred-check cache); `PUT /api/config` partial merge; `Config.OnboardingComplete` field; disk-on-demand audit (reads clean, only cred-check cached). Checkpoint: `go build ./...` + `go test ./...`.
+- 2026-06-28 — **3.2 green.** `internal/backend/credcheck/` (claude auth-status + codex /v1/models probers, 6s timeout, CredResult, env merge); `ValidateBackendsConfig` (invariants + auto-promote); `PUT /api/backends` with injected credCheck for tests; all invariant + cred-check tests. Checkpoint: `go build ./...` + `go test ./...`.
+- 2026-06-28 — **3.1 green.** `internal/config/validate.go` (`ValidSlug`, `FieldError`, role/project validators); `POST/PUT/DELETE /api/roles/{role}` + `POST/PUT/DELETE /api/projects/{project}` in `internal/server/config_handlers.go`; in-use guard; `cwd_not_found` warning; disk-on-demand; tests. Checkpoint: `go build ./...` + `go test ./...`.
+- 2026-06-28 — **Phase 2 COMPLETE / 2.6 green.** Added full chat route/panel with live header,
+  transcript renderers (markdown + code highlight, tool/diff/error/permission), prompt send/cancel, Approve/Deny,
+  reconnect transcript refetch, and refreshed embedded UI assets. Checkpoint: `go build ./...` + `go test ./...` +
+  `cd ui && npm test` + `cd ui && npm run build`.
+- 2026-06-28 — **2.5 green.** Added live card grid route with layout load/save, dnd-kit reorder,
+  density control, cards/badges/context meter, empty-state launch, context menu with Open/Rename/Stop and
+  disabled future actions, plus `POST /api/sessions/{id}/rename`. Checkpoint: `go build ./...`,
+  `go test ./...`, `cd ui && npm test`, `cd ui && npm run build`.
+- 2026-06-28 — **2.4 green.** Added `GET/PUT /api/layout` Phase 2 API shape, `GET /api/sessions/{id}/transcript`,
+  retained in-memory runtime transcript events, React Router shell, Zustand stores, SSE singleton, REST/types modules,
+  Vitest store tests, and refreshed embedded UI assets. Checkpoint: `go build ./...`, `go test ./...`, `cd ui && npm test`,
+  `cd ui && npm run build`.
+- 2026-06-28 — **2.3 green.** Added `internal/bus` with global-seq envelopes, snapshot hydration, drop-oldest
+  clients, and state/runtime publishers; replaced per-agent HTTP SSE with `GET /api/events`; runtime now mirrors
+  transcript events as bus `new_message` and touches state manager after status writes. Checkpoint: `go build ./...`,
+  `go test ./...`, `go test -race ./internal/bus`.
+- 2026-06-28 — **2.2 green.** Added `POST /api/hook` with header/body token support and fixed
+  `{error,message}` envelope; persisted hook tokens in `running.hook_token`; added `Manager.ApplyHook`
+  for `running`/`status`/`stopped`; added fsnotify + periodic sessions reconciliation that only corrects
+  stale status rows. Checkpoint: `go build ./...` + `go test ./...`.
+- 2026-06-28 — **2.1 green.** Added `state.Manager`, `AgentState`/`AgentStateUpdate`, migration v2
+  (`status.updated_at`), `busy_timeout=5000`, effective identity+running+status recompute, startup scan,
+  tombstone removal semantics, and focused manager tests. Checkpoint: `go build ./...` + `go test ./...`.
 - 2026-06-28 — **Review fix: full Appendix A real-adapter coverage.** Added 4 gated tests
   (permission deny/approve, cancel, stop) alongside the stream test — all 5 PASS against
   `claude-code-acp` v0.16.2. Real option kinds confirmed (`allow_once`/`reject_once`/`allow_always`).
