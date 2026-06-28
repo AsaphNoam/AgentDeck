@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -122,6 +123,43 @@ FROM sessions WHERE agent_id = 'a_index'`).Scan(&turnCount, &eventCount, &lastSe
 	}
 	if command != "go test ./..." || status != "completed" {
 		t.Fatalf("tracked command = %q/%q", command, status)
+	}
+}
+
+func TestResumeAfterRestartPreservesFTSContent(t *testing.T) {
+	st, _ := openTestDB(t)
+	db := st.DB()
+
+	// First process: index a session and flush a turn. "distinctive quartz
+	// phrase" lands in the durable sessions_fts.content column.
+	indexFixture(t, db)
+	var before string
+	if err := db.QueryRow(`SELECT content FROM sessions_fts WHERE agent_id = 'a_index'`).Scan(&before); err != nil {
+		t.Fatalf("read fts content before restart: %v", err)
+	}
+	if !strings.Contains(before, "distinctive quartz") {
+		t.Fatalf("pre-restart content missing original phrase: %q", before)
+	}
+
+	// Second process (restart/resume): a brand-new Indexer with an empty
+	// in-memory buffer over the same DB. A resumed turn brings new content.
+	ix2 := New(db)
+	if err := ix2.OnEvent("a_index", ev(t, 7, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "post restart marker"})); err != nil {
+		t.Fatalf("OnEvent after restart: %v", err)
+	}
+	if err := ix2.OnTurnEnd("a_index", runtime.TurnRollup{LastSeq: 7, UpdatedAt: "2026-06-28T11:00:00Z"}); err != nil {
+		t.Fatalf("OnTurnEnd after restart: %v", err)
+	}
+
+	var after string
+	if err := db.QueryRow(`SELECT content FROM sessions_fts WHERE agent_id = 'a_index'`).Scan(&after); err != nil {
+		t.Fatalf("read fts content after restart: %v", err)
+	}
+	if !strings.Contains(after, "distinctive quartz") {
+		t.Fatalf("original phrase wiped after resume: %q", after)
+	}
+	if !strings.Contains(after, "post restart marker") {
+		t.Fatalf("new phrase missing after resume: %q", after)
 	}
 }
 
