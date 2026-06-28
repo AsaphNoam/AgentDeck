@@ -313,6 +313,22 @@ body {
   color: var(--badge-error);
 }
 
+.user-message {
+  white-space: pre-wrap;
+  font-weight: 500;
+}
+
+.error-boundary {
+  color: var(--badge-error);
+  padding: 12px 0;
+}
+
+.composer-error {
+  grid-column: 1 / -1;
+  color: var(--badge-error);
+  margin: 0;
+}
+
 .composer {
   display: grid;
   gap: 8px;
