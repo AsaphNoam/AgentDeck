@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/agentdeck/agentdeck/internal/backend/credcheck"
 	"github.com/agentdeck/agentdeck/internal/config"
@@ -462,4 +463,199 @@ func (s *Server) handlePutBackends(w http.ResponseWriter, r *http.Request) {
 		BackendsConfig: body,
 		Credentials:    credentials,
 	})
+}
+
+// ---- Config GET/PUT handlers + onboarding gate ----
+
+// onboardingStep is the per-step status in the GET /api/config onboarding block.
+type onboardingStep struct {
+	Done   bool   `json:"done"`
+	Detail string `json:"detail,omitempty"`
+}
+
+// onboardingBlock is the computed onboarding status returned by GET /api/config.
+type onboardingBlock struct {
+	Satisfied bool `json:"satisfied"`
+	Steps     struct {
+		Backend onboardingStep `json:"backend"`
+		Project onboardingStep `json:"project"`
+		Role    onboardingStep `json:"role"`
+	} `json:"steps"`
+}
+
+// configResponse is the GET /api/config body (config fields + onboarding block).
+type configResponse struct {
+	config.Config
+	Onboarding onboardingBlock `json:"onboarding"`
+}
+
+// computeOnboarding computes the min-viable-config onboarding status.
+// The backend cred-check result is cached for ~60s per §3.6.
+func (s *Server) computeOnboarding(ctx context.Context) onboardingBlock {
+	var ob onboardingBlock
+
+	// Role step: ≥1 role exists.
+	roles, err := s.configStore.ListRoles()
+	if err == nil && len(roles) > 0 {
+		ob.Steps.Role = onboardingStep{Done: true, Detail: fmt.Sprintf("%d roles", len(roles))}
+	} else {
+		ob.Steps.Role = onboardingStep{Done: false, Detail: "no roles defined"}
+	}
+
+	// Project step: ≥1 project exists.
+	projects, err := s.configStore.ListProjects()
+	if err == nil && len(projects) > 0 {
+		ob.Steps.Project = onboardingStep{Done: true, Detail: fmt.Sprintf("%d projects", len(projects))}
+	} else {
+		ob.Steps.Project = onboardingStep{Done: false, Detail: "no projects defined"}
+	}
+
+	// Backend step: backends.json parses, version==2, default backend + model with ok creds.
+	ob.Steps.Backend = s.computeBackendStep(ctx)
+
+	ob.Satisfied = ob.Steps.Backend.Done && ob.Steps.Project.Done && ob.Steps.Role.Done
+	return ob
+}
+
+func (s *Server) computeBackendStep(ctx context.Context) onboardingStep {
+	backends, err := s.configStore.ReadBackends()
+	if err != nil || backends.Version != 2 || len(backends.Backends) == 0 {
+		return onboardingStep{Done: false, Detail: "no valid backends configured"}
+	}
+
+	// Find the default backend.
+	var defaultBK config.Backend
+	var defaultBKID string
+	for id, bk := range backends.Backends {
+		if bk.Default {
+			defaultBK = bk
+			defaultBKID = id
+			break
+		}
+	}
+	if defaultBKID == "" {
+		return onboardingStep{Done: false, Detail: "no default backend set"}
+	}
+	defaultModel, ok := defaultBK.Models[defaultBK.DefaultModel]
+	if !ok {
+		return onboardingStep{Done: false, Detail: "default model not found"}
+	}
+
+	// Check cache.
+	result := s.cachedCredCheck(ctx, defaultBK, defaultModel, defaultBKID)
+	if result.Status == "ok" {
+		return onboardingStep{Done: true, Detail: fmt.Sprintf("%s default model creds ok", defaultBKID)}
+	}
+	detail := result.Detail
+	if detail == "" {
+		detail = result.Status
+	}
+	return onboardingStep{Done: false, Detail: fmt.Sprintf("cred check %s: %s", result.Status, detail)}
+}
+
+// cachedCredCheck returns the cached cred result if still valid, otherwise runs the probe.
+func (s *Server) cachedCredCheck(ctx context.Context, bk config.Backend, model config.Model, backendID string) credcheck.CredResult {
+	s.onboardingCacheMu.Lock()
+	defer s.onboardingCacheMu.Unlock()
+
+	if s.onboardingCache != nil &&
+		s.onboardingCache.backend == backendID &&
+		s.onboardingCache.model == bk.DefaultModel &&
+		time.Now().Before(s.onboardingCache.expires) {
+		return s.onboardingCache.result
+	}
+
+	merged := credcheck.MergeEnv(bk.Env, model.Env)
+	result := s.credCheck(ctx, bk, model, merged)
+	s.onboardingCache = &onboardingCacheEntry{
+		result:  result,
+		backend: backendID,
+		model:   bk.DefaultModel,
+		expires: time.Now().Add(onboardingCacheTTL),
+	}
+	return result
+}
+
+// handleGetConfig implements GET /api/config (§5.4).
+func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
+	cfg, err := s.configStore.ReadConfig()
+	if err != nil {
+		if errors.Is(err, config.ErrNotFound) || errors.Is(err, config.ErrCorrupt) {
+			cfg = config.DefaultConfig()
+		} else {
+			s.log.Error("config: read", "err", err)
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+	}
+
+	ob := s.computeOnboarding(r.Context())
+	// If onboarding_complete is already set, gate is satisfied regardless.
+	if cfg.OnboardingComplete {
+		ob.Satisfied = true
+	}
+
+	writeJSON(w, http.StatusOK, configResponse{Config: cfg, Onboarding: ob})
+}
+
+// configPutBody is the request body for PUT /api/config (§5.5).
+// Only the user-editable subset; version and port are rejected.
+type configPutBody struct {
+	OnboardingComplete *bool   `json:"onboarding_complete"`
+	DefaultProject     *string `json:"default_project"`
+	DefaultRole        *string `json:"default_role"`
+	// Sentinel fields: reject if present.
+	Version *int `json:"version"`
+	Port    *int `json:"port"`
+}
+
+// handlePutConfig implements PUT /api/config partial merge (§5.5).
+func (s *Server) handlePutConfig(w http.ResponseWriter, r *http.Request) {
+	var body configPutBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeValidationError(w, &config.ValidationErrors{Errors: []config.FieldError{
+			{Field: "", Code: "bad_request", Message: "malformed JSON"},
+		}})
+		return
+	}
+	// Reject attempts to change immutable fields.
+	if body.Version != nil || body.Port != nil {
+		writeValidationError(w, &config.ValidationErrors{Errors: []config.FieldError{
+			{Field: "version/port", Code: "immutable", Message: "version and port are not user-editable via PUT /api/config"},
+		}})
+		return
+	}
+
+	cfg, err := s.configStore.ReadConfig()
+	if err != nil {
+		if errors.Is(err, config.ErrNotFound) || errors.Is(err, config.ErrCorrupt) {
+			cfg = config.DefaultConfig()
+		} else {
+			s.log.Error("config: read", "err", err)
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+	}
+
+	// Merge provided fields.
+	if body.OnboardingComplete != nil {
+		cfg.OnboardingComplete = *body.OnboardingComplete
+		// Invalidate the onboarding cred-check cache so the next GET re-evaluates.
+		s.onboardingCacheMu.Lock()
+		s.onboardingCache = nil
+		s.onboardingCacheMu.Unlock()
+	}
+	if body.DefaultProject != nil {
+		cfg.DefaultProject = *body.DefaultProject
+	}
+	if body.DefaultRole != nil {
+		cfg.DefaultRole = *body.DefaultRole
+	}
+
+	if err := s.configStore.WriteConfig(cfg); err != nil {
+		s.log.Error("config: write", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	writeJSON(w, http.StatusOK, cfg)
 }
