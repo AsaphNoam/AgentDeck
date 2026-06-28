@@ -29,8 +29,6 @@ func TestValidSlug(t *testing.T) {
 }
 
 func TestValidateRole(t *testing.T) {
-	boolPtr := func(b bool) *bool { return &b }
-
 	t.Run("valid", func(t *testing.T) {
 		r := Role{Title: "Reviewer", SystemPrompt: "Review code.", SkipPermissions: boolPtr(false)}
 		if ve := ValidateRole("reviewer", r, true); ve != nil {
