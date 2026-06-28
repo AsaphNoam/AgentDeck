@@ -33,6 +33,7 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/sessions/{id}/prompt", s.handlePrompt)
 	api("POST /api/sessions/{id}/cancel", s.handleCancel)
 	api("POST /api/sessions/{id}/stop", s.handleStop)
+	api("POST /api/sessions/{id}/rename", s.handleRename)
 	api("POST /api/sessions/{id}/permission", s.handlePermission)
 
 	// Catch-all for any other /api/* path → 404 JSON (more specific GET routes

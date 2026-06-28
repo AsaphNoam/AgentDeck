@@ -100,6 +100,35 @@ func (s *Server) handlePermission(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleRename(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var body struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeAPIError(w, apiError(runtime.CodeValidation, "invalid JSON body"))
+		return
+	}
+	if strings.TrimSpace(body.Name) == "" {
+		writeAPIError(w, apiError(runtime.CodeValidation, "name is required"))
+		return
+	}
+	agent, err := s.stateStore.ReadAgent(id)
+	if err != nil {
+		writeAPIError(w, apiError(runtime.CodeNotFound, "no such agent: "+id))
+		return
+	}
+	agent.Name = strings.TrimSpace(body.Name)
+	if err := s.stateStore.WriteAgent(agent); err != nil {
+		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
+		return
+	}
+	if _, err := s.stateMgr.Touch(id); err != nil {
+		s.log.Debug("rename state touch failed", "agent", id, "err", err)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"renamed": true, "agent": agent})
+}
+
 // sessionOpError maps a prompt/control error to an APIError (techspec §7.3).
 func sessionOpError(err error) *runtime.APIError {
 	switch {
