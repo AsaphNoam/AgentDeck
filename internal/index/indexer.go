@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/agentdeck/agentdeck/internal/strutil"
 )
 
 type Indexer struct {
@@ -25,7 +26,7 @@ func (ix *Indexer) UpsertSessionMeta(agentID string, meta runtime.SessionMetaDat
 	if agentID == "" {
 		return fmt.Errorf("index: agent id is required")
 	}
-	now := firstNonEmpty(meta.CreatedAt, meta.SessionID)
+	now := strutil.FirstNonEmpty(meta.CreatedAt, meta.SessionID)
 	if now == "" {
 		now = "1970-01-01T00:00:00Z"
 	}
@@ -45,9 +46,10 @@ ON CONFLICT(agent_id) DO UPDATE SET
   interface=excluded.interface,
   grp=excluded.grp,
   cwd=excluded.cwd,
+  system_prompt=excluded.system_prompt,
   env_keys=excluded.env_keys,
   last_session_id=excluded.last_session_id,
-  updated_at=excluded.updated_at`,
+  updated_at=MAX(excluded.updated_at, sessions.updated_at)`,
 		agentID, meta.Name, meta.Role, meta.Project, meta.Backend, meta.Model, meta.Interface,
 		meta.Group, meta.Cwd, meta.SystemPrompt, string(envKeys), meta.SessionID, now, now)
 	if err != nil {
@@ -138,6 +140,8 @@ WHERE agent_id = ?`,
 	return nil
 }
 
+const maxContentBytes = 1 << 20 // 1 MiB per agent
+
 func (ix *Indexer) addContent(agentID, text string) {
 	text = strings.TrimSpace(text)
 	if text == "" {
@@ -145,11 +149,16 @@ func (ix *Indexer) addContent(agentID, text string) {
 	}
 	ix.mu.Lock()
 	defer ix.mu.Unlock()
-	if ix.content[agentID] == "" {
+	cur := ix.content[agentID]
+	if cur == "" {
 		ix.content[agentID] = text
 		return
 	}
-	ix.content[agentID] += "\n" + text
+	combined := cur + "\n" + text
+	if len(combined) > maxContentBytes {
+		combined = combined[len(combined)-maxContentBytes:]
+	}
+	ix.content[agentID] = combined
 }
 
 func replaceFTS(tx *sql.Tx, agentID, content string) error {
@@ -233,7 +242,7 @@ VALUES (?, ?, ?, ?, ?, 'in_progress', '')`, agentID, ev.Seq, ev.Ts, d.ToolCallID
 		if _, err := ix.db.Exec(`
 UPDATE tracked_commands
 SET exit_status = ?, exit_error = ?
-WHERE agent_id = ? AND tool_call_id = ?`, firstNonEmpty(d.Status, "completed"), d.Error, agentID, d.ToolCallID); err != nil {
+WHERE agent_id = ? AND tool_call_id = ?`, strutil.FirstNonEmpty(d.Status, "completed"), d.Error, agentID, d.ToolCallID); err != nil {
 			return fmt.Errorf("index: update command result: %w", err)
 		}
 	case runtime.EvDiff:
@@ -349,11 +358,3 @@ func boolInt(v bool) int {
 	return 0
 }
 
-func firstNonEmpty(vals ...string) string {
-	for _, v := range vals {
-		if v != "" {
-			return v
-		}
-	}
-	return ""
-}

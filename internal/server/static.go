@@ -27,7 +27,7 @@ func (s *Server) staticHandler() http.Handler {
 	if err != nil {
 		s.log.Error("static: embedded UI unavailable", "err", err)
 		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			writeError(w, http.StatusInternalServerError, "ui assets unavailable")
+			writeAPIError(w, apiError("internal", "ui assets unavailable"))
 		})
 	}
 	return spaHandler(sub)

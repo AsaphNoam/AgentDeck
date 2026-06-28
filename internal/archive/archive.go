@@ -3,7 +3,6 @@ package archive
 import (
 	"database/sql"
 	"fmt"
-	"strconv"
 	"strings"
 )
 
@@ -217,9 +216,6 @@ func matchedIn(r Result, q string) []string {
 	if hitContent {
 		out = append(out, "transcript")
 	}
-	if len(out) == 0 {
-		out = append(out, "transcript")
-	}
 	return out
 }
 
@@ -228,9 +224,6 @@ func allContain(haystack string, terms []string) bool {
 		return false
 	}
 	for _, term := range terms {
-		if _, err := strconv.Unquote(`"` + term + `"`); err != nil {
-			return false
-		}
 		if !strings.Contains(haystack, term) {
 			return false
 		}

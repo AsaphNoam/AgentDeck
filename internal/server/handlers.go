@@ -53,13 +53,13 @@ func (s *Server) handleSessions(w http.ResponseWriter, _ *http.Request) {
 	running, err := s.stateStore.ListRunning()
 	if err != nil {
 		s.log.Error("sessions: list running", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
 	agents, err := s.stateStore.ListAgents()
 	if err != nil {
 		s.log.Error("sessions: list agents", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
 	byID := make(map[string]state.Agent, len(agents))
@@ -93,7 +93,7 @@ func (s *Server) handleRoles(w http.ResponseWriter, _ *http.Request) {
 	roles, err := s.configStore.ListRoles()
 	if err != nil {
 		s.log.Error("roles: list", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
 	writeJSON(w, http.StatusOK, roles)
@@ -104,7 +104,7 @@ func (s *Server) handleProjects(w http.ResponseWriter, _ *http.Request) {
 	projects, err := s.configStore.ListProjects()
 	if err != nil {
 		s.log.Error("projects: list", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
 	writeJSON(w, http.StatusOK, projects)
@@ -121,7 +121,7 @@ func (s *Server) handleBackends(w http.ResponseWriter, _ *http.Request) {
 			return
 		}
 		s.log.Error("backends: read", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
 	writeJSON(w, http.StatusOK, b)
@@ -137,7 +137,7 @@ func (s *Server) handleLayout(w http.ResponseWriter, _ *http.Request) {
 			return
 		}
 		s.log.Error("layout: read", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
 	writeJSON(w, http.StatusOK, layoutFromConfig(l))

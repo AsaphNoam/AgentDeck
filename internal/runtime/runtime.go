@@ -25,7 +25,9 @@ type LaunchSpec struct {
 	SkipPerms    bool            // effective skip_permissions after role/global resolution
 	HookToken    string          // per-launch one-time token passed to the agent's hooks
 	MCPServers   []MCPServerSpec // messaging MCP server registration; one entry this phase
-	ExtraArgs    []string        // reserved (e.g. extra adapter flags) — empty this phase
+	ExtraArgs      []string        // reserved (e.g. extra adapter flags) — empty this phase
+	LastSessionID  string          // prior CLI session id; Resume tries session/load with this
+	LastContextPct float64         // last-known context pct; Resume restores it to the status row
 }
 
 // MCPServerSpec is one stdio MCP server the agent should connect to. This phase

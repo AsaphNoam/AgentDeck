@@ -62,6 +62,17 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("state: commit migration: %w", err)
 	}
+
+	// Guard against running an older binary against a schema written by a newer one.
+	// latestKnownMigration must be updated whenever a new migration is added.
+	const latestKnownMigration = 4
+	var maxApplied int
+	if err := db.QueryRow(`SELECT COALESCE(MAX(version), 0) FROM schema_migrations`).Scan(&maxApplied); err != nil {
+		return fmt.Errorf("state: check max migration: %w", err)
+	}
+	if maxApplied > latestKnownMigration {
+		return fmt.Errorf("state: database was created by a newer binary (migration %d > %d known); upgrade agentdeck", maxApplied, latestKnownMigration)
+	}
 	return nil
 }
 

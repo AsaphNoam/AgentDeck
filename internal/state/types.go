@@ -72,14 +72,6 @@ type AgentStateUpdate struct {
 	Removed bool `json:"removed,omitempty"`
 }
 
-// TranscriptEvent is the generic persisted/live transcript shape consumed by
-// later Phase 2 UI and bus work. Runtime-specific normalization lives in
-// internal/runtime; state only needs a storage-friendly mirror.
-type TranscriptEvent struct {
-	Kind string `json:"kind"`
-	Data any    `json:"data,omitempty"`
-}
-
 // HookPayload is the POST /api/hook body after token extraction.
 type HookPayload struct {
 	AgentID    string   `json:"agent_id"`

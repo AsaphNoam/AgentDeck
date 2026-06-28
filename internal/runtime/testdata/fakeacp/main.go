@@ -86,6 +86,9 @@ func handle(msg *rpcMessage) {
 		respond(*msg.ID, map[string]any{"protocolVersion": 1, "agentCapabilities": map[string]any{}})
 	case "session/new":
 		respond(*msg.ID, map[string]any{"sessionId": sessionID})
+	case "session/load":
+		// Simulate successful load by returning a distinct resumed session ID.
+		respond(*msg.ID, map[string]any{"sessionId": "fake-sess-loaded"})
 	case "session/prompt":
 		id := *msg.ID
 		// Run the scenario asynchronously so the read loop keeps handling the
