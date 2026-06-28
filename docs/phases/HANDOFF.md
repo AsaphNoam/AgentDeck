@@ -9,9 +9,9 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 ## Current position
 
 - **Active phase:** 4 — Persistence: archive, search, resume, file/command tracking
-- **Active subphase:** 4.4 — Archive list + FTS5 search API
+- **Active subphase:** 4.5 — Resume (`ChatRuntime.Resume` + endpoint + CLI)
 - **Spec:** [`phase-4-persistence-archive.md`](phase-4-persistence-archive.md), [`tech/phase-4-persistence-archive-techspec.md`](tech/phase-4-persistence-archive-techspec.md)
-- **Last GREEN checkpoint:** 4.3 @ `impl/phase-3`: `go test ./internal/server -run 'TestCrashMidTurnPersistsDeliveredTranscript|TestLaunchPromptPermissionFlow' -v`, `go test -tags sqlite_fts5 ./internal/index/...`, `go build -tags sqlite_fts5 ./...`, `go build ./...`, `go test ./...`
+- **Last GREEN checkpoint:** 4.4 @ `impl/phase-3`: `go test -tags sqlite_fts5 ./internal/archive ./internal/index`, `go build -tags sqlite_fts5 ./...`, `go build ./...`, `go test ./...`
 - **Branch:** `impl/phase-3` (do not commit to `main`; do not push unless asked).
 
 ---
@@ -43,11 +43,13 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 **Subphase 4.3 ✅** — Server runtime path now enables persistence via `Registry.SetPersistence(home, transcript.Open, indexer)`. `ChatRuntime.Start` opens `transcript.ndjson`, writes `session_meta`, sets seq from `Writer.NextSeq`, and upserts `sessions`; `emit` appends to raw log before hub/SSE publish and feeds `Indexer.OnEvent`; `turn_end` syncs and calls `OnTurnEnd`; `error` syncs without double-counting turns. `Stop`/crash close the writer. Permission decisions now emit/persist `permission_resolved` (`approve`/`deny`/`timeout`/`auto_approve`). `GET /api/sessions/{id}/transcript` now reads persisted NDJSON with `since_seq` and `include_meta`. Crash-mid-turn server integration asserts delivered text exists in the API response and raw log.
 
-**Subphase 4.4 — Archive list + FTS5 search API (next)**
-- Add `internal/archive.Archive`: metadata listing joined to `running`, pagination, active filter.
-- Add FTS5 search over `sessions_fts` with sanitized whitespace-AND query, snippets, rank, and `matched_in`.
-- Add `GET /api/archive?q=&limit&offset&active` handler.
-- Tests: active+inactive listing, transcript-only hit with snippet, metadata hit, AND semantics, pagination, negative query, reindex equivalence. Checkpoint: `go build -tags sqlite_fts5 ./...` and full existing tests.
+**Subphase 4.4 ✅** — Added `internal/archive.Archive` with listing over `sessions` joined to `running`, `active` filtering, pagination, FTS5 search over `sessions_fts`, snippets, bm25 ordering, and `matched_in` labels. Added `GET /api/archive?q=&limit&offset&active` with validation. Tests cover active/inactive listing, transcript-only hit+snippet, metadata hit, pagination, negative query, and handler envelope.
+
+**Subphase 4.5 — Resume (`ChatRuntime.Resume` + endpoint + CLI) (next)**
+- Implement real `ChatRuntime.Resume`: spawn/handshake, best-effort `session/load` then `session/new`, reopen same transcript in append mode, append resumed `session_meta`, write fresh `running.session_id`, restore context pct, register handle.
+- Add `POST /api/sessions/{id}/resume` with already-running and missing-persistence checks; optional override seam validated for Phase 6.
+- CLI resume-not-duplicate path (`resume <id>` / `--resume` / `--new`) per spec.
+- Tests: unchanged `agent_id`, fresh `running.session_id`, prior transcript plus new `session_meta`, monotonic seq after prompt, 409 already-running, 422 no persisted session, CLI resume vs `--new`. Checkpoint: `go build -tags sqlite_fts5 ./...` and full existing tests.
 
 ---
 
@@ -163,6 +165,9 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-28 — **4.4 green.** Added `internal/archive` list/search queries and `GET /api/archive`
+  handler; FTS5 search covers transcript/content hits, metadata hits, snippets, active filters, pagination,
+  and negative queries. Checkpoint: tagged archive/index tests, tagged build, standard build, full Go tests.
 - 2026-06-28 — **4.3 green.** Wired server runtime persistence: `transcript.ndjson` writer + indexer in
   `ChatRuntime.Start`/`emit`/`Stop`; persisted `permission_resolved`; transcript endpoint reads raw NDJSON with
   `since_seq`/`include_meta`; crash-mid-turn integration verifies delivered text survives in the API response and raw log.
