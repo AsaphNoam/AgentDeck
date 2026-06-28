@@ -16,10 +16,11 @@ type Indexer struct {
 	db      *sql.DB
 	mu      sync.Mutex
 	content map[string]string
+	seeded  map[string]bool
 }
 
 func New(db *sql.DB) *Indexer {
-	return &Indexer{db: db, content: map[string]string{}}
+	return &Indexer{db: db, content: map[string]string{}, seeded: map[string]bool{}}
 }
 
 func (ix *Indexer) UpsertSessionMeta(agentID string, meta runtime.SessionMetaData) error {
@@ -106,6 +107,7 @@ func (ix *Indexer) flush(agentID string, rollup runtime.TurnRollup, countTurn bo
 		return fmt.Errorf("index: agent id is required")
 	}
 	ix.mu.Lock()
+	ix.seedLocked(agentID)
 	content := ix.content[agentID]
 	ix.mu.Unlock()
 
@@ -149,6 +151,7 @@ func (ix *Indexer) addContent(agentID, text string) {
 	}
 	ix.mu.Lock()
 	defer ix.mu.Unlock()
+	ix.seedLocked(agentID)
 	cur := ix.content[agentID]
 	if cur == "" {
 		ix.content[agentID] = text
@@ -159,6 +162,30 @@ func (ix *Indexer) addContent(agentID, text string) {
 		combined = combined[len(combined)-maxContentBytes:]
 	}
 	ix.content[agentID] = combined
+}
+
+// seedLocked primes the in-memory content buffer for an agent from the durable
+// sessions_fts row the first time it is touched in this process. Without it, a
+// server restart or resume starts with an empty buffer; the next turn_end flush
+// would replaceFTS() with only post-restart content, wiping previously-indexed
+// transcript text until a manual reindex. Caller must hold ix.mu.
+func (ix *Indexer) seedLocked(agentID string) {
+	if ix.seeded[agentID] {
+		return
+	}
+	ix.seeded[agentID] = true
+	if ix.content[agentID] != "" {
+		return
+	}
+	var existing string
+	err := ix.db.QueryRow(`SELECT content FROM sessions_fts WHERE agent_id = ?`, agentID).Scan(&existing)
+	if err != nil {
+		// No prior FTS row (new session) or read error: nothing to seed.
+		return
+	}
+	if existing != "" {
+		ix.content[agentID] = existing
+	}
 }
 
 func replaceFTS(tx *sql.Tx, agentID, content string) error {
