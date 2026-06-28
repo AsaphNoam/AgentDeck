@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import App from "./App";
 import { CardGrid } from "./components/grid/CardGrid";
 import { ChatPanel } from "./components/chat/ChatPanel";
+import { SettingsPage } from "./features/settings/SettingsPage";
 
 export const router = createBrowserRouter([
   {
@@ -10,6 +11,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <CardGrid /> },
       { path: "agent/:id", element: <ChatPanel /> },
+      { path: "settings", element: <SettingsPage /> },
       { path: "*", element: <Navigate to="/" replace /> },
     ],
   },
