@@ -163,6 +163,28 @@ export function usePutConfig() {
   });
 }
 
+// ---- Launch (New Agent) ----
+
+export interface LaunchParams {
+  name?: string;
+  role: string;
+  project: string;
+  backend?: string;
+  model?: string;
+  interface: "chat";
+}
+
+export function useLaunchAgent() {
+  return useMutation({
+    mutationFn: (params: LaunchParams) =>
+      json<{ agent: { agent_id: string; name: string } }>("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params),
+      }),
+  });
+}
+
 // Shared QueryClient for the app (singleton).
 export const queryClient = new QueryClient({
   defaultOptions: {
