@@ -153,3 +153,41 @@ Commits are the recovery anchor across spaced sessions, so the work survives a h
 2. `HANDOFF.md` updated + condensed; `Last GREEN checkpoint` and changelog current.
 3. Committed (if green). Summary to the human of what moved and what's next — and **explicitly list any
    autonomous decisions** (§3) you made, or state plainly that there were none.
+
+---
+
+## 8. Review action (separate from the build loop)
+
+Triggered independently (Claude Code: `/review-phase`; Codex: `"Review the last commit/PR per AGENTS.md"`).
+Reviews the other agent's work — not your own. This is a **read-only action**: no code changes, no commits.
+
+### What to review
+
+Default target: the last merged PR, or if there's no PR, the last commit on the current branch.
+The human may also name a specific commit or range. Get the diff with `git log` / `git show` / `git diff`.
+
+Cross-reference against:
+- **Phase spec adherence** — does the code match the phase PRD and tech spec? Any required deliverable missing or wrong?
+- **Dead code** — exported symbols never referenced, unreachable paths, leftover stubs or TODOs that should be done.
+- **Bad practices** — error swallowing, obvious data races, magic strings, hardcoded paths, missing input validation at system boundaries.
+- **Flagrant bugs** — nil dereference risks, wrong status codes, logic inversions, off-by-ones in critical paths, missing error checks on writes.
+
+### What NOT to chase
+
+- Style nits, naming preferences, formatting.
+- Micro-optimizations ("this could be a map instead of a slice").
+- One-in-a-million edge cases that won't arise in regular personal use.
+- Theoretical issues with no realistic trigger path.
+
+The bar is: **would this cause a real problem during normal usage?**
+
+### Output
+
+Categorize every finding as one of:
+
+- **BLOCKING** — must fix before the next phase starts (spec violation, data-loss risk, crash under normal use).
+- **ADVISORY** — worth fixing but not blocking; next agent should address it when convenient.
+
+Report findings directly to the human. For **BLOCKING** items, also write them to `## Review findings`
+in `HANDOFF.md` so the next build agent sees them before starting.
+If there are no findings, say so plainly. Do not pad the report.

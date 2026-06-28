@@ -7,13 +7,15 @@ import "encoding/json"
 // new backend never changes anything downstream. New types may be added; existing
 // payload fields are append-only (techspec §11).
 const (
-	EvAssistantText     = "assistant_text"
-	EvToolCall          = "tool_call"
-	EvToolResult        = "tool_result"
-	EvDiff              = "diff"
-	EvPermissionRequest = "permission_request"
-	EvTurnEnd           = "turn_end"
-	EvError             = "error"
+	EvAssistantText      = "assistant_text"
+	EvToolCall           = "tool_call"
+	EvToolResult         = "tool_result"
+	EvDiff               = "diff"
+	EvPermissionRequest  = "permission_request"
+	EvPermissionResolved = "permission_resolved"
+	EvSessionMeta        = "session_meta"
+	EvTurnEnd            = "turn_end"
+	EvError              = "error"
 )
 
 // Event is the normalized transcript event emitted to subscribers (techspec §3.1).
@@ -71,6 +73,13 @@ type PermissionRequestData struct {
 	ExpiresAt    string          `json:"expires_at"`    // RFC3339; after this we auto-deny
 }
 
+// PermissionResolvedData records the terminal outcome for a previously emitted
+// permission_request so archived transcripts do not replay dangling gates.
+type PermissionResolvedData struct {
+	ToolCallID string `json:"tool_call_id"`
+	Decision   string `json:"decision"` // "approve" | "deny" | "timeout" | "auto_approve"
+}
+
 // PermOption is one ACP-offered permission option.
 type PermOption struct {
 	OptionID string `json:"option_id"`
@@ -89,4 +98,23 @@ type ErrorData struct {
 	Scope   string `json:"scope"` // "protocol" | "process" | "tool" | "internal"
 	Message string `json:"message"`
 	Fatal   bool   `json:"fatal"` // true => session is dead, Stop has been performed
+}
+
+// SessionMetaData captures the launch/resume snapshot persisted as session_meta
+// records in transcript.ndjson. It intentionally stores env key names only.
+type SessionMetaData struct {
+	Name            string   `json:"name"`
+	Role            string   `json:"role"`
+	Project         string   `json:"project"`
+	Backend         string   `json:"backend"`
+	Model           string   `json:"model"`
+	Interface       string   `json:"interface"`
+	Group           string   `json:"group,omitempty"`
+	Cwd             string   `json:"cwd"`
+	SystemPrompt    string   `json:"system_prompt,omitempty"`
+	SystemPromptSHA string   `json:"system_prompt_sha,omitempty"`
+	EnvKeys         []string `json:"env_keys,omitempty"`
+	CreatedAt       string   `json:"created_at"`
+	ResumedAt       *string  `json:"resumed_at"`
+	SessionID       string   `json:"session_id,omitempty"`
 }
