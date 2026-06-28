@@ -59,7 +59,9 @@ cp -R ui/dist/. "${EMBED_DIR}/"
 
 echo "==> Building ${BINARY} (version ${VERSION}, commit ${COMMIT})"
 mkdir -p bin
-go build -ldflags "${LDFLAGS}" -o "bin/${BINARY}" ./cmd/agentdeck
+# -tags sqlite_fts5 is required: the archive search path uses FTS5 MATCH/snippet/
+# bm25, which error at runtime on the untagged plain-table fallback.
+go build -tags sqlite_fts5 -ldflags "${LDFLAGS}" -o "bin/${BINARY}" ./cmd/agentdeck
 
 # Choose an install dir on PATH, preferring a user-writable location.
 INSTALL_DIR="${INSTALL_DIR:-}"
