@@ -84,6 +84,8 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 
 > Written by the review agent (workflow §8). Remove an entry once fixed and verified green.
 
+- ✅ **RESOLVED — path-param slug validation added to all PUT/DELETE handlers.** `handlePutRole`, `handleDeleteRole`, `handlePutProject`, `handleDeleteProject` now call `config.ValidSlug(id)` before any store call; non-slug ids return `validation_failed` 400. `TestPathTraversalRejected` + `TestPathTraversalEncodedDots` added and green.
+
 - ✅ **RESOLVED — Phase 2.6 committed + review advisories fixed.** 2.6 chat panel is now a committed
   green checkpoint. Fixed alongside it: PermissionPrompt collapses to an Approved/Denied chip after a
   decision (resolved state stored per `tool_call_id`); TranscriptView autoscrolls with a jump-to-latest
