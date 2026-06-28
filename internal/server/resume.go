@@ -43,8 +43,13 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 2. Running row present → 409 conflict (resume is for inactive sessions).
+	// A non-ErrNotFound error means the DB read itself failed; do NOT fall through
+	// (that could resume an already-running agent) — surface it as a 500 instead.
 	if _, err := s.stateStore.ReadRunning(id); err == nil {
 		writeAPIError(w, apiError(runtime.CodeConflict, "agent is already running"))
+		return
+	} else if !errors.Is(err, state.ErrNotFound) {
+		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
 		return
 	}
 
