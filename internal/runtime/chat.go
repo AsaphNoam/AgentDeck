@@ -33,6 +33,8 @@ type ChatRuntime struct {
 
 	mu     sync.Mutex
 	agents map[string]*agentState
+	sink   func(Event)
+	touch  func(string)
 }
 
 // NewChatRuntime constructs the chat runtime bound to the state store, targeting
@@ -50,6 +52,21 @@ func NewChatRuntime(s *state.Store) *ChatRuntime {
 func (c *ChatRuntime) SetCommand(bin string, args ...string) {
 	c.command = bin
 	c.cmdArgs = args
+}
+
+// SetEventSink mirrors normalized runtime events into the Phase 2 bus.
+func (c *ChatRuntime) SetEventSink(sink func(Event)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.sink = sink
+}
+
+// SetStateTouch is called after runtime-owned state.db writes so the dashboard
+// manager can recompute and publish state_update.
+func (c *ChatRuntime) SetStateTouch(touch func(string)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.touch = touch
 }
 
 // agentState is the live, in-memory state for one running agent.
@@ -265,6 +282,7 @@ func (c *ChatRuntime) Stop(ctx context.Context, agentID string) error {
 	if !ok {
 		// Idempotent: ensure no stale rows remain.
 		_ = c.store.DeleteRunning(agentID)
+		c.touchState(agentID)
 		return nil
 	}
 
@@ -278,6 +296,7 @@ func (c *ChatRuntime) Stop(ctx context.Context, agentID string) error {
 	st.State = "done"
 	st.BusySince = nil
 	_ = c.store.WriteStatus(st)
+	c.touchState(agentID)
 	as.hub.Close()
 	return nil
 }
@@ -360,6 +379,7 @@ func (c *ChatRuntime) onTransportClosed(as *agentState) {
 	// never observes a stale running row or busy status.
 	c.updateStatus(as, "error", clip(tail, 120), "Error", clearBusySince)
 	_ = c.store.DeleteRunning(as.agentID)
+	c.touchState(as.agentID)
 	c.removeAgent(as.agentID)
 
 	c.emit(as, EvTurnEnd, TurnEndData{StopReason: "error", ContextPct: as.lastPct()})
@@ -385,13 +405,20 @@ func (c *ChatRuntime) emit(as *agentState, typ string, data any) {
 	seq := as.seq
 	as.mu.Unlock()
 
-	as.hub.Publish(Event{
+	ev := Event{
 		AgentID: as.agentID,
 		Seq:     seq,
 		Type:    typ,
 		Data:    raw,
 		Ts:      time.Now().UTC().Format(time.RFC3339),
-	})
+	}
+	as.hub.Publish(ev)
+	c.mu.Lock()
+	sink := c.sink
+	c.mu.Unlock()
+	if sink != nil {
+		sink(ev)
+	}
 }
 
 // applyEventStatus writes the §4.4 status transition implied by a streamed event.
@@ -445,11 +472,25 @@ func (c *ChatRuntime) updateStatus(as *agentState, st, detail, trace string, mod
 	if err := c.store.WriteStatus(cur); err != nil {
 		slog.Error("runtime: write status", "agent", as.agentID, "err", err)
 	}
+	c.touchState(as.agentID)
 }
 
 // writeStatus writes a fully-specified status row.
 func (c *ChatRuntime) writeStatus(as *agentState, st state.Status) error {
-	return c.store.WriteStatus(st)
+	if err := c.store.WriteStatus(st); err != nil {
+		return err
+	}
+	c.touchState(as.agentID)
+	return nil
+}
+
+func (c *ChatRuntime) touchState(agentID string) {
+	c.mu.Lock()
+	touch := c.touch
+	c.mu.Unlock()
+	if touch != nil {
+		touch(agentID)
+	}
 }
 
 // stripEnv returns env without any "KEY=..." entries for the given key.

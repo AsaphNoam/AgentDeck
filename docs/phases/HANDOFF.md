@@ -9,9 +9,9 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 ## Current position
 
 - **Active phase:** 2 — State manager, SSE bus, dashboard card grid — **in progress**
-- **Active subphase:** 2.3 — SSE event bus + `GET /api/events` + runtime re-point
+- **Active subphase:** 2.4 — Layout + transcript-refetch endpoints; React shell + store + SSE client
 - **Spec:** [`tech/phase-2-state-dashboard-techspec.md`](tech/phase-2-state-dashboard-techspec.md)
-- **Last GREEN checkpoint:** Subphase 2.2 @ `impl/phase-2`: `go build ./...` + `go test ./...`
+- **Last GREEN checkpoint:** Subphase 2.3 @ `impl/phase-2`: `go build ./...` + `go test ./...` + `go test -race ./internal/bus`
 - **Branch:** `impl/phase-2` (do not commit to `main`; do not push unless asked).
 
 ---
@@ -20,7 +20,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 
 - [x] Phase 0 — Foundation (data model, file store, server & CLI skeleton) ✅
 - [x] Phase 1 — Core loop (ACP chat runtime, launch, streaming chat) ✅ — verified against real `claude-code-acp` v0.16.2
-- [ ] Phase 2 — State manager, SSE bus, dashboard card grid — **2.1 ✅; 2.2 ✅; 2.3 next**
+- [ ] Phase 2 — State manager, SSE bus, dashboard card grid — **2.1 ✅; 2.2 ✅; 2.3 ✅; 2.4 next**
 - [ ] Phase 3 — Config CRUD & onboarding
 - [ ] Phase 4 — Persistence: archive, search, resume, file/command tracking
 - [ ] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications
@@ -39,14 +39,15 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 **Subphase 2.2 — `POST /api/hook` ingest + reconciliation sweep ✅**
 
-**Subphase 2.3 — SSE event bus + `GET /api/events` + runtime re-point**
+**Subphase 2.3 — SSE event bus + `GET /api/events` + runtime re-point ✅**
 
-- [ ] Add `internal/bus` with `Event`, `Bus`, clients, `bufSize=256`, global seq, snapshot map, and drop-oldest publish.
-- [ ] Add `GET /api/events`: SSE headers, `retry:2000`, hydration burst, `__hydrated__` marker, live frames, 10s ping, disconnect cleanup.
-- [ ] Wire `state.Manager` publisher to the real bus and keep snapshot current.
-- [ ] Re-point runtime transcript deltas from per-agent SSE/hub to multiplexed `new_message` events on the bus.
-- [ ] Delete `GET /api/sessions/{id}/events` and remove any remaining callers.
-- [ ] Tests: bus ordering/drop-oldest + race, SSE hydration/publish/ping httptest, existing suites green; manual `curl -N /api/events` sanity if running locally.
+**Subphase 2.4 — Layout + transcript-refetch endpoints; React shell + store + SSE client**
+
+- [ ] Backend: add `GET/PUT /api/layout` Phase 2 shape/validation/atomic write (existing Phase 0 `GET /api/layout` is read-only/default-only).
+- [ ] Backend: add `GET /api/sessions/{id}/transcript` returning in-memory retained runtime events, empty if none, 404 for unknown agent.
+- [ ] Frontend: scaffold `ui/` Vite + React 18.3 + TS with proxy to `:4317`, routes (`/`, `/agent/:id`, fallback), shell, tokens/global CSS.
+- [ ] Add `api/types.ts`, Zustand stores (`agentStore`, `transcriptStore`, `uiStore`), REST client wrappers, and singleton EventSource SSE client with hydration/watchdog/reconnect dispatch.
+- [ ] Tests: Go endpoint tests; `cd ui && npm run build`; Vitest store tests for apply/hydrate/transcript concat; `go build ./...` + `go test ./...` green.
 
 ---
 
@@ -118,18 +119,25 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
   (incl. `bypassPermissions`/`acceptEdits`). Phase 1 doesn't assert the model, so this is fine; a future
   phase wanting real model/mode selection should map our model→adapter modelId in `acpmap.go`/`sessionNewParams`.
 - **Phase 2.1 manager contract:** `state.Manager` wraps the existing Phase 0 `Store`; it does not replace
-  typed CRUD. It emits `AgentStateUpdate` through `StatePublisher`, a small interface intended for the
-  Phase 2.3 bus. `status.updated_at` is migration v2, `running.hook_token` is migration v3, and
-  `Store.WriteStatus` stamps `updated_at` when callers omit it.
+  typed CRUD. It emits `AgentStateUpdate` through `StatePublisher`, now implemented by `internal/bus`.
+  `status.updated_at` is migration v2, `running.hook_token` is migration v3, and `Store.WriteStatus` stamps
+  `updated_at` when callers omit it.
 - **Phase 2.1 transcript mirror kept generic.** The spec asked for transcript types in `internal/state/types.go`
   but Phase 1's concrete normalized event shapes already live in `internal/runtime/event.go`. I added only
   `state.TranscriptEvent {Kind, Data}` as a storage/UI-facing mirror to avoid duplicating runtime structs.
   To reverse: replace it with concrete state-owned transcript structs when 2.4/2.6 needs them.
+- **Phase 2.3 kept runtime Hub internally.** The HTTP route `GET /api/sessions/{id}/events` is deleted and
+  transcript deltas now publish as bus `new_message`, but `Runtime.Subscribe`/per-agent `Hub` still exist for
+  runtime tests and local internal compatibility. To reverse: remove the hub API once no tests/internal callers need it.
 
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-28 — **2.3 green.** Added `internal/bus` with global-seq envelopes, snapshot hydration, drop-oldest
+  clients, and state/runtime publishers; replaced per-agent HTTP SSE with `GET /api/events`; runtime now mirrors
+  transcript events as bus `new_message` and touches state manager after status writes. Checkpoint: `go build ./...`,
+  `go test ./...`, `go test -race ./internal/bus`.
 - 2026-06-28 — **2.2 green.** Added `POST /api/hook` with header/body token support and fixed
   `{error,message}` envelope; persisted hook tokens in `running.hook_token`; added `Manager.ApplyHook`
   for `running`/`status`/`stopped`; added fsnotify + periodic sessions reconciliation that only corrects

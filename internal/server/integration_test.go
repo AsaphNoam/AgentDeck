@@ -97,11 +97,17 @@ func waitForEventType(t *testing.T, frames <-chan sseFrame, typ string) runtime.
 			if !ok {
 				t.Fatalf("SSE closed before %q", typ)
 			}
-			if f.event != "message" {
+			if f.event != "new_message" {
+				continue
+			}
+			var env struct {
+				Data json.RawMessage `json:"data"`
+			}
+			if err := json.Unmarshal(f.data, &env); err != nil {
 				continue
 			}
 			var ev runtime.Event
-			if err := json.Unmarshal(f.data, &ev); err != nil {
+			if err := json.Unmarshal(env.Data, &ev); err != nil {
 				continue
 			}
 			if ev.Type == typ {
@@ -143,7 +149,7 @@ func post(t *testing.T, url string, body any) (*http.Response, []byte) {
 }
 
 // TestLaunchPromptPermissionFlow drives the full HTTP surface against the fake
-// CLI: POST /sessions → /events → prompt → permission_request → permission
+// CLI: POST /sessions → /api/events → prompt → permission_request → permission
 // approve → sentinel created → turn_end (techspec §10.3, Appendix A).
 func TestLaunchPromptPermissionFlow(t *testing.T) {
 	fake := buildFakeACP(t)
@@ -184,7 +190,7 @@ func TestLaunchPromptPermissionFlow(t *testing.T) {
 	// subscribed before prompting.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	frames := streamSSE(t, ctx, ts.URL+"/api/sessions/"+agentID+"/events")
+	frames := streamSSE(t, ctx, ts.URL+"/api/events")
 	select {
 	case f := <-frames:
 		if f.event != "state_update" {
