@@ -177,6 +177,26 @@ func TestPutLayoutValidatesAndPersists(t *testing.T) {
 	}
 }
 
+func TestRenameSession(t *testing.T) {
+	srv := testServer(t, true)
+	agentID := seedHookAgent(t, srv)
+	h := srv.routes()
+	req := httptest.NewRequest(http.MethodPost, "/api/sessions/"+agentID+"/rename", bytes.NewBufferString(`{"name":"Vega"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("rename status = %d body=%s, want 200", rec.Code, rec.Body.String())
+	}
+	agent, err := srv.stateStore.ReadAgent(agentID)
+	if err != nil {
+		t.Fatalf("ReadAgent: %v", err)
+	}
+	if agent.Name != "Vega" {
+		t.Fatalf("agent name = %q, want Vega", agent.Name)
+	}
+}
+
 func TestBackendsCorruptFallsBackTo200(t *testing.T) {
 	srv := testServer(t, true)
 	// Overwrite backends.json with garbage.

@@ -9,9 +9,9 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 ## Current position
 
 - **Active phase:** 2 — State manager, SSE bus, dashboard card grid — **in progress**
-- **Active subphase:** 2.5 — Card grid (F1) + drag-reorder + density + context menu
+- **Active subphase:** 2.6 — Chat panel (F3, full)
 - **Spec:** [`tech/phase-2-state-dashboard-techspec.md`](tech/phase-2-state-dashboard-techspec.md)
-- **Last GREEN checkpoint:** Subphase 2.4 @ `impl/phase-2`: `go build ./...` + `go test ./...` + `cd ui && npm test` + `cd ui && npm run build`
+- **Last GREEN checkpoint:** Subphase 2.5 @ `impl/phase-2`: `go build ./...` + `go test ./...` + `cd ui && npm test` + `cd ui && npm run build`
 - **Branch:** `impl/phase-2` (do not commit to `main`; do not push unless asked).
 
 ---
@@ -20,7 +20,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 
 - [x] Phase 0 — Foundation (data model, file store, server & CLI skeleton) ✅
 - [x] Phase 1 — Core loop (ACP chat runtime, launch, streaming chat) ✅ — verified against real `claude-code-acp` v0.16.2
-- [ ] Phase 2 — State manager, SSE bus, dashboard card grid — **2.1 ✅; 2.2 ✅; 2.3 ✅; 2.4 ✅; 2.5 next**
+- [ ] Phase 2 — State manager, SSE bus, dashboard card grid — **2.1 ✅; 2.2 ✅; 2.3 ✅; 2.4 ✅; 2.5 ✅; 2.6 next**
 - [ ] Phase 3 — Config CRUD & onboarding
 - [ ] Phase 4 — Persistence: archive, search, resume, file/command tracking
 - [ ] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications
@@ -43,14 +43,16 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 **Subphase 2.4 — Layout + transcript-refetch endpoints; React shell + store + SSE client ✅**
 
-**Subphase 2.5 — Card grid (F1) + drag-reorder + density + context menu**
+**Subphase 2.5 — Card grid (F1) + drag-reorder + density + context menu ✅**
 
-- [ ] Build `components/grid/`: `CardGrid`, `AgentCard`, `StateBadge`, `ContextBar`, `EmptyState`, `DensityControl`, `CardContextMenu`.
-- [ ] Load/save layout via `GET/PUT /api/layout`; debounce saves; append new agents not yet in order.
-- [ ] Add drag-reorder (`@dnd-kit/core` + `@dnd-kit/sortable`) and install deps if needed.
-- [ ] Render card fields: name, role/project, backend/model, state badge, context bar, last-output line from `detail` with transcript fallback, stopped dimming.
-- [ ] Context menu: wired Open chat/Rename/Stop; disabled Switch runtime/Clone/Move with phase tooltips.
-- [ ] Tests/build: component/store tests for badge/context/card/menu and SSE hydration rendering; `cd ui && npm test`; `cd ui && npm run build`; `go build ./...` + `go test ./...` green.
+**Subphase 2.6 — Chat panel (F3, full)**
+
+- [ ] Build `components/chat/`: `ChatPanel`, `ChatHeader`, `TranscriptView`, renderers (`AssistantText`, `ToolCall`, `ToolResult`, `DiffBlock`, `PermissionPrompt`, `TurnError`), `Composer`.
+- [ ] Wire `/agent/:id` route to real chat panel; header shows live agent/model/context and back nav.
+- [ ] Composer: send prompt (`POST /prompt`), optimistic user bubble, disable while busy; cancel (`POST /cancel`).
+- [ ] Permission prompts: inline Approve/Deny to `POST /permission`, clear pending state.
+- [ ] Reconnect repaint: open chat sets active agent for SSE client and refetches `GET /transcript`.
+- [ ] Tests/build: permission endpoint call, assistant delta concatenation in rendered view, composer re-enable on turn_end; `cd ui && npm test`; `cd ui && npm run build`; `go build ./...` + `go test ./...` green.
 
 ---
 
@@ -140,6 +142,10 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-28 — **2.5 green.** Added live card grid route with layout load/save, dnd-kit reorder,
+  density control, cards/badges/context meter, empty-state launch, context menu with Open/Rename/Stop and
+  disabled future actions, plus `POST /api/sessions/{id}/rename`. Checkpoint: `go build ./...`,
+  `go test ./...`, `cd ui && npm test`, `cd ui && npm run build`.
 - 2026-06-28 — **2.4 green.** Added `GET/PUT /api/layout` Phase 2 API shape, `GET /api/sessions/{id}/transcript`,
   retained in-memory runtime transcript events, React Router shell, Zustand stores, SSE singleton, REST/types modules,
   Vitest store tests, and refreshed embedded UI assets. Checkpoint: `go build ./...`, `go test ./...`, `cd ui && npm test`,
