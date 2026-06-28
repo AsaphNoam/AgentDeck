@@ -31,6 +31,12 @@ type ChatRuntime struct {
 	command string   // adapter binary (injectable for tests)
 	cmdArgs []string // adapter args
 
+	// onExit notifies the owner (the Registry) that an agent's live handle is
+	// gone after an unsolicited teardown (crash). Without it, Registry.rtByAgent
+	// keeps stale ownership and blocks relaunch/resume until a manual Stop. Nil
+	// when the runtime is constructed standalone (tests). See registry.go.
+	onExit func(agentID string)
+
 	mu     sync.Mutex
 	agents map[string]*agentState
 }
@@ -361,6 +367,13 @@ func (c *ChatRuntime) onTransportClosed(as *agentState) {
 	c.updateStatus(as, "error", clip(tail, 120), "Error", clearBusySince)
 	_ = c.store.DeleteRunning(as.agentID)
 	c.removeAgent(as.agentID)
+	// Tell the Registry the handle is gone so it drops ownership; otherwise a
+	// relaunch/resume on this agent_id is rejected with ErrAlreadyStarted while
+	// the runtime has no handle to serve it (techspec §8.2). Done before the
+	// turn_end emit so a client reacting to turn_end can immediately relaunch.
+	if c.onExit != nil {
+		c.onExit(as.agentID)
+	}
 
 	c.emit(as, EvTurnEnd, TurnEndData{StopReason: "error", ContextPct: as.lastPct()})
 	as.cancel()

@@ -61,9 +61,10 @@ type Runtime interface {
 	// and returns; transcript events stream asynchronously via the agent's hub.
 	SendPrompt(ctx context.Context, agentID, text string) error
 
-	// Cancel interrupts the in-progress turn (ACP cancel). Safe to call when idle
-	// (no-op). Does not stop the process.
-	Cancel(ctx context.Context, agentID string) error
+	// Cancel interrupts the in-progress turn (ACP cancel). Safe to call when idle:
+	// it is then a no-op and reports false. The bool is true when a turn or a
+	// pending permission was actually interrupted. Does not stop the process.
+	Cancel(ctx context.Context, agentID string) (bool, error)
 
 	// Stop terminates the process group, removes the running row from state.db,
 	// and sets the status row's state. Idempotent.

@@ -33,7 +33,8 @@ func (s *Server) handlePrompt(w http.ResponseWriter, r *http.Request) {
 // handleCancel implements POST /api/sessions/{id}/cancel (techspec §7.4).
 func (s *Server) handleCancel(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if err := s.registry.Cancel(r.Context(), id); err != nil {
+	cancelled, err := s.registry.Cancel(r.Context(), id)
+	if err != nil {
 		if errors.Is(err, runtime.ErrNoHandle) {
 			writeAPIError(w, apiError(runtime.CodeNotFound, "no such agent: "+id))
 			return
@@ -41,7 +42,8 @@ func (s *Server) handleCancel(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
 		return
 	}
-	writeJSON(w, http.StatusAccepted, map[string]any{"cancelled": true})
+	// false = the agent was idle, so the cancel was a no-op (techspec §7.4).
+	writeJSON(w, http.StatusAccepted, map[string]any{"cancelled": cancelled})
 }
 
 // handleStop implements POST /api/sessions/{id}/stop (techspec §7.5).
