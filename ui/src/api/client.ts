@@ -41,3 +41,23 @@ export function renameAgent(agentId: string, name: string) {
 export function stopAgent(agentId: string) {
   return json<unknown>(`/api/sessions/${agentId}/stop`, { method: "POST" });
 }
+
+export function sendPrompt(agentId: string, text: string) {
+  return json<unknown>(`/api/sessions/${agentId}/prompt`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+}
+
+export function cancelTurn(agentId: string) {
+  return json<unknown>(`/api/sessions/${agentId}/cancel`, { method: "POST" });
+}
+
+export function decidePermission(agentId: string, toolCallId: string, decision: "approve" | "deny") {
+  return json<unknown>(`/api/sessions/${agentId}/permission`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tool_call_id: toolCallId, decision }),
+  });
+}

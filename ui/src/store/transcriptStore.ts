@@ -6,7 +6,7 @@ interface TranscriptStoreState {
   pending: Record<string, TranscriptEvent | null>;
   appendMessage: (agentId: string, event: TranscriptEvent) => void;
   setTranscript: (agentId: string, events: TranscriptEvent[]) => void;
-  resolvePermission: (agentId: string, toolCallId: string) => void;
+  resolvePermission: (agentId: string, toolCallId: string, decision: "approve" | "deny") => void;
 }
 
 function kindOf(event: TranscriptEvent) {
@@ -41,5 +41,16 @@ export const useTranscriptStore = create<TranscriptStoreState>((set) => ({
       };
     }),
   setTranscript: (agentId, events) => set((state) => ({ byAgent: { ...state.byAgent, [agentId]: events } })),
-  resolvePermission: (agentId) => set((state) => ({ pending: { ...state.pending, [agentId]: null } })),
+  resolvePermission: (agentId, toolCallId, decision) =>
+    set((state) => {
+      const events = (state.byAgent[agentId] ?? []).map((event) =>
+        kindOf(event) === "permission_request" && String(event.tool_call_id ?? "") === toolCallId
+          ? { ...event, resolved: decision }
+          : event,
+      );
+      return {
+        byAgent: { ...state.byAgent, [agentId]: events },
+        pending: { ...state.pending, [agentId]: null },
+      };
+    }),
 }));

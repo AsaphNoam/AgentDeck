@@ -8,11 +8,11 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 
 ## Current position
 
-- **Active phase:** 2 — State manager, SSE bus, dashboard card grid — **in progress**
-- **Active subphase:** 2.6 — Chat panel (F3, full)
-- **Spec:** [`tech/phase-2-state-dashboard-techspec.md`](tech/phase-2-state-dashboard-techspec.md)
-- **Last GREEN checkpoint:** Subphase 2.5 @ `impl/phase-2`: `go build ./...` + `go test ./...` + `cd ui && npm test` + `cd ui && npm run build`
-- **Branch:** `impl/phase-2` (do not commit to `main`; do not push unless asked).
+- **Active phase:** 3 — Config CRUD & onboarding — **next**
+- **Active subphase:** 3.1 — Validators + Roles & Projects write paths
+- **Spec:** [`tech/phase-3-config-onboarding-techspec.md`](tech/phase-3-config-onboarding-techspec.md)
+- **Last GREEN checkpoint:** Phase 2 complete @ `impl/phase-2`: `go build ./...` + `go test ./...` + `cd ui && npm test` + `cd ui && npm run build`
+- **Branch:** current work is on `impl/phase-2`; start Phase 3 from a fresh `impl/phase-3` branch (do not commit to `main`; do not push unless asked).
 
 ---
 
@@ -20,8 +20,8 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 
 - [x] Phase 0 — Foundation (data model, file store, server & CLI skeleton) ✅
 - [x] Phase 1 — Core loop (ACP chat runtime, launch, streaming chat) ✅ — verified against real `claude-code-acp` v0.16.2
-- [ ] Phase 2 — State manager, SSE bus, dashboard card grid — **2.1 ✅; 2.2 ✅; 2.3 ✅; 2.4 ✅; 2.5 ✅; 2.6 next**
-- [ ] Phase 3 — Config CRUD & onboarding
+- [x] Phase 2 — State manager, SSE bus, dashboard card grid ✅
+- [ ] Phase 3 — Config CRUD & onboarding — **start at 3.1**
 - [ ] Phase 4 — Persistence: archive, search, resume, file/command tracking
 - [ ] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications
 - [ ] Phase 6 — Flexibility: terminal runtime, switch-runtime, task groups
@@ -35,24 +35,15 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 > The ONLY place granular steps live.
 
-**Subphase 2.1 — State manager + SQLite store ✅**
+**Phase 2 complete ✅** (2.1–2.6 green; details in git history).
 
-**Subphase 2.2 — `POST /api/hook` ingest + reconciliation sweep ✅**
+**Subphase 3.1 — Validators + Roles & Projects write paths**
 
-**Subphase 2.3 — SSE event bus + `GET /api/events` + runtime re-point ✅**
-
-**Subphase 2.4 — Layout + transcript-refetch endpoints; React shell + store + SSE client ✅**
-
-**Subphase 2.5 — Card grid (F1) + drag-reorder + density + context menu ✅**
-
-**Subphase 2.6 — Chat panel (F3, full)**
-
-- [ ] Build `components/chat/`: `ChatPanel`, `ChatHeader`, `TranscriptView`, renderers (`AssistantText`, `ToolCall`, `ToolResult`, `DiffBlock`, `PermissionPrompt`, `TurnError`), `Composer`.
-- [ ] Wire `/agent/:id` route to real chat panel; header shows live agent/model/context and back nav.
-- [ ] Composer: send prompt (`POST /prompt`), optimistic user bubble, disable while busy; cancel (`POST /cancel`).
-- [ ] Permission prompts: inline Approve/Deny to `POST /permission`, clear pending state.
-- [ ] Reconnect repaint: open chat sets active agent for SSE client and refetches `GET /transcript`.
-- [ ] Tests/build: permission endpoint call, assistant delta concatenation in rendered view, composer re-enable on turn_end; `cd ui && npm test`; `cd ui && npm run build`; `go build ./...` + `go test ./...` green.
+- [ ] Add `internal/config/validate.go`: `ValidSlug`, `FieldError`, role/project validators.
+- [ ] Add `POST/PUT/DELETE /api/roles[/{role}]` with validation and in-use guard against live `running` rows.
+- [ ] Add `POST/PUT/DELETE /api/projects[/{project}]` with validation, non-blocking `cwd_not_found` warning, and in-use guard.
+- [ ] Ensure config reads hit disk per request and use the shared `validation_failed` error shape from Phase 3 spec §5.6.
+- [ ] Tests: validators plus roles/projects POST→GET→PUT→DELETE, validation failure, and in-use guard; `go build ./...` + `go test ./...` green.
 
 ---
 
@@ -86,6 +77,13 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 ## Review findings (BLOCKING items from the last review)
 
 > Written by the review agent (workflow §8). Remove an entry once fixed and verified green.
+
+- ✅ **RESOLVED — Phase 2.6 committed + review advisories fixed.** 2.6 chat panel is now a committed
+  green checkpoint. Fixed alongside it: PermissionPrompt collapses to an Approved/Denied chip after a
+  decision (resolved state stored per `tool_call_id`); TranscriptView autoscrolls with a jump-to-latest
+  affordance; CardContextMenu closes on click-outside/Escape; `resolvePermission` now uses its
+  `toolCallId`; CardGrid skips the layout PUT on initial load; and `ToolCall`/`ToolResult`/`TurnError`
+  renderers added (collapsible args, truncated results). Embedded `internal/server/ui/dist` re-synced.
 
 - ✅ **RESOLVED — full real-adapter Appendix A coverage added & PASSED.** The gated acceptance suite
   (`internal/runtime/acceptance_test.go`, `//go:build acceptance`) now has five real-CLI tests, all green
@@ -142,6 +140,10 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-28 — **Phase 2 COMPLETE / 2.6 green.** Added full chat route/panel with live header,
+  transcript renderers (markdown + code highlight, tool/diff/error/permission), prompt send/cancel, Approve/Deny,
+  reconnect transcript refetch, and refreshed embedded UI assets. Checkpoint: `go build ./...` + `go test ./...` +
+  `cd ui && npm test` + `cd ui && npm run build`.
 - 2026-06-28 — **2.5 green.** Added live card grid route with layout load/save, dnd-kit reorder,
   density control, cards/badges/context meter, empty-state launch, context menu with Open/Rename/Stop and
   disabled future actions, plus `POST /api/sessions/{id}/rename`. Checkpoint: `go build ./...`,
