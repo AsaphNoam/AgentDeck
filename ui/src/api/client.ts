@@ -21,3 +21,23 @@ export function putLayout(layout: Layout) {
 export function getTranscript(agentId: string) {
   return json<{ agent_id: string; events: TranscriptEvent[] }>(`/api/sessions/${agentId}/transcript`);
 }
+
+export function launchDefaultAgent() {
+  return json<unknown>("/api/sessions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role: "implementer", project: "my-app", interface: "chat" }),
+  });
+}
+
+export function renameAgent(agentId: string, name: string) {
+  return json<unknown>(`/api/sessions/${agentId}/rename`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+}
+
+export function stopAgent(agentId: string) {
+  return json<unknown>(`/api/sessions/${agentId}/stop`, { method: "POST" });
+}

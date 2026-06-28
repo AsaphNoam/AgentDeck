@@ -60,3 +60,166 @@ body {
 .connection-dot.down {
   background: var(--badge-error);
 }
+
+.grid-toolbar,
+.agent-card-top {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.grid-toolbar {
+  margin-bottom: 16px;
+}
+
+.grid-toolbar h1 {
+  font-size: 24px;
+  margin: 0;
+}
+
+.density-control {
+  display: flex;
+  gap: 12px;
+}
+
+.density-control label {
+  color: var(--muted);
+  display: grid;
+  font-size: 12px;
+  gap: 4px;
+}
+
+.density-control input {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px;
+  width: 72px;
+}
+
+.card-grid {
+  display: grid;
+}
+
+.agent-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  min-height: 168px;
+  padding: 14px;
+}
+
+.agent-card.dragging {
+  opacity: 0.7;
+}
+
+.agent-card.stopped {
+  opacity: 0.62;
+}
+
+.agent-card strong,
+.agent-subtitle,
+.agent-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-subtitle,
+.agent-preview,
+.stopped-label {
+  color: var(--muted);
+}
+
+.model-pill {
+  background: #eef2f7;
+  border-radius: 6px;
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  margin: 8px 0;
+  padding: 4px 6px;
+}
+
+.state-badge {
+  align-items: center;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 12px;
+  gap: 6px;
+  text-transform: capitalize;
+}
+
+.state-badge span {
+  background: var(--badge-unknown);
+  border-radius: 999px;
+  height: 8px;
+  width: 8px;
+}
+
+.state-badge.busy span { background: var(--badge-busy); }
+.state-badge.idle span { background: var(--badge-idle); }
+.state-badge.waiting_input span { background: var(--badge-waiting); }
+.state-badge.done span { background: var(--badge-done); }
+.state-badge.error span { background: var(--badge-error); }
+
+.context-bar {
+  background: #e5e7eb;
+  border-radius: 999px;
+  height: 8px;
+  margin: 8px 0;
+  position: relative;
+}
+
+.context-bar span {
+  background: var(--badge-done);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+}
+
+.context-bar.medium span { background: var(--badge-busy); }
+.context-bar.high span { background: var(--badge-error); }
+.context-bar em {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  position: absolute;
+  right: 0;
+  top: 10px;
+}
+
+.empty-state {
+  align-items: flex-start;
+  display: grid;
+  gap: 12px;
+}
+
+.empty-state button,
+.context-menu button {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  padding: 8px 10px;
+}
+
+.context-menu {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 16px 40px rgb(15 23 42 / 18%);
+  display: grid;
+  min-width: 180px;
+  padding: 6px;
+  position: fixed;
+  z-index: 10;
+}
+
+.context-menu button {
+  border: 0;
+  text-align: left;
+}
+
+.context-menu button:disabled {
+  color: #9ca3af;
+}
