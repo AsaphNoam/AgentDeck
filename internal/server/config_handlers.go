@@ -471,6 +471,11 @@ func (s *Server) handlePutBackends(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Invalidate the onboarding cred-check cache: env/model contents may have changed.
+	s.onboardingCacheMu.Lock()
+	s.onboardingCache = nil
+	s.onboardingCacheMu.Unlock()
+
 	// Run cred checks for the default model of each backend (best-effort, bounded).
 	credentials := make(map[string]credcheck.CredResult, len(body.Backends))
 	for id, bk := range body.Backends {

@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 3 — Config CRUD & onboarding
 - **Active subphase:** 4.1 — Archive + search (Phase 4 first subphase)
 - **Spec:** Phase 3 complete ✅. See Phase 4 spec when available.
-- **Last GREEN checkpoint:** 3.6 @ `impl/phase-3`: 26 Vitest tests + `go build ./...` + `go test ./...`
+- **Last GREEN checkpoint:** review-fix @ `impl/phase-3`: 26 Vitest + go tests green (path-traversal fix + cache invalidation + force-delete UI)
 - **Branch:** `impl/phase-3` (do not commit to `main`; do not push unless asked).
 
 ---
@@ -92,6 +92,10 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
   affordance; CardContextMenu closes on click-outside/Escape; `resolvePermission` now uses its
   `toolCallId`; CardGrid skips the layout PUT on initial load; and `ToolCall`/`ToolResult`/`TurnError`
   renderers added (collapsible args, truncated results). Embedded `internal/server/ui/dist` re-synced.
+
+- ✅ **RESOLVED — advisory: onboarding cred-check cache invalidated on PUT /api/backends.** `handlePutBackends` now clears `onboardingCache` after every successful write, ensuring a changed API key is always re-probed on the next `GET /api/config` rather than serving a stale ok/failed result for up to 60s.
+
+- ✅ **RESOLVED — advisory: force-delete UI flow added to RolesEditor and ProjectsEditor.** DELETE 409 responses are now caught; the UI parses `body.agents`, shows a confirm listing affected agents, and retries with `?force=true` if the user confirms. Running agents are unaffected per the spec.
 
 - ✅ **RESOLVED — full real-adapter Appendix A coverage added & PASSED.** The gated acceptance suite
   (`internal/runtime/acceptance_test.go`, `//go:build acceptance`) now has five real-CLI tests, all green

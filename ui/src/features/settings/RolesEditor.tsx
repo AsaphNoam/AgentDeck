@@ -48,7 +48,22 @@ export function RolesEditor() {
 
   function handleDelete(id: string) {
     if (!confirm(`Delete role "${id}"?`)) return;
-    deleteRole.mutate({ id });
+    deleteRole.mutate(
+      { id },
+      {
+        onError: (err) => {
+          const e = err as { status?: number; body?: { agents?: string[] } };
+          if (e?.status === 409) {
+            const agents = e?.body?.agents ?? [];
+            const msg =
+              agents.length > 0
+                ? `Role "${id}" is used by ${agents.length} running agent(s):\n${agents.join(", ")}\n\nDelete the role definition anyway? Running agents are unaffected.`
+                : `Role "${id}" is in use. Delete the definition anyway?`;
+            if (confirm(msg)) deleteRole.mutate({ id, force: true });
+          }
+        },
+      },
+    );
   }
 
   if (isLoading) return <p>Loading roles…</p>;

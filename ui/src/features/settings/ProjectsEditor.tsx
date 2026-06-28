@@ -63,7 +63,22 @@ export function ProjectsEditor() {
 
   function handleDelete(id: string) {
     if (!confirm(`Delete project "${id}"?`)) return;
-    deleteProject.mutate({ id });
+    deleteProject.mutate(
+      { id },
+      {
+        onError: (err) => {
+          const e = err as { status?: number; body?: { agents?: string[] } };
+          if (e?.status === 409) {
+            const agents = e?.body?.agents ?? [];
+            const msg =
+              agents.length > 0
+                ? `Project "${id}" is used by ${agents.length} running agent(s):\n${agents.join(", ")}\n\nDelete the project definition anyway? Running agents are unaffected.`
+                : `Project "${id}" is in use. Delete the definition anyway?`;
+            if (confirm(msg)) deleteProject.mutate({ id, force: true });
+          }
+        },
+      },
+    );
   }
 
   if (isLoading) return <p>Loading projects…</p>;
