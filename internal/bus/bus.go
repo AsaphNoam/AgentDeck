@@ -1,6 +1,7 @@
 package bus
 
 import (
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -21,7 +22,7 @@ type Event struct {
 
 type client struct {
 	ch      chan Event
-	dropped uint64
+	dropped atomic.Uint64
 }
 
 type Bus struct {
@@ -76,7 +77,8 @@ func (b *Bus) Publish(typ string, agentID *string, data any) Event {
 			case c.ch <- ev:
 			default:
 			}
-			c.dropped++
+			n := c.dropped.Add(1)
+			slog.Warn("bus: slow consumer, event dropped", "total_dropped", n)
 		}
 	}
 	return ev
