@@ -11,10 +11,10 @@ func (s *Store) ReadStatus(id string) (Status, error) {
 	var st Status
 	var busySince sql.NullString
 	err := s.db.QueryRow(`
-SELECT agent_id, state, detail, last_trace, busy_since, context_pct
+SELECT agent_id, state, detail, last_trace, busy_since, context_pct, updated_at
 FROM status
 WHERE agent_id = ?`, id).Scan(
-		&st.AgentID, &st.State, &st.Detail, &st.LastTrace, &busySince, &st.ContextPct,
+		&st.AgentID, &st.State, &st.Detail, &st.LastTrace, &busySince, &st.ContextPct, &st.UpdatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Status{}, ErrNotFound
@@ -31,16 +31,20 @@ WHERE agent_id = ?`, id).Scan(
 
 // WriteStatus inserts or updates a live status row.
 func (s *Store) WriteStatus(st Status) error {
+	if st.UpdatedAt == 0 {
+		st.UpdatedAt = timeNow().UnixMilli()
+	}
 	_, err := s.db.Exec(`
-INSERT INTO status(agent_id, state, detail, last_trace, busy_since, context_pct)
-VALUES (?, ?, ?, ?, ?, ?)
+INSERT INTO status(agent_id, state, detail, last_trace, busy_since, context_pct, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(agent_id) DO UPDATE SET
     state = excluded.state,
     detail = excluded.detail,
     last_trace = excluded.last_trace,
     busy_since = excluded.busy_since,
-    context_pct = excluded.context_pct`,
-		st.AgentID, st.State, st.Detail, st.LastTrace, formatOptionalTime(st.BusySince), st.ContextPct,
+    context_pct = excluded.context_pct,
+    updated_at = excluded.updated_at`,
+		st.AgentID, st.State, st.Detail, st.LastTrace, formatOptionalTime(st.BusySince), st.ContextPct, st.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("state: write status: %w", err)
@@ -51,7 +55,7 @@ ON CONFLICT(agent_id) DO UPDATE SET
 // ListStatus returns all status rows.
 func (s *Store) ListStatus() ([]Status, error) {
 	rows, err := s.db.Query(`
-SELECT agent_id, state, detail, last_trace, busy_since, context_pct
+SELECT agent_id, state, detail, last_trace, busy_since, context_pct, updated_at
 FROM status
 ORDER BY agent_id`)
 	if err != nil {
@@ -63,7 +67,7 @@ ORDER BY agent_id`)
 	for rows.Next() {
 		var st Status
 		var busySince sql.NullString
-		if err := rows.Scan(&st.AgentID, &st.State, &st.Detail, &st.LastTrace, &busySince, &st.ContextPct); err != nil {
+		if err := rows.Scan(&st.AgentID, &st.State, &st.Detail, &st.LastTrace, &busySince, &st.ContextPct, &st.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("state: scan status: %w", err)
 		}
 		st.BusySince, err = parseOptionalTime(busySince)
