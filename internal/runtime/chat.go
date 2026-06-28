@@ -35,6 +35,10 @@ type ChatRuntime struct {
 	agents map[string]*agentState
 	sink   func(Event)
 	touch  func(string)
+
+	transcriptHome string
+	openTranscript TranscriptOpener
+	indexer        PersistenceIndexer
 }
 
 // NewChatRuntime constructs the chat runtime bound to the state store, targeting
@@ -69,6 +73,15 @@ func (c *ChatRuntime) SetStateTouch(touch func(string)) {
 	c.touch = touch
 }
 
+// SetPersistence enables durable transcript writes and state.db indexing.
+func (c *ChatRuntime) SetPersistence(home string, open TranscriptOpener, ix PersistenceIndexer) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.transcriptHome = home
+	c.openTranscript = open
+	c.indexer = ix
+}
+
 // agentState is the live, in-memory state for one running agent.
 type agentState struct {
 	agentID   string
@@ -92,6 +105,7 @@ type agentState struct {
 	toolNames  map[string]string       // toolCallID -> normalized name (for status detail)
 	pending    map[string]*pendingPerm // toolCallID -> withheld permission request
 	transcript []Event
+	writer     TranscriptWriter
 	stopped    bool
 }
 
@@ -184,6 +198,10 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 		return nil, fmt.Errorf("runtime: session/new returned no sessionId")
 	}
 	as.sessionID = sess.SessionID
+	if err := c.openPersistence(as, spec, sess.SessionID); err != nil {
+		as.shutdown()
+		return nil, err
+	}
 
 	// Persist running + initial status rows (state.db is the sole writer).
 	now := time.Now().UTC()
@@ -288,6 +306,7 @@ func (c *ChatRuntime) Stop(ctx context.Context, agentID string) error {
 	}
 
 	as.shutdown()
+	as.closePersistence()
 	_ = c.store.DeleteRunning(agentID)
 	// Keep the status row so the archive/UI can show a final state (§7.5).
 	st, err := c.store.ReadStatus(agentID)
@@ -396,6 +415,7 @@ func (c *ChatRuntime) onTransportClosed(as *agentState) {
 	c.removeAgent(as.agentID)
 
 	c.emit(as, EvTurnEnd, TurnEndData{StopReason: "error", ContextPct: as.lastPct()})
+	as.closePersistence()
 	as.cancel()
 	as.hub.Close()
 }
@@ -428,6 +448,9 @@ func (c *ChatRuntime) emit(as *agentState, typ string, data any) {
 	as.mu.Lock()
 	as.transcript = append(as.transcript, ev)
 	as.mu.Unlock()
+	if !c.persistEvent(as, ev) {
+		return
+	}
 	as.hub.Publish(ev)
 	c.mu.Lock()
 	sink := c.sink
@@ -435,6 +458,100 @@ func (c *ChatRuntime) emit(as *agentState, typ string, data any) {
 	if sink != nil {
 		sink(ev)
 	}
+}
+
+func (c *ChatRuntime) openPersistence(as *agentState, spec LaunchSpec, sessionID string) error {
+	c.mu.Lock()
+	home := c.transcriptHome
+	open := c.openTranscript
+	ix := c.indexer
+	c.mu.Unlock()
+	if home == "" || open == nil || ix == nil {
+		return nil
+	}
+	meta := runtimeMeta(spec, sessionID)
+	w, err := open(home, spec.Agent.AgentID, &meta)
+	if err != nil {
+		return fmt.Errorf("runtime: open transcript: %w", err)
+	}
+	if err := ix.UpsertSessionMeta(spec.Agent.AgentID, meta); err != nil {
+		_ = w.Close()
+		return fmt.Errorf("runtime: index session meta: %w", err)
+	}
+	as.writer = w
+	as.seq = w.NextSeq() - 1
+	return nil
+}
+
+func (c *ChatRuntime) persistEvent(as *agentState, ev Event) bool {
+	c.mu.Lock()
+	ix := c.indexer
+	c.mu.Unlock()
+	as.mu.Lock()
+	w := as.writer
+	as.mu.Unlock()
+	if w == nil || ix == nil {
+		return true
+	}
+	if err := w.Append(ev); err != nil {
+		slog.Error("runtime: append transcript", "agent", as.agentID, "seq", ev.Seq, "err", err)
+		return false
+	}
+	if err := ix.OnEvent(as.agentID, ev); err != nil {
+		slog.Error("runtime: index event", "agent", as.agentID, "seq", ev.Seq, "err", err)
+	}
+	if ev.Type == EvError {
+		_ = w.Sync()
+	}
+	if ev.Type == EvTurnEnd {
+		_ = w.Sync()
+		rollup := TurnRollup{LastSeq: ev.Seq, UpdatedAt: ev.Ts, LastContextPct: as.lastPct()}
+		var td TurnEndData
+		if err := json.Unmarshal(ev.Data, &td); err == nil {
+			rollup.LastContextPct = td.ContextPct
+		}
+		if err := ix.OnTurnEnd(as.agentID, rollup); err != nil {
+			slog.Error("runtime: index turn end", "agent", as.agentID, "seq", ev.Seq, "err", err)
+		}
+	}
+	return true
+}
+
+func (as *agentState) closePersistence() {
+	as.mu.Lock()
+	w := as.writer
+	as.writer = nil
+	as.mu.Unlock()
+	if w != nil {
+		_ = w.Close()
+	}
+}
+
+func runtimeMeta(spec LaunchSpec, sessionID string) SessionMetaData {
+	return SessionMetaData{
+		Name:         spec.Agent.Name,
+		Role:         spec.Agent.Role,
+		Project:      spec.Agent.Project,
+		Backend:      spec.Agent.Backend,
+		Model:        spec.Agent.Model,
+		Interface:    spec.Agent.Interface,
+		Group:        spec.Agent.Group,
+		Cwd:          spec.Cwd,
+		SystemPrompt: spec.SystemPrompt,
+		EnvKeys:      envKeys(spec.Env),
+		CreatedAt:    spec.Agent.CreatedAt.UTC().Format(time.RFC3339),
+		SessionID:    sessionID,
+	}
+}
+
+func envKeys(env []string) []string {
+	keys := make([]string, 0, len(env))
+	for _, kv := range env {
+		if i := strings.Index(kv, "="); i > 0 {
+			keys = append(keys, kv[:i])
+		}
+	}
+	return keys
 }
 
 // applyEventStatus writes the §4.4 status transition implied by a streamed event.

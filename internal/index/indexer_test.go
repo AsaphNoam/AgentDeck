@@ -84,7 +84,7 @@ func indexFixture(t *testing.T, db *sql.DB) {
 		if e.Type == runtime.EvTurnEnd {
 			var d runtime.TurnEndData
 			_ = json.Unmarshal(e.Data, &d)
-			if err := ix.OnTurnEnd("a_index", TurnRollup{LastSeq: e.Seq, LastContextPct: d.ContextPct, UpdatedAt: e.Ts}); err != nil {
+			if err := ix.OnTurnEnd("a_index", runtime.TurnRollup{LastSeq: e.Seq, LastContextPct: d.ContextPct, UpdatedAt: e.Ts}); err != nil {
 				t.Fatalf("OnTurnEnd: %v", err)
 			}
 		}
