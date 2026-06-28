@@ -176,7 +176,7 @@ func TestRealCLICancel(t *testing.T) {
 	case <-time.After(60 * time.Second):
 		t.Fatal("no events before cancel — turn never started")
 	}
-	if err := c.Cancel(ctx, h.AgentID); err != nil {
+	if _, err := c.Cancel(ctx, h.AgentID); err != nil {
 		t.Fatalf("Cancel: %v", err)
 	}
 

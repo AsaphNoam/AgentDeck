@@ -199,8 +199,10 @@ func TestCancelDuringPendingPermission(t *testing.T) {
 	}
 	waitForEvent(t, ch, EvPermissionRequest)
 
-	if err := c.Cancel(ctx, h.AgentID); err != nil {
+	if cancelled, err := c.Cancel(ctx, h.AgentID); err != nil {
 		t.Fatalf("Cancel: %v", err)
+	} else if !cancelled {
+		t.Fatal("Cancel reported no-op, want cancelled=true (pending permission was in flight)")
 	}
 	te := waitForEvent(t, ch, EvTurnEnd)
 	var td TurnEndData
@@ -210,6 +212,13 @@ func TestCancelDuringPendingPermission(t *testing.T) {
 	}
 	if fileExists(sentinel) {
 		t.Fatal("sentinel exists after cancel — tool ran")
+	}
+
+	// Cancelling again now that the agent is idle is a no-op: reports false.
+	if cancelled, err := c.Cancel(ctx, h.AgentID); err != nil {
+		t.Fatalf("idle Cancel: %v", err)
+	} else if cancelled {
+		t.Fatal("idle Cancel reported cancelled=true, want no-op false")
 	}
 }
 
