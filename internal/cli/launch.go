@@ -21,6 +21,8 @@ type launchArgs struct {
 	Interface string
 	Name      string
 	Group     string
+	ForceNew  bool   // --new: always POST /api/sessions
+	ResumeID  string // --resume <id>: explicit resume by agent_id
 }
 
 // launchBody is the POST /api/sessions request body (techspec §6.5, §7.1). Empty
@@ -77,6 +79,10 @@ func parseLaunch(args []string) (launchArgs, error) {
 			out.Name = val()
 		case "--group":
 			out.Group = val()
+		case "--new":
+			out.ForceNew = true
+		case "--resume":
+			out.ResumeID = val()
 		default:
 			return launchArgs{}, fmt.Errorf("unknown flag %q", flag)
 		}
@@ -86,6 +92,7 @@ func parseLaunch(args []string) (launchArgs, error) {
 
 // runLaunch parses the launch form and POSTs it to the running dashboard's
 // /api/sessions endpoint (CLI and modal produce an identical agent, §6.5).
+// With --resume <id> or bare-form single-inactive-match, resumes instead.
 func runLaunch(args []string) int {
 	la, err := parseLaunch(args)
 	if err != nil {
@@ -99,6 +106,29 @@ func runLaunch(args []string) int {
 		return 1
 	}
 	port := dashboardPort(cfgStore)
+
+	// Explicit --resume <id>: bypass role@project launch entirely.
+	if la.ResumeID != "" {
+		return runResumeByID(la.ResumeID)
+	}
+
+	// --new forces a fresh launch with no inactive-session check.
+	if !la.ForceNew {
+		// Bare-form: check for a single inactive match with the same role@project.
+		matches, merr := listInactiveSessions(port, la.Role, la.Project)
+		if merr == nil && len(matches) == 1 {
+			fmt.Printf("resuming existing session %s (%s)...\n", matches[0].Name, matches[0].AgentID)
+			return runResumeByID(matches[0].AgentID)
+		}
+		if merr == nil && len(matches) > 1 {
+			fmt.Printf("multiple inactive %s@%s sessions found — specify one with --resume <id> or use --new:\n", la.Role, la.Project)
+			for _, m := range matches {
+				fmt.Printf("  %s  %s\n", m.AgentID, m.Name)
+			}
+			return 1
+		}
+		// No inactive match or archive unavailable → fall through to new launch.
+	}
 
 	resp, body, err := postLaunch(port, la.body())
 	if err != nil {

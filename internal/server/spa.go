@@ -16,7 +16,7 @@ func spaHandler(fsys fs.FS) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Normalize the request path to a clean, rooted filesystem path.
 		reqPath := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
-		if reqPath == "" {
+		if reqPath == "" || strings.HasPrefix(reqPath, "..") {
 			reqPath = "index.html"
 		}
 		if _, err := fs.Stat(fsys, reqPath); err != nil {

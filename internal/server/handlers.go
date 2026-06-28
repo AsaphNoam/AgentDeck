@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
@@ -52,13 +53,13 @@ func (s *Server) handleSessions(w http.ResponseWriter, _ *http.Request) {
 	running, err := s.stateStore.ListRunning()
 	if err != nil {
 		s.log.Error("sessions: list running", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
 	agents, err := s.stateStore.ListAgents()
 	if err != nil {
 		s.log.Error("sessions: list agents", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
 	byID := make(map[string]state.Agent, len(agents))
@@ -92,7 +93,7 @@ func (s *Server) handleRoles(w http.ResponseWriter, _ *http.Request) {
 	roles, err := s.configStore.ListRoles()
 	if err != nil {
 		s.log.Error("roles: list", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
 	writeJSON(w, http.StatusOK, roles)
@@ -103,7 +104,7 @@ func (s *Server) handleProjects(w http.ResponseWriter, _ *http.Request) {
 	projects, err := s.configStore.ListProjects()
 	if err != nil {
 		s.log.Error("projects: list", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
 	writeJSON(w, http.StatusOK, projects)
@@ -120,7 +121,7 @@ func (s *Server) handleBackends(w http.ResponseWriter, _ *http.Request) {
 			return
 		}
 		s.log.Error("backends: read", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
 	writeJSON(w, http.StatusOK, b)
@@ -132,14 +133,62 @@ func (s *Server) handleLayout(w http.ResponseWriter, _ *http.Request) {
 	if err != nil {
 		if errors.Is(err, config.ErrNotFound) || errors.Is(err, config.ErrCorrupt) {
 			s.log.Warn("layout: falling back to default", "err", err)
-			writeJSON(w, http.StatusOK, config.DefaultLayout())
+			writeJSON(w, http.StatusOK, layoutFromConfig(config.DefaultLayout()))
 			return
 		}
 		s.log.Error("layout: read", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
-	writeJSON(w, http.StatusOK, l)
+	writeJSON(w, http.StatusOK, layoutFromConfig(l))
+}
+
+type layoutResponse struct {
+	Order   []string      `json:"order"`
+	Density layoutDensity `json:"density"`
+}
+
+type layoutDensity struct {
+	PerRow int `json:"perRow"`
+	Gap    int `json:"gap"`
+}
+
+func layoutFromConfig(l config.Layout) layoutResponse {
+	return layoutResponse{
+		Order:   append([]string(nil), l.Order...),
+		Density: layoutDensity{PerRow: l.Density.CardsPerRow, Gap: l.Density.Gap},
+	}
+}
+
+func (l layoutResponse) toConfig() config.Layout {
+	return config.Layout{
+		Order:   append([]string(nil), l.Order...),
+		Density: config.Density{CardsPerRow: l.Density.PerRow, Gap: l.Density.Gap},
+	}
+}
+
+func (s *Server) handlePutLayout(w http.ResponseWriter, r *http.Request) {
+	var body layoutResponse
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeHookError(w, http.StatusBadRequest, "bad_request", "malformed JSON")
+		return
+	}
+	if body.Density.PerRow < 1 || body.Density.PerRow > 8 || body.Density.Gap < 0 || body.Density.Gap > 48 {
+		writeHookError(w, http.StatusBadRequest, "bad_request", "density out of range")
+		return
+	}
+	for _, id := range body.Order {
+		if id == "" {
+			writeHookError(w, http.StatusBadRequest, "bad_request", "order contains empty id")
+			return
+		}
+	}
+	if err := s.configStore.WriteLayout(body.toConfig()); err != nil {
+		s.log.Error("layout: write", "err", err)
+		writeHookError(w, http.StatusInternalServerError, "internal", "write layout")
+		return
+	}
+	writeJSON(w, http.StatusOK, body)
 }
 
 // handleAPINotFound is the catch-all for unmatched /api/* paths → 404 JSON.
