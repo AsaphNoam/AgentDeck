@@ -33,6 +33,7 @@ func (s *Server) routes() http.Handler {
 	api("PUT /api/layout", s.handlePutLayout)
 	api("POST /api/hook", s.handleHook)
 	api("GET /api/events", s.handleEvents)
+	api("GET /api/archive", s.handleArchive)
 
 	// Phase 1 session lifecycle (launch, control). The {id} routes
 	// are more specific than the GET /api/ catch-all and win via mux precedence.

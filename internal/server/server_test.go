@@ -84,6 +84,32 @@ func TestSessionsEmptyIsArray(t *testing.T) {
 	}
 }
 
+func TestArchiveListHandler(t *testing.T) {
+	srv := testServer(t, true)
+	if _, err := srv.stateStore.DB().Exec(`
+INSERT INTO sessions(agent_id, name, role, project, backend, model, interface, cwd, system_prompt, created_at, updated_at)
+VALUES ('a_archive','Atlas','implementer','my-app','claude','sonnet','chat','/tmp','prompt','2026-06-28T10:00:00Z','2026-06-28T10:01:00Z')`); err != nil {
+		t.Fatalf("insert archive session: %v", err)
+	}
+	rec := doGET(t, srv.routes(), "/api/archive?limit=10")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("archive status = %d: %s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Total   int `json:"total"`
+		Results []struct {
+			AgentID string `json:"agent_id"`
+			Active  bool   `json:"active"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("archive body: %v", err)
+	}
+	if body.Total != 1 || len(body.Results) != 1 || body.Results[0].AgentID != "a_archive" || body.Results[0].Active {
+		t.Fatalf("archive body = %+v", body)
+	}
+}
+
 func TestRolesSeeded(t *testing.T) {
 	h := testServer(t, true).routes()
 	rec := doGET(t, h, "/api/roles")
