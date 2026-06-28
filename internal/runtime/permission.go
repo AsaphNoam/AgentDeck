@@ -111,11 +111,12 @@ func (c *ChatRuntime) onPermissionTimeout(as *agentState, toolCallID string) {
 
 // Cancel interrupts the in-progress turn. Any pending permission is first
 // resolved as cancelled (freeing the agent), then an ACP session/cancel
-// notification is sent (techspec §8.4). No-op when idle. Never kills the process.
-func (c *ChatRuntime) Cancel(ctx context.Context, agentID string) error {
+// notification is sent (techspec §8.4). When idle it is a no-op and reports
+// false. Never kills the process.
+func (c *ChatRuntime) Cancel(ctx context.Context, agentID string) (bool, error) {
 	as, err := c.lookup(agentID)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	as.mu.Lock()
@@ -130,10 +131,11 @@ func (c *ChatRuntime) Cancel(ctx context.Context, agentID string) error {
 		c.resolvePending(as, id, "cancelled", "")
 	}
 
-	if active || len(ids) > 0 {
+	cancelled := active || len(ids) > 0
+	if cancelled {
 		_ = as.transport.Notify("session/cancel", map[string]any{"sessionId": as.sessionID})
 	}
-	return nil
+	return cancelled, nil
 }
 
 // resolvePending answers a withheld permission request and removes it. Returns
