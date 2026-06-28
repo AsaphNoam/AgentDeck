@@ -1,6 +1,6 @@
 import { DndContext, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, rectSortingStrategy } from "@dnd-kit/sortable";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getLayout, putLayout } from "../../api/client";
 import type { TranscriptEvent } from "../../api/types";
 import { useAgentStore } from "../../store/agentStore";
@@ -10,6 +10,7 @@ import { AgentCard } from "./AgentCard";
 import { CardContextMenu } from "./CardContextMenu";
 import { DensityControl } from "./DensityControl";
 import { EmptyState } from "./EmptyState";
+import { NewAgentModal } from "../../features/launch/NewAgentModal";
 
 export function CardGrid() {
   const agents = useAgentStore((state) => state.agents);
@@ -18,6 +19,7 @@ export function CardGrid() {
   const density = useUiStore((state) => state.density);
   const setDensity = useUiStore((state) => state.setDensity);
   const transcripts = useTranscriptStore((state) => state.byAgent);
+  const [showNewAgent, setShowNewAgent] = useState(false);
 
   const loaded = useRef(false);
 
@@ -49,12 +51,18 @@ export function CardGrid() {
     setOrder(arrayMove(ids, oldIndex, newIndex));
   };
 
-  if (ids.length === 0) return <EmptyState />;
+  if (ids.length === 0) return (
+    <>
+      <EmptyState onNewAgent={() => setShowNewAgent(true)} />
+      <NewAgentModal open={showNewAgent} onClose={() => setShowNewAgent(false)} />
+    </>
+  );
 
   return (
     <section className="grid-view">
       <div className="grid-toolbar">
         <h1>Agents</h1>
+        <button type="button" onClick={() => setShowNewAgent(true)}>New agent</button>
         <DensityControl />
       </div>
       <DndContext onDragEnd={onDragEnd}>
@@ -67,6 +75,7 @@ export function CardGrid() {
         </SortableContext>
       </DndContext>
       <CardContextMenu />
+      <NewAgentModal open={showNewAgent} onClose={() => setShowNewAgent(false)} />
     </section>
   );
 }

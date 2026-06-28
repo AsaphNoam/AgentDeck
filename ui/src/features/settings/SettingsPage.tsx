@@ -1,6 +1,7 @@
 import * as Tabs from "@radix-ui/react-tabs";
 import { RolesEditor } from "./RolesEditor";
 import { ProjectsEditor } from "./ProjectsEditor";
+import { BackendsEditor } from "./BackendsEditor";
 
 export function SettingsPage() {
   return (
@@ -19,7 +20,7 @@ export function SettingsPage() {
           <ProjectsEditor />
         </Tabs.Content>
         <Tabs.Content value="backends" className="settings-tab-content">
-          <p className="config-empty">Backends editor coming in the next subphase.</p>
+          <BackendsEditor />
         </Tabs.Content>
       </Tabs.Root>
     </div>
