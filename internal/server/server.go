@@ -6,9 +6,11 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
@@ -19,17 +21,28 @@ const shutdownTimeout = 5 * time.Second
 type Server struct {
 	configStore *config.Store
 	stateStore  *state.Store
+	registry    *runtime.Registry
 	cfg         config.Config
 	log         *slog.Logger
+
+	hookMu     sync.Mutex
+	hookTokens map[string]string // agent_id -> per-launch hook token (Phase 2 persists these)
 }
 
-// New constructs a Server. The config supplies the port; the store backs all
-// data handlers; the logger is used by middleware and handlers.
-func New(cfgStore *config.Store, stateStore *state.Store, cfg config.Config, log *slog.Logger) *Server {
+// New constructs a Server. The config supplies the port; the stores back the data
+// handlers; the registry drives agent runtimes; the logger is used by middleware.
+func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Registry, cfg config.Config, log *slog.Logger) *Server {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Server{configStore: cfgStore, stateStore: stateStore, cfg: cfg, log: log}
+	return &Server{
+		configStore: cfgStore,
+		stateStore:  stateStore,
+		registry:    registry,
+		cfg:         cfg,
+		log:         log,
+		hookTokens:  map[string]string{},
+	}
 }
 
 // Start binds 127.0.0.1:{cfg.Port}, asserts the listener is loopback, serves
@@ -69,6 +82,10 @@ func (s *Server) Start(ctx context.Context) error {
 		s.log.Info("dashboard shutting down")
 		shutCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
+		// Stop every live agent so no orphaned CLI process groups survive (§8.5).
+		if s.registry != nil {
+			s.registry.Shutdown(shutCtx)
+		}
 		if err := srv.Shutdown(shutCtx); err != nil {
 			return fmt.Errorf("shutdown: %w", err)
 		}
