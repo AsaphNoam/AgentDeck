@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { renameAgent, stopAgent } from "../../api/client";
@@ -9,6 +10,23 @@ export function CardContextMenu() {
   const close = useUiStore((state) => state.closeContextMenu);
   const agent = useAgentStore((state) => (menu ? state.agents[menu.agentId] : null));
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!menu) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!(event.target as HTMLElement)?.closest(".context-menu")) close();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    window.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menu, close]);
+
   if (!menu || !agent) return null;
 
   return createPortal(
