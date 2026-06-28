@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/agentdeck/agentdeck/internal/transcript"
 )
 
 // handlePrompt implements POST /api/sessions/{id}/prompt (techspec §7.3).
@@ -36,16 +38,28 @@ func (s *Server) handleTranscript(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError(runtime.CodeNotFound, "no such agent: "+id))
 		return
 	}
-	events, err := s.registry.Transcript(id)
+	sinceSeq, err := parseInt64Query(r, "since_seq")
 	if err != nil {
-		if errors.Is(err, runtime.ErrNoHandle) {
-			writeJSON(w, http.StatusOK, map[string]any{"agent_id": id, "events": []runtime.Event{}})
-			return
-		}
-		writeAPIError(w, sessionOpError(err))
+		writeAPIError(w, apiError(runtime.CodeValidation, "since_seq must be an integer"))
+		return
+	}
+	events, err := transcript.ReadFile(s.configStore.Home(), id, transcript.ReadOptions{
+		SinceSeq:    sinceSeq,
+		IncludeMeta: r.URL.Query().Get("include_meta") == "true",
+	})
+	if err != nil {
+		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"agent_id": id, "events": events})
+}
+
+func parseInt64Query(r *http.Request, key string) (int64, error) {
+	raw := strings.TrimSpace(r.URL.Query().Get(key))
+	if raw == "" {
+		return 0, nil
+	}
+	return strconv.ParseInt(raw, 10, 64)
 }
 
 // handleCancel implements POST /api/sessions/{id}/cancel (techspec §7.4).

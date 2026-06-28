@@ -9,9 +9,9 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 ## Current position
 
 - **Active phase:** 4 — Persistence: archive, search, resume, file/command tracking
-- **Active subphase:** 4.3 — Wire writer + indexer into runtime; persisted-backed transcript endpoint
+- **Active subphase:** 4.4 — Archive list + FTS5 search API
 - **Spec:** [`phase-4-persistence-archive.md`](phase-4-persistence-archive.md), [`tech/phase-4-persistence-archive-techspec.md`](tech/phase-4-persistence-archive-techspec.md)
-- **Last GREEN checkpoint:** 4.2 @ `impl/phase-3`: `go test -tags sqlite_fts5 ./internal/index/...`, `go build -tags sqlite_fts5 ./...`, `go build ./...`, `go test ./...`
+- **Last GREEN checkpoint:** 4.3 @ `impl/phase-3`: `go test ./internal/server -run 'TestCrashMidTurnPersistsDeliveredTranscript|TestLaunchPromptPermissionFlow' -v`, `go test -tags sqlite_fts5 ./internal/index/...`, `go build -tags sqlite_fts5 ./...`, `go build ./...`, `go test ./...`
 - **Branch:** `impl/phase-3` (do not commit to `main`; do not push unless asked).
 
 ---
@@ -41,13 +41,13 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 **Subphase 4.2 ✅** — Phase-4 state migration added: `sessions`, `sessions_fts`, `tracked_files`, `tracked_commands`; `state.Open` now also sets `PRAGMA synchronous=NORMAL`. With `-tags sqlite_fts5`, `sessions_fts` is a real FTS5 virtual table; without the tag it degrades to a compatible plain table so the standard checkpoint remains green. Added `internal/index.Indexer` (`UpsertSessionMeta`, `OnEvent`, `OnTurnEnd`) with FTS content accumulation, session rollups, file diff rollups, command tracking/result correlation. Added `index.Reindex(home, db)` and CLI `agentdeck reindex`, which resets derived Phase-4 tables and replays `sessions/{agent_id}/transcript.ndjson`.
 
-**Subphase 4.3 — Wire writer + indexer into runtime; persisted-backed transcript endpoint (next)**
-- `ChatRuntime.Start`: open transcript writer, append `session_meta`, and upsert `sessions` row from the frozen launch snapshot.
-- Runtime dispatch order: append raw log → publish event → `Indexer.OnEvent`; on `turn_end`/`error`, sync writer and call `OnTurnEnd`.
-- `ChatRuntime.Stop`: sync/close writer and flush indexer before deleting `running`; keep raw logs and archive rows intact.
-- Emit/persist `permission_resolved` on permission decisions.
-- Upgrade `GET /api/sessions/{id}/transcript` to read `transcript.ndjson` with `since_seq`/`include_meta`, replacing the in-memory stopgap.
-- Checkpoint: crash-mid-turn/persisted transcript tests plus `go build -tags sqlite_fts5 ./...` and full existing tests.
+**Subphase 4.3 ✅** — Server runtime path now enables persistence via `Registry.SetPersistence(home, transcript.Open, indexer)`. `ChatRuntime.Start` opens `transcript.ndjson`, writes `session_meta`, sets seq from `Writer.NextSeq`, and upserts `sessions`; `emit` appends to raw log before hub/SSE publish and feeds `Indexer.OnEvent`; `turn_end` syncs and calls `OnTurnEnd`; `error` syncs without double-counting turns. `Stop`/crash close the writer. Permission decisions now emit/persist `permission_resolved` (`approve`/`deny`/`timeout`/`auto_approve`). `GET /api/sessions/{id}/transcript` now reads persisted NDJSON with `since_seq` and `include_meta`. Crash-mid-turn server integration asserts delivered text exists in the API response and raw log.
+
+**Subphase 4.4 — Archive list + FTS5 search API (next)**
+- Add `internal/archive.Archive`: metadata listing joined to `running`, pagination, active filter.
+- Add FTS5 search over `sessions_fts` with sanitized whitespace-AND query, snippets, rank, and `matched_in`.
+- Add `GET /api/archive?q=&limit&offset&active` handler.
+- Tests: active+inactive listing, transcript-only hit with snippet, metadata hit, AND semantics, pagination, negative query, reindex equivalence. Checkpoint: `go build -tags sqlite_fts5 ./...` and full existing tests.
 
 ---
 
@@ -154,15 +154,18 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
   virtual table when the tag is enabled and a schema-compatible plain `sessions_fts` table otherwise. Tagged builds/tests
   cover real `MATCH`; no-tag builds keep state.Open usable. To reverse: make all checkpoints/builds always pass
   `-tags sqlite_fts5` and remove the fallback branch in `ensureSessionsFTS`.
-- **Phase 4.2 `system_prompt` is empty during raw-log reindex.** The DB schema requires exact `system_prompt`, but the
-  4.1 `session_meta` record only has `system_prompt_sha`. `Indexer.UpsertSessionMeta` preserves the column with `''`;
-  4.3 runtime wiring should upsert the full frozen launch snapshot when it has `LaunchSpec.SystemPrompt`. To reverse:
-  add the full prompt to `session_meta` before any persisted logs are generated.
+- **Phase 4.3 adds full `system_prompt` to new `session_meta` records.** The DB schema requires exact `system_prompt`,
+  but 4.1 initially only modeled `system_prompt_sha`. Runtime wiring now writes `system_prompt` into `session_meta`
+  and `sessions.system_prompt`; reindex of any older raw log without that field leaves the DB column empty. To reverse:
+  remove `SessionMetaData.SystemPrompt` and require runtime Start to upsert the DB snapshot out-of-band.
 
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-28 — **4.3 green.** Wired server runtime persistence: `transcript.ndjson` writer + indexer in
+  `ChatRuntime.Start`/`emit`/`Stop`; persisted `permission_resolved`; transcript endpoint reads raw NDJSON with
+  `since_seq`/`include_meta`; crash-mid-turn integration verifies delivered text survives in the API response and raw log.
 - 2026-06-28 — **4.2 green.** Added Phase-4 state migration (`sessions`, `sessions_fts`,
   `tracked_files`, `tracked_commands`) plus `synchronous=NORMAL`; added `internal/index.Indexer` for
   session rollups, FTS content, file rollups, command tracking/result correlation; added `index.Reindex`
