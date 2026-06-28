@@ -87,81 +87,15 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 
 > Written by the review agent (workflow §8). Remove an entry once fixed and verified green.
 
-- **[A1] TOCTOU double-start in `Registry.Launch`** `internal/runtime/registry.go:88–101`. Check and insert are two separate lock acquisitions — two concurrent launches for the same agent both pass the existence check and both spawn processes. Fix: use a nil sentinel in `rtByAgent` before releasing the lock on first check; guard `ownerFor` against nil entry; replace sentinel with real runtime on success.
+- **[R1] Crash teardown leaves registry ownership stale** `internal/runtime/chat.go:532-568`, `internal/runtime/registry.go:113-120`. On ACP process crash, `ChatRuntime` deletes its live handle, running row, and status, but `Registry.rtByAgent` still maps the agent to the chat runtime. Later resume/launch for the same `agent_id` sees `ErrAlreadyStarted`/409 until explicit stop or server restart. Fix: add a registry-owned cleanup callback from crash teardown, or make `ownerFor`/`Resume` validate the runtime still has a live handle and delete stale ownership.
 
-- **[A2] `emit()` split critical section** `internal/runtime/chat.go:430–460`. `as.seq++` and `as.transcript = append(…)` are two separate `as.mu` acquisitions — concurrent emitters can interleave, producing out-of-order seq in the in-memory transcript and disk log. Fix: hold a single `as.mu` across both seq increment and transcript append.
+- **[R2] UI transcript renderers read the wrong event shape** `internal/bus/bus.go:109-112`, `ui/src/api/sse.ts:60-75`, `ui/src/components/chat/renderers/AssistantText.tsx:7-9`, `PermissionPrompt.tsx:8-20`, `ToolCall.tsx:6-8`, `ToolResult.tsx:8-10`, `DiffBlock.tsx:7-8`, `TurnError.tsx:4`. The server sends `new_message.data` as a nested `runtime.Event` with payload under `event.data`; persisted transcript replay returns the same shape. Renderers read payload fields at top level, so assistant text is blank, tool details disappear, and permission decisions POST an empty `tool_call_id`. Fix: normalize once at the UI boundary/store, e.g. `{kind: event.type, seq, ts, ...event.data}`, and apply `permission_resolved` to earlier prompts.
 
-- **[A3] `initialize` response never validated** `internal/runtime/chat.go:181–186`. Protocol version from the adapter is discarded. Fix: parse the response, log a warning if `protocolVersion` ≠ 1.
+- **[R3] FTS content can be wiped after server restart/resume** `internal/index/indexer.go:15-19`, `internal/index/indexer.go:104-120`, `internal/runtime/chat.go:654-662`. `Indexer.content` is process-local; after restart, the next resumed `turn_end` replaces the durable `sessions_fts` row using only post-restart content. Old transcript phrases become unsearchable until manual `agentdeck reindex`. Fix: seed `ix.content[agent_id]` from existing `sessions_fts.content` before first append/flush for an existing session, or append/merge from DB content during flush.
 
-- **[A4] `state.TranscriptEvent` dead code** `internal/state/types.go:75–81`. Defined but never referenced — all live code uses `runtime.Event`. Fix: delete the type.
+- **[R4] Normal build/install path produces an archive search binary without FTS5** `Makefile:35-37`, `install.sh:60-62`, `internal/state/migrate.go:79-110`, `internal/archive/archive.go:107-128`. Phase 4 archive search calls FTS-only `MATCH`, `snippet()`, and `bm25()`, but `make build` and `install.sh` use untagged `go build`; untagged migration creates a plain fallback table, so `GET /api/archive?q=...` fails in the normal installed binary. Fix: build release/install paths with `-tags sqlite_fts5`, or implement a real non-FTS fallback search path.
 
-- **[A5] `SessionMetaData.SystemPromptSHA` always empty** `internal/runtime/event.go:115` / `chat.go:530–545`. Field is declared and serialized as `""` in every transcript. Fix: compute SHA256 of `SystemPrompt` in `runtimeMeta()`; add `omitempty` so it serializes to empty string only when absent.
-
-- **[A6] CORS missing PUT/DELETE** `internal/server/middleware.go:38`. `Access-Control-Allow-Methods` only lists `GET, POST, OPTIONS`. PUT/DELETE routes are blocked by cross-origin preflight. Fix: add `PUT, DELETE`.
-
-- ✅ **RESOLVED — A7: `notification` SSE event type not registered.** `ui/src/api/sse.ts`. Phase 5 will emit `notification` events; client registers no listener. Fix: add a no-op `notification` listener now per spec §4.3.
-
-- ✅ **RESOLVED — A8: SSE double-open wipes hydration burst.** Added `hydrating` flag; `onopen` skips `hydrateBegin`/`hydrationIds=[]` if already hydrating. `hydrating` cleared when `hydrateComplete` fires. Vitest green.
-
-- ✅ **RESOLVED — A9: Seq gap detection not implemented.** Added `lastAgentSeq: Record<string, number>`. `onNewMessage` reads `envelope.data.seq`; on gap triggers full `getTranscript` refetch. `lastAgentSeq` reset on fresh connect. Vitest green.
-
-- **[A10] `client.dropped` never observed** `internal/bus/bus.go`. Counter is incremented on slow-consumer drop but never logged, exposed, or acted on. Fix: log a warning on each drop.
-
-- ✅ **RESOLVED — A11: `ConnectionDot` inline in Header.** Extracted to `ui/src/components/shell/ConnectionDot.tsx`; Header now imports it. Vitest green.
-
-- ✅ **RESOLVED — A12: `cachedCredCheck` held mutex during 6 s probe.** Refactored to: lock→read cache→unlock; run probe unlocked; lock→write result→unlock. Concurrent `GET /api/config` calls no longer block on the probe. `go build ./...` green.
-
-- ✅ **RESOLVED — A13: `ProjectsEditor` dialog stayed open on `cwd_not_found`.** Both create and update `onSuccess` now always call `setOpen(false)`; warnings are non-blocking. Test updated to assert dialog closes. Vitest green.
-
-- ✅ **RESOLVED — A14: `add_dirs` absent from `ProjectForm`.** Added `addDirs` state (initialised from `initial.add_dirs`); rendered as a removable list with an inline input+Add button (Enter also commits). Submit passes `addDirs` instead of the old `initial?.add_dirs ?? []` passthrough. Vitest green.
-
-- ✅ **RESOLVED — A15: `OnboardingGate` mounts dashboard behind wizard.** When `!satisfied`, renders only `<OnboardingWizard>`; children are not mounted at all. Keyboard focus can no longer reach dashboard controls through the overlay. Vitest green (all 6 OnboardingGate tests pass).
-
-- **[A16] `Stop()` closes persistence before transport goroutine drains** `internal/runtime/chat.go:308–309`. Events arriving between SIGTERM and EOF may be written to a closed writer (logged error, not crash). Fix: remove `closePersistence()` from `Stop()`; call it in `onTransportClosed`'s early-return path so it runs after the goroutine exits.
-
-- **[A17] `addContent` map accumulates unboundedly** `internal/index/indexer.go:141–152`. Content is appended for the entire session lifetime without a cap. Fix: cap accumulated content at 1 MiB per agent, dropping oldest bytes.
-
-- ✅ **RESOLVED — A18: `Reindex` unsafe under concurrent server use.** Added doc comment to `internal/index/reindex.go::Reindex` explaining the danger. CLI `reindex` command now checks pidfile + `processAlive`; prints a clear warning to stderr if the server appears live. `go build ./...` green.
-
-- **[A19] `matchedIn` fallback always returns `"transcript"`** `internal/archive/archive.go:218–222`. When neither metadata nor content matches substring terms, the fallback appends `"transcript"` even though the match location is unknown. Fix: return `nil` when no classification succeeds (field has `omitempty`).
-
-- **[A20] `Registry.Stop()` window wider than Launch TOCTOU** `internal/runtime/registry.go:134–145`. Entry is not removed from `rtByAgent` until after `rt.Stop()` returns (up to 5 s). Concurrent `SendPrompt`/`Permission` calls race Stop for the full grace period. Fix: delete from `rtByAgent` before calling `rt.Stop()`.
-
-- **[A21] `spaHandler` path not guarded against `..` components** `internal/server/spa.go:18`. `path.Clean` + `TrimPrefix("/")` can yield a `../…` path passed to `fs.Stat`. Go's `fs.ValidPath` blocks this on current versions, but the protection is implicit. Fix: add explicit `strings.HasPrefix(reqPath, "..")` guard.
-
-- ✅ **RESOLVED — A22: `firstNonEmpty` duplicated.** Extracted to `internal/strutil/strutil.go` as `FirstNonEmpty`. All three call sites in `acpmap.go`, one in `chat.go`, two in `indexer.go` updated; local definitions deleted. `go build ./...` green.
-
-- **[A23] Migration system has no max-version guard** `internal/state/migrate.go:42–56`. No check for migrations applied by a newer binary — downgrade silently runs against an unknown schema. Fix: after migrations, check `MAX(version)` in `schema_migrations`; fail with a clear error if it exceeds the latest known migration version.
-
-- ✅ **RESOLVED — B1: data race on `client.dropped` in bus.go.** Changed `dropped uint64` → `dropped atomic.Uint64`; `c.dropped++` → `c.dropped.Add(1)`. `go test -race ./internal/bus` green.
-
-- ✅ **RESOLVED — B2: PermissionPrompt optimistic collapse.** Now awaits `decidePermission` POST before calling `resolve`; try/catch shows inline error message on failure so the prompt stays interactive. All Vitest tests green.
-
-- ✅ **RESOLVED — B3: `UpsertSessionMeta` dropped `system_prompt` on conflict.** Added `system_prompt=excluded.system_prompt` to the `ON CONFLICT DO UPDATE SET` clause in `internal/index/indexer.go`. Both tagged and untagged index tests green.
-
-- ✅ **RESOLVED — B4: unified HTTP error envelope for 500s.** Migrated all `writeError(w, http.StatusInternalServerError, ...)` calls in `handlers.go`, `config_handlers.go`, and `static.go` to `writeAPIError(w, apiError("internal", "internal error"))`. The only remaining `writeError` is the 404 catch-all (intentional). Spec-mandated Phase-3 shapes (`writeValidationError`, `inUseBody`) are unchanged. Full `go build ./...`, `go test ./...`, and tagged FTS5 builds green.
-
-- ✅ **RESOLVED — path-param slug validation added to all PUT/DELETE handlers.** `handlePutRole`, `handleDeleteRole`, `handlePutProject`, `handleDeleteProject` now call `config.ValidSlug(id)` before any store call; non-slug ids return `validation_failed` 400. `TestPathTraversalRejected` + `TestPathTraversalEncodedDots` added and green.
-
-- ✅ **RESOLVED — Phase 2.6 committed + review advisories fixed.** 2.6 chat panel is now a committed
-  green checkpoint. Fixed alongside it: PermissionPrompt collapses to an Approved/Denied chip after a
-  decision (resolved state stored per `tool_call_id`); TranscriptView autoscrolls with a jump-to-latest
-  affordance; CardContextMenu closes on click-outside/Escape; `resolvePermission` now uses its
-  `toolCallId`; CardGrid skips the layout PUT on initial load; and `ToolCall`/`ToolResult`/`TurnError`
-  renderers added (collapsible args, truncated results). Embedded `internal/server/ui/dist` re-synced.
-
-- ✅ **RESOLVED — advisory: onboarding cred-check cache invalidated on PUT /api/backends.** `handlePutBackends` now clears `onboardingCache` after every successful write, ensuring a changed API key is always re-probed on the next `GET /api/config` rather than serving a stale ok/failed result for up to 60s.
-
-- ✅ **RESOLVED — advisory: force-delete UI flow added to RolesEditor and ProjectsEditor.** DELETE 409 responses are now caught; the UI parses `body.agents`, shows a confirm listing affected agents, and retries with `?force=true` if the user confirms. Running agents are unaffected per the spec.
-
-- ✅ **RESOLVED — full real-adapter Appendix A coverage added & PASSED.** The gated acceptance suite
-  (`internal/runtime/acceptance_test.go`, `//go:build acceptance`) now has five real-CLI tests, all green
-  against `claude-code-acp` v0.16.2 (`go test -tags acceptance ./internal/runtime -run TestRealCLI -v`):
-  `TestRealCLIAcceptance` (incremental stream + turn_end + idle), `TestRealCLIPermissionDeny` (real gate;
-  denied tool's side effect never happens), `TestRealCLIPermissionApprove` (approved tool runs),
-  `TestRealCLICancel` (cancel interrupts an in-flight turn → idle), `TestRealCLIStop` (terminates the
-  process group + removes the running row + status `done`). Confirmed real option kinds are
-  `allow_once`/`reject_once`/`allow_always` — `selectOption` (§5.3) maps approve/deny correctly.
+Note: the prior A*/B* review list was stale/noisy; the top-to-bottom 2026-06-28 review found A1-A6, A10, A16, A17, A19-A21, and A23 fixed in current code.
 
 ## Autonomous decisions (please review)
 
