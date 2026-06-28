@@ -1,11 +1,13 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 
+	"github.com/agentdeck/agentdeck/internal/backend/credcheck"
 	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
@@ -411,4 +413,53 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ---- Backends PUT handler ----
+
+// backendsResponse is the §5.3 200 body: normalized doc + cred results.
+type backendsResponse struct {
+	config.BackendsConfig
+	Credentials map[string]credcheck.CredResult `json:"credentials"`
+}
+
+// handlePutBackends implements PUT /api/backends (§5.3).
+func (s *Server) handlePutBackends(w http.ResponseWriter, r *http.Request) {
+	var body config.BackendsConfig
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeValidationError(w, &config.ValidationErrors{Errors: []config.FieldError{
+			{Field: "", Code: "bad_request", Message: "malformed JSON"},
+		}})
+		return
+	}
+
+	// Validate + auto-promote defaults (mutates body in place for normalized form).
+	if ve := config.ValidateBackendsConfig(&body); ve != nil {
+		writeValidationError(w, ve)
+		return
+	}
+
+	// Persist the normalized document (save regardless of cred-check outcome).
+	if err := s.configStore.WriteBackends(body); err != nil {
+		s.log.Error("backends: write", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	// Run cred checks for the default model of each backend (best-effort, bounded).
+	credentials := make(map[string]credcheck.CredResult, len(body.Backends))
+	for id, bk := range body.Backends {
+		model, ok := bk.Models[bk.DefaultModel]
+		if !ok {
+			credentials[id] = credcheck.CredResult{Status: "skipped", Detail: "no_default_model"}
+			continue
+		}
+		merged := credcheck.MergeEnv(bk.Env, model.Env)
+		credentials[id] = s.credCheck(context.Background(), bk, model, merged)
+	}
+
+	writeJSON(w, http.StatusOK, backendsResponse{
+		BackendsConfig: body,
+		Credentials:    credentials,
+	})
 }

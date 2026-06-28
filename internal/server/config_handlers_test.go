@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agentdeck/agentdeck/internal/backend/credcheck"
 	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
@@ -403,6 +405,151 @@ func TestSelectableWithoutRestart(t *testing.T) {
 	json.Unmarshal(rec.Body.Bytes(), &projects)
 	if _, ok := projects["fresh-proj"]; !ok {
 		t.Fatal("freshly created project not returned by GET without restart")
+	}
+}
+
+// ---- Backends PUT tests ----
+
+// testServerWithCredCheck builds a test server with an injected credCheck stub.
+func testServerWithCredCheck(t *testing.T, result credcheck.CredResult) *Server {
+	t.Helper()
+	srv := testServer(t, false)
+	srv.credCheck = func(_ context.Context, _ config.Backend, _ config.Model, _ map[string]string) credcheck.CredResult {
+		return result
+	}
+	return srv
+}
+
+func validBackendsBody() map[string]any {
+	return map[string]any{
+		"version": 2,
+		"backends": map[string]any{
+			"claude": map[string]any{
+				"name":          "Claude",
+				"type":          "claude-acp",
+				"default":       true,
+				"default_model": "default",
+				"models": map[string]any{
+					"default": map[string]any{
+						"name":  "Default",
+						"model": "claude-sonnet-4-6",
+					},
+				},
+			},
+		},
+	}
+}
+
+func TestPutBackendsValid(t *testing.T) {
+	srv := testServerWithCredCheck(t, credcheck.CredResult{Status: "ok"})
+	h := srv.routes()
+	rec := doRequest(t, h, http.MethodPut, "/api/backends", validBackendsBody())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT /api/backends status = %d body=%s, want 200", rec.Code, rec.Body)
+	}
+	var resp backendsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("body: %v", err)
+	}
+	if resp.Version != 2 {
+		t.Errorf("version = %d, want 2", resp.Version)
+	}
+	if resp.Credentials["claude"].Status != "ok" {
+		t.Errorf("cred status = %q, want ok", resp.Credentials["claude"].Status)
+	}
+	// Verify document persisted on disk.
+	stored, err := srv.configStore.ReadBackends()
+	if err != nil {
+		t.Fatalf("ReadBackends: %v", err)
+	}
+	if stored.Version != 2 {
+		t.Errorf("stored version = %d, want 2", stored.Version)
+	}
+}
+
+func TestPutBackendsAutoPromoteDefault(t *testing.T) {
+	srv := testServerWithCredCheck(t, credcheck.CredResult{Status: "ok"})
+	h := srv.routes()
+	// Send a body with no default backend set.
+	body := map[string]any{
+		"version": 2,
+		"backends": map[string]any{
+			"claude": map[string]any{
+				"name":          "Claude",
+				"type":          "claude-acp",
+				"default":       false, // no default
+				"default_model": "default",
+				"models": map[string]any{
+					"default": map[string]any{"name": "D", "model": "m"},
+				},
+			},
+		},
+	}
+	rec := doRequest(t, h, http.MethodPut, "/api/backends", body)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT status = %d body=%s", rec.Code, rec.Body)
+	}
+	var resp backendsResponse
+	json.Unmarshal(rec.Body.Bytes(), &resp)
+	// Auto-promoted: the returned doc must have Default=true.
+	if !resp.Backends["claude"].Default {
+		t.Error("claude not auto-promoted to default in response")
+	}
+}
+
+func TestPutBackendsUnsupportedVersion400NothingWritten(t *testing.T) {
+	srv := testServerWithCredCheck(t, credcheck.CredResult{Status: "ok"})
+	h := srv.routes()
+	body := validBackendsBody()
+	body["version"] = 1 // wrong version
+	rec := doRequest(t, h, http.MethodPut, "/api/backends", body)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("version=1 status = %d, want 400", rec.Code)
+	}
+	// Verify nothing was written to disk.
+	if _, err := srv.configStore.ReadBackends(); err == nil {
+		t.Error("backends file should not exist after a 400")
+	}
+}
+
+func TestPutBackendsMultipleDefaults400(t *testing.T) {
+	srv := testServerWithCredCheck(t, credcheck.CredResult{Status: "ok"})
+	h := srv.routes()
+	body := map[string]any{
+		"version": 2,
+		"backends": map[string]any{
+			"a": map[string]any{
+				"type": "claude-acp", "default": true,
+				"default_model": "m", "models": map[string]any{"m": map[string]any{"model": "x"}},
+			},
+			"b": map[string]any{
+				"type": "codex-acp", "default": true,
+				"default_model": "m", "models": map[string]any{"m": map[string]any{"model": "x"}},
+			},
+		},
+	}
+	rec := doRequest(t, h, http.MethodPut, "/api/backends", body)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("multiple-defaults status = %d, want 400", rec.Code)
+	}
+}
+
+func TestPutBackendsFailedCredCheckStillPersists(t *testing.T) {
+	// A 200 with failed creds means the bytes are saved — the UI shouldn't lose user edits.
+	srv := testServerWithCredCheck(t, credcheck.CredResult{Status: "failed", Detail: "invalid_api_key"})
+	h := srv.routes()
+	rec := doRequest(t, h, http.MethodPut, "/api/backends", validBackendsBody())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("failed-creds status = %d, want 200", rec.Code)
+	}
+	var resp backendsResponse
+	json.Unmarshal(rec.Body.Bytes(), &resp)
+	if resp.Credentials["claude"].Status != "failed" {
+		t.Errorf("cred status = %q, want failed", resp.Credentials["claude"].Status)
+	}
+	// Must be persisted.
+	if _, err := srv.configStore.ReadBackends(); err != nil {
+		t.Errorf("backends not persisted on failed cred-check: %v", err)
 	}
 }
 
