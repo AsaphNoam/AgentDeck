@@ -21,6 +21,13 @@ PKG="github.com/agentdeck/agentdeck"
 VERSION_PKG="${PKG}/internal/version"
 EMBED_DIR="internal/server/ui/dist"
 
+# Pinned ACP adapter for the Claude Code chat runtime (techspec §12.1). The Go
+# runtime targets the ACP protocol version this adapter negotiates; bump this pin
+# deliberately and re-run the gated acceptance test (see docs/phases/phase-1-acceptance.md).
+# Install it (Node required) with: INSTALL_ACP=1 ./install.sh
+CLAUDE_ACP_PKG="@zed-industries/claude-code-acp"
+CLAUDE_ACP_VERSION="0.16.2"
+
 VERSION="${VERSION:-0.1.0}"
 COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo none)"
 DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -33,6 +40,14 @@ echo "==> Checking prerequisites"
 command -v go   >/dev/null 2>&1 || { echo "error: Go 1.22+ is required"; exit 1; }
 command -v node >/dev/null 2>&1 || { echo "error: Node 18+ is required"; exit 1; }
 command -v npm  >/dev/null 2>&1 || { echo "error: npm is required"; exit 1; }
+
+# Optional: install the pinned ACP adapter so chat agents can launch. Off by
+# default (the Go binary builds + the test suite passes without it); the real-CLI
+# acceptance test needs it plus a logged-in Claude account.
+if [ "${INSTALL_ACP:-0}" = "1" ]; then
+  echo "==> Installing ${CLAUDE_ACP_PKG}@${CLAUDE_ACP_VERSION}"
+  npm install -g "${CLAUDE_ACP_PKG}@${CLAUDE_ACP_VERSION}"
+fi
 
 echo "==> Building UI (ui/dist)"
 ( cd ui && npm ci && npm run build )
