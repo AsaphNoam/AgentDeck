@@ -85,15 +85,21 @@ func (r *Registry) Launch(ctx context.Context, spec LaunchSpec) (*Handle, error)
 	if err != nil {
 		return nil, err
 	}
+	// Atomically claim the slot with a nil sentinel before releasing the lock so
+	// no concurrent Launch for the same agent can also pass the existence check.
 	r.mu.Lock()
 	if _, ok := r.rtByAgent[spec.Agent.AgentID]; ok {
 		r.mu.Unlock()
 		return nil, ErrAlreadyStarted
 	}
+	r.rtByAgent[spec.Agent.AgentID] = nil // sentinel: "launching in progress"
 	r.mu.Unlock()
 
 	h, err := rt.Start(ctx, spec)
 	if err != nil {
+		r.mu.Lock()
+		delete(r.rtByAgent, spec.Agent.AgentID)
+		r.mu.Unlock()
 		return nil, err
 	}
 	r.mu.Lock()
@@ -103,14 +109,44 @@ func (r *Registry) Launch(ctx context.Context, spec LaunchSpec) (*Handle, error)
 }
 
 // ownerFor returns the runtime that owns an agent, or ErrNoHandle.
+// A nil entry means a Launch is in progress; treat as ErrNoHandle until committed.
 func (r *Registry) ownerFor(agentID string) (Runtime, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	rt, ok := r.rtByAgent[agentID]
-	if !ok {
+	if !ok || rt == nil {
 		return nil, ErrNoHandle
 	}
 	return rt, nil
+}
+
+// Resume re-attaches to a persisted inactive agent. The spec carries LastSessionID
+// and LastContextPct from the sessions snapshot. Guards against double-resume with
+// the same nil-sentinel pattern used by Launch.
+func (r *Registry) Resume(ctx context.Context, spec LaunchSpec) (*Handle, error) {
+	rt, err := r.runtimeFor(spec.Agent.Interface)
+	if err != nil {
+		return nil, err
+	}
+	r.mu.Lock()
+	if _, ok := r.rtByAgent[spec.Agent.AgentID]; ok {
+		r.mu.Unlock()
+		return nil, ErrAlreadyStarted
+	}
+	r.rtByAgent[spec.Agent.AgentID] = nil // sentinel: "resuming in progress"
+	r.mu.Unlock()
+
+	h, err := rt.Resume(ctx, spec, spec.LastSessionID)
+	if err != nil {
+		r.mu.Lock()
+		delete(r.rtByAgent, spec.Agent.AgentID)
+		r.mu.Unlock()
+		return nil, err
+	}
+	r.mu.Lock()
+	r.rtByAgent[spec.Agent.AgentID] = rt
+	r.mu.Unlock()
+	return h, nil
 }
 
 // SendPrompt routes a prompt to the owning runtime.
@@ -132,16 +168,18 @@ func (r *Registry) Cancel(ctx context.Context, agentID string) error {
 }
 
 // Stop routes a stop to the owning runtime and forgets the agent.
+// The agent is removed from rtByAgent before rt.Stop() so that concurrent
+// SendPrompt/Permission calls get ErrNoHandle immediately rather than racing
+// for the full stopGrace window.
 func (r *Registry) Stop(ctx context.Context, agentID string) error {
-	rt, err := r.ownerFor(agentID)
-	if err != nil {
-		return ErrNoHandle
-	}
-	err = rt.Stop(ctx, agentID)
 	r.mu.Lock()
+	rt, ok := r.rtByAgent[agentID]
 	delete(r.rtByAgent, agentID)
 	r.mu.Unlock()
-	return err
+	if !ok || rt == nil {
+		return ErrNoHandle
+	}
+	return rt.Stop(ctx, agentID)
 }
 
 // Permission routes a permission decision to the owning runtime.

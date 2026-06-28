@@ -77,7 +77,7 @@ describe("ProjectsEditor", () => {
     expect(await screen.findByText("Billing")).toBeInTheDocument();
   });
 
-  it("shows cwd_not_found warning but keeps dialog open for acknowledgement", async () => {
+  it("closes dialog on success even when cwd_not_found warnings are present", async () => {
     server.use(
       http.get("/api/projects", () =>
         HttpResponse.json({
@@ -116,7 +116,9 @@ describe("ProjectsEditor", () => {
     });
     fireEvent.click(screen.getByText("Create"));
 
-    // Dialog stays open with warning visible.
-    expect(await screen.findByText(/directory does not exist yet/)).toBeInTheDocument();
+    // Dialog closes on success; warnings are non-blocking (A13).
+    await waitFor(() =>
+      expect(screen.queryByPlaceholderText("e.g. my-app")).not.toBeInTheDocument()
+    );
   });
 });

@@ -61,6 +61,32 @@ func TestParseLaunch(t *testing.T) {
 	}
 }
 
+func TestParseLaunchNewAndResumeFlags(t *testing.T) {
+	// --new sets ForceNew, no ResumeID.
+	la, err := parseLaunch([]string{"impl@my-app", "--new"})
+	if err != nil {
+		t.Fatalf("parseLaunch --new: %v", err)
+	}
+	if !la.ForceNew {
+		t.Error("--new: ForceNew should be true")
+	}
+	if la.ResumeID != "" {
+		t.Errorf("--new: ResumeID should be empty, got %q", la.ResumeID)
+	}
+
+	// --resume <id> sets ResumeID, ForceNew stays false.
+	la2, err := parseLaunch([]string{"impl@my-app", "--resume", "a_abc123"})
+	if err != nil {
+		t.Fatalf("parseLaunch --resume: %v", err)
+	}
+	if la2.ResumeID != "a_abc123" {
+		t.Errorf("--resume: ResumeID = %q, want a_abc123", la2.ResumeID)
+	}
+	if la2.ForceNew {
+		t.Error("--resume: ForceNew should be false")
+	}
+}
+
 func TestParseLaunchErrors(t *testing.T) {
 	for _, bad := range []string{"@my-app", "implementer@", "noatsign", ""} {
 		if _, err := parseLaunch([]string{bad}); err == nil {

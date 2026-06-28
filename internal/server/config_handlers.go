@@ -141,7 +141,7 @@ func (s *Server) handlePostRole(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.configStore.WriteRole(body.RoleID, role); err != nil {
 		s.log.Error("roles: write", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
 	writeJSON(w, http.StatusCreated, toRoleResponse(body.RoleID, role))
@@ -181,12 +181,12 @@ func (s *Server) handlePutRole(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.log.Error("roles: read", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
 	if err := s.configStore.WriteRole(id, role); err != nil {
 		s.log.Error("roles: write", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
 	writeJSON(w, http.StatusOK, toRoleResponse(id, role))
@@ -209,14 +209,14 @@ func (s *Server) handleDeleteRole(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.log.Error("roles: read", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
 	if !force {
 		agents, err := s.runningAgentsForRole(id)
 		if err != nil {
 			s.log.Error("roles: in-use check", "err", err)
-			writeError(w, http.StatusInternalServerError, "internal error")
+			writeAPIError(w, apiError("internal", "internal error"))
 			return
 		}
 		if len(agents) > 0 {
@@ -231,7 +231,7 @@ func (s *Server) handleDeleteRole(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.configStore.DeleteRole(id); err != nil {
 		s.log.Error("roles: delete", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -343,7 +343,7 @@ func (s *Server) handlePostProject(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.configStore.WriteProject(body.ProjectID, proj); err != nil {
 		s.log.Error("projects: write", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
 	writeJSON(w, http.StatusCreated, toProjectResponse(body.ProjectID, proj, warnings))
@@ -384,12 +384,12 @@ func (s *Server) handlePutProject(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.log.Error("projects: read", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
 	if err := s.configStore.WriteProject(id, proj); err != nil {
 		s.log.Error("projects: write", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
 	writeJSON(w, http.StatusOK, toProjectResponse(id, proj, warnings))
@@ -412,14 +412,14 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.log.Error("projects: read", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
 	if !force {
 		agents, err := s.runningAgentsForProject(id)
 		if err != nil {
 			s.log.Error("projects: in-use check", "err", err)
-			writeError(w, http.StatusInternalServerError, "internal error")
+			writeAPIError(w, apiError("internal", "internal error"))
 			return
 		}
 		if len(agents) > 0 {
@@ -434,7 +434,7 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.configStore.DeleteProject(id); err != nil {
 		s.log.Error("projects: delete", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -467,7 +467,7 @@ func (s *Server) handlePutBackends(w http.ResponseWriter, r *http.Request) {
 	// Persist the normalized document (save regardless of cred-check outcome).
 	if err := s.configStore.WriteBackends(body); err != nil {
 		s.log.Error("backends: write", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
 
@@ -583,25 +583,31 @@ func (s *Server) computeBackendStep(ctx context.Context) onboardingStep {
 }
 
 // cachedCredCheck returns the cached cred result if still valid, otherwise runs the probe.
+// The credential probe runs outside the mutex to avoid blocking concurrent GET /api/config
+// requests for the full probe duration (up to 6 s).
 func (s *Server) cachedCredCheck(ctx context.Context, bk config.Backend, model config.Model, backendID string) credcheck.CredResult {
 	s.onboardingCacheMu.Lock()
-	defer s.onboardingCacheMu.Unlock()
-
 	if s.onboardingCache != nil &&
 		s.onboardingCache.backend == backendID &&
 		s.onboardingCache.model == bk.DefaultModel &&
 		time.Now().Before(s.onboardingCache.expires) {
-		return s.onboardingCache.result
+		result := s.onboardingCache.result
+		s.onboardingCacheMu.Unlock()
+		return result
 	}
+	s.onboardingCacheMu.Unlock()
 
 	merged := credcheck.MergeEnv(bk.Env, model.Env)
 	result := s.credCheck(ctx, bk, model, merged)
+
+	s.onboardingCacheMu.Lock()
 	s.onboardingCache = &onboardingCacheEntry{
 		result:  result,
 		backend: backendID,
 		model:   bk.DefaultModel,
 		expires: time.Now().Add(onboardingCacheTTL),
 	}
+	s.onboardingCacheMu.Unlock()
 	return result
 }
 
@@ -613,7 +619,7 @@ func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 			cfg = config.DefaultConfig()
 		} else {
 			s.log.Error("config: read", "err", err)
-			writeError(w, http.StatusInternalServerError, "internal error")
+			writeAPIError(w, apiError("internal", "internal error"))
 			return
 		}
 	}
@@ -661,7 +667,7 @@ func (s *Server) handlePutConfig(w http.ResponseWriter, r *http.Request) {
 			cfg = config.DefaultConfig()
 		} else {
 			s.log.Error("config: read", "err", err)
-			writeError(w, http.StatusInternalServerError, "internal error")
+			writeAPIError(w, apiError("internal", "internal error"))
 			return
 		}
 	}
@@ -683,7 +689,7 @@ func (s *Server) handlePutConfig(w http.ResponseWriter, r *http.Request) {
 
 	if err := s.configStore.WriteConfig(cfg); err != nil {
 		s.log.Error("config: write", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
 	writeJSON(w, http.StatusOK, cfg)
