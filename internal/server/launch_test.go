@@ -51,6 +51,26 @@ func TestComposeHookRegistration(t *testing.T) {
 	}
 }
 
+func TestComposeHookRegistrationTerminalDefault(t *testing.T) {
+	srv := testServer(t, true)
+	agent := state.Agent{AgentID: "a_term", Interface: "terminal"}
+
+	// Terminal registers hooks by DEFAULT (no AGENTDECK_HOOK_REGISTRATION): the
+	// terminal runtime runs the real CLI under a PTY where --settings is
+	// known-good and hooks are the only status producer.
+	args, err := srv.composeHookRegistration(agent, "claude-acp")
+	if err != nil {
+		t.Fatalf("composeHookRegistration: %v", err)
+	}
+	if len(args) != 2 || args[0] != "--settings" || !strings.HasSuffix(args[1], ".json") {
+		t.Fatalf("args = %v, want [--settings <path>] by default for terminal", args)
+	}
+	settingsPath := fmt.Sprintf("%s/agents/%s.json", hooks.Dir(srv.configStore.Home()), agent.AgentID)
+	if _, err := os.Stat(settingsPath); err != nil {
+		t.Fatalf("settings file not written: %v", err)
+	}
+}
+
 func TestComposeEnvLayering(t *testing.T) {
 	base := []string{"PATH=/bin", "HOME=/home/x", "SHARED=base"}
 	backend := map[string]string{"SHARED": "backend", "B_ONLY": "1"}

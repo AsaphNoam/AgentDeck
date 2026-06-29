@@ -128,6 +128,7 @@ func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 			// 404 is reserved for ids with no identity row at all.
 			if _, rerr := s.stateStore.ReadAgent(id); rerr == nil {
 				s.cleanupMessagingMCP(id)
+				s.cleanupHookSettings(id)
 				writeJSON(w, http.StatusOK, map[string]any{"stopped": true})
 				return
 			}
@@ -138,6 +139,7 @@ func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.cleanupMessagingMCP(id)
+	s.cleanupHookSettings(id)
 	writeJSON(w, http.StatusOK, map[string]any{"stopped": true})
 }
 

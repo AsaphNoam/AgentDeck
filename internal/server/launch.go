@@ -66,6 +66,7 @@ func (s *Server) handleLaunch(w http.ResponseWriter, r *http.Request) {
 		_ = s.stateStore.DeleteAgent(agent.AgentID)
 		s.forgetHookToken(agent.AgentID)
 		s.cleanupMessagingMCP(agent.AgentID)
+		s.cleanupHookSettings(agent.AgentID)
 		writeAPIError(w, launchStartError(err))
 		return
 	}
@@ -225,11 +226,18 @@ func (s *Server) hookEnv(agent state.Agent, token string) map[string]string {
 // each lifecycle event to its installed script via the backend adapter's
 // hookMap) and returns the adapter's launch args that point the CLI at it.
 //
-// The args are gated behind AGENTDECK_HOOK_REGISTRATION=1 (default off): the
-// settings file + AGENTDECK_* env are always prepared, but the unverified
-// CLI-flag passthrough (claude's `--settings`, codex TBD) is only activated once
-// a credentialed live run confirms the backend accepts it — so the currently
-// green real chat-launch path is never regressed by an unconfirmed flag.
+// The settings file + AGENTDECK_* env are always prepared; whether the CLI-flag
+// passthrough (claude's `--settings`, codex TBD) is added depends on interface:
+//
+//   - terminal: ON by default. The terminal runtime (6.3) runs the *real*
+//     interactive CLI directly under a PTY (not claude-code-acp), where
+//     `--settings` is a known-good flag, and hooks are the ONLY status producer —
+//     so registration must be active for terminal status to flow over /api/hook.
+//   - chat: gated behind AGENTDECK_HOOK_REGISTRATION=1 (default off). Chat runs
+//     through claude-code-acp (whose `--settings` forwarding is unverified) AND
+//     does not need registration: the runtime owns chat status and the `_post.sh`
+//     interface gate self-suppresses redundant POSTs. Keeping it off avoids
+//     regressing the currently-green real chat-launch path with an unconfirmed flag.
 func (s *Server) composeHookRegistration(agent state.Agent, backendType string) ([]string, error) {
 	ad, ok := backend.For(backendType)
 	if !ok {
@@ -240,7 +248,7 @@ func (s *Server) composeHookRegistration(agent state.Agent, backendType string) 
 	if err != nil {
 		return nil, err
 	}
-	if os.Getenv("AGENTDECK_HOOK_REGISTRATION") != "1" {
+	if agent.Interface != "terminal" && os.Getenv("AGENTDECK_HOOK_REGISTRATION") != "1" {
 		return nil, nil
 	}
 	return ad.HookLaunchArgs(settingsPath), nil
@@ -384,4 +392,13 @@ func (s *Server) forgetHookToken(agentID string) {
 	s.hookMu.Lock()
 	delete(s.hookTokens, agentID)
 	s.hookMu.Unlock()
+}
+
+// cleanupHookSettings deletes the per-agent hook settings file on agent
+// teardown, mirroring cleanupMessagingMCP so the two registration artifacts
+// share a lifecycle (review fix: the settings file is no longer orphaned).
+func (s *Server) cleanupHookSettings(agentID string) {
+	if err := hooks.RemoveAgentSettings(s.configStore.Home(), agentID); err != nil {
+		s.log.Warn("cleanup hook settings", "agent_id", agentID, "err", err)
+	}
 }
