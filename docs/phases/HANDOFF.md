@@ -91,13 +91,6 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 > **This section holds only OPEN findings** — no resolved/dismissed graveyard.
 > Blocking items must be fixed before the next phase starts; advisory items when convenient.
 
-- **BLOCKING — SSE watchdog can enter a permanent reconnect loop (Phase 2).** `ui/src/api/sse.ts`
-  initializes `lastPing` once and only refreshes it on `ping`; after the watchdog closes a stale
-  stream it immediately calls `connect()` without resetting `lastPing`. Because the server sends
-  pings every 10s and the watchdog ticks every 5s, a stale timestamp can make each fresh stream close
-  before its first ping, breaking dashboard live updates/reconnect recovery. Fix by resetting the
-  liveness timestamp on connect/open or otherwise giving a fresh connection a grace window; add a
-  watchdog reconnect regression test.
 - **BLOCKING — successful `session/load` resume skips fresh MCP registration (Phase 4.5 / Phase 5
   blocker).** `server/resume.go` correctly mints a new hook token and builds `LaunchSpec.MCPServers`,
   but `ChatRuntime.Resume` calls `session/load` with only `{sessionId}`. The only path that serializes
@@ -203,6 +196,7 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-29 — **review fix: SSE watchdog permanent reconnect loop — green.** `ui/src/api/sse.ts` now resets `lastPing` in `connect()` so each fresh/reconnected stream gets the full 25s liveness window instead of inheriting a stale timestamp that reaped it before its first ping. New `src/api/sse.test.ts` drives a mock `EventSource` + fake timers: reaps the first (ping-less) stream at 30s, then asserts the reconnected stream survives the 5s watchdog tick before its ~10s first ping. UI 49/49, build green, embedded dist refreshed.
 - 2026-06-29 — **Workflow: trunk-based + `/fix-review` added; `impl/phase-4` merged to `main`.** Switched the build/review/fix workflows to commit **directly on `main`** (no per-phase branches, no PRs — workflow §6, work-phase/fix-review skills, AGENTS.md). Added the **`/fix-review`** skill + workflow §9: validate each review finding is actually true, then fix the real ones to green; review-phase (§8) now writes **both** BLOCKING and ADVISORY findings to `## Review findings`, and resolved/dismissed findings are **deleted** (changelog is the record), not kept (§5). Fast-forwarded `impl/phase-4` (Phase 4.6) into `main` and re-verified green: tagged + standard `go build`, full `go test`, `cd ui && npm test` (48/48), `cd ui && npm run build`. Not pushed.
 - 2026-06-29 — **Phase 4 COMPLETE / 4.6 green.** `GET /api/sessions/{id}/files` + `GET /api/sessions/{id}/commands` over `tracked_files`/`tracked_commands`; `POST /api/hook` extended for `file_edit`/`command` events via `Indexer.CaptureHookFile`/`CaptureHookCommand`; `Store.ValidateHookToken` token guard. Frontend: `/archive` route (search + result list + snippet + state chip), `/archive/:id` read-only transcript view with Resume button, ChatPanel Files/Commands tabs with filter/copy/diff-link, Archive nav link. 18 new Vitest tests. All 48 UI tests green; `go build ./...`; full Go tests; tagged FTS build; UI build.
 - 2026-06-28 — **4.5 green.** Full `ChatRuntime.Resume` (spawn+handshake, best-effort `session/load→session/new`, append-mode transcript reopen, resumed `session_meta` with `resumed_at`, restored `context_pct`). `POST /api/sessions/{id}/resume` endpoint + `Registry.Resume` nil-sentinel guard. `state.ReadSession`/`ListInactiveSessions`. `UpsertSessionMeta` max(`updated_at`) guard. CLI: `agentdeck resume`, `--resume`, `--new`, bare-form auto-resume. fakeacp `session/load`. Integration+CLI tests green. Checkpoint: `go build -tags sqlite_fts5 ./...`, `go build ./...`, `go test ./...`.
