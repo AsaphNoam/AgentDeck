@@ -116,6 +116,10 @@ The handoff must always reflect *current* truth and nothing stale. Condense as y
 - **Decisions / blockers** that still matter → keep them, tersely, in their sections. Drop ones that no longer apply.
 - **Autonomous decisions** → keep each until the human has clearly acknowledged it; only then fold the durable
   ones into "Decisions & notes" and drop the rest. Never silently delete one the human hasn't seen.
+- **Review findings** → the section holds **only open findings.** The moment the fix agent (§9) resolves a
+  finding (fixed + green + committed) **or** dismisses it as a validated false positive, **delete the bullet**
+  and drop a one-line entry in the changelog. The commit/changelog + the end-of-turn summary are the record —
+  do not keep a `✅ RESOLVED` / `❌ DISMISSED` graveyard here.
 - **Changelog** → keep only the last ~10 entries; older history lives in git.
 
 What survives long-term: the one-line-per-phase status, the *active* subphase detail, durable
@@ -127,7 +131,8 @@ decisions, open blockers, a short recent changelog. Everything else is junk — 
 
 Commits are the recovery anchor across spaced sessions, so the work survives a hard quota cut-off.
 
-- Work on a branch (e.g. `impl/phase-N`), **never commit straight to `main`** unless the human said to.
+- **Commit directly to `main`.** This repo is trunk-based: no per-phase branches, no PRs. Each GREEN
+  checkpoint is a commit on `main` — that's the recovery anchor. (Only commit on a red checkpoint never.)
 - At each GREEN checkpoint, commit the code **and** the updated `HANDOFF.md` together.
 - Message: `phase N.M: <subphase title> — green checkpoint`. End the body with:
 
@@ -163,8 +168,8 @@ Reviews the other agent's work — not your own. This is a **read-only action**:
 
 ### What to review
 
-Default target: the last merged PR, or if there's no PR, the last commit on the current branch.
-The human may also name a specific commit or range. Get the diff with `git log` / `git show` / `git diff`.
+Default target: the last GREEN-checkpoint commit(s) on `main` since the previous review (trunk-based —
+no PRs). The human may also name a specific commit or range. Get the diff with `git log` / `git show` / `git diff`.
 
 Cross-reference against:
 - **Phase spec adherence** — does the code match the phase PRD and tech spec? Any required deliverable missing or wrong?
@@ -188,6 +193,76 @@ Categorize every finding as one of:
 - **BLOCKING** — must fix before the next phase starts (spec violation, data-loss risk, crash under normal use).
 - **ADVISORY** — worth fixing but not blocking; next agent should address it when convenient.
 
-Report findings directly to the human. For **BLOCKING** items, also write them to `## Review findings`
-in `HANDOFF.md` so the next build agent sees them before starting.
-If there are no findings, say so plainly. Do not pad the report.
+Report findings directly to the human **and** write **every** finding — BLOCKING *and*
+ADVISORY — to `## Review findings` in `HANDOFF.md`, each tagged with its severity. This is the
+hand-off contract: the fix agent (§9) and the next build agent can only act on findings that land
+in the handoff, so an advisory spoken only to the human is lost. Use the entry shape in §9.
+If there are no findings, say so plainly and write nothing to the handoff. Do not pad the report.
+
+### Review-findings entry shape (written by §8, consumed by §9)
+
+Each finding lives as one bullet under `## Review findings`, opening with its severity tag so the
+fix agent can triage at a glance. Keep the same `file:line` + what's wrong + why it matters + a
+fix hint as the spoken report:
+
+```
+- **BLOCKING — <one-line title>.** <where: file:line> <what's wrong> <why it matters under normal use> <fix hint + what test would prove it>
+- **ADVISORY — <one-line title>.** <same shape>
+```
+
+The §9 fix agent **deletes** a bullet once it has resolved the finding (fixed + green) or dismissed it
+as a validated false positive, recording the outcome in the changelog + its summary (§5) — the section
+holds only open findings.
+
+---
+
+## 9. Fix action — validate, then fix the review findings
+
+Triggered independently **after a review** (Claude Code: `/fix-review`; Codex: `"Fix the review
+findings per AGENTS.md §9"`). Unlike §8 this is **not** read-only — it writes code, runs tests, and
+commits, exactly like the build loop. Its input is the `## Review findings` section §8 just populated.
+
+`$ARGUMENTS`, if present, scopes the run: a severity (`blocking` → only BLOCKING items) or a finding
+title/keyword (just that one). Default with no args: **all** unresolved findings, BLOCKING first.
+
+### The two-gate loop, per finding
+
+Work findings one at a time, BLOCKING before ADVISORY. For each:
+
+```
+1. VALIDATE → confirm the finding is ACTUALLY TRUE before touching anything.
+2. FIX      → only if validated real: implement to a GREEN checkpoint (§2) with a regression test.
+3. RECORD   → rewrite the bullet's tag, condense (§5), commit at the checkpoint (§6).
+```
+
+**Gate 1 — VALIDATE (don't trust the review).** Reviews produce false positives. Read the cited
+code at `file:line`, trace the actual path, and convince yourself the problem is real and would bite
+under **normal use** (the §8 bar). Where practical, reproduce it first with a **failing test** — that
+both proves the finding and becomes the regression guard once you fix it.
+  - **Real** → proceed to fix.
+  - **False positive / not reproducible / already fixed since the review** → make **no code change**.
+    Your validation is the verdict — **delete the bullet** and record a one-line changelog entry
+    (`dismissed <title> — false positive: <one-line evidence>`). Call it out in your end-of-turn
+    summary too — a dismissal is a judgment call (§3), so the human should see it there, but it does
+    not linger in the findings section.
+
+**Gate 2 — FIX.** Same rules as building a subphase: implement the fix yourself (**no coding
+subagents — §4**), add/keep the regression test, and reach a **GREEN checkpoint** (§2). A fix is only
+done when green; never mark one resolved or commit on red. If a finding is real but you can't get it
+green, or the right fix needs a human decision, that's a **STOP** (§3) — leave the bullet as-is,
+record it under `## Blocked on human`, and move to the next finding.
+
+**RECORD.** When green, **delete the finding's bullet** and add a one-line changelog entry
+(`review fix: <title> — <fix + the test that covers it>`). Commit code + `HANDOFF.md` together on
+`main`, message `review fix: <short title> — green checkpoint`, with the
+`Co-Authored-By: Claude Opus 4.8` trailer. Then take the next finding.
+
+### Carry over the same discipline
+
+- **STOP conditions (§3)** and **autonomous-decision flagging (§3)** apply unchanged — if a fix forces
+  a design call the finding didn't dictate, record it under `## Autonomous decisions` and say so.
+- **Condensation (§5):** delete each finding's bullet as you resolve or dismiss it (changelog +
+  summary carry the record); the findings section trends to empty, never a graveyard of stale tags.
+- **End-of-session (§7 checklist):** tree green, handoff updated, work committed, summary to the human
+  listing what was fixed, what was **dismissed as a false positive** (and why), and anything that
+  became a blocker.
