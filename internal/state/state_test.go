@@ -280,6 +280,59 @@ func TestTurnBudgetConsumeAndBreach(t *testing.T) {
 	}
 }
 
+// TestResetTurnBudgetReusesSingleRow guards the restart+resume path: turnSeq
+// resets to 0 on a fresh process, so ResetTurnBudget re-targets low turn_ids
+// while prior-session rows linger with higher rowids. ResetTurnBudget must keep
+// at most one row per agent so the runtime's reset and the MCP handlers'
+// reads/increments always agree on the current turn.
+func TestResetTurnBudgetReusesSingleRow(t *testing.T) {
+	st, _ := newTestStore(t)
+	// Session 1: turn 1 runs to breach, then turn 2 starts.
+	if err := st.ResetTurnBudget("a_budget", "t_000000000001"); err != nil {
+		t.Fatalf("ResetTurnBudget t1: %v", err)
+	}
+	if _, _, err := st.ConsumeTurnBudget("a_budget", 15, 1, 15); err != nil {
+		t.Fatalf("ConsumeTurnBudget breach: %v", err)
+	}
+	if err := st.ResetTurnBudget("a_budget", "t_000000000002"); err != nil {
+		t.Fatalf("ResetTurnBudget t2: %v", err)
+	}
+	if _, _, err := st.ConsumeTurnBudget("a_budget", 5, 0, 15); err != nil {
+		t.Fatalf("ConsumeTurnBudget t2: %v", err)
+	}
+
+	// Simulate a server restart + resume: turnSeq is back to 0, so the first
+	// runtime turn resets t_...01 again. The handler's current-budget read must
+	// see this freshly-reset row (0 used), not the stale t_...02.
+	if err := st.ResetTurnBudget("a_budget", "t_000000000001"); err != nil {
+		t.Fatalf("ResetTurnBudget t1 after restart: %v", err)
+	}
+	got, err := st.CurrentTurnBudget("a_budget", 15)
+	if err != nil {
+		t.Fatalf("CurrentTurnBudget: %v", err)
+	}
+	if got.TurnID != "t_000000000001" || got.Inbound != 0 || got.Outbound != 0 || got.Breached {
+		t.Fatalf("post-restart budget = %+v, want fresh t_...01 (0/0, not breached)", got)
+	}
+
+	cur, breached, err := st.ConsumeTurnBudget("a_budget", 1, 0, 15)
+	if err != nil || breached {
+		t.Fatalf("ConsumeTurnBudget post-restart = %+v breached=%v err=%v, want no breach on fresh row", cur, breached, err)
+	}
+	if cur.TurnID != "t_000000000001" || cur.Inbound != 1 {
+		t.Fatalf("ConsumeTurnBudget post-restart = %+v, want t_...01 inbound 1", cur)
+	}
+
+	// Exactly one row survives per agent (also caps unbounded growth).
+	var n int
+	if err := st.db.QueryRow(`SELECT COUNT(*) FROM turn_budget WHERE agent_id = ?`, "a_budget").Scan(&n); err != nil {
+		t.Fatalf("count turn_budget rows: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("turn_budget rows = %d, want 1", n)
+	}
+}
+
 func TestDeleteExpiredMessagesRetention(t *testing.T) {
 	st, _ := newTestStore(t)
 	now := mustTime(t, "2026-06-29T12:00:00Z")
