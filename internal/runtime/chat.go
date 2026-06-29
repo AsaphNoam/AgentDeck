@@ -437,9 +437,13 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 	}
 
 	// Try session/load to restore native context; fall back to session/new.
+	// The load params must carry the current cwd + freshly-minted MCP servers
+	// (ACP loadSession takes the same registration shape as newSession), or an
+	// adapter where session/load succeeds would run without the in-process
+	// messaging MCP server Phase 5 depends on.
 	newSessionID := ""
 	if sessionID != "" {
-		if loadRes, loadErr := as.transport.Call(ctx, "session/load", map[string]any{"sessionId": sessionID}); loadErr == nil {
+		if loadRes, loadErr := as.transport.Call(ctx, "session/load", sessionLoadParams(spec, sessionID)); loadErr == nil {
 			var loaded struct {
 				SessionID string `json:"sessionId"`
 			}
@@ -884,5 +888,23 @@ func sessionNewParams(spec LaunchSpec) map[string]any {
 		"model":                 spec.ModelID,
 		"systemPrompt":          spec.SystemPrompt,
 		"additionalDirectories": spec.AddDirs,
+	}
+}
+
+// sessionLoadParams builds the session/load params. ACP loadSession takes the
+// same cwd + mcpServers registration as session/new (plus the sessionId to
+// restore), so resuming applies the freshly-minted messaging MCP server on the
+// load path — not only on the session/new fallback.
+func sessionLoadParams(spec LaunchSpec, sessionID string) map[string]any {
+	mcp := make([]map[string]any, 0, len(spec.MCPServers))
+	for _, m := range spec.MCPServers {
+		mcp = append(mcp, map[string]any{
+			"name": m.Name, "command": m.Command, "args": m.Args, "env": m.Env,
+		})
+	}
+	return map[string]any{
+		"sessionId":  sessionID,
+		"cwd":        spec.Cwd,
+		"mcpServers": mcp,
 	}
 }
