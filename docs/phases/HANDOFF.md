@@ -9,9 +9,9 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 ## Current position
 
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
-- **Active subphase:** 6.1 (next) — hook ingest + backend adapter + Codex (chat)
+- **Active subphase:** 6.2 (next) — hook scripts + registration + interface gate
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** 5.4 / Phase 5 complete @ `main`: `go build ./...`, `go build -tags sqlite_fts5 ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, `cd ui && npm test`, `cd ui && npm run build`.
+- **Last GREEN checkpoint:** 6.1 @ `main`: `go build ./...`, `go build -tags sqlite_fts5 ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...` (6.1 is Go-only — no `ui/` change).
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -39,11 +39,18 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 **Phase 5 complete ✅.** MCP messaging server, message store/tools, per-agent registration, nudger, per-turn budgets, janitor, notification SSE, config-backed notification mutes, Web Notification/in-app toast client, message badges/outbound pulse, and read-only inbox endpoint are all green. Details live in git history (`5.1`–`5.4`) and changelog.
 
-**Subphase 6.1 — next to implement** (hook ingest + backend adapter + Codex chat; techspec §4.4, §6, §8.6):
-- [ ] Harden `POST /api/hook`: per-launch-token validation, running-row refresh/clear on `SessionStart`/`Stop`, valid token applies status + emits `state_update`, stale token → `401`.
-- [ ] Extract `internal/backend/adapter.go` with `BackendAdapter` interface and `claude-acp` implementation from current inline launch/runtime logic; carry capability flags, `hookMap`, and `resolveResumeId`.
-- [ ] Add `codex-acp` adapter and per-model env in the launch composer; make Codex launch → prompt → stream → stop → native resume work through existing chat runtime.
-- **Checkpoint:** `go build ./...` + `go test ./...`; include hook-ingest tests and the Codex chat acceptance gate if credentials/tools are available, otherwise leave the credentialed live run gated like prior real-CLI checks.
+**Subphase 6.1 ✅ — hook ingest hardened + backend adapter + Codex (chat).** `internal/backend/adapter.go`
+(`BackendAdapter` for `claude-acp`/`codex-acp`: binary, env-strip keys, `ResolveResumeID`, `CanSwitchModelOnResume`,
+`HookMap`/`UnsupportedHookEvents`); chat runtime resolves spawn binary/env-strip per adapter (codex now runs through
+the chat runtime); `/api/hook` accepts the terminal lifecycle events + 401-on-stale-token. Details in changelog.
+
+**Subphase 6.2 — next to implement** (hook scripts + registration + interface gate; techspec §4.1–4.3, task 4):
+- [ ] Write `~/.agentdeck/hooks/` script set: `_post.sh` helper (`jq`-encoded JSON → `curl POST /api/hook`, carrying `AGENTDECK_*` env) + `session-start.sh`, `user-prompt-submit.sh`, `pre-tool-use.sh`, `post-tool-use.sh`, `stop.sh`.
+- [ ] Interface gate in `_post.sh`: `AGENTDECK_INTERFACE=chat` → `exit 0` for events the chat runtime already owns (SessionStart/UserPromptSubmit/Pre/PostToolUse/Stop); `terminal` → always POST.
+- [ ] Install/refresh the scripts on server startup (so they always match the running binary).
+- [ ] Launch-time registration: inject `AGENTDECK_HOOK_URL`/`AGENTDECK_HOOK_TOKEN`/`AGENTDECK_AGENT_ID`/`AGENTDECK_INTERFACE` per launch and map each lifecycle event → `~/.agentdeck/hooks/<event>.sh` via the per-backend `hookMap` (claude settings injection; codex per its surface).
+- **Checkpoint:** `go build ./...` + `go test ./...`; interface-gate test (chat → no POST for covered events; terminal → POSTs); scripts install on startup; a chat agent shows no redundant hook POSTs.
+- **Resume note:** `/api/hook` ingest + adapter `HookMap` exist; no scripts written, no launch-time registration yet. The hook env-var names + the `hookMap` are the contract to wire.
 
 ---
 
@@ -83,6 +90,13 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
   emits the stdio entry for that backend. This does **not** block 5.2/5.3 — they proceed targeting HTTP
   with the stdio fallback ready. Subphase 5.3 currently emits HTTP MCP entries for both backends pending this verdict.
 
+- **GATED (not blocking 6.2): live Codex (codex-acp) chat acceptance.** 6.1 wired `codex-acp` end-to-end through the
+  chat runtime and proved launch→prompt→stream→stop→native-resume against **fakeacp** (the codex adapter supplies the
+  binary/env/resume). What's gated: a real `codex-acp` CLI + OpenAI credentials to confirm the live handshake, model
+  arg, and native resume. Same class as the Phase 1 real-CLI run. **To do (human):** install `codex-acp`, set
+  `CODEX_HOME`/`OPENAI_API_KEY`, launch a Codex chat agent, run a turn, stop, resume; if the live hook event names
+  differ from Claude's, note them so 6.2's registration + `codexACP.HookMap()` are corrected.
+
 ## Review findings (from the last review — BLOCKING and ADVISORY)
 
 > Written by the review agent (workflow §8), one bullet per finding tagged with its severity
@@ -98,6 +112,23 @@ _(no open findings)_
 
 > Resolved without stopping; the human should still see them. Remove once acknowledged (workflow §3, §5).
 
+- **NEW (6.1): terminal-CLI `Stop` hook does NOT clear the running row.** The subphase line said "running-row
+  refresh/clear on SessionStart/Stop", but Claude Code's `Stop` hook fires at the **end of each turn**, not on CLI
+  exit (§4.2 footnote ties the clear to "CLI exit", a separate signal). Clearing on every `Stop` would unregister a
+  live idle terminal agent. So `SessionStart` refreshes the running row's `session_id`/`tty`; `Stop` only applies
+  idle/done status. The running-row clear stays with the runtime's `Stop`, the explicit internal `stopped` event, and
+  the 6.6 liveness sweep. **To reverse:** if a real terminal CLI emits `Stop` only on exit, add a running-row delete
+  to the `Stop` case in `manager.go::ApplyHook`.
+- **NEW (6.1): `/api/hook` token errors realigned to §8.6 on the status path — 401 `bad_token`, 404 `agent_not_found`.**
+  Was 403 `forbidden` / 404 `not_found`. The subphase requires "stale token → 401". The file_edit/command **tracking**
+  path (Phase 4) is untouched (still 403 `forbidden`). Updated `TestHookValidationErrors` expectations accordingly.
+  **To reverse:** restore the prior codes in `hook.go` (status switch) — but §8.6 mandates these.
+- **NEW (6.1): Codex `HookMap` mirrors Claude's lifecycle keys — GATED, unverified against a live codex-acp.** Same
+  class as the Phase 1 real-CLI / Phase 5 two-CLI gates: without codex-acp credentials I can't confirm Codex's real
+  hook event names. I targeted the five Claude keys (`SessionStart`…`Stop`); any Codex rejects in 6.2 move that event
+  into `UnsupportedHookEvents` and the terminal runtime backfills it from ACP. The Codex chat e2e (launch→prompt→
+  stream→stop→native-resume) is proven against **fakeacp**, not a real codex-acp CLI — the credentialed live Codex run
+  remains gated (see Blocked on human). **To reverse:** edit `codexACP.HookMap()` once the live surface is known.
 - **NEW (5.4): notification edge detection lives in `internal/bus`, not `state.Manager`.** The tech spec phrases this as a state-manager extension, but the bus already owns the prior `AgentStateUpdate` snapshot needed to edge-detect `done`/`waiting_input` without adding another state cache. `state.Manager` still recomputes `unread_messages`; `bus.PublishStateUpdate` emits `notification` on transitions, and `bus.PublishRuntimeEvent` emits `permission_required`. **To reverse:** move the previous-state cache and notification publishing into `state.Manager` and have the bus only transport events.
 - **NEW (5.3): HTTP MCP entries emitted for both `claude-acp` and `codex-acp` while live CLI verdict remains gated.** The spec's Task 1 wants a per-CLI HTTP-vs-stdio decision, but the credentialed live confirmation is still blocked on the human. I chose the already-proven in-process HTTP transport for both backends and left the stdio fallback branch in `registerMessagingMCP` for a future verdict. **To reverse:** change `usesHTTPMessagingMCP(backendType)` for any backend that rejects HTTP and implement/enable the `agentdeck mcp` proxy path.
 - **NEW (5.3): direct MCP calls without a runtime turn use implicit turn `t_000000000000`.** Runtime-owned turns still reset real `t_` counters at user/nudge turn boundaries. The implicit row exists so direct MCP tests/manual calls have deterministic budget accounting instead of bypassing the loop cap or failing before a runtime turn. **To reverse:** make `CurrentTurnBudget`/`ConsumeTurnBudget` return an error when no runtime-created row exists and require tests/manual callers to reset one first.
@@ -213,6 +244,18 @@ _(no open findings)_
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-29 — **6.1 green — hook ingest hardened + backend adapter + Codex (chat).** New `internal/backend/adapter.go`:
+  `BackendAdapter` for `claude-acp`/`codex-acp` carrying `Binary`/`LaunchArgs`/`StripEnvKeys`/`ResolveResumeID`/
+  `CanSwitchModelOnResume`/`HookMap`/`UnsupportedHookEvents`. `ChatRuntime` now resolves the spawn binary + env-strip
+  per adapter (claude strips `CLAUDECODE`; codex strips nothing) instead of hardcoding claude — **codex-acp now runs
+  through the chat runtime** (gate accepts known backends, rejects unknown with `ErrNotImplemented`). `/api/hook`
+  accepts the terminal lifecycle events (`SessionStart`/`UserPromptSubmit`/`PreToolUse`/`PostToolUse`/`Stop`):
+  SessionStart refreshes the running row `session_id`/`tty` (new `HookPayload.TTY`); the rest are pure status
+  producers; **Stop does not clear the running row** (per-turn — see Autonomous decisions). Status-path token errors
+  realigned to §8.6 (`401 bad_token`, `404 agent_not_found`). Per-model env was already layered in `composeLaunch`
+  (model env overrides backend env). Tests: `backend` adapter units; runtime backend-gate + Codex chat e2e
+  (launch→prompt→stream→stop→native-resume vs fakeacp); server hook-lifecycle ingest (SessionStart refresh, PreToolUse
+  busy+publish, Stop keeps running row, stale→401). Green both tag modes; live codex-acp run gated (Blocked on human).
 - 2026-06-29 — **review fix: budget_exceeded toast names the agent + dismissed recipient-badge false positive — green.** New `bus.PublishBudgetExceeded` routes breaches through `notificationPayload` (the existing `budget_exceeded` case) using the agent's snapshot, so the toast carries `agent_name`/`address`/named title instead of the old inline generic payload; `SetBudgetExceededSink` now uses it. Tests: `TestPublishBudgetExceededNamesAgent` + `…FallsBackToAgentID`. **Dismissed** the "recipient unread badge doesn't update live" advisory as a false positive: the message-inserted sink calls `stateMgr.Touch(toAgentID)`, and `Touch`→`recomputeAndPublish` already `PublishStateUpdate`s the recipient with the recomputed `unread_messages` (the inline `SetSnapshot` was merely redundant — `PublishStateUpdate` already sets the snapshot). Dropped that redundant `SetSnapshot`; guard test `TestTouchRecipientPublishesUnread`. Green both tag modes.
 - 2026-06-29 — **review fix: turn budget single-row-per-agent — green (also fixes unbounded growth).** `ResetTurnBudget` now deletes the agent's other `turn_budget` rows in-tx so at most one row survives per agent. Fixes the restart+resume blocker: `turnSeq` resets to 0 on a fresh process, so a resumed agent re-emitted low `turn_id`s while prior-session rows kept the highest rowids — `currentBudgetTx`'s `ORDER BY rowid DESC` read a stale/breached row and could block `send_message`/`check_messages`. One row per agent also caps `turn_budget`'s formerly unbounded growth (resolves that advisory too). Test `TestResetTurnBudgetReusesSingleRow` simulates the restart, asserts the freshly-reset `t_…01` is read (0 used, not the stale `t_…02`), and that exactly one row remains. Green both tag modes.
 - 2026-06-29 — **5.4 green / Phase 5 COMPLETE — notifications + dashboard message indicators.** `AgentState` now includes `unread_messages` and `last_sent_at`; message sends touch recipient/sender state for unread badges and outbound pulse; bus emits edge-triggered `notification` SSE for done/waiting_input/permission_required plus the existing budget_exceeded path. `config.json` gained `notifications.desktop_enabled` + per-type mutes via existing `GET/PUT /api/config`; UI consumes notification SSE, sends hidden-tab desktop notifications when permitted, visible-tab toasts otherwise, and adds Settings notification toggles. Added read-only `GET /api/sessions/{id}/messages`. Embedded UI refreshed. Tests: Go notification/indicator/config/inbox coverage; UI mute + hidden desktop notification + settings toggle. Checkpoint green: Go standard/tagged build+tests, `cd ui && npm test`, `cd ui && npm run build`.
@@ -226,82 +269,3 @@ _(most recent first; keep ~10, older history is in git)_
 - 2026-06-29 — **review fix: archive FTS no longer drops content past 1 MiB — green.** Removed the `maxContentBytes` keep-newest cap in `index.Indexer.addContent`; the FTS content buffer now accumulates the COMPLETE transcript so every phrase ever streamed stays searchable (and `reindex` rebuilds it complete). New tagged `TestIndexerFTSLongTranscript` indexes an early phrase + >1 MiB of later content and asserts the early phrase still `MATCH`es. Build (both tag modes) + full + tagged index/archive/state tests green. See Autonomous decisions for the unbounded-growth tradeoff.
 - 2026-06-29 — **review fix: session/load resume now applies fresh MCP registration — green.** `ChatRuntime.Resume` called `session/load` with only `{sessionId}`, so adapters where load succeeds never received the freshly-minted messaging MCP server (Phase 5 blocker). Added `sessionLoadParams(spec, sessionID)` (sessionId + cwd + mcpServers, mirroring ACP loadSession) and use it on the load path. fakeacp now dumps received `session/load` params via `FAKEACP_LOAD_DUMP`; new `TestResumeSessionLoadAppliesMCP` asserts the load path carries sessionId + the messaging server. Go build (both tag modes) + full tests green.
 - 2026-06-29 — **review fix: SSE watchdog permanent reconnect loop — green.** `ui/src/api/sse.ts` now resets `lastPing` in `connect()` so each fresh/reconnected stream gets the full 25s liveness window instead of inheriting a stale timestamp that reaped it before its first ping. New `src/api/sse.test.ts` drives a mock `EventSource` + fake timers: reaps the first (ping-less) stream at 30s, then asserts the reconnected stream survives the 5s watchdog tick before its ~10s first ping. UI 49/49, build green, embedded dist refreshed.
-- 2026-06-29 — **Workflow: trunk-based + `/fix-review` added; `impl/phase-4` merged to `main`.** Switched the build/review/fix workflows to commit **directly on `main`** (no per-phase branches, no PRs — workflow §6, work-phase/fix-review skills, AGENTS.md). Added the **`/fix-review`** skill + workflow §9: validate each review finding is actually true, then fix the real ones to green; review-phase (§8) now writes **both** BLOCKING and ADVISORY findings to `## Review findings`, and resolved/dismissed findings are **deleted** (changelog is the record), not kept (§5). Fast-forwarded `impl/phase-4` (Phase 4.6) into `main` and re-verified green: tagged + standard `go build`, full `go test`, `cd ui && npm test` (48/48), `cd ui && npm run build`. Not pushed.
-- 2026-06-29 — **Phase 4 COMPLETE / 4.6 green.** `GET /api/sessions/{id}/files` + `GET /api/sessions/{id}/commands` over `tracked_files`/`tracked_commands`; `POST /api/hook` extended for `file_edit`/`command` events via `Indexer.CaptureHookFile`/`CaptureHookCommand`; `Store.ValidateHookToken` token guard. Frontend: `/archive` route (search + result list + snippet + state chip), `/archive/:id` read-only transcript view with Resume button, ChatPanel Files/Commands tabs with filter/copy/diff-link, Archive nav link. 18 new Vitest tests. All 48 UI tests green; `go build ./...`; full Go tests; tagged FTS build; UI build.
-- 2026-06-28 — **4.5 green.** Full `ChatRuntime.Resume` (spawn+handshake, best-effort `session/load→session/new`, append-mode transcript reopen, resumed `session_meta` with `resumed_at`, restored `context_pct`). `POST /api/sessions/{id}/resume` endpoint + `Registry.Resume` nil-sentinel guard. `state.ReadSession`/`ListInactiveSessions`. `UpsertSessionMeta` max(`updated_at`) guard. CLI: `agentdeck resume`, `--resume`, `--new`, bare-form auto-resume. fakeacp `session/load`. Integration+CLI tests green. Checkpoint: `go build -tags sqlite_fts5 ./...`, `go build ./...`, `go test ./...`.
-- 2026-06-28 — **Review fixes: B1–B4 resolved.** Bus `dropped` race → `atomic.Uint64`; `PermissionPrompt` now awaits POST before collapsing; `UpsertSessionMeta` ON CONFLICT now updates `system_prompt`; all server 500s unified to `writeAPIError`. Full build + tests + FTS5 green.
-- 2026-06-28 — **4.4 green.** Added `internal/archive` list/search queries and `GET /api/archive`
-  handler; FTS5 search covers transcript/content hits, metadata hits, snippets, active filters, pagination,
-  and negative queries. Checkpoint: tagged archive/index tests, tagged build, standard build, full Go tests.
-- 2026-06-28 — **4.3 green.** Wired server runtime persistence: `transcript.ndjson` writer + indexer in
-  `ChatRuntime.Start`/`emit`/`Stop`; persisted `permission_resolved`; transcript endpoint reads raw NDJSON with
-  `since_seq`/`include_meta`; crash-mid-turn integration verifies delivered text survives in the API response and raw log.
-- 2026-06-28 — **4.2 green.** Added Phase-4 state migration (`sessions`, `sessions_fts`,
-  `tracked_files`, `tracked_commands`) plus `synchronous=NORMAL`; added `internal/index.Indexer` for
-  session rollups, FTS content, file rollups, command tracking/result correlation; added `index.Reindex`
-  and CLI `agentdeck reindex`. Tagged FTS tests and standard checkpoint green.
-- 2026-06-28 — **4.1 green.** Added `internal/transcript` raw NDJSON writer/reader with `session_meta`
-  first record, max-seq recovery/`NextSeq`, `since_seq`/`include_meta` replay, malformed-line tolerance,
-  and 8 MiB scanner cap. Added additive `runtime` event types/payloads for `session_meta` and
-  `permission_resolved`. Checkpoint: `go test ./internal/transcript/...`, `go build ./...`, `go test ./...`.
-- 2026-06-28 — **Codex review pass (branch `claude/codex-issue-review-jhrf6m`).** Fixed two implemented-code
-  issues with tests (build + `go test ./...` + `-race` green): crash-teardown registry-ownership leak
-  (BLOCKING — `chat.go`/`registry.go`, new `registry_crash_test.go`) and idle-cancel no-op reporting
-  (`Runtime.Cancel`→`(bool,error)`, `sessions.go`). Recorded the remaining future-phase findings into
-  `## 0` sections of the Phase 2/3/4 techspecs (see Review findings above).
-- 2026-06-28 — **Phase 3 COMPLETE / 3.6 green.** `OnboardingGate` + `OnboardingWizard` (3 steps: BackendStep/ProjectStep/LaunchStep); resume-from-step logic; non-dismissible (Esc/overlay blocked); sets `onboarding_complete` on first launch; 26 Vitest+MSW tests; embedded dist refreshed. Checkpoint: all Vitest tests + `go build ./...` + `go test ./...`.
-- 2026-06-28 — **3.5 green.** `BackendsEditor`+`ModelRow` (default radios, masked env editor, cred chip); `useSuggestedName`; `NewAgentModal` (role/project/backend/model, terminal disabled); "New agent" CTA in CardGrid/EmptyState; 20 Vitest+MSW tests; embedded dist refreshed. Checkpoint: all Vitest tests + `go build ./...` + `go test ./...`.
-- 2026-06-28 — **3.4 green.** Zod schemas; TanStack Query hooks; SettingsPage tabs; RolesEditor/RoleForm + ProjectsEditor/ProjectForm (RGB swatch, cwd_not_found); Settings route; 11 Vitest+MSW tests green; embedded dist refreshed. Checkpoint: all Vitest tests + `go build ./...` + `go test ./...`.
-- 2026-06-28 — **3.3 green.** `GET /api/config` with computed onboarding block (min-viable check + ~60s cred-check cache); `PUT /api/config` partial merge; `Config.OnboardingComplete` field; disk-on-demand audit (reads clean, only cred-check cached). Checkpoint: `go build ./...` + `go test ./...`.
-- 2026-06-28 — **3.2 green.** `internal/backend/credcheck/` (claude auth-status + codex /v1/models probers, 6s timeout, CredResult, env merge); `ValidateBackendsConfig` (invariants + auto-promote); `PUT /api/backends` with injected credCheck for tests; all invariant + cred-check tests. Checkpoint: `go build ./...` + `go test ./...`.
-- 2026-06-28 — **3.1 green.** `internal/config/validate.go` (`ValidSlug`, `FieldError`, role/project validators); `POST/PUT/DELETE /api/roles/{role}` + `POST/PUT/DELETE /api/projects/{project}` in `internal/server/config_handlers.go`; in-use guard; `cwd_not_found` warning; disk-on-demand; tests. Checkpoint: `go build ./...` + `go test ./...`.
-- 2026-06-28 — **Phase 2 COMPLETE / 2.6 green.** Added full chat route/panel with live header,
-  transcript renderers (markdown + code highlight, tool/diff/error/permission), prompt send/cancel, Approve/Deny,
-  reconnect transcript refetch, and refreshed embedded UI assets. Checkpoint: `go build ./...` + `go test ./...` +
-  `cd ui && npm test` + `cd ui && npm run build`.
-- 2026-06-28 — **2.5 green.** Added live card grid route with layout load/save, dnd-kit reorder,
-  density control, cards/badges/context meter, empty-state launch, context menu with Open/Rename/Stop and
-  disabled future actions, plus `POST /api/sessions/{id}/rename`. Checkpoint: `go build ./...`,
-  `go test ./...`, `cd ui && npm test`, `cd ui && npm run build`.
-- 2026-06-28 — **2.4 green.** Added `GET/PUT /api/layout` Phase 2 API shape, `GET /api/sessions/{id}/transcript`,
-  retained in-memory runtime transcript events, React Router shell, Zustand stores, SSE singleton, REST/types modules,
-  Vitest store tests, and refreshed embedded UI assets. Checkpoint: `go build ./...`, `go test ./...`, `cd ui && npm test`,
-  `cd ui && npm run build`.
-- 2026-06-28 — **2.3 green.** Added `internal/bus` with global-seq envelopes, snapshot hydration, drop-oldest
-  clients, and state/runtime publishers; replaced per-agent HTTP SSE with `GET /api/events`; runtime now mirrors
-  transcript events as bus `new_message` and touches state manager after status writes. Checkpoint: `go build ./...`,
-  `go test ./...`, `go test -race ./internal/bus`.
-- 2026-06-28 — **2.2 green.** Added `POST /api/hook` with header/body token support and fixed
-  `{error,message}` envelope; persisted hook tokens in `running.hook_token`; added `Manager.ApplyHook`
-  for `running`/`status`/`stopped`; added fsnotify + periodic sessions reconciliation that only corrects
-  stale status rows. Checkpoint: `go build ./...` + `go test ./...`.
-- 2026-06-28 — **2.1 green.** Added `state.Manager`, `AgentState`/`AgentStateUpdate`, migration v2
-  (`status.updated_at`), `busy_timeout=5000`, effective identity+running+status recompute, startup scan,
-  tombstone removal semantics, and focused manager tests. Checkpoint: `go build ./...` + `go test ./...`.
-- 2026-06-28 — **Review fix: full Appendix A real-adapter coverage.** Added 4 gated tests
-  (permission deny/approve, cancel, stop) alongside the stream test — all 5 PASS against
-  `claude-code-acp` v0.16.2. Real option kinds confirmed (`allow_once`/`reject_once`/`allow_always`).
-  Resolves the BLOCKING review finding. Default suite untouched (tests tagged off).
-- 2026-06-28 — **Phase 1 COMPLETE.** Real-CLI acceptance PASSED against `claude-code-acp` v0.16.2:
-  handshake + incremental stream + turn_end + idle. Fixed: runtime strips `CLAUDECODE` from the spawned
-  adapter env (adapter refuses nested sessions); `install.sh` pin corrected `0.4.1`→`0.16.2`.
-- 2026-06-27 — **1.6 code/docs.** Gated `acceptance` build-tag test + `install.sh` adapter pin +
-  `phase-1-acceptance.md` curl/SSE recipe.
-- 2026-06-27 — **1.5 green** (incl. `-race`). Launch composition + REST (`POST /api/sessions`, detail,
-  prompt/cancel/stop/permission) + interim SSE + CLI launch. Tests: composeEnv/joinSystemPrompt/resolveSkip
-  units, CLI parseLaunch + parity, full HTTP integration (launch→SSE→prompt→permission_request→approve→
-  sentinel→turn_end), §7.7 validation/404 envelopes. Replaced the Phase-0 CLI launch stub.
-- 2026-06-27 — **1.4 green** (incl. `-race`). Permission gating (withhold/approve/deny/timeout/skip),
-  Cancel, crash handling, stale-row reconcile. Tests: approve→sentinel, deny→no sentinel, timeout auto-deny,
-  skip auto-approve, unknown-tool 409, cancel-during-pending, crash (fatal err + running row deleted), reconcile.
-- 2026-06-27 — **1.3 green.** Real `ChatRuntime`: process-group spawn + ACP handshake, isolated
-  `acpmap.go`, per-agent `Hub` (drop-oldest), async `SendPrompt` streaming a turn end-to-end, §4.4 status
-  writes, working `Stop`. Tests (incl. `-race`): `stream_text` (multi-delta + monotonic seq + context_pct),
-  `tool_flow` (correlated call/result/diff), idle→busy→idle. fakeacp gained `tool_flow` + usage in result.
-- 2026-06-27 — **1.2 green.** Added JSON-RPC stdio transport (8 MiB scanner, serialized writer, Call/Notify,
-  correlation map, IncomingRequest withhold/Respond) + standalone fakeacp CLI (stream_text/big_frame/
-  malformed_then_valid). Tests: >64 KiB frame, malformed-then-valid resync, Call/response, incoming-request reply.
-- 2026-06-27 — **1.1 green.** Created `internal/runtime`: sentinel + APIError/code vocab, Event envelope +
-  payload structs, Runtime interface, Registry dispatch + terminal/ChatRuntime stubs. Tests: payload JSON
-  round-trips, code→status map, dispatch table. `go build ./...` + `go test ./...` green.
-- 2026-06-27 — Handoff + workflow created. Phase 0 confirmed complete (build + tests green). Phase 1 ready to start at 1.1.

@@ -136,6 +136,21 @@ ON CONFLICT(agent_id) DO UPDATE SET
 			if _, err := tx.Exec(`DELETE FROM running WHERE agent_id = ?`, payload.AgentID); err != nil {
 				return fmt.Errorf("state: apply stopped hook: %w", err)
 			}
+		case "SessionStart":
+			// A terminal CLI's SessionStart hook refreshes the running row's
+			// session_id/tty (if the CLI exposed them) before applying the idle
+			// status (techspec §4.2, §4.4). The running row itself already exists
+			// (the runtime wrote it at launch with the live hook token).
+			if err := refreshRunningFromHook(tx, payload, current); err != nil {
+				return err
+			}
+			return applyStatusHook(tx, payload, now)
+		case "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop":
+			// Lifecycle hooks from a terminal agent are pure status producers
+			// (§4.3). They never clear the running row — Stop fires at the END OF
+			// EACH TURN, not on CLI exit; the running row is cleared by the
+			// runtime's Stop / the liveness sweep / the explicit "stopped" event.
+			return applyStatusHook(tx, payload, now)
 		}
 		return nil
 	})
@@ -244,7 +259,9 @@ func validateHookPayload(payload HookPayload) error {
 		if payload.PID < 0 {
 			return fmt.Errorf("%w: pid must be positive", ErrInvalidHook)
 		}
-	case "status":
+	case "status", "SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop":
+		// "status" is the runtime-internal event; the rest are the terminal CLI
+		// lifecycle events (techspec §4.2). All carry an explicit state.
 		switch payload.State {
 		case "busy", "idle", "waiting_input", "done", "error":
 		default:
@@ -293,6 +310,29 @@ WHERE agent_id = ?`, agentID).Scan(
 	}
 	r.StartedAt = started
 	return r, nil
+}
+
+// refreshRunningFromHook updates the running row's session_id/tty from a
+// SessionStart hook when the CLI exposes them, preserving everything else
+// (pid/interface/token/started_at). A SessionStart that omits both is a no-op.
+func refreshRunningFromHook(tx *sql.Tx, payload HookPayload, current RunningEntry) error {
+	sessionID := current.SessionID
+	if payload.SessionID != "" {
+		sessionID = payload.SessionID
+	}
+	tty := current.TTY
+	if payload.TTY != "" {
+		tty = payload.TTY
+	}
+	if sessionID == current.SessionID && tty == current.TTY {
+		return nil
+	}
+	_, err := tx.Exec(`UPDATE running SET session_id = ?, tty = ? WHERE agent_id = ?`,
+		sessionID, tty, payload.AgentID)
+	if err != nil {
+		return fmt.Errorf("state: refresh running from hook: %w", err)
+	}
+	return nil
 }
 
 func applyStatusHook(tx *sql.Tx, payload HookPayload, now time.Time) error {

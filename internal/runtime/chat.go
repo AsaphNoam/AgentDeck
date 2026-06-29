@@ -14,24 +14,23 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/agentdeck/agentdeck/internal/backend"
 	"github.com/agentdeck/agentdeck/internal/state"
 	"github.com/agentdeck/agentdeck/internal/strutil"
 )
 
-// defaultChatBinary is the ACP adapter invoked for the claude-acp backend
-// (techspec §12.1). Tests inject the fake CLI by overriding command/args.
-const defaultChatBinary = "claude-code-acp"
-
 // stopGrace is how long Stop waits after SIGTERM before SIGKILL (techspec §8.5).
 const stopGrace = 5 * time.Second
 
-// ChatRuntime drives Claude Code agents over the ACP stdio protocol. It owns one
-// agentState per live agent. ALL ACP wire decoding is isolated in acpmap.go;
-// this file orchestrates process lifecycle, the hub, and status writes.
+// ChatRuntime drives ACP agents (claude-acp, codex-acp) over the stdio protocol.
+// It owns one agentState per live agent. ALL ACP wire decoding is isolated in
+// acpmap.go; per-backend differences (binary, env strip, resume) live in the
+// backend.BackendAdapter; this file orchestrates process lifecycle, the hub, and
+// status writes.
 type ChatRuntime struct {
 	store   *state.Store
-	command string   // adapter binary (injectable for tests)
-	cmdArgs []string // adapter args
+	command string   // adapter binary OVERRIDE (injectable for tests); empty → adapter default
+	cmdArgs []string // adapter args override
 
 	// onExit notifies the owner (the Registry) that an agent's live handle is
 	// gone after an unsolicited teardown (crash). Without it, Registry.rtByAgent
@@ -49,21 +48,53 @@ type ChatRuntime struct {
 	indexer        PersistenceIndexer
 }
 
-// NewChatRuntime constructs the chat runtime bound to the state store, targeting
-// the real claude-code-acp adapter.
+// NewChatRuntime constructs the chat runtime bound to the state store. The launch
+// binary is resolved per agent from the backend.BackendAdapter unless overridden
+// via SetCommand (or c.command) — e.g. tests pointing at the fake ACP CLI.
 func NewChatRuntime(s *state.Store) *ChatRuntime {
 	return &ChatRuntime{
-		store:   s,
-		command: defaultChatBinary,
-		agents:  map[string]*agentState{},
+		store:  s,
+		agents: map[string]*agentState{},
 	}
 }
 
-// SetCommand overrides the adapter binary + args. Used to point at a pinned
-// adapter path (1.6) or, in tests, the fake ACP CLI.
+// SetCommand overrides the adapter binary + args for every backend. Used to
+// point at a pinned adapter path (1.6) or, in tests, the fake ACP CLI.
 func (c *ChatRuntime) SetCommand(bin string, args ...string) {
 	c.command = bin
 	c.cmdArgs = args
+}
+
+// adapterFor resolves the per-backend adapter, or ErrNotImplemented for an
+// unknown backend type (mapped to 501 by the API layer).
+func (c *ChatRuntime) adapterFor(backendType string) (backend.BackendAdapter, error) {
+	ad, ok := backend.For(backendType)
+	if !ok {
+		return nil, fmt.Errorf("%w: backend %q", ErrNotImplemented, backendType)
+	}
+	return ad, nil
+}
+
+// spawnCmd builds the *exec.Cmd for a launch/resume: the adapter supplies the
+// default binary/args (unless overridden) and the env keys to strip; the process
+// runs in its own group so the runtime can signal the whole tree.
+func (c *ChatRuntime) spawnCmd(ad backend.BackendAdapter, spec LaunchSpec) *exec.Cmd {
+	bin, args := c.command, c.cmdArgs
+	if bin == "" {
+		bin, args = ad.Binary(), ad.LaunchArgs()
+	}
+	cmd := exec.Command(bin, args...)
+	cmd.Dir = spec.Cwd
+	env := spec.Env
+	if len(env) == 0 {
+		env = os.Environ()
+	}
+	for _, k := range ad.StripEnvKeys() {
+		env = stripEnv(env, k)
+	}
+	cmd.Env = env
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	return cmd
 }
 
 // SetEventSink mirrors normalized runtime events into the Phase 2 bus.
@@ -127,22 +158,12 @@ type pendingPerm struct {
 }
 
 func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, error) {
-	if spec.BackendType != "claude-acp" {
-		return nil, fmt.Errorf("%w: backend %q", ErrNotImplemented, spec.BackendType)
+	ad, err := c.adapterFor(spec.BackendType)
+	if err != nil {
+		return nil, err
 	}
 
-	cmd := exec.Command(c.command, c.cmdArgs...)
-	cmd.Dir = spec.Cwd
-	// Strip CLAUDECODE: the claude-code-acp adapter refuses to start a "nested"
-	// session when this is set (true when AgentDeck itself was launched from a
-	// Claude Code terminal). AgentDeck spawns independent agent processes, so the
-	// nested-session guard must never apply to them.
-	if env := spec.Env; len(env) > 0 {
-		cmd.Env = stripEnv(env, "CLAUDECODE")
-	} else {
-		cmd.Env = stripEnv(os.Environ(), "CLAUDECODE")
-	}
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd := c.spawnCmd(ad, spec)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -369,19 +390,13 @@ func (c *ChatRuntime) Transcript(agentID string) ([]Event, error) {
 // --- still-stubbed methods (later phases) ---
 
 func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID string) (*Handle, error) {
-	if spec.BackendType != "claude-acp" {
-		return nil, fmt.Errorf("%w: backend %q", ErrNotImplemented, spec.BackendType)
+	ad, err := c.adapterFor(spec.BackendType)
+	if err != nil {
+		return nil, err
 	}
 
 	// Spawn process (identical to Start).
-	cmd := exec.Command(c.command, c.cmdArgs...)
-	cmd.Dir = spec.Cwd
-	if env := spec.Env; len(env) > 0 {
-		cmd.Env = stripEnv(env, "CLAUDECODE")
-	} else {
-		cmd.Env = stripEnv(os.Environ(), "CLAUDECODE")
-	}
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd := c.spawnCmd(ad, spec)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
