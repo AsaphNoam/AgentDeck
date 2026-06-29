@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** 6.6 @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, `cd ui && npm test`, `cd ui && npm run build`.
+- **Last GREEN checkpoint:** review fix (terminal-tab binary input) @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, `cd ui && npm test`, `cd ui && npm run build`.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -143,7 +143,8 @@ launch option via capabilities, and refreshed embedded UI. Details in changelog 
 > **This section holds only OPEN findings** — no resolved/dismissed graveyard.
 > Blocking items must be fixed before the next phase starts; advisory items when convenient.
 
-_(no open findings)_
+- **ADVISORY — switch-runtime / move-to-group failures are silently swallowed.** [`ui/src/components/grid/CardContextMenu.tsx`](../../ui/src/components/grid/CardContextMenu.tsx) fires `void switchRuntime(...)` / `void updateAgentIdentity(...)` with no `.catch` and no result handling. The prompt pre-fills current interface/backend/model, so accepting unchanged values returns `400 no_change` (and any real failure — `409 switch_in_progress`, `422 terminal_unavailable`, rollback `500`) is invisible to the user; the card just doesn't change with no feedback. This is part of the acknowledged MVP prompt-based UI decision, but at minimum the promise should surface an error toast. Fix: add `.catch` → toast via `useUiStore`.
+- **ADVISORY — terminal panel is a line-box, not xterm.js, and never sends resize.** Task 13 calls for an xterm.js panel; [`TerminalTab.tsx`](../../ui/src/components/chat/TerminalTab.tsx) is a hand-rolled `<pre>` + input that renders raw bytes (ANSI escapes shown literally) and never sends `{cols,rows}`, so the PTY stays at its default size and output wrapping can be wrong. Functional for basic output once the input fix lands, but not the specified terminal experience. Fix: integrate xterm.js (its `onData` → binary frame, `onResize` → `{cols,rows}` text frame) when convenient.
 
 ## Autonomous decisions (please review)
 
@@ -375,6 +376,13 @@ _(no open findings)_
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-30 — **review fix: terminal-tab input reaches the PTY (binary frame) — green.** BLOCKING:
+  `TerminalTab.tsx`'s `send()` sent `ws.send(`${input}\n`)` — a string, transmitted as a WebSocket
+  *text* frame, which the PTY↔WS bridge routes to resize and drops (only binary frames reach the PTY
+  master), so the headless xterm/PTY driver's only input surface was inert. Now sends
+  `ws.send(new TextEncoder().encode(input + "\n"))`. Test `TerminalTab.test.tsx` (new) asserts Send and
+  Enter each emit a non-string ArrayBuffer view decoding to `"<cmd>\n"`. Embedded UI dist refreshed.
+  Checkpoint green: `go build ./...`, `cd ui && npm test`, `cd ui && npm run build`.
 - 2026-06-29 — **6.6 green — task groups + remaining endpoints + UI.** Backend: `POST /api/sessions/{id}/identity`
   edits name/group and emits `state_update`; `POST /api/groups/{group}/release` stops group members with a bounded worker
   pool and returns per-agent results; existing rename now returns the §8.2 shape; layout schema/API persists
