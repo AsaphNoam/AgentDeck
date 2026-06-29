@@ -13,6 +13,7 @@ import (
 	"github.com/agentdeck/agentdeck/internal/bus"
 	"github.com/agentdeck/agentdeck/internal/config"
 	persistindex "github.com/agentdeck/agentdeck/internal/index"
+	"github.com/agentdeck/agentdeck/internal/messaging"
 	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
 	"github.com/agentdeck/agentdeck/internal/transcript"
@@ -43,6 +44,7 @@ type Server struct {
 	log         *slog.Logger
 
 	indexer    *persistindex.Indexer
+	messaging  *messaging.Server
 
 	hookMu     sync.Mutex
 	hookTokens map[string]string // agent_id -> per-launch hook token (Phase 2 persists these)
@@ -83,6 +85,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		eventBus:    eventBus,
 		registry:    registry,
 		indexer:     ix,
+		messaging:   messaging.New(stateStore, log),
 		cfg:         cfg,
 		log:         log,
 		hookTokens:  map[string]string{},

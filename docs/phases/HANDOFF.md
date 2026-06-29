@@ -9,9 +9,9 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 ## Current position
 
 - **Active phase:** 5 — Coordination: MCP messaging, nudger, budgets, notifications
-- **Active subphase:** 5.1 (next)
-- **Spec:** phase-5 spec (TBD)
-- **Last GREEN checkpoint:** 4.6 @ `main`: `go build -tags sqlite_fts5 ./...`, `go build ./...`, `go test ./...`, `cd ui && npm test` (48/48), `cd ui && npm run build`
+- **Active subphase:** 5.2 (next) — message store + the three MCP tools
+- **Spec:** [`tech/phase-5-coordination-techspec.md`](tech/phase-5-coordination-techspec.md) (PRD: [`phase-5-coordination.md`](phase-5-coordination.md)); subphase plan at §"Subphase plan"
+- **Last GREEN checkpoint:** 5.1 @ `main`: `go build ./...`, `go build -tags sqlite_fts5 ./...`, `go test ./...` (incl. new MCP spike round-trips). No UI changes this subphase.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -35,23 +35,17 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 > The ONLY place granular steps live.
 
-**Phase 3 complete ✅** (3.1–3.6 all green; details in git history).
+**Phases 0–4 complete ✅** (all subphases green; details in git history & Phase status above).
 
-**Subphase 4.1 ✅** — `internal/transcript` package added: append-only `transcript.ndjson` writer (`Open`/`Append`/`Sync`/`Close`, `O_APPEND`, one JSON record write per event, fsync on `turn_end`/`error`), `session_meta` first record for new logs, max-seq recovery on reopen, `NextSeq()`, and replay reader with `since_seq`, `include_meta`, default meta skip, malformed-line tolerance, and 8 MiB scanner cap. Added additive runtime event types/payloads: `session_meta`, `permission_resolved`. Tests cover append→read, reopen seq continuation, bad middle line, partial trailing line, and >64 KiB line replay. No runtime hot-path wiring yet.
+**Subphase 5.1 ✅ — Go-MCP-SDK handshake spike.** Added `github.com/modelcontextprotocol/go-sdk v1.6.1` (`go` directive bumped `1.22→1.25.0`). New `internal/messaging` package: one `mcp.Server` with a trivial `ping` echo tool, exposed via `mcp.NewStreamableHTTPHandler`, mounted on the dashboard listener at `POST/GET/DELETE /mcp` (`routes.go`); `token→agent_id` session registry (`Register`/`Revoke`/`Lookup`); the HTTP handler reads `X-AgentDeck-Token` per request. `Server` carries a `*messaging.Server`, constructed in `New`. Round-trip proven in-process two ways: `messaging.TestSpikePingRoundTrip` (direct) and `server.TestMCPRouteMounted` (through the real mux), both via a go-sdk `StreamableClientTransport` carrying the token header. Transport (A)/HTTP confirmed working; the per-CLI HTTP-vs-stdio confirmation against live Claude Code/Codex is GATED (see Blocked on human). Task 1 outcome recorded in techspec §2.2.
 
-**Subphase 4.2 ✅** — Phase-4 state migration added: `sessions`, `sessions_fts`, `tracked_files`, `tracked_commands`; `state.Open` now also sets `PRAGMA synchronous=NORMAL`. With `-tags sqlite_fts5`, `sessions_fts` is a real FTS5 virtual table; without the tag it degrades to a compatible plain table so the standard checkpoint remains green. Added `internal/index.Indexer` (`UpsertSessionMeta`, `OnEvent`, `OnTurnEnd`) with FTS content accumulation, session rollups, file diff rollups, command tracking/result correlation. Added `index.Reindex(home, db)` and CLI `agentdeck reindex`, which resets derived Phase-4 tables and replays `sessions/{agent_id}/transcript.ndjson`.
-
-**Subphase 4.3 ✅** — Server runtime path now enables persistence via `Registry.SetPersistence(home, transcript.Open, indexer)`. `ChatRuntime.Start` opens `transcript.ndjson`, writes `session_meta`, sets seq from `Writer.NextSeq`, and upserts `sessions`; `emit` appends to raw log before hub/SSE publish and feeds `Indexer.OnEvent`; `turn_end` syncs and calls `OnTurnEnd`; `error` syncs without double-counting turns. `Stop`/crash close the writer. Permission decisions now emit/persist `permission_resolved` (`approve`/`deny`/`timeout`/`auto_approve`). `GET /api/sessions/{id}/transcript` now reads persisted NDJSON with `since_seq` and `include_meta`. Crash-mid-turn server integration asserts delivered text exists in the API response and raw log.
-
-**Subphase 4.4 ✅** — Added `internal/archive.Archive` with listing over `sessions` joined to `running`, `active` filtering, pagination, FTS5 search over `sessions_fts`, snippets, bm25 ordering, and `matched_in` labels. Added `GET /api/archive?q=&limit&offset&active` with validation. Tests cover active/inactive listing, transcript-only hit+snippet, metadata hit, pagination, negative query, and handler envelope.
-
-**Subphase 4.5 ✅** — `ChatRuntime.Resume` (spawn/handshake, best-effort `session/load→session/new`, append-mode transcript reopen, resumed `session_meta` with `resumed_at`, fresh running row + restored `context_pct`). `POST /api/sessions/{id}/resume` (404/409/422 guards; optional backend/model/interface override seam for Phase 6). `Registry.Resume` with nil-sentinel double-resume guard. `state.ReadSession`/`ListInactiveSessions`. `UpsertSessionMeta` `updated_at` max guard. CLI: `agentdeck resume <id>`, `--resume <id>`, `--new`, bare-form single-inactive auto-resume. fakeacp `session/load` handler. Integration tests: happy path (agent_id unchanged, new session_id, prior transcript + resumed_at, monotonic seq after post-resume prompt), 409 already-running, 422 no persisted session, 404 unknown agent. CLI unit tests: `--new` / `--resume` flag parsing.
-
-**Subphase 4.6 ✅** — `GET /api/sessions/{id}/files` and `GET /api/sessions/{id}/commands` over `tracked_files`/`tracked_commands` (sorted by `last_ts` / `seq` desc). `POST /api/hook` extended: `event:"file_edit"` and `event:"command"` route to new `applyTrackingHook` (validates token via `Store.ValidateHookToken`, writes via `Indexer.CaptureHookFile`/`CaptureHookCommand`). `Indexer` gained `CaptureHookFile`/`CaptureHookCommand` for direct terminal-runtime capture. `Server` carries `*index.Indexer` field. Frontend: `/archive` route (debounced search, result list, snippet, state chip, active→`/agent/:id` / inactive→`/archive/:id`); `/archive/:id` read-only transcript view (`ArchiveAgentPage`) with Resume button → `POST .../resume` + navigate to live agent; ChatPanel gained Transcript/Files/Commands tabs (`FilesTab`, `CommandsTab` — lists, per-row copy, filter, diff-scroll for files). Archive nav link in Header. 18 new Vitest/MSW tests. Checkpoint: `go build ./...`, `go test ./...`, `cd ui && npm test` (48/48), `cd ui && npm run build`.
-
-**Phase 4 COMPLETE ✅** (4.1–4.6 all green; next is Phase 5 — Coordination).
-
-**Phase 5 — next to implement** (spec TBD; see `phase-5-*.md` when available).
+**Subphase 5.2 — next to implement** (message store + the three MCP tools; techspec §3.2–§3.5, §4.1, §6.1):
+- [ ] Add `messages` + `turn_budget` tables/indexes to the `state.db` migration (§4.1, §6.1).
+- [ ] `Store` messaging methods (§3.2): `LiveAgents`, `InsertMessage`, `ListMessages`, `MarkRead`, `DeleteMessages`, `UnreadCount`, `ResolveRecipient`.
+- [ ] Replace the spike `ping` tool with the three real typed handlers: `list_agents` (§3.3), `send_message` (§3.4), `check_messages` (§3.5), each closing over `*Store`, identity from the session token (resolve via `messaging.Server.Lookup`; unknown → `session_unknown`).
+- [ ] `to`-resolution (agent_id / role@project / name / ambiguous / not-found) + error shapes (§9). Budget is *read* here; turn-boundary enforcement lands in 5.3.
+- [ ] Unit tests: `to`-resolution cases + session identity (`from` always = session agent_id; unknown token → `session_unknown`).
+- **Checkpoint:** `go build ./...` (+ `-tags sqlite_fts5`) + `go test ./...` green.
 
 ---
 
@@ -80,7 +74,16 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 ## Blocked on human
 
-_(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` v0.16.2. Nothing blocking.)_
+- **GATED (not blocking 5.2): live two-CLI MCP registration confirmation.** Subphase 5.1 proved the
+  in-process HTTP streamable MCP transport works (round-trips a `ping` via the go-sdk client, both
+  directly and through the real dashboard mux). What can't be done without credentials: confirming that
+  the **real Claude Code and Codex CLIs** each accept the transport-(A) HTTP MCP entry (vs. needing the
+  transport-(B) stdio `agentdeck mcp` subcommand). This is a credentialed acceptance, same class as the
+  Phase 1 real-CLI run. **To do (human, ~30min):** launch the dashboard, register an HTTP MCP server
+  entry (`type:"http"`, `url:http://127.0.0.1:{port}/mcp`, header `X-AgentDeck-Token`) with each CLI and
+  confirm a `ping` tool call round-trips; if a CLI rejects HTTP, note it so 5.3's `RegisterMessagingMCP`
+  emits the stdio entry for that backend. This does **not** block 5.2/5.3 — they proceed targeting HTTP
+  with the stdio fallback ready.
 
 ## Review findings (from the last review — BLOCKING and ADVISORY)
 
@@ -96,6 +99,23 @@ _(no open findings)_
 ## Autonomous decisions (please review)
 
 > Resolved without stopping; the human should still see them. Remove once acknowledged (workflow §3, §5).
+
+- **NEW (5.1): `go` directive bumped `1.22 → 1.25.0`.** `go get github.com/modelcontextprotocol/go-sdk`
+  auto-raised the directive to the SDK's minimum (1.25.0); local toolchain is go1.25.5, all builds/tests
+  green. Forced, not chosen — the v1.x SDK the spec mandates requires it. **To reverse:** only by dropping
+  the SDK, which the phase can't do. No action expected; flagging because a toolchain-floor bump is a
+  durable repo change.
+- **NEW (5.1): `/mcp` registered for explicit `POST`/`GET`/`DELETE`, not method-agnostic.** A bare
+  method-agnostic `mux.Handle("/mcp", …)` panics — Go 1.22 mux rejects it as conflicting with the
+  existing `OPTIONS /` CORS route ("matches more methods but more specific path"). I registered the three
+  methods the streamable transport actually uses. **To reverse/extend:** if a future transport needs more
+  verbs on `/mcp`, add them explicitly (don't go method-agnostic while `OPTIONS /` exists).
+- **NEW (5.1): spike kept, not throwaway; `messaging.New` already takes `*state.Store`.** The spec allows
+  throwaway-or-keep; I built `internal/messaging` as the keep-able foundation 5.2 extends (the `ping` tool
+  is the only throwaway part — 5.2 replaces it with the three real tools). `New(store, log)` takes the
+  store now (the ping tool ignores it) to avoid a constructor-signature churn next subphase. The existing
+  `launch.go::messagingServer` stdio stub is left untouched and will be **superseded** by 5.3's
+  `RegisterMessagingMCP`. **To reverse:** none needed; it's additive.
 
 - **NEW (review fix): seeded-`my-app`-cwd advisory addressed only by surfacing the failure, not by
   pre-launch validation.** The advisory offered two arms: (a) steer users to set a real project before
@@ -175,6 +195,7 @@ _(no open findings)_
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-29 — **5.1 green — Go-MCP-SDK handshake spike.** Added `github.com/modelcontextprotocol/go-sdk v1.6.1` (`go` 1.22→1.25.0). New `internal/messaging` package: in-process `mcp.Server` + trivial `ping` tool over the streamable HTTP transport, mounted at `POST/GET/DELETE /mcp`; `token→agent_id` session registry; `X-AgentDeck-Token` header read per request. HTTP transport round-trip proven via `messaging.TestSpikePingRoundTrip` + `server.TestMCPRouteMounted` (go-sdk client through the real dashboard mux). Per-CLI live confirmation gated (Blocked on human). Task 1 outcome recorded in techspec §2.2. Build (both tags) + full tests green.
 - 2026-06-29 — **review fix: bare-form CLI resume respects `--name` — green.** `listInactiveSessions` now takes a `name` arg and filters by it when non-empty, so `agentdeck role@project --name X` only auto-resumes the inactive session actually named X (not any inactive role@project session). New `resume_test.go::TestListInactiveSessionsNameFilter` (no-name → all; named → exact). Build (both tags) + full tests green.
 - 2026-06-29 — **review fix: 4 Phase 2/3 UI advisories — green (53/53 UI, embedded dist refreshed).** (1) `transcriptStore` gained `foldTranscript`, used by `setTranscript`, so a REST refetch/archive replay folds `permission_resolved` into its `permission_request` (was left visually unresolved); regression test added. (2) `useDeleteRole`/`useDeleteProject` now throw the structured `{status, body}` error (shared `httpError` helper) so the editors' 409 `?force=true` retry actually fires; `useDeleteRole` rejection test. (3) `NewAgentModal` now reads `/api/config` and preselects `default_role`/`default_project` (falls back to first entry only when absent); preselect test. (4) Launch failures now surface the server's `error.message` (e.g. nonexistent project cwd) instead of opaque "HTTP 502"; test added — partially addresses the seeded-`my-app`-cwd advisory (see Autonomous decisions).
 - 2026-06-29 — **review fix: ACP protocol version mismatch now fails the handshake — green.** `ChatRuntime.Start`/`Resume` previously only `slog.Warn`ed on an out-of-range `protocolVersion`; per techspec §12.1 they now fail via new `checkACPVersion` + `ErrProtocolVersion` (pinned `[minACPVersion,maxACPVersion]` = `[1,1]`; missing/0 tolerated). fakeacp honors `FAKEACP_PROTO_VERSION`; new `TestStartProtocolVersionMismatch` asserts Start errors with `ErrProtocolVersion`. Build (both tags) + full tests green.
