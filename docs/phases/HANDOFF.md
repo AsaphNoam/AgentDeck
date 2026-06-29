@@ -96,14 +96,6 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
   normalizes events. A reload/archive refetch with `permission_request` followed by `permission_resolved`
   leaves the request visually unresolved because `TranscriptView` hides the resolution event. Add a
   replay/folding helper shared by live append and REST refetch, plus a `setTranscript` regression test.
-- **ADVISORY — `stop` is not idempotent after the first successful stop (Phase 1).** `Registry.Stop`
-  returns `ErrNoHandle` on a repeated call after deleting ownership, and the HTTP handler maps that to
-  404. A double-click or lost-response retry then looks like "unknown agent" even though the identity
-  still exists. Treat known stopped agents as already-stopped success, and reserve 404 for unknown ids.
-- **ADVISORY — ACP protocol version mismatch only logs (Phase 1).** `ChatRuntime.Start` and `Resume`
-  accept unsupported `protocolVersion` values and only warn, despite the tech spec calling for a clear
-  failure outside the pinned range. Fail early on incompatible protocol versions and add a fake-adapter
-  mismatch test.
 - **ADVISORY — force-delete retry UI cannot see 409 details (Phase 3).** The role/project delete
   mutations throw a plain `Error` instead of preserving `{status, body}`, while the editors expect those
   fields to offer the `?force=true` retry for in-use definitions. Parse/delete errors through the same
@@ -195,6 +187,8 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-29 — **review fix: ACP protocol version mismatch now fails the handshake — green.** `ChatRuntime.Start`/`Resume` previously only `slog.Warn`ed on an out-of-range `protocolVersion`; per techspec §12.1 they now fail via new `checkACPVersion` + `ErrProtocolVersion` (pinned `[minACPVersion,maxACPVersion]` = `[1,1]`; missing/0 tolerated). fakeacp honors `FAKEACP_PROTO_VERSION`; new `TestStartProtocolVersionMismatch` asserts Start errors with `ErrProtocolVersion`. Build (both tags) + full tests green.
+- 2026-06-29 — **review fix: stop is idempotent for known agents — green.** `handleStop` now returns 200 `{stopped:true}` when `Registry.Stop` reports `ErrNoHandle` but the identity row still exists (double-click / lost-response retry); 404 reserved for ids with no identity. New `TestStopIdempotent` (first stop 200, repeat 200, unknown id 404).
 - 2026-06-29 — **review fix: archive FTS no longer drops content past 1 MiB — green.** Removed the `maxContentBytes` keep-newest cap in `index.Indexer.addContent`; the FTS content buffer now accumulates the COMPLETE transcript so every phrase ever streamed stays searchable (and `reindex` rebuilds it complete). New tagged `TestIndexerFTSLongTranscript` indexes an early phrase + >1 MiB of later content and asserts the early phrase still `MATCH`es. Build (both tag modes) + full + tagged index/archive/state tests green. See Autonomous decisions for the unbounded-growth tradeoff.
 - 2026-06-29 — **review fix: session/load resume now applies fresh MCP registration — green.** `ChatRuntime.Resume` called `session/load` with only `{sessionId}`, so adapters where load succeeds never received the freshly-minted messaging MCP server (Phase 5 blocker). Added `sessionLoadParams(spec, sessionID)` (sessionId + cwd + mcpServers, mirroring ACP loadSession) and use it on the load path. fakeacp now dumps received `session/load` params via `FAKEACP_LOAD_DUMP`; new `TestResumeSessionLoadAppliesMCP` asserts the load path carries sessionId + the messaging server. Go build (both tag modes) + full tests green.
 - 2026-06-29 — **review fix: SSE watchdog permanent reconnect loop — green.** `ui/src/api/sse.ts` now resets `lastPing` in `connect()` so each fresh/reconnected stream gets the full 25s liveness window instead of inheriting a stale timestamp that reaped it before its first ping. New `src/api/sse.test.ts` drives a mock `EventSource` + fake timers: reaps the first (ping-less) stream at 30s, then asserts the reconnected stream survives the 5s watchdog tick before its ~10s first ping. UI 49/49, build green, embedded dist refreshed.
