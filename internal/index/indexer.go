@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode/utf8"
 
 	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/strutil"
@@ -153,8 +152,6 @@ WHERE agent_id = ?`,
 	return nil
 }
 
-const maxContentBytes = 1 << 20 // 1 MiB per agent
-
 func (ix *Indexer) addContent(agentID, text string) {
 	text = strings.TrimSpace(text)
 	if text == "" {
@@ -168,16 +165,12 @@ func (ix *Indexer) addContent(agentID, text string) {
 		ix.content[agentID] = text
 		return
 	}
-	combined := cur + "\n" + text
-	if len(combined) > maxContentBytes {
-		combined = combined[len(combined)-maxContentBytes:]
-		// The byte-slice cut can land mid-rune; drop the leading partial rune so
-		// the FTS content column never stores invalid UTF-8.
-		for len(combined) > 0 && !utf8.RuneStart(combined[0]) {
-			combined = combined[1:]
-		}
-	}
-	ix.content[agentID] = combined
+	// Accumulate the COMPLETE transcript so the archive-search contract holds:
+	// every phrase ever streamed stays searchable. (A prior 1 MiB cap kept only
+	// the newest bytes, silently dropping older content from sessions_fts even
+	// though the raw transcript was intact.) See HANDOFF "Autonomous decisions"
+	// for the unbounded-growth tradeoff and the segment-model alternative.
+	ix.content[agentID] = cur + "\n" + text
 }
 
 // seedLocked primes the in-memory content buffer for an agent from the durable
