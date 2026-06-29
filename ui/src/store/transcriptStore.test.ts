@@ -88,4 +88,16 @@ describe("transcriptStore", () => {
     expect(event.kind).toBe("assistant_text");
     expect(event.text ?? event.delta).toBe("hi");
   });
+
+  it("folds permission_resolved on setTranscript (refetch/archive replay)", () => {
+    useTranscriptStore.getState().setTranscript("a_6", [
+      { agent_id: "a_6", seq: 1, type: "permission_request", ts: "t1", data: { tool_call_id: "tc_7", name: "Bash", reason: "run" } },
+      { agent_id: "a_6", seq: 2, type: "permission_resolved", ts: "t2", data: { tool_call_id: "tc_7", decision: "deny" } },
+    ]);
+    const events = useTranscriptStore.getState().byAgent.a_6;
+    // The resolution event is folded into the request, not rendered on its own.
+    expect(events).toHaveLength(1);
+    expect(events[0].kind).toBe("permission_request");
+    expect(events[0].resolved).toBe("deny");
+  });
 });
