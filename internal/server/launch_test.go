@@ -1,8 +1,55 @@
 package server
 
 import (
+	"fmt"
+	"os"
+	"strings"
 	"testing"
+
+	"github.com/agentdeck/agentdeck/internal/hooks"
+	"github.com/agentdeck/agentdeck/internal/state"
 )
+
+func TestHookEnvInjected(t *testing.T) {
+	srv := testServer(t, true)
+	agent := state.Agent{AgentID: "a_h1", Interface: "terminal"}
+	env := srv.hookEnv(agent, "tok-xyz")
+	wantURL := fmt.Sprintf("http://127.0.0.1:%d/api/hook", srv.cfg.Port)
+	if env["AGENTDECK_HOOK_URL"] != wantURL {
+		t.Fatalf("AGENTDECK_HOOK_URL = %q, want %q", env["AGENTDECK_HOOK_URL"], wantURL)
+	}
+	if env["AGENTDECK_HOOK_TOKEN"] != "tok-xyz" || env["AGENTDECK_AGENT_ID"] != "a_h1" || env["AGENTDECK_INTERFACE"] != "terminal" {
+		t.Fatalf("hook env = %v", env)
+	}
+}
+
+func TestComposeHookRegistration(t *testing.T) {
+	srv := testServer(t, true)
+	agent := state.Agent{AgentID: "a_h2", Interface: "chat"}
+
+	// Default (flag off): writes the per-agent settings file, returns no launch args.
+	args, err := srv.composeHookRegistration(agent, "claude-acp")
+	if err != nil {
+		t.Fatalf("composeHookRegistration: %v", err)
+	}
+	if len(args) != 0 {
+		t.Fatalf("args = %v, want none while registration flag is off", args)
+	}
+	settingsPath := fmt.Sprintf("%s/agents/%s.json", hooks.Dir(srv.configStore.Home()), agent.AgentID)
+	if _, err := os.Stat(settingsPath); err != nil {
+		t.Fatalf("settings file not written: %v", err)
+	}
+
+	// Flag on: claude points the CLI at the settings file.
+	t.Setenv("AGENTDECK_HOOK_REGISTRATION", "1")
+	args, err = srv.composeHookRegistration(agent, "claude-acp")
+	if err != nil {
+		t.Fatalf("composeHookRegistration (on): %v", err)
+	}
+	if len(args) != 2 || args[0] != "--settings" || !strings.HasSuffix(args[1], ".json") {
+		t.Fatalf("args = %v, want [--settings <path>]", args)
+	}
+}
 
 func TestComposeEnvLayering(t *testing.T) {
 	base := []string{"PATH=/bin", "HOME=/home/x", "SHARED=base"}

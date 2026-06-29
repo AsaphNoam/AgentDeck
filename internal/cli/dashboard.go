@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/agentdeck/agentdeck/internal/hooks"
 	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/server"
 	"github.com/agentdeck/agentdeck/internal/state"
@@ -60,6 +61,10 @@ func resolveConfig(log *slog.Logger) (*config.Store, config.Config, error) {
 	}
 	if err := cfgStore.SeedIfAbsent(); err != nil {
 		return nil, config.Config{}, err
+	}
+	// (Re)install the hook scripts so they always match this binary (techspec §4.1).
+	if err := hooks.Install(cfgStore.Home()); err != nil {
+		log.Warn("install hooks", "err", err)
 	}
 	cfg, err := cfgStore.ReadConfig()
 	if err != nil {

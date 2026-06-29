@@ -9,9 +9,9 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 ## Current position
 
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
-- **Active subphase:** 6.2 (next) — hook scripts + registration + interface gate
+- **Active subphase:** 6.3 (next) — terminal runtime (xterm/PTY default + tmux)
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** 6.1 @ `main`: `go build ./...`, `go build -tags sqlite_fts5 ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...` (6.1 is Go-only — no `ui/` change).
+- **Last GREEN checkpoint:** 6.2 @ `main`: `go build ./...`, `go build -tags sqlite_fts5 ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...` (6.1/6.2 are Go-only — no `ui/` change).
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -44,13 +44,21 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 `HookMap`/`UnsupportedHookEvents`); chat runtime resolves spawn binary/env-strip per adapter (codex now runs through
 the chat runtime); `/api/hook` accepts the terminal lifecycle events + 401-on-stale-token. Details in changelog.
 
-**Subphase 6.2 — next to implement** (hook scripts + registration + interface gate; techspec §4.1–4.3, task 4):
-- [ ] Write `~/.agentdeck/hooks/` script set: `_post.sh` helper (`jq`-encoded JSON → `curl POST /api/hook`, carrying `AGENTDECK_*` env) + `session-start.sh`, `user-prompt-submit.sh`, `pre-tool-use.sh`, `post-tool-use.sh`, `stop.sh`.
-- [ ] Interface gate in `_post.sh`: `AGENTDECK_INTERFACE=chat` → `exit 0` for events the chat runtime already owns (SessionStart/UserPromptSubmit/Pre/PostToolUse/Stop); `terminal` → always POST.
-- [ ] Install/refresh the scripts on server startup (so they always match the running binary).
-- [ ] Launch-time registration: inject `AGENTDECK_HOOK_URL`/`AGENTDECK_HOOK_TOKEN`/`AGENTDECK_AGENT_ID`/`AGENTDECK_INTERFACE` per launch and map each lifecycle event → `~/.agentdeck/hooks/<event>.sh` via the per-backend `hookMap` (claude settings injection; codex per its surface).
-- **Checkpoint:** `go build ./...` + `go test ./...`; interface-gate test (chat → no POST for covered events; terminal → POSTs); scripts install on startup; a chat agent shows no redundant hook POSTs.
-- **Resume note:** `/api/hook` ingest + adapter `HookMap` exist; no scripts written, no launch-time registration yet. The hook env-var names + the `hookMap` are the contract to wire.
+**Subphase 6.2 ✅ — hook scripts + registration + interface gate.** New `internal/hooks`: embedded `_post.sh`
+(jq-encoded `curl POST /api/hook`, interface gate) + 5 event wrappers, `Install(home)` (rewritten on dashboard
+startup), `ClaudeSettings`/`WriteAgentSettings`. Launch + resume inject `AGENTDECK_*` env and write a per-agent
+settings file; `BackendAdapter.HookLaunchArgs` (claude `--settings <path>`, codex gated). The `--settings`
+passthrough is gated behind `AGENTDECK_HOOK_REGISTRATION=1` (default off) so real launches aren't regressed. Details
+in changelog.
+
+**Subphase 6.3 — next to implement** (terminal runtime: xterm/PTY default + tmux; techspec §3, §8.5, task 5):
+- [ ] `internal/runtime/terminal` implementing `Runtime` (`Start/SendPrompt/Cancel/Stop/Resume/CheckMessages`), registered under `interface == "terminal"` (replaces the `notImplementedRuntime` stub).
+- [ ] `TerminalDriver` seam (`StartTab`, `WriteText`, `ReadTTY`, `CloseTab`, `RevealTab`); xterm.js/PTY driver (`github.com/creack/pty`) + tmux driver.
+- [ ] PTY↔WebSocket bridge at `/api/sessions/{id}/terminal/ws` (keystrokes → PTY master; output → frames; `{cols,rows}` → `pty.Setsize`).
+- [ ] `terminal.Capabilities()` + `GET /api/capabilities` (xterm always available, tmux if on PATH, iterm2 omitted off-darwin); `tty`/`driver`/`driver_ids` written to the running row.
+- [ ] Status flows from hooks only (the 6.2 scripts already POST when `AGENTDECK_INTERFACE=terminal`); runtime sets only the initial idle (race-guarded) + a terminal done on Stop.
+- **Checkpoint:** `go build ./...` + `go test ./...`; PTY-bridge unit tests (keystroke→master write, output→frame, resize→`Setsize`); `GET /api/capabilities` returns `xterm:true`, `default_driver:"xterm"`; a terminal agent launches, records `tty`, idle→busy→idle via hook POSTs.
+- **Resume note:** hooks POST terminal status (6.2) but `interface=="terminal"` still returns "not implemented". Note: the running-row schema already has `tty`; `driver`/`driver_ids` columns do NOT exist yet — add a state migration or store them in an existing column. Begin with the `TerminalDriver` interface, then the PTY driver + WS bridge, then capabilities.
 
 ---
 
@@ -112,6 +120,17 @@ _(no open findings)_
 
 > Resolved without stopping; the human should still see them. Remove once acknowledged (workflow §3, §5).
 
+- **NEW (6.2): CLI hook-registration `--settings` passthrough is gated behind `AGENTDECK_HOOK_REGISTRATION=1`
+  (default OFF).** The launch composer always injects the `AGENTDECK_*` env and writes the per-agent settings file,
+  but the args that point the CLI at that file (claude `--settings <path>`) are only added when the flag is set —
+  because whether `claude-code-acp` forwards `--settings` to Claude is unverified, and passing an unknown flag to the
+  real binary would regress the currently-green chat-launch path. The full pipeline is wired + tested; only the final
+  flag is gated. **To activate:** confirm the flag against a live CLI, then set `AGENTDECK_HOOK_REGISTRATION=1` (or
+  flip the default in `composeHookRegistration`). Codex's `HookLaunchArgs` returns nil (its hook surface is gated too).
+- **NEW (6.2): hook scripts require `jq` + `curl` on PATH (POSIX `sh`).** Per techspec §2.3 these are documented
+  prereqs (no python3/node at runtime). `_post.sh`'s interface gate runs before `jq`/`curl`, so a chat agent
+  self-suppresses even without them; a terminal agent needs both to POST. No fallback is provided. **To reverse:**
+  add a curl-less POST path (e.g. a tiny `agentdeck hook-post` subcommand) if a target host lacks them.
 - **NEW (6.1): terminal-CLI `Stop` hook does NOT clear the running row.** The subphase line said "running-row
   refresh/clear on SessionStart/Stop", but Claude Code's `Stop` hook fires at the **end of each turn**, not on CLI
   exit (§4.2 footnote ties the clear to "CLI exit", a separate signal). Clearing on every `Stop` would unregister a
@@ -244,6 +263,17 @@ _(no open findings)_
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-29 — **6.2 green — hook scripts + registration + interface gate.** New `internal/hooks` package: embedded
+  POSIX-`sh` script set — `_post.sh` (jq-encoded body → `curl POST /api/hook`, with the `AGENTDECK_INTERFACE=chat`
+  self-suppression gate for runtime-owned events) + `session-start/user-prompt-submit/pre-tool-use/post-tool-use/stop.sh`
+  wrappers; `Install(home)` atomically (re)writes them to `{home}/hooks` on dashboard startup; `ClaudeSettings` +
+  `WriteAgentSettings` compose a per-agent Claude hooks settings file from the adapter `HookMap`. Launch + resume now
+  inject `AGENTDECK_HOOK_URL/TOKEN/AGENT_ID/INTERFACE` env and write the settings file; new
+  `BackendAdapter.HookLaunchArgs` (claude `--settings <path>`, codex nil/gated) feeds `LaunchSpec.ExtraArgs`, appended
+  to the spawn argv. The `--settings` activation is gated behind `AGENTDECK_HOOK_REGISTRATION=1` (default off) so real
+  launches aren't regressed by an unverified flag (see Autonomous decisions). Tests: hooks install/executability,
+  `ClaudeSettings` shape, hermetic interface-gate (shimmed curl+jq: chat→no POST, terminal→POST); server hookEnv +
+  composeHookRegistration; adapter `HookLaunchArgs`. Green both tag modes (Go-only).
 - 2026-06-29 — **6.1 green — hook ingest hardened + backend adapter + Codex (chat).** New `internal/backend/adapter.go`:
   `BackendAdapter` for `claude-acp`/`codex-acp` carrying `Binary`/`LaunchArgs`/`StripEnvKeys`/`ResolveResumeID`/
   `CanSwitchModelOnResume`/`HookMap`/`UnsupportedHookEvents`. `ChatRuntime` now resolves the spawn binary + env-strip
