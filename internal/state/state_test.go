@@ -83,7 +83,7 @@ func TestOpenMigratesAndConfiguresSQLite(t *testing.T) {
 		t.Fatalf("synchronous = %d, want 1 (NORMAL)", synchronous)
 	}
 
-	for _, table := range []string{"schema_migrations", "agents", "running", "status", "messages", "sessions", "sessions_fts", "tracked_files", "tracked_commands"} {
+	for _, table := range []string{"schema_migrations", "agents", "running", "status", "messages", "turn_budget", "sessions", "sessions_fts", "tracked_files", "tracked_commands"} {
 		var name string
 		err := st.DB().QueryRow(
 			`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`,
@@ -97,8 +97,8 @@ func TestOpenMigratesAndConfiguresSQLite(t *testing.T) {
 	if err := st.DB().QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil {
 		t.Fatalf("schema_migrations version: %v", err)
 	}
-	if version != 4 {
-		t.Fatalf("migration version = %d, want 4", version)
+	if version != 5 {
+		t.Fatalf("migration version = %d, want 5", version)
 	}
 }
 
@@ -129,8 +129,8 @@ func TestOpenIsIdempotentAndPreservesRows(t *testing.T) {
 	if err := reopened.DB().QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatalf("count migration: %v", err)
 	}
-	if count != 4 {
-		t.Fatalf("migration version rows = %d, want 4", count)
+	if count != 5 {
+		t.Fatalf("migration version rows = %d, want 5", count)
 	}
 }
 
@@ -183,27 +183,54 @@ func TestRoundTripStateObjects(t *testing.T) {
 	if err := st.WriteAgent(recipient); err != nil {
 		t.Fatalf("WriteAgent recipient: %v", err)
 	}
+	_ = read
 	msg := Message{
-		FromAgent: agent.AgentID,
-		ToAgent:   recipient.AgentID,
-		Body:      "Please review auth.",
-		CreatedAt: mustTime(t, "2026-06-22T10:00:03Z"),
-		ReadAt:    &read,
+		FromAgent:   agent.AgentID,
+		FromAddress: address(agent.Role, agent.Project),
+		FromName:    agent.Name,
+		ToAgent:     recipient.AgentID,
+		Subject:     "Review request",
+		Body:        "Please review auth.",
+		CreatedAt:   mustTime(t, "2026-06-22T10:00:03Z"),
 	}
-	id, err := st.WriteMessage(msg)
+	id, err := st.InsertMessage(msg)
 	if err != nil {
-		t.Fatalf("WriteMessage: %v", err)
+		t.Fatalf("InsertMessage: %v", err)
 	}
-	msg.ID = id
-	if got, err := st.ReadMessage(id); err != nil || !reflect.DeepEqual(got, msg) {
-		t.Fatalf("ReadMessage round-trip: got %+v err %v, want %+v", got, err, msg)
+	if !regexp.MustCompile(`^m_[0-9a-f]{6}$`).MatchString(id) {
+		t.Fatalf("message_id = %q, want ^m_[0-9a-f]{6}$", id)
 	}
-	messages, err := st.ListMessages(recipient.AgentID)
+	messages, err := st.ListMessages(recipient.AgentID, false, 0)
 	if err != nil {
 		t.Fatalf("ListMessages: %v", err)
 	}
-	if !reflect.DeepEqual(messages, []Message{msg}) {
-		t.Fatalf("messages = %+v, want %+v", messages, []Message{msg})
+	if len(messages) != 1 {
+		t.Fatalf("messages = %+v, want 1 row", messages)
+	}
+	got := messages[0]
+	if got.MessageID != id || got.FromAgent != agent.AgentID || got.ToAgent != recipient.AgentID ||
+		got.Body != msg.Body || got.Subject != msg.Subject || got.Read || got.DeliveredVia != "pending" {
+		t.Fatalf("message round-trip = %+v", got)
+	}
+
+	// Unread filter + count, mark-read, delete.
+	if n, err := st.UnreadCount(recipient.AgentID); err != nil || n != 1 {
+		t.Fatalf("UnreadCount = %d err %v, want 1", n, err)
+	}
+	if err := st.MarkRead([]string{id}); err != nil {
+		t.Fatalf("MarkRead: %v", err)
+	}
+	if n, err := st.UnreadCount(recipient.AgentID); err != nil || n != 0 {
+		t.Fatalf("UnreadCount after MarkRead = %d err %v, want 0", n, err)
+	}
+	if unread, err := st.ListMessages(recipient.AgentID, true, 0); err != nil || len(unread) != 0 {
+		t.Fatalf("unread-only after MarkRead = %+v err %v, want []", unread, err)
+	}
+	if err := st.DeleteMessages([]string{id}); err != nil {
+		t.Fatalf("DeleteMessages: %v", err)
+	}
+	if all, err := st.ListMessages(recipient.AgentID, false, 0); err != nil || len(all) != 0 {
+		t.Fatalf("messages after delete = %+v err %v, want []", all, err)
 	}
 }
 
@@ -218,7 +245,7 @@ func TestListEmptyAndReadNotFound(t *testing.T) {
 	if statuses, err := st.ListStatus(); err != nil || len(statuses) != 0 {
 		t.Fatalf("ListStatus empty = %+v err %v, want [] nil", statuses, err)
 	}
-	if messages, err := st.ListMessages("a_nope"); err != nil || len(messages) != 0 {
+	if messages, err := st.ListMessages("a_nope", false, 0); err != nil || len(messages) != 0 {
 		t.Fatalf("ListMessages empty = %+v err %v, want [] nil", messages, err)
 	}
 
@@ -230,9 +257,6 @@ func TestListEmptyAndReadNotFound(t *testing.T) {
 	}
 	if _, err := st.ReadStatus("a_nope"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("ReadStatus missing err = %v, want ErrNotFound", err)
-	}
-	if _, err := st.ReadMessage(123); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("ReadMessage missing err = %v, want ErrNotFound", err)
 	}
 }
 
@@ -303,11 +327,14 @@ func TestDeleteAgentCascades(t *testing.T) {
 	if err := st.WriteStatus(Status{AgentID: agent.AgentID, State: "idle"}); err != nil {
 		t.Fatalf("WriteStatus: %v", err)
 	}
-	if _, err := st.WriteMessage(Message{
-		FromAgent: agent.AgentID, ToAgent: recipient.AgentID, Body: "hello",
+	// Phase 5: messages have no agent FK (they outlive a stopped/deleted agent
+	// until the janitor — techspec §4.3), so they are not cascade-deleted here.
+	if _, err := st.InsertMessage(Message{
+		FromAgent: agent.AgentID, FromAddress: address(agent.Role, agent.Project), FromName: agent.Name,
+		ToAgent: recipient.AgentID, Body: "hello",
 		CreatedAt: mustTime(t, "2026-06-22T10:00:03Z"),
 	}); err != nil {
-		t.Fatalf("WriteMessage: %v", err)
+		t.Fatalf("InsertMessage: %v", err)
 	}
 
 	if err := st.DeleteAgent(agent.AgentID); err != nil {
@@ -319,12 +346,13 @@ func TestDeleteAgentCascades(t *testing.T) {
 	if _, err := st.ReadStatus(agent.AgentID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("ReadStatus after DeleteAgent err = %v, want ErrNotFound", err)
 	}
-	messages, err := st.ListMessages(recipient.AgentID)
+	// The message survives the deleted sender (no FK cascade).
+	messages, err := st.ListMessages(recipient.AgentID, false, 0)
 	if err != nil {
 		t.Fatalf("ListMessages after DeleteAgent: %v", err)
 	}
-	if len(messages) != 0 {
-		t.Fatalf("messages after DeleteAgent = %+v, want []", messages)
+	if len(messages) != 1 {
+		t.Fatalf("messages after DeleteAgent = %+v, want 1 (no cascade)", messages)
 	}
 }
 
@@ -339,7 +367,10 @@ func TestDeleteMethodsAreIdempotent(t *testing.T) {
 	if err := st.DeleteStatus("a_nope"); err != nil {
 		t.Fatalf("DeleteStatus missing: %v", err)
 	}
-	if err := st.DeleteMessage(42); err != nil {
-		t.Fatalf("DeleteMessage missing: %v", err)
+	if err := st.DeleteMessages([]string{"m_nope"}); err != nil {
+		t.Fatalf("DeleteMessages missing: %v", err)
+	}
+	if err := st.MarkRead([]string{"m_nope"}); err != nil {
+		t.Fatalf("MarkRead missing: %v", err)
 	}
 }
