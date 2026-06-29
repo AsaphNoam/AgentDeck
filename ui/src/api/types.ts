@@ -19,9 +19,25 @@ export interface AgentState {
   last_trace?: string;
   busy_since?: string;
   context_pct: number;
+  unread_messages?: number;
+  last_sent_at?: string;
   updated_at: number;
   removed?: boolean;
   hydrated?: boolean;
+}
+
+export type NotificationType = "done" | "waiting_input" | "permission_required" | "budget_exceeded";
+
+export interface NotificationPayload {
+  type: "notification";
+  notification_type: NotificationType;
+  agent_id: string;
+  agent_name?: string;
+  address?: string;
+  title: string;
+  body?: string;
+  detail?: Record<string, unknown>;
+  ts: string;
 }
 
 export interface BusEvent<T = unknown> {

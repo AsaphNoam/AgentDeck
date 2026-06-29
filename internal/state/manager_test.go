@@ -68,6 +68,32 @@ func TestManagerRecomputesEffectiveAgentState(t *testing.T) {
 	}
 }
 
+func TestManagerIncludesUnreadMessageCount(t *testing.T) {
+	st, _ := newTestStore(t)
+	pub := &capturePublisher{}
+	mgr := NewManager(st, pub)
+	agent := testAgent("a_8f3c12", mustTime(t, "2026-06-22T10:00:00Z"))
+	sender := testAgent("a_sender", mustTime(t, "2026-06-22T10:00:00Z"))
+	for _, a := range []Agent{agent, sender} {
+		if err := st.WriteAgent(a); err != nil {
+			t.Fatalf("WriteAgent: %v", err)
+		}
+	}
+	if _, err := st.InsertMessage(Message{
+		FromAgent: sender.AgentID, FromAddress: "implementer@my-app", FromName: sender.Name,
+		ToAgent: agent.AgentID, Body: "hello",
+	}); err != nil {
+		t.Fatalf("InsertMessage: %v", err)
+	}
+	update, err := mgr.Touch(agent.AgentID)
+	if err != nil {
+		t.Fatalf("Touch: %v", err)
+	}
+	if update.UnreadMessages != 1 {
+		t.Fatalf("UnreadMessages = %d, want 1", update.UnreadMessages)
+	}
+}
+
 func TestManagerRecomputeRunningFalseAndRemovalTombstone(t *testing.T) {
 	withFixedNow(t, mustTime(t, "2026-06-22T10:01:00Z"))
 	st, _ := newTestStore(t)

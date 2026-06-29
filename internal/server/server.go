@@ -71,10 +71,17 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	ix := persistindex.New(stateStore.DB())
 	msg := messaging.New(stateStore, log)
 	nudgeCh := make(chan string, 32)
-	msg.SetMessageInsertedSink(func(agentID string) {
+	msg.SetMessageInsertedSink(func(fromAgentID, toAgentID string) {
 		select {
-		case nudgeCh <- agentID:
+		case nudgeCh <- toAgentID:
 		default:
+		}
+		if update, err := stateMgr.Touch(toAgentID); err == nil {
+			eventBus.SetSnapshot(update)
+		}
+		if update, err := stateMgr.Touch(fromAgentID); err == nil {
+			update.LastSentAt = time.Now().UTC().Format(time.RFC3339)
+			eventBus.PublishStateUpdate(update)
 		}
 	})
 	msg.SetBudgetExceededSink(func(agentID, turnID string, used int) {

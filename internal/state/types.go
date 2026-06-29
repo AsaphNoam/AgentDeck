@@ -62,7 +62,9 @@ type AgentState struct {
 	BusySince  string  `json:"busy_since,omitempty"`
 	ContextPct float64 `json:"context_pct"`
 
-	UpdatedAt int64 `json:"updated_at"`
+	UnreadMessages int    `json:"unread_messages,omitempty"`
+	LastSentAt     string `json:"last_sent_at,omitempty"`
+	UpdatedAt      int64  `json:"updated_at"`
 }
 
 // AgentStateUpdate is the payload published after Manager recomputes an agent.

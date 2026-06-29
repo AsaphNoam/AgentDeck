@@ -149,7 +149,7 @@ func (s *Server) handleSendMessage(_ context.Context, req *mcp.CallToolRequest, 
 			"used":    MessageBudgetPerTurn,
 		})
 	}
-	s.messageInserted(toID)
+	s.messageInserted(self, toID)
 	return jsonResult(map[string]any{
 		"ok":         true,
 		"message_id": msgID,

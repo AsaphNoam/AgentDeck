@@ -8,10 +8,10 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 
 ## Current position
 
-- **Active phase:** 5 — Coordination: MCP messaging, nudger, budgets, notifications
-- **Active subphase:** 5.4 (next) — notifications + dashboard message indicators
-- **Spec:** [`tech/phase-5-coordination-techspec.md`](tech/phase-5-coordination-techspec.md) (PRD: [`phase-5-coordination.md`](phase-5-coordination.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** 5.3 @ `main`: `go build ./...`, `go build -tags sqlite_fts5 ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`. No UI changes 5.1–5.3.
+- **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
+- **Active subphase:** 6.1 (next) — hook ingest + backend adapter + Codex (chat)
+- **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
+- **Last GREEN checkpoint:** 5.4 / Phase 5 complete @ `main`: `go build ./...`, `go build -tags sqlite_fts5 ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, `cd ui && npm test`, `cd ui && npm run build`.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -23,7 +23,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - [x] Phase 2 — State manager, SSE bus, dashboard card grid ✅
 - [x] Phase 3 — Config CRUD & onboarding ✅
 - [x] Phase 4 — Persistence: archive, search, resume, file/command tracking ✅
-- [ ] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications
+- [x] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications ✅
 - [ ] Phase 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - [ ] Phase 7 — Polish: activity map
 
@@ -37,20 +37,13 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 **Phases 0–4 complete ✅** (all subphases green; details in git history & Phase status above).
 
-**Subphase 5.1 ✅ — Go-MCP-SDK handshake spike.** Added `github.com/modelcontextprotocol/go-sdk v1.6.1` (`go` directive `1.22→1.25.0`). `internal/messaging`: in-process `mcp.Server` over the streamable HTTP transport mounted at `POST/GET/DELETE /mcp`; `token→agent_id` session registry; `X-AgentDeck-Token` read per request. HTTP transport round-trip proven; per-CLI live confirmation GATED (see Blocked on human); Task 1 outcome in techspec §2.2.
+**Phase 5 complete ✅.** MCP messaging server, message store/tools, per-agent registration, nudger, per-turn budgets, janitor, notification SSE, config-backed notification mutes, Web Notification/in-app toast client, message badges/outbound pulse, and read-only inbox endpoint are all green. Details live in git history (`5.1`–`5.4`) and changelog.
 
-**Subphase 5.2 ✅ — message store + the three MCP tools.** Migration v5 replaced the Phase-0 placeholder `messages` table and added `turn_budget`; `state` gained `LiveAgents`/`ResolveRecipient`/message CRUD/unread helpers; `messaging` replaced the spike with `list_agents`/`send_message`/`check_messages` using session-token identity and §9 error shapes.
-
-**Subphase 5.3 ✅ — registration, nudger, turn budget, janitor.** `registerMessagingMCP` now mints per-agent tokens, registers `token→agent_id`, writes per-agent HTTP MCP config files under `~/.agentdeck/mcp/{agent_id}.mcp.json`, wires launch/resume MCP specs, and cleans token+file on stop/start failure/shutdown. Chat runtime `CheckMessages(pid)` injects the nudge turn with idle/in-flight guards; user turns and nudges reset `turn_budget` rows via runtime-owned `t_` counters. `send_message`/`check_messages` now use transactional budget-aware store helpers; 16th outbound send returns `message_budget_exceeded`, check caps to remaining budget, `breached=1` is persisted, WARN logged, and `budget_exceeded` SSE notification emitted. Nudger loop (ticker + insert signal) wakes idle agents and stamps unread rows `delivered_via='nudge'`; `MarkRead` stamps poll reads as `delivered_via='poll'`. Janitor loop deletes read>24h and any>7d. Tests added/updated: budget breach/cap, transactional budget state, poll stamp, retention, registration cleanup, runtime nudge prompt, server nudge pass.
-
-**Subphase 5.4 — next to implement** (notifications + dashboard message indicators; techspec §7–§8):
-- [ ] State-manager extensions: recompute `unread_messages` on message-row change; emit `last_sent_at` outbound pulse on sender `state_update`; edge-trigger `notification` SSE on done/waiting_input/permission_required/budget_exceeded.
-- [ ] Notification settings persistence: extend config or add focused endpoints for `notifications.desktop_enabled` and per-type mute (`done`, `waiting_input`, `permission_required`, `budget_exceeded`).
-- [ ] Optional inbox endpoint: `GET /api/sessions/{id}/messages` (read-only, newest first, no mark-read).
-- [ ] UI notification client: consume SSE `notification`, route backgrounded tab to Web Notifications when permitted, visible tab to in-app toast, honor mute settings.
-- [ ] Settings notifications panel: desktop master switch + per-type mute toggles.
-- [ ] Card indicators: unread mail badge + transient outbound pulse from `state_update`.
-- **Checkpoint:** `go build ./...` + `go test ./...` + `cd ui && npm run build`; include UI tests for mute filtering and backgrounded notification behavior plus Go tests for notification/indicator emission.
+**Subphase 6.1 — next to implement** (hook ingest + backend adapter + Codex chat; techspec §4.4, §6, §8.6):
+- [ ] Harden `POST /api/hook`: per-launch-token validation, running-row refresh/clear on `SessionStart`/`Stop`, valid token applies status + emits `state_update`, stale token → `401`.
+- [ ] Extract `internal/backend/adapter.go` with `BackendAdapter` interface and `claude-acp` implementation from current inline launch/runtime logic; carry capability flags, `hookMap`, and `resolveResumeId`.
+- [ ] Add `codex-acp` adapter and per-model env in the launch composer; make Codex launch → prompt → stream → stop → native resume work through existing chat runtime.
+- **Checkpoint:** `go build ./...` + `go test ./...`; include hook-ingest tests and the Codex chat acceptance gate if credentials/tools are available, otherwise leave the credentialed live run gated like prior real-CLI checks.
 
 ---
 
@@ -79,7 +72,7 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 ## Blocked on human
 
-- **GATED (not blocking 5.4): live two-CLI MCP registration confirmation.** Subphase 5.1 proved the
+- **GATED (not blocking 6.1): live two-CLI MCP registration confirmation.** Subphase 5.1 proved the
   in-process HTTP streamable MCP transport works (round-trips a `ping` via the go-sdk client, both
   directly and through the real dashboard mux). What can't be done without credentials: confirming that
   the **real Claude Code and Codex CLIs** each accept the transport-(A) HTTP MCP entry (vs. needing the
@@ -105,6 +98,7 @@ _(no open findings)_
 
 > Resolved without stopping; the human should still see them. Remove once acknowledged (workflow §3, §5).
 
+- **NEW (5.4): notification edge detection lives in `internal/bus`, not `state.Manager`.** The tech spec phrases this as a state-manager extension, but the bus already owns the prior `AgentStateUpdate` snapshot needed to edge-detect `done`/`waiting_input` without adding another state cache. `state.Manager` still recomputes `unread_messages`; `bus.PublishStateUpdate` emits `notification` on transitions, and `bus.PublishRuntimeEvent` emits `permission_required`. **To reverse:** move the previous-state cache and notification publishing into `state.Manager` and have the bus only transport events.
 - **NEW (5.3): HTTP MCP entries emitted for both `claude-acp` and `codex-acp` while live CLI verdict remains gated.** The spec's Task 1 wants a per-CLI HTTP-vs-stdio decision, but the credentialed live confirmation is still blocked on the human. I chose the already-proven in-process HTTP transport for both backends and left the stdio fallback branch in `registerMessagingMCP` for a future verdict. **To reverse:** change `usesHTTPMessagingMCP(backendType)` for any backend that rejects HTTP and implement/enable the `agentdeck mcp` proxy path.
 - **NEW (5.3): direct MCP calls without a runtime turn use implicit turn `t_000000000000`.** Runtime-owned turns still reset real `t_` counters at user/nudge turn boundaries. The implicit row exists so direct MCP tests/manual calls have deterministic budget accounting instead of bypassing the loop cap or failing before a runtime turn. **To reverse:** make `CurrentTurnBudget`/`ConsumeTurnBudget` return an error when no runtime-created row exists and require tests/manual callers to reset one first.
 - **NEW (5.1): `go` directive bumped `1.22 → 1.25.0`.** `go get github.com/modelcontextprotocol/go-sdk`
@@ -219,6 +213,7 @@ _(no open findings)_
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-29 — **5.4 green / Phase 5 COMPLETE — notifications + dashboard message indicators.** `AgentState` now includes `unread_messages` and `last_sent_at`; message sends touch recipient/sender state for unread badges and outbound pulse; bus emits edge-triggered `notification` SSE for done/waiting_input/permission_required plus the existing budget_exceeded path. `config.json` gained `notifications.desktop_enabled` + per-type mutes via existing `GET/PUT /api/config`; UI consumes notification SSE, sends hidden-tab desktop notifications when permitted, visible-tab toasts otherwise, and adds Settings notification toggles. Added read-only `GET /api/sessions/{id}/messages`. Embedded UI refreshed. Tests: Go notification/indicator/config/inbox coverage; UI mute + hidden desktop notification + settings toggle. Checkpoint green: Go standard/tagged build+tests, `cd ui && npm test`, `cd ui && npm run build`.
 - 2026-06-29 — **5.3 green — registration, nudger, turn budget, janitor.** Added per-agent HTTP MCP registration files + token cleanup wired through launch/resume/stop/shutdown; chat `CheckMessages(pid)` now injects a nudge turn and runtime turns reset `turn_budget`. `send_message`/`check_messages` enforce the shared 15-action budget transactionally (`message_budget_exceeded`, persisted `breached=1`, WARN + `budget_exceeded` SSE); nudger wakes idle agents on ticker/insert signal and stamps `delivered_via='nudge'`; poll reads now stamp `delivered_via='poll'`; janitor deletes read>24h and any>7d. Tests cover registration cleanup, runtime/server nudge, budget breach/caps, retention, and poll stamping. Checkpoint green: `go build ./...`, `go build -tags sqlite_fts5 ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
 - 2026-06-29 — **5.2 green — message store + three MCP tools.** Migration v5 replaces the Phase-0 placeholder `messages` table with the §4.1 schema (TEXT `message_id` PK, no agent FK) + adds `turn_budget`. New `state` messaging API (`LiveAgents`, `ResolveRecipient`, `InsertMessage`, `ListMessages`, `MarkRead`, `DeleteMessages`, `UnreadCount`) + `Message`/`LiveAgent`/`AgentRef` types. `messaging` package: `list_agents`/`send_message`/`check_messages` tools replace the `ping` spike, identity from the session token (`req.Extra.Header`→`Lookup`, unknown→`session_unknown`), §9 error shapes, locked §13 constants. Budget enforcement deferred to 5.3 (static cap + TODO). New state + messaging tests; updated Phase-0 state tests (cascade now asserts mail survives a deleted sender) + `server.TestMCPRouteMounted`. Build + full tests green both tag modes.
 - 2026-06-29 — **5.1 green — Go-MCP-SDK handshake spike.** Added `github.com/modelcontextprotocol/go-sdk v1.6.1` (`go` 1.22→1.25.0). New `internal/messaging` package: in-process `mcp.Server` + trivial `ping` tool over the streamable HTTP transport, mounted at `POST/GET/DELETE /mcp`; `token→agent_id` session registry; `X-AgentDeck-Token` header read per request. HTTP transport round-trip proven via `messaging.TestSpikePingRoundTrip` + `server.TestMCPRouteMounted` (go-sdk client through the real dashboard mux). Per-CLI live confirmation gated (Blocked on human). Task 1 outcome recorded in techspec §2.2. Build (both tags) + full tests green.

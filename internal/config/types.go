@@ -70,10 +70,16 @@ type Density struct {
 
 // Config is the top-level config.json. Version is the schema version (== 1).
 type Config struct {
-	Version             int    `json:"version"`              // == 1
-	Port                int    `json:"port"`                 // 4317
-	DefaultProject      string `json:"default_project"`      // "my-app"
-	DefaultRole         string `json:"default_role"`         // "implementer"
-	SkipPermissions     bool   `json:"skip_permissions"`     // false
-	OnboardingComplete  bool   `json:"onboarding_complete"`  // set after first launch
+	Version            int                 `json:"version"`             // == 1
+	Port               int                 `json:"port"`                // 4317
+	DefaultProject     string              `json:"default_project"`     // "my-app"
+	DefaultRole        string              `json:"default_role"`        // "implementer"
+	SkipPermissions    bool                `json:"skip_permissions"`    // false
+	OnboardingComplete bool                `json:"onboarding_complete"` // set after first launch
+	Notifications      NotificationsConfig `json:"notifications"`
+}
+
+type NotificationsConfig struct {
+	DesktopEnabled bool            `json:"desktop_enabled"`
+	Muted          map[string]bool `json:"muted"`
 }
