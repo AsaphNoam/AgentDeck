@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -240,6 +241,21 @@ func TestChatBackendGate(t *testing.T) {
 	c := NewChatRuntime(nil)
 	if _, err := c.Start(context.Background(), LaunchSpec{BackendType: "codex-acp"}); err == nil {
 		t.Fatal("codex-acp Start should error")
+	}
+}
+
+// TestStartProtocolVersionMismatch verifies Start fails (not just warns) when
+// the adapter negotiates an ACP protocol version outside the pinned range.
+func TestStartProtocolVersionMismatch(t *testing.T) {
+	c, spec := newChatTest(t, "stream_text")
+	spec.Env = append(spec.Env, "FAKEACP_PROTO_VERSION=99")
+
+	_, err := c.Start(context.Background(), spec)
+	if err == nil {
+		t.Fatal("Start should fail on incompatible protocol version")
+	}
+	if !errors.Is(err, ErrProtocolVersion) {
+		t.Fatalf("err = %v, want ErrProtocolVersion", err)
 	}
 }
 
