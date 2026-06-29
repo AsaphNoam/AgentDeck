@@ -21,14 +21,15 @@ Claude and Codex taking turns). Do **not** improvise a process — follow the sh
 - **Flag every judgment call.** If an ambiguity or spec gap forced *you* to make a design/implementation decision (without stopping), record it under `## Autonomous decisions (please review)` **and** call it out explicitly in your end-of-turn summary — never let the human find a self-made decision only by reading the diff.
 - **Do the work yourself** — don't hand the build to sub-agents that can't run the build/test commands.
 
-## If you're here to review the last commit/PR
+## If you're here to review the last commit
 
-Prompt: `"Review the last commit/PR per AGENTS.md."`
+Prompt: `"Review the last commit per AGENTS.md."`
 
 Follow **[`docs/phases/AGENT-WORKFLOW.md`](docs/phases/AGENT-WORKFLOW.md) §8** exactly. In short:
-find the diff, cross-reference the relevant phase PRD + tech spec, flag **BLOCKING** and **ADVISORY**
-issues only (spec violations, dead code, bad practices, flagrant bugs that affect normal usage —
-not style nits, not micro-optimizations). Write **every** finding (both severities, tagged) to
+find the diff (last GREEN-checkpoint commit(s) on `main` since the previous review — trunk-based, no
+PRs), cross-reference the relevant phase PRD + tech spec, flag **BLOCKING** and **ADVISORY** issues
+only (spec violations, dead code, bad practices, flagrant bugs that affect normal usage — not style
+nits, not micro-optimizations). Write **every** finding (both severities, tagged) to
 `## Review findings` in `HANDOFF.md` — that's the contract the fix step reads. Report everything to
 the human. No code changes, no commits.
 
@@ -37,11 +38,13 @@ the human. No code changes, no commits.
 Prompt: `"Fix the review findings per AGENTS.md."`
 
 Follow **[`docs/phases/AGENT-WORKFLOW.md`](docs/phases/AGENT-WORKFLOW.md) §9** exactly. In short: take
-the findings in `## Review findings`, **validate each is actually true** (trace the cited `file:line`,
-reproduce with a failing test where practical — dismiss false positives with evidence, no code
-change), then **fix the real ones** to a GREEN checkpoint with a regression test. Rewrite each bullet
-to `✅ RESOLVED` / `❌ DISMISSED`, commit code + handoff together (`review fix: <title> — green
-checkpoint`), BLOCKING first. This step **does** write code and commit. (Claude Code: `/fix-review`.)
+the findings in `## Review findings`, BLOCKING first, and for each **validate it's actually true**
+(trace the cited `file:line`, reproduce with a failing test where practical). If real, **fix it** to a
+GREEN checkpoint with a regression test; if it's a false positive, make no code change. Either way,
+**delete the finding's bullet** and record the outcome in the changelog — the section keeps only OPEN
+findings, no `RESOLVED`/`DISMISSED` graveyard (workflow §5). Commit code + handoff together on `main`
+(`review fix: <title> — green checkpoint`). Surface what you fixed and what you dismissed (and why) in
+your end-of-turn summary. This step **does** write code and commit. (Claude Code: `/fix-review`.)
 
 ## Project orientation
 
