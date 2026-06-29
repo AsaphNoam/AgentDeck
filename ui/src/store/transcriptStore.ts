@@ -50,6 +50,30 @@ function markResolved(
   );
 }
 
+// foldTranscript normalizes a full event list AND folds each permission_resolved
+// into its matching prior permission_request (then drops the resolution event,
+// which is never rendered on its own). Live append folds incrementally; a REST
+// refetch / archive reload replays the whole list, so it must fold the same way
+// or a resolved request would render as still-pending.
+export function foldTranscript(raw: TranscriptEvent[]): TranscriptEvent[] {
+  const out: TranscriptEvent[] = [];
+  for (const r of raw) {
+    const event = normalizeEvent(r);
+    if (kindOf(event) === "permission_resolved") {
+      const toolCallId = String(event.tool_call_id ?? "");
+      for (let i = out.length - 1; i >= 0; i--) {
+        if (kindOf(out[i]) === "permission_request" && String(out[i].tool_call_id ?? "") === toolCallId) {
+          out[i] = { ...out[i], resolved: decisionToResolved(event.decision) };
+          break;
+        }
+      }
+      continue;
+    }
+    out.push(event);
+  }
+  return out;
+}
+
 export const useTranscriptStore = create<TranscriptStoreState>((set) => ({
   byAgent: {},
   pending: {},
@@ -84,7 +108,7 @@ export const useTranscriptStore = create<TranscriptStoreState>((set) => ({
       };
     }),
   setTranscript: (agentId, events) =>
-    set((state) => ({ byAgent: { ...state.byAgent, [agentId]: events.map(normalizeEvent) } })),
+    set((state) => ({ byAgent: { ...state.byAgent, [agentId]: foldTranscript(events) } })),
   resolvePermission: (agentId, toolCallId, decision) =>
     set((state) => ({
       byAgent: { ...state.byAgent, [agentId]: markResolved(state.byAgent[agentId] ?? [], toolCallId, decision) },
