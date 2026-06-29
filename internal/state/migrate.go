@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 
 	// Guard against running an older binary against a schema written by a newer one.
 	// latestKnownMigration must be updated whenever a new migration is added.
-	const latestKnownMigration = 5
+	const latestKnownMigration = 6
 	var maxApplied int
 	if err := db.QueryRow(`SELECT COALESCE(MAX(version), 0) FROM schema_migrations`).Scan(&maxApplied); err != nil {
 		return fmt.Errorf("state: check max migration: %w", err)

@@ -22,8 +22,13 @@ type RunningEntry struct {
 	SessionID string    `json:"session_id"`
 	Interface string    `json:"interface"`
 	TTY       string    `json:"tty,omitempty"`
-	HookToken string    `json:"-"`
-	StartedAt time.Time `json:"started_at"`
+	// Driver is the TerminalDriver backing a terminal agent (xterm/tmux/iterm2);
+	// empty for chat agents. DriverIDs carries driver-specific identifiers (e.g.
+	// the tmux session name, iTerm2 window/tab/session ids). (Phase 6 techspec §3.1.)
+	Driver    string            `json:"driver,omitempty"`
+	DriverIDs map[string]string `json:"driver_ids,omitempty"`
+	HookToken string            `json:"-"`
+	StartedAt time.Time         `json:"started_at"`
 }
 
 // Status is the live, frequently-updated state of an agent.
