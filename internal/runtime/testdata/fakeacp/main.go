@@ -87,6 +87,11 @@ func handle(msg *rpcMessage) {
 	case "session/new":
 		respond(*msg.ID, map[string]any{"sessionId": sessionID})
 	case "session/load":
+		// If asked, dump the raw load params so tests can assert that the
+		// fresh MCP registration is carried on the load path (not just new).
+		if dump := os.Getenv("FAKEACP_LOAD_DUMP"); dump != "" {
+			_ = os.WriteFile(dump, msg.Params, 0o600)
+		}
 		// Simulate successful load by returning a distinct resumed session ID.
 		respond(*msg.ID, map[string]any{"sessionId": "fake-sess-loaded"})
 	case "session/prompt":
