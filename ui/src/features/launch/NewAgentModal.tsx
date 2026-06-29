@@ -3,6 +3,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { useRoles } from "../../api/config";
 import { useProjects } from "../../api/config";
 import { useBackends } from "../../api/config";
+import { useConfig } from "../../api/config";
 import { useLaunchAgent } from "../../api/config";
 import { useSuggestedName } from "./useSuggestedName";
 
@@ -19,6 +20,7 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject }: Ne
   const { data: rolesData } = useRoles();
   const { data: projectsData } = useProjects();
   const { data: backendsData } = useBackends();
+  const { data: configData } = useConfig();
   const launch = useLaunchAgent();
 
   const roleEntries = Object.entries(rolesData ?? {});
@@ -37,14 +39,28 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject }: Ne
 
   const [name, setName] = useSuggestedName(role, project);
 
-  // Set defaults once data loads.
+  // Set defaults once data loads: prefer the configured default_role/
+  // default_project, falling back to the first available entry only when the
+  // configured id is absent (or unset).
   useEffect(() => {
-    if (!role && roleEntries.length > 0) setRole(roleEntries[0][0]);
-  }, [roleEntries.length]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (role || roleEntries.length === 0) return;
+    const configured = configData?.default_role;
+    if (configured && roleEntries.some(([id]) => id === configured)) {
+      setRole(configured);
+    } else {
+      setRole(roleEntries[0][0]);
+    }
+  }, [roleEntries.length, configData?.default_role]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!project && projectEntries.length > 0) setProject(projectEntries[0][0]);
-  }, [projectEntries.length]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (project || projectEntries.length === 0) return;
+    const configured = configData?.default_project;
+    if (configured && projectEntries.some(([id]) => id === configured)) {
+      setProject(configured);
+    } else {
+      setProject(projectEntries[0][0]);
+    }
+  }, [projectEntries.length, configData?.default_project]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!backendId && defaultBackendId) setBackendId(defaultBackendId);
@@ -66,7 +82,12 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject }: Ne
       { name: name || undefined, role, project, backend: backendId || undefined, model: modelId || undefined, interface: "chat" },
       {
         onSuccess: () => onClose(),
-        onError: (err) => setLaunchError(String(err)),
+        onError: (err) => {
+          // Surface the server's actual reason (e.g. a nonexistent project cwd
+          // → runtime launch failure) instead of an opaque "HTTP 502".
+          const e = err as { body?: { error?: { message?: string } } };
+          setLaunchError(e?.body?.error?.message ?? String(err));
+        },
       },
     );
   };

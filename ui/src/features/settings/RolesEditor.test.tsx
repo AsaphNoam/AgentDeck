@@ -1,10 +1,11 @@
 import React from "react";
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { render, renderHook, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
 import { RolesEditor } from "./RolesEditor";
+import { useDeleteRole } from "../../api/config";
 
 // Minimal MSW server for roles API.
 const server = setupServer(
@@ -73,5 +74,31 @@ describe("RolesEditor", () => {
     // After create, query invalidates and the new role appears.
     await waitFor(() => expect(calls).toBeGreaterThan(1));
     expect(await screen.findByText("New Role")).toBeInTheDocument();
+  });
+
+  it("delete mutation rejects with a structured {status, body} error on 409", async () => {
+    // The editor's force-retry branch reads err.status === 409 and
+    // err.body.agents; a plain Error would silently disable it. This guards
+    // that the mutation preserves both.
+    server.use(
+      http.delete("/api/roles/:id", () =>
+        HttpResponse.json({ agents: ["a_1", "a_2"] }, { status: 409 }),
+      ),
+    );
+
+    const qc = new QueryClient({ defaultOptions: { mutations: { retry: 0 } } });
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useDeleteRole(), { wrapper });
+
+    let caught: unknown;
+    await result.current.mutateAsync({ id: "implementer" }).catch((e) => {
+      caught = e;
+    });
+
+    const err = caught as { status?: number; body?: { agents?: string[] } };
+    expect(err?.status).toBe(409);
+    expect(err?.body?.agents).toEqual(["a_1", "a_2"]);
   });
 });
