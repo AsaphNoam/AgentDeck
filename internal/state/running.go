@@ -79,6 +79,24 @@ ORDER BY started_at, agent_id`)
 	return out, nil
 }
 
+// ValidateHookToken checks that the given token matches the hook_token in the
+// running row for agentID. Returns ErrNotFound if no running row, ErrTokenMismatch
+// if the token is wrong.
+func (s *Store) ValidateHookToken(agentID, token string) error {
+	var stored string
+	err := s.db.QueryRow(`SELECT hook_token FROM running WHERE agent_id = ?`, agentID).Scan(&stored)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("state: validate token: %w", err)
+	}
+	if stored == "" || stored != token {
+		return ErrTokenMismatch
+	}
+	return nil
+}
+
 // DeleteRunning deletes one running entry.
 func (s *Store) DeleteRunning(id string) error {
 	if _, err := s.db.Exec(`DELETE FROM running WHERE agent_id = ?`, id); err != nil {

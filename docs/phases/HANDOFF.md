@@ -8,11 +8,11 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 
 ## Current position
 
-- **Active phase:** 4 — Persistence: archive, search, resume, file/command tracking
-- **Active subphase:** 4.6 — File/command endpoints, hook capture, archive/read-only UI
-- **Spec:** [`phase-4-persistence-archive.md`](phase-4-persistence-archive.md), [`tech/phase-4-persistence-archive-techspec.md`](tech/phase-4-persistence-archive-techspec.md)
-- **Last GREEN checkpoint:** 4.5 @ `impl/phase-3`: `go build -tags sqlite_fts5 ./...`, `go build ./...`, `go test ./...`
-- **Branch:** `impl/phase-3` (do not commit to `main`; do not push unless asked).
+- **Active phase:** 5 — Coordination: MCP messaging, nudger, budgets, notifications
+- **Active subphase:** 5.1 (next)
+- **Spec:** phase-5 spec (TBD)
+- **Last GREEN checkpoint:** 4.6 @ `impl/phase-4`: `go build -tags sqlite_fts5 ./...`, `go build ./...`, `go test ./...`, `cd ui && npm test`, `cd ui && npm run build`
+- **Branch:** `impl/phase-4` (do not commit to `main`; do not push unless asked).
 
 ---
 
@@ -22,7 +22,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - [x] Phase 1 — Core loop (ACP chat runtime, launch, streaming chat) ✅ — verified against real `claude-code-acp` v0.16.2
 - [x] Phase 2 — State manager, SSE bus, dashboard card grid ✅
 - [x] Phase 3 — Config CRUD & onboarding ✅
-- [ ] Phase 4 — Persistence: archive, search, resume, file/command tracking
+- [x] Phase 4 — Persistence: archive, search, resume, file/command tracking ✅
 - [ ] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications
 - [ ] Phase 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - [ ] Phase 7 — Polish: activity map
@@ -47,12 +47,11 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 **Subphase 4.5 ✅** — `ChatRuntime.Resume` (spawn/handshake, best-effort `session/load→session/new`, append-mode transcript reopen, resumed `session_meta` with `resumed_at`, fresh running row + restored `context_pct`). `POST /api/sessions/{id}/resume` (404/409/422 guards; optional backend/model/interface override seam for Phase 6). `Registry.Resume` with nil-sentinel double-resume guard. `state.ReadSession`/`ListInactiveSessions`. `UpsertSessionMeta` `updated_at` max guard. CLI: `agentdeck resume <id>`, `--resume <id>`, `--new`, bare-form single-inactive auto-resume. fakeacp `session/load` handler. Integration tests: happy path (agent_id unchanged, new session_id, prior transcript + resumed_at, monotonic seq after post-resume prompt), 409 already-running, 422 no persisted session, 404 unknown agent. CLI unit tests: `--new` / `--resume` flag parsing.
 
-**Subphase 4.6 — File/command endpoints + hook capture + archive UI (next)**
-- `GET /api/sessions/{id}/files` — list tracked files from `tracked_files` table (top-N by edit count, with `path`, `edits`, `last_edited_at`).
-- `GET /api/sessions/{id}/commands` — list tracked commands from `tracked_commands` table.
-- Hook capture for file/command events: if the hook payload carries `event:"file_edit"` or `event:"command"`, write rows into `tracked_files`/`tracked_commands` via the indexer/state store.
-- Read-only archive UI: route `/archive` in the React app; lists inactive sessions with search, links to `/sessions/{id}` read-only transcript view.
-- Tests: files/commands endpoints return correct rows; archive UI renders and filters (Vitest + MSW). Checkpoint: `go build -tags sqlite_fts5 ./...` and full test suite.
+**Subphase 4.6 ✅** — `GET /api/sessions/{id}/files` and `GET /api/sessions/{id}/commands` over `tracked_files`/`tracked_commands` (sorted by `last_ts` / `seq` desc). `POST /api/hook` extended: `event:"file_edit"` and `event:"command"` route to new `applyTrackingHook` (validates token via `Store.ValidateHookToken`, writes via `Indexer.CaptureHookFile`/`CaptureHookCommand`). `Indexer` gained `CaptureHookFile`/`CaptureHookCommand` for direct terminal-runtime capture. `Server` carries `*index.Indexer` field. Frontend: `/archive` route (debounced search, result list, snippet, state chip, active→`/agent/:id` / inactive→`/archive/:id`); `/archive/:id` read-only transcript view (`ArchiveAgentPage`) with Resume button → `POST .../resume` + navigate to live agent; ChatPanel gained Transcript/Files/Commands tabs (`FilesTab`, `CommandsTab` — lists, per-row copy, filter, diff-scroll for files). Archive nav link in Header. 18 new Vitest/MSW tests. Checkpoint: `go build ./...`, `go test ./...`, `cd ui && npm test` (48/48), `cd ui && npm run build`.
+
+**Phase 4 COMPLETE ✅** (4.1–4.6 all green; next is Phase 5 — Coordination).
+
+**Phase 5 — next to implement** (spec TBD; see `phase-5-*.md` when available).
 
 ---
 
@@ -149,6 +148,7 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
   to be truly project-wide.
 - **`messagingServer.Command = os.Executable()`** with `["mcp-stdio","--agent",ID,"--token",T]` —
   registration-only; the `mcp-stdio` subcommand lands in Phase 5.
+- **NEW (4.6): `Server` stores a shared `*index.Indexer` field.** The registry's persistence path and the hook capture both use the same indexer instance so the in-memory FTS content accumulator is shared. To reverse: create a second indexer for hook capture only (no harm beyond a second seed per agent per process).
 - **NEW: runtime strips `CLAUDECODE` from the spawned adapter's env** (`chat.go::stripEnv`). The real
   `claude-code-acp` refuses a "nested" session when `CLAUDECODE` is set (true when AgentDeck is launched
   from a Claude Code terminal). AgentDeck spawns independent agents, so the nested guard must never apply.
@@ -192,6 +192,7 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-29 — **Phase 4 COMPLETE / 4.6 green.** `GET /api/sessions/{id}/files` + `GET /api/sessions/{id}/commands` over `tracked_files`/`tracked_commands`; `POST /api/hook` extended for `file_edit`/`command` events via `Indexer.CaptureHookFile`/`CaptureHookCommand`; `Store.ValidateHookToken` token guard. Frontend: `/archive` route (search + result list + snippet + state chip), `/archive/:id` read-only transcript view with Resume button, ChatPanel Files/Commands tabs with filter/copy/diff-link, Archive nav link. 18 new Vitest tests. All 48 UI tests green; `go build ./...`; full Go tests; tagged FTS build; UI build.
 - 2026-06-28 — **4.5 green.** Full `ChatRuntime.Resume` (spawn+handshake, best-effort `session/load→session/new`, append-mode transcript reopen, resumed `session_meta` with `resumed_at`, restored `context_pct`). `POST /api/sessions/{id}/resume` endpoint + `Registry.Resume` nil-sentinel guard. `state.ReadSession`/`ListInactiveSessions`. `UpsertSessionMeta` max(`updated_at`) guard. CLI: `agentdeck resume`, `--resume`, `--new`, bare-form auto-resume. fakeacp `session/load`. Integration+CLI tests green. Checkpoint: `go build -tags sqlite_fts5 ./...`, `go build ./...`, `go test ./...`.
 - 2026-06-28 — **Review fixes: B1–B4 resolved.** Bus `dropped` race → `atomic.Uint64`; `PermissionPrompt` now awaits POST before collapsing; `UpsertSessionMeta` ON CONFLICT now updates `system_prompt`; all server 500s unified to `writeAPIError`. Full build + tests + FTS5 green.
 - 2026-06-28 — **4.4 green.** Added `internal/archive` list/search queries and `GET /api/archive`
