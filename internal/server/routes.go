@@ -48,6 +48,7 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/sessions/{id}/resume", s.handleResume)
 	api("GET /api/sessions/{id}/files", s.handleFiles)
 	api("GET /api/sessions/{id}/commands", s.handleCommands)
+	api("GET /api/sessions/{id}/messages", s.handleMessages)
 
 	// Catch-all for any other /api/* path → 404 JSON (more specific GET routes
 	// above win via the 1.22 mux precedence rules). Registered GET-only on

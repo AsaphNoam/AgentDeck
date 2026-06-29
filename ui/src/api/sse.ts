@@ -1,5 +1,7 @@
 import { getTranscript } from "./client";
-import type { AgentState, BusEvent, TranscriptEvent } from "./types";
+import { QUERY_KEYS, queryClient } from "./config";
+import type { Config } from "../schemas/config";
+import type { AgentState, BusEvent, NotificationPayload, TranscriptEvent } from "./types";
 import { useAgentStore } from "../store/agentStore";
 import { useTranscriptStore } from "../store/transcriptStore";
 import { useUiStore } from "../store/uiStore";
@@ -34,7 +36,7 @@ class SseClient {
     this.es.onerror = () => useUiStore.getState().setConnection("reconnecting");
     this.es.addEventListener("state_update", (event) => this.onStateUpdate(event as MessageEvent<string>));
     this.es.addEventListener("new_message", (event) => this.onNewMessage(event as MessageEvent<string>));
-    this.es.addEventListener("notification", () => { /* reserved for future use */ });
+    this.es.addEventListener("notification", (event) => this.onNotification(event as MessageEvent<string>));
     this.es.addEventListener("ping", () => {
       this.lastPing = Date.now();
     });
@@ -58,6 +60,10 @@ class SseClient {
       return;
     }
     useAgentStore.getState().applyStateUpdate(envelope.data);
+    if (envelope.agent_id && envelope.data.last_sent_at) {
+      const sentAt = envelope.data.last_sent_at;
+      window.setTimeout(() => useAgentStore.getState().clearLastSentAt(envelope.agent_id!, sentAt), 2_000);
+    }
     if (envelope.agent_id) this.hydrationIds.push(envelope.agent_id);
   }
 
@@ -77,6 +83,25 @@ class SseClient {
       this.lastAgentSeq[agentId] = seq;
     }
     useTranscriptStore.getState().appendMessage(agentId, envelope.data);
+  }
+
+  private onNotification(event: MessageEvent<string>) {
+    const envelope = JSON.parse(event.data) as BusEvent<NotificationPayload>;
+    const notification = envelope.data;
+    const cfg = queryClient.getQueryData<Config>(QUERY_KEYS.config);
+    if (cfg?.notifications?.muted?.[notification.notification_type]) return;
+
+    const canDesktop =
+      cfg?.notifications?.desktop_enabled !== false &&
+      typeof document !== "undefined" &&
+      document.visibilityState === "hidden" &&
+      "Notification" in window &&
+      Notification.permission === "granted";
+    if (canDesktop) {
+      new Notification(notification.title, { body: notification.body, tag: notification.agent_id });
+      return;
+    }
+    useUiStore.getState().pushToast(notification);
   }
 
   private startWatchdog() {

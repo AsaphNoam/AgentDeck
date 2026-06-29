@@ -21,6 +21,10 @@ export const configSchema = z.object({
   default_role: z.string(),
   skip_permissions: z.boolean(),
   onboarding_complete: z.boolean(),
+  notifications: z.object({
+    desktop_enabled: z.boolean(),
+    muted: z.record(z.boolean()),
+  }),
   onboarding: onboardingSchema,
 });
 

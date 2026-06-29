@@ -1,9 +1,11 @@
 package bus
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
+	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
@@ -28,6 +30,47 @@ func TestPublishDeliversInOrderToSubscribers(t *testing.T) {
 		if first.TS != 1000 || second.TS != 1000 {
 			t.Fatalf("subscriber %d timestamps = %d,%d want 1000", i, first.TS, second.TS)
 		}
+	}
+}
+
+func TestStateUpdateEmitsNotificationOnTransition(t *testing.T) {
+	b := New()
+	ch, unsub := b.Subscribe()
+	defer unsub()
+	update := state.AgentStateUpdate{AgentState: state.AgentState{
+		AgentID: "a_1", Name: "Atlas", Role: "implementer", Project: "my-app", State: "idle",
+	}}
+	b.PublishStateUpdate(update)
+	<-ch
+
+	update.State = "done"
+	update.Detail = "complete"
+	b.PublishStateUpdate(update)
+	<-ch // state_update
+	ev := <-ch
+	if ev.Type != "notification" {
+		t.Fatalf("event type = %q, want notification", ev.Type)
+	}
+	payload := ev.Data.(map[string]any)
+	if payload["notification_type"] != "done" || payload["title"] != "Atlas finished" {
+		t.Fatalf("notification payload = %+v", payload)
+	}
+}
+
+func TestPermissionRuntimeEventEmitsNotification(t *testing.T) {
+	b := New()
+	ch, unsub := b.Subscribe()
+	defer unsub()
+	data, _ := json.Marshal(runtime.PermissionRequestData{Reason: "edit file"})
+	b.PublishRuntimeEvent(runtime.Event{AgentID: "a_1", Type: runtime.EvPermissionRequest, Data: data})
+	<-ch // new_message
+	ev := <-ch
+	if ev.Type != "notification" {
+		t.Fatalf("event type = %q, want notification", ev.Type)
+	}
+	payload := ev.Data.(map[string]any)
+	if payload["notification_type"] != "permission_required" {
+		t.Fatalf("notification payload = %+v", payload)
 	}
 }
 

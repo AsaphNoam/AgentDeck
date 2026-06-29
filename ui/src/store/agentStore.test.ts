@@ -36,4 +36,12 @@ describe("agentStore", () => {
     expect(Object.keys(useAgentStore.getState().agents)).toEqual(["a_2"]);
     expect(useAgentStore.getState().order).toEqual(["a_2"]);
   });
+
+  it("clears last_sent_at only when the timestamp still matches", () => {
+    useAgentStore.getState().applyStateUpdate({ ...agent, last_sent_at: "t1" });
+    useAgentStore.getState().clearLastSentAt("a_1", "old");
+    expect(useAgentStore.getState().agents.a_1.last_sent_at).toBe("t1");
+    useAgentStore.getState().clearLastSentAt("a_1", "t1");
+    expect(useAgentStore.getState().agents.a_1.last_sent_at).toBeUndefined();
+  });
 });

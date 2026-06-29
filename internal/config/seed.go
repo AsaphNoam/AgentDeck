@@ -23,6 +23,15 @@ func DefaultConfig() Config {
 		DefaultProject:  "my-app",
 		DefaultRole:     "implementer",
 		SkipPermissions: false,
+		Notifications: NotificationsConfig{
+			DesktopEnabled: true,
+			Muted: map[string]bool{
+				"done":                false,
+				"waiting_input":       false,
+				"permission_required": false,
+				"budget_exceeded":     false,
+			},
+		},
 	}
 }
 

@@ -201,3 +201,26 @@ func TestPutConfigRejectsImmutableFields(t *testing.T) {
 		t.Fatalf("port change status = %d, want 400", rec.Code)
 	}
 }
+
+func TestPutConfigPersistsNotificationSettings(t *testing.T) {
+	srv := testServer(t, true)
+	h := srv.routes()
+	rec := doRequest(t, h, http.MethodPut, "/api/config", map[string]any{
+		"notifications": map[string]any{
+			"desktop_enabled": false,
+			"muted": map[string]bool{
+				"done": true, "waiting_input": false, "permission_required": false, "budget_exceeded": true,
+			},
+		},
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT /api/config status = %d body=%s, want 200", rec.Code, rec.Body)
+	}
+	cfg, err := srv.configStore.ReadConfig()
+	if err != nil {
+		t.Fatalf("ReadConfig: %v", err)
+	}
+	if cfg.Notifications.DesktopEnabled || !cfg.Notifications.Muted["done"] || !cfg.Notifications.Muted["budget_exceeded"] {
+		t.Fatalf("notifications = %+v", cfg.Notifications)
+	}
+}
