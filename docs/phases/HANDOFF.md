@@ -11,8 +11,8 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 5 — Coordination: MCP messaging, nudger, budgets, notifications
 - **Active subphase:** 5.1 (next)
 - **Spec:** phase-5 spec (TBD)
-- **Last GREEN checkpoint:** 4.6 @ `impl/phase-4`: `go build -tags sqlite_fts5 ./...`, `go build ./...`, `go test ./...`, `cd ui && npm test`, `cd ui && npm run build`
-- **Branch:** `impl/phase-4` (do not commit to `main`; do not push unless asked).
+- **Last GREEN checkpoint:** 4.6 @ `main`: `go build -tags sqlite_fts5 ./...`, `go build ./...`, `go test ./...`, `cd ui && npm test` (48/48), `cd ui && npm run build`
+- **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
 
@@ -82,55 +82,66 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` v0.16.2. Nothing blocking.)_
 
-## Review findings (BLOCKING items from the last review)
+## Review findings (from the last review — BLOCKING and ADVISORY)
 
-> Written by the review agent (workflow §8). Remove an entry once fixed and verified green.
+> Written by the review agent (workflow §8), one bullet per finding tagged with its severity
+> (`BLOCKING` / `ADVISORY`). Consumed by the fix agent (`/fix-review`, workflow §9), which validates
+> each is actually true, then **deletes the bullet** once it's fixed-and-green or dismissed as a
+> validated false positive — recording the outcome in the changelog + its end-of-turn summary (§5).
+> **This section holds only OPEN findings** — no resolved/dismissed graveyard.
+> Blocking items must be fixed before the next phase starts; advisory items when convenient.
 
-- ✅ **RESOLVED — crash teardown left registry ownership stale (Phase 0/1, BLOCKING).** On an ACP crash,
-  `ChatRuntime.onTransportClosed` removed its handle but `Registry.rtByAgent` kept claiming the agent, so a
-  relaunch/resume was rejected with `ErrAlreadyStarted` (and control ops hit `ErrNoHandle`) until a manual
-  `Stop`. Fixed: `ChatRuntime` now carries an `onExit` callback, wired by `NewRegistry` to `Registry.forget`,
-  invoked from `onTransportClosed` before the `turn_end` emit. New `TestRegistryForgetsAgentAfterCrash`
-  (`registry_crash_test.go`) drives a crash through the registry and asserts ownership is dropped + relaunch
-  is no longer blocked. Green incl. `-race`.
-- ✅ **RESOLVED — idle cancel reported a no-op as success (Phase 1, advisory).** `Runtime.Cancel` now returns
-  `(cancelled bool, error)`; `ChatRuntime.Cancel` reports `true` only when a turn or pending permission was
-  actually interrupted, and `POST /api/sessions/{id}/cancel` returns `{cancelled:false}` for an idle no-op.
-  `TestCancelDuringPendingPermission` extended to assert the idle no-op case.
-- ✅ **RESOLVED — full real-adapter Appendix A coverage added & PASSED.** The gated acceptance suite
-  (`internal/runtime/acceptance_test.go`, `//go:build acceptance`) now has five real-CLI tests, all green
-  against `claude-code-acp` v0.16.2 (`go test -tags acceptance ./internal/runtime -run TestRealCLI -v`):
-  `TestRealCLIAcceptance` (incremental stream + turn_end + idle), `TestRealCLIPermissionDeny` (real gate;
-  denied tool's side effect never happens), `TestRealCLIPermissionApprove` (approved tool runs),
-  `TestRealCLICancel` (cancel interrupts an in-flight turn → idle), `TestRealCLIStop` (terminates the
-  process group + removes the running row + status `done`). Confirmed real option kinds are
-  `allow_once`/`reject_once`/`allow_always` — `selectOption` (§5.3) maps approve/deny correctly.
-- ✅ **RESOLVED — [R2] UI transcript renderers read the wrong event shape (BLOCKING).** Confirmed the
-  wire shape is *double-nested*: `bus` sends `new_message.data` = the `runtime.Event`, whose typed payload
-  lives under *its own* `data` field (so the real delta was at `envelope.data.data.delta`); the REST
-  transcript endpoint (`transcript.ReadFile` → `[]runtime.Event`) returns the same shape. Fixed by
-  normalizing at the store boundary: `transcriptStore.normalizeEvent` flattens `{type,data:{…}}` →
-  `{kind, seq, ts, …payload}` and is applied in both `appendMessage` and `setTranscript` (covers SSE,
-  gap-recovery, refetch, and ChatPanel's initial load). Consecutive `assistant_text` deltas (which carry no
-  `message_id`) now merge into one bubble; `permission_resolved` folds into its matching prompt instead of
-  rendering raw; added `user_text` rendering and a `session_meta`/`permission_resolved` no-render guard;
-  fixed `ToolResult` field reads (`content`/`status`/`error`). New regression tests cover the nested wire
-  shape, tool_call field surfacing, permission_resolved folding, and the REST path. UI 30/30 + build green.
-- ✅ **RESOLVED — [R3] FTS content could be wiped after server restart/resume (BLOCKING).** `Indexer.content`
-  is process-local, so a fresh process (server restart or resume) started with an empty buffer; the first
-  resumed `turn_end` → `flush` → `replaceFTS` would `DELETE`+`INSERT` the `sessions_fts` row using only
-  post-restart content, dropping all previously-indexed transcript text until a manual `agentdeck reindex`.
-  Fixed by lazily seeding the in-memory buffer once per agent from the durable `sessions_fts.content`
-  (`Indexer.seedLocked`, called under `ix.mu` from both `addContent` and `flush`); subsequent flushes now
-  merge old + new content. Works in both tagged and untagged builds (the plain fallback table also has a
-  `content` column). New `TestResumeAfterRestartPreservesFTSContent` reproduces the wipe (fails without the
-  fix) and asserts old + new phrases coexist after a simulated restart. Full Go suite + tagged FTS tests green.
-- ✅ **RESOLVED — [R4] Normal build/install path produced an archive search binary without FTS5 (BLOCKING).**
-  Confirmed: untagged migration creates a plain `sessions_fts` table (server boots), then `GET /api/archive?q=...`
-  errors at runtime on `MATCH` → 500. Fixed by adding `-tags sqlite_fts5` to the release/install build paths:
-  `Makefile` (new `TAGS := sqlite_fts5`, used in the `build` target) and `install.sh` (the `go build` line).
-  The untagged plain-table fallback is intentionally retained so the no-tag `go build ./...` / `go test ./...`
-  checkpoint stays green. Verified: tagged build + standard build + full Go test suite + tagged FTS tests green.
+- **BLOCKING — SSE watchdog can enter a permanent reconnect loop (Phase 2).** `ui/src/api/sse.ts`
+  initializes `lastPing` once and only refreshes it on `ping`; after the watchdog closes a stale
+  stream it immediately calls `connect()` without resetting `lastPing`. Because the server sends
+  pings every 10s and the watchdog ticks every 5s, a stale timestamp can make each fresh stream close
+  before its first ping, breaking dashboard live updates/reconnect recovery. Fix by resetting the
+  liveness timestamp on connect/open or otherwise giving a fresh connection a grace window; add a
+  watchdog reconnect regression test.
+- **BLOCKING — successful `session/load` resume skips fresh MCP registration (Phase 4.5 / Phase 5
+  blocker).** `server/resume.go` correctly mints a new hook token and builds `LaunchSpec.MCPServers`,
+  but `ChatRuntime.Resume` calls `session/load` with only `{sessionId}`. The only path that serializes
+  `mcpServers` is fallback `session/new`, so adapters where `session/load` succeeds do not receive the
+  fresh in-process MCP registration required for Phase 5 messaging. Fix by passing the registration
+  through the load path if supported, or by using a load flow that still applies the current MCP server
+  spec; test the successful-load path.
+- **BLOCKING — archive FTS silently drops older transcript content after 1 MiB (Phase 4).** The indexer
+  caps accumulated searchable text at `1 << 20` and keeps only the newest bytes; `agentdeck reindex`
+  uses the same path, so older transcript phrases become permanently unsearchable in `state.db` even
+  though the raw transcript is intact. This violates the Phase 4 archive-search contract unless search
+  is explicitly scoped to recent content. Fix by indexing complete transcript content or by replacing
+  the schema/query design with a bounded-but-specified searchable segment model; add long-transcript
+  search/reindex coverage.
+- **ADVISORY — persisted permission resolutions are not folded on transcript refetch (Phase 2).**
+  `appendMessage` folds `permission_resolved` into its matching prompt, but `setTranscript` only
+  normalizes events. A reload/archive refetch with `permission_request` followed by `permission_resolved`
+  leaves the request visually unresolved because `TranscriptView` hides the resolution event. Add a
+  replay/folding helper shared by live append and REST refetch, plus a `setTranscript` regression test.
+- **ADVISORY — `stop` is not idempotent after the first successful stop (Phase 1).** `Registry.Stop`
+  returns `ErrNoHandle` on a repeated call after deleting ownership, and the HTTP handler maps that to
+  404. A double-click or lost-response retry then looks like "unknown agent" even though the identity
+  still exists. Treat known stopped agents as already-stopped success, and reserve 404 for unknown ids.
+- **ADVISORY — ACP protocol version mismatch only logs (Phase 1).** `ChatRuntime.Start` and `Resume`
+  accept unsupported `protocolVersion` values and only warn, despite the tech spec calling for a clear
+  failure outside the pinned range. Fail early on incompatible protocol versions and add a fake-adapter
+  mismatch test.
+- **ADVISORY — force-delete retry UI cannot see 409 details (Phase 3).** The role/project delete
+  mutations throw a plain `Error` instead of preserving `{status, body}`, while the editors expect those
+  fields to offer the `?force=true` retry for in-use definitions. Parse/delete errors through the same
+  structured helper used by the other config mutations.
+- **ADVISORY — New Agent modal ignores configured role/project defaults (Phase 3).** `NewAgentModal`
+  reads roles/projects/backends but not `/api/config`, then falls back to the first available role and
+  project. It should preselect `config.default_role` and `config.default_project` when present, then
+  fall back only if those ids are missing.
+- **ADVISORY — seeded default project can satisfy onboarding but fail launch (Phase 3).** The seeded
+  `my-app` project points at `~/Projects/my-app`; because `cwd_not_found` is warning-level and
+  min-viable config can lift the gate, a first launch may pass that nonexistent directory to `cmd.Dir`
+  and fail at runtime. This is allowed by the current spec, but the UX should either steer users to set a
+  real project before launch or surface the launch failure more directly.
+- **ADVISORY — bare-form CLI resume ignores `--name` (Phase 4).** Bare `role@project --name X` should
+  only auto-resume an inactive session with the same name, but the current inactive-session selection
+  filters only by role/project. Include name in the auto-resume match when provided, or force an explicit
+  `--resume` when name disambiguation is needed.
 
 ## Autonomous decisions (please review)
 
@@ -192,6 +203,7 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-29 — **Workflow: trunk-based + `/fix-review` added; `impl/phase-4` merged to `main`.** Switched the build/review/fix workflows to commit **directly on `main`** (no per-phase branches, no PRs — workflow §6, work-phase/fix-review skills, AGENTS.md). Added the **`/fix-review`** skill + workflow §9: validate each review finding is actually true, then fix the real ones to green; review-phase (§8) now writes **both** BLOCKING and ADVISORY findings to `## Review findings`, and resolved/dismissed findings are **deleted** (changelog is the record), not kept (§5). Fast-forwarded `impl/phase-4` (Phase 4.6) into `main` and re-verified green: tagged + standard `go build`, full `go test`, `cd ui && npm test` (48/48), `cd ui && npm run build`. Not pushed.
 - 2026-06-29 — **Phase 4 COMPLETE / 4.6 green.** `GET /api/sessions/{id}/files` + `GET /api/sessions/{id}/commands` over `tracked_files`/`tracked_commands`; `POST /api/hook` extended for `file_edit`/`command` events via `Indexer.CaptureHookFile`/`CaptureHookCommand`; `Store.ValidateHookToken` token guard. Frontend: `/archive` route (search + result list + snippet + state chip), `/archive/:id` read-only transcript view with Resume button, ChatPanel Files/Commands tabs with filter/copy/diff-link, Archive nav link. 18 new Vitest tests. All 48 UI tests green; `go build ./...`; full Go tests; tagged FTS build; UI build.
 - 2026-06-28 — **4.5 green.** Full `ChatRuntime.Resume` (spawn+handshake, best-effort `session/load→session/new`, append-mode transcript reopen, resumed `session_meta` with `resumed_at`, restored `context_pct`). `POST /api/sessions/{id}/resume` endpoint + `Registry.Resume` nil-sentinel guard. `state.ReadSession`/`ListInactiveSessions`. `UpsertSessionMeta` max(`updated_at`) guard. CLI: `agentdeck resume`, `--resume`, `--new`, bare-form auto-resume. fakeacp `session/load`. Integration+CLI tests green. Checkpoint: `go build -tags sqlite_fts5 ./...`, `go build ./...`, `go test ./...`.
 - 2026-06-28 — **Review fixes: B1–B4 resolved.** Bus `dropped` race → `atomic.Uint64`; `PermissionPrompt` now awaits POST before collapsing; `UpsertSessionMeta` ON CONFLICT now updates `system_prompt`; all server 500s unified to `writeAPIError`. Full build + tests + FTS5 green.
