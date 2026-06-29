@@ -65,3 +65,47 @@ export interface Layout {
   order: string[];
   density: { perRow: number; gap: number };
 }
+
+export interface ArchiveResult {
+  agent_id: string;
+  name: string;
+  role: string;
+  project: string;
+  backend: string;
+  model: string;
+  interface: string;
+  group?: string;
+  created_at: string;
+  updated_at: string;
+  turn_count: number;
+  files_touched: number;
+  commands_run: number;
+  active: boolean;
+  matched_in?: string[];
+  snippet?: string;
+}
+
+export interface DiffRef {
+  seq: number;
+  tool_call_id: string;
+}
+
+export interface TrackedFile {
+  path: string;
+  edit_count: number;
+  first_seq: number;
+  last_seq: number;
+  first_ts: string;
+  last_ts: string;
+  has_diff: boolean;
+  diff_refs: DiffRef[];
+}
+
+export interface TrackedCommand {
+  command: string;
+  seq: number;
+  ts: string;
+  tool_call_id: string;
+  exit_status: string;
+  exit_error: string;
+}
