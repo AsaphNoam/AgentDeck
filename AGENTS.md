@@ -16,7 +16,7 @@ Claude and Codex taking turns). Do **not** improvise a process — follow the sh
 
 - **GREEN checkpoint = `go build ./...` + `go test ./...` pass** (`+ cd ui && npm run build` if you touched `ui/`). Never record a subphase done or commit on red.
 - **Keep `HANDOFF.md` lean and current** — update after every change; collapse finished subphases/phases (workflow §5). It's the only thing the next agent has.
-- **Commit at every checkpoint** on a branch (not `main`); don't push unless the human asked. Use your own `Co-Authored-By` trailer.
+- **Commit at every checkpoint directly on `main`** (trunk-based: no per-phase branches, no PRs); don't push unless the human asked. Use your own `Co-Authored-By` trailer.
 - **Only stop for real blockers** (workflow §3: unresolvable ambiguity, a checkpoint you can't fix, missing credentials, destructive actions). Write the blocker under `## Blocked on human`, then stop.
 - **Flag every judgment call.** If an ambiguity or spec gap forced *you* to make a design/implementation decision (without stopping), record it under `## Autonomous decisions (please review)` **and** call it out explicitly in your end-of-turn summary — never let the human find a self-made decision only by reading the diff.
 - **Do the work yourself** — don't hand the build to sub-agents that can't run the build/test commands.
@@ -28,8 +28,20 @@ Prompt: `"Review the last commit/PR per AGENTS.md."`
 Follow **[`docs/phases/AGENT-WORKFLOW.md`](docs/phases/AGENT-WORKFLOW.md) §8** exactly. In short:
 find the diff, cross-reference the relevant phase PRD + tech spec, flag **BLOCKING** and **ADVISORY**
 issues only (spec violations, dead code, bad practices, flagrant bugs that affect normal usage —
-not style nits, not micro-optimizations). Write BLOCKING findings to `## Review findings` in
-`HANDOFF.md`. Report everything to the human. No code changes, no commits.
+not style nits, not micro-optimizations). Write **every** finding (both severities, tagged) to
+`## Review findings` in `HANDOFF.md` — that's the contract the fix step reads. Report everything to
+the human. No code changes, no commits.
+
+## If you're here to fix the review findings
+
+Prompt: `"Fix the review findings per AGENTS.md."`
+
+Follow **[`docs/phases/AGENT-WORKFLOW.md`](docs/phases/AGENT-WORKFLOW.md) §9** exactly. In short: take
+the findings in `## Review findings`, **validate each is actually true** (trace the cited `file:line`,
+reproduce with a failing test where practical — dismiss false positives with evidence, no code
+change), then **fix the real ones** to a GREEN checkpoint with a regression test. Rewrite each bullet
+to `✅ RESOLVED` / `❌ DISMISSED`, commit code + handoff together (`review fix: <title> — green
+checkpoint`), BLOCKING first. This step **does** write code and commit. (Claude Code: `/fix-review`.)
 
 ## Project orientation
 
