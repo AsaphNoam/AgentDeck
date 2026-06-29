@@ -91,13 +91,6 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 > **This section holds only OPEN findings** — no resolved/dismissed graveyard.
 > Blocking items must be fixed before the next phase starts; advisory items when convenient.
 
-- **BLOCKING — archive FTS silently drops older transcript content after 1 MiB (Phase 4).** The indexer
-  caps accumulated searchable text at `1 << 20` and keeps only the newest bytes; `agentdeck reindex`
-  uses the same path, so older transcript phrases become permanently unsearchable in `state.db` even
-  though the raw transcript is intact. This violates the Phase 4 archive-search contract unless search
-  is explicitly scoped to recent content. Fix by indexing complete transcript content or by replacing
-  the schema/query design with a bounded-but-specified searchable segment model; add long-transcript
-  search/reindex coverage.
 - **ADVISORY — persisted permission resolutions are not folded on transcript refetch (Phase 2).**
   `appendMessage` folds `permission_resolved` into its matching prompt, but `setTranscript` only
   normalizes events. A reload/archive refetch with `permission_request` followed by `permission_resolved`
@@ -132,6 +125,19 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 ## Autonomous decisions (please review)
 
 > Resolved without stopping; the human should still see them. Remove once acknowledged (workflow §3, §5).
+
+- **NEW (review fix): archive FTS now indexes the COMPLETE transcript — unbounded buffer chosen over a
+  segment model.** The 1 MiB cap was data-loss (older phrases unsearchable), so I removed it. The
+  reviewer offered two fixes: (a) index complete content, or (b) a bounded-but-specified segment model.
+  I took (a) because it's minimal and zero-risk to the existing single-row `sessions_fts` schema and the
+  archive search/COUNT/snippet query — a segment model would need a schema migration (FTS5 can't
+  `ALTER ADD COLUMN`, so a drop+recreate) and dedupe/aggregation across multiple rows per agent.
+  **Tradeoff:** the per-agent in-memory `content` buffer now grows with the session, and each `turn_end`
+  flush rewrites the full FTS row (DELETE+INSERT) → O(n) per turn, ~O(n²) cumulative over one very long
+  session. Fine for normal personal use (transcripts of a few MiB); a multi-tens-of-MiB single session
+  would get costly. **To reverse / harden later:** implement the segment model (bounded chunk rows per
+  agent, append-only, rewrite only the active chunk; archive query groups by `agent_id`, best snippet
+  per agent). Guard test: `TestIndexerFTSLongTranscript`.
 
 - **`internal/store` (spec) → `internal/state` (Phase 0 reality).** The runtime imports `internal/state`
   throughout; the spec's `store` is the older name for the same package. No behavior change.
@@ -189,6 +195,7 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-29 — **review fix: archive FTS no longer drops content past 1 MiB — green.** Removed the `maxContentBytes` keep-newest cap in `index.Indexer.addContent`; the FTS content buffer now accumulates the COMPLETE transcript so every phrase ever streamed stays searchable (and `reindex` rebuilds it complete). New tagged `TestIndexerFTSLongTranscript` indexes an early phrase + >1 MiB of later content and asserts the early phrase still `MATCH`es. Build (both tag modes) + full + tagged index/archive/state tests green. See Autonomous decisions for the unbounded-growth tradeoff.
 - 2026-06-29 — **review fix: session/load resume now applies fresh MCP registration — green.** `ChatRuntime.Resume` called `session/load` with only `{sessionId}`, so adapters where load succeeds never received the freshly-minted messaging MCP server (Phase 5 blocker). Added `sessionLoadParams(spec, sessionID)` (sessionId + cwd + mcpServers, mirroring ACP loadSession) and use it on the load path. fakeacp now dumps received `session/load` params via `FAKEACP_LOAD_DUMP`; new `TestResumeSessionLoadAppliesMCP` asserts the load path carries sessionId + the messaging server. Go build (both tag modes) + full tests green.
 - 2026-06-29 — **review fix: SSE watchdog permanent reconnect loop — green.** `ui/src/api/sse.ts` now resets `lastPing` in `connect()` so each fresh/reconnected stream gets the full 25s liveness window instead of inheriting a stale timestamp that reaped it before its first ping. New `src/api/sse.test.ts` drives a mock `EventSource` + fake timers: reaps the first (ping-less) stream at 30s, then asserts the reconnected stream survives the 5s watchdog tick before its ~10s first ping. UI 49/49, build green, embedded dist refreshed.
 - 2026-06-29 — **Workflow: trunk-based + `/fix-review` added; `impl/phase-4` merged to `main`.** Switched the build/review/fix workflows to commit **directly on `main`** (no per-phase branches, no PRs — workflow §6, work-phase/fix-review skills, AGENTS.md). Added the **`/fix-review`** skill + workflow §9: validate each review finding is actually true, then fix the real ones to green; review-phase (§8) now writes **both** BLOCKING and ADVISORY findings to `## Review findings`, and resolved/dismissed findings are **deleted** (changelog is the record), not kept (§5). Fast-forwarded `impl/phase-4` (Phase 4.6) into `main` and re-verified green: tagged + standard `go build`, full `go test`, `cd ui && npm test` (48/48), `cd ui && npm run build`. Not pushed.
