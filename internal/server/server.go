@@ -12,6 +12,7 @@ import (
 	"github.com/agentdeck/agentdeck/internal/backend/credcheck"
 	"github.com/agentdeck/agentdeck/internal/bus"
 	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/agentdeck/agentdeck/internal/hooks"
 	persistindex "github.com/agentdeck/agentdeck/internal/index"
 	"github.com/agentdeck/agentdeck/internal/messaging"
 	"github.com/agentdeck/agentdeck/internal/runtime"
@@ -169,6 +170,9 @@ func (s *Server) Start(ctx context.Context) error {
 			s.registry.Shutdown(shutCtx)
 		}
 		s.cleanupAllMessagingMCP()
+		if err := hooks.RemoveAllAgentSettings(s.configStore.Home()); err != nil {
+			s.log.Warn("cleanup hook settings dir", "err", err)
+		}
 		if err := srv.Shutdown(shutCtx); err != nil {
 			return fmt.Errorf("shutdown: %w", err)
 		}
