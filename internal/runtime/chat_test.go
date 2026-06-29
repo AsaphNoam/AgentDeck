@@ -242,3 +242,53 @@ func TestChatBackendGate(t *testing.T) {
 		t.Fatal("codex-acp Start should error")
 	}
 }
+
+// TestResumeSessionLoadAppliesMCP guards the BLOCKING finding that a successful
+// session/load resume must still carry the freshly-minted MCP registration that
+// Phase 5 messaging depends on — not only the session/new fallback path.
+func TestResumeSessionLoadAppliesMCP(t *testing.T) {
+	c, spec := newChatTest(t, "stream_text")
+	ctx := context.Background()
+
+	dump := filepath.Join(t.TempDir(), "load_params.json")
+	spec.Env = append(spec.Env, "FAKEACP_LOAD_DUMP="+dump)
+	spec.HookToken = "tok-123"
+	spec.MCPServers = []MCPServerSpec{{
+		Name:    "agentdeck-messaging",
+		Command: "/usr/bin/agentdeck",
+		Args:    []string{"mcp-stdio", "--agent", spec.Agent.AgentID, "--token", "tok-123"},
+		Env:     []string{"X=1"},
+	}}
+
+	h, err := c.Resume(ctx, spec, "prior-session-id")
+	if err != nil {
+		t.Fatalf("Resume: %v", err)
+	}
+	t.Cleanup(func() { c.Stop(ctx, h.AgentID) })
+
+	// fakeacp's session/load succeeds → resumed via the load path.
+	if h.SessionID != "fake-sess-loaded" {
+		t.Fatalf("sessionID = %q, want fake-sess-loaded (load path)", h.SessionID)
+	}
+
+	raw, err := os.ReadFile(dump)
+	if err != nil {
+		t.Fatalf("read load-params dump (session/load not invoked?): %v", err)
+	}
+	var params struct {
+		SessionID  string `json:"sessionId"`
+		Cwd        string `json:"cwd"`
+		MCPServers []struct {
+			Name string `json:"name"`
+		} `json:"mcpServers"`
+	}
+	if err := json.Unmarshal(raw, &params); err != nil {
+		t.Fatalf("unmarshal load params: %v\n%s", err, raw)
+	}
+	if params.SessionID != "prior-session-id" {
+		t.Fatalf("load sessionId = %q, want prior-session-id", params.SessionID)
+	}
+	if len(params.MCPServers) != 1 || params.MCPServers[0].Name != "agentdeck-messaging" {
+		t.Fatalf("load mcpServers = %+v, want the fresh messaging server", params.MCPServers)
+	}
+}
