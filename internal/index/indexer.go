@@ -378,6 +378,34 @@ func isCommandTool(name string) bool {
 	}
 }
 
+// CaptureHookFile records a file-edit event from POST /api/hook (terminal runtime producer).
+// path is the edited file path; ts is RFC3339; seq is an optional transcript seq (0 if unknown).
+func (ix *Indexer) CaptureHookFile(agentID, path, ts string, seq int64) error {
+	if agentID == "" || path == "" {
+		return fmt.Errorf("index: agent_id and path are required")
+	}
+	ev := runtime.Event{AgentID: agentID, Seq: seq, Ts: ts}
+	return ix.upsertFile(agentID, path, ev, "", false)
+}
+
+// CaptureHookCommand records a command event from POST /api/hook (terminal runtime producer).
+// command is the shell command; ts is RFC3339; seq is an optional transcript seq (0 if unknown).
+func (ix *Indexer) CaptureHookCommand(agentID, command, ts, toolCallID string, seq int64) error {
+	if agentID == "" || command == "" {
+		return fmt.Errorf("index: agent_id and command are required")
+	}
+	if toolCallID == "" {
+		toolCallID = fmt.Sprintf("hook_%d", seq)
+	}
+	_, err := ix.db.Exec(`
+INSERT OR REPLACE INTO tracked_commands(agent_id, seq, ts, tool_call_id, command, exit_status, exit_error)
+VALUES (?, ?, ?, ?, ?, 'completed', '')`, agentID, seq, ts, toolCallID, command)
+	if err != nil {
+		return fmt.Errorf("index: capture hook command: %w", err)
+	}
+	return nil
+}
+
 func boolInt(v bool) int {
 	if v {
 		return 1
