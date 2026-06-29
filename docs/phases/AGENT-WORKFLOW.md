@@ -163,7 +163,7 @@ Commits are the recovery anchor across spaced sessions, so the work survives a h
 
 ## 8. Review action (separate from the build loop)
 
-Triggered independently (Claude Code: `/review-phase`; Codex: `"Review the last commit/PR per AGENTS.md"`).
+Triggered independently (Claude Code: `/review-phase`; Codex: `"Review the last commit per AGENTS.md"`).
 Reviews the other agent's work — not your own. This is a **read-only action**: no code changes, no commits.
 
 ### What to review
