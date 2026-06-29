@@ -50,6 +50,12 @@ type BackendAdapter interface {
 	// UnsupportedHookEvents lists AgentDeck lifecycle events this backend has no
 	// hook for (sorted). Empty when every event maps.
 	UnsupportedHookEvents() []string
+
+	// HookLaunchArgs are the adapter args that point the CLI at the composed
+	// per-agent hook settings file at launch (techspec §2.3). Claude Code reads a
+	// settings JSON via `--settings <path>`. Returns nil when the backend has no
+	// settings-file mechanism (or it is not yet confirmed for that backend).
+	HookLaunchArgs(settingsPath string) []string
 }
 
 // agentDeckHookEvents is the canonical AgentDeck lifecycle event set (techspec §4.2).
@@ -104,6 +110,13 @@ func (claudeACP) HookMap() map[string]string {
 
 func (claudeACP) UnsupportedHookEvents() []string { return unsupported(claudeACP{}.HookMap()) }
 
+func (claudeACP) HookLaunchArgs(settingsPath string) []string {
+	if settingsPath == "" {
+		return nil
+	}
+	return []string{"--settings", settingsPath}
+}
+
 // codexACP is the adapter for the codex-acp backend. It speaks ACP over stdio
 // like claude-acp, so it reuses the chat runtime transport; only the binary,
 // env, resume mechanism and hook map differ (techspec §2.4, §6).
@@ -144,6 +157,13 @@ func (codexACP) HookMap() map[string]string {
 }
 
 func (codexACP) UnsupportedHookEvents() []string { return unsupported(codexACP{}.HookMap()) }
+
+func (codexACP) HookLaunchArgs(settingsPath string) []string {
+	// GATED: the codex-acp hook settings mechanism is unconfirmed (no credentialed
+	// CLI). Until verified, codex registers no settings file — the terminal runtime
+	// backfills its status from the ACP stream. To enable: return the correct args.
+	return nil
+}
 
 // unsupported returns the AgentDeck lifecycle events absent from hookMap, sorted.
 func unsupported(hookMap map[string]string) []string {
