@@ -15,6 +15,10 @@ class SseClient {
 
   connect() {
     if (this.es) return;
+    // Give each fresh connection the full liveness window before the watchdog
+    // can reap it; otherwise a stale lastPing from a prior stream would close
+    // the new stream before its first ping arrives, looping forever.
+    this.lastPing = Date.now();
     useUiStore.getState().setConnection("connecting");
     this.es = new EventSource("/api/events");
     this.es.onopen = () => {
