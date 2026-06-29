@@ -103,6 +103,9 @@ func handle(msg *rpcMessage) {
 		respond(*msg.ID, map[string]any{"sessionId": "fake-sess-loaded"})
 	case "session/prompt":
 		id := *msg.ID
+		if dump := os.Getenv("FAKEACP_PROMPT_DUMP"); dump != "" {
+			_ = os.WriteFile(dump, msg.Params, 0o600)
+		}
 		// Run the scenario asynchronously so the read loop keeps handling the
 		// client's permission reply / cancel while the scenario blocks.
 		go func() {

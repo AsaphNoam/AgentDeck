@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -134,6 +135,9 @@ func TestChatStreamText(t *testing.T) {
 
 	if err := c.SendPrompt(ctx, h.AgentID, "hello"); err != nil {
 		t.Fatalf("SendPrompt: %v", err)
+	}
+	if budget, err := c.store.CurrentTurnBudget(h.AgentID, 15); err != nil || budget.TurnID != "t_000000000001" || budget.Remaining != 15 {
+		t.Fatalf("turn budget after SendPrompt = %+v err=%v, want fresh t_000000000001", budget, err)
 	}
 	// SendPrompt writes busy synchronously before returning.
 	if st, _ := c.store.ReadStatus(h.AgentID); st.State != "busy" {
@@ -306,5 +310,49 @@ func TestResumeSessionLoadAppliesMCP(t *testing.T) {
 	}
 	if len(params.MCPServers) != 1 || params.MCPServers[0].Name != "agentdeck-messaging" {
 		t.Fatalf("load mcpServers = %+v, want the fresh messaging server", params.MCPServers)
+	}
+}
+
+func TestCheckMessagesInjectsNudgeTurn(t *testing.T) {
+	c, spec := newChatTest(t, "stream_text")
+	dump := filepath.Join(t.TempDir(), "prompt.json")
+	spec.Env = append(spec.Env, "FAKEACP_PROMPT_DUMP="+dump)
+	ctx := context.Background()
+
+	h, err := c.Start(ctx, spec)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { c.Stop(ctx, h.AgentID) })
+	ch, unsub, err := c.Subscribe(h.AgentID)
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+	defer unsub()
+	run, err := c.store.ReadRunning(h.AgentID)
+	if err != nil {
+		t.Fatalf("ReadRunning: %v", err)
+	}
+	if err := c.CheckMessages(ctx, run.PID); err != nil {
+		t.Fatalf("CheckMessages: %v", err)
+	}
+	if budget, err := c.store.CurrentTurnBudget(h.AgentID, 15); err != nil || budget.TurnID != "t_000000000001" || budget.Remaining != 15 {
+		t.Fatalf("turn budget after nudge = %+v err=%v, want fresh t_000000000001", budget, err)
+	}
+	_ = drainTurn(t, ch)
+
+	raw, err := os.ReadFile(dump)
+	if err != nil {
+		t.Fatalf("read prompt dump: %v", err)
+	}
+	if !strings.Contains(string(raw), "check_messages") {
+		t.Fatalf("nudge prompt = %s, want check_messages instruction", raw)
+	}
+	final, err := c.store.ReadStatus(h.AgentID)
+	if err != nil {
+		t.Fatalf("ReadStatus final: %v", err)
+	}
+	if final.State != "idle" {
+		t.Fatalf("final status = %+v, want idle", final)
 	}
 }
