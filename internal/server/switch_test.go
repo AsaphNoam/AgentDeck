@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/agentdeck/agentdeck/internal/messaging"
 )
 
 // switchTestServer launches a server wired to the fake ACP CLI (chat) and the
@@ -102,6 +105,92 @@ func TestSwitchRuntimeChatToTerminal(t *testing.T) {
 	}
 	if a, _ := srv.stateStore.ReadAgent(id); a.Interface != "terminal" {
 		t.Fatalf("identity interface = %q, want terminal", a.Interface)
+	}
+}
+
+// Regression (review fix): a chat→terminal switch must leave the TARGET's hook
+// settings file present and the TARGET's MCP token usable after the 200 — the
+// old-artifact cleanup must run before the target spec is composed, not after.
+func TestSwitchRuntimeKeepsTargetRegistration(t *testing.T) {
+	srv, ts := switchTestServer(t)
+	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+
+	resp, body := post(t, ts.URL+"/api/sessions/"+id+"/switch-runtime", map[string]string{"interface": "terminal"})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("switch status = %d: %s", resp.StatusCode, body)
+	}
+
+	// The per-agent hook settings file the terminal CLI is pointed at must exist
+	// (terminal agents launch with `--settings <path>`; deleting it breaks hooks).
+	settingsPath := filepath.Join(srv.configStore.Home(), "hooks", "agents", id+".json")
+	if _, err := os.Stat(settingsPath); err != nil {
+		t.Fatalf("target hook settings file missing after switch: %v", err)
+	}
+
+	// The MCP token written into the target's config file must still authenticate
+	// (the cleanup must not have revoked the freshly-registered token).
+	token := readMessagingToken(t, srv, id)
+	if got, ok := srv.messaging.Lookup(token); !ok || got != id {
+		t.Fatalf("target MCP token not usable: lookup(%q) = (%q, %v), want (%q, true)", token, got, ok, id)
+	}
+}
+
+// readMessagingToken extracts the X-AgentDeck-Token from the agent's persisted
+// MCP config file.
+func readMessagingToken(t *testing.T, srv *Server, id string) string {
+	t.Helper()
+	path := filepath.Join(srv.configStore.Home(), "mcp", id+".mcp.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read mcp config %q: %v", path, err)
+	}
+	var cfg struct {
+		MCPServers map[string]struct {
+			Headers map[string]string `json:"headers"`
+		} `json:"mcpServers"`
+	}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("parse mcp config: %v", err)
+	}
+	entry, ok := cfg.MCPServers[messagingMCPName]
+	if !ok {
+		t.Fatalf("mcp config missing %q entry: %s", messagingMCPName, data)
+	}
+	return entry.Headers[messaging.TokenHeader]
+}
+
+// Regression (review fix): archive-resume of a terminal agent must work. A chat
+// agent switched to terminal then stopped has a persisted snapshot whose frozen
+// interface is still "chat"; resume must honor the LIVE identity (terminal) and
+// relaunch under the terminal runtime, recording a terminal running row with
+// tty/driver — not return the old 501 guard.
+func TestResumeTerminalAgent(t *testing.T) {
+	srv, ts := switchTestServer(t)
+	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+
+	// Switch chat → terminal so the live identity row is terminal.
+	resp, body := post(t, ts.URL+"/api/sessions/"+id+"/switch-runtime", map[string]string{"interface": "terminal"})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("switch status = %d: %s", resp.StatusCode, body)
+	}
+
+	// Stop the terminal agent (archive resume is for inactive sessions).
+	resp, body = post(t, ts.URL+"/api/sessions/"+id+"/stop", nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("stop status = %d: %s", resp.StatusCode, body)
+	}
+
+	// Resume must succeed (no longer 501) and relaunch under the terminal runtime.
+	resp, body = post(t, ts.URL+"/api/sessions/"+id+"/resume", nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("terminal resume status = %d, want 200: %s", resp.StatusCode, body)
+	}
+	run, err := srv.stateStore.ReadRunning(id)
+	if err != nil {
+		t.Fatalf("ReadRunning after resume: %v", err)
+	}
+	if run.Interface != "terminal" || run.Driver != "xterm" || run.TTY == "" {
+		t.Fatalf("resumed running row not terminal/xterm/tty: %+v", run)
 	}
 }
 

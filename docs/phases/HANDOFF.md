@@ -140,6 +140,17 @@ _(no open findings)_
 
 > Resolved without stopping; the human should still see them. Remove once acknowledged (workflow §3, §5).
 
+- **NEW (review fix): archive resume now resolves identity (interface/backend/model) from the LIVE `agents`
+  row, not the frozen `sessions` snapshot.** The terminal-resume BLOCKING fix required this: after a
+  chat→terminal switch the snapshot's `interface` stays `"chat"` (no terminal `turn_end` ever refreshes it),
+  while the agents row correctly reads `"terminal"` — so the prior snapshot-sourced resume would relaunch the
+  wrong runtime. `handleResume` (`internal/server/resume.go`) now reads `agent.Backend/Model/Interface` (the
+  identity switch-runtime keeps current); cwd/system_prompt/last_session_id still come from the frozen
+  snapshot, and the optional override fields still win. **Why a judgment call:** Phase 4 originally resumed
+  purely from the frozen snapshot; trusting the live identity row is the minimal correct source for a switched
+  agent and is equivalent for never-switched agents (agents row == snapshot identity). **To reverse:** read
+  `snap.Backend/Model/Interface` again — but then a switched-then-stopped agent resumes under its pre-switch
+  interface.
 - **NEW (6.4): switch-runtime cancel-then-wait is best-effort (poll status≠busy up to 5s), not a true `turn_end` await.**
   §9 says wait up to `config.switch.cancel_timeout_ms` for `turn_end`. I poll the status row leaving `busy` rather than
   subscribing to the runtime hub for the `turn_end` event (simpler, no subscription lifecycle in the handler); the
@@ -339,6 +350,18 @@ _(no open findings)_
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-29 — **review fix: switch-runtime keeps the target registration + terminal archive resume — green.**
+  (1) BLOCKING: `handleSwitchRuntime` (`internal/server/switch.go`) cleaned the OLD MCP/hook artifacts (keyed by
+  the unchanged `agent_id`) AFTER `composeSwitchSpec` had already registered the fresh target token + rewritten
+  the per-agent hook settings file — so it revoked the new MCP token, deleted the `--settings` file the resume
+  needs, and orphaned the old token (its cleanup closure was overwritten). Reordered to validate (new pure
+  `validateSwitchTarget` — no side effects) → stop old → cleanup OLD → `composeSwitchSpec` (register fresh) →
+  resume. Test `TestSwitchRuntimeKeepsTargetRegistration` (chat→terminal: hook settings file present + MCP token
+  still `Lookup`-able after the 200). (2) BLOCKING: removed the stale `501 "terminal resume not implemented"`
+  guard in `handleResume`; resume now resolves interface/backend/model from the live `agents` row (not the frozen
+  snapshot, which stays `chat` after a switch). Test `TestResumeTerminalAgent` (chat→switch terminal→stop→resume
+  → terminal running row with tty/driver). See Autonomous decisions for the identity-source judgment call. Green
+  both tag modes (Go-only).
 - 2026-06-29 — **6.4 green — switch-runtime: same-backend (interface/model swap).** New `internal/server/switch.go`:
   `POST /api/sessions/{id}/switch-runtime {interface?, backend?, model?}`. Per-agent switch lock (`Server.switching`
   set; concurrent → `409 switch_in_progress`). Flow: merge target over current (`400 no_change`/`400 invalid_field`) →
@@ -401,5 +424,3 @@ _(most recent first; keep ~10, older history is in git)_
 - 2026-06-29 — **review fix: budget_exceeded toast names the agent + dismissed recipient-badge false positive — green.** New `bus.PublishBudgetExceeded` routes breaches through `notificationPayload` (the existing `budget_exceeded` case) using the agent's snapshot, so the toast carries `agent_name`/`address`/named title instead of the old inline generic payload; `SetBudgetExceededSink` now uses it. Tests: `TestPublishBudgetExceededNamesAgent` + `…FallsBackToAgentID`. **Dismissed** the "recipient unread badge doesn't update live" advisory as a false positive: the message-inserted sink calls `stateMgr.Touch(toAgentID)`, and `Touch`→`recomputeAndPublish` already `PublishStateUpdate`s the recipient with the recomputed `unread_messages` (the inline `SetSnapshot` was merely redundant — `PublishStateUpdate` already sets the snapshot). Dropped that redundant `SetSnapshot`; guard test `TestTouchRecipientPublishesUnread`. Green both tag modes.
 - 2026-06-29 — **review fix: turn budget single-row-per-agent — green (also fixes unbounded growth).** `ResetTurnBudget` now deletes the agent's other `turn_budget` rows in-tx so at most one row survives per agent. Fixes the restart+resume blocker: `turnSeq` resets to 0 on a fresh process, so a resumed agent re-emitted low `turn_id`s while prior-session rows kept the highest rowids — `currentBudgetTx`'s `ORDER BY rowid DESC` read a stale/breached row and could block `send_message`/`check_messages`. One row per agent also caps `turn_budget`'s formerly unbounded growth (resolves that advisory too). Test `TestResetTurnBudgetReusesSingleRow` simulates the restart, asserts the freshly-reset `t_…01` is read (0 used, not the stale `t_…02`), and that exactly one row remains. Green both tag modes.
 - 2026-06-29 — **5.4 green / Phase 5 COMPLETE — notifications + dashboard message indicators.** `AgentState` now includes `unread_messages` and `last_sent_at`; message sends touch recipient/sender state for unread badges and outbound pulse; bus emits edge-triggered `notification` SSE for done/waiting_input/permission_required plus the existing budget_exceeded path. `config.json` gained `notifications.desktop_enabled` + per-type mutes via existing `GET/PUT /api/config`; UI consumes notification SSE, sends hidden-tab desktop notifications when permitted, visible-tab toasts otherwise, and adds Settings notification toggles. Added read-only `GET /api/sessions/{id}/messages`. Embedded UI refreshed. Tests: Go notification/indicator/config/inbox coverage; UI mute + hidden desktop notification + settings toggle. Checkpoint green: Go standard/tagged build+tests, `cd ui && npm test`, `cd ui && npm run build`.
-- 2026-06-29 — **5.3 green — registration, nudger, turn budget, janitor.** Added per-agent HTTP MCP registration files + token cleanup wired through launch/resume/stop/shutdown; chat `CheckMessages(pid)` now injects a nudge turn and runtime turns reset `turn_budget`. `send_message`/`check_messages` enforce the shared 15-action budget transactionally (`message_budget_exceeded`, persisted `breached=1`, WARN + `budget_exceeded` SSE); nudger wakes idle agents on ticker/insert signal and stamps `delivered_via='nudge'`; poll reads now stamp `delivered_via='poll'`; janitor deletes read>24h and any>7d. Tests cover registration cleanup, runtime/server nudge, budget breach/caps, retention, and poll stamping. Checkpoint green: `go build ./...`, `go build -tags sqlite_fts5 ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
-- 2026-06-29 — **5.2 green — message store + three MCP tools.** Migration v5 replaces the Phase-0 placeholder `messages` table with the §4.1 schema (TEXT `message_id` PK, no agent FK) + adds `turn_budget`. New `state` messaging API (`LiveAgents`, `ResolveRecipient`, `InsertMessage`, `ListMessages`, `MarkRead`, `DeleteMessages`, `UnreadCount`) + `Message`/`LiveAgent`/`AgentRef` types. `messaging` package: `list_agents`/`send_message`/`check_messages` tools replace the `ping` spike, identity from the session token (`req.Extra.Header`→`Lookup`, unknown→`session_unknown`), §9 error shapes, locked §13 constants. Budget enforcement deferred to 5.3 (static cap + TODO). New state + messaging tests; updated Phase-0 state tests (cascade now asserts mail survives a deleted sender) + `server.TestMCPRouteMounted`. Build + full tests green both tag modes.
