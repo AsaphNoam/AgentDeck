@@ -74,11 +74,14 @@ describe("NewAgentModal", () => {
 
   it("auto-suggests name from role and project", async () => {
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
-    // Wait for data to load — name should be auto-suggested
+    // Wait for both role and project data to load — the suggested name is empty
+    // until both defaults are applied (suggest() returns "" if either is unset),
+    // so awaiting only the role text would race the project default.
     await screen.findByText(/Implementer/);
-    const nameInput = screen.getByPlaceholderText("e.g. Atlas");
-    // Name is suggested as "Implementer-my-app" or similar based on first loaded role/project
-    expect((nameInput as HTMLInputElement).value).toBeTruthy();
+    await screen.findByText(/My App/);
+    const nameInput = screen.getByPlaceholderText("e.g. Atlas") as HTMLInputElement;
+    // Name is suggested as "Implementer-my-app" or similar based on first loaded role/project.
+    await waitFor(() => expect(nameInput.value).toBeTruthy());
   });
 
   it("model select shows only models for the chosen backend", async () => {

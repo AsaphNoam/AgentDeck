@@ -62,11 +62,12 @@ export function decidePermission(agentId: string, toolCallId: string, decision: 
   });
 }
 
-export function searchArchive(q: string, limit = 50, offset = 0) {
+export function searchArchive(q: string, limit = 50, offset = 0, signal?: AbortSignal) {
   const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
   if (q) params.set("q", q);
   return json<{ query: string; total: number; limit: number; offset: number; results: ArchiveResult[] }>(
     `/api/archive?${params}`,
+    { signal },
   );
 }
 
