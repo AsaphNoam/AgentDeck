@@ -83,6 +83,14 @@ func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if err := s.registry.Stop(r.Context(), id); err != nil {
 		if errors.Is(err, runtime.ErrNoHandle) {
+			// Not currently running. If the identity still exists, the agent is
+			// already stopped — make stop idempotent so a double-click or a
+			// lost-response retry reads as success, not a phantom "unknown agent".
+			// 404 is reserved for ids with no identity row at all.
+			if _, rerr := s.stateStore.ReadAgent(id); rerr == nil {
+				writeJSON(w, http.StatusOK, map[string]any{"stopped": true})
+				return
+			}
 			writeAPIError(w, apiError(runtime.CodeNotFound, "no such agent: "+id))
 			return
 		}

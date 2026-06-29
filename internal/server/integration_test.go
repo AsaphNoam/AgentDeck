@@ -595,6 +595,53 @@ func TestResumeUnknownAgent(t *testing.T) {
 	}
 }
 
+// TestStopIdempotent verifies that stopping an already-stopped (but known)
+// agent reads as success, while an unknown id still 404s.
+func TestStopIdempotent(t *testing.T) {
+	fake := buildFakeACP(t)
+	t.Setenv("FAKEACP_SCENARIO", "stream_text")
+
+	srv := testServer(t, true)
+	srv.registry.Chat().SetCommand(fake)
+	if err := srv.configStore.WriteProject("tmpproj", config.Project{Title: "Tmp", Cwd: t.TempDir()}); err != nil {
+		t.Fatalf("WriteProject: %v", err)
+	}
+	if err := srv.configStore.WriteRole("impl", config.Role{Title: "Impl", SystemPrompt: "be helpful"}); err != nil {
+		t.Fatalf("WriteRole: %v", err)
+	}
+
+	ts := httptest.NewServer(srv.routes())
+	defer ts.Close()
+	t.Cleanup(func() { srv.registry.Shutdown(context.Background()) })
+
+	agentID := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+
+	// First stop succeeds.
+	resp, body := post(t, ts.URL+"/api/sessions/"+agentID+"/stop", nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("first stop status = %d, want 200: %s", resp.StatusCode, body)
+	}
+
+	// Repeated stop on the known-but-stopped agent is idempotent success.
+	resp, body = post(t, ts.URL+"/api/sessions/"+agentID+"/stop", nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("second stop status = %d, want 200 (idempotent): %s", resp.StatusCode, body)
+	}
+	var stopped struct {
+		Stopped bool `json:"stopped"`
+	}
+	json.Unmarshal(body, &stopped)
+	if !stopped.Stopped {
+		t.Fatalf("second stop body = %s, want stopped:true", body)
+	}
+
+	// Unknown id still 404s.
+	resp, _ = post(t, ts.URL+"/api/sessions/a_ghost/stop", nil)
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("stop unknown agent status = %d, want 404", resp.StatusCode)
+	}
+}
+
 func mustAgent() state.Agent {
 	return state.Agent{
 		AgentID: "a_nopersist", Name: "Ghost", Role: "impl", Project: "tmpproj",
