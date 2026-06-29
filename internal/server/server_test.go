@@ -263,6 +263,46 @@ func TestSessionMessagesEndpoint(t *testing.T) {
 	}
 }
 
+// TestTouchRecipientPublishesUnread documents why the "recipient badge doesn't
+// update live" review finding was a false positive: the message-inserted sink
+// calls stateMgr.Touch(toAgentID), and Touch publishes a state_update (via the
+// manager's bus publisher) carrying the recomputed unread_messages — no extra
+// publish is needed. Guards against a regression that would drop this.
+func TestTouchRecipientPublishesUnread(t *testing.T) {
+	srv := testServer(t, true)
+	recipient := state.Agent{AgentID: "a_recipient", Name: "Nova", Role: "reviewer", Project: "my-app", Backend: "claude", Model: "sonnet", Interface: "chat", CreatedAt: time.Now().UTC()}
+	if err := srv.stateStore.WriteAgent(recipient); err != nil {
+		t.Fatalf("WriteAgent: %v", err)
+	}
+	if _, err := srv.stateStore.InsertMessage(state.Message{
+		FromAgent: "a_sender", FromAddress: "implementer@my-app", FromName: "Atlas",
+		ToAgent: recipient.AgentID, Body: "mail", CreatedAt: time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("InsertMessage: %v", err)
+	}
+
+	ch, unsub := srv.eventBus.Subscribe()
+	defer unsub()
+	if _, err := srv.stateMgr.Touch(recipient.AgentID); err != nil {
+		t.Fatalf("Touch: %v", err)
+	}
+	select {
+	case ev := <-ch:
+		if ev.Type != "state_update" {
+			t.Fatalf("event type = %q, want state_update", ev.Type)
+		}
+		update, ok := ev.Data.(state.AgentStateUpdate)
+		if !ok {
+			t.Fatalf("event data type = %T, want AgentStateUpdate", ev.Data)
+		}
+		if update.AgentID != recipient.AgentID || update.UnreadMessages != 1 {
+			t.Fatalf("state_update = %+v, want recipient with unread_messages 1", update)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("no state_update published for recipient on Touch")
+	}
+}
+
 func TestBackendsCorruptFallsBackTo200(t *testing.T) {
 	srv := testServer(t, true)
 	// Overwrite backends.json with garbage.
