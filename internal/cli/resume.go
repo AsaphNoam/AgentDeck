@@ -76,8 +76,10 @@ type archiveResult struct {
 }
 
 // listInactiveSessions queries the archive endpoint for inactive sessions
-// matching the given role and project.
-func listInactiveSessions(port int, role, project string) ([]archiveResult, error) {
+// matching the given role and project. When name is non-empty it also filters
+// by name, so a bare `role@project --name X` only auto-resumes the session
+// actually named X rather than any inactive role@project session.
+func listInactiveSessions(port int, role, project, name string) ([]archiveResult, error) {
 	url := fmt.Sprintf("http://127.0.0.1:%d/api/archive?active=false&limit=200", port)
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get(url)
@@ -96,7 +98,7 @@ func listInactiveSessions(port int, role, project string) ([]archiveResult, erro
 
 	var matches []archiveResult
 	for _, r := range ar.Results {
-		if !r.Active && r.Role == role && r.Project == project {
+		if !r.Active && r.Role == role && r.Project == project && (name == "" || r.Name == name) {
 			matches = append(matches, r)
 		}
 	}

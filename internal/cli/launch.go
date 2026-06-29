@@ -115,7 +115,7 @@ func runLaunch(args []string) int {
 	// --new forces a fresh launch with no inactive-session check.
 	if !la.ForceNew {
 		// Bare-form: check for a single inactive match with the same role@project.
-		matches, merr := listInactiveSessions(port, la.Role, la.Project)
+		matches, merr := listInactiveSessions(port, la.Role, la.Project, la.Name)
 		if merr == nil && len(matches) == 1 {
 			fmt.Printf("resuming existing session %s (%s)...\n", matches[0].Name, matches[0].AgentID)
 			return runResumeByID(matches[0].AgentID)
