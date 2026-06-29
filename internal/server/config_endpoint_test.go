@@ -161,6 +161,9 @@ func TestPutConfigMergesFields(t *testing.T) {
 
 	trueVal := true
 	project := "my-app"
+	if err := srv.configStore.WriteProject(project, config.Project{Title: "My App", Cwd: "/tmp"}); err != nil {
+		t.Fatalf("WriteProject: %v", err)
+	}
 	rec := doRequest(t, h, http.MethodPut, "/api/config", map[string]any{
 		"onboarding_complete": true,
 		"default_project":     project,

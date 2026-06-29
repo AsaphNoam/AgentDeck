@@ -321,6 +321,38 @@ func TestHookCommandCapture(t *testing.T) {
 	}
 }
 
+// TestHookCommandCaptureMultiple guards against the (agent_id, seq) PK collision:
+// hook commands without an explicit seq must each get a distinct row rather than
+// overwriting each other at seq=0.
+func TestHookCommandCaptureMultiple(t *testing.T) {
+	srv := testServer(t, false)
+	seedSessionForTracking(t, srv)
+	h := srv.routes()
+
+	for _, cmd := range []string{"make build", "npm test", "git status"} {
+		body := `{"agent_id":"a_fc_test","event":"command","command":"` + cmd + `","timestamp":"2026-06-28T10:00:02Z"}`
+		if rec := postHookJSON(t, h, body, "tok_fc"); rec.Code != http.StatusNoContent {
+			t.Fatalf("hook command %q status = %d body=%s", cmd, rec.Code, rec.Body.String())
+		}
+	}
+
+	rec := doGET(t, h, "/api/sessions/a_fc_test/commands")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("commands status = %d", rec.Code)
+	}
+	var resp struct {
+		Commands []struct {
+			Command string `json:"command"`
+		} `json:"commands"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(resp.Commands) != 3 {
+		t.Fatalf("commands = %+v, want 3 distinct rows", resp.Commands)
+	}
+}
+
 func TestHookTrackingValidationErrors(t *testing.T) {
 	srv := testServer(t, false)
 	seedSessionForTracking(t, srv)
