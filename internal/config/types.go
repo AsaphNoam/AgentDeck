@@ -77,9 +77,14 @@ type Config struct {
 	SkipPermissions    bool                `json:"skip_permissions"`    // false
 	OnboardingComplete bool                `json:"onboarding_complete"` // set after first launch
 	Notifications      NotificationsConfig `json:"notifications"`
+	Switch             SwitchConfig        `json:"switch"`
 }
 
 type NotificationsConfig struct {
 	DesktopEnabled bool            `json:"desktop_enabled"`
 	Muted          map[string]bool `json:"muted"`
+}
+
+type SwitchConfig struct {
+	PrimerTokenBudget int `json:"primer_token_budget"`
 }

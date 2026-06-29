@@ -64,6 +64,11 @@ type Server struct {
 	// Tests inject a stub so real network/CLI calls are avoided.
 	credCheck func(ctx context.Context, bk config.Backend, model config.Model, mergedEnv map[string]string) credcheck.CredResult
 
+	// primerSummarizer is the one-shot target-backend summary seam for backend
+	// switches. The default implementation is gated until live CLI invocation is
+	// confirmed; tests inject deterministic behavior.
+	primerSummarizer primerSummarizer
+
 	// onboardingCacheMu guards onboardingCache.
 	onboardingCacheMu sync.Mutex
 	onboardingCache   *onboardingCacheEntry
@@ -121,21 +126,22 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	// (agent_name/address) like every other notification type.
 	msg.SetBudgetExceededSink(eventBus.PublishBudgetExceeded)
 	return &Server{
-		configStore: cfgStore,
-		stateStore:  stateStore,
-		stateMgr:    stateMgr,
-		eventBus:    eventBus,
-		registry:    registry,
-		terminal:    term,
-		indexer:     ix,
-		messaging:   msg,
-		nudgeCh:     nudgeCh,
-		cfg:         cfg,
-		log:         log,
-		hookTokens:  map[string]string{},
-		mcpCleanups: map[string]func(){},
-		switching:   map[string]bool{},
-		credCheck:   credcheck.Check,
+		configStore:      cfgStore,
+		stateStore:       stateStore,
+		stateMgr:         stateMgr,
+		eventBus:         eventBus,
+		registry:         registry,
+		terminal:         term,
+		indexer:          ix,
+		messaging:        msg,
+		nudgeCh:          nudgeCh,
+		cfg:              cfg,
+		log:              log,
+		hookTokens:       map[string]string{},
+		mcpCleanups:      map[string]func(){},
+		switching:        map[string]bool{},
+		credCheck:        credcheck.Check,
+		primerSummarizer: defaultPrimerSummarizer,
 	}
 }
 

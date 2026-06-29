@@ -32,6 +32,7 @@ func DefaultConfig() Config {
 				"budget_exceeded":     false,
 			},
 		},
+		Switch: SwitchConfig{PrimerTokenBudget: 8000},
 	}
 }
 

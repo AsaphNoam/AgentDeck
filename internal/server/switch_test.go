@@ -12,6 +12,8 @@ import (
 
 	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/messaging"
+	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/agentdeck/agentdeck/internal/transcript"
 )
 
 // switchTestServer launches a server wired to the fake ACP CLI (chat) and the
@@ -45,6 +47,22 @@ func runningSessionID(t *testing.T, srv *Server, id string) string {
 		t.Fatalf("ReadRunning(%s): %v", id, err)
 	}
 	return r.SessionID
+}
+
+func waitForStatus(t *testing.T, srv *Server, id, want string) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		st, err := srv.stateStore.ReadStatus(id)
+		if err == nil && st.State == want {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if st, err := srv.stateStore.ReadStatus(id); err == nil {
+		t.Fatalf("status = %q, want %q", st.State, want)
+	}
+	t.Fatalf("status %q not reached", want)
 }
 
 // Same-backend model swap keeps the agent_id and the persisted transcript while
@@ -108,6 +126,58 @@ func TestSwitchRuntimeChatToTerminal(t *testing.T) {
 	}
 }
 
+// Backend swap starts a fresh native session, injects a primer, records a
+// backend_switch marker, and keeps the same AgentDeck agent/archive log
+// (techspec §5.3, §8.1).
+func TestSwitchRuntimeBackendSwapUsesPrimer(t *testing.T) {
+	srv, ts := switchTestServer(t)
+	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+	resp, body := post(t, ts.URL+"/api/sessions/"+id+"/prompt", map[string]string{"text": "say hello"})
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("prompt status = %d: %s", resp.StatusCode, body)
+	}
+	waitForStatus(t, srv, id, "idle")
+
+	summarized := false
+	srv.primerSummarizer = func(_ context.Context, req primerSummaryRequest) (string, error) {
+		summarized = true
+		if req.Target != "codex/gpt-5.5" || req.Backend != "codex-acp" || req.Model != "gpt-5.5" {
+			t.Fatalf("summary target = %+v", req)
+		}
+		return "Earlier assistant helped with setup.", nil
+	}
+
+	resp, body = post(t, ts.URL+"/api/sessions/"+id+"/switch-runtime", map[string]string{"backend": "codex", "model": "gpt-5.5"})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("switch status = %d: %s", resp.StatusCode, body)
+	}
+	var sr switchRuntimeResponse
+	if err := json.Unmarshal(body, &sr); err != nil {
+		t.Fatalf("switch body: %v", err)
+	}
+	if sr.AgentID != id || sr.Backend != "codex" || sr.Model != "gpt-5.5" || sr.HistoryHandoff != "primer" {
+		t.Fatalf("unexpected switch response: %+v", sr)
+	}
+	if summarized {
+		t.Fatal("summarizer should not be called when only the last tail turns exist")
+	}
+	if a, _ := srv.stateStore.ReadAgent(id); a.Backend != "codex" || a.Model != "gpt-5.5" {
+		t.Fatalf("identity not switched: %+v", a)
+	}
+	events, err := transcript.ReadFile(srv.configStore.Home(), id, transcript.ReadOptions{IncludeMeta: true})
+	if err != nil {
+		t.Fatalf("read transcript: %v", err)
+	}
+	if !hasBackendSwitchMarker(events, "claude/sonnet-4-6", "codex/gpt-5.5") {
+		t.Fatalf("missing backend_switch marker in transcript: %+v", events)
+	}
+
+	resp, body = post(t, ts.URL+"/api/sessions/"+id+"/prompt", map[string]string{"text": "continue"})
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("post-switch prompt status = %d: %s", resp.StatusCode, body)
+	}
+}
+
 // Regression (review fix): a chat→terminal switch must leave the TARGET's hook
 // settings file present and the TARGET's MCP token usable after the 200 — the
 // old-artifact cleanup must run before the target spec is composed, not after.
@@ -157,6 +227,19 @@ func readMessagingToken(t *testing.T, srv *Server, id string) string {
 		t.Fatalf("mcp config missing %q entry: %s", messagingMCPName, data)
 	}
 	return entry.Headers[messaging.TokenHeader]
+}
+
+func hasBackendSwitchMarker(events []runtime.Event, from, to string) bool {
+	for _, ev := range events {
+		if ev.Type != runtime.EvBackendSwitch {
+			continue
+		}
+		var d runtime.BackendSwitchData
+		if json.Unmarshal(ev.Data, &d) == nil && d.From == from && d.To == to && d.At != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // Regression (review fix): archive-resume of a terminal agent must work. A chat

@@ -16,6 +16,7 @@ const (
 	EvSessionMeta        = "session_meta"
 	EvTurnEnd            = "turn_end"
 	EvError              = "error"
+	EvBackendSwitch      = "backend_switch"
 )
 
 // Event is the normalized transcript event emitted to subscribers (techspec §3.1).
@@ -98,6 +99,15 @@ type ErrorData struct {
 	Scope   string `json:"scope"` // "protocol" | "process" | "tool" | "internal"
 	Message string `json:"message"`
 	Fatal   bool   `json:"fatal"` // true => session is dead, Stop has been performed
+}
+
+// BackendSwitchData marks a cross-backend history hand-off in the durable
+// transcript so archive/chat views can render a divider while keeping the same
+// logical AgentDeck session.
+type BackendSwitchData struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+	At   string `json:"at"`
 }
 
 // SessionMetaData captures the launch/resume snapshot persisted as session_meta
