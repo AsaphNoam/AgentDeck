@@ -51,6 +51,13 @@ The dashboard server hosts the MCP server in-process. The open mechanism is *how
 
 In both shapes the dashboard server is the single owner of the MCP server and of `state.db`; the only difference is whether the CLI talks to it directly over HTTP or through a stdio proxy that the same binary provides.
 
+#### Task 1 spike outcome (recorded 5.1)
+
+- **SDK pinned:** `github.com/modelcontextprotocol/go-sdk v1.6.1` (v1.x). Required bumping the `go` directive `1.22 → 1.25.0` (the SDK's minimum); local toolchain is go1.25.5.
+- **In-process server stood up:** `internal/messaging` constructs one `mcp.Server` (trivial `ping` echo tool), exposed via `mcp.NewStreamableHTTPHandler` and mounted on the existing dashboard listener at **`POST/GET/DELETE /mcp`** (method-agnostic mounting conflicts with the `OPTIONS /` CORS route, so the three transport methods are registered explicitly). A `token → agent_id` session registry (`Register`/`Revoke`/`Lookup`) is in place; the HTTP handler reads `X-AgentDeck-Token` per request, proving the per-agent session binding arrives over the wire.
+- **HTTP transport (A) confirmed working in-process** — a go-sdk `StreamableClientTransport` client carrying the token header round-trips a `ping` call both directly against the messaging handler (`messaging.TestSpikePingRoundTrip`) and through the real dashboard mux (`server.TestMCPRouteMounted`). This validates the SDK + transport + session-header mechanics end-to-end without a live CLI.
+- **Per-CLI HTTP-vs-stdio verdict — still GATED on the two live CLIs.** Confirming that *Claude Code* and *Codex* each accept the transport-(A) HTTP entry (vs. requiring the transport-(B) stdio subcommand) requires their logged-in CLIs registering against a running dashboard — a credentialed acceptance, same class as the Phase 1 real-CLI acceptance. Target is **HTTP (A) for both**, with the **stdio (B)** `agentdeck mcp` proxy as the fallback `RegisterMessagingMCP` (§3.6, 5.3) emits per-backend once the live result is known. The existing `internal/server/launch.go::messagingServer` stub (which emits a `mcp-stdio` stdio entry) is **superseded** by `RegisterMessagingMCP` in 5.3 and left untouched for now. See HANDOFF `## Blocked on human` for the gated confirmation step.
+
 ### 2.3 Where messaging state lives
 
 - **Messages:** rows in the `messages` table in `state.db` (§4.1). `list_agents` reads `state.db`; `send_message` inserts a row; `check_messages` selects, flags, or deletes the caller's rows.
