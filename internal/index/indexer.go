@@ -7,10 +7,18 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
+	"unicode/utf8"
 
 	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/strutil"
 )
+
+// execer is satisfied by both *sql.DB and *sql.Tx so rollup updates can run
+// either standalone or inside an existing transaction.
+type execer interface {
+	Exec(query string, args ...any) (sql.Result, error)
+}
 
 type Indexer struct {
 	db      *sql.DB
@@ -27,9 +35,12 @@ func (ix *Indexer) UpsertSessionMeta(agentID string, meta runtime.SessionMetaDat
 	if agentID == "" {
 		return fmt.Errorf("index: agent id is required")
 	}
-	now := strutil.FirstNonEmpty(meta.CreatedAt, meta.SessionID)
+	// created_at/updated_at must be a real timestamp; fall back to now (never the
+	// session id, which would sort lexically after real RFC3339 values and corrupt
+	// the MAX(updated_at) guard below).
+	now := meta.CreatedAt
 	if now == "" {
-		now = "1970-01-01T00:00:00Z"
+		now = time.Now().UTC().Format(time.RFC3339)
 	}
 	envKeys, err := json.Marshal(meta.EnvKeys)
 	if err != nil {
@@ -160,6 +171,11 @@ func (ix *Indexer) addContent(agentID, text string) {
 	combined := cur + "\n" + text
 	if len(combined) > maxContentBytes {
 		combined = combined[len(combined)-maxContentBytes:]
+		// The byte-slice cut can land mid-rune; drop the leading partial rune so
+		// the FTS content column never stores invalid UTF-8.
+		for len(combined) > 0 && !utf8.RuneStart(combined[0]) {
+			combined = combined[1:]
+		}
 	}
 	ix.content[agentID] = combined
 }
@@ -385,7 +401,10 @@ func (ix *Indexer) CaptureHookFile(agentID, path, ts string, seq int64) error {
 		return fmt.Errorf("index: agent_id and path are required")
 	}
 	ev := runtime.Event{AgentID: agentID, Seq: seq, Ts: ts}
-	return ix.upsertFile(agentID, path, ev, "", false)
+	if err := ix.upsertFile(agentID, path, ev, "", false); err != nil {
+		return err
+	}
+	return bumpRollups(ix.db, agentID)
 }
 
 // CaptureHookCommand records a command event from POST /api/hook (terminal runtime producer).
@@ -394,14 +413,47 @@ func (ix *Indexer) CaptureHookCommand(agentID, command, ts, toolCallID string, s
 	if agentID == "" || command == "" {
 		return fmt.Errorf("index: agent_id and command are required")
 	}
+	tx, err := ix.db.Begin()
+	if err != nil {
+		return fmt.Errorf("index: begin capture command: %w", err)
+	}
+	defer tx.Rollback()
+	// Hook callers may omit seq (terminal producer with no transcript seq). seq<=0
+	// would collide on the (agent_id, seq) PK and overwrite prior commands, so
+	// allocate the next free seq for this agent instead.
+	if seq <= 0 {
+		if err := tx.QueryRow(`SELECT COALESCE(MAX(seq), 0) + 1 FROM tracked_commands WHERE agent_id = ?`, agentID).Scan(&seq); err != nil {
+			return fmt.Errorf("index: next command seq: %w", err)
+		}
+	}
 	if toolCallID == "" {
 		toolCallID = fmt.Sprintf("hook_%d", seq)
 	}
-	_, err := ix.db.Exec(`
+	if _, err := tx.Exec(`
 INSERT OR REPLACE INTO tracked_commands(agent_id, seq, ts, tool_call_id, command, exit_status, exit_error)
-VALUES (?, ?, ?, ?, ?, 'completed', '')`, agentID, seq, ts, toolCallID, command)
-	if err != nil {
+VALUES (?, ?, ?, ?, ?, 'completed', '')`, agentID, seq, ts, toolCallID, command); err != nil {
 		return fmt.Errorf("index: capture hook command: %w", err)
+	}
+	if err := bumpRollups(tx, agentID); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("index: commit capture command: %w", err)
+	}
+	return nil
+}
+
+// bumpRollups refreshes the sessions row's files_touched/commands_run counts from
+// the tracked_* tables. The runtime hot path maintains these on turn_end, but the
+// hook-capture path has no turn boundary, so it must refresh them directly. A
+// no-op (0 rows) when the agent has no sessions row yet (e.g. terminal-only).
+func bumpRollups(db execer, agentID string) error {
+	if _, err := db.Exec(`
+UPDATE sessions
+SET files_touched = (SELECT COUNT(*) FROM tracked_files WHERE agent_id = ?),
+    commands_run  = (SELECT COUNT(*) FROM tracked_commands WHERE agent_id = ?)
+WHERE agent_id = ?`, agentID, agentID, agentID); err != nil {
+		return fmt.Errorf("index: bump rollups: %w", err)
 	}
 	return nil
 }

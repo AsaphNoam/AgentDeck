@@ -672,6 +672,25 @@ func (s *Server) handlePutConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Validate that referenced defaults exist (a dangling default would surface as
+	// a broken pre-selection in the launch modal / onboarding).
+	if body.DefaultProject != nil && *body.DefaultProject != "" {
+		if _, err := s.configStore.ReadProject(*body.DefaultProject); err != nil {
+			writeValidationError(w, &config.ValidationErrors{Errors: []config.FieldError{
+				{Field: "default_project", Code: "not_found", Message: "no such project: " + *body.DefaultProject},
+			}})
+			return
+		}
+	}
+	if body.DefaultRole != nil && *body.DefaultRole != "" {
+		if _, err := s.configStore.ReadRole(*body.DefaultRole); err != nil {
+			writeValidationError(w, &config.ValidationErrors{Errors: []config.FieldError{
+				{Field: "default_role", Code: "not_found", Message: "no such role: " + *body.DefaultRole},
+			}})
+			return
+		}
+	}
+
 	// Merge provided fields.
 	if body.OnboardingComplete != nil {
 		cfg.OnboardingComplete = *body.OnboardingComplete
