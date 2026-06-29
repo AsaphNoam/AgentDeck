@@ -84,6 +84,7 @@ type HookPayload struct {
 	ContextPct *float64 `json:"context_pct,omitempty"`
 	PID        int      `json:"pid,omitempty"`
 	SessionID  string   `json:"session_id,omitempty"`
+	TTY        string   `json:"tty,omitempty"`
 	TS         int64    `json:"ts,omitempty"`
 	// Fields for file_edit / command hook events (Phase 4 file/command tracking).
 	Path       string `json:"path,omitempty"`

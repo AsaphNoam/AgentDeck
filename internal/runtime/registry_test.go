@@ -75,14 +75,23 @@ func TestTerminalStubReturnsNotImplemented(t *testing.T) {
 	}
 }
 
-// TestChatRuntimeCodexBackendNotImplemented asserts the codex backend path on
-// the real chat runtime returns ErrNotImplemented at the backend gate, before
-// any process spawn (techspec §3.3). The claude-acp path passes the gate and is
-// exercised end-to-end (against the fake CLI) in chat_test.go.
-func TestChatRuntimeCodexBackendNotImplemented(t *testing.T) {
+// TestChatRuntimeBackendGate asserts the backend gate: a known ACP backend
+// (codex-acp) passes the adapter lookup (so it spawns and fails later on the
+// missing binary, NOT at the gate), while an unknown backend type is rejected
+// with ErrNotImplemented before any process spawn (techspec §3.3, §6.3).
+func TestChatRuntimeBackendGate(t *testing.T) {
 	c := NewChatRuntime(nil)
+
+	// codex-acp is a real backend now: the gate accepts it. It fails downstream
+	// trying to exec the (absent) codex-acp binary, which is NOT ErrNotImplemented.
 	_, err := c.Start(context.Background(), LaunchSpec{BackendType: "codex-acp"})
+	if errors.Is(err, ErrNotImplemented) {
+		t.Fatalf("codex-acp Start err = %v, want it to pass the backend gate", err)
+	}
+
+	// An unknown backend type is still rejected at the gate.
+	_, err = c.Start(context.Background(), LaunchSpec{BackendType: "openai-direct"})
 	if !errors.Is(err, ErrNotImplemented) {
-		t.Fatalf("codex Start err = %v, want ErrNotImplemented", err)
+		t.Fatalf("unknown backend Start err = %v, want ErrNotImplemented", err)
 	}
 }
