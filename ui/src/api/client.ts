@@ -2,7 +2,19 @@ import type { ArchiveResult, Capabilities, Layout, TrackedCommand, TrackedFile, 
 
 async function json<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init);
-  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  if (!response.ok) {
+    // Session routes return the §7.7 nested envelope { error: { code, message } };
+    // surface that message so callers can show a meaningful toast instead of a
+    // bare status line. Fall back to the status text if the body isn't JSON.
+    let message = `${response.status} ${response.statusText}`;
+    try {
+      const body = (await response.json()) as { error?: { message?: string } };
+      if (body?.error?.message) message = body.error.message;
+    } catch {
+      /* non-JSON body — keep the status line */
+    }
+    throw new Error(message);
+  }
   return (await response.json()) as T;
 }
 

@@ -8,6 +8,7 @@ import { useUiStore } from "../../store/uiStore";
 export function CardContextMenu() {
   const menu = useUiStore((state) => state.contextMenu);
   const close = useUiStore((state) => state.closeContextMenu);
+  const pushError = useUiStore((state) => state.pushError);
   const agent = useAgentStore((state) => (menu ? state.agents[menu.agentId] : null));
   const navigate = useNavigate();
 
@@ -63,7 +64,9 @@ export function CardContextMenu() {
           const iface = window.prompt("Interface (chat or terminal)", agent.interface) || agent.interface;
           const backend = window.prompt("Backend", agent.backend) || agent.backend;
           const model = window.prompt("Model", agent.model) || agent.model;
-          void switchRuntime(agent.agent_id, { interface: iface, backend, model });
+          switchRuntime(agent.agent_id, { interface: iface, backend, model }).catch((err) =>
+            pushError("Switch runtime failed", err instanceof Error ? err.message : String(err)),
+          );
           close();
         }}
       >
@@ -76,7 +79,10 @@ export function CardContextMenu() {
         type="button"
         onClick={() => {
           const group = window.prompt("Move to group (blank removes group)", agent.group ?? "");
-          if (group !== null) void updateAgentIdentity(agent.agent_id, { group });
+          if (group !== null)
+            updateAgentIdentity(agent.agent_id, { group }).catch((err) =>
+              pushError("Move to group failed", err instanceof Error ? err.message : String(err)),
+            );
           close();
         }}
       >
