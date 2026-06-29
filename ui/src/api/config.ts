@@ -17,11 +17,18 @@ export const QUERY_KEYS = {
   config: ["config"] as const,
 };
 
+// httpError builds the structured error the editors rely on: it preserves the
+// status code and parsed body so callers can branch on 409 (in-use) and read
+// `body.agents` to offer the ?force=true retry.
+async function httpError(res: Response): Promise<Error> {
+  const body = await res.json().catch(() => ({}));
+  return Object.assign(new Error(`HTTP ${res.status}`), { status: res.status, body });
+}
+
 async function json<T>(input: string, init?: RequestInit): Promise<T> {
   const res = await fetch(input, init);
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status, body });
+    throw await httpError(res);
   }
   return res.json() as Promise<T>;
 }
@@ -65,8 +72,8 @@ export function useDeleteRole() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, force }: { id: string; force?: boolean }) =>
-      fetch(`/api/roles/${id}${force ? "?force=true" : ""}`, { method: "DELETE" }).then((r) => {
-        if (!r.ok && r.status !== 204) throw new Error(`HTTP ${r.status}`);
+      fetch(`/api/roles/${id}${force ? "?force=true" : ""}`, { method: "DELETE" }).then(async (r) => {
+        if (!r.ok && r.status !== 204) throw await httpError(r);
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: QUERY_KEYS.roles }),
   });
@@ -111,8 +118,8 @@ export function useDeleteProject() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, force }: { id: string; force?: boolean }) =>
-      fetch(`/api/projects/${id}${force ? "?force=true" : ""}`, { method: "DELETE" }).then((r) => {
-        if (!r.ok && r.status !== 204) throw new Error(`HTTP ${r.status}`);
+      fetch(`/api/projects/${id}${force ? "?force=true" : ""}`, { method: "DELETE" }).then(async (r) => {
+        if (!r.ok && r.status !== 204) throw await httpError(r);
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: QUERY_KEYS.projects }),
   });

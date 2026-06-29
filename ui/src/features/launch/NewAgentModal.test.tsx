@@ -114,6 +114,46 @@ describe("NewAgentModal", () => {
     expect(terminalRadio).toBeDisabled();
   });
 
+  it("preselects configured default_role / default_project over the first entry", async () => {
+    server.use(
+      http.get("/api/config", () =>
+        HttpResponse.json({
+          onboarding_complete: true,
+          default_role: "reviewer",
+          default_project: "billing",
+        }),
+      ),
+    );
+
+    renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
+    await screen.findByText(/Implementer/);
+    await screen.findByText(/My App/);
+
+    const roleSelect = screen.getAllByRole("combobox")[0] as HTMLSelectElement;
+    const projectSelect = screen.getAllByRole("combobox")[1] as HTMLSelectElement;
+    // Configured defaults (the second entries) must win over the first entry.
+    await waitFor(() => expect(roleSelect.value).toBe("reviewer"));
+    await waitFor(() => expect(projectSelect.value).toBe("billing"));
+  });
+
+  it("surfaces the server error message when launch fails", async () => {
+    server.use(
+      http.post("/api/sessions", () =>
+        HttpResponse.json(
+          { error: { code: "runtime_start_failed", message: "project cwd does not exist: ~/Projects/my-app" } },
+          { status: 502 },
+        ),
+      ),
+    );
+
+    renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
+    await screen.findByText(/Implementer/);
+
+    fireEvent.click(screen.getByText("Launch"));
+
+    expect(await screen.findByText(/project cwd does not exist/)).toBeInTheDocument();
+  });
+
   it("submits correct payload on Launch", async () => {
     let capturedBody: unknown;
     server.use(

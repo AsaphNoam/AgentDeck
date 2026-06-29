@@ -91,24 +91,6 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 > **This section holds only OPEN findings** — no resolved/dismissed graveyard.
 > Blocking items must be fixed before the next phase starts; advisory items when convenient.
 
-- **ADVISORY — persisted permission resolutions are not folded on transcript refetch (Phase 2).**
-  `appendMessage` folds `permission_resolved` into its matching prompt, but `setTranscript` only
-  normalizes events. A reload/archive refetch with `permission_request` followed by `permission_resolved`
-  leaves the request visually unresolved because `TranscriptView` hides the resolution event. Add a
-  replay/folding helper shared by live append and REST refetch, plus a `setTranscript` regression test.
-- **ADVISORY — force-delete retry UI cannot see 409 details (Phase 3).** The role/project delete
-  mutations throw a plain `Error` instead of preserving `{status, body}`, while the editors expect those
-  fields to offer the `?force=true` retry for in-use definitions. Parse/delete errors through the same
-  structured helper used by the other config mutations.
-- **ADVISORY — New Agent modal ignores configured role/project defaults (Phase 3).** `NewAgentModal`
-  reads roles/projects/backends but not `/api/config`, then falls back to the first available role and
-  project. It should preselect `config.default_role` and `config.default_project` when present, then
-  fall back only if those ids are missing.
-- **ADVISORY — seeded default project can satisfy onboarding but fail launch (Phase 3).** The seeded
-  `my-app` project points at `~/Projects/my-app`; because `cwd_not_found` is warning-level and
-  min-viable config can lift the gate, a first launch may pass that nonexistent directory to `cmd.Dir`
-  and fail at runtime. This is allowed by the current spec, but the UX should either steer users to set a
-  real project before launch or surface the launch failure more directly.
 - **ADVISORY — bare-form CLI resume ignores `--name` (Phase 4).** Bare `role@project --name X` should
   only auto-resume an inactive session with the same name, but the current inactive-session selection
   filters only by role/project. Include name in the auto-resume match when provided, or force an explicit
@@ -118,6 +100,15 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 
 > Resolved without stopping; the human should still see them. Remove once acknowledged (workflow §3, §5).
 
+- **NEW (review fix): seeded-`my-app`-cwd advisory addressed only by surfacing the failure, not by
+  pre-launch validation.** The advisory offered two arms: (a) steer users to set a real project before
+  launch, or (b) surface the launch failure more directly. I did (b) — `NewAgentModal` now shows the
+  server's `error.message` (e.g. "project cwd does not exist") instead of "HTTP 502" — because it's
+  bounded and clearly correct. I did **not** do (a): adding pre-launch cwd validation or changing the
+  `cwd_not_found` onboarding gate is a design decision the spec explicitly permits as-is, so it's left
+  for the human. The seed still points `my-app` → `~/Projects/my-app`. **To take arm (a):** add a
+  pre-launch existence check (server 422 or modal-side warning) and/or promote `cwd_not_found` to a hard
+  gate. Deleted the finding bullet since the actionable part is fixed.
 - **NEW (review fix): archive FTS now indexes the COMPLETE transcript — unbounded buffer chosen over a
   segment model.** The 1 MiB cap was data-loss (older phrases unsearchable), so I removed it. The
   reviewer offered two fixes: (a) index complete content, or (b) a bounded-but-specified segment model.
@@ -187,6 +178,7 @@ _(empty — the 1.6 credentialed acceptance ran GREEN against `claude-code-acp` 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-29 — **review fix: 4 Phase 2/3 UI advisories — green (53/53 UI, embedded dist refreshed).** (1) `transcriptStore` gained `foldTranscript`, used by `setTranscript`, so a REST refetch/archive replay folds `permission_resolved` into its `permission_request` (was left visually unresolved); regression test added. (2) `useDeleteRole`/`useDeleteProject` now throw the structured `{status, body}` error (shared `httpError` helper) so the editors' 409 `?force=true` retry actually fires; `useDeleteRole` rejection test. (3) `NewAgentModal` now reads `/api/config` and preselects `default_role`/`default_project` (falls back to first entry only when absent); preselect test. (4) Launch failures now surface the server's `error.message` (e.g. nonexistent project cwd) instead of opaque "HTTP 502"; test added — partially addresses the seeded-`my-app`-cwd advisory (see Autonomous decisions).
 - 2026-06-29 — **review fix: ACP protocol version mismatch now fails the handshake — green.** `ChatRuntime.Start`/`Resume` previously only `slog.Warn`ed on an out-of-range `protocolVersion`; per techspec §12.1 they now fail via new `checkACPVersion` + `ErrProtocolVersion` (pinned `[minACPVersion,maxACPVersion]` = `[1,1]`; missing/0 tolerated). fakeacp honors `FAKEACP_PROTO_VERSION`; new `TestStartProtocolVersionMismatch` asserts Start errors with `ErrProtocolVersion`. Build (both tags) + full tests green.
 - 2026-06-29 — **review fix: stop is idempotent for known agents — green.** `handleStop` now returns 200 `{stopped:true}` when `Registry.Stop` reports `ErrNoHandle` but the identity row still exists (double-click / lost-response retry); 404 reserved for ids with no identity. New `TestStopIdempotent` (first stop 200, repeat 200, unknown id 404).
 - 2026-06-29 — **review fix: archive FTS no longer drops content past 1 MiB — green.** Removed the `maxContentBytes` keep-newest cap in `index.Indexer.addContent`; the FTS content buffer now accumulates the COMPLETE transcript so every phrase ever streamed stays searchable (and `reindex` rebuilds it complete). New tagged `TestIndexerFTSLongTranscript` indexes an early phrase + >1 MiB of later content and asserts the early phrase still `MATCH`es. Build (both tag modes) + full + tagged index/archive/state tests green. See Autonomous decisions for the unbounded-growth tradeoff.
