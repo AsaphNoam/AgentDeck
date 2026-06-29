@@ -18,6 +18,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -83,7 +84,13 @@ func handle(msg *rpcMessage) {
 	}
 	switch msg.Method {
 	case "initialize":
-		respond(*msg.ID, map[string]any{"protocolVersion": 1, "agentCapabilities": map[string]any{}})
+		ver := 1
+		if v := os.Getenv("FAKEACP_PROTO_VERSION"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil {
+				ver = n
+			}
+		}
+		respond(*msg.ID, map[string]any{"protocolVersion": ver, "agentCapabilities": map[string]any{}})
 	case "session/new":
 		respond(*msg.ID, map[string]any{"sessionId": sessionID})
 	case "session/load":

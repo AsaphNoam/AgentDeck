@@ -20,6 +20,9 @@ var (
 	ErrNoPendingPermission = errors.New("runtime: no pending permission request")
 	// ErrInvalidDecision: a permission decision other than approve/deny.
 	ErrInvalidDecision = errors.New("runtime: invalid permission decision")
+	// ErrProtocolVersion: the adapter negotiated an ACP protocol version outside
+	// the pinned [minACPVersion, maxACPVersion] range (techspec §12.1).
+	ErrProtocolVersion = errors.New("runtime: incompatible ACP protocol version")
 )
 
 // Error code vocabulary (techspec §7.7). These are the project-wide error codes

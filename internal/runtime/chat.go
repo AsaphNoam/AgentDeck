@@ -194,11 +194,9 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 		as.shutdown()
 		return nil, fmt.Errorf("runtime: initialize: %w", err)
 	}
-	var initResp struct {
-		ProtocolVersion int `json:"protocolVersion"`
-	}
-	if jsonErr := json.Unmarshal(initRes, &initResp); jsonErr == nil && initResp.ProtocolVersion != 0 && initResp.ProtocolVersion != 1 {
-		slog.Warn("runtime: adapter protocol version mismatch", "got", initResp.ProtocolVersion, "want", 1)
+	if err := checkACPVersion(initRes); err != nil {
+		as.shutdown()
+		return nil, err
 	}
 	newRes, err := as.transport.Call(ctx, "session/new", sessionNewParams(spec))
 	if err != nil {
@@ -429,11 +427,9 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 		as.shutdown()
 		return nil, fmt.Errorf("runtime: initialize: %w", err)
 	}
-	var initResp struct {
-		ProtocolVersion int `json:"protocolVersion"`
-	}
-	if jsonErr := json.Unmarshal(initRes, &initResp); jsonErr == nil && initResp.ProtocolVersion != 0 && initResp.ProtocolVersion != 1 {
-		slog.Warn("runtime: adapter protocol version mismatch", "got", initResp.ProtocolVersion, "want", 1)
+	if err := checkACPVersion(initRes); err != nil {
+		as.shutdown()
+		return nil, err
 	}
 
 	// Try session/load to restore native context; fall back to session/new.
@@ -872,6 +868,35 @@ func (as *agentState) shutdown() {
 		_ = syscall.Kill(-as.pgid, syscall.SIGKILL)
 		<-waited
 	}
+}
+
+// Pinned ACP protocol range (§12.1). The Go client targets the version the
+// pinned claude-code-acp adapter negotiates; today that is exactly 1.
+const (
+	minACPVersion = 1
+	maxACPVersion = 1
+)
+
+// checkACPVersion enforces the pinned ACP protocol range on the initialize
+// result (§12.1). A reported version outside [minACPVersion, maxACPVersion]
+// fails the handshake with ErrProtocolVersion. A missing/unparseable version
+// (0) is tolerated — there is nothing to negotiate against, so we proceed
+// best-effort rather than refusing adapters that omit the field.
+func checkACPVersion(initRes json.RawMessage) error {
+	var initResp struct {
+		ProtocolVersion int `json:"protocolVersion"`
+	}
+	if err := json.Unmarshal(initRes, &initResp); err != nil {
+		return nil
+	}
+	if initResp.ProtocolVersion == 0 {
+		return nil
+	}
+	if initResp.ProtocolVersion < minACPVersion || initResp.ProtocolVersion > maxACPVersion {
+		return fmt.Errorf("%w: adapter negotiated %d, supported range [%d,%d]",
+			ErrProtocolVersion, initResp.ProtocolVersion, minACPVersion, maxACPVersion)
+	}
+	return nil
 }
 
 // sessionNewParams builds the session/new params from the launch spec (§4.1).
