@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -17,6 +18,7 @@ func (s *Server) startReconciliationSweep(ctx context.Context) {
 		sessionsDir := filepath.Join(s.configStore.Home(), "sessions")
 		_ = os.MkdirAll(sessionsDir, 0o755)
 		s.reconcileSessionsOnce(time.Now().Add(-reconcileInterval))
+		s.pruneStaleRunning()
 
 		watcher, err := fsnotify.NewWatcher()
 		if err != nil {
@@ -41,11 +43,13 @@ func (s *Server) startReconciliationSweep(ctx context.Context) {
 						_ = watcher.Add(ev.Name)
 					}
 					s.reconcileSessionsOnce(time.Now().Add(-reconcileInterval))
+					s.pruneStaleRunning()
 				}
 			case err := <-watcher.Errors:
 				s.log.Warn("reconcile: watcher error", "err", err)
 			case <-ticker.C:
 				s.reconcileSessionsOnce(time.Now().Add(-reconcileInterval))
+				s.pruneStaleRunning()
 			}
 		}
 	}()
@@ -60,6 +64,7 @@ func (s *Server) reconcileSessionsTimer(ctx context.Context) {
 			return
 		case <-ticker.C:
 			s.reconcileSessionsOnce(time.Now().Add(-reconcileInterval))
+			s.pruneStaleRunning()
 		}
 	}
 }
@@ -116,4 +121,41 @@ func lastNonEmptyLine(path string) string {
 		}
 	}
 	return ""
+}
+
+func (s *Server) pruneStaleRunning() int {
+	rows, err := s.stateStore.ListRunning()
+	if err != nil {
+		s.log.Debug("liveness: list running", "err", err)
+		return 0
+	}
+	pruned := 0
+	for _, row := range rows {
+		if pidAlive(row.PID) {
+			continue
+		}
+		if err := s.stateStore.DeleteRunning(row.AgentID); err != nil {
+			s.log.Debug("liveness: delete running", "agent", row.AgentID, "err", err)
+			continue
+		}
+		if st, err := s.stateStore.ReadStatus(row.AgentID); err == nil {
+			st.State = "done"
+			st.Detail = "process exited"
+			st.LastTrace = "Stop"
+			st.BusySince = nil
+			_ = s.stateStore.WriteStatus(st)
+		}
+		if _, err := s.stateMgr.Touch(row.AgentID); err != nil {
+			s.log.Debug("liveness: touch", "agent", row.AgentID, "err", err)
+		}
+		pruned++
+	}
+	return pruned
+}
+
+func pidAlive(pid int) bool {
+	if pid <= 0 {
+		return false
+	}
+	return syscall.Kill(pid, 0) == nil
 }

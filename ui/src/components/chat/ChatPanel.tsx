@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import * as Tabs from "@radix-ui/react-tabs";
 import { getTranscript } from "../../api/client";
 import { sseClient } from "../../api/sse";
@@ -10,9 +10,11 @@ import { Composer } from "./Composer";
 import { TranscriptView } from "./TranscriptView";
 import { FilesTab } from "./FilesTab";
 import { CommandsTab } from "./CommandsTab";
+import { TerminalTab } from "./TerminalTab";
 
 export function ChatPanel() {
   const { id = "" } = useParams();
+  const [params] = useSearchParams();
   const agent = useAgentStore((state) => state.agents[id]);
   const events = useTranscriptStore((state) => state.byAgent[id] ?? []);
   const setTranscript = useTranscriptStore((state) => state.setTranscript);
@@ -42,11 +44,12 @@ export function ChatPanel() {
         </div>
         <ContextBar value={agent.context_pct} />
       </header>
-      <Tabs.Root defaultValue="transcript" className="chat-tabs">
+      <Tabs.Root defaultValue={params.get("tab") === "terminal" ? "terminal" : "transcript"} className="chat-tabs">
         <Tabs.List className="chat-tabs-list">
           <Tabs.Trigger value="transcript">Transcript</Tabs.Trigger>
           <Tabs.Trigger value="files">Files</Tabs.Trigger>
           <Tabs.Trigger value="commands">Commands</Tabs.Trigger>
+          {agent.interface === "terminal" && <Tabs.Trigger value="terminal">Terminal</Tabs.Trigger>}
         </Tabs.List>
         <Tabs.Content value="transcript" className="chat-tab-content">
           <TranscriptView agentId={id} events={events} />
@@ -57,8 +60,17 @@ export function ChatPanel() {
         <Tabs.Content value="commands" className="chat-tab-content">
           <CommandsTab agentId={id} />
         </Tabs.Content>
+        {agent.interface === "terminal" && (
+          <Tabs.Content value="terminal" className="chat-tab-content">
+            <TerminalTab agentId={id} />
+          </Tabs.Content>
+        )}
       </Tabs.Root>
-      <Composer agentId={id} busy={agent.state === "busy" || agent.state === "waiting_input"} />
+      {agent.interface === "terminal" ? (
+        <p className="terminal-readonly">Terminal agents receive input in the terminal tab.</p>
+      ) : (
+        <Composer agentId={id} busy={agent.state === "busy" || agent.state === "waiting_input"} />
+      )}
     </section>
   );
 }

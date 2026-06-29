@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { renameAgent, stopAgent } from "../../api/client";
+import { renameAgent, stopAgent, switchRuntime, updateAgentIdentity } from "../../api/client";
 import { useAgentStore } from "../../store/agentStore";
 import { useUiStore } from "../../store/uiStore";
 
@@ -55,15 +55,38 @@ export function CardContextMenu() {
         Stop
       </button>
       <hr />
-      <button type="button" disabled title="Available in Phase 6">
+      <button
+        type="button"
+        disabled={!agent.running}
+        title={agent.running ? "Switch interface/backend/model" : "Agent must be running"}
+        onClick={() => {
+          const iface = window.prompt("Interface (chat or terminal)", agent.interface) || agent.interface;
+          const backend = window.prompt("Backend", agent.backend) || agent.backend;
+          const model = window.prompt("Model", agent.model) || agent.model;
+          void switchRuntime(agent.agent_id, { interface: iface, backend, model });
+          close();
+        }}
+      >
         Switch runtime
       </button>
       <button type="button" disabled title="Available in Phase 3">
         Clone
       </button>
-      <button type="button" disabled title="Available in Phase 6">
+      <button
+        type="button"
+        onClick={() => {
+          const group = window.prompt("Move to group (blank removes group)", agent.group ?? "");
+          if (group !== null) void updateAgentIdentity(agent.agent_id, { group });
+          close();
+        }}
+      >
         Move to group
       </button>
+      {agent.interface === "terminal" && (
+        <button type="button" onClick={() => { navigate(`/agent/${agent.agent_id}?tab=terminal`); close(); }}>
+          Reveal terminal
+        </button>
+      )}
     </div>,
     document.body,
   );

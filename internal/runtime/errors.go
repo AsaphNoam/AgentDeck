@@ -44,6 +44,11 @@ const (
 	CodeTerminalUnavailable    = "terminal_unavailable"      // 422
 	CodeSwitchFailed           = "switch_failed"             // 500
 	CodeSwitchFailedRolledBack = "switch_failed_rolled_back" // 500
+
+	// identity/group edit error codes (Phase 6 techspec §8.2–8.4).
+	CodeEmptyName        = "empty_name"         // 400
+	CodeInvalidGroupName = "invalid_group_name" // 400
+	CodeGroupNotFound    = "group_not_found"    // 404
 )
 
 // APIError is the normalized error payload. It serializes to the §7.7 envelope:
@@ -70,9 +75,9 @@ func statusForCode(code string) int {
 	switch code {
 	case CodeValidation, CodeTerminalUnavailable:
 		return http.StatusUnprocessableEntity // 422
-	case CodeNoChange, CodeInvalidField:
+	case CodeNoChange, CodeInvalidField, CodeEmptyName, CodeInvalidGroupName:
 		return http.StatusBadRequest // 400
-	case CodeNotFound:
+	case CodeNotFound, CodeGroupNotFound:
 		return http.StatusNotFound // 404
 	case CodeConflict, CodeAgentNotRunning, CodeSwitchInProgress:
 		return http.StatusConflict // 409

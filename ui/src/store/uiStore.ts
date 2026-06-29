@@ -10,10 +10,13 @@ export interface ToastItem {
 
 interface UiStoreState {
   density: { perRow: number; gap: number };
+  groupLayout: Record<string, { collapsed: boolean }>;
   connection: "connecting" | "open" | "reconnecting" | "down";
   contextMenu: { agentId: string; x: number; y: number } | null;
   toasts: ToastItem[];
   setDensity: (density: { perRow: number; gap: number }) => void;
+  setGroupLayout: (groups: Record<string, { collapsed: boolean }>) => void;
+  toggleGroupCollapsed: (group: string) => void;
   setConnection: (connection: UiStoreState["connection"]) => void;
   openContextMenu: (agentId: string, x: number, y: number) => void;
   closeContextMenu: () => void;
@@ -23,10 +26,19 @@ interface UiStoreState {
 
 export const useUiStore = create<UiStoreState>((set) => ({
   density: { perRow: 3, gap: 16 },
+  groupLayout: {},
   connection: "connecting",
   contextMenu: null,
   toasts: [],
   setDensity: (density) => set({ density }),
+  setGroupLayout: (groupLayout) => set({ groupLayout }),
+  toggleGroupCollapsed: (group) =>
+    set((state) => ({
+      groupLayout: {
+        ...state.groupLayout,
+        [group]: { collapsed: !state.groupLayout[group]?.collapsed },
+      },
+    })),
   setConnection: (connection) => set({ connection }),
   openContextMenu: (agentId, x, y) => set({ contextMenu: { agentId, x, y } }),
   closeContextMenu: () => set({ contextMenu: null }),

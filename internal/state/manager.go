@@ -400,7 +400,7 @@ func (m *Manager) recompute(agentID string) (AgentStateUpdate, error) {
 	row := m.store.db.QueryRow(`
 SELECT
     a.agent_id, a.name, a.role, a.project, a.backend, a.model, a.interface, a.grp, a.created_at,
-    r.pid, r.session_id, r.started_at,
+    r.pid, r.session_id, r.tty, r.driver, r.started_at,
     st.state, st.detail, st.last_trace, st.busy_since, st.context_pct
 FROM agents a
 LEFT JOIN running r ON r.agent_id = a.agent_id
@@ -409,13 +409,13 @@ WHERE a.agent_id = ?`, agentID)
 
 	var out AgentState
 	var pid sql.NullInt64
-	var sessionID, startedAt sql.NullString
+	var sessionID, tty, driver, startedAt sql.NullString
 	var state, detail, lastTrace, busySince sql.NullString
 	var contextPct sql.NullFloat64
 	err := row.Scan(
 		&out.AgentID, &out.Name, &out.Role, &out.Project, &out.Backend, &out.Model,
 		&out.Interface, &out.Group, &out.CreatedAt,
-		&pid, &sessionID, &startedAt,
+		&pid, &sessionID, &tty, &driver, &startedAt,
 		&state, &detail, &lastTrace, &busySince, &contextPct,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -437,6 +437,12 @@ WHERE a.agent_id = ?`, agentID)
 	}
 	if sessionID.Valid {
 		out.SessionID = sessionID.String
+	}
+	if tty.Valid {
+		out.TTY = tty.String
+	}
+	if driver.Valid {
+		out.Driver = driver.String
 	}
 	if startedAt.Valid {
 		out.StartedAt = startedAt.String

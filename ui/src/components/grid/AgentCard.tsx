@@ -36,6 +36,7 @@ export function AgentCard({ agent, lastLine }: { agent: AgentState; lastLine?: s
       <span className="model-pill">
         {agent.backend} · {agent.model}
       </span>
+      {agent.interface === "terminal" && <span className="terminal-pill">terminal{agent.driver ? ` · ${agent.driver}` : ""}</span>}
       <div className="message-indicators" aria-label="Message indicators">
         {agent.unread_messages ? <span className="mail-badge">Mail {agent.unread_messages}</span> : null}
         {agent.last_sent_at ? <span className="sent-pulse">Sent</span> : null}

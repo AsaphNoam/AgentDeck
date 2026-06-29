@@ -51,6 +51,11 @@ const server = setupServer(
       { status: 201 },
     ),
   ),
+  http.get("/api/capabilities", () =>
+    HttpResponse.json({
+      terminal: { available: true, default_driver: "xterm", drivers: { xterm: true } },
+    }),
+  ),
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
@@ -106,12 +111,12 @@ describe("NewAgentModal", () => {
     expect(screen.queryByText(/Sonnet 4.6/)).toBeNull();
   });
 
-  it("terminal interface option is disabled", async () => {
+  it("terminal interface option is enabled when capabilities allow it", async () => {
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
     await screen.findByText(/Implementer/);
 
     const terminalRadio = screen.getByRole("radio", { name: /Terminal/i });
-    expect(terminalRadio).toBeDisabled();
+    await waitFor(() => expect(terminalRadio).toBeEnabled());
   });
 
   it("preselects configured default_role / default_project over the first entry", async () => {

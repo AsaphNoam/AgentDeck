@@ -178,7 +178,7 @@ export interface LaunchParams {
   project: string;
   backend?: string;
   model?: string;
-  interface: "chat";
+  interface: "chat" | "terminal";
 }
 
 export function useLaunchAgent() {

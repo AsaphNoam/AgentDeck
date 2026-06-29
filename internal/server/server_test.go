@@ -224,6 +224,101 @@ func TestRenameSession(t *testing.T) {
 	}
 }
 
+func TestIdentityHandlerUpdatesGroupAndPublishesState(t *testing.T) {
+	srv := testServer(t, true)
+	agent := state.Agent{
+		AgentID: "a_ident", Name: "Atlas", Role: "implementer", Project: "my-app",
+		Backend: "claude", Model: "sonnet-4-6", Interface: "chat", CreatedAt: time.Now().UTC(),
+	}
+	if err := srv.stateStore.WriteAgent(agent); err != nil {
+		t.Fatalf("WriteAgent: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/sessions/a_ident/identity", bytes.NewBufferString(`{"group":"auth","name":"Vega"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	srv.routes().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("identity status = %d body=%s, want 200", rec.Code, rec.Body.String())
+	}
+	got, err := srv.stateStore.ReadAgent("a_ident")
+	if err != nil {
+		t.Fatalf("ReadAgent: %v", err)
+	}
+	if got.Group != "auth" || got.Name != "Vega" {
+		t.Fatalf("identity = %+v, want group auth name Vega", got)
+	}
+}
+
+func TestIdentityRejectsReservedUngrouped(t *testing.T) {
+	srv := testServer(t, true)
+	agent := state.Agent{
+		AgentID: "a_ident", Name: "Atlas", Role: "implementer", Project: "my-app",
+		Backend: "claude", Model: "sonnet-4-6", Interface: "chat", CreatedAt: time.Now().UTC(),
+	}
+	if err := srv.stateStore.WriteAgent(agent); err != nil {
+		t.Fatalf("WriteAgent: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/sessions/a_ident/identity", bytes.NewBufferString(`{"group":"_ungrouped"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	srv.routes().ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("identity reserved status = %d body=%s, want 400", rec.Code, rec.Body.String())
+	}
+}
+
+func TestReleaseGroupStopsMembers(t *testing.T) {
+	srv := testServer(t, true)
+	now := time.Now().UTC()
+	for _, id := range []string{"a_g1", "a_g2"} {
+		if err := srv.stateStore.WriteAgent(state.Agent{
+			AgentID: id, Name: id, Role: "implementer", Project: "my-app", Backend: "claude", Model: "sonnet-4-6",
+			Interface: "chat", Group: "auth", CreatedAt: now,
+		}); err != nil {
+			t.Fatalf("WriteAgent %s: %v", id, err)
+		}
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/groups/auth/release", nil)
+	rec := httptest.NewRecorder()
+	srv.routes().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("release status = %d body=%s, want 200", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Group   string `json:"group"`
+		Stopped []struct {
+			AgentID string `json:"agent_id"`
+			OK      bool   `json:"ok"`
+		} `json:"stopped"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("release body: %v", err)
+	}
+	if body.Group != "auth" || len(body.Stopped) != 2 || !body.Stopped[0].OK || !body.Stopped[1].OK {
+		t.Fatalf("release body = %+v", body)
+	}
+}
+
+func TestPruneStaleRunning(t *testing.T) {
+	srv := testServer(t, true)
+	agent := state.Agent{
+		AgentID: "a_stale", Name: "Stale", Role: "implementer", Project: "my-app",
+		Backend: "claude", Model: "sonnet-4-6", Interface: "chat", CreatedAt: time.Now().UTC(),
+	}
+	if err := srv.stateStore.WriteAgent(agent); err != nil {
+		t.Fatalf("WriteAgent: %v", err)
+	}
+	if err := srv.stateStore.WriteRunning(state.RunningEntry{AgentID: agent.AgentID, PID: -42, Interface: "chat", StartedAt: time.Now().UTC()}); err != nil {
+		t.Fatalf("WriteRunning: %v", err)
+	}
+	if n := srv.pruneStaleRunning(); n != 1 {
+		t.Fatalf("pruned = %d, want 1", n)
+	}
+	if _, err := srv.stateStore.ReadRunning(agent.AgentID); err == nil {
+		t.Fatal("stale running row still present")
+	}
+}
+
 func TestSessionMessagesEndpoint(t *testing.T) {
 	srv := testServer(t, true)
 	recipient := state.Agent{AgentID: "a_recipient", Name: "Nova", Role: "reviewer", Project: "my-app", Backend: "claude", Model: "sonnet", Interface: "chat", CreatedAt: time.Now().UTC()}
