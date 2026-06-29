@@ -83,6 +83,12 @@ type HookPayload struct {
 	PID        int      `json:"pid,omitempty"`
 	SessionID  string   `json:"session_id,omitempty"`
 	TS         int64    `json:"ts,omitempty"`
+	// Fields for file_edit / command hook events (Phase 4 file/command tracking).
+	Path       string `json:"path,omitempty"`
+	Command    string `json:"command,omitempty"`
+	ToolCallID string `json:"tool_call_id,omitempty"`
+	Seq        int64  `json:"seq,omitempty"`
+	Timestamp  string `json:"timestamp,omitempty"` // RFC3339; fallback if TS is absent
 }
 
 // Message is one agent-to-agent mailbox entry.

@@ -8,6 +8,7 @@ export function Header() {
         <strong>AgentDeck</strong>
       </Link>
       <nav className="app-nav">
+        <Link to="/archive">Archive</Link>
         <Link to="/settings">Settings</Link>
       </nav>
       <ConnectionDot />
