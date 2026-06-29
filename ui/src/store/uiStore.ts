@@ -5,7 +5,7 @@ export interface ToastItem {
   id: string;
   title: string;
   body?: string;
-  type: NotificationPayload["notification_type"];
+  type: NotificationPayload["notification_type"] | "error";
 }
 
 interface UiStoreState {
@@ -21,6 +21,7 @@ interface UiStoreState {
   openContextMenu: (agentId: string, x: number, y: number) => void;
   closeContextMenu: () => void;
   pushToast: (notification: NotificationPayload) => void;
+  pushError: (title: string, body?: string) => void;
   dismissToast: (id: string) => void;
 }
 
@@ -51,6 +52,16 @@ export const useUiStore = create<UiStoreState>((set) => ({
           { id, title: notification.title, body: notification.body, type: notification.notification_type },
         ].slice(-4),
       };
+    }),
+  pushError: (title, body) =>
+    set((state) => {
+      const toast: ToastItem = {
+        id: `error-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        title,
+        body,
+        type: "error",
+      };
+      return { toasts: [...state.toasts, toast].slice(-4) };
     }),
   dismissToast: (id) => set((state) => ({ toasts: state.toasts.filter((toast) => toast.id !== id) })),
 }));
