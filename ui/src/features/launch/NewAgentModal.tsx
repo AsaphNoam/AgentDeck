@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { getCapabilities } from "../../api/client";
 import { useRoles } from "../../api/config";
 import { useProjects } from "../../api/config";
 import { useBackends } from "../../api/config";
@@ -35,6 +36,8 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject }: Ne
   const [project, setProject] = useState(initialProject ?? "");
   const [backendId, setBackendId] = useState(defaultBackendId);
   const [modelId, setModelId] = useState("");
+  const [agentInterface, setAgentInterface] = useState<"chat" | "terminal">("chat");
+  const [terminalAvailable, setTerminalAvailable] = useState(true);
   const [launchError, setLaunchError] = useState<string | null>(null);
 
   const [name, setName] = useSuggestedName(role, project);
@@ -72,6 +75,11 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject }: Ne
     setModelId(backend?.default_model ?? Object.keys(backend?.models ?? {})[0] ?? "");
   }, [backendId, backendsData]);
 
+  useEffect(() => {
+    if (!open) return;
+    void getCapabilities().then((caps) => setTerminalAvailable(caps.terminal.available)).catch(() => setTerminalAvailable(false));
+  }, [open]);
+
   const selectedBackend = backendsData?.backends[backendId];
   const modelEntries = Object.entries(selectedBackend?.models ?? {});
 
@@ -79,7 +87,7 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject }: Ne
     e.preventDefault();
     setLaunchError(null);
     launch.mutate(
-      { name: name || undefined, role, project, backend: backendId || undefined, model: modelId || undefined, interface: "chat" },
+      { name: name || undefined, role, project, backend: backendId || undefined, model: modelId || undefined, interface: agentInterface },
       {
         onSuccess: () => onClose(),
         onError: (err) => {
@@ -153,11 +161,11 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject }: Ne
               <label>Interface</label>
               <div className="interface-controls">
                 <label className="interface-option">
-                  <input type="radio" name="interface" value="chat" defaultChecked />
+                  <input type="radio" name="interface" value="chat" checked={agentInterface === "chat"} onChange={() => setAgentInterface("chat")} />
                   Chat
                 </label>
-                <label className="interface-option interface-disabled" title="Available in a later release">
-                  <input type="radio" name="interface" value="terminal" disabled />
+                <label className={terminalAvailable ? "interface-option" : "interface-option interface-disabled"} title={terminalAvailable ? "Terminal runtime" : "Terminal unavailable"}>
+                  <input type="radio" name="interface" value="terminal" checked={agentInterface === "terminal"} disabled={!terminalAvailable} onChange={() => setAgentInterface("terminal")} />
                   Terminal
                 </label>
               </div>

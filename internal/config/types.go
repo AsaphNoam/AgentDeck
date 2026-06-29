@@ -56,14 +56,19 @@ type Model struct {
 
 // Layout is the dashboard card arrangement.
 type Layout struct {
-	Order   []string `json:"order"` // agent_id card order
-	Density Density  `json:"density"`
+	Order   []string               `json:"order"` // agent_id card order
+	Density Density                `json:"density"`
+	Groups  map[string]GroupLayout `json:"groups,omitempty"`
 }
 
 // Density controls card grid spacing.
 type Density struct {
 	CardsPerRow int `json:"cards_per_row"`
 	Gap         int `json:"gap"` // px
+}
+
+type GroupLayout struct {
+	Collapsed bool `json:"collapsed"`
 }
 
 // ---- Config: config.json (PRD §3.5 + phase-0 §3) ----

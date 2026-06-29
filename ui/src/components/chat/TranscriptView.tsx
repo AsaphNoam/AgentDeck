@@ -71,6 +71,11 @@ function TranscriptItem({ agentId, event }: { agentId: string; event: Transcript
   if (kind === "tool_result") return <ToolResult event={event} />;
   if (kind === "error") return <TurnError event={event} />;
   if (kind === "turn_end") return <hr className="turn-end" />;
+  if (kind === "backend_switch") {
+    const from = String(event.from ?? "");
+    const to = String(event.to ?? "");
+    return <div className="backend-switch-divider">{from} {"->"} {to}</div>;
+  }
   // permission_resolved is folded into its prompt by the store; nothing to render.
   if (kind === "permission_resolved" || kind === "session_meta") return null;
   return <pre className="tool-block">{JSON.stringify(event, null, 2)}</pre>;

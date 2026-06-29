@@ -9,9 +9,9 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 ## Current position
 
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
-- **Active subphase:** 6.6 (next) — task groups + remaining endpoints + UI
+- **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** 6.5 @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...` (6.1–6.5 are Go-only — no `ui/` change).
+- **Last GREEN checkpoint:** 6.6 @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, `cd ui && npm test`, `cd ui && npm run build`.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -76,15 +76,18 @@ route to `history_handoff:"primer"`: no native resume id, bounded transcript pri
 `backend_switch` transcript marker. Claude→Codex fake-backend integration proves marker + new Codex runtime prompt.
 Details in changelog + Autonomous decisions.
 
-**Subphase 6.6 — next to implement** (task groups + remaining endpoints + UI; techspec §7, §8.2–8.5, §9, tasks 8–13):
-- [ ] `POST /api/sessions/{id}/rename` (if absent) and `POST /api/sessions/{id}/identity` for group changes; direct `state_update`.
-- [ ] `POST /api/groups/{group}/release` with bounded worker pool.
-- [ ] Liveness sweep pruning stale running rows.
-- [ ] UI group affordances: collapsible group sections with `layout.json` collapse persistence, Move-to-group picker, Release-group, group state summary.
-- [ ] UI switch-runtime dialog with capability-gated drivers and handoff note.
-- [ ] UI terminal panel attaches to PTY WebSocket and shows terminal badge / Reveal terminal.
-- **Checkpoint:** `go build ./...` + `go test ./...` + `go test -tags sqlite_fts5 ./...` + `cd ui && npm run build` (because 6.6 touches UI); group-collapse, Move-to-group/Release-group, and terminal-panel checks per techspec.
-- **Resume note:** backend switch/terminal/hook machinery is green; groups still stubbed and no switch/terminal UI. Begin with identity/group endpoints, then UI sections, then switch dialog and terminal panel.
+**Subphase 6.6 ✅ — task groups + remaining endpoints + UI.** Added identity/group endpoints, bounded group release,
+liveness pruning, layout group-collapse persistence, grouped card sections with Release group, functional Move-to-group
+and switch-runtime context actions, terminal badges/reveal link, terminal tab attached to the PTY WebSocket, terminal
+launch option via capabilities, and refreshed embedded UI. Details in changelog + Autonomous decisions.
+
+**Subphase 6.7 — next to implement (optional)** (iTerm2/AppleScript driver; techspec §2.2, §3.6, task 6):
+- [ ] iTerm2 `TerminalDriver` implementation via `osascript`.
+- [ ] AppleScript templates rendered with `text/template` for create-tab, set-appearance, write-text.
+- [ ] Escaping + shell-quote helper with tests for quotes/backslashes/newlines/argv shell-quoting.
+- [ ] Capability probe wiring; explicit unavailable `driver:"iterm2"` returns `422 terminal_unavailable` with reason.
+- **Checkpoint:** `go build ./...` + `go test ./...` + `go test -tags sqlite_fts5 ./...` (Go-only unless UI driver picker changes).
+- **Resume note:** xterm/tmux drivers and capabilities are green. 6.7 is fully skippable; if skipped, roll Phase 6 complete and proceed to Phase 7.
 
 ---
 
@@ -146,6 +149,16 @@ _(no open findings)_
 
 > Resolved without stopping; the human should still see them. Remove once acknowledged (workflow §3, §5).
 
+- **NEW (6.6): switch-runtime and move-to-group UI use compact browser prompts/context-menu actions, not a custom in-app dialog/picker yet.**
+  The spec asks for a switch-runtime dialog and Move-to-group picker. I implemented the functional API-backed controls through
+  the existing card context menu (`window.prompt` for interface/backend/model and group) to keep 6.6 shippable without adding
+  a new modal subsystem. **Tradeoff:** the workflow is usable but less polished and lacks capability-gated model/driver dropdowns.
+  **To reverse/fix:** replace the prompt flow with a dedicated React dialog backed by `/api/backends` + `/api/capabilities`, and a
+  group picker populated from current agent groups.
+- **NEW (6.6): liveness pruning marks disappeared processes `done` / `Stop`, not `error`.** §9 says the liveness sweep prunes
+  stale rows when a process is gone; it does not pin the resulting badge. I chose `done` with detail `process exited` so a normal
+  terminal close reads as stopped rather than a failure. **To reverse:** set status `error`/`Error` (like startup stale reconcile)
+  if the human wants unexpected process disappearance to be noisy.
 - **NEW (6.5, GATED): target-backend summary is an injectable seam with local truncation fallback by default, not a live CLI call yet.**
   §5.3 calls for a one-shot target-model summary before launch. Without credentialed Claude/Codex CLI surfaces and a confirmed
   non-interactive invocation form, I added `Server.primerSummarizer` as the one-shot seam and made the production default return
@@ -362,6 +375,16 @@ _(no open findings)_
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-29 — **6.6 green — task groups + remaining endpoints + UI.** Backend: `POST /api/sessions/{id}/identity`
+  edits name/group and emits `state_update`; `POST /api/groups/{group}/release` stops group members with a bounded worker
+  pool and returns per-agent results; existing rename now returns the §8.2 shape; layout schema/API persists
+  `groups[name].collapsed`; dashboard state includes terminal `tty`/`driver`; reconciliation loop prunes stale running rows.
+  UI: grouped card sections with persisted collapse + aggregate state summary + Release group; context-menu Move-to-group,
+  Switch runtime, and Reveal terminal actions; terminal badge on cards; `backend_switch` transcript divider; terminal tab
+  attaches to `/api/sessions/{id}/terminal/ws`; new-agent modal enables terminal via `/api/capabilities`; embedded UI dist
+  refreshed. Tests: new server coverage for identity, reserved group, release group, stale-running prune; existing UI tests
+  updated for terminal availability. Checkpoint green: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`,
+  `cd ui && npm test`, `cd ui && npm run build`. See Autonomous decisions for the MVP prompt-based UI controls + liveness badge.
 - 2026-06-29 — **6.5 green — switch-runtime: backend-swap history primer.** Removed the cross-backend `501` guard:
   `handleSwitchRuntime` now routes cross-backend swaps and same-backend model swaps with `CanSwitchModelOnResume=false`
   through `history_handoff:"primer"` (empty native resume id). New `internal/server/primer.go` reads

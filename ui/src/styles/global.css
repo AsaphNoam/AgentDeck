@@ -100,6 +100,41 @@ body {
   display: grid;
 }
 
+.group-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.agent-group {
+  display: grid;
+  gap: 8px;
+}
+
+.agent-group-header {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 10px;
+  min-height: 36px;
+}
+
+.agent-group-header button,
+.group-release {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+
+.agent-group-header span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.group-release {
+  margin-left: auto;
+}
+
 .agent-card {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -138,6 +173,17 @@ body {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
   margin: 8px 0;
+  padding: 4px 6px;
+}
+
+.terminal-pill {
+  background: #ecfdf5;
+  border-radius: 6px;
+  color: #047857;
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  margin-left: 6px;
   padding: 4px 6px;
 }
 
@@ -395,6 +441,24 @@ body {
   color: var(--badge-error);
 }
 
+.backend-switch-divider {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  font-size: 12px;
+  gap: 8px;
+  justify-content: center;
+  padding: 10px 0;
+}
+
+.backend-switch-divider::before,
+.backend-switch-divider::after {
+  background: var(--line);
+  content: "";
+  height: 1px;
+  width: 80px;
+}
+
 .user-message {
   white-space: pre-wrap;
   font-weight: 500;
@@ -430,6 +494,48 @@ body {
   border-radius: 6px;
   background: var(--panel);
   padding: 8px 12px;
+}
+
+.terminal-readonly {
+  color: var(--muted);
+  margin: 0;
+}
+
+.terminal-panel {
+  background: #0f172a;
+  border-radius: 8px;
+  color: #dbeafe;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  height: 100%;
+  min-height: 320px;
+}
+
+.terminal-panel pre {
+  margin: 0;
+  overflow: auto;
+  padding: 12px;
+  white-space: pre-wrap;
+}
+
+.terminal-input {
+  border-top: 1px solid #334155;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr auto;
+  padding: 8px;
+}
+
+.terminal-input input,
+.terminal-input button {
+  border: 1px solid #475569;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.terminal-input input {
+  background: #111827;
+  color: #f8fafc;
 }
 
 /* archive page */

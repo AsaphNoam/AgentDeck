@@ -41,6 +41,7 @@ func DefaultLayout() Layout {
 	return Layout{
 		Order:   []string{},
 		Density: Density{CardsPerRow: 3, Gap: 16},
+		Groups:  map[string]GroupLayout{},
 	}
 }
 
