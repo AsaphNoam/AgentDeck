@@ -10,7 +10,6 @@
 package messaging
 
 import (
-	"context"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -57,9 +56,17 @@ func New(store *state.Store, log *slog.Logger) *Server {
 		Version: version.String(),
 	}, nil)
 	mcp.AddTool(s.mcp, &mcp.Tool{
-		Name:        "ping",
-		Description: "Handshake spike: echo the supplied message back.",
-	}, s.handlePing)
+		Name:        "list_agents",
+		Description: "List other live agents you can message (by address role@project, name, or agent_id).",
+	}, s.handleListAgents)
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "send_message",
+		Description: "Send a message to another live agent. `to` is role@project, an agent name, or an agent_id.",
+	}, s.handleSendMessage)
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "check_messages",
+		Description: "Read your pending messages; flags them read (or deletes) as requested.",
+	}, s.handleCheckMessages)
 
 	// getServer resolves the per-request server. Reading the token header here
 	// proves the per-agent session binding arrives over the transport (§3.1);
@@ -100,20 +107,4 @@ func (s *Server) Lookup(token string) (string, bool) {
 	agentID, ok := s.sessions[token]
 	s.mu.RUnlock()
 	return agentID, ok
-}
-
-// pingArgs / pingResult are the trivial spike tool's typed I/O.
-type pingArgs struct {
-	Message string `json:"message" jsonschema:"the message to echo back"`
-}
-
-type pingResult struct {
-	Echo string `json:"echo"`
-}
-
-func (s *Server) handlePing(_ context.Context, _ *mcp.CallToolRequest, in pingArgs) (*mcp.CallToolResult, pingResult, error) {
-	out := pingResult{Echo: in.Message}
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{&mcp.TextContent{Text: out.Echo}},
-	}, out, nil
 }
