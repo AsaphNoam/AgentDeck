@@ -42,6 +42,8 @@ type Server struct {
 	cfg         config.Config
 	log         *slog.Logger
 
+	indexer    *persistindex.Indexer
+
 	hookMu     sync.Mutex
 	hookTokens map[string]string // agent_id -> per-launch hook token (Phase 2 persists these)
 
@@ -62,10 +64,11 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	}
 	eventBus := bus.New()
 	stateMgr := state.NewManager(stateStore, eventBus)
+	ix := persistindex.New(stateStore.DB())
 	if registry != nil {
 		registry.SetPersistence(cfgStore.Home(), func(home, agentID string, meta *runtime.SessionMetaData) (runtime.TranscriptWriter, error) {
 			return transcript.Open(home, agentID, meta)
-		}, persistindex.New(stateStore.DB()))
+		}, ix)
 		registry.SetEventSink(eventBus.PublishRuntimeEvent)
 		registry.SetStateTouch(func(agentID string) {
 			if _, err := stateMgr.Touch(agentID); err != nil {
@@ -79,6 +82,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		stateMgr:    stateMgr,
 		eventBus:    eventBus,
 		registry:    registry,
+		indexer:     ix,
 		cfg:         cfg,
 		log:         log,
 		hookTokens:  map[string]string{},
