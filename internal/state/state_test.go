@@ -223,6 +223,13 @@ func TestRoundTripStateObjects(t *testing.T) {
 	if n, err := st.UnreadCount(recipient.AgentID); err != nil || n != 0 {
 		t.Fatalf("UnreadCount after MarkRead = %d err %v, want 0", n, err)
 	}
+	readRows, err := st.ListMessages(recipient.AgentID, false, 0)
+	if err != nil {
+		t.Fatalf("ListMessages after MarkRead: %v", err)
+	}
+	if len(readRows) != 1 || readRows[0].DeliveredVia != "poll" || !readRows[0].Read || readRows[0].ReadAt == nil {
+		t.Fatalf("message after MarkRead = %+v, want read via poll with read_at", readRows)
+	}
 	if unread, err := st.ListMessages(recipient.AgentID, true, 0); err != nil || len(unread) != 0 {
 		t.Fatalf("unread-only after MarkRead = %+v err %v, want []", unread, err)
 	}
@@ -231,6 +238,100 @@ func TestRoundTripStateObjects(t *testing.T) {
 	}
 	if all, err := st.ListMessages(recipient.AgentID, false, 0); err != nil || len(all) != 0 {
 		t.Fatalf("messages after delete = %+v err %v, want []", all, err)
+	}
+}
+
+func TestTurnBudgetConsumeAndBreach(t *testing.T) {
+	st, _ := newTestStore(t)
+	if err := st.ResetTurnBudget("a_budget", "t_000000000001"); err != nil {
+		t.Fatalf("ResetTurnBudget: %v", err)
+	}
+	got, breached, err := st.ConsumeTurnBudget("a_budget", 10, 4, 15)
+	if err != nil || breached {
+		t.Fatalf("ConsumeTurnBudget first = %+v breached=%v err=%v, want no breach", got, breached, err)
+	}
+	if got.Inbound != 10 || got.Outbound != 4 || got.Remaining != 1 || got.Breached {
+		t.Fatalf("budget after first consume = %+v, want 10/4 remaining 1", got)
+	}
+	got, breached, err = st.ConsumeTurnBudget("a_budget", 0, 2, 15)
+	if err != nil || !breached {
+		t.Fatalf("ConsumeTurnBudget breach = %+v breached=%v err=%v, want breach", got, breached, err)
+	}
+	if got.Inbound != 10 || got.Outbound != 4 || got.Remaining != 1 || !got.Breached {
+		t.Fatalf("budget after breach = %+v, want unchanged 10/4 breached remaining 1", got)
+	}
+	got, err = st.CurrentTurnBudget("a_budget", 15)
+	if err != nil {
+		t.Fatalf("CurrentTurnBudget: %v", err)
+	}
+	if !got.Breached || got.Remaining != 1 {
+		t.Fatalf("persisted budget = %+v, want breached remaining 1", got)
+	}
+
+	if err := st.ResetTurnBudget("a_budget", "t_000000000002"); err != nil {
+		t.Fatalf("ResetTurnBudget second: %v", err)
+	}
+	got, err = st.CurrentTurnBudget("a_budget", 15)
+	if err != nil {
+		t.Fatalf("CurrentTurnBudget second: %v", err)
+	}
+	if got.TurnID != "t_000000000002" || got.Inbound != 0 || got.Outbound != 0 || got.Breached || got.Remaining != 15 {
+		t.Fatalf("budget after reset = %+v, want fresh turn", got)
+	}
+}
+
+func TestDeleteExpiredMessagesRetention(t *testing.T) {
+	st, _ := newTestStore(t)
+	now := mustTime(t, "2026-06-29T12:00:00Z")
+	agent := testAgent("a_sender", now)
+	recipient := testAgent("a_recipient", now)
+	for _, a := range []Agent{agent, recipient} {
+		if err := st.WriteAgent(a); err != nil {
+			t.Fatalf("WriteAgent: %v", err)
+		}
+	}
+	insert := func(body string, created time.Time) string {
+		t.Helper()
+		id, err := st.InsertMessage(Message{
+			FromAgent: agent.AgentID, FromAddress: address(agent.Role, agent.Project), FromName: agent.Name,
+			ToAgent: recipient.AgentID, Body: body, CreatedAt: created,
+		})
+		if err != nil {
+			t.Fatalf("InsertMessage %s: %v", body, err)
+		}
+		return id
+	}
+	oldRead := insert("old-read", now.Add(-25*time.Hour))
+	recentRead := insert("recent-read", now.Add(-2*time.Hour))
+	hardOld := insert("hard-old-unread", now.Add(-8*24*time.Hour))
+	fresh := insert("fresh-unread", now.Add(-time.Hour))
+
+	if _, err := st.DB().Exec(`UPDATE messages SET read = 1, read_at = ? WHERE message_id IN (?, ?)`,
+		formatTime(now.Add(-25*time.Hour)), oldRead, recentRead); err != nil {
+		t.Fatalf("mark fixture read: %v", err)
+	}
+	if _, err := st.DB().Exec(`UPDATE messages SET read_at = ? WHERE message_id = ?`,
+		formatTime(now.Add(-2*time.Hour)), recentRead); err != nil {
+		t.Fatalf("mark recent read: %v", err)
+	}
+
+	readDeleted, hardDeleted, err := st.DeleteExpiredMessages(now, 24*time.Hour, 7*24*time.Hour)
+	if err != nil {
+		t.Fatalf("DeleteExpiredMessages: %v", err)
+	}
+	if readDeleted != 1 || hardDeleted != 1 {
+		t.Fatalf("deleted read=%d hard=%d, want 1/1", readDeleted, hardDeleted)
+	}
+	rows, err := st.ListMessages(recipient.AgentID, false, 0)
+	if err != nil {
+		t.Fatalf("ListMessages: %v", err)
+	}
+	left := map[string]bool{}
+	for _, m := range rows {
+		left[m.MessageID] = true
+	}
+	if left[oldRead] || left[hardOld] || !left[recentRead] || !left[fresh] {
+		t.Fatalf("remaining ids = %v, want recentRead+fresh only", left)
 	}
 }
 

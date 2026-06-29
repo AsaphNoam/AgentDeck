@@ -31,11 +31,48 @@ type Server struct {
 	store *state.Store
 	log   *slog.Logger
 
+	onBudgetExceeded  func(agentID, turnID string, used int)
+	onMessageInserted func(toAgentID string)
+
 	mcp     *mcp.Server
 	handler http.Handler
 
 	mu       sync.RWMutex
 	sessions map[string]string // session token -> agent_id
+}
+
+// SetBudgetExceededSink wires the Phase 5 budget breach notification path.
+func (s *Server) SetBudgetExceededSink(fn func(agentID, turnID string, used int)) {
+	s.mu.Lock()
+	s.onBudgetExceeded = fn
+	s.mu.Unlock()
+}
+
+// SetMessageInsertedSink wires send_message inserts to the nudger's event-driven
+// wake check. The ticker remains the fallback if the signal is dropped.
+func (s *Server) SetMessageInsertedSink(fn func(toAgentID string)) {
+	s.mu.Lock()
+	s.onMessageInserted = fn
+	s.mu.Unlock()
+}
+
+func (s *Server) messageInserted(toAgentID string) {
+	s.mu.RLock()
+	fn := s.onMessageInserted
+	s.mu.RUnlock()
+	if fn != nil {
+		fn(toAgentID)
+	}
+}
+
+func (s *Server) budgetExceeded(agentID, turnID string, used int) {
+	s.log.Warn("budget exceeded", "agent", agentID, "turn", turnID, "used", used)
+	s.mu.RLock()
+	fn := s.onBudgetExceeded
+	s.mu.RUnlock()
+	if fn != nil {
+		fn(agentID, turnID, used)
+	}
 }
 
 // New constructs the messaging server, registers its tools, and builds the

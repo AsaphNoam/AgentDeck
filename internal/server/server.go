@@ -45,9 +45,11 @@ type Server struct {
 
 	indexer   *persistindex.Indexer
 	messaging *messaging.Server
+	nudgeCh   chan string
 
-	hookMu     sync.Mutex
-	hookTokens map[string]string // agent_id -> per-launch hook token (Phase 2 persists these)
+	hookMu      sync.Mutex
+	hookTokens  map[string]string // agent_id -> per-launch hook token (Phase 2 persists these)
+	mcpCleanups map[string]func()
 
 	// credCheck is the credential probe function; defaults to credcheck.Check.
 	// Tests inject a stub so real network/CLI calls are avoided.
@@ -67,6 +69,25 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	eventBus := bus.New()
 	stateMgr := state.NewManager(stateStore, eventBus)
 	ix := persistindex.New(stateStore.DB())
+	msg := messaging.New(stateStore, log)
+	nudgeCh := make(chan string, 32)
+	msg.SetMessageInsertedSink(func(agentID string) {
+		select {
+		case nudgeCh <- agentID:
+		default:
+		}
+	})
+	msg.SetBudgetExceededSink(func(agentID, turnID string, used int) {
+		eventBus.Publish("notification", &agentID, map[string]any{
+			"type":              "notification",
+			"notification_type": "budget_exceeded",
+			"agent_id":          agentID,
+			"title":             "Agent hit its message budget",
+			"body":              "Per-turn message budget reached.",
+			"detail":            map[string]any{"turn_id": turnID, "used": used},
+			"ts":                time.Now().UTC().Format(time.RFC3339),
+		})
+	})
 	if registry != nil {
 		registry.SetPersistence(cfgStore.Home(), func(home, agentID string, meta *runtime.SessionMetaData) (runtime.TranscriptWriter, error) {
 			return transcript.Open(home, agentID, meta)
@@ -85,10 +106,12 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		eventBus:    eventBus,
 		registry:    registry,
 		indexer:     ix,
-		messaging:   messaging.New(stateStore, log),
+		messaging:   msg,
+		nudgeCh:     nudgeCh,
 		cfg:         cfg,
 		log:         log,
 		hookTokens:  map[string]string{},
+		mcpCleanups: map[string]func(){},
 		credCheck:   credcheck.Check,
 	}
 }
@@ -121,6 +144,7 @@ func (s *Server) Start(ctx context.Context) error {
 	sweepCtx, stopSweep := context.WithCancel(ctx)
 	defer stopSweep()
 	s.startReconciliationSweep(sweepCtx)
+	s.startMessagingLoops(sweepCtx)
 
 	go func() {
 		if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
@@ -141,6 +165,7 @@ func (s *Server) Start(ctx context.Context) error {
 		if s.registry != nil {
 			s.registry.Shutdown(shutCtx)
 		}
+		s.cleanupAllMessagingMCP()
 		if err := srv.Shutdown(shutCtx); err != nil {
 			return fmt.Errorf("shutdown: %w", err)
 		}

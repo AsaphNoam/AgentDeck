@@ -224,6 +224,92 @@ func TestSendErrors(t *testing.T) {
 	}
 }
 
+func TestSendMessageBudgetExceeded(t *testing.T) {
+	st := newStore(t)
+	liveAgent(t, st, "a_impl", "Atlas", "implementer", "my-app")
+	liveAgent(t, st, "a_rev", "Nova", "reviewer", "my-app")
+	if err := st.ResetTurnBudget("a_impl", "t_000000000001"); err != nil {
+		t.Fatalf("ResetTurnBudget: %v", err)
+	}
+
+	srv := New(st, nil)
+	srv.Register("tok-impl", "a_impl")
+	var budgetEvents int
+	srv.SetBudgetExceededSink(func(agentID, turnID string, used int) {
+		if agentID != "a_impl" || turnID != "t_000000000001" || used != MessageBudgetPerTurn {
+			t.Fatalf("budget event = %s/%s/%d, want a_impl/t_000000000001/%d", agentID, turnID, used, MessageBudgetPerTurn)
+		}
+		budgetEvents++
+	})
+	cs := connect(t, srv, "tok-impl")
+
+	for i := 0; i < MessageBudgetPerTurn; i++ {
+		res, isErr := call(t, cs, "send_message", map[string]any{"to": "a_rev", "body": "ping"})
+		if isErr || res["ok"] != true {
+			t.Fatalf("send %d = %v isErr=%v, want success", i+1, res, isErr)
+		}
+	}
+	res, isErr := call(t, cs, "send_message", map[string]any{"to": "a_rev", "body": "one too many"})
+	if !isErr || res["error"] != "message_budget_exceeded" {
+		t.Fatalf("16th send = %v isErr=%v, want message_budget_exceeded", res, isErr)
+	}
+	if budgetEvents != 1 {
+		t.Fatalf("budget events = %d, want 1", budgetEvents)
+	}
+	msgs, err := st.ListMessages("a_rev", false, 0)
+	if err != nil {
+		t.Fatalf("ListMessages: %v", err)
+	}
+	if len(msgs) != MessageBudgetPerTurn {
+		t.Fatalf("messages inserted = %d, want %d", len(msgs), MessageBudgetPerTurn)
+	}
+	budget, err := st.CurrentTurnBudget("a_impl", MessageBudgetPerTurn)
+	if err != nil {
+		t.Fatalf("CurrentTurnBudget: %v", err)
+	}
+	if !budget.Breached || budget.Outbound != MessageBudgetPerTurn || budget.Remaining != 0 {
+		t.Fatalf("budget row = %+v, want breached outbound=%d remaining=0", budget, MessageBudgetPerTurn)
+	}
+}
+
+func TestCheckMessagesCapsAtRemainingBudget(t *testing.T) {
+	st := newStore(t)
+	liveAgent(t, st, "a_impl", "Atlas", "implementer", "my-app")
+	liveAgent(t, st, "a_rev", "Nova", "reviewer", "my-app")
+	if err := st.ResetTurnBudget("a_rev", "t_000000000001"); err != nil {
+		t.Fatalf("ResetTurnBudget: %v", err)
+	}
+	if _, _, err := st.ConsumeTurnBudget("a_rev", MessageBudgetPerTurn-2, 0, MessageBudgetPerTurn); err != nil {
+		t.Fatalf("ConsumeTurnBudget: %v", err)
+	}
+	for i := 0; i < 5; i++ {
+		if _, err := st.InsertMessage(state.Message{
+			FromAgent: "a_impl", FromAddress: "implementer@my-app", FromName: "Atlas",
+			ToAgent: "a_rev", Body: "queued",
+		}); err != nil {
+			t.Fatalf("InsertMessage %d: %v", i, err)
+		}
+	}
+
+	srv := New(st, nil)
+	srv.Register("tok-rev", "a_rev")
+	cs := connect(t, srv, "tok-rev")
+	res, isErr := call(t, cs, "check_messages", map[string]any{"limit": 5})
+	if isErr {
+		t.Fatalf("check_messages = %v, want success", res)
+	}
+	msgs := res["messages"].([]any)
+	if len(msgs) != 2 {
+		t.Fatalf("returned messages = %d, want 2 due remaining budget", len(msgs))
+	}
+	if got := int(res["budget_remaining"].(float64)); got != 0 {
+		t.Fatalf("budget_remaining = %d, want 0", got)
+	}
+	if got := int(res["remaining"].(float64)); got != 3 {
+		t.Fatalf("remaining unread = %d, want 3", got)
+	}
+}
+
 // TestSessionRegistry covers the token→agent_id binding the HTTP transport reads.
 func TestSessionRegistry(t *testing.T) {
 	srv := New(nil, nil)

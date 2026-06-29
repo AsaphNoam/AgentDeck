@@ -127,9 +127,7 @@ func (s *Server) handleSendMessage(_ context.Context, req *mcp.CallToolRequest, 
 		return storeUnavailable(err)
 	}
 
-	// TODO(5.3): check + increment the sender's outbound turn budget within the
-	// insert transaction; refuse with message_budget_exceeded on breach (§6).
-	msgID, err := s.store.InsertMessage(state.Message{
+	msgID, budget, breached, err := s.store.InsertMessageWithBudget(state.Message{
 		FromAgent:   self,
 		FromAddress: sender.Role + "@" + sender.Project,
 		FromName:    sender.Name,
@@ -137,10 +135,21 @@ func (s *Server) handleSendMessage(_ context.Context, req *mcp.CallToolRequest, 
 		Subject:     in.Subject,
 		Body:        in.Body,
 		InReplyTo:   in.InReplyTo,
-	})
+	}, MessageBudgetPerTurn)
 	if err != nil {
 		return storeUnavailable(err)
 	}
+	if breached {
+		s.budgetExceeded(self, budget.TurnID, MessageBudgetPerTurn-budget.Remaining)
+		return errResult(map[string]any{
+			"ok":      false,
+			"error":   "message_budget_exceeded",
+			"message": fmt.Sprintf("Per-turn message budget (%d) reached. This message was not sent.", MessageBudgetPerTurn),
+			"budget":  MessageBudgetPerTurn,
+			"used":    MessageBudgetPerTurn,
+		})
+	}
+	s.messageInserted(toID)
 	return jsonResult(map[string]any{
 		"ok":         true,
 		"message_id": msgID,
@@ -185,20 +194,16 @@ func (s *Server) handleCheckMessages(_ context.Context, req *mcp.CallToolRequest
 	if limit > maxCheckLimit {
 		limit = maxCheckLimit
 	}
-	// Hard-cap at the per-turn budget (real per-turn accounting lands in 5.3).
-	if limit > MessageBudgetPerTurn {
-		limit = MessageBudgetPerTurn
-	}
-
-	msgs, err := s.store.ListMessages(self, unreadOnly, limit)
+	msgs, budget, breached, err := s.store.TakeMessagesWithBudget(self, unreadOnly, limit, MessageBudgetPerTurn, markRead, deleteAfter)
 	if err != nil {
 		return storeUnavailable(err)
 	}
+	if breached {
+		s.budgetExceeded(self, budget.TurnID, MessageBudgetPerTurn-budget.Remaining)
+	}
 
-	ids := make([]string, len(msgs))
 	out := make([]outMessage, len(msgs))
 	for i, m := range msgs {
-		ids[i] = m.MessageID
 		out[i] = outMessage{
 			MessageID:   m.MessageID,
 			From:        m.FromAgent,
@@ -211,27 +216,25 @@ func (s *Server) handleCheckMessages(_ context.Context, req *mcp.CallToolRequest
 		}
 	}
 
-	// delete wins over mark_read (techspec §3.5).
-	if deleteAfter {
-		if err := s.store.DeleteMessages(ids); err != nil {
-			return storeUnavailable(err)
-		}
-	} else if markRead {
-		if err := s.store.MarkRead(ids); err != nil {
-			return storeUnavailable(err)
-		}
-	}
-
 	remaining, err := s.store.UnreadCount(self)
 	if err != nil {
 		return storeUnavailable(err)
 	}
 	return jsonResult(map[string]any{
-		"messages":  out,
-		"remaining": remaining,
-		// TODO(5.3): real per-turn inbound budget remaining; static cap for now.
-		"budget_remaining": MessageBudgetPerTurn - len(out),
+		"messages":           out,
+		"remaining":          remaining,
+		"budget_remaining":   budget.Remaining,
+		"budget_exhausted":   budget.Remaining == 0,
+		"budget_exceeded":    breached,
+		"budget_explanation": budgetExplanation(budget.Remaining),
 	})
+}
+
+func budgetExplanation(remaining int) string {
+	if remaining > 0 {
+		return ""
+	}
+	return fmt.Sprintf("Per-turn message budget (%d) reached; no more messages can be processed this turn.", MessageBudgetPerTurn)
 }
 
 func storeUnavailable(err error) (*mcp.CallToolResult, any, error) {
