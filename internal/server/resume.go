@@ -113,25 +113,35 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	resumeAgent := state.Agent{
+		AgentID:   agent.AgentID,
+		Name:      agent.Name,
+		Role:      agent.Role,
+		Project:   agent.Project,
+		Backend:   backendID,
+		Model:     modelKey,
+		Interface: iface,
+		CreatedAt: agent.CreatedAt,
+		Group:     agent.Group,
+	}
+	extraArgs, err := s.composeHookRegistration(resumeAgent, backend.Type)
+	if err != nil {
+		s.forgetHookToken(id)
+		s.cleanupMessagingMCP(id)
+		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
+		return
+	}
+
 	spec := runtime.LaunchSpec{
-		Agent: state.Agent{
-			AgentID:   agent.AgentID,
-			Name:      agent.Name,
-			Role:      agent.Role,
-			Project:   agent.Project,
-			Backend:   backendID,
-			Model:     modelKey,
-			Interface: iface,
-			CreatedAt: agent.CreatedAt,
-			Group:     agent.Group,
-		},
+		Agent:          resumeAgent,
 		Cwd:            snap.Cwd,
 		SystemPrompt:   snap.SystemPrompt,
 		BackendType:    backend.Type,
 		ModelID:        model.Model,
-		Env:            composeEnv(os.Environ(), backend.Env, model.Env),
+		Env:            composeEnv(os.Environ(), backend.Env, model.Env, s.hookEnv(resumeAgent, token)),
 		HookToken:      token,
 		MCPServers:     []runtime.MCPServerSpec{mcpSpec},
+		ExtraArgs:      extraArgs,
 		LastSessionID:  snap.LastSessionID,
 		LastContextPct: snap.LastContextPct,
 	}

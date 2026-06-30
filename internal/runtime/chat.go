@@ -83,6 +83,9 @@ func (c *ChatRuntime) spawnCmd(ad backend.BackendAdapter, spec LaunchSpec) *exec
 	if bin == "" {
 		bin, args = ad.Binary(), ad.LaunchArgs()
 	}
+	// ExtraArgs carries launch-time hook registration flags (e.g. claude's
+	// --settings <per-agent hooks file>), composed by the server (techspec §2.3).
+	args = append(append([]string{}, args...), spec.ExtraArgs...)
 	cmd := exec.Command(bin, args...)
 	cmd.Dir = spec.Cwd
 	env := spec.Env

@@ -5,12 +5,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/agentdeck/agentdeck/internal/backend"
 	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/agentdeck/agentdeck/internal/hooks"
 	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
@@ -182,6 +185,14 @@ func (s *Server) composeLaunch(req launchRequest) (runtime.LaunchSpec, state.Age
 		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeInternal, err.Error())
 	}
 
+	hookEnv := s.hookEnv(agent, token)
+	extraArgs, err := s.composeHookRegistration(agent, backend.Type)
+	if err != nil {
+		s.forgetHookToken(agentID)
+		s.cleanupMessagingMCP(agentID)
+		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeInternal, err.Error())
+	}
+
 	spec := runtime.LaunchSpec{
 		Agent:        agent,
 		Cwd:          cwd,
@@ -189,12 +200,50 @@ func (s *Server) composeLaunch(req launchRequest) (runtime.LaunchSpec, state.Age
 		SystemPrompt: joinSystemPrompt(project.ContextPrompt, role.SystemPrompt),
 		BackendType:  backend.Type,
 		ModelID:      model.Model,
-		Env:          composeEnv(os.Environ(), backend.Env, model.Env),
+		Env:          composeEnv(os.Environ(), backend.Env, model.Env, hookEnv),
 		SkipPerms:    resolveSkip(s.cfg.SkipPermissions, role.SkipPermissions),
 		HookToken:    token,
 		MCPServers:   []runtime.MCPServerSpec{mcpSpec},
+		ExtraArgs:    extraArgs,
 	}
 	return spec, agent, nil
+}
+
+// hookEnv builds the per-launch AGENTDECK_* env the hook scripts read (§2.3,
+// §4.1): the POST endpoint, the rotated per-launch token, the agent id, and the
+// interface (which drives the chat self-suppression gate in _post.sh).
+func (s *Server) hookEnv(agent state.Agent, token string) map[string]string {
+	return map[string]string{
+		"AGENTDECK_HOOK_URL":   fmt.Sprintf("http://127.0.0.1:%d/api/hook", s.cfg.Port),
+		"AGENTDECK_HOOK_TOKEN": token,
+		"AGENTDECK_AGENT_ID":   agent.AgentID,
+		"AGENTDECK_INTERFACE":  agent.Interface,
+	}
+}
+
+// composeHookRegistration writes the per-agent CLI hook settings file (mapping
+// each lifecycle event to its installed script via the backend adapter's
+// hookMap) and returns the adapter's launch args that point the CLI at it.
+//
+// The args are gated behind AGENTDECK_HOOK_REGISTRATION=1 (default off): the
+// settings file + AGENTDECK_* env are always prepared, but the unverified
+// CLI-flag passthrough (claude's `--settings`, codex TBD) is only activated once
+// a credentialed live run confirms the backend accepts it — so the currently
+// green real chat-launch path is never regressed by an unconfirmed flag.
+func (s *Server) composeHookRegistration(agent state.Agent, backendType string) ([]string, error) {
+	ad, ok := backend.For(backendType)
+	if !ok {
+		return nil, nil // unknown backend fails later at the runtime gate
+	}
+	settings := hooks.ClaudeSettings(s.configStore.Home(), ad.HookMap())
+	settingsPath, err := hooks.WriteAgentSettings(s.configStore.Home(), agent.AgentID, settings)
+	if err != nil {
+		return nil, err
+	}
+	if os.Getenv("AGENTDECK_HOOK_REGISTRATION") != "1" {
+		return nil, nil
+	}
+	return ad.HookLaunchArgs(settingsPath), nil
 }
 
 // defaultBackendID returns the backend marked Default, else "claude", else any.
