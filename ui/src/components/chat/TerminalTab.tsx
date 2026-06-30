@@ -23,7 +23,10 @@ export function TerminalTab({ agentId }: { agentId: string }) {
   const send = () => {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN || input === "") return;
-    ws.send(`${input}\n`);
+    // Keystrokes must reach the PTY as a *binary* frame: the bridge routes text
+    // frames to resize ({cols,rows}) and only forwards binary frames to the PTY
+    // master, so a string send would be silently dropped (review fix).
+    ws.send(new TextEncoder().encode(`${input}\n`));
     setInput("");
   };
 
