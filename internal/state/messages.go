@@ -321,17 +321,35 @@ func (s *Store) UnreadCount(agentID string) (int, error) {
 	return n, nil
 }
 
-// ResetTurnBudget starts a new messaging-budget window for an agent turn.
+// ResetTurnBudget starts a new messaging-budget window for an agent turn. It is
+// the single source of truth for the agent's current turn: it keeps at most one
+// turn_budget row per agent by deleting any other rows in the same transaction.
+// This matters across a server restart + resume — agentState.turnSeq resets to
+// 0 on a fresh process, so a resumed agent re-emits low turn_ids while the prior
+// session's higher-numbered (and possibly breached) rows linger with the highest
+// rowids. Without this cleanup, currentBudgetTx's ORDER BY rowid DESC would read
+// a stale row and could block send_message/check_messages for the resumed agent.
+// Collapsing to one row also caps turn_budget's otherwise unbounded growth.
 func (s *Store) ResetTurnBudget(agentID, turnID string) error {
-	_, err := s.db.Exec(`
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("state: begin reset turn budget: %w", err)
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM turn_budget WHERE agent_id = ? AND turn_id <> ?`, agentID, turnID); err != nil {
+		return fmt.Errorf("state: prune turn budget rows: %w", err)
+	}
+	if _, err := tx.Exec(`
 INSERT INTO turn_budget(agent_id, turn_id, inbound, outbound, breached)
 VALUES (?, ?, 0, 0, 0)
 ON CONFLICT(agent_id, turn_id) DO UPDATE SET
     inbound = 0,
     outbound = 0,
-    breached = 0`, agentID, turnID)
-	if err != nil {
+    breached = 0`, agentID, turnID); err != nil {
 		return fmt.Errorf("state: reset turn budget: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("state: commit reset turn budget: %w", err)
 	}
 	return nil
 }
