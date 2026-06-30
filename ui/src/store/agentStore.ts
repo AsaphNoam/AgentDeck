@@ -10,6 +10,7 @@ interface AgentStoreState {
   hydrateComplete: (seenIds: string[]) => void;
   removeAgent: (id: string) => void;
   setOrder: (order: string[]) => void;
+  clearLastSentAt: (id: string, sentAt: string) => void;
 }
 
 export const useAgentStore = create<AgentStoreState>((set) => ({
@@ -34,4 +35,10 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
       return { agents, order: state.order.filter((item) => item !== id) };
     }),
   setOrder: (order) => set({ order }),
+  clearLastSentAt: (id, sentAt) =>
+    set((state) => {
+      const agent = state.agents[id];
+      if (!agent || agent.last_sent_at !== sentAt) return state;
+      return { agents: { ...state.agents, [id]: { ...agent, last_sent_at: undefined } } };
+    }),
 }));

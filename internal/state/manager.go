@@ -416,6 +416,9 @@ WHERE a.agent_id = ?`, agentID)
 	if contextPct.Valid {
 		out.ContextPct = contextPct.Float64
 	}
+	if unread, err := m.store.UnreadCount(agentID); err == nil {
+		out.UnreadMessages = unread
+	}
 
 	m.setKnown(agentID, true)
 	return AgentStateUpdate{AgentState: out}, nil
