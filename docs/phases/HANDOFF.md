@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** review fix (terminal-tab binary input) @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, `cd ui && npm test`, `cd ui && npm run build`.
+- **Last GREEN checkpoint:** review fix (xterm.js terminal panel) @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, `cd ui && npm test`, `cd ui && npm run build`.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -143,12 +143,20 @@ launch option via capabilities, and refreshed embedded UI. Details in changelog 
 > **This section holds only OPEN findings** — no resolved/dismissed graveyard.
 > Blocking items must be fixed before the next phase starts; advisory items when convenient.
 
-- **ADVISORY — terminal panel is a line-box, not xterm.js, and never sends resize.** Task 13 calls for an xterm.js panel; [`TerminalTab.tsx`](../../ui/src/components/chat/TerminalTab.tsx) is a hand-rolled `<pre>` + input that renders raw bytes (ANSI escapes shown literally) and never sends `{cols,rows}`, so the PTY stays at its default size and output wrapping can be wrong. Functional for basic output once the input fix lands, but not the specified terminal experience. Fix: integrate xterm.js (its `onData` → binary frame, `onResize` → `{cols,rows}` text frame) when convenient.
+_(no open findings)_
 
 ## Autonomous decisions (please review)
 
 > Resolved without stopping; the human should still see them. Remove once acknowledged (workflow §3, §5).
 
+- **NEW (review fix): adopted xterm.js for the terminal panel — two new UI deps (`@xterm/xterm`, `@xterm/addon-fit`).**
+  The advisory asked for the spec's task-13 xterm.js panel (replacing the hand-rolled `<pre>` + input). I integrated the
+  real emulator: `TerminalTab` now mounts `Terminal` + `FitAddon`, pipes `onData`→binary frame and `onResize`/fit→`{cols,rows}`
+  text frame, and writes PTY bytes via `term.write`. **Why a judgment call:** it adds two runtime dependencies and grows the
+  bundle (the build already warns >500 kB); I judged that acceptable since it's the specified terminal experience and resolves
+  the never-sent-resize gap. The component test mocks the xterm modules (xterm needs canvas measurement jsdom lacks) and drives
+  `onData`/`onResize` to assert the binary-keystroke / text-resize contract. **To reverse:** restore the line-box `<pre>` panel
+  and drop the two deps — but then ANSI renders literally and the PTY size is never set.
 - **NEW (6.6): switch-runtime and move-to-group UI use compact browser prompts/context-menu actions, not a custom in-app dialog/picker yet.**
   The spec asks for a switch-runtime dialog and Move-to-group picker. I implemented the functional API-backed controls through
   the existing card context menu (`window.prompt` for interface/backend/model and group) to keep 6.6 shippable without adding
@@ -375,6 +383,13 @@ launch option via capabilities, and refreshed embedded UI. Details in changelog 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-30 — **review fix: real xterm.js terminal panel + resize — green.** ADVISORY: the terminal panel was a
+  hand-rolled `<pre>` + input that showed ANSI literally and never sent `{cols,rows}` (PTY stuck at default size).
+  Replaced it with xterm.js (`@xterm/xterm` + `@xterm/addon-fit`): `onData`→binary keystroke frame, fit/`onResize`→
+  `{cols,rows}` text frame, PTY bytes via `term.write`; sends an initial resize on WS open. Reworked `TerminalTab.test.tsx`
+  to mock the xterm modules (no canvas in jsdom) and assert the binary-keystroke + text-resize contract. CSS swapped the
+  line-box for an xterm host. Embedded UI dist refreshed. Checkpoint green: `go build ./...`, `cd ui && npm test`,
+  `cd ui && npm run build`. See Autonomous decisions for the new-dependency call.
 - 2026-06-30 — **review fix: switch-runtime / move-to-group failures now surface a toast — green.** ADVISORY:
   `CardContextMenu` fired `void switchRuntime(...)` / `void updateAgentIdentity(...)` with no `.catch`, so any
   failure (the common `400 no_change`, `409 switch_in_progress`, `422`, rollback `500`) was invisible. Added a
