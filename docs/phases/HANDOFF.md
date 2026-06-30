@@ -9,9 +9,9 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 ## Current position
 
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
-- **Active subphase:** 6.4 (next) — switch-runtime: same-backend (interface/model swap)
+- **Active subphase:** 6.5 (next) — switch-runtime: backend-swap history primer (riskiest)
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** 6.3 @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...` (6.1–6.3 are Go-only — no `ui/` change).
+- **Last GREEN checkpoint:** 6.4 @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...` (6.1–6.4 are Go-only — no `ui/` change).
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -60,14 +60,25 @@ seam (`StartTab/WriteText/ReadTTY/CloseTab/RevealTab`); xterm/PTY driver (`creac
 runtime via `SetTerminalRuntime` (subpackage→avoids import cycle); status flows from hooks only (runtime writes the
 race-guarded initial idle + a `done` on Stop). Details in changelog + Autonomous decisions.
 
-**Subphase 6.4 — next to implement** (switch-runtime same-backend: interface/model swap; techspec §5.1–5.2, §5.4, §8.1, task 7 partial):
-- [ ] `POST /api/sessions/{id}/switch-runtime {interface?, backend?, model?}` (≥1 must differ from current, else `400 no_change`).
-- [ ] Per-agent in-memory **switch lock** (mutex keyed by `agent_id`) serializing switch/stop/prompt; concurrent → `409 switch_in_progress`.
-- [ ] Core algorithm: validate target (driver availability §3.5, backend/model exist) → flush/checkpoint transcript → `Cancel` + wait `turn_end`/timeout → `oldRuntime.Stop` → persist new identity fields (agent_id UNCHANGED) → `resolveResumeId` (same-backend native id via the adapter; cross-backend returns "" + a TODO guard, NO primer yet — that's 6.5) → `newRuntime.Resume`.
-- [ ] chat↔terminal interface swap (the terminal runtime + registry dispatch already exist).
-- [ ] Rollback on `Resume` failure after `Stop`: re-launch previous interface/backend/model, restore identity row, return `500 switch_failed_rolled_back`; if rollback also fails → identity at target, status `error`, `500 switch_failed`.
-- **Checkpoint:** `go build ./...` + `go test ./...` (both tag modes); same-backend model-swap integration test (same `agent_id`, prior transcript intact, new `session_id`, turn continues); chat↔terminal swap test; rollback test.
-- **Resume note:** terminal + chat runtimes + adapters all exist green; no switch endpoint yet. The adapter already exposes `ResolveResumeID(prev, sameBackend)` (same-backend→prev id; cross-backend→"") and `CanSwitchModelOnResume`. Identity edit needs a `state` writer for interface/backend/model on the agents row (verify one exists or add it). Begin with the lock + endpoint + core algorithm + native resolveResumeId; leave cross-backend returning empty without a primer (6.5).
+**Subphase 6.4 ✅ — switch-runtime: same-backend (interface/model swap).** `POST /api/sessions/{id}/switch-runtime`
+(`internal/server/switch.go`): per-agent switch lock (`Server.switching` set → `409 switch_in_progress`); merge target
+over current (`400 no_change` if identical, `400 invalid_field` for bad interface); validate→cancel-and-wait→
+`registry.Stop`→cleanup old MCP/hook→persist new identity (`WriteAgent`, agent_id UNCHANGED)→`registry.Resume` (dispatch
+by new interface). `resolveResumeId` via the adapter (same-backend→prev native id; `CanSwitchModelOnResume` gate);
+chat↔terminal works. Rollback on Resume-after-Stop failure re-launches the previous identity (`500
+switch_failed_rolled_back`; double-fault → status `error` + `500 switch_failed`). New switch-runtime error codes added to
+`runtime/errors.go` (`no_change`/`invalid_field`→400, `switch_in_progress`/`agent_not_running`→409,
+`terminal_unavailable`→422, `switch_failed*`→500). **Cross-backend swap is guarded to 6.5** (`501` "history primer lands
+in 6.5"). Details in changelog + Autonomous decisions.
+
+**Subphase 6.5 — next to implement** (switch-runtime backend-swap history primer; techspec §5.3, §8.1, task 7 remainder):
+- [ ] Remove the 6.4 cross-backend `501` guard in `handleSwitchRuntime`; allow `target.Backend != agent.Backend`.
+- [ ] `resolveResumeId` already returns "" cross-backend (adapter) → drive the **history-primer** path instead of a bare fresh session.
+- [ ] Bounded primer synthesis appended to the launch composition (`spec.SystemPrompt` for this launch only, NOT persisted to the role): running summary of older turns + last N=6 verbatim turns, capped at `switch.primer_token_budget` (default 8k). One-shot **target-model** summary call with a cheap truncation fallback when it fails (degrade, don't block).
+- [ ] `{type:"backend_switch", from, to, at}` transcript marker appended to `sessions/{agent_id}/` so the chat panel renders a divider; archive shows one continuous session.
+- [ ] `history_handoff` in the 200 response becomes `"primer"` for cross-backend (already `"native_resume"` for same-backend); `CanSwitchModelOnResume`-false same-backend model swap also routes to primer (already guarded `501` in 6.4 — swap that for the primer path).
+- **Checkpoint:** `go build ./...` + `go test ./...` (both tag modes); primer-synthesis unit tests (respects token budget; truncation fallback when summary call fails; emits `backend_switch` marker); Claude→Codex backend-swap integration test (handoff=primer, marker present, new Codex session runs).
+- **Resume note:** switch-runtime works same-backend; cross-backend returns `501` at `handleSwitchRuntime` (search "lands in subphase 6.5"). The transcript writer is `internal/transcript` (NDJSON append, `runtime.Event`); the primer reads prior turns from there (or the in-memory transcript). The one-shot summary call needs a non-interactive target-backend invocation — decide how to call it (a `--print`-style CLI run, or a minimal ACP turn) and FLAG it (gated, like the other live-CLI items). Begin with primer synthesis + budget (pure, unit-tested), then wire it into `composeSwitchSpec`'s `SystemPrompt`, then the marker + response field.
 
 ---
 
@@ -128,6 +139,28 @@ _(no open findings)_
 ## Autonomous decisions (please review)
 
 > Resolved without stopping; the human should still see them. Remove once acknowledged (workflow §3, §5).
+
+- **NEW (6.4): switch-runtime cancel-then-wait is best-effort (poll status≠busy up to 5s), not a true `turn_end` await.**
+  §9 says wait up to `config.switch.cancel_timeout_ms` for `turn_end`. I poll the status row leaving `busy` rather than
+  subscribing to the runtime hub for the `turn_end` event (simpler, no subscription lifecycle in the handler); the
+  streamed events are already persisted, so a lost in-flight tool result is acceptable (§9). The timeout is a hardcoded
+  5s const (`switchCancelTimeout`) — `config.switch.cancel_timeout_ms` plumbing is deferred. **To reverse:** subscribe to
+  `registry.Subscribe(id)` and block on a `turn_end` event; add the config field.
+- **NEW (6.4): switch error codes added to the §7.7 vocabulary with 400/409 statuses.** The spec's §8.1 uses distinct
+  code strings (`no_change`, `invalid_field`, `switch_in_progress`, `terminal_unavailable`, `switch_failed*`,
+  `agent_not_running`) with 400/409 statuses the existing vocab lacked (it only had 422/404/409/501/502/500). I added the
+  code constants + `statusForCode` cases (incl. the first **400** mappings in the project). The not-found case still uses
+  the existing `not_found` (404) code string rather than §8.1's `agent_not_found`, for consistency with every other
+  session route. **To reverse:** drop the constants/cases; map switch validation onto the generic `validation` (422).
+- **NEW (6.4): a not-running agent → `409 agent_not_running` (a code §8.1 doesn't list).** §8.1's listed errors assume a
+  live agent; it has no "not running" case. Rather than 404 (the identity exists) I return a new `agent_not_running`
+  (409). **To reverse:** fold into `conflict`/`not_found` if preferred.
+- **NEW (6.4): switch persists new identity to the `agents` row only; the `sessions` snapshot refreshes on next
+  turn_end.** `composeSwitchSpec` reads cwd/system_prompt from the frozen `sessions` snapshot (like resume) and overrides
+  backend/model/interface; the durable snapshot's interface/backend/model columns are updated by the indexer on the next
+  turn_end, not synchronously in the handler. Archive-resume between the switch and the next turn would see the old
+  snapshot identity. **To reverse:** add a `state` writer that updates the snapshot's interface/backend/model in the
+  switch handler.
 
 - **NEW (6.3): terminal runtime registered via `Registry.SetTerminalRuntime` (setter), not constructed in `NewRegistry`.**
   The terminal runtime lives in `internal/runtime/terminal`, which imports `internal/runtime` for the `Runtime`
@@ -306,6 +339,17 @@ _(no open findings)_
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-29 — **6.4 green — switch-runtime: same-backend (interface/model swap).** New `internal/server/switch.go`:
+  `POST /api/sessions/{id}/switch-runtime {interface?, backend?, model?}`. Per-agent switch lock (`Server.switching`
+  set; concurrent → `409 switch_in_progress`). Flow: merge target over current (`400 no_change`/`400 invalid_field`) →
+  validate target (terminal driver via `terminal.Probe().DriverAvailable`; backend/model exist) → adapter
+  `ResolveResumeID(prev.SessionID, true)` (native, same-backend) gated by `CanSwitchModelOnResume` →
+  `cancelAndWait` (poll status≠busy ≤5s) → `registry.Stop` + cleanup old MCP/hook → `WriteAgent(target)` (agent_id
+  UNCHANGED) → `registry.Resume` (dispatches by new interface). Rollback on Resume-after-Stop failure re-launches the
+  previous identity (`500 switch_failed_rolled_back`); double-fault sets status `error` + `500 switch_failed`.
+  Cross-backend swap guarded `501` (history primer → 6.5). New switch error codes in `runtime/errors.go` (first 400
+  mappings). Tests: model-swap (agent_id stable, new session_id, identity persisted, handoff=native_resume), chat→terminal
+  (running row terminal/xterm/tty), no_change (400), rollback (500 rolled_back + chat restored). Green both tag modes (Go-only).
 - 2026-06-29 — **6.3 green — terminal runtime (xterm/PTY default + tmux).** New `internal/runtime/terminal` package
   implementing `runtime.Runtime` behind a `TerminalDriver` seam (`StartTab/WriteText/ReadTTY/CloseTab/RevealTab`):
   xterm/PTY driver (`creack/pty`; opens a PTY, child as session leader via Setsid+Setctty so pid==pgid, records the slave
@@ -359,4 +403,3 @@ _(most recent first; keep ~10, older history is in git)_
 - 2026-06-29 — **5.4 green / Phase 5 COMPLETE — notifications + dashboard message indicators.** `AgentState` now includes `unread_messages` and `last_sent_at`; message sends touch recipient/sender state for unread badges and outbound pulse; bus emits edge-triggered `notification` SSE for done/waiting_input/permission_required plus the existing budget_exceeded path. `config.json` gained `notifications.desktop_enabled` + per-type mutes via existing `GET/PUT /api/config`; UI consumes notification SSE, sends hidden-tab desktop notifications when permitted, visible-tab toasts otherwise, and adds Settings notification toggles. Added read-only `GET /api/sessions/{id}/messages`. Embedded UI refreshed. Tests: Go notification/indicator/config/inbox coverage; UI mute + hidden desktop notification + settings toggle. Checkpoint green: Go standard/tagged build+tests, `cd ui && npm test`, `cd ui && npm run build`.
 - 2026-06-29 — **5.3 green — registration, nudger, turn budget, janitor.** Added per-agent HTTP MCP registration files + token cleanup wired through launch/resume/stop/shutdown; chat `CheckMessages(pid)` now injects a nudge turn and runtime turns reset `turn_budget`. `send_message`/`check_messages` enforce the shared 15-action budget transactionally (`message_budget_exceeded`, persisted `breached=1`, WARN + `budget_exceeded` SSE); nudger wakes idle agents on ticker/insert signal and stamps `delivered_via='nudge'`; poll reads now stamp `delivered_via='poll'`; janitor deletes read>24h and any>7d. Tests cover registration cleanup, runtime/server nudge, budget breach/caps, retention, and poll stamping. Checkpoint green: `go build ./...`, `go build -tags sqlite_fts5 ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
 - 2026-06-29 — **5.2 green — message store + three MCP tools.** Migration v5 replaces the Phase-0 placeholder `messages` table with the §4.1 schema (TEXT `message_id` PK, no agent FK) + adds `turn_budget`. New `state` messaging API (`LiveAgents`, `ResolveRecipient`, `InsertMessage`, `ListMessages`, `MarkRead`, `DeleteMessages`, `UnreadCount`) + `Message`/`LiveAgent`/`AgentRef` types. `messaging` package: `list_agents`/`send_message`/`check_messages` tools replace the `ping` spike, identity from the session token (`req.Extra.Header`→`Lookup`, unknown→`session_unknown`), §9 error shapes, locked §13 constants. Budget enforcement deferred to 5.3 (static cap + TODO). New state + messaging tests; updated Phase-0 state tests (cascade now asserts mail survives a deleted sender) + `server.TestMCPRouteMounted`. Build + full tests green both tag modes.
-- 2026-06-29 — **5.1 green — Go-MCP-SDK handshake spike.** Added `github.com/modelcontextprotocol/go-sdk v1.6.1` (`go` 1.22→1.25.0). New `internal/messaging` package: in-process `mcp.Server` + trivial `ping` tool over the streamable HTTP transport, mounted at `POST/GET/DELETE /mcp`; `token→agent_id` session registry; `X-AgentDeck-Token` header read per request. HTTP transport round-trip proven via `messaging.TestSpikePingRoundTrip` + `server.TestMCPRouteMounted` (go-sdk client through the real dashboard mux). Per-CLI live confirmation gated (Blocked on human). Task 1 outcome recorded in techspec §2.2. Build (both tags) + full tests green.

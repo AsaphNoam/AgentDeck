@@ -1,0 +1,311 @@
+package server
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"os"
+	"time"
+
+	"github.com/agentdeck/agentdeck/internal/backend"
+	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/agentdeck/agentdeck/internal/runtime/terminal"
+	"github.com/agentdeck/agentdeck/internal/state"
+)
+
+// switchCancelTimeout bounds the wait for an in-flight turn to settle before the
+// switch stops the old runtime (techspec §9; config plumbing deferred).
+const switchCancelTimeout = 5 * time.Second
+
+// switchRuntimeRequest is the POST body (techspec §8.1); any subset, ≥1 field
+// must differ from current.
+type switchRuntimeRequest struct {
+	Interface string `json:"interface"`
+	Backend   string `json:"backend"`
+	Model     string `json:"model"`
+}
+
+// switchRuntimeResponse is the 200 body (techspec §8.1).
+type switchRuntimeResponse struct {
+	AgentID        string              `json:"agent_id"`
+	Interface      string              `json:"interface"`
+	Backend        string              `json:"backend"`
+	Model          string              `json:"model"`
+	Running        *state.RunningEntry `json:"running,omitempty"`
+	HistoryHandoff string              `json:"history_handoff"` // "native_resume" | "primer"
+}
+
+// handleSwitchRuntime implements POST /api/sessions/{id}/switch-runtime for the
+// same-backend path (techspec §5.1–5.2, §5.4): interface and/or model swap via
+// the runtime's native Resume on the same agent_id. Cross-backend (history
+// primer) is guarded to subphase 6.5.
+func (s *Server) handleSwitchRuntime(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	var req switchRuntimeRequest
+	if r.ContentLength != 0 {
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeAPIError(w, apiError(runtime.CodeValidation, "invalid JSON body"))
+			return
+		}
+	}
+
+	agent, err := s.stateStore.ReadAgent(id)
+	if err != nil {
+		writeAPIError(w, apiError(runtime.CodeNotFound, "no such agent: "+id))
+		return
+	}
+
+	// Compute the target identity (merge requested fields over current).
+	target := agent
+	if req.Interface != "" {
+		target.Interface = req.Interface
+	}
+	if req.Backend != "" {
+		target.Backend = req.Backend
+	}
+	if req.Model != "" {
+		target.Model = req.Model
+	}
+	if target.Interface == agent.Interface && target.Backend == agent.Backend && target.Model == agent.Model {
+		writeAPIError(w, apiError(runtime.CodeNoChange, "switch request equals current state"))
+		return
+	}
+	if target.Interface != "chat" && target.Interface != "terminal" {
+		writeAPIError(w, apiError(runtime.CodeInvalidField, "invalid interface: "+target.Interface))
+		return
+	}
+	if target.Interface == "terminal" && !terminal.Probe().DriverAvailable("xterm") {
+		writeAPIError(w, apiError(runtime.CodeTerminalUnavailable, "no terminal driver available on this host"))
+		return
+	}
+	// Cross-backend swap needs the history primer (techspec §5.3) — deferred to 6.5.
+	if target.Backend != agent.Backend {
+		writeAPIError(w, apiError(runtime.CodeNotImplemented, "backend swap (history primer) lands in subphase 6.5"))
+		return
+	}
+
+	// Per-agent switch lock (§5.4).
+	if !s.acquireSwitch(id) {
+		writeAPIError(w, apiError(runtime.CodeSwitchInProgress, "a switch is already in progress for this agent"))
+		return
+	}
+	defer s.releaseSwitch(id)
+
+	// The switch operates on a live agent (cancel → stop → resume). No running row
+	// → nothing to switch.
+	prev, err := s.stateStore.ReadRunning(id)
+	if errors.Is(err, state.ErrNotFound) {
+		writeAPIError(w, apiError(runtime.CodeAgentNotRunning, "agent is not running"))
+		return
+	}
+	if err != nil {
+		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
+		return
+	}
+
+	// Resolve the resume id via the adapter: same-backend → the prev native
+	// session id (native resume); the adapter also gates model-on-resume (§5.3).
+	ad, ok := backend.For(s.backendType(agent.Backend))
+	if !ok {
+		writeAPIError(w, apiError(runtime.CodeInvalidField, "unknown backend: "+agent.Backend))
+		return
+	}
+	resumeID := ad.ResolveResumeID(prev.SessionID, true)
+	if target.Model != agent.Model && !ad.CanSwitchModelOnResume() {
+		// This backend can't keep its native session across a model change; that
+		// needs the primer path (6.5).
+		writeAPIError(w, apiError(runtime.CodeNotImplemented, "model swap on this backend needs the history primer (subphase 6.5)"))
+		return
+	}
+
+	// Validate target backend/model exist before tearing anything down.
+	spec, ae := s.composeSwitchSpec(target, resumeID)
+	if ae != nil {
+		writeAPIError(w, ae)
+		return
+	}
+
+	// 1. Cancel any in-flight turn and let it settle (streamed events already
+	//    persisted), then stop the old runtime (removes running row, status done).
+	s.cancelAndWait(r.Context(), id, switchCancelTimeout)
+	if err := s.registry.Stop(r.Context(), id); err != nil && !errors.Is(err, runtime.ErrNoHandle) {
+		writeAPIError(w, apiError(runtime.CodeInternal, "stop current runtime: "+err.Error()))
+		return
+	}
+	s.cleanupMessagingMCP(id)
+	s.cleanupHookSettings(id)
+
+	// 2. Persist the new identity (agent_id UNCHANGED) so the resume composes the
+	//    new interface/backend/model and the card re-renders its badges.
+	if err := s.stateStore.WriteAgent(target); err != nil {
+		writeAPIError(w, apiError(runtime.CodeInternal, "persist identity: "+err.Error()))
+		return
+	}
+
+	// 3. Resume under the target runtime (registry dispatches by target interface).
+	if _, err := s.registry.Resume(r.Context(), spec); err != nil {
+		s.rollbackSwitch(r.Context(), w, agent, prev.SessionID, err)
+		return
+	}
+
+	// The identity write + the resume's running/status writes already published
+	// state_update via the runtime's state-touch, so the card re-renders.
+	running, _ := s.stateStore.ReadRunning(id)
+	writeJSON(w, http.StatusOK, switchRuntimeResponse{
+		AgentID: id, Interface: target.Interface, Backend: target.Backend, Model: target.Model,
+		Running: ptrRunning(running), HistoryHandoff: "native_resume",
+	})
+}
+
+// rollbackSwitch re-launches the previous identity after a failed Resume (§5.4).
+// If rollback also fails, it leaves the status row at error and returns 500
+// switch_failed.
+func (s *Server) rollbackSwitch(ctx context.Context, w http.ResponseWriter, prevAgent state.Agent, prevSessionID string, cause error) {
+	s.cleanupMessagingMCP(prevAgent.AgentID)
+	s.cleanupHookSettings(prevAgent.AgentID)
+	if err := s.stateStore.WriteAgent(prevAgent); err != nil {
+		s.failSwitch(w, prevAgent.AgentID, "restore identity: "+err.Error())
+		return
+	}
+	spec, ae := s.composeSwitchSpec(prevAgent, prevSessionID)
+	if ae != nil {
+		s.failSwitch(w, prevAgent.AgentID, "recompose previous: "+ae.Message)
+		return
+	}
+	if _, err := s.registry.Resume(ctx, spec); err != nil {
+		s.failSwitch(w, prevAgent.AgentID, err.Error())
+		return
+	}
+	writeAPIError(w, apiError(runtime.CodeSwitchFailedRolledBack, "switch failed, rolled back to previous runtime: "+cause.Error()))
+}
+
+// failSwitch records the unrecoverable state (status error) and returns 500
+// switch_failed; the agent is recoverable via archive resume (§5.4).
+func (s *Server) failSwitch(w http.ResponseWriter, agentID, detail string) {
+	if st, err := s.stateStore.ReadStatus(agentID); err == nil {
+		st.State = "error"
+		st.Detail = "switch failed: " + clipDetail(detail)
+		st.BusySince = nil
+		_ = s.stateStore.WriteStatus(st)
+		if _, terr := s.stateMgr.Touch(agentID); terr != nil {
+			s.log.Debug("touch after failed switch", "agent", agentID, "err", terr)
+		}
+	}
+	writeAPIError(w, apiError(runtime.CodeSwitchFailed, detail))
+}
+
+// composeSwitchSpec builds the resume LaunchSpec for the target identity from the
+// frozen session snapshot (cwd/system_prompt) + re-resolved backend/model env,
+// minting a fresh hook token and MCP registration (mirrors handleResume).
+func (s *Server) composeSwitchSpec(target state.Agent, resumeID string) (runtime.LaunchSpec, *runtime.APIError) {
+	snap, err := s.stateStore.ReadSession(target.AgentID)
+	if errors.Is(err, state.ErrNotFound) {
+		return runtime.LaunchSpec{}, apiError(runtime.CodeValidation, "no persisted session to switch")
+	}
+	if err != nil {
+		return runtime.LaunchSpec{}, apiError(runtime.CodeInternal, err.Error())
+	}
+
+	backends, err := s.configStore.ReadBackends()
+	if err != nil {
+		if errors.Is(err, config.ErrNotFound) || errors.Is(err, config.ErrCorrupt) {
+			backends = config.DefaultBackends()
+		} else {
+			return runtime.LaunchSpec{}, apiError(runtime.CodeInternal, "read backends: "+err.Error())
+		}
+	}
+	be, ok := backends.Backends[target.Backend]
+	if !ok {
+		return runtime.LaunchSpec{}, apiError(runtime.CodeInvalidField, "unknown backend: "+target.Backend)
+	}
+	model, ok := be.Models[target.Model]
+	if !ok {
+		return runtime.LaunchSpec{}, apiError(runtime.CodeInvalidField, "unknown model: "+target.Model)
+	}
+
+	token := mintHookToken()
+	s.rememberHookToken(target.AgentID, token)
+	mcpSpec, err := s.registerMessagingMCP(target, be.Type)
+	if err != nil {
+		s.forgetHookToken(target.AgentID)
+		return runtime.LaunchSpec{}, apiError(runtime.CodeInternal, err.Error())
+	}
+	extraArgs, err := s.composeHookRegistration(target, be.Type)
+	if err != nil {
+		s.forgetHookToken(target.AgentID)
+		s.cleanupMessagingMCP(target.AgentID)
+		return runtime.LaunchSpec{}, apiError(runtime.CodeInternal, err.Error())
+	}
+
+	return runtime.LaunchSpec{
+		Agent:          target,
+		Cwd:            snap.Cwd,
+		SystemPrompt:   snap.SystemPrompt,
+		BackendType:    be.Type,
+		ModelID:        model.Model,
+		Env:            composeEnv(os.Environ(), be.Env, model.Env, s.hookEnv(target, token)),
+		HookToken:      token,
+		MCPServers:     []runtime.MCPServerSpec{mcpSpec},
+		ExtraArgs:      extraArgs,
+		LastSessionID:  resumeID,
+		LastContextPct: snap.LastContextPct,
+	}, nil
+}
+
+// cancelAndWait cancels the in-flight turn and waits up to timeout for the agent
+// to leave the busy state (best-effort; the streamed events are already persisted).
+func (s *Server) cancelAndWait(ctx context.Context, id string, timeout time.Duration) {
+	_, _ = s.registry.Cancel(ctx, id)
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		st, err := s.stateStore.ReadStatus(id)
+		if err != nil || st.State != "busy" {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+func (s *Server) backendType(backendID string) string {
+	backends, err := s.configStore.ReadBackends()
+	if err != nil {
+		backends = config.DefaultBackends()
+	}
+	if be, ok := backends.Backends[backendID]; ok {
+		return be.Type
+	}
+	return ""
+}
+
+func (s *Server) acquireSwitch(id string) bool {
+	s.switchMu.Lock()
+	defer s.switchMu.Unlock()
+	if s.switching[id] {
+		return false
+	}
+	s.switching[id] = true
+	return true
+}
+
+func (s *Server) releaseSwitch(id string) {
+	s.switchMu.Lock()
+	delete(s.switching, id)
+	s.switchMu.Unlock()
+}
+
+func ptrRunning(r state.RunningEntry) *state.RunningEntry {
+	if r.AgentID == "" {
+		return nil
+	}
+	return &r
+}
+
+func clipDetail(s string) string {
+	if len(s) <= 120 {
+		return s
+	}
+	return s[:120]
+}

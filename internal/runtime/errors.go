@@ -34,6 +34,16 @@ const (
 	CodeNotImplemented     = "not_implemented"      // 501
 	CodeRuntimeStartFailed = "runtime_start_failed" // 502
 	CodeInternal           = "internal"             // 500
+
+	// switch-runtime error codes (Phase 6 techspec §8.1). Distinct code strings
+	// the UI branches on, each with its own HTTP status.
+	CodeNoChange               = "no_change"                 // 400
+	CodeInvalidField           = "invalid_field"             // 400
+	CodeAgentNotRunning        = "agent_not_running"         // 409
+	CodeSwitchInProgress       = "switch_in_progress"        // 409
+	CodeTerminalUnavailable    = "terminal_unavailable"      // 422
+	CodeSwitchFailed           = "switch_failed"             // 500
+	CodeSwitchFailedRolledBack = "switch_failed_rolled_back" // 500
 )
 
 // APIError is the normalized error payload. It serializes to the §7.7 envelope:
@@ -58,11 +68,13 @@ func (e *APIError) HTTPStatus() int {
 // statusForCode maps an error code to its HTTP status. Unknown codes map to 500.
 func statusForCode(code string) int {
 	switch code {
-	case CodeValidation:
+	case CodeValidation, CodeTerminalUnavailable:
 		return http.StatusUnprocessableEntity // 422
+	case CodeNoChange, CodeInvalidField:
+		return http.StatusBadRequest // 400
 	case CodeNotFound:
 		return http.StatusNotFound // 404
-	case CodeConflict:
+	case CodeConflict, CodeAgentNotRunning, CodeSwitchInProgress:
 		return http.StatusConflict // 409
 	case CodeNotImplemented:
 		return http.StatusNotImplemented // 501
