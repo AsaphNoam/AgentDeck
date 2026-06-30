@@ -25,7 +25,8 @@ func (t tokenRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 
 // TestMCPRouteMounted proves the in-process MCP messaging server is reachable
 // through the real dashboard mux at /mcp: a go-sdk client connects over the
-// streamable HTTP transport and round-trips the spike `ping` tool (Phase 5.1).
+// streamable HTTP transport and round-trips a `list_agents` tool call, with the
+// caller resolved from the per-agent session token (Phase 5).
 func TestMCPRouteMounted(t *testing.T) {
 	srv := testServer(t, true)
 	srv.messaging.Register("tok-route", "a_route")
@@ -47,17 +48,14 @@ func TestMCPRouteMounted(t *testing.T) {
 	}
 	defer cs.Close()
 
-	res, err := cs.CallTool(ctx, &mcp.CallToolParams{
-		Name:      "ping",
-		Arguments: map[string]any{"message": "wired"},
-	})
+	res, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "list_agents", Arguments: nil})
 	if err != nil {
-		t.Fatalf("call ping: %v", err)
+		t.Fatalf("call list_agents: %v", err)
 	}
 	if res.IsError || len(res.Content) == 0 {
-		t.Fatalf("ping failed: %+v", res)
+		t.Fatalf("list_agents failed: %+v", res)
 	}
-	if text, ok := res.Content[0].(*mcp.TextContent); !ok || text.Text != "wired" {
-		t.Fatalf("ping content = %+v, want TextContent{wired}", res.Content[0])
+	if _, ok := res.Content[0].(*mcp.TextContent); !ok {
+		t.Fatalf("list_agents content = %+v, want TextContent", res.Content[0])
 	}
 }
