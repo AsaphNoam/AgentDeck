@@ -143,7 +143,6 @@ launch option via capabilities, and refreshed embedded UI. Details in changelog 
 > **This section holds only OPEN findings** — no resolved/dismissed graveyard.
 > Blocking items must be fixed before the next phase starts; advisory items when convenient.
 
-- **ADVISORY — switch-runtime / move-to-group failures are silently swallowed.** [`ui/src/components/grid/CardContextMenu.tsx`](../../ui/src/components/grid/CardContextMenu.tsx) fires `void switchRuntime(...)` / `void updateAgentIdentity(...)` with no `.catch` and no result handling. The prompt pre-fills current interface/backend/model, so accepting unchanged values returns `400 no_change` (and any real failure — `409 switch_in_progress`, `422 terminal_unavailable`, rollback `500`) is invisible to the user; the card just doesn't change with no feedback. This is part of the acknowledged MVP prompt-based UI decision, but at minimum the promise should surface an error toast. Fix: add `.catch` → toast via `useUiStore`.
 - **ADVISORY — terminal panel is a line-box, not xterm.js, and never sends resize.** Task 13 calls for an xterm.js panel; [`TerminalTab.tsx`](../../ui/src/components/chat/TerminalTab.tsx) is a hand-rolled `<pre>` + input that renders raw bytes (ANSI escapes shown literally) and never sends `{cols,rows}`, so the PTY stays at its default size and output wrapping can be wrong. Functional for basic output once the input fix lands, but not the specified terminal experience. Fix: integrate xterm.js (its `onData` → binary frame, `onResize` → `{cols,rows}` text frame) when convenient.
 
 ## Autonomous decisions (please review)
@@ -376,6 +375,14 @@ launch option via capabilities, and refreshed embedded UI. Details in changelog 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-30 — **review fix: switch-runtime / move-to-group failures now surface a toast — green.** ADVISORY:
+  `CardContextMenu` fired `void switchRuntime(...)` / `void updateAgentIdentity(...)` with no `.catch`, so any
+  failure (the common `400 no_change`, `409 switch_in_progress`, `422`, rollback `500`) was invisible. Added a
+  `pushError(title, body?)` action to `uiStore` (new `"error"` toast type) and `.catch` → `pushError` on both
+  context-menu actions; also taught `client.ts::json()` to extract the §7.7 nested `error.message` so the toast
+  shows the real reason instead of a bare status line. Test `CardContextMenu.test.tsx` (new) asserts a failing
+  switch-runtime/move-to-group yields an `"error"` toast carrying the server message. Embedded UI dist refreshed.
+  Checkpoint green: `go build ./...`, `cd ui && npm test`, `cd ui && npm run build`.
 - 2026-06-30 — **review fix: terminal-tab input reaches the PTY (binary frame) — green.** BLOCKING:
   `TerminalTab.tsx`'s `send()` sent `ws.send(`${input}\n`)` — a string, transmitted as a WebSocket
   *text* frame, which the PTY↔WS bridge routes to resize and drops (only binary frames reach the PTY
