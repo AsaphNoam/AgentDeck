@@ -9,9 +9,9 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 ## Current position
 
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
-- **Active subphase:** 6.5 (next) — switch-runtime: backend-swap history primer (riskiest)
+- **Active subphase:** 6.6 (next) — task groups + remaining endpoints + UI
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** 6.4 @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...` (6.1–6.4 are Go-only — no `ui/` change).
+- **Last GREEN checkpoint:** 6.5 @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...` (6.1–6.5 are Go-only — no `ui/` change).
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -68,17 +68,23 @@ by new interface). `resolveResumeId` via the adapter (same-backend→prev native
 chat↔terminal works. Rollback on Resume-after-Stop failure re-launches the previous identity (`500
 switch_failed_rolled_back`; double-fault → status `error` + `500 switch_failed`). New switch-runtime error codes added to
 `runtime/errors.go` (`no_change`/`invalid_field`→400, `switch_in_progress`/`agent_not_running`→409,
-`terminal_unavailable`→422, `switch_failed*`→500). **Cross-backend swap is guarded to 6.5** (`501` "history primer lands
-in 6.5"). Details in changelog + Autonomous decisions.
+`terminal_unavailable`→422, `switch_failed*`→500). Details in changelog + Autonomous decisions.
 
-**Subphase 6.5 — next to implement** (switch-runtime backend-swap history primer; techspec §5.3, §8.1, task 7 remainder):
-- [ ] Remove the 6.4 cross-backend `501` guard in `handleSwitchRuntime`; allow `target.Backend != agent.Backend`.
-- [ ] `resolveResumeId` already returns "" cross-backend (adapter) → drive the **history-primer** path instead of a bare fresh session.
-- [ ] Bounded primer synthesis appended to the launch composition (`spec.SystemPrompt` for this launch only, NOT persisted to the role): running summary of older turns + last N=6 verbatim turns, capped at `switch.primer_token_budget` (default 8k). One-shot **target-model** summary call with a cheap truncation fallback when it fails (degrade, don't block).
-- [ ] `{type:"backend_switch", from, to, at}` transcript marker appended to `sessions/{agent_id}/` so the chat panel renders a divider; archive shows one continuous session.
-- [ ] `history_handoff` in the 200 response becomes `"primer"` for cross-backend (already `"native_resume"` for same-backend); `CanSwitchModelOnResume`-false same-backend model swap also routes to primer (already guarded `501` in 6.4 — swap that for the primer path).
-- **Checkpoint:** `go build ./...` + `go test ./...` (both tag modes); primer-synthesis unit tests (respects token budget; truncation fallback when summary call fails; emits `backend_switch` marker); Claude→Codex backend-swap integration test (handoff=primer, marker present, new Codex session runs).
-- **Resume note:** switch-runtime works same-backend; cross-backend returns `501` at `handleSwitchRuntime` (search "lands in subphase 6.5"). The transcript writer is `internal/transcript` (NDJSON append, `runtime.Event`); the primer reads prior turns from there (or the in-memory transcript). The one-shot summary call needs a non-interactive target-backend invocation — decide how to call it (a `--print`-style CLI run, or a minimal ACP turn) and FLAG it (gated, like the other live-CLI items). Begin with primer synthesis + budget (pure, unit-tested), then wire it into `composeSwitchSpec`'s `SystemPrompt`, then the marker + response field.
+**Subphase 6.5 ✅ — switch-runtime: backend-swap history primer.** Cross-backend and non-native-resumable model swaps now
+route to `history_handoff:"primer"`: no native resume id, bounded transcript primer appended to this launch's
+`SystemPrompt` only, `switch.primer_token_budget` default 8k, tail N=6 turns, summary fallback to local truncation, and
+`backend_switch` transcript marker. Claude→Codex fake-backend integration proves marker + new Codex runtime prompt.
+Details in changelog + Autonomous decisions.
+
+**Subphase 6.6 — next to implement** (task groups + remaining endpoints + UI; techspec §7, §8.2–8.5, §9, tasks 8–13):
+- [ ] `POST /api/sessions/{id}/rename` (if absent) and `POST /api/sessions/{id}/identity` for group changes; direct `state_update`.
+- [ ] `POST /api/groups/{group}/release` with bounded worker pool.
+- [ ] Liveness sweep pruning stale running rows.
+- [ ] UI group affordances: collapsible group sections with `layout.json` collapse persistence, Move-to-group picker, Release-group, group state summary.
+- [ ] UI switch-runtime dialog with capability-gated drivers and handoff note.
+- [ ] UI terminal panel attaches to PTY WebSocket and shows terminal badge / Reveal terminal.
+- **Checkpoint:** `go build ./...` + `go test ./...` + `go test -tags sqlite_fts5 ./...` + `cd ui && npm run build` (because 6.6 touches UI); group-collapse, Move-to-group/Release-group, and terminal-panel checks per techspec.
+- **Resume note:** backend switch/terminal/hook machinery is green; groups still stubbed and no switch/terminal UI. Begin with identity/group endpoints, then UI sections, then switch dialog and terminal panel.
 
 ---
 
@@ -140,6 +146,12 @@ _(no open findings)_
 
 > Resolved without stopping; the human should still see them. Remove once acknowledged (workflow §3, §5).
 
+- **NEW (6.5, GATED): target-backend summary is an injectable seam with local truncation fallback by default, not a live CLI call yet.**
+  §5.3 calls for a one-shot target-model summary before launch. Without credentialed Claude/Codex CLI surfaces and a confirmed
+  non-interactive invocation form, I added `Server.primerSummarizer` as the one-shot seam and made the production default return
+  an error so primer synthesis degrades to bounded local truncation (as the spec allows) instead of blocking a switch. Tests inject
+  a deterministic summarizer and cover success + failure. **To reverse/fix:** once live CLI surfaces are confirmed, implement
+  `defaultPrimerSummarizer` with the chosen `--print`/ACP one-turn invocation and keep the fallback on failure.
 - **NEW (review fix): archive resume now resolves identity (interface/backend/model) from the LIVE `agents`
   row, not the frozen `sessions` snapshot.** The terminal-resume BLOCKING fix required this: after a
   chat→terminal switch the snapshot's `interface` stays `"chat"` (no terminal `turn_end` ever refreshes it),
@@ -350,6 +362,15 @@ _(no open findings)_
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-29 — **6.5 green — switch-runtime: backend-swap history primer.** Removed the cross-backend `501` guard:
+  `handleSwitchRuntime` now routes cross-backend swaps and same-backend model swaps with `CanSwitchModelOnResume=false`
+  through `history_handoff:"primer"` (empty native resume id). New `internal/server/primer.go` reads
+  `sessions/{agent_id}/transcript.ndjson`, synthesizes a bounded primer (older-turn summary + last N=6 verbatim turns),
+  appends it to this launch's `SystemPrompt` only, honors `config.json switch.primer_token_budget` (default 8k), and falls
+  back to local truncation if the one-shot target-model summary seam fails. New `runtime.EvBackendSwitch`/
+  `BackendSwitchData`; switch appends `{type:"backend_switch", from, to, at}` after target resume succeeds. Tests: primer budget,
+  summarizer success + fallback, marker append, Claude→Codex backend swap (handoff=primer, marker present, identity switched,
+  new Codex fake session accepts prompt). Green both tag modes (Go-only). See Autonomous decisions for the gated live-summary seam.
 - 2026-06-29 — **review fix: switch-runtime keeps the target registration + terminal archive resume — green.**
   (1) BLOCKING: `handleSwitchRuntime` (`internal/server/switch.go`) cleaned the OLD MCP/hook artifacts (keyed by
   the unchanged `agent_id`) AFTER `composeSwitchSpec` had already registered the fresh target token + rewritten

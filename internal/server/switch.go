@@ -37,10 +37,11 @@ type switchRuntimeResponse struct {
 	HistoryHandoff string              `json:"history_handoff"` // "native_resume" | "primer"
 }
 
-// handleSwitchRuntime implements POST /api/sessions/{id}/switch-runtime for the
-// same-backend path (techspec §5.1–5.2, §5.4): interface and/or model swap via
-// the runtime's native Resume on the same agent_id. Cross-backend (history
-// primer) is guarded to subphase 6.5.
+// handleSwitchRuntime implements POST /api/sessions/{id}/switch-runtime
+// (techspec §5.1–5.4): stop the current runtime, persist the new identity, and
+// resume on the same agent_id. Same-backend compatible switches use native
+// resume; cross-backend/incompatible switches use a bounded AgentDeck transcript
+// history primer.
 func (s *Server) handleSwitchRuntime(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
@@ -81,11 +82,6 @@ func (s *Server) handleSwitchRuntime(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError(runtime.CodeTerminalUnavailable, "no terminal driver available on this host"))
 		return
 	}
-	// Cross-backend swap needs the history primer (techspec §5.3) — deferred to 6.5.
-	if target.Backend != agent.Backend {
-		writeAPIError(w, apiError(runtime.CodeNotImplemented, "backend swap (history primer) lands in subphase 6.5"))
-		return
-	}
 
 	// Per-agent switch lock (§5.4).
 	if !s.acquireSwitch(id) {
@@ -106,19 +102,21 @@ func (s *Server) handleSwitchRuntime(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Resolve the resume id via the adapter: same-backend → the prev native
-	// session id (native resume); the adapter also gates model-on-resume (§5.3).
-	ad, ok := backend.For(s.backendType(agent.Backend))
+	// Resolve native resume vs primer via the target adapter (§5.3): cross-backend
+	// swaps never share native history; same-backend model swaps use native resume
+	// only when the adapter says that is supported.
+	ad, ok := backend.For(s.backendType(target.Backend))
 	if !ok {
-		writeAPIError(w, apiError(runtime.CodeInvalidField, "unknown backend: "+agent.Backend))
+		writeAPIError(w, apiError(runtime.CodeInvalidField, "unknown backend: "+target.Backend))
 		return
 	}
-	resumeID := ad.ResolveResumeID(prev.SessionID, true)
-	if target.Model != agent.Model && !ad.CanSwitchModelOnResume() {
-		// This backend can't keep its native session across a model change; that
-		// needs the primer path (6.5).
-		writeAPIError(w, apiError(runtime.CodeNotImplemented, "model swap on this backend needs the history primer (subphase 6.5)"))
-		return
+	handoff := "native_resume"
+	sameBackend := target.Backend == agent.Backend
+	usePrimer := !sameBackend || (target.Model != agent.Model && !ad.CanSwitchModelOnResume())
+	resumeID := ad.ResolveResumeID(prev.SessionID, sameBackend && !usePrimer)
+	if usePrimer {
+		resumeID = ""
+		handoff = "primer"
 	}
 
 	// Validate the target backend/model/session snapshot exist before tearing
@@ -155,6 +153,14 @@ func (s *Server) handleSwitchRuntime(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, ae)
 		return
 	}
+	if usePrimer {
+		primer, err := s.buildHistoryPrimer(r.Context(), spec, s.switchPrimerTokenBudget())
+		if err != nil {
+			writeAPIError(w, apiError(runtime.CodeInternal, "build history primer: "+err.Error()))
+			return
+		}
+		spec.SystemPrompt = joinSystemPrompt(spec.SystemPrompt, primer)
+	}
 
 	// 4. Persist the new identity (agent_id UNCHANGED) so the resume composes the
 	//    new interface/backend/model and the card re-renders its badges.
@@ -168,13 +174,19 @@ func (s *Server) handleSwitchRuntime(w http.ResponseWriter, r *http.Request) {
 		s.rollbackSwitch(r.Context(), w, agent, prev.SessionID, err)
 		return
 	}
+	if usePrimer {
+		if err := appendBackendSwitchMarker(s.configStore.Home(), id, agent.Backend+"/"+agent.Model, target.Backend+"/"+target.Model, time.Now().UTC()); err != nil {
+			writeAPIError(w, apiError(runtime.CodeInternal, "append backend switch marker: "+err.Error()))
+			return
+		}
+	}
 
 	// The identity write + the resume's running/status writes already published
 	// state_update via the runtime's state-touch, so the card re-renders.
 	running, _ := s.stateStore.ReadRunning(id)
 	writeJSON(w, http.StatusOK, switchRuntimeResponse{
 		AgentID: id, Interface: target.Interface, Backend: target.Backend, Model: target.Model,
-		Running: ptrRunning(running), HistoryHandoff: "native_resume",
+		Running: ptrRunning(running), HistoryHandoff: handoff,
 	})
 }
 
@@ -326,6 +338,17 @@ func (s *Server) backendType(backendID string) string {
 		return be.Type
 	}
 	return ""
+}
+
+func (s *Server) switchPrimerTokenBudget() int {
+	cfg := s.cfg
+	if fromDisk, err := s.configStore.ReadConfig(); err == nil {
+		cfg = fromDisk
+	}
+	if cfg.Switch.PrimerTokenBudget <= 0 {
+		return defaultPrimerTokenBudget
+	}
+	return cfg.Switch.PrimerTokenBudget
 }
 
 func (s *Server) acquireSwitch(id string) bool {
