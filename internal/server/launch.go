@@ -62,6 +62,7 @@ func (s *Server) handleLaunch(w http.ResponseWriter, r *http.Request) {
 		_ = s.stateStore.DeleteStatus(agent.AgentID)
 		_ = s.stateStore.DeleteAgent(agent.AgentID)
 		s.forgetHookToken(agent.AgentID)
+		s.cleanupMessagingMCP(agent.AgentID)
 		writeAPIError(w, launchStartError(err))
 		return
 	}
@@ -175,6 +176,11 @@ func (s *Server) composeLaunch(req launchRequest) (runtime.LaunchSpec, state.Age
 
 	token := mintHookToken()
 	s.rememberHookToken(agentID, token)
+	mcpSpec, err := s.registerMessagingMCP(agent, backend.Type)
+	if err != nil {
+		s.forgetHookToken(agentID)
+		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeInternal, err.Error())
+	}
 
 	spec := runtime.LaunchSpec{
 		Agent:        agent,
@@ -186,7 +192,7 @@ func (s *Server) composeLaunch(req launchRequest) (runtime.LaunchSpec, state.Age
 		Env:          composeEnv(os.Environ(), backend.Env, model.Env),
 		SkipPerms:    resolveSkip(s.cfg.SkipPermissions, role.SkipPermissions),
 		HookToken:    token,
-		MCPServers:   []runtime.MCPServerSpec{messagingServer(agentID, token)},
+		MCPServers:   []runtime.MCPServerSpec{mcpSpec},
 	}
 	return spec, agent, nil
 }
@@ -261,21 +267,6 @@ func mintHookToken() string {
 	var b [16]byte
 	_, _ = rand.Read(b[:])
 	return hex.EncodeToString(b[:])
-}
-
-// messagingServer builds the in-process Go MCP messaging server registration. The
-// command re-execs this binary in a hidden mcp-stdio mode scoped to the agent;
-// the tool handlers land in Phase 5 (techspec §6.4).
-func messagingServer(agentID, token string) runtime.MCPServerSpec {
-	self, err := os.Executable()
-	if err != nil || self == "" {
-		self = "agentdeck"
-	}
-	return runtime.MCPServerSpec{
-		Name:    "agentdeck-messaging",
-		Command: self,
-		Args:    []string{"mcp-stdio", "--agent", agentID, "--token", token},
-	}
 }
 
 // suggestName picks the first wordlist name not used by a live agent (techspec §6.3).

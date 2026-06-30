@@ -106,6 +106,12 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 	// 6. Mint fresh hook token and build LaunchSpec from the frozen snapshot.
 	token := mintHookToken()
 	s.rememberHookToken(id, token)
+	mcpSpec, err := s.registerMessagingMCP(agent, backend.Type)
+	if err != nil {
+		s.forgetHookToken(id)
+		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
+		return
+	}
 
 	spec := runtime.LaunchSpec{
 		Agent: state.Agent{
@@ -125,7 +131,7 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 		ModelID:        model.Model,
 		Env:            composeEnv(os.Environ(), backend.Env, model.Env),
 		HookToken:      token,
-		MCPServers:     []runtime.MCPServerSpec{messagingServer(id, token)},
+		MCPServers:     []runtime.MCPServerSpec{mcpSpec},
 		LastSessionID:  snap.LastSessionID,
 		LastContextPct: snap.LastContextPct,
 	}
@@ -133,6 +139,7 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 	// 7. Resume via the registry (double-resume is guarded by the registry sentinel).
 	if _, err := s.registry.Resume(r.Context(), spec); err != nil {
 		s.forgetHookToken(id)
+		s.cleanupMessagingMCP(id)
 		writeAPIError(w, resumeStartError(err))
 		return
 	}

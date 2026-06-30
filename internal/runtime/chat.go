@@ -108,6 +108,7 @@ type agentState struct {
 
 	mu         sync.Mutex
 	seq        int64
+	turnSeq    int64
 	contextPct float64
 	turnActive bool
 	toolNames  map[string]string       // toolCallID -> normalized name (for status detail)
@@ -253,7 +254,14 @@ func (c *ChatRuntime) SendPrompt(ctx context.Context, agentID, text string) erro
 		return ErrTurnInFlight
 	}
 	as.turnActive = true
+	turnID := as.nextTurnIDLocked()
 	as.mu.Unlock()
+	if err := c.store.ResetTurnBudget(as.agentID, turnID); err != nil {
+		as.mu.Lock()
+		as.turnActive = false
+		as.mu.Unlock()
+		return err
+	}
 
 	// busy / thinking (techspec §4.4).
 	now := time.Now().UTC()
@@ -504,7 +512,68 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 }
 
 func (c *ChatRuntime) CheckMessages(ctx context.Context, pid int) error {
-	return fmt.Errorf("%w: CheckMessages (Phase 5)", ErrNotImplemented)
+	as, err := c.lookupByPID(pid)
+	if err != nil {
+		return err
+	}
+	st, err := c.store.ReadStatus(as.agentID)
+	if err != nil || st.State != "idle" {
+		return nil
+	}
+	as.mu.Lock()
+	if as.turnActive {
+		as.mu.Unlock()
+		return nil
+	}
+	as.turnActive = true
+	turnID := as.nextTurnIDLocked()
+	as.mu.Unlock()
+	if err := c.store.ResetTurnBudget(as.agentID, turnID); err != nil {
+		as.mu.Lock()
+		as.turnActive = false
+		as.mu.Unlock()
+		return err
+	}
+
+	now := time.Now().UTC()
+	_ = c.writeStatus(as, state.Status{
+		AgentID: as.agentID, State: "busy", Detail: "checking messages",
+		LastTrace: "MessageNudge", BusySince: &now, ContextPct: as.lastPct(),
+	})
+
+	go func() {
+		params := map[string]any{
+			"sessionId": as.sessionID,
+			"prompt": []map[string]any{{"type": "text",
+				"text": "You have new messages. Call the check_messages tool and handle them."}},
+		}
+		res, err := as.transport.Call(as.ctx, "session/prompt", params)
+		if err != nil {
+			as.mu.Lock()
+			as.turnActive = false
+			as.mu.Unlock()
+			if errors.Is(err, errTransportClosed) || as.isStopped() {
+				return
+			}
+			c.emit(as, EvError, ErrorData{Scope: "protocol", Message: err.Error(), Fatal: false})
+			td := TurnEndData{StopReason: "error", ContextPct: as.lastPct()}
+			c.applyTurnEndStatus(as, td)
+			c.emit(as, EvTurnEnd, td)
+			return
+		}
+		td, hasPct := mapPromptResult(res)
+		as.mu.Lock()
+		as.turnActive = false
+		if hasPct {
+			as.contextPct = td.ContextPct
+		} else {
+			td.ContextPct = as.contextPct
+		}
+		as.mu.Unlock()
+		c.applyTurnEndStatus(as, td)
+		c.emit(as, EvTurnEnd, td)
+	}()
+	return nil
 }
 
 // --- internals ---
@@ -517,6 +586,17 @@ func (c *ChatRuntime) lookup(agentID string) (*agentState, error) {
 		return nil, ErrNoHandle
 	}
 	return as, nil
+}
+
+func (c *ChatRuntime) lookupByPID(pid int) (*agentState, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, as := range c.agents {
+		if as.pgid == pid {
+			return as, nil
+		}
+	}
+	return nil, ErrNoHandle
 }
 
 // onNotification dispatches a server→client notification. session/update frames
@@ -821,6 +901,11 @@ func (as *agentState) lastPct() float64 {
 	return as.contextPct
 }
 
+func (as *agentState) nextTurnIDLocked() string {
+	as.turnSeq++
+	return fmt.Sprintf("t_%012d", as.turnSeq)
+}
+
 func (as *agentState) toolNameFor(id string) string {
 	as.mu.Lock()
 	defer as.mu.Unlock()
@@ -903,9 +988,7 @@ func checkACPVersion(initRes json.RawMessage) error {
 func sessionNewParams(spec LaunchSpec) map[string]any {
 	mcp := make([]map[string]any, 0, len(spec.MCPServers))
 	for _, m := range spec.MCPServers {
-		mcp = append(mcp, map[string]any{
-			"name": m.Name, "command": m.Command, "args": m.Args, "env": m.Env,
-		})
+		mcp = append(mcp, mcpServerParam(m))
 	}
 	return map[string]any{
 		"cwd":                   spec.Cwd,
@@ -923,13 +1006,25 @@ func sessionNewParams(spec LaunchSpec) map[string]any {
 func sessionLoadParams(spec LaunchSpec, sessionID string) map[string]any {
 	mcp := make([]map[string]any, 0, len(spec.MCPServers))
 	for _, m := range spec.MCPServers {
-		mcp = append(mcp, map[string]any{
-			"name": m.Name, "command": m.Command, "args": m.Args, "env": m.Env,
-		})
+		mcp = append(mcp, mcpServerParam(m))
 	}
 	return map[string]any{
 		"sessionId":  sessionID,
 		"cwd":        spec.Cwd,
 		"mcpServers": mcp,
+	}
+}
+
+func mcpServerParam(m MCPServerSpec) map[string]any {
+	if m.Type == "http" {
+		return map[string]any{
+			"name":    m.Name,
+			"type":    "http",
+			"url":     m.URL,
+			"headers": m.Headers,
+		}
+	}
+	return map[string]any{
+		"name": m.Name, "command": m.Command, "args": m.Args, "env": m.Env,
 	}
 }

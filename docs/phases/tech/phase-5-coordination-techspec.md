@@ -104,6 +104,11 @@ A `Store` type (the same `state.db` handle the rest of the server uses) gains me
 - `MarkRead(ids []string) error` / `DeleteMessages(ids []string) error` — flag or remove returned rows.
 - `UnreadCount(agentID string) (int, error)` — drives the card badge and the nudger.
 - `ResolveRecipient(to string) (agentID string, candidates []AgentRef, err error)` — `to`-resolution (§3.4).
+- `InsertMessageWithBudget(m Message, limit int) (messageID string, budget BudgetStatus, breached bool, err error)` — `send_message`'s transactional outbound budget check + insert.
+- `TakeMessagesWithBudget(recipientID string, unreadOnly bool, limit int, budgetLimit int, markRead bool, deleteAfter bool) (messages []Message, budget BudgetStatus, breached bool, err error)` — `check_messages`' transactional select + inbound budget increment + mark/delete.
+- `ResetTurnBudget(agentID, turnID string) error` / `CurrentTurnBudget(agentID string, limit int) (BudgetStatus, error)` — runtime turn-boundary reset and diagnostics.
+- `MarkUnreadDeliveredVia(agentID, via string) (int64, error)` — nudger audit stamp (`delivered_via='nudge'`) without marking rows read.
+- `DeleteExpiredMessages(now time.Time, readTTL, hardTTL time.Duration) (readDeleted, hardDeleted int64, err error)` — janitor retention policy.
 
 Because the Go server is the sole writer and these run in one process, concurrent tool calls from different agents are serialized by the DB connection/transaction layer — there is no cross-process write contention to reason about.
 
@@ -204,7 +209,10 @@ Read + flag/delete the caller's pending messages. Caller is the session's `agent
     }
   ],
   "remaining": 3,            // unread messages left after this read
-  "budget_remaining": 12     // inbound budget left this turn
+  "budget_remaining": 12,    // inbound budget left this turn
+  "budget_exhausted": false, // true when no messaging budget remains this turn
+  "budget_exceeded": false,  // true only on a breach response
+  "budget_explanation": ""   // explanatory text when exhausted
 }
 ```
 
