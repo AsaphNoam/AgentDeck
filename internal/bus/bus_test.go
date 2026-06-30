@@ -74,6 +74,43 @@ func TestPermissionRuntimeEventEmitsNotification(t *testing.T) {
 	}
 }
 
+func TestPublishBudgetExceededNamesAgent(t *testing.T) {
+	b := New()
+	// Seed the snapshot so the notification can name the agent + address.
+	b.SetSnapshot(state.AgentStateUpdate{AgentState: state.AgentState{
+		AgentID: "a_1", Name: "Atlas", Role: "implementer", Project: "my-app", State: "busy",
+	}})
+	ch, unsub := b.Subscribe()
+	defer unsub()
+	b.PublishBudgetExceeded("a_1", "t_000000000003", 15)
+	ev := <-ch
+	if ev.Type != "notification" {
+		t.Fatalf("event type = %q, want notification", ev.Type)
+	}
+	payload := ev.Data.(map[string]any)
+	if payload["notification_type"] != "budget_exceeded" {
+		t.Fatalf("notification_type = %v, want budget_exceeded", payload["notification_type"])
+	}
+	if payload["agent_name"] != "Atlas" || payload["address"] != "implementer@my-app" {
+		t.Fatalf("payload missing agent name/address: %+v", payload)
+	}
+	if payload["title"] != "Atlas hit its message budget" {
+		t.Fatalf("title = %v, want named title", payload["title"])
+	}
+}
+
+func TestPublishBudgetExceededFallsBackToAgentID(t *testing.T) {
+	b := New()
+	ch, unsub := b.Subscribe()
+	defer unsub()
+	b.PublishBudgetExceeded("a_unknown", "t_000000000001", 15)
+	ev := <-ch
+	payload := ev.Data.(map[string]any)
+	if payload["agent_name"] != "a_unknown" {
+		t.Fatalf("agent_name = %v, want fallback to agent_id", payload["agent_name"])
+	}
+}
+
 func TestPublishDropsOldestForSlowSubscriber(t *testing.T) {
 	b := New()
 	ch, unsub := b.Subscribe()

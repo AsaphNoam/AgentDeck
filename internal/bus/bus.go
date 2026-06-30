@@ -140,6 +140,21 @@ func (b *Bus) PublishRuntimeEvent(ev runtime.Event) {
 	}
 }
 
+// PublishBudgetExceeded emits a budget_exceeded notification, naming the agent
+// from its current snapshot (falling back to the agent_id) so the toast carries
+// agent_name/address like every other notification type.
+func (b *Bus) PublishBudgetExceeded(agentID, turnID string, used int) {
+	b.mu.RLock()
+	update := b.snapshot[agentID]
+	b.mu.RUnlock()
+	if update.AgentID == "" {
+		update.AgentID = agentID
+		update.Name = agentID
+	}
+	payload := notificationPayload(update, "budget_exceeded", map[string]any{"turn_id": turnID, "used": used})
+	b.Publish("notification", &agentID, payload)
+}
+
 func notificationPayload(update state.AgentStateUpdate, typ string, detail map[string]any) map[string]any {
 	name := update.Name
 	if name == "" {

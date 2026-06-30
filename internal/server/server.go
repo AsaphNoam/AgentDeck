@@ -71,30 +71,6 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	ix := persistindex.New(stateStore.DB())
 	msg := messaging.New(stateStore, log)
 	nudgeCh := make(chan string, 32)
-	msg.SetMessageInsertedSink(func(fromAgentID, toAgentID string) {
-		select {
-		case nudgeCh <- toAgentID:
-		default:
-		}
-		if update, err := stateMgr.Touch(toAgentID); err == nil {
-			eventBus.SetSnapshot(update)
-		}
-		if update, err := stateMgr.Touch(fromAgentID); err == nil {
-			update.LastSentAt = time.Now().UTC().Format(time.RFC3339)
-			eventBus.PublishStateUpdate(update)
-		}
-	})
-	msg.SetBudgetExceededSink(func(agentID, turnID string, used int) {
-		eventBus.Publish("notification", &agentID, map[string]any{
-			"type":              "notification",
-			"notification_type": "budget_exceeded",
-			"agent_id":          agentID,
-			"title":             "Agent hit its message budget",
-			"body":              "Per-turn message budget reached.",
-			"detail":            map[string]any{"turn_id": turnID, "used": used},
-			"ts":                time.Now().UTC().Format(time.RFC3339),
-		})
-	})
 	if registry != nil {
 		registry.SetPersistence(cfgStore.Home(), func(home, agentID string, meta *runtime.SessionMetaData) (runtime.TranscriptWriter, error) {
 			return transcript.Open(home, agentID, meta)
@@ -106,6 +82,26 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 			}
 		})
 	}
+	msg.SetMessageInsertedSink(func(fromAgentID, toAgentID string) {
+		select {
+		case nudgeCh <- toAgentID:
+		default:
+		}
+		// Touch publishes a state_update (via the manager's bus publisher) for
+		// both ends, carrying the recipient's recomputed unread_messages badge.
+		if _, err := stateMgr.Touch(toAgentID); err != nil {
+			log.Debug("touch recipient failed", "agent", toAgentID, "err", err)
+		}
+		if update, err := stateMgr.Touch(fromAgentID); err == nil {
+			// Re-publish the sender with the outbound-pulse timestamp, which
+			// recompute does not persist.
+			update.LastSentAt = time.Now().UTC().Format(time.RFC3339)
+			eventBus.PublishStateUpdate(update)
+		}
+	})
+	// Route budget breaches through the bus so the toast names the agent
+	// (agent_name/address) like every other notification type.
+	msg.SetBudgetExceededSink(eventBus.PublishBudgetExceeded)
 	return &Server{
 		configStore: cfgStore,
 		stateStore:  stateStore,
