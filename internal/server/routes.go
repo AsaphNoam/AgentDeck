@@ -63,6 +63,18 @@ func (s *Server) routes() http.Handler {
 	// method-specific "OPTIONS /" does not conflict with "GET /..." patterns.
 	mux.Handle("OPTIONS /", withMiddleware(s.log, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})))
 
+	// In-process MCP messaging server (Phase 5, techspec §2.2 (A)): the go-sdk
+	// streamable HTTP transport. Registered for the explicit methods the
+	// transport uses (POST messages, GET SSE stream, DELETE session teardown) —
+	// a method-agnostic "/mcp" would conflict with "OPTIONS /". Mounted raw (no
+	// API middleware): the transport speaks its own protocol, not the JSON API.
+	if s.messaging != nil {
+		h := s.messaging.Handler()
+		mux.Handle("POST /mcp", h)
+		mux.Handle("GET /mcp", h)
+		mux.Handle("DELETE /mcp", h)
+	}
+
 	// Everything else is the embedded UI with SPA fallback. Registered for GET
 	// only — a method-agnostic "/" would match every request, including non-GET
 	// requests to /api/* routes, and silently serve the SPA (200) instead of
