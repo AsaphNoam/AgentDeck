@@ -128,6 +128,18 @@ func toRefs(agents []LiveAgent) []AgentRef {
 // read=false, delivered_via="pending" unless the caller set it (techspec §3.2,
 // §4.1). Returns the minted message_id.
 func (s *Store) InsertMessage(m Message) (string, error) {
+	id, err := insertMessageTx(s.db, m)
+	if err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
+type messageExecer interface {
+	Exec(query string, args ...any) (sql.Result, error)
+}
+
+func insertMessageTx(exec messageExecer, m Message) (string, error) {
 	if m.CreatedAt.IsZero() {
 		m.CreatedAt = time.Now().UTC()
 	}
@@ -144,7 +156,7 @@ func (s *Store) InsertMessage(m Message) (string, error) {
 			return "", fmt.Errorf("state: read random: %w", err)
 		}
 		id := "m_" + hex.EncodeToString(b[:])
-		_, err := s.db.Exec(`
+		_, err := exec.Exec(`
 INSERT INTO messages(message_id, from_agent, from_address, from_name, to_agent, subject, body, created_at, read, read_at, delivered_via, in_reply_to)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?)`,
 			id, m.FromAgent, m.FromAddress, m.FromName, m.ToAgent, m.Subject, m.Body,
@@ -158,6 +170,36 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?)`,
 		return "", fmt.Errorf("state: insert message: %w", err)
 	}
 	return "", errors.New("state: could not mint unique message_id after 10 tries")
+}
+
+// InsertMessageWithBudget writes one outbound message and increments the
+// sender's turn budget in the same transaction. On breach, the message is not
+// inserted and the budget row is marked breached.
+func (s *Store) InsertMessageWithBudget(m Message, limit int) (string, BudgetStatus, bool, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return "", BudgetStatus{}, false, fmt.Errorf("state: begin message insert budget: %w", err)
+	}
+	defer tx.Rollback()
+
+	budget, breached, err := consumeBudgetTx(tx, m.FromAgent, 0, 1, limit)
+	if err != nil {
+		return "", BudgetStatus{}, false, err
+	}
+	if breached {
+		if err := tx.Commit(); err != nil {
+			return "", BudgetStatus{}, false, fmt.Errorf("state: commit message budget breach: %w", err)
+		}
+		return "", budget, true, nil
+	}
+	id, err := insertMessageTx(tx, m)
+	if err != nil {
+		return "", BudgetStatus{}, false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return "", BudgetStatus{}, false, fmt.Errorf("state: commit message insert budget: %w", err)
+	}
+	return id, budget, false, nil
 }
 
 // isUniqueViolation reports whether err is a SQLite UNIQUE/PK constraint error.
@@ -231,11 +273,29 @@ func (s *Store) MarkRead(ids []string) error {
 	}
 	placeholders, args := inClause(ids)
 	args = append([]any{formatTime(time.Now().UTC())}, args...)
-	q := `UPDATE messages SET read = 1, read_at = ? WHERE message_id IN (` + placeholders + `)`
+	q := `UPDATE messages
+SET read = 1,
+    read_at = ?,
+    delivered_via = CASE WHEN delivered_via = 'pending' THEN 'poll' ELSE delivered_via END
+WHERE message_id IN (` + placeholders + `)`
 	if _, err := s.db.Exec(q, args...); err != nil {
 		return fmt.Errorf("state: mark messages read: %w", err)
 	}
 	return nil
+}
+
+// MarkUnreadDeliveredVia stamps unread pending messages for a recipient with a
+// delivery mechanism ("nudge" today) without marking them read.
+func (s *Store) MarkUnreadDeliveredVia(agentID, via string) (int64, error) {
+	res, err := s.db.Exec(`
+UPDATE messages
+SET delivered_via = ?
+WHERE to_agent = ? AND read = 0 AND delivered_via = 'pending'`, via, agentID)
+	if err != nil {
+		return 0, fmt.Errorf("state: mark messages delivered: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	return n, nil
 }
 
 // DeleteMessages removes the given messages (techspec §3.5).
@@ -259,6 +319,232 @@ func (s *Store) UnreadCount(agentID string) (int, error) {
 		return 0, fmt.Errorf("state: unread count: %w", err)
 	}
 	return n, nil
+}
+
+// ResetTurnBudget starts a new messaging-budget window for an agent turn.
+func (s *Store) ResetTurnBudget(agentID, turnID string) error {
+	_, err := s.db.Exec(`
+INSERT INTO turn_budget(agent_id, turn_id, inbound, outbound, breached)
+VALUES (?, ?, 0, 0, 0)
+ON CONFLICT(agent_id, turn_id) DO UPDATE SET
+    inbound = 0,
+    outbound = 0,
+    breached = 0`, agentID, turnID)
+	if err != nil {
+		return fmt.Errorf("state: reset turn budget: %w", err)
+	}
+	return nil
+}
+
+// BudgetStatus is the current per-turn messaging budget row for an agent.
+type BudgetStatus struct {
+	AgentID   string
+	TurnID    string
+	Inbound   int
+	Outbound  int
+	Breached  bool
+	Remaining int
+}
+
+// ConsumeTurnBudget atomically increments the latest budget row for agentID by
+// inbound/outbound deltas unless that would exceed limit. If no runtime-created
+// row exists yet, it creates an implicit t_000000000000 row so direct MCP calls
+// in tests/manual sessions still have deterministic accounting.
+func (s *Store) ConsumeTurnBudget(agentID string, inboundDelta, outboundDelta, limit int) (BudgetStatus, bool, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return BudgetStatus{}, false, fmt.Errorf("state: begin budget: %w", err)
+	}
+	defer tx.Rollback()
+
+	cur, breached, err := consumeBudgetTx(tx, agentID, inboundDelta, outboundDelta, limit)
+	if err != nil {
+		return BudgetStatus{}, false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return BudgetStatus{}, false, fmt.Errorf("state: commit budget: %w", err)
+	}
+	return cur, breached, nil
+}
+
+func consumeBudgetTx(tx *sql.Tx, agentID string, inboundDelta, outboundDelta, limit int) (BudgetStatus, bool, error) {
+	cur, err := currentBudgetTx(tx, agentID, limit)
+	if err != nil {
+		return BudgetStatus{}, false, err
+	}
+	used := cur.Inbound + cur.Outbound
+	nextUsed := used + inboundDelta + outboundDelta
+	if nextUsed > limit {
+		if _, err := tx.Exec(`UPDATE turn_budget SET breached = 1 WHERE agent_id = ? AND turn_id = ?`, agentID, cur.TurnID); err != nil {
+			return BudgetStatus{}, false, fmt.Errorf("state: mark budget breached: %w", err)
+		}
+		cur.Breached = true
+		cur.Remaining = max(0, limit-used)
+		return cur, true, nil
+	}
+	cur.Inbound += inboundDelta
+	cur.Outbound += outboundDelta
+	cur.Remaining = max(0, limit-nextUsed)
+	if _, err := tx.Exec(`
+UPDATE turn_budget SET inbound = ?, outbound = ?
+WHERE agent_id = ? AND turn_id = ?`, cur.Inbound, cur.Outbound, agentID, cur.TurnID); err != nil {
+		return BudgetStatus{}, false, fmt.Errorf("state: update budget: %w", err)
+	}
+	return cur, false, nil
+}
+
+// CurrentTurnBudget returns the latest budget row for agentID, creating the same
+// implicit row used by ConsumeTurnBudget if none exists yet.
+func (s *Store) CurrentTurnBudget(agentID string, limit int) (BudgetStatus, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return BudgetStatus{}, fmt.Errorf("state: begin budget read: %w", err)
+	}
+	defer tx.Rollback()
+	cur, err := currentBudgetTx(tx, agentID, limit)
+	if err != nil {
+		return BudgetStatus{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return BudgetStatus{}, fmt.Errorf("state: commit budget read: %w", err)
+	}
+	return cur, nil
+}
+
+func currentBudgetTx(tx *sql.Tx, agentID string, limit int) (BudgetStatus, error) {
+	var cur BudgetStatus
+	var breached int
+	err := tx.QueryRow(`
+SELECT agent_id, turn_id, inbound, outbound, breached
+FROM turn_budget
+WHERE agent_id = ?
+ORDER BY rowid DESC
+LIMIT 1`, agentID).Scan(&cur.AgentID, &cur.TurnID, &cur.Inbound, &cur.Outbound, &breached)
+	if errors.Is(err, sql.ErrNoRows) {
+		cur = BudgetStatus{AgentID: agentID, TurnID: "t_000000000000"}
+		if _, err := tx.Exec(`
+INSERT INTO turn_budget(agent_id, turn_id, inbound, outbound, breached)
+VALUES (?, ?, 0, 0, 0)`, cur.AgentID, cur.TurnID); err != nil {
+			return BudgetStatus{}, fmt.Errorf("state: create implicit budget: %w", err)
+		}
+	} else if err != nil {
+		return BudgetStatus{}, fmt.Errorf("state: read budget: %w", err)
+	}
+	cur.Breached = breached != 0
+	cur.Remaining = max(0, limit-cur.Inbound-cur.Outbound)
+	return cur, nil
+}
+
+// TakeMessagesWithBudget returns and optionally marks/deletes messages while
+// incrementing the inbound turn budget in one transaction.
+func (s *Store) TakeMessagesWithBudget(recipientID string, unreadOnly bool, limit, budgetLimit int, markRead, deleteAfter bool) ([]Message, BudgetStatus, bool, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, BudgetStatus{}, false, fmt.Errorf("state: begin message take budget: %w", err)
+	}
+	defer tx.Rollback()
+
+	budget, err := currentBudgetTx(tx, recipientID, budgetLimit)
+	if err != nil {
+		return nil, BudgetStatus{}, false, err
+	}
+	if limit > budget.Remaining {
+		limit = budget.Remaining
+	}
+
+	msgs := []Message{}
+	if limit > 0 {
+		q := `
+SELECT message_id, from_agent, from_address, from_name, to_agent, subject, body, created_at, read, read_at, delivered_via, in_reply_to
+FROM messages
+WHERE to_agent = ?`
+		if unreadOnly {
+			q += ` AND read = 0`
+		}
+		q += ` ORDER BY created_at, message_id LIMIT ?`
+		rows, err := tx.Query(q, recipientID, limit)
+		if err != nil {
+			return nil, BudgetStatus{}, false, fmt.Errorf("state: list messages for budget: %w", err)
+		}
+		for rows.Next() {
+			m, err := scanMessage(rows)
+			if err != nil {
+				rows.Close()
+				return nil, BudgetStatus{}, false, err
+			}
+			msgs = append(msgs, m)
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return nil, BudgetStatus{}, false, fmt.Errorf("state: iterate messages for budget: %w", err)
+		}
+		rows.Close()
+	}
+
+	budget, breached, err := consumeBudgetTx(tx, recipientID, len(msgs), 0, budgetLimit)
+	if err != nil {
+		return nil, BudgetStatus{}, false, err
+	}
+	if !breached && len(msgs) > 0 {
+		ids := make([]string, len(msgs))
+		for i, m := range msgs {
+			ids[i] = m.MessageID
+		}
+		placeholders, args := inClause(ids)
+		if deleteAfter {
+			if _, err := tx.Exec(`DELETE FROM messages WHERE message_id IN (`+placeholders+`)`, args...); err != nil {
+				return nil, BudgetStatus{}, false, fmt.Errorf("state: delete messages with budget: %w", err)
+			}
+		} else if markRead {
+			args = append([]any{formatTime(time.Now().UTC())}, args...)
+			q := `UPDATE messages
+SET read = 1,
+    read_at = ?,
+    delivered_via = CASE WHEN delivered_via = 'pending' THEN 'poll' ELSE delivered_via END
+WHERE message_id IN (` + placeholders + `)`
+			if _, err := tx.Exec(q, args...); err != nil {
+				return nil, BudgetStatus{}, false, fmt.Errorf("state: mark messages read with budget: %w", err)
+			}
+		}
+	}
+	if budget.Remaining == 0 && len(msgs) == 0 {
+		budget, breached, err = consumeBudgetTx(tx, recipientID, 1, 0, budgetLimit)
+		if err != nil {
+			return nil, BudgetStatus{}, false, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, BudgetStatus{}, false, fmt.Errorf("state: commit message take budget: %w", err)
+	}
+	if breached {
+		msgs = nil
+	}
+	return msgs, budget, breached, nil
+}
+
+// DeleteExpiredMessages applies the Phase 5 retention policy. It deletes read
+// messages older than readTTL and any message older than hardTTL.
+func (s *Store) DeleteExpiredMessages(now time.Time, readTTL, hardTTL time.Duration) (readDeleted, hardDeleted int64, err error) {
+	readCutoff := formatTime(now.UTC().Add(-readTTL))
+	hardCutoff := formatTime(now.UTC().Add(-hardTTL))
+	res, err := s.db.Exec(`DELETE FROM messages WHERE read = 1 AND read_at IS NOT NULL AND read_at < ?`, readCutoff)
+	if err != nil {
+		return 0, 0, fmt.Errorf("state: delete read expired messages: %w", err)
+	}
+	readDeleted, _ = res.RowsAffected()
+	res, err = s.db.Exec(`DELETE FROM messages WHERE created_at < ?`, hardCutoff)
+	if err != nil {
+		return readDeleted, 0, fmt.Errorf("state: delete hard expired messages: %w", err)
+	}
+	hardDeleted, _ = res.RowsAffected()
+	return readDeleted, hardDeleted, nil
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 // inClause builds an "?, ?, ..." placeholder string and the matching args slice.

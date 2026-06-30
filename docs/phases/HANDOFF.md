@@ -9,9 +9,9 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 ## Current position
 
 - **Active phase:** 5 — Coordination: MCP messaging, nudger, budgets, notifications
-- **Active subphase:** 5.3 (next) — registration, nudger, turn budget, janitor
+- **Active subphase:** 5.4 (next) — notifications + dashboard message indicators
 - **Spec:** [`tech/phase-5-coordination-techspec.md`](tech/phase-5-coordination-techspec.md) (PRD: [`phase-5-coordination.md`](phase-5-coordination.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** 5.2 @ `main`: `go build ./...`, `go build -tags sqlite_fts5 ./...`, `go test ./...` (both tag modes; incl. new message-store + MCP-tool tests). No UI changes 5.1/5.2.
+- **Last GREEN checkpoint:** 5.3 @ `main`: `go build ./...`, `go build -tags sqlite_fts5 ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`. No UI changes 5.1–5.3.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -39,16 +39,18 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 **Subphase 5.1 ✅ — Go-MCP-SDK handshake spike.** Added `github.com/modelcontextprotocol/go-sdk v1.6.1` (`go` directive `1.22→1.25.0`). `internal/messaging`: in-process `mcp.Server` over the streamable HTTP transport mounted at `POST/GET/DELETE /mcp`; `token→agent_id` session registry; `X-AgentDeck-Token` read per request. HTTP transport round-trip proven; per-CLI live confirmation GATED (see Blocked on human); Task 1 outcome in techspec §2.2.
 
-**Subphase 5.2 ✅ — message store + the three MCP tools.** Migration **v5** (`schema.go`): drops the Phase-0 placeholder `messages` table and recreates it per techspec §4.1 (TEXT `message_id` PK, `from_address`/`from_name`/`subject`/`read`/`delivered_via`/`in_reply_to`, **no agent FK** so mail outlives a stopped agent — §4.3); adds `turn_budget` (§6.1). New `state` messaging API (`messages.go`): `LiveAgents`, `ResolveRecipient` (exact agent_id → role@project → case-insensitive name; `*AmbiguousError`/`ErrRecipientNotFound`), `InsertMessage` (mints `m_`+6hex w/ collision retry, returns id), `ListMessages(recipient, unreadOnly, limit)`, `MarkRead`, `DeleteMessages`, `UnreadCount`. New `Message`/`LiveAgent`/`AgentRef` types. `messaging` tools (`tools.go` + `constants.go`): replaced the `ping` spike with `list_agents`/`send_message`/`check_messages`, identity from `req.Extra.Header[X-AgentDeck-Token]` → `Lookup` (unknown → `session_unknown`); error shapes per §9 (`recipient_not_found`/`ambiguous_recipient`/`invalid_body`/`store_unavailable`); locked §13 constants. **Budget is NOT enforced yet** (deferred to 5.3 per spec): `check_messages` statically caps `limit` at `MessageBudgetPerTurn` and returns a stub `budget_remaining`; `send_message` has a `TODO(5.3)` for the outbound budget check. Tests: state `TestResolveRecipient`(+ambiguous/stopped), `ListMessages` order/limit, round-trip; messaging `TestSendAndCheckRoundTrip`, `TestSendIdentityNotSpoofable` (from=session id; unknown token→session_unknown), `TestSendErrors`; updated Phase-0 state tests (migration count 4→5, cascade test now asserts mail survives a deleted sender) and `server.TestMCPRouteMounted`.
+**Subphase 5.2 ✅ — message store + the three MCP tools.** Migration v5 replaced the Phase-0 placeholder `messages` table and added `turn_budget`; `state` gained `LiveAgents`/`ResolveRecipient`/message CRUD/unread helpers; `messaging` replaced the spike with `list_agents`/`send_message`/`check_messages` using session-token identity and §9 error shapes.
 
-**Subphase 5.3 — next to implement** (registration, nudger, turn budget, janitor; techspec §3.6, §4.3, §5, §6.2–§6.3):
-- [ ] `RegisterMessagingMCP(agent, backendType) (launchArgs []string, cleanup func())` (§3.6): mint per-agent token, `messaging.Server.Register(token,agentID)`, emit per-agent `~/.agentdeck/mcp/{agent_id}.mcp.json` (HTTP entry — `type:"http"`, `url:.../mcp`, header `X-AgentDeck-Token`; stdio fallback per the gated CLI verdict), return CLI args + cleanup (remove file + `Revoke` token). Wire into Phase-1 launch composition (replaces the `launch.go::messagingServer` stub) for `claude-acp` & `codex-acp`.
-- [ ] Chat-runtime `CheckMessages(pid)` (§5.2): replace the Phase-1 stub — inject a system nudge turn ("You have new messages. Call check_messages…") with an idle re-check guard.
-- [ ] Runtime turn-boundary `turn_id` reset (§6.2): on each turn start upsert the `turn_budget` row `{inbound:0,outbound:0,breached:0}`; track current `turn_id` (`t_`+counter) in memory.
-- [ ] Budget breach handling in the handlers (§6.3): read+increment `turn_budget` inside the insert/select tx; `send_message` 16th → `message_budget_exceeded` + `breached=1`; `check_messages` caps to remaining; WARN log + `budget_exceeded` SSE.
-- [ ] Nudger loop (§5): ticker (2s) + insert-driven detection; idle + `UnreadCount≥1` → `Runtime.CheckMessages`; in-flight/cooldown guards (constants already in `messaging/constants.go`); set `delivered_via='nudge'`.
-- [ ] Janitor (§4.3): every 60s delete read>24h and any>7d.
-- **Checkpoint:** `go build ./...` (+ `-tags sqlite_fts5`) + `go test ./...`; F8 send→nudge→process-without-user test + budget-caps-a-loop test (16th send → `message_budget_exceeded`, `breached=1`) + janitor/registration unit tests.
+**Subphase 5.3 ✅ — registration, nudger, turn budget, janitor.** `registerMessagingMCP` now mints per-agent tokens, registers `token→agent_id`, writes per-agent HTTP MCP config files under `~/.agentdeck/mcp/{agent_id}.mcp.json`, wires launch/resume MCP specs, and cleans token+file on stop/start failure/shutdown. Chat runtime `CheckMessages(pid)` injects the nudge turn with idle/in-flight guards; user turns and nudges reset `turn_budget` rows via runtime-owned `t_` counters. `send_message`/`check_messages` now use transactional budget-aware store helpers; 16th outbound send returns `message_budget_exceeded`, check caps to remaining budget, `breached=1` is persisted, WARN logged, and `budget_exceeded` SSE notification emitted. Nudger loop (ticker + insert signal) wakes idle agents and stamps unread rows `delivered_via='nudge'`; `MarkRead` stamps poll reads as `delivered_via='poll'`. Janitor loop deletes read>24h and any>7d. Tests added/updated: budget breach/cap, transactional budget state, poll stamp, retention, registration cleanup, runtime nudge prompt, server nudge pass.
+
+**Subphase 5.4 — next to implement** (notifications + dashboard message indicators; techspec §7–§8):
+- [ ] State-manager extensions: recompute `unread_messages` on message-row change; emit `last_sent_at` outbound pulse on sender `state_update`; edge-trigger `notification` SSE on done/waiting_input/permission_required/budget_exceeded.
+- [ ] Notification settings persistence: extend config or add focused endpoints for `notifications.desktop_enabled` and per-type mute (`done`, `waiting_input`, `permission_required`, `budget_exceeded`).
+- [ ] Optional inbox endpoint: `GET /api/sessions/{id}/messages` (read-only, newest first, no mark-read).
+- [ ] UI notification client: consume SSE `notification`, route backgrounded tab to Web Notifications when permitted, visible tab to in-app toast, honor mute settings.
+- [ ] Settings notifications panel: desktop master switch + per-type mute toggles.
+- [ ] Card indicators: unread mail badge + transient outbound pulse from `state_update`.
+- **Checkpoint:** `go build ./...` + `go test ./...` + `cd ui && npm run build`; include UI tests for mute filtering and backgrounded notification behavior plus Go tests for notification/indicator emission.
 
 ---
 
@@ -77,7 +79,7 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 ## Blocked on human
 
-- **GATED (not blocking 5.2): live two-CLI MCP registration confirmation.** Subphase 5.1 proved the
+- **GATED (not blocking 5.4): live two-CLI MCP registration confirmation.** Subphase 5.1 proved the
   in-process HTTP streamable MCP transport works (round-trips a `ping` via the go-sdk client, both
   directly and through the real dashboard mux). What can't be done without credentials: confirming that
   the **real Claude Code and Codex CLIs** each accept the transport-(A) HTTP MCP entry (vs. needing the
@@ -86,7 +88,7 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
   entry (`type:"http"`, `url:http://127.0.0.1:{port}/mcp`, header `X-AgentDeck-Token`) with each CLI and
   confirm a `ping` tool call round-trips; if a CLI rejects HTTP, note it so 5.3's `RegisterMessagingMCP`
   emits the stdio entry for that backend. This does **not** block 5.2/5.3 — they proceed targeting HTTP
-  with the stdio fallback ready.
+  with the stdio fallback ready. Subphase 5.3 currently emits HTTP MCP entries for both backends pending this verdict.
 
 ## Review findings (from the last review — BLOCKING and ADVISORY)
 
@@ -103,6 +105,8 @@ _(no open findings)_
 
 > Resolved without stopping; the human should still see them. Remove once acknowledged (workflow §3, §5).
 
+- **NEW (5.3): HTTP MCP entries emitted for both `claude-acp` and `codex-acp` while live CLI verdict remains gated.** The spec's Task 1 wants a per-CLI HTTP-vs-stdio decision, but the credentialed live confirmation is still blocked on the human. I chose the already-proven in-process HTTP transport for both backends and left the stdio fallback branch in `registerMessagingMCP` for a future verdict. **To reverse:** change `usesHTTPMessagingMCP(backendType)` for any backend that rejects HTTP and implement/enable the `agentdeck mcp` proxy path.
+- **NEW (5.3): direct MCP calls without a runtime turn use implicit turn `t_000000000000`.** Runtime-owned turns still reset real `t_` counters at user/nudge turn boundaries. The implicit row exists so direct MCP tests/manual calls have deterministic budget accounting instead of bypassing the loop cap or failing before a runtime turn. **To reverse:** make `CurrentTurnBudget`/`ConsumeTurnBudget` return an error when no runtime-created row exists and require tests/manual callers to reset one first.
 - **NEW (5.1): `go` directive bumped `1.22 → 1.25.0`.** `go get github.com/modelcontextprotocol/go-sdk`
   auto-raised the directive to the SDK's minimum (1.25.0); local toolchain is go1.25.5, all builds/tests
   green. Forced, not chosen — the v1.x SDK the spec mandates requires it. **To reverse:** only by dropping
@@ -215,6 +219,7 @@ _(no open findings)_
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-29 — **5.3 green — registration, nudger, turn budget, janitor.** Added per-agent HTTP MCP registration files + token cleanup wired through launch/resume/stop/shutdown; chat `CheckMessages(pid)` now injects a nudge turn and runtime turns reset `turn_budget`. `send_message`/`check_messages` enforce the shared 15-action budget transactionally (`message_budget_exceeded`, persisted `breached=1`, WARN + `budget_exceeded` SSE); nudger wakes idle agents on ticker/insert signal and stamps `delivered_via='nudge'`; poll reads now stamp `delivered_via='poll'`; janitor deletes read>24h and any>7d. Tests cover registration cleanup, runtime/server nudge, budget breach/caps, retention, and poll stamping. Checkpoint green: `go build ./...`, `go build -tags sqlite_fts5 ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
 - 2026-06-29 — **5.2 green — message store + three MCP tools.** Migration v5 replaces the Phase-0 placeholder `messages` table with the §4.1 schema (TEXT `message_id` PK, no agent FK) + adds `turn_budget`. New `state` messaging API (`LiveAgents`, `ResolveRecipient`, `InsertMessage`, `ListMessages`, `MarkRead`, `DeleteMessages`, `UnreadCount`) + `Message`/`LiveAgent`/`AgentRef` types. `messaging` package: `list_agents`/`send_message`/`check_messages` tools replace the `ping` spike, identity from the session token (`req.Extra.Header`→`Lookup`, unknown→`session_unknown`), §9 error shapes, locked §13 constants. Budget enforcement deferred to 5.3 (static cap + TODO). New state + messaging tests; updated Phase-0 state tests (cascade now asserts mail survives a deleted sender) + `server.TestMCPRouteMounted`. Build + full tests green both tag modes.
 - 2026-06-29 — **5.1 green — Go-MCP-SDK handshake spike.** Added `github.com/modelcontextprotocol/go-sdk v1.6.1` (`go` 1.22→1.25.0). New `internal/messaging` package: in-process `mcp.Server` + trivial `ping` tool over the streamable HTTP transport, mounted at `POST/GET/DELETE /mcp`; `token→agent_id` session registry; `X-AgentDeck-Token` header read per request. HTTP transport round-trip proven via `messaging.TestSpikePingRoundTrip` + `server.TestMCPRouteMounted` (go-sdk client through the real dashboard mux). Per-CLI live confirmation gated (Blocked on human). Task 1 outcome recorded in techspec §2.2. Build (both tags) + full tests green.
 - 2026-06-29 — **review fix: bare-form CLI resume respects `--name` — green.** `listInactiveSessions` now takes a `name` arg and filters by it when non-empty, so `agentdeck role@project --name X` only auto-resumes the inactive session actually named X (not any inactive role@project session). New `resume_test.go::TestListInactiveSessionsNameFilter` (no-name → all; named → exact). Build (both tags) + full tests green.

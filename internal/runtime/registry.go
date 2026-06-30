@@ -195,6 +195,27 @@ func (r *Registry) Stop(ctx context.Context, agentID string) error {
 	return rt.Stop(ctx, agentID)
 }
 
+// CheckMessages routes a nudger wake-up by process id. The nudger reads pids
+// from the running registry; this method maps that pid back to the owning agent
+// and runtime.
+func (r *Registry) CheckMessages(ctx context.Context, pid int) error {
+	running, err := r.store.ListRunning()
+	if err != nil {
+		return err
+	}
+	for _, row := range running {
+		if row.PID != pid {
+			continue
+		}
+		rt, err := r.ownerFor(row.AgentID)
+		if err != nil {
+			return err
+		}
+		return rt.CheckMessages(ctx, pid)
+	}
+	return ErrNoHandle
+}
+
 // Permission routes a permission decision to the owning runtime.
 func (r *Registry) Permission(ctx context.Context, agentID, toolCallID, decision string) error {
 	rt, err := r.ownerFor(agentID)

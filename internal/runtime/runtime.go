@@ -15,28 +15,31 @@ import (
 // builds this from agent identity + project + role + backend/model so the Runtime
 // needs no further lookups; a running agent's spec is frozen.
 type LaunchSpec struct {
-	Agent        state.Agent     // stable identity (agent_id, role, project, backend, model, interface)
-	Cwd          string          // resolved absolute working dir (project.cwd, ~-expanded)
-	AddDirs      []string        // project.add_dirs, ~-expanded
-	SystemPrompt string          // composed: context_prompt + role.system_prompt
-	BackendType  string          // "claude-acp" | "codex-acp"
-	ModelID      string          // provider model id, e.g. "claude-sonnet-4-6"
-	Env          []string        // composed env layering (backend then per-model override), "K=V"
-	SkipPerms    bool            // effective skip_permissions after role/global resolution
-	HookToken    string          // per-launch one-time token passed to the agent's hooks
-	MCPServers   []MCPServerSpec // messaging MCP server registration; one entry this phase
+	Agent          state.Agent     // stable identity (agent_id, role, project, backend, model, interface)
+	Cwd            string          // resolved absolute working dir (project.cwd, ~-expanded)
+	AddDirs        []string        // project.add_dirs, ~-expanded
+	SystemPrompt   string          // composed: context_prompt + role.system_prompt
+	BackendType    string          // "claude-acp" | "codex-acp"
+	ModelID        string          // provider model id, e.g. "claude-sonnet-4-6"
+	Env            []string        // composed env layering (backend then per-model override), "K=V"
+	SkipPerms      bool            // effective skip_permissions after role/global resolution
+	HookToken      string          // per-launch one-time token passed to the agent's hooks
+	MCPServers     []MCPServerSpec // messaging MCP server registration; one entry this phase
 	ExtraArgs      []string        // reserved (e.g. extra adapter flags) — empty this phase
 	LastSessionID  string          // prior CLI session id; Resume tries session/load with this
 	LastContextPct float64         // last-known context pct; Resume restores it to the status row
 }
 
-// MCPServerSpec is one stdio MCP server the agent should connect to. This phase
-// carries exactly one: the in-process Go messaging server (techspec §6.4).
+// MCPServerSpec is one MCP server the agent should connect to. Phase 5 prefers
+// the dashboard's in-process HTTP transport, with stdio retained as fallback.
 type MCPServerSpec struct {
-	Name    string   // "agentdeck-messaging"
-	Command string   // path to invoke; re-execs the binary in a hidden mcp-stdio mode
-	Args    []string // includes the hook token / agent_id so the server scopes to this agent
-	Env     []string // "K=V"
+	Name    string            // "agentdeck-messaging"
+	Type    string            // "http" for streamable HTTP; empty/"stdio" for command fallback
+	URL     string            // HTTP transport URL when Type == "http"
+	Headers map[string]string // HTTP headers, including X-AgentDeck-Token
+	Command string            // stdio fallback command
+	Args    []string          // stdio fallback args
+	Env     []string          // "K=V"
 }
 
 // TurnRollup is the per-turn summary the runtime gives to the persistence
@@ -102,8 +105,8 @@ type Runtime interface {
 	// ErrNotImplemented. Signature fixed now for Phase 4.
 	Resume(ctx context.Context, spec LaunchSpec, sessionID string) (*Handle, error)
 
-	// CheckMessages wakes an idle agent to drain its mailbox. STUB this phase:
-	// returns ErrNotImplemented. Signature fixed now for Phase 5.
+	// CheckMessages wakes an idle agent to drain its mailbox. Chat runtimes inject
+	// a nudge turn; terminal returns ErrNotImplemented until Phase 6.
 	CheckMessages(ctx context.Context, pid int) error
 
 	// Permission relays an approve/deny decision back over ACP for a pending
