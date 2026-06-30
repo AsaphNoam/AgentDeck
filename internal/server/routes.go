@@ -44,6 +44,7 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/sessions/{id}/cancel", s.handleCancel)
 	api("POST /api/sessions/{id}/stop", s.handleStop)
 	api("POST /api/sessions/{id}/rename", s.handleRename)
+	api("POST /api/sessions/{id}/identity", s.handleIdentity)
 	api("POST /api/sessions/{id}/permission", s.handlePermission)
 	api("POST /api/sessions/{id}/resume", s.handleResume)
 	api("POST /api/sessions/{id}/switch-runtime", s.handleSwitchRuntime)
@@ -56,6 +57,7 @@ func (s *Server) routes() http.Handler {
 	// coder/websocket handshake manages its own headers, and the CORS wrapper's
 	// OPTIONS short-circuit / header rewriting would interfere with the upgrade.
 	api("GET /api/capabilities", s.handleCapabilities)
+	api("POST /api/groups/{group}/release", s.handleReleaseGroup)
 	mux.Handle("GET /api/sessions/{id}/terminal/ws", http.HandlerFunc(s.handleTerminalWS))
 
 	// Catch-all for any other /api/* path → 404 JSON (more specific GET routes

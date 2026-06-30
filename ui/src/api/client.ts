@@ -1,4 +1,4 @@
-import type { ArchiveResult, Layout, TrackedCommand, TrackedFile, TranscriptEvent } from "./types";
+import type { ArchiveResult, Capabilities, Layout, TrackedCommand, TrackedFile, TranscriptEvent } from "./types";
 
 async function json<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init);
@@ -36,6 +36,33 @@ export function renameAgent(agentId: string, name: string) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
   });
+}
+
+export function updateAgentIdentity(agentId: string, body: { name?: string; group?: string }) {
+  return json<unknown>(`/api/sessions/${agentId}/identity`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export function releaseGroup(group: string) {
+  return json<{ group: string; stopped: Array<{ agent_id: string; ok: boolean; error?: string }> }>(
+    `/api/groups/${encodeURIComponent(group)}/release`,
+    { method: "POST" },
+  );
+}
+
+export function switchRuntime(agentId: string, body: { interface?: string; backend?: string; model?: string }) {
+  return json<{ history_handoff: "native_resume" | "primer" }>(`/api/sessions/${agentId}/switch-runtime`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export function getCapabilities() {
+  return json<Capabilities>("/api/capabilities");
 }
 
 export function stopAgent(agentId: string) {

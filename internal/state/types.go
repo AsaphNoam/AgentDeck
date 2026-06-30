@@ -59,6 +59,8 @@ type AgentState struct {
 	Running   bool   `json:"running"`
 	PID       int    `json:"pid,omitempty"`
 	SessionID string `json:"session_id,omitempty"`
+	TTY       string `json:"tty,omitempty"`
+	Driver    string `json:"driver,omitempty"`
 	StartedAt string `json:"started_at,omitempty"`
 
 	State      string  `json:"state"`

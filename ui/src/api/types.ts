@@ -14,6 +14,8 @@ export interface AgentState {
   pid?: number;
   session_id?: string;
   started_at?: string;
+  tty?: string;
+  driver?: string;
   state: AgentStatus;
   detail: string;
   last_trace?: string;
@@ -80,6 +82,15 @@ export interface TranscriptEvent {
 export interface Layout {
   order: string[];
   density: { perRow: number; gap: number };
+  groups?: Record<string, { collapsed: boolean }>;
+}
+
+export interface Capabilities {
+  terminal: {
+    available: boolean;
+    default_driver: string;
+    drivers: Record<string, boolean | { available: boolean; reason?: string }>;
+  };
 }
 
 export interface ArchiveResult {
