@@ -64,10 +64,16 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 4. Apply optional override fields (Phase 4: only no-override path is exercised).
-	backendID := snap.Backend
-	modelKey := snap.Model
-	iface := snap.Interface
+	// 4. Resolve the identity to resume. backend/model/interface come from the LIVE
+	// identity row (which switch-runtime keeps current), NOT the frozen snapshot:
+	// after a chat→terminal switch the snapshot's interface stays "chat" (no
+	// terminal turn_end refreshes it), but the agents row correctly reads
+	// "terminal" — so resuming from the snapshot would relaunch the wrong runtime.
+	// cwd/system_prompt/last_session_id below still come from the frozen snapshot.
+	// Optional override fields win (Phase 4 exercises only the no-override path).
+	backendID := agent.Backend
+	modelKey := agent.Model
+	iface := agent.Interface
 	if override.Backend != "" {
 		backendID = override.Backend
 	}
@@ -77,8 +83,8 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 	if override.Interface != "" {
 		iface = override.Interface
 	}
-	if iface == "terminal" {
-		writeAPIError(w, apiError(runtime.CodeNotImplemented, "terminal resume not implemented until Phase 6"))
+	if iface != "chat" && iface != "terminal" {
+		writeAPIError(w, apiError(runtime.CodeValidation, "invalid interface: "+iface))
 		return
 	}
 

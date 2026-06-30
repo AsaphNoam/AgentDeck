@@ -121,9 +121,12 @@ func (s *Server) handleSwitchRuntime(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate target backend/model exist before tearing anything down.
-	spec, ae := s.composeSwitchSpec(target, resumeID)
-	if ae != nil {
+	// Validate the target backend/model/session snapshot exist before tearing
+	// anything down — WITHOUT the registration side effects. composeSwitchSpec
+	// (below) writes the per-agent hook settings file and registers a fresh MCP
+	// token, both keyed by the unchanged agent_id; doing that here would let the
+	// old-artifact cleanup (step 2) wipe the target's just-created registration.
+	if ae := s.validateSwitchTarget(target); ae != nil {
 		writeAPIError(w, ae)
 		return
 	}
@@ -135,17 +138,32 @@ func (s *Server) handleSwitchRuntime(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError(runtime.CodeInternal, "stop current runtime: "+err.Error()))
 		return
 	}
+
+	// 2. Clean the OLD runtime's MCP token + hook settings (keyed by agent_id)
+	//    BEFORE composing the target spec. Because the agent_id is unchanged,
+	//    composeSwitchSpec re-registers a fresh MCP token and rewrites the
+	//    per-agent hook settings file under the same id; cleaning afterward would
+	//    revoke the new token and delete the settings file the resume needs (and
+	//    orphan the old MCP token, whose cleanup closure the new register overwrote).
 	s.cleanupMessagingMCP(id)
 	s.cleanupHookSettings(id)
 
-	// 2. Persist the new identity (agent_id UNCHANGED) so the resume composes the
+	// 3. Compose the target launch spec (registers a fresh MCP token + writes the
+	//    per-agent hook settings file for the target identity).
+	spec, ae := s.composeSwitchSpec(target, resumeID)
+	if ae != nil {
+		writeAPIError(w, ae)
+		return
+	}
+
+	// 4. Persist the new identity (agent_id UNCHANGED) so the resume composes the
 	//    new interface/backend/model and the card re-renders its badges.
 	if err := s.stateStore.WriteAgent(target); err != nil {
 		writeAPIError(w, apiError(runtime.CodeInternal, "persist identity: "+err.Error()))
 		return
 	}
 
-	// 3. Resume under the target runtime (registry dispatches by target interface).
+	// 5. Resume under the target runtime (registry dispatches by target interface).
 	if _, err := s.registry.Resume(r.Context(), spec); err != nil {
 		s.rollbackSwitch(r.Context(), w, agent, prev.SessionID, err)
 		return
@@ -195,6 +213,36 @@ func (s *Server) failSwitch(w http.ResponseWriter, agentID, detail string) {
 		}
 	}
 	writeAPIError(w, apiError(runtime.CodeSwitchFailed, detail))
+}
+
+// validateSwitchTarget checks the target identity is launchable — the frozen
+// session snapshot exists and the target backend/model are known — without any
+// registration side effects, so the switch can reject a bad request before it
+// stops the live agent. composeSwitchSpec repeats these lookups (and does the
+// registration) once the old artifacts are cleaned.
+func (s *Server) validateSwitchTarget(target state.Agent) *runtime.APIError {
+	if _, err := s.stateStore.ReadSession(target.AgentID); err != nil {
+		if errors.Is(err, state.ErrNotFound) {
+			return apiError(runtime.CodeValidation, "no persisted session to switch")
+		}
+		return apiError(runtime.CodeInternal, err.Error())
+	}
+	backends, err := s.configStore.ReadBackends()
+	if err != nil {
+		if errors.Is(err, config.ErrNotFound) || errors.Is(err, config.ErrCorrupt) {
+			backends = config.DefaultBackends()
+		} else {
+			return apiError(runtime.CodeInternal, "read backends: "+err.Error())
+		}
+	}
+	be, ok := backends.Backends[target.Backend]
+	if !ok {
+		return apiError(runtime.CodeInvalidField, "unknown backend: "+target.Backend)
+	}
+	if _, ok := be.Models[target.Model]; !ok {
+		return apiError(runtime.CodeInvalidField, "unknown model: "+target.Model)
+	}
+	return nil
 }
 
 // composeSwitchSpec builds the resume LaunchSpec for the target identity from the
