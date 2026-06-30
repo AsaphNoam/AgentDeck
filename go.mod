@@ -11,6 +11,8 @@ require (
 )
 
 require (
+	github.com/coder/websocket v1.8.15 // indirect
+	github.com/creack/pty v1.1.24 // indirect
 	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/segmentio/asm v1.1.3 // indirect

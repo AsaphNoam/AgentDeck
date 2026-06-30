@@ -50,6 +50,13 @@ func (s *Server) routes() http.Handler {
 	api("GET /api/sessions/{id}/commands", s.handleCommands)
 	api("GET /api/sessions/{id}/messages", s.handleMessages)
 
+	// Phase 6 terminal runtime: capability probe (§8.5) and the PTY↔WebSocket
+	// bridge (§3.4). The WS route is registered raw (no API middleware): the
+	// coder/websocket handshake manages its own headers, and the CORS wrapper's
+	// OPTIONS short-circuit / header rewriting would interfere with the upgrade.
+	api("GET /api/capabilities", s.handleCapabilities)
+	mux.Handle("GET /api/sessions/{id}/terminal/ws", http.HandlerFunc(s.handleTerminalWS))
+
 	// Catch-all for any other /api/* path → 404 JSON (more specific GET routes
 	// above win via the 1.22 mux precedence rules). Registered GET-only on
 	// purpose: a non-GET request to a known route then matches no pattern's

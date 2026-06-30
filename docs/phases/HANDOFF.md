@@ -9,9 +9,9 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 ## Current position
 
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
-- **Active subphase:** 6.3 (next) — terminal runtime (xterm/PTY default + tmux)
+- **Active subphase:** 6.4 (next) — switch-runtime: same-backend (interface/model swap)
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** 6.2 @ `main`: `go build ./...`, `go build -tags sqlite_fts5 ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...` (6.1/6.2 are Go-only — no `ui/` change).
+- **Last GREEN checkpoint:** 6.3 @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...` (6.1–6.3 are Go-only — no `ui/` change).
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -51,14 +51,23 @@ settings file; `BackendAdapter.HookLaunchArgs` (claude `--settings <path>`, code
 passthrough is gated behind `AGENTDECK_HOOK_REGISTRATION=1` (default off) so real launches aren't regressed. Details
 in changelog.
 
-**Subphase 6.3 — next to implement** (terminal runtime: xterm/PTY default + tmux; techspec §3, §8.5, task 5):
-- [ ] `internal/runtime/terminal` implementing `Runtime` (`Start/SendPrompt/Cancel/Stop/Resume/CheckMessages`), registered under `interface == "terminal"` (replaces the `notImplementedRuntime` stub).
-- [ ] `TerminalDriver` seam (`StartTab`, `WriteText`, `ReadTTY`, `CloseTab`, `RevealTab`); xterm.js/PTY driver (`github.com/creack/pty`) + tmux driver.
-- [ ] PTY↔WebSocket bridge at `/api/sessions/{id}/terminal/ws` (keystrokes → PTY master; output → frames; `{cols,rows}` → `pty.Setsize`).
-- [ ] `terminal.Capabilities()` + `GET /api/capabilities` (xterm always available, tmux if on PATH, iterm2 omitted off-darwin); `tty`/`driver`/`driver_ids` written to the running row.
-- [ ] Status flows from hooks only (the 6.2 scripts already POST when `AGENTDECK_INTERFACE=terminal`); runtime sets only the initial idle (race-guarded) + a terminal done on Stop.
-- **Checkpoint:** `go build ./...` + `go test ./...`; PTY-bridge unit tests (keystroke→master write, output→frame, resize→`Setsize`); `GET /api/capabilities` returns `xterm:true`, `default_driver:"xterm"`; a terminal agent launches, records `tty`, idle→busy→idle via hook POSTs.
-- **Resume note:** hooks POST terminal status (6.2) but `interface=="terminal"` still returns "not implemented". Note: the running-row schema already has `tty`; `driver`/`driver_ids` columns do NOT exist yet — add a state migration or store them in an existing column. Begin with the `TerminalDriver` interface, then the PTY driver + WS bridge, then capabilities.
+**Subphase 6.3 ✅ — terminal runtime (xterm/PTY default + tmux).** New `internal/runtime/terminal`: `Runtime`
+(`Start/SendPrompt/Cancel/Stop/Resume/CheckMessages/Permission/Subscribe/Transcript`) behind the `TerminalDriver`
+seam (`StartTab/WriteText/ReadTTY/CloseTab/RevealTab`); xterm/PTY driver (`creack/pty`, Setsid+Setctty, pgid signal)
++ tmux driver (new-session/send-keys/display-message). PTY↔WS bridge at `GET /api/sessions/{id}/terminal/ws`
+(`coder/websocket`; binary frames↔master, JSON `{cols,rows}`→`pty.Setsize`). `terminal.Probe()` + `GET
+/api/capabilities`. Running row gained `driver`/`driver_ids` (state migration v6). Registry gets the real terminal
+runtime via `SetTerminalRuntime` (subpackage→avoids import cycle); status flows from hooks only (runtime writes the
+race-guarded initial idle + a `done` on Stop). Details in changelog + Autonomous decisions.
+
+**Subphase 6.4 — next to implement** (switch-runtime same-backend: interface/model swap; techspec §5.1–5.2, §5.4, §8.1, task 7 partial):
+- [ ] `POST /api/sessions/{id}/switch-runtime {interface?, backend?, model?}` (≥1 must differ from current, else `400 no_change`).
+- [ ] Per-agent in-memory **switch lock** (mutex keyed by `agent_id`) serializing switch/stop/prompt; concurrent → `409 switch_in_progress`.
+- [ ] Core algorithm: validate target (driver availability §3.5, backend/model exist) → flush/checkpoint transcript → `Cancel` + wait `turn_end`/timeout → `oldRuntime.Stop` → persist new identity fields (agent_id UNCHANGED) → `resolveResumeId` (same-backend native id via the adapter; cross-backend returns "" + a TODO guard, NO primer yet — that's 6.5) → `newRuntime.Resume`.
+- [ ] chat↔terminal interface swap (the terminal runtime + registry dispatch already exist).
+- [ ] Rollback on `Resume` failure after `Stop`: re-launch previous interface/backend/model, restore identity row, return `500 switch_failed_rolled_back`; if rollback also fails → identity at target, status `error`, `500 switch_failed`.
+- **Checkpoint:** `go build ./...` + `go test ./...` (both tag modes); same-backend model-swap integration test (same `agent_id`, prior transcript intact, new `session_id`, turn continues); chat↔terminal swap test; rollback test.
+- **Resume note:** terminal + chat runtimes + adapters all exist green; no switch endpoint yet. The adapter already exposes `ResolveResumeID(prev, sameBackend)` (same-backend→prev id; cross-backend→"") and `CanSwitchModelOnResume`. Identity edit needs a `state` writer for interface/backend/model on the agents row (verify one exists or add it). Begin with the lock + endpoint + core algorithm + native resolveResumeId; leave cross-backend returning empty without a primer (6.5).
 
 ---
 
@@ -119,6 +128,35 @@ _(no open findings)_
 ## Autonomous decisions (please review)
 
 > Resolved without stopping; the human should still see them. Remove once acknowledged (workflow §3, §5).
+
+- **NEW (6.3): terminal runtime registered via `Registry.SetTerminalRuntime` (setter), not constructed in `NewRegistry`.**
+  The terminal runtime lives in `internal/runtime/terminal`, which imports `internal/runtime` for the `Runtime`
+  interface + `Event`/`LaunchSpec`/`Handle`/`Hub` — so `runtime.NewRegistry` can't construct it without an import
+  cycle. The server (which imports both) builds it and calls `registry.SetTerminalRuntime(term)`, which swaps out the
+  `notImplementedRuntime` stub and wires `onExit`/`StopAll` via interface assertions (`exitNotifier`/`stopAller`). The
+  spec named the package `internal/runtime/terminal` (§3), so I kept the subpackage and broke the cycle with the setter
+  rather than moving the runtime into package `runtime`. **To reverse:** move the terminal runtime into package
+  `runtime` and construct it directly in `NewRegistry` (drops the setter, no import cycle but a fatter package).
+- **NEW (6.3, GATED): terminal runtime launches the *interactive* CLI via a hardcoded `interactiveBinary` map +
+  `--resume <id>`, both unverified against a live CLI.** Unlike chat (which spawns the ACP adapter `claude-code-acp`),
+  terminal runs the real CLI under a PTY (per the 6.2 decision). The backend adapter only models the *ACP* binary, so
+  the terminal runtime maps `claude-acp→"claude"`, `codex-acp→"codex"` and uses claude's `--resume <id>` resume form —
+  none confirmed against a credentialed CLI (same gate class as the Phase 1 real-CLI / Codex acceptances). Tests use
+  `SetCommand("cat")` to avoid needing a real CLI. **To reverse/fix:** add an `InteractiveBinary()`/resume-args method to
+  `BackendAdapter` and resolve from there once the live CLI surfaces are known. Codex's resume is `CODEX_HOME`-based, not
+  `--resume` — refine when verified.
+- **NEW (6.3): two new deps — `github.com/creack/pty` (PTY) + `github.com/coder/websocket` (WS bridge).** Both pure-Go,
+  no transitive C. creack/pty backs the xterm driver; coder/websocket backs `/api/sessions/{id}/terminal/ws`
+  (accepted with `InsecureSkipVerify` since the server is loopback-only, so the same-machine UI origin is trusted). **To
+  reverse:** only by dropping the terminal PTY/WS feature.
+- **NEW (6.3): `running.driver_ids` is a JSON-object TEXT column (migration v6), `RunningEntry.DriverIDs map[string]string`.**
+  Added alongside `driver TEXT`. Chat agents write empty (`""`/`{}`→nil map, omitted from API JSON). The manager's hook
+  "running"/SessionStart paths don't touch the driver columns (ON CONFLICT preserves them). **To reverse:** none sensible —
+  6.3 needs it; existing local DBs auto-migrate (no real data lost).
+- **NEW (6.3): terminal `Permission` returns `ErrNotImplemented`; `Subscribe` returns an empty hub; `Transcript` returns nil.**
+  Terminal has no ACP permission-relay channel (an approval surfaces as `waiting_input` via hooks and the user answers in
+  the terminal); terminal *content* flows over the PTY WebSocket, not as normalized `Event`s, so the hub stays empty until
+  Stop closes it. **To reverse:** if a terminal driver ever exposes a structured event stream, populate the hub from it.
 
 - **NEW (review fix, supersedes the 6.2 env-flag gate): CLI hook-registration `--settings` passthrough is now gated
   by INTERFACE, not by `AGENTDECK_HOOK_REGISTRATION`.** The launch composer always injects the `AGENTDECK_*` env and
@@ -268,6 +306,20 @@ _(no open findings)_
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-29 — **6.3 green — terminal runtime (xterm/PTY default + tmux).** New `internal/runtime/terminal` package
+  implementing `runtime.Runtime` behind a `TerminalDriver` seam (`StartTab/WriteText/ReadTTY/CloseTab/RevealTab`):
+  xterm/PTY driver (`creack/pty`; opens a PTY, child as session leader via Setsid+Setctty so pid==pgid, records the slave
+  tty, reaps via one Wait closing an `exited` chan) + tmux driver (`new-session -d`/`send-keys`/`display-message`/
+  `kill-session`). PTY↔WebSocket bridge at `GET /api/sessions/{id}/terminal/ws` (`coder/websocket`): binary frames↔PTY
+  master, JSON `{cols,rows}` text frames→`pty.Setsize`; pump logic unit-tested against fakes. `terminal.Probe()` +
+  `GET /api/capabilities` (xterm always available + default; tmux if on PATH; iterm2 reported unavailable w/ reason until
+  6.7). State migration v6 adds `running.driver`/`driver_ids`; `RunningEntry` carries them. Registry swaps the terminal
+  stub for the real runtime via `SetTerminalRuntime` (subpackage→avoids import cycle; wires onExit/StopAll). Status flows
+  from hooks only — the runtime writes just the race-guarded initial idle (§3.1 step 7) and a `done` on Stop; Cancel
+  SIGINTs the pgid, Stop SIGTERM→grace→SIGKILL then CloseTab + clears the running row. Tests: bridge pumps (keystroke→
+  master, output→frame, resize→Setsize), capabilities (endpoint + probe), terminal launch records tty/driver + idle→busy
+  →idle via `Manager.ApplyHook`, WS route 404s unknown agent. Green both tag modes (Go-only; no `ui/` change). New deps:
+  `creack/pty`, `coder/websocket`. Interactive-CLI binary map + `--resume` are GATED (see Autonomous decisions).
 - 2026-06-29 — **review fix: hook registration enabled by default for terminal + per-agent settings cleanup — green.**
   (1) BLOCKING: `composeHookRegistration` no longer disables registration in the default path — it now gates by
   *interface*: terminal agents get the `--settings` launch args by default (the terminal runtime runs the real CLI
