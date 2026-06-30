@@ -505,37 +505,21 @@ body {
   background: #0f172a;
   border-radius: 8px;
   color: #dbeafe;
-  display: grid;
-  grid-template-rows: 1fr auto;
   height: 100%;
   min-height: 320px;
-}
-
-.terminal-panel pre {
-  margin: 0;
-  overflow: auto;
-  padding: 12px;
-  white-space: pre-wrap;
-}
-
-.terminal-input {
-  border-top: 1px solid #334155;
-  display: grid;
-  gap: 8px;
-  grid-template-columns: 1fr auto;
+  overflow: hidden;
   padding: 8px;
 }
 
-.terminal-input input,
-.terminal-input button {
-  border: 1px solid #475569;
-  border-radius: 6px;
-  padding: 8px 10px;
+.terminal-xterm {
+  height: 100%;
+  width: 100%;
 }
 
-.terminal-input input {
-  background: #111827;
-  color: #f8fafc;
+/* xterm renders its own background; let the panel show through the gutters. */
+.terminal-xterm .xterm,
+.terminal-xterm .xterm-viewport {
+  background: transparent !important;
 }
 
 /* archive page */
