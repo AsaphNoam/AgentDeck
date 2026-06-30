@@ -54,6 +54,12 @@ type Server struct {
 	hookTokens  map[string]string // agent_id -> per-launch hook token (Phase 2 persists these)
 	mcpCleanups map[string]func()
 
+	// switchMu guards switching: the set of agents with an in-flight
+	// switch-runtime (techspec §5.4 per-agent switch lock). A concurrent switch
+	// for the same agent → 409 switch_in_progress.
+	switchMu  sync.Mutex
+	switching map[string]bool
+
 	// credCheck is the credential probe function; defaults to credcheck.Check.
 	// Tests inject a stub so real network/CLI calls are avoided.
 	credCheck func(ctx context.Context, bk config.Backend, model config.Model, mergedEnv map[string]string) credcheck.CredResult
@@ -128,6 +134,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		log:         log,
 		hookTokens:  map[string]string{},
 		mcpCleanups: map[string]func(){},
+		switching:   map[string]bool{},
 		credCheck:   credcheck.Check,
 	}
 }

@@ -46,6 +46,7 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/sessions/{id}/rename", s.handleRename)
 	api("POST /api/sessions/{id}/permission", s.handlePermission)
 	api("POST /api/sessions/{id}/resume", s.handleResume)
+	api("POST /api/sessions/{id}/switch-runtime", s.handleSwitchRuntime)
 	api("GET /api/sessions/{id}/files", s.handleFiles)
 	api("GET /api/sessions/{id}/commands", s.handleCommands)
 	api("GET /api/sessions/{id}/messages", s.handleMessages)
