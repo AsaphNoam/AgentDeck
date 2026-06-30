@@ -118,4 +118,39 @@ CREATE TABLE IF NOT EXISTS tracked_commands (
 CREATE INDEX IF NOT EXISTS idx_commands_agent_seq ON tracked_commands(agent_id, seq DESC);
 `,
 	},
+	{
+		// Phase 5 messaging (techspec §4.1, §6.1). Replaces the Phase-0
+		// placeholder messages table (different shape + TEXT message_id PK, and
+		// no agent FK so a stopped agent's mail survives until the janitor — §4.3).
+		version: 5,
+		sql: `
+DROP TABLE IF EXISTS messages;
+
+CREATE TABLE messages (
+  message_id     TEXT PRIMARY KEY,
+  from_agent     TEXT NOT NULL,
+  from_address   TEXT NOT NULL,
+  from_name      TEXT NOT NULL,
+  to_agent       TEXT NOT NULL,
+  subject        TEXT NOT NULL DEFAULT '',
+  body           TEXT NOT NULL,
+  created_at     TEXT NOT NULL,
+  read           INTEGER NOT NULL DEFAULT 0,
+  read_at        TEXT,
+  delivered_via  TEXT NOT NULL DEFAULT 'pending',
+  in_reply_to    TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_messages_to_unread  ON messages(to_agent, read);
+CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
+
+CREATE TABLE IF NOT EXISTS turn_budget (
+  agent_id  TEXT NOT NULL,
+  turn_id   TEXT NOT NULL,
+  inbound   INTEGER NOT NULL DEFAULT 0,
+  outbound  INTEGER NOT NULL DEFAULT 0,
+  breached  INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (agent_id, turn_id)
+);
+`,
+	},
 }

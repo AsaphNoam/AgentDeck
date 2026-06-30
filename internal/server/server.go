@@ -43,8 +43,8 @@ type Server struct {
 	cfg         config.Config
 	log         *slog.Logger
 
-	indexer    *persistindex.Indexer
-	messaging  *messaging.Server
+	indexer   *persistindex.Indexer
+	messaging *messaging.Server
 
 	hookMu     sync.Mutex
 	hookTokens map[string]string // agent_id -> per-launch hook token (Phase 2 persists these)

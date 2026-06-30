@@ -9,9 +9,9 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 ## Current position
 
 - **Active phase:** 5 — Coordination: MCP messaging, nudger, budgets, notifications
-- **Active subphase:** 5.2 (next) — message store + the three MCP tools
+- **Active subphase:** 5.3 (next) — registration, nudger, turn budget, janitor
 - **Spec:** [`tech/phase-5-coordination-techspec.md`](tech/phase-5-coordination-techspec.md) (PRD: [`phase-5-coordination.md`](phase-5-coordination.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** 5.1 @ `main`: `go build ./...`, `go build -tags sqlite_fts5 ./...`, `go test ./...` (incl. new MCP spike round-trips). No UI changes this subphase.
+- **Last GREEN checkpoint:** 5.2 @ `main`: `go build ./...`, `go build -tags sqlite_fts5 ./...`, `go test ./...` (both tag modes; incl. new message-store + MCP-tool tests). No UI changes 5.1/5.2.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -37,15 +37,18 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 **Phases 0–4 complete ✅** (all subphases green; details in git history & Phase status above).
 
-**Subphase 5.1 ✅ — Go-MCP-SDK handshake spike.** Added `github.com/modelcontextprotocol/go-sdk v1.6.1` (`go` directive bumped `1.22→1.25.0`). New `internal/messaging` package: one `mcp.Server` with a trivial `ping` echo tool, exposed via `mcp.NewStreamableHTTPHandler`, mounted on the dashboard listener at `POST/GET/DELETE /mcp` (`routes.go`); `token→agent_id` session registry (`Register`/`Revoke`/`Lookup`); the HTTP handler reads `X-AgentDeck-Token` per request. `Server` carries a `*messaging.Server`, constructed in `New`. Round-trip proven in-process two ways: `messaging.TestSpikePingRoundTrip` (direct) and `server.TestMCPRouteMounted` (through the real mux), both via a go-sdk `StreamableClientTransport` carrying the token header. Transport (A)/HTTP confirmed working; the per-CLI HTTP-vs-stdio confirmation against live Claude Code/Codex is GATED (see Blocked on human). Task 1 outcome recorded in techspec §2.2.
+**Subphase 5.1 ✅ — Go-MCP-SDK handshake spike.** Added `github.com/modelcontextprotocol/go-sdk v1.6.1` (`go` directive `1.22→1.25.0`). `internal/messaging`: in-process `mcp.Server` over the streamable HTTP transport mounted at `POST/GET/DELETE /mcp`; `token→agent_id` session registry; `X-AgentDeck-Token` read per request. HTTP transport round-trip proven; per-CLI live confirmation GATED (see Blocked on human); Task 1 outcome in techspec §2.2.
 
-**Subphase 5.2 — next to implement** (message store + the three MCP tools; techspec §3.2–§3.5, §4.1, §6.1):
-- [ ] Add `messages` + `turn_budget` tables/indexes to the `state.db` migration (§4.1, §6.1).
-- [ ] `Store` messaging methods (§3.2): `LiveAgents`, `InsertMessage`, `ListMessages`, `MarkRead`, `DeleteMessages`, `UnreadCount`, `ResolveRecipient`.
-- [ ] Replace the spike `ping` tool with the three real typed handlers: `list_agents` (§3.3), `send_message` (§3.4), `check_messages` (§3.5), each closing over `*Store`, identity from the session token (resolve via `messaging.Server.Lookup`; unknown → `session_unknown`).
-- [ ] `to`-resolution (agent_id / role@project / name / ambiguous / not-found) + error shapes (§9). Budget is *read* here; turn-boundary enforcement lands in 5.3.
-- [ ] Unit tests: `to`-resolution cases + session identity (`from` always = session agent_id; unknown token → `session_unknown`).
-- **Checkpoint:** `go build ./...` (+ `-tags sqlite_fts5`) + `go test ./...` green.
+**Subphase 5.2 ✅ — message store + the three MCP tools.** Migration **v5** (`schema.go`): drops the Phase-0 placeholder `messages` table and recreates it per techspec §4.1 (TEXT `message_id` PK, `from_address`/`from_name`/`subject`/`read`/`delivered_via`/`in_reply_to`, **no agent FK** so mail outlives a stopped agent — §4.3); adds `turn_budget` (§6.1). New `state` messaging API (`messages.go`): `LiveAgents`, `ResolveRecipient` (exact agent_id → role@project → case-insensitive name; `*AmbiguousError`/`ErrRecipientNotFound`), `InsertMessage` (mints `m_`+6hex w/ collision retry, returns id), `ListMessages(recipient, unreadOnly, limit)`, `MarkRead`, `DeleteMessages`, `UnreadCount`. New `Message`/`LiveAgent`/`AgentRef` types. `messaging` tools (`tools.go` + `constants.go`): replaced the `ping` spike with `list_agents`/`send_message`/`check_messages`, identity from `req.Extra.Header[X-AgentDeck-Token]` → `Lookup` (unknown → `session_unknown`); error shapes per §9 (`recipient_not_found`/`ambiguous_recipient`/`invalid_body`/`store_unavailable`); locked §13 constants. **Budget is NOT enforced yet** (deferred to 5.3 per spec): `check_messages` statically caps `limit` at `MessageBudgetPerTurn` and returns a stub `budget_remaining`; `send_message` has a `TODO(5.3)` for the outbound budget check. Tests: state `TestResolveRecipient`(+ambiguous/stopped), `ListMessages` order/limit, round-trip; messaging `TestSendAndCheckRoundTrip`, `TestSendIdentityNotSpoofable` (from=session id; unknown token→session_unknown), `TestSendErrors`; updated Phase-0 state tests (migration count 4→5, cascade test now asserts mail survives a deleted sender) and `server.TestMCPRouteMounted`.
+
+**Subphase 5.3 — next to implement** (registration, nudger, turn budget, janitor; techspec §3.6, §4.3, §5, §6.2–§6.3):
+- [ ] `RegisterMessagingMCP(agent, backendType) (launchArgs []string, cleanup func())` (§3.6): mint per-agent token, `messaging.Server.Register(token,agentID)`, emit per-agent `~/.agentdeck/mcp/{agent_id}.mcp.json` (HTTP entry — `type:"http"`, `url:.../mcp`, header `X-AgentDeck-Token`; stdio fallback per the gated CLI verdict), return CLI args + cleanup (remove file + `Revoke` token). Wire into Phase-1 launch composition (replaces the `launch.go::messagingServer` stub) for `claude-acp` & `codex-acp`.
+- [ ] Chat-runtime `CheckMessages(pid)` (§5.2): replace the Phase-1 stub — inject a system nudge turn ("You have new messages. Call check_messages…") with an idle re-check guard.
+- [ ] Runtime turn-boundary `turn_id` reset (§6.2): on each turn start upsert the `turn_budget` row `{inbound:0,outbound:0,breached:0}`; track current `turn_id` (`t_`+counter) in memory.
+- [ ] Budget breach handling in the handlers (§6.3): read+increment `turn_budget` inside the insert/select tx; `send_message` 16th → `message_budget_exceeded` + `breached=1`; `check_messages` caps to remaining; WARN log + `budget_exceeded` SSE.
+- [ ] Nudger loop (§5): ticker (2s) + insert-driven detection; idle + `UnreadCount≥1` → `Runtime.CheckMessages`; in-flight/cooldown guards (constants already in `messaging/constants.go`); set `delivered_via='nudge'`.
+- [ ] Janitor (§4.3): every 60s delete read>24h and any>7d.
+- **Checkpoint:** `go build ./...` (+ `-tags sqlite_fts5`) + `go test ./...`; F8 send→nudge→process-without-user test + budget-caps-a-loop test (16th send → `message_budget_exceeded`, `breached=1`) + janitor/registration unit tests.
 
 ---
 
@@ -110,6 +113,23 @@ _(no open findings)_
   existing `OPTIONS /` CORS route ("matches more methods but more specific path"). I registered the three
   methods the streamable transport actually uses. **To reverse/extend:** if a future transport needs more
   verbs on `/mcp`, add them explicitly (don't go method-agnostic while `OPTIONS /` exists).
+- **NEW (5.2): Phase-0 placeholder `messages` table + its CRUD were REPLACED, not extended.** Migration v5
+  drops+recreates `messages` with the §4.1 shape (TEXT `message_id` PK vs the old INTEGER autoincrement) and
+  **removes the agent FK / `ON DELETE CASCADE`** (mail must outlive a stopped/deleted agent until the janitor —
+  §4.3). The old `state.Message` type and `WriteMessage`/`ReadMessage`/`DeleteMessage`/`ListMessages(to)` are
+  gone, replaced by the §3.2 API. The spec contradicted shipped Phase-0 code here; I treated the Phase-0 table
+  as the placeholder it was. **Test impact (flagged):** `TestDeleteAgentCascades` now asserts a message
+  *survives* its deleted sender (was: cascaded away); migration-count asserts 5 not 4. **To reverse:** none
+  sensible — Phase 5 needs this schema. Existing local DBs auto-migrate (the placeholder table held no real data).
+- **NEW (5.2): `InsertMessage` returns `(string, error)`, not the spec's `error`.** §3.2 lists
+  `InsertMessage(m Message) error`, but §4.1 also requires the server to mint `message_id` with collision-retry.
+  I put that minting in `InsertMessage` and return the id (the `send_message` handler needs it for its response).
+  **To reverse:** move id-minting into the handler and restore the `error`-only signature.
+- **NEW (5.2): tool results are JSON-in-TextContent with `IsError`, `Out`=`any` (no output schema).** The spec's
+  success and error payloads have different shapes; rather than fight the typed-output inference I marshal each
+  payload to a single text content and set `IsError` on errors (matching §3.3–§3.5 "content[0].text = JSON"). The
+  go-sdk still validates *input* schemas strictly (extra args are rejected before the handler — relevant when
+  testing). **To reverse:** define typed `Out` structs per tool and use structured content.
 - **NEW (5.1): spike kept, not throwaway; `messaging.New` already takes `*state.Store`.** The spec allows
   throwaway-or-keep; I built `internal/messaging` as the keep-able foundation 5.2 extends (the `ping` tool
   is the only throwaway part — 5.2 replaces it with the three real tools). `New(store, log)` takes the
@@ -195,6 +215,7 @@ _(no open findings)_
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-29 — **5.2 green — message store + three MCP tools.** Migration v5 replaces the Phase-0 placeholder `messages` table with the §4.1 schema (TEXT `message_id` PK, no agent FK) + adds `turn_budget`. New `state` messaging API (`LiveAgents`, `ResolveRecipient`, `InsertMessage`, `ListMessages`, `MarkRead`, `DeleteMessages`, `UnreadCount`) + `Message`/`LiveAgent`/`AgentRef` types. `messaging` package: `list_agents`/`send_message`/`check_messages` tools replace the `ping` spike, identity from the session token (`req.Extra.Header`→`Lookup`, unknown→`session_unknown`), §9 error shapes, locked §13 constants. Budget enforcement deferred to 5.3 (static cap + TODO). New state + messaging tests; updated Phase-0 state tests (cascade now asserts mail survives a deleted sender) + `server.TestMCPRouteMounted`. Build + full tests green both tag modes.
 - 2026-06-29 — **5.1 green — Go-MCP-SDK handshake spike.** Added `github.com/modelcontextprotocol/go-sdk v1.6.1` (`go` 1.22→1.25.0). New `internal/messaging` package: in-process `mcp.Server` + trivial `ping` tool over the streamable HTTP transport, mounted at `POST/GET/DELETE /mcp`; `token→agent_id` session registry; `X-AgentDeck-Token` header read per request. HTTP transport round-trip proven via `messaging.TestSpikePingRoundTrip` + `server.TestMCPRouteMounted` (go-sdk client through the real dashboard mux). Per-CLI live confirmation gated (Blocked on human). Task 1 outcome recorded in techspec §2.2. Build (both tags) + full tests green.
 - 2026-06-29 — **review fix: bare-form CLI resume respects `--name` — green.** `listInactiveSessions` now takes a `name` arg and filters by it when non-empty, so `agentdeck role@project --name X` only auto-resumes the inactive session actually named X (not any inactive role@project session). New `resume_test.go::TestListInactiveSessionsNameFilter` (no-name → all; named → exact). Build (both tags) + full tests green.
 - 2026-06-29 — **review fix: 4 Phase 2/3 UI advisories — green (53/53 UI, embedded dist refreshed).** (1) `transcriptStore` gained `foldTranscript`, used by `setTranscript`, so a REST refetch/archive replay folds `permission_resolved` into its `permission_request` (was left visually unresolved); regression test added. (2) `useDeleteRole`/`useDeleteProject` now throw the structured `{status, body}` error (shared `httpError` helper) so the editors' 409 `?force=true` retry actually fires; `useDeleteRole` rejection test. (3) `NewAgentModal` now reads `/api/config` and preselects `default_role`/`default_project` (falls back to first entry only when absent); preselect test. (4) Launch failures now surface the server's `error.message` (e.g. nonexistent project cwd) instead of opaque "HTTP 502"; test added — partially addresses the seeded-`my-app`-cwd advisory (see Autonomous decisions).

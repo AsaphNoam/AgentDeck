@@ -91,12 +91,42 @@ type HookPayload struct {
 	Timestamp  string `json:"timestamp,omitempty"` // RFC3339; fallback if TS is absent
 }
 
-// Message is one agent-to-agent mailbox entry.
+// Message is one agent-to-agent mailbox entry (Phase 5 techspec §4.1). The
+// dashboard server is the sole writer. from_agent is always the sender's
+// session-bound agent_id (never a spoofable argument).
 type Message struct {
-	ID        int64      `json:"id"`
-	FromAgent string     `json:"from_agent"`
-	ToAgent   string     `json:"to_agent"`
-	Body      string     `json:"body"`
-	CreatedAt time.Time  `json:"created_at"`
-	ReadAt    *time.Time `json:"read_at,omitempty"`
+	MessageID    string     `json:"message_id"`
+	FromAgent    string     `json:"from_agent"`
+	FromAddress  string     `json:"from_address"`
+	FromName     string     `json:"from_name"`
+	ToAgent      string     `json:"to_agent"`
+	Subject      string     `json:"subject"`
+	Body         string     `json:"body"`
+	CreatedAt    time.Time  `json:"created_at"`
+	Read         bool       `json:"read"`
+	ReadAt       *time.Time `json:"read_at,omitempty"`
+	DeliveredVia string     `json:"delivered_via"`
+	InReplyTo    string     `json:"in_reply_to,omitempty"`
+}
+
+// LiveAgent is a currently-running agent (a row in the running registry) joined
+// with identity and latest status — the unit list_agents returns and
+// ResolveRecipient matches against (techspec §3.2, §3.3).
+type LiveAgent struct {
+	AgentID    string  `json:"agent_id"`
+	Name       string  `json:"name"`
+	Role       string  `json:"role"`
+	Project    string  `json:"project"`
+	Address    string  `json:"address"` // canonical "role@project"
+	State      string  `json:"state"`   // latest status state, or "unknown"
+	Detail     string  `json:"detail"`
+	ContextPct float64 `json:"context_pct"`
+}
+
+// AgentRef is a compact reference returned in ambiguous-recipient errors so the
+// sender can re-address by agent_id (techspec §9).
+type AgentRef struct {
+	AgentID string `json:"agent_id"`
+	Name    string `json:"name"`
+	Address string `json:"address"`
 }
