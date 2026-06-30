@@ -30,6 +30,20 @@ func TestForKnownAndUnknown(t *testing.T) {
 	}
 }
 
+func TestHookLaunchArgs(t *testing.T) {
+	claude, _ := For("claude-acp")
+	if got := claude.HookLaunchArgs("/h/agents/a.json"); len(got) != 2 || got[0] != "--settings" || got[1] != "/h/agents/a.json" {
+		t.Fatalf("claude HookLaunchArgs = %v, want [--settings /h/agents/a.json]", got)
+	}
+	if got := claude.HookLaunchArgs(""); got != nil {
+		t.Fatalf("claude HookLaunchArgs(\"\") = %v, want nil", got)
+	}
+	codex, _ := For("codex-acp")
+	if got := codex.HookLaunchArgs("/h/agents/a.json"); got != nil {
+		t.Fatalf("codex HookLaunchArgs = %v, want nil (gated)", got)
+	}
+}
+
 func TestStripEnvKeys(t *testing.T) {
 	claude, _ := For("claude-acp")
 	if got := claude.StripEnvKeys(); len(got) != 1 || got[0] != "CLAUDECODE" {
