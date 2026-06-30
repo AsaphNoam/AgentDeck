@@ -122,3 +122,24 @@ func WriteAgentSettings(home, agentID string, settings map[string]any) (string, 
 	}
 	return path, nil
 }
+
+// RemoveAgentSettings deletes the per-agent settings file written by
+// WriteAgentSettings. A missing file is not an error, so cleanup is idempotent
+// across stop/shutdown/relaunch.
+func RemoveAgentSettings(home, agentID string) error {
+	path := filepath.Join(Dir(home), "agents", agentID+".json")
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("hooks: remove settings %q: %w", path, err)
+	}
+	return nil
+}
+
+// RemoveAllAgentSettings deletes the entire per-agent settings directory. Used
+// on dashboard shutdown to leave no stale registration artifacts behind.
+func RemoveAllAgentSettings(home string) error {
+	dir := filepath.Join(Dir(home), "agents")
+	if err := os.RemoveAll(dir); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("hooks: remove settings dir %q: %w", dir, err)
+	}
+	return nil
+}

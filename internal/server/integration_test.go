@@ -642,6 +642,43 @@ func TestStopIdempotent(t *testing.T) {
 	}
 }
 
+// TestStopRemovesHookSettings verifies the per-agent hook settings file written
+// at launch is deleted on stop, so the registration artifact is not orphaned
+// (review fix: shared lifecycle with the messaging MCP registration).
+func TestStopRemovesHookSettings(t *testing.T) {
+	fake := buildFakeACP(t)
+	t.Setenv("FAKEACP_SCENARIO", "stream_text")
+
+	srv := testServer(t, true)
+	srv.registry.Chat().SetCommand(fake)
+	if err := srv.configStore.WriteProject("tmpproj", config.Project{Title: "Tmp", Cwd: t.TempDir()}); err != nil {
+		t.Fatalf("WriteProject: %v", err)
+	}
+	if err := srv.configStore.WriteRole("impl", config.Role{Title: "Impl", SystemPrompt: "be helpful"}); err != nil {
+		t.Fatalf("WriteRole: %v", err)
+	}
+
+	ts := httptest.NewServer(srv.routes())
+	defer ts.Close()
+	t.Cleanup(func() { srv.registry.Shutdown(context.Background()) })
+
+	agentID := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+
+	// The settings file is written at launch regardless of interface.
+	settingsPath := filepath.Join(srv.configStore.Home(), "hooks", "agents", agentID+".json")
+	if _, err := os.Stat(settingsPath); err != nil {
+		t.Fatalf("settings file not written at launch: %v", err)
+	}
+
+	resp, body := post(t, ts.URL+"/api/sessions/"+agentID+"/stop", nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("stop status = %d, want 200: %s", resp.StatusCode, body)
+	}
+	if _, err := os.Stat(settingsPath); !os.IsNotExist(err) {
+		t.Fatalf("settings file still present after stop (err=%v); want removed", err)
+	}
+}
+
 func mustAgent() state.Agent {
 	return state.Agent{
 		AgentID: "a_nopersist", Name: "Ghost", Role: "impl", Project: "tmpproj",

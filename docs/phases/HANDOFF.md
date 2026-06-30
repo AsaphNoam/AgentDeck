@@ -120,13 +120,18 @@ _(no open findings)_
 
 > Resolved without stopping; the human should still see them. Remove once acknowledged (workflow §3, §5).
 
-- **NEW (6.2): CLI hook-registration `--settings` passthrough is gated behind `AGENTDECK_HOOK_REGISTRATION=1`
-  (default OFF).** The launch composer always injects the `AGENTDECK_*` env and writes the per-agent settings file,
-  but the args that point the CLI at that file (claude `--settings <path>`) are only added when the flag is set —
-  because whether `claude-code-acp` forwards `--settings` to Claude is unverified, and passing an unknown flag to the
-  real binary would regress the currently-green chat-launch path. The full pipeline is wired + tested; only the final
-  flag is gated. **To activate:** confirm the flag against a live CLI, then set `AGENTDECK_HOOK_REGISTRATION=1` (or
-  flip the default in `composeHookRegistration`). Codex's `HookLaunchArgs` returns nil (its hook surface is gated too).
+- **NEW (review fix, supersedes the 6.2 env-flag gate): CLI hook-registration `--settings` passthrough is now gated
+  by INTERFACE, not by `AGENTDECK_HOOK_REGISTRATION`.** The launch composer always injects the `AGENTDECK_*` env and
+  writes the per-agent settings file; whether it adds the CLI flag (`claude --settings <path>`) now depends on the
+  agent's interface: **terminal → ON by default** (the 6.3 terminal runtime runs the *real* interactive CLI under a
+  PTY — not `claude-code-acp` — where `--settings` is a known-good flag and hooks are the only status producer);
+  **chat → still gated behind `AGENTDECK_HOOK_REGISTRATION=1`** (chat runs through `claude-code-acp`, whose
+  `--settings` forwarding is unverified, AND doesn't need registration — the runtime owns chat status and `_post.sh`
+  self-suppresses). This resolved the review's BLOCKING finding without regressing the green chat path. **Why this is
+  a judgment call:** I chose interface-gating over either flipping the env-flag default (would risk the chat path) or
+  building the `.claude/settings.json` project-injection fallback (writes into the user's project dir, can clobber
+  user settings). **To reverse:** restore the unconditional `AGENTDECK_HOOK_REGISTRATION` gate in
+  `composeHookRegistration`. Codex's `HookLaunchArgs` still returns nil (its hook surface is gated regardless).
 - **NEW (6.2): hook scripts require `jq` + `curl` on PATH (POSIX `sh`).** Per techspec §2.3 these are documented
   prereqs (no python3/node at runtime). `_post.sh`'s interface gate runs before `jq`/`curl`, so a chat agent
   self-suppresses even without them; a terminal agent needs both to POST. No fallback is provided. **To reverse:**
@@ -263,6 +268,17 @@ _(no open findings)_
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-06-29 — **review fix: hook registration enabled by default for terminal + per-agent settings cleanup — green.**
+  (1) BLOCKING: `composeHookRegistration` no longer disables registration in the default path — it now gates by
+  *interface*: terminal agents get the `--settings` launch args by default (the terminal runtime runs the real CLI
+  under a PTY where the flag is known-good and hooks are the only status producer), while chat stays gated behind
+  `AGENTDECK_HOOK_REGISTRATION=1` (claude-code-acp flag-forwarding unverified; chat doesn't need hook registration).
+  This unblocks 6.3 terminal status without regressing the green chat path (see Autonomous decisions for the judgment
+  call). Test `TestComposeHookRegistrationTerminalDefault` (terminal → `--settings <path>` with no env flag); existing
+  `TestComposeHookRegistration` keeps chat default-off + chat self-suppression covered by the hooks interface-gate
+  test. (2) ADVISORY: per-agent `{home}/hooks/agents/{id}.json` is now deleted on stop, launch-rollback, and shutdown
+  (new `hooks.RemoveAgentSettings`/`RemoveAllAgentSettings` + `Server.cleanupHookSettings`, mirroring
+  `cleanupMessagingMCP`). Test `TestStopRemovesHookSettings` (file present at launch, gone after stop). Green both tag modes.
 - 2026-06-29 — **6.2 green — hook scripts + registration + interface gate.** New `internal/hooks` package: embedded
   POSIX-`sh` script set — `_post.sh` (jq-encoded body → `curl POST /api/hook`, with the `AGENTDECK_INTERFACE=chat`
   self-suppression gate for runtime-owned events) + `session-start/user-prompt-submit/pre-tool-use/post-tool-use/stop.sh`
@@ -292,10 +308,3 @@ _(most recent first; keep ~10, older history is in git)_
 - 2026-06-29 — **5.3 green — registration, nudger, turn budget, janitor.** Added per-agent HTTP MCP registration files + token cleanup wired through launch/resume/stop/shutdown; chat `CheckMessages(pid)` now injects a nudge turn and runtime turns reset `turn_budget`. `send_message`/`check_messages` enforce the shared 15-action budget transactionally (`message_budget_exceeded`, persisted `breached=1`, WARN + `budget_exceeded` SSE); nudger wakes idle agents on ticker/insert signal and stamps `delivered_via='nudge'`; poll reads now stamp `delivered_via='poll'`; janitor deletes read>24h and any>7d. Tests cover registration cleanup, runtime/server nudge, budget breach/caps, retention, and poll stamping. Checkpoint green: `go build ./...`, `go build -tags sqlite_fts5 ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
 - 2026-06-29 — **5.2 green — message store + three MCP tools.** Migration v5 replaces the Phase-0 placeholder `messages` table with the §4.1 schema (TEXT `message_id` PK, no agent FK) + adds `turn_budget`. New `state` messaging API (`LiveAgents`, `ResolveRecipient`, `InsertMessage`, `ListMessages`, `MarkRead`, `DeleteMessages`, `UnreadCount`) + `Message`/`LiveAgent`/`AgentRef` types. `messaging` package: `list_agents`/`send_message`/`check_messages` tools replace the `ping` spike, identity from the session token (`req.Extra.Header`→`Lookup`, unknown→`session_unknown`), §9 error shapes, locked §13 constants. Budget enforcement deferred to 5.3 (static cap + TODO). New state + messaging tests; updated Phase-0 state tests (cascade now asserts mail survives a deleted sender) + `server.TestMCPRouteMounted`. Build + full tests green both tag modes.
 - 2026-06-29 — **5.1 green — Go-MCP-SDK handshake spike.** Added `github.com/modelcontextprotocol/go-sdk v1.6.1` (`go` 1.22→1.25.0). New `internal/messaging` package: in-process `mcp.Server` + trivial `ping` tool over the streamable HTTP transport, mounted at `POST/GET/DELETE /mcp`; `token→agent_id` session registry; `X-AgentDeck-Token` header read per request. HTTP transport round-trip proven via `messaging.TestSpikePingRoundTrip` + `server.TestMCPRouteMounted` (go-sdk client through the real dashboard mux). Per-CLI live confirmation gated (Blocked on human). Task 1 outcome recorded in techspec §2.2. Build (both tags) + full tests green.
-- 2026-06-29 — **review fix: bare-form CLI resume respects `--name` — green.** `listInactiveSessions` now takes a `name` arg and filters by it when non-empty, so `agentdeck role@project --name X` only auto-resumes the inactive session actually named X (not any inactive role@project session). New `resume_test.go::TestListInactiveSessionsNameFilter` (no-name → all; named → exact). Build (both tags) + full tests green.
-- 2026-06-29 — **review fix: 4 Phase 2/3 UI advisories — green (53/53 UI, embedded dist refreshed).** (1) `transcriptStore` gained `foldTranscript`, used by `setTranscript`, so a REST refetch/archive replay folds `permission_resolved` into its `permission_request` (was left visually unresolved); regression test added. (2) `useDeleteRole`/`useDeleteProject` now throw the structured `{status, body}` error (shared `httpError` helper) so the editors' 409 `?force=true` retry actually fires; `useDeleteRole` rejection test. (3) `NewAgentModal` now reads `/api/config` and preselects `default_role`/`default_project` (falls back to first entry only when absent); preselect test. (4) Launch failures now surface the server's `error.message` (e.g. nonexistent project cwd) instead of opaque "HTTP 502"; test added — partially addresses the seeded-`my-app`-cwd advisory (see Autonomous decisions).
-- 2026-06-29 — **review fix: ACP protocol version mismatch now fails the handshake — green.** `ChatRuntime.Start`/`Resume` previously only `slog.Warn`ed on an out-of-range `protocolVersion`; per techspec §12.1 they now fail via new `checkACPVersion` + `ErrProtocolVersion` (pinned `[minACPVersion,maxACPVersion]` = `[1,1]`; missing/0 tolerated). fakeacp honors `FAKEACP_PROTO_VERSION`; new `TestStartProtocolVersionMismatch` asserts Start errors with `ErrProtocolVersion`. Build (both tags) + full tests green.
-- 2026-06-29 — **review fix: stop is idempotent for known agents — green.** `handleStop` now returns 200 `{stopped:true}` when `Registry.Stop` reports `ErrNoHandle` but the identity row still exists (double-click / lost-response retry); 404 reserved for ids with no identity. New `TestStopIdempotent` (first stop 200, repeat 200, unknown id 404).
-- 2026-06-29 — **review fix: archive FTS no longer drops content past 1 MiB — green.** Removed the `maxContentBytes` keep-newest cap in `index.Indexer.addContent`; the FTS content buffer now accumulates the COMPLETE transcript so every phrase ever streamed stays searchable (and `reindex` rebuilds it complete). New tagged `TestIndexerFTSLongTranscript` indexes an early phrase + >1 MiB of later content and asserts the early phrase still `MATCH`es. Build (both tag modes) + full + tagged index/archive/state tests green. See Autonomous decisions for the unbounded-growth tradeoff.
-- 2026-06-29 — **review fix: session/load resume now applies fresh MCP registration — green.** `ChatRuntime.Resume` called `session/load` with only `{sessionId}`, so adapters where load succeeds never received the freshly-minted messaging MCP server (Phase 5 blocker). Added `sessionLoadParams(spec, sessionID)` (sessionId + cwd + mcpServers, mirroring ACP loadSession) and use it on the load path. fakeacp now dumps received `session/load` params via `FAKEACP_LOAD_DUMP`; new `TestResumeSessionLoadAppliesMCP` asserts the load path carries sessionId + the messaging server. Go build (both tag modes) + full tests green.
-- 2026-06-29 — **review fix: SSE watchdog permanent reconnect loop — green.** `ui/src/api/sse.ts` now resets `lastPing` in `connect()` so each fresh/reconnected stream gets the full 25s liveness window instead of inheriting a stale timestamp that reaped it before its first ping. New `src/api/sse.test.ts` drives a mock `EventSource` + fake timers: reaps the first (ping-less) stream at 30s, then asserts the reconnected stream survives the 5s watchdog tick before its ~10s first ping. UI 49/49, build green, embedded dist refreshed.
