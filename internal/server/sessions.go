@@ -177,7 +177,7 @@ func (s *Server) handleRename(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if strings.TrimSpace(body.Name) == "" {
-		writeAPIError(w, apiError(runtime.CodeValidation, "name is required"))
+		writeAPIError(w, apiError(runtime.CodeEmptyName, "name is required"))
 		return
 	}
 	agent, err := s.stateStore.ReadAgent(id)
@@ -193,7 +193,57 @@ func (s *Server) handleRename(w http.ResponseWriter, r *http.Request) {
 	if _, err := s.stateMgr.Touch(id); err != nil {
 		s.log.Debug("rename state touch failed", "agent", id, "err", err)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"renamed": true, "agent": agent})
+	writeJSON(w, http.StatusOK, map[string]any{"agent_id": id, "name": agent.Name})
+}
+
+func (s *Server) handleIdentity(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var body struct {
+		Name  *string `json:"name"`
+		Group *string `json:"group"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeAPIError(w, apiError(runtime.CodeValidation, "invalid JSON body"))
+		return
+	}
+	agent, err := s.stateStore.ReadAgent(id)
+	if err != nil {
+		writeAPIError(w, apiError(runtime.CodeNotFound, "no such agent: "+id))
+		return
+	}
+	if body.Name != nil {
+		name := strings.TrimSpace(*body.Name)
+		if name == "" {
+			writeAPIError(w, apiError(runtime.CodeEmptyName, "name is required"))
+			return
+		}
+		agent.Name = name
+	}
+	if body.Group != nil {
+		group := strings.TrimSpace(*body.Group)
+		if group == "_ungrouped" {
+			writeAPIError(w, apiError(runtime.CodeInvalidGroupName, "_ungrouped is reserved"))
+			return
+		}
+		agent.Group = group
+	}
+	if err := s.stateStore.WriteAgent(agent); err != nil {
+		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
+		return
+	}
+	if _, err := s.stateMgr.Touch(id); err != nil {
+		s.log.Debug("identity state touch failed", "agent", id, "err", err)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"agent_id":  agent.AgentID,
+		"group":     agent.Group,
+		"name":      agent.Name,
+		"role":      agent.Role,
+		"project":   agent.Project,
+		"backend":   agent.Backend,
+		"model":     agent.Model,
+		"interface": agent.Interface,
+	})
 }
 
 // sessionOpError maps a prompt/control error to an APIError (techspec §7.3).

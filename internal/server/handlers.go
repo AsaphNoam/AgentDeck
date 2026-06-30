@@ -146,6 +146,9 @@ func (s *Server) handleLayout(w http.ResponseWriter, _ *http.Request) {
 type layoutResponse struct {
 	Order   []string      `json:"order"`
 	Density layoutDensity `json:"density"`
+	Groups  map[string]struct {
+		Collapsed bool `json:"collapsed"`
+	} `json:"groups,omitempty"`
 }
 
 type layoutDensity struct {
@@ -154,16 +157,30 @@ type layoutDensity struct {
 }
 
 func layoutFromConfig(l config.Layout) layoutResponse {
+	groups := map[string]struct {
+		Collapsed bool `json:"collapsed"`
+	}{}
+	for name, g := range l.Groups {
+		groups[name] = struct {
+			Collapsed bool `json:"collapsed"`
+		}{Collapsed: g.Collapsed}
+	}
 	return layoutResponse{
 		Order:   append([]string(nil), l.Order...),
 		Density: layoutDensity{PerRow: l.Density.CardsPerRow, Gap: l.Density.Gap},
+		Groups:  groups,
 	}
 }
 
 func (l layoutResponse) toConfig() config.Layout {
+	groups := map[string]config.GroupLayout{}
+	for name, g := range l.Groups {
+		groups[name] = config.GroupLayout{Collapsed: g.Collapsed}
+	}
 	return config.Layout{
 		Order:   append([]string(nil), l.Order...),
 		Density: config.Density{CardsPerRow: l.Density.PerRow, Gap: l.Density.Gap},
+		Groups:  groups,
 	}
 }
 
