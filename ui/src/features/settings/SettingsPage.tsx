@@ -2,6 +2,7 @@ import * as Tabs from "@radix-ui/react-tabs";
 import { RolesEditor } from "./RolesEditor";
 import { ProjectsEditor } from "./ProjectsEditor";
 import { BackendsEditor } from "./BackendsEditor";
+import { NotificationsEditor } from "./NotificationsEditor";
 
 export function SettingsPage() {
   return (
@@ -12,6 +13,7 @@ export function SettingsPage() {
           <Tabs.Trigger value="roles">Roles</Tabs.Trigger>
           <Tabs.Trigger value="projects">Projects</Tabs.Trigger>
           <Tabs.Trigger value="backends">Backends</Tabs.Trigger>
+          <Tabs.Trigger value="notifications">Notifications</Tabs.Trigger>
         </Tabs.List>
         <Tabs.Content value="roles" className="settings-tab-content">
           <RolesEditor />
@@ -21,6 +23,9 @@ export function SettingsPage() {
         </Tabs.Content>
         <Tabs.Content value="backends" className="settings-tab-content">
           <BackendsEditor />
+        </Tabs.Content>
+        <Tabs.Content value="notifications" className="settings-tab-content">
+          <NotificationsEditor />
         </Tabs.Content>
       </Tabs.Root>
     </div>

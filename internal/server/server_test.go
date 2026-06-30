@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/runtime"
@@ -220,6 +221,45 @@ func TestRenameSession(t *testing.T) {
 	}
 	if agent.Name != "Vega" {
 		t.Fatalf("agent name = %q, want Vega", agent.Name)
+	}
+}
+
+func TestSessionMessagesEndpoint(t *testing.T) {
+	srv := testServer(t, true)
+	recipient := state.Agent{AgentID: "a_recipient", Name: "Nova", Role: "reviewer", Project: "my-app", Backend: "claude", Model: "sonnet", Interface: "chat", CreatedAt: time.Now().UTC()}
+	sender := state.Agent{AgentID: "a_sender", Name: "Atlas", Role: "implementer", Project: "my-app", Backend: "claude", Model: "sonnet", Interface: "chat", CreatedAt: time.Now().UTC()}
+	for _, a := range []state.Agent{recipient, sender} {
+		if err := srv.stateStore.WriteAgent(a); err != nil {
+			t.Fatalf("WriteAgent: %v", err)
+		}
+	}
+	if _, err := srv.stateStore.InsertMessage(state.Message{
+		FromAgent: sender.AgentID, FromAddress: "implementer@my-app", FromName: sender.Name,
+		ToAgent: recipient.AgentID, Body: "first", CreatedAt: time.Date(2026, 6, 29, 10, 0, 0, 0, time.UTC),
+	}); err != nil {
+		t.Fatalf("InsertMessage first: %v", err)
+	}
+	if _, err := srv.stateStore.InsertMessage(state.Message{
+		FromAgent: sender.AgentID, FromAddress: "implementer@my-app", FromName: sender.Name,
+		ToAgent: recipient.AgentID, Body: "second", CreatedAt: time.Date(2026, 6, 29, 10, 1, 0, 0, time.UTC),
+	}); err != nil {
+		t.Fatalf("InsertMessage second: %v", err)
+	}
+	rec := doGET(t, srv.routes(), "/api/sessions/a_recipient/messages?limit=10")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("messages status = %d body=%s, want 200", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		UnreadCount int `json:"unread_count"`
+		Messages    []struct {
+			Body string `json:"body"`
+		} `json:"messages"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("messages body: %v", err)
+	}
+	if body.UnreadCount != 2 || len(body.Messages) != 2 || body.Messages[0].Body != "second" {
+		t.Fatalf("messages body = %+v, want newest first + unread count", body)
 	}
 }
 

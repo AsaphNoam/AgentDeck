@@ -160,7 +160,7 @@ export function useConfig() {
 export function usePutConfig() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: Partial<Pick<Config, "onboarding_complete" | "default_project" | "default_role">>) =>
+    mutationFn: (data: Partial<Pick<Config, "onboarding_complete" | "default_project" | "default_role" | "notifications">>) =>
       json<Config>("/api/config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },

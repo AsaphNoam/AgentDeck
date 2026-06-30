@@ -54,6 +54,45 @@ func (s *Server) handleTranscript(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"agent_id": id, "events": events})
 }
 
+func (s *Server) handleMessages(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if _, err := s.stateStore.ReadAgent(id); err != nil {
+		writeAPIError(w, apiError(runtime.CodeNotFound, "no such agent: "+id))
+		return
+	}
+	unreadOnly := r.URL.Query().Get("unread_only") == "true"
+	limit := 50
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 {
+			writeAPIError(w, apiError(runtime.CodeValidation, "limit must be a positive integer"))
+			return
+		}
+		limit = n
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	msgs, err := s.stateStore.ListMessages(id, unreadOnly, limit)
+	if err != nil {
+		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
+		return
+	}
+	for i, j := 0, len(msgs)-1; i < j; i, j = i+1, j-1 {
+		msgs[i], msgs[j] = msgs[j], msgs[i]
+	}
+	unread, err := s.stateStore.UnreadCount(id)
+	if err != nil {
+		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"agent_id":     id,
+		"unread_count": unread,
+		"messages":     msgs,
+	})
+}
+
 func parseInt64Query(r *http.Request, key string) (int64, error) {
 	raw := strings.TrimSpace(r.URL.Query().Get(key))
 	if raw == "" {

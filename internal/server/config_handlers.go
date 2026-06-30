@@ -629,16 +629,33 @@ func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	if cfg.OnboardingComplete {
 		ob.Satisfied = true
 	}
+	normalizeNotifications(&cfg)
 
 	writeJSON(w, http.StatusOK, configResponse{Config: cfg, Onboarding: ob})
+}
+
+func normalizeNotifications(cfg *config.Config) {
+	def := config.DefaultConfig().Notifications
+	if len(cfg.Notifications.Muted) == 0 && !cfg.Notifications.DesktopEnabled {
+		cfg.Notifications.DesktopEnabled = def.DesktopEnabled
+	}
+	if cfg.Notifications.Muted == nil {
+		cfg.Notifications.Muted = map[string]bool{}
+	}
+	for k, v := range def.Muted {
+		if _, ok := cfg.Notifications.Muted[k]; !ok {
+			cfg.Notifications.Muted[k] = v
+		}
+	}
 }
 
 // configPutBody is the request body for PUT /api/config (§5.5).
 // Only the user-editable subset; version and port are rejected.
 type configPutBody struct {
-	OnboardingComplete *bool   `json:"onboarding_complete"`
-	DefaultProject     *string `json:"default_project"`
-	DefaultRole        *string `json:"default_role"`
+	OnboardingComplete *bool                       `json:"onboarding_complete"`
+	DefaultProject     *string                     `json:"default_project"`
+	DefaultRole        *string                     `json:"default_role"`
+	Notifications      *config.NotificationsConfig `json:"notifications"`
 	// Sentinel fields: reject if present.
 	Version *int `json:"version"`
 	Port    *int `json:"port"`
@@ -704,6 +721,10 @@ func (s *Server) handlePutConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.DefaultRole != nil {
 		cfg.DefaultRole = *body.DefaultRole
+	}
+	if body.Notifications != nil {
+		cfg.Notifications = *body.Notifications
+		normalizeNotifications(&cfg)
 	}
 
 	if err := s.configStore.WriteConfig(cfg); err != nil {

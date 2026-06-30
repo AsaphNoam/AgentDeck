@@ -1,6 +1,7 @@
 package bus
 
 import (
+	"encoding/json"
 	"log/slog"
 	"sync"
 	"sync/atomic"
@@ -99,16 +100,86 @@ func (b *Bus) PingEvent() Event {
 }
 
 func (b *Bus) PublishStateUpdate(update state.AgentStateUpdate) {
+	var previous *state.AgentStateUpdate
+	if update.AgentID != "" && !update.Removed {
+		b.mu.RLock()
+		if p, ok := b.snapshot[update.AgentID]; ok {
+			cp := p
+			previous = &cp
+		}
+		b.mu.RUnlock()
+	}
 	if update.AgentID != "" {
 		b.SetSnapshot(update)
 	}
 	agentID := update.AgentID
 	b.Publish("state_update", &agentID, update)
+	if previous != nil && previous.State != update.State {
+		switch update.State {
+		case "done", "waiting_input":
+			b.Publish("notification", &agentID, notificationPayload(update, update.State, nil))
+		}
+	}
 }
 
 func (b *Bus) PublishRuntimeEvent(ev runtime.Event) {
 	agentID := ev.AgentID
 	b.Publish("new_message", &agentID, ev)
+	if ev.Type == runtime.EvPermissionRequest {
+		var detail map[string]any
+		_ = json.Unmarshal(ev.Data, &detail)
+		var update state.AgentStateUpdate
+		b.mu.RLock()
+		update = b.snapshot[agentID]
+		b.mu.RUnlock()
+		if update.AgentID == "" {
+			update.AgentID = agentID
+			update.Name = agentID
+		}
+		b.Publish("notification", &agentID, notificationPayload(update, "permission_required", detail))
+	}
+}
+
+func notificationPayload(update state.AgentStateUpdate, typ string, detail map[string]any) map[string]any {
+	name := update.Name
+	if name == "" {
+		name = update.AgentID
+	}
+	title := name + " needs attention"
+	switch typ {
+	case "done":
+		title = name + " finished"
+	case "waiting_input":
+		title = name + " needs input"
+	case "permission_required":
+		title = name + " requests permission"
+	case "budget_exceeded":
+		title = name + " hit its message budget"
+	}
+	body := update.Detail
+	if body == "" && typ == "permission_required" && detail != nil {
+		if reason, ok := detail["reason"].(string); ok {
+			body = reason
+		}
+	}
+	if detail == nil {
+		detail = map[string]any{}
+	}
+	return map[string]any{
+		"type":              "notification",
+		"notification_type": typ,
+		"agent_id":          update.AgentID,
+		"agent_name":        name,
+		"address":           update.Role + "@" + update.Project,
+		"title":             title,
+		"body":              body,
+		"detail":            detail,
+		"ts":                btime(),
+	}
+}
+
+func btime() string {
+	return time.Now().UTC().Format(time.RFC3339)
 }
 
 func (b *Bus) SetSnapshot(update state.AgentStateUpdate) {
