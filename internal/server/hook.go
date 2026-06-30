@@ -33,7 +33,7 @@ func (s *Server) handleHook(w http.ResponseWriter, r *http.Request) {
 		token = req.Token
 	}
 	if token == "" {
-		writeHookError(w, http.StatusUnauthorized, "unauthorized", "missing token")
+		writeHookError(w, http.StatusUnauthorized, "bad_token", "missing token")
 		return
 	}
 
@@ -63,9 +63,11 @@ func (s *Server) handleHook(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, state.ErrInvalidHook):
 			writeHookError(w, http.StatusBadRequest, "bad_request", err.Error())
 		case errors.Is(err, state.ErrTokenMismatch):
-			writeHookError(w, http.StatusForbidden, "forbidden", "token mismatch")
+			// Missing/stale per-launch token (§8.6): 401 so a lingering hook from a
+			// stopped launch can't spoof status.
+			writeHookError(w, http.StatusUnauthorized, "bad_token", "invalid or stale token")
 		case errors.Is(err, state.ErrNotFound):
-			writeHookError(w, http.StatusNotFound, "not_found", "unknown agent")
+			writeHookError(w, http.StatusNotFound, "agent_not_found", "unknown agent")
 		default:
 			s.log.Error("hook: apply", "err", err)
 			writeHookError(w, http.StatusInternalServerError, "internal", err.Error())

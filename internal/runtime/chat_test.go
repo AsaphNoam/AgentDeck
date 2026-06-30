@@ -106,6 +106,70 @@ func drainTurn(t *testing.T, ch <-chan Event) []Event {
 	}
 }
 
+// TestChatCodexBackendEndToEnd exercises the codex-acp backend through the chat
+// runtime end-to-end: launch → prompt → stream → stop → native resume. The
+// per-backend adapter (binary/env/resume) is the only difference from claude;
+// here the fakeacp command override stands in for the real codex-acp CLI (the
+// credentialed live Codex run is gated, like the Phase 1 real-CLI acceptance).
+func TestChatCodexBackendEndToEnd(t *testing.T) {
+	c, spec := newChatTest(t, "stream_text")
+	ctx := context.Background()
+	spec.BackendType = "codex-acp"
+	spec.Agent.Backend = "codex"
+	spec.ModelID = "gpt-5.5"
+
+	h, err := c.Start(ctx, spec)
+	if err != nil {
+		t.Fatalf("codex Start: %v", err)
+	}
+	if st, err := c.store.ReadStatus(h.AgentID); err != nil || st.State != "idle" {
+		t.Fatalf("post-start status = %+v err=%v, want idle", st, err)
+	}
+
+	ch, unsub, err := c.Subscribe(h.AgentID)
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+	if err := c.SendPrompt(ctx, h.AgentID, "hello codex"); err != nil {
+		t.Fatalf("SendPrompt: %v", err)
+	}
+	evs := drainTurn(t, ch)
+	if evs[len(evs)-1].Type != EvTurnEnd {
+		t.Fatalf("codex turn last event = %q, want turn_end", evs[len(evs)-1].Type)
+	}
+	var texts int
+	for _, e := range evs {
+		if e.Type == EvAssistantText {
+			texts++
+		}
+	}
+	if texts < 1 {
+		t.Fatalf("codex turn produced no assistant text")
+	}
+	unsub()
+
+	if err := c.Stop(ctx, h.AgentID); err != nil {
+		t.Fatalf("codex Stop: %v", err)
+	}
+	if _, err := c.store.ReadRunning(h.AgentID); err == nil {
+		t.Fatalf("running row should be gone after Stop")
+	}
+
+	// Native resume: same agent_id, fresh running row.
+	spec.LastSessionID = h.SessionID
+	rh, err := c.Resume(ctx, spec, h.SessionID)
+	if err != nil {
+		t.Fatalf("codex Resume: %v", err)
+	}
+	t.Cleanup(func() { c.Stop(ctx, rh.AgentID) })
+	if rh.AgentID != h.AgentID {
+		t.Fatalf("resume agent_id = %q, want %q (stable)", rh.AgentID, h.AgentID)
+	}
+	if _, err := c.store.ReadRunning(rh.AgentID); err != nil {
+		t.Fatalf("running row missing after resume: %v", err)
+	}
+}
+
 func TestChatStreamText(t *testing.T) {
 	c, spec := newChatTest(t, "stream_text")
 	ctx := context.Background()
