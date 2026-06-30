@@ -153,4 +153,15 @@ CREATE TABLE IF NOT EXISTS turn_budget (
 );
 `,
 	},
+	{
+		// Phase 6 terminal runtime (techspec §3.1 step 6): the running row records
+		// which TerminalDriver backs the agent (xterm/tmux/iterm2) and any
+		// driver-specific identifiers (e.g. iTerm2 window/tab/session ids, the
+		// tmux session name). Empty for chat agents. driver_ids is a JSON object.
+		version: 6,
+		sql: `
+ALTER TABLE running ADD COLUMN driver     TEXT NOT NULL DEFAULT '';
+ALTER TABLE running ADD COLUMN driver_ids TEXT NOT NULL DEFAULT '{}';
+`,
+	},
 }

@@ -19,11 +19,20 @@ var ErrAlreadyStarted = errors.New("runtime: agent already started")
 // control ops route correctly.
 type Registry struct {
 	mu        sync.Mutex
-	byIface   map[string]Runtime // "chat" -> ChatRuntime, "terminal" -> stub
+	byIface   map[string]Runtime // "chat" -> ChatRuntime, "terminal" -> terminal runtime/stub
 	rtByAgent map[string]Runtime // agent_id -> owning runtime
 	chat      *ChatRuntime
+	term      Runtime // the registered terminal runtime (nil until SetTerminalRuntime)
 	store     *state.Store
 }
+
+// exitNotifier is implemented by runtimes that can tell the Registry to drop
+// ownership when an agent's process disappears outside a Stop (crash teardown).
+type exitNotifier interface{ SetOnExit(func(string)) }
+
+// stopAller is implemented by runtimes that can stop all their live agents on
+// server shutdown.
+type stopAller interface{ StopAll(ctx context.Context) }
 
 // NewRegistry builds a Registry wired with the chat runtime and the terminal
 // stub. The terminal runtime is a not-implemented stub until Phase 6.
@@ -55,6 +64,25 @@ func (r *Registry) forget(agentID string) {
 // Chat returns the chat runtime (e.g. to point it at a pinned adapter binary or,
 // in tests, the fake CLI).
 func (r *Registry) Chat() *ChatRuntime { return r.chat }
+
+// SetTerminalRuntime registers the real terminal runtime under interface
+// "terminal", replacing the not-implemented stub. It lives in a subpackage
+// (internal/runtime/terminal) that imports this package, so it can't be
+// constructed here without an import cycle — the server wires it in via this
+// setter. If the runtime supports onExit notification, it is connected to the
+// Registry's ownership-forget path (same crash-teardown contract as chat).
+func (r *Registry) SetTerminalRuntime(rt Runtime) {
+	if rt == nil {
+		return
+	}
+	r.mu.Lock()
+	r.byIface["terminal"] = rt
+	r.term = rt
+	r.mu.Unlock()
+	if en, ok := rt.(exitNotifier); ok {
+		en.SetOnExit(r.forget)
+	}
+}
 
 // SetEventSink mirrors runtime transcript events into an external bus.
 func (r *Registry) SetEventSink(sink func(Event)) {
@@ -245,6 +273,12 @@ func (r *Registry) Transcript(agentID string) ([]Event, error) {
 // Shutdown stops every live agent (server shutdown, techspec §8.5).
 func (r *Registry) Shutdown(ctx context.Context) {
 	r.chat.StopAll(ctx)
+	r.mu.Lock()
+	term := r.term
+	r.mu.Unlock()
+	if sa, ok := term.(stopAller); ok {
+		sa.StopAll(ctx)
+	}
 	r.mu.Lock()
 	r.rtByAgent = map[string]Runtime{}
 	r.mu.Unlock()

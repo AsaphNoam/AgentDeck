@@ -16,6 +16,7 @@ import (
 	persistindex "github.com/agentdeck/agentdeck/internal/index"
 	"github.com/agentdeck/agentdeck/internal/messaging"
 	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/agentdeck/agentdeck/internal/runtime/terminal"
 	"github.com/agentdeck/agentdeck/internal/state"
 	"github.com/agentdeck/agentdeck/internal/transcript"
 )
@@ -41,6 +42,7 @@ type Server struct {
 	stateMgr    *state.Manager
 	eventBus    *bus.Bus
 	registry    *runtime.Registry
+	terminal    *terminal.Runtime
 	cfg         config.Config
 	log         *slog.Logger
 
@@ -72,16 +74,25 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	ix := persistindex.New(stateStore.DB())
 	msg := messaging.New(stateStore, log)
 	nudgeCh := make(chan string, 32)
+	touch := func(agentID string) {
+		if _, err := stateMgr.Touch(agentID); err != nil {
+			log.Debug("state touch failed", "agent", agentID, "err", err)
+		}
+	}
+	var term *terminal.Runtime
 	if registry != nil {
 		registry.SetPersistence(cfgStore.Home(), func(home, agentID string, meta *runtime.SessionMetaData) (runtime.TranscriptWriter, error) {
 			return transcript.Open(home, agentID, meta)
 		}, ix)
 		registry.SetEventSink(eventBus.PublishRuntimeEvent)
-		registry.SetStateTouch(func(agentID string) {
-			if _, err := stateMgr.Touch(agentID); err != nil {
-				log.Debug("state touch failed", "agent", agentID, "err", err)
-			}
-		})
+		registry.SetStateTouch(touch)
+		// Construct + register the terminal runtime here (it lives in a subpackage
+		// that imports runtime, so the Registry can't build it without an import
+		// cycle — see Registry.SetTerminalRuntime). Wire its state-touch the same
+		// way the chat runtime is wired.
+		term = terminal.New(stateStore)
+		term.SetStateTouch(touch)
+		registry.SetTerminalRuntime(term)
 	}
 	msg.SetMessageInsertedSink(func(fromAgentID, toAgentID string) {
 		select {
@@ -109,6 +120,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		stateMgr:    stateMgr,
 		eventBus:    eventBus,
 		registry:    registry,
+		terminal:    term,
 		indexer:     ix,
 		messaging:   msg,
 		nudgeCh:     nudgeCh,
