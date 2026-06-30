@@ -1,0 +1,2081 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AgentDeck Atlas - Product Manual & Developer Guide</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d1117;
+      --bg-2: #111722;
+      --panel: #151c26;
+      --panel-2: #1b2532;
+      --panel-3: #223044;
+      --line: #314053;
+      --line-2: #43566e;
+      --text: #eef5ff;
+      --muted: #afbed0;
+      --soft: #8292a7;
+      --cyan: #65d5ff;
+      --green: #4fd19b;
+      --amber: #f1c86b;
+      --rose: #ff7a90;
+      --violet: #bca8ff;
+      --orange: #ffad72;
+      --blue: #75a7ff;
+      --ink: #070a0f;
+      --radius: 8px;
+      --shadow: 0 28px 80px rgba(0, 0, 0, 0.38);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 18% 0%, rgba(101, 213, 255, 0.14), transparent 30rem),
+        radial-gradient(circle at 95% 8%, rgba(79, 209, 155, 0.10), transparent 28rem),
+        linear-gradient(180deg, #0c1016 0%, #0d1117 42%, #0b0f15 100%);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    a { color: inherit; }
+    button, input { font: inherit; }
+    button {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 0.58rem 0.78rem;
+      cursor: pointer;
+    }
+    button:hover, button.active {
+      border-color: var(--cyan);
+      background: #24354b;
+    }
+    button:focus-visible, a:focus-visible, input:focus-visible, summary:focus-visible {
+      outline: 3px solid var(--amber);
+      outline-offset: 2px;
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 292px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+      padding: 22px;
+      border-right: 1px solid var(--line);
+      background: rgba(10, 14, 20, 0.92);
+      backdrop-filter: blur(18px);
+    }
+
+    .brand {
+      display: grid;
+      grid-template-columns: 48px 1fr;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 22px;
+    }
+    .brand-mark {
+      height: 48px;
+      width: 48px;
+      border: 1px solid var(--line-2);
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      color: var(--cyan);
+      font-weight: 900;
+      background:
+        linear-gradient(135deg, rgba(101, 213, 255, 0.18), rgba(79, 209, 155, 0.08)),
+        #101823;
+    }
+    .brand strong { display: block; }
+    .brand span { color: var(--muted); font-size: 0.84rem; }
+    .nav-label {
+      margin: 20px 0 8px;
+      color: var(--soft);
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+    .nav {
+      display: grid;
+      gap: 4px;
+    }
+    .nav a {
+      text-decoration: none;
+      color: var(--muted);
+      border: 1px solid transparent;
+      border-radius: 7px;
+      padding: 8px 9px;
+      font-size: 0.92rem;
+    }
+    .nav a:hover, .nav a.active {
+      color: var(--text);
+      border-color: var(--line);
+      background: var(--panel);
+    }
+    .read-meter {
+      margin-top: 20px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px;
+      background: var(--panel);
+    }
+    .read-meter strong { display: block; margin-bottom: 8px; }
+    .meter-track {
+      height: 8px;
+      border-radius: 99px;
+      background: #0d141d;
+      overflow: hidden;
+      border: 1px solid #243244;
+    }
+    .meter-track span {
+      display: block;
+      height: 100%;
+      width: 8%;
+      background: linear-gradient(90deg, var(--cyan), var(--green));
+    }
+    .read-meter p { margin: 8px 0 0; color: var(--muted); font-size: 0.84rem; }
+
+    main { min-width: 0; }
+    .hero {
+      min-height: 92vh;
+      padding: 44px clamp(22px, 5vw, 72px) 32px;
+      display: grid;
+      align-content: center;
+      border-bottom: 1px solid var(--line);
+    }
+    .hero-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(420px, 1.05fr);
+      gap: clamp(24px, 4vw, 48px);
+      align-items: center;
+    }
+    .kicker {
+      margin: 0 0 10px;
+      color: var(--green);
+      font-size: 0.78rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+    h1, h2, h3, h4 { line-height: 1.1; letter-spacing: 0; }
+    h1 {
+      margin: 0;
+      max-width: 980px;
+      font-size: clamp(2.7rem, 6vw, 6.7rem);
+    }
+    h2 { margin: 0 0 14px; font-size: clamp(1.8rem, 3.2vw, 3.2rem); }
+    h3 { margin: 0 0 8px; font-size: 1.16rem; }
+    h4 { margin: 0 0 8px; font-size: 0.98rem; }
+    p { color: var(--muted); }
+    .lead {
+      color: #d9e4f0;
+      max-width: 780px;
+      font-size: clamp(1.03rem, 1.55vw, 1.28rem);
+      margin: 20px 0 0;
+    }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+    .hero-actions a {
+      display: inline-flex;
+      min-height: 42px;
+      align-items: center;
+      text-decoration: none;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 0.64rem 0.88rem;
+      background: var(--panel-2);
+    }
+    .hero-actions a.primary {
+      color: var(--ink);
+      border-color: transparent;
+      background: linear-gradient(135deg, var(--cyan), var(--green));
+      font-weight: 800;
+    }
+    .learn-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 28px;
+      max-width: 750px;
+    }
+    .learn-item {
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 12px;
+      align-items: start;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(21, 28, 38, 0.72);
+      padding: 12px;
+    }
+    .learn-item b {
+      display: grid;
+      place-items: center;
+      height: 34px;
+      border-radius: 7px;
+      color: var(--cyan);
+      background: #0e1822;
+      border: 1px solid #294059;
+    }
+    .learn-item span { color: var(--muted); font-size: 0.93rem; }
+
+    .command-center {
+      border: 1px solid var(--line-2);
+      border-radius: 8px;
+      background:
+        linear-gradient(180deg, rgba(34, 48, 68, 0.72), rgba(15, 21, 30, 0.96)),
+        var(--panel);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .cc-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(7, 10, 15, 0.5);
+    }
+    .cc-top strong { font-size: 0.95rem; }
+    .cc-dot {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--green);
+      font-size: 0.82rem;
+    }
+    .cc-dot::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 99px;
+      background: var(--green);
+      box-shadow: 0 0 14px var(--green);
+    }
+    .cc-body {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 14px;
+      padding: 16px;
+    }
+    .agent-board {
+      display: grid;
+      gap: 10px;
+    }
+    .agent-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #121a25;
+      padding: 12px;
+    }
+    .agent-card.busy { border-color: rgba(101, 213, 255, 0.68); }
+    .agent-card.waiting { border-color: rgba(241, 200, 107, 0.68); }
+    .agent-card.done { border-color: rgba(79, 209, 155, 0.58); }
+    .agent-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .agent-card strong { display: block; }
+    .agent-card small { color: var(--soft); }
+    .status-pill {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 0.76rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .busy .status-pill { color: var(--cyan); border-color: rgba(101, 213, 255, 0.5); }
+    .waiting .status-pill { color: var(--amber); border-color: rgba(241, 200, 107, 0.5); }
+    .done .status-pill { color: var(--green); border-color: rgba(79, 209, 155, 0.5); }
+    .agent-card p { margin: 10px 0 0; font-size: 0.88rem; }
+    .context {
+      height: 7px;
+      border-radius: 99px;
+      background: #0b1118;
+      border: 1px solid #263547;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+    .context span {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, var(--green), var(--cyan), var(--amber));
+    }
+    .radar {
+      min-height: 355px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px),
+        linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+        #0c121a;
+      background-size: 30px 30px;
+      position: relative;
+      overflow: hidden;
+    }
+    .radar::before {
+      content: "";
+      position: absolute;
+      inset: 22px;
+      border: 1px solid rgba(101, 213, 255, 0.15);
+      border-radius: 999px;
+    }
+    .radar::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 1px;
+      height: 46%;
+      background: linear-gradient(var(--cyan), transparent);
+      transform-origin: top;
+      animation: sweep 7s linear infinite;
+      opacity: 0.55;
+    }
+    @keyframes sweep {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .radar-node {
+      position: absolute;
+      width: 112px;
+      border: 1px solid var(--line-2);
+      border-radius: 8px;
+      padding: 8px;
+      background: rgba(18, 26, 37, 0.9);
+      box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+    }
+    .radar-node b { display: block; font-size: 0.88rem; }
+    .radar-node span { display: block; color: var(--soft); font-size: 0.74rem; }
+    .rn-ui { left: 8%; top: 14%; border-color: rgba(117,167,255,0.6); }
+    .rn-server { left: 43%; top: 35%; border-color: rgba(101,213,255,0.7); }
+    .rn-cli { right: 8%; top: 14%; border-color: rgba(255,173,114,0.6); }
+    .rn-db { left: 14%; bottom: 14%; border-color: rgba(79,209,155,0.6); }
+    .rn-mcp { right: 14%; bottom: 14%; border-color: rgba(188,168,255,0.6); }
+    .pulse-line {
+      position: absolute;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(101,213,255,0.9), transparent);
+      transform-origin: left center;
+      opacity: 0.6;
+    }
+    .pl-1 { width: 39%; left: 24%; top: 28%; transform: rotate(12deg); }
+    .pl-2 { width: 31%; left: 46%; top: 54%; transform: rotate(-27deg); }
+    .pl-3 { width: 32%; left: 24%; bottom: 30%; transform: rotate(-14deg); }
+
+    section.chapter {
+      padding: 54px clamp(22px, 5vw, 72px);
+      border-bottom: 1px solid var(--line);
+    }
+    .section-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 26px;
+      margin-bottom: 24px;
+    }
+    .section-head p { max-width: 850px; margin: 0; }
+    .source-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .source, .tag, .chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #101821;
+      color: var(--muted);
+      padding: 4px 10px;
+      text-decoration: none;
+      font-size: 0.79rem;
+      white-space: nowrap;
+    }
+    .source:hover { color: var(--text); border-color: var(--cyan); }
+    .tag.cyan { color: var(--cyan); }
+    .tag.green { color: var(--green); }
+    .tag.amber { color: var(--amber); }
+    .tag.violet { color: var(--violet); }
+    .tag.rose { color: var(--rose); }
+
+    .grid { display: grid; gap: 14px; }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(21, 28, 38, 0.88);
+      padding: 16px;
+      box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset;
+    }
+    .card p, .card li { color: var(--muted); }
+    .card p { margin: 0; }
+    .card h3 + p, .card h4 + p { margin-top: 8px; }
+    .card ul, .card ol { margin: 10px 0 0; padding-left: 19px; }
+    .wide-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(15, 21, 30, 0.76);
+      padding: 18px;
+    }
+
+    .scenario {
+      display: grid;
+      grid-template-columns: 310px minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+    .timeline {
+      display: grid;
+      gap: 8px;
+      position: sticky;
+      top: 22px;
+    }
+    .timeline button {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 10px;
+      text-align: left;
+      align-items: center;
+    }
+    .timeline b {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      color: var(--cyan);
+      background: #0d151f;
+    }
+    .scenario-stage {
+      min-height: 620px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background:
+        linear-gradient(180deg, rgba(34,48,68,0.58), rgba(13,17,23,0.9)),
+        var(--panel);
+      overflow: hidden;
+    }
+    .stage-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: center;
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(7, 10, 15, 0.42);
+    }
+    .stage-top p { margin: 0; }
+    .stage-body {
+      display: grid;
+      grid-template-columns: 1fr 0.9fr;
+      gap: 16px;
+      padding: 16px;
+    }
+    .stage-panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #111923;
+      padding: 14px;
+      min-height: 430px;
+    }
+    .stage-panel.secondary {
+      background: #0e151e;
+    }
+    .mock-toolbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .mock-list { display: grid; gap: 10px; }
+    .mock-row {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+      padding: 11px;
+    }
+    .mock-row strong { display: block; }
+    .mock-row span { color: var(--muted); font-size: 0.86rem; }
+    .scenario-notes {
+      display: grid;
+      gap: 10px;
+    }
+    .scenario-notes .card { background: #121b26; }
+
+    .feature-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .feature-atlas {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .feature {
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 10px;
+      min-height: 320px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(21, 28, 38, 0.9);
+      padding: 16px;
+    }
+    .feature[data-hidden="true"] { display: none; }
+    .feature-num { color: var(--cyan); font-weight: 900; font-size: 0.78rem; }
+    .feature h3 { margin: 0; }
+    .feature-grid {
+      display: grid;
+      gap: 8px;
+    }
+    .feature-grid div {
+      border-top: 1px solid rgba(49,64,83,0.7);
+      padding-top: 8px;
+    }
+    .feature-grid strong { display: block; font-size: 0.82rem; color: var(--text); margin-bottom: 3px; }
+    .feature-grid span { color: var(--muted); font-size: 0.86rem; }
+
+    .atlas-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(360px, 0.72fr);
+      gap: 16px;
+      align-items: start;
+    }
+    .system-map {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #0e151e;
+      padding: 16px;
+      position: relative;
+    }
+    .module-node {
+      min-height: 132px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+      padding: 12px;
+      text-align: left;
+    }
+    .module-node.active {
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 2px rgba(101,213,255,0.14);
+      background: #203047;
+    }
+    .module-node strong { display: block; margin-bottom: 6px; }
+    .module-node span { color: var(--muted); font-size: 0.84rem; }
+    .detail-panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      padding: 16px;
+      min-height: 470px;
+    }
+    .io-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .io-grid div {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #101821;
+      padding: 10px;
+    }
+    .io-grid strong { display: block; margin-bottom: 4px; }
+    .io-grid span { color: var(--muted); font-size: 0.88rem; }
+
+    .flow-shell {
+      display: grid;
+      grid-template-columns: 300px minmax(0, 1fr);
+      gap: 16px;
+    }
+    .flow-list { display: grid; gap: 8px; align-content: start; }
+    .flow-list button {
+      display: grid;
+      grid-template-columns: 32px 1fr;
+      gap: 10px;
+      align-items: center;
+      text-align: left;
+    }
+    .flow-list b {
+      display: grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 7px;
+      border: 1px solid var(--line);
+      color: var(--cyan);
+      background: #0e151e;
+    }
+    .flow-detail {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      min-height: 600px;
+      padding: 18px;
+    }
+    .mode-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .flow-lanes {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      margin: 18px 0;
+    }
+    .lane {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #101821;
+      padding: 12px;
+      min-height: 122px;
+    }
+    .lane span { display: block; color: var(--soft); font-size: 0.75rem; margin-bottom: 7px; }
+    .lane strong { font-size: 0.9rem; }
+
+    .protocol-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .protocol-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      padding: 16px;
+      min-height: 260px;
+    }
+    .protocol-card .big {
+      display: inline-grid;
+      place-items: center;
+      width: 54px;
+      height: 54px;
+      border-radius: 8px;
+      border: 1px solid var(--line-2);
+      background: #0e151e;
+      color: var(--cyan);
+      font-weight: 900;
+      margin-bottom: 12px;
+    }
+
+    .recipe-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    details.recipe {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      padding: 0;
+      overflow: hidden;
+    }
+    .recipe summary {
+      cursor: pointer;
+      padding: 14px 16px;
+      color: var(--text);
+      font-weight: 800;
+      background: #121b26;
+    }
+    .recipe-body { padding: 0 16px 16px; }
+    .recipe-body p { margin: 12px 0; }
+
+    code, pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+    code {
+      border: 1px solid #2a3b50;
+      border-radius: 5px;
+      background: #0c131c;
+      color: #d8ebff;
+      padding: 0.12rem 0.32rem;
+      font-size: 0.86em;
+    }
+    pre {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #080d13;
+      color: #d8ebff;
+      padding: 14px;
+      white-space: pre-wrap;
+      overflow: auto;
+      margin: 12px 0 0;
+      font-size: 0.85rem;
+    }
+    .path-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .path-list a {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #101821;
+      padding: 8px 10px;
+      color: #d8ebff;
+      text-decoration: none;
+      overflow-wrap: anywhere;
+      font-size: 0.86rem;
+    }
+    .path-list a:hover { border-color: var(--cyan); }
+
+    .data-plane {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+    .plane {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #101821;
+      padding: 14px;
+    }
+    .plane strong { display: block; margin-bottom: 8px; }
+    .plane ul { margin: 0; padding-left: 18px; color: var(--muted); }
+
+    .graph-suite {
+      display: grid;
+      gap: 20px;
+      margin-bottom: 28px;
+    }
+    .big-graph {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background:
+        linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px),
+        linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+        #0b1118;
+      background-size: 28px 28px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.22);
+    }
+    .big-graph-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(7, 10, 15, 0.58);
+    }
+    .big-graph-header p { margin: 6px 0 0; max-width: 920px; font-size: 0.95rem; }
+    .graph-reader {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 280px;
+      gap: 16px;
+      padding: 16px 20px 0;
+    }
+    .graph-reader-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(16, 24, 33, 0.86);
+      padding: 14px;
+    }
+    .graph-reader-card strong { display: block; margin-bottom: 6px; }
+    .graph-reader-card p { margin: 0; font-size: 0.92rem; }
+    .graph-legend {
+      display: grid;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(16, 24, 33, 0.86);
+      padding: 14px;
+    }
+    .legend-item {
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 9px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+    .legend-swatch {
+      display: block;
+      height: 3px;
+      border-radius: 999px;
+      background: var(--cyan);
+    }
+    .legend-swatch.green { background: var(--green); }
+    .legend-swatch.amber { background: var(--amber); }
+    .legend-swatch.violet { background: var(--violet); }
+    .legend-swatch.muted { background: #7d8da3; border-top: 1px dashed #7d8da3; }
+    .big-flow-svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      min-height: 660px;
+    }
+    .svg-panel { fill: rgba(21, 28, 38, 0.92); stroke: #314053; stroke-width: 1.2; rx: 8; }
+    .svg-panel-title { fill: #eef5ff; font-size: 16px; font-weight: 800; }
+    .svg-label { fill: #d8e7f6; font-size: 13px; font-weight: 700; }
+    .svg-sub { fill: #9fb0c4; font-size: 11px; }
+    .svg-node { fill: #121c27; stroke: #43566e; stroke-width: 1; rx: 7; }
+    .svg-node.hot { stroke: #65d5ff; fill: #17283a; }
+    .svg-node.green { stroke: #4fd19b; fill: #14251f; }
+    .svg-node.amber { stroke: #f1c86b; fill: #2a2416; }
+    .svg-node.violet { stroke: #bca8ff; fill: #201b32; }
+    .svg-line { stroke: #65d5ff; stroke-width: 2; fill: none; marker-end: url(#arrow); opacity: 0.72; }
+    .svg-line.green { stroke: #4fd19b; }
+    .svg-line.amber { stroke: #f1c86b; }
+    .svg-line.violet { stroke: #bca8ff; }
+    .svg-line.muted { stroke: #7d8da3; stroke-dasharray: 6 6; opacity: 0.55; }
+    .mini-graphs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .concept-graph {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(15, 21, 30, 0.88);
+      padding: 16px;
+      overflow: hidden;
+    }
+    .concept-graph h3 { margin-bottom: 6px; }
+    .identity-chain {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 14px;
+      position: relative;
+    }
+    .identity-root {
+      grid-row: span 4;
+      display: grid;
+      place-items: center;
+      min-height: 250px;
+      border: 1px solid rgba(79,209,155,0.55);
+      border-radius: 8px;
+      background: #12221d;
+      text-align: center;
+      padding: 18px;
+    }
+    .identity-root strong { display: block; color: var(--green); font-size: 1.25rem; }
+    .identity-hop {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #111923;
+      padding: 12px;
+    }
+    .identity-hop strong { display: block; }
+    .identity-hop span { color: var(--muted); font-size: 0.85rem; }
+    .plane-graph {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .plane-row {
+      display: grid;
+      grid-template-columns: 126px minmax(0, 1fr);
+      gap: 10px;
+      align-items: stretch;
+    }
+    .plane-row b {
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #101821;
+      color: var(--text);
+    }
+    .plane-row span {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #121b26;
+      padding: 10px 12px;
+      color: var(--muted);
+    }
+
+    .glossary-tools { margin-bottom: 14px; }
+    .glossary-tools input {
+      width: min(520px, 100%);
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #0c131c;
+      color: var(--text);
+      padding: 0.68rem 0.8rem;
+    }
+    .glossary-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .term {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      padding: 14px;
+    }
+    .term[data-hidden="true"] { display: none; }
+    .term strong { display: block; margin-bottom: 6px; }
+    .term p { margin: 0; font-size: 0.92rem; }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 14px;
+    }
+    .callout {
+      border: 1px solid rgba(241, 200, 107, 0.5);
+      background: rgba(241, 200, 107, 0.08);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .callout strong { color: var(--amber); }
+    .callout p { margin: 8px 0 0; }
+    .footer {
+      padding: 30px clamp(22px, 5vw, 72px);
+      color: var(--soft);
+    }
+
+    @media (max-width: 1180px) {
+      .shell { grid-template-columns: 1fr; }
+      .sidebar {
+        position: static;
+        height: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .nav { display: flex; flex-wrap: wrap; gap: 6px; }
+      .read-meter { display: none; }
+      .hero-layout, .scenario, .atlas-layout, .flow-shell, .status-grid { grid-template-columns: 1fr; }
+      .timeline { position: static; }
+      .feature-atlas, .protocol-grid, .system-map, .graph-reader { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .mini-graphs { grid-template-columns: 1fr; }
+      .stage-body { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 760px) {
+      .hero, section.chapter { padding-left: 18px; padding-right: 18px; }
+      .grid.two, .grid.three, .grid.four, .feature-atlas, .protocol-grid,
+      .system-map, .recipe-grid, .glossary-list, .data-plane, .path-list,
+      .flow-lanes, .io-grid, .cc-body, .identity-chain, .plane-row, .graph-reader { grid-template-columns: 1fr; }
+      .section-head { display: block; }
+      .hero { min-height: auto; }
+      .big-flow-svg { min-height: 780px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">AD</div>
+        <div>
+          <strong>AgentDeck Atlas</strong>
+          <span>Product manual + system guide</span>
+        </div>
+      </div>
+      <div class="nav-label">Learning path</div>
+      <nav class="nav" aria-label="Guide sections">
+        <a href="#start">Start here</a>
+        <a href="#tour">Guided tour</a>
+        <a href="#features">Feature atlas</a>
+        <a href="#system">System atlas</a>
+        <a href="#flows">How it works</a>
+        <a href="#protocols">Protocols</a>
+        <a href="#developer">Developer map</a>
+        <a href="#recipes">Recipes</a>
+        <a href="#glossary">Glossary</a>
+        <a href="#status">Status</a>
+      </nav>
+      <div class="read-meter">
+        <strong>Atlas progress</strong>
+        <div class="meter-track" aria-hidden="true"><span id="progressBar"></span></div>
+        <p id="progressText">Start with the command center, then follow the scenario.</p>
+      </div>
+    </aside>
+
+    <main>
+      <header class="hero" id="start">
+        <div class="hero-layout">
+          <div>
+            <p class="kicker">Local-first AI agent command center</p>
+            <h1>Learn AgentDeck like you are walking through the machine room.</h1>
+            <p class="lead">AgentDeck is a single local Go binary and browser UI for launching, supervising, coordinating, switching, and resuming coding agents. This atlas teaches the product, the user workflows, and the modules that make it run.</p>
+            <div class="hero-actions">
+              <a class="primary" href="#tour">Begin the guided tour</a>
+              <a href="#system">Open the system atlas</a>
+              <a href="#recipes">Jump to recipes</a>
+            </div>
+            <div class="learn-list" aria-label="Learning outcomes">
+              <div class="learn-item"><b>1</b><span>You will know what each AgentDeck feature is for and when to use it.</span></div>
+              <div class="learn-item"><b>2</b><span>You will understand stable <code>agent_id</code>, runtime switching, ACP chat, PTY terminal, MCP messaging, hooks, SQLite state, and SSE updates.</span></div>
+              <div class="learn-item"><b>3</b><span>You will know which Go or React module owns each behavior and what to inspect when something acts strangely.</span></div>
+            </div>
+          </div>
+
+          <div class="command-center" aria-label="AgentDeck command center illustration">
+            <div class="cc-top">
+              <strong>AgentDeck local control plane</strong>
+              <span class="cc-dot">loopback live</span>
+            </div>
+            <div class="cc-body">
+              <div class="agent-board">
+                <div class="agent-card busy">
+                  <div class="agent-card-head"><div><strong>Atlas</strong><small>implementer@AgentDeck</small></div><span class="status-pill">busy</span></div>
+                  <p>Editing terminal runtime UI and streaming tool output.</p>
+                  <div class="context"><span style="width:64%"></span></div>
+                </div>
+                <div class="agent-card waiting">
+                  <div class="agent-card-head"><div><strong>Vega</strong><small>reviewer@AgentDeck</small></div><span class="status-pill">waiting_input</span></div>
+                  <p>Permission requested for a diff inspection command.</p>
+                  <div class="context"><span style="width:41%"></span></div>
+                </div>
+                <div class="agent-card done">
+                  <div class="agent-card-head"><div><strong>Quill</strong><small>pm@AgentDeck</small></div><span class="status-pill">done</span></div>
+                  <p>Summarized archive findings and left a handoff.</p>
+                  <div class="context"><span style="width:52%"></span></div>
+                </div>
+              </div>
+              <div class="radar">
+                <div class="pulse-line pl-1"></div>
+                <div class="pulse-line pl-2"></div>
+                <div class="pulse-line pl-3"></div>
+                <div class="radar-node rn-ui"><b>React UI</b><span>cards, chat, settings</span></div>
+                <div class="radar-node rn-server"><b>Go server</b><span>REST, SSE, registry</span></div>
+                <div class="radar-node rn-cli"><b>Agent CLI</b><span>ACP or PTY</span></div>
+                <div class="radar-node rn-db"><b>state.db</b><span>identity, status, FTS</span></div>
+                <div class="radar-node rn-mcp"><b>MCP</b><span>agent messages</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section class="chapter" id="tour">
+        <div class="section-head">
+          <div>
+            <p class="kicker">Guided tour</p>
+            <h2>A day with AgentDeck</h2>
+            <p>Follow one realistic session: configure the dashboard, launch agents, supervise live work, approve tools, coordinate agents, switch runtime, and resume later. Each step has a user view, a system view, and code pointers.</p>
+          </div>
+          <div class="source-row">
+            <a class="source" href="../README.md">README</a>
+            <a class="source" href="agent-dashboard-prd.md">Master PRD</a>
+            <a class="source" href="../architecture-flow.md">Architecture flow</a>
+          </div>
+        </div>
+        <div class="scenario">
+          <div class="timeline" id="scenarioTimeline" aria-label="Scenario steps"></div>
+          <div class="scenario-stage">
+            <div class="stage-top">
+              <div>
+                <p class="kicker" id="scenarioKicker">Step 1 of 8</p>
+                <h3 id="scenarioTitle">Configure the local workspace</h3>
+              </div>
+              <div class="source-row" id="scenarioTags"></div>
+            </div>
+            <div class="stage-body">
+              <div class="stage-panel">
+                <div class="mock-toolbar">
+                  <strong id="mockTitle">User surface</strong>
+                  <span class="status-pill" id="mockState">settings</span>
+                </div>
+                <div id="scenarioMock"></div>
+              </div>
+              <div class="stage-panel secondary">
+                <div class="scenario-notes">
+                  <article class="card">
+                    <h4>User goal</h4>
+                    <p id="scenarioUser"></p>
+                  </article>
+                  <article class="card">
+                    <h4>Behind the scenes</h4>
+                    <p id="scenarioBehind"></p>
+                  </article>
+                  <article class="card">
+                    <h4>Where to read</h4>
+                    <div class="path-list" id="scenarioPaths"></div>
+                  </article>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter" id="features">
+        <div class="section-head">
+          <div>
+            <p class="kicker">Feature atlas</p>
+            <h2>Everything AgentDeck has to offer</h2>
+            <p>Each feature card explains the product behavior, the mental model, the implementation machinery, and the main surface to inspect when debugging.</p>
+          </div>
+          <a class="source" href="agent-dashboard-prd.md#5-feature-requirements">Source: PRD F1-F13</a>
+        </div>
+        <div class="feature-controls" aria-label="Feature filters">
+          <button class="feature-filter active" data-feature-filter="all">All</button>
+          <button class="feature-filter" data-feature-filter="operate">Operate</button>
+          <button class="feature-filter" data-feature-filter="configure">Configure</button>
+          <button class="feature-filter" data-feature-filter="coordinate">Coordinate</button>
+          <button class="feature-filter" data-feature-filter="history">History</button>
+          <button class="feature-filter" data-feature-filter="flex">Flexibility</button>
+          <button class="feature-filter" data-feature-filter="polish">Polish</button>
+        </div>
+        <div class="feature-atlas" id="featureAtlas"></div>
+      </section>
+
+      <section class="chapter" id="system">
+        <div class="section-head">
+          <div>
+            <p class="kicker">System atlas</p>
+            <h2>The modules and how they interact</h2>
+            <p>Click a module to see what it owns, what flows in, what flows out, what it persists, and which neighbor modules it talks to.</p>
+          </div>
+          <div class="source-row">
+            <a class="source" href="../architecture-flow.md">Architecture flow</a>
+            <a class="source" href="architecture-decisions.md">Architecture decisions</a>
+            <a class="source" href="../MAP.md">MAP.md</a>
+          </div>
+        </div>
+        <div class="graph-suite">
+          <div class="big-graph">
+            <div class="big-graph-header">
+              <div>
+                <h3>Big-picture moving-parts graph</h3>
+                <p>The whole product is a browser UI, one loopback Go binary, one child process per agent, and local disk. REST commands move left-to-right; live state returns through SSE; terminal bytes use WebSocket; agent coordination uses MCP.</p>
+              </div>
+              <span class="tag cyan">Mermaid-inspired · static SVG</span>
+            </div>
+            <div class="graph-reader">
+              <div class="graph-reader-card">
+                <strong>How to read it</strong>
+                <p>Start at the browser on the left. User actions enter the Go server through REST. The registry starts either chat or terminal runtimes. Agent output and hooks flow back into server-owned state, then return to the browser as SSE or terminal WebSocket bytes.</p>
+              </div>
+              <div class="graph-legend" aria-label="Diagram legend">
+                <div class="legend-item"><span class="legend-swatch"></span><span>Control path: REST, registry, ACP</span></div>
+                <div class="legend-item"><span class="legend-swatch green"></span><span>Live/state path: SSE, hooks, SQLite</span></div>
+                <div class="legend-item"><span class="legend-swatch amber"></span><span>Terminal path: WebSocket, PTY</span></div>
+                <div class="legend-item"><span class="legend-swatch violet"></span><span>Coordination path: MCP, nudger</span></div>
+              </div>
+            </div>
+            <svg class="big-flow-svg" viewBox="0 0 1480 900" role="img" aria-label="AgentDeck system landscape graph">
+              <defs>
+                <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+                  <path d="M0,0 L0,6 L9,3 z" fill="#65d5ff"></path>
+                </marker>
+              </defs>
+
+              <rect class="svg-panel" x="44" y="54" width="300" height="746"></rect>
+              <text class="svg-panel-title" x="72" y="90">Browser - React SPA</text>
+              <rect class="svg-node hot" x="76" y="132" width="226" height="74"></rect>
+              <text class="svg-label" x="100" y="162">UI components</text>
+              <text class="svg-sub" x="100" y="184">grid · chat · archive · settings</text>
+              <rect class="svg-node" x="76" y="248" width="226" height="74"></rect>
+              <text class="svg-label" x="100" y="278">Zustand + React Query</text>
+              <text class="svg-sub" x="100" y="300">live stores · config cache</text>
+              <rect class="svg-node green" x="76" y="364" width="226" height="74"></rect>
+              <text class="svg-label" x="100" y="394">SSE client</text>
+              <text class="svg-sub" x="100" y="416">GET /api/events</text>
+              <rect class="svg-node amber" x="76" y="480" width="226" height="74"></rect>
+              <text class="svg-label" x="100" y="510">Terminal panel</text>
+              <text class="svg-sub" x="100" y="532">xterm.js · WebSocket</text>
+              <rect class="svg-node hot" x="76" y="612" width="226" height="74"></rect>
+              <text class="svg-label" x="100" y="642">agentdeck CLI</text>
+              <text class="svg-sub" x="100" y="664">dashboard · launch · resume</text>
+
+              <rect class="svg-panel" x="438" y="54" width="500" height="746"></rect>
+              <text class="svg-panel-title" x="470" y="90">Go single binary - 127.0.0.1 only</text>
+              <rect class="svg-node hot" x="480" y="126" width="176" height="68"></rect>
+              <text class="svg-label" x="504" y="154">HTTP server</text>
+              <text class="svg-sub" x="504" y="174">routes · middleware · static UI</text>
+              <rect class="svg-node" x="720" y="126" width="176" height="68"></rect>
+              <text class="svg-label" x="744" y="154">Runtime registry</text>
+              <text class="svg-sub" x="744" y="174">dispatch by interface</text>
+              <rect class="svg-node green" x="480" y="236" width="176" height="68"></rect>
+              <text class="svg-label" x="504" y="264">Config loader</text>
+              <text class="svg-sub" x="504" y="284">roles · projects · backends</text>
+              <rect class="svg-node" x="720" y="236" width="176" height="68"></rect>
+              <text class="svg-label" x="744" y="264">Backend adapter</text>
+              <text class="svg-sub" x="744" y="284">argv · env · resume IDs</text>
+              <rect class="svg-node" x="480" y="346" width="176" height="68"></rect>
+              <text class="svg-label" x="504" y="374">State manager</text>
+              <text class="svg-sub" x="504" y="394">SQLite sole writer</text>
+              <rect class="svg-node green" x="720" y="346" width="176" height="68"></rect>
+              <text class="svg-label" x="744" y="374">Event bus</text>
+              <text class="svg-sub" x="744" y="394">SSE fan-out</text>
+              <rect class="svg-node violet" x="480" y="456" width="176" height="68"></rect>
+              <text class="svg-label" x="504" y="484">MCP messaging</text>
+              <text class="svg-sub" x="504" y="504">tools + identity binding</text>
+              <rect class="svg-node violet" x="720" y="456" width="176" height="68"></rect>
+              <text class="svg-label" x="744" y="484">Nudger</text>
+              <text class="svg-sub" x="744" y="504">wake idle recipients</text>
+              <rect class="svg-node" x="480" y="566" width="176" height="68"></rect>
+              <text class="svg-label" x="504" y="594">Chat runtime</text>
+              <text class="svg-sub" x="504" y="614">ACP over stdio</text>
+              <rect class="svg-node amber" x="720" y="566" width="176" height="68"></rect>
+              <text class="svg-label" x="744" y="594">Terminal runtime</text>
+              <text class="svg-sub" x="744" y="614">PTY · tmux · xterm</text>
+              <rect class="svg-node" x="600" y="682" width="176" height="68"></rect>
+              <text class="svg-label" x="624" y="710">Transcript/indexer</text>
+              <text class="svg-sub" x="624" y="730">NDJSON · files · FTS</text>
+
+              <rect class="svg-panel" x="1024" y="54" width="220" height="746"></rect>
+              <text class="svg-panel-title" x="1054" y="90">Agent CLIs</text>
+              <rect class="svg-node" x="1054" y="150" width="160" height="82"></rect>
+              <text class="svg-label" x="1076" y="180">ACP adapter</text>
+              <text class="svg-sub" x="1076" y="202">claude-code-acp</text>
+              <text class="svg-sub" x="1076" y="218">codex-acp</text>
+              <rect class="svg-node amber" x="1054" y="318" width="160" height="82"></rect>
+              <text class="svg-label" x="1076" y="348">Real CLI</text>
+              <text class="svg-sub" x="1076" y="370">terminal interface</text>
+              <rect class="svg-node green" x="1054" y="486" width="160" height="82"></rect>
+              <text class="svg-label" x="1076" y="516">Hook scripts</text>
+              <text class="svg-sub" x="1076" y="538">POST /api/hook</text>
+              <rect class="svg-node violet" x="1054" y="626" width="160" height="82"></rect>
+              <text class="svg-label" x="1076" y="656">MCP tools</text>
+              <text class="svg-sub" x="1076" y="678">list/send/check</text>
+
+              <rect class="svg-panel" x="1320" y="54" width="124" height="746"></rect>
+              <text class="svg-panel-title" x="1338" y="90">Disk</text>
+              <rect class="svg-node green" x="1338" y="142" width="88" height="82"></rect>
+              <text class="svg-label" x="1352" y="174">JSON</text>
+              <text class="svg-sub" x="1352" y="196">config</text>
+              <rect class="svg-node hot" x="1338" y="316" width="88" height="82"></rect>
+              <text class="svg-label" x="1352" y="348">state.db</text>
+              <text class="svg-sub" x="1352" y="370">SQLite/FTS</text>
+              <rect class="svg-node" x="1338" y="490" width="88" height="82"></rect>
+              <text class="svg-label" x="1352" y="522">sessions</text>
+              <text class="svg-sub" x="1352" y="544">NDJSON</text>
+              <rect class="svg-node green" x="1338" y="636" width="88" height="82"></rect>
+              <text class="svg-label" x="1352" y="668">hooks</text>
+              <text class="svg-sub" x="1352" y="690">settings</text>
+
+              <path class="svg-line" d="M302 169 C365 169, 410 160, 480 160"></path>
+              <text class="svg-sub" x="354" y="150">REST commands</text>
+              <path class="svg-line" d="M302 649 C382 640, 422 190, 480 160"></path>
+              <text class="svg-sub" x="332" y="628">CLI REST launch/resume</text>
+              <path class="svg-line green" d="M720 380 C590 424, 430 400, 302 401"></path>
+              <text class="svg-sub" x="448" y="356">SSE live push</text>
+              <path class="svg-line amber" d="M302 517 C448 566, 572 594, 720 600"></path>
+              <text class="svg-sub" x="410" y="558">terminal WebSocket</text>
+              <path class="svg-line" d="M656 160 L720 160"></path>
+              <path class="svg-line green" d="M480 270 C405 238, 1240 178, 1338 183"></path>
+              <path class="svg-line" d="M656 270 L720 270"></path>
+              <path class="svg-line" d="M808 304 C818 230, 800 205, 808 194"></path>
+              <path class="svg-line" d="M808 194 C742 314, 636 492, 568 566"></path>
+              <path class="svg-line amber" d="M808 194 C852 330, 848 470, 808 566"></path>
+              <path class="svg-line" d="M656 600 C790 546, 890 250, 1054 191"></path>
+              <text class="svg-sub" x="860" y="304">stdio JSON-RPC / ACP</text>
+              <path class="svg-line amber" d="M896 600 C958 552, 996 420, 1054 359"></path>
+              <text class="svg-sub" x="954" y="508">PTY master</text>
+              <path class="svg-line green" d="M1338 677 C1280 640, 1238 558, 1214 527"></path>
+              <path class="svg-line green" d="M1134 486 C1010 470, 706 315, 656 160"></path>
+              <text class="svg-sub" x="872" y="466">hook POST + token</text>
+              <path class="svg-line violet" d="M1054 667 C900 650, 700 525, 656 490"></path>
+              <path class="svg-line violet" d="M302 285 C378 348, 412 458, 480 490"></path>
+              <text class="svg-sub" x="330" y="340">MCP tools</text>
+              <path class="svg-line violet" d="M656 490 L720 490"></path>
+              <path class="svg-line violet" d="M808 524 C812 546, 812 550, 808 566"></path>
+              <path class="svg-line green" d="M568 414 L568 456"></path>
+              <path class="svg-line green" d="M656 380 L720 380"></path>
+              <path class="svg-line green" d="M568 414 C740 432, 1110 354, 1338 357"></path>
+              <path class="svg-line muted" d="M688 750 C850 742, 1094 536, 1338 531"></path>
+              <path class="svg-line green" d="M688 682 C850 560, 1120 402, 1338 357"></path>
+              <path class="svg-line muted" d="M688 716 C850 668, 1124 574, 1338 531"></path>
+              <text class="svg-sub" x="960" y="624">transcripts + reindex</text>
+            </svg>
+            <div class="graph-reader" style="padding-top:0; padding-bottom:18px">
+              <div class="graph-reader-card">
+                <strong>The three big takeaways</strong>
+                <p>AgentDeck is local-first: browser and agent CLIs never write SQLite directly; they talk to the Go server. The server is the control point that launches runtimes, receives status, writes state, and fans updates out. Chat content is structured ACP; terminal content is raw PTY bytes; both still share the same stable agent identity.</p>
+              </div>
+              <div class="graph-reader-card">
+                <strong>What is intentionally separate</strong>
+                <p>Terminal bytes are not SSE messages, and chat transcript events are not hook posts. Config JSON is read at launch time, while <code>state.db</code> is live machine truth. That separation is what keeps switching, resume, archive, and dashboard updates understandable.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="mini-graphs">
+            <article class="concept-graph">
+              <h3>Identity graph: one logical agent, many runtime sessions</h3>
+              <p>The most important invariant: every resume or switch keeps the same <code>agent_id</code>. Only the provider/runtime <code>session_id</code> changes.</p>
+              <div class="identity-chain">
+                <div class="identity-root"><div><strong>agent_id</strong><span>a_8f3c12<br>stable identity</span></div></div>
+                <div class="identity-hop"><strong>first launch</strong><span>session_id A · chat · Claude</span></div>
+                <div class="identity-hop"><strong>resume later</strong><span>session_id B · history intact</span></div>
+                <div class="identity-hop"><strong>switch model</strong><span>session_id C · same card</span></div>
+                <div class="identity-hop"><strong>switch terminal</strong><span>session_id D · PTY runtime</span></div>
+              </div>
+            </article>
+            <article class="concept-graph">
+              <h3>Data/control planes</h3>
+              <p>REST asks the system to do things. SSE tells the browser what changed. WebSocket carries terminal bytes. SQLite is written only by the server process.</p>
+              <div class="plane-graph">
+                <div class="plane-row"><b>Control</b><span>REST: launch, prompt, stop, resume, switch, config CRUD</span></div>
+                <div class="plane-row"><b>Live push</b><span>SSE: state_update, new_message, notification, ping</span></div>
+                <div class="plane-row"><b>Terminal</b><span>WebSocket: browser keystrokes/resizes ⇄ PTY output</span></div>
+                <div class="plane-row"><b>State</b><span>SQLite: identity, running, status, messages, sessions, FTS5</span></div>
+              </div>
+            </article>
+          </div>
+        </div>
+        <div class="atlas-layout">
+          <div class="system-map" id="moduleMap"></div>
+          <article class="detail-panel" id="moduleDetail"></article>
+        </div>
+        <div class="data-plane">
+          <div class="plane">
+            <strong>Control plane</strong>
+            <ul>
+              <li>REST launches, prompts, stops, resumes, switches, edits config.</li>
+              <li>Terminal WebSocket carries PTY bytes.</li>
+              <li>MCP tool calls coordinate agent-to-agent messages.</li>
+            </ul>
+          </div>
+          <div class="plane">
+            <strong>Live data plane</strong>
+            <ul>
+              <li>SSE pushes <code>state_update</code>, <code>new_message</code>, <code>notification</code>, <code>ping</code>.</li>
+              <li>UI stores hydrate and update from the stream.</li>
+              <li>No browser polling of agent CLIs.</li>
+            </ul>
+          </div>
+          <div class="plane">
+            <strong>Persistence plane</strong>
+            <ul>
+              <li>Config is JSON under <code>~/.agentdeck</code>.</li>
+              <li>Machine state is SQLite, server-only writer.</li>
+              <li>Transcripts are append logs indexed into FTS5.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter" id="flows">
+        <div class="section-head">
+          <div>
+            <p class="kicker">How it works</p>
+            <h2>Deep flows without line-by-line code reading</h2>
+            <p>Choose a flow. Switch between the user experience, system choreography, and code map. The lanes show which part of AgentDeck is active at each stage.</p>
+          </div>
+          <a class="source" href="phases/">Source: phase PRDs and tech specs</a>
+        </div>
+        <div class="flow-shell">
+          <div class="flow-list" id="flowList"></div>
+          <div class="flow-detail">
+            <div class="mode-tabs">
+              <button class="flow-mode active" data-flow-mode="user">User view</button>
+              <button class="flow-mode" data-flow-mode="system">System view</button>
+              <button class="flow-mode" data-flow-mode="code">Code map</button>
+              <button class="flow-mode" data-flow-mode="debug">Debug lens</button>
+            </div>
+            <div id="flowOutput"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter" id="protocols">
+        <div class="section-head">
+          <div>
+            <p class="kicker">Protocol explainers</p>
+            <h2>The AI/system terms in AgentDeck language</h2>
+            <p>These are not generic definitions. They explain exactly how each protocol or channel is used in this repo.</p>
+          </div>
+        </div>
+        <div class="protocol-grid" id="protocolGrid"></div>
+      </section>
+
+      <section class="chapter" id="developer">
+        <div class="section-head">
+          <div>
+            <p class="kicker">Developer map</p>
+            <h2>How to find the code that owns a behavior</h2>
+            <p>Start from behavior, then jump to the package. The product is easier to learn by following data and control flow than by reading files alphabetically.</p>
+          </div>
+          <a class="source" href="../MAP.md">Source: MAP.md</a>
+        </div>
+        <div class="grid three">
+          <article class="card">
+            <h3>Reading sequence</h3>
+            <ol>
+              <li><a href="../architecture-flow.md">architecture-flow.md</a> for the whole picture.</li>
+              <li><a href="phases/HANDOFF.md">HANDOFF.md</a> for current truth.</li>
+              <li>The phase tech spec for the feature.</li>
+              <li>The module package from the atlas.</li>
+              <li>The tests next to that package.</li>
+            </ol>
+          </article>
+          <article class="card">
+            <h3>Build/run loop</h3>
+            <pre>make dist
+./bin/agentdeck dashboard start
+./bin/agentdeck dashboard open
+
+go build ./...
+go test ./...
+
+# If UI changed:
+cd ui && npm run build</pre>
+          </article>
+          <article class="card">
+            <h3>Debugging heuristic</h3>
+            <p>If the UI looks stale, inspect SSE and stores. If launch fails, inspect config composition and backend adapter. If archive/search is wrong, inspect transcript writer and indexer. If a switch loses identity, inspect <code>agent_id</code> vs <code>session_id</code>.</p>
+          </article>
+        </div>
+        <div class="grid two" style="margin-top:14px">
+          <article class="wide-card">
+            <h3>Feature to package map</h3>
+            <div class="path-list">
+              <a href="../internal/server/routes.go">Routes: internal/server/routes.go</a>
+              <a href="../internal/runtime/chat.go">ACP chat: internal/runtime/chat.go</a>
+              <a href="../internal/runtime/terminal">Terminal: internal/runtime/terminal</a>
+              <a href="../internal/state/schema.go">State: internal/state/schema.go</a>
+              <a href="../internal/messaging/tools.go">MCP tools: internal/messaging/tools.go</a>
+              <a href="../internal/hooks/hooks.go">Hooks: internal/hooks/hooks.go</a>
+              <a href="../internal/index/indexer.go">Indexer: internal/index/indexer.go</a>
+              <a href="../ui/src/api/sse.ts">UI live stream: ui/src/api/sse.ts</a>
+            </div>
+          </article>
+          <article class="wide-card">
+            <h3>Local data layout</h3>
+            <pre>~/.agentdeck/
+  roles/*.json
+  projects/*.json
+  backends.json
+  layout.json
+  config.json
+  state.db
+  sessions/{agent_id}/...</pre>
+            <p>Human-facing config is readable JSON. Machine-facing state is SQLite because AgentDeck needs identity joins, running/session status, message rows, and FTS5 search.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="chapter" id="recipes">
+        <div class="section-head">
+          <div>
+            <p class="kicker">Recipes</p>
+            <h2>How to use AgentDeck day to day</h2>
+            <p>Open the recipe for the workflow you want. These are product-level operations with implementation notes where they matter.</p>
+          </div>
+          <a class="source" href="../README.md#quickstart">Source: README quickstart</a>
+        </div>
+        <div class="recipe-grid" id="recipeGrid"></div>
+      </section>
+
+      <section class="chapter" id="glossary">
+        <div class="section-head">
+          <div>
+            <p class="kicker">Glossary</p>
+            <h2>Terms that unlock the repo</h2>
+          </div>
+        </div>
+        <div class="glossary-tools">
+          <input id="glossarySearch" type="search" placeholder="Filter terms: ACP, hook, registry, FTS5, runtime...">
+        </div>
+        <div class="glossary-list" id="glossaryList"></div>
+      </section>
+
+      <section class="chapter" id="status">
+        <div class="section-head">
+          <div>
+            <p class="kicker">Current status</p>
+            <h2>What is live, what is gated, what comes next</h2>
+          </div>
+          <a class="source" href="phases/HANDOFF.md">Source: HANDOFF.md</a>
+        </div>
+        <div class="status-grid">
+          <article class="card">
+            <h3>Green today</h3>
+            <ul>
+              <li>Phases 0-5 are complete: foundation, core ACP chat loop, dashboard/state, config/onboarding, archive/search/resume, MCP coordination, nudger, budgets, notifications.</li>
+              <li>Phase 6 subphases 6.1-6.6 are green: hook registration, Codex adapter path, xterm/tmux terminal runtime, switch-runtime, backend primer, task groups, UI endpoints.</li>
+              <li>The current README lists launch, streaming chat, dashboard, config CRUD, archive/search/resume, MCP messaging, terminal runtime, and switch-runtime as working today.</li>
+            </ul>
+          </article>
+          <article class="callout">
+            <strong>Still gated or optional</strong>
+            <p>Phase 6.7, the iTerm2/AppleScript driver, is optional and next if desired. Live two-CLI MCP registration, live Codex chat acceptance, Codex hook names, target-backend live summarization, and interactive terminal resume forms still need credentialed validation. Phase 7 activity map remains future polish.</p>
+          </article>
+        </div>
+      </section>
+
+      <footer class="footer">
+        Static AgentDeck atlas. One file, no external assets, no backend calls.
+      </footer>
+    </main>
+  </div>
+
+  <script>
+    const scenarioSteps = [
+      {
+        title: "Configure the local workspace",
+        state: "settings",
+        tags: ["roles", "projects", "backends"],
+        user: "You define reusable roles, projects, and backend/model choices. AgentDeck should know where work happens, which persona to use, and which CLI/model should run.",
+        behind: "The config package reads and writes JSON under ~/.agentdeck. Launches compose project cwd/context, role system prompt, backend env, selected model, permission policy, and interface. Existing agents keep their already-composed config until restart.",
+        paths: ["internal/config", "ui/src/features/settings", "docs/phases/tech/phase-3-config-onboarding-techspec.md"],
+        rows: [
+          ["Project", "AgentDeck · cwd ~/Projects/AgentDeck · context prompt"],
+          ["Role", "implementer · reviewer · researcher · pm"],
+          ["Backend", "claude-acp default · codex-acp optional"]
+        ]
+      },
+      {
+        title: "Launch implementer@AgentDeck",
+        state: "launch",
+        tags: ["REST", "registry", "identity"],
+        user: "You start Atlas from the modal or CLI. A card appears, and the agent gets a stable identity that will survive stops, resumes, switches, and messages.",
+        behind: "POST /api/sessions mints agent_id, hook token, MCP registration, and launch spec. The runtime registry dispatches by interface. Chat starts ACP over stdio; terminal starts a PTY driver.",
+        paths: ["internal/server/launch.go", "internal/runtime/registry.go", "internal/backend/adapter.go"],
+        rows: [
+          ["Request", "role=implementer, project=agentdeck, backend=claude, interface=chat"],
+          ["Identity", "agent_id=a_8f3c12 stays stable"],
+          ["Runtime", "chat runtime starts ACP child process"]
+        ]
+      },
+      {
+        title: "Watch the dashboard breathe",
+        state: "dashboard",
+        tags: ["SSE", "state.db", "Zustand"],
+        user: "You glance at cards to see busy, idle, waiting_input, done, context usage, unread messages, and recent activity without opening every terminal.",
+        behind: "The server writes status to SQLite and emits state_update events through the bus. The browser SSE client updates UI stores directly and rehydrates on reconnect.",
+        paths: ["internal/bus/bus.go", "internal/server/sse.go", "ui/src/api/sse.ts", "ui/src/store/agentStore.ts"],
+        rows: [
+          ["Atlas", "busy · PreToolUse: Edit"],
+          ["Vega", "waiting_input · permission required"],
+          ["Quill", "done · summary available"]
+        ]
+      },
+      {
+        title: "Chat, tools, diffs, permission",
+        state: "chat",
+        tags: ["ACP", "permission", "transcript"],
+        user: "You open the chat panel, send a prompt, inspect streamed assistant output, review tool calls and diffs, and approve or deny permission requests inline.",
+        behind: "ChatRuntime maps ACP JSON-RPC/NDJSON frames into AgentDeck events. Permission requests withhold the agent response until the server relays approve/deny back through ACP.",
+        paths: ["internal/runtime/chat.go", "internal/runtime/acpmap.go", "internal/runtime/permission.go", "ui/src/components/chat/renderers"],
+        rows: [
+          ["User", "Implement phase 6.6 and run green checkpoint"],
+          ["Tool call", "Edit ui/src/components/grid/AgentCard.tsx"],
+          ["Permission", "Approve shell command? npm run build"]
+        ]
+      },
+      {
+        title: "Ask a reviewer agent for help",
+        state: "messaging",
+        tags: ["MCP", "nudger", "budget"],
+        user: "Atlas can ask Vega to review work using an MCP tool. Vega wakes if idle, reads the message, and acts without you copy-pasting context.",
+        behind: "The in-process MCP server binds caller identity to a registered session token, writes message rows to SQLite, emits indicators, and uses a nudger plus per-turn budget to prevent runaway loops.",
+        paths: ["internal/messaging/tools.go", "internal/server/messaging_loops.go", "internal/state/messages.go"],
+        rows: [
+          ["Tool", "send_message(to=Vega, body=review this diff)"],
+          ["State", "messages row + unread badge"],
+          ["Nudger", "injects check_messages turn if Vega is idle"]
+        ]
+      },
+      {
+        title: "Switch to terminal or another model",
+        state: "switch",
+        tags: ["switch-runtime", "PTY", "resume"],
+        user: "You can move Atlas from chat to terminal, or change backend/model, while keeping the same logical agent, name, group, archive, and messages.",
+        behind: "The switch handler takes a per-agent lock, cancels/stops the old runtime, persists target identity, resolves native resume or primer handoff, relaunches through the registry, and emits a state update.",
+        paths: ["internal/server/switch.go", "internal/server/primer.go", "internal/runtime/terminal", "internal/runtime/registry.go"],
+        rows: [
+          ["Old runtime", "chat · claude · sonnet"],
+          ["Switch target", "terminal · codex · gpt-5.5"],
+          ["Invariant", "agent_id unchanged"]
+        ]
+      },
+      {
+        title: "Audit files, commands, and archive",
+        state: "archive",
+        tags: ["FTS5", "indexer", "resume"],
+        user: "You review edited files and commands, search historical sessions by phrase, and resume useful work later with history intact.",
+        behind: "Transcript logs are durable source. The indexer updates SQLite session metadata, file/command trails, and FTS5 search tables. Resume starts a fresh runtime for the same identity.",
+        paths: ["internal/transcript/writer.go", "internal/index/indexer.go", "internal/archive/archive.go", "internal/server/resume.go"],
+        rows: [
+          ["Files", "internal/server/switch.go · ui/src/components/chat/TerminalTab.tsx"],
+          ["Commands", "go test ./... · npm run build"],
+          ["Archive", "search phrase: switch-runtime rollback"]
+        ]
+      },
+      {
+        title: "Release the group and leave a clean handoff",
+        state: "groups",
+        tags: ["groups", "stop", "handoff"],
+        user: "You collapse task groups, move agents between them, or release a whole group when a workstream is done.",
+        behind: "Group is identity metadata on the agent row. Layout stores collapse state. Release group batches stop operations with liveness pruning so the dashboard remains truthful.",
+        paths: ["internal/server/groups.go", "internal/state/agents.go", "ui/src/components/grid/CardGrid.tsx"],
+        rows: [
+          ["Group", "phase-6-flexibility"],
+          ["Action", "Release group"],
+          ["Result", "running rows removed, cards become done"]
+        ]
+      }
+    ];
+
+    const features = [
+      ["F1", "Multi-agent dashboard", "operate", "See every active agent as a card with state, context, message badges, and recent output.", "Think of the dashboard as a live projection of SQLite status plus SSE updates.", "State manager, bus, server sessions endpoints, UI stores, card grid.", "Check /api/events, internal/bus, internal/state/status.go, ui/src/store/agentStore.ts."],
+      ["F2", "Task groups", "flex", "Organize agents by workstream and release them in batches.", "Group is stable identity metadata; collapse state is layout preference.", "agents.group, layout group collapse, group release endpoint, card sections.", "Check internal/server/groups.go, internal/state/agents.go, CardGrid."],
+      ["F3", "Streaming chat panel", "operate", "Send prompts, stream assistant text, inspect tools/diffs/results, approve permissions.", "ACP wire events become AgentDeck normalized events consumed by UI and persistence.", "Chat runtime, event hub, renderers, permission gate.", "Check chat.go, acpmap.go, permission.go, ui/src/components/chat/renderers."],
+      ["F4", "Launch an agent", "operate configure", "Start from UI modal or CLI with role, project, backend, model, interface.", "Launch is composition: config files plus backend adapter plus runtime dispatch.", "server launch handler, config store, backend adapter, runtime registry.", "Check launch.go, config package, backend/adapter.go, registry.go."],
+      ["F5", "Projects and roles", "configure", "Define where agents work and how they behave.", "JSON config is intentionally hand-editable and affects future launches.", "config package, settings UI, validation.", "Check internal/config/projects.go, roles.go, ui/src/features/settings."],
+      ["F6", "Backends and models", "configure", "Configure Claude/Codex providers, defaults, model names, env overrides.", "Backend type selects adapter behavior; model/env shape feeds launch spec.", "backends.json, backend adapter, credential checks.", "Check internal/config/backends.go, internal/backend/credcheck."],
+      ["F7", "Switch runtime", "flex", "Change chat/terminal, backend, or model without losing logical identity.", "Switch equals stop and relaunch on same agent_id with native resume or primer handoff.", "switch handler, primer, registry resume, backend adapter.", "Check internal/server/switch.go and primer.go."],
+      ["F8", "Agent messaging", "coordinate", "Agents coordinate using MCP tools and unread badges.", "MCP sessions bind identity; messages are rows in SQLite; nudger wakes idle recipients.", "messaging server/tools, message store, nudger, budgets.", "Check internal/messaging and internal/state/messages.go."],
+      ["F9", "Archive/search/resume", "history", "Find old sessions and resume with history intact.", "Transcript logs are durable; SQLite metadata/FTS make search fast.", "transcript writer/reader, indexer, archive endpoint, resume endpoint.", "Check internal/transcript, internal/index, internal/archive, resume.go."],
+      ["F10", "Files and commands", "history operate", "Audit files edited and commands run by each agent.", "Derived from tool events and hooks, indexed as queryable rows.", "indexer, hook capture, files/commands endpoints, chat tabs.", "Check internal/server/files_commands.go and ui chat tabs."],
+      ["F11", "Notifications", "coordinate operate", "Get in-app/browser notifications when agents finish or need input.", "Notifications are SSE events sourced from state transitions and message activity.", "notification SSE, UI notification center, config mutes.", "Check server SSE/notification paths and uiStore."],
+      ["F12", "Onboarding", "configure", "First-run flow guides backend setup, project creation, and launch.", "Onboarding is a config readiness gate before the main dashboard.", "config endpoints, validation, React onboarding wizard.", "Check ui/src/features/onboarding and config handlers."],
+      ["F13", "Activity map", "polish", "Optional ambient visualization of agents moving between zones.", "Pure UI layer over existing state and message events; no new core state.", "Phase 7 SVG map, zone config, SSE marker updates.", "Check phase-7 polish tech spec when building it."]
+    ];
+
+    const modules = [
+      {
+        id: "ui", title: "React UI", short: "Cards, chat, settings, archive, terminal panel.",
+        owns: "User-facing workflows and live dashboard state.",
+        inputs: "REST responses, /api/events SSE, terminal WebSocket bytes, user actions.",
+        outputs: "REST commands, WebSocket keystrokes/resizes, local store updates.",
+        persists: "Layout preferences via API; no direct database writes.",
+        neighbors: "server routes, SSE bus, terminal runtime.",
+        paths: ["ui/src/App.tsx", "ui/src/api/sse.ts", "ui/src/components/grid/CardGrid.tsx", "ui/src/components/chat/ChatPanel.tsx"]
+      },
+      {
+        id: "server", title: "HTTP server", short: "REST routes, SSE, hooks, static UI, switch/resume.",
+        owns: "The product contract exposed to UI, CLI, hooks, and local integrations.",
+        inputs: "Browser REST calls, hook POSTs, terminal WS, MCP transport, CLI launch requests.",
+        outputs: "Runtime commands, state writes, SSE events, API responses.",
+        persists: "Writes through state/config/archive packages; never lets browser write SQLite directly.",
+        neighbors: "runtime registry, state manager, config store, bus, messaging.",
+        paths: ["internal/server/routes.go", "internal/server/server.go", "internal/server/launch.go", "internal/server/switch.go"]
+      },
+      {
+        id: "runtime", title: "Runtime registry", short: "Dispatches chat vs terminal.",
+        owns: "A stable control interface: Launch, Prompt, Cancel, Stop, Permission, Resume, Subscribe.",
+        inputs: "LaunchSpec and control commands from server.",
+        outputs: "Child processes, normalized events, status changes.",
+        persists: "Running rows and status through state manager.",
+        neighbors: "chat runtime, terminal runtime, backend adapters, server.",
+        paths: ["internal/runtime/registry.go", "internal/runtime/runtime.go", "internal/runtime/event.go"]
+      },
+      {
+        id: "chat", title: "Chat runtime", short: "ACP over stdio.",
+        owns: "Structured chat sessions, ACP handshake, prompt stream, permissions, normalized transcript events.",
+        inputs: "Prompt/control commands and ACP frames from child CLI.",
+        outputs: "Events to hub/SSE/transcript, ACP permission decisions, process lifecycle.",
+        persists: "Status/running rows and transcript records via writer/indexer integration.",
+        neighbors: "backend adapter, transcript, state, bus.",
+        paths: ["internal/runtime/chat.go", "internal/runtime/acpmap.go", "internal/runtime/permission.go"]
+      },
+      {
+        id: "terminal", title: "Terminal runtime", short: "PTY/xterm/tmux driver layer.",
+        owns: "Interactive CLI execution under PTY plus terminal WebSocket bridge.",
+        inputs: "Terminal launch specs, prompt writes, keystrokes, resize frames.",
+        outputs: "PTY bytes, running row driver info, stop/cancel signals.",
+        persists: "Running row driver/tty metadata; high-level status mostly comes from hooks.",
+        neighbors: "server terminal endpoint, hooks, state, UI TerminalTab.",
+        paths: ["internal/runtime/terminal", "internal/server/terminal.go", "ui/src/components/chat/TerminalTab.tsx"]
+      },
+      {
+        id: "state", title: "State manager", short: "SQLite identity, running, status, messages, sessions.",
+        owns: "Machine-generated truth. The server process is the sole SQLite writer.",
+        inputs: "Runtime lifecycle, hook events, MCP messages, archive indexing.",
+        outputs: "Queries for API/UI/MCP, state_update events, searchable archive metadata.",
+        persists: "state.db with migrations, WAL, FTS5 index, messages, session metadata.",
+        neighbors: "server, runtime, messaging, archive, indexer.",
+        paths: ["internal/state/schema.go", "internal/state/manager.go", "internal/state/types.go", "internal/state/messages.go"]
+      },
+      {
+        id: "hooks", title: "Hooks", short: "Lifecycle shell scripts POST status.",
+        owns: "Language-agnostic status reporting from agent CLIs into the server.",
+        inputs: "CLI lifecycle events and AGENTDECK_* environment variables.",
+        outputs: "POST /api/hook with event, state, detail, token.",
+        persists: "Generated hook scripts/settings files under AgentDeck home.",
+        neighbors: "server hook handler, terminal runtime, backend adapter.",
+        paths: ["internal/hooks/hooks.go", "internal/hooks/scripts", "internal/server/hook.go"]
+      },
+      {
+        id: "messaging", title: "MCP messaging", short: "list_agents, send_message, check_messages.",
+        owns: "Agent-to-agent coordination and loop safety budgets.",
+        inputs: "MCP tool calls from registered agent sessions.",
+        outputs: "Message rows, unread indicators, nudger prompts, notification events.",
+        persists: "messages table and per-turn budget counters.",
+        neighbors: "state manager, runtime registry, bus/SSE.",
+        paths: ["internal/messaging/tools.go", "internal/messaging/messaging.go", "internal/server/messaging_loops.go"]
+      },
+      {
+        id: "archive", title: "Archive/index", short: "Transcript logs, search, resume material.",
+        owns: "Durable session history, file/command trails, FTS5 search, reindex.",
+        inputs: "Normalized transcript events, hook/tool signals, reindex command.",
+        outputs: "Archive rows, search results, resume snapshots, files/commands API.",
+        persists: "sessions/{agent_id}/ transcript logs and state.db search/index rows.",
+        neighbors: "runtime writer, server archive endpoints, state manager.",
+        paths: ["internal/transcript/writer.go", "internal/index/indexer.go", "internal/archive/archive.go"]
+      },
+      {
+        id: "config", title: "Config store", short: "Roles, projects, backends, layout, app config.",
+        owns: "Human-editable JSON and validation/default seeding.",
+        inputs: "Settings UI/API edits, launch composition reads, AGENTDECK_HOME.",
+        outputs: "Validated config objects and atomic file writes.",
+        persists: "roles, projects, backends.json, config.json, layout.json.",
+        neighbors: "server config endpoints, launch handler, onboarding UI.",
+        paths: ["internal/config/config.go", "internal/config/backends.go", "internal/config/projects.go", "internal/config/roles.go"]
+      }
+    ];
+
+    const flows = [
+      {
+        title: "Launch and first state update",
+        user: "You click New Agent or run agentdeck implementer@project. A card appears and starts streaming status.",
+        system: "POST /api/sessions composes config, registers hooks/MCP, mints identity/token, dispatches registry.Launch, writes running/status rows, and emits state_update.",
+        debug: "If launch fails, check backend binary/env, project cwd, config validation, and adapter launch args.",
+        lanes: ["UI/CLI request", "server launch", "config + adapter", "runtime starts CLI", "state.db + SSE"],
+        paths: ["internal/server/launch.go", "internal/config", "internal/backend/adapter.go", "internal/runtime/registry.go"],
+        source: "docs/phases/tech/phase-1-core-loop-techspec.md"
+      },
+      {
+        title: "Chat turn and ACP normalization",
+        user: "You send a prompt and see assistant output, tool calls, results, diffs, and turn end in the chat panel.",
+        system: "ChatRuntime sends ACP prompt over stdio, reads NDJSON JSON-RPC frames, maps them in acpmap.go, writes transcript events, and fans out SSE.",
+        debug: "If a message renders wrong, inspect the normalized Event first, then acpmap.go. Downstream UI should not know provider wire shape.",
+        lanes: ["Prompt REST", "ACP stdio", "event mapping", "hub/transcript", "SSE/UI render"],
+        paths: ["internal/runtime/chat.go", "internal/runtime/acpmap.go", "internal/runtime/event.go", "ui/src/components/chat/renderers"],
+        source: "docs/phases/tech/phase-1-core-loop-techspec.md"
+      },
+      {
+        title: "Permission gate",
+        user: "A tool needs approval. The UI shows Approve/Deny, and the agent remains paused until you decide.",
+        system: "The runtime records a pending permission request and withholds the response. POST /permission resolves it and relays the decision over ACP.",
+        debug: "If approval seems ignored, check the pending tool_call_id and whether the runtime was canceled or timed out while waiting.",
+        lanes: ["ACP permission request", "pending gate", "UI prompt", "POST decision", "ACP resumes/denies"],
+        paths: ["internal/runtime/permission.go", "internal/server/sessions.go", "ui/src/components/chat/renderers/PermissionPrompt.tsx"],
+        source: "docs/phases/tech/phase-1-core-loop-techspec.md"
+      },
+      {
+        title: "Hooks to dashboard status",
+        user: "Terminal agents and lifecycle events update cards even when the browser is just observing.",
+        system: "Hook scripts POST to /api/hook with launch token. The server validates token, maps event to status/file/command changes, updates SQLite, and emits SSE.",
+        debug: "If terminal status is stale, check AGENTDECK_* env, generated settings file, hook token freshness, and hook endpoint response.",
+        lanes: ["CLI lifecycle", "shell hook", "/api/hook", "state/index", "SSE card update"],
+        paths: ["internal/hooks/hooks.go", "internal/hooks/scripts", "internal/server/hook.go", "internal/index/indexer.go"],
+        source: "docs/phases/tech/phase-6-flexibility-techspec.md"
+      },
+      {
+        title: "MCP messaging and nudger",
+        user: "One agent asks another for help. The recipient gets unread mail and can be nudged into checking it.",
+        system: "MCP tool call resolves caller identity from the registered session, writes a message row, consumes budget, emits indicators, and nudges idle recipients.",
+        debug: "If messages do not deliver, check token-to-agent registration, unread row state, recipient status, and per-turn budget.",
+        lanes: ["MCP tool call", "identity binding", "message row", "budget/nudger", "recipient check"],
+        paths: ["internal/messaging/tools.go", "internal/state/messages.go", "internal/server/messaging_loops.go"],
+        source: "docs/phases/tech/phase-5-coordination-techspec.md"
+      },
+      {
+        title: "Archive search and resume",
+        user: "You search an old phrase, open a session, and resume it with history intact.",
+        system: "Transcript logs feed the indexer. SQLite stores session metadata and FTS5 rows. Resume reads the snapshot/history and launches a fresh runtime under the same agent_id.",
+        debug: "If search misses a phrase, run reindex and inspect transcript append records versus FTS rows.",
+        lanes: ["transcript append", "indexer", "FTS5 query", "resume endpoint", "runtime.Resume"],
+        paths: ["internal/transcript/writer.go", "internal/index/indexer.go", "internal/archive/archive.go", "internal/server/resume.go"],
+        source: "docs/phases/tech/phase-4-persistence-archive-techspec.md"
+      },
+      {
+        title: "Terminal PTY and WebSocket",
+        user: "You open a terminal tab, type into a real CLI, and see output in xterm.js.",
+        system: "Terminal runtime starts a CLI under PTY, server bridges PTY master to /terminal/ws, xterm.js writes keystrokes/resizes and renders bytes.",
+        debug: "If terminal is blank, check capabilities, driver selection, PTY process, WebSocket frames, and hook status separately.",
+        lanes: ["terminal launch", "PTY child", "WebSocket bridge", "xterm.js panel", "hooks status"],
+        paths: ["internal/runtime/terminal", "internal/server/terminal.go", "ui/src/components/chat/TerminalTab.tsx"],
+        source: "docs/phases/tech/phase-6-flexibility-techspec.md"
+      },
+      {
+        title: "Switch runtime",
+        user: "You change model/backend/interface while keeping the same logical agent and history.",
+        system: "Switch handler locks the agent, cancels/stops old runtime, cleans old registration, persists new identity, picks native resume or primer, and relaunches.",
+        debug: "If switch loses history, inspect agent_id stability, resume ID resolution, primer generation, and whether rollback path fired.",
+        lanes: ["switch request", "per-agent lock", "stop old runtime", "persist target", "resume/relaunch"],
+        paths: ["internal/server/switch.go", "internal/server/primer.go", "internal/backend/adapter.go", "internal/runtime/registry.go"],
+        source: "docs/phases/tech/phase-6-flexibility-techspec.md"
+      },
+      {
+        title: "Task groups",
+        user: "You group related agents, collapse sections, move cards, and release a workstream.",
+        system: "Group label lives on agent identity. Layout persists collapse. Release group queries live members and stops them with liveness pruning.",
+        debug: "If a card appears in the wrong group, check identity update endpoint and layout collapse state separately.",
+        lanes: ["identity edit", "agent row", "layout state", "group render", "release stop batch"],
+        paths: ["internal/server/groups.go", "internal/state/agents.go", "ui/src/components/grid/CardGrid.tsx"],
+        source: "docs/phases/tech/phase-6-flexibility-techspec.md"
+      }
+    ];
+
+    const protocols = [
+      ["ACP", "Chat runtime protocol", "AgentDeck speaks ACP over stdio to chat adapters. ACP gives structured events: assistant text, tool calls, diffs, permission requests, and turn boundaries. AgentDeck immediately normalizes those into its own Event model so UI/archive code does not depend on provider wire shapes.", ["internal/runtime/chat.go", "internal/runtime/acpmap.go"]],
+      ["MCP", "Agent-to-agent tools", "AgentDeck hosts an MCP server in-process. Agents call list_agents, send_message, and check_messages. The server uses MCP session identity, not a spoofable argument, to know who is calling.", ["internal/messaging/tools.go", "docs/phases/tech/phase-5-coordination-techspec.md"]],
+      ["SSE", "Live browser updates", "The browser keeps one /api/events stream open. The server pushes state_update, new_message, notification, and ping events. This is why dashboard cards breathe without polling.", ["internal/server/sse.go", "internal/bus/bus.go", "ui/src/api/sse.ts"]],
+      ["PTY/WS", "Interactive terminal path", "Terminal runtime uses a pseudo-terminal for a real CLI. The server bridges PTY bytes over WebSocket to xterm.js. Terminal content and terminal status are separate: bytes over WS, lifecycle over hooks.", ["internal/runtime/terminal", "internal/server/terminal.go"]],
+      ["Hooks", "Lifecycle status producers", "Hooks are tiny shell scripts registered with agent CLIs. They POST lifecycle events to the server with a per-launch token. This keeps status immediate and avoids fragile file-watcher channels.", ["internal/hooks/hooks.go", "internal/server/hook.go"]],
+      ["SQLite/FTS5", "Machine state and search", "State.db stores identity, running rows, live status, messages, sessions, and FTS5 search tables. The server is the sole writer, which keeps local SQLite simple and reliable.", ["internal/state/schema.go", "internal/index/indexer.go"]]
+    ];
+
+    const recipes = [
+      ["Install and run", "Build the UI and binary, then start the dashboard locally.", "Run ./install.sh or make dist. Start with agentdeck dashboard start and open with agentdeck dashboard open. The server binds 127.0.0.1 only.", "README.md"],
+      ["Launch from CLI", "Start an agent without touching the UI.", "Use agentdeck implementer@my-app --backend claude --model sonnet. The CLI calls the same REST launch path as the modal, so parity matters.", "internal/cli/launch.go"],
+      ["Create a role", "Define a new agent persona.", "Add or edit a role in Settings. It writes roles/{role}.json. Existing agents keep their current composed prompt until restarted.", "internal/config/roles.go"],
+      ["Create a project", "Point agents at a workspace.", "Set title, cwd, optional add_dirs, color, and context prompt. Cwd must exist; project context is injected at launch.", "internal/config/projects.go"],
+      ["Approve a tool", "Handle a permission prompt.", "Open the chat panel, review the tool and diff/context, choose Approve or Deny. The runtime relays that decision back over ACP.", "internal/runtime/permission.go"],
+      ["Send an agent message", "Ask another agent for help.", "Prompt an agent to use send_message(to, body). The recipient sees unread state and the nudger can wake it if idle.", "internal/messaging/tools.go"],
+      ["Search and resume", "Find historical work and continue it.", "Use Archive search. Resume relaunches a runtime under the same stable agent identity with history restored.", "internal/server/resume.go"],
+      ["Switch runtime", "Move chat to terminal or change backend/model.", "Use Switch runtime from card actions. The server stops and relaunches on the same agent_id, using native resume or primer handoff.", "internal/server/switch.go"],
+      ["Use terminal mode", "Work with a real interactive CLI.", "Choose terminal interface if capabilities report available drivers. xterm/PTY is the default; tmux may be available; iTerm2 remains optional.", "internal/runtime/terminal"],
+      ["Release a group", "Stop a whole workstream.", "Assign group labels, collapse sections as needed, then Release group. AgentDeck stops running members and updates cards.", "internal/server/groups.go"]
+    ];
+
+    const glossary = [
+      ["agent_id", "AgentDeck's stable identity for a logical agent. It survives resume, switch-runtime, backend swap, group changes, messages, and archive rows."],
+      ["session_id", "The provider/runtime session identifier. It is ephemeral and may change every resume or switch. Do not use it as the product identity."],
+      ["Runtime registry", "The Go facade that dispatches common operations to chat or terminal implementations based on agent.interface."],
+      ["ACP", "Agent Communication Protocol over stdio for structured chat sessions."],
+      ["MCP", "Model Context Protocol, used here for in-process agent-to-agent messaging tools."],
+      ["SSE", "Server-Sent Events, the one-way live stream from server to browser."],
+      ["PTY", "Pseudo-terminal used to run a real CLI interactively and bridge bytes to the browser."],
+      ["Hook token", "Per-launch secret passed to hook scripts so stale or unrelated local processes cannot spoof status."],
+      ["Nudger", "Server loop that wakes idle agents with unread messages by injecting a check_messages prompt."],
+      ["Primer", "Bounded transcript summary/handoff used when native resume is unavailable across backend/model switches."],
+      ["FTS5", "SQLite full-text search extension used for archive transcript search."],
+      ["Config composition", "The launch-time merge of project cwd/context, role prompt, backend/model/env, permissions, hooks, and MCP registration."]
+    ];
+
+    let activeScenario = 0;
+    let activeModule = modules[0];
+    let activeFlow = flows[0];
+    let activeFlowMode = "user";
+
+    const rel = path => {
+      if (path.startsWith("internal/") || path.startsWith("ui/")) return "../" + path;
+      if (path === "README.md" || path === "MAP.md" || path === "architecture-flow.md") return "../" + path;
+      if (path.startsWith("docs/")) return path.replace(/^docs\//, "");
+      return path;
+    };
+    const pathLink = path => `<a href="${rel(path)}">${path}</a>`;
+
+    function renderScenario() {
+      const timeline = document.getElementById("scenarioTimeline");
+      timeline.innerHTML = scenarioSteps.map((step, i) => `
+        <button class="${i === activeScenario ? "active" : ""}" data-scenario="${i}">
+          <b>${i + 1}</b><span>${step.title}</span>
+        </button>
+      `).join("");
+      timeline.querySelectorAll("button").forEach(button => {
+        button.addEventListener("click", () => {
+          activeScenario = Number(button.dataset.scenario);
+          renderScenario();
+        });
+      });
+      const step = scenarioSteps[activeScenario];
+      document.getElementById("scenarioKicker").textContent = `Step ${activeScenario + 1} of ${scenarioSteps.length}`;
+      document.getElementById("scenarioTitle").textContent = step.title;
+      document.getElementById("mockState").textContent = step.state;
+      document.getElementById("scenarioUser").textContent = step.user;
+      document.getElementById("scenarioBehind").textContent = step.behind;
+      document.getElementById("scenarioTags").innerHTML = step.tags.map(tag => `<span class="tag cyan">${tag}</span>`).join("");
+      document.getElementById("scenarioPaths").innerHTML = step.paths.map(pathLink).join("");
+      document.getElementById("scenarioMock").innerHTML = `
+        <div class="mock-list">
+          ${step.rows.map(row => `<div class="mock-row"><strong>${row[0]}</strong><span>${row[1]}</span></div>`).join("")}
+        </div>
+        <pre>${scenarioSnippet(step.state)}</pre>
+      `;
+    }
+
+    function scenarioSnippet(state) {
+      const snippets = {
+        settings: `roles/implementer.json + projects/agentdeck.json + backends.json\ncompose only on future launches`,
+        launch: `POST /api/sessions\n{ role, project, backend, model, interface }\n=> agent_id stays stable`,
+        dashboard: `event: state_update\ndata: { agent_id, state, detail, context_pct }`,
+        chat: `ACP frame -> normalized Event\nassistant_text | tool_call | permission_request | turn_end`,
+        messaging: `MCP send_message -> messages table\nnudger -> Runtime.CheckMessages(recipient)`,
+        switch: `same agent_id\nold runtime stop -> new identity -> registry.Resume`,
+        archive: `transcript.ndjson -> indexer -> state.db FTS5\nPOST /resume -> fresh runtime`,
+        groups: `POST /api/groups/{group}/release\nbatch stop live members`
+      };
+      return snippets[state] || "";
+    }
+
+    function renderFeatures() {
+      const host = document.getElementById("featureAtlas");
+      host.innerHTML = features.map(f => `
+        <article class="feature" data-feature-category="${f[2]}">
+          <span class="feature-num">${f[0]}</span>
+          <h3>${f[1]}</h3>
+          <p>${f[3]}</p>
+          <div class="feature-grid">
+            <div><strong>Mental model</strong><span>${f[4]}</span></div>
+            <div><strong>Machinery</strong><span>${f[5]}</span></div>
+            <div><strong>Debug lens</strong><span>${f[6]}</span></div>
+          </div>
+          <div class="source-row">${f[2].split(" ").map(c => `<span class="tag ${c === "coordinate" ? "violet" : c === "history" ? "green" : c === "flex" ? "amber" : "cyan"}">${c}</span>`).join("")}</div>
+        </article>
+      `).join("");
+    }
+
+    function renderModules() {
+      document.getElementById("moduleMap").innerHTML = modules.map(module => `
+        <button class="module-node ${module.id === activeModule.id ? "active" : ""}" data-module="${module.id}">
+          <strong>${module.title}</strong><span>${module.short}</span>
+        </button>
+      `).join("");
+      document.querySelectorAll(".module-node").forEach(button => {
+        button.addEventListener("click", () => {
+          activeModule = modules.find(m => m.id === button.dataset.module);
+          renderModules();
+        });
+      });
+      document.getElementById("moduleDetail").innerHTML = `
+        <h3>${activeModule.title}</h3>
+        <p>${activeModule.short}</p>
+        <div class="io-grid">
+          <div><strong>Owns</strong><span>${activeModule.owns}</span></div>
+          <div><strong>Inputs</strong><span>${activeModule.inputs}</span></div>
+          <div><strong>Outputs</strong><span>${activeModule.outputs}</span></div>
+          <div><strong>Persists</strong><span>${activeModule.persists}</span></div>
+        </div>
+        <article class="card" style="margin-top:12px"><h4>Neighbors</h4><p>${activeModule.neighbors}</p></article>
+        <div class="path-list">${activeModule.paths.map(pathLink).join("")}</div>
+      `;
+    }
+
+    function renderFlows() {
+      document.getElementById("flowList").innerHTML = flows.map((flow, i) => `
+        <button class="${flow.title === activeFlow.title ? "active" : ""}" data-flow="${i}">
+          <b>${i + 1}</b><span>${flow.title}</span>
+        </button>
+      `).join("");
+      document.querySelectorAll("#flowList button").forEach(button => {
+        button.addEventListener("click", () => {
+          activeFlow = flows[Number(button.dataset.flow)];
+          renderFlows();
+        });
+      });
+      const text = activeFlow[activeFlowMode];
+      document.getElementById("flowOutput").innerHTML = `
+        <h3>${activeFlow.title}</h3>
+        <p>${text}</p>
+        <div class="flow-lanes">${activeFlow.lanes.map((lane, i) => `<div class="lane"><span>Lane ${i + 1}</span><strong>${lane}</strong></div>`).join("")}</div>
+        <div class="source-row"><a class="source" href="${rel(activeFlow.source)}">Source: ${activeFlow.source}</a></div>
+        <div class="path-list">${activeFlow.paths.map(pathLink).join("")}</div>
+      `;
+    }
+
+    function renderProtocols() {
+      document.getElementById("protocolGrid").innerHTML = protocols.map(protocol => `
+        <article class="protocol-card">
+          <span class="big">${protocol[0]}</span>
+          <h3>${protocol[1]}</h3>
+          <p>${protocol[2]}</p>
+          <div class="path-list">${protocol[3].map(pathLink).join("")}</div>
+        </article>
+      `).join("");
+    }
+
+    function renderRecipes() {
+      document.getElementById("recipeGrid").innerHTML = recipes.map((recipe, i) => `
+        <details class="recipe" ${i < 2 ? "open" : ""}>
+          <summary>${recipe[0]}</summary>
+          <div class="recipe-body">
+            <p><strong>${recipe[1]}</strong></p>
+            <p>${recipe[2]}</p>
+            <div class="path-list">${pathLink(recipe[3])}</div>
+          </div>
+        </details>
+      `).join("");
+    }
+
+    function renderGlossary() {
+      document.getElementById("glossaryList").innerHTML = glossary.map(term => `
+        <article class="term" data-term="${term[0]} ${term[1]}">
+          <strong>${term[0]}</strong><p>${term[1]}</p>
+        </article>
+      `).join("");
+    }
+
+    document.querySelectorAll(".feature-filter").forEach(button => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll(".feature-filter").forEach(b => b.classList.remove("active"));
+        button.classList.add("active");
+        const filter = button.dataset.featureFilter;
+        document.querySelectorAll(".feature").forEach(card => {
+          const categories = card.dataset.featureCategory.split(" ");
+          card.dataset.hidden = filter === "all" || categories.includes(filter) ? "false" : "true";
+        });
+      });
+    });
+
+    document.querySelectorAll(".flow-mode").forEach(button => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll(".flow-mode").forEach(b => b.classList.remove("active"));
+        button.classList.add("active");
+        activeFlowMode = button.dataset.flowMode;
+        renderFlows();
+      });
+    });
+
+    document.getElementById("glossarySearch").addEventListener("input", event => {
+      const q = event.target.value.trim().toLowerCase();
+      document.querySelectorAll(".term").forEach(term => {
+        term.dataset.hidden = term.dataset.term.toLowerCase().includes(q) ? "false" : "true";
+      });
+    });
+
+    const navLinks = [...document.querySelectorAll(".nav a")];
+    const sections = navLinks.map(link => document.querySelector(link.getAttribute("href"))).filter(Boolean);
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        navLinks.forEach(link => link.classList.toggle("active", link.getAttribute("href") === "#" + entry.target.id));
+        const index = sections.findIndex(section => section.id === entry.target.id);
+        const pct = Math.max(8, Math.round(((index + 1) / sections.length) * 100));
+        document.getElementById("progressBar").style.width = pct + "%";
+        document.getElementById("progressText").textContent = `${entry.target.querySelector("h2")?.textContent || "Atlas"} - ${pct}% of the learning path`;
+      });
+    }, { rootMargin: "-30% 0px -55% 0px" });
+    sections.forEach(section => observer.observe(section));
+
+    renderScenario();
+    renderFeatures();
+    renderModules();
+    renderFlows();
+    renderProtocols();
+    renderRecipes();
+    renderGlossary();
+  </script>
+</body>
+</html>

@@ -80,7 +80,7 @@ sessions/{id}/       raw transcript history for resume
 - **Stable `agent_id` vs ephemeral `session_id`.** Identity survives resume/clone/backend-swap; the CLI's session id changes. Everything that "switches" (model/backend/interface, F7) re-launches on the same `agent_id` and resumes. Get this right in Phase 0/1.
 - **Hook POST → server → SQLite → SSE.** Hooks `POST /api/hook` (token-authed); the server applies to `state.db` and emits `state_update`. A reconciliation watcher over `sessions/` is a fallback only. SSE event types: `state_update`, `new_message`, `notification`, `ping`.
 - **Server is sole SQLite writer.** No multi-process contention; `state.db` is authoritative (no derived-index drift).
-- **Two runtimes, one CLI, one identity.** Chat (ACP over stdio, cross-platform default) and Terminal (deferred Phase 6; cross-platform xterm.js/tmux preferred over iTerm2). Registry dispatches by `agent.interface`.
+- **Two runtimes, one CLI, one identity.** Chat (ACP over stdio, cross-platform default) and Terminal (Phase 6; cross-platform xterm.js/tmux default, iTerm2 an optional macOS-only driver). Registry dispatches by `agent.interface`.
 - **Messaging in-process + nudger.** `list_agents`/`send_message`/`check_messages` are in-process reads/writes of `state.db`; the nudger wakes idle recipients. Per-turn budget (default 15) caps loops.
 - **Config composition at launch:** `project.cwd` + `project.context_prompt` + `role.system_prompt` + `backend/model` → CLI invocation. Edits affect future launches only.
 
@@ -93,4 +93,4 @@ sessions/{id}/       raw transcript history for resume
 
 ## Stack & prereqs
 
-Go 1.22+ (single binary: server + in-process MCP + embedded UI), Node 18+ + npm (**build-time only**, for the Vite UI), ≥1 authenticated agent CLI. **No runtime Node, no python3.** Deps: `modelcontextprotocol/go-sdk` (MCP), `mattn/go-sqlite3` (state). Platforms: macOS + Linux (terminal runtime deferred/optional). Install via `install.sh`; run `agentdeck dashboard start && agentdeck dashboard open`.
+Go 1.22+ (single binary: server + in-process MCP + embedded UI), Node 18+ + npm (**build-time only**, for the Vite UI), ≥1 authenticated agent CLI. **No runtime Node, no python3.** Deps: `modelcontextprotocol/go-sdk` (MCP), `mattn/go-sqlite3` (state). Platforms: macOS + Linux (cross-platform xterm.js/tmux terminal runtime; iTerm2 driver optional, macOS-only). Install via `install.sh`; run `agentdeck dashboard start && agentdeck dashboard open`.
