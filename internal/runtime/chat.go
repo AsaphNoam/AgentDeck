@@ -1027,9 +1027,10 @@ func sessionLoadParams(spec LaunchSpec, sessionID string) map[string]any {
 		mcp = append(mcp, mcpServerParam(m))
 	}
 	return map[string]any{
-		"sessionId":  sessionID,
-		"cwd":        spec.Cwd,
-		"mcpServers": mcp,
+		"sessionId":             sessionID,
+		"cwd":                   spec.Cwd,
+		"mcpServers":            mcp,
+		"additionalDirectories": spec.AddDirs,
 	}
 }
 
