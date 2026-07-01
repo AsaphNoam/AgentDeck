@@ -66,6 +66,38 @@ describe("CardContextMenu error surfacing", () => {
     );
   });
 
+  it("shows an error toast when rename fails", async () => {
+    vi.spyOn(window, "prompt").mockReturnValue("beta");
+    server.use(
+      http.post("/api/sessions/:id/rename", () =>
+        HttpResponse.json({ error: { code: "validation", message: "bad name" } }, { status: 422 }),
+      ),
+    );
+
+    renderMenu();
+    fireEvent.click(screen.getByRole("button", { name: /Rename/i }));
+
+    await waitFor(() =>
+      expect(useUiStore.getState().toasts.some((t) => t.type === "error" && t.title === "Rename failed")).toBe(true),
+    );
+  });
+
+  it("shows an error toast when stop fails", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    server.use(
+      http.post("/api/sessions/:id/stop", () =>
+        HttpResponse.json({ error: { code: "internal", message: "boom" } }, { status: 500 }),
+      ),
+    );
+
+    renderMenu();
+    fireEvent.click(screen.getByRole("button", { name: /^Stop$/i }));
+
+    await waitFor(() =>
+      expect(useUiStore.getState().toasts.some((t) => t.type === "error" && t.title === "Stop failed")).toBe(true),
+    );
+  });
+
   it("shows an error toast when move-to-group fails", async () => {
     vi.spyOn(window, "prompt").mockReturnValue("squad");
     server.use(
