@@ -127,8 +127,7 @@ func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 			// lost-response retry reads as success, not a phantom "unknown agent".
 			// 404 is reserved for ids with no identity row at all.
 			if _, rerr := s.stateStore.ReadAgent(id); rerr == nil {
-				s.cleanupMessagingMCP(id)
-				s.cleanupHookSettings(id)
+				s.teardownAgentRegistration(id)
 				writeJSON(w, http.StatusOK, map[string]any{"stopped": true})
 				return
 			}
@@ -138,8 +137,7 @@ func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
 		return
 	}
-	s.cleanupMessagingMCP(id)
-	s.cleanupHookSettings(id)
+	s.teardownAgentRegistration(id)
 	writeJSON(w, http.StatusOK, map[string]any{"stopped": true})
 }
 
