@@ -29,10 +29,14 @@ func newReindexCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// reindex opens its own writer and DELETEs the index tables — running
+			// it against a live server violates the sole-writer invariant and can
+			// corrupt/rewind live archive data. Refuse rather than warn. (A stale
+			// pidfile is handled by serverRunning's signal-0 liveness probe, so this
+			// only fires when the daemon is actually up.)
 			if serverRunning(cfgStore.Home()) {
-				_, _ = fmt.Fprintln(cmd.ErrOrStderr(),
-					"warning: agentdeck server appears to be running — reindex wipes the index "+
-						"and may corrupt it under a live server; stop the server first")
+				return fmt.Errorf("agentdeck server is running — stop it before reindex " +
+					"(reindex wipes and rebuilds the archive index and must be the sole DB writer)")
 			}
 			st, err := state.Open(cfgStore.Home())
 			if err != nil {
