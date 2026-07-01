@@ -147,7 +147,7 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 func (s *Server) composeResumeSpec(agent state.Agent, snap state.SessionSnapshot, be config.Backend, model config.Model) (runtime.LaunchSpec, *runtime.APIError) {
 	token := mintHookToken()
 	s.rememberHookToken(agent.AgentID, token)
-	mcpSpec, err := s.registerMessagingMCP(agent, be.Type)
+	mcpSpec, err := s.registerMessagingMCP(agent)
 	if err != nil {
 		s.forgetHookToken(agent.AgentID)
 		return runtime.LaunchSpec{}, apiError(runtime.CodeInternal, err.Error())

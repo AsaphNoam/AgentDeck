@@ -40,8 +40,7 @@ type Tab struct {
 // TerminalDriver is the seam (§2.1). The xterm/PTY and tmux drivers are
 // cross-platform; the iTerm2 driver (6.7) is an optional macOS extra. StartTab
 // launches the CLI under the emulator and reads back the tty; WriteText delivers
-// a prompt; ReadTTY returns the recorded tty; CloseTab releases the surface
-// (close the PTY / kill the tmux session); RevealTab brings the tab forward.
+// a prompt; CloseTab releases the surface (close the PTY / kill the tmux session).
 //
 // Process signalling for Cancel/Stop is done by the runtime against Tab.PGID
 // (§3.1), not by the driver, so the signalling path is identical across drivers.
@@ -49,7 +48,5 @@ type TerminalDriver interface {
 	Name() string
 	StartTab(spec TabSpec) (*Tab, error)
 	WriteText(tab *Tab, text string) error
-	ReadTTY(tab *Tab) (string, error)
 	CloseTab(tab *Tab) error
-	RevealTab(tab *Tab) error
 }
