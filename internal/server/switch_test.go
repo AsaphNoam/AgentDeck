@@ -277,6 +277,75 @@ func TestResumeTerminalAgent(t *testing.T) {
 	}
 }
 
+// Regression (review fix): both the resume and switch-runtime LaunchSpec
+// composers must re-resolve role/project-derived fields (skip_permissions,
+// add_dirs) from current config — the frozen snapshot doesn't persist them, so
+// without this a skip_permissions=true / multi-dir agent silently loses
+// auto-approval and its extra directories after any stop→resume or switch.
+func TestResumeAndSwitchCarryRoleAndProjectFields(t *testing.T) {
+	srv, ts := switchTestServer(t)
+
+	// Re-declare the role with skip_permissions=true and the project with an add_dir.
+	skip := true
+	cwd := t.TempDir()
+	extra := t.TempDir()
+	if err := srv.configStore.WriteRole("impl", config.Role{Title: "Impl", SystemPrompt: "be helpful", SkipPermissions: &skip}); err != nil {
+		t.Fatalf("WriteRole: %v", err)
+	}
+	if err := srv.configStore.WriteProject("tmpproj", config.Project{Title: "Tmp", Cwd: cwd, AddDirs: []string{extra}}); err != nil {
+		t.Fatalf("WriteProject: %v", err)
+	}
+
+	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+	agent, err := srv.stateStore.ReadAgent(id)
+	if err != nil {
+		t.Fatalf("ReadAgent: %v", err)
+	}
+	snap, err := srv.stateStore.ReadSession(id)
+	if err != nil {
+		t.Fatalf("ReadSession: %v", err)
+	}
+	backends, err := srv.configStore.ReadBackends()
+	if err != nil {
+		t.Fatalf("ReadBackends: %v", err)
+	}
+	be := backends.Backends[agent.Backend]
+	model := be.Models[agent.Model]
+
+	// Resume spec.
+	rspec, ae := srv.composeResumeSpec(agent, snap, be, model)
+	if ae != nil {
+		t.Fatalf("composeResumeSpec: %s", ae.Message)
+	}
+	if !rspec.SkipPerms {
+		t.Errorf("resume spec SkipPerms = false, want true (role skip_permissions=true)")
+	}
+	if !containsStr(rspec.AddDirs, extra) {
+		t.Errorf("resume spec AddDirs = %v, missing %q", rspec.AddDirs, extra)
+	}
+
+	// Switch spec (target == current identity; only the carried fields matter here).
+	sspec, ae := srv.composeSwitchSpec(agent, "")
+	if ae != nil {
+		t.Fatalf("composeSwitchSpec: %s", ae.Message)
+	}
+	if !sspec.SkipPerms {
+		t.Errorf("switch spec SkipPerms = false, want true")
+	}
+	if !containsStr(sspec.AddDirs, extra) {
+		t.Errorf("switch spec AddDirs = %v, missing %q", sspec.AddDirs, extra)
+	}
+}
+
+func containsStr(ss []string, want string) bool {
+	for _, s := range ss {
+		if s == want {
+			return true
+		}
+	}
+	return false
+}
+
 // no_change: a switch that equals the current state is rejected 400.
 func TestSwitchRuntimeNoChange(t *testing.T) {
 	_, ts := switchTestServer(t)
