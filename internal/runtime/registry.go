@@ -24,6 +24,11 @@ type Registry struct {
 	chat      *ChatRuntime
 	term      Runtime // the registered terminal runtime (nil until SetTerminalRuntime)
 	store     *state.Store
+
+	// onExitExtra runs after forget on an unsolicited agent exit (crash). The
+	// server wires its teardownAgentRegistration here so a crash tears down the
+	// hook token / MCP session / hook files, not just registry ownership.
+	onExitExtra func(string)
 }
 
 // exitNotifier is implemented by runtimes that can tell the Registry to drop
@@ -48,8 +53,10 @@ func NewRegistry(s *state.Store) *Registry {
 	r.byIface["terminal"] = notImplementedRuntime{name: "terminal"}
 	// When a runtime tears an agent down unsolicited (crash), it must clear our
 	// ownership record too — otherwise rtByAgent keeps claiming the agent and
-	// blocks relaunch/resume with ErrAlreadyStarted (techspec §8.2).
-	chat.onExit = r.forget
+	// blocks relaunch/resume with ErrAlreadyStarted (techspec §8.2). It must also
+	// run the server's registration teardown (SetExitHook) so the hook token / MCP
+	// session / hook files don't leak on a crash.
+	chat.onExit = r.handleAgentExit
 	return r
 }
 
@@ -59,6 +66,27 @@ func (r *Registry) forget(agentID string) {
 	r.mu.Lock()
 	delete(r.rtByAgent, agentID)
 	r.mu.Unlock()
+}
+
+// SetExitHook registers a callback run (after ownership forget) whenever an agent
+// exits unsolicited. The server uses it to tear down per-agent registration
+// artifacts on the crash path, mirroring a solicited stop.
+func (r *Registry) SetExitHook(fn func(string)) {
+	r.mu.Lock()
+	r.onExitExtra = fn
+	r.mu.Unlock()
+}
+
+// handleAgentExit is the runtimes' onExit callback: it drops registry ownership
+// and then runs the server's registration teardown, if wired.
+func (r *Registry) handleAgentExit(agentID string) {
+	r.forget(agentID)
+	r.mu.Lock()
+	extra := r.onExitExtra
+	r.mu.Unlock()
+	if extra != nil {
+		extra(agentID)
+	}
 }
 
 // Chat returns the chat runtime (e.g. to point it at a pinned adapter binary or,
@@ -80,7 +108,7 @@ func (r *Registry) SetTerminalRuntime(rt Runtime) {
 	r.term = rt
 	r.mu.Unlock()
 	if en, ok := rt.(exitNotifier); ok {
-		en.SetOnExit(r.forget)
+		en.SetOnExit(r.handleAgentExit)
 	}
 }
 

@@ -428,6 +428,20 @@ func (s *Server) forgetHookToken(agentID string) {
 	s.hookMu.Unlock()
 }
 
+// teardownAgentRegistration removes every per-agent server-side registration
+// artifact — the in-memory hook token, the messaging MCP session + on-disk
+// mcp/{id}.mcp.json, and the per-agent hooks settings file. It is the single
+// teardown unit invoked from every agent exit: solicited stop AND the runtime
+// crash path (wired as the Registry exit hook in server.New). Without the crash
+// path, a crashed agent left a live hook token + MCP session behind — a spoofable
+// messaging identity that an orphaned child/hook could still send/check as — plus
+// leaked files that grow per crash.
+func (s *Server) teardownAgentRegistration(agentID string) {
+	s.forgetHookToken(agentID)
+	s.cleanupMessagingMCP(agentID)
+	s.cleanupHookSettings(agentID)
+}
+
 // cleanupHookSettings deletes the per-agent hook settings file on agent
 // teardown, mirroring cleanupMessagingMCP so the two registration artifacts
 // share a lifecycle (review fix: the settings file is no longer orphaned).
