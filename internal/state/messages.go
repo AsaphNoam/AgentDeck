@@ -336,6 +336,19 @@ func (s *Store) ResetTurnBudget(agentID, turnID string) error {
 		return fmt.Errorf("state: begin reset turn budget: %w", err)
 	}
 	defer tx.Rollback()
+	if err := resetTurnBudgetTx(tx, agentID, turnID); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("state: commit reset turn budget: %w", err)
+	}
+	return nil
+}
+
+// resetTurnBudgetTx performs the turn-budget reset inside an existing transaction
+// so callers already holding a tx (e.g. Manager.ApplyHook's terminal turn
+// boundary) can reset without opening a second connection.
+func resetTurnBudgetTx(tx *sql.Tx, agentID, turnID string) error {
 	if _, err := tx.Exec(`DELETE FROM turn_budget WHERE agent_id = ? AND turn_id <> ?`, agentID, turnID); err != nil {
 		return fmt.Errorf("state: prune turn budget rows: %w", err)
 	}
@@ -347,9 +360,6 @@ ON CONFLICT(agent_id, turn_id) DO UPDATE SET
     outbound = 0,
     breached = 0`, agentID, turnID); err != nil {
 		return fmt.Errorf("state: reset turn budget: %w", err)
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("state: commit reset turn budget: %w", err)
 	}
 	return nil
 }

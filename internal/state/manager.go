@@ -145,7 +145,22 @@ ON CONFLICT(agent_id) DO UPDATE SET
 				return err
 			}
 			return applyStatusHook(tx, payload, now)
-		case "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop":
+		case "UserPromptSubmit":
+			// A terminal agent's UserPromptSubmit marks a new turn boundary. The
+			// chat runtime resets the messaging budget at each turn (ChatRuntime.
+			// SendPrompt/CheckMessages); the terminal runtime has no such call, so
+			// without resetting here a terminal agent rides the implicit
+			// t_000000000000 budget row forever and locks out with
+			// message_budget_exceeded after MessageBudgetPerTurn lifetime actions.
+			// Gate on the terminal interface: chat agents self-suppress these hooks
+			// and own their own turn budget, so they must not be reset from here.
+			if current.Interface == "terminal" {
+				if err := resetTurnBudgetTx(tx, payload.AgentID, terminalTurnID(now)); err != nil {
+					return err
+				}
+			}
+			return applyStatusHook(tx, payload, now)
+		case "PreToolUse", "PostToolUse", "Stop":
 			// Lifecycle hooks from a terminal agent are pure status producers
 			// (§4.3). They never clear the running row — Stop fires at the END OF
 			// EACH TURN, not on CLI exit; the running row is cleared by the
@@ -333,6 +348,14 @@ func refreshRunningFromHook(tx *sql.Tx, payload HookPayload, current RunningEntr
 		return fmt.Errorf("state: refresh running from hook: %w", err)
 	}
 	return nil
+}
+
+// terminalTurnID mints the turn_id for a terminal agent's turn boundary. The
+// exact value only needs to differ from the prior turn so ResetTurnBudget starts
+// a fresh window; a millisecond timestamp is monotonic across a session and
+// distinct from the chat runtime's t_%012d counter ids.
+func terminalTurnID(now time.Time) string {
+	return fmt.Sprintf("t_%013d", now.UnixMilli())
 }
 
 func applyStatusHook(tx *sql.Tx, payload HookPayload, now time.Time) error {

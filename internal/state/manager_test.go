@@ -221,3 +221,60 @@ func TestManagerApplyHookStatusAndStopped(t *testing.T) {
 		t.Fatalf("published updates = %d, want 2", len(pub.updates))
 	}
 }
+
+// Regression (review fix): a terminal agent's UserPromptSubmit hook must reset the
+// messaging turn budget. Without it the terminal agent rides the implicit
+// t_000000000000 row forever and locks out with message_budget_exceeded after
+// MessageBudgetPerTurn lifetime actions (chat resets in the runtime; terminal had
+// no turn boundary that reset it).
+func TestManagerTerminalUserPromptResetsBudget(t *testing.T) {
+	withFixedNow(t, mustTime(t, "2026-07-01T10:00:00Z"))
+	st, _ := newTestStore(t)
+	mgr := NewManager(st, &capturePublisher{})
+
+	created := mustTime(t, "2026-07-01T09:00:00Z")
+	agent := testAgent("a_term01", created)
+	agent.Interface = "terminal"
+	if err := st.WriteAgent(agent); err != nil {
+		t.Fatalf("WriteAgent: %v", err)
+	}
+	if err := st.WriteRunning(RunningEntry{
+		AgentID: agent.AgentID, PID: 4242, SessionID: "sess", Interface: "terminal",
+		Driver: "xterm", TTY: "/dev/ttys001", HookToken: "tok_term", StartedAt: created,
+	}); err != nil {
+		t.Fatalf("WriteRunning: %v", err)
+	}
+
+	const limit = 15
+	consume := func() bool {
+		_, breached, err := st.ConsumeTurnBudget(agent.AgentID, 0, 1, limit)
+		if err != nil {
+			t.Fatalf("ConsumeTurnBudget: %v", err)
+		}
+		return breached
+	}
+	promptSubmit := func(turn int) {
+		if _, err := mgr.ApplyHook("tok_term", HookPayload{
+			AgentID: agent.AgentID, Event: "UserPromptSubmit", State: "busy",
+		}); err != nil {
+			t.Fatalf("ApplyHook UserPromptSubmit (turn %d): %v", turn, err)
+		}
+	}
+
+	// Turn 1: exhaust the per-turn budget.
+	promptSubmit(1)
+	for i := 0; i < limit; i++ {
+		if consume() {
+			t.Fatalf("consume %d breached before the limit", i+1)
+		}
+	}
+	if !consume() {
+		t.Fatalf("action %d should breach the per-turn budget", limit+1)
+	}
+
+	// Turn 2: the new turn boundary must reset the budget so sending resumes.
+	promptSubmit(2)
+	if consume() {
+		t.Fatalf("first action of the new terminal turn should not be blocked")
+	}
+}
