@@ -53,6 +53,28 @@ func (b *Bus) Subscribe() (<-chan Event, func()) {
 	return c.ch, func() { b.unsubscribe(id) }
 }
 
+// SubscribeWithSnapshot atomically captures the current snapshot AND registers a
+// subscriber under a single write lock. A separate Snapshot()-then-Subscribe()
+// leaves a gap: a state_update published between the two calls is in neither (not
+// in the already-taken snapshot, and the client isn't registered yet), so the
+// connecting client shows stale state until the next update. Holding the write
+// lock for both closes that gap — a concurrent Publish (which needs the read lock)
+// either completes fully before, and is reflected in the snapshot, or fully after,
+// and is delivered to the now-registered channel.
+func (b *Bus) SubscribeWithSnapshot() ([]state.AgentStateUpdate, <-chan Event, func()) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	out := make([]state.AgentStateUpdate, 0, len(b.snapshot))
+	for _, update := range b.snapshot {
+		out = append(out, update)
+	}
+	id := b.nextID
+	b.nextID++
+	c := &client{ch: make(chan Event, BufferSize)}
+	b.clients[id] = c
+	return out, c.ch, func() { b.unsubscribe(id) }
+}
+
 func (b *Bus) unsubscribe(id int) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
