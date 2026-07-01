@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** review fix (terminal messaging budget reset) @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
+- **Last GREEN checkpoint:** review fix (WS bridge dups the PTY master) @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -147,7 +147,6 @@ launch option via capabilities, and refreshed embedded UI. Details in changelog 
 
 ### BLOCKING
 
-- **BLOCKING — WebSocket disconnect closes the agent's live PTY master and kills the CLI.** `internal/runtime/terminal/bridge.go:62` (`_ = p.Close()`) closes `&ptyMaster{a.tab.ptmx}` (terminal.go:241) — the agent's live master — on every WS teardown; `TerminalTab.tsx` closes the WS on any unmount (tab switch, navigate away). Result: clicking away from the terminal panel SIGHUPs and kills the running agent; two tabs read/close the same master and corrupt each other. Fix: bridge over a `dup()` of the master (or refcount) so only `Stop` closes `a.tab.ptmx`; the WS view closes only its own fd. Test: run one full `Bridge` to EOF, assert the child is still alive and a second `Bridge` still streams. *(Asymmetric-teardown root cause.)*
 - **BLOCKING — Crash/unsolicited teardown leaks hook token + MCP session + on-disk files, and leaves a spoofable messaging identity.** The only `onExit` callback wired is `registry.forget` (registry.go:52,83), which clears just `rtByAgent`; every `forgetHookToken`/`cleanupMessagingMCP`/`cleanupHookSettings` lives in an HTTP handler, none on the crash path (chat.go:674, terminal.go:307). On any agent crash the server keeps `hookTokens[id]`, the registered MCP session + `mcp/{id}.mcp.json`, and `hooks/{id}` settings — so an orphaned child/hook can still call `send_message`/`check_messages` as the dead agent, and the maps/dirs grow per crash. Fix: extend the exit seam to invoke a single `teardownAgentRegistration(id)` (token+MCP+hook-settings) on crash, mirroring stop. Test: kill an agent process, assert its MCP token no longer resolves and the on-disk files are gone. *(Asymmetric-teardown root cause.)*
 
 ### ADVISORY
@@ -432,6 +431,14 @@ launch option via capabilities, and refreshed embedded UI. Details in changelog 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-01 — **review fix: WS bridge dups the PTY master so a tab-switch no longer kills the agent — green.**
+  BLOCKING (asymmetric-teardown root cause): `Bridge` closed its `PTYConn` on every WS teardown, and the browser
+  closes the WS on any unmount — so `_ = p.Close()` closed the agent's live PTY master and SIGHUP'd the CLI. `Runtime.
+  Bridge` now hands out a `dup()` of the master (`dupPTYMaster`, via `SyscallConn().Control` — not `(*os.File).Fd()`,
+  which forces the shared description blocking and hangs the pump — plus `SetNonblock` so `os.NewFile` yields a pollable
+  fd whose Close interrupts the pump). Only Stop/CloseTab closes the real master; a reconnect gets its own fd. Test:
+  `TestBridgeTeardownKeepsPTYAndAgentAlive` (bridge to EOF, then the agent is still live and a 2nd bridge round-trips
+  through `cat`). Green plain + `-tags sqlite_fts5` (Go-only).
 - 2026-07-01 — **review fix: terminal messaging budget resets at the terminal turn boundary — green.** BLOCKING
   (turn-boundary-leak root cause): `ResetTurnBudget` was called only by the chat runtime, so a terminal agent rode the
   implicit `t_000000000000` budget row forever and locked out with `message_budget_exceeded` after
