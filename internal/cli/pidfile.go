@@ -41,6 +41,14 @@ func writePidfile(home string, info pidInfo) error {
 		os.Remove(tmpName)
 		return err
 	}
+	// Sync before rename so a crash right after `dashboard start --detach` can't
+	// leave a truncated pidfile (which would make stop/open report "not running"
+	// while the daemon is actually up).
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		return err
+	}
 	if err := tmp.Close(); err != nil {
 		os.Remove(tmpName)
 		return err

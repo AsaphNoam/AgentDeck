@@ -54,6 +54,13 @@ func writeJSONAtomic(path string, v any) error {
 		os.Remove(tmpName)
 		return fmt.Errorf("config: rename %s -> %s: %w", tmpName, path, err)
 	}
+	// Fsync the parent directory so the rename itself is durable — otherwise a
+	// hard crash right after rename can lose a just-written config even though the
+	// temp file's contents were synced.
+	if d, err := os.Open(dir); err == nil {
+		_ = d.Sync()
+		_ = d.Close()
+	}
 	return nil
 }
 
