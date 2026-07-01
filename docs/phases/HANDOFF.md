@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** review fix (dead-code removal + session/load model) @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
+- **Last GREEN checkpoint:** review fix (UI advisory batch) @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, `cd ui && npm test`, `cd ui && npm run build`.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -159,11 +159,6 @@ _All 5 BLOCKINGs validated and fixed-and-green (see changelog 2026-07-01). None 
 - **ADVISORY — `ensureSessionsFTS` runs outside the numbered migration set.** `internal/state/migrate.go:58,79` (re)creates the FTS/fallback table on every `Open`; a DB once opened without FTS5 support keeps a plain table a later FTS5 binary won't upgrade. Fold into a numbered migration.
 - **ADVISORY — `matched_in` empty on diacritic/tokenizer-divergent hits.** `internal/archive/archive.go:207-232` labels hits via `strings.Contains` on raw content while FTS uses `remove_diacritics`; `café`-vs-`cafe` returns the row but with no match reason. Cosmetic. Derive `matched_in` from a metadata-restricted second MATCH.
 - **ADVISORY — Switch teardown has an un-rolled-back window.** `internal/server/switch.go:151-170` — `rollbackSwitch` fires only on `Resume` failure; if `composeSwitchSpec`/`buildHistoryPrimer`/`WriteAgent` fail *after* the old runtime was Stopped+cleaned, the agent is left dead with no running row. Route those failures through rollback too.
-- **ADVISORY — UI: FilesTab "Diff" button is a no-op.** `ui/src/components/chat/FilesTab.tsx:63-66` queries `[data-seq=...]` that no transcript renderer emits, and the transcript is in a different tab; clicking does nothing. Emit `data-seq` on transcript items + switch tab before scrolling.
-- **ADVISORY — UI: seq-gap refetch ignores open panel + can clobber live appends.** `ui/src/api/sse.ts:75-85` refetches the full transcript for any agent (never checks `openAgentId`) and calls `appendMessage` while the async `getTranscript` is in flight, so a just-appended message can be overwritten. Gate on `agentId === openAgentId`; reconcile after `setTranscript`.
-- **ADVISORY — UI: swallowed rename/stop errors.** `ui/src/components/grid/CardContextMenu.tsx:42,52` — `void renameAgent`/`void stopAgent` have no `.catch`, unlike sibling actions; a failed rename/stop shows nothing. Add `pushError` catches.
-- **ADVISORY — UI: dead `launchDefaultAgent` export.** `ui/src/api/client.ts:37-43` referenced nowhere and hardcodes stale `implementer`/`my-app` defaults. Delete.
-- **ADVISORY — UI: toast timers reset on every new toast.** `ui/src/components/shell/NotificationCenter.tsx:8-12` — the effect depends on the whole `toasts` array, restarting all 6s timers on each new toast so older toasts linger. Key timers per-toast id.
 
 ### Systemic root causes (fix the class, not just the instances)
 
@@ -427,6 +422,14 @@ _All 5 BLOCKINGs validated and fixed-and-green (see changelog 2026-07-01). None 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-01 — **review fix: UI advisory batch — green.** Five UI advisories: FilesTab "Diff" now works —
+  `TranscriptView` emits `data-seq`, `ChatPanel` tabs are controlled so `FilesTab.onReveal` switches to the transcript
+  tab then scrolls to the event; `sse.ts` seq-gap refetch is gated on the OPEN agent and no longer double-appends the
+  gap event (was refetching any agent + clobbering live appends); `CardContextMenu` rename/stop now `.catch → pushError`
+  like their siblings; removed the dead `launchDefaultAgent` export; `NotificationCenter` gives each toast its own 6s
+  timer (per-toast `<Toast>` component) so a new toast no longer restarts older ones. Tests: FilesTab onReveal,
+  CardContextMenu rename+stop error toasts, NotificationCenter independent timers, sse open-agent-only gap refetch.
+  Embedded UI dist refreshed. Green: `go build/test`, `npm test` (66), `npm run build`.
 - 2026-07-01 — **review fix: dead-code removal + session/load carries model/systemPrompt — green.** (1) Real bug:
   `sessionLoadParams` (native resume) dropped `model`/`systemPrompt`, so a same-backend model swap via switch-runtime
   (native-resume path) silently kept the OLD model — now carries both, matching `sessionNewParams` (test

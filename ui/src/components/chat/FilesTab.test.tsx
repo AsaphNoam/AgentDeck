@@ -1,5 +1,5 @@
 import React from "react";
-import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
@@ -74,6 +74,14 @@ describe("FilesTab", () => {
     await screen.findByText("src/auth.ts");
     const copyBtns = screen.getAllByRole("button", { name: /Copy/i });
     expect(copyBtns.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("Diff button calls onReveal with the diff seq", async () => {
+    const onReveal = vi.fn();
+    render(<FilesTab agentId="a_1" onReveal={onReveal} />);
+    await screen.findByText("src/auth.ts");
+    fireEvent.click(screen.getByRole("button", { name: /Diff/i }));
+    expect(onReveal).toHaveBeenCalledWith(5);
   });
 
   it("shows empty state when no files", async () => {

@@ -35,13 +35,16 @@ export function TranscriptView({ agentId, events }: { agentId: string; events: T
     <div className="transcript-wrap">
       <div className="transcript-view" ref={scrollRef} onScroll={onScroll}>
         {events.map((event, index) => (
-          <ErrorBoundary
-            key={keyOf(event, index)}
-            label="message"
-            fallback={<pre className="tool-block tool-result-error">Failed to render this event.</pre>}
-          >
-            <TranscriptItem agentId={agentId} event={event} />
-          </ErrorBoundary>
+          // data-seq lets the Files tab's "Diff" action scroll to this event
+          // (present only when the event carries a runtime seq).
+          <div key={keyOf(event, index)} className="transcript-item" data-seq={event.seq ?? undefined}>
+            <ErrorBoundary
+              label="message"
+              fallback={<pre className="tool-block tool-result-error">Failed to render this event.</pre>}
+            >
+              <TranscriptItem agentId={agentId} event={event} />
+            </ErrorBoundary>
+          </div>
         ))}
       </div>
       {!atBottom && (
