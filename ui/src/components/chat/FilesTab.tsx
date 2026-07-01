@@ -38,7 +38,7 @@ function FileRow({ file, onDiffClick }: { file: TrackedFile; onDiffClick: (seq: 
   );
 }
 
-export function FilesTab({ agentId }: { agentId: string }) {
+export function FilesTab({ agentId, onReveal }: { agentId: string; onReveal?: (seq: number) => void }) {
   const [files, setFiles] = useState<TrackedFile[]>([]);
   const [filter, setFilter] = useState("");
   const [loading, setLoading] = useState(true);
@@ -60,7 +60,14 @@ export function FilesTab({ agentId }: { agentId: string }) {
     ? files.filter((f) => f.path.toLowerCase().includes(filter.toLowerCase()))
     : files;
 
-  const scrollToDiff = (seq: number) => {
+  // Prefer the parent's reveal (switches to the transcript tab first, since its
+  // content is unmounted while the Files tab is active); fall back to an in-place
+  // scroll if used standalone.
+  const handleDiff = (seq: number) => {
+    if (onReveal) {
+      onReveal(seq);
+      return;
+    }
     const el = document.querySelector(`[data-seq="${seq}"]`);
     if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
   };
@@ -85,7 +92,7 @@ export function FilesTab({ agentId }: { agentId: string }) {
       ) : (
         <ul className="tracked-list">
           {filtered.map((f) => (
-            <FileRow key={f.path} file={f} onDiffClick={scrollToDiff} />
+            <FileRow key={f.path} file={f} onDiffClick={handleDiff} />
           ))}
         </ul>
       )}

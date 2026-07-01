@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import * as Tabs from "@radix-ui/react-tabs";
 import { getTranscript } from "../../api/client";
@@ -18,12 +18,26 @@ export function ChatPanel() {
   const agent = useAgentStore((state) => state.agents[id]);
   const events = useTranscriptStore((state) => state.byAgent[id] ?? []);
   const setTranscript = useTranscriptStore((state) => state.setTranscript);
+  const [tab, setTab] = useState(params.get("tab") === "terminal" ? "terminal" : "transcript");
 
   useEffect(() => {
     sseClient.setOpenAgent(id);
     void getTranscript(id).then((result) => setTranscript(result.agent_id, result.events)).catch(() => {});
     return () => sseClient.setOpenAgent(null);
   }, [id, setTranscript]);
+
+  // Reveal a transcript event from the Files tab's "Diff" action: switch to the
+  // transcript tab (its content is unmounted while another tab is active), then
+  // scroll to the [data-seq] node once it has mounted.
+  const revealInTranscript = (seq: number) => {
+    setTab("transcript");
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const el = document.querySelector(`[data-seq="${seq}"]`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }),
+    );
+  };
 
   if (!agent) {
     return (
@@ -44,7 +58,7 @@ export function ChatPanel() {
         </div>
         <ContextBar value={agent.context_pct} />
       </header>
-      <Tabs.Root defaultValue={params.get("tab") === "terminal" ? "terminal" : "transcript"} className="chat-tabs">
+      <Tabs.Root value={tab} onValueChange={setTab} className="chat-tabs">
         <Tabs.List className="chat-tabs-list">
           <Tabs.Trigger value="transcript">Transcript</Tabs.Trigger>
           <Tabs.Trigger value="files">Files</Tabs.Trigger>
@@ -55,7 +69,7 @@ export function ChatPanel() {
           <TranscriptView agentId={id} events={events} />
         </Tabs.Content>
         <Tabs.Content value="files" className="chat-tab-content">
-          <FilesTab agentId={id} />
+          <FilesTab agentId={id} onReveal={revealInTranscript} />
         </Tabs.Content>
         <Tabs.Content value="commands" className="chat-tab-content">
           <CommandsTab agentId={id} />

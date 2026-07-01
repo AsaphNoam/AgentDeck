@@ -39,7 +39,10 @@ export function CardContextMenu() {
         type="button"
         onClick={() => {
           const name = window.prompt("Rename agent", agent.name);
-          if (name) void renameAgent(agent.agent_id, name);
+          if (name)
+            renameAgent(agent.agent_id, name).catch((err) =>
+              pushError("Rename failed", err instanceof Error ? err.message : String(err)),
+            );
           close();
         }}
       >
@@ -49,7 +52,10 @@ export function CardContextMenu() {
         type="button"
         disabled={!agent.running}
         onClick={() => {
-          if (window.confirm(`Stop ${agent.name}?`)) void stopAgent(agent.agent_id);
+          if (window.confirm(`Stop ${agent.name}?`))
+            stopAgent(agent.agent_id).catch((err) =>
+              pushError("Stop failed", err instanceof Error ? err.message : String(err)),
+            );
           close();
         }}
       >

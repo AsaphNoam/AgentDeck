@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("./client", () => ({
+  getTranscript: vi.fn(async (id: string) => ({ agent_id: id, events: [] })),
+}));
+
 // A minimal fake EventSource that records instances and lets the test drive
 // open/ping/close. Each construction is tracked so we can assert reconnects.
 class FakeEventSource {
@@ -67,6 +71,32 @@ describe("SseClient watchdog reconnect", () => {
     second.emit("ping");
     vi.advanceTimersByTime(6_000);
     expect(second.closed).toBe(false);
+  });
+
+  // Regression (review fix): a seq-gap transcript refetch must only fire for the
+  // OPEN agent (others aren't displayed and ChatPanel refetches on open), and the
+  // gap event must not also be appended (the async setTranscript would clobber /
+  // duplicate it).
+  it("only refetches on a seq gap for the open agent", async () => {
+    const { sseClient } = await import("./sse");
+    const client = await import("./client");
+    sseClient.connect();
+    const es = FakeEventSource.instances[0];
+    const msg = (agent: string, seq: number) =>
+      JSON.stringify({ type: "new_message", seq, ts: 1, agent_id: agent, data: { kind: "assistant_text", seq, ts: "t", delta: "x" } });
+
+    sseClient.setOpenAgent("a_open");
+    // Seed lastSeq=1 for both agents (no gap yet).
+    es.emit("new_message", msg("a_open", 1));
+    es.emit("new_message", msg("a_bg", 1));
+    (client.getTranscript as ReturnType<typeof vi.fn>).mockClear();
+
+    // Gap for the open agent → refetch.
+    es.emit("new_message", msg("a_open", 5));
+    expect(client.getTranscript).toHaveBeenCalledWith("a_open");
+    // Gap for a background agent → no refetch.
+    es.emit("new_message", msg("a_bg", 9));
+    expect(client.getTranscript).toHaveBeenCalledTimes(1);
   });
 
   it("drops muted notification types", async () => {

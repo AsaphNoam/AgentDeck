@@ -74,13 +74,19 @@ class SseClient {
     const seq = (envelope.data as { seq?: number }).seq ?? 0;
     if (seq > 0) {
       const last = this.lastAgentSeq[agentId] ?? 0;
-      if (last > 0 && seq > last + 1) {
-        // Gap detected — refetch full transcript to recover missed events.
-        getTranscript(agentId).then((t) =>
-          useTranscriptStore.getState().setTranscript(t.agent_id, t.events)
-        ).catch(() => undefined);
-      }
       this.lastAgentSeq[agentId] = seq;
+      // Only the open agent's transcript is displayed; a gap refetch for any
+      // other agent is wasted work (ChatPanel refetches on open anyway). On a
+      // gap we refetch the authoritative transcript — which already includes
+      // this event — and return WITHOUT also appending it, so the async
+      // setTranscript can't clobber (or duplicate, since appendMessage doesn't
+      // dedupe) a concurrent optimistic append.
+      if (last > 0 && seq > last + 1 && agentId === this.openAgentId) {
+        getTranscript(agentId)
+          .then((t) => useTranscriptStore.getState().setTranscript(t.agent_id, t.events))
+          .catch(() => undefined);
+        return;
+      }
     }
     useTranscriptStore.getState().appendMessage(agentId, envelope.data);
   }
