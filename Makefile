@@ -49,9 +49,10 @@ dist: embed build
 run: build
 	./bin/$(BINARY) dashboard start
 
-## test: run the Go test suite
+## test: run the Go test suite (no-tag fallback path + the sqlite_fts5 FTS path)
 test:
 	go test ./...
+	go test -tags sqlite_fts5 ./...
 
 ## vet: static analysis
 vet:
