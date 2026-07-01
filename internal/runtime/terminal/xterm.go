@@ -70,13 +70,6 @@ func (xtermDriver) WriteText(tab *Tab, text string) error {
 	return err
 }
 
-func (xtermDriver) ReadTTY(tab *Tab) (string, error) {
-	if tab == nil {
-		return "", fmt.Errorf("terminal: nil tab")
-	}
-	return tab.TTY, nil
-}
-
 // CloseTab closes the PTY master. The bridged WebSocket then sees EOF and the
 // pump ends; the child (already signalled by the runtime's Stop) exits.
 func (xtermDriver) CloseTab(tab *Tab) error {
@@ -85,7 +78,3 @@ func (xtermDriver) CloseTab(tab *Tab) error {
 	}
 	return tab.ptmx.Close()
 }
-
-// RevealTab is a UI-side concern for the embedded xterm panel; nothing to do
-// server-side.
-func (xtermDriver) RevealTab(tab *Tab) error { return nil }

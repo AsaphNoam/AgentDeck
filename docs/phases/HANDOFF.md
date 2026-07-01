@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** review fix (durability/Makefile advisories) @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
+- **Last GREEN checkpoint:** review fix (dead-code removal + session/load model) @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -156,14 +156,9 @@ _All 5 BLOCKINGs validated and fixed-and-green (see changelog 2026-07-01). None 
 - **ADVISORY — Crash mid-turn double-emits error+turn_end.** `internal/runtime/transport.go:182` delivers a fresh `*rpcError` instead of the `errTransportClosed` sentinel, so `errors.Is` at chat.go:311/573 is always false and the only guard is a racy `isStopped()`; a crash mid-turn can emit a spurious `error{protocol}` + second `turn_end` on top of the real ones. Deliver the sentinel itself.
 - **ADVISORY — `tool_call_update` always mapped to a completed tool_result.** `internal/runtime/acpmap.go:165-172` emits `EvToolResult` (status default `completed`) for every update, including intermediate `in_progress` ones, so status flips to "done" prematurely and the transcript repeats tool_results. Only emit on terminal status.
 - **ADVISORY — Cancel never escalates to SIGINT.** `internal/runtime/permission.go:119-142` sends `session/cancel` with no grace-then-SIGINT escalation (techspec §8.4); an agent that ignores ACP cancel stays busy until hard Stop.
-- **ADVISORY — `sessionLoadParams` drops systemPrompt/model on resume path.** `internal/runtime/chat.go:1024-1034` (session/load) sends neither; works today only because a primer switch forces `resumeID=""` → session/new (switch.go:118). Document/assert that coupling or carry systemPrompt in session/load so a future change can't silently drop the switch primer.
 - **ADVISORY — `ensureSessionsFTS` runs outside the numbered migration set.** `internal/state/migrate.go:58,79` (re)creates the FTS/fallback table on every `Open`; a DB once opened without FTS5 support keeps a plain table a later FTS5 binary won't upgrade. Fold into a numbered migration.
-- **ADVISORY — `NewAgentID` uses 24 bits with a 10-try cap.** `internal/state/agents.go:15-32` matches spec but the "astronomically unlikely" claim overstates the margin at large agent counts; irrelevant for personal use.
-- **ADVISORY — Dead no-op color branch.** `internal/server/config_handlers.go:252-258` assigns `color` the value it already holds; comment implies a default that never happens. Delete or implement.
-- **ADVISORY — Dead unreachable stdio-MCP fallback.** `internal/server/messaging_registration.go:39-49,63-70` — `usesHTTPMessagingMCP` is constant-true, so the stdio-spec branch (and the `agentdeck mcp` subcommand it implies) is dead. Remove or wire.
 - **ADVISORY — `matched_in` empty on diacritic/tokenizer-divergent hits.** `internal/archive/archive.go:207-232` labels hits via `strings.Contains` on raw content while FTS uses `remove_diacritics`; `café`-vs-`cafe` returns the row but with no match reason. Cosmetic. Derive `matched_in` from a metadata-restricted second MATCH.
 - **ADVISORY — Switch teardown has an un-rolled-back window.** `internal/server/switch.go:151-170` — `rollbackSwitch` fires only on `Resume` failure; if `composeSwitchSpec`/`buildHistoryPrimer`/`WriteAgent` fail *after* the old runtime was Stopped+cleaned, the agent is left dead with no running row. Route those failures through rollback too.
-- **ADVISORY — Unwired terminal driver-seam methods.** `internal/runtime/terminal/driver.go:52,54` — `ReadTTY` and `RevealTab` implemented on every driver but have zero call sites. Drop until needed or wire `RevealTab` to the reveal affordance.
 - **ADVISORY — UI: FilesTab "Diff" button is a no-op.** `ui/src/components/chat/FilesTab.tsx:63-66` queries `[data-seq=...]` that no transcript renderer emits, and the transcript is in a different tab; clicking does nothing. Emit `data-seq` on transcript items + switch tab before scrolling.
 - **ADVISORY — UI: seq-gap refetch ignores open panel + can clobber live appends.** `ui/src/api/sse.ts:75-85` refetches the full transcript for any agent (never checks `openAgentId`) and calls `appendMessage` while the async `getTranscript` is in flight, so a just-appended message can be overwritten. Gate on `agentId === openAgentId`; reconcile after `setTranscript`.
 - **ADVISORY — UI: swallowed rename/stop errors.** `ui/src/components/grid/CardContextMenu.tsx:42,52` — `void renameAgent`/`void stopAgent` have no `.catch`, unlike sibling actions; a failed rename/stop shows nothing. Add `pushError` catches.
@@ -180,6 +175,13 @@ _All 5 BLOCKINGs validated and fixed-and-green (see changelog 2026-07-01). None 
 
 > Resolved without stopping; the human should still see them. Remove once acknowledged (workflow §3, §5).
 
+- **NEW (review fix): removed the (dead, unimplemented) stdio-MCP fallback scaffolding.** The 5.3 decision left a
+  stdio branch in `registerMessagingMCP` behind a constant-true `usesHTTPMessagingMCP`, as a placeholder for the gated
+  live two-CLI HTTP-vs-stdio verdict. The dead-code review flagged it; I removed it (branch + function + the now-unused
+  `backendType` param) because it was unreachable AND non-functional — the `agentdeck mcp` stdio subcommand it pointed
+  at doesn't exist, so it would fail at runtime if ever hit. **Why a judgment call:** it deletes intentional gated
+  scaffolding rather than leaving it. The gate itself remains open in "Blocked on human" (live CLI HTTP acceptance).
+  **To reverse:** if a real CLI rejects HTTP, re-add a stdio branch AND implement the `agentdeck mcp` proxy subcommand.
 - **NEW (review fix): skip_permissions/add_dirs are RE-RESOLVED from current role/project config on resume+switch,
   not persisted into the frozen session snapshot.** The BLOCKING findings suggested persisting `add_dirs` into
   `SessionSnapshot` + the `sessions` table (+ a migration). I chose to re-resolve both `skip_permissions` (via
@@ -425,6 +427,14 @@ _All 5 BLOCKINGs validated and fixed-and-green (see changelog 2026-07-01). None 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-01 — **review fix: dead-code removal + session/load carries model/systemPrompt — green.** (1) Real bug:
+  `sessionLoadParams` (native resume) dropped `model`/`systemPrompt`, so a same-backend model swap via switch-runtime
+  (native-resume path) silently kept the OLD model — now carries both, matching `sessionNewParams` (test
+  `TestSessionLoadParamsCarriesModelAndSystemPrompt`). (2) Dead code removed: the no-op color branch in
+  `config_handlers.go`; the unreachable stdio-MCP fallback + constant-true `usesHTTPMessagingMCP` (dropped the
+  `backendType` param too — HTTP is used unconditionally); the never-called `ReadTTY`/`RevealTab` driver-seam methods
+  (interface + xterm + tmux). Also **dismissed** the `NewAgentID` advisory (24-bit/10-try is correct for single-user
+  scope — not a real defect). Green plain + `-tags sqlite_fts5` (Go-only).
 - 2026-07-01 — **review fix: durability + Makefile advisories — green.** ADVISORY batch: `make test` now runs both the
   no-tag path AND `-tags sqlite_fts5` (FTS/search tests were untested by the standard target); `config/atomic.go`
   fsyncs the parent dir after rename (durable config write); `cli/pidfile.go` `tmp.Sync()`s before rename (no truncated

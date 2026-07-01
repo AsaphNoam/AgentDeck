@@ -175,7 +175,7 @@ func (s *Server) composeLaunch(req launchRequest) (runtime.LaunchSpec, state.Age
 
 	token := mintHookToken()
 	s.rememberHookToken(agentID, token)
-	mcpSpec, err := s.registerMessagingMCP(agent, backend.Type)
+	mcpSpec, err := s.registerMessagingMCP(agent)
 	if err != nil {
 		s.forgetHookToken(agentID)
 		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeInternal, err.Error())
