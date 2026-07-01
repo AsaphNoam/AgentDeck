@@ -165,12 +165,19 @@ func mapSessionUpdate(params json.RawMessage) []mappedEvent {
 	case "tool_call_update":
 		blocks := decodeContentArray(u.Content)
 		evs := make([]mappedEvent, 0, 1+len(blocks))
-		evs = append(evs, mappedEvent{Type: EvToolResult, Data: ToolResultData{
-			ToolCallID: u.ToolCallID,
-			Status:     defaultStr(u.Status, "completed"),
-			Content:    nonNullRaw(u.Content),
-		}})
-		// A tool_call_update may carry one or more diff blocks (one per file).
+		// Only a TERMINAL update produces a tool_result (ToolResultData.Status is
+		// "completed" | "failed"). An intermediate/in-progress update — or one that
+		// omits status — must not be mapped to a completed result, or the status
+		// flips to done prematurely and the transcript repeats tool_results.
+		if u.Status == "completed" || u.Status == "failed" {
+			evs = append(evs, mappedEvent{Type: EvToolResult, Data: ToolResultData{
+				ToolCallID: u.ToolCallID,
+				Status:     u.Status,
+				Content:    nonNullRaw(u.Content),
+			}})
+		}
+		// A tool_call_update may carry one or more diff blocks (one per file); diffs
+		// can stream on in-progress updates, so emit them regardless of status.
 		for _, b := range blocks {
 			if b.Type == "diff" {
 				evs = append(evs, mappedEvent{Type: EvDiff, Data: DiffData{

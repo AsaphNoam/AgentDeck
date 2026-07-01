@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"strings"
 	"sync"
@@ -88,6 +89,35 @@ func TestTransportMalformedThenValid(t *testing.T) {
 	defer mu.Unlock()
 	if len(methods) != 1 || methods[0] != "session/update" {
 		t.Fatalf("resync failed: got notifications %v, want [session/update]", methods)
+	}
+}
+
+// Regression (review fix): when the transport shuts down (crash/EOF) with a Call
+// in flight, the pending Call must receive the errTransportClosed SENTINEL so the
+// chat runtime's errors.Is(err, errTransportClosed) guard matches and it doesn't
+// spuriously emit error{protocol} + a second turn_end. Previously shutdown wrapped
+// a fresh *rpcError with the same message, which errors.Is could never match.
+func TestTransportCallErrTransportClosedOnShutdown(t *testing.T) {
+	respR, respW := io.Pipe() // transport reads from respR; closing respW → EOF
+	tr := NewTransport(io.Discard, nil, nil)
+	go func() { _ = tr.Run(respR) }()
+
+	errc := make(chan error, 1)
+	go func() {
+		_, err := tr.Call(context.Background(), "session/prompt", map[string]any{})
+		errc <- err
+	}()
+	// Let the Call register as pending, then close the read side (transport EOF).
+	time.Sleep(50 * time.Millisecond)
+	_ = respW.Close()
+
+	select {
+	case err := <-errc:
+		if !errors.Is(err, errTransportClosed) {
+			t.Fatalf("Call err = %v, want errors.Is errTransportClosed", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Call did not return after transport shutdown")
 	}
 }
 
