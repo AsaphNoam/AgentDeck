@@ -33,6 +33,31 @@ func TestPublishDeliversInOrderToSubscribers(t *testing.T) {
 	}
 }
 
+// Regression (review fix): SubscribeWithSnapshot returns the current snapshot AND
+// a live subscription in one lock, so no state_update is dropped in the gap a
+// separate Snapshot()+Subscribe() left open.
+func TestSubscribeWithSnapshotReturnsSnapshotAndLiveChannel(t *testing.T) {
+	b := New()
+	b.SetSnapshot(state.AgentStateUpdate{AgentState: state.AgentState{AgentID: "a1", State: "idle"}})
+
+	snap, ch, unsub := b.SubscribeWithSnapshot()
+	defer unsub()
+	if len(snap) != 1 || snap[0].AgentID != "a1" {
+		t.Fatalf("snapshot = %+v, want one entry for a1", snap)
+	}
+
+	id := "a1"
+	b.Publish("state_update", &id, map[string]string{"state": "busy"})
+	select {
+	case ev := <-ch:
+		if ev.Type != "state_update" {
+			t.Fatalf("event type = %q, want state_update", ev.Type)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("no event delivered to the SubscribeWithSnapshot channel")
+	}
+}
+
 func TestStateUpdateEmitsNotificationOnTransition(t *testing.T) {
 	b := New()
 	ch, unsub := b.Subscribe()
