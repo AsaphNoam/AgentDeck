@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 
@@ -203,6 +204,56 @@ func TestSwitchRuntimeKeepsTargetRegistration(t *testing.T) {
 	if got, ok := srv.messaging.Lookup(token); !ok || got != id {
 		t.Fatalf("target MCP token not usable: lookup(%q) = (%q, %v), want (%q, true)", token, got, ok, id)
 	}
+}
+
+// Regression (review fix): an agent CRASH (unsolicited process exit) must tear
+// down its registration artifacts, not just registry ownership. Before the fix
+// only registry.forget ran on the crash path, so the hook token + MCP session +
+// on-disk mcp/hook files leaked — leaving a spoofable messaging identity a
+// lingering child could still send/check as.
+func TestCrashTearsDownAgentRegistration(t *testing.T) {
+	srv, ts := switchTestServer(t)
+	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+
+	token := readMessagingToken(t, srv, id)
+	if got, ok := srv.messaging.Lookup(token); !ok || got != id {
+		t.Fatalf("precondition: token should resolve to %s, got (%q,%v)", id, got, ok)
+	}
+	mcpPath := filepath.Join(srv.configStore.Home(), "mcp", id+".mcp.json")
+	hookPath := filepath.Join(srv.configStore.Home(), "hooks", "agents", id+".json")
+	if _, err := os.Stat(mcpPath); err != nil {
+		t.Fatalf("precondition mcp file: %v", err)
+	}
+	if _, err := os.Stat(hookPath); err != nil {
+		t.Fatalf("precondition hook file: %v", err)
+	}
+
+	run, err := srv.stateStore.ReadRunning(id)
+	if err != nil || run.PID <= 0 {
+		t.Fatalf("ReadRunning for pid: %+v err=%v", run, err)
+	}
+
+	// Simulate a crash: hard-kill the agent process outside stop/switch.
+	if err := syscall.Kill(run.PID, syscall.SIGKILL); err != nil {
+		t.Fatalf("kill agent pid %d: %v", run.PID, err)
+	}
+
+	// The crash exit path (onExit → teardownAgentRegistration) must revoke the
+	// token and remove the on-disk artifacts.
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		_, ok := srv.messaging.Lookup(token)
+		_, mcpErr := os.Stat(mcpPath)
+		_, hookErr := os.Stat(hookPath)
+		if !ok && os.IsNotExist(mcpErr) && os.IsNotExist(hookErr) {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	_, ok := srv.messaging.Lookup(token)
+	_, mcpErr := os.Stat(mcpPath)
+	_, hookErr := os.Stat(hookPath)
+	t.Fatalf("registration not torn down after crash: tokenResolves=%v mcpStat=%v hookStat=%v", ok, mcpErr, hookErr)
 }
 
 // readMessagingToken extracts the X-AgentDeck-Token from the agent's persisted

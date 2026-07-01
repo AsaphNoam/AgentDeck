@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** review fix (WS bridge dups the PTY master) @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
+- **Last GREEN checkpoint:** review fix (crash-path registration teardown) @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -147,11 +147,8 @@ launch option via capabilities, and refreshed embedded UI. Details in changelog 
 
 ### BLOCKING
 
-- **BLOCKING — Crash/unsolicited teardown leaks hook token + MCP session + on-disk files, and leaves a spoofable messaging identity.** The only `onExit` callback wired is `registry.forget` (registry.go:52,83), which clears just `rtByAgent`; every `forgetHookToken`/`cleanupMessagingMCP`/`cleanupHookSettings` lives in an HTTP handler, none on the crash path (chat.go:674, terminal.go:307). On any agent crash the server keeps `hookTokens[id]`, the registered MCP session + `mcp/{id}.mcp.json`, and `hooks/{id}` settings — so an orphaned child/hook can still call `send_message`/`check_messages` as the dead agent, and the maps/dirs grow per crash. Fix: extend the exit seam to invoke a single `teardownAgentRegistration(id)` (token+MCP+hook-settings) on crash, mirroring stop. Test: kill an agent process, assert its MCP token no longer resolves and the on-disk files are gone. *(Asymmetric-teardown root cause.)*
-
 ### ADVISORY
 
-- **ADVISORY — Stop handler omits `forgetHookToken`.** `internal/server/sessions.go:141-142` cleans MCP + hook-settings but not the in-memory hook-token map, so it grows one entry per stopped agent for the server's lifetime. Bundle all three into one `teardownAgentRegistration` helper used everywhere an agent exits.
 - **ADVISORY — SSE snapshot-before-subscribe race.** `internal/server/sse.go:29` (`Snapshot()`) and `:36` (`Subscribe()`) are two separate bus-lock acquisitions; a `state_update` published in the gap is missed by the connecting client and it reads a pre-update snapshot → a card can show stale state until the next update. Flagged in the Phase 2 techspec's own review, still unfixed. Fix: add an atomic `Bus.SubscribeWithSnapshot()`.
 - **ADVISORY — `make test` never runs the FTS/search tests.** `Makefile:54` `test:` is `go test ./...` with no `-tags sqlite_fts5`; the FTS tests are build-tag-gated, so the entire archive-search path (MATCH/bm25/snippet + fallback) is untested by the standard command while showing green. Add `-tags sqlite_fts5` to the `test:` target.
 - **ADVISORY — `reindex` is a second SQLite writer against a live server.** `internal/cli/reindex.go:32-44` + `internal/index/reindex.go` open their own handle and `DELETE` sessions/tracked_* tables, only warning (not aborting) when the server is running — violates the sole-writer invariant and can corrupt/rewind live archive data. Fix: hard-error (non-zero exit) when the server is up, or proxy through it.
@@ -159,7 +156,6 @@ launch option via capabilities, and refreshed embedded UI. Details in changelog 
 - **ADVISORY — `tool_call_update` always mapped to a completed tool_result.** `internal/runtime/acpmap.go:165-172` emits `EvToolResult` (status default `completed`) for every update, including intermediate `in_progress` ones, so status flips to "done" prematurely and the transcript repeats tool_results. Only emit on terminal status.
 - **ADVISORY — Cancel never escalates to SIGINT.** `internal/runtime/permission.go:119-142` sends `session/cancel` with no grace-then-SIGINT escalation (techspec §8.4); an agent that ignores ACP cancel stays busy until hard Stop.
 - **ADVISORY — `sessionLoadParams` drops systemPrompt/model on resume path.** `internal/runtime/chat.go:1024-1034` (session/load) sends neither; works today only because a primer switch forces `resumeID=""` → session/new (switch.go:118). Document/assert that coupling or carry systemPrompt in session/load so a future change can't silently drop the switch primer.
-- **ADVISORY — hook tokens never forgotten on stop (P1 duplicate of the stop-handler advisory above).** `internal/server/launch.go:391` `forgetHookToken` only called on error paths; `handleStop` doesn't call it. (Same fix.)
 - **ADVISORY — Config atomic write doesn't fsync the parent directory.** `internal/config/atomic.go:53` fsyncs the temp file and renames but never `Dir.Sync()`s the parent, so a hard crash right after rename can lose a just-written config. Add a parent-dir sync.
 - **ADVISORY — Pidfile write skips fsync.** `internal/cli/pidfile.go:34-48` does temp+rename with no `tmp.Sync()`; a crash after `dashboard start --detach` can leave a truncated pidfile so stop/open report "not running" while the daemon runs.
 - **ADVISORY — `dashboard.log` path built with string concat.** `internal/cli/dashboard.go:148` `home + "/dashboard.log"` hardcodes the separator where the package uses `filepath.Join` elsewhere. Cosmetic/portability.
@@ -431,6 +427,15 @@ launch option via capabilities, and refreshed embedded UI. Details in changelog 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-01 — **review fix: crash-path registration teardown (+ stop-handler token cleanup) — green.** BLOCKING
+  (asymmetric-teardown root cause): the only `onExit` wired was `registry.forget` (ownership only); on an agent crash
+  the hook token + MCP session + `mcp/{id}.mcp.json` + `hooks/agents/{id}.json` all leaked — a spoofable messaging
+  identity a lingering child could still send/check as. Added one `teardownAgentRegistration(id)` (token + MCP +
+  hook-settings) and a `Registry.SetExitHook`; runtimes' onExit now runs `handleAgentExit` = forget + the server
+  teardown (crash path only — solicited Stop/switch already suppress onExit, so a switch's re-registration is safe).
+  `handleStop` now routes through the same helper, closing the two related ADVISORYs (stop omitted `forgetHookToken`).
+  Test: `TestCrashTearsDownAgentRegistration` (SIGKILL the agent → token stops resolving + both files gone). Green
+  plain + `-tags sqlite_fts5` (Go-only).
 - 2026-07-01 — **review fix: WS bridge dups the PTY master so a tab-switch no longer kills the agent — green.**
   BLOCKING (asymmetric-teardown root cause): `Bridge` closed its `PTYConn` on every WS teardown, and the browser
   closes the WS on any unmount — so `_ = p.Close()` closed the agent's live PTY master and SIGHUP'd the CLI. `Runtime.

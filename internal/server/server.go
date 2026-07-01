@@ -125,7 +125,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	// Route budget breaches through the bus so the toast names the agent
 	// (agent_name/address) like every other notification type.
 	msg.SetBudgetExceededSink(eventBus.PublishBudgetExceeded)
-	return &Server{
+	s := &Server{
 		configStore:      cfgStore,
 		stateStore:       stateStore,
 		stateMgr:         stateMgr,
@@ -143,6 +143,13 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		credCheck:        credcheck.Check,
 		primerSummarizer: defaultPrimerSummarizer,
 	}
+	// Tear down per-agent registration artifacts on the runtime crash path too,
+	// not only on solicited stop/switch — otherwise a crashed agent leaves a live
+	// hook token + MCP session (a spoofable messaging identity) and leaked files.
+	if registry != nil {
+		registry.SetExitHook(s.teardownAgentRegistration)
+	}
+	return s
 }
 
 // Start binds 127.0.0.1:{cfg.Port}, asserts the listener is loopback, serves
