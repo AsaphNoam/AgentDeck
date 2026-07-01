@@ -21,7 +21,7 @@ func TestRegisterMessagingMCPWritesHTTPConfigAndCleanup(t *testing.T) {
 		AgentID: "a_msgreg", Name: "Atlas", Role: "implementer", Project: "my-app",
 		Backend: "claude", Model: "sonnet", Interface: "chat",
 	}
-	spec, err := srv.registerMessagingMCP(agent, "claude-acp")
+	spec, err := srv.registerMessagingMCP(agent)
 	if err != nil {
 		t.Fatalf("registerMessagingMCP: %v", err)
 	}

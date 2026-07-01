@@ -24,3 +24,22 @@ func TestSessionLoadParamsForwardsAddDirs(t *testing.T) {
 		t.Fatalf("additionalDirectories = %v, want the spec's AddDirs", dirs)
 	}
 }
+
+// Regression (review fix): the native-resume path (session/load) must carry the
+// model + systemPrompt, or a same-backend model swap via switch-runtime that uses
+// native resume silently keeps the OLD model (the new one never reaches the CLI).
+func TestSessionLoadParamsCarriesModelAndSystemPrompt(t *testing.T) {
+	spec := LaunchSpec{
+		Cwd:          "/work",
+		ModelID:      "opus-4-7",
+		SystemPrompt: "be helpful",
+	}
+	params := sessionLoadParams(spec, "sess-123")
+
+	if got := params["model"]; got != "opus-4-7" {
+		t.Fatalf("session/load model = %v, want opus-4-7", got)
+	}
+	if got := params["systemPrompt"]; got != "be helpful" {
+		t.Fatalf("session/load systemPrompt = %v, want %q", got, "be helpful")
+	}
+}

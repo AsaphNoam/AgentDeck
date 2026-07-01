@@ -288,7 +288,7 @@ func (s *Server) composeSwitchSpec(target state.Agent, resumeID string) (runtime
 
 	token := mintHookToken()
 	s.rememberHookToken(target.AgentID, token)
-	mcpSpec, err := s.registerMessagingMCP(target, be.Type)
+	mcpSpec, err := s.registerMessagingMCP(target)
 	if err != nil {
 		s.forgetHookToken(target.AgentID)
 		return runtime.LaunchSpec{}, apiError(runtime.CodeInternal, err.Error())

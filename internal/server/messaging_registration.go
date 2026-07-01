@@ -18,7 +18,7 @@ const messagingMCPName = "agentdeck-messaging"
 // registerMessagingMCP wires one agent to the dashboard-owned MCP server
 // (techspec §3.6). The live CLI verdict is still gated, so both current chat
 // backends receive the preferred HTTP transport entry.
-func (s *Server) registerMessagingMCP(agent state.Agent, backendType string) (runtime.MCPServerSpec, error) {
+func (s *Server) registerMessagingMCP(agent state.Agent) (runtime.MCPServerSpec, error) {
 	token, err := mintMessagingToken()
 	if err != nil {
 		return runtime.MCPServerSpec{}, err
@@ -28,6 +28,11 @@ func (s *Server) registerMessagingMCP(agent state.Agent, backendType string) (ru
 	}
 	s.messaging.Register(token, agent.AgentID)
 
+	// Both current backends (claude-acp, codex-acp) take the in-process HTTP
+	// streamable transport. A stdio fallback (an `agentdeck mcp` proxy subcommand)
+	// would only be needed if a real CLI rejects HTTP — that's still gated on the
+	// live two-CLI acceptance (see HANDOFF "Blocked on human"); it isn't wired
+	// (no such subcommand exists), so we don't emit an unreachable/broken branch.
 	spec := runtime.MCPServerSpec{
 		Name: messagingMCPName,
 		Type: "http",
@@ -35,17 +40,6 @@ func (s *Server) registerMessagingMCP(agent state.Agent, backendType string) (ru
 		Headers: map[string]string{
 			messaging.TokenHeader: token,
 		},
-	}
-	if !usesHTTPMessagingMCP(backendType) {
-		self, err := os.Executable()
-		if err != nil || self == "" {
-			self = "agentdeck"
-		}
-		spec = runtime.MCPServerSpec{
-			Name:    messagingMCPName,
-			Command: self,
-			Args:    []string{"mcp", "--agent", agent.AgentID, "--token", token},
-		}
 	}
 
 	path, err := s.writeMessagingMCPConfig(agent.AgentID, spec)
@@ -58,15 +52,6 @@ func (s *Server) registerMessagingMCP(agent state.Agent, backendType string) (ru
 		_ = os.Remove(path)
 	})
 	return spec, nil
-}
-
-func usesHTTPMessagingMCP(backendType string) bool {
-	switch backendType {
-	case "claude-acp", "codex-acp":
-		return true
-	default:
-		return true
-	}
 }
 
 func (s *Server) writeMessagingMCPConfig(agentID string, spec runtime.MCPServerSpec) (string, error) {

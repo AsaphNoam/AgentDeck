@@ -1017,10 +1017,12 @@ func sessionNewParams(spec LaunchSpec) map[string]any {
 	}
 }
 
-// sessionLoadParams builds the session/load params. ACP loadSession takes the
-// same cwd + mcpServers registration as session/new (plus the sessionId to
-// restore), so resuming applies the freshly-minted messaging MCP server on the
-// load path — not only on the session/new fallback.
+// sessionLoadParams builds the session/load params. It carries the SAME fields as
+// session/new (cwd, mcpServers, model, systemPrompt, additionalDirectories) plus
+// the sessionId to restore — so resuming applies the freshly-minted messaging MCP
+// server AND the current model/system-prompt on the native-resume path, not only
+// on the session/new fallback. Without model here, a same-backend model swap that
+// uses native resume (CanSwitchModelOnResume) would silently keep the old model.
 func sessionLoadParams(spec LaunchSpec, sessionID string) map[string]any {
 	mcp := make([]map[string]any, 0, len(spec.MCPServers))
 	for _, m := range spec.MCPServers {
@@ -1030,6 +1032,8 @@ func sessionLoadParams(spec LaunchSpec, sessionID string) map[string]any {
 		"sessionId":             sessionID,
 		"cwd":                   spec.Cwd,
 		"mcpServers":            mcp,
+		"model":                 spec.ModelID,
+		"systemPrompt":          spec.SystemPrompt,
 		"additionalDirectories": spec.AddDirs,
 	}
 }

@@ -60,16 +60,6 @@ func (tmuxDriver) WriteText(tab *Tab, text string) error {
 	return exec.Command("tmux", "send-keys", "-t", tab.tmuxName, "Enter").Run()
 }
 
-func (tmuxDriver) ReadTTY(tab *Tab) (string, error) {
-	if tab == nil || tab.tmuxName == "" {
-		return "", fmt.Errorf("terminal: nil tmux tab")
-	}
-	if tab.TTY != "" {
-		return tab.TTY, nil
-	}
-	return tmuxDisplay(tab.tmuxName, "#{pane_tty}")
-}
-
 // CloseTab kills the tmux session, terminating the CLI inside it.
 func (tmuxDriver) CloseTab(tab *Tab) error {
 	if tab == nil || tab.tmuxName == "" {
@@ -77,10 +67,6 @@ func (tmuxDriver) CloseTab(tab *Tab) error {
 	}
 	return exec.Command("tmux", "kill-session", "-t", tab.tmuxName).Run()
 }
-
-// RevealTab is a no-op server-side: the user attaches with `tmux attach`, or the
-// embedded panel attaches to the pane tty.
-func (tmuxDriver) RevealTab(tab *Tab) error { return nil }
 
 func (s TabSpec) tmuxSession() string {
 	// Stable, collision-free per agent: the runtime sets a unique Title, but the

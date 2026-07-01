@@ -249,13 +249,9 @@ type projectCreateBody struct {
 }
 
 func (b projectCreateBody) toProject() config.Project {
+	// Color is stored verbatim (zeros preserved — a user may intentionally want
+	// black); the UI sends [128,128,128] explicitly when it wants the default.
 	color := b.Color
-	if color == [3]int{0, 0, 0} {
-		// Spec: default [128,128,128] if omitted. A zero value may mean omitted.
-		// We keep user-supplied zeros because the user may intentionally want black;
-		// the UI should send [128,128,128] explicitly when omitted.
-		color = b.Color
-	}
 	addDirs := b.AddDirs
 	if addDirs == nil {
 		addDirs = []string{}
