@@ -109,16 +109,8 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 6. Mint fresh hook token and build LaunchSpec from the frozen snapshot.
-	token := mintHookToken()
-	s.rememberHookToken(id, token)
-	mcpSpec, err := s.registerMessagingMCP(agent, backend.Type)
-	if err != nil {
-		s.forgetHookToken(id)
-		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
-		return
-	}
-
+	// 6. Build the resume LaunchSpec from the frozen snapshot + current role/project
+	//    (skip_permissions and add_dirs are re-resolved, not stored in the snapshot).
 	resumeAgent := state.Agent{
 		AgentID:   agent.AgentID,
 		Name:      agent.Name,
@@ -130,26 +122,10 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: agent.CreatedAt,
 		Group:     agent.Group,
 	}
-	extraArgs, err := s.composeHookRegistration(resumeAgent, backend.Type)
-	if err != nil {
-		s.forgetHookToken(id)
-		s.cleanupMessagingMCP(id)
-		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
+	spec, ae := s.composeResumeSpec(resumeAgent, snap, backend, model)
+	if ae != nil {
+		writeAPIError(w, ae)
 		return
-	}
-
-	spec := runtime.LaunchSpec{
-		Agent:          resumeAgent,
-		Cwd:            snap.Cwd,
-		SystemPrompt:   snap.SystemPrompt,
-		BackendType:    backend.Type,
-		ModelID:        model.Model,
-		Env:            composeEnv(os.Environ(), backend.Env, model.Env, s.hookEnv(resumeAgent, token)),
-		HookToken:      token,
-		MCPServers:     []runtime.MCPServerSpec{mcpSpec},
-		ExtraArgs:      extraArgs,
-		LastSessionID:  snap.LastSessionID,
-		LastContextPct: snap.LastContextPct,
 	}
 
 	// 7. Resume via the registry (double-resume is guarded by the registry sentinel).
@@ -161,6 +137,42 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, resumeResponse{sessionResponse: s.readSession(id), Resumed: true})
+}
+
+// composeResumeSpec mints a fresh hook token + MCP registration and builds the
+// resume LaunchSpec from the frozen snapshot (cwd/system_prompt/last_session_id)
+// plus re-resolved role/project fields (skip_permissions, add_dirs) — mirroring
+// composeSwitchSpec. On registration failure it rolls back its own side effects
+// and returns an APIError.
+func (s *Server) composeResumeSpec(agent state.Agent, snap state.SessionSnapshot, be config.Backend, model config.Model) (runtime.LaunchSpec, *runtime.APIError) {
+	token := mintHookToken()
+	s.rememberHookToken(agent.AgentID, token)
+	mcpSpec, err := s.registerMessagingMCP(agent, be.Type)
+	if err != nil {
+		s.forgetHookToken(agent.AgentID)
+		return runtime.LaunchSpec{}, apiError(runtime.CodeInternal, err.Error())
+	}
+	extraArgs, err := s.composeHookRegistration(agent, be.Type)
+	if err != nil {
+		s.forgetHookToken(agent.AgentID)
+		s.cleanupMessagingMCP(agent.AgentID)
+		return runtime.LaunchSpec{}, apiError(runtime.CodeInternal, err.Error())
+	}
+	return runtime.LaunchSpec{
+		Agent:          agent,
+		Cwd:            snap.Cwd,
+		AddDirs:        s.resolveAddDirs(agent.Project),
+		SystemPrompt:   snap.SystemPrompt,
+		BackendType:    be.Type,
+		ModelID:        model.Model,
+		Env:            composeEnv(os.Environ(), be.Env, model.Env, s.hookEnv(agent, token)),
+		SkipPerms:      s.resolveSkipForRole(agent.Role),
+		HookToken:      token,
+		MCPServers:     []runtime.MCPServerSpec{mcpSpec},
+		ExtraArgs:      extraArgs,
+		LastSessionID:  snap.LastSessionID,
+		LastContextPct: snap.LastContextPct,
+	}, nil
 }
 
 // resumeStartError maps a Resume failure to the right API error code.
