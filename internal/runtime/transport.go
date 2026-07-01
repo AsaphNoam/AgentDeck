@@ -87,7 +87,10 @@ type Transport struct {
 
 type rpcResult struct {
 	result json.RawMessage
-	err    *rpcError
+	// err is `error` (not `*rpcError`) so shutdown can deliver the
+	// errTransportClosed sentinel itself — the read side uses errors.Is to
+	// distinguish a crash/stop from a genuine RPC error.
+	err error
 }
 
 // NewTransport builds a transport writing to w. Handlers may be nil (frames of
@@ -144,7 +147,13 @@ func (t *Transport) dispatch(msg *rpcMessage) {
 			slog.Warn("runtime: no handler for incoming request", "method", msg.Method, "id", *msg.ID)
 		}
 	case frameResponse:
-		t.deliver(*msg.ID, rpcResult{result: msg.Result, err: msg.Error})
+		// Guard the typed-nil trap: a nil *rpcError stored in an `error` field
+		// would read as non-nil. Only set err on a genuine RPC error object.
+		res := rpcResult{result: msg.Result}
+		if msg.Error != nil {
+			res.err = msg.Error
+		}
+		t.deliver(*msg.ID, res)
 	default:
 		slog.Warn("runtime: unknown frame shape", "raw", truncate(rawOf(msg), 256))
 	}
@@ -179,7 +188,7 @@ func (t *Transport) shutdown(err error) {
 	t.mu.Unlock()
 
 	for _, ch := range pending {
-		ch <- rpcResult{err: &rpcError{Message: errTransportClosed.Error()}}
+		ch <- rpcResult{err: errTransportClosed}
 	}
 	close(t.done)
 }
