@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** review fix (UI advisory batch) @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, `cd ui && npm test`, `cd ui && npm run build`.
+- **Last GREEN checkpoint:** review fix (runtime: transport sentinel + tool_call_update) @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -153,8 +153,6 @@ _All 5 BLOCKINGs validated and fixed-and-green (see changelog 2026-07-01). None 
 
 - **ADVISORY — SSE snapshot-before-subscribe race.** `internal/server/sse.go:29` (`Snapshot()`) and `:36` (`Subscribe()`) are two separate bus-lock acquisitions; a `state_update` published in the gap is missed by the connecting client and it reads a pre-update snapshot → a card can show stale state until the next update. Flagged in the Phase 2 techspec's own review, still unfixed. Fix: add an atomic `Bus.SubscribeWithSnapshot()`.
 - **ADVISORY — `reindex` is a second SQLite writer against a live server.** `internal/cli/reindex.go:32-44` + `internal/index/reindex.go` open their own handle and `DELETE` sessions/tracked_* tables, only warning (not aborting) when the server is running — violates the sole-writer invariant and can corrupt/rewind live archive data. Fix: hard-error (non-zero exit) when the server is up, or proxy through it.
-- **ADVISORY — Crash mid-turn double-emits error+turn_end.** `internal/runtime/transport.go:182` delivers a fresh `*rpcError` instead of the `errTransportClosed` sentinel, so `errors.Is` at chat.go:311/573 is always false and the only guard is a racy `isStopped()`; a crash mid-turn can emit a spurious `error{protocol}` + second `turn_end` on top of the real ones. Deliver the sentinel itself.
-- **ADVISORY — `tool_call_update` always mapped to a completed tool_result.** `internal/runtime/acpmap.go:165-172` emits `EvToolResult` (status default `completed`) for every update, including intermediate `in_progress` ones, so status flips to "done" prematurely and the transcript repeats tool_results. Only emit on terminal status.
 - **ADVISORY — Cancel never escalates to SIGINT.** `internal/runtime/permission.go:119-142` sends `session/cancel` with no grace-then-SIGINT escalation (techspec §8.4); an agent that ignores ACP cancel stays busy until hard Stop.
 - **ADVISORY — `ensureSessionsFTS` runs outside the numbered migration set.** `internal/state/migrate.go:58,79` (re)creates the FTS/fallback table on every `Open`; a DB once opened without FTS5 support keeps a plain table a later FTS5 binary won't upgrade. Fold into a numbered migration.
 - **ADVISORY — `matched_in` empty on diacritic/tokenizer-divergent hits.** `internal/archive/archive.go:207-232` labels hits via `strings.Contains` on raw content while FTS uses `remove_diacritics`; `café`-vs-`cafe` returns the row but with no match reason. Cosmetic. Derive `matched_in` from a metadata-restricted second MATCH.
@@ -422,6 +420,13 @@ _All 5 BLOCKINGs validated and fixed-and-green (see changelog 2026-07-01). None 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-01 — **review fix: runtime — transport-closed sentinel + tool_call_update terminal-only — green.** (1)
+  `transport.shutdown` now delivers the `errTransportClosed` sentinel itself (widened `rpcResult.err` to `error` with a
+  typed-nil guard at the deliver site) so chat.go's `errors.Is(err, errTransportClosed)` matches — a crash mid-turn no
+  longer risks a spurious `error{protocol}` + second `turn_end`. (2) `acpmap` only emits a `tool_result` on a terminal
+  `tool_call_update` status (completed/failed), not on in-progress/status-less updates (diff blocks still stream). Tests:
+  `TestTransportCallErrTransportClosedOnShutdown`, `TestMapToolCallUpdateOnlyTerminalStatusEmitsResult`,
+  `TestMapToolCallUpdateEmitsDiffOnInProgress`. Green plain + `-tags sqlite_fts5` (Go-only).
 - 2026-07-01 — **review fix: UI advisory batch — green.** Five UI advisories: FilesTab "Diff" now works —
   `TranscriptView` emits `data-seq`, `ChatPanel` tabs are controlled so `FilesTab.onReveal` switches to the transcript
   tab then scrolls to the event; `sse.ts` seq-gap refetch is gated on the OPEN agent and no longer double-appends the
