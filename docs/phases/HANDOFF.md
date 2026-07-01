@@ -143,9 +143,11 @@ launch option via capabilities, and refreshed embedded UI. Details in changelog 
 > **This section holds only OPEN findings** — no resolved/dismissed graveyard.
 > Blocking items must be fixed before the next phase starts; advisory items when convenient.
 
-**Source:** full top-to-bottom project review (2026-07-01) — 7 segmented subagent reviews (phases 0–6 + UI) + 1 holistic cross-project pass. All 5 BLOCKINGs code-verified. Systemic root causes at the bottom.
+**Source:** full top-to-bottom project review (2026-07-01) — 7 segmented subagent reviews (phases 0–6 + UI) + 1 holistic cross-project pass. Systemic root causes at the bottom.
 
 ### BLOCKING
+
+_All 5 BLOCKINGs validated and fixed-and-green (see changelog 2026-07-01). None open._
 
 ### ADVISORY
 
@@ -515,51 +517,4 @@ _(most recent first; keep ~10, older history is in git)_
   snapshot, which stays `chat` after a switch). Test `TestResumeTerminalAgent` (chat→switch terminal→stop→resume
   → terminal running row with tty/driver). See Autonomous decisions for the identity-source judgment call. Green
   both tag modes (Go-only).
-- 2026-06-29 — **6.4 green — switch-runtime: same-backend (interface/model swap).** New `internal/server/switch.go`:
-  `POST /api/sessions/{id}/switch-runtime {interface?, backend?, model?}`. Per-agent switch lock (`Server.switching`
-  set; concurrent → `409 switch_in_progress`). Flow: merge target over current (`400 no_change`/`400 invalid_field`) →
-  validate target (terminal driver via `terminal.Probe().DriverAvailable`; backend/model exist) → adapter
-  `ResolveResumeID(prev.SessionID, true)` (native, same-backend) gated by `CanSwitchModelOnResume` →
-  `cancelAndWait` (poll status≠busy ≤5s) → `registry.Stop` + cleanup old MCP/hook → `WriteAgent(target)` (agent_id
-  UNCHANGED) → `registry.Resume` (dispatches by new interface). Rollback on Resume-after-Stop failure re-launches the
-  previous identity (`500 switch_failed_rolled_back`); double-fault sets status `error` + `500 switch_failed`.
-  Cross-backend swap guarded `501` (history primer → 6.5). New switch error codes in `runtime/errors.go` (first 400
-  mappings). Tests: model-swap (agent_id stable, new session_id, identity persisted, handoff=native_resume), chat→terminal
-  (running row terminal/xterm/tty), no_change (400), rollback (500 rolled_back + chat restored). Green both tag modes (Go-only).
-- 2026-06-29 — **6.3 green — terminal runtime (xterm/PTY default + tmux).** New `internal/runtime/terminal` package
-  implementing `runtime.Runtime` behind a `TerminalDriver` seam (`StartTab/WriteText/ReadTTY/CloseTab/RevealTab`):
-  xterm/PTY driver (`creack/pty`; opens a PTY, child as session leader via Setsid+Setctty so pid==pgid, records the slave
-  tty, reaps via one Wait closing an `exited` chan) + tmux driver (`new-session -d`/`send-keys`/`display-message`/
-  `kill-session`). PTY↔WebSocket bridge at `GET /api/sessions/{id}/terminal/ws` (`coder/websocket`): binary frames↔PTY
-  master, JSON `{cols,rows}` text frames→`pty.Setsize`; pump logic unit-tested against fakes. `terminal.Probe()` +
-  `GET /api/capabilities` (xterm always available + default; tmux if on PATH; iterm2 reported unavailable w/ reason until
-  6.7). State migration v6 adds `running.driver`/`driver_ids`; `RunningEntry` carries them. Registry swaps the terminal
-  stub for the real runtime via `SetTerminalRuntime` (subpackage→avoids import cycle; wires onExit/StopAll). Status flows
-  from hooks only — the runtime writes just the race-guarded initial idle (§3.1 step 7) and a `done` on Stop; Cancel
-  SIGINTs the pgid, Stop SIGTERM→grace→SIGKILL then CloseTab + clears the running row. Tests: bridge pumps (keystroke→
-  master, output→frame, resize→Setsize), capabilities (endpoint + probe), terminal launch records tty/driver + idle→busy
-  →idle via `Manager.ApplyHook`, WS route 404s unknown agent. Green both tag modes (Go-only; no `ui/` change). New deps:
-  `creack/pty`, `coder/websocket`. Interactive-CLI binary map + `--resume` are GATED (see Autonomous decisions).
-- 2026-06-29 — **review fix: hook registration enabled by default for terminal + per-agent settings cleanup — green.**
-  (1) BLOCKING: `composeHookRegistration` no longer disables registration in the default path — it now gates by
-  *interface*: terminal agents get the `--settings` launch args by default (the terminal runtime runs the real CLI
-  under a PTY where the flag is known-good and hooks are the only status producer), while chat stays gated behind
-  `AGENTDECK_HOOK_REGISTRATION=1` (claude-code-acp flag-forwarding unverified; chat doesn't need hook registration).
-  This unblocks 6.3 terminal status without regressing the green chat path (see Autonomous decisions for the judgment
-  call). Test `TestComposeHookRegistrationTerminalDefault` (terminal → `--settings <path>` with no env flag); existing
-  `TestComposeHookRegistration` keeps chat default-off + chat self-suppression covered by the hooks interface-gate
-  test. (2) ADVISORY: per-agent `{home}/hooks/agents/{id}.json` is now deleted on stop, launch-rollback, and shutdown
-  (new `hooks.RemoveAgentSettings`/`RemoveAllAgentSettings` + `Server.cleanupHookSettings`, mirroring
-  `cleanupMessagingMCP`). Test `TestStopRemovesHookSettings` (file present at launch, gone after stop). Green both tag modes.
-- 2026-06-29 — **6.2 green — hook scripts + registration + interface gate.** New `internal/hooks` package: embedded
-  POSIX-`sh` script set — `_post.sh` (jq-encoded body → `curl POST /api/hook`, with the `AGENTDECK_INTERFACE=chat`
-  self-suppression gate for runtime-owned events) + `session-start/user-prompt-submit/pre-tool-use/post-tool-use/stop.sh`
-  wrappers; `Install(home)` atomically (re)writes them to `{home}/hooks` on dashboard startup; `ClaudeSettings` +
-  `WriteAgentSettings` compose a per-agent Claude hooks settings file from the adapter `HookMap`. Launch + resume now
-  inject `AGENTDECK_HOOK_URL/TOKEN/AGENT_ID/INTERFACE` env and write the settings file; new
-  `BackendAdapter.HookLaunchArgs` (claude `--settings <path>`, codex nil/gated) feeds `LaunchSpec.ExtraArgs`, appended
-  to the spawn argv. The `--settings` activation is gated behind `AGENTDECK_HOOK_REGISTRATION=1` (default off) so real
-  launches aren't regressed by an unverified flag (see Autonomous decisions). Tests: hooks install/executability,
-  `ClaudeSettings` shape, hermetic interface-gate (shimmed curl+jq: chat→no POST, terminal→POST); server hookEnv +
-  composeHookRegistration; adapter `HookLaunchArgs`. Green both tag modes (Go-only).
-- _(older entries — 6.1, budget_exceeded/turn-budget review fixes, 5.4 — live in git history.)_
+- _(older entries — 6.4, 6.3, 6.2, the hook-registration review fix, 6.1, budget/turn-budget review fixes, 5.4 — live in git history.)_
