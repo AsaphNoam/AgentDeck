@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** review fix (crash-path registration teardown) @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
+- **Last GREEN checkpoint:** review fix (durability/Makefile advisories) @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -152,15 +152,11 @@ _All 5 BLOCKINGs validated and fixed-and-green (see changelog 2026-07-01). None 
 ### ADVISORY
 
 - **ADVISORY — SSE snapshot-before-subscribe race.** `internal/server/sse.go:29` (`Snapshot()`) and `:36` (`Subscribe()`) are two separate bus-lock acquisitions; a `state_update` published in the gap is missed by the connecting client and it reads a pre-update snapshot → a card can show stale state until the next update. Flagged in the Phase 2 techspec's own review, still unfixed. Fix: add an atomic `Bus.SubscribeWithSnapshot()`.
-- **ADVISORY — `make test` never runs the FTS/search tests.** `Makefile:54` `test:` is `go test ./...` with no `-tags sqlite_fts5`; the FTS tests are build-tag-gated, so the entire archive-search path (MATCH/bm25/snippet + fallback) is untested by the standard command while showing green. Add `-tags sqlite_fts5` to the `test:` target.
 - **ADVISORY — `reindex` is a second SQLite writer against a live server.** `internal/cli/reindex.go:32-44` + `internal/index/reindex.go` open their own handle and `DELETE` sessions/tracked_* tables, only warning (not aborting) when the server is running — violates the sole-writer invariant and can corrupt/rewind live archive data. Fix: hard-error (non-zero exit) when the server is up, or proxy through it.
 - **ADVISORY — Crash mid-turn double-emits error+turn_end.** `internal/runtime/transport.go:182` delivers a fresh `*rpcError` instead of the `errTransportClosed` sentinel, so `errors.Is` at chat.go:311/573 is always false and the only guard is a racy `isStopped()`; a crash mid-turn can emit a spurious `error{protocol}` + second `turn_end` on top of the real ones. Deliver the sentinel itself.
 - **ADVISORY — `tool_call_update` always mapped to a completed tool_result.** `internal/runtime/acpmap.go:165-172` emits `EvToolResult` (status default `completed`) for every update, including intermediate `in_progress` ones, so status flips to "done" prematurely and the transcript repeats tool_results. Only emit on terminal status.
 - **ADVISORY — Cancel never escalates to SIGINT.** `internal/runtime/permission.go:119-142` sends `session/cancel` with no grace-then-SIGINT escalation (techspec §8.4); an agent that ignores ACP cancel stays busy until hard Stop.
 - **ADVISORY — `sessionLoadParams` drops systemPrompt/model on resume path.** `internal/runtime/chat.go:1024-1034` (session/load) sends neither; works today only because a primer switch forces `resumeID=""` → session/new (switch.go:118). Document/assert that coupling or carry systemPrompt in session/load so a future change can't silently drop the switch primer.
-- **ADVISORY — Config atomic write doesn't fsync the parent directory.** `internal/config/atomic.go:53` fsyncs the temp file and renames but never `Dir.Sync()`s the parent, so a hard crash right after rename can lose a just-written config. Add a parent-dir sync.
-- **ADVISORY — Pidfile write skips fsync.** `internal/cli/pidfile.go:34-48` does temp+rename with no `tmp.Sync()`; a crash after `dashboard start --detach` can leave a truncated pidfile so stop/open report "not running" while the daemon runs.
-- **ADVISORY — `dashboard.log` path built with string concat.** `internal/cli/dashboard.go:148` `home + "/dashboard.log"` hardcodes the separator where the package uses `filepath.Join` elsewhere. Cosmetic/portability.
 - **ADVISORY — `ensureSessionsFTS` runs outside the numbered migration set.** `internal/state/migrate.go:58,79` (re)creates the FTS/fallback table on every `Open`; a DB once opened without FTS5 support keeps a plain table a later FTS5 binary won't upgrade. Fold into a numbered migration.
 - **ADVISORY — `NewAgentID` uses 24 bits with a 10-try cap.** `internal/state/agents.go:15-32` matches spec but the "astronomically unlikely" claim overstates the margin at large agent counts; irrelevant for personal use.
 - **ADVISORY — Dead no-op color branch.** `internal/server/config_handlers.go:252-258` assigns `color` the value it already holds; comment implies a default that never happens. Delete or implement.
@@ -429,6 +425,11 @@ _All 5 BLOCKINGs validated and fixed-and-green (see changelog 2026-07-01). None 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-01 — **review fix: durability + Makefile advisories — green.** ADVISORY batch: `make test` now runs both the
+  no-tag path AND `-tags sqlite_fts5` (FTS/search tests were untested by the standard target); `config/atomic.go`
+  fsyncs the parent dir after rename (durable config write); `cli/pidfile.go` `tmp.Sync()`s before rename (no truncated
+  pidfile on crash); `cli/dashboard.go` builds `dashboard.log` with `filepath.Join`. No new unit tests (durability/
+  cosmetic — guarded by existing atomic-write/pidfile round-trip tests). Green plain + `-tags sqlite_fts5`.
 - 2026-07-01 — **review fix: crash-path registration teardown (+ stop-handler token cleanup) — green.** BLOCKING
   (asymmetric-teardown root cause): the only `onExit` wired was `registry.forget` (ownership only); on an agent crash
   the hook token + MCP session + `mcp/{id}.mcp.json` + `hooks/agents/{id}.json` all leaked — a spoofable messaging
