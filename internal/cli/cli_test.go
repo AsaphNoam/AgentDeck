@@ -2,9 +2,32 @@ package cli
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 )
+
+// Regression (review fix): reindex refuses to run against a live server. It gates
+// on serverRunning, which must report true only for an actually-alive pid (a stale
+// pidfile — a dead pid — must not block reindex).
+func TestServerRunningDetectsLiveProcess(t *testing.T) {
+	home := t.TempDir()
+	if serverRunning(home) {
+		t.Fatal("serverRunning with no pidfile = true")
+	}
+	if err := writePidfile(home, pidInfo{PID: os.Getpid(), Port: 4317}); err != nil {
+		t.Fatal(err)
+	}
+	if !serverRunning(home) {
+		t.Fatal("serverRunning with a live pid = false")
+	}
+	if err := writePidfile(home, pidInfo{PID: 2_000_000_000, Port: 4317}); err != nil {
+		t.Fatal(err)
+	}
+	if serverRunning(home) {
+		t.Fatal("serverRunning with a dead pid = true (a stale pidfile must not block reindex)")
+	}
+}
 
 func TestVersionFlag(t *testing.T) {
 	root := NewRootCmd()

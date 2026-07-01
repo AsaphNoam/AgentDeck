@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -148,15 +149,18 @@ func (s *Server) handleSwitchRuntime(w http.ResponseWriter, r *http.Request) {
 
 	// 3. Compose the target launch spec (registers a fresh MCP token + writes the
 	//    per-agent hook settings file for the target identity).
+	// Any failure from here on happens AFTER the old runtime was stopped + cleaned,
+	// so it must roll back to the previous identity (re-register + re-resume) rather
+	// than leave the agent dead with no running row — the same recovery step 5 uses.
 	spec, ae := s.composeSwitchSpec(target, resumeID)
 	if ae != nil {
-		writeAPIError(w, ae)
+		s.rollbackSwitch(r.Context(), w, agent, prev.SessionID, errors.New(ae.Message))
 		return
 	}
 	if usePrimer {
 		primer, err := s.buildHistoryPrimer(r.Context(), spec, s.switchPrimerTokenBudget())
 		if err != nil {
-			writeAPIError(w, apiError(runtime.CodeInternal, "build history primer: "+err.Error()))
+			s.rollbackSwitch(r.Context(), w, agent, prev.SessionID, fmt.Errorf("build history primer: %w", err))
 			return
 		}
 		spec.SystemPrompt = joinSystemPrompt(spec.SystemPrompt, primer)
@@ -165,7 +169,7 @@ func (s *Server) handleSwitchRuntime(w http.ResponseWriter, r *http.Request) {
 	// 4. Persist the new identity (agent_id UNCHANGED) so the resume composes the
 	//    new interface/backend/model and the card re-renders its badges.
 	if err := s.stateStore.WriteAgent(target); err != nil {
-		writeAPIError(w, apiError(runtime.CodeInternal, "persist identity: "+err.Error()))
+		s.rollbackSwitch(r.Context(), w, agent, prev.SessionID, fmt.Errorf("persist identity: %w", err))
 		return
 	}
 
