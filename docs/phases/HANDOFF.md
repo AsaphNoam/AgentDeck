@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** review fix (skip_permissions + add_dirs on resume/switch) @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
+- **Last GREEN checkpoint:** review fix (terminal messaging budget reset) @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -147,7 +147,6 @@ launch option via capabilities, and refreshed embedded UI. Details in changelog 
 
 ### BLOCKING
 
-- **BLOCKING — Terminal agents' messaging budget never resets → permanent lockout.** `ResetTurnBudget` is called only by the chat runtime (`internal/runtime/chat.go:283,549`); the terminal runtime has no turn boundary that resets it, so a terminal agent rides the implicit `t_000000000000` budget row forever and every send/check past 15 lifetime actions returns `message_budget_exceeded`. Fix: reset the budget at the terminal turn boundary (UserPromptSubmit hook / CheckMessages) with a fresh turn_id. Test: drive >15 send/check actions across multiple simulated terminal turns, assert the 16th (new turn) is not blocked. *(Turn-boundary-leak root cause.)*
 - **BLOCKING — WebSocket disconnect closes the agent's live PTY master and kills the CLI.** `internal/runtime/terminal/bridge.go:62` (`_ = p.Close()`) closes `&ptyMaster{a.tab.ptmx}` (terminal.go:241) — the agent's live master — on every WS teardown; `TerminalTab.tsx` closes the WS on any unmount (tab switch, navigate away). Result: clicking away from the terminal panel SIGHUPs and kills the running agent; two tabs read/close the same master and corrupt each other. Fix: bridge over a `dup()` of the master (or refcount) so only `Stop` closes `a.tab.ptmx`; the WS view closes only its own fd. Test: run one full `Bridge` to EOF, assert the child is still alive and a second `Bridge` still streams. *(Asymmetric-teardown root cause.)*
 - **BLOCKING — Crash/unsolicited teardown leaks hook token + MCP session + on-disk files, and leaves a spoofable messaging identity.** The only `onExit` callback wired is `registry.forget` (registry.go:52,83), which clears just `rtByAgent`; every `forgetHookToken`/`cleanupMessagingMCP`/`cleanupHookSettings` lives in an HTTP handler, none on the crash path (chat.go:674, terminal.go:307). On any agent crash the server keeps `hookTokens[id]`, the registered MCP session + `mcp/{id}.mcp.json`, and `hooks/{id}` settings — so an orphaned child/hook can still call `send_message`/`check_messages` as the dead agent, and the maps/dirs grow per crash. Fix: extend the exit seam to invoke a single `teardownAgentRegistration(id)` (token+MCP+hook-settings) on crash, mirroring stop. Test: kill an agent process, assert its MCP token no longer resolves and the on-disk files are gone. *(Asymmetric-teardown root cause.)*
 
@@ -433,6 +432,14 @@ launch option via capabilities, and refreshed embedded UI. Details in changelog 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-01 — **review fix: terminal messaging budget resets at the terminal turn boundary — green.** BLOCKING
+  (turn-boundary-leak root cause): `ResetTurnBudget` was called only by the chat runtime, so a terminal agent rode the
+  implicit `t_000000000000` budget row forever and locked out with `message_budget_exceeded` after
+  `MessageBudgetPerTurn` lifetime actions. `Manager.ApplyHook` now resets the budget on a terminal agent's
+  `UserPromptSubmit` (its real turn boundary), gated on `interface=="terminal"` so chat (which self-suppresses these
+  hooks and owns its own turn budget) is untouched. Added tx-scoped `resetTurnBudgetTx` (reused by `ResetTurnBudget`)
+  and `terminalTurnID`. Test: `TestManagerTerminalUserPromptResetsBudget` (exhaust 15 actions → 16th breaches → next
+  UserPromptSubmit unblocks). Green plain + `-tags sqlite_fts5` (Go-only).
 - 2026-07-01 — **review fix: skip_permissions + add_dirs no longer dropped on resume/switch — green.** Two BLOCKINGs
   (LaunchSpec-drift root cause): `resume.go`/`switch.go` rebuilt `LaunchSpec` without `SkipPerms` or `AddDirs`, so a
   `skip_permissions=true` agent stalled in `waiting_input` and a multi-dir agent lost its extra dirs after any
