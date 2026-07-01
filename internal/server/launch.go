@@ -156,12 +156,7 @@ func (s *Server) composeLaunch(req launchRequest) (runtime.LaunchSpec, state.Age
 	if err != nil {
 		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeValidation, "bad project cwd: "+err.Error())
 	}
-	addDirs := make([]string, 0, len(project.AddDirs))
-	for _, d := range project.AddDirs {
-		if ex, err := config.ExpandTilde(d); err == nil {
-			addDirs = append(addDirs, ex)
-		}
-	}
+	addDirs := expandAddDirs(project.AddDirs)
 
 	agentID, err := s.stateStore.NewAgentID()
 	if err != nil {
@@ -289,6 +284,45 @@ func resolveSkip(global bool, roleSkip *bool) bool {
 		return *roleSkip
 	}
 	return global
+}
+
+// resolveSkipForRole re-resolves the effective skip_permissions for the resume and
+// switch-runtime paths, which rebuild the LaunchSpec without the original role in
+// hand. The frozen session snapshot does NOT persist skip_permissions, so it is
+// re-read from the current role config (a missing/unreadable role degrades to the
+// global default). Without this, a role/global skip_permissions=true agent would
+// silently lose auto-approval after any stop→resume or switch and stall in
+// waiting_input on its next tool prompt.
+func (s *Server) resolveSkipForRole(roleName string) bool {
+	if role, err := s.configStore.ReadRole(roleName); err == nil {
+		return resolveSkip(s.cfg.SkipPermissions, role.SkipPermissions)
+	}
+	return s.cfg.SkipPermissions
+}
+
+// resolveAddDirs re-resolves project.add_dirs (~-expanded) for the resume and
+// switch-runtime paths. Like skip_permissions, the extra directories are not
+// persisted in the frozen session snapshot, so they are re-read from the current
+// project config (a missing/unreadable project yields no extra dirs). Without
+// this, a multi-dir agent silently loses access to its extra project directories
+// after any resume or switch.
+func (s *Server) resolveAddDirs(projectName string) []string {
+	project, err := s.configStore.ReadProject(projectName)
+	if err != nil {
+		return nil
+	}
+	return expandAddDirs(project.AddDirs)
+}
+
+// expandAddDirs ~-expands each add_dir, dropping any that fail to expand.
+func expandAddDirs(raw []string) []string {
+	dirs := make([]string, 0, len(raw))
+	for _, d := range raw {
+		if ex, err := config.ExpandTilde(d); err == nil {
+			dirs = append(dirs, ex)
+		}
+	}
+	return dirs
 }
 
 // composeEnv layers env: process env, then backend env, then per-model env (later

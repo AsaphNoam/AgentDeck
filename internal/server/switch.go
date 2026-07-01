@@ -303,10 +303,12 @@ func (s *Server) composeSwitchSpec(target state.Agent, resumeID string) (runtime
 	return runtime.LaunchSpec{
 		Agent:          target,
 		Cwd:            snap.Cwd,
+		AddDirs:        s.resolveAddDirs(target.Project),
 		SystemPrompt:   snap.SystemPrompt,
 		BackendType:    be.Type,
 		ModelID:        model.Model,
 		Env:            composeEnv(os.Environ(), be.Env, model.Env, s.hookEnv(target, token)),
+		SkipPerms:      s.resolveSkipForRole(target.Role),
 		HookToken:      token,
 		MCPServers:     []runtime.MCPServerSpec{mcpSpec},
 		ExtraArgs:      extraArgs,
