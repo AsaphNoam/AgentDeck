@@ -118,6 +118,78 @@ func TestTerminalLaunchRecordsTTYAndHookStatusFlow(t *testing.T) {
 	}
 }
 
+// Regression (review fix): a WebSocket teardown (tab switch, navigate away — the
+// browser closes the WS on any unmount) must NOT kill the agent. Bridge closes
+// its PTYConn on every teardown; before the fix that closed the agent's live PTY
+// master and SIGHUP'd the CLI. Now Bridge hands out a dup() of the master, so
+// after a full bridge-to-EOF the child is still alive and a second Bridge streams.
+func TestBridgeTeardownKeepsPTYAndAgentAlive(t *testing.T) {
+	store, err := state.Open(t.TempDir())
+	if err != nil {
+		t.Fatalf("state.Open: %v", err)
+	}
+	t.Cleanup(func() { store.Close() })
+
+	r := New(store)
+	r.SetCommand("cat") // echoes its input → proves the PTY is still live
+	r.SetInitialIdleDelay(10 * time.Millisecond)
+
+	const id, token = "a_bridge", "tok-bridge"
+	agent := state.Agent{
+		AgentID: id, Name: "Nova", Role: "dev", Project: "demo",
+		Backend: "claude", Model: "sonnet", Interface: "terminal",
+		CreatedAt: time.Now().UTC(),
+	}
+	if err := store.WriteAgent(agent); err != nil {
+		t.Fatalf("WriteAgent: %v", err)
+	}
+	if _, err := r.Start(context.Background(), rt.LaunchSpec{
+		Agent: agent, Cwd: t.TempDir(), BackendType: "claude-acp", HookToken: token,
+	}); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { r.Stop(context.Background(), id) })
+
+	// First bridge: the client disconnects immediately (fakeWS has no frames, so
+	// read returns io.EOF), tearing the bridge down and closing its PTYConn.
+	conn1, err := r.Bridge(id)
+	if err != nil {
+		t.Fatalf("first Bridge: %v", err)
+	}
+	_ = Bridge(context.Background(), &fakeWS{}, conn1) // returns io.EOF; not fatal
+
+	// The agent must survive a mere WS teardown.
+	if _, err := r.lookup(id); err != nil {
+		t.Fatalf("agent removed after a WS teardown: %v", err)
+	}
+
+	// A second bridge must still reach a live PTY: writing to the master reaches
+	// cat, which echoes it back — impossible if the first teardown killed the CLI.
+	conn2, err := r.Bridge(id)
+	if err != nil {
+		t.Fatalf("second Bridge after teardown: %v", err)
+	}
+	defer conn2.Close()
+
+	got := make(chan int, 1)
+	go func() {
+		buf := make([]byte, 64)
+		n, _ := conn2.Read(buf)
+		got <- n
+	}()
+	if _, err := conn2.Write([]byte("ping\n")); err != nil {
+		t.Fatalf("write to the live PTY master: %v", err)
+	}
+	select {
+	case n := <-got:
+		if n <= 0 {
+			t.Fatal("no bytes from the live PTY; the CLI appears dead after WS teardown")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out reading from the PTY; the CLI appears dead after WS teardown")
+	}
+}
+
 func waitState(t *testing.T, store *state.Store, id, want string) {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)

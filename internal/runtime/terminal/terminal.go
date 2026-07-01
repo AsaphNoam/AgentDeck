@@ -238,7 +238,51 @@ func (r *Runtime) Bridge(agentID string) (PTYConn, error) {
 	if a.tab.ptmx == nil {
 		return nil, fmt.Errorf("terminal: agent %s has no PTY bridge (driver %q)", agentID, a.tab.Driver)
 	}
-	return &ptyMaster{a.tab.ptmx}, nil
+	// Hand the WebSocket a dup() of the master, never the master itself. Bridge
+	// closes its PTYConn on every WS teardown — and the browser closes the WS on
+	// any unmount (tab switch, navigate away), not just an intentional stop. If
+	// that closed the agent's live master, the CLI would get SIGHUP and die. A dup
+	// shares the same open file description, so closing the WS's fd leaves the
+	// agent's master open; only Stop/CloseTab closes the real master. It also lets
+	// a reconnect (or a second viewer) get its own fd instead of racing to close
+	// the one master.
+	dup, err := dupPTYMaster(a.tab.ptmx, agentID)
+	if err != nil {
+		return nil, err
+	}
+	return &ptyMaster{dup}, nil
+}
+
+// dupPTYMaster returns a pollable dup of the PTY master. It dups via
+// SyscallConn().Control rather than (*os.File).Fd()+syscall.Dup: Fd() forces the
+// shared open file description into BLOCKING mode, which would leave the returned
+// File's Read uninterruptible by Close and hang the WS pump on teardown. Reading
+// the fd through Control leaves the description non-blocking, so os.NewFile wraps
+// a pollable File whose Close cleanly unblocks the pump — and closing it does not
+// touch the agent's own master fd.
+func dupPTYMaster(f *os.File, agentID string) (*os.File, error) {
+	rc, err := f.SyscallConn()
+	if err != nil {
+		return nil, fmt.Errorf("terminal: pty syscallconn for %s: %w", agentID, err)
+	}
+	var dupFD int
+	var dupErr error
+	if cerr := rc.Control(func(fd uintptr) {
+		dupFD, dupErr = syscall.Dup(int(fd))
+		if dupErr == nil {
+			syscall.CloseOnExec(dupFD)
+			// The dup can come back in blocking mode; force non-blocking so
+			// os.NewFile registers it with the runtime poller and Close can
+			// interrupt a pending pump Read on WS teardown (otherwise it hangs).
+			dupErr = syscall.SetNonblock(dupFD, true)
+		}
+	}); cerr != nil {
+		return nil, fmt.Errorf("terminal: pty control for %s: %w", agentID, cerr)
+	}
+	if dupErr != nil {
+		return nil, fmt.Errorf("terminal: dup pty master for %s: %w", agentID, dupErr)
+	}
+	return os.NewFile(uintptr(dupFD), f.Name()+"-ws"), nil
 }
 
 // StopAll stops every live terminal agent (server shutdown, §8.5).
