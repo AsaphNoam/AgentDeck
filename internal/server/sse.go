@@ -26,15 +26,19 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, "retry: 2000\n\n")
 
-	for _, update := range s.eventBus.Snapshot() {
+	// Atomically snapshot + subscribe so a state_update published in between is
+	// not lost (it would otherwise be in neither the snapshot nor this client).
+	// The channel is buffered, so events published while we write the snapshot
+	// below queue until the select loop drains them.
+	snapshot, ch, unsub := s.eventBus.SubscribeWithSnapshot()
+	defer unsub()
+
+	for _, update := range snapshot {
 		agentID := update.AgentID
 		writeBusSSE(w, s.eventBus.NewEvent("state_update", &agentID, update))
 	}
 	writeBusSSE(w, s.eventBus.HydratedMarker())
 	flusher.Flush()
-
-	ch, unsub := s.eventBus.Subscribe()
-	defer unsub()
 
 	ticker := time.NewTicker(sseKeepalive)
 	defer ticker.Stop()
