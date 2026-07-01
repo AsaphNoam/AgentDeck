@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
@@ -145,7 +146,7 @@ func newDashboardStartCmd() *cobra.Command {
 // stdio to {home}/dashboard.log, records the child PID in the pidfile, and prints
 // a confirmation. The parent then returns (exits 0).
 func startDetached(home string, port int) error {
-	logPath := home + "/dashboard.log"
+	logPath := filepath.Join(home, "dashboard.log")
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		return err
