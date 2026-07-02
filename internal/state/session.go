@@ -95,8 +95,8 @@ WHERE r.agent_id IS NULL`
 		}
 		out = append(out, snap)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, fmt.Errorf("state: close inactive sessions: %w", err)
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("state: list inactive sessions: %w", err)
 	}
 	return out, nil
 }
