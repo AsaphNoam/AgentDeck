@@ -143,18 +143,73 @@ launch option via capabilities, and refreshed embedded UI. Details in changelog 
 > **This section holds only OPEN findings** — no resolved/dismissed graveyard.
 > Blocking items must be fixed before the next phase starts; advisory items when convenient.
 
-**Source:** full top-to-bottom project review (2026-07-01) — 7 segmented subagent reviews (phases 0–6 + UI) + 1 holistic cross-project pass. Systemic root causes at the bottom.
+**Source:** second full top-to-bottom project review (2026-07-02) — segmented reviews per phase (0–6 + UI)
++ a holistic cross-project pass, covering everything implemented through 6.6 including the 2026-07-01
+review fixes (all of which held up under re-inspection). Baseline verified green before review: `go
+build/test` (plain + `-tags sqlite_fts5`), UI 66/66 + `npm run build`.
 
 ### BLOCKING
 
-_All 5 BLOCKINGs validated and fixed-and-green (see changelog 2026-07-01). None open._
+- **BLOCKING — `dashboard start --detach` bypasses the already-running guard and clobbers the live server's
+  pidfile.** `internal/cli/dashboard.go:98` (vs. the check at :107). The detach parent spawns the re-exec'd
+  child *before* the pidfile-liveness check, and the child (`daemon=true`) skips the check too. Running
+  `agentdeck dashboard start --detach` while a server is already up: (a) the parent overwrites the live
+  pidfile with the doomed child's PID and prints success without verifying the child bound the port; (b) the
+  child dies on `address already in use` and its `defer removePidfile` deletes the pidfile entirely — so
+  `dashboard stop`/`open`/`reindex`'s `serverRunning` sole-writer gate all report "not running" while the
+  original server still runs. Techspec §5.3/§7 requires start to refuse when a live pidfile process exists;
+  only the foreground path honors it. Fix: run the same `readPidfile`+`processAlive` refusal in the detach
+  parent before spawning (and verify child liveness before printing success). Test: start a server, run
+  `start --detach`, assert refusal + pidfile intact.
+- **BLOCKING — reconciliation sweep writes the raw NDJSON transcript line into `status.detail`, corrupting
+  every idle card's preview.** `internal/server/reconcile.go:83-84` passes `lastNonEmptyLine(transcript.ndjson)`
+  — a raw event envelope like `{"agent_id":"a_..","seq":57,"type":"turn_end",...}` — as the `detail` to
+  `ApplyStaleCorrection`, which writes it into `status.detail` unbounded (`internal/state/manager.go:209-211`,
+  no clip). Trigger is normal use: any live chat agent idle ≥30s gets its detail overwritten on the next 30s
+  tick, repeatedly. The UI's preview is `agent.detail || lastLine` (`ui/src/components/grid/AgentCard.tsx:14`),
+  so the primary source wins and idle cards show JSON garbage instead of the §13/§6.4 last-output-line; a
+  multi-MB tool_result line becomes a multi-MB status row + SSE `state_update` each tick. §3.8 intends the
+  sweep for *missed-hook* staleness with a "minimal correction"; an idle agent with a healthy final status is
+  not a missed hook. Also folds in: the sweep sets `last_trace="ReconcileSweep"` (`manager.go:230`), outside
+  the §4.4 vocabulary. Fix: derive the preview from the last `assistant_text` delta (parse tail lines, skip
+  non-text events), clip to ~120 chars (like chat.go's crash path), and/or only apply when the status row is
+  genuinely inconsistent (busy with dead pid / missing row). Test: idle live agent + 31s-old status +
+  transcript ending in `turn_end` → sweep must not replace detail with raw JSON.
 
 ### ADVISORY
 
-_All advisories resolved-and-green or dismissed (see changelog 2026-07-01/07-02). None open. One was
-dismissed: `matched_in` empty on diacritic-only hits — real but cosmetic (search returns the correct rows;
-only the "matched in" badge can be blank), and a correct fix needs the `x/text` NFD normalizer (a new
-dependency) not justified for a label. See end-of-turn summary._
+- **ADVISORY — `rows.Close()` checked instead of `rows.Err()` in three list scans.** `internal/state/session.go:98`
+  (`ListInactiveSessions`), `internal/server/files_commands.go:88,115` (`queryTrackedFiles`/`queryTrackedCommands`).
+  `Rows.Close` does not surface iteration errors, so a mid-iteration failure returns a silently truncated list as
+  success (archive resume matching / Files & Commands tabs would quietly miss rows). Every sibling scan checks
+  `rows.Err()` — these are the outliers. Fix: check `rows.Err()` after the loop in all three.
+- **ADVISORY — registration-artifact cleanup misses two abnormal failure paths.** (1) `internal/server/launch.go:57-60`:
+  if `WriteAgent` fails after `composeLaunch` already registered the MCP token + wrote the hook-settings file +
+  remembered the hook token, the handler returns without cleaning any of them. (2) `internal/server/resume.go:133-135`:
+  the Resume-failure path cleans token+MCP but not the hook-settings file (launch's failure path cleans all three).
+  Both are disk-error/rare paths; the fix is to route every failure path through the existing
+  `teardownAgentRegistration` (the handoff's root-cause-#2 "one teardown unit" refactor).
+- **ADVISORY — stale "Clone — Available in Phase 3" stub.** `ui/src/components/grid/CardContextMenu.tsx:81-83`.
+  The master PRD (agent-dashboard-prd.md:245) lists Clone in the card context menu; the phase-2 techspec stubbed
+  it pending the Phase-3 launch modal; Phase 3 shipped the modal but no phase spec picked Clone back up, and with
+  Phases 3–6 done the tooltip is now false. Fix: wire Clone (open NewAgentModal prefilled from the agent's
+  role/project/backend/model) or retitle the tooltip and record Clone as unscheduled scope.
+
+### Cross-project observations (2026-07-02 holistic pass — guidance, not findings)
+
+1. **Early-phase fallbacks vs late-phase data:** the 2.2 sweep predates Phase 4's AgentDeck-owned NDJSON
+   transcript, which is how "last transcript line" silently became raw JSON. Re-check fallback paths whenever
+   a later phase changes the data they read.
+2. **Pidfile is a load-bearing cross-cutting contract** (stop/open/CLI port resolution/reindex sole-writer
+   gate) — treat its writers with the same care as state.db.
+3. **Foundation traps (awareness):** hardcoded `latestKnownMigration=6` (`migrate.go`) must be bumped with any
+   v7; SQLite pragmas are per-connection and rely on `SetMaxOpenConns(1)`; `go.mod` lists `creack/pty` +
+   `coder/websocket` under `// indirect` though they're direct (tidy drift).
+4. **Biggest real-world risk is the gated live-CLI surface, not code quality:** `interactiveBinary` map,
+   claude `--resume` form, codex hook names, HTTP-MCP acceptance are all unverified against credentialed CLIs
+   (documented gates). Burn these down before Phase 7 polish.
+5. **Docs sweep before Phase 7:** Clone fell between phase specs; check no other master-PRD promise is
+   similarly unowned.
 
 ### Systemic root causes (fix the class, not just the instances)
 
