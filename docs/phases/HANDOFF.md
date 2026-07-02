@@ -150,11 +150,6 @@ build/test` (plain + `-tags sqlite_fts5`), UI 66/66 + `npm run build`.
 
 ### ADVISORY
 
-- **ADVISORY — `rows.Close()` checked instead of `rows.Err()` in three list scans.** `internal/state/session.go:98`
-  (`ListInactiveSessions`), `internal/server/files_commands.go:88,115` (`queryTrackedFiles`/`queryTrackedCommands`).
-  `Rows.Close` does not surface iteration errors, so a mid-iteration failure returns a silently truncated list as
-  success (archive resume matching / Files & Commands tabs would quietly miss rows). Every sibling scan checks
-  `rows.Err()` — these are the outliers. Fix: check `rows.Err()` after the loop in all three.
 - **ADVISORY — registration-artifact cleanup misses two abnormal failure paths.** (1) `internal/server/launch.go:57-60`:
   if `WriteAgent` fails after `composeLaunch` already registered the MCP token + wrote the hook-settings file +
   remembered the hook token, the handler returns without cleaning any of them. (2) `internal/server/resume.go:133-135`:
@@ -449,6 +444,12 @@ build/test` (plain + `-tags sqlite_fts5`), UI 66/66 + `npm run build`.
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-02 — **review fix: list scans check `rows.Err()` not `rows.Close()` — green.** `ListInactiveSessions`
+  (`state/session.go`), `queryTrackedFiles`/`queryTrackedCommands` (`server/files_commands.go`) ended their scan loops
+  with `rows.Close()` (already deferred), which does not surface a mid-iteration error — a failed row scan would return
+  a silently truncated list as success (archive resume matching / Files & Commands tabs could miss rows). All three now
+  check `rows.Err()`. No bespoke test (a mid-iteration scan fault isn't deterministically forceable; happy-path list
+  tests cover the return). Green (Go-only).
 - 2026-07-02 — **review fix: `dashboard start --detach` refuses when a live server holds the pidfile — green.**
   BLOCKING: the detach parent re-exec'd its daemon child *before* the already-running liveness check (which the child
   also skips), so `start --detach` against a live server overwrote the live pidfile with the doomed child's PID; the
