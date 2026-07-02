@@ -29,6 +29,29 @@ func TestServerRunningDetectsLiveProcess(t *testing.T) {
 	}
 }
 
+// Regression (review fix, BLOCKING): `dashboard start --detach` must not spawn a
+// child (and clobber the pidfile) when a live server already holds it. Before the
+// fix the detach parent bypassed the already-running guard: it overwrote the live
+// pidfile with a doomed child's PID, and the child's failure cleanup then deleted
+// the pidfile entirely, breaking stop/open/reindex against the still-live server.
+func TestStartDetachedRefusesWhenAlreadyRunning(t *testing.T) {
+	home := t.TempDir()
+	// A live instance holds the pidfile (this test process's own PID is alive).
+	if err := writePidfile(home, pidInfo{PID: os.Getpid(), Port: 4317}); err != nil {
+		t.Fatalf("writePidfile: %v", err)
+	}
+	if err := startDetached(home, 4317); err != nil {
+		t.Fatalf("startDetached returned error: %v", err)
+	}
+	info, ok, err := readPidfile(home)
+	if err != nil || !ok {
+		t.Fatalf("pidfile missing after refusal: ok=%v err=%v", ok, err)
+	}
+	if info.PID != os.Getpid() {
+		t.Fatalf("pidfile PID = %d, want the live server's %d (child clobbered it)", info.PID, os.Getpid())
+	}
+}
+
 func TestVersionFlag(t *testing.T) {
 	root := NewRootCmd()
 	var out bytes.Buffer

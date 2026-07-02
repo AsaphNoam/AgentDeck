@@ -146,6 +146,18 @@ func newDashboardStartCmd() *cobra.Command {
 // stdio to {home}/dashboard.log, records the child PID in the pidfile, and prints
 // a confirmation. The parent then returns (exits 0).
 func startDetached(home string, port int) error {
+	// Refuse before spawning if a live instance already holds the pidfile. The
+	// foreground path checks this after the detach dispatch, so without this the
+	// detach parent would overwrite the live server's pidfile with a doomed
+	// child's PID; the child then dies on "address already in use" and its
+	// `defer removePidfile` deletes the pidfile entirely, leaving stop/open/
+	// reindex's sole-writer gate reporting "not running" while the original
+	// server still runs (techspec §5.3/§7).
+	if info, ok, _ := readPidfile(home); ok && processAlive(info.PID) {
+		fmt.Printf("already running pid=%d http://127.0.0.1:%d\n", info.PID, info.Port)
+		return nil
+	}
+
 	logPath := filepath.Join(home, "dashboard.log")
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
@@ -171,9 +183,22 @@ func startDetached(home string, port int) error {
 	}
 	// Release the child so it keeps running after the parent exits.
 	_ = child.Process.Release()
+
+	// Verify the child is still alive before reporting success: if the port was
+	// already taken (by a non-agentdeck process, say) the child exits almost
+	// immediately and its `defer removePidfile` clears the pidfile, so a "started"
+	// message would be a lie. Give it a brief grace window, then confirm.
+	time.Sleep(startConfirmGrace)
+	if !processAlive(pid) {
+		return fmt.Errorf("dashboard failed to start; see %s", logPath)
+	}
 	fmt.Printf("started pid=%d http://127.0.0.1:%d\n", pid, port)
 	return nil
 }
+
+// startConfirmGrace is how long the detach parent waits for the child to bind
+// the port (or fail) before confirming it actually started.
+const startConfirmGrace = 300 * time.Millisecond
 
 func newDashboardStopCmd() *cobra.Command {
 	return &cobra.Command{
