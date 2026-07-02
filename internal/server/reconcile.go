@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +10,8 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+
+	"github.com/agentdeck/agentdeck/internal/runtime"
 )
 
 const reconcileInterval = 30 * time.Second
@@ -80,8 +83,8 @@ func (s *Server) reconcileSessionsOnce(staleBefore time.Time) int {
 		if agentID == "" {
 			return nil
 		}
-		line := lastNonEmptyLine(path)
-		if _, ok, err := s.stateMgr.ApplyStaleCorrection(agentID, line, staleBefore); err != nil {
+		preview := lastAssistantPreview(path)
+		if _, ok, err := s.stateMgr.ApplyStaleCorrection(agentID, preview, staleBefore); err != nil {
 			s.log.Debug("reconcile: correction skipped", "agent", agentID, "err", err)
 		} else if ok {
 			applied++
@@ -108,19 +111,62 @@ func agentIDFromSessionPath(root, path string) string {
 	return ""
 }
 
-func lastNonEmptyLine(path string) string {
+// lastAssistantPreview derives a bounded, human-readable status preview from the
+// assistant's text in the last turn of the NDJSON transcript. Each line is a
+// normalized runtime.Event; assistant_text deltas are concatenated and reset at
+// each turn boundary, so the result is the final assistant message (clipped to
+// detailPreviewLimit chars) rather than a raw event envelope (§6.4/§13 "last
+// output line"). Returns "" when the transcript carries no assistant text, which
+// leaves the existing status detail untouched (a non-text envelope is never a
+// meaningful preview and must not clobber a healthy card — the BLOCKING fix).
+func lastAssistantPreview(path string) string {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return ""
 	}
-	lines := strings.Split(string(b), "\n")
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := strings.TrimSpace(lines[i])
-		if line != "" {
-			return line
+	var completed, current string
+	for _, raw := range strings.Split(string(b), "\n") {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			continue
+		}
+		var ev runtime.Event
+		if json.Unmarshal([]byte(raw), &ev) != nil {
+			continue
+		}
+		switch ev.Type {
+		case runtime.EvAssistantText:
+			var d runtime.AssistantTextData
+			if json.Unmarshal(ev.Data, &d) == nil {
+				current += d.Delta
+			}
+		case runtime.EvTurnEnd:
+			if strings.TrimSpace(current) != "" {
+				completed = current
+			}
+			current = ""
 		}
 	}
-	return ""
+	preview := current
+	if strings.TrimSpace(preview) == "" {
+		preview = completed
+	}
+	return clipPreview(strings.TrimSpace(preview), detailPreviewLimit)
+}
+
+// detailPreviewLimit bounds a reconciled status-detail preview (mirrors the
+// chat runtime's clip(tail, 120) crash-path convention).
+const detailPreviewLimit = 120
+
+// clipPreview truncates s to at most n runes, so a status detail written from a
+// transcript never grows unbounded and never splits a multi-byte rune (which
+// would produce invalid UTF-8 in the status JSON).
+func clipPreview(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return string(r[:n])
 }
 
 func (s *Server) pruneStaleRunning() int {

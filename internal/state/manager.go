@@ -207,7 +207,9 @@ WHERE agent_id = ?`, agentID).Scan(&curState, &curDetail, &curTrace, &curBusy, &
 			curState = "idle"
 		}
 		if strings.TrimSpace(detail) != "" {
-			curDetail = detail
+			// Clamp at the boundary: the caller derives this from a transcript,
+			// so an unbounded value must never reach the status row.
+			curDetail = clipRunes(detail, statusDetailLimit)
 		}
 		contextPct := 0.0
 		if curPct.Valid {
@@ -227,7 +229,7 @@ ON CONFLICT(agent_id) DO UPDATE SET
     busy_since = excluded.busy_since,
     context_pct = excluded.context_pct,
     updated_at = excluded.updated_at`,
-			agentID, curState, curDetail, "ReconcileSweep", busySince, contextPct, timeNow().UnixMilli(),
+			agentID, curState, curDetail, curTrace, busySince, contextPct, timeNow().UnixMilli(),
 		)
 		if err != nil {
 			return fmt.Errorf("state: apply stale correction: %w", err)
@@ -239,6 +241,18 @@ ON CONFLICT(agent_id) DO UPDATE SET
 		return AgentStateUpdate{}, false, err
 	}
 	return update, applied, nil
+}
+
+// statusDetailLimit bounds a status detail written by the stale-correction sweep.
+const statusDetailLimit = 120
+
+// clipRunes truncates s to at most n runes without splitting a multi-byte rune.
+func clipRunes(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return string(r[:n])
 }
 
 func (m *Manager) apply(agentID string, mutate func(*sql.Tx) error) (AgentStateUpdate, error) {
