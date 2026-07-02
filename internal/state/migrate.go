@@ -2,6 +2,7 @@ package state
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -77,6 +78,27 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 }
 
 func ensureSessionsFTS(tx *sql.Tx) error {
+	// If a plain fallback sessions_fts (from a prior non-FTS5 build) exists and an
+	// FTS5-capable binary is now running, drop it so the CREATE VIRTUAL below can
+	// upgrade it in place — otherwise `CREATE VIRTUAL TABLE IF NOT EXISTS` sees the
+	// plain table and silently no-ops, leaving search stuck in degraded mode
+	// forever. Search content repopulates on the next index/`reindex`.
+	var createSQL string
+	switch err := tx.QueryRow(
+		`SELECT sql FROM sqlite_master WHERE type='table' AND name='sessions_fts'`,
+	).Scan(&createSQL); {
+	case errors.Is(err, sql.ErrNoRows):
+		// no table yet — first create below
+	case err != nil:
+		return fmt.Errorf("state: inspect sessions_fts: %w", err)
+	default:
+		if !strings.Contains(strings.ToUpper(createSQL), "VIRTUAL") && fts5Available(tx) {
+			if _, derr := tx.Exec(`DROP TABLE sessions_fts`); derr != nil {
+				return fmt.Errorf("state: drop stale fallback sessions_fts: %w", derr)
+			}
+		}
+	}
+
 	_, err := tx.Exec(`
 CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
   agent_id UNINDEXED,
@@ -109,4 +131,14 @@ CREATE TABLE IF NOT EXISTS sessions_fts (
 		return fmt.Errorf("state: create fallback sessions_fts: %w", err)
 	}
 	return nil
+}
+
+// fts5Available reports whether the SQLite build has the FTS5 module, probed by
+// attempting to create (and drop) a throwaway virtual table.
+func fts5Available(tx *sql.Tx) bool {
+	if _, err := tx.Exec(`CREATE VIRTUAL TABLE IF NOT EXISTS __fts5_probe USING fts5(x)`); err != nil {
+		return false
+	}
+	_, _ = tx.Exec(`DROP TABLE IF EXISTS __fts5_probe`)
+	return true
 }
