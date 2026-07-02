@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** review fix (cancel SIGINT + FTS upgrade) @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
+- **Last GREEN checkpoint:** review fix (Clone context-menu action wired): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, UI 68/68 + `npm run build`.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -148,13 +148,8 @@ launch option via capabilities, and refreshed embedded UI. Details in changelog 
 review fixes (all of which held up under re-inspection). Baseline verified green before review: `go
 build/test` (plain + `-tags sqlite_fts5`), UI 66/66 + `npm run build`.
 
-### ADVISORY
-
-- **ADVISORY — stale "Clone — Available in Phase 3" stub.** `ui/src/components/grid/CardContextMenu.tsx:81-83`.
-  The master PRD (agent-dashboard-prd.md:245) lists Clone in the card context menu; the phase-2 techspec stubbed
-  it pending the Phase-3 launch modal; Phase 3 shipped the modal but no phase spec picked Clone back up, and with
-  Phases 3–6 done the tooltip is now false. Fix: wire Clone (open NewAgentModal prefilled from the agent's
-  role/project/backend/model) or retitle the tooltip and record Clone as unscheduled scope.
+_All BLOCKING and ADVISORY findings from the 2026-07-02 review are resolved (see changelog); the
+cross-project guidance below is retained for the Phase 7 lead-in._
 
 ### Cross-project observations (2026-07-02 holistic pass — guidance, not findings)
 
@@ -185,6 +180,17 @@ build/test` (plain + `-tags sqlite_fts5`), UI 66/66 + `npm run build`.
 ## Autonomous decisions (please review)
 
 > Resolved without stopping; the human should still see them. Remove once acknowledged (workflow §3, §5).
+
+- **NEW (review fix): Clone is a direct clone-launch, not a prefilled NewAgentModal.** The advisory offered two arms —
+  (a) open `NewAgentModal` prefilled from the agent's role/project/backend/model, or (b) retitle/de-scope. I did neither
+  literally: I wired Clone to POST `/api/sessions` directly with the source agent's config (role/project/backend/model/
+  interface/group), server auto-suggesting the name — a functional Clone matching the existing prompt/direct-API context
+  menu style (consistent with the 6.6 decision that context-menu actions use direct API calls, not a modal subsystem).
+  **Why a judgment call:** arm (a) would need new modal props (`initialBackend`/`initialModel`/`initialInterface`) +
+  open-state plumbing from the context menu; the direct launch is smaller, immediate, and clones with zero extra clicks.
+  **Tradeoff:** no pre-launch review/edit of the cloned config (it launches on click); a mistaken clone must be stopped.
+  **To reverse/fix:** add the prefill props to `NewAgentModal` and open it from the context menu instead of launching
+  directly, if a confirm-before-launch step is wanted.
 
 - **NEW (review fix): removed the (dead, unimplemented) stdio-MCP fallback scaffolding.** The 5.3 decision left a
   stdio branch in `registerMessagingMCP` behind a constant-true `usesHTTPMessagingMCP`, as a placeholder for the gated
@@ -438,6 +444,12 @@ build/test` (plain + `-tags sqlite_fts5`), UI 66/66 + `npm run build`.
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-02 — **review fix: Clone context-menu action wired (was a dead "Available in Phase 3" stub) — green.**
+  ADVISORY: `CardContextMenu`'s Clone button was permanently `disabled` with a stale Phase-3 tooltip though Phase 3
+  shipped the launch flow. Wired it to `launchAgent(...)` (new `api/client` helper) — a clone launches a new agent with
+  the source's role/project/backend/model/interface/group and lets the server auto-suggest a name; failures surface a
+  "Clone failed" toast. Tests: two new `CardContextMenu` tests (correct POST payload + error toast). UI 68/68,
+  `npm run build`, embedded dist refreshed. See Autonomous decisions (direct clone-launch vs. prefilled modal).
 - 2026-07-02 — **review fix: every launch/resume failure path routes through `teardownAgentRegistration` — green.**
   ADVISORY: (1) `handleLaunch`'s `WriteAgent`-failure path returned without cleaning the token/MCP/hook-settings that
   `composeLaunch` had already created; (2) `handleResume`'s Resume-failure path cleaned token+MCP but leaked the
@@ -501,52 +513,6 @@ _(most recent first; keep ~10, older history is in git)_
   timer (per-toast `<Toast>` component) so a new toast no longer restarts older ones. Tests: FilesTab onReveal,
   CardContextMenu rename+stop error toasts, NotificationCenter independent timers, sse open-agent-only gap refetch.
   Embedded UI dist refreshed. Green: `go build/test`, `npm test` (66), `npm run build`.
-- 2026-07-01 — **review fix: dead-code removal + session/load carries model/systemPrompt — green.** (1) Real bug:
-  `sessionLoadParams` (native resume) dropped `model`/`systemPrompt`, so a same-backend model swap via switch-runtime
-  (native-resume path) silently kept the OLD model — now carries both, matching `sessionNewParams` (test
-  `TestSessionLoadParamsCarriesModelAndSystemPrompt`). (2) Dead code removed: the no-op color branch in
-  `config_handlers.go`; the unreachable stdio-MCP fallback + constant-true `usesHTTPMessagingMCP` (dropped the
-  `backendType` param too — HTTP is used unconditionally); the never-called `ReadTTY`/`RevealTab` driver-seam methods
-  (interface + xterm + tmux). Also **dismissed** the `NewAgentID` advisory (24-bit/10-try is correct for single-user
-  scope — not a real defect). Green plain + `-tags sqlite_fts5` (Go-only).
-- 2026-07-01 — **review fix: durability + Makefile advisories — green.** ADVISORY batch: `make test` now runs both the
-  no-tag path AND `-tags sqlite_fts5` (FTS/search tests were untested by the standard target); `config/atomic.go`
-  fsyncs the parent dir after rename (durable config write); `cli/pidfile.go` `tmp.Sync()`s before rename (no truncated
-  pidfile on crash); `cli/dashboard.go` builds `dashboard.log` with `filepath.Join`. No new unit tests (durability/
-  cosmetic — guarded by existing atomic-write/pidfile round-trip tests). Green plain + `-tags sqlite_fts5`.
-- 2026-07-01 — **review fix: crash-path registration teardown (+ stop-handler token cleanup) — green.** BLOCKING
-  (asymmetric-teardown root cause): the only `onExit` wired was `registry.forget` (ownership only); on an agent crash
-  the hook token + MCP session + `mcp/{id}.mcp.json` + `hooks/agents/{id}.json` all leaked — a spoofable messaging
-  identity a lingering child could still send/check as. Added one `teardownAgentRegistration(id)` (token + MCP +
-  hook-settings) and a `Registry.SetExitHook`; runtimes' onExit now runs `handleAgentExit` = forget + the server
-  teardown (crash path only — solicited Stop/switch already suppress onExit, so a switch's re-registration is safe).
-  `handleStop` now routes through the same helper, closing the two related ADVISORYs (stop omitted `forgetHookToken`).
-  Test: `TestCrashTearsDownAgentRegistration` (SIGKILL the agent → token stops resolving + both files gone). Green
-  plain + `-tags sqlite_fts5` (Go-only).
-- 2026-07-01 — **review fix: WS bridge dups the PTY master so a tab-switch no longer kills the agent — green.**
-  BLOCKING (asymmetric-teardown root cause): `Bridge` closed its `PTYConn` on every WS teardown, and the browser
-  closes the WS on any unmount — so `_ = p.Close()` closed the agent's live PTY master and SIGHUP'd the CLI. `Runtime.
-  Bridge` now hands out a `dup()` of the master (`dupPTYMaster`, via `SyscallConn().Control` — not `(*os.File).Fd()`,
-  which forces the shared description blocking and hangs the pump — plus `SetNonblock` so `os.NewFile` yields a pollable
-  fd whose Close interrupts the pump). Only Stop/CloseTab closes the real master; a reconnect gets its own fd. Test:
-  `TestBridgeTeardownKeepsPTYAndAgentAlive` (bridge to EOF, then the agent is still live and a 2nd bridge round-trips
-  through `cat`). Green plain + `-tags sqlite_fts5` (Go-only).
-- 2026-07-01 — **review fix: terminal messaging budget resets at the terminal turn boundary — green.** BLOCKING
-  (turn-boundary-leak root cause): `ResetTurnBudget` was called only by the chat runtime, so a terminal agent rode the
-  implicit `t_000000000000` budget row forever and locked out with `message_budget_exceeded` after
-  `MessageBudgetPerTurn` lifetime actions. `Manager.ApplyHook` now resets the budget on a terminal agent's
-  `UserPromptSubmit` (its real turn boundary), gated on `interface=="terminal"` so chat (which self-suppresses these
-  hooks and owns its own turn budget) is untouched. Added tx-scoped `resetTurnBudgetTx` (reused by `ResetTurnBudget`)
-  and `terminalTurnID`. Test: `TestManagerTerminalUserPromptResetsBudget` (exhaust 15 actions → 16th breaches → next
-  UserPromptSubmit unblocks). Green plain + `-tags sqlite_fts5` (Go-only).
-- 2026-07-01 — **review fix: skip_permissions + add_dirs no longer dropped on resume/switch — green.** Two BLOCKINGs
-  (LaunchSpec-drift root cause): `resume.go`/`switch.go` rebuilt `LaunchSpec` without `SkipPerms` or `AddDirs`, so a
-  `skip_permissions=true` agent stalled in `waiting_input` and a multi-dir agent lost its extra dirs after any
-  stop→resume or switch. Added shared helpers `resolveSkipForRole`/`resolveAddDirs`/`expandAddDirs` (launch.go),
-  extracted `composeResumeSpec` (mirrors `composeSwitchSpec`), set both fields in both composers, and forwarded
-  `additionalDirectories` on the native-resume `session/load` path (chat.go, was `session/new`-only). Tests:
-  `TestResumeAndSwitchCarryRoleAndProjectFields` (both composers carry SkipPerms+AddDirs from current config),
-  `TestSessionLoadParamsForwardsAddDirs`. Green plain + `-tags sqlite_fts5` (Go-only). See Autonomous decisions for the
-  re-resolve-vs-persist call.
-
-- _(older entries — the 6.x subphases (6.2–6.6), their review fixes (xterm panel, toast surfacing, terminal-tab input, switch-keeps-target), 6.1, budget/turn-budget review fixes, 5.4 — live in git history.)_
+- _(older entries — the 2026-07-01 review-fix batch (dead-code + session/load model/systemPrompt, durability + Makefile,
+  crash-path registration teardown, WS-bridge PTY dup, terminal turn-budget reset, skip_permissions/add_dirs on
+  resume/switch), the 6.x subphases (6.2–6.6) + their review fixes, 6.1, 5.4 — all live in git history.)_
