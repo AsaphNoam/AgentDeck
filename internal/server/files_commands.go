@@ -85,8 +85,8 @@ ORDER BY last_ts DESC`, agentID)
 		f.DiffRefs = diffRefs
 		out = append(out, f)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, fmt.Errorf("files: close: %w", err)
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("files: rows: %w", err)
 	}
 	if out == nil {
 		out = []trackedFile{}
@@ -112,8 +112,8 @@ ORDER BY seq DESC`, agentID)
 		}
 		out = append(out, c)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, fmt.Errorf("commands: close: %w", err)
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("commands: rows: %w", err)
 	}
 	if out == nil {
 		out = []trackedCommand{}
