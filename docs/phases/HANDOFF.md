@@ -161,21 +161,6 @@ build/test` (plain + `-tags sqlite_fts5`), UI 66/66 + `npm run build`.
   only the foreground path honors it. Fix: run the same `readPidfile`+`processAlive` refusal in the detach
   parent before spawning (and verify child liveness before printing success). Test: start a server, run
   `start --detach`, assert refusal + pidfile intact.
-- **BLOCKING — reconciliation sweep writes the raw NDJSON transcript line into `status.detail`, corrupting
-  every idle card's preview.** `internal/server/reconcile.go:83-84` passes `lastNonEmptyLine(transcript.ndjson)`
-  — a raw event envelope like `{"agent_id":"a_..","seq":57,"type":"turn_end",...}` — as the `detail` to
-  `ApplyStaleCorrection`, which writes it into `status.detail` unbounded (`internal/state/manager.go:209-211`,
-  no clip). Trigger is normal use: any live chat agent idle ≥30s gets its detail overwritten on the next 30s
-  tick, repeatedly. The UI's preview is `agent.detail || lastLine` (`ui/src/components/grid/AgentCard.tsx:14`),
-  so the primary source wins and idle cards show JSON garbage instead of the §13/§6.4 last-output-line; a
-  multi-MB tool_result line becomes a multi-MB status row + SSE `state_update` each tick. §3.8 intends the
-  sweep for *missed-hook* staleness with a "minimal correction"; an idle agent with a healthy final status is
-  not a missed hook. Also folds in: the sweep sets `last_trace="ReconcileSweep"` (`manager.go:230`), outside
-  the §4.4 vocabulary. Fix: derive the preview from the last `assistant_text` delta (parse tail lines, skip
-  non-text events), clip to ~120 chars (like chat.go's crash path), and/or only apply when the status row is
-  genuinely inconsistent (busy with dead pid / missing row). Test: idle live agent + 31s-old status +
-  transcript ending in `turn_end` → sweep must not replace detail with raw JSON.
-
 ### ADVISORY
 
 - **ADVISORY — `rows.Close()` checked instead of `rows.Err()` in three list scans.** `internal/state/session.go:98`
@@ -477,6 +462,15 @@ build/test` (plain + `-tags sqlite_fts5`), UI 66/66 + `npm run build`.
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-02 — **review fix: reconcile sweep derives a bounded assistant-text preview, no more raw JSON in status.detail — green.**
+  BLOCKING: the 2.2 stale-correction sweep passed `lastNonEmptyLine(transcript.jsonl)` — a raw NDJSON event envelope
+  (Phase 4's transcript is JSON, not plain text) — as the status `detail`, so any live agent idle ≥30s got its card
+  preview overwritten with `{"agent_id":...,"type":"turn_end",...}` (unbounded, multi-MB for a big tool_result). Replaced
+  it with `lastAssistantPreview`: parse tail events, concatenate the last turn's `assistant_text` deltas, clip to 120
+  runes (§6.4 last-output-line); no assistant text → return "" so the existing detail is preserved. `ApplyStaleCorrection`
+  now preserves the prior `last_trace` (was the out-of-§4.4-vocab `"ReconcileSweep"`) and clamps detail at the boundary.
+  Tests: `TestReconcileSessionsOnceDoesNotWriteRawJSON`, `…PreservesDetailWithoutAssistantText`, rewritten
+  `…AppliesStaleCorrection` (NDJSON). Green plain + `-tags sqlite_fts5`.
 - 2026-07-02 — **review fix: Cancel escalates to SIGINT + FTS fallback upgrade; matched_in dismissed — green.** (1)
   `ChatRuntime.Cancel` now arms a grace-then-SIGINT escalation (`SetCancelGrace`, default 3s) so a peer that ignores
   `session/cancel` is reaped instead of staying busy until a hard Stop (techspec §8.4). New fakeacp `ignore_cancel`
