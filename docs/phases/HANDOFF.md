@@ -148,19 +148,6 @@ launch option via capabilities, and refreshed embedded UI. Details in changelog 
 review fixes (all of which held up under re-inspection). Baseline verified green before review: `go
 build/test` (plain + `-tags sqlite_fts5`), UI 66/66 + `npm run build`.
 
-### BLOCKING
-
-- **BLOCKING — `dashboard start --detach` bypasses the already-running guard and clobbers the live server's
-  pidfile.** `internal/cli/dashboard.go:98` (vs. the check at :107). The detach parent spawns the re-exec'd
-  child *before* the pidfile-liveness check, and the child (`daemon=true`) skips the check too. Running
-  `agentdeck dashboard start --detach` while a server is already up: (a) the parent overwrites the live
-  pidfile with the doomed child's PID and prints success without verifying the child bound the port; (b) the
-  child dies on `address already in use` and its `defer removePidfile` deletes the pidfile entirely — so
-  `dashboard stop`/`open`/`reindex`'s `serverRunning` sole-writer gate all report "not running" while the
-  original server still runs. Techspec §5.3/§7 requires start to refuse when a live pidfile process exists;
-  only the foreground path honors it. Fix: run the same `readPidfile`+`processAlive` refusal in the detach
-  parent before spawning (and verify child liveness before printing success). Test: start a server, run
-  `start --detach`, assert refusal + pidfile intact.
 ### ADVISORY
 
 - **ADVISORY — `rows.Close()` checked instead of `rows.Err()` in three list scans.** `internal/state/session.go:98`
@@ -462,6 +449,13 @@ build/test` (plain + `-tags sqlite_fts5`), UI 66/66 + `npm run build`.
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-02 — **review fix: `dashboard start --detach` refuses when a live server holds the pidfile — green.**
+  BLOCKING: the detach parent re-exec'd its daemon child *before* the already-running liveness check (which the child
+  also skips), so `start --detach` against a live server overwrote the live pidfile with the doomed child's PID; the
+  child then died on `address already in use` and its `defer removePidfile` deleted the pidfile entirely, leaving
+  stop/open/reindex reporting "not running" while the original kept running. `startDetached` now runs the same
+  `readPidfile`+`processAlive` refusal before spawning, and confirms the child is still alive (300ms grace) before
+  printing "started". Test: `TestStartDetachedRefusesWhenAlreadyRunning`. Green (Go-only).
 - 2026-07-02 — **review fix: reconcile sweep derives a bounded assistant-text preview, no more raw JSON in status.detail — green.**
   BLOCKING: the 2.2 stale-correction sweep passed `lastNonEmptyLine(transcript.jsonl)` — a raw NDJSON event envelope
   (Phase 4's transcript is JSON, not plain text) — as the status `detail`, so any live agent idle ≥30s got its card
