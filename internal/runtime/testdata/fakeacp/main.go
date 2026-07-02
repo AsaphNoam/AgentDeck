@@ -164,6 +164,13 @@ func runScenario(name string) string {
 		os.Exit(1)
 		return "" // unreachable
 
+	case "ignore_cancel":
+		// Never end the turn and never react to session/cancel — the runtime must
+		// escalate to SIGINT (techspec §8.4). Blocks until the process is signalled.
+		emitChunk("working…")
+		_ = out.Flush()
+		select {}
+
 	default:
 		emitChunk("unknown scenario: " + name)
 		return "end_turn"

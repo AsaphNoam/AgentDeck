@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** review fix (reindex guard + switch rollback window) @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
+- **Last GREEN checkpoint:** review fix (cancel SIGINT + FTS upgrade) @ `main`: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -151,11 +151,16 @@ _All 5 BLOCKINGs validated and fixed-and-green (see changelog 2026-07-01). None 
 
 ### ADVISORY
 
-- **ADVISORY — Cancel never escalates to SIGINT.** `internal/runtime/permission.go:119-142` sends `session/cancel` with no grace-then-SIGINT escalation (techspec §8.4); an agent that ignores ACP cancel stays busy until hard Stop.
-- **ADVISORY — `ensureSessionsFTS` runs outside the numbered migration set.** `internal/state/migrate.go:58,79` (re)creates the FTS/fallback table on every `Open`; a DB once opened without FTS5 support keeps a plain table a later FTS5 binary won't upgrade. Fold into a numbered migration.
-- **ADVISORY — `matched_in` empty on diacritic/tokenizer-divergent hits.** `internal/archive/archive.go:207-232` labels hits via `strings.Contains` on raw content while FTS uses `remove_diacritics`; `café`-vs-`cafe` returns the row but with no match reason. Cosmetic. Derive `matched_in` from a metadata-restricted second MATCH.
+_All advisories resolved-and-green or dismissed (see changelog 2026-07-01/07-02). None open. One was
+dismissed: `matched_in` empty on diacritic-only hits — real but cosmetic (search returns the correct rows;
+only the "matched in" badge can be blank), and a correct fix needs the `x/text` NFD normalizer (a new
+dependency) not justified for a label. See end-of-turn summary._
 
 ### Systemic root causes (fix the class, not just the instances)
+
+> Every *instance* below is now fixed-and-green. The deeper class refactors (a single shared `composeSpec`;
+> a fully unified teardown/turn abstraction) were NOT done — the fixes were targeted. Left here as guidance
+> for future work, not as open findings.
 
 1. **LaunchSpec composition drift** — three independent spec builders (`composeLaunch`, `composeSwitchSpec`, `handleResume`), two sourcing from a *lossy* `SessionSnapshot` that never re-reads role/project. Root of the SkipPerms + AddDirs BLOCKINGs. Fix: one shared `composeSpec(agent, snapshot, overrides)` + make the snapshot store every launch-affecting field.
 2. **Asymmetric create/teardown across the server↔runtime boundary** — registration artifacts (hook token, MCP session/file, hook-settings file) and the PTY master are created on one side and torn down on the other, complete only on explicit HTTP handlers, absent on crash/WS-close. Root of the crash-leak + WS-kills-PTY BLOCKINGs + the stop-handler advisory. Fix: one teardown unit per agent-exit driven by *all* exits; give the PTY a distinct agent-owned master vs per-WS view.
@@ -417,6 +422,13 @@ _All 5 BLOCKINGs validated and fixed-and-green (see changelog 2026-07-01). None 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-02 — **review fix: Cancel escalates to SIGINT + FTS fallback upgrade; matched_in dismissed — green.** (1)
+  `ChatRuntime.Cancel` now arms a grace-then-SIGINT escalation (`SetCancelGrace`, default 3s) so a peer that ignores
+  `session/cancel` is reaped instead of staying busy until a hard Stop (techspec §8.4). New fakeacp `ignore_cancel`
+  scenario; test `TestCancelEscalatesToSIGINT`. (2) `ensureSessionsFTS` detects a stale plain `sessions_fts` (from a
+  prior non-FTS5 build) and, when FTS5 is now available, drops+recreates it as the virtual table (content repopulates on
+  reindex) instead of staying degraded forever; tagged test `TestEnsureSessionsFTSUpgradesFallback`. (3) DISMISSED the
+  `matched_in`-on-diacritics advisory — cosmetic, correct fix needs a new `x/text` dep. Green plain + `-tags sqlite_fts5`.
 - 2026-07-01 — **review fix: reindex refuses a live server + switch rollback covers the pre-resume window — green.** (1)
   `agentdeck reindex` now hard-errors when the server is running (was only a warning) — it opens its own writer and wipes
   the index, violating the sole-writer invariant; a stale pidfile is tolerated via the signal-0 liveness probe. Test:
@@ -493,57 +505,4 @@ _(most recent first; keep ~10, older history is in git)_
   `TestSessionLoadParamsForwardsAddDirs`. Green plain + `-tags sqlite_fts5` (Go-only). See Autonomous decisions for the
   re-resolve-vs-persist call.
 
-- 2026-06-30 — **review fix: real xterm.js terminal panel + resize — green.** ADVISORY: the terminal panel was a
-  hand-rolled `<pre>` + input that showed ANSI literally and never sent `{cols,rows}` (PTY stuck at default size).
-  Replaced it with xterm.js (`@xterm/xterm` + `@xterm/addon-fit`): `onData`→binary keystroke frame, fit/`onResize`→
-  `{cols,rows}` text frame, PTY bytes via `term.write`; sends an initial resize on WS open. Reworked `TerminalTab.test.tsx`
-  to mock the xterm modules (no canvas in jsdom) and assert the binary-keystroke + text-resize contract. CSS swapped the
-  line-box for an xterm host. Embedded UI dist refreshed. Checkpoint green: `go build ./...`, `cd ui && npm test`,
-  `cd ui && npm run build`. See Autonomous decisions for the new-dependency call.
-- 2026-06-30 — **review fix: switch-runtime / move-to-group failures now surface a toast — green.** ADVISORY:
-  `CardContextMenu` fired `void switchRuntime(...)` / `void updateAgentIdentity(...)` with no `.catch`, so any
-  failure (the common `400 no_change`, `409 switch_in_progress`, `422`, rollback `500`) was invisible. Added a
-  `pushError(title, body?)` action to `uiStore` (new `"error"` toast type) and `.catch` → `pushError` on both
-  context-menu actions; also taught `client.ts::json()` to extract the §7.7 nested `error.message` so the toast
-  shows the real reason instead of a bare status line. Test `CardContextMenu.test.tsx` (new) asserts a failing
-  switch-runtime/move-to-group yields an `"error"` toast carrying the server message. Embedded UI dist refreshed.
-  Checkpoint green: `go build ./...`, `cd ui && npm test`, `cd ui && npm run build`.
-- 2026-06-30 — **review fix: terminal-tab input reaches the PTY (binary frame) — green.** BLOCKING:
-  `TerminalTab.tsx`'s `send()` sent `ws.send(`${input}\n`)` — a string, transmitted as a WebSocket
-  *text* frame, which the PTY↔WS bridge routes to resize and drops (only binary frames reach the PTY
-  master), so the headless xterm/PTY driver's only input surface was inert. Now sends
-  `ws.send(new TextEncoder().encode(input + "\n"))`. Test `TerminalTab.test.tsx` (new) asserts Send and
-  Enter each emit a non-string ArrayBuffer view decoding to `"<cmd>\n"`. Embedded UI dist refreshed.
-  Checkpoint green: `go build ./...`, `cd ui && npm test`, `cd ui && npm run build`.
-- 2026-06-29 — **6.6 green — task groups + remaining endpoints + UI.** Backend: `POST /api/sessions/{id}/identity`
-  edits name/group and emits `state_update`; `POST /api/groups/{group}/release` stops group members with a bounded worker
-  pool and returns per-agent results; existing rename now returns the §8.2 shape; layout schema/API persists
-  `groups[name].collapsed`; dashboard state includes terminal `tty`/`driver`; reconciliation loop prunes stale running rows.
-  UI: grouped card sections with persisted collapse + aggregate state summary + Release group; context-menu Move-to-group,
-  Switch runtime, and Reveal terminal actions; terminal badge on cards; `backend_switch` transcript divider; terminal tab
-  attaches to `/api/sessions/{id}/terminal/ws`; new-agent modal enables terminal via `/api/capabilities`; embedded UI dist
-  refreshed. Tests: new server coverage for identity, reserved group, release group, stale-running prune; existing UI tests
-  updated for terminal availability. Checkpoint green: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`,
-  `cd ui && npm test`, `cd ui && npm run build`. See Autonomous decisions for the MVP prompt-based UI controls + liveness badge.
-- 2026-06-29 — **6.5 green — switch-runtime: backend-swap history primer.** Removed the cross-backend `501` guard:
-  `handleSwitchRuntime` now routes cross-backend swaps and same-backend model swaps with `CanSwitchModelOnResume=false`
-  through `history_handoff:"primer"` (empty native resume id). New `internal/server/primer.go` reads
-  `sessions/{agent_id}/transcript.ndjson`, synthesizes a bounded primer (older-turn summary + last N=6 verbatim turns),
-  appends it to this launch's `SystemPrompt` only, honors `config.json switch.primer_token_budget` (default 8k), and falls
-  back to local truncation if the one-shot target-model summary seam fails. New `runtime.EvBackendSwitch`/
-  `BackendSwitchData`; switch appends `{type:"backend_switch", from, to, at}` after target resume succeeds. Tests: primer budget,
-  summarizer success + fallback, marker append, Claude→Codex backend swap (handoff=primer, marker present, identity switched,
-  new Codex fake session accepts prompt). Green both tag modes (Go-only). See Autonomous decisions for the gated live-summary seam.
-- 2026-06-29 — **review fix: switch-runtime keeps the target registration + terminal archive resume — green.**
-  (1) BLOCKING: `handleSwitchRuntime` (`internal/server/switch.go`) cleaned the OLD MCP/hook artifacts (keyed by
-  the unchanged `agent_id`) AFTER `composeSwitchSpec` had already registered the fresh target token + rewritten
-  the per-agent hook settings file — so it revoked the new MCP token, deleted the `--settings` file the resume
-  needs, and orphaned the old token (its cleanup closure was overwritten). Reordered to validate (new pure
-  `validateSwitchTarget` — no side effects) → stop old → cleanup OLD → `composeSwitchSpec` (register fresh) →
-  resume. Test `TestSwitchRuntimeKeepsTargetRegistration` (chat→terminal: hook settings file present + MCP token
-  still `Lookup`-able after the 200). (2) BLOCKING: removed the stale `501 "terminal resume not implemented"`
-  guard in `handleResume`; resume now resolves interface/backend/model from the live `agents` row (not the frozen
-  snapshot, which stays `chat` after a switch). Test `TestResumeTerminalAgent` (chat→switch terminal→stop→resume
-  → terminal running row with tty/driver). See Autonomous decisions for the identity-source judgment call. Green
-  both tag modes (Go-only).
-- _(older entries — 6.4, 6.3, 6.2, the hook-registration review fix, 6.1, budget/turn-budget review fixes, 5.4 — live in git history.)_
+- _(older entries — the 6.x subphases (6.2–6.6), their review fixes (xterm panel, toast surfacing, terminal-tab input, switch-keeps-target), 6.1, budget/turn-budget review fixes, 5.4 — live in git history.)_
