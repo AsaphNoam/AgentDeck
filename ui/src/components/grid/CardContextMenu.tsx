@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { renameAgent, stopAgent, switchRuntime, updateAgentIdentity } from "../../api/client";
+import { launchAgent, renameAgent, stopAgent, switchRuntime, updateAgentIdentity } from "../../api/client";
 import { useAgentStore } from "../../store/agentStore";
 import { useUiStore } from "../../store/uiStore";
 
@@ -78,7 +78,23 @@ export function CardContextMenu() {
       >
         Switch runtime
       </button>
-      <button type="button" disabled title="Available in Phase 3">
+      <button
+        type="button"
+        title="Launch a new agent with this one's role, project, backend, and model"
+        onClick={() => {
+          launchAgent({
+            role: agent.role,
+            project: agent.project,
+            backend: agent.backend,
+            model: agent.model,
+            interface: agent.interface,
+            group: agent.group,
+          }).catch((err) =>
+            pushError("Clone failed", err instanceof Error ? err.message : String(err)),
+          );
+          close();
+        }}
+      >
         Clone
       </button>
       <button
