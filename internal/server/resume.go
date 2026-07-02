@@ -130,8 +130,10 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 
 	// 7. Resume via the registry (double-resume is guarded by the registry sentinel).
 	if _, err := s.registry.Resume(r.Context(), spec); err != nil {
-		s.forgetHookToken(id)
-		s.cleanupMessagingMCP(id)
+		// composeResumeSpec wrote the hook-settings file too (via
+		// composeHookRegistration) — tear down all three artifacts, not just
+		// token + MCP, so a failed resume leaves nothing behind (launch parity).
+		s.teardownAgentRegistration(id)
 		writeAPIError(w, resumeStartError(err))
 		return
 	}
