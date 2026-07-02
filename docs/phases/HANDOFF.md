@@ -150,12 +150,6 @@ build/test` (plain + `-tags sqlite_fts5`), UI 66/66 + `npm run build`.
 
 ### ADVISORY
 
-- **ADVISORY — registration-artifact cleanup misses two abnormal failure paths.** (1) `internal/server/launch.go:57-60`:
-  if `WriteAgent` fails after `composeLaunch` already registered the MCP token + wrote the hook-settings file +
-  remembered the hook token, the handler returns without cleaning any of them. (2) `internal/server/resume.go:133-135`:
-  the Resume-failure path cleans token+MCP but not the hook-settings file (launch's failure path cleans all three).
-  Both are disk-error/rare paths; the fix is to route every failure path through the existing
-  `teardownAgentRegistration` (the handoff's root-cause-#2 "one teardown unit" refactor).
 - **ADVISORY — stale "Clone — Available in Phase 3" stub.** `ui/src/components/grid/CardContextMenu.tsx:81-83`.
   The master PRD (agent-dashboard-prd.md:245) lists Clone in the card context menu; the phase-2 techspec stubbed
   it pending the Phase-3 launch modal; Phase 3 shipped the modal but no phase spec picked Clone back up, and with
@@ -444,6 +438,12 @@ build/test` (plain + `-tags sqlite_fts5`), UI 66/66 + `npm run build`.
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-02 — **review fix: every launch/resume failure path routes through `teardownAgentRegistration` — green.**
+  ADVISORY: (1) `handleLaunch`'s `WriteAgent`-failure path returned without cleaning the token/MCP/hook-settings that
+  `composeLaunch` had already created; (2) `handleResume`'s Resume-failure path cleaned token+MCP but leaked the
+  hook-settings file `composeResumeSpec` wrote. Both now call `teardownAgentRegistration` (all three artifacts); the
+  launch Start-failure path was unified onto it too. Test: `TestResumeFailureRemovesHookSettings` (verified failing
+  before the fix). Green (Go-only).
 - 2026-07-02 — **review fix: list scans check `rows.Err()` not `rows.Close()` — green.** `ListInactiveSessions`
   (`state/session.go`), `queryTrackedFiles`/`queryTrackedCommands` (`server/files_commands.go`) ended their scan loops
   with `rows.Close()` (already deferred), which does not surface a mid-iteration error — a failed row scan would return
