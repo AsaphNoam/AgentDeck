@@ -55,18 +55,20 @@ func (s *Server) handleLaunch(w http.ResponseWriter, r *http.Request) {
 	// Insert identity row before Start so a crash mid-handshake still has a
 	// stable id; roll back if Start fails outright (§6.1 step 4, step 8).
 	if err := s.stateStore.WriteAgent(agent); err != nil {
+		// composeLaunch already remembered the hook token, registered the MCP
+		// session, and wrote the hook-settings file — tear them all down so a
+		// WriteAgent failure doesn't leak a spoofable messaging identity + files.
+		s.teardownAgentRegistration(agent.AgentID)
 		writeAPIError(w, apiError(runtime.CodeInternal, "write identity: "+err.Error()))
 		return
 	}
 
 	if _, err := s.registry.Launch(r.Context(), spec); err != nil {
-		// Roll back identity + any partial rows.
+		// Roll back identity + any partial rows + all registration artifacts.
 		_ = s.stateStore.DeleteRunning(agent.AgentID)
 		_ = s.stateStore.DeleteStatus(agent.AgentID)
 		_ = s.stateStore.DeleteAgent(agent.AgentID)
-		s.forgetHookToken(agent.AgentID)
-		s.cleanupMessagingMCP(agent.AgentID)
-		s.cleanupHookSettings(agent.AgentID)
+		s.teardownAgentRegistration(agent.AgentID)
 		writeAPIError(w, launchStartError(err))
 		return
 	}

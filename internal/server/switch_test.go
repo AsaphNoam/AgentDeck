@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/agentdeck/agentdeck/internal/hooks"
 	"github.com/agentdeck/agentdeck/internal/messaging"
 	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/transcript"
@@ -439,5 +440,35 @@ func TestSwitchRuntimeRollbackOnResumeFailure(t *testing.T) {
 	}
 	if run.Interface != "chat" {
 		t.Fatalf("restored running interface = %q, want chat", run.Interface)
+	}
+}
+
+// Regression (review fix, ADVISORY): a failed resume must tear down ALL
+// registration artifacts — including the hook-settings file that composeResumeSpec
+// writes — not just the token + MCP session. Otherwise a resume that fails after
+// composeResumeSpec leaves an orphaned {home}/hooks/agents/{id}.json behind.
+func TestResumeFailureRemovesHookSettings(t *testing.T) {
+	srv, ts := switchTestServer(t)
+	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+
+	// Switch chat → terminal so resume relaunches under the terminal runtime,
+	// then stop (archive resume is for inactive sessions).
+	if resp, body := post(t, ts.URL+"/api/sessions/"+id+"/switch-runtime", map[string]string{"interface": "terminal"}); resp.StatusCode != http.StatusOK {
+		t.Fatalf("switch status = %d: %s", resp.StatusCode, body)
+	}
+	if resp, body := post(t, ts.URL+"/api/sessions/"+id+"/stop", nil); resp.StatusCode != http.StatusOK {
+		t.Fatalf("stop status = %d: %s", resp.StatusCode, body)
+	}
+
+	// Make the terminal target fail to launch so the resume-failure path runs.
+	srv.terminal.SetCommand("/nonexistent/agentdeck-no-such-binary")
+
+	resp, body := post(t, ts.URL+"/api/sessions/"+id+"/resume", nil)
+	if resp.StatusCode == http.StatusOK {
+		t.Fatalf("resume unexpectedly succeeded: %s", body)
+	}
+	settingsPath := filepath.Join(hooks.Dir(srv.configStore.Home()), "agents", id+".json")
+	if _, err := os.Stat(settingsPath); !os.IsNotExist(err) {
+		t.Fatalf("hook-settings file leaked after failed resume: stat err = %v (%s)", err, settingsPath)
 	}
 }
