@@ -265,6 +265,47 @@ func TestCrashMidTurn(t *testing.T) {
 	}
 }
 
+// Regression (review fix): a peer that ignores session/cancel must not stay busy
+// forever — Cancel escalates to SIGINT on the process group after the grace window
+// (techspec §8.4), which reaps the hung agent (running row removed).
+func TestCancelEscalatesToSIGINT(t *testing.T) {
+	c, spec := newChatTest(t, "ignore_cancel")
+	c.SetCancelGrace(100 * time.Millisecond)
+
+	h, err := c.Start(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if err := c.SendPrompt(context.Background(), h.AgentID, "go"); err != nil {
+		t.Fatalf("SendPrompt: %v", err)
+	}
+
+	// Wait until the turn is active.
+	busy := false
+	for deadline := time.Now().Add(2 * time.Second); time.Now().Before(deadline); {
+		if st, _ := c.store.ReadStatus(h.AgentID); st.State == "busy" {
+			busy = true
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if !busy {
+		t.Fatal("turn never became busy")
+	}
+
+	// The peer ignores session/cancel → Cancel must escalate to SIGINT.
+	if _, err := c.Cancel(context.Background(), h.AgentID); err != nil {
+		t.Fatalf("Cancel: %v", err)
+	}
+	for deadline := time.Now().Add(3 * time.Second); time.Now().Before(deadline); {
+		if _, err := c.store.ReadRunning(h.AgentID); err != nil {
+			return // hung peer reaped by the SIGINT escalation
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("agent still running after cancel; SIGINT escalation did not reach the hung peer")
+}
+
 func TestReconcileStale(t *testing.T) {
 	st, err := state.Open(t.TempDir())
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"syscall"
 	"time"
 )
 
@@ -115,7 +116,8 @@ func (c *ChatRuntime) onPermissionTimeout(as *agentState, toolCallID string) {
 // Cancel interrupts the in-progress turn. Any pending permission is first
 // resolved as cancelled (freeing the agent), then an ACP session/cancel
 // notification is sent (techspec §8.4). When idle it is a no-op and reports
-// false. Never kills the process.
+// false. If the turn was active it also arms a grace-then-SIGINT escalation so a
+// peer that ignores session/cancel does not stay busy until a hard Stop.
 func (c *ChatRuntime) Cancel(ctx context.Context, agentID string) (bool, error) {
 	as, err := c.lookup(agentID)
 	if err != nil {
@@ -138,7 +140,36 @@ func (c *ChatRuntime) Cancel(ctx context.Context, agentID string) (bool, error) 
 	if cancelled {
 		_ = as.transport.Notify("session/cancel", map[string]any{"sessionId": as.sessionID})
 	}
+	if active {
+		c.escalateCancel(as)
+	}
 	return cancelled, nil
+}
+
+// escalateCancel sends SIGINT to the agent's process group if the turn is still
+// active after the cancel grace window — a fallback for an ACP peer that ignores
+// session/cancel (techspec §8.4). It stops short of a hard kill (SIGTERM/SIGKILL);
+// that remains Stop's job. A non-positive grace disables escalation.
+func (c *ChatRuntime) escalateCancel(as *agentState) {
+	grace := c.cancelGrace
+	if grace <= 0 {
+		return
+	}
+	go func() {
+		select {
+		case <-as.ctx.Done():
+			return
+		case <-time.After(grace):
+		}
+		as.mu.Lock()
+		stillBusy := as.turnActive && !as.stopped
+		pgid := as.pgid
+		hasProc := as.cmd != nil && as.cmd.Process != nil
+		as.mu.Unlock()
+		if stillBusy && hasProc && pgid > 0 {
+			_ = syscall.Kill(-pgid, syscall.SIGINT)
+		}
+	}()
 }
 
 // resolvePending answers a withheld permission request and removes it. Returns

@@ -22,6 +22,10 @@ import (
 // stopGrace is how long Stop waits after SIGTERM before SIGKILL (techspec §8.5).
 const stopGrace = 5 * time.Second
 
+// defaultCancelGrace is how long Cancel waits for a peer to honor session/cancel
+// before escalating to SIGINT on the process group (techspec §8.4).
+const defaultCancelGrace = 3 * time.Second
+
 // ChatRuntime drives ACP agents (claude-acp, codex-acp) over the stdio protocol.
 // It owns one agentState per live agent. ALL ACP wire decoding is isolated in
 // acpmap.go; per-backend differences (binary, env strip, resume) live in the
@@ -38,6 +42,8 @@ type ChatRuntime struct {
 	// when the runtime is constructed standalone (tests). See registry.go.
 	onExit func(agentID string)
 
+	cancelGrace time.Duration // Cancel→SIGINT escalation window (§8.4)
+
 	mu     sync.Mutex
 	agents map[string]*agentState
 	sink   func(Event)
@@ -53,10 +59,15 @@ type ChatRuntime struct {
 // via SetCommand (or c.command) — e.g. tests pointing at the fake ACP CLI.
 func NewChatRuntime(s *state.Store) *ChatRuntime {
 	return &ChatRuntime{
-		store:  s,
-		agents: map[string]*agentState{},
+		store:       s,
+		agents:      map[string]*agentState{},
+		cancelGrace: defaultCancelGrace,
 	}
 }
+
+// SetCancelGrace overrides the Cancel→SIGINT escalation window (tests use a short
+// value; a non-positive value disables escalation).
+func (c *ChatRuntime) SetCancelGrace(d time.Duration) { c.cancelGrace = d }
 
 // SetCommand overrides the adapter binary + args for every backend. Used to
 // point at a pinned adapter path (1.6) or, in tests, the fake ACP CLI.
