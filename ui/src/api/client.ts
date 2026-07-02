@@ -34,6 +34,24 @@ export function getTranscript(agentId: string) {
   return json<{ agent_id: string; events: TranscriptEvent[] }>(`/api/sessions/${agentId}/transcript`);
 }
 
+// launchAgent POSTs a new session (techspec §7.1). Used by Clone to spin up a new
+// agent from an existing one's config; the server auto-suggests a name when omitted.
+export function launchAgent(body: {
+  role: string;
+  project: string;
+  backend?: string;
+  model?: string;
+  interface?: string;
+  name?: string;
+  group?: string;
+}) {
+  return json<{ agent: { agent_id: string; name: string } }>("/api/sessions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
 export function renameAgent(agentId: string, name: string) {
   return json<unknown>(`/api/sessions/${agentId}/rename`, {
     method: "POST",

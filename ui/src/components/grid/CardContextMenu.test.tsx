@@ -98,6 +98,45 @@ describe("CardContextMenu error surfacing", () => {
     );
   });
 
+  it("clones an agent by launching a new session with the same config", async () => {
+    let received: Record<string, unknown> | null = null;
+    server.use(
+      http.post("/api/sessions", async ({ request }) => {
+        received = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ agent: { agent_id: "a_2", name: "beta" } }, { status: 201 });
+      }),
+    );
+
+    renderMenu();
+    fireEvent.click(screen.getByRole("button", { name: /^Clone$/i }));
+
+    await waitFor(() => expect(received).not.toBeNull());
+    expect(received).toMatchObject({
+      role: "implementer",
+      project: "my-app",
+      backend: "claude",
+      model: "sonnet",
+      interface: "chat",
+    });
+    // No name is sent so the server auto-suggests a fresh one.
+    expect(received).not.toHaveProperty("name");
+  });
+
+  it("shows an error toast when clone fails", async () => {
+    server.use(
+      http.post("/api/sessions", () =>
+        HttpResponse.json({ error: { code: "internal", message: "project cwd does not exist" } }, { status: 502 }),
+      ),
+    );
+
+    renderMenu();
+    fireEvent.click(screen.getByRole("button", { name: /^Clone$/i }));
+
+    await waitFor(() =>
+      expect(useUiStore.getState().toasts.some((t) => t.type === "error" && t.title === "Clone failed")).toBe(true),
+    );
+  });
+
   it("shows an error toast when move-to-group fails", async () => {
     vi.spyOn(window, "prompt").mockReturnValue("squad");
     server.use(
