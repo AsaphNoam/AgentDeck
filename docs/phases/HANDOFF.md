@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** review fix (terminal PTY broadcast hub, findings 8+9): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, UI 71/71 + `npm run build` + dist refreshed.
+- **Last GREEN checkpoint:** review fix (onboarding BackendStep merge-preserve, finding 10): UI 72/72 + `npm run build` + dist refreshed (all Go checkpoints still green).
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -162,14 +162,6 @@ re-audited review-fix commits: three hold fully (464bbdc, 2c5fefb, 7514349), two
   the frozen-spec invariant (phase-4 techspec; the 6.4 decision claims "system_prompt still
   frozen"). Fix: keep the primer in the one-shot Resume spec only; persist the pre-primer prompt;
   test: after a primer switch, `ReadSession(id).SystemPrompt` contains no primer.
-- **BLOCKING — onboarding BackendStep clobbers the seeded backend and can persist the literal
-  model string "default".** `ui/src/features/onboarding/steps/BackendStep.tsx:32-49` PUTs
-  `{...backends, [id]: NEW single-model backend}`, wholesale-replacing the seeded models map;
-  untouched inputs yield `models:{default:{model:"default"}}`; server validation only checks
-  non-empty and the cred check ignores the model param — onboarding "succeeds" and every later
-  launch on that backend fails. Hits routine first-run AND configured users (any transient
-  cred-check failure re-surfaces the step). No BackendStep submit test exists. Fix: pre-fill from
-  the existing entry, merge-preserve models; test: untouched submit retains seeded models.
 - **BLOCKING — Cancel's SIGINT escalation isn't turn-scoped and can kill the healthy NEXT turn.**
   `internal/runtime/permission.go:153-173`: `escalateCancel` re-checks only `as.turnActive` at fire
   time (no turn generation captured; `turnSeq` exists but is unread here; `SendPrompt` doesn't
@@ -623,6 +615,14 @@ re-audited review-fix commits: three hold fully (464bbdc, 2c5fefb, 7514349), two
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-03 — **review fix: onboarding BackendStep merge-preserve (finding 10) — green.** BLOCKING, confirmed real
+  (reproduced: an untouched submit persisted `models:{default:{model:"default"}}`, wiping the seeded models —
+  every later launch on that backend then fails). `ui/src/features/onboarding/steps/BackendStep.tsx` now pre-fills
+  `modelKey`/`modelName`/`modelStr` from the seeded backend's default model (a `useEffect` keyed on the loaded
+  config), and on submit MERGES `...(seeded.models)` under the one edited key instead of replacing the map (also
+  preserves the seeded `name`/`env`). An untouched submit round-trips the real seeded models, never the "default"
+  placeholder. Test: `BackendStep.test.tsx` — seeded two-model backend, untouched Validate&Continue, asserts the PUT
+  payload retains both seeded models and no `model:"default"`. Green: UI 72/72 + `npm run build` + dist refreshed.
 - 2026-07-03 — **review fix: terminal PTY broadcast hub (findings 8+9, + fd-leak advisory) — green.** BLOCKING×2,
   both confirmed real, ONE architectural fix. New `internal/runtime/terminal/ptyhub.go` `ptyHub`: a per-agent
   broadcast hub with a single always-on reader goroutine that drains the PTY master from launch (not on WS attach)
