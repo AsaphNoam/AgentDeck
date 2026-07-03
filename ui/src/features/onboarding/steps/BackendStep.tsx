@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useBackends, usePutBackends } from "../../../api/config";
 import type { BackendsConfig } from "../../../schemas/backends";
 
@@ -12,12 +12,27 @@ export function BackendStep({ onDone }: BackendStepProps) {
 
   const [type, setType] = useState<"claude-acp" | "codex-acp">("claude-acp");
   const [modelKey, setModelKey] = useState("default");
-  const [modelName] = useState("Default");
+  const [modelName, setModelName] = useState("Default");
   const [modelStr, setModelStr] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [credStatus, setCredStatus] = useState<string | null>(null);
   const [credDetail, setCredDetail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Pre-fill from the seeded backend entry for the selected type (once loaded), so an
+  // untouched submit reuses the seeded default model (name + model string) instead of a
+  // synthesized placeholder.
+  useEffect(() => {
+    if (!existing) return;
+    const backendId = type === "claude-acp" ? "claude" : "codex";
+    const seeded = existing.backends[backendId];
+    const seededModel = seeded?.default_model ? seeded.models[seeded.default_model] : undefined;
+    if (seeded && seeded.default_model && seededModel) {
+      setModelKey(seeded.default_model);
+      setModelName(seededModel.name);
+      setModelStr(seededModel.model);
+    }
+  }, [existing, type]);
 
   // If existing backends already have a default with ok creds shown — just offer to continue.
   // (The wizard calls onDone when the cred check comes back ok.)
@@ -30,20 +45,25 @@ export function BackendStep({ onDone }: BackendStepProps) {
     if (apiKey) env["OPENAI_API_KEY"] = apiKey;
 
     const backends: BackendsConfig["backends"] = existing?.backends ?? {};
-    // Merge or replace the backend in question:
+    const seeded = backends[backendId];
+    // Merge-preserve: keep the seeded backend's full `models` map (and other fields) and
+    // only overlay the one model the user is editing here. This avoids clobbering seeded
+    // models with a synthesized single-model map (which previously could persist the
+    // literal placeholder model string "default" when the form was left untouched).
     const config: BackendsConfig = {
       version: 2,
       backends: {
         ...backends,
         [backendId]: {
-          name: type === "claude-acp" ? "Claude" : "Codex",
+          name: seeded?.name ?? (type === "claude-acp" ? "Claude" : "Codex"),
           type,
           default: true,
           default_model: modelKey,
           models: {
+            ...(seeded?.models ?? {}),
             [modelKey]: { name: modelName, model: modelStr || modelKey, env },
           },
-          env: {},
+          env: seeded?.env ?? {},
         },
       },
     };
