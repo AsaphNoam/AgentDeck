@@ -1065,7 +1065,7 @@ func sessionNewParams(spec LaunchSpec) map[string]any {
 		"cwd":                   spec.Cwd,
 		"mcpServers":            mcp,
 		"model":                 spec.ModelID,
-		"systemPrompt":          spec.SystemPrompt,
+		"systemPrompt":          spec.StartSystemPrompt(),
 		"additionalDirectories": spec.AddDirs,
 	}
 }
@@ -1086,7 +1086,7 @@ func sessionLoadParams(spec LaunchSpec, sessionID string) map[string]any {
 		"cwd":                   spec.Cwd,
 		"mcpServers":            mcp,
 		"model":                 spec.ModelID,
-		"systemPrompt":          spec.SystemPrompt,
+		"systemPrompt":          spec.StartSystemPrompt(),
 		"additionalDirectories": spec.AddDirs,
 	}
 }
