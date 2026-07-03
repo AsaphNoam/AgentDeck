@@ -121,8 +121,9 @@ func TestTerminalLaunchRecordsTTYAndHookStatusFlow(t *testing.T) {
 // Regression (review fix): a WebSocket teardown (tab switch, navigate away — the
 // browser closes the WS on any unmount) must NOT kill the agent. Bridge closes
 // its PTYConn on every teardown; before the fix that closed the agent's live PTY
-// master and SIGHUP'd the CLI. Now Bridge hands out a dup() of the master, so
-// after a full bridge-to-EOF the child is still alive and a second Bridge streams.
+// master and SIGHUP'd the CLI. Now Bridge hands out a hub SUBSCRIBER whose Close
+// only unsubscribes, so after a full bridge-to-EOF the child is still alive and a
+// second Bridge streams.
 func TestBridgeTeardownKeepsPTYAndAgentAlive(t *testing.T) {
 	store, err := state.Open(t.TempDir())
 	if err != nil {

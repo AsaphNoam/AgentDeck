@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import * as Tabs from "@radix-ui/react-tabs";
 import { getTranscript } from "../../api/client";
@@ -12,13 +12,38 @@ import { FilesTab } from "./FilesTab";
 import { CommandsTab } from "./CommandsTab";
 import { TerminalTab } from "./TerminalTab";
 
+// initialTab picks the tab a chat panel opens on. An explicit ?tab= wins; then a
+// terminal-interface agent defaults to its Terminal tab so a WS attaches right
+// after launch and the user sees the live session (the server-side always-on PTY
+// drain already prevents a stall, but a transcript-first default would hide the
+// terminal until the user clicked over). Everything else defaults to transcript.
+export function initialTab(tabParam: string | null, agentInterface?: string): string {
+  if (tabParam === "terminal") return "terminal";
+  if (tabParam) return tabParam;
+  if (agentInterface === "terminal") return "terminal";
+  return "transcript";
+}
+
 export function ChatPanel() {
   const { id = "" } = useParams();
   const [params] = useSearchParams();
   const agent = useAgentStore((state) => state.agents[id]);
   const events = useTranscriptStore((state) => state.byAgent[id] ?? []);
   const setTranscript = useTranscriptStore((state) => state.setTranscript);
-  const [tab, setTab] = useState(params.get("tab") === "terminal" ? "terminal" : "transcript");
+  const [tab, setTab] = useState(() => initialTab(params.get("tab"), agent?.interface));
+
+  // The agent often isn't in the store yet at mount (it hydrates over SSE), so
+  // the useState initializer above can't see its interface. Once it loads, apply
+  // the terminal default exactly once — and never over an explicit ?tab= or a
+  // manual switch the user already made.
+  const appliedDefault = useRef(false);
+  useEffect(() => {
+    if (appliedDefault.current || params.get("tab")) return;
+    if (agent?.interface === "terminal") {
+      appliedDefault.current = true;
+      setTab("terminal");
+    }
+  }, [agent?.interface, params]);
 
   useEffect(() => {
     sseClient.setOpenAgent(id);

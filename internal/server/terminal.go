@@ -43,7 +43,8 @@ func (s *Server) handleTerminalWS(w http.ResponseWriter, r *http.Request) {
 	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
 	if err != nil {
 		s.log.Debug("terminal ws accept failed", "agent", id, "err", err)
-		return // Accept already wrote the failure response
+		_ = conn.Close() // unsubscribe from the hub so the accept-error path leaks no subscriber
+		return           // Accept already wrote the failure response
 	}
 	// Bridge owns the conn for its lifetime and closes it on return.
 	_ = terminal.ServeWS(r.Context(), ws, conn)

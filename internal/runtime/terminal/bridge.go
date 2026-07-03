@@ -5,10 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"os"
 
 	"github.com/coder/websocket"
-	"github.com/creack/pty"
 )
 
 // PTYConn is the bidirectional PTY a WebSocket bridges to the browser (§3.4):
@@ -17,14 +15,6 @@ import (
 type PTYConn interface {
 	io.ReadWriteCloser
 	Resize(rows, cols uint16) error
-}
-
-// ptyMaster adapts a PTY master *os.File to PTYConn: Read/Write/Close come from
-// *os.File; Resize maps {rows,cols} to pty.Setsize (§3.4).
-type ptyMaster struct{ *os.File }
-
-func (m *ptyMaster) Resize(rows, cols uint16) error {
-	return pty.Setsize(m.File, &pty.Winsize{Rows: rows, Cols: cols})
 }
 
 // wsConn is the minimal WebSocket surface the pumps need, so the bridge logic is

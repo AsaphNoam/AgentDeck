@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** review fix (terminal lifecycle trio, findings 7/4/5): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
+- **Last GREEN checkpoint:** review fix (terminal PTY broadcast hub, findings 8+9): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, UI 71/71 + `npm run build` + dist refreshed.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -162,21 +162,6 @@ re-audited review-fix commits: three hold fully (464bbdc, 2c5fefb, 7514349), two
   the frozen-spec invariant (phase-4 techspec; the 6.4 decision claims "system_prompt still
   frozen"). Fix: keep the primer in the one-shot Resume spec only; persist the pre-primer prompt;
   test: after a primer switch, `ReadSession(id).SystemPrompt` contains no primer.
-- **BLOCKING — two terminal viewers split (not mirror) the PTY stream; no second-bridge guard.**
-  `internal/runtime/terminal/terminal.go:233-254` `Bridge` dups the master per WS; `dup()` shares
-  one open-file description so concurrent readers consume disjoint bytes (empirically reproduced:
-  1480/520-line split, zero duplicates); both viewers garbled, keystrokes from both interleave into
-  stdin. Two tabs or a reload overlapping teardown triggers it. Fix: single reader + per-agent
-  broadcast hub, or refuse a second bridge (409); test: double `Bridge` errors, or both readers see
-  identical bytes.
-- **BLOCKING — an unobserved terminal agent blocks on a full tty buffer with zero dashboard
-  symptom.** The only PTY reader is the WS bridge pump (`internal/runtime/terminal/bridge.go:92`);
-  no drain/scrollback exists when no WS is attached — and unattached is the DEFAULT
-  (`ui/src/components/chat/ChatPanel.tsx:21` defaults to the transcript tab; Radix unmounts the
-  terminal tab closing its WS; nothing auto-reveals terminal after launch). Long output fills the
-  kernel tty queue → the CLI stalls indefinitely; hooks may never fire again. Fix: always-on
-  per-agent drain goroutine + bounded scrollback replayed on attach; default the Terminal tab for
-  terminal-interface agents; test: terminal agent writes >64 KB with no bridge → not blocked.
 - **BLOCKING — onboarding BackendStep clobbers the seeded backend and can persist the literal
   model string "default".** `ui/src/features/onboarding/steps/BackendStep.tsx:32-49` PUTs
   `{...backends, [id]: NEW single-model backend}`, wholesale-replacing the seeded models map;
@@ -255,9 +240,6 @@ re-audited review-fix commits: three hold fully (464bbdc, 2c5fefb, 7514349), two
 - **ADVISORY — the inbox endpoint returns the OLDEST N when the mailbox exceeds `limit`**
   (`server/sessions.go:76-83`: ASC LIMIT then reverse). Latent (inbox UI unbuilt). Use
   `ORDER BY created_at DESC LIMIT`.
-- **ADVISORY — dup'd PTY fd leaks when `websocket.Accept` fails after `Bridge()`**
-  (`server/terminal.go:35-47`, no close on the Accept-error path); the leak holds the PTY open
-  kernel-side even after agent stop. One-line fix.
 - **ADVISORY — Settings editors discard structured validation errors.** Roles/Projects/Backends
   `onError` shows `String(e)` → "Error: HTTP 400" though the 400 body names the offending field
   (`ui/src/api/config.ts` `.body` unread outside the DELETE-409 handlers). Same class as the fixed
@@ -358,6 +340,15 @@ re-audited review-fix commits: three hold fully (464bbdc, 2c5fefb, 7514349), two
 
 > Resolved without stopping; the human should still see them. Remove once acknowledged (workflow §3, §5).
 
+- **NEW (review fix, findings 8+9): terminal PTY hub design choices the findings left open.** (1) **Scrollback ring
+  = 256 KiB** per agent (a documented constant) — bounds per-agent memory while covering a screenful+context on
+  attach. (2) **Slow-subscriber overflow = drop-and-close that one subscriber** (per-sub buffer 256 chunks), NOT
+  drop-oldest: a mid-stream byte drop would corrupt the xterm render, so a clean cut + browser reconnect (fresh
+  scrollback replay) is safer, and it keeps the always-on reader non-blocking (load-bearing for Finding 9). (3) **UI
+  default-tab** for terminal agents implemented as a pure `initialTab(tabParam, interface)` lazy `useState` initializer
+  PLUS a one-shot `useRef`-guarded effect that applies the terminal default once the agent hydrates over SSE (the agent
+  often isn't in the store at mount); it never overrides an explicit `?tab=` or a manual switch. **To reverse:** tune
+  the two constants; switch overflow to drop-oldest; or gate the terminal default differently.
 - **NEW (review fix, finding 4): terminal agents are made NON-messageable (excluded from `ResolveRecipient`),
   rather than wiring full terminal messaging.** The finding offered two arms: (a) pass `--mcp-config` to the
   terminal CLI so it gets the `check_messages` tool, or (b) exclude terminal agents from recipient resolution until
@@ -632,6 +623,21 @@ re-audited review-fix commits: three hold fully (464bbdc, 2c5fefb, 7514349), two
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-03 — **review fix: terminal PTY broadcast hub (findings 8+9, + fd-leak advisory) — green.** BLOCKING×2,
+  both confirmed real, ONE architectural fix. New `internal/runtime/terminal/ptyhub.go` `ptyHub`: a per-agent
+  broadcast hub with a single always-on reader goroutine that drains the PTY master from launch (not on WS attach)
+  into a bounded 256 KiB scrollback ring and fans out to N subscribers via NON-blocking sends — replaces the per-WS
+  `dup()` (deleted `dupPTYMaster`/`ptyMaster`). Fixes Finding 9 (unobserved agent no longer stalls on a full tty
+  buffer: reader always drains; a slow subscriber is dropped-and-closed, never blocks the reader) and Finding 8
+  (all viewers now see IDENTICAL bytes — subscribe snapshots scrollback + registers under one lock, no split/dup).
+  `Bridge` now returns a `hubConn` subscriber (scrollback-then-live Read; Write/Resize→shared master; Close only
+  unsubscribes). Hub lifecycle wired into Start/Resume (+failure teardown), Stop, and the crash watcher alongside
+  the existing `closePersistence`; Stop still keeps the sessions row. UI: `ChatPanel` now defaults the active tab to
+  Terminal for terminal-interface agents (`initialTab` pure fn + hydration effect). Also fixed the advisory PTY-fd
+  leak (`server/terminal.go` closes the conn on the `websocket.Accept` error path). Tests:
+  `TestPTYHubBroadcastsIdenticalBytesToAllSubscribers`, `TestPTYHubDrainsWithNoSubscriberThenReplaysScrollback`,
+  `TestPTYHubCloseUnblocksReaderAndSubscribers`, `TestPTYHubDropsSlowSubscriber`, 3 `ChatPanel` initialTab cases.
+  Green: `go build/test`, `-tags sqlite_fts5`, UI 71/71 + `npm run build`, embedded dist refreshed.
 - 2026-07-03 — **review fix: terminal lifecycle trio (findings 7/4/5) — green.** BLOCKING×3, all confirmed real.
   (7) terminal-origin agents now get a `sessions` row + transcript: `terminal.Runtime.SetPersistence`/`openPersistence`
   mirror the chat runtime (wired in `server.go` via a `transcript.Open` adapter + indexer); `Start`/`Resume` open
