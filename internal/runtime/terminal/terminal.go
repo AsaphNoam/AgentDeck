@@ -10,6 +10,7 @@ import (
 
 	rt "github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/creack/pty"
 )
 
 // stopGrace is how long Stop waits after SIGTERM before SIGKILL (techspec §8.5,
@@ -51,10 +52,32 @@ type termAgent struct {
 	agentID string
 	tab     *Tab
 	hub     *rt.Hub
+	ptyHub  *ptyHub             // per-agent PTY broadcast hub (nil for non-PTY drivers, e.g. tmux)
 	writer  rt.TranscriptWriter // durable transcript handle; nil when persistence is off
 
 	mu      sync.Mutex
 	stopped bool
+}
+
+// startPTYHub creates the per-agent PTY broadcast hub over the tab's master and
+// starts its always-on reader. No-op for drivers without a server-side PTY
+// (tmux), where the user attaches directly and there is no master to drain.
+func (a *termAgent) startPTYHub() {
+	if a.tab == nil || a.tab.ptmx == nil {
+		return
+	}
+	master := a.tab.ptmx
+	a.ptyHub = newPTYHub(master, func(rows, cols uint16) error {
+		return pty.Setsize(master, &pty.Winsize{Rows: rows, Cols: cols})
+	})
+}
+
+// closePTYHub stops the always-on PTY reader and closes every subscriber (and the
+// master). No-op for non-PTY drivers. Safe to call multiple times.
+func (a *termAgent) closePTYHub() {
+	if a.ptyHub != nil {
+		a.ptyHub.Close()
+	}
 }
 
 func (a *termAgent) closePersistence() {
@@ -157,11 +180,17 @@ func (r *Runtime) Start(ctx context.Context, spec rt.LaunchSpec) (*rt.Handle, er
 		return nil, err
 	}
 
+	// Start the always-on PTY hub (ptmx drivers only) so the master is drained
+	// from launch — no WS need attach — preventing a full-tty-buffer stall
+	// (Finding 9), and so every viewer sees identical bytes (Finding 8).
+	a.startPTYHub()
+
 	if err := r.store.WriteRunning(state.RunningEntry{
 		AgentID: a.agentID, PID: tab.PGID, SessionID: "", Interface: "terminal",
 		TTY: tab.TTY, Driver: tab.Driver, DriverIDs: tab.IDs,
 		HookToken: spec.HookToken, StartedAt: time.Now().UTC(),
 	}); err != nil {
+		a.closePTYHub()
 		a.closePersistence()
 		_ = r.driver.CloseTab(tab)
 		return nil, fmt.Errorf("terminal: write running: %w", err)
@@ -193,11 +222,16 @@ func (r *Runtime) Resume(ctx context.Context, spec rt.LaunchSpec, sessionID stri
 		return nil, err
 	}
 
+	// Start the always-on PTY hub (ptmx drivers only): drains from launch and
+	// broadcasts to all viewers (Findings 8+9), same as Start.
+	a.startPTYHub()
+
 	if err := r.store.WriteRunning(state.RunningEntry{
 		AgentID: a.agentID, PID: tab.PGID, SessionID: sessionID, Interface: "terminal",
 		TTY: tab.TTY, Driver: tab.Driver, DriverIDs: tab.IDs,
 		HookToken: spec.HookToken, StartedAt: time.Now().UTC(),
 	}); err != nil {
+		a.closePTYHub()
 		a.closePersistence()
 		_ = r.driver.CloseTab(tab)
 		return nil, fmt.Errorf("terminal: write running: %w", err)
@@ -265,6 +299,11 @@ func (r *Runtime) Stop(ctx context.Context, agentID string) error {
 	if !already {
 		r.terminate(a)
 	}
+	// Close the PTY hub (subscribers + master) so the always-on reader exits, then
+	// CloseTab (idempotent on the same master fd). The reader goroutine terminates
+	// on the master close — closePTYHub blocks nothing, but readLoop unblocks and
+	// tears down its subscribers with no leak.
+	a.closePTYHub()
 	_ = r.driver.CloseTab(a.tab)
 	a.closePersistence()
 	_ = r.store.DeleteRunning(agentID)
@@ -337,62 +376,27 @@ func (r *Runtime) Subscribe(agentID string) (<-chan rt.Event, func(), error) {
 // lives in the terminal / persisted log).
 func (r *Runtime) Transcript(agentID string) ([]rt.Event, error) { return nil, nil }
 
-// Bridge returns the PTY backing a terminal agent for the WebSocket handler
-// (§3.4). Returns an error for drivers without a server-side PTY (e.g. tmux,
-// where the user attaches directly).
+// Bridge returns a PTYConn backing a terminal agent for the WebSocket handler
+// (§3.4). It is a SUBSCRIBER of the agent's per-agent PTY hub: its Read replays
+// the current scrollback then the live stream, Write/Resize go to the single
+// shared master, and Close only unsubscribes (never closes the master). Multiple
+// concurrent viewers therefore see identical bytes (Finding 8), and the always-on
+// hub reader keeps draining the master even with no WS attached (Finding 9).
+// Returns an error for drivers without a server-side PTY (e.g. tmux, where the
+// user attaches directly).
 func (r *Runtime) Bridge(agentID string) (PTYConn, error) {
 	a, err := r.lookup(agentID)
 	if err != nil {
 		return nil, err
 	}
-	if a.tab.ptmx == nil {
+	if a.tab.ptmx == nil || a.ptyHub == nil {
 		return nil, fmt.Errorf("terminal: agent %s has no PTY bridge (driver %q)", agentID, a.tab.Driver)
 	}
-	// Hand the WebSocket a dup() of the master, never the master itself. Bridge
-	// closes its PTYConn on every WS teardown — and the browser closes the WS on
-	// any unmount (tab switch, navigate away), not just an intentional stop. If
-	// that closed the agent's live master, the CLI would get SIGHUP and die. A dup
-	// shares the same open file description, so closing the WS's fd leaves the
-	// agent's master open; only Stop/CloseTab closes the real master. It also lets
-	// a reconnect (or a second viewer) get its own fd instead of racing to close
-	// the one master.
-	dup, err := dupPTYMaster(a.tab.ptmx, agentID)
-	if err != nil {
-		return nil, err
-	}
-	return &ptyMaster{dup}, nil
-}
-
-// dupPTYMaster returns a pollable dup of the PTY master. It dups via
-// SyscallConn().Control rather than (*os.File).Fd()+syscall.Dup: Fd() forces the
-// shared open file description into BLOCKING mode, which would leave the returned
-// File's Read uninterruptible by Close and hang the WS pump on teardown. Reading
-// the fd through Control leaves the description non-blocking, so os.NewFile wraps
-// a pollable File whose Close cleanly unblocks the pump — and closing it does not
-// touch the agent's own master fd.
-func dupPTYMaster(f *os.File, agentID string) (*os.File, error) {
-	rc, err := f.SyscallConn()
-	if err != nil {
-		return nil, fmt.Errorf("terminal: pty syscallconn for %s: %w", agentID, err)
-	}
-	var dupFD int
-	var dupErr error
-	if cerr := rc.Control(func(fd uintptr) {
-		dupFD, dupErr = syscall.Dup(int(fd))
-		if dupErr == nil {
-			syscall.CloseOnExec(dupFD)
-			// The dup can come back in blocking mode; force non-blocking so
-			// os.NewFile registers it with the runtime poller and Close can
-			// interrupt a pending pump Read on WS teardown (otherwise it hangs).
-			dupErr = syscall.SetNonblock(dupFD, true)
-		}
-	}); cerr != nil {
-		return nil, fmt.Errorf("terminal: pty control for %s: %w", agentID, cerr)
-	}
-	if dupErr != nil {
-		return nil, fmt.Errorf("terminal: dup pty master for %s: %w", agentID, dupErr)
-	}
-	return os.NewFile(uintptr(dupFD), f.Name()+"-ws"), nil
+	// Subscribe is safe to race with teardown: after Close it returns the final
+	// scrollback and an already-closed channel, so a late Bridge yields a
+	// short-lived read-only conn rather than panicking.
+	snapshot, ch, unsub := a.ptyHub.subscribe()
+	return &hubConn{hub: a.ptyHub, ch: ch, unsub: unsub, pending: snapshot}, nil
 }
 
 // StopAll stops every live terminal agent (server shutdown, §8.5).
@@ -454,6 +458,7 @@ func (r *Runtime) startWatcher(a *termAgent) {
 		a.stopped = true
 		a.mu.Unlock()
 
+		a.closePTYHub()
 		a.closePersistence()
 		_ = r.store.DeleteRunning(a.agentID)
 		r.setDone(a.agentID)
