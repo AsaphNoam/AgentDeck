@@ -45,30 +45,69 @@ func (r *Reader) ReadAll(opts ReadOptions) ([]runtime.Event, error) {
 }
 
 func readAll(rd io.Reader, opts ReadOptions) ([]runtime.Event, error) {
-	sc := bufio.NewScanner(rd)
-	sc.Buffer(make([]byte, 64*1024), maxRecordSize)
+	br := bufio.NewReaderSize(rd, 64*1024)
 	var out []runtime.Event
-	for sc.Scan() {
-		line := append([]byte(nil), sc.Bytes()...)
-		if len(line) == 0 {
-			continue
+	for {
+		line, oversized, err := readLine(br)
+		if !oversized && len(line) > 0 {
+			var ev runtime.Event
+			if json.Unmarshal(line, &ev) == nil {
+				keep := true
+				if !opts.IncludeMeta && (ev.Seq == 0 || ev.Type == runtime.EvSessionMeta) {
+					keep = false
+				}
+				if opts.SinceSeq > 0 && ev.Seq <= opts.SinceSeq {
+					keep = false
+				}
+				if keep {
+					out = append(out, ev)
+				}
+			}
 		}
-		var ev runtime.Event
-		if err := json.Unmarshal(line, &ev); err != nil {
-			continue
+		if err == io.EOF {
+			break
 		}
-		if !opts.IncludeMeta && (ev.Seq == 0 || ev.Type == runtime.EvSessionMeta) {
-			continue
+		if err != nil {
+			return nil, fmt.Errorf("transcript: scan: %w", err)
 		}
-		if opts.SinceSeq > 0 && ev.Seq <= opts.SinceSeq {
-			continue
-		}
-		out = append(out, ev)
-	}
-	if err := sc.Err(); err != nil {
-		return nil, fmt.Errorf("transcript: scan: %w", err)
 	}
 	return out, nil
+}
+
+// readLine reads one newline-terminated record from br. A record whose length
+// exceeds maxRecordSize is skipped: oversized is set true, its bytes are
+// discarded, but the stream is still consumed up to the next newline so the
+// reader stays aligned to the following record. The returned line has any
+// trailing '\n' stripped. err is nil for a normal line, io.EOF at end of
+// stream (possibly with a final unterminated fragment), or a real read error.
+func readLine(br *bufio.Reader) (line []byte, oversized bool, err error) {
+	var buf []byte
+	for {
+		frag, e := br.ReadSlice('\n')
+		if !oversized {
+			if len(buf)+len(frag) > maxRecordSize {
+				oversized = true
+				buf = nil
+			} else {
+				buf = append(buf, frag...)
+			}
+		}
+		if e == bufio.ErrBufferFull {
+			continue
+		}
+		if e != nil {
+			// io.EOF or a real read error terminates this record.
+			return trimNewline(buf), oversized, e
+		}
+		return trimNewline(buf), oversized, nil
+	}
+}
+
+func trimNewline(b []byte) []byte {
+	if n := len(b); n > 0 && b[n-1] == '\n' {
+		return b[:n-1]
+	}
+	return b
 }
 
 func recoverMaxSeq(path string) (maxSeq int64, existed bool, err error) {

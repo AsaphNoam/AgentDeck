@@ -168,6 +168,109 @@ func TestReaderSkipsPartialTrailingAndBadMiddleLine(t *testing.T) {
 	}
 }
 
+// TestOpenTruncatesTornTrailingLine guards the BLOCKING finding that a crash-
+// truncated (torn) partial trailing record used to fuse onto the next Append,
+// producing one permanently unparseable line. After a torn write, reopening via
+// Open must drop the partial bytes so the subsequent Append lands as its own
+// clean record and every complete event is recoverable.
+func TestOpenTruncatesTornTrailingLine(t *testing.T) {
+	home := t.TempDir()
+	w, err := Open(home, "a_test", meta())
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	const k = 3
+	for seq := int64(1); seq <= k; seq++ {
+		if err := w.Append(event(t, seq, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "e"})); err != nil {
+			t.Fatalf("Append seq %d: %v", seq, err)
+		}
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	// Simulate a crash mid-Append: torn partial record with NO trailing '\n'.
+	f, err := os.OpenFile(w.Path(), os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatalf("OpenFile append: %v", err)
+	}
+	if _, err := f.WriteString(`{"agent_id":"a_test","seq":99,"type":"assistant_text","data`); err != nil {
+		t.Fatalf("write torn line: %v", err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatalf("close torn file: %v", err)
+	}
+
+	// Reopen: Open must truncate the torn bytes before append mode.
+	w2, err := Open(home, "a_test", meta())
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	if got := w2.NextSeq(); got != k+1 {
+		t.Fatalf("reopen NextSeq = %d, want %d", got, k+1)
+	}
+	if err := w2.Append(event(t, 0, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "recovered"})); err != nil {
+		t.Fatalf("Append after reopen: %v", err)
+	}
+	if err := w2.Close(); err != nil {
+		t.Fatalf("Close reopen: %v", err)
+	}
+
+	events, err := ReadFile(home, "a_test", ReadOptions{})
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if len(events) != k+1 {
+		t.Fatalf("events len = %d, want %d (all recoverable, no fused line)", len(events), k+1)
+	}
+	for i := range events {
+		if events[i].Seq != int64(i+1) {
+			t.Fatalf("events[%d].Seq = %d, want %d (full=%+v)", i, events[i].Seq, i+1, events)
+		}
+	}
+	var last runtime.AssistantTextData
+	if err := json.Unmarshal(events[k].Data, &last); err != nil {
+		t.Fatalf("unmarshal last event (fused?): %v", err)
+	}
+	if last.Delta != "recovered" {
+		t.Fatalf("last event delta = %q, want recovered", last.Delta)
+	}
+}
+
+// TestOpenLeavesWellFormedLogUntouched ensures a normal log ending in '\n' is
+// not truncated when reopened.
+func TestOpenLeavesWellFormedLogUntouched(t *testing.T) {
+	home := t.TempDir()
+	w, err := Open(home, "a_test", meta())
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	if err := w.Append(event(t, 1, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "one"})); err != nil {
+		t.Fatalf("Append: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	before, err := os.Stat(w.Path())
+	if err != nil {
+		t.Fatalf("stat before: %v", err)
+	}
+	w2, err := Open(home, "a_test", meta())
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	if err := w2.Close(); err != nil {
+		t.Fatalf("close reopen: %v", err)
+	}
+	after, err := os.Stat(w.Path())
+	if err != nil {
+		t.Fatalf("stat after: %v", err)
+	}
+	if before.Size() != after.Size() {
+		t.Fatalf("well-formed log size changed: %d -> %d", before.Size(), after.Size())
+	}
+}
+
 func TestLargeLineRoundTrips(t *testing.T) {
 	home := t.TempDir()
 	w, err := Open(home, "a_test", meta())

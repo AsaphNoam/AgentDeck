@@ -200,6 +200,60 @@ func TestReindexRebuildsFromRawLogs(t *testing.T) {
 	}
 }
 
+// TestReindexIsolatesBadAgent guards the BLOCKING finding that Reindex wiped
+// every agent's index up front and then aborted on the FIRST bad transcript,
+// leaving the archive partially destroyed. A good agent must remain fully
+// reindexed even when another agent's transcript is unreadable, and Reindex
+// must report the skipped agent via a non-nil aggregated error.
+func TestReindexIsolatesBadAgent(t *testing.T) {
+	st, home := openTestDB(t)
+
+	// Good agent: a real, replayable transcript.
+	w, err := transcript.Open(home, "a_index", nil)
+	if err != nil {
+		t.Fatalf("transcript.Open good: %v", err)
+	}
+	for _, e := range fixtureEvents(t) {
+		if err := w.Append(e); err != nil {
+			t.Fatalf("Append seq %d: %v", e.Seq, err)
+		}
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("Close writer: %v", err)
+	}
+
+	// Bad agent: its transcript.ndjson is a directory, so ReadAll fails. This
+	// is the "one bad transcript" that must not abort the whole reindex.
+	badDir := filepath.Join(home, "sessions", "a_bad")
+	if err := os.MkdirAll(filepath.Join(badDir, "transcript.ndjson"), 0o755); err != nil {
+		t.Fatalf("make bad transcript dir: %v", err)
+	}
+
+	err = Reindex(home, st.DB())
+	if err == nil {
+		t.Fatalf("Reindex returned nil, want aggregated error naming skipped agent")
+	}
+	if !strings.Contains(err.Error(), "a_bad") {
+		t.Fatalf("Reindex error = %v, want it to name a_bad", err)
+	}
+
+	// The good agent must still be fully in the index despite the bad one.
+	var agentID string
+	if err := st.DB().QueryRow(`SELECT agent_id FROM sessions WHERE agent_id = 'a_index'`).Scan(&agentID); err != nil {
+		t.Fatalf("good agent missing from sessions after reindex: %v", err)
+	}
+	if agentID != "a_index" {
+		t.Fatalf("sessions agent = %q, want a_index", agentID)
+	}
+	var ftsAgent string
+	if err := st.DB().QueryRow(`SELECT agent_id FROM sessions_fts WHERE content LIKE ?`, `%distinctive quartz%`).Scan(&ftsAgent); err != nil {
+		t.Fatalf("good agent fts content missing after reindex: %v", err)
+	}
+	if ftsAgent != "a_index" {
+		t.Fatalf("fts agent = %q, want a_index", ftsAgent)
+	}
+}
+
 func TestReindexMissingSessionsDirIsNoop(t *testing.T) {
 	st, home := openTestDB(t)
 	if err := os.RemoveAll(filepath.Join(home, "sessions")); err != nil {
