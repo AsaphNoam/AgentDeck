@@ -143,39 +143,261 @@ launch option via capabilities, and refreshed embedded UI. Details in changelog 
 > **This section holds only OPEN findings** — no resolved/dismissed graveyard.
 > Blocking items must be fixed before the next phase starts; advisory items when convenient.
 
-**Source:** second full top-to-bottom project review (2026-07-02) — segmented reviews per phase (0–6 + UI)
-+ a holistic cross-project pass, covering everything implemented through 6.6 including the 2026-07-01
-review fixes (all of which held up under re-inspection). Baseline verified green before review: `go
-build/test` (plain + `-tags sqlite_fts5`), UI 66/66 + `npm run build`.
+**Source:** third full top-to-bottom review (2026-07-03) — 10 segmented reviews (phases 0–6, UI,
+the five 2026-07-02 review-fix commits, cross-cutting concurrency/lifecycle) + 3 adversarial
+verification passes over every BLOCKING candidate (several empirically reproduced) + a holistic
+cross-project synthesis. Baseline verified green first: `go build/test` (plain + `-tags
+sqlite_fts5`), UI 68/68 + `npm run build`. `go test -race` is data-race-clean but exposes a ~2%
+flake in `TestSwitchRuntimeKeepsTargetRegistration` (root-caused; see advisory). Of the five
+re-audited review-fix commits: three hold fully (464bbdc, 2c5fefb, 7514349), two are partial
+(aa6f99c, d6a18cb — see advisories).
 
-_All BLOCKING and ADVISORY findings from the 2026-07-02 review are resolved (see changelog); the
-cross-project guidance below is retained for the Phase 7 lead-in._
+### BLOCKING
 
-### Cross-project observations (2026-07-02 holistic pass — guidance, not findings)
+- **BLOCKING — a >8 MiB transcript line permanently breaks transcript, resume, and reindex.**
+  `internal/transcript/reader.go:47-71` `readAll` aborts wholesale on `bufio.ErrTooLong` instead of
+  skipping the one record (techspec §2.6 promises per-record truncation): `GET …/transcript` 500s
+  forever, `transcript.Open`→`recoverMaxSeq` fails so the agent can never be resumed, and reindex
+  hits the same error. A single big diff/tool_result can exceed 8 MiB in normal coding use.
+  Reproduced: 9 MiB line → 0 events recovered. Fix: skip oversized records; test: events
+  before/after a 9 MiB line → N−1 recovered, `Open` succeeds.
+- **BLOCKING — `agentdeck reindex` wipes ALL agents' index up front, then aborts on the first
+  unreadable transcript.** `internal/index/reindex.go:20-45`: `resetTables` truncates
+  `sessions`/`sessions_fts`/`tracked_*` for every agent before replay; the loop `return`s on the
+  first `ReadAll` error — the documented repair tool leaves the archive partially destroyed (worse
+  than not running it). Compounds with the finding above. Fix: per-agent error isolation
+  (skip+report, continue); test: reindex over one corrupt + one good agent restores the good one.
+- **BLOCKING — reopening a crash-truncated transcript silently loses the next appended event.**
+  `internal/transcript/writer.go:30-54`: `recoverMaxSeq` drops an unparseable partial trailing line
+  but never truncates it; the next `Append` (O_APPEND) byte-fuses onto the dangling bytes → one
+  permanently unparseable line, zero error/log (reproduced). The trigger is routine, not rare:
+  shutdown with a dashboard tab open regularly ends in SIGKILL (see shutdown advisory). Fix:
+  truncate to the last complete line in `Open` (or write a leading `\n`); test: crash-truncated
+  file + Append → all events recoverable.
+- **BLOCKING — terminal agents can be messaged/nudged but can never read messages → paid-turn
+  nudge loop for up to 7 days.** Terminal launch (`internal/runtime/terminal/terminal.go:437-450`
+  `launchArgv`) ignores `LaunchSpec.MCPServers` (no `--mcp-config`), so the CLI has no
+  `check_messages` tool; but recipient resolution has no interface filter and the nudger
+  (`internal/server/messaging_loops.go:40-89`) has no give-up (`inFlight` 60s, clear requires
+  `unread==0`) — one chat→terminal message injects a full prompt into the terminal every ~62s
+  until the 7-day mail TTL (~9,700 wasted turns). Verified independently twice. Fix: pass
+  `--mcp-config` in terminal `launchArgv` (same gated class as `--settings`) or exclude terminal
+  agents from `ResolveRecipient` until wired; test: message a terminal agent → bounded nudges.
+- **BLOCKING — Stop on an agent the registry doesn't own silently deletes the row and orphans the
+  live process.** `internal/runtime/chat.go:349-375` + `internal/runtime/terminal/terminal.go:169-195`:
+  the `!ok` branch does `DeleteRunning` + `return nil`, no signal — contradicts techspec §8.6
+  (no-handle → 404). After any dashboard restart with agents running (`ReconcileStale` intentionally
+  never re-adopts live PIDs), Stop reports success while the CLI/PTY keeps running — invisible and
+  unreachable from the UI thereafter. Fix: in the `!ok` branch read the running row; if `pidAlive`,
+  SIGTERM→SIGKILL `-pid` before deleting (or 404 per spec); test: `WriteRunning` with a live child
+  PID absent from the runtime map → Stop kills or errors, never silently succeeds.
+- **BLOCKING — backend-swap primer is permanently baked into the frozen `sessions.system_prompt`
+  and stacks on every switch.** `internal/server/switch.go:161-167` mutates `spec.SystemPrompt`
+  with the primer; the mutated spec flows to `runtimeMeta`/`openPersistence` → `UpsertSessionMeta`
+  (`internal/index/indexer.go:60`, `system_prompt=excluded`) overwriting the snapshot every future
+  resume/switch reads; a second switch appends another primer (no strip/dedup anywhere). Violates
+  the frozen-spec invariant (phase-4 techspec; the 6.4 decision claims "system_prompt still
+  frozen"). Fix: keep the primer in the one-shot Resume spec only; persist the pre-primer prompt;
+  test: after a primer switch, `ReadSession(id).SystemPrompt` contains no primer.
+- **BLOCKING — terminal-origin agents never get a `sessions` row: invisible in archive,
+  unresumable, and vanish entirely after Stop.** `internal/runtime/terminal/terminal.go:90-140`
+  Start/Resume never call `UpsertSessionMeta`/`transcript.Open`; archive lists `FROM sessions`,
+  resume 422s "no persisted session", and `GET /api/sessions` joins agents+running only — after
+  Stop the agent disappears from every surface (orphaned `agents` row). Violates PRD F9 + phase-6
+  techspec ("archive resume when the target interface is terminal"). Fix: interface-agnostic
+  session-row creation on terminal Start/Resume; test: launch terminal agent → stop → archive row
+  exists, resume works.
+- **BLOCKING — two terminal viewers split (not mirror) the PTY stream; no second-bridge guard.**
+  `internal/runtime/terminal/terminal.go:233-254` `Bridge` dups the master per WS; `dup()` shares
+  one open-file description so concurrent readers consume disjoint bytes (empirically reproduced:
+  1480/520-line split, zero duplicates); both viewers garbled, keystrokes from both interleave into
+  stdin. Two tabs or a reload overlapping teardown triggers it. Fix: single reader + per-agent
+  broadcast hub, or refuse a second bridge (409); test: double `Bridge` errors, or both readers see
+  identical bytes.
+- **BLOCKING — an unobserved terminal agent blocks on a full tty buffer with zero dashboard
+  symptom.** The only PTY reader is the WS bridge pump (`internal/runtime/terminal/bridge.go:92`);
+  no drain/scrollback exists when no WS is attached — and unattached is the DEFAULT
+  (`ui/src/components/chat/ChatPanel.tsx:21` defaults to the transcript tab; Radix unmounts the
+  terminal tab closing its WS; nothing auto-reveals terminal after launch). Long output fills the
+  kernel tty queue → the CLI stalls indefinitely; hooks may never fire again. Fix: always-on
+  per-agent drain goroutine + bounded scrollback replayed on attach; default the Terminal tab for
+  terminal-interface agents; test: terminal agent writes >64 KB with no bridge → not blocked.
+- **BLOCKING — onboarding BackendStep clobbers the seeded backend and can persist the literal
+  model string "default".** `ui/src/features/onboarding/steps/BackendStep.tsx:32-49` PUTs
+  `{...backends, [id]: NEW single-model backend}`, wholesale-replacing the seeded models map;
+  untouched inputs yield `models:{default:{model:"default"}}`; server validation only checks
+  non-empty and the cred check ignores the model param — onboarding "succeeds" and every later
+  launch on that backend fails. Hits routine first-run AND configured users (any transient
+  cred-check failure re-surfaces the step). No BackendStep submit test exists. Fix: pre-fill from
+  the existing entry, merge-preserve models; test: untouched submit retains seeded models.
+- **BLOCKING — Cancel's SIGINT escalation isn't turn-scoped and can kill the healthy NEXT turn.**
+  `internal/runtime/permission.go:153-173`: `escalateCancel` re-checks only `as.turnActive` at fire
+  time (no turn generation captured; `turnSeq` exists but is unread here; `SendPrompt` doesn't
+  disarm). Cancel turn A → peer honors fast → user re-prompts within the 3s grace → SIGINT hits
+  turn B. Fix: capture `armedTurnSeq` at arm, require match at fire; test: fakeacp
+  immediate-cancel-ack + re-prompt inside grace → second turn survives.
+- **BLOCKING — Permission() ignores whether its resolution won the race: fabricated
+  `resolved:true` + conflicting transcript events.** `internal/runtime/permission.go:67-95`
+  discards `resolvePending`'s bool and unconditionally returns success, emits
+  `EvPermissionResolved` with its own decision, and sets busy; `onPermissionTimeout` (98-114) has
+  the same TOCTOU + unconditional emit — racing approve/cancel/timeout can record two conflicting
+  resolutions for one tool call while the ACP peer saw only one. Trigger: double-click approve then
+  cancel, or approve racing the timeout. Fix: check the bool; the loser returns already-resolved
+  and emits nothing; test: race `Permission` vs `Cancel`, assert exactly one resolved event
+  matching the decision that reached fakeacp.
 
-1. **Early-phase fallbacks vs late-phase data:** the 2.2 sweep predates Phase 4's AgentDeck-owned NDJSON
-   transcript, which is how "last transcript line" silently became raw JSON. Re-check fallback paths whenever
-   a later phase changes the data they read.
-2. **Pidfile is a load-bearing cross-cutting contract** (stop/open/CLI port resolution/reindex sole-writer
-   gate) — treat its writers with the same care as state.db.
-3. **Foundation traps (awareness):** hardcoded `latestKnownMigration=6` (`migrate.go`) must be bumped with any
-   v7; SQLite pragmas are per-connection and rely on `SetMaxOpenConns(1)`; `go.mod` lists `creack/pty` +
-   `coder/websocket` under `// indirect` though they're direct (tidy drift).
-4. **Biggest real-world risk is the gated live-CLI surface, not code quality:** `interactiveBinary` map,
-   claude `--resume` form, codex hook names, HTTP-MCP acceptance are all unverified against credentialed CLIs
-   (documented gates). Burn these down before Phase 7 polish.
-5. **Docs sweep before Phase 7:** Clone fell between phase specs; check no other master-PRD promise is
-   similarly unowned.
+### ADVISORY
+
+- **ADVISORY — user's own chat prompts are never persisted; history reads one-sided on every
+  revisit.** No user-prompt `EventType` (`internal/runtime/event.go`); the Composer's `user_text`
+  is client-local; every ChatPanel mount / gap-refetch / archive view drops it; typed text is
+  unsearchable in FTS. Formally in-spec (phase-2 techspec resolved this client-side), but it is the
+  most frequently user-visible defect found — recommend before Phase 7: emit+persist a `user_text`
+  event in `SendPrompt` (and nudge turns).
+- **ADVISORY — crash-path teardown lacks a launch-generation guard (root of a reproducible ~2%
+  test flake).** `teardownAgentRegistration` is keyed by agent_id only (`launch.go:441`, exit hook
+  `server.go:150`) — a late crash teardown for launch N deletes launch N+1's hook-settings/MCP
+  file/token (switch re-registration window, `switch.go:147-180`).
+  `TestSwitchRuntimeKeepsTargetRegistration` fails ~6/300 under `-race -count=300` (switch_test's
+  `cat` + `--settings` ExtraArgs dies instantly, racing the assertions). Fix: generation/epoch tag
+  on artifacts (exit hook no-ops on mismatch) + a flag-tolerant long-lived test command.
+- **ADVISORY — graceful shutdown never completes while a dashboard tab is open → every stop ends
+  in SIGKILL.** SSE handlers never idle (`internal/server/sse.go:47-61`), `srv.Shutdown` doesn't
+  cancel request contexts, and the bus is never closed on shutdown (`server.go:198-211`) → 5s
+  timeout, `dashboard stop` prints "did not exit gracefully" and SIGKILLs. Also makes the
+  crash-truncated-transcript BLOCKING's precondition routine. Fix: close bus subscribers on
+  shutdown (or cancelable BaseContext).
+- **ADVISORY — StopAll ignores ctx; stop grace is serial 5s per agent; the tmux path always sleeps
+  the full 5s** (`internal/runtime/permission.go:210-220`, `chat.go:977-984`,
+  `terminal/terminal.go:396-399`) — multi-agent shutdown overshoots every timeout → SIGKILL +
+  possible orphaned process groups.
+- **ADVISORY — reconcile sweep stomps switched-to-terminal agents' status detail with stale
+  pre-switch chat text.** `internal/server/reconcile.go` derives previews from `transcript.ndjson`
+  with no interface check; `ApplyStaleCorrection` discards `RunningEntry.Interface`
+  (`state/manager.go:176-244`). Self-heals on the next hook. Fix: skip the preview when
+  `interface != "chat"`.
+- **ADVISORY — deleting a role silently flips archived agents to the GLOBAL `skip_permissions` on
+  resume.** The delete in-use guard checks only running agents (`config_handlers.go:215-231`);
+  `resolveSkipForRole` (`launch.go:298-303`) falls back to the global default when the role is
+  missing — a deliberately-cautious (skip=false) role deleted during cleanup makes a later resumed
+  agent auto-approve. Safety-relevant. Fix: include archived references in the 409 guard, or fall
+  back to `skip=false`.
+- **ADVISORY — the nudger has no retry cap or backoff** (`messaging_loops.go:40-89`): any
+  recipient that can't drain unread mail is re-nudged every ~62s indefinitely (bounded only by the
+  mail TTL). Cap per (agent, oldest-unread) or back off exponentially.
+- **ADVISORY — notification edge detection is racy: duplicate or missed done/waiting_input
+  notifications.** `Manager.Touch` skips `writeMu` (`manager.go:82-84`); `PublishStateUpdate`
+  reads prev + writes snapshot under separate lock acquisitions (`bus.go:124-145`); the
+  message-insert sink touching the recipient races its own turn-end touch → double "finished"
+  toasts or a card stuck busy. Fix: read-prev + set-snapshot + publish under one lock; Touch takes
+  `writeMu`.
+- **ADVISORY — terminal nudge injects mid-typing.** `terminal/terminal.go:199-205` writes
+  text+`\n` straight to the PTY without the §5.2 pre-injection idle re-check chat does — can
+  submit a mangled half-typed command. Re-check status just before `WriteText`.
+- **ADVISORY — `budget_exceeded` notifies on every over-limit retry, not first breach**
+  (`state/messages.go:398-422` re-marks breached unconditionally; `messaging/tools.go:143,202`
+  fire the sink each time). Gate on the prior breached flag.
+- **ADVISORY — the inbox endpoint returns the OLDEST N when the mailbox exceeds `limit`**
+  (`server/sessions.go:76-83`: ASC LIMIT then reverse). Latent (inbox UI unbuilt). Use
+  `ORDER BY created_at DESC LIMIT`.
+- **ADVISORY — dup'd PTY fd leaks when `websocket.Accept` fails after `Bridge()`**
+  (`server/terminal.go:35-47`, no close on the Accept-error path); the leak holds the PTY open
+  kernel-side even after agent stop. One-line fix.
+- **ADVISORY — Settings editors discard structured validation errors.** Roles/Projects/Backends
+  `onError` shows `String(e)` → "Error: HTTP 400" though the 400 body names the offending field
+  (`ui/src/api/config.ts` `.body` unread outside the DELETE-409 handlers). Same class as the fixed
+  NewAgentModal gap — generalize it.
+- **ADVISORY — SSE client: notification mutes are silently ignored on deep links** (`sse.ts:97-105`
+  reads config via passive `getQueryData`, populated only on `/` and `/settings` routes) — prefetch
+  config in `main.tsx`. **And transcript refetches race with no ordering token** (gap-refetch,
+  ChatPanel mount, reconnect refetch → last-to-resolve wins, transcript can regress until the next
+  append). Add a per-agent request token or max-seq compare before `setTranscript`.
+- **ADVISORY — archive search UI hardcodes limit 50 / offset 0** (`ArchivePage.tsx:72`) while
+  displaying the true total; matches past 50 are unreachable. Add pagination.
+- **ADVISORY — tmux driver is implemented+tested but unselectable, while `/api/capabilities`
+  advertises `tmux:true`** (no `driver` field in launch/switch API or UI; `DriverAvailable`'s 422
+  is unreachable). Wire a driver field or stop advertising. Related: `config.terminal.max_tabs` /
+  `429 terminal_tab_limit` (techspec §9) is entirely unimplemented and untracked — implement or
+  record as a deviation.
+- **ADVISORY — liveness/identity checks trust bare PIDs.** The pidfile (`cli/pidfile.go:83-95`)
+  and the running-row sweeps (`server/reconcile.go:202-207`, `runtime/reconcile.go:43-50`) use
+  `kill(pid,0)` with no start-time//proc-comm/nonce corroboration → PID reuse can block `start`,
+  mis-target `stop`, or keep dead rows alive. Same primitive gap in both places; compounds with
+  the Stop-orphan BLOCKING.
+- **ADVISORY — `start --detach` residue from aa6f99c:** concurrent double-invocation TOCTOU
+  remains (no flock/O_EXCL; `removePidfile` never verifies the pidfile names its own PID — a
+  losing child can delete the winner's live pidfile), and the 300ms confirm grace is measured from
+  spawn, not bind (slow setup → parent prints "started", child dies after). The re-exec/grace/
+  confirm paths are untested.
+- **ADVISORY — d6a18cb residue: `state/migrate.go:39` is a missed `rows.Err()` sibling** (the
+  schema_migrations scan still checks `rows.Close()`); and `latestKnownMigration=6` is
+  hand-maintained with no guard test tying it to the migrations slice (a future v7 without the
+  bump self-bricks). Add the one-line guard test.
+- **ADVISORY — `emit()` delivery order can invert seq.** `chat.go:704-732`: seq assigned under
+  lock, persist/hub/sink run after unlock; five concurrent emitter classes exist → NDJSON + SSE
+  can carry locally non-monotonic seq (in-memory transcript stays ordered). Widen the critical
+  section or serialize dispatch per agent.
+- **ADVISORY — the reconcile watcher re-reads and re-parses EVERY session's ENTIRE transcript on
+  EVERY `sessions/` fsnotify write, with no debounce** (`server/reconcile.go`) — O(all
+  transcripts) work per streamed append during active multi-agent sessions.
+- **ADVISORY — `PUT /api/backends` cred checks run sequentially, 6s timeout each**
+  (`config_handlers.go:476-485`; UI Save blocks on it) — Settings Save can hang 6s×N with one
+  unreachable backend. Parallelize.
+- **ADVISORY — every chat permission prompt double-notifies** (`permission.go:61-62`:
+  waiting_input status edge + permission_required event always fire together → two stacked
+  toasts; muting one type doesn't suppress its twin). Collapse or make one type authoritative.
+- **ADVISORY — docs/install drift for a fresh user:** README quickstart omits that `install.sh`
+  defaults `INSTALL_ACP=0` (a fresh install cannot launch a chat agent until the adapter is
+  installed) and never lists `jq`/`curl` (required by terminal hooks, which are ON by default for
+  terminal agents); `MAP.md` still says the messaging MCP is stdio (shipped transport is HTTP
+  `/mcp`); `architecture-flow.md`'s diagram shows terminal→bus event parity that doesn't exist.
+
+### Cross-project observations (2026-07-03 holistic pass — guidance, not findings)
+
+1. **Dangerous finding combos** (each half individually confirmed): (a) crash-truncated transcript →
+   user runs `agentdeck reindex` to repair → the tool wipes ALL agents' index then aborts on the corrupt
+   one (less data than before the "repair"); (b) restart-no-re-adoption (intentional) + Stop-no-op →
+   a live agent becomes permanently unkillable/invisible from the product; (c) terminal's gaps stack in
+   one ordinary session: reload splits the stream, walking away blocks the child, stopping erases it
+   from every surface (no sessions row).
+2. **Biggest real-world risk remains the gated live-CLI surface:** `interactiveBinary` map, claude
+   `--resume` form, codex hook names, HTTP-MCP acceptance, and now also whether `session/load` applies
+   `mcpServers` on resume (if the real adapter ignores them, every resumed chat agent silently loses
+   messaging). Burn these down before Phase 7 polish.
+3. **Docs drift accumulates at the seams:** MAP.md (stdio vs shipped HTTP MCP), architecture-flow.md
+   (terminal→bus parity that doesn't exist), README (INSTALL_ACP=0 default, jq/curl prereqs). Fresh-user
+   experience depends on these more than on code quality.
+4. **Foundation traps (still open):** hardcoded `latestKnownMigration=6` needs a guard test; SQLite
+   pragmas are per-connection and rely on `SetMaxOpenConns(1)`; bare-PID liveness (`kill(pid,0)`) is the
+   same unhardened primitive in pidfile + running-row sweeps.
 
 ### Systemic root causes (fix the class, not just the instances)
 
-> Every *instance* below is now fixed-and-green. The deeper class refactors (a single shared `composeSpec`;
-> a fully unified teardown/turn abstraction) were NOT done — the fixes were targeted. Left here as guidance
-> for future work, not as open findings.
+> Updated by the 2026-07-03 review. Classes 1–2 from the previous review are CONFIRMED still generating
+> bugs (new instances found in new code); class 3 has grown into class C below. Fixing instances without
+> the class refactor has now cost three review cycles of repeat findings.
 
-1. **LaunchSpec composition drift** — three independent spec builders (`composeLaunch`, `composeSwitchSpec`, `handleResume`), two sourcing from a *lossy* `SessionSnapshot` that never re-reads role/project. Root of the SkipPerms + AddDirs BLOCKINGs. Fix: one shared `composeSpec(agent, snapshot, overrides)` + make the snapshot store every launch-affecting field.
-2. **Asymmetric create/teardown across the server↔runtime boundary** — registration artifacts (hook token, MCP session/file, hook-settings file) and the PTY master are created on one side and torn down on the other, complete only on explicit HTTP handlers, absent on crash/WS-close. Root of the crash-leak + WS-kills-PTY BLOCKINGs + the stop-handler advisory. Fix: one teardown unit per agent-exit driven by *all* exits; give the PTY a distinct agent-owned master vs per-WS view.
-3. **Turn-boundary abstraction leaks into the terminal runtime** — budget/context_pct/turn markers are chat-only concepts; the terminal runtime shares the state model without the transitions. Root of the budget-lockout BLOCKING. Fix: a runtime-agnostic turn signal that resets per-turn state.
+1. **Compose-from-partial-view, write-back-whole** (was "LaunchSpec composition drift" — now proven to be
+   a project-wide anti-pattern, not a Go-only one): switch.go mutating the spec that gets persisted
+   (primer BLOCKING), BackendStep building a replacement backend from only the fields on screen
+   (onboarding BLOCKING), role/project POST read-then-write. Fix: one shared `composeSpec`, plus a
+   convention that every config/settings write merges against the current persisted object.
+2. **Teardown not scoped to a launch generation** (was "asymmetric create/teardown"): registration
+   artifacts are keyed by agent_id alone, so a stale crash-teardown for launch N can destroy launch N+1's
+   artifacts (root of the ~2% switch-test flake); Stop's `!ok` branch tears down DB state while
+   abandoning the process side (orphan BLOCKING). Fix: generation/epoch tag on artifacts + one idempotent
+   teardown unit driven by every exit path, no-op on generation mismatch.
+3. **Terminal runtime is a second-class citizen of chat-shaped contracts** — the dominant class this
+   review (6 findings, 4 BLOCKING): no persistence contract (no sessions row), no fan-out contract (PTY
+   split), no backpressure contract (child blocks unobserved), no messaging contract (nudge loop), no
+   reconcile awareness (stale chat preview), capabilities that advertise the unreachable (tmux). Fix
+   direction: give terminal first-class equivalents — session-row creation on Start/Resume, a per-agent
+   broadcast hub with a ring buffer instead of raw fd dups, and interface/capability gates in messaging
+   and reconcile.
+4. **Checked-then-acted state transitions without a generation token** (chat runtime): escalateCancel
+   fires on a boolean that a NEW turn re-set (SIGINT BLOCKING); Permission/onPermissionTimeout emit and
+   report success even when a concurrent resolver won (fabricated-resolution BLOCKING). Fix: capture a
+   turn/resolution generation at arm time, require exact match at act time, treat mismatch as superseded.
 
 ## Autonomous decisions (please review)
 
