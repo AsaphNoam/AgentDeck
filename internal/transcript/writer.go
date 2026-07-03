@@ -36,6 +36,13 @@ func Open(home, agentID string, meta *runtime.SessionMetaData) (*Writer, error) 
 		return nil, fmt.Errorf("transcript: mkdir: %w", err)
 	}
 	path := filepath.Join(dir, fileLog)
+	// A crash mid-Append can leave a torn partial record after the last '\n'.
+	// Every complete record ends with '\n', so truncate any trailing bytes
+	// before we open in append mode — otherwise the next Append fuses onto the
+	// partial bytes, producing one permanently unparseable line.
+	if err := truncateToLastNewline(path); err != nil {
+		return nil, err
+	}
 	maxSeq, existed, err := recoverMaxSeq(path)
 	if err != nil {
 		return nil, err
@@ -160,4 +167,61 @@ func (w *Writer) Close() error {
 
 func transcriptPath(home, agentID string) string {
 	return filepath.Join(home, dirSessions, agentID, fileLog)
+}
+
+// truncateToLastNewline removes any trailing bytes after the file's last '\n',
+// which represent a torn write from a crash mid-Append. A well-formed log ends
+// with '\n' and is left untouched. If the file has no '\n' at all, it is
+// truncated to zero. A missing or empty file is a no-op.
+func truncateToLastNewline(path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("transcript: open truncate: %w", err)
+	}
+	defer f.Close()
+
+	fi, err := f.Stat()
+	if err != nil {
+		return fmt.Errorf("transcript: stat truncate: %w", err)
+	}
+	size := fi.Size()
+	if size == 0 {
+		return nil
+	}
+
+	// Scan backward in chunks to find the offset of the last '\n'.
+	const chunk = 64 * 1024
+	buf := make([]byte, chunk)
+	lastNewline := int64(-1)
+	for off := size; off > 0; {
+		readLen := int64(chunk)
+		if off < readLen {
+			readLen = off
+		}
+		start := off - readLen
+		if _, err := f.ReadAt(buf[:readLen], start); err != nil {
+			return fmt.Errorf("transcript: read truncate: %w", err)
+		}
+		for i := int(readLen) - 1; i >= 0; i-- {
+			if buf[i] == '\n' {
+				lastNewline = start + int64(i)
+				break
+			}
+		}
+		if lastNewline >= 0 {
+			break
+		}
+		off = start
+	}
+
+	validLen := lastNewline + 1 // 0 when no '\n' found (lastNewline == -1)
+	if size > validLen {
+		if err := os.Truncate(path, validLen); err != nil {
+			return fmt.Errorf("transcript: truncate: %w", err)
+		}
+	}
+	return nil
 }

@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** review fix (Clone context-menu action wired): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, UI 68/68 + `npm run build`.
+- **Last GREEN checkpoint:** review fix (transcript durability trio, findings 1–3): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -154,26 +154,6 @@ re-audited review-fix commits: three hold fully (464bbdc, 2c5fefb, 7514349), two
 
 ### BLOCKING
 
-- **BLOCKING — a >8 MiB transcript line permanently breaks transcript, resume, and reindex.**
-  `internal/transcript/reader.go:47-71` `readAll` aborts wholesale on `bufio.ErrTooLong` instead of
-  skipping the one record (techspec §2.6 promises per-record truncation): `GET …/transcript` 500s
-  forever, `transcript.Open`→`recoverMaxSeq` fails so the agent can never be resumed, and reindex
-  hits the same error. A single big diff/tool_result can exceed 8 MiB in normal coding use.
-  Reproduced: 9 MiB line → 0 events recovered. Fix: skip oversized records; test: events
-  before/after a 9 MiB line → N−1 recovered, `Open` succeeds.
-- **BLOCKING — `agentdeck reindex` wipes ALL agents' index up front, then aborts on the first
-  unreadable transcript.** `internal/index/reindex.go:20-45`: `resetTables` truncates
-  `sessions`/`sessions_fts`/`tracked_*` for every agent before replay; the loop `return`s on the
-  first `ReadAll` error — the documented repair tool leaves the archive partially destroyed (worse
-  than not running it). Compounds with the finding above. Fix: per-agent error isolation
-  (skip+report, continue); test: reindex over one corrupt + one good agent restores the good one.
-- **BLOCKING — reopening a crash-truncated transcript silently loses the next appended event.**
-  `internal/transcript/writer.go:30-54`: `recoverMaxSeq` drops an unparseable partial trailing line
-  but never truncates it; the next `Append` (O_APPEND) byte-fuses onto the dangling bytes → one
-  permanently unparseable line, zero error/log (reproduced). The trigger is routine, not rare:
-  shutdown with a dashboard tab open regularly ends in SIGKILL (see shutdown advisory). Fix:
-  truncate to the last complete line in `Open` (or write a leading `\n`); test: crash-truncated
-  file + Append → all events recoverable.
 - **BLOCKING — terminal agents can be messaged/nudged but can never read messages → paid-turn
   nudge loop for up to 7 days.** Terminal launch (`internal/runtime/terminal/terminal.go:437-450`
   `launchArgv`) ignores `LaunchSpec.MCPServers` (no `--mcp-config`), so the CLI has no
@@ -666,6 +646,18 @@ re-audited review-fix commits: three hold fully (464bbdc, 2c5fefb, 7514349), two
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-03 — **review fix: transcript durability trio (findings 1–3) — green.** BLOCKING×3, all confirmed real.
+  (1) `transcript/reader.go`: `readAll` replaced the 8 MiB `bufio.Scanner` (which aborted the whole file on
+  `ErrTooLong`) with a `bufio.Reader`+`readLine` loop that SKIPS an oversized record and stays aligned to the
+  next — a big diff/tool_result no longer 500s `/transcript` or bricks resume/reindex. (2) `transcript/writer.go`:
+  new `truncateToLastNewline` runs in `Open` before the O_APPEND, removing a torn trailing partial line so the
+  next `Append` can't byte-fuse onto it (well-formed logs untouched). (3) `index/reindex.go`: per-agent isolation
+  via `reindexAgent` + `errors.Join` — a single unreadable transcript is skipped-and-reported, the good agents
+  stay reindexed (was: wipe-all-then-abort). Tests: `TestReadAllSkipsOversizedRecord`,
+  `TestReadAllOversizedTrailingRecordNoAbort`, `TestReaderRecoversMaxSeqPastOversized`,
+  `TestOpenTruncatesTornTrailingLine`, `TestOpenLeavesWellFormedLogUntouched`, `TestReindexIsolatesBadAgent`.
+  Green: `go build/test`, `-tags sqlite_fts5`. (Note: with 1+3 in place, in-content corruption is now always
+  tolerated per techspec §8.1; the only remaining reindex-abort trigger is an I/O-level failure, which isolation contains.)
 - 2026-07-02 — **review fix: Clone context-menu action wired (was a dead "Available in Phase 3" stub) — green.**
   ADVISORY: `CardContextMenu`'s Clone button was permanently `disabled` with a stale Phase-3 tooltip though Phase 3
   shipped the launch flow. Wired it to `launchAgent(...)` (new `api/client` helper) — a clone launches a new agent with

@@ -3,6 +3,7 @@ package index
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,42 +34,58 @@ func Reindex(home string, db *sql.DB) error {
 		return fmt.Errorf("index: read sessions dir: %w", err)
 	}
 	ix := New(db)
+	var failures []error
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
 		agentID := entry.Name()
-		path := filepath.Join(root, agentID, "transcript.ndjson")
-		events, err := transcript.NewReader(path).ReadAll(transcript.ReadOptions{IncludeMeta: true})
-		if err != nil {
-			return fmt.Errorf("index: replay %s: %w", agentID, err)
+		// Isolate each agent: a bad transcript (unreadable, or an OnEvent/
+		// OnTurnEnd/flush error) is captured and skipped so the remaining
+		// agents are still reindexed rather than leaving the archive wiped.
+		if err := reindexAgent(ix, root, agentID); err != nil {
+			failures = append(failures, err)
 		}
-		var lastSeq int64
-		var lastContext float64
-		var updatedAt string
-		var sawTurnEnd bool
-		for _, ev := range events {
-			if err := ix.OnEvent(agentID, ev); err != nil {
-				return fmt.Errorf("index: event %s seq %d: %w", agentID, ev.Seq, err)
-			}
-			if ev.Seq > lastSeq {
-				lastSeq = ev.Seq
-				updatedAt = ev.Ts
-			}
-			if ev.Type == runtime.EvTurnEnd {
-				var d runtime.TurnEndData
-				_ = json.Unmarshal(ev.Data, &d)
-				lastContext = d.ContextPct
-				sawTurnEnd = true
-				if err := ix.OnTurnEnd(agentID, runtime.TurnRollup{LastSeq: ev.Seq, LastContextPct: d.ContextPct, UpdatedAt: ev.Ts}); err != nil {
-					return fmt.Errorf("index: turn_end %s seq %d: %w", agentID, ev.Seq, err)
-				}
+	}
+	if len(failures) > 0 {
+		return fmt.Errorf("index: reindex skipped %d agent(s): %w", len(failures), errors.Join(failures...))
+	}
+	return nil
+}
+
+// reindexAgent replays one agent's transcript into the index. Any error is
+// returned (not fatal to the whole reindex) so the caller can continue.
+func reindexAgent(ix *Indexer, root, agentID string) error {
+	path := filepath.Join(root, agentID, "transcript.ndjson")
+	events, err := transcript.NewReader(path).ReadAll(transcript.ReadOptions{IncludeMeta: true})
+	if err != nil {
+		return fmt.Errorf("index: replay %s: %w", agentID, err)
+	}
+	var lastSeq int64
+	var lastContext float64
+	var updatedAt string
+	var sawTurnEnd bool
+	for _, ev := range events {
+		if err := ix.OnEvent(agentID, ev); err != nil {
+			return fmt.Errorf("index: event %s seq %d: %w", agentID, ev.Seq, err)
+		}
+		if ev.Seq > lastSeq {
+			lastSeq = ev.Seq
+			updatedAt = ev.Ts
+		}
+		if ev.Type == runtime.EvTurnEnd {
+			var d runtime.TurnEndData
+			_ = json.Unmarshal(ev.Data, &d)
+			lastContext = d.ContextPct
+			sawTurnEnd = true
+			if err := ix.OnTurnEnd(agentID, runtime.TurnRollup{LastSeq: ev.Seq, LastContextPct: d.ContextPct, UpdatedAt: ev.Ts}); err != nil {
+				return fmt.Errorf("index: turn_end %s seq %d: %w", agentID, ev.Seq, err)
 			}
 		}
-		if lastSeq > 0 && updatedAt != "" && !sawTurnEnd {
-			if err := ix.flush(agentID, runtime.TurnRollup{LastSeq: lastSeq, LastContextPct: lastContext, UpdatedAt: updatedAt}, false); err != nil {
-				return fmt.Errorf("index: final flush %s: %w", agentID, err)
-			}
+	}
+	if lastSeq > 0 && updatedAt != "" && !sawTurnEnd {
+		if err := ix.flush(agentID, runtime.TurnRollup{LastSeq: lastSeq, LastContextPct: lastContext, UpdatedAt: updatedAt}, false); err != nil {
+			return fmt.Errorf("index: final flush %s: %w", agentID, err)
 		}
 	}
 	return nil
