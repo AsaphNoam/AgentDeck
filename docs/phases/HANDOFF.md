@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** review fix (onboarding BackendStep merge-preserve, finding 10): UI 72/72 + `npm run build` + dist refreshed (all Go checkpoints still green).
+- **Last GREEN checkpoint:** review fix (switch primer one-shot, finding 6): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -154,14 +154,6 @@ re-audited review-fix commits: three hold fully (464bbdc, 2c5fefb, 7514349), two
 
 ### BLOCKING
 
-- **BLOCKING — backend-swap primer is permanently baked into the frozen `sessions.system_prompt`
-  and stacks on every switch.** `internal/server/switch.go:161-167` mutates `spec.SystemPrompt`
-  with the primer; the mutated spec flows to `runtimeMeta`/`openPersistence` → `UpsertSessionMeta`
-  (`internal/index/indexer.go:60`, `system_prompt=excluded`) overwriting the snapshot every future
-  resume/switch reads; a second switch appends another primer (no strip/dedup anywhere). Violates
-  the frozen-spec invariant (phase-4 techspec; the 6.4 decision claims "system_prompt still
-  frozen"). Fix: keep the primer in the one-shot Resume spec only; persist the pre-primer prompt;
-  test: after a primer switch, `ReadSession(id).SystemPrompt` contains no primer.
 - **BLOCKING — Cancel's SIGINT escalation isn't turn-scoped and can kill the healthy NEXT turn.**
   `internal/runtime/permission.go:153-173`: `escalateCancel` re-checks only `as.turnActive` at fire
   time (no turn generation captured; `turnSeq` exists but is unread here; `SendPrompt` doesn't
@@ -615,6 +607,15 @@ re-audited review-fix commits: three hold fully (464bbdc, 2c5fefb, 7514349), two
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-03 — **review fix: switch primer one-shot (finding 6) — green.** BLOCKING, confirmed real (reproduced: the
+  frozen snapshot absorbed the primer; a second cross-backend switch stacked another). Decoupled "prompt fed to the
+  backend process this launch" from "prompt persisted to the frozen snapshot": new `LaunchSpec.RuntimeSystemPrompt`
+  (one-shot, NOT persisted) + `LaunchSpec.StartSystemPrompt()`; `session/new` + `session/load` params now use
+  `StartSystemPrompt()`, while `runtimeMeta`/`UpsertSessionMeta` still snapshot the pristine `SystemPrompt`. The
+  switch backend-swap path sets `spec.RuntimeSystemPrompt = join(SystemPrompt, primer)` instead of mutating
+  `spec.SystemPrompt`, so `sessions.system_prompt` stays pre-primer and successive switches prime from the clean base
+  (no stacking). Test: `TestSwitchRuntimePrimerKeepsFrozenSystemPrompt` (primer switch → snapshot unchanged; second
+  switch → still no primer). Green: `go build/test`, `-tags sqlite_fts5`.
 - 2026-07-03 — **review fix: onboarding BackendStep merge-preserve (finding 10) — green.** BLOCKING, confirmed real
   (reproduced: an untouched submit persisted `models:{default:{model:"default"}}`, wiping the seeded models —
   every later launch on that backend then fails). `ui/src/features/onboarding/steps/BackendStep.tsx` now pre-fills

@@ -163,7 +163,12 @@ func (s *Server) handleSwitchRuntime(w http.ResponseWriter, r *http.Request) {
 			s.rollbackSwitch(r.Context(), w, agent, prev.SessionID, fmt.Errorf("build history primer: %w", err))
 			return
 		}
-		spec.SystemPrompt = joinSystemPrompt(spec.SystemPrompt, primer)
+		// Feed the primer to the new backend for THIS resume only. spec.SystemPrompt
+		// stays pristine (the frozen snapshot), so persistence (runtimeMeta /
+		// UpsertSessionMeta / session_meta) keeps recording the pre-primer prompt and
+		// a later switch primes from that clean base rather than stacking primer on
+		// primer. RuntimeSystemPrompt is consumed only by the process-start params.
+		spec.RuntimeSystemPrompt = joinSystemPrompt(spec.SystemPrompt, primer)
 	}
 
 	// 4. Persist the new identity (agent_id UNCHANGED) so the resume composes the

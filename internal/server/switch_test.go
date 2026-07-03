@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -177,6 +178,85 @@ func TestSwitchRuntimeBackendSwapUsesPrimer(t *testing.T) {
 	resp, body = post(t, ts.URL+"/api/sessions/"+id+"/prompt", map[string]string{"text": "continue"})
 	if resp.StatusCode != http.StatusAccepted {
 		t.Fatalf("post-switch prompt status = %d: %s", resp.StatusCode, body)
+	}
+}
+
+// Regression (review fix): the backend-swap history primer is a one-shot context
+// injection for the new backend — it must NOT bake into the frozen
+// sessions.system_prompt snapshot, and two successive primer switches must not
+// stack primers (each primes from the clean pre-primer base). Before the fix,
+// switch.go overwrote spec.SystemPrompt with the primer, which flowed to
+// UpsertSessionMeta (system_prompt=excluded) and permanently reframed the frozen
+// snapshot; the next switch then read the already-primed prompt as its base.
+func TestSwitchRuntimePrimerKeepsFrozenSystemPrompt(t *testing.T) {
+	srv, ts := switchTestServer(t)
+	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+
+	// The frozen snapshot at launch: joinSystemPrompt(project.ContextPrompt="",
+	// role "impl".SystemPrompt="be helpful") == "be helpful".
+	original, err := srv.stateStore.ReadSession(id)
+	if err != nil {
+		t.Fatalf("ReadSession(original): %v", err)
+	}
+	if original.SystemPrompt != "be helpful" {
+		t.Fatalf("unexpected original system_prompt: %q", original.SystemPrompt)
+	}
+
+	const primerMark = "AgentDeck backend-switch history primer."
+
+	// Switch #1: claude → codex is a cross-backend swap → primer path.
+	resp, body := post(t, ts.URL+"/api/sessions/"+id+"/switch-runtime", map[string]string{"backend": "codex", "model": "gpt-5.5"})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("switch#1 status = %d: %s", resp.StatusCode, body)
+	}
+	var sr switchRuntimeResponse
+	if err := json.Unmarshal(body, &sr); err != nil {
+		t.Fatalf("switch#1 body: %v", err)
+	}
+	if sr.HistoryHandoff != "primer" {
+		t.Fatalf("switch#1 history_handoff = %q, want primer", sr.HistoryHandoff)
+	}
+
+	// The persisted (frozen) snapshot must be unchanged — no primer text.
+	afterFirst, err := srv.stateStore.ReadSession(id)
+	if err != nil {
+		t.Fatalf("ReadSession(after#1): %v", err)
+	}
+	if afterFirst.SystemPrompt != original.SystemPrompt {
+		t.Fatalf("frozen system_prompt mutated after primer switch:\n got: %q\nwant: %q", afterFirst.SystemPrompt, original.SystemPrompt)
+	}
+	if strings.Contains(afterFirst.SystemPrompt, primerMark) {
+		t.Fatalf("primer text leaked into frozen system_prompt: %q", afterFirst.SystemPrompt)
+	}
+
+	// Switch #2: codex → claude is again cross-backend → primer path. If the frozen
+	// snapshot had absorbed the first primer, this switch would prime primer-on-
+	// primer; with the fix it primes from the clean base and the snapshot stays clean.
+	resp, body = post(t, ts.URL+"/api/sessions/"+id+"/switch-runtime", map[string]string{"backend": "claude", "model": "sonnet-4-6"})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("switch#2 status = %d: %s", resp.StatusCode, body)
+	}
+	if err := json.Unmarshal(body, &sr); err != nil {
+		t.Fatalf("switch#2 body: %v", err)
+	}
+	if sr.HistoryHandoff != "primer" {
+		t.Fatalf("switch#2 history_handoff = %q, want primer", sr.HistoryHandoff)
+	}
+
+	afterSecond, err := srv.stateStore.ReadSession(id)
+	if err != nil {
+		t.Fatalf("ReadSession(after#2): %v", err)
+	}
+	if afterSecond.SystemPrompt != original.SystemPrompt {
+		t.Fatalf("frozen system_prompt mutated after second primer switch:\n got: %q\nwant: %q", afterSecond.SystemPrompt, original.SystemPrompt)
+	}
+	if strings.Contains(afterSecond.SystemPrompt, primerMark) {
+		t.Fatalf("primer text leaked into frozen system_prompt after two switches: %q", afterSecond.SystemPrompt)
+	}
+	// And the primer is never stacked: the base a switch primes from is the frozen
+	// snapshot, so it can carry at most one primer marker — never two.
+	if n := strings.Count(afterSecond.SystemPrompt, primerMark); n != 0 {
+		t.Fatalf("primer marker count in frozen snapshot = %d, want 0", n)
 	}
 }
 
