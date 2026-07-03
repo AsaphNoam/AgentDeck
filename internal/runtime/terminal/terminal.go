@@ -36,6 +36,14 @@ type Runtime struct {
 	agents map[string]*termAgent
 	touch  func(string)
 	onExit func(string)
+
+	// Persistence (mirrors the chat runtime): opening a per-agent transcript and
+	// upserting the sessions row on Start/Resume makes a terminal-origin agent a
+	// first-class citizen of the archive/resume contracts (Finding 7). Nil until
+	// SetPersistence wires them (tests without persistence leave them unset).
+	transcriptHome string
+	openTranscript rt.TranscriptOpener
+	indexer        rt.PersistenceIndexer
 }
 
 // termAgent is the live state for one terminal agent.
@@ -43,9 +51,20 @@ type termAgent struct {
 	agentID string
 	tab     *Tab
 	hub     *rt.Hub
+	writer  rt.TranscriptWriter // durable transcript handle; nil when persistence is off
 
 	mu      sync.Mutex
 	stopped bool
+}
+
+func (a *termAgent) closePersistence() {
+	a.mu.Lock()
+	w := a.writer
+	a.writer = nil
+	a.mu.Unlock()
+	if w != nil {
+		_ = w.Close()
+	}
 }
 
 func (a *termAgent) isStopped() bool {
@@ -85,6 +104,43 @@ func (r *Runtime) SetStateTouch(touch func(string)) { r.touch = touch }
 // disappears outside a Stop (crash teardown), mirroring the chat runtime.
 func (r *Runtime) SetOnExit(fn func(string)) { r.onExit = fn }
 
+// SetPersistence enables durable transcript writes and sessions-row indexing for
+// terminal agents, wired identically to the chat runtime (server layer). Without
+// it a terminal agent produces no sessions row and is invisible to the archive /
+// unresumable (Finding 7).
+func (r *Runtime) SetPersistence(home string, open rt.TranscriptOpener, ix rt.PersistenceIndexer) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.transcriptHome = home
+	r.openTranscript = open
+	r.indexer = ix
+}
+
+// openPersistence opens the per-agent transcript and upserts the sessions row
+// (interface-agnostic, driven off the launch spec). No-op when persistence is
+// unwired. Mirrors ChatRuntime.openPersistence.
+func (r *Runtime) openPersistence(a *termAgent, spec rt.LaunchSpec, sessionID string) error {
+	r.mu.Lock()
+	home := r.transcriptHome
+	open := r.openTranscript
+	ix := r.indexer
+	r.mu.Unlock()
+	if home == "" || open == nil || ix == nil {
+		return nil
+	}
+	meta := rt.NewSessionMeta(spec, sessionID)
+	w, err := open(home, spec.Agent.AgentID, &meta)
+	if err != nil {
+		return fmt.Errorf("terminal: open transcript: %w", err)
+	}
+	if err := ix.UpsertSessionMeta(spec.Agent.AgentID, meta); err != nil {
+		_ = w.Close()
+		return fmt.Errorf("terminal: index session meta: %w", err)
+	}
+	a.writer = w
+	return nil
+}
+
 // Start launches the CLI under the driver, records the running row (tty, driver,
 // driver_ids), and schedules the race-guarded initial idle (§3.1).
 func (r *Runtime) Start(ctx context.Context, spec rt.LaunchSpec) (*rt.Handle, error) {
@@ -94,11 +150,19 @@ func (r *Runtime) Start(ctx context.Context, spec rt.LaunchSpec) (*rt.Handle, er
 	}
 	a := &termAgent{agentID: spec.Agent.AgentID, tab: tab, hub: rt.NewHub()}
 
+	// Open the transcript + upsert the sessions row BEFORE the running row so a
+	// launched terminal agent is a first-class archive/resume citizen (Finding 7).
+	if err := r.openPersistence(a, spec, ""); err != nil {
+		_ = r.driver.CloseTab(tab)
+		return nil, err
+	}
+
 	if err := r.store.WriteRunning(state.RunningEntry{
 		AgentID: a.agentID, PID: tab.PGID, SessionID: "", Interface: "terminal",
 		TTY: tab.TTY, Driver: tab.Driver, DriverIDs: tab.IDs,
 		HookToken: spec.HookToken, StartedAt: time.Now().UTC(),
 	}); err != nil {
+		a.closePersistence()
 		_ = r.driver.CloseTab(tab)
 		return nil, fmt.Errorf("terminal: write running: %w", err)
 	}
@@ -121,11 +185,20 @@ func (r *Runtime) Resume(ctx context.Context, spec rt.LaunchSpec, sessionID stri
 	}
 	a := &termAgent{agentID: spec.Agent.AgentID, tab: tab, hub: rt.NewHub()}
 
+	// Re-open the transcript in append mode and re-upsert the sessions row with the
+	// resumed session_id, mirroring the chat runtime so archive resume of a terminal
+	// agent stays a first-class citizen (Finding 7).
+	if err := r.openPersistence(a, spec, sessionID); err != nil {
+		_ = r.driver.CloseTab(tab)
+		return nil, err
+	}
+
 	if err := r.store.WriteRunning(state.RunningEntry{
 		AgentID: a.agentID, PID: tab.PGID, SessionID: sessionID, Interface: "terminal",
 		TTY: tab.TTY, Driver: tab.Driver, DriverIDs: tab.IDs,
 		HookToken: spec.HookToken, StartedAt: time.Now().UTC(),
 	}); err != nil {
+		a.closePersistence()
 		_ = r.driver.CloseTab(tab)
 		return nil, fmt.Errorf("terminal: write running: %w", err)
 	}
@@ -174,6 +247,12 @@ func (r *Runtime) Stop(ctx context.Context, agentID string) error {
 	}
 	r.mu.Unlock()
 	if !ok {
+		// The registry doesn't own this agent — typically after a dashboard restart,
+		// where ReconcileStale intentionally never re-adopts a still-live PID. Do NOT
+		// silently succeed: if the recorded process group is alive, kill it before
+		// clearing the row, otherwise the PTY/CLI keeps running invisible and
+		// unkillable from the UI (Finding 5).
+		r.reconcileOrphanStop(agentID)
 		_ = r.store.DeleteRunning(agentID)
 		r.touchState(agentID)
 		return nil
@@ -187,11 +266,42 @@ func (r *Runtime) Stop(ctx context.Context, agentID string) error {
 		r.terminate(a)
 	}
 	_ = r.driver.CloseTab(a.tab)
+	a.closePersistence()
 	_ = r.store.DeleteRunning(agentID)
 	r.setDone(agentID)
 	r.touchState(agentID)
 	a.hub.Close()
 	return nil
+}
+
+// reconcileOrphanStop handles a Stop on an agent the in-memory registry no longer
+// owns (e.g. post-restart, where reconcile leaves the live PID un-adopted). If the
+// recorded process group is still alive it is SIGTERM'd, then SIGKILL'd after a
+// short grace, so Stop never reports success while a live child keeps running
+// (Finding 5). No live PID → nothing to kill.
+func (r *Runtime) reconcileOrphanStop(agentID string) {
+	row, err := r.store.ReadRunning(agentID)
+	if err != nil {
+		return // no running row → nothing to reconcile
+	}
+	if row.PID <= 0 || !rt.PidAlive(row.PID) {
+		return
+	}
+	_ = syscall.Kill(-row.PID, syscall.SIGTERM)
+	deadline := time.After(stopGrace)
+	tick := time.NewTicker(50 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		select {
+		case <-deadline:
+			_ = syscall.Kill(-row.PID, syscall.SIGKILL)
+			return
+		case <-tick.C:
+			if !rt.PidAlive(row.PID) {
+				return
+			}
+		}
+	}
 }
 
 // CheckMessages wakes an idle terminal agent by writing a nudge prompt (Phase 5
@@ -344,6 +454,7 @@ func (r *Runtime) startWatcher(a *termAgent) {
 		a.stopped = true
 		a.mu.Unlock()
 
+		a.closePersistence()
 		_ = r.store.DeleteRunning(a.agentID)
 		r.setDone(a.agentID)
 		r.touchState(a.agentID)
