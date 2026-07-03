@@ -127,8 +127,9 @@ type LiveAgent struct {
 	Name       string  `json:"name"`
 	Role       string  `json:"role"`
 	Project    string  `json:"project"`
-	Address    string  `json:"address"` // canonical "role@project"
-	State      string  `json:"state"`   // latest status state, or "unknown"
+	Interface  string  `json:"interface"` // "chat" | "terminal"
+	Address    string  `json:"address"`   // canonical "role@project"
+	State      string  `json:"state"`     // latest status state, or "unknown"
 	Detail     string  `json:"detail"`
 	ContextPct float64 `json:"context_pct"`
 }

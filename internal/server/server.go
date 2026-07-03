@@ -103,6 +103,12 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		// way the chat runtime is wired.
 		term = terminal.New(stateStore)
 		term.SetStateTouch(touch)
+		// Wire durable persistence the same way the chat runtime is wired (above), so
+		// a terminal agent gets a sessions row + transcript on Start/Resume and is a
+		// first-class archive/resume citizen (Finding 7).
+		term.SetPersistence(cfgStore.Home(), func(home, agentID string, meta *runtime.SessionMetaData) (runtime.TranscriptWriter, error) {
+			return transcript.Open(home, agentID, meta)
+		}, ix)
 		registry.SetTerminalRuntime(term)
 	}
 	msg.SetMessageInsertedSink(func(fromAgentID, toAgentID string) {

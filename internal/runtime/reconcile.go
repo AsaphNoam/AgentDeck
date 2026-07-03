@@ -43,6 +43,13 @@ func ReconcileStale(s *state.Store) error {
 // pidAlive reports whether a process group / pid is still alive. signal 0 does no
 // signalling but performs the existence + permission check.
 func pidAlive(pid int) bool {
+	return PidAlive(pid)
+}
+
+// PidAlive reports whether a pid is still alive (signal 0: existence + permission
+// check, no actual signal delivered). Exported so the terminal runtime subpackage
+// can reuse the same liveness check when reconciling an orphaned Stop.
+func PidAlive(pid int) bool {
 	if pid <= 0 {
 		return false
 	}

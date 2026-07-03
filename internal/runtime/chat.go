@@ -355,7 +355,12 @@ func (c *ChatRuntime) Stop(ctx context.Context, agentID string) error {
 	}
 	c.mu.Unlock()
 	if !ok {
-		// Idempotent: ensure no stale rows remain.
+		// The runtime doesn't own this agent — typically after a dashboard restart,
+		// where ReconcileStale intentionally never re-adopts a still-live PID. Don't
+		// silently succeed: if the recorded process group is alive, kill it before
+		// clearing the row, otherwise the CLI keeps running invisible and unkillable
+		// from the UI (Finding 5).
+		c.reconcileOrphanStop(agentID)
 		_ = c.store.DeleteRunning(agentID)
 		c.touchState(agentID)
 		return nil
@@ -376,6 +381,36 @@ func (c *ChatRuntime) Stop(ctx context.Context, agentID string) error {
 	c.touchState(agentID)
 	as.hub.Close()
 	return nil
+}
+
+// reconcileOrphanStop handles a Stop on an agent this runtime no longer owns in
+// memory (e.g. post-restart, where reconcile leaves the live PID un-adopted). If
+// the recorded process group is still alive it is SIGTERM'd, then SIGKILL'd after
+// a short grace, so Stop never reports success while a live child keeps running
+// (Finding 5). No live PID → nothing to kill.
+func (c *ChatRuntime) reconcileOrphanStop(agentID string) {
+	row, err := c.store.ReadRunning(agentID)
+	if err != nil {
+		return // no running row → nothing to reconcile
+	}
+	if row.PID <= 0 || !pidAlive(row.PID) {
+		return
+	}
+	_ = syscall.Kill(-row.PID, syscall.SIGTERM)
+	deadline := time.After(stopGrace)
+	tick := time.NewTicker(50 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		select {
+		case <-deadline:
+			_ = syscall.Kill(-row.PID, syscall.SIGKILL)
+			return
+		case <-tick.C:
+			if !pidAlive(row.PID) {
+				return
+			}
+		}
+	}
 }
 
 func (c *ChatRuntime) Subscribe(agentID string) (<-chan Event, func(), error) {
@@ -796,6 +831,13 @@ func (as *agentState) closePersistence() {
 	if w != nil {
 		_ = w.Close()
 	}
+}
+
+// NewSessionMeta builds the SessionMetaData for a launch/resume. Exported so the
+// terminal runtime (a subpackage) can create the same session_meta the chat
+// runtime does, keeping session-row creation interface-agnostic.
+func NewSessionMeta(spec LaunchSpec, sessionID string) SessionMetaData {
+	return runtimeMeta(spec, sessionID)
 }
 
 func runtimeMeta(spec LaunchSpec, sessionID string) SessionMetaData {

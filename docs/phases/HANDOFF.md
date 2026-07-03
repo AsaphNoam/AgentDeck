@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** review fix (transcript durability trio, findings 1–3): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
+- **Last GREEN checkpoint:** review fix (terminal lifecycle trio, findings 7/4/5): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -154,23 +154,6 @@ re-audited review-fix commits: three hold fully (464bbdc, 2c5fefb, 7514349), two
 
 ### BLOCKING
 
-- **BLOCKING — terminal agents can be messaged/nudged but can never read messages → paid-turn
-  nudge loop for up to 7 days.** Terminal launch (`internal/runtime/terminal/terminal.go:437-450`
-  `launchArgv`) ignores `LaunchSpec.MCPServers` (no `--mcp-config`), so the CLI has no
-  `check_messages` tool; but recipient resolution has no interface filter and the nudger
-  (`internal/server/messaging_loops.go:40-89`) has no give-up (`inFlight` 60s, clear requires
-  `unread==0`) — one chat→terminal message injects a full prompt into the terminal every ~62s
-  until the 7-day mail TTL (~9,700 wasted turns). Verified independently twice. Fix: pass
-  `--mcp-config` in terminal `launchArgv` (same gated class as `--settings`) or exclude terminal
-  agents from `ResolveRecipient` until wired; test: message a terminal agent → bounded nudges.
-- **BLOCKING — Stop on an agent the registry doesn't own silently deletes the row and orphans the
-  live process.** `internal/runtime/chat.go:349-375` + `internal/runtime/terminal/terminal.go:169-195`:
-  the `!ok` branch does `DeleteRunning` + `return nil`, no signal — contradicts techspec §8.6
-  (no-handle → 404). After any dashboard restart with agents running (`ReconcileStale` intentionally
-  never re-adopts live PIDs), Stop reports success while the CLI/PTY keeps running — invisible and
-  unreachable from the UI thereafter. Fix: in the `!ok` branch read the running row; if `pidAlive`,
-  SIGTERM→SIGKILL `-pid` before deleting (or 404 per spec); test: `WriteRunning` with a live child
-  PID absent from the runtime map → Stop kills or errors, never silently succeeds.
 - **BLOCKING — backend-swap primer is permanently baked into the frozen `sessions.system_prompt`
   and stacks on every switch.** `internal/server/switch.go:161-167` mutates `spec.SystemPrompt`
   with the primer; the mutated spec flows to `runtimeMeta`/`openPersistence` → `UpsertSessionMeta`
@@ -179,14 +162,6 @@ re-audited review-fix commits: three hold fully (464bbdc, 2c5fefb, 7514349), two
   the frozen-spec invariant (phase-4 techspec; the 6.4 decision claims "system_prompt still
   frozen"). Fix: keep the primer in the one-shot Resume spec only; persist the pre-primer prompt;
   test: after a primer switch, `ReadSession(id).SystemPrompt` contains no primer.
-- **BLOCKING — terminal-origin agents never get a `sessions` row: invisible in archive,
-  unresumable, and vanish entirely after Stop.** `internal/runtime/terminal/terminal.go:90-140`
-  Start/Resume never call `UpsertSessionMeta`/`transcript.Open`; archive lists `FROM sessions`,
-  resume 422s "no persisted session", and `GET /api/sessions` joins agents+running only — after
-  Stop the agent disappears from every surface (orphaned `agents` row). Violates PRD F9 + phase-6
-  techspec ("archive resume when the target interface is terminal"). Fix: interface-agnostic
-  session-row creation on terminal Start/Resume; test: launch terminal agent → stop → archive row
-  exists, resume works.
 - **BLOCKING — two terminal viewers split (not mirror) the PTY stream; no second-bridge guard.**
   `internal/runtime/terminal/terminal.go:233-254` `Bridge` dups the master per WS; `dup()` shares
   one open-file description so concurrent readers consume disjoint bytes (empirically reproduced:
@@ -383,6 +358,17 @@ re-audited review-fix commits: three hold fully (464bbdc, 2c5fefb, 7514349), two
 
 > Resolved without stopping; the human should still see them. Remove once acknowledged (workflow §3, §5).
 
+- **NEW (review fix, finding 4): terminal agents are made NON-messageable (excluded from `ResolveRecipient`),
+  rather than wiring full terminal messaging.** The finding offered two arms: (a) pass `--mcp-config` to the
+  terminal CLI so it gets the `check_messages` tool, or (b) exclude terminal agents from recipient resolution until
+  wired. I chose (b): a terminal agent now resolves to `ErrRecipientNotFound` by every address form, which
+  definitively stops the paid-turn nudge loop without depending on the unverified `--mcp-config` CLI flag (same gated
+  class as `--settings`) or adding a nudger give-up. **Tradeoff:** terminal agents can no longer receive messages from
+  other agents at all (they still appear in `list_agents`, just can't be mailed) — a real feature reduction vs. wiring
+  arm (a). **Why a judgment call:** arm (a) is the fuller feature but rests on a credential-gated CLI flag AND still
+  needs a nudge give-up (a separate open advisory) to be safe; arm (b) is the robust BLOCKING-closer. **To reverse:**
+  drop the terminal filter in `ResolveRecipient`, pass `--mcp-config` in terminal `launchArgv` (gated), and add the
+  nudger give-up (advisory) so a terminal agent that can't drain mail isn't nudged forever.
 - **NEW (review fix): Clone is a direct clone-launch, not a prefilled NewAgentModal.** The advisory offered two arms —
   (a) open `NewAgentModal` prefilled from the agent's role/project/backend/model, or (b) retitle/de-scope. I did neither
   literally: I wired Clone to POST `/api/sessions` directly with the source agent's config (role/project/backend/model/
@@ -646,6 +632,20 @@ re-audited review-fix commits: three hold fully (464bbdc, 2c5fefb, 7514349), two
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-03 — **review fix: terminal lifecycle trio (findings 7/4/5) — green.** BLOCKING×3, all confirmed real.
+  (7) terminal-origin agents now get a `sessions` row + transcript: `terminal.Runtime.SetPersistence`/`openPersistence`
+  mirror the chat runtime (wired in `server.go` via a `transcript.Open` adapter + indexer); `Start`/`Resume` open
+  persistence before `WriteRunning` (teardown on failure), `Stop` KEEPS the archive row (only `DeleteRunning`), and the
+  crash watcher + failure paths close the writer — terminal agents are now archive-visible and resumable. Exported
+  `runtime.NewSessionMeta`. (5) Stop-on-unowned-agent no longer silently orphans a live process: both `!ok` branches
+  (`chat.go`, `terminal.go`) call `reconcileOrphanStop` — read the running row, and if the recorded pgid is alive
+  SIGTERM→(5s grace)→SIGKILL `-pid` before `DeleteRunning` (kill, not 404, since reconcile never re-adopts live PIDs).
+  Exported `runtime.PidAlive`. (4) terminal nudge-loop closed at the choke point: `ResolveRecipient` now excludes
+  `interface=="terminal"` agents (added `Interface` to `LiveAgent`/`LiveAgents` query) so a terminal agent is never
+  handed mail and the nudger never targets it (terminal agents stay visible in `list_agents`, just unmailable until
+  full terminal messaging is wired). Tests: `TestTerminalStartCreatesSessionRowSurvivingStop`,
+  `TestChatStopKillsOrphanedLiveProcess`, `TestTerminalStopKillsOrphanedLiveProcess`,
+  `TestResolveRecipientExcludesTerminalAgents`. Green: `go build/test`, `-tags sqlite_fts5`.
 - 2026-07-03 — **review fix: transcript durability trio (findings 1–3) — green.** BLOCKING×3, all confirmed real.
   (1) `transcript/reader.go`: `readAll` replaced the 8 MiB `bufio.Scanner` (which aborted the whole file on
   `ErrTooLong`) with a `bufio.Reader`+`readLine` loop that SKIPS an oversized record and stays aligned to the

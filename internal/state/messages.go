@@ -34,7 +34,7 @@ func address(role, project string) string { return role + "@" + project }
 // no status row report state "unknown".
 func (s *Store) LiveAgents() ([]LiveAgent, error) {
 	rows, err := s.db.Query(`
-SELECT a.agent_id, a.name, a.role, a.project,
+SELECT a.agent_id, a.name, a.role, a.project, a.interface,
        COALESCE(st.state, 'unknown'), COALESCE(st.detail, ''), COALESCE(st.context_pct, 0)
 FROM running r
 JOIN agents a ON a.agent_id = r.agent_id
@@ -48,7 +48,7 @@ ORDER BY a.name`)
 	out := []LiveAgent{}
 	for rows.Next() {
 		var la LiveAgent
-		if err := rows.Scan(&la.AgentID, &la.Name, &la.Role, &la.Project, &la.State, &la.Detail, &la.ContextPct); err != nil {
+		if err := rows.Scan(&la.AgentID, &la.Name, &la.Role, &la.Project, &la.Interface, &la.State, &la.Detail, &la.ContextPct); err != nil {
 			return nil, fmt.Errorf("state: scan live agent: %w", err)
 		}
 		la.Address = address(la.Role, la.Project)
@@ -62,17 +62,28 @@ ORDER BY a.name`)
 
 // ResolveRecipient resolves a `to` string to a single live agent_id following
 // the techspec §3.4 order (exact agent_id, then role@project, then
-// case-insensitive name). Only live agents are considered. On more than one
-// match it returns an *AmbiguousError (wrapping ErrAmbiguousRecipient); on no
-// match, ErrRecipientNotFound.
+// case-insensitive name). Only live NON-terminal agents are considered as
+// recipients: a terminal agent has no check_messages tool wired, so delivering to
+// it would spin the nudger indefinitely (up to the 7-day mail TTL) without the
+// agent ever draining its mailbox (Finding 4). Excluding it here stops both
+// delivery and the nudge loop (the nudger only fires when unread > 0). On more
+// than one match it returns an *AmbiguousError (wrapping ErrAmbiguousRecipient);
+// on no match, ErrRecipientNotFound.
 func (s *Store) ResolveRecipient(to string) (string, []AgentRef, error) {
 	to = strings.TrimSpace(to)
 	if to == "" {
 		return "", nil, ErrRecipientNotFound
 	}
-	live, err := s.LiveAgents()
+	all, err := s.LiveAgents()
 	if err != nil {
 		return "", nil, err
+	}
+	live := make([]LiveAgent, 0, len(all))
+	for _, a := range all {
+		if a.Interface == "terminal" {
+			continue // terminal agents cannot receive mail (see doc above)
+		}
+		live = append(live, a)
 	}
 
 	// 1. Exact agent_id.

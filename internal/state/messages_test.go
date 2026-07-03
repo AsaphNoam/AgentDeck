@@ -24,6 +24,39 @@ func liveAgent(t *testing.T, st *Store, id, name, role, project string) {
 	}
 }
 
+// liveTerminalAgent writes an agent + running row with interface "terminal".
+func liveTerminalAgent(t *testing.T, st *Store, id, name, role, project string) {
+	t.Helper()
+	a := Agent{
+		AgentID: id, Name: name, Role: role, Project: project,
+		Backend: "claude", Model: "sonnet", Interface: "terminal",
+		CreatedAt: time.Now().UTC(),
+	}
+	if err := st.WriteAgent(a); err != nil {
+		t.Fatalf("WriteAgent %s: %v", id, err)
+	}
+	if err := st.WriteRunning(RunningEntry{
+		AgentID: id, PID: 200, SessionID: "s_" + id, Interface: "terminal", Driver: "xterm", StartedAt: time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("WriteRunning %s: %v", id, err)
+	}
+}
+
+// Finding 4 regression: a terminal-interface agent has no check_messages tool, so
+// delivering mail to it would spin the nudger indefinitely (up to the 7-day mail
+// TTL). ResolveRecipient must therefore never select a terminal agent as a
+// recipient, by any address form — stopping both delivery and the nudge loop.
+func TestResolveRecipientExcludesTerminalAgents(t *testing.T) {
+	st, _ := newTestStore(t)
+	liveTerminalAgent(t, st, "a_term1", "Zephyr", "runner", "my-app")
+
+	for _, to := range []string{"a_term1", "runner@my-app", "zephyr"} {
+		if id, _, err := st.ResolveRecipient(to); !errors.Is(err, ErrRecipientNotFound) {
+			t.Fatalf("ResolveRecipient(%q) = %q,%v want ErrRecipientNotFound (terminal agents must not receive mail)", to, id, err)
+		}
+	}
+}
+
 func TestResolveRecipient(t *testing.T) {
 	st, _ := newTestStore(t)
 	liveAgent(t, st, "a_impl1", "Atlas", "implementer", "my-app")
