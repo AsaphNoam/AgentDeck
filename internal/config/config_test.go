@@ -332,8 +332,8 @@ func TestSeedIfAbsentNoClobber(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListRoles: %v", err)
 	}
-	if len(roles) != 4 {
-		t.Fatalf("seeded roles = %d, want 4", len(roles))
+	if len(roles) != 5 {
+		t.Fatalf("seeded roles = %d, want 5", len(roles))
 	}
 	if _, err := s.ReadProject("my-app"); err != nil {
 		t.Fatalf("seeded project: %v", err)
