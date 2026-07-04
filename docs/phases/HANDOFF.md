@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** review fix (permission resolution race, finding 1): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
+- **Last GREEN checkpoint:** review fix (onboarding backend validation race, finding 3): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, `cd ui && npm run build`.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -162,14 +162,6 @@ in current code (`permission.go` captures `turnSeq`); the permission-resolution 
   agents can survive indefinitely. Fix: treat every `onopen` after an error as a fresh hydration
   generation/liveness boundary; tests: fake auto-reconnect after >25s and reconnect before
   `hydrated`, asserting the stream survives and removed agents are pruned.
-- **BLOCKING — Onboarding backend validation can overwrite seeded backends with placeholder
-  model data.** `ui/src/features/onboarding/steps/BackendStep.tsx:22-35,40-76,143-145`: the
-  Validate button is enabled while `useBackends()` is still undefined; a fast click composes from
-  `{}` with `modelKey="default"` and `modelStr=""`, then `PUT`s a replacement backend document
-  containing the literal placeholder model. This defeats the merge-preserve review fix and can
-  destroy the seeded model map on a fresh install. Fix: disable validation until the backend query
-  has loaded/prefilled, or compose only from the fetched document; test: delay `GET /api/backends`,
-  click immediately, and assert no placeholder payload is sent.
 - **BLOCKING — Terminal backend swaps report `history_handoff:"primer"` but drop the primer.**
   `internal/server/switch.go:160-172` stores the bounded history primer in
   `spec.RuntimeSystemPrompt`, but `internal/runtime/terminal/terminal.go:537-565` builds terminal
@@ -628,6 +620,14 @@ in current code (`permission.go` captures `turnSeq`); the permission-resolution 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-04 — **review fix: onboarding backend validation race (finding 3) — green.** BLOCKING,
+  confirmed real: the onboarding Validate button stayed enabled while `/api/backends` was still
+  loading, so an immediate click could still compose from placeholder state before the seeded
+  backend document arrived. `BackendStep` now gates validation on the backend query being loaded,
+  reuses the loaded seeded backend identity in the submit path, and adds a delayed-load regression
+  test proving the button stays disabled and no premature PUT is sent before prefill completes.
+  Regression coverage: `BackendStep.test.tsx` delayed-load case + existing merge-preserve case.
+  Green: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, `cd ui && npm run build`.
 - 2026-07-04 — **review fix: permission resolution race (finding 1) — green.** BLOCKING,
   confirmed real: `Permission()` and `onPermissionTimeout()` each loaded the pending request before
   deleting it, so concurrent approve/deny/cancel/timeout paths could both believe they won and emit
