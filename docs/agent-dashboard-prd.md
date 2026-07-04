@@ -92,7 +92,7 @@ A reusable persona: system prompt + display metadata + permission policy. Define
   "skip_permissions": null         // null = inherit global; true/false = override
 }
 ```
-Seed roles to ship: `agentdecker` (a built-in AgentDeck guide/orchestrator persona), `implementer`, `reviewer`, `researcher`, `pm`.
+Seed roles to ship: `agentdecker` (a built-in AgentDeck guide/orchestrator persona), `implementer`, `reviewer`, `researcher`, `pm`, `teammate` (a messaging-fluent worker for multi-agent runs).
 
 ### 3.3 Project
 A reusable workspace: working directory + injected context + extra dirs + display metadata. Defines *where* and *on what* an agent works.
