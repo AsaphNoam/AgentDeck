@@ -70,25 +70,26 @@ func (c *ChatRuntime) Permission(ctx context.Context, agentID, toolCallID, decis
 		return err
 	}
 
-	as.mu.Lock()
-	p, ok := as.pending[toolCallID]
-	as.mu.Unlock()
-	if !ok {
-		return ErrNoPendingPermission
+	p, err := c.takePending(as, toolCallID)
+	if err != nil {
+		return err
 	}
 
 	optID, ok := selectOption(p.optByKind, decision)
 	if !ok {
 		// Either an invalid decision or the adapter offered no usable option.
 		if decision != "approve" && decision != "deny" {
+			c.restorePending(as, toolCallID, p)
 			return ErrInvalidDecision
 		}
-		c.resolvePending(as, toolCallID, "cancelled", "")
+		p.resolve("cancelled", "")
+		c.markResolved(as, toolCallID)
 		c.emit(as, EvError, ErrorData{Scope: "tool", Message: "adapter offered no usable permission option"})
 		return nil
 	}
 
-	c.resolvePending(as, toolCallID, "selected", optID)
+	p.resolve("selected", optID)
+	c.markResolved(as, toolCallID)
 	c.emit(as, EvPermissionResolved, PermissionResolvedData{ToolCallID: toolCallID, Decision: decision})
 	c.updateStatus(as, "busy", "thinking", "PermissionResolved", keepBusySince)
 	return nil
@@ -96,18 +97,17 @@ func (c *ChatRuntime) Permission(ctx context.Context, agentID, toolCallID, decis
 
 // onPermissionTimeout auto-denies a request that was never decided (techspec §5.4).
 func (c *ChatRuntime) onPermissionTimeout(as *agentState, toolCallID string) {
-	as.mu.Lock()
-	p, ok := as.pending[toolCallID]
-	as.mu.Unlock()
-	if !ok {
+	p, err := c.takePending(as, toolCallID)
+	if err != nil {
 		return
 	}
 	optID, found := selectOption(p.optByKind, "deny")
 	if found {
-		c.resolvePending(as, toolCallID, "selected", optID)
+		p.resolve("selected", optID)
 	} else {
-		c.resolvePending(as, toolCallID, "cancelled", "")
+		p.resolve("cancelled", "")
 	}
+	c.markResolved(as, toolCallID)
 	c.emit(as, EvPermissionResolved, PermissionResolvedData{ToolCallID: toolCallID, Decision: "timeout"})
 	c.emit(as, EvError, ErrorData{Scope: "tool", Message: "permission timed out"})
 	c.updateStatus(as, "busy", "thinking", "PermissionResolved", keepBusySince)
@@ -184,24 +184,56 @@ func (c *ChatRuntime) escalateCancel(as *agentState, armedTurn int64) {
 // resolvePending answers a withheld permission request and removes it. Returns
 // false if no such pending request remains.
 func (c *ChatRuntime) resolvePending(as *agentState, toolCallID, outcome, optionID string) bool {
+	p, err := c.takePending(as, toolCallID)
+	if err != nil {
+		return false
+	}
+	p.resolve(outcome, optionID)
+	c.markResolved(as, toolCallID)
+	return true
+}
+
+func (c *ChatRuntime) takePending(as *agentState, toolCallID string) (*pendingPerm, error) {
 	as.mu.Lock()
+	defer as.mu.Unlock()
 	p, ok := as.pending[toolCallID]
 	if ok {
 		delete(as.pending, toolCallID)
+		return p, nil
 	}
-	as.mu.Unlock()
-	if !ok {
-		return false
+	if _, resolved := as.resolved[toolCallID]; resolved {
+		return nil, ErrPermissionAlreadyResolved
 	}
+	return nil, ErrNoPendingPermission
+}
+
+func (c *ChatRuntime) restorePending(as *agentState, toolCallID string, p *pendingPerm) {
+	as.mu.Lock()
+	defer as.mu.Unlock()
+	if _, exists := as.pending[toolCallID]; exists {
+		return
+	}
+	as.pending[toolCallID] = p
+}
+
+func (c *ChatRuntime) markResolved(as *agentState, toolCallID string) {
+	as.mu.Lock()
+	defer as.mu.Unlock()
+	if as.resolved == nil {
+		as.resolved = map[string]struct{}{}
+	}
+	as.resolved[toolCallID] = struct{}{}
+}
+
+func (p *pendingPerm) resolve(outcome, optionID string) {
 	if p.timer != nil {
 		p.timer.Stop()
 	}
 	if outcome == "selected" {
 		_ = p.req.Respond(selectedOutcome(optionID))
-	} else {
-		_ = p.req.Respond(cancelledOutcome())
+		return
 	}
-	return true
+	_ = p.req.Respond(cancelledOutcome())
 }
 
 func selectedOutcome(optionID string) json.RawMessage {

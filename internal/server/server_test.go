@@ -204,6 +204,16 @@ func TestPutLayoutValidatesAndPersists(t *testing.T) {
 	}
 }
 
+func TestPermissionErrorAlreadyResolved(t *testing.T) {
+	got := permissionError(runtime.ErrPermissionAlreadyResolved)
+	if got.Code != runtime.CodeConflict {
+		t.Fatalf("permissionError code = %q, want %q", got.Code, runtime.CodeConflict)
+	}
+	if got.Message != "permission already resolved for that tool_call_id" {
+		t.Fatalf("permissionError message = %q", got.Message)
+	}
+}
+
 func TestRenameSession(t *testing.T) {
 	srv := testServer(t, true)
 	agentID := seedHookAgent(t, srv)

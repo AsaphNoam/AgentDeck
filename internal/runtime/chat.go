@@ -158,6 +158,7 @@ type agentState struct {
 	turnActive bool
 	toolNames  map[string]string       // toolCallID -> normalized name (for status detail)
 	pending    map[string]*pendingPerm // toolCallID -> withheld permission request
+	resolved   map[string]struct{}     // toolCallIDs already settled this turn
 	transcript []Event
 	writer     TranscriptWriter
 	stopped    bool
@@ -209,6 +210,7 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 		skipPerms: spec.SkipPerms,
 		toolNames: map[string]string{},
 		pending:   map[string]*pendingPerm{},
+		resolved:  map[string]struct{}{},
 	}
 	as.transport = NewTransport(stdin,
 		func(method string, params json.RawMessage) { c.onNotification(as, method, params) },
@@ -289,6 +291,7 @@ func (c *ChatRuntime) SendPrompt(ctx context.Context, agentID, text string) erro
 		return ErrTurnInFlight
 	}
 	as.turnActive = true
+	as.resolved = map[string]struct{}{}
 	turnID := as.nextTurnIDLocked()
 	as.mu.Unlock()
 	if err := c.store.ResetTurnBudget(as.agentID, turnID); err != nil {
@@ -477,6 +480,7 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 		skipPerms:  spec.SkipPerms,
 		toolNames:  map[string]string{},
 		pending:    map[string]*pendingPerm{},
+		resolved:   map[string]struct{}{},
 		contextPct: spec.LastContextPct,
 	}
 	as.transport = NewTransport(stdin,

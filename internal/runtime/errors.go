@@ -18,6 +18,9 @@ var (
 	ErrTurnInFlight = errors.New("runtime: a turn is already in flight")
 	// ErrNoPendingPermission: no pending permission for the given tool_call_id.
 	ErrNoPendingPermission = errors.New("runtime: no pending permission request")
+	// ErrPermissionAlreadyResolved: a concurrent approve/deny/cancel/timeout
+	// already settled this permission request before the caller won the race.
+	ErrPermissionAlreadyResolved = errors.New("runtime: permission request already resolved")
 	// ErrInvalidDecision: a permission decision other than approve/deny.
 	ErrInvalidDecision = errors.New("runtime: invalid permission decision")
 	// ErrProtocolVersion: the adapter negotiated an ACP protocol version outside
