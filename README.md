@@ -86,6 +86,23 @@ sessions/{id}/        transcript history
 `AGENTDECK_HOME` overrides `~/.agentdeck/` (used by tests/CI).
 `AGENTDECK_LOG_LEVEL` sets the slog level (`debug|info|warn|error`, default `info`).
 
+### Seeded roles
+
+Seeding is per-file and if-absent: new roles appear on the next `dashboard start`,
+and your edits to existing ones are never overwritten. Edit them in Settings or
+directly in `roles/{role}.json`.
+
+- **`agentdecker`** — built-in AgentDeck expert. Ask it how anything works
+  (launch syntax, config files, switch-runtime, archive, messaging), or hand it
+  a goal: it can launch other agents via the `agentdeck` CLI and coordinate
+  them over MCP messaging.
+- **`implementer` / `reviewer` / `researcher` / `pm`** — the classic worker
+  archetypes: ship focused changes with tests, review diffs, investigate before
+  acting, break down and track work.
+- **`teammate`** — a worker built for multi-agent runs: checks its MCP mail on
+  wake, treats coordinator messages as its task queue, and reports outcomes
+  back. Pair it with `pm` or `agentdecker` as the coordinator.
+
 ## HTTP API (`127.0.0.1:{port}`)
 
 All routes are loopback-only and unauthenticated. Full surface in

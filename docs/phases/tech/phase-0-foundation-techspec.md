@@ -487,7 +487,7 @@ Seed set:
     }
   }
   ```
-- `roles/{implementer,reviewer,researcher,pm}.json` (each if absent):
+- `roles/{implementer,reviewer,researcher,pm}.json` (each if absent). *(Post-Phase-0 note: the seed set later grew to six roles — `agentdecker` and `teammate` were added, and the four prompts below were expanded into full personas; `internal/config/seed.go` and PRD §3.2 are current. The Phase 0 shapes below are kept as the original spec.)*
   - `implementer` → `{ "title":"Implementer", "system_prompt":"Implement the requested changes carefully; write tests; keep diffs focused.", "skip_permissions": null }`
   - `reviewer` → `{ "title":"Reviewer", "system_prompt":"Review changes for correctness, edge cases, and consistency.", "skip_permissions": null }`
   - `researcher` → `{ "title":"Researcher", "system_prompt":"Investigate and summarize; gather context before proposing actions.", "skip_permissions": null }`
