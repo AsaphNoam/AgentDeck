@@ -134,13 +134,7 @@ Commits are the recovery anchor across spaced sessions, so the work survives a h
 - **Commit directly to `main`.** This repo is trunk-based: no per-phase branches, no PRs. Each GREEN
   checkpoint is a commit on `main` — that's the recovery anchor. (Only commit on a red checkpoint never.)
 - At each GREEN checkpoint, commit the code **and** the updated `HANDOFF.md` together.
-- Message: `phase N.M: <subphase title> — green checkpoint`. End the body with:
-
-  ```
-  Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
-  ```
-
-  (Codex: use your own co-author trailer.)
+- Message: `phase N.M: <subphase title> — green checkpoint`.
 - **Pushing** is a STOP-style action — don't push unless the human has asked for it.
 
 ---
@@ -254,8 +248,7 @@ record it under `## Blocked on human`, and move to the next finding.
 
 **RECORD.** When green, **delete the finding's bullet** and add a one-line changelog entry
 (`review fix: <title> — <fix + the test that covers it>`). Commit code + `HANDOFF.md` together on
-`main`, message `review fix: <short title> — green checkpoint`, with the
-`Co-Authored-By: Claude Opus 4.8` trailer. Then take the next finding.
+`main` with message `review fix: <short title> — green checkpoint`. Then take the next finding.
 
 ### Carry over the same discipline
 

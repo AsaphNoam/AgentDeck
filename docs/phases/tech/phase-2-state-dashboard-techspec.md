@@ -78,7 +78,7 @@ Stubbed items render as disabled menu rows with a tooltip, **not** hidden — th
 
 ### 1.4 Explicitly out of scope
 
-Config-editing UI (Phase 3), launch modal (Phase 3 — Phase 2 ships only a minimal "New Agent" trigger that calls `POST /api/sessions` with defaults), archive/search/resume (Phase 4), message indicators (Phase 5), task-group collapsible sections (Phase 6), activity map (Phase 7).
+Config-editing UI (Phase 3), launch modal (Phase 3 — Phase 2 ships only a minimal "New Agent" trigger that calls `POST /api/sessions` with defaults), archive/search/resume (Phase 4), message indicators (Phase 5), task-group collapsible sections (Phase 6), future-phase candidates such as the activity map.
 
 ---
 
@@ -889,7 +889,7 @@ Every subphase ends at a GREEN checkpoint — `go build ./...` passes (and `npm 
 - **Phase 4 (persistence/archive):** adds REST archive/search/resume over `state.db` (FTS5 full-text index); `GET /api/sessions/{id}/transcript` (added here, in-memory) is upgraded to read persisted history; resume produces normal `state_update`/`new_message` flow — no bus change.
 - **Phase 5 (coordination/notifications):** emits `notification` events (type + payload pinned in §8.2) and message indicators via `state_update` (e.g. a future `has_messages` field on `AgentState`). The in-process messaging MCP server reads/writes `state.db`; the Nudger does not touch the bus directly; status changes flow through the state manager.
 - **Phase 6 (terminal runtime / switch-runtime / groups):** enables the **stubbed** menu items (Switch runtime, Move to group); F2 group sections extend `CardGrid` (the `AgentState.group` field already rides the envelope). Switch-runtime re-launch surfaces as ordinary `state_update`s.
-- **Phase 7 (activity map):** pure consumer of existing `state_update` + `new_message` — no new server data.
+- **Future activity-map candidate:** pure consumer of existing `state_update` + `new_message` — no new server data.
 
 **UI shell extension points:** `App.tsx` shell + `Header`, the Zustand store trio, the `api/sse.ts` singleton, `tokens.css` color variables, and the renderer registry in `TranscriptView` (later phases add renderers by `kind` without touching existing ones).
 

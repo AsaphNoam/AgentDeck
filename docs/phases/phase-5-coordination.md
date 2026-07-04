@@ -3,7 +3,7 @@
 **Status:** ready to build after Phase 2
 **Features:** F8 (agent-to-agent messaging), F11 (notifications)
 **Depends on:** Phases 1, 2
-**Enables:** Phase 7 (activity-map message animations); parallelizable with Phases 3 and 4
+**Enables:** Future activity-map candidate; parallelizable with Phases 3 and 4
 
 ---
 
@@ -28,7 +28,7 @@ Begin with the **SDK handshake spike** (~1h): confirm `modelcontextprotocol/go-s
 
 ### Out of scope
 - Cross-turn loop detection beyond the per-turn budget (flagged as open question).
-- Activity-map animation (Phase 7 consumes the `new_message`/notification events this phase emits).
+- Activity-map animation (a future candidate can consume the `new_message`/notification events this phase emits).
 
 ---
 

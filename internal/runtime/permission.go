@@ -130,6 +130,7 @@ func (c *ChatRuntime) Cancel(ctx context.Context, agentID string) (bool, error) 
 		ids = append(ids, id)
 	}
 	active := as.turnActive
+	armedTurn := as.turnSeq
 	as.mu.Unlock()
 
 	for _, id := range ids {
@@ -141,7 +142,7 @@ func (c *ChatRuntime) Cancel(ctx context.Context, agentID string) (bool, error) 
 		_ = as.transport.Notify("session/cancel", map[string]any{"sessionId": as.sessionID})
 	}
 	if active {
-		c.escalateCancel(as)
+		c.escalateCancel(as, armedTurn)
 	}
 	return cancelled, nil
 }
@@ -150,7 +151,13 @@ func (c *ChatRuntime) Cancel(ctx context.Context, agentID string) (bool, error) 
 // active after the cancel grace window — a fallback for an ACP peer that ignores
 // session/cancel (techspec §8.4). It stops short of a hard kill (SIGTERM/SIGKILL);
 // that remains Stop's job. A non-positive grace disables escalation.
-func (c *ChatRuntime) escalateCancel(as *agentState) {
+//
+// armedTurn is the turn generation captured when the escalation was armed. At fire
+// time we SIGINT only if that generation is STILL the current turn — a peer that
+// honored the cancel quickly (turn ends) followed by a fresh re-prompt increments
+// turnSeq, so this stale escalation is a no-op against the healthy next turn rather
+// than interrupting it (review Finding 11).
+func (c *ChatRuntime) escalateCancel(as *agentState, armedTurn int64) {
 	grace := c.cancelGrace
 	if grace <= 0 {
 		return
@@ -162,7 +169,9 @@ func (c *ChatRuntime) escalateCancel(as *agentState) {
 		case <-time.After(grace):
 		}
 		as.mu.Lock()
-		stillBusy := as.turnActive && !as.stopped
+		// Only escalate if the SAME turn we armed against is still active. A new
+		// turn (re-prompt) bumped turnSeq, making this escalation stale.
+		stillBusy := as.turnActive && !as.stopped && as.turnSeq == armedTurn
 		pgid := as.pgid
 		hasProc := as.cmd != nil && as.cmd.Process != nil
 		as.mu.Unlock()

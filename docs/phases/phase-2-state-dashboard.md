@@ -26,7 +26,7 @@ Turn the single-agent loop into a supervisable, multi-agent dashboard. Add the S
 - Chat panel UI consuming the Phase 1 streaming surface (the full F3 view).
 
 ### Out of scope
-- Config editing UI (Phase 3), archive (Phase 4), messaging indicators (Phase 5), task-group sections (Phase 6/F2), activity map (Phase 7).
+- Config editing UI (Phase 3), archive (Phase 4), messaging indicators (Phase 5), task-group sections (Phase 6/F2), future-phase candidates such as the activity map.
 
 ---
 

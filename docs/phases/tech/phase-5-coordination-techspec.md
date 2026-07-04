@@ -24,7 +24,7 @@ This is the implementation-level companion to the Phase 5 PRD. It is prescriptiv
 
 ### Out of scope (explicit non-goals)
 - **Cross-turn loop detection.** Only the per-turn budget (15/turn) is built. Detecting a slow ping-pong that stays under budget every turn but never terminates across turns is an **open question, not built** (see §13). We keep the data a future phase would need (per-turn budget rows + full message history in `state.db`), but no cross-turn termination logic ships here.
-- **Activity-map animation** (Phase 7). Phase 5 only *emits* the `new_message` / `notification` events Phase 7 will animate on (see §12).
+- **Activity-map animation** (future candidate). Phase 5 only *emits* the `new_message` / `notification` events that candidate would animate on (see §12).
 - **Threaded conversations / reply chains.** Messages carry an optional `in_reply_to` field for future use, but no threading UI or semantics ship.
 - **Terminal-runtime `CheckMessages`.** Only the chat runtime's `CheckMessages` is implemented here. Terminal runtime (Phase 6) wires its own; this phase returns a typed "not implemented" for `interface: "terminal"` (consistent with Phase 1's registry behavior).
 
@@ -403,7 +403,7 @@ Two agents pinging each other: each ping is an outbound (sender) + an inbound (r
 ### 7.1 Card message indicator
 
 - **Recipient indicator (unread badge):** driven by message state. When a `messages` row is inserted, updated, or deleted for an agent, the state manager recomputes that agent's unread count (`Store.UnreadCount`) and folds it into that agent's `state_update` SSE payload as `unread_messages: N`. The card renders a mail badge with the count when `N > 0`.
-- **Sender (outbound) indicator:** a brief "sent" pulse. When `send_message` inserts a row, the state manager emits a `state_update` for the sender carrying `last_sent_at` (timestamp). The card shows a transient outbound icon for ~2s. (This doubles as the signal Phase 7's activity map animates on — see §12.)
+- **Sender (outbound) indicator:** a brief "sent" pulse. When `send_message` inserts a row, the state manager emits a `state_update` for the sender carrying `last_sent_at` (timestamp). The card shows a transient outbound icon for ~2s. (This doubles as the signal a future activity map can animate on — see §12.)
 - No new SSE event type is needed for indicators; they ride on the existing `state_update` (per PRD §4: the dashboard reads message/indicator state via `state_update`/`new_message`).
 
 ### 7.2 Notification SSE events
@@ -616,9 +616,9 @@ Map each test to an acceptance criterion. Use a temp `state.db` for isolation.
 
 ## 12. Interfaces produced for later phases
 
-Phase 7 (activity map) consumes, with no new data needed:
+The future activity-map candidate consumes, with no new data needed:
 - **`notification` SSE events** (§8.1) — markers can flash on `done`/`waiting_input`/`permission_required`.
-- **Outbound message signal** — `state_update.last_sent_at` (§7.1) plus, if richer animation is wanted, the message-row inserts the state manager already observes. Phase 7 can animate a "message in flight" from sender→recipient using `from_agent`/`to_agent` on the row. The `messages` table (with `from_agent`/`to_agent`/`created_at`) is a stable, queryable record for any later visualization.
+- **Outbound message signal** — `state_update.last_sent_at` (§7.1) plus, if richer animation is wanted, the message-row inserts the state manager already observes. A future activity map can animate a "message in flight" from sender→recipient using `from_agent`/`to_agent` on the row. The `messages` table (with `from_agent`/`to_agent`/`created_at`) is a stable, queryable record for any later visualization.
 - **`unread_messages` per agent** (§7.1, §8.1) — for showing pending mail on map markers.
 - **Per-turn budget data** in the `turn_budget` table — available to a future cross-turn loop-detection phase (§13).
 

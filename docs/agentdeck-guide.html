@@ -229,6 +229,50 @@
       border: 1px solid #294059;
     }
     .learn-item span { color: var(--muted); font-size: 0.93rem; }
+    .start-primer {
+      display: grid;
+      gap: 12px;
+      margin-top: 22px;
+      max-width: 850px;
+    }
+    .primer-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(16, 24, 33, 0.82);
+      padding: 14px;
+    }
+    .primer-card strong {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
+    .primer-card p { margin: 0; font-size: 0.94rem; }
+    .screen-grid, .truth-grid, .lab-grid, .debug-grid, .workflow-grid, .mental-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .screen-card, .truth-card, .lab-card, .debug-card, .workflow-card, .mental-card {
+      border: 1px solid rgba(67, 86, 110, 0.8);
+      border-radius: 8px;
+      background: rgba(13, 20, 30, 0.9);
+      padding: 12px;
+    }
+    .screen-card b, .truth-card b, .lab-card b, .debug-card b, .workflow-card b, .mental-card b {
+      display: block;
+      margin-bottom: 4px;
+      color: #dcecff;
+    }
+    .screen-card span, .truth-card span, .lab-card span, .debug-card span, .workflow-card span, .mental-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+    .truth-card.warning { border-color: rgba(241, 200, 107, 0.62); background: rgba(241, 200, 107, 0.08); }
+    .truth-card.risk { border-color: rgba(255, 122, 144, 0.55); background: rgba(255, 122, 144, 0.07); }
+    .workflow-card { min-height: 164px; }
+    .workflow-card ul, .lab-card ul, .debug-card ul, .mental-card ul { margin: 8px 0 0; padding-left: 18px; color: var(--muted); }
 
     .command-center {
       border: 1px solid var(--line-2);
@@ -978,7 +1022,8 @@
       .hero, section.chapter { padding-left: 18px; padding-right: 18px; }
       .grid.two, .grid.three, .grid.four, .feature-atlas, .protocol-grid,
       .system-map, .recipe-grid, .glossary-list, .data-plane, .path-list,
-      .flow-lanes, .io-grid, .cc-body, .identity-chain, .plane-row, .graph-reader { grid-template-columns: 1fr; }
+      .flow-lanes, .io-grid, .cc-body, .identity-chain, .plane-row, .graph-reader,
+      .screen-grid, .truth-grid, .lab-grid, .debug-grid, .workflow-grid, .mental-grid { grid-template-columns: 1fr; }
       .section-head { display: block; }
       .hero { min-height: auto; }
       .big-flow-svg { min-height: 780px; }
@@ -1007,11 +1052,13 @@
       <nav class="nav" aria-label="Guide sections">
         <a href="#start">Start here</a>
         <a href="#tour">Guided tour</a>
-        <a href="#features">Feature atlas</a>
+        <a href="#mental">Mental model</a>
+        <a href="#features">Workflows</a>
         <a href="#system">System atlas</a>
         <a href="#flows">How it works</a>
         <a href="#protocols">Protocols</a>
         <a href="#developer">Developer map</a>
+        <a href="#labs">Labs</a>
         <a href="#recipes">Recipes</a>
         <a href="#glossary">Glossary</a>
         <a href="#status">Status</a>
@@ -1028,12 +1075,46 @@
         <div class="hero-layout">
           <div>
             <p class="kicker">Local-first AI agent command center</p>
-            <h1>Learn AgentDeck like you are walking through the machine room.</h1>
-            <p class="lead">AgentDeck is a single local Go binary and browser UI for launching, supervising, coordinating, switching, and resuming coding agents. This atlas teaches the product, the user workflows, and the modules that make it run.</p>
+            <h1>Learn AgentDeck as a working tool, then as a machine.</h1>
+            <p class="lead">AgentDeck is a single local Go binary and browser UI for launching, supervising, coordinating, switching, and resuming coding agents. This guide is written for a strong SWE ramping into Go and AI-tooling internals: first what to use at work, then what the product really built, then where to debug it.</p>
             <div class="hero-actions">
               <a class="primary" href="#tour">Begin the guided tour</a>
-              <a href="#system">Open the system atlas</a>
-              <a href="#recipes">Jump to recipes</a>
+              <a href="#mental">Learn the mental model</a>
+              <a href="#labs">Run the labs</a>
+            </div>
+            <div class="start-primer" aria-label="AgentDeck overview">
+              <article class="primer-card">
+                <strong>What problem it solves at work</strong>
+                <p>AgentDeck is for the moment when one AI agent is no longer enough: an implementer is coding, a reviewer is checking, a researcher is digging through history, and you need one local cockpit instead of a pile of terminal tabs and lost context.</p>
+              </article>
+              <article class="primer-card">
+                <strong>Three concrete workflows</strong>
+                <div class="screen-grid">
+                  <div class="screen-card"><b>Parallel build + review</b><span>Launch implementer@repo, then a reviewer@repo. Let agents message each other through MCP instead of manually relaying summaries.</span></div>
+                  <div class="screen-card"><b>Bug triage across context</b><span>Use roles and projects to run a focused investigator while you keep the dashboard open for status, permissions, and commands.</span></div>
+                  <div class="screen-card"><b>Resume yesterday's work</b><span>Search Archive, inspect files/commands/transcript, then resume the same stable <code>agent_id</code> rather than starting from memory.</span></div>
+                  <div class="screen-card"><b>Switch when the tool fit changes</b><span>Move a logical agent between model/backend/interface when needed, with native resume when possible and primer handoff when not.</span></div>
+                </div>
+              </article>
+              <article class="primer-card">
+                <strong>What AgentDeck is not</strong>
+                <p>It is not an IDE, not a cloud agent service, not a multi-user server, and not a complete terminal multiplexer replacement. It orchestrates local CLI agents, persists local state, and gives you one dashboard for supervision and recovery.</p>
+              </article>
+              <article class="primer-card">
+                <strong>The basic operating loop</strong>
+                <p>Configure roles, projects, and backends. Launch an agent from UI or CLI. Watch live state. Intervene through chat or terminal. Audit files, commands, messages, and assistant/tool transcript history. Note: user prompt bubbles are currently UI-local and are not yet persisted/searchable as transcript events.</p>
+              </article>
+              <article class="primer-card">
+                <strong>Available screens</strong>
+                <div class="screen-grid">
+                  <div class="screen-card"><b>Dashboard</b><span>Grouped agent cards, live badges, context usage, message indicators, density controls, and right-click actions.</span></div>
+                  <div class="screen-card"><b>New Agent</b><span>Launch flow for role, project, backend/model, name, and chat/terminal interface when capabilities allow it.</span></div>
+                  <div class="screen-card"><b>Chat</b><span>ACP assistant output, tool calls, diffs, results, permission prompts, files, commands, and terminal tab when applicable.</span></div>
+                  <div class="screen-card"><b>Archive</b><span>Search sessions by metadata/transcript content, inspect history, and resume inactive agents.</span></div>
+                  <div class="screen-card"><b>Settings</b><span>Roles, projects, backends/models, and notifications. Defaults exist in config, but there is no dedicated defaults editor tab today.</span></div>
+                  <div class="screen-card"><b>Onboarding</b><span>First-run gate for backend/project readiness. Current handoff tracks a backend-step bug; see Current Truth.</span></div>
+                </div>
+              </article>
             </div>
             <div class="learn-list" aria-label="Learning outcomes">
               <div class="learn-item"><b>1</b><span>You will know what each AgentDeck feature is for and when to use it.</span></div>
@@ -1132,14 +1213,60 @@
         </div>
       </section>
 
+      <section class="chapter" id="mental">
+        <div class="section-head">
+          <div>
+            <p class="kicker">Beginner mental model</p>
+            <h2>The four ideas that make the repo legible</h2>
+            <p>Read this before the protocol names. Most implementation details are variations on identity, storage, runtime interface, and communication plane.</p>
+          </div>
+          <a class="source" href="../MAP.md">Source: MAP.md</a>
+        </div>
+        <div class="mental-grid">
+          <article class="mental-card">
+            <b><code>role@project</code> is the human launch address</b>
+            <span>A role supplies persona and permission policy; a project supplies cwd and context. Backend/model/interface choose the engine shape.</span>
+            <ul><li>Example: <code>implementer@agentdeck --backend claude --model sonnet</code></li></ul>
+          </article>
+          <article class="mental-card">
+            <b><code>agent_id</code> is product identity; <code>session_id</code> is runtime identity</b>
+            <span>The card, archive, messages, group, and switch flow follow <code>agent_id</code>. Chat runtimes may carry provider session IDs; terminal launches can instead record tty/driver metadata.</span>
+          </article>
+          <article class="mental-card">
+            <b>Three stores, three jobs</b>
+            <span>JSON config is human-editable. <code>state.db</code> is server-owned machine truth. <code>sessions/{agent_id}/transcript.ndjson</code> is the append log indexed for archive/search.</span>
+          </article>
+          <article class="mental-card">
+            <b>Two runtimes, one registry</b>
+            <span>Chat is structured ACP over stdio. Terminal is a real CLI under PTY/xterm or tmux. The registry exposes one control surface to the server.</span>
+          </article>
+          <article class="mental-card">
+            <b>Switch is a controlled relaunch</b>
+            <span>Switch-runtime stops the old runtime and resumes/relaunches the same <code>agent_id</code>. Same-backend paths prefer native resume; cross-backend paths use a bounded primer handoff.</span>
+          </article>
+          <article class="mental-card">
+            <b>Communication planes stay separate</b>
+            <span>REST asks for actions. SSE pushes dashboard state. WebSocket carries terminal bytes. ACP carries structured chat. MCP is tool-calling between agents. Hooks report lifecycle/status.</span>
+          </article>
+        </div>
+      </section>
+
       <section class="chapter" id="features">
         <div class="section-head">
           <div>
-            <p class="kicker">Feature atlas</p>
-            <h2>Everything AgentDeck has to offer</h2>
-            <p>Each feature card explains the product behavior, the mental model, the implementation machinery, and the main surface to inspect when debugging.</p>
+            <p class="kicker">Workflow atlas</p>
+            <h2>What you do with AgentDeck</h2>
+            <p>Start with the jobs, then use the F-number cards as a reference map back to the PRD.</p>
           </div>
           <a class="source" href="agent-dashboard-prd.md#5-feature-requirements">Source: PRD F1-F13</a>
+        </div>
+        <div class="workflow-grid" aria-label="Workflow groups">
+          <article class="workflow-card"><b>Configure</b><span>Roles, projects, backends, notification preferences, and first-run readiness.</span><ul><li>F5, F6, F12</li></ul></article>
+          <article class="workflow-card"><b>Launch and supervise</b><span>Start agents, watch cards, sort groups, and inspect live state without opening every session.</span><ul><li>F1, F2, F4</li></ul></article>
+          <article class="workflow-card"><b>Intervene</b><span>Prompt, approve, deny, cancel, stop, inspect tools/diffs/results, and use terminal when raw CLI interaction matters.</span><ul><li>F3, F7, F10</li></ul></article>
+          <article class="workflow-card"><b>Coordinate</b><span>Let agents discover each other, send messages, and get nudged within loop-safety budgets.</span><ul><li>F8, F11</li></ul></article>
+          <article class="workflow-card"><b>Resume and audit</b><span>Search old work, inspect files/commands, resume the same logical agent, and rebuild the index if needed.</span><ul><li>F9, F10</li></ul></article>
+          <article class="workflow-card"><b>Polish</b><span>Future activity-map work should stay a UI layer over existing state and message events.</span><ul><li>F13</li></ul></article>
         </div>
         <div class="feature-controls" aria-label="Feature filters">
           <button class="feature-filter active" data-feature-filter="all">All</button>
@@ -1475,7 +1602,7 @@ cd ui && npm run build</pre>
   layout.json
   config.json
   state.db
-  sessions/{agent_id}/...</pre>
+  sessions/{agent_id}/transcript.ndjson</pre>
             <p>Human-facing config is readable JSON. Machine-facing state is SQLite because AgentDeck needs identity joins, running/session status, message rows, and FTS5 search.</p>
           </article>
         </div>
@@ -1491,6 +1618,33 @@ cd ui && npm run build</pre>
           <a class="source" href="../README.md#quickstart">Source: README quickstart</a>
         </div>
         <div class="recipe-grid" id="recipeGrid"></div>
+      </section>
+
+      <section class="chapter" id="labs">
+        <div class="section-head">
+          <div>
+            <p class="kicker">Hands-on labs</p>
+            <h2>Small loops that teach the product</h2>
+            <p>Each lab is deliberately tiny: do one thing, observe one result, then inspect the package or file that owns it.</p>
+          </div>
+          <a class="source" href="../README.md#quickstart">Source: README quickstart</a>
+        </div>
+        <div class="lab-grid">
+          <article class="lab-card"><b>1. Start the dashboard</b><span>Run <code>make dist</code>, start/open the dashboard, then inspect <code>~/.agentdeck</code>.</span><ul><li>Expected: seeded roles/projects/backends plus <code>state.db</code>.</li><li>Read: <code>internal/config</code>, <code>README.md</code>.</li></ul></article>
+          <article class="lab-card"><b>2. Configure and launch one agent</b><span>Create or edit a role/project/backend, then launch from the modal or CLI.</span><ul><li>Expected: one card with a stable <code>agent_id</code>.</li><li>Read: <code>internal/server/launch.go</code>.</li></ul></article>
+          <article class="lab-card"><b>3. Trace one chat turn</b><span>Send a prompt and follow UI -> REST -> ACP -> normalized event -> transcript/SSE.</span><ul><li>Expected: assistant/tool events stream; your prompt bubble is not durable yet.</li><li>Read: <code>chat.go</code>, <code>acpmap.go</code>, <code>writer.go</code>.</li></ul></article>
+          <article class="lab-card"><b>4. Send an agent message</b><span>Ask one agent to use <code>send_message</code> to another live chat agent.</span><ul><li>Expected: message row, unread badge, possible nudger turn.</li><li>Read: <code>internal/messaging</code>.</li></ul></article>
+          <article class="lab-card"><b>5. Search and resume</b><span>Stop an agent, search Archive for phrase/file/command context, then resume it.</span><ul><li>Expected: same <code>agent_id</code>, fresh runtime, prior indexed history.</li><li>Read: <code>internal/archive</code>, <code>internal/server/resume.go</code>.</li></ul></article>
+          <article class="lab-card"><b>6. Switch runtime or model</b><span>Use the card context menu to switch backend/model/interface and verify identity stability.</span><ul><li>Expected: same card identity; native resume or primer handoff depending on target.</li><li>Read: <code>internal/server/switch.go</code>.</li></ul></article>
+        </div>
+        <div class="debug-grid" style="margin-top:16px">
+          <article class="debug-card"><b>Stale card</b><span>Check <code>/api/events</code>, <code>internal/bus</code>, status row writes, and the Zustand agent store.</span></article>
+          <article class="debug-card"><b>Prompt missing from Archive</b><span>Expected today: user prompt bubbles are client-local. Search assistant/tool output instead until <code>user_text</code> persistence lands.</span></article>
+          <article class="debug-card"><b>Blank terminal</b><span>Check <code>/api/capabilities</code>, selected driver, terminal WebSocket, PTY hub/scrollback, and hook status separately.</span></article>
+          <article class="debug-card"><b>Message not delivered</b><span>Check MCP token registration, recipient resolution, chat-vs-terminal recipient rules, unread rows, and turn budget.</span></article>
+          <article class="debug-card"><b>Switch failed or lost history</b><span>Check switch lock, resume ID resolution, primer generation, rollback path, and the frozen session snapshot.</span></article>
+          <article class="debug-card"><b>Onboarding looks successful but launches fail</b><span>Check the open BackendStep finding before trusting a newly saved seeded backend.</span></article>
+        </div>
       </section>
 
       <section class="chapter" id="glossary">
@@ -1510,7 +1664,7 @@ cd ui && npm run build</pre>
         <div class="section-head">
           <div>
             <p class="kicker">Current status</p>
-            <h2>What is live, what is gated, what comes next</h2>
+            <h2>Current Truth: live, gated, sharp edges</h2>
           </div>
           <a class="source" href="phases/HANDOFF.md">Source: HANDOFF.md</a>
         </div>
@@ -1519,14 +1673,20 @@ cd ui && npm run build</pre>
             <h3>Green today</h3>
             <ul>
               <li>Phases 0-5 are complete: foundation, core ACP chat loop, dashboard/state, config/onboarding, archive/search/resume, MCP coordination, nudger, budgets, notifications.</li>
-              <li>Phase 6 subphases 6.1-6.6 are green: hook registration, Codex adapter path, xterm/tmux terminal runtime, switch-runtime, backend primer, task groups, UI endpoints.</li>
-              <li>The current README lists launch, streaming chat, dashboard, config CRUD, archive/search/resume, MCP messaging, terminal runtime, and switch-runtime as working today.</li>
+              <li>Phase 6 subphases 6.1-6.6 landed: backend adapters, hook registration, xterm/tmux terminal runtime, switch-runtime, backend primer handoff, task groups, and UI endpoints.</li>
+              <li>Terminal PTY has in-progress uncommitted hub work in this tree: one reader drains the PTY, broadcasts to subscribers, and replays bounded scrollback if that patch is kept and green.</li>
             </ul>
           </article>
           <article class="callout">
             <strong>Still gated or optional</strong>
-            <p>Phase 6.7, the iTerm2/AppleScript driver, is optional and next if desired. Live two-CLI MCP registration, live Codex chat acceptance, Codex hook names, target-backend live summarization, and interactive terminal resume forms still need credentialed validation. Phase 7 activity map remains future polish.</p>
+            <p>Codex ACP wiring exists but live Codex chat acceptance is credential-gated. Codex hook names and live two-CLI HTTP MCP registration still need real CLI validation. Phase 6.7 iTerm2/AppleScript is optional. Phase 7 activity map remains future polish.</p>
           </article>
+        </div>
+        <div class="truth-grid">
+          <article class="truth-card risk"><b>Open blockers to respect</b><span>HANDOFF currently tracks onboarding backend clobber, primer persistence during switch, cancel escalation crossing turns, and permission resolution races. Treat these as product truth until fixed.</span></article>
+          <article class="truth-card warning"><b>Not persisted yet</b><span>User prompt bubbles are not durable transcript/search records. Assistant/tool events, files, commands, messages, session metadata, and FTS rows are the durable surfaces today.</span></article>
+          <article class="truth-card warning"><b>Terminal nuance</b><span>Raw terminal bytes are not the same as normalized ACP transcript events. The PTY path is capability-gated, hook-driven for status, and its multi-view/no-viewer behavior depends on the current PTY hub patch being completed and verified.</span></article>
+          <article class="truth-card warning"><b>MCP transport reality</b><span>AgentDeck mounts streamable HTTP MCP at <code>/mcp</code> and binds caller identity through generated per-agent registration. A working stdio proxy fallback is not currently shipped.</span></article>
         </div>
       </section>
 
@@ -1543,12 +1703,12 @@ cd ui && npm run build</pre>
         state: "settings",
         tags: ["roles", "projects", "backends"],
         user: "You define reusable roles, projects, and backend/model choices. AgentDeck should know where work happens, which persona to use, and which CLI/model should run.",
-        behind: "The config package reads and writes JSON under ~/.agentdeck. Launches compose project cwd/context, role system prompt, backend env, selected model, permission policy, and interface. Existing agents keep their already-composed config until restart.",
+        behind: "The config package reads and writes JSON under ~/.agentdeck. Launch composes project cwd/context, role system prompt, backend env, selected model, permission policy, and interface. Resume/switch keep the frozen prompt/cwd snapshot while re-resolving live identity/backend/model/env details.",
         paths: ["internal/config", "ui/src/features/settings", "docs/phases/tech/phase-3-config-onboarding-techspec.md"],
         rows: [
           ["Project", "AgentDeck · cwd ~/Projects/AgentDeck · context prompt"],
           ["Role", "implementer · reviewer · researcher · pm"],
-          ["Backend", "claude-acp default · codex-acp optional"]
+          ["Backend", "claude-acp default · codex-acp wired, live gated"]
         ]
       },
       {
@@ -1581,8 +1741,8 @@ cd ui && npm run build</pre>
         title: "Chat, tools, diffs, permission",
         state: "chat",
         tags: ["ACP", "permission", "transcript"],
-        user: "You open the chat panel, send a prompt, inspect streamed assistant output, review tool calls and diffs, and approve or deny permission requests inline.",
-        behind: "ChatRuntime maps ACP JSON-RPC/NDJSON frames into AgentDeck events. Permission requests withhold the agent response until the server relays approve/deny back through ACP.",
+        user: "You open the chat panel, send a prompt, inspect streamed assistant output, review tool calls and diffs, and approve or deny permission requests inline. Today your prompt bubble is UI-local, not a searchable transcript event.",
+        behind: "ChatRuntime maps ACP JSON-RPC/NDJSON frames into AgentDeck events. Assistant/tool events persist to sessions/{agent_id}/transcript.ndjson and FTS; user prompt persistence is an open advisory.",
         paths: ["internal/runtime/chat.go", "internal/runtime/acpmap.go", "internal/runtime/permission.go", "ui/src/components/chat/renderers"],
         rows: [
           ["User", "Implement phase 6.6 and run green checkpoint"],
@@ -1595,7 +1755,7 @@ cd ui && npm run build</pre>
         state: "messaging",
         tags: ["MCP", "nudger", "budget"],
         user: "Atlas can ask Vega to review work using an MCP tool. Vega wakes if idle, reads the message, and acts without you copy-pasting context.",
-        behind: "The in-process MCP server binds caller identity to a registered session token, writes message rows to SQLite, emits indicators, and uses a nudger plus per-turn budget to prevent runaway loops.",
+        behind: "The in-process streamable HTTP MCP server is mounted at /mcp. Generated per-agent registration binds caller identity to a token, writes message rows to SQLite, emits indicators, and uses a nudger plus per-turn budget to prevent runaway loops.",
         paths: ["internal/messaging/tools.go", "internal/server/messaging_loops.go", "internal/state/messages.go"],
         rows: [
           ["Tool", "send_message(to=Vega, body=review this diff)"],
@@ -1607,8 +1767,8 @@ cd ui && npm run build</pre>
         title: "Switch to terminal or another model",
         state: "switch",
         tags: ["switch-runtime", "PTY", "resume"],
-        user: "You can move Atlas from chat to terminal, or change backend/model, while keeping the same logical agent, name, group, archive, and messages.",
-        behind: "The switch handler takes a per-agent lock, cancels/stops the old runtime, persists target identity, resolves native resume or primer handoff, relaunches through the registry, and emits a state update.",
+        user: "You can move Atlas from chat to terminal, or change backend/model, while keeping the same logical agent, name, group, archive, and messages. Current HANDOFF still tracks a primer persistence blocker to fix.",
+        behind: "The switch handler takes a per-agent lock, cancels/stops the old runtime, persists target identity, resolves native resume or primer handoff, relaunches through the registry, and emits a state update. Cross-backend primer handoff must stay one-shot, not baked into the frozen session snapshot.",
         paths: ["internal/server/switch.go", "internal/server/primer.go", "internal/runtime/terminal", "internal/runtime/registry.go"],
         rows: [
           ["Old runtime", "chat · claude · sonnet"],
@@ -1620,8 +1780,8 @@ cd ui && npm run build</pre>
         title: "Audit files, commands, and archive",
         state: "archive",
         tags: ["FTS5", "indexer", "resume"],
-        user: "You review edited files and commands, search historical sessions by phrase, and resume useful work later with history intact.",
-        behind: "Transcript logs are durable source. The indexer updates SQLite session metadata, file/command trails, and FTS5 search tables. Resume starts a fresh runtime for the same identity.",
+        user: "You review edited files and commands, search historical assistant/tool transcript content by phrase, and resume useful work later with history intact.",
+        behind: "Transcript logs live at sessions/{agent_id}/transcript.ndjson. The indexer updates SQLite session metadata, file/command trails, and FTS5 search tables. Resume starts a fresh runtime for the same identity.",
         paths: ["internal/transcript/writer.go", "internal/index/indexer.go", "internal/archive/archive.go", "internal/server/resume.go"],
         rows: [
           ["Files", "internal/server/switch.go · ui/src/components/chat/TerminalTab.tsx"],
@@ -1647,16 +1807,16 @@ cd ui && npm run build</pre>
     const features = [
       ["F1", "Multi-agent dashboard", "operate", "See every active agent as a card with state, context, message badges, and recent output.", "Think of the dashboard as a live projection of SQLite status plus SSE updates.", "State manager, bus, server sessions endpoints, UI stores, card grid.", "Check /api/events, internal/bus, internal/state/status.go, ui/src/store/agentStore.ts."],
       ["F2", "Task groups", "flex", "Organize agents by workstream and release them in batches.", "Group is stable identity metadata; collapse state is layout preference.", "agents.group, layout group collapse, group release endpoint, card sections.", "Check internal/server/groups.go, internal/state/agents.go, CardGrid."],
-      ["F3", "Streaming chat panel", "operate", "Send prompts, stream assistant text, inspect tools/diffs/results, approve permissions.", "ACP wire events become AgentDeck normalized events consumed by UI and persistence.", "Chat runtime, event hub, renderers, permission gate.", "Check chat.go, acpmap.go, permission.go, ui/src/components/chat/renderers."],
+      ["F3", "Streaming chat panel", "operate", "Send prompts, stream assistant text, inspect tools/diffs/results, approve permissions.", "ACP wire events become AgentDeck normalized events consumed by UI and persistence; user prompt bubbles are not persisted/searchable yet.", "Chat runtime, event hub, renderers, permission gate.", "Check chat.go, acpmap.go, permission.go, ui/src/components/chat/renderers."],
       ["F4", "Launch an agent", "operate configure", "Start from UI modal or CLI with role, project, backend, model, interface.", "Launch is composition: config files plus backend adapter plus runtime dispatch.", "server launch handler, config store, backend adapter, runtime registry.", "Check launch.go, config package, backend/adapter.go, registry.go."],
       ["F5", "Projects and roles", "configure", "Define where agents work and how they behave.", "JSON config is intentionally hand-editable and affects future launches.", "config package, settings UI, validation.", "Check internal/config/projects.go, roles.go, ui/src/features/settings."],
-      ["F6", "Backends and models", "configure", "Configure Claude/Codex providers, defaults, model names, env overrides.", "Backend type selects adapter behavior; model/env shape feeds launch spec.", "backends.json, backend adapter, credential checks.", "Check internal/config/backends.go, internal/backend/credcheck."],
-      ["F7", "Switch runtime", "flex", "Change chat/terminal, backend, or model without losing logical identity.", "Switch equals stop and relaunch on same agent_id with native resume or primer handoff.", "switch handler, primer, registry resume, backend adapter.", "Check internal/server/switch.go and primer.go."],
-      ["F8", "Agent messaging", "coordinate", "Agents coordinate using MCP tools and unread badges.", "MCP sessions bind identity; messages are rows in SQLite; nudger wakes idle recipients.", "messaging server/tools, message store, nudger, budgets.", "Check internal/messaging and internal/state/messages.go."],
-      ["F9", "Archive/search/resume", "history", "Find old sessions and resume with history intact.", "Transcript logs are durable; SQLite metadata/FTS make search fast.", "transcript writer/reader, indexer, archive endpoint, resume endpoint.", "Check internal/transcript, internal/index, internal/archive, resume.go."],
-      ["F10", "Files and commands", "history operate", "Audit files edited and commands run by each agent.", "Derived from tool events and hooks, indexed as queryable rows.", "indexer, hook capture, files/commands endpoints, chat tabs.", "Check internal/server/files_commands.go and ui chat tabs."],
+      ["F6", "Backends and models", "configure", "Configure Claude/Codex providers, model names, env overrides, and launch defaults stored in config.", "Backend type selects adapter behavior; Codex live chat and hook names still need credentialed validation.", "backends.json, backend adapter, credential checks.", "Check internal/config/backends.go, internal/backend/credcheck."],
+      ["F7", "Switch runtime", "flex", "Change chat/terminal, backend, or model without losing logical identity.", "Switch equals stop and relaunch on same agent_id with native resume or primer handoff; current HANDOFF tracks a primer persistence blocker.", "switch handler, primer, registry resume, backend adapter.", "Check internal/server/switch.go and primer.go."],
+      ["F8", "Agent messaging", "coordinate", "Agents coordinate using MCP tools and unread badges.", "Streamable HTTP MCP at /mcp binds identity through generated registration; messages are rows in SQLite; nudger wakes idle chat recipients.", "messaging server/tools, message store, nudger, budgets.", "Check internal/messaging and internal/state/messages.go."],
+      ["F9", "Archive/search/resume", "history", "Find old sessions and resume with history intact.", "sessions/{agent_id}/transcript.ndjson plus SQLite metadata/FTS make search fast; user prompt bubbles are not searchable yet.", "transcript writer/reader, indexer, archive endpoint, resume endpoint.", "Check internal/transcript, internal/index, internal/archive, resume.go."],
+      ["F10", "Files and commands", "history operate", "Audit files edited and commands run by each agent.", "Derived from normalized tool events plus explicit hook/API ingest where available; bundled hooks are primarily lifecycle/status producers.", "indexer, files/commands endpoints, chat tabs.", "Check internal/server/files_commands.go and ui chat tabs."],
       ["F11", "Notifications", "coordinate operate", "Get in-app/browser notifications when agents finish or need input.", "Notifications are SSE events sourced from state transitions and message activity.", "notification SSE, UI notification center, config mutes.", "Check server SSE/notification paths and uiStore."],
-      ["F12", "Onboarding", "configure", "First-run flow guides backend setup, project creation, and launch.", "Onboarding is a config readiness gate before the main dashboard.", "config endpoints, validation, React onboarding wizard.", "Check ui/src/features/onboarding and config handlers."],
+      ["F12", "Onboarding", "configure", "First-run flow guides backend setup, project creation, and launch.", "Onboarding is a config readiness gate before the main dashboard; HANDOFF currently tracks a BackendStep model-clobber bug.", "config endpoints, validation, React onboarding wizard.", "Check ui/src/features/onboarding and config handlers."],
       ["F13", "Activity map", "polish", "Optional ambient visualization of agents moving between zones.", "Pure UI layer over existing state and message events; no new core state.", "Phase 7 SVG map, zone config, SSE marker updates.", "Check phase-7 polish tech spec when building it."]
     ];
 
@@ -1693,16 +1853,16 @@ cd ui && npm run build</pre>
         owns: "Structured chat sessions, ACP handshake, prompt stream, permissions, normalized transcript events.",
         inputs: "Prompt/control commands and ACP frames from child CLI.",
         outputs: "Events to hub/SSE/transcript, ACP permission decisions, process lifecycle.",
-        persists: "Status/running rows and transcript records via writer/indexer integration.",
+        persists: "Assistant/tool transcript records via writer/indexer integration; user prompts are not durable Event records yet.",
         neighbors: "backend adapter, transcript, state, bus.",
         paths: ["internal/runtime/chat.go", "internal/runtime/acpmap.go", "internal/runtime/permission.go"]
       },
       {
         id: "terminal", title: "Terminal runtime", short: "PTY/xterm/tmux driver layer.",
-        owns: "Interactive CLI execution under PTY plus terminal WebSocket bridge.",
+        owns: "Interactive CLI execution under PTY plus terminal WebSocket bridge; the current working tree adds a PTY hub for drain, broadcast, and scrollback.",
         inputs: "Terminal launch specs, prompt writes, keystrokes, resize frames.",
-        outputs: "PTY bytes, running row driver info, stop/cancel signals.",
-        persists: "Running row driver/tty metadata; high-level status mostly comes from hooks.",
+        outputs: "PTY bytes, bounded scrollback replay, running row driver info, stop/cancel signals.",
+        persists: "Running row driver/tty metadata and session rows; raw terminal bytes are not normalized ACP transcript content.",
         neighbors: "server terminal endpoint, hooks, state, UI TerminalTab.",
         paths: ["internal/runtime/terminal", "internal/server/terminal.go", "ui/src/components/chat/TerminalTab.tsx"]
       },
@@ -1719,7 +1879,7 @@ cd ui && npm run build</pre>
         id: "hooks", title: "Hooks", short: "Lifecycle shell scripts POST status.",
         owns: "Language-agnostic status reporting from agent CLIs into the server.",
         inputs: "CLI lifecycle events and AGENTDECK_* environment variables.",
-        outputs: "POST /api/hook with event, state, detail, token.",
+        outputs: "POST /api/hook with lifecycle/status event, state, detail, token. File/command tracking is handled by normalized events or explicit ingest, not implied by every bundled hook.",
         persists: "Generated hook scripts/settings files under AgentDeck home.",
         neighbors: "server hook handler, terminal runtime, backend adapter.",
         paths: ["internal/hooks/hooks.go", "internal/hooks/scripts", "internal/server/hook.go"]
@@ -1727,7 +1887,7 @@ cd ui && npm run build</pre>
       {
         id: "messaging", title: "MCP messaging", short: "list_agents, send_message, check_messages.",
         owns: "Agent-to-agent coordination and loop safety budgets.",
-        inputs: "MCP tool calls from registered agent sessions.",
+        inputs: "Streamable HTTP MCP tool calls at /mcp from registered agent sessions.",
         outputs: "Message rows, unread indicators, nudger prompts, notification events.",
         persists: "messages table and per-turn budget counters.",
         neighbors: "state manager, runtime registry, bus/SSE.",
@@ -1736,9 +1896,9 @@ cd ui && npm run build</pre>
       {
         id: "archive", title: "Archive/index", short: "Transcript logs, search, resume material.",
         owns: "Durable session history, file/command trails, FTS5 search, reindex.",
-        inputs: "Normalized transcript events, hook/tool signals, reindex command.",
+        inputs: "Normalized assistant/tool transcript events, file/command signals, reindex command.",
         outputs: "Archive rows, search results, resume snapshots, files/commands API.",
-        persists: "sessions/{agent_id}/ transcript logs and state.db search/index rows.",
+        persists: "sessions/{agent_id}/transcript.ndjson logs and state.db search/index rows.",
         neighbors: "runtime writer, server archive endpoints, state manager.",
         paths: ["internal/transcript/writer.go", "internal/index/indexer.go", "internal/archive/archive.go"]
       },
@@ -1766,8 +1926,8 @@ cd ui && npm run build</pre>
       {
         title: "Chat turn and ACP normalization",
         user: "You send a prompt and see assistant output, tool calls, results, diffs, and turn end in the chat panel.",
-        system: "ChatRuntime sends ACP prompt over stdio, reads NDJSON JSON-RPC frames, maps them in acpmap.go, writes transcript events, and fans out SSE.",
-        debug: "If a message renders wrong, inspect the normalized Event first, then acpmap.go. Downstream UI should not know provider wire shape.",
+        system: "ChatRuntime sends ACP prompt over stdio, reads NDJSON JSON-RPC frames, maps them in acpmap.go, writes assistant/tool transcript events, and fans out SSE. User prompt bubbles are UI-local today.",
+        debug: "If a message renders wrong, inspect the normalized Event first, then acpmap.go. If your own prompt is missing from Archive/search, that is the current persistence gap.",
         lanes: ["Prompt REST", "ACP stdio", "event mapping", "hub/transcript", "SSE/UI render"],
         paths: ["internal/runtime/chat.go", "internal/runtime/acpmap.go", "internal/runtime/event.go", "ui/src/components/chat/renderers"],
         source: "docs/phases/tech/phase-1-core-loop-techspec.md"
@@ -1784,7 +1944,7 @@ cd ui && npm run build</pre>
       {
         title: "Hooks to dashboard status",
         user: "Terminal agents and lifecycle events update cards even when the browser is just observing.",
-        system: "Hook scripts POST to /api/hook with launch token. The server validates token, maps event to status/file/command changes, updates SQLite, and emits SSE.",
+        system: "Hook scripts POST lifecycle/status events to /api/hook with launch token. The server validates token, maps status, updates SQLite, and emits SSE. File/command trails come from normalized tool events or explicit ingest, not every bundled hook wrapper.",
         debug: "If terminal status is stale, check AGENTDECK_* env, generated settings file, hook token freshness, and hook endpoint response.",
         lanes: ["CLI lifecycle", "shell hook", "/api/hook", "state/index", "SSE card update"],
         paths: ["internal/hooks/hooks.go", "internal/hooks/scripts", "internal/server/hook.go", "internal/index/indexer.go"],
@@ -1793,17 +1953,17 @@ cd ui && npm run build</pre>
       {
         title: "MCP messaging and nudger",
         user: "One agent asks another for help. The recipient gets unread mail and can be nudged into checking it.",
-        system: "MCP tool call resolves caller identity from the registered session, writes a message row, consumes budget, emits indicators, and nudges idle recipients.",
-        debug: "If messages do not deliver, check token-to-agent registration, unread row state, recipient status, and per-turn budget.",
-        lanes: ["MCP tool call", "identity binding", "message row", "budget/nudger", "recipient check"],
+        system: "Streamable HTTP MCP at /mcp resolves caller identity from generated per-agent registration, writes a message row, consumes budget, emits indicators, and nudges idle chat recipients.",
+        debug: "If messages do not deliver, check HTTP MCP registration, token-to-agent binding, unread row state, recipient interface/status, and per-turn budget.",
+        lanes: ["/mcp tool call", "identity binding", "message row", "budget/nudger", "recipient check"],
         paths: ["internal/messaging/tools.go", "internal/state/messages.go", "internal/server/messaging_loops.go"],
         source: "docs/phases/tech/phase-5-coordination-techspec.md"
       },
       {
         title: "Archive search and resume",
         user: "You search an old phrase, open a session, and resume it with history intact.",
-        system: "Transcript logs feed the indexer. SQLite stores session metadata and FTS5 rows. Resume reads the snapshot/history and launches a fresh runtime under the same agent_id.",
-        debug: "If search misses a phrase, run reindex and inspect transcript append records versus FTS rows.",
+        system: "sessions/{agent_id}/transcript.ndjson feeds the indexer. SQLite stores session metadata and FTS5 rows. Resume reads the snapshot/history and launches a fresh runtime under the same agent_id.",
+        debug: "If search misses assistant/tool content, run reindex and inspect transcript append records versus FTS rows. If it misses your own prompt, that prompt was not persisted yet.",
         lanes: ["transcript append", "indexer", "FTS5 query", "resume endpoint", "runtime.Resume"],
         paths: ["internal/transcript/writer.go", "internal/index/indexer.go", "internal/archive/archive.go", "internal/server/resume.go"],
         source: "docs/phases/tech/phase-4-persistence-archive-techspec.md"
@@ -1811,9 +1971,9 @@ cd ui && npm run build</pre>
       {
         title: "Terminal PTY and WebSocket",
         user: "You open a terminal tab, type into a real CLI, and see output in xterm.js.",
-        system: "Terminal runtime starts a CLI under PTY, server bridges PTY master to /terminal/ws, xterm.js writes keystrokes/resizes and renders bytes.",
-        debug: "If terminal is blank, check capabilities, driver selection, PTY process, WebSocket frames, and hook status separately.",
-        lanes: ["terminal launch", "PTY child", "WebSocket bridge", "xterm.js panel", "hooks status"],
+        system: "Terminal runtime starts a CLI under PTY. In the current working tree, a per-agent PTY hub drains the master, broadcasts identical bytes to viewers, and replays bounded scrollback; xterm.js writes keystrokes/resizes over WebSocket.",
+        debug: "If terminal is blank, check capabilities, driver selection, PTY process, PTY hub/WS frames, and hook status separately. Raw terminal bytes are not ACP transcript events.",
+        lanes: ["terminal launch", "PTY child", "PTY hub + WS", "xterm.js panel", "hooks status"],
         paths: ["internal/runtime/terminal", "internal/server/terminal.go", "ui/src/components/chat/TerminalTab.tsx"],
         source: "docs/phases/tech/phase-6-flexibility-techspec.md"
       },
@@ -1838,38 +1998,38 @@ cd ui && npm run build</pre>
     ];
 
     const protocols = [
-      ["ACP", "Chat runtime protocol", "AgentDeck speaks ACP over stdio to chat adapters. ACP gives structured events: assistant text, tool calls, diffs, permission requests, and turn boundaries. AgentDeck immediately normalizes those into its own Event model so UI/archive code does not depend on provider wire shapes.", ["internal/runtime/chat.go", "internal/runtime/acpmap.go"]],
-      ["MCP", "Agent-to-agent tools", "AgentDeck hosts an MCP server in-process. Agents call list_agents, send_message, and check_messages. The server uses MCP session identity, not a spoofable argument, to know who is calling.", ["internal/messaging/tools.go", "docs/phases/tech/phase-5-coordination-techspec.md"]],
-      ["SSE", "Live browser updates", "The browser keeps one /api/events stream open. The server pushes state_update, new_message, notification, and ping events. This is why dashboard cards breathe without polling.", ["internal/server/sse.go", "internal/bus/bus.go", "ui/src/api/sse.ts"]],
-      ["PTY/WS", "Interactive terminal path", "Terminal runtime uses a pseudo-terminal for a real CLI. The server bridges PTY bytes over WebSocket to xterm.js. Terminal content and terminal status are separate: bytes over WS, lifecycle over hooks.", ["internal/runtime/terminal", "internal/server/terminal.go"]],
-      ["Hooks", "Lifecycle status producers", "Hooks are tiny shell scripts registered with agent CLIs. They POST lifecycle events to the server with a per-launch token. This keeps status immediate and avoids fragile file-watcher channels.", ["internal/hooks/hooks.go", "internal/server/hook.go"]],
-      ["SQLite/FTS5", "Machine state and search", "State.db stores identity, running rows, live status, messages, sessions, and FTS5 search tables. The server is the sole writer, which keeps local SQLite simple and reliable.", ["internal/state/schema.go", "internal/index/indexer.go"]]
+      ["ACP", "Chat runtime protocol", "What it is: structured chat over stdio. Why AgentDeck uses it: assistant text, tool calls, diffs, permissions, and turn boundaries arrive as machine-readable events. What can break: provider wire-shape changes, permission races, or missing user-prompt persistence.", ["internal/runtime/chat.go", "internal/runtime/acpmap.go"]],
+      ["MCP", "Agent-to-agent tools", "What it is here: streamable HTTP MCP mounted at /mcp. Why AgentDeck uses it: agents call list_agents, send_message, and check_messages without a user copy-paste relay. What can break: live CLI registration is still gated and no working stdio proxy fallback is shipped.", ["internal/messaging/tools.go", "docs/phases/tech/phase-5-coordination-techspec.md"]],
+      ["SSE", "Live browser updates", "What it is: one-way server push from /api/events. Why AgentDeck uses it: dashboard cards, transcript deltas, notifications, and pings update without polling. What can break: stale store state, missed reconnect fetches, or subscriber lifecycle bugs.", ["internal/server/sse.go", "internal/bus/bus.go", "ui/src/api/sse.ts"]],
+      ["PTY/WS", "Interactive terminal path", "What it is: real CLI bytes over pseudo-terminal plus WebSocket. Why AgentDeck uses it: terminal mode can drive CLIs that are not ACP-structured. What can break: capabilities, PTY hub/drain, WebSocket attach, and hook status are separate concerns.", ["internal/runtime/terminal", "internal/server/terminal.go"]],
+      ["Hooks", "Lifecycle status producers", "What they are: tiny shell scripts registered with agent CLIs. Why AgentDeck uses them: lifecycle/status events POST to /api/hook with a per-launch token, especially for terminal agents. What can break: missing jq/curl, gated chat passthrough, Codex hook names, or stale tokens.", ["internal/hooks/hooks.go", "internal/server/hook.go"]],
+      ["SQLite/FTS5", "Machine state and search", "What it is: state.db stores identity, running rows, live status, messages, sessions, and FTS5 search tables. Why AgentDeck uses it: local joins and search without cloud state. What can break: index drift, transcript parse errors, or missing event types.", ["internal/state/schema.go", "internal/index/indexer.go"]]
     ];
 
     const recipes = [
       ["Install and run", "Build the UI and binary, then start the dashboard locally.", "Run ./install.sh or make dist. Start with agentdeck dashboard start and open with agentdeck dashboard open. The server binds 127.0.0.1 only.", "README.md"],
       ["Launch from CLI", "Start an agent without touching the UI.", "Use agentdeck implementer@my-app --backend claude --model sonnet. The CLI calls the same REST launch path as the modal, so parity matters.", "internal/cli/launch.go"],
-      ["Create a role", "Define a new agent persona.", "Add or edit a role in Settings. It writes roles/{role}.json. Existing agents keep their current composed prompt until restarted.", "internal/config/roles.go"],
+      ["Create a role", "Define a new agent persona.", "Add or edit a role in Settings. It writes roles/{role}.json. Existing running processes keep their launch-time prompt; resume/switch use the frozen session prompt/cwd with live identity/backend/model/env resolution.", "internal/config/roles.go"],
       ["Create a project", "Point agents at a workspace.", "Set title, cwd, optional add_dirs, color, and context prompt. Cwd must exist; project context is injected at launch.", "internal/config/projects.go"],
       ["Approve a tool", "Handle a permission prompt.", "Open the chat panel, review the tool and diff/context, choose Approve or Deny. The runtime relays that decision back over ACP.", "internal/runtime/permission.go"],
-      ["Send an agent message", "Ask another agent for help.", "Prompt an agent to use send_message(to, body). The recipient sees unread state and the nudger can wake it if idle.", "internal/messaging/tools.go"],
-      ["Search and resume", "Find historical work and continue it.", "Use Archive search. Resume relaunches a runtime under the same stable agent identity with history restored.", "internal/server/resume.go"],
-      ["Switch runtime", "Move chat to terminal or change backend/model.", "Use Switch runtime from card actions. The server stops and relaunches on the same agent_id, using native resume or primer handoff.", "internal/server/switch.go"],
-      ["Use terminal mode", "Work with a real interactive CLI.", "Choose terminal interface if capabilities report available drivers. xterm/PTY is the default; tmux may be available; iTerm2 remains optional.", "internal/runtime/terminal"],
+      ["Send an agent message", "Ask another agent for help.", "Prompt an agent to use send_message(to, body). The recipient sees unread state and the nudger can wake idle chat recipients. The transport is streamable HTTP MCP at /mcp with token-bound identity.", "internal/messaging/tools.go"],
+      ["Search and resume", "Find historical work and continue it.", "Use Archive search. Resume relaunches a runtime under the same stable agent identity with history restored. Search covers indexed assistant/tool transcript content, not your own prompt bubbles yet.", "internal/server/resume.go"],
+      ["Switch runtime", "Move chat to terminal or change backend/model.", "Use Switch runtime from card actions. The server stops and relaunches on the same agent_id, using native resume or primer handoff. Respect the open primer persistence blocker until fixed.", "internal/server/switch.go"],
+      ["Use terminal mode", "Work with a real interactive CLI.", "Choose terminal interface if capabilities report available drivers. xterm/PTY is the default, tmux may be available, iTerm2 remains optional, and raw terminal bytes are not ACP transcript events.", "internal/runtime/terminal"],
       ["Release a group", "Stop a whole workstream.", "Assign group labels, collapse sections as needed, then Release group. AgentDeck stops running members and updates cards.", "internal/server/groups.go"]
     ];
 
     const glossary = [
       ["agent_id", "AgentDeck's stable identity for a logical agent. It survives resume, switch-runtime, backend swap, group changes, messages, and archive rows."],
-      ["session_id", "The provider/runtime session identifier. It is ephemeral and may change every resume or switch. Do not use it as the product identity."],
+      ["session_id", "The provider/runtime session identifier. Chat backends use native session IDs; terminal launches may have an empty session_id and instead record tty/driver metadata. Do not use it as the product identity."],
       ["Runtime registry", "The Go facade that dispatches common operations to chat or terminal implementations based on agent.interface."],
       ["ACP", "Agent Communication Protocol over stdio for structured chat sessions."],
-      ["MCP", "Model Context Protocol, used here for in-process agent-to-agent messaging tools."],
+      ["MCP", "Model Context Protocol, used here as streamable HTTP /mcp tools for agent-to-agent messaging."],
       ["SSE", "Server-Sent Events, the one-way live stream from server to browser."],
       ["PTY", "Pseudo-terminal used to run a real CLI interactively and bridge bytes to the browser."],
       ["Hook token", "Per-launch secret passed to hook scripts so stale or unrelated local processes cannot spoof status."],
       ["Nudger", "Server loop that wakes idle agents with unread messages by injecting a check_messages prompt."],
-      ["Primer", "Bounded transcript summary/handoff used when native resume is unavailable across backend/model switches."],
+      ["Primer", "Bounded transcript summary/handoff used when native resume is unavailable across backend/model switches. Current HANDOFF tracks a blocker to keep it one-shot and out of frozen session prompts."],
       ["FTS5", "SQLite full-text search extension used for archive transcript search."],
       ["Config composition", "The launch-time merge of project cwd/context, role prompt, backend/model/env, permissions, hooks, and MCP registration."]
     ];
