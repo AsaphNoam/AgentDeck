@@ -74,7 +74,7 @@ cd ui && npm install && npm run dev   # http://localhost:5173
 ## Layout (`~/.agentdeck/`)
 
 ```
-roles/{role}.json     personas (seeded: agentdecker, implementer, reviewer, researcher, pm)
+roles/{role}.json     personas (seeded: agentdecker, implementer, reviewer, researcher, pm, teammate)
 projects/{p}.json     workspaces (seeded: my-app)
 backends.json         providers + models (version 2)
 layout.json           card order + density
