@@ -7,7 +7,7 @@ This folder breaks the [master PRD](../agent-dashboard-prd.md) into **dependency
 - **Vertical slices, not horizontal layers.** Every phase from 1 onward ends with something a user can run and see, not just an internal layer.
 - **The server is the contract.** Human-edited config lives as plain JSON files; machine state lives in a single SQLite `state.db` the server solely writes. Producers (hooks via `/api/hook`, runtimes) and consumers (UI via SSE) are decoupled through the server, not a shared file layout.
 - **Stable identity first.** `agent_id` never changes; everything that "swaps" (model, backend, interface, resume) is layered on top of it. Getting this right in Phase 0/1 is what makes Phases 6 cheap.
-- **Defer the optional.** Terminal runtime and the activity map are explicitly last; the cross-platform chat runtime is the spine.
+- **Defer the optional.** Terminal runtime comes after the core chat/runtime spine. Phase 7 is a future-phase candidate slot, not a required polish dependency.
 
 ## Phase map
 
@@ -20,7 +20,7 @@ This folder breaks the [master PRD](../agent-dashboard-prd.md) into **dependency
 | [4](phase-4-persistence-archive.md) | Persistence: archive, search, resume, file/command tracking | F9, F10 | 1, 2 |
 | [5](phase-5-coordination.md) | Coordination: MCP messaging, nudger, budgets, notifications | F8, F11 | 1, 2 |
 | [6](phase-6-flexibility.md) | Flexibility: terminal runtime, switch-runtime, task groups | F7, F2 | 1, 2, 4 |
-| [7](phase-7-polish-activity-map.md) | Polish: activity map & ambient visualization | F13 | 2, 5 |
+| [7](phase-7-future-phase.md) | Future phase: candidate-driven post-core work | Candidate backlog | Selected candidate |
 
 ## Dependency graph
 
@@ -47,11 +47,11 @@ This folder breaks the [master PRD](../agent-dashboard-prd.md) into **dependency
               └────┬─────┘
                    ▼
               ┌──────────┐
-              │ 7 Polish │
+              │ 7 Future │
               └──────────┘
 ```
 
-Phases 3, 4, and 5 all sit on top of Phase 2 and have no hard dependencies on each other, so they can be built in parallel or reordered by priority. Phase 6 wants resume (Phase 4) in place; Phase 7 wants messaging (Phase 5) for its animations.
+Phases 3, 4, and 5 all sit on top of Phase 2 and have no hard dependencies on each other, so they can be built in parallel or reordered by priority. Phase 6 wants resume (Phase 4) in place. Phase 7 is candidate-driven; choose its dependencies from the selected candidate in [`phase-7-feature-candidates.md`](phase-7-feature-candidates.md).
 
 ## Milestone-to-PRD mapping
 

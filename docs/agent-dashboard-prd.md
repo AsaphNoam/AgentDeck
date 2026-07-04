@@ -364,7 +364,7 @@ GET    /events                          SSE stream (state_update, new_message, n
 4. **Persistence:** session save + SQLite FTS5 archive search + resume (F9), file/command tracking (F10).
 5. **Coordination:** in-process Go MCP messaging server (begin with the SDK handshake spike) + nudger + budgets (F8); notifications (F11).
 6. **Flexibility:** terminal runtime + switch-runtime (F7); task groups (F2).
-7. **Polish:** activity map and any ambient visualizations (F13).
+7. **Future phase:** choose the highest-value post-core candidate. Current candidates include launch templates/task bundles, session notes, dashboard triage, command palette, and the optional activity map (F13).
 
 ---
 

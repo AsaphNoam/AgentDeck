@@ -27,7 +27,7 @@ This phase also delivers the **non-destructive resume** machinery that Phase 6's
 
 ### Out of scope
 - Switch interface/backend/model on a live agent (Phase 6/F7 — built on this phase's resume).
-- Messaging (Phase 5), activity map (Phase 7).
+- Messaging (Phase 5), future-phase candidates such as the activity map.
 
 ---
 

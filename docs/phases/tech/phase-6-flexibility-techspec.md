@@ -3,7 +3,7 @@
 **Mirrors:** `docs/phases/phase-6-flexibility.md` (phase PRD)
 **Features:** F7 (switch runtime on a live agent), F2 (task groups)
 **Depends on:** Phase 1 (Runtime interface, chat runtime, launch composition), Phase 2 (state manager, SSE bus, card grid, layout), Phase 4 (resume machinery, transcript persistence)
-**Enables:** Phase 7
+**Enables:** Future-phase candidates
 **Audience:** the engineer implementing this phase. Prescriptive; no further design decisions required.
 
 ---
@@ -28,7 +28,7 @@ Phase 6 cashes in the stable-`agent_id` investment. Three deliverables, plus one
 - `rename` endpoint if not already present from Phase 2.
 
 ### Out of scope
-- **Activity map** (Phase 7).
+- **Activity map and other future-phase candidates.**
 
 ### Assumptions inherited from prior phases
 - `Runtime` interface and chat runtime exist (Phase 1): `Start`, `SendPrompt`, `Cancel`, `Stop`, `Resume`, `CheckMessages`.
@@ -157,7 +157,7 @@ tell application "iTerm2"
   return ttyVal & tab & wid
 end tell
 ```
-(Create a **window** per agent by default; grouping windows into one window's tabs is a Phase 7 nicety. We still call them "tabs" loosely.)
+(Create a **window** per agent by default; grouping windows into one window's tabs is a future-phase nicety. We still call them "tabs" loosely.)
 
 **set-appearance.applescript** — sets `name` (title) and `background color` from `project.color` (mapped 0–255 → 0–65535).
 

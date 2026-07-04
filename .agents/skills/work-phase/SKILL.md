@@ -28,8 +28,8 @@ work whatever the handoff marks active.
 3. **Update + condense the handoff after every change**, and especially at each GREEN checkpoint:
    tick steps, collapse finished subphases, collapse finished phases to one line (workflow §5).
 4. **Commit at every GREEN checkpoint** — code + `HANDOFF.md` together, **directly on `main`**
-   (trunk-based: no per-phase branches, no PRs), message `phase N.M: <title> — green checkpoint`,
-   with the `Co-Authored-By: Codex Opus 4.8` trailer. Do **not** push unless the user asked.
+   (trunk-based: no per-phase branches, no PRs), message `phase N.M: <title> — green checkpoint`.
+   Do **not** push unless the user asked.
 5. **Keep going** past each finished subphase to the next one. A green subphase boundary is the best
    place to be cut off, not a reason to quit.
 6. **Only stop for STOP conditions** (workflow §3): unresolvable ambiguity, a checkpoint you can't get

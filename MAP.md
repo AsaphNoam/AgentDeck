@@ -18,7 +18,8 @@ Central index of the planning docs: what each file is, the build order, and the 
 | [docs/phases/phase-4-persistence-archive.md](docs/phases/phase-4-persistence-archive.md) | Archive, search, resume, file/command tracking. (F9, F10) |
 | [docs/phases/phase-5-coordination.md](docs/phases/phase-5-coordination.md) | MCP messaging, nudger, budgets, notifications. (F8, F11) |
 | [docs/phases/phase-6-flexibility.md](docs/phases/phase-6-flexibility.md) | Terminal runtime, switch-runtime, task groups. (F7, F2) |
-| [docs/phases/phase-7-polish-activity-map.md](docs/phases/phase-7-polish-activity-map.md) | Activity map / ambient viz. Optional. (F13) |
+| [docs/phases/phase-7-future-phase.md](docs/phases/phase-7-future-phase.md) | Future phase candidate bucket. Start here for post-core feature selection. |
+| [docs/phases/phase-7-feature-candidates.md](docs/phases/phase-7-feature-candidates.md) | Candidate backlog for Phase 7; currently prioritizes launch templates/task bundles and session notes. |
 
 ### Implementation tech specs
 
@@ -33,23 +34,23 @@ Each phase PRD above has a mirror **tech spec** under `docs/phases/tech/` — th
 | [tech/phase-4-persistence-archive-techspec.md](docs/phases/tech/phase-4-persistence-archive-techspec.md) | Phase 4 |
 | [tech/phase-5-coordination-techspec.md](docs/phases/tech/phase-5-coordination-techspec.md) | Phase 5 |
 | [tech/phase-6-flexibility-techspec.md](docs/phases/tech/phase-6-flexibility-techspec.md) | Phase 6 |
-| [tech/phase-7-polish-activity-map-techspec.md](docs/phases/tech/phase-7-polish-activity-map-techspec.md) | Phase 7 |
+| [tech/phase-7-polish-activity-map-techspec.md](docs/phases/tech/phase-7-polish-activity-map-techspec.md) | Optional activity-map candidate for Phase 7 |
 
 ## Build order
 
 ```
 0 ─▶ 1 ─▶ 2 ─┬▶ 3   (config/onboarding)
              ├▶ 4   (persistence) ─┐
-             └▶ 5   (coordination) ─┴▶ 6 (flexibility) ─▶ 7 (polish)
+             └▶ 5   (coordination) ─┴▶ 6 (flexibility) ─▶ 7 (future)
 ```
 
 - **0 → 1 → 2** is a strict chain — each requires the previous.
 - **3, 4, 5** all sit on 2 and are independent of each other → parallelizable / reorderable by priority.
-- **6** needs 4 (reuses resume machinery). **7** needs 2 + 5.
+- **6** needs 4 (reuses resume machinery). **7** is candidate-driven; dependencies depend on the selected candidate.
 
 ## Feature → phase
 
-F1→2 · F2→6 · F3→1(min)+2(full) · F4→1(API)+3(modal) · F5→3 · F6→3 · F7→6 · F8→5 · F9→4 · F10→4 · F11→5 · F12→3 · F13→7
+F1→2 · F2→6 · F3→1(min)+2(full) · F4→1(API)+3(modal) · F5→3 · F6→3 · F7→6 · F8→5 · F9→4 · F10→4 · F11→5 · F12→3 · F13→7 candidate
 
 ## Architecture in one breath
 

@@ -3,7 +3,7 @@
 **Status:** ready to build after Phases 1, 2, 4
 **Features:** F7 (switch runtime on a live agent), F2 (task groups)
 **Depends on:** Phases 1, 2, 4 (resume machinery)
-**Enables:** Phase 7
+**Enables:** Future-phase candidates
 
 ---
 
@@ -23,7 +23,7 @@ Pay off the stable-identity investment: let a user change a live agent's interfa
 - Task groups (F2): assign agents a `group` label; dashboard renders collapsible group sections; collapse/expand persists; "release group" stops all agents in it.
 
 ### Out of scope
-- Activity map (Phase 7).
+- Activity map and other future-phase candidates.
 
 ---
 

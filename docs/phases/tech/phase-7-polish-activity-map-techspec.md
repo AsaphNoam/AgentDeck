@@ -1,6 +1,6 @@
-# Phase 7 — Implementation Tech Spec: Activity Map / Ambient Visualization (F13)
+# Phase 7 Candidate — Implementation Tech Spec: Activity Map / Ambient Visualization (F13)
 
-**Mirrors:** `docs/phases/phase-7-polish-activity-map.md` (phase PRD)
+**Mirrors:** `docs/phases/phase-7-future-phase.md` (future phase bucket) and remains the implementation baseline if the activity-map candidate is selected.
 **Feature:** F13 (activity map)
 **Depends on:** Phase 2 (`/api/events` SSE bus, React app shell, global agent store) and Phase 5 (`new_message` / `notification` events that drive animations)
 **Status:** optional / lowest priority. Pure frontend. No server changes.
@@ -189,7 +189,7 @@ No routes are added. The only network reads the map performs are: (a) the shared
 
 ## Subphase plan (incremental / quota-limited implementation)
 
-Every subphase ends at a GREEN checkpoint — `npm run build` (in `ui/`) passes and all existing tests pass — so work is never half-done and a fresh agent can resume cold; Phase 7 is a pure frontend consumer of the existing `/api/events` SSE bus and adds no server changes.
+Every subphase ends at a GREEN checkpoint — `npm run build` (in `ui/`) passes and all existing tests pass — so work is never half-done and a fresh agent can resume cold; the activity-map candidate is a pure frontend consumer of the existing `/api/events` SSE bus and adds no server changes.
 
 ### Subphase 7.1 — Map scaffold, zone config load, and static SVG map
 - **Goal:** Stand up the `MapView` shell with a `Grid | Map` toggle and a static SVG map whose zones are painted from `zones.json` (markers not yet live).
@@ -260,7 +260,7 @@ Test against the four PRD acceptance criteria plus the locked decisions.
 **No-new-server-data verification (the load-bearing constraint):**
 
 - Spy on `fetch`/`EventSource` during a Grid→Map switch; assert **no new `/api/...` requests** and **no second `EventSource`** are created — only the one-time static `zones.json` read. (PRD AC: "the view is purely additive and introduces no new server data.")
-- Static check / review gate: the Phase 7 diff touches **only `ui/`**; it adds no Go handler, no new SSE event type, no new file written under `~/.agentdeck/`.
+- Static check / review gate: the activity-map candidate diff touches **only `ui/`**; it adds no Go handler, no new SSE event type, no new file written under `~/.agentdeck/`.
 
 **Manual / E2E smoke:**
 

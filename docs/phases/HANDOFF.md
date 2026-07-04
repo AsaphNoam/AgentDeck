@@ -25,7 +25,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - [x] Phase 4 — Persistence: archive, search, resume, file/command tracking ✅
 - [x] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications ✅
 - [ ] Phase 6 — Flexibility: terminal runtime, switch-runtime, task groups
-- [ ] Phase 7 — Polish: activity map
+- [ ] Phase 7 — Future phase: candidate-driven post-core work
 
 Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent after 2).
 
@@ -87,7 +87,7 @@ launch option via capabilities, and refreshed embedded UI. Details in changelog 
 - [ ] Escaping + shell-quote helper with tests for quotes/backslashes/newlines/argv shell-quoting.
 - [ ] Capability probe wiring; explicit unavailable `driver:"iterm2"` returns `422 terminal_unavailable` with reason.
 - **Checkpoint:** `go build ./...` + `go test ./...` + `go test -tags sqlite_fts5 ./...` (Go-only unless UI driver picker changes).
-- **Resume note:** xterm/tmux drivers and capabilities are green. 6.7 is fully skippable; if skipped, roll Phase 6 complete and proceed to Phase 7.
+- **Resume note:** xterm/tmux drivers and capabilities are green. 6.7 is fully skippable; if skipped, roll Phase 6 complete and pick the Phase 7 candidate from `phase-7-feature-candidates.md`.
 
 ---
 
@@ -284,7 +284,7 @@ re-audited review-fix commits: three hold fully (464bbdc, 2c5fefb, 7514349), two
 2. **Biggest real-world risk remains the gated live-CLI surface:** `interactiveBinary` map, claude
    `--resume` form, codex hook names, HTTP-MCP acceptance, and now also whether `session/load` applies
    `mcpServers` on resume (if the real adapter ignores them, every resumed chat agent silently loses
-   messaging). Burn these down before Phase 7 polish.
+   messaging). Burn these down before Phase 7 candidate work.
 3. **Docs drift accumulates at the seams:** MAP.md (stdio vs shipped HTTP MCP), architecture-flow.md
    (terminal→bus parity that doesn't exist), README (INSTALL_ACP=0 default, jq/curl prereqs). Fresh-user
    experience depends on these more than on code quality.

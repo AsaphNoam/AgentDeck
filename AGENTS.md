@@ -16,7 +16,7 @@ Claude and Codex taking turns). Do **not** improvise a process — follow the sh
 
 - **GREEN checkpoint = `go build ./...` + `go test ./...` pass** (`+ cd ui && npm run build` if you touched `ui/`). Never record a subphase done or commit on red.
 - **Keep `HANDOFF.md` lean and current** — update after every change; collapse finished subphases/phases (workflow §5). It's the only thing the next agent has.
-- **Commit at every checkpoint directly on `main`** (trunk-based: no per-phase branches, no PRs); don't push unless the human asked. Use your own `Co-Authored-By` trailer.
+- **Commit at every checkpoint directly on `main`** (trunk-based: no per-phase branches, no PRs); don't push unless the human asked.
 - **Only stop for real blockers** (workflow §3: unresolvable ambiguity, a checkpoint you can't fix, missing credentials, destructive actions). Write the blocker under `## Blocked on human`, then stop.
 - **Flag every judgment call.** If an ambiguity or spec gap forced *you* to make a design/implementation decision (without stopping), record it under `## Autonomous decisions (please review)` **and** call it out explicitly in your end-of-turn summary — never let the human find a self-made decision only by reading the diff.
 - **Do the work yourself** — don't hand the build to sub-agents that can't run the build/test commands.
