@@ -15,10 +15,10 @@ import (
 // builds this from agent identity + project + role + backend/model so the Runtime
 // needs no further lookups; a running agent's spec is frozen.
 type LaunchSpec struct {
-	Agent          state.Agent     // stable identity (agent_id, role, project, backend, model, interface)
-	Cwd            string          // resolved absolute working dir (project.cwd, ~-expanded)
-	AddDirs        []string        // project.add_dirs, ~-expanded
-	SystemPrompt   string          // composed: context_prompt + role.system_prompt — the FROZEN, persisted snapshot
+	Agent        state.Agent // stable identity (agent_id, role, project, backend, model, interface)
+	Cwd          string      // resolved absolute working dir (project.cwd, ~-expanded)
+	AddDirs      []string    // project.add_dirs, ~-expanded
+	SystemPrompt string      // composed: context_prompt + role.system_prompt — the FROZEN, persisted snapshot
 	// RuntimeSystemPrompt, when non-empty, is the system prompt fed to the backend
 	// process for THIS launch only (session/new + session/load). It is deliberately
 	// NOT persisted: runtimeMeta/UpsertSessionMeta always snapshot SystemPrompt, so
@@ -26,15 +26,15 @@ type LaunchSpec struct {
 	// primer path sets this so the one-time history primer reaches the new backend
 	// without baking into (or stacking onto) the durable snapshot.
 	RuntimeSystemPrompt string
-	BackendType    string          // "claude-acp" | "codex-acp"
-	ModelID        string          // provider model id, e.g. "claude-sonnet-4-6"
-	Env            []string        // composed env layering (backend then per-model override), "K=V"
-	SkipPerms      bool            // effective skip_permissions after role/global resolution
-	HookToken      string          // per-launch one-time token passed to the agent's hooks
-	MCPServers     []MCPServerSpec // messaging MCP server registration; one entry this phase
-	ExtraArgs      []string        // reserved (e.g. extra adapter flags) — empty this phase
-	LastSessionID  string          // prior CLI session id; Resume tries session/load with this
-	LastContextPct float64         // last-known context pct; Resume restores it to the status row
+	BackendType         string          // "claude-acp" | "codex-acp"
+	ModelID             string          // provider model id, e.g. "claude-sonnet-4-6"
+	Env                 []string        // composed env layering (backend then per-model override), "K=V"
+	SkipPerms           bool            // effective skip_permissions after role/global resolution
+	HookToken           string          // per-launch one-time token passed to the agent's hooks
+	MCPServers          []MCPServerSpec // messaging MCP server registration; one entry this phase
+	ExtraArgs           []string        // reserved (e.g. extra adapter flags) — empty this phase
+	LastSessionID       string          // prior CLI session id; Resume tries session/load with this
+	LastContextPct      float64         // last-known context pct; Resume restores it to the status row
 }
 
 // StartSystemPrompt is the system prompt handed to the backend process for this
