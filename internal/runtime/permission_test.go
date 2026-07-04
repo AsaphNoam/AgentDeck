@@ -3,8 +3,10 @@ package runtime
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -187,6 +189,70 @@ func TestPermissionUnknownToolCall(t *testing.T) {
 	waitForEvent(t, ch, EvPermissionRequest)
 	if err := c.Permission(ctx, h.AgentID, "no_such_tc", "approve"); err != ErrNoPendingPermission {
 		t.Fatalf("Permission unknown id err = %v, want ErrNoPendingPermission", err)
+	}
+}
+
+func TestTakePendingSingleWinner(t *testing.T) {
+	st, err := state.Open(t.TempDir())
+	if err != nil {
+		t.Fatalf("state.Open: %v", err)
+	}
+	t.Cleanup(func() { st.Close() })
+
+	c := NewChatRuntime(st)
+	as := &agentState{
+		agentID: "a_perm_race",
+		hub:     NewHub(),
+		pending: map[string]*pendingPerm{
+			"tc_p": {
+				req:       &IncomingRequest{ID: 1, t: NewTransport(io.Discard, nil, nil)},
+				optByKind: map[string]string{"allow_once": "opt_allow"},
+			},
+		},
+		resolved: map[string]struct{}{},
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	wins := make(chan bool, 2)
+	for i := 0; i < 2; i++ {
+		go func() {
+			defer wg.Done()
+			_, err := c.takePending(as, "tc_p")
+			wins <- err == nil
+		}()
+	}
+	wg.Wait()
+	close(wins)
+
+	got := 0
+	for ok := range wins {
+		if ok {
+			got++
+		}
+	}
+	if got != 1 {
+		t.Fatalf("takePending winners = %d, want 1", got)
+	}
+}
+
+func TestTakePendingReportsAlreadyResolved(t *testing.T) {
+	st, err := state.Open(t.TempDir())
+	if err != nil {
+		t.Fatalf("state.Open: %v", err)
+	}
+	t.Cleanup(func() { st.Close() })
+
+	c := NewChatRuntime(st)
+	as := &agentState{
+		agentID:  "a_perm_done",
+		hub:      NewHub(),
+		pending:  map[string]*pendingPerm{},
+		resolved: map[string]struct{}{"tc_p": {}},
+	}
+
+	if _, err := c.takePending(as, "tc_p"); err != ErrPermissionAlreadyResolved {
+		t.Fatalf("takePending err = %v, want ErrPermissionAlreadyResolved", err)
 	}
 }
 

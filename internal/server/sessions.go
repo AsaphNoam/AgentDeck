@@ -263,6 +263,8 @@ func permissionError(err error) *runtime.APIError {
 		return apiError(runtime.CodeNotFound, "agent not started")
 	case errors.Is(err, runtime.ErrNoPendingPermission):
 		return apiError(runtime.CodeConflict, "no pending permission for that tool_call_id")
+	case errors.Is(err, runtime.ErrPermissionAlreadyResolved):
+		return apiError(runtime.CodeConflict, "permission already resolved for that tool_call_id")
 	case errors.Is(err, runtime.ErrInvalidDecision):
 		return apiError(runtime.CodeValidation, "decision must be approve or deny")
 	default:

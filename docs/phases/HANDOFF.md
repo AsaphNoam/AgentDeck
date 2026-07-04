@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** review fix (switch primer one-shot, finding 6): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
+- **Last GREEN checkpoint:** review fix (permission resolution race, finding 1): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -153,15 +153,6 @@ in current code (`permission.go` captures `turnSeq`); the permission-resolution 
 
 ### BLOCKING
 
-- **BLOCKING — Permission() ignores whether its resolution won the race: fabricated
-  `resolved:true` + conflicting transcript events.** `internal/runtime/permission.go:67-95`
-  discards `resolvePending`'s bool and unconditionally returns success, emits
-  `EvPermissionResolved` with its own decision, and sets busy; `onPermissionTimeout` (98-114) has
-  the same TOCTOU + unconditional emit — racing approve/cancel/timeout can record two conflicting
-  resolutions for one tool call while the ACP peer saw only one. Trigger: double-click approve then
-  cancel, or approve racing the timeout. Fix: check the bool; the loser returns already-resolved
-  and emits nothing; test: race `Permission` vs `Cancel`, assert exactly one resolved event
-  matching the decision that reached fakeacp.
 - **BLOCKING — SSE auto-reconnect can kill a healthy stream and preserve stale snapshot rows.**
   `ui/src/api/sse.ts:18-35,50-55,113-121`: `lastPing`, `hydrationIds`, and `lastAgentSeq` reset
   only on `connect()`/first hydration, not on the browser's automatic `EventSource.onopen`
@@ -637,6 +628,16 @@ in current code (`permission.go` captures `turnSeq`); the permission-resolution 
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-04 — **review fix: permission resolution race (finding 1) — green.** BLOCKING,
+  confirmed real: `Permission()` and `onPermissionTimeout()` each loaded the pending request before
+  deleting it, so concurrent approve/deny/cancel/timeout paths could both believe they won and emit
+  conflicting transcript state. Fixed by making "take the pending request" the atomic step
+  (`takePending`), resolving through the claimed request only, restoring the pending entry on invalid
+  decisions, and surfacing `ErrPermissionAlreadyResolved` as a 409 instead of fabricating
+  `resolved:true`. Regression coverage: `TestTakePendingSingleWinner`,
+  `TestTakePendingReportsAlreadyResolved`, and server mapping coverage in
+  `TestPermissionErrorAlreadyResolved`. Green: `go build ./...`, `go test ./...`,
+  `go test -tags sqlite_fts5 ./...`.
 - 2026-07-03 — **review fix: switch primer one-shot (finding 6) — green.** BLOCKING, confirmed real (reproduced: the
   frozen snapshot absorbed the primer; a second cross-backend switch stacked another). Decoupled "prompt fed to the
   backend process this launch" from "prompt persisted to the frozen snapshot": new `LaunchSpec.RuntimeSystemPrompt`
