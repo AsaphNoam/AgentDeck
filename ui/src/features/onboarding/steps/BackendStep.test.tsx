@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/re
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
+import { delay } from "msw";
 import { BackendStep } from "./BackendStep";
 
 // Mirrors the real seed (internal/config/seed.go): a "claude" backend with two
@@ -51,6 +52,27 @@ function renderWithQuery(ui: React.ReactElement) {
 }
 
 describe("BackendStep", () => {
+  it("keeps validation disabled until the backends query has loaded", async () => {
+    server.use(
+      http.get("/api/backends", async () => {
+        await delay(200);
+        return HttpResponse.json(seededBackendsDoc);
+      }),
+    );
+
+    renderWithQuery(<BackendStep onDone={vi.fn()} />);
+
+    const button = screen.getByText("Validate & Continue");
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("claude-sonnet-4-6")).toBeInTheDocument();
+    });
+    expect(button).not.toBeDisabled();
+    expect(lastPutBody).toBeNull();
+  });
+
   it("submitting without touching model inputs preserves the seeded models map (no 'default' placeholder)", async () => {
     const onDone = vi.fn();
     renderWithQuery(<BackendStep onDone={onDone} />);

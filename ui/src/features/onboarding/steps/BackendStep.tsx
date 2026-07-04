@@ -7,7 +7,7 @@ interface BackendStepProps {
 }
 
 export function BackendStep({ onDone }: BackendStepProps) {
-  const { data: existing } = useBackends();
+  const { data: existing, isLoading } = useBackends();
   const putBackends = usePutBackends();
 
   const [type, setType] = useState<"claude-acp" | "codex-acp">("claude-acp");
@@ -18,14 +18,15 @@ export function BackendStep({ onDone }: BackendStepProps) {
   const [credStatus, setCredStatus] = useState<string | null>(null);
   const [credDetail, setCredDetail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const backendId = type === "claude-acp" ? "claude" : "codex";
+  const seeded = existing?.backends[backendId];
+  const readyToValidate = !!existing && !isLoading;
 
   // Pre-fill from the seeded backend entry for the selected type (once loaded), so an
   // untouched submit reuses the seeded default model (name + model string) instead of a
   // synthesized placeholder.
   useEffect(() => {
     if (!existing) return;
-    const backendId = type === "claude-acp" ? "claude" : "codex";
-    const seeded = existing.backends[backendId];
     const seededModel = seeded?.default_model ? seeded.models[seeded.default_model] : undefined;
     if (seeded && seeded.default_model && seededModel) {
       setModelKey(seeded.default_model);
@@ -38,14 +39,13 @@ export function BackendStep({ onDone }: BackendStepProps) {
   // (The wizard calls onDone when the cred check comes back ok.)
 
   const handleValidate = () => {
+    if (!readyToValidate) return;
     setError(null);
     setCredStatus(null);
-    const backendId = type === "claude-acp" ? "claude" : "codex";
     const env: Record<string, string> = {};
     if (apiKey) env["OPENAI_API_KEY"] = apiKey;
 
     const backends: BackendsConfig["backends"] = existing?.backends ?? {};
-    const seeded = backends[backendId];
     // Merge-preserve: keep the seeded backend's full `models` map (and other fields) and
     // only overlay the one model the user is editing here. This avoids clobbering seeded
     // models with a synthesized single-model map (which previously could persist the
@@ -140,7 +140,11 @@ export function BackendStep({ onDone }: BackendStepProps) {
       {error && <p className="form-error">{error}</p>}
 
       <div className="form-actions">
-        <button type="button" onClick={handleValidate} disabled={putBackends.isPending}>
+        <button
+          type="button"
+          onClick={handleValidate}
+          disabled={putBackends.isPending || !readyToValidate}
+        >
           {putBackends.isPending ? "Validating…" : "Validate & Continue"}
         </button>
       </div>
