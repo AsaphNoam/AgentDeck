@@ -143,23 +143,16 @@ launch option via capabilities, and refreshed embedded UI. Details in changelog 
 > **This section holds only OPEN findings** — no resolved/dismissed graveyard.
 > Blocking items must be fixed before the next phase starts; advisory items when convenient.
 
-**Source:** third full top-to-bottom review (2026-07-03) — 10 segmented reviews (phases 0–6, UI,
-the five 2026-07-02 review-fix commits, cross-cutting concurrency/lifecycle) + 3 adversarial
-verification passes over every BLOCKING candidate (several empirically reproduced) + a holistic
-cross-project synthesis. Baseline verified green first: `go build/test` (plain + `-tags
-sqlite_fts5`), UI 68/68 + `npm run build`. `go test -race` is data-race-clean but exposes a ~2%
-flake in `TestSwitchRuntimeKeepsTargetRegistration` (root-caused; see advisory). Of the five
-re-audited review-fix commits: three hold fully (464bbdc, 2c5fefb, 7514349), two are partial
-(aa6f99c, d6a18cb — see advisories).
+**Source:** fourth full top-to-bottom review (2026-07-04) — segmented simpler-model reviews for
+phases 0–6.6 (foundation/config/state, runtime, SSE/dashboard, onboarding/config, persistence,
+coordination, terminal/switch/UI) followed by a holistic simpler-model synthesis and main-agent
+verification. Baseline: `go test ./...`, `go test -tags sqlite_fts5 ./...`, `cd ui && npm run
+test`, and `cd ui && npm run build` all pass. `go build ./...` exits 0 but prints a sandbox-denied
+Go module stat-cache write outside the repo. The prior cancel-escalation BLOCKING finding is fixed
+in current code (`permission.go` captures `turnSeq`); the permission-resolution race remains open.
 
 ### BLOCKING
 
-- **BLOCKING — Cancel's SIGINT escalation isn't turn-scoped and can kill the healthy NEXT turn.**
-  `internal/runtime/permission.go:153-173`: `escalateCancel` re-checks only `as.turnActive` at fire
-  time (no turn generation captured; `turnSeq` exists but is unread here; `SendPrompt` doesn't
-  disarm). Cancel turn A → peer honors fast → user re-prompts within the 3s grace → SIGINT hits
-  turn B. Fix: capture `armedTurnSeq` at arm, require match at fire; test: fakeacp
-  immediate-cancel-ack + re-prompt inside grace → second turn survives.
 - **BLOCKING — Permission() ignores whether its resolution won the race: fabricated
   `resolved:true` + conflicting transcript events.** `internal/runtime/permission.go:67-95`
   discards `resolvePending`'s bool and unconditionally returns success, emits
@@ -169,9 +162,74 @@ re-audited review-fix commits: three hold fully (464bbdc, 2c5fefb, 7514349), two
   cancel, or approve racing the timeout. Fix: check the bool; the loser returns already-resolved
   and emits nothing; test: race `Permission` vs `Cancel`, assert exactly one resolved event
   matching the decision that reached fakeacp.
+- **BLOCKING — SSE auto-reconnect can kill a healthy stream and preserve stale snapshot rows.**
+  `ui/src/api/sse.ts:18-35,50-55,113-121`: `lastPing`, `hydrationIds`, and `lastAgentSeq` reset
+  only on `connect()`/first hydration, not on the browser's automatic `EventSource.onopen`
+  reconnect. A normal dropped connection can reopen on the same `EventSource` after the stale
+  25s ping window, then the watchdog closes it before its first new ping; if the drop happened
+  mid-hydration, stale IDs from the partial snapshot are unioned into the next snapshot and deleted
+  agents can survive indefinitely. Fix: treat every `onopen` after an error as a fresh hydration
+  generation/liveness boundary; tests: fake auto-reconnect after >25s and reconnect before
+  `hydrated`, asserting the stream survives and removed agents are pruned.
+- **BLOCKING — Onboarding backend validation can overwrite seeded backends with placeholder
+  model data.** `ui/src/features/onboarding/steps/BackendStep.tsx:22-35,40-76,143-145`: the
+  Validate button is enabled while `useBackends()` is still undefined; a fast click composes from
+  `{}` with `modelKey="default"` and `modelStr=""`, then `PUT`s a replacement backend document
+  containing the literal placeholder model. This defeats the merge-preserve review fix and can
+  destroy the seeded model map on a fresh install. Fix: disable validation until the backend query
+  has loaded/prefilled, or compose only from the fetched document; test: delay `GET /api/backends`,
+  click immediately, and assert no placeholder payload is sent.
+- **BLOCKING — Terminal backend swaps report `history_handoff:"primer"` but drop the primer.**
+  `internal/server/switch.go:160-172` stores the bounded history primer in
+  `spec.RuntimeSystemPrompt`, but `internal/runtime/terminal/terminal.go:537-565` builds terminal
+  launches from argv/env only and never consumes `RuntimeSystemPrompt`/`StartSystemPrompt()`.
+  Cross-backend or non-native-resumable switches into terminal therefore lose the continuity the
+  API claims was handed off. Fix: thread the one-shot primer into the terminal launch path or reject
+  primer-required terminal switches; test: switch into terminal with `history_handoff:"primer"` and
+  assert the launched backend receives the primer payload.
+- **BLOCKING — Codex terminal launches register no hooks, so hooks-only terminal status never
+  advances.** `internal/backend/adapter.go:161-165` returns nil `HookLaunchArgs` for Codex, while
+  `internal/server/launch.go:229-238` says terminal hook registration is required because hooks are
+  the sole status producer and `internal/runtime/terminal/terminal.go:167-205` only writes the
+  initial idle row. The UI exposes `backend=codex` + `interface=terminal`, so a normal Codex
+  terminal launch can succeed but stay stuck at the initial status. Fix: implement Codex terminal
+  hook registration or reject the unsupported combination with 422; test: Codex terminal launch
+  must either receive hook args or fail before launch.
 
 ### ADVISORY
 
+- **ADVISORY — launch parser accepts missing value operands as empty strings.**
+  `internal/cli/launch.go:62-85`: `val()` returns `""` when a value flag is last or followed by
+  another flag, so `agentdeck impl@proj --resume` silently falls through to a fresh launch instead
+  of failing fast. Fix: make value-taking flags require a non-flag operand; test:
+  `parseLaunch([]string{"impl@p", "--resume"})` returns an error.
+- **ADVISORY — New Agent modal does not follow later default-backend changes.**
+  `ui/src/features/launch/NewAgentModal.tsx:30-76`: `backendId` initializes once and only fills
+  when empty, so an open modal can keep a stale backend after Settings changes the default. Fix:
+  track whether the current selection was auto-derived and resync on default changes until the user
+  explicitly selects a backend.
+- **ADVISORY — hook-only file/command activity never bumps session recency.**
+  `internal/index/indexer.go:392-448`: `CaptureHookFile`/`CaptureHookCommand` refresh rollup
+  counts but not `sessions.updated_at` or `last_seq`; terminal-only activity can stay buried in
+  archive ordering and look idle until another turn boundary. Fix: touch the session row from hook
+  capture; test: hook file/command activity moves the session to the top of `/api/archive`.
+- **ADVISORY — live Files/Commands tabs are one-shot snapshots.**
+  `ui/src/components/chat/FilesTab.tsx:48-56` and
+  `ui/src/components/chat/CommandsTab.tsx:35-43` fetch only on mount; if the agent keeps editing or
+  running commands while the tab is open, the list stays frozen until remount. Fix: refetch on
+  relevant SSE/transcript activity or poll while visible; test: add a tracked row after mount and
+  assert the visible tab updates.
+- **ADVISORY — unread badges stay stale after message read/delete/expiry.**
+  `internal/messaging/tools.go:182-230`, `internal/server/messaging_loops.go:91-106`, and
+  `internal/server/server.go:114-129`: `send_message` publishes a state update, but
+  `check_messages` and janitor cleanup mutate read/delete state without touching the affected
+  agent, so `unread_messages` can remain nonzero until unrelated activity. Fix: publish/touch after
+  read/delete/expiry; test: reading or expiring messages immediately emits `unread_messages:0`.
+- **ADVISORY — nudger cooldown state survives stop/relaunch by agent_id.**
+  `internal/server/messaging_loops.go:12-26,40-87`: in-memory nudge state is keyed only by stable
+  `agent_id`, so a fresh launch can inherit stale `inFlight`/`lastNudgeAt` and miss a wake for up
+  to the cooldown. Fix: key the cache by launch generation/started_at or clear it when the running
+  row changes; test: stop/relaunch with pending mail still nudges promptly.
 - **ADVISORY — user's own chat prompts are never persisted; history reads one-sided on every
   revisit.** No user-prompt `EventType` (`internal/runtime/event.go`); the Composer's `user_text`
   is client-local; every ChatPanel mount / gap-refetch / archive view drops it; typed text is
@@ -273,52 +331,24 @@ re-audited review-fix commits: three hold fully (464bbdc, 2c5fefb, 7514349), two
   terminal agents); `MAP.md` still says the messaging MCP is stdio (shipped transport is HTTP
   `/mcp`); `architecture-flow.md`'s diagram shows terminal→bus event parity that doesn't exist.
 
-### Cross-project observations (2026-07-03 holistic pass — guidance, not findings)
+### Cross-project observations (2026-07-04 holistic pass — guidance, not findings)
 
-1. **Dangerous finding combos** (each half individually confirmed): (a) crash-truncated transcript →
-   user runs `agentdeck reindex` to repair → the tool wipes ALL agents' index then aborts on the corrupt
-   one (less data than before the "repair"); (b) restart-no-re-adoption (intentional) + Stop-no-op →
-   a live agent becomes permanently unkillable/invisible from the product; (c) terminal's gaps stack in
-   one ordinary session: reload splits the stream, walking away blocks the child, stopping erases it
-   from every surface (no sessions row).
-2. **Biggest real-world risk remains the gated live-CLI surface:** `interactiveBinary` map, claude
-   `--resume` form, codex hook names, HTTP-MCP acceptance, and now also whether `session/load` applies
-   `mcpServers` on resume (if the real adapter ignores them, every resumed chat agent silently loses
-   messaging). Burn these down before Phase 7 candidate work.
-3. **Docs drift accumulates at the seams:** MAP.md (stdio vs shipped HTTP MCP), architecture-flow.md
-   (terminal→bus parity that doesn't exist), README (INSTALL_ACP=0 default, jq/curl prereqs). Fresh-user
-   experience depends on these more than on code quality.
-4. **Foundation traps (still open):** hardcoded `latestKnownMigration=6` needs a guard test; SQLite
-   pragmas are per-connection and rely on `SetMaxOpenConns(1)`; bare-PID liveness (`kill(pid,0)`) is the
-   same unhardened primitive in pidfile + running-row sweeps.
-
-### Systemic root causes (fix the class, not just the instances)
-
-> Updated by the 2026-07-03 review. Classes 1–2 from the previous review are CONFIRMED still generating
-> bugs (new instances found in new code); class 3 has grown into class C below. Fixing instances without
-> the class refactor has now cost three review cycles of repeat findings.
-
-1. **Compose-from-partial-view, write-back-whole** (was "LaunchSpec composition drift" — now proven to be
-   a project-wide anti-pattern, not a Go-only one): switch.go mutating the spec that gets persisted
-   (primer BLOCKING), BackendStep building a replacement backend from only the fields on screen
-   (onboarding BLOCKING), role/project POST read-then-write. Fix: one shared `composeSpec`, plus a
-   convention that every config/settings write merges against the current persisted object.
-2. **Teardown not scoped to a launch generation** (was "asymmetric create/teardown"): registration
-   artifacts are keyed by agent_id alone, so a stale crash-teardown for launch N can destroy launch N+1's
-   artifacts (root of the ~2% switch-test flake); Stop's `!ok` branch tears down DB state while
-   abandoning the process side (orphan BLOCKING). Fix: generation/epoch tag on artifacts + one idempotent
-   teardown unit driven by every exit path, no-op on generation mismatch.
-3. **Terminal runtime is a second-class citizen of chat-shaped contracts** — the dominant class this
-   review (6 findings, 4 BLOCKING): no persistence contract (no sessions row), no fan-out contract (PTY
-   split), no backpressure contract (child blocks unobserved), no messaging contract (nudge loop), no
-   reconcile awareness (stale chat preview), capabilities that advertise the unreachable (tmux). Fix
-   direction: give terminal first-class equivalents — session-row creation on Start/Resume, a per-agent
-   broadcast hub with a ring buffer instead of raw fd dups, and interface/capability gates in messaging
-   and reconcile.
-4. **Checked-then-acted state transitions without a generation token** (chat runtime): escalateCancel
-   fires on a boolean that a NEW turn re-set (SIGINT BLOCKING); Permission/onPermissionTimeout emit and
-   report success even when a concurrent resolver won (fabricated-resolution BLOCKING). Fix: capture a
-   turn/resolution generation at arm time, require exact match at act time, treat mismatch as superseded.
+1. **The repeat failure mode is stale state crossing a boundary without reset or republish.** Confirmed
+   instances span SSE reconnect/hydration, permission races, unread badges after read/delete, nudger
+   relaunch cooldown, and terminal switch handoff. Fix direction: make reconnect/relaunch/read/switch
+   boundaries explicit generation changes, and require every durable state mutation that affects cards to
+   publish/touch the affected agent immediately.
+2. **Terminal remains vulnerable where it depends on chat-shaped contracts.** Recent fixes made PTY
+   fan-out, persistence, and stop behavior much better, but switch primer delivery and Codex hook
+   registration still assume chat/ACP mechanisms that terminal does not actually use. Treat terminal as a
+   first-class runtime in launch composition, hook registration, status production, and capability gating.
+3. **Config/UI writes need a loaded-source precondition.** The BackendStep blocker is the sharpest current
+   example: whole-document writes composed from pre-query placeholders can destroy seeded state. Settings
+   and onboarding components should either block until the authoritative query has loaded or merge on the
+   server against the persisted document.
+4. **Biggest real-world acceptance risk remains gated live-CLI behavior.** Codex terminal hooks, Codex chat
+   live acceptance, Claude/Codex HTTP MCP registration, interactive resume forms, and optional driver
+   support should be burned down before Phase 7 feature work expands the surface.
 
 ## Autonomous decisions (please review)
 
