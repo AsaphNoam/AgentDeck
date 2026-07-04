@@ -92,7 +92,16 @@ A reusable persona: system prompt + display metadata + permission policy. Define
   "skip_permissions": null         // null = inherit global; true/false = override
 }
 ```
-Seed roles to ship: `agentdecker` (a built-in AgentDeck guide/orchestrator persona), `implementer`, `reviewer`, `researcher`, `pm`, `teammate` (a messaging-fluent worker for multi-agent runs).
+Seed roles to ship (written only if absent — `SeedIfAbsent` never overwrites user edits, so existing installs pick up new roles without losing changes to old ones):
+
+| Role | Purpose |
+|------|---------|
+| `agentdecker` | Built-in AgentDeck expert. Teaches the product's features (launch syntax, config files, dashboard, switch-runtime, archive, messaging) and orchestrates multi-agent workflows — it can launch agents itself via the `agentdeck` CLI and drive them over MCP messaging. |
+| `implementer` | Ships code changes: focused diffs, tests, verification before declaring done. |
+| `reviewer` | Reviews diffs for correctness, edge cases, and consistency; reports findings rather than rewriting. |
+| `researcher` | Investigates and summarizes; gathers context and evidence before proposing actions. |
+| `pm` | Breaks work down, assigns and tracks it across agents. |
+| `teammate` | Messaging-fluent worker for coordinated multi-agent runs: checks its MCP mail on wake (the nudger's wake-up carries no instruction), treats coordinator messages as its task queue, reports outcomes back, and respects the per-turn message budget. |
 
 ### 3.3 Project
 A reusable workspace: working directory + injected context + extra dirs + display metadata. Defines *where* and *on what* an agent works.
