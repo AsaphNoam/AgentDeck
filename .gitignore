@@ -18,3 +18,4 @@ mcp/node_modules/
 # Local runtime / editor
 .DS_Store
 *.log
+.gocache
