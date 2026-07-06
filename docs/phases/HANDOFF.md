@@ -143,16 +143,34 @@ launch option via capabilities, and refreshed embedded UI. Details in changelog 
 > **This section holds only OPEN findings** — no resolved/dismissed graveyard.
 > Blocking items must be fixed before the next phase starts; advisory items when convenient.
 
-**Source:** fourth full top-to-bottom review (2026-07-04) — segmented simpler-model reviews for
-phases 0–6.6 (foundation/config/state, runtime, SSE/dashboard, onboarding/config, persistence,
-coordination, terminal/switch/UI) followed by a holistic simpler-model synthesis and main-agent
-verification. Baseline: `go test ./...`, `go test -tags sqlite_fts5 ./...`, `cd ui && npm run
-test`, and `cd ui && npm run build` all pass. `go build ./...` exits 0 but prints a sandbox-denied
-Go module stat-cache write outside the repo. The prior cancel-escalation BLOCKING finding is fixed
-in current code (`permission.go` captures `turnSeq`); the permission-resolution race remains open.
+**Source:** fifth full top-to-bottom review (2026-07-04) — focused mixed-model reviews for
+foundation/config/state/persistence, runtime/switching, UI/SSE/dashboard, and
+coordination/notifications/shutdown, followed by a holistic higher-intelligence synthesis and
+main-agent verification. Baseline in this sandbox: `cd ui && npm run test` and `cd ui && npm run
+build` pass; `env GOCACHE=/Users/mcnoam/Projects/AgentDeck/.gocache go build ./...` exits 0 but
+prints a sandbox-denied Go module stat-cache write outside the repo; `env
+GOCACHE=/Users/mcnoam/Projects/AgentDeck/.gocache go test ./...` and `go test -tags sqlite_fts5
+./...` are partially blocked here because several tests call `httptest.NewServer`, which fails to
+bind `tcp6 [::1]:0` under this sandbox. The prior cancel-escalation BLOCKING finding is fixed in
+current code (`permission.go` captures `turnSeq`); the permission-resolution race remains open.
 
 ### BLOCKING
 
+- **BLOCKING — reindex drops the last partial turn whenever a transcript already has earlier turn_end markers.**
+  `internal/index/reindex.go:53-78`: `reindexAgent` flushes each completed turn, but the post-loop flush only runs when no
+  `turn_end` was seen at all. A transcript with one finished turn and then a crash mid-later-turn leaves the final
+  assistant text sitting only in the in-memory buffer, so `agentdeck reindex` silently loses searchable content from the
+  most recent partial turn. Fix: flush any buffered content after replay even when earlier turn_end events were seen, or
+  track whether the buffer has unflushed content; test: seed a transcript with turn 1 complete, turn 2 partial, reindex,
+  then assert the turn-2 phrase is searchable.
+- **BLOCKING — resume does not preserve the frozen composed config.**
+  `internal/server/resume.go:112-177` rebuilds `SkipPerms` and `AddDirs` from the live role/project files, but
+  `internal/state/schema.go:37-60` and `internal/state/session.go:12-25` never persist those composed values in the
+  sessions snapshot. A normal role/project edit after stop can therefore change the behavior of a later resume
+  (permission policy or accessible directories) even though the phase spec says the resumed LaunchSpec must come from
+  the frozen session snapshot. Fix: persist the composed launch fields needed for resume at launch time and read those
+  frozen values back during resume; test: launch with role skip_permissions=true and extra add_dirs, edit the config,
+  stop, resume, and assert the resumed spec still uses the original values.
 - **BLOCKING — SSE auto-reconnect can kill a healthy stream and preserve stale snapshot rows.**
   `ui/src/api/sse.ts:18-35,50-55,113-121`: `lastPing`, `hydrationIds`, and `lastAgentSeq` reset
   only on `connect()`/first hydration, not on the browser's automatic `EventSource.onopen`
@@ -162,25 +180,32 @@ in current code (`permission.go` captures `turnSeq`); the permission-resolution 
   agents can survive indefinitely. Fix: treat every `onopen` after an error as a fresh hydration
   generation/liveness boundary; tests: fake auto-reconnect after >25s and reconnect before
   `hydrated`, asserting the stream survives and removed agents are pruned.
-- **BLOCKING — Terminal backend swaps report `history_handoff:"primer"` but drop the primer.**
-  `internal/server/switch.go:160-172` stores the bounded history primer in
-  `spec.RuntimeSystemPrompt`, but `internal/runtime/terminal/terminal.go:537-565` builds terminal
-  launches from argv/env only and never consumes `RuntimeSystemPrompt`/`StartSystemPrompt()`.
-  Cross-backend or non-native-resumable switches into terminal therefore lose the continuity the
-  API claims was handed off. Fix: thread the one-shot primer into the terminal launch path or reject
-  primer-required terminal switches; test: switch into terminal with `history_handoff:"primer"` and
-  assert the launched backend receives the primer payload.
-- **BLOCKING — Codex terminal launches register no hooks, so hooks-only terminal status never
-  advances.** `internal/backend/adapter.go:161-165` returns nil `HookLaunchArgs` for Codex, while
-  `internal/server/launch.go:229-238` says terminal hook registration is required because hooks are
-  the sole status producer and `internal/runtime/terminal/terminal.go:167-205` only writes the
-  initial idle row. The UI exposes `backend=codex` + `interface=terminal`, so a normal Codex
-  terminal launch can succeed but stay stuck at the initial status. Fix: implement Codex terminal
-  hook registration or reject the unsupported combination with 422; test: Codex terminal launch
-  must either receive hook args or fail before launch.
+- **BLOCKING — terminal runtime does not honor the composed `LaunchSpec` contract.**
+  `internal/runtime/terminal/terminal.go:537-565` builds terminal launches from argv/env only, and
+  `internal/server/messaging_registration.go:18-51` writes per-agent MCP config that the terminal
+  path never consumes. In normal usage, terminal launch/switch flows can silently drop the selected
+  model, system prompt/primer, `add_dirs`, and messaging MCP registration; the same gap also leaves
+  Codex terminal status without a valid hook-registration path. Fix: add a terminal launch adapter
+  that consumes the relevant `LaunchSpec` fields, or reject unsupported terminal combinations with
+  `422 terminal_unavailable`; tests: terminal launch/switch must prove model selection, primer
+  delivery, `add_dirs`, MCP availability, and unsupported Codex terminal paths behave correctly.
+- **BLOCKING — graceful shutdown never completes while an SSE dashboard client is open.**
+  `internal/server/server.go:203-215` calls `srv.Shutdown`, but `internal/server/sse.go:46-60`
+  keeps `/api/events` handlers alive until their request contexts are canceled, and shutdown does
+  not actively end those streams. In normal usage, `dashboard stop` with a tab open waits for the
+  5s timeout and then falls back to the ungraceful kill path instead of a clean stop. Fix: close
+  SSE subscribers or run the server with a cancelable base context; test: hold `/api/events` open,
+  stop the server, and assert `Start()` returns without the timeout/kill fallback.
 
 ### ADVISORY
 
+- **ADVISORY — archive `matched_in` can go empty on mixed metadata+transcript hits.**
+  `internal/archive/archive.go:207-219`: `matchedIn` only returns `metadata` or `transcript` when *all* query terms are
+  contained inside one field. A normal query that spans both fields, such as one token in the agent name and one token in
+  the transcript, still returns a valid FTS hit but `matched_in` comes back empty, so the archive UI cannot explain the
+  result and the API shape is misleading. Fix: compute field coverage per token/column, or mark any result whose terms are
+  split across metadata and transcript as matching both; test: query a session whose name matches one term and transcript
+  matches another, and assert `matched_in` is non-empty.
 - **ADVISORY — launch parser accepts missing value operands as empty strings.**
   `internal/cli/launch.go:62-85`: `val()` returns `""` when a value flag is last or followed by
   another flag, so `agentdeck impl@proj --resume` silently falls through to a fresh launch instead
@@ -226,12 +251,6 @@ in current code (`permission.go` captures `turnSeq`); the permission-resolution 
   `TestSwitchRuntimeKeepsTargetRegistration` fails ~6/300 under `-race -count=300` (switch_test's
   `cat` + `--settings` ExtraArgs dies instantly, racing the assertions). Fix: generation/epoch tag
   on artifacts (exit hook no-ops on mismatch) + a flag-tolerant long-lived test command.
-- **ADVISORY — graceful shutdown never completes while a dashboard tab is open → every stop ends
-  in SIGKILL.** SSE handlers never idle (`internal/server/sse.go:47-61`), `srv.Shutdown` doesn't
-  cancel request contexts, and the bus is never closed on shutdown (`server.go:198-211`) → 5s
-  timeout, `dashboard stop` prints "did not exit gracefully" and SIGKILLs. Also makes the
-  crash-truncated-transcript BLOCKING's precondition routine. Fix: close bus subscribers on
-  shutdown (or cancelable BaseContext).
 - **ADVISORY — StopAll ignores ctx; stop grace is serial 5s per agent; the tmux path always sleeps
   the full 5s** (`internal/runtime/permission.go:210-220`, `chat.go:977-984`,
   `terminal/terminal.go:396-399`) — multi-agent shutdown overshoots every timeout → SIGKILL +
@@ -313,6 +332,24 @@ in current code (`permission.go` captures `turnSeq`); the permission-resolution 
   installed) and never lists `jq`/`curl` (required by terminal hooks, which are ON by default for
   terminal agents); `MAP.md` still says the messaging MCP is stdio (shipped transport is HTTP
   `/mcp`); `architecture-flow.md`'s diagram shows terminal→bus event parity that doesn't exist.
+- **ADVISORY — Files and Commands tabs can show the wrong agent after a quick switch.**
+  `ui/src/components/chat/FilesTab.tsx:48-56` and `ui/src/components/chat/CommandsTab.tsx:35-43`
+  reuse one `mountedRef` across `agentId` changes, so a slower request from the previous agent can
+  land after the new effect has flipped the flag back to `true` and overwrite the current tab with
+  stale rows. Fix: tie each fetch to the requested `agentId` or cancel it with an `AbortController`;
+  test: start loading agent A, switch to B before A resolves, and assert A's late response does not
+  replace B's list.
+- **ADVISORY — Release group failures are silent.** `ui/src/components/grid/CardGrid.tsx:88-94`
+  fires `releaseGroup()` without a catch or toast, so a 500/409 leaves the user with no indication
+  that the group stop did not happen. That breaks the normal task-group workflow because the button
+  appears to succeed even when nothing changed. Fix: await the call and surface the server error
+  through the existing toast path; test: mock a rejected release and assert the UI shows an error.
+- **ADVISORY — New Agent drafts never reset between launches.** `ui/src/features/launch/NewAgentModal.tsx:35-43`
+  and `ui/src/features/launch/useSuggestedName.ts:17-28` keep the last modal's local form values
+  and `dirtyRef` alive across close/reopen, so a canceled or completed launch reopens with stale
+  role/project/backend/model/interface/name state instead of current defaults and a fresh name
+  suggestion. Fix: reset the draft on `open` transitions or remount the dialog per launch; test:
+  edit the name/role, close the modal, reopen, and expect the current default suggestion.
 
 ### Cross-project observations (2026-07-04 holistic pass — guidance, not findings)
 
