@@ -99,6 +99,38 @@ describe("SseClient watchdog reconnect", () => {
     expect(client.getTranscript).toHaveBeenCalledTimes(1);
   });
 
+  // Regression (review fix, BLOCKING): a drop mid-hydration triggers the
+  // browser's automatic EventSource reconnect, which fires onopen again on the
+  // SAME object. Each onopen must reset the hydration generation; otherwise the
+  // partial snapshot's stale IDs are unioned into the next hydrateComplete and a
+  // server-deleted agent survives the reconnect indefinitely.
+  it("resets the hydration generation on auto-reconnect so deleted agents are pruned", async () => {
+    const { sseClient } = await import("./sse");
+    const { useAgentStore } = await import("../store/agentStore");
+    sseClient.connect();
+    const es = FakeEventSource.instances[0];
+    const upd = (id: string) =>
+      JSON.stringify({ type: "state_update", seq: 1, ts: 1, agent_id: id, data: { agent_id: id } });
+    const hydrated = JSON.stringify({ type: "state_update", seq: 2, ts: 2, agent_id: "", data: { hydrated: true } });
+
+    // First (partial) hydration: two agents arrive, then the connection drops
+    // BEFORE the `hydrated` marker (still hydrating).
+    es.onopen?.();
+    es.emit("state_update", upd("a_keep"));
+    es.emit("state_update", upd("a_gone"));
+
+    // Browser auto-reconnects on the same EventSource → onopen fires again. The
+    // fresh full snapshot no longer contains a_gone (deleted server-side), then
+    // the hydrated marker closes the generation.
+    es.onopen?.();
+    es.emit("state_update", upd("a_keep"));
+    es.emit("state_update", hydrated);
+
+    const agents = useAgentStore.getState().agents;
+    expect(agents["a_keep"]).toBeDefined();
+    expect(agents["a_gone"]).toBeUndefined();
+  });
+
   it("drops muted notification types", async () => {
     const { sseClient } = await import("./sse");
     const { queryClient } = await import("./config");
