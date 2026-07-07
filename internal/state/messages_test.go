@@ -137,7 +137,18 @@ func TestListMessagesOrderingAndLimit(t *testing.T) {
 	if len(msgs) != 2 {
 		t.Fatalf("limit not applied: got %d, want 2", len(msgs))
 	}
-	if !msgs[0].CreatedAt.Before(msgs[1].CreatedAt) {
-		t.Fatalf("not ascending by created_at: %v then %v", msgs[0].CreatedAt, msgs[1].CreatedAt)
+	// When the mailbox exceeds the limit, the NEWEST N must be returned (the two
+	// most recent: base+1m and base+2m), newest-first — not the oldest N. The
+	// oldest message (base+0m) must be dropped, not the newest.
+	if !msgs[0].CreatedAt.After(msgs[1].CreatedAt) {
+		t.Fatalf("not descending by created_at: %v then %v", msgs[0].CreatedAt, msgs[1].CreatedAt)
+	}
+	if !msgs[0].CreatedAt.Equal(base.Add(2 * time.Minute)) {
+		t.Fatalf("newest message not returned first: got %v, want %v", msgs[0].CreatedAt, base.Add(2*time.Minute))
+	}
+	for _, m := range msgs {
+		if m.CreatedAt.Equal(base) {
+			t.Fatalf("oldest message should have been dropped by the limit, but it is present")
+		}
 	}
 }

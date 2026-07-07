@@ -144,6 +144,19 @@ func TestParseLaunchErrors(t *testing.T) {
 	if err != nil || la.Role != "impl" || la.Project != "my-app" {
 		t.Fatalf("parseLaunch impl@my-app = %+v err=%v", la, err)
 	}
+
+	// A value-taking flag with no operand (last, or followed by another flag) must
+	// fail fast rather than silently take "" — `--resume` with no id previously
+	// fell through to a fresh launch.
+	for _, bad := range [][]string{
+		{"impl@my-app", "--resume"},
+		{"impl@my-app", "--model"},
+		{"impl@my-app", "--backend", "--name", "Atlas"},
+	} {
+		if _, err := parseLaunch(bad); err == nil {
+			t.Errorf("parseLaunch(%v) expected error for missing operand", bad)
+		}
+	}
 }
 
 func TestPidfileRoundTrip(t *testing.T) {

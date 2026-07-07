@@ -61,30 +61,38 @@ func parseLaunch(args []string) (launchArgs, error) {
 	rest := args[1:]
 	for i := 0; i < len(rest); i++ {
 		flag := rest[i]
-		val := func() string {
-			if i+1 < len(rest) {
-				i++
-				return rest[i]
+		// val consumes the next token as the flag's value, requiring a present
+		// non-flag operand. Without this, a value flag given last or before another
+		// flag (e.g. `impl@proj --resume`) silently took "" and fell through to a
+		// fresh launch instead of failing fast.
+		val := func() (string, error) {
+			if i+1 >= len(rest) || strings.HasPrefix(rest[i+1], "--") {
+				return "", fmt.Errorf("flag %q requires a value", flag)
 			}
-			return ""
+			i++
+			return rest[i], nil
 		}
+		var err error
 		switch flag {
 		case "--backend":
-			out.Backend = val()
+			out.Backend, err = val()
 		case "--model":
-			out.Model = val()
+			out.Model, err = val()
 		case "--interface":
-			out.Interface = val()
+			out.Interface, err = val()
 		case "--name":
-			out.Name = val()
+			out.Name, err = val()
 		case "--group":
-			out.Group = val()
+			out.Group, err = val()
 		case "--new":
 			out.ForceNew = true
 		case "--resume":
-			out.ResumeID = val()
+			out.ResumeID, err = val()
 		default:
 			return launchArgs{}, fmt.Errorf("unknown flag %q", flag)
+		}
+		if err != nil {
+			return launchArgs{}, err
 		}
 	}
 	return out, nil
