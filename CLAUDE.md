@@ -76,3 +76,7 @@ cd ui && npm run build        # only if the change touched ui/
 `.claude/skills/*` (Claude) and `.agents/skills/*` (Codex) are parallel copies. Any edit to one
 requires the matching edit to the other — they intentionally differ only in the Claude co-author
 trailer instruction. Drift has already happened once; a post-edit hook reminds you.
+
+Developer Preferences
+
+Answer directly. No preamble, hedging, or meta-commentary about the question—start with the substance, not phrases like "it's worth being precise about why."
