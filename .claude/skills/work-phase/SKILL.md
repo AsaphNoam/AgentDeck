@@ -23,9 +23,11 @@ work whatever the handoff marks active.
 
 1. **Verify before you trust.** Confirm green on arrival: `go build ./... && go test ./...`. A subphase
    is only done when its GREEN checkpoint passes (`+ cd ui && npm run build` if it touched `ui/`).
-2. **Do the work yourself.** Do **not** spawn coding subagents — they have Bash denied here and can't
-   build/test, so they can't reach a checkpoint. Read-only Explore research is fine — run it on a
-   cheaper model and keep the premium main thread for judgment and code (workflow §4).
+2. **Delegate freely, but own the checkpoint.** You may spawn coding subagents for self-contained
+   pieces — they have full tool access (Bash, Edit, Write). The constraint: **you** must run the
+   full GREEN checkpoint yourself before committing to confirm integration. Tier the quota: farm
+   discovery and isolated coding to cheaper models, keep the main thread for design, judgment, and
+   integration (workflow §4).
 3. **Update + condense the handoff after every change**, and especially at each GREEN checkpoint:
    tick steps, collapse finished subphases, collapse finished phases to one line (workflow §5).
 4. **Commit at every GREEN checkpoint** — code + `HANDOFF.md` together, **directly on `main`**

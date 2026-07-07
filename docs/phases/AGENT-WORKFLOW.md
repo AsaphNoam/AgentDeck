@@ -32,7 +32,7 @@ quota-sized step that ends at a **GREEN checkpoint** so work is never left half-
 
 ```
 1. ORIENT  → read HANDOFF.md; find the active phase + next incomplete subphase; open its spec section.
-2. BUILD   → implement that subphase's steps yourself (no coding subagents — see §4).
+2. BUILD   → implement the subphase (coding subagents OK — see §4).
 3. VERIFY  → run the GREEN checkpoint (§2). Not green → fix. Can't fix → STOP (§3).
 4. RECORD  → update HANDOFF.md, condense (§5), commit at the checkpoint (§6).
 5. REPEAT  → next subphase. Phase done? Roll to the next phase per the build order.
@@ -98,19 +98,20 @@ decision costs a sentence; an unflagged wrong assumption costs a rebuild.
 
 ---
 
-## 4. Do the work yourself — no coding subagents
+## 4. Delegate freely — tier the quota
 
-Implement directly in this session. **Do not delegate the build to subagents:** delegated
-agents in this environment have Bash denied, so they cannot run `go build`, `go test`, or
-`npm run build` — they can write code but can't reach a GREEN checkpoint, which defeats the
-whole protocol. You are the one who must verify. (Read-only research via the Explore agent is fine.)
+Subagents in this environment have full tool access (Bash, Edit, Write) and **can** run
+`go build`, `go test`, and `npm run build`. You may delegate coding work to them — especially
+self-contained pieces (a new file, a test, a migration) where the subagent can build and
+verify in isolation. The constraint: **the main thread owns the GREEN checkpoint.** Before
+committing, *you* must run the full checkpoint (§2) yourself to confirm integration.
 
-**Do delegate bulk reading — tier the quota.** Sessions run on a premium, quota-limited model
-(Opus-class or above); its turns and context are the scarce resource. Farm discovery out to
-read-only subagents on a cheaper model (usually Sonnet opus4.6 if the discovery requires more reasoning): repo/doc sweeps, diff audits, log and
-history mining — anything where you need conclusions, not the raw text. Have them return
-structured findings (paths, line numbers, short quotes) so the main thread spends its quota and context
-only on design, judgment, and the code itself.
+**Tier the quota.** Sessions run on a premium, quota-limited model (Opus-class or above);
+its turns and context are the scarce resource. Farm discovery and self-contained coding out
+to subagents on a cheaper model (Sonnet, or Opus if the work requires deeper reasoning):
+repo/doc sweeps, diff audits, isolated implementations, test writing. Have them return
+structured results so the main thread spends its quota and context on design, judgment,
+and integration.
 
 ---
 
@@ -251,7 +252,7 @@ both proves the finding and becomes the regression guard once you fix it.
     not linger in the findings section.
 
 **Gate 2 — FIX.** Same rules as building a subphase: implement the fix yourself (**no coding
-subagents — §4**), add/keep the regression test, and reach a **GREEN checkpoint** (§2). A fix is only
+§4**), add/keep the regression test, and reach a **GREEN checkpoint** (§2). A fix is only
 done when green; never mark one resolved or commit on red. If a finding is real but you can't get it
 green, or the right fix needs a human decision, that's a **STOP** (§3) — leave the bullet as-is,
 record it under `## Blocked on human`, and move to the next finding.

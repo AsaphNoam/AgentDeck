@@ -73,13 +73,13 @@ func (s *Server) handleMessages(w http.ResponseWriter, r *http.Request) {
 	if limit > 200 {
 		limit = 200
 	}
+	// ListMessages returns the newest N (created_at DESC); the inbox presents
+	// newest-first directly, so no reversal is needed. (The prior ASC query +
+	// reversal returned the oldest N and dropped new mail past the limit.)
 	msgs, err := s.stateStore.ListMessages(id, unreadOnly, limit)
 	if err != nil {
 		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
 		return
-	}
-	for i, j := 0, len(msgs)-1; i < j; i, j = i+1, j-1 {
-		msgs[i], msgs[j] = msgs[j], msgs[i]
 	}
 	unread, err := s.stateStore.UnreadCount(id)
 	if err != nil {

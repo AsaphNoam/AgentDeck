@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** review fix (graceful shutdown ends open SSE streams): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...` (+ `-race` on `internal/server`).
+- **Last GREEN checkpoint:** review fix (advisory batch: inbox newest-N + CLI operand validation): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -165,11 +165,6 @@ current code (`permission.go` captures `turnSeq`); the permission-resolution rac
   result and the API shape is misleading. Fix: compute field coverage per token/column, or mark any result whose terms are
   split across metadata and transcript as matching both; test: query a session whose name matches one term and transcript
   matches another, and assert `matched_in` is non-empty.
-- **ADVISORY — launch parser accepts missing value operands as empty strings.**
-  `internal/cli/launch.go:62-85`: `val()` returns `""` when a value flag is last or followed by
-  another flag, so `agentdeck impl@proj --resume` silently falls through to a fresh launch instead
-  of failing fast. Fix: make value-taking flags require a non-flag operand; test:
-  `parseLaunch([]string{"impl@p", "--resume"})` returns an error.
 - **ADVISORY — New Agent modal does not follow later default-backend changes.**
   `ui/src/features/launch/NewAgentModal.tsx:30-76`: `backendId` initializes once and only fills
   when empty, so an open modal can keep a stale backend after Settings changes the default. Fix:
@@ -234,9 +229,6 @@ current code (`permission.go` captures `turnSeq`); the permission-resolution rac
 - **ADVISORY — `budget_exceeded` notifies on every over-limit retry, not first breach**
   (`state/messages.go:398-422` re-marks breached unconditionally; `messaging/tools.go:143,202`
   fire the sink each time). Gate on the prior breached flag.
-- **ADVISORY — the inbox endpoint returns the OLDEST N when the mailbox exceeds `limit`**
-  (`server/sessions.go:76-83`: ASC LIMIT then reverse). Latent (inbox UI unbuilt). Use
-  `ORDER BY created_at DESC LIMIT`.
 - **ADVISORY — Settings editors discard structured validation errors.** Roles/Projects/Backends
   `onError` shows `String(e)` → "Error: HTTP 400" though the 400 body names the offending field
   (`ui/src/api/config.ts` `.body` unread outside the DELETE-409 handlers). Same class as the fixed
@@ -627,6 +619,15 @@ current code (`permission.go` captures `turnSeq`); the permission-resolution rac
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-07 — **review fix: advisory batch (inbox newest-N + CLI operand validation) — green.** Two ADVISORY,
+  both confirmed real. (1) Invariant §7: the inbox endpoint returned the OLDEST N when the mailbox exceeded
+  `limit` (`ListMessages` did `ORDER BY created_at ASC LIMIT`, then the handler reversed). Switched `ListMessages`
+  to `ORDER BY created_at DESC, message_id DESC` (newest N) and dropped the handler's now-redundant reversal —
+  the endpoint still presents newest-first and truncation now keeps recent mail. Test: `TestListMessagesOrderingAndLimit`
+  now asserts the newest N with the oldest dropped. (2) `internal/cli/launch.go`: value-taking flags (`--resume`,
+  `--model`, …) took `""` when given last or before another flag, so `impl@proj --resume` silently fell through to
+  a fresh launch; they now require a non-flag operand or error. Test: `TestParseLaunchErrors` missing-operand cases.
+  Green: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
 - 2026-07-07 — **review fix: graceful shutdown ends open SSE streams — green.** BLOCKING, confirmed real
   (invariant §9 — liveness/lifecycle primitives are weaker than they look; `http.Server.Shutdown` waits for
   in-flight requests but never cancels their contexts). The `/api/events` SSE handler blocks on `<-ctx.Done()`,

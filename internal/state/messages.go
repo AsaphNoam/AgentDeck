@@ -229,7 +229,11 @@ WHERE to_agent = ?`
 	if unreadOnly {
 		q += ` AND read = 0`
 	}
-	q += ` ORDER BY created_at, message_id`
+	// Newest N: when the mailbox exceeds limit, callers want the most RECENT
+	// messages, not the oldest. (A prior `ORDER BY created_at ASC LIMIT` returned
+	// the oldest N and dropped new mail.) The inbox handler reverses this back to
+	// chronological order for display.
+	q += ` ORDER BY created_at DESC, message_id DESC`
 	args := []any{recipientID}
 	if limit > 0 {
 		q += ` LIMIT ?`
