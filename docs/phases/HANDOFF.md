@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** review fix (reindex preserves final partial turn): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
+- **Last GREEN checkpoint:** review fix (freeze skip_permissions/add_dirs in snapshot): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -156,14 +156,6 @@ current code (`permission.go` captures `turnSeq`); the permission-resolution rac
 
 ### BLOCKING
 
-- **BLOCKING — resume does not preserve the frozen composed config.**
-  `internal/server/resume.go:112-177` rebuilds `SkipPerms` and `AddDirs` from the live role/project files, but
-  `internal/state/schema.go:37-60` and `internal/state/session.go:12-25` never persist those composed values in the
-  sessions snapshot. A normal role/project edit after stop can therefore change the behavior of a later resume
-  (permission policy or accessible directories) even though the phase spec says the resumed LaunchSpec must come from
-  the frozen session snapshot. Fix: persist the composed launch fields needed for resume at launch time and read those
-  frozen values back during resume; test: launch with role skip_permissions=true and extra add_dirs, edit the config,
-  stop, resume, and assert the resumed spec still uses the original values.
 - **BLOCKING — SSE auto-reconnect can kill a healthy stream and preserve stale snapshot rows.**
   `ui/src/api/sse.ts:18-35,50-55,113-121`: `lastPing`, `hydrationIds`, and `lastAgentSeq` reset
   only on `connect()`/first hydration, not on the browser's automatic `EventSource.onopen`
@@ -253,12 +245,6 @@ current code (`permission.go` captures `turnSeq`); the permission-resolution rac
   with no interface check; `ApplyStaleCorrection` discards `RunningEntry.Interface`
   (`state/manager.go:176-244`). Self-heals on the next hook. Fix: skip the preview when
   `interface != "chat"`.
-- **ADVISORY — deleting a role silently flips archived agents to the GLOBAL `skip_permissions` on
-  resume.** The delete in-use guard checks only running agents (`config_handlers.go:215-231`);
-  `resolveSkipForRole` (`launch.go:298-303`) falls back to the global default when the role is
-  missing — a deliberately-cautious (skip=false) role deleted during cleanup makes a later resumed
-  agent auto-approve. Safety-relevant. Fix: include archived references in the 409 guard, or fall
-  back to `skip=false`.
 - **ADVISORY — the nudger has no retry cap or backoff** (`messaging_loops.go:40-89`): any
   recipient that can't drain unread mail is re-nudged every ~62s indefinitely (bounded only by the
   mail TTL). Cap per (agent, oldest-unread) or back off exponentially.
@@ -303,10 +289,6 @@ current code (`permission.go` captures `turnSeq`); the permission-resolution rac
   losing child can delete the winner's live pidfile), and the 300ms confirm grace is measured from
   spawn, not bind (slow setup → parent prints "started", child dies after). The re-exec/grace/
   confirm paths are untested.
-- **ADVISORY — d6a18cb residue: `state/migrate.go:39` is a missed `rows.Err()` sibling** (the
-  schema_migrations scan still checks `rows.Close()`); and `latestKnownMigration=6` is
-  hand-maintained with no guard test tying it to the migrations slice (a future v7 without the
-  bump self-bricks). Add the one-line guard test.
 - **ADVISORY — `emit()` delivery order can invert seq.** `chat.go:704-732`: seq assigned under
   lock, persist/hub/sink run after unlock; five concurrent emitter classes exist → NDJSON + SSE
   can carry locally non-monotonic seq (in-memory transcript stays ordered). Widen the critical
@@ -405,17 +387,19 @@ current code (`permission.go` captures `turnSeq`); the permission-resolution rac
   at doesn't exist, so it would fail at runtime if ever hit. **Why a judgment call:** it deletes intentional gated
   scaffolding rather than leaving it. The gate itself remains open in "Blocked on human" (live CLI HTTP acceptance).
   **To reverse:** if a real CLI rejects HTTP, re-add a stdio branch AND implement the `agentdeck mcp` proxy subcommand.
-- **NEW (review fix): skip_permissions/add_dirs are RE-RESOLVED from current role/project config on resume+switch,
-  not persisted into the frozen session snapshot.** The BLOCKING findings suggested persisting `add_dirs` into
-  `SessionSnapshot` + the `sessions` table (+ a migration). I chose to re-resolve both `skip_permissions` (via
-  `resolveSkipForRole`) and `add_dirs` (via `resolveAddDirs`) from the current role/project config instead. **Why a
-  judgment call:** (1) the finding itself mandates "resume must re-read the role" for skip — re-reading the project for
-  add_dirs is the consistent analog; (2) it avoids a schema migration + session write-path changes (lower risk, smaller
-  blast radius); (3) it picks up config edits made after launch. **Tradeoff:** it diverges from the strict "frozen
-  snapshot" philosophy — `cwd`/`system_prompt` are still frozen, but skip/add_dirs now track the live config, so editing
-  a project's `add_dirs` between launch and resume changes the resumed agent's dirs. **To reverse:** add an `add_dirs`
-  column to `sessions` + `SessionSnapshot`/`SessionMetaData`, populate it at session creation, and read `snap.AddDirs`
-  (and a persisted skip flag) in the composers instead of the resolvers.
+- **NEW (review fix, REVERSES the prior "re-resolve" decision): skip_permissions/add_dirs are now FROZEN into the
+  session snapshot at launch and read back verbatim on resume+switch.** A prior fix agent had deliberately chosen to
+  re-resolve both from the *current* role/project config (via `resolveSkipForRole`/`resolveAddDirs`), documented here as
+  a pending-review autonomous decision. The fifth review re-flagged that as a BLOCKING spec violation, and it is: the
+  techspec (§12.4, and repeated at spec lines 305/326/460/488) plus the master-PRD invariant say resume must reproduce
+  the *frozen composed config*, with only env **values** (§8.7) and MCP servers as documented exceptions — skip/add_dirs
+  are not exempt. Re-resolution was also the root of the (now-moot) "delete-a-role flips skip on resume" safety advisory.
+  So I reversed it: migration v7 adds `sessions.skip_permissions`/`add_dirs`; `SessionMetaData`+`runtimeMeta` carry them;
+  `UpsertSessionMeta` persists them; `SessionSnapshot`/`ReadSession`/`ListInactiveSessions` read them; the resume/switch
+  composers now use `snap.SkipPermissions`/`snap.AddDirs`; the dead `resolveSkipForRole`/`resolveAddDirs` were removed.
+  Pre-v7 rows default to skip=0 (fail closed — never auto-approve) and no extra dirs. **Why still a judgment call:** it
+  overrides another agent's documented decision (the review is the tiebreaker, and the spec is unambiguous). **To
+  reverse:** re-introduce the resolvers and call them in the composers — but that re-violates §12.4.
 - **NEW (review fix): adopted xterm.js for the terminal panel — two new UI deps (`@xterm/xterm`, `@xterm/addon-fit`).**
   The advisory asked for the spec's task-13 xterm.js panel (replacing the hand-rolled `<pre>` + input). I integrated the
   real emulator: `TerminalTab` now mounts `Terminal` + `FitAddon`, pipes `onData`→binary frame and `onResize`/fit→`{cols,rows}`
@@ -650,6 +634,19 @@ current code (`permission.go` captures `turnSeq`); the permission-resolution rac
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-07 — **review fix: freeze skip_permissions/add_dirs in the session snapshot — green.** BLOCKING,
+  confirmed real (invariant §3 — persisted fields must not be re-derived from live config; §2 — resume/switch
+  compose through the frozen snapshot). Resume/switch re-resolved `SkipPerms`/`AddDirs` from the *current*
+  role/project, so a config edit after launch silently changed a resumed agent's permission policy or dirs —
+  violating techspec §12.4's frozen-snapshot rule. This **reverses a prior autonomous decision** that chose
+  re-resolution (see Autonomous decisions). Migration v7 adds `sessions.skip_permissions`/`add_dirs`; the values
+  flow launch → `SessionMetaData`/`runtimeMeta` → `UpsertSessionMeta` → `SessionSnapshot`; the composers read
+  `snap.*`; removed the dead `resolveSkipForRole`/`resolveAddDirs`. Also closed two advisories in passing:
+  the "delete-a-role flips skip on resume" safety advisory (moot once skip is frozen) and the `migrate.go`
+  `rows.Err()`/hand-maintained `latestKnownMigration` residue (added the `rows.Err()` check; derived the
+  migration floor from the slice so it can't drift). Regression: `TestResumeAndSwitchUseFrozenSkipAndAddDirs`
+  (verified failing when the composer reads live config). Green: `go build ./...`, `go test ./...`,
+  `go test -tags sqlite_fts5 ./...`.
 - 2026-07-07 — **review fix: reindex preserves the final partial turn — green.** BLOCKING, confirmed real
   (invariant §7 — the read-path repair losing the final partial turn, already listed there). `reindexAgent`
   (`internal/index/reindex.go`) flushed each completed turn but only ran the post-loop flush when NO `turn_end`

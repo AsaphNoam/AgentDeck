@@ -45,9 +45,13 @@ func (ix *Indexer) UpsertSessionMeta(agentID string, meta runtime.SessionMetaDat
 	if err != nil {
 		return fmt.Errorf("index: marshal env keys: %w", err)
 	}
+	addDirs, err := json.Marshal(meta.AddDirs)
+	if err != nil {
+		return fmt.Errorf("index: marshal add dirs: %w", err)
+	}
 	_, err = ix.db.Exec(`
-INSERT INTO sessions(agent_id, name, role, project, backend, model, interface, grp, cwd, system_prompt, env_keys, last_session_id, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO sessions(agent_id, name, role, project, backend, model, interface, grp, cwd, system_prompt, env_keys, skip_permissions, add_dirs, last_session_id, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(agent_id) DO UPDATE SET
   name=excluded.name,
   role=excluded.role,
@@ -59,10 +63,12 @@ ON CONFLICT(agent_id) DO UPDATE SET
   cwd=excluded.cwd,
   system_prompt=excluded.system_prompt,
   env_keys=excluded.env_keys,
+  skip_permissions=excluded.skip_permissions,
+  add_dirs=excluded.add_dirs,
   last_session_id=excluded.last_session_id,
   updated_at=MAX(excluded.updated_at, sessions.updated_at)`,
 		agentID, meta.Name, meta.Role, meta.Project, meta.Backend, meta.Model, meta.Interface,
-		meta.Group, meta.Cwd, meta.SystemPrompt, string(envKeys), meta.SessionID, now, now)
+		meta.Group, meta.Cwd, meta.SystemPrompt, string(envKeys), meta.SkipPermissions, string(addDirs), meta.SessionID, now, now)
 	if err != nil {
 		return fmt.Errorf("index: upsert session meta: %w", err)
 	}
@@ -457,4 +463,3 @@ func boolInt(v bool) int {
 	}
 	return 0
 }
-

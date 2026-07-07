@@ -469,6 +469,83 @@ func TestResumeAndSwitchCarryRoleAndProjectFields(t *testing.T) {
 	}
 }
 
+// TestResumeAndSwitchUseFrozenSkipAndAddDirs guards the BLOCKING finding that
+// resume/switch re-read skip_permissions and add_dirs from the LIVE role/project
+// files instead of the frozen snapshot. Per techspec §12.4 (and the master-PRD
+// invariant that a running agent's spec is frozen, edits affecting future
+// launches only), a role/project edit AFTER launch must NOT change a later
+// resume's permission policy or accessible directories.
+func TestResumeAndSwitchUseFrozenSkipAndAddDirs(t *testing.T) {
+	srv, ts := switchTestServer(t)
+
+	// Launch with role skip_permissions=true and a project add_dir.
+	skipTrue := true
+	cwd := t.TempDir()
+	extra := t.TempDir()
+	if err := srv.configStore.WriteRole("impl", config.Role{Title: "Impl", SystemPrompt: "be helpful", SkipPermissions: &skipTrue}); err != nil {
+		t.Fatalf("WriteRole: %v", err)
+	}
+	if err := srv.configStore.WriteProject("tmpproj", config.Project{Title: "Tmp", Cwd: cwd, AddDirs: []string{extra}}); err != nil {
+		t.Fatalf("WriteProject: %v", err)
+	}
+	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+
+	// Confirm the frozen snapshot captured the composed values at launch.
+	snap, err := srv.stateStore.ReadSession(id)
+	if err != nil {
+		t.Fatalf("ReadSession: %v", err)
+	}
+	if !snap.SkipPermissions {
+		t.Fatalf("frozen snapshot SkipPermissions = false, want true")
+	}
+	if !containsStr(snap.AddDirs, extra) {
+		t.Fatalf("frozen snapshot AddDirs = %v, missing %q", snap.AddDirs, extra)
+	}
+
+	// Now EDIT the config after launch: role flips to skip=false, project drops
+	// the add_dir. A frozen resume/switch must ignore these edits.
+	skipFalse := false
+	if err := srv.configStore.WriteRole("impl", config.Role{Title: "Impl", SystemPrompt: "be helpful", SkipPermissions: &skipFalse}); err != nil {
+		t.Fatalf("WriteRole edit: %v", err)
+	}
+	if err := srv.configStore.WriteProject("tmpproj", config.Project{Title: "Tmp", Cwd: cwd, AddDirs: nil}); err != nil {
+		t.Fatalf("WriteProject edit: %v", err)
+	}
+
+	agent, err := srv.stateStore.ReadAgent(id)
+	if err != nil {
+		t.Fatalf("ReadAgent: %v", err)
+	}
+	backends, err := srv.configStore.ReadBackends()
+	if err != nil {
+		t.Fatalf("ReadBackends: %v", err)
+	}
+	be := backends.Backends[agent.Backend]
+	model := be.Models[agent.Model]
+
+	rspec, ae := srv.composeResumeSpec(agent, snap, be, model)
+	if ae != nil {
+		t.Fatalf("composeResumeSpec: %s", ae.Message)
+	}
+	if !rspec.SkipPerms {
+		t.Errorf("resume spec SkipPerms = false after role edit; must stay frozen true")
+	}
+	if !containsStr(rspec.AddDirs, extra) {
+		t.Errorf("resume spec AddDirs = %v after project edit; must stay frozen with %q", rspec.AddDirs, extra)
+	}
+
+	sspec, ae := srv.composeSwitchSpec(agent, "")
+	if ae != nil {
+		t.Fatalf("composeSwitchSpec: %s", ae.Message)
+	}
+	if !sspec.SkipPerms {
+		t.Errorf("switch spec SkipPerms = false after role edit; must stay frozen true")
+	}
+	if !containsStr(sspec.AddDirs, extra) {
+		t.Errorf("switch spec AddDirs = %v after project edit; must stay frozen with %q", sspec.AddDirs, extra)
+	}
+}
+
 func containsStr(ss []string, want string) bool {
 	for _, s := range ss {
 		if s == want {

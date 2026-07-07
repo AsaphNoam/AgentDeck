@@ -164,4 +164,18 @@ ALTER TABLE running ADD COLUMN driver     TEXT NOT NULL DEFAULT '';
 ALTER TABLE running ADD COLUMN driver_ids TEXT NOT NULL DEFAULT '{}';
 `,
 	},
+	{
+		// Freeze skip_permissions and add_dirs into the composed-config snapshot so
+		// resume/switch reproduce the original launch composition instead of
+		// re-reading the current role/project files (techspec §12.4 frozen-snapshot
+		// rule; the master-PRD invariant that a running agent's spec is frozen and
+		// edits affect future launches only). add_dirs is a JSON array of strings.
+		// Pre-existing rows default to skip=0 (fail closed: never auto-approve) and
+		// no extra dirs.
+		version: 7,
+		sql: `
+ALTER TABLE sessions ADD COLUMN skip_permissions INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE sessions ADD COLUMN add_dirs         TEXT    NOT NULL DEFAULT '[]';
+`,
+	},
 }
