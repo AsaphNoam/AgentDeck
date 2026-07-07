@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** review fix (onboarding backend validation race, finding 3): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, `cd ui && npm run build`.
+- **Last GREEN checkpoint:** review fix (reindex preserves final partial turn): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -156,13 +156,6 @@ current code (`permission.go` captures `turnSeq`); the permission-resolution rac
 
 ### BLOCKING
 
-- **BLOCKING — reindex drops the last partial turn whenever a transcript already has earlier turn_end markers.**
-  `internal/index/reindex.go:53-78`: `reindexAgent` flushes each completed turn, but the post-loop flush only runs when no
-  `turn_end` was seen at all. A transcript with one finished turn and then a crash mid-later-turn leaves the final
-  assistant text sitting only in the in-memory buffer, so `agentdeck reindex` silently loses searchable content from the
-  most recent partial turn. Fix: flush any buffered content after replay even when earlier turn_end events were seen, or
-  track whether the buffer has unflushed content; test: seed a transcript with turn 1 complete, turn 2 partial, reindex,
-  then assert the turn-2 phrase is searchable.
 - **BLOCKING — resume does not preserve the frozen composed config.**
   `internal/server/resume.go:112-177` rebuilds `SkipPerms` and `AddDirs` from the live role/project files, but
   `internal/state/schema.go:37-60` and `internal/state/session.go:12-25` never persist those composed values in the
@@ -657,6 +650,14 @@ current code (`permission.go` captures `turnSeq`); the permission-resolution rac
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-07 — **review fix: reindex preserves the final partial turn — green.** BLOCKING, confirmed real
+  (invariant §7 — the read-path repair losing the final partial turn, already listed there). `reindexAgent`
+  (`internal/index/reindex.go`) flushed each completed turn but only ran the post-loop flush when NO `turn_end`
+  was ever seen (`!sawTurnEnd`), so a transcript with turn 1 completed + turn 2 crash-truncated left turn 2's
+  assistant text only in the in-memory buffer — dropped from `sessions_fts`. Replaced the `sawTurnEnd` gate with
+  a `pendingFlush` dirty flag (set on every event, cleared after each `OnTurnEnd`) so a final flush also fires
+  when a completed turn is followed by a partial one. Regression: `TestReindexPreservesFinalPartialTurn`
+  (verified failing before the fix). Green: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
 - 2026-07-04 — **review fix: onboarding backend validation race (finding 3) — green.** BLOCKING,
   confirmed real: the onboarding Validate button stayed enabled while `/api/backends` was still
   loading, so an immediate click could still compose from placeholder state before the seeded

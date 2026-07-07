@@ -64,7 +64,12 @@ func reindexAgent(ix *Indexer, root, agentID string) error {
 	var lastSeq int64
 	var lastContext float64
 	var updatedAt string
-	var sawTurnEnd bool
+	// pendingFlush tracks whether events have been buffered since the last
+	// turn_end flush. It must trigger a final flush not only when NO turn_end
+	// was ever seen, but also when a completed turn is followed by a partial
+	// (crash-truncated) turn — otherwise the partial turn's assistant text sits
+	// only in the in-memory buffer and is silently dropped from sessions_fts.
+	var pendingFlush bool
 	for _, ev := range events {
 		if err := ix.OnEvent(agentID, ev); err != nil {
 			return fmt.Errorf("index: event %s seq %d: %w", agentID, ev.Seq, err)
@@ -73,17 +78,18 @@ func reindexAgent(ix *Indexer, root, agentID string) error {
 			lastSeq = ev.Seq
 			updatedAt = ev.Ts
 		}
+		pendingFlush = true
 		if ev.Type == runtime.EvTurnEnd {
 			var d runtime.TurnEndData
 			_ = json.Unmarshal(ev.Data, &d)
 			lastContext = d.ContextPct
-			sawTurnEnd = true
 			if err := ix.OnTurnEnd(agentID, runtime.TurnRollup{LastSeq: ev.Seq, LastContextPct: d.ContextPct, UpdatedAt: ev.Ts}); err != nil {
 				return fmt.Errorf("index: turn_end %s seq %d: %w", agentID, ev.Seq, err)
 			}
+			pendingFlush = false
 		}
 	}
-	if lastSeq > 0 && updatedAt != "" && !sawTurnEnd {
+	if lastSeq > 0 && updatedAt != "" && pendingFlush {
 		if err := ix.flush(agentID, runtime.TurnRollup{LastSeq: lastSeq, LastContextPct: lastContext, UpdatedAt: updatedAt}, false); err != nil {
 			return fmt.Errorf("index: final flush %s: %w", agentID, err)
 		}
