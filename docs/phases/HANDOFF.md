@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** review fix (terminal honors composed LaunchSpec; codex terminal rejected): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
+- **Last GREEN checkpoint:** review fix (graceful shutdown ends open SSE streams): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...` (+ `-race` on `internal/server`).
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -155,14 +155,6 @@ bind `tcp6 [::1]:0` under this sandbox. The prior cancel-escalation BLOCKING fin
 current code (`permission.go` captures `turnSeq`); the permission-resolution race remains open.
 
 ### BLOCKING
-
-- **BLOCKING — graceful shutdown never completes while an SSE dashboard client is open.**
-  `internal/server/server.go:203-215` calls `srv.Shutdown`, but `internal/server/sse.go:46-60`
-  keeps `/api/events` handlers alive until their request contexts are canceled, and shutdown does
-  not actively end those streams. In normal usage, `dashboard stop` with a tab open waits for the
-  5s timeout and then falls back to the ungraceful kill path instead of a clean stop. Fix: close
-  SSE subscribers or run the server with a cancelable base context; test: hold `/api/events` open,
-  stop the server, and assert `Start()` returns without the timeout/kill fallback.
 
 ### ADVISORY
 
@@ -635,6 +627,14 @@ current code (`permission.go` captures `turnSeq`); the permission-resolution rac
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-07 — **review fix: graceful shutdown ends open SSE streams — green.** BLOCKING, confirmed real
+  (invariant §9 — liveness/lifecycle primitives are weaker than they look; `http.Server.Shutdown` waits for
+  in-flight requests but never cancels their contexts). The `/api/events` SSE handler blocks on `<-ctx.Done()`,
+  so a single open dashboard tab held `Server.Start` for the full `shutdownTimeout` (5s) and then the CLI fell
+  back to an ungraceful kill. Gave the `http.Server` a cancelable `BaseContext` and cancel it just before
+  `srv.Shutdown`, so every in-flight request context (incl. SSE) is Done and the handlers return immediately.
+  Regression: `TestStartShutsDownWithOpenSSEClient` (verified: 4.1s timeout-fail without the cancel, 0.1s with;
+  `-race` clean). Green: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
 - 2026-07-07 — **review fix: terminal honors the composed LaunchSpec; codex terminal rejected — green.** BLOCKING,
   confirmed real (invariant §6 — a new runtime must join the LaunchSpec contract + capability honesty). The terminal
   runtime's `launchArgv` built the CLI invocation from argv/env only, silently dropping the composed model, add_dirs,

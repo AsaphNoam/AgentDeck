@@ -179,7 +179,19 @@ func (s *Server) Start(ctx context.Context) error {
 		return err
 	}
 
-	srv := &http.Server{Handler: s.routes()}
+	// Derive every request context from a cancelable base so shutdown can actively
+	// end long-lived streaming handlers. http.Server.Shutdown waits for in-flight
+	// requests to return but never cancels their contexts, and the /api/events SSE
+	// handler blocks until its request context is Done — so without this, a single
+	// open dashboard tab kept Shutdown blocked for the full timeout, then the CLI
+	// fell back to an ungraceful kill. Cancelling baseCtx at shutdown unblocks the
+	// SSE select (`<-ctx.Done()`) so the stream returns and Shutdown completes.
+	baseCtx, cancelBase := context.WithCancel(context.Background())
+	defer cancelBase()
+	srv := &http.Server{
+		Handler:     s.routes(),
+		BaseContext: func(net.Listener) context.Context { return baseCtx },
+	}
 	s.log.Info("dashboard listening", "addr", "http://"+ln.Addr().String())
 
 	serveErr := make(chan error, 1)
@@ -211,6 +223,8 @@ func (s *Server) Start(ctx context.Context) error {
 		if err := hooks.RemoveAllAgentSettings(s.configStore.Home()); err != nil {
 			s.log.Warn("cleanup hook settings dir", "err", err)
 		}
+		// End open streaming handlers (SSE) so Shutdown doesn't block on them.
+		cancelBase()
 		if err := srv.Shutdown(shutCtx); err != nil {
 			return fmt.Errorf("shutdown: %w", err)
 		}
