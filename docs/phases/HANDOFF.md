@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** review fix (freeze skip_permissions/add_dirs in snapshot): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
+- **Last GREEN checkpoint:** review fix (SSE onopen hydration-generation reset): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, `cd ui && npm run test` + `npm run build`.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -156,15 +156,6 @@ current code (`permission.go` captures `turnSeq`); the permission-resolution rac
 
 ### BLOCKING
 
-- **BLOCKING — SSE auto-reconnect can kill a healthy stream and preserve stale snapshot rows.**
-  `ui/src/api/sse.ts:18-35,50-55,113-121`: `lastPing`, `hydrationIds`, and `lastAgentSeq` reset
-  only on `connect()`/first hydration, not on the browser's automatic `EventSource.onopen`
-  reconnect. A normal dropped connection can reopen on the same `EventSource` after the stale
-  25s ping window, then the watchdog closes it before its first new ping; if the drop happened
-  mid-hydration, stale IDs from the partial snapshot are unioned into the next snapshot and deleted
-  agents can survive indefinitely. Fix: treat every `onopen` after an error as a fresh hydration
-  generation/liveness boundary; tests: fake auto-reconnect after >25s and reconnect before
-  `hydrated`, asserting the stream survives and removed agents are pruned.
 - **BLOCKING — terminal runtime does not honor the composed `LaunchSpec` contract.**
   `internal/runtime/terminal/terminal.go:537-565` builds terminal launches from argv/env only, and
   `internal/server/messaging_registration.go:18-51` writes per-agent MCP config that the terminal
@@ -634,6 +625,16 @@ current code (`permission.go` captures `turnSeq`); the permission-resolution rac
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-07 — **review fix: SSE onopen is a fresh hydration generation — green.** BLOCKING, confirmed real
+  (invariant §1 — reset connection-scoped state in `onopen`, not the constructor). `ui/src/api/sse.ts` reset
+  `lastPing`/`hydrationIds`/`lastAgentSeq` only when `!hydrating`, so the browser's automatic `EventSource`
+  reconnect (fires `onopen` again on the same object; the server re-sends a full snapshot + `hydrated` every
+  connection) inherited stale state: a drop mid-hydration unioned the partial snapshot's IDs into the next
+  `hydrateComplete` so a server-deleted agent survived forever, and a stale `lastPing` let the watchdog reap the
+  freshly-reopened stream before its first ping. Now every `onopen` unconditionally resets liveness + starts a
+  new hydration generation; removed the now-dead `hydrating` field. Regression: `sse.test.ts` "resets the
+  hydration generation on auto-reconnect so deleted agents are pruned" (verified failing before the fix). Green:
+  `go build ./...`, `go test ./...`, `-tags sqlite_fts5`, UI 74/74 + `npm run build`, embedded dist refreshed.
 - 2026-07-07 — **review fix: freeze skip_permissions/add_dirs in the session snapshot — green.** BLOCKING,
   confirmed real (invariant §3 — persisted fields must not be re-derived from live config; §2 — resume/switch
   compose through the frozen snapshot). Resume/switch re-resolved `SkipPerms`/`AddDirs` from the *current*

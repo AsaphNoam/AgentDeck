@@ -107,9 +107,9 @@ whole protocol. You are the one who must verify. (Read-only research via the Exp
 
 **Do delegate bulk reading — tier the quota.** Sessions run on a premium, quota-limited model
 (Opus-class or above); its turns and context are the scarce resource. Farm discovery out to
-read-only subagents on a cheaper model (e.g. Sonnet): repo/doc sweeps, diff audits, log and
+read-only subagents on a cheaper model (usually Sonnet opus4.6 if the discovery requires more reasoning): repo/doc sweeps, diff audits, log and
 history mining — anything where you need conclusions, not the raw text. Have them return
-structured findings (paths, line numbers, short quotes) so the main thread spends its quota
+structured findings (paths, line numbers, short quotes) so the main thread spends its quota and context
 only on design, judgment, and the code itself.
 
 ---

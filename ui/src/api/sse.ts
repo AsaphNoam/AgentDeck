@@ -11,7 +11,6 @@ class SseClient {
   private watchdog: number | null = null;
   private lastPing = Date.now();
   private hydrationIds: string[] = [];
-  private hydrating = false;
   private openAgentId: string | null = null;
   private lastAgentSeq: Record<string, number> = {};
 
@@ -25,12 +24,19 @@ class SseClient {
     this.es = new EventSource("/api/events");
     this.es.onopen = () => {
       useUiStore.getState().setConnection("open");
-      if (!this.hydrating) {
-        useAgentStore.getState().hydrateBegin();
-        this.hydrationIds = [];
-        this.hydrating = true;
-        this.lastAgentSeq = {};
-      }
+      // Every (re)open is a hydration/liveness boundary — including the browser's
+      // automatic EventSource reconnect, which fires onopen again on the SAME
+      // object without going through connect(). The server re-sends a full
+      // snapshot + `hydrated` on every connection, so each onopen MUST start a
+      // fresh generation and reset all connection-scoped state. Resetting only
+      // when `!hydrating` left two bugs on a drop mid-hydration: stale IDs from
+      // the partial snapshot were unioned into the next hydrateComplete (deleted
+      // agents survived forever), and a stale lastPing let the watchdog reap the
+      // freshly-reopened stream before its first ping.
+      this.lastPing = Date.now();
+      useAgentStore.getState().hydrateBegin();
+      this.hydrationIds = [];
+      this.lastAgentSeq = {};
       this.refetchOpenTranscript();
     };
     this.es.onerror = () => useUiStore.getState().setConnection("reconnecting");
@@ -52,7 +58,6 @@ class SseClient {
     if (envelope.data.hydrated) {
       useAgentStore.getState().hydrateComplete(this.hydrationIds);
       this.hydrationIds = [];
-      this.hydrating = false;
       return;
     }
     if (envelope.data.removed && envelope.agent_id) {
