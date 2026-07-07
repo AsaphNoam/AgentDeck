@@ -2,7 +2,9 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -505,6 +507,74 @@ func TestAssertLoopback(t *testing.T) {
 	if err := assertLoopback(public); err == nil {
 		t.Fatal("assertLoopback(8.8.8.8): want error, got nil")
 	}
+}
+
+// TestStartShutsDownWithOpenSSEClient guards the BLOCKING finding that graceful
+// shutdown blocked on open /api/events streams: http.Server.Shutdown waits for
+// in-flight requests but never cancels their contexts, and the SSE handler blocks
+// until its request context is Done, so a single open dashboard tab held Start()
+// for the full shutdownTimeout (then the CLI fell back to an ungraceful kill).
+// Start must return promptly once ctx is cancelled even with a stream open.
+func TestStartShutsDownWithOpenSSEClient(t *testing.T) {
+	srv := testServer(t, true)
+	srv.cfg.Port = freePort(t)
+	base := fmt.Sprintf("http://127.0.0.1:%d", srv.cfg.Port)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	startErr := make(chan error, 1)
+	go func() { startErr <- srv.Start(ctx) }()
+
+	// Wait until the server is accepting connections.
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		if resp, err := http.Get(base + "/api/health"); err == nil {
+			resp.Body.Close()
+			break
+		}
+		if time.Now().After(deadline) {
+			cancel()
+			t.Fatal("server never came up")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Open /api/events and keep it open — read the initial streamed bytes so the
+	// handler is actively blocked in its select before we shut down.
+	resp, err := http.Get(base + "/api/events")
+	if err != nil {
+		cancel()
+		t.Fatalf("open SSE: %v", err)
+	}
+	defer resp.Body.Close()
+	if _, err := resp.Body.Read(make([]byte, 1)); err != nil {
+		cancel()
+		t.Fatalf("read SSE first byte: %v", err)
+	}
+
+	// Stop the server. With the base-context cancel wired into shutdown, Start
+	// must return well within the graceful window instead of blocking on the
+	// open stream until shutdownTimeout and returning a deadline error.
+	cancel()
+	select {
+	case err := <-startErr:
+		if err != nil {
+			t.Fatalf("Start returned error (shutdown not graceful): %v", err)
+		}
+	case <-time.After(shutdownTimeout - time.Second):
+		t.Fatal("Start did not return within the graceful window; shutdown blocked on the open SSE stream")
+	}
+}
+
+// freePort binds an ephemeral loopback port, releases it, and returns the number.
+func freePort(t *testing.T) int {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("reserve port: %v", err)
+	}
+	port := ln.Addr().(*net.TCPAddr).Port
+	_ = ln.Close()
+	return port
 }
 
 func TestStartBindsLoopback(t *testing.T) {
