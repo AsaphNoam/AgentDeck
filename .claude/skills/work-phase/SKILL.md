@@ -24,12 +24,13 @@ work whatever the handoff marks active.
 1. **Verify before you trust.** Confirm green on arrival: `go build ./... && go test ./...`. A subphase
    is only done when its GREEN checkpoint passes (`+ cd ui && npm run build` if it touched `ui/`).
 2. **Do the work yourself.** Do **not** spawn coding subagents — they have Bash denied here and can't
-   build/test, so they can't reach a checkpoint. Read-only Explore research is fine.
+   build/test, so they can't reach a checkpoint. Read-only Explore research is fine — run it on a
+   cheaper model and keep the premium main thread for judgment and code (workflow §4).
 3. **Update + condense the handoff after every change**, and especially at each GREEN checkpoint:
    tick steps, collapse finished subphases, collapse finished phases to one line (workflow §5).
 4. **Commit at every GREEN checkpoint** — code + `HANDOFF.md` together, **directly on `main`**
    (trunk-based: no per-phase branches, no PRs), message `phase N.M: <title> — green checkpoint`,
-   with the `Co-Authored-By: Claude Opus 4.8` trailer. Do **not** push unless the user asked.
+   with a `Co-Authored-By:` trailer naming the model that did the work. Do **not** push unless the user asked.
 5. **Keep going** past each finished subphase to the next one. A green subphase boundary is the best
    place to be cut off, not a reason to quit.
 6. **Only stop for STOP conditions** (workflow §3): unresolvable ambiguity, a checkpoint you can't get
@@ -40,6 +41,10 @@ work whatever the handoff marks active.
    a design/implementation decision (without it being a hard blocker), record it under `## Autonomous
    decisions (please review)` in the handoff **and** call it out explicitly in your closing summary —
    never let the user discover a self-made decision by reading the diff (workflow §3).
+8. **Honor the invariant catalog.** Before building in a hot-spot area, read the matching sections
+   of [`docs/phases/INVARIANTS.md`](../../../docs/phases/INVARIANTS.md) — its intro lists the hot
+   spots. A new interface/runtime/driver must complete its §6 "joins every contract" checklist
+   before its subphase is called done.
 
 ## When you finish a session (any exit, including running low)
 

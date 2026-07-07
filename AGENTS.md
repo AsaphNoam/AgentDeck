@@ -19,7 +19,7 @@ Claude and Codex taking turns). Do **not** improvise a process — follow the sh
 - **Commit at every checkpoint directly on `main`** (trunk-based: no per-phase branches, no PRs); don't push unless the human asked.
 - **Only stop for real blockers** (workflow §3: unresolvable ambiguity, a checkpoint you can't fix, missing credentials, destructive actions). Write the blocker under `## Blocked on human`, then stop.
 - **Flag every judgment call.** If an ambiguity or spec gap forced *you* to make a design/implementation decision (without stopping), record it under `## Autonomous decisions (please review)` **and** call it out explicitly in your end-of-turn summary — never let the human find a self-made decision only by reading the diff.
-- **Do the work yourself** — don't hand the build to sub-agents that can't run the build/test commands.
+- **Do the work yourself** — don't hand the build to sub-agents that can't run the build/test commands. Bulk *reading* is the exception: delegate discovery to cheap read-only subagents and spend the premium quota on judgment and code (workflow §4).
 
 ## If you're here to review the last commit
 
@@ -48,6 +48,7 @@ your end-of-turn summary. This step **does** write code and commit. (Claude Code
 
 ## Project orientation
 
+- [`docs/phases/INVARIANTS.md`](docs/phases/INVARIANTS.md) — **the paid-for bug-class catalog.** Read the matching sections before touching a hot spot; its intro lists the hot spots and how the build/review/fix roles each use it.
 - [`MAP.md`](MAP.md) — index of all planning docs.
 - [`docs/agent-dashboard-prd.md`](docs/agent-dashboard-prd.md) — master PRD.
 - [`docs/phases/`](docs/phases/) — phase PRDs (`phase-N-*.md`) and tech specs (`tech/phase-N-*-techspec.md`).
