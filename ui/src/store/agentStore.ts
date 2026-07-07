@@ -27,14 +27,14 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
     set((state) => {
       const seen = new Set(seenIds);
       const agents = Object.fromEntries(Object.entries(state.agents).filter(([id]) => seen.has(id)));
-      return { agents, order: state.order.filter((id) => seen.has(id)), hydrating: false };
+      return { agents, order: (state.order ?? []).filter((id) => seen.has(id)), hydrating: false };
     }),
   removeAgent: (id) =>
     set((state) => {
       const { [id]: _removed, ...agents } = state.agents;
       return { agents, order: state.order.filter((item) => item !== id) };
     }),
-  setOrder: (order) => set({ order }),
+  setOrder: (order) => set({ order: order ?? [] }),
   clearLastSentAt: (id, sentAt) =>
     set((state) => {
       const agent = state.agents[id];

@@ -177,6 +177,9 @@ func TestLayoutDefault(t *testing.T) {
 	if l.Density.PerRow != 3 || l.Density.Gap != 16 {
 		t.Fatalf("default layout wrong: %+v", l)
 	}
+	if l.Order == nil {
+		t.Fatalf("default layout order = nil, want empty slice")
+	}
 }
 
 func TestPutLayoutValidatesAndPersists(t *testing.T) {

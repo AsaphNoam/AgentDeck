@@ -24,11 +24,12 @@ func (claudeProber) Check(ctx context.Context, _ config.Backend, _ config.Model,
 		return CredResult{Status: "skipped", Detail: "cli_not_installed"}
 	}
 
-	// Run `claude auth status` non-interactively. Exit 0 + no "not logged in"
-	// output → ok; exit non-0 or "not logged in" output → failed.
-	cmd := exec.CommandContext(ctx, path, "auth", "status", "--no-color")
-	cmd.Env = buildEnv(mergedEnv)
-	out, err := cmd.CombinedOutput()
+	// Run `claude auth status` non-interactively. Older Claude builds may not
+	// support `--no-color`, so retry once without it before surfacing a failure.
+	out, err := runClaudeAuthStatus(ctx, path, mergedEnv, true)
+	if err != nil && strings.Contains(strings.ToLower(string(out)), "unknown option '--no-color'") {
+		out, err = runClaudeAuthStatus(ctx, path, mergedEnv, false)
+	}
 
 	if ctx.Err() != nil {
 		return CredResult{Status: "skipped", Detail: "timeout"}
@@ -47,4 +48,14 @@ func (claudeProber) Check(ctx context.Context, _ config.Backend, _ config.Model,
 		return CredResult{Status: "failed", Detail: "not_logged_in"}
 	}
 	return CredResult{Status: "ok"}
+}
+
+func runClaudeAuthStatus(ctx context.Context, path string, mergedEnv map[string]string, noColor bool) ([]byte, error) {
+	args := []string{"auth", "status"}
+	if noColor {
+		args = append(args, "--no-color")
+	}
+	cmd := exec.CommandContext(ctx, path, args...)
+	cmd.Env = buildEnv(mergedEnv)
+	return cmd.CombinedOutput()
 }
