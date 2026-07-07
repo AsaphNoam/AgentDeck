@@ -2,6 +2,7 @@ package terminal
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,6 +35,53 @@ func TestProbeXtermAlwaysAvailable(t *testing.T) {
 	if caps.Terminal.Drivers.ITerm2.Reason == "" {
 		t.Fatal("unavailable iterm2 must carry a reason")
 	}
+}
+
+// TestLaunchArgvHonorsComposedSpec guards the BLOCKING §6 finding that the
+// terminal runtime built its CLI invocation from argv/env only, silently
+// dropping the composed model, add_dirs, and system prompt / switch primer.
+// The claude interactive CLI must receive them as flags.
+func TestLaunchArgvHonorsComposedSpec(t *testing.T) {
+	r := New(nil) // no store needed: launchArgv touches only the spec
+	spec := rt.LaunchSpec{
+		Agent:               state.Agent{Backend: "claude", Interface: "terminal"},
+		BackendType:         "claude-acp",
+		ModelID:             "claude-sonnet-4-6",
+		AddDirs:             []string{"/work/extra-a", "/work/extra-b"},
+		SystemPrompt:        "be a careful engineer",
+		RuntimeSystemPrompt: "PRIMER: prior context summary",
+		ExtraArgs:           []string{"--settings", "/tmp/settings.json"},
+	}
+	argv := r.launchArgv(spec, true, "sess-42")
+	joined := strings.Join(argv, " ")
+
+	wantPairs := [][2]string{
+		{"--model", "claude-sonnet-4-6"},
+		{"--add-dir", "/work/extra-a"},
+		{"--add-dir", "/work/extra-b"},
+		// StartSystemPrompt prefers the one-shot RuntimeSystemPrompt (the primer).
+		{"--append-system-prompt", "PRIMER: prior context summary"},
+		{"--settings", "/tmp/settings.json"},
+		{"--resume", "sess-42"},
+	}
+	for _, p := range wantPairs {
+		if !argvHasFlagValue(argv, p[0], p[1]) {
+			t.Errorf("argv missing %s %q; got: %s", p[0], p[1], joined)
+		}
+	}
+	if argv[0] != "claude" {
+		t.Errorf("argv[0] = %q, want claude", argv[0])
+	}
+}
+
+// argvHasFlagValue reports whether argv contains flag immediately followed by val.
+func argvHasFlagValue(argv []string, flag, val string) bool {
+	for i := 0; i+1 < len(argv); i++ {
+		if argv[i] == flag && argv[i+1] == val {
+			return true
+		}
+	}
+	return false
 }
 
 // A terminal agent launches under the xterm/PTY driver, records its tty + driver

@@ -546,6 +546,38 @@ func TestResumeAndSwitchUseFrozenSkipAndAddDirs(t *testing.T) {
 	}
 }
 
+// TestCodexTerminalRejected guards the BLOCKING §6 finding: a codex terminal
+// agent has no verified hook-registration path (its status never flows) and its
+// CLI flags differ from claude's, so launching/switching to it silently produces
+// a statusless agent that drops the composed spec. Both the launch and switch
+// paths must reject it with 422 terminal_unavailable rather than land it.
+func TestCodexTerminalRejected(t *testing.T) {
+	_, ts := switchTestServer(t)
+
+	// Launch: interface=terminal + backend=codex → 422 terminal_unavailable.
+	resp, body := post(t, ts.URL+"/api/sessions", map[string]string{
+		"role": "impl", "project": "tmpproj", "interface": "terminal", "backend": "codex", "model": "gpt-5.5",
+	})
+	if resp.StatusCode != http.StatusUnprocessableEntity {
+		t.Fatalf("launch codex terminal status = %d, want 422: %s", resp.StatusCode, body)
+	}
+	if !strings.Contains(string(body), "terminal_unavailable") {
+		t.Fatalf("launch codex terminal error = %s, want terminal_unavailable", body)
+	}
+
+	// Switch: a live chat agent switched to codex terminal → same 422.
+	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+	resp, body = post(t, ts.URL+"/api/sessions/"+id+"/switch-runtime", map[string]string{
+		"interface": "terminal", "backend": "codex", "model": "gpt-5.5",
+	})
+	if resp.StatusCode != http.StatusUnprocessableEntity {
+		t.Fatalf("switch to codex terminal status = %d, want 422: %s", resp.StatusCode, body)
+	}
+	if !strings.Contains(string(body), "terminal_unavailable") {
+		t.Fatalf("switch codex terminal error = %s, want terminal_unavailable", body)
+	}
+}
+
 func containsStr(ss []string, want string) bool {
 	for _, s := range ss {
 		if s == want {

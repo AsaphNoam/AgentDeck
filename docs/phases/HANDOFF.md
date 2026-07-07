@@ -11,7 +11,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
 - **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
 - **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** review fix (SSE onopen hydration-generation reset): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, `cd ui && npm run test` + `npm run build`.
+- **Last GREEN checkpoint:** review fix (terminal honors composed LaunchSpec; codex terminal rejected): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -156,15 +156,6 @@ current code (`permission.go` captures `turnSeq`); the permission-resolution rac
 
 ### BLOCKING
 
-- **BLOCKING — terminal runtime does not honor the composed `LaunchSpec` contract.**
-  `internal/runtime/terminal/terminal.go:537-565` builds terminal launches from argv/env only, and
-  `internal/server/messaging_registration.go:18-51` writes per-agent MCP config that the terminal
-  path never consumes. In normal usage, terminal launch/switch flows can silently drop the selected
-  model, system prompt/primer, `add_dirs`, and messaging MCP registration; the same gap also leaves
-  Codex terminal status without a valid hook-registration path. Fix: add a terminal launch adapter
-  that consumes the relevant `LaunchSpec` fields, or reject unsupported terminal combinations with
-  `422 terminal_unavailable`; tests: terminal launch/switch must prove model selection, primer
-  delivery, `add_dirs`, MCP availability, and unsupported Codex terminal paths behave correctly.
 - **BLOCKING — graceful shutdown never completes while an SSE dashboard client is open.**
   `internal/server/server.go:203-215` calls `srv.Shutdown`, but `internal/server/sse.go:46-60`
   keeps `/api/events` handlers alive until their request contexts are canceled, and shutdown does
@@ -339,6 +330,25 @@ current code (`permission.go` captures `turnSeq`); the permission-resolution rac
 ## Autonomous decisions (please review)
 
 > Resolved without stopping; the human should still see them. Remove once acknowledged (workflow §3, §5).
+
+- **NEW (review fix, finding 4 — terminal LaunchSpec contract): hybrid fix — HONOR claude terminal fields, REJECT
+  codex terminal with 422.** The finding offered two arms (honor via adapter, or 422-reject); I split by backend
+  because the techspec (line 140) requires terminal launches to succeed and switch requests carry a model, so
+  full-reject was not viable. (1) **claude terminal**: `terminal/launchArgv` now appends the documented Claude Code
+  CLI flags `--model`, `--add-dir` (per dir), `--append-system-prompt` (from `StartSystemPrompt()`, so the switch
+  primer rides along) — GATED-labeled like the existing `interactiveBinary`/`--resume`/`--settings` (real flags,
+  unverified against a live login). (2) **codex terminal**: rejected at BOTH launch (`composeLaunch`) and switch
+  (`validateSwitchTarget`, which runs before any teardown) with `422 terminal_unavailable` — codex's interactive CLI
+  has no verified hook-registration path (status never flows) and its flags differ from claude's, so landing one
+  produces a statusless agent that drops the spec. (3) **messaging MCP**: deliberately NOT wired into the terminal
+  CLI — terminal agents are already non-messageable (`ResolveRecipient` excludes them, prior decision), so wiring
+  send-only tools would be inconsistent and rests on the unverified `--mcp-config` flag; the in-process registration
+  is left as-is (idle, teardown-symmetric). **Why judgment calls:** the arm split, the exact CLI flags, and rejecting
+  a codex-terminal combo the spec shows as an example (line 352) are all decisions the finding left open. **Tradeoffs:**
+  claude-terminal flags are unverified against a live CLI (same gate class as all Phase 6 terminal CLI behavior); codex
+  terminal is now unavailable until its live hook/flag surface is confirmed. **To reverse:** drop the codex-terminal
+  guards + implement codex's verified hook registration and CLI flags; or move the claude flag mapping behind an
+  adapter method once the live CLI surface is known. Tests: `TestLaunchArgvHonorsComposedSpec`, `TestCodexTerminalRejected`.
 
 - **NEW (review fix, findings 8+9): terminal PTY hub design choices the findings left open.** (1) **Scrollback ring
   = 256 KiB** per agent (a documented constant) — bounds per-agent memory while covering a screenful+context on
@@ -625,6 +635,15 @@ current code (`permission.go` captures `turnSeq`); the permission-resolution rac
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-07 — **review fix: terminal honors the composed LaunchSpec; codex terminal rejected — green.** BLOCKING,
+  confirmed real (invariant §6 — a new runtime must join the LaunchSpec contract + capability honesty). The terminal
+  runtime's `launchArgv` built the CLI invocation from argv/env only, silently dropping the composed model, add_dirs,
+  and system prompt/primer. `composeLaunch` composes them correctly (shared §2 helper); the gap was purely in the
+  terminal runtime. Fix (hybrid, see Autonomous decisions): claude terminal now passes `--model`/`--add-dir`/
+  `--append-system-prompt`; codex terminal is rejected at launch + switch with `422 terminal_unavailable` (no verified
+  hook/flag path — also resolves the "codex terminal status has no registration path" half); messaging MCP stays
+  intentionally unwired (terminal is non-messageable). Tests: `TestLaunchArgvHonorsComposedSpec`,
+  `TestCodexTerminalRejected`. Green: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
 - 2026-07-07 — **review fix: SSE onopen is a fresh hydration generation — green.** BLOCKING, confirmed real
   (invariant §1 — reset connection-scoped state in `onopen`, not the constructor). `ui/src/api/sse.ts` reset
   `lastPing`/`hydrationIds`/`lastAgentSeq` only when `!hydrating`, so the browser's automatic `EventSource`
