@@ -1,6 +1,6 @@
 #  Future phase
 
-**Status:** future / candidate-driven — define after the core product is solid
+**Status:** candidate SELECTED (2026-07-07): OpenHands & OpenCode backends — PRD [`phase-7-additional-features.md`](phase-7-additional-features.md), spec [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md). This file remains the backlog for the NEXT post-core slot.
 **Features:** candidate backlog, including F13 (activity map)
 **Depends on:** Candidate-specific; most candidates build on Phases 2-6
 **Enables:** —

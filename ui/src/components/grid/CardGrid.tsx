@@ -28,7 +28,7 @@ export function CardGrid() {
 
   useEffect(() => {
     void getLayout().then((layout) => {
-      setOrder(layout.order);
+      setOrder(layout.order ?? []);
       setDensity(layout.density);
       setGroupLayout(layout.groups ?? {});
       loaded.current = true;
@@ -44,8 +44,9 @@ export function CardGrid() {
   }, [density, groupLayout, order]);
 
   const ids = useMemo(() => {
+    const safeOrder = order ?? [];
     const known = new Set(Object.keys(agents));
-    return [...order.filter((id) => known.has(id)), ...Object.keys(agents).filter((id) => !order.includes(id))];
+    return [...safeOrder.filter((id) => known.has(id)), ...Object.keys(agents).filter((id) => !safeOrder.includes(id))];
   }, [agents, order]);
 
   const grouped = useMemo(() => groupAgents(ids.map((id) => agents[id]).filter(Boolean)), [agents, ids]);

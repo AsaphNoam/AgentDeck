@@ -2,6 +2,8 @@ package credcheck
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/agentdeck/agentdeck/internal/config"
@@ -62,5 +64,35 @@ func TestCheckWithMockProber(t *testing.T) {
 	result := Check(context.Background(), bk, config.Model{}, nil)
 	if result.Status != "ok" {
 		t.Errorf("status = %q, want ok", result.Status)
+	}
+}
+
+func TestClaudeProberRetriesWithoutNoColor(t *testing.T) {
+	dir := t.TempDir()
+	cliPath := filepath.Join(dir, "claude")
+	script := `#!/bin/sh
+if [ "$1" = "auth" ] && [ "$2" = "status" ] && [ "$3" = "--no-color" ]; then
+  echo "error: unknown option '--no-color'" >&2
+  exit 1
+fi
+if [ "$1" = "auth" ] && [ "$2" = "status" ]; then
+  echo "logged in"
+  exit 0
+fi
+echo "unexpected args: $@" >&2
+exit 2
+`
+	if err := os.WriteFile(cliPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake claude: %v", err)
+	}
+
+	result := claudeProber{}.Check(
+		context.Background(),
+		config.Backend{},
+		config.Model{},
+		map[string]string{"CLAUDE_PATH": cliPath},
+	)
+	if result.Status != "ok" {
+		t.Fatalf("status = %q, want ok (detail=%q)", result.Status, result.Detail)
 	}
 }

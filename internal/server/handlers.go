@@ -165,8 +165,9 @@ func layoutFromConfig(l config.Layout) layoutResponse {
 			Collapsed bool `json:"collapsed"`
 		}{Collapsed: g.Collapsed}
 	}
+	order := append([]string{}, l.Order...)
 	return layoutResponse{
-		Order:   append([]string(nil), l.Order...),
+		Order:   order,
 		Density: layoutDensity{PerRow: l.Density.CardsPerRow, Gap: l.Density.Gap},
 		Groups:  groups,
 	}
@@ -177,8 +178,9 @@ func (l layoutResponse) toConfig() config.Layout {
 	for name, g := range l.Groups {
 		groups[name] = config.GroupLayout{Collapsed: g.Collapsed}
 	}
+	order := append([]string{}, l.Order...)
 	return config.Layout{
-		Order:   append([]string(nil), l.Order...),
+		Order:   order,
 		Density: config.Density{CardsPerRow: l.Density.PerRow, Gap: l.Density.Gap},
 		Groups:  groups,
 	}

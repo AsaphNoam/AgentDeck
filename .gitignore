@@ -19,3 +19,5 @@ mcp/node_modules/
 .DS_Store
 *.log
 .gocache
+
+.agentdeck-dev/

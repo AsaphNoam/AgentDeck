@@ -20,7 +20,7 @@ This folder breaks the [master PRD](../agent-dashboard-prd.md) into **dependency
 | [4](phase-4-persistence-archive.md) | Persistence: archive, search, resume, file/command tracking | F9, F10 | 1, 2 |
 | [5](phase-5-coordination.md) | Coordination: MCP messaging, nudger, budgets, notifications | F8, F11 | 1, 2 |
 | [6](phase-6-flexibility.md) | Flexibility: terminal runtime, switch-runtime, task groups | F7, F2 | 1, 2, 4 |
-| [7](phase-7-future-phase.md) | Future phase: candidate-driven post-core work | Candidate backlog | Selected candidate |
+| [7](phase-7-additional-features.md) | Additional features: OpenHands & OpenCode backends (selected from the [candidate backlog](future-phase.md)) | F14, F15 | 1, 2, 6 |
 
 ## Dependency graph
 
@@ -51,7 +51,7 @@ This folder breaks the [master PRD](../agent-dashboard-prd.md) into **dependency
               └──────────┘
 ```
 
-Phases 3, 4, and 5 all sit on top of Phase 2 and have no hard dependencies on each other, so they can be built in parallel or reordered by priority. Phase 6 wants resume (Phase 4) in place. Phase 7 is candidate-driven; choose its dependencies from the selected candidate in [`phase-7-feature-candidates.md`](phase-7-feature-candidates.md).
+Phases 3, 4, and 5 all sit on top of Phase 2 and have no hard dependencies on each other, so they can be built in parallel or reordered by priority. Phase 6 wants resume (Phase 4) in place. Phase 7's selected candidate is OpenHands & OpenCode backend support ([`phase-7-additional-features.md`](phase-7-additional-features.md)); the remaining candidate backlog lives in [`future-phase.md`](future-phase.md).
 
 ## Milestone-to-PRD mapping
 

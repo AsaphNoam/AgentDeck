@@ -25,7 +25,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - [x] Phase 4 — Persistence: archive, search, resume, file/command tracking ✅
 - [x] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications ✅
 - [ ] Phase 6 — Flexibility: terminal runtime, switch-runtime, task groups
-- [ ] Phase 7 — Future phase: candidate-driven post-core work
+- [ ] Phase 7 — Additional features: OpenHands & OpenCode backends — candidate selected 2026-07-07; PRD [`phase-7-additional-features.md`](phase-7-additional-features.md), spec [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md); not started
 
 Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent after 2).
 
@@ -87,7 +87,7 @@ launch option via capabilities, and refreshed embedded UI. Details in changelog 
 - [ ] Escaping + shell-quote helper with tests for quotes/backslashes/newlines/argv shell-quoting.
 - [ ] Capability probe wiring; explicit unavailable `driver:"iterm2"` returns `422 terminal_unavailable` with reason.
 - **Checkpoint:** `go build ./...` + `go test ./...` + `go test -tags sqlite_fts5 ./...` (Go-only unless UI driver picker changes).
-- **Resume note:** xterm/tmux drivers and capabilities are green. 6.7 is fully skippable; if skipped, roll Phase 6 complete and pick the Phase 7 candidate from `phase-7-feature-candidates.md`.
+- **Resume note:** xterm/tmux drivers and capabilities are green. 6.7 is fully skippable; if skipped, roll Phase 6 complete and start Phase 7 (selected candidate: OpenHands & OpenCode backends — [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md), subphase plan §7).
 
 ---
 
