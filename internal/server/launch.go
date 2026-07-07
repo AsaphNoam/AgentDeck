@@ -153,6 +153,14 @@ func (s *Server) composeLaunch(req launchRequest) (runtime.LaunchSpec, state.Age
 	if iface != "chat" && iface != "terminal" {
 		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeValidation, "invalid interface: "+iface)
 	}
+	// Codex terminal is unsupported: the codex interactive CLI has no verified
+	// hook-registration path (so terminal status never flows) and its model/
+	// add_dir/resume flags differ from claude's and are unverified. Reject it
+	// rather than launch a statusless agent that silently drops the composed spec
+	// (§6 capability honesty). Claude terminal is honored in the terminal runtime.
+	if iface == "terminal" && backend.Type == "codex-acp" {
+		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeTerminalUnavailable, "codex terminal is not supported (no verified hook-registration or CLI-flag path)")
+	}
 
 	cwd, err := config.ExpandTilde(project.Cwd)
 	if err != nil {

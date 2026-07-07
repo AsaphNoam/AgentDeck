@@ -1,4 +1,4 @@
-# Phase 7 — Future phase
+#  Future phase
 
 **Status:** future / candidate-driven — define after the core product is solid
 **Features:** candidate backlog, including F13 (activity map)
@@ -9,9 +9,9 @@
 
 ## 1. Goal
 
-Hold the post-core feature slot for the highest-value beta improvements once Phases 0-6 are stable. Phase 7 is no longer reserved only for polish; it is the place to choose the next product bet after the dashboard, archive, messaging, terminal runtime, switching, and groups exist.
+Hold the post-core feature slot for the highest-value beta improvements once Phases 0-6 are stable. future phase is no longer reserved only for polish; it is the place to choose the next product bet after the dashboard, archive, messaging, terminal runtime, switching, and groups exist.
 
-Phase 7 was previously reserved for the optional activity map. Based on the current beta shape, the strongest next candidates are workflow features that help a single developer launch, supervise, and resume multiple coding agents with less overhead.
+future phase was previously reserved for the optional activity map. Based on the current beta shape, the strongest next candidates are workflow features that help a single developer launch, supervise, and resume multiple coding agents with less overhead.
 
 This file is intentionally product-level. Once a candidate is selected, turn it into a focused phase PRD or subphase plan with API shapes, storage decisions, UI details, and acceptance tests.
 
@@ -243,7 +243,7 @@ The user-facing model should be simple:
 
 ## 9. Acceptance criteria
 
-- [ ] The selected Phase 7 candidate has a focused PRD or subphase plan before implementation starts.
+- [ ] The selected future phase candidate has a focused PRD or subphase plan before implementation starts.
 - [ ] Candidate scope names the user workflow, storage/API/UI changes, migration needs, and acceptance tests.
 - [ ] If activity map is selected, use the existing activity-map tech spec as the implementation baseline.
 - [ ] If a higher-value workflow candidate is selected, activity map remains optional/future and is not a dependency.
@@ -251,5 +251,5 @@ The user-facing model should be simple:
 
 ## 10. Open questions
 - Which candidate should become the first post-core build target: launch templates/task bundles, session notes, dashboard triage/command palette, or activity map?
-- Should Phase 7 remain a single candidate, or should it be split into 7A/7B if one small QoL item and one larger workflow item are both worth doing?
+- Should future phase remain a single candidate, or should it be split into 7A/7B if one small QoL item and one larger workflow item are both worth doing?
 - For candidate features that add config/state, which data should be hand-editable JSON versus SQLite state?

@@ -548,14 +548,33 @@ func (r *Runtime) tabSpec(spec rt.LaunchSpec, resume bool, sessionID string) Tab
 }
 
 // launchArgv builds the launch command. Tests override the binary; production
-// resolves the per-backend interactive CLI and appends the hook-registration
+// resolves the per-backend interactive CLI, honors the composed LaunchSpec
+// (model, add_dirs, system prompt/primer), and appends the hook-registration
 // args (spec.ExtraArgs, e.g. claude `--settings <path>`).
 func (r *Runtime) launchArgv(spec rt.LaunchSpec, resume bool, sessionID string) []string {
 	if r.command != "" {
 		return append(append([]string{r.command}, r.cmdArgs...), spec.ExtraArgs...)
 	}
-	argv := []string{interactiveBinary(spec.BackendType)}
+	bin := interactiveBinary(spec.BackendType)
+	argv := []string{bin}
 	argv = append(argv, spec.ExtraArgs...)
+	// §6 contract: the composed model, add_dirs, and system prompt / switch primer
+	// MUST reach the interactive CLI — silently dropping them launched a
+	// default-model agent with no project dirs or persona. These are the
+	// documented Claude Code CLI flags; GATED like interactiveBinary/--resume/
+	// --settings (unverified against a live login). Codex terminal is rejected
+	// upstream (422 terminal_unavailable), so only the claude CLI reaches here.
+	if bin == "claude" {
+		if spec.ModelID != "" {
+			argv = append(argv, "--model", spec.ModelID)
+		}
+		for _, d := range spec.AddDirs {
+			argv = append(argv, "--add-dir", d)
+		}
+		if sp := spec.StartSystemPrompt(); sp != "" {
+			argv = append(argv, "--append-system-prompt", sp)
+		}
+	}
 	if resume && sessionID != "" {
 		// GATED: claude's interactive resume flag; unverified against a live CLI,
 		// same class as the other Phase 6 credentialed gates. Codex's resume form
