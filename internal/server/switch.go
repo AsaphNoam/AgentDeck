@@ -267,8 +267,10 @@ func (s *Server) validateSwitchTarget(target state.Agent) *runtime.APIError {
 }
 
 // composeSwitchSpec builds the resume LaunchSpec for the target identity from the
-// frozen session snapshot (cwd/system_prompt) + re-resolved backend/model env,
-// minting a fresh hook token and MCP registration (mirrors handleResume).
+// frozen session snapshot (cwd/system_prompt/skip_permissions/add_dirs) plus the
+// target backend/model env, minting a fresh hook token and MCP registration
+// (mirrors handleResume). Switch overrides only backend/model/interface; the
+// permission policy and add_dirs stay frozen to the original launch (§12.4).
 func (s *Server) composeSwitchSpec(target state.Agent, resumeID string) (runtime.LaunchSpec, *runtime.APIError) {
 	snap, err := s.stateStore.ReadSession(target.AgentID)
 	if errors.Is(err, state.ErrNotFound) {
@@ -312,12 +314,12 @@ func (s *Server) composeSwitchSpec(target state.Agent, resumeID string) (runtime
 	return runtime.LaunchSpec{
 		Agent:          target,
 		Cwd:            snap.Cwd,
-		AddDirs:        s.resolveAddDirs(target.Project),
+		AddDirs:        snap.AddDirs,
 		SystemPrompt:   snap.SystemPrompt,
 		BackendType:    be.Type,
 		ModelID:        model.Model,
 		Env:            composeEnv(os.Environ(), be.Env, model.Env, s.hookEnv(target, token)),
-		SkipPerms:      s.resolveSkipForRole(target.Role),
+		SkipPerms:      snap.SkipPermissions,
 		HookToken:      token,
 		MCPServers:     []runtime.MCPServerSpec{mcpSpec},
 		ExtraArgs:      extraArgs,

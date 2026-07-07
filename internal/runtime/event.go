@@ -124,6 +124,12 @@ type SessionMetaData struct {
 	SystemPrompt    string   `json:"system_prompt,omitempty"`
 	SystemPromptSHA string   `json:"system_prompt_sha,omitempty"`
 	EnvKeys         []string `json:"env_keys,omitempty"`
+	// SkipPermissions and AddDirs are part of the frozen composed config: they are
+	// resolved once at launch and persisted so resume/switch reproduce the original
+	// composition, NOT the current role/project files (techspec §12.4, master-PRD
+	// "a running agent's spec is frozen; edits affect future launches only").
+	SkipPermissions bool     `json:"skip_permissions,omitempty"`
+	AddDirs         []string `json:"add_dirs,omitempty"`
 	CreatedAt       string   `json:"created_at"`
 	ResumedAt       *string  `json:"resumed_at"`
 	SessionID       string   `json:"session_id,omitempty"`

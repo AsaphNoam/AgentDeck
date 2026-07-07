@@ -36,6 +36,10 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 		}
 		applied[version] = true
 	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return fmt.Errorf("state: iterate schema_migrations: %w", err)
+	}
 	if err := rows.Close(); err != nil {
 		return fmt.Errorf("state: close schema_migrations rows: %w", err)
 	}
@@ -65,8 +69,9 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 	}
 
 	// Guard against running an older binary against a schema written by a newer one.
-	// latestKnownMigration must be updated whenever a new migration is added.
-	const latestKnownMigration = 6
+	// Derived from the migrations slice itself so a new migration can never forget
+	// to bump the floor (a hand-maintained constant once risked self-bricking).
+	latestKnownMigration := migrations[len(migrations)-1].version
 	var maxApplied int
 	if err := db.QueryRow(`SELECT COALESCE(MAX(version), 0) FROM schema_migrations`).Scan(&maxApplied); err != nil {
 		return fmt.Errorf("state: check max migration: %w", err)

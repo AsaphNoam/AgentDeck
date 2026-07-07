@@ -109,8 +109,10 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 6. Build the resume LaunchSpec from the frozen snapshot + current role/project
-	//    (skip_permissions and add_dirs are re-resolved, not stored in the snapshot).
+	// 6. Build the resume LaunchSpec entirely from the frozen snapshot — including
+	//    skip_permissions and add_dirs, which are persisted at launch so a later
+	//    role/project edit cannot change a resumed agent's permission policy or
+	//    accessible directories (techspec §12.4 frozen-snapshot rule).
 	resumeAgent := state.Agent{
 		AgentID:   agent.AgentID,
 		Name:      agent.Name,
@@ -142,8 +144,8 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 }
 
 // composeResumeSpec mints a fresh hook token + MCP registration and builds the
-// resume LaunchSpec from the frozen snapshot (cwd/system_prompt/last_session_id)
-// plus re-resolved role/project fields (skip_permissions, add_dirs) — mirroring
+// resume LaunchSpec entirely from the frozen snapshot (cwd/system_prompt/
+// last_session_id plus the frozen skip_permissions/add_dirs) — mirroring
 // composeSwitchSpec. On registration failure it rolls back its own side effects
 // and returns an APIError.
 func (s *Server) composeResumeSpec(agent state.Agent, snap state.SessionSnapshot, be config.Backend, model config.Model) (runtime.LaunchSpec, *runtime.APIError) {
@@ -163,12 +165,12 @@ func (s *Server) composeResumeSpec(agent state.Agent, snap state.SessionSnapshot
 	return runtime.LaunchSpec{
 		Agent:          agent,
 		Cwd:            snap.Cwd,
-		AddDirs:        s.resolveAddDirs(agent.Project),
+		AddDirs:        snap.AddDirs,
 		SystemPrompt:   snap.SystemPrompt,
 		BackendType:    be.Type,
 		ModelID:        model.Model,
 		Env:            composeEnv(os.Environ(), be.Env, model.Env, s.hookEnv(agent, token)),
-		SkipPerms:      s.resolveSkipForRole(agent.Role),
+		SkipPerms:      snap.SkipPermissions,
 		HookToken:      token,
 		MCPServers:     []runtime.MCPServerSpec{mcpSpec},
 		ExtraArgs:      extraArgs,
