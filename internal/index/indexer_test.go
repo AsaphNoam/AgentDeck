@@ -254,6 +254,57 @@ func TestReindexIsolatesBadAgent(t *testing.T) {
 	}
 }
 
+// TestReindexPreservesFinalPartialTurn guards the BLOCKING finding that
+// reindexAgent's post-loop flush only ran when NO turn_end was ever seen. A
+// transcript with one completed turn followed by a crash mid-later-turn left
+// the final assistant text sitting only in the in-memory buffer, so reindex
+// silently dropped the most recent partial turn's searchable content.
+func TestReindexPreservesFinalPartialTurn(t *testing.T) {
+	st, home := openTestDB(t)
+	w, err := transcript.Open(home, "a_index", nil)
+	if err != nil {
+		t.Fatalf("transcript.Open: %v", err)
+	}
+	m := meta()
+	metaRaw, err := json.Marshal(m)
+	if err != nil {
+		t.Fatalf("marshal meta: %v", err)
+	}
+	events := []runtime.Event{
+		{AgentID: "a_index", Seq: 0, Type: runtime.EvSessionMeta, Data: metaRaw, Ts: m.CreatedAt},
+		// Turn 1: completed (has a turn_end).
+		ev(t, 1, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "turnone_alpha_phrase"}),
+		ev(t, 2, runtime.EvTurnEnd, runtime.TurnEndData{StopReason: "end_turn", ContextPct: 0.3}),
+		// Turn 2: partial — crash before a turn_end.
+		ev(t, 3, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "turntwo_partial_bravo_phrase"}),
+	}
+	for _, e := range events {
+		if err := w.Append(e); err != nil {
+			t.Fatalf("Append seq %d: %v", e.Seq, err)
+		}
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("Close writer: %v", err)
+	}
+
+	if err := Reindex(home, st.DB()); err != nil {
+		t.Fatalf("Reindex: %v", err)
+	}
+
+	// The completed turn's phrase is searchable (never in question) ...
+	var agentID string
+	if err := st.DB().QueryRow(`SELECT agent_id FROM sessions_fts WHERE content LIKE ?`, `%turnone_alpha_phrase%`).Scan(&agentID); err != nil {
+		t.Fatalf("completed-turn phrase missing after reindex: %v", err)
+	}
+	// ... and so must the partial (unterminated) turn's phrase.
+	if err := st.DB().QueryRow(`SELECT agent_id FROM sessions_fts WHERE content LIKE ?`, `%turntwo_partial_bravo_phrase%`).Scan(&agentID); err != nil {
+		t.Fatalf("partial-turn phrase dropped by reindex (BLOCKING regression): %v", err)
+	}
+	if agentID != "a_index" {
+		t.Fatalf("fts agent = %q, want a_index", agentID)
+	}
+}
+
 func TestReindexMissingSessionsDirIsNoop(t *testing.T) {
 	st, home := openTestDB(t)
 	if err := os.RemoveAll(filepath.Join(home, "sessions")); err != nil {
