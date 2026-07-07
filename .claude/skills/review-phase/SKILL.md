@@ -15,6 +15,7 @@ Follow the full review protocol in [`docs/phases/AGENT-WORKFLOW.md`](../../../do
 2. **Get the diff.** `git show <sha>` or `git diff <base>..<head>`.
 3. **Read HANDOFF.md** to know which phase was just completed, then open its PRD (`docs/phases/phase-N-*.md`) and tech spec (`docs/phases/tech/phase-N-*-techspec.md`).
 4. **Review against the four criteria** (§8): spec adherence · dead code · bad practices · flagrant bugs.
-5. **Skip** style nits, micro-optimizations, and edge cases that won't arise in normal use. The bar: *would this cause a real problem during regular usage?*
-6. **Categorize** each finding as **BLOCKING** or **ADVISORY**.
-7. **Report** to the human — every finding with file + line, what's wrong, and why it matters. For BLOCKING items, also write them to `## Review findings` in `HANDOFF.md`. If nothing found, say so plainly.
+5. **Sweep against the paid-for bug classes.** Check the diff against every class in [`docs/phases/INVARIANTS.md`](../../../docs/phases/INVARIANTS.md) and tag each finding with its class number — a match is strong evidence the finding is real.
+6. **Skip** style nits, micro-optimizations, and edge cases that won't arise in normal use. The bar: *would this cause a real problem during regular usage?*
+7. **Categorize** each finding as **BLOCKING** or **ADVISORY**.
+8. **Report** to the human — every finding with file + line, what's wrong, and why it matters. For BLOCKING items, also write them to `## Review findings` in `HANDOFF.md`. If a finding reveals a genuinely new systemic class, append it to `INVARIANTS.md` (doc writes are allowed; code writes are not). If nothing found, say so plainly.

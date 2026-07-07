@@ -29,7 +29,8 @@ title/keyword (just that one). Otherwise work **all** unresolved findings, **BLO
    changelog entry (`dismissed <title> — false positive: <evidence>`). Your validation is the verdict;
    **call it out in your summary** — a dismissal is a judgment call — but it does not linger in the handoff.
 3. **Do the work yourself.** Do **not** spawn coding subagents — they have Bash denied here and can't
-   build/test, so they can't reach a checkpoint. Read-only Explore research is fine.
+   build/test, so they can't reach a checkpoint. Read-only Explore research is fine — run it on a
+   cheaper model and keep the premium main thread for judgment and code (workflow §4).
 4. **Fix to GREEN only.** A fix is done when its checkpoint passes (`go build ./... && go test ./...`,
    `-tags sqlite_fts5` and `cd ui && npm run build` where relevant). Never mark a finding resolved or
    commit on red. Keep/add a regression test for every real fix.
@@ -43,6 +44,10 @@ title/keyword (just that one). Otherwise work **all** unresolved findings, **BLO
 7. **Flag every judgment call (§3).** If a fix forced *you* to make a design/implementation decision
    the finding didn't dictate, record it under `## Autonomous decisions (please review)` and say so
    explicitly in your closing summary.
+8. **Feed the catalog.** Most real findings are instances of a class in
+   [`docs/phases/INVARIANTS.md`](../../../docs/phases/INVARIANTS.md) — name the class in the
+   changelog line. If the root cause is a genuinely new class, or the fix produced a new canonical
+   helper worth reusing, append it there; that file is how the next agent avoids reintroducing the bug.
 
 ## When you finish a session (any exit)
 

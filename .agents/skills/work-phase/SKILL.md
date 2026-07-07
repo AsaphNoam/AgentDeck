@@ -7,7 +7,7 @@ description: Autonomously implement the next AgentDeck phase/subphase in spaced,
 
 You are driving AgentDeck's **fire-and-forget** implementation loop. Build the codebase one
 subphase at a time, keep [`docs/phases/HANDOFF.md`](../../../docs/phases/HANDOFF.md) accurate
-enough for the next agent (Codex **or** Codex) to resume cold, and keep going until the phase
+enough for the next agent (Claude **or** Codex) to resume cold, and keep going until the phase
 is done, you're blocked on the human, or your quota runs out.
 
 ## The protocol is canonical — read it
@@ -24,7 +24,8 @@ work whatever the handoff marks active.
 1. **Verify before you trust.** Confirm green on arrival: `go build ./... && go test ./...`. A subphase
    is only done when its GREEN checkpoint passes (`+ cd ui && npm run build` if it touched `ui/`).
 2. **Do the work yourself.** Do **not** spawn coding subagents — they have Bash denied here and can't
-   build/test, so they can't reach a checkpoint. Read-only Explore research is fine.
+   build/test, so they can't reach a checkpoint. Read-only Explore research is fine — run it on a
+   cheaper model and keep the premium main thread for judgment and code (workflow §4).
 3. **Update + condense the handoff after every change**, and especially at each GREEN checkpoint:
    tick steps, collapse finished subphases, collapse finished phases to one line (workflow §5).
 4. **Commit at every GREEN checkpoint** — code + `HANDOFF.md` together, **directly on `main`**
@@ -40,6 +41,10 @@ work whatever the handoff marks active.
    a design/implementation decision (without it being a hard blocker), record it under `## Autonomous
    decisions (please review)` in the handoff **and** call it out explicitly in your closing summary —
    never let the user discover a self-made decision by reading the diff (workflow §3).
+8. **Honor the invariant catalog.** Before building in a hot-spot area, read the matching sections
+   of [`docs/phases/INVARIANTS.md`](../../../docs/phases/INVARIANTS.md) — its intro lists the hot
+   spots. A new interface/runtime/driver must complete its §6 "joins every contract" checklist
+   before its subphase is called done.
 
 ## When you finish a session (any exit, including running low)
 

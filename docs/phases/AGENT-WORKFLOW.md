@@ -18,6 +18,9 @@ quota runs out, and you keep [`HANDOFF.md`](HANDOFF.md) so accurate that the nex
 - [`README.md`](README.md) — phase plan, dependency graph, build order.
 - `phase-N-*.md` — phase PRD (the *what* + acceptance criteria).
 - `tech/phase-N-*-techspec.md` — tech spec (the *how*). Each ends in a **`## Subphase plan`** section — this is your task list.
+- [`INVARIANTS.md`](INVARIANTS.md) — the paid-for bug-class catalog. Its intro lists the hot-spot
+  areas and how each loop role uses it: build reads the matching class first, review (§8) sweeps
+  the diff against every class, fix (§9) names the class it closes and appends new ones.
 - [`../../MAP.md`](../../MAP.md) — top-level index. [`../agent-dashboard-prd.md`](../agent-dashboard-prd.md) — master PRD.
 
 A **phase** is split into **subphases** (e.g. `5.1`, `5.2`). Each subphase is a single
@@ -101,6 +104,13 @@ Implement directly in this session. **Do not delegate the build to subagents:** 
 agents in this environment have Bash denied, so they cannot run `go build`, `go test`, or
 `npm run build` — they can write code but can't reach a GREEN checkpoint, which defeats the
 whole protocol. You are the one who must verify. (Read-only research via the Explore agent is fine.)
+
+**Do delegate bulk reading — tier the quota.** Sessions run on a premium, quota-limited model
+(Opus-class or above); its turns and context are the scarce resource. Farm discovery out to
+read-only subagents on a cheaper model (e.g. Sonnet): repo/doc sweeps, diff audits, log and
+history mining — anything where you need conclusions, not the raw text. Have them return
+structured findings (paths, line numbers, short quotes) so the main thread spends its quota
+only on design, judgment, and the code itself.
 
 ---
 
