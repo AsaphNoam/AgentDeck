@@ -183,6 +183,37 @@ func TestSwitchRuntimeBackendSwapUsesPrimer(t *testing.T) {
 	}
 }
 
+// TestSwitchClaudeToOpenCodePrimer proves the switch matrix widens to the Phase
+// 7 backends: claude → opencode is a cross-backend swap, so ResolveResumeID
+// yields no native id and the switch takes the history-primer path (§4, §5.3) —
+// the same mechanism as claude → codex, now reached for a new backend.
+func TestSwitchClaudeToOpenCodePrimer(t *testing.T) {
+	srv, ts := switchTestServer(t)
+	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+
+	resp, body := post(t, ts.URL+"/api/sessions/"+id+"/switch-runtime", map[string]string{"backend": "opencode", "model": "sonnet-4-5"})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("switch status = %d: %s", resp.StatusCode, body)
+	}
+	var sr switchRuntimeResponse
+	if err := json.Unmarshal(body, &sr); err != nil {
+		t.Fatalf("switch body: %v", err)
+	}
+	if sr.AgentID != id || sr.Backend != "opencode" || sr.Model != "sonnet-4-5" || sr.HistoryHandoff != "primer" {
+		t.Fatalf("unexpected switch response: %+v (want opencode/sonnet-4-5/primer)", sr)
+	}
+	if a, _ := srv.stateStore.ReadAgent(id); a.Backend != "opencode" || a.Model != "sonnet-4-5" {
+		t.Fatalf("identity not switched: %+v", a)
+	}
+	events, err := transcript.ReadFile(srv.configStore.Home(), id, transcript.ReadOptions{IncludeMeta: true})
+	if err != nil {
+		t.Fatalf("read transcript: %v", err)
+	}
+	if !hasBackendSwitchMarker(events, "claude/sonnet-4-6", "opencode/sonnet-4-5") {
+		t.Fatalf("missing backend_switch marker in transcript: %+v", events)
+	}
+}
+
 // Regression (review fix): the backend-swap history primer is a one-shot context
 // injection for the new backend — it must NOT bake into the frozen
 // sessions.system_prompt snapshot, and two successive primer switches must not

@@ -67,6 +67,77 @@ func TestCheckWithMockProber(t *testing.T) {
 	}
 }
 
+// fakeCLI writes an executable stub at dir/<name> so lookPath resolves it.
+func fakeCLI(t *testing.T, dir, name string) string {
+	t.Helper()
+	p := filepath.Join(dir, name)
+	if err := os.WriteFile(p, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write fake %s: %v", name, err)
+	}
+	return p
+}
+
+func TestOpenCodeProber(t *testing.T) {
+	home := t.TempDir()
+	cli := fakeCLI(t, t.TempDir(), "opencode")
+
+	// No CLI on PATH → skipped (cli_not_installed).
+	if r := (opencodeProber{}).Check(context.Background(), config.Backend{}, config.Model{}, map[string]string{"OPENCODE_PATH": filepath.Join(home, "nope"), "HOME": home}); r.Status != "skipped" || r.Detail != "cli_not_installed" {
+		t.Fatalf("missing cli = %+v, want skipped/cli_not_installed", r)
+	}
+
+	base := map[string]string{"OPENCODE_PATH": cli, "HOME": home}
+	// CLI present but no auth.json and no provider key → skipped (not_logged_in).
+	if r := (opencodeProber{}).Check(context.Background(), config.Backend{}, config.Model{}, base); r.Status != "skipped" || r.Detail != "not_logged_in" {
+		t.Fatalf("no auth = %+v, want skipped/not_logged_in", r)
+	}
+	// Provider API key in env → ok.
+	withKey := map[string]string{"OPENCODE_PATH": cli, "HOME": home, "ANTHROPIC_API_KEY": "sk-x"}
+	if r := (opencodeProber{}).Check(context.Background(), config.Backend{}, config.Model{}, withKey); r.Status != "ok" {
+		t.Fatalf("provider key = %+v, want ok", r)
+	}
+	// CLI-side auth.json present → ok (even without an env key).
+	authDir := filepath.Join(home, ".local", "share", "opencode")
+	if err := os.MkdirAll(authDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(authDir, "auth.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatalf("write auth.json: %v", err)
+	}
+	if r := (opencodeProber{}).Check(context.Background(), config.Backend{}, config.Model{}, base); r.Status != "ok" {
+		t.Fatalf("auth.json = %+v, want ok", r)
+	}
+}
+
+func TestOpenHandsProber(t *testing.T) {
+	home := t.TempDir()
+	cli := fakeCLI(t, t.TempDir(), "openhands")
+
+	if r := (openhandsProber{}).Check(context.Background(), config.Backend{}, config.Model{}, map[string]string{"OPENHANDS_PATH": filepath.Join(home, "nope"), "HOME": home}); r.Status != "skipped" || r.Detail != "cli_not_installed" {
+		t.Fatalf("missing cli = %+v, want skipped/cli_not_installed", r)
+	}
+
+	base := map[string]string{"OPENHANDS_PATH": cli, "HOME": home}
+	if r := (openhandsProber{}).Check(context.Background(), config.Backend{}, config.Model{}, base); r.Status != "skipped" || r.Detail != "no_llm_api_key" {
+		t.Fatalf("no auth = %+v, want skipped/no_llm_api_key", r)
+	}
+	// LLM_API_KEY present → ok.
+	withKey := map[string]string{"OPENHANDS_PATH": cli, "HOME": home, "LLM_API_KEY": "sk-x"}
+	if r := (openhandsProber{}).Check(context.Background(), config.Backend{}, config.Model{}, withKey); r.Status != "ok" {
+		t.Fatalf("llm key = %+v, want ok", r)
+	}
+	// settings.json present → ok.
+	if err := os.MkdirAll(filepath.Join(home, ".openhands"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".openhands", "settings.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatalf("write settings.json: %v", err)
+	}
+	if r := (openhandsProber{}).Check(context.Background(), config.Backend{}, config.Model{}, base); r.Status != "ok" {
+		t.Fatalf("settings.json = %+v, want ok", r)
+	}
+}
+
 func TestClaudeProberRetriesWithoutNoColor(t *testing.T) {
 	dir := t.TempDir()
 	cliPath := filepath.Join(dir, "claude")
