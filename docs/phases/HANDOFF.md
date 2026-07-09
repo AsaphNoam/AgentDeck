@@ -609,6 +609,15 @@ current code (`permission.go` captures `turnSeq`); the permission-resolution rac
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-09 — **docs: usability-review protocol added (post-mortem of the `353e940` first-use blockers).**
+  Three usability blockers (fresh-install `order: null` UI crash, `--no-color` cred-check failure on older
+  Claude CLIs, undefined wizard/dialog CSS classes) escaped every static diff review — all invisible in a diff,
+  all obvious in a browser. New [`USABILITY-REVIEW.md`](USABILITY-REVIEW.md): behavior-driven top-to-bottom
+  review protocol (journey matrix J1–J12 on fresh/seeded/lived-in fixtures, static sweeps S1–S6, token-efficient
+  subagent orchestration; findings feed the §8/§9 loop unchanged). Twinned `/usability-review` skill; INVARIANTS
+  gained §11 (nil→`null` serialization contracts + mock fidelity), §12 (external-CLI version variance), and a
+  §10 CSS-wiring bullet; pointers added in `MAP.md` + workflow §8. Docs-only; checkpoint re-run green.
+
 - 2026-07-09 — **phase 6.7: iTerm2/AppleScript driver + driver-selection plumbing — green (Phase 6 complete).**
   New `internal/runtime/terminal/iterm2.go` (`iterm2Driver` via `osascript -`, 4s timeout + stderr capture, best-effort
   title/color) + `applescript.go` (three `text/template` templates; mandatory `escapeAppleScript` + reused `shellJoin`
