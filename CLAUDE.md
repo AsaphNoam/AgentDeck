@@ -10,7 +10,11 @@ SQLite via `mattn/go-sqlite3` with FTS5 behind the `sqlite_fts5` build tag, `cre
   change. (The session-start hook injects its "Current position" header — that is not a substitute
   for reading the file.)
 - **`docs/phases/AGENT-WORKFLOW.md`** — the canonical work/review/fix protocol (GREEN checkpoints,
-  STOP conditions, condensation rules). If any skill or doc disagrees with it, it wins.
+  STOP conditions, condensation rules, the human-brief contract §10). If any skill or doc disagrees
+  with it, it wins.
+- **`docs/phases/BRIEFS.md`** — the human's only channel. The human is zoomed out: they read short
+  plain-language briefs, never HANDOFF/diffs/specs. Every work/review/fix/usability session ends by
+  prepending a ≤250-word brief there (workflow §10) and pasting it as the end-of-turn message.
 - **`docs/phases/INVARIANTS.md`** — the catalog of bug classes this codebase already paid for.
   Before touching a hot-spot area (below), read the matching sections; reviews here exist largely
   to catch regressions of exactly these classes.

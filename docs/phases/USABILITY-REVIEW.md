@@ -231,8 +231,11 @@ and flagged as such — never silently reported as fact.
   report.
 - If a finding reveals a **genuinely new systemic class**, append it to
   [`INVARIANTS.md`](INVARIANTS.md) (curated — merge near-duplicates, per that file's own rules).
-- Save the full run summary (checkpoint matrix per journey, all findings, evidence paths) as a file
-  for the human, and give them the top-5 executive summary in the end-of-turn message.
+- Save the full run summary (checkpoint matrix per journey, all findings, evidence paths) as a file,
+  and report to the human via the **brief** (AGENT-WORKFLOW §10): a ≤250-word plain-language entry in
+  [`BRIEFS.md`](BRIEFS.md) — what was driven, severity counts, each blocker as one plain sentence,
+  link to the run summary file — pasted as the end-of-turn message. No enumerated advisory lists in
+  the brief; those live in the handoff and the run file.
 - If a journey is all-PASS, say so in the matrix — an unexercised journey and a passing journey
   must be distinguishable.
 

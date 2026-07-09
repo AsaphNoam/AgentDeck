@@ -17,5 +17,14 @@ Follow the full review protocol in [`docs/phases/AGENT-WORKFLOW.md`](../../../do
 4. **Review against the four criteria** (§8): spec adherence · dead code · bad practices · flagrant bugs.
 5. **Sweep against the paid-for bug classes.** Check the diff against every class in [`docs/phases/INVARIANTS.md`](../../../docs/phases/INVARIANTS.md) and tag each finding with its class number — a match is strong evidence the finding is real.
 6. **Skip** style nits, micro-optimizations, and edge cases that won't arise in normal use. The bar: *would this cause a real problem during regular usage?*
-7. **Categorize** each finding as **BLOCKING** or **ADVISORY**.
-8. **Report** to the human — every finding with file + line, what's wrong, and why it matters. For BLOCKING items, also write them to `## Review findings` in `HANDOFF.md`. If a finding reveals a genuinely new systemic class, append it to `INVARIANTS.md` (doc writes are allowed; code writes are not). If nothing found, say so plainly.
+7. **Peer-review the pending autonomous decisions** (workflow §8/§10). The human is zoomed out — you
+   are the reviewer of record: audit each un-endorsed `## Autonomous decisions` entry in `HANDOFF.md`
+   against the specs; endorse sound ones (append `— peer-reviewed <date>`), convert unsound ones into findings.
+8. **Categorize** each finding as **BLOCKING** or **ADVISORY**.
+9. **Record + report.** Write **every** finding — BLOCKING *and* ADVISORY — to `## Review findings` in
+   `HANDOFF.md` in the §8 entry shape (that's what the fix step consumes). If a finding reveals a
+   genuinely new systemic class, append it to `INVARIANTS.md` (doc writes are allowed; code writes are
+   not). Then report to the human via the **brief** (workflow §10): prepend a ≤250-word plain-language
+   entry to `docs/phases/BRIEFS.md` — severity counts, each BLOCKING finding as one plain sentence,
+   advisories as a count + theme — and paste it as your end-of-turn message. If nothing found, the
+   brief says so plainly; write nothing to the handoff.

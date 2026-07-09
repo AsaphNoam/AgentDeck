@@ -39,10 +39,11 @@ work whatever the handoff marks active.
    green, missing credentials/external input, or a destructive/irreversible action. When you stop, write
    it under `## Blocked on human` in the handoff with enough context to answer cold, and give the user a
    one-line summary of what's blocking and what's next.
-7. **Flag every judgment call you made.** If something ambiguous or under-specified forced *you* to pick
-   a design/implementation decision (without it being a hard blocker), record it under `## Autonomous
-   decisions (please review)` in the handoff **and** call it out explicitly in your closing summary —
-   never let the user discover a self-made decision by reading the diff (workflow §3).
+7. **Record every judgment call; surface only the few that matter.** If something ambiguous or
+   under-specified forced *you* to pick a design/implementation decision (without it being a hard
+   blocker), record it in full under `## Autonomous decisions (please review)` in the handoff — the
+   review step peer-reviews these. Promote to the human brief only calls that change user-visible
+   behavior, are costly to reverse, or deviate from spec, with the default you applied (workflow §3, §10).
 8. **Honor the invariant catalog.** Before building in a hot-spot area, read the matching sections
    of [`docs/phases/INVARIANTS.md`](../../../docs/phases/INVARIANTS.md) — its intro lists the hot
    spots. A new interface/runtime/driver must complete its §6 "joins every contract" checklist
@@ -51,5 +52,9 @@ work whatever the handoff marks active.
 ## When you finish a session (any exit, including running low)
 
 Leave the tree at a GREEN checkpoint (or the handoff clearly says what's half-done), `HANDOFF.md`
-updated + condensed, work committed. Tell the user what moved and what's next — and **explicitly list
-any autonomous decisions you made**, or say plainly there were none.
+updated + condensed, work committed. Then **write the human brief** (workflow §10): prepend a
+≤250-word plain-language entry to `docs/phases/BRIEFS.md` — TL;DR, a 2–4 sentence architecture
+re-orientation (the user is zoomed out and forgot the vocabulary; gloss every project term), the
+decisions that clear the brief bar with their applied defaults, what needs their input (with the
+default if they stay silent), and what's next — and paste that same brief as your end-of-turn
+message. The brief IS the summary: no walls of text, no unglossed file paths or symbol names.
