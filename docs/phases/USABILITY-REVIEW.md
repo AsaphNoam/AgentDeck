@@ -238,6 +238,8 @@ and flagged as such — never silently reported as fact.
   the brief; those live in the handoff and the run file.
 - If a journey is all-PASS, say so in the matrix — an unexercised journey and a passing journey
   must be distinguishable.
+- Commit the doc updates together on `main` (`docs: usability review <date> — findings`) and push
+  at session exit (AGENT-WORKFLOW §6) — product code stays untouched.
 
 ---
 

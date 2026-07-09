@@ -12,8 +12,9 @@ Agent-to-agent state lives in [`HANDOFF.md`](HANDOFF.md) — never point the hum
 
 **TL;DR:** No product code changed. The workflow now ends every session with a short plain-language
 brief in this file — you read only this, never `HANDOFF.md`. Agents decide more on their own: the
-review agent now audits their judgment calls (a job that used to be yours), and your silence on a
-brief counts as consent.
+review agent audits their judgment calls (a job that used to be yours), your silence on a brief
+counts as consent, and per your instruction agents now work on `main` and push to origin
+automatically when a task completes (force-pushes still ask).
 
 **Where this fits:** AgentDeck is the multi-agent dashboard (a Go server with an embedded React UI)
 being built phase by phase by autonomous agents. `HANDOFF.md` is the agents' shared memory between

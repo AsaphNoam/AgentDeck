@@ -14,7 +14,7 @@ never point them here to catch up, and end every session by writing a brief.
 - **Active subphase:** 7.4 (next) — GATED live acceptance, **blocked on human** (needs `opencode`+`openhands` CLIs + provider keys); 7.1–7.3 done ✅. All fakeacp/UI paths green.
 - **Spec:** [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) (PRD: [`phase-7-additional-features.md`](phase-7-additional-features.md))
 - **Last GREEN checkpoint:** phase 7.3 (UI plumbing): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, `cd ui && npm run test` (78) + `npm run build` + embed.
-- **Branch:** working branch `claude/work-phase-ngp3b7` (this session's designated branch); commit here.
+- **Branch:** `main` (trunk-based); commit each green checkpoint there and **push to origin at task completion** (workflow §6).
 
 ---
 
@@ -750,6 +750,13 @@ prefixed `J#`/`S#`; repros live in that report.
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
+
+- 2026-07-09 — **docs: push-on-completion + artifact sweep for the brief paradigm.** Pushing to origin `main` no
+  longer needs human approval: §6 now says push at task completion (only force-pushes stay a §3 destructive STOP);
+  `guard-bash.sh` downgraded from ask-on-any-push to ask-on-force-push-only. §8/usability reviews now commit+push
+  their doc writes (`docs: review …`) instead of "no commits" leaving dirty trees. Swept old-paradigm artifacts:
+  `DecisionsToReview.md` emptied to a superseded pointer (BRIEFS.md is the human channel), stale Current-position
+  branch line reset to `main`, CLAUDE.md/AGENTS.md/all four twinned skills updated. Docs+hook only.
 
 - 2026-07-09 — **docs: human-brief workflow — reporting granularity rezoomed.** The human no longer reads this
   file; new [`BRIEFS.md`](BRIEFS.md) + workflow **§10** define the ≤250-word plain-language brief every session

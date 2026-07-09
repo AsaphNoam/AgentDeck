@@ -20,8 +20,8 @@ SQLite via `mattn/go-sqlite3` with FTS5 behind the `sqlite_fts5` build tag, `cre
   to catch regressions of exactly these classes.
 - Orientation: `MAP.md` (doc index + load-bearing concepts), `architecture-flow.md` (diagrams and
   sequence flows). `AGENTS.md` is the Codex-facing entry point to the same protocol.
-- `DecisionsToReview.md` (repo root) is a **stale, human-facing snapshot** of two HANDOFF sections.
-  Never read or update it as live state — `docs/phases/HANDOFF.md` wins.
+- `DecisionsToReview.md` (repo root) is **superseded** — now just a pointer. The human channel is
+  `docs/phases/BRIEFS.md`; live state is `docs/phases/HANDOFF.md`. Never resurrect it.
 
 ## Build & verify — the GREEN checkpoint
 A change is done only when ALL of these pass (never commit on red):
@@ -50,8 +50,9 @@ cd ui && npm run build        # only if the change touched ui/
 - `.gocache/` at the repo root is a gitignored local Go build cache — ignore it; never `git add` it.
 
 ## Commits & history
-- Trunk-based: commit directly to `main`; no branches, no PRs. **Never push to origin unless the
-  human explicitly asked** (a hook will prompt if you try).
+- Trunk-based: commit directly to `main`; no branches, no PRs. **Push to origin when a task
+  completes** (end of a work/review/fix/usability session, or any user-requested change) — no
+  approval needed. Only **force-pushes** still require an explicit human request (a hook will prompt).
 - Message templates: `phase N.M: <title> — green checkpoint` (build loop), `review fix: <title> —
   green checkpoint` (fix loop); plain `docs:`/`feat:` prefixes for out-of-loop commits. Add a
   `Co-Authored-By:` trailer naming the model that actually did the work.
