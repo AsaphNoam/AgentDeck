@@ -9,9 +9,9 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 ## Current position
 
 - **Active phase:** 7 — Additional features: OpenHands & OpenCode backends (Phase 6 complete ✅)
-- **Active subphase:** 7.3 (next) — UI plumbing (enum + labels, per-type Settings fields, modal terminal gating, dist refresh); 7.1 + 7.2 done ✅
+- **Active subphase:** 7.4 (next) — GATED live acceptance, **blocked on human** (needs `opencode`+`openhands` CLIs + provider keys); 7.1–7.3 done ✅. All fakeacp/UI paths green.
 - **Spec:** [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) (PRD: [`phase-7-additional-features.md`](phase-7-additional-features.md))
-- **Last GREEN checkpoint:** phase 7.2 (permissions/yolo + credchecks + switch matrix + PUT-type validation): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
+- **Last GREEN checkpoint:** phase 7.3 (UI plumbing): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, `cd ui && npm run test` (78) + `npm run build` + embed.
 - **Branch:** working branch `claude/work-phase-ngp3b7` (this session's designated branch); commit here.
 
 ---
@@ -25,7 +25,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - [x] Phase 4 — Persistence: archive, search, resume, file/command tracking ✅
 - [x] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications ✅
 - [x] Phase 6 — Flexibility: terminal runtime, switch-runtime, task groups, drivers (xterm/tmux/iterm2) ✅
-- [ ] Phase 7 — Additional features: OpenHands & OpenCode backends — **7.1 ✅ + 7.2 ✅** (adapters, config, terminal gates, yolo/credchecks/switch matrix); 7.3 (UI) next. PRD [`phase-7-additional-features.md`](phase-7-additional-features.md), spec [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md)
+- [ ] Phase 7 — Additional features: OpenHands & OpenCode backends — **7.1–7.3 ✅** (adapters, config, terminal gates, yolo/credchecks/switch matrix, UI); **7.4 GATED** (live acceptance, blocked on human credentials). PRD [`phase-7-additional-features.md`](phase-7-additional-features.md), spec [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md)
 
 Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent after 2).
 
@@ -61,19 +61,17 @@ Details in git history (`6.1`–`6.7`) and changelog.
   at PUT; also lets the new seeds validate). Tests: `TestSkipPermissionsEnvOpenCode`, `TestOpenCodeProber`,
   `TestOpenHandsProber`, `TestValidateBackendsConfig_NewBackendTypesAccepted`, `TestSwitchClaudeToOpenCodePrimer`.
 
-- **7.3 — next (UI plumbing).** Steps (spec §5 / tasks 8–10; touches `ui/` → checkpoint adds `cd ui && npm run test` +
-  `npm run build` + `make embed`):
-  - [ ] `ui/src/schemas/backends.ts`: widen the type enum to `["claude-acp","codex-acp","opencode-acp","openhands-acp"]`
-        (single source of the union — do this first or the UI can't render a seeded opencode backend).
-  - [ ] `ui/src/lib/backendTypes.ts`: `BACKEND_TYPE_LABELS` map (`Claude`, `Codex / OpenAI`, `OpenCode`, `OpenHands`);
-        replace the inlined ternaries in `BackendStep.tsx` / `BackendsEditor.tsx` / `NewAgentModal.tsx`.
-  - [ ] BackendStep + BackendsEditor: options from enum+labels; per-type conditional fields — `openhands-acp` shows
-        `LLM_API_KEY`/`LLM_BASE_URL` inputs (mirror `codex-acp`), `opencode-acp` none. Merge-over-seed discipline.
-  - [ ] NewAgentModal: hide/disable the Terminal interface option when the selected backend type isn't `claude-acp`
-        (client mirror of `terminalSupported`).
-  - [ ] `make embed` dist refresh. Done when GREEN incl. `cd ui && npm run test` + `npm run build`.
+- **7.3 ✅ (UI plumbing).** `schemas/backends.ts` exports `backendTypeSchema`/`BackendType` (four-value enum, single
+  source); new `lib/backendTypes.ts` (`BACKEND_TYPE_LABELS`, `BACKEND_TYPE_OPTIONS`, `terminalSupported`). BackendStep
+  and BackendsEditor render type options from the enum+labels; BackendStep shows `LLM_API_KEY`/`LLM_BASE_URL` inputs
+  for `openhands-acp`. NewAgentModal disables/hides Terminal for non-claude backends and resets a stale terminal
+  selection to chat. Embedded dist refreshed. Tests (+4): editor four-option, BackendStep openhands fields, modal
+  terminal disable + reset-to-chat.
 
-- **7.4 (GATED live acceptance)** follows — see spec §7.4 (human-credentialed; nothing may regress the fakeacp paths).
+- **7.4 — GATED, blocked on human.** Live acceptance against real `opencode`/`openhands` CLIs (handshake, one streamed
+  turn, permission round-trip, stop, resume-or-primer verdict, `mcpServers` honor verdict). See "Blocked on human".
+  Everything is fakeacp/UI-green; when credentials arrive, add `//go:build acceptance` tests and flip the GATED adapter
+  one-liners per the verdicts (§2.1 resume, §2.3 yolo arms, §2.4 MCP). Nothing in 7.4 may regress the fake paths.
 
 ---
 
@@ -101,6 +99,18 @@ Details in git history (`6.1`–`6.7`) and changelog.
   (needs `claude-code-acp` + a logged-in Claude account). Recipe + Appendix A: [`phase-1-acceptance.md`](phase-1-acceptance.md).
 
 ## Blocked on human
+
+- **GATED (7.4): live OpenCode & OpenHands acceptance.** Phases 7.1–7.3 wired both backends end-to-end through the
+  chat runtime and proved launch→prompt→stream→stop→resume against **fakeacp**, plus yolo env, credchecks, cross-backend
+  primer switch, and the full UI. What's gated (needs the real CLIs + provider keys, same class as the Phase 1/Codex
+  acceptances): confirm (1) `opencode acp` / `openhands acp` speak the same ACP handshake the runtime expects; (2)
+  native `session/load` resume works (else the adapters' `ResolveResumeID` should return `""` → primer floor, a one-line
+  flip); (3) OpenCode `OPENCODE_CONFIG_CONTENT` yolo keys are correct, and pick OpenHands' skip arm (currently the
+  shared auto-approve gate; confirm/adopt the CLI's ACP always-approve mode or flag — see Autonomous decisions); (4)
+  each CLI honors HTTP `mcpServers` entries via `session/new` (else document, don't build, the fallback). **To do
+  (human):** install `opencode` + `openhands`, set provider keys, launch a chat agent of each, run a turn + permission
+  round-trip + stop + resume; note any deviation so the adapter one-liners are flipped. Does not block anything else —
+  the phase ships with gates documented if credentials never arrive (Codex precedent).
 
 - **GATED (not blocking 6.1): live two-CLI MCP registration confirmation.** Subphase 5.1 proved the
   in-process HTTP streamable MCP transport works (round-trips a `ping` via the go-sdk client, both
@@ -664,6 +674,16 @@ current code (`permission.go` captures `turnSeq`); the permission-resolution rac
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
+
+- 2026-07-09 — **phase 7.3: OpenCode/OpenHands UI plumbing — green.** `schemas/backends.ts` now exports
+  `backendTypeSchema`/`BackendType` (four-value enum — the single source of the union); new `lib/backendTypes.ts`
+  (`BACKEND_TYPE_LABELS`, `BACKEND_TYPE_OPTIONS`, `terminalSupported`) replaces the per-component type ternaries.
+  BackendStep + BackendsEditor render options from the enum+labels; BackendStep adds `LLM_API_KEY`/`LLM_BASE_URL`
+  fields for `openhands-acp`. NewAgentModal gates the Terminal interface on `terminalSupported(backend.type)` (only
+  claude) in addition to host capability, and resets a stale terminal selection to chat on backend change. Embedded
+  dist refreshed (index.html). Tests (+4, 78 total): editor four-option dropdown, BackendStep openhands fields, modal
+  terminal-disable + reset-to-chat. Green: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`,
+  `cd ui && npm run test` + `npm run build`.
 
 - 2026-07-09 — **phase 7.2: OpenCode/OpenHands permissions + credchecks + switch matrix — green.** OpenCode skip=true
   → `opencodeACP.ExtraEnv` injects `OPENCODE_CONFIG_CONTENT` yolo config (env-only, torn down with the process);
