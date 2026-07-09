@@ -9,10 +9,10 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 ## Current position
 
 - **Active phase:** 7 — Additional features: OpenHands & OpenCode backends (Phase 6 complete ✅)
-- **Active subphase:** 7.1 (next) — see [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) §"Subphase plan" (not started; expand its steps on ORIENT)
+- **Active subphase:** 7.2 (next) — permissions/yolo, credchecks, switch matrix, PUT-type validation (7.1 done ✅)
 - **Spec:** [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) (PRD: [`phase-7-additional-features.md`](phase-7-additional-features.md))
-- **Last GREEN checkpoint:** phase 6.7 (iTerm2/AppleScript driver + driver-selection plumbing): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, `go test -race ./internal/runtime/terminal`.
-- **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
+- **Last GREEN checkpoint:** phase 7.1 (adapters + config + terminal gates): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, `go test -race ./internal/runtime`.
+- **Branch:** working branch `claude/work-phase-ngp3b7` (this session's designated branch); commit here.
 
 ---
 
@@ -25,7 +25,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - [x] Phase 4 — Persistence: archive, search, resume, file/command tracking ✅
 - [x] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications ✅
 - [x] Phase 6 — Flexibility: terminal runtime, switch-runtime, task groups, drivers (xterm/tmux/iterm2) ✅
-- [ ] Phase 7 — Additional features: OpenHands & OpenCode backends — candidate selected 2026-07-07; PRD [`phase-7-additional-features.md`](phase-7-additional-features.md), spec [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md); not started
+- [ ] Phase 7 — Additional features: OpenHands & OpenCode backends — **7.1 ✅** (adapters + config + terminal gates); 7.2 next. PRD [`phase-7-additional-features.md`](phase-7-additional-features.md), spec [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md)
 
 Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent after 2).
 
@@ -46,9 +46,25 @@ and driver-selection plumbing (`driver` field on launch/switch → per-agent run
 terminal_unavailable` for unavailable drivers) are all green. `GET /api/capabilities` advertises xterm/tmux/iterm2.
 Details in git history (`6.1`–`6.7`) and changelog.
 
-**Phase 7 — next to implement (7.1).** OpenHands & OpenCode backends. Read
-[`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) §"Subphase plan" on
-ORIENT and expand 7.1's granular steps here before building.
+**Phase 7 — in progress.** OpenHands & OpenCode chat backends through the existing ACP runtime (no runtime changes).
+
+- **7.1 ✅ (adapters + config + terminal gates).** `opencodeACP`/`openhandsACP` adapters (`internal/backend/adapter.go`);
+  new optional `ExtraEnvProvider` interface consumed in `chat.go::spawnCmd` (OpenHands sets `LLM_MODEL`); seed backends
+  `opencode`/`openhands` + widened type-union comment; `terminalSupported` helper in `server/terminal.go` replacing the
+  three `codex-acp` literals in launch/switch/resume composers. Tests: `TestNewBackendAdapters`,
+  `TestOpenHandsExtraEnvCarriesModel`, `TestOpenCodeChatE2E`, `TestOpenHandsChatE2E`, `TestNewBackendTerminalRejected`.
+
+- **7.2 — next (permissions, credchecks, switch matrix).** Steps (expand as you go; spec §7.2 / tasks 5–7):
+  - [ ] skip=true yolo mapping (§2.3): OpenCode `ExtraEnv` sets `OPENCODE_CONFIG_CONTENT={"permission":{...}}`;
+        OpenHands skip via ACP session-mode arm (GATED) — extend `openhandsACP.ExtraEnv`/`LaunchArgs` per §2.3.
+  - [ ] fakeacp asserts the spawned env / session-mode for skip=true (`TestSkipPermissionsEnvOpenCode`).
+  - [ ] `credcheck/opencode.go` + `credcheck/openhands.go` (§3) with fs/env-faked tests (mirror `claude.go`).
+  - [ ] switch-runtime integration test claude→opencode primer path (`TestSwitchClaudeToOpenCodePrimer`).
+  - [ ] `PUT /api/backends` 400 `invalid_field` for a type outside the four-value union (§3; deferred from 7.1 — see
+        Autonomous decisions).
+  - Done when GREEN (Go-only) both tag variants; the two named tests pass.
+
+- **7.3 (UI plumbing)** and **7.4 (GATED live acceptance)** follow — see spec §7.
 
 ---
 
@@ -277,6 +293,25 @@ current code (`permission.go` captures `turnSeq`); the permission-resolution rac
 ## Autonomous decisions (please review)
 
 > Resolved without stopping; the human should still see them. Remove once acknowledged (workflow §3, §5).
+
+- **NEW (7.1): the terminal-rejection gate was ADDED to the resume composer, which previously had none.** The spec
+  (§4) says `terminalSupported` must guard all three composers (launch/switch/resume), but before 7.1 only launch and
+  switch rejected codex-terminal — `composeResumeSpec` had no such gate. So `terminalSupported` in resume is a genuine
+  behavior addition: a resume whose override sets `interface:terminal` on a non-claude backend now returns `422
+  terminal_unavailable` instead of composing a statusless spec. Spec-directed, but flagging because it closes a hole
+  that wasn't previously gated. **To reverse:** drop the gate at the top of `composeResumeSpec` (re-opens the hole).
+- **NEW (7.1): `ExtraEnv` takes primitives `(modelID string, skipPerms bool)`, not a `LaunchSpec`.** The spec sketches
+  it as `ExtraEnv(spec)`, but `internal/backend` must not import `internal/runtime` (the runtime imports backend — a
+  cycle), so the optional `ExtraEnvProvider` interface takes the two launch fields it needs. `chat.go::spawnCmd` passes
+  `spec.ModelID, spec.SkipPerms`. **To reverse:** move the adapter into package `runtime` and pass the whole spec.
+- **NEW (7.1): PUT /api/backends type-union 400 deferred to 7.2.** 7.1's deliverables list "type-union validation (§3)"
+  while task 7 (7.2) lists "backends-PUT type validation" — the same item. I read the task breakdown as authoritative
+  and left the explicit 400 for 7.2; in 7.1 the union is enforced by `backend.For` (unknown type → 501 at launch) plus
+  the widened `Backend.Type` comment. **To reverse:** pull the PUT 400 forward — it's a small handler check.
+- **NEW (7.1): OpenCode/OpenHands each seeded with one model key `sonnet-4-5` → `anthropic/claude-sonnet-4-5`.** The
+  spec names the default model value but not the map key; I used a short key. OpenHands seeds empty `LLM_API_KEY`/
+  `LLM_BASE_URL` env so Settings shows the fields. Neither changes the default backend (`claude`). **To reverse:**
+  rename the key or add more seeded models.
 
 - **NEW (6.7): went beyond the checkpoint's minimum — full driver-selection plumbing, not just the 422 gate.**
   6.7's "done when" only strictly required an explicit unavailable `driver:"iterm2"` request to return `422`. I also
@@ -608,6 +643,17 @@ current code (`permission.go` captures `turnSeq`); the permission-resolution rac
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
+
+- 2026-07-09 — **phase 7.1: OpenCode/OpenHands adapters + config + terminal gates — green.** Added `opencodeACP`
+  and `openhandsACP` to `internal/backend/adapter.go` (both `<bin> acp`, hookless → chat status from the ACP stream,
+  native `session/load` resume attempt with primer floor; GATED for live CLI). New optional `ExtraEnvProvider`
+  interface, applied in `chat.go::spawnCmd` after `StripEnvKeys` — OpenHands sets `LLM_MODEL` (model rides env; also in
+  its StripEnvKeys so a shell value can't leak). Seeded `opencode`/`openhands` backends (`config/seed.go`), widened the
+  `Backend.Type` union comment. `terminalSupported` helper (`server/terminal.go`) replaces the three `codex-acp`
+  literals in the launch/switch/resume composers — and adds the previously-missing gate to `composeResumeSpec`. Tests:
+  `TestNewBackendAdapters`, `TestOpenHandsExtraEnvCarriesModel`, `TestOpenCodeChatE2E`, `TestOpenHandsChatE2E`,
+  `TestNewBackendTerminalRejected`. Green: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`,
+  `go test -race ./internal/runtime`.
 
 - 2026-07-09 — **phase 6.7: iTerm2/AppleScript driver + driver-selection plumbing — green (Phase 6 complete).**
   New `internal/runtime/terminal/iterm2.go` (`iterm2Driver` via `osascript -`, 4s timeout + stderr capture, best-effort

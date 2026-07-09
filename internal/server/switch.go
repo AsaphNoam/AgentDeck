@@ -269,11 +269,11 @@ func (s *Server) validateSwitchTarget(target state.Agent) *runtime.APIError {
 	if _, ok := be.Models[target.Model]; !ok {
 		return apiError(runtime.CodeInvalidField, "unknown model: "+target.Model)
 	}
-	// Codex terminal is unsupported (no verified hook-registration/CLI-flag path);
-	// reject the switch rather than land a statusless agent that drops the composed
+	// Only claude-acp supports the terminal interface; reject a terminal switch to
+	// any other backend rather than land a statusless agent that drops the composed
 	// spec (mirrors the launch guard, §6 capability honesty).
-	if target.Interface == "terminal" && be.Type == "codex-acp" {
-		return apiError(runtime.CodeTerminalUnavailable, "codex terminal is not supported (no verified hook-registration or CLI-flag path)")
+	if target.Interface == "terminal" && !terminalSupported(be.Type) {
+		return apiError(runtime.CodeTerminalUnavailable, terminalUnsupportedReason(be.Type))
 	}
 	return nil
 }

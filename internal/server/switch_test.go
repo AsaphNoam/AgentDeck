@@ -17,6 +17,7 @@ import (
 	"github.com/agentdeck/agentdeck/internal/messaging"
 	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/runtime/terminal"
+	"github.com/agentdeck/agentdeck/internal/state"
 	"github.com/agentdeck/agentdeck/internal/transcript"
 )
 
@@ -576,6 +577,55 @@ func TestCodexTerminalRejected(t *testing.T) {
 	}
 	if !strings.Contains(string(body), "terminal_unavailable") {
 		t.Fatalf("switch codex terminal error = %s, want terminal_unavailable", body)
+	}
+}
+
+// TestNewBackendTerminalRejected extends the §6 capability-honesty gate to the
+// Phase 7 backends: opencode/openhands have no verified interactive-CLI hook
+// path, so a terminal launch/switch/resume must be rejected with 422
+// terminal_unavailable rather than land a statusless agent. All three composers
+// share the terminalSupported helper, so this guards their common gate.
+func TestNewBackendTerminalRejected(t *testing.T) {
+	srv, ts := switchTestServer(t)
+
+	for _, backendID := range []string{"opencode", "openhands"} {
+		// Launch: interface=terminal + new backend → 422 terminal_unavailable.
+		resp, body := post(t, ts.URL+"/api/sessions", map[string]string{
+			"role": "impl", "project": "tmpproj", "interface": "terminal", "backend": backendID,
+		})
+		if resp.StatusCode != http.StatusUnprocessableEntity {
+			t.Fatalf("launch %s terminal status = %d, want 422: %s", backendID, resp.StatusCode, body)
+		}
+		if !strings.Contains(string(body), "terminal_unavailable") {
+			t.Fatalf("launch %s terminal error = %s, want terminal_unavailable", backendID, body)
+		}
+
+		// Switch: a live chat agent switched to the new backend's terminal → same 422.
+		// Pass the target backend's own model key ("sonnet-4-5"): switch validation
+		// checks the model against the target backend before the terminal gate.
+		id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+		resp, body = post(t, ts.URL+"/api/sessions/"+id+"/switch-runtime", map[string]string{
+			"interface": "terminal", "backend": backendID, "model": "sonnet-4-5",
+		})
+		if resp.StatusCode != http.StatusUnprocessableEntity {
+			t.Fatalf("switch to %s terminal status = %d, want 422: %s", backendID, resp.StatusCode, body)
+		}
+		if !strings.Contains(string(body), "terminal_unavailable") {
+			t.Fatalf("switch %s terminal error = %s, want terminal_unavailable", backendID, body)
+		}
+	}
+
+	// Resume: composeResumeSpec is the third composer; a terminal-interface resume
+	// on a new backend (e.g. via an override) must be rejected before touching any
+	// registration. Exercise it directly (a snapshot need not exist to reach the
+	// gate, which is the first check).
+	for _, backendType := range []string{"opencode-acp", "openhands-acp"} {
+		agent := state.Agent{AgentID: "a_res01", Interface: "terminal"}
+		be := config.Backend{Type: backendType}
+		_, ae := srv.composeResumeSpec(agent, state.SessionSnapshot{}, be, config.Model{})
+		if ae == nil || ae.Code != string(runtime.CodeTerminalUnavailable) {
+			t.Fatalf("resume %s terminal composer = %+v, want terminal_unavailable", backendType, ae)
+		}
 	}
 }
 

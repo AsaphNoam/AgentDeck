@@ -58,6 +58,19 @@ type BackendAdapter interface {
 	HookLaunchArgs(settingsPath string) []string
 }
 
+// ExtraEnvProvider is an optional interface a BackendAdapter may implement to
+// contribute launch-derived environment variables ("K=V"), given the resolved
+// model id and the effective skip-permissions flag (techspec §2.2, §2.3).
+// OpenHands carries its model in LLM_MODEL and OpenCode injects a yolo
+// permission block via OPENCODE_CONFIG_CONTENT — neither fits the ACP
+// session/new params, so they ride the process env. Adapters that don't
+// implement this contribute nothing. The runtime applies these AFTER
+// StripEnvKeys, so every key an ExtraEnv value sets MUST also appear in
+// StripEnvKeys to guarantee a single, authoritative dashboard-owned value.
+type ExtraEnvProvider interface {
+	ExtraEnv(modelID string, skipPerms bool) []string
+}
+
 // agentDeckHookEvents is the canonical AgentDeck lifecycle event set (techspec §4.2).
 var agentDeckHookEvents = []string{
 	"SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop",
@@ -70,6 +83,10 @@ func For(backendType string) (BackendAdapter, bool) {
 		return claudeACP{}, true
 	case "codex-acp":
 		return codexACP{}, true
+	case "opencode-acp":
+		return opencodeACP{}, true
+	case "openhands-acp":
+		return openhandsACP{}, true
 	default:
 		return nil, false
 	}
@@ -163,6 +180,79 @@ func (codexACP) HookLaunchArgs(settingsPath string) []string {
 	// CLI). Until verified, codex registers no settings file — the terminal runtime
 	// backfills its status from the ACP stream. To enable: return the correct args.
 	return nil
+}
+
+// opencodeACP is the adapter for the OpenCode CLI (`opencode acp`). It speaks
+// ACP over stdio like the other backends, so the chat runtime is unchanged; the
+// binary/argv, env hygiene, and yolo-via-env differ (techspec §2.1, §2.3).
+type opencodeACP struct{}
+
+func (opencodeACP) Type() string         { return "opencode-acp" }
+func (opencodeACP) Binary() string       { return "opencode" }
+func (opencodeACP) LaunchArgs() []string { return []string{"acp"} }
+func (opencodeACP) StripEnvKeys() []string {
+	// CLAUDECODE: shared nested-session guard. OPENCODE_CONFIG / _CONTENT: strip
+	// any shell-level config override so a user's ambient config never leaks into
+	// a dashboard-managed agent — the adapter sets OPENCODE_CONFIG_CONTENT itself
+	// for skip=true (ExtraEnv), and that value must be the only one.
+	return []string{"CLAUDECODE", "OPENCODE_CONFIG", "OPENCODE_CONFIG_CONTENT"}
+}
+
+func (opencodeACP) ResolveResumeID(prevSessionID string, sameBackend bool) string {
+	// GATED (7.4): attempt native ACP session/load with the prior id. Cross-backend
+	// swaps have no compatible native session → "" drives the Phase 6 primer. If
+	// 7.4 finds session/load unsupported, return "" unconditionally (primer floor).
+	if !sameBackend {
+		return ""
+	}
+	return prevSessionID
+}
+
+func (opencodeACP) CanSwitchModelOnResume() bool { return true }
+
+// OpenCode has no AgentDeck hook surface; chat status derives from the ACP
+// stream like every chat agent.
+func (opencodeACP) HookMap() map[string]string      { return nil }
+func (opencodeACP) UnsupportedHookEvents() []string { return unsupported(nil) }
+func (opencodeACP) HookLaunchArgs(string) []string  { return nil }
+
+// openhandsACP is the adapter for the OpenHands CLI (`openhands acp`). Its one
+// distinguishing trait is that model selection rides the LLM_MODEL env var
+// rather than the ACP session param (techspec §2.2).
+type openhandsACP struct{}
+
+func (openhandsACP) Type() string         { return "openhands-acp" }
+func (openhandsACP) Binary() string       { return "openhands" }
+func (openhandsACP) LaunchArgs() []string { return []string{"acp"} }
+func (openhandsACP) StripEnvKeys() []string {
+	// CLAUDECODE: shared nested-session guard. LLM_MODEL: never inherit the shell's
+	// model — the adapter sets it authoritatively from backend config (ExtraEnv).
+	return []string{"CLAUDECODE", "LLM_MODEL"}
+}
+
+func (openhandsACP) ResolveResumeID(prevSessionID string, sameBackend bool) string {
+	// GATED (7.4): same posture as OpenCode — native session/load attempt, primer
+	// floor on cross-backend or a failed 7.4 verdict.
+	if !sameBackend {
+		return ""
+	}
+	return prevSessionID
+}
+
+func (openhandsACP) CanSwitchModelOnResume() bool { return true }
+
+func (openhandsACP) HookMap() map[string]string      { return nil }
+func (openhandsACP) UnsupportedHookEvents() []string { return unsupported(nil) }
+func (openhandsACP) HookLaunchArgs(string) []string  { return nil }
+
+// ExtraEnv sets LLM_MODEL from the resolved model id (OpenHands selects the
+// model via env, not the ACP session param — techspec §2.2). The skip=true yolo
+// mapping (§2.3) is wired in subphase 7.2.
+func (openhandsACP) ExtraEnv(modelID string, skipPerms bool) []string {
+	if modelID == "" {
+		return nil
+	}
+	return []string{"LLM_MODEL=" + modelID}
 }
 
 // unsupported returns the AgentDeck lifecycle events absent from hookMap, sorted.

@@ -70,6 +70,28 @@ func DefaultBackends() BackendsConfig {
 					"gpt-4o":  {Name: "GPT-4o", Model: "gpt-4o"},
 				},
 			},
+			"opencode": {
+				Name:         "OpenCode",
+				Type:         "opencode-acp",
+				DefaultModel: "sonnet-4-5",
+				// OpenCode model ids are provider-qualified (provider/model);
+				// auth is CLI-side (`opencode auth login`), so no env keys seeded.
+				Models: map[string]Model{
+					"sonnet-4-5": {Name: "Claude Sonnet 4.5", Model: "anthropic/claude-sonnet-4-5"},
+				},
+			},
+			"openhands": {
+				Name:         "OpenHands",
+				Type:         "openhands-acp",
+				DefaultModel: "sonnet-4-5",
+				// OpenHands selects the model and authenticates via env
+				// (LLM_MODEL/LLM_API_KEY/LLM_BASE_URL); seed the auth keys empty
+				// so Settings shows the fields without shipping a real secret.
+				Env: map[string]string{"LLM_API_KEY": "", "LLM_BASE_URL": ""},
+				Models: map[string]Model{
+					"sonnet-4-5": {Name: "Claude Sonnet 4.5", Model: "anthropic/claude-sonnet-4-5"},
+				},
+			},
 		},
 	}
 }

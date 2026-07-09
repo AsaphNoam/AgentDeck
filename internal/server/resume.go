@@ -149,6 +149,13 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 // composeSwitchSpec. On registration failure it rolls back its own side effects
 // and returns an APIError.
 func (s *Server) composeResumeSpec(agent state.Agent, snap state.SessionSnapshot, be config.Backend, model config.Model) (runtime.LaunchSpec, *runtime.APIError) {
+	// Only claude-acp supports the terminal interface; a resume that lands (or is
+	// overridden to) terminal on any other backend would produce a statusless
+	// agent, so reject it here — the third of the three composers that gate on
+	// terminalSupported (launch/switch/resume drift hot spot, §4).
+	if agent.Interface == "terminal" && !terminalSupported(be.Type) {
+		return runtime.LaunchSpec{}, apiError(runtime.CodeTerminalUnavailable, terminalUnsupportedReason(be.Type))
+	}
 	token := mintHookToken()
 	s.rememberHookToken(agent.AgentID, token)
 	mcpSpec, err := s.registerMessagingMCP(agent)
