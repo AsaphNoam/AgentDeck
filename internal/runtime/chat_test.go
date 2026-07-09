@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agentdeck/agentdeck/internal/backend"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
@@ -240,6 +241,52 @@ func runNewBackendChatE2E(t *testing.T, backendType, backendID, modelID string) 
 	}
 	if _, err := c.store.ReadRunning(rh.AgentID); err != nil {
 		t.Fatalf("%s running row missing after resume: %v", backendType, err)
+	}
+}
+
+// TestSkipPermissionsEnvOpenCode proves the yolo mapping reaches the spawned
+// process env: OpenCode gets OPENCODE_CONFIG_CONTENT only when skip=true, and
+// OpenHands always carries LLM_MODEL (model-via-env). Asserted on the real
+// exec.Cmd spawnCmd builds, so the adapter→runtime wiring is covered end to end.
+func TestSkipPermissionsEnvOpenCode(t *testing.T) {
+	st, err := state.Open(t.TempDir())
+	if err != nil {
+		t.Fatalf("state.Open: %v", err)
+	}
+	t.Cleanup(func() { st.Close() })
+	c := NewChatRuntime(st)
+
+	hasEnv := func(env []string, key string) (string, bool) {
+		for _, kv := range env {
+			if strings.HasPrefix(kv, key+"=") {
+				return strings.TrimPrefix(kv, key+"="), true
+			}
+		}
+		return "", false
+	}
+
+	ocAd, _ := backend.For("opencode-acp")
+	base := LaunchSpec{Cwd: t.TempDir(), ModelID: "anthropic/claude-sonnet-4-5", Env: []string{"HOME=/x"}}
+
+	// skip=false → no OPENCODE_CONFIG_CONTENT.
+	if _, ok := hasEnv(c.spawnCmd(ocAd, base).Env, "OPENCODE_CONFIG_CONTENT"); ok {
+		t.Fatal("opencode skip=false must not set OPENCODE_CONFIG_CONTENT")
+	}
+	// skip=true → yolo config injected.
+	yolo := base
+	yolo.SkipPerms = true
+	v, ok := hasEnv(c.spawnCmd(ocAd, yolo).Env, "OPENCODE_CONFIG_CONTENT")
+	if !ok || !strings.Contains(v, `"permission"`) {
+		t.Fatalf("opencode skip=true OPENCODE_CONFIG_CONTENT = %q, want a permission config", v)
+	}
+
+	// OpenHands: LLM_MODEL carries the model regardless of skip; a shell LLM_MODEL
+	// is stripped so the adapter value is authoritative.
+	ohAd, _ := backend.For("openhands-acp")
+	ohSpec := LaunchSpec{Cwd: t.TempDir(), ModelID: "anthropic/claude-sonnet-4-5", Env: []string{"HOME=/x", "LLM_MODEL=shell-leak"}}
+	got, ok := hasEnv(c.spawnCmd(ohAd, ohSpec).Env, "LLM_MODEL")
+	if !ok || got != "anthropic/claude-sonnet-4-5" {
+		t.Fatalf("openhands LLM_MODEL = %q (ok=%v), want the adapter model, not the shell leak", got, ok)
 	}
 }
 

@@ -216,6 +216,19 @@ func (opencodeACP) HookMap() map[string]string      { return nil }
 func (opencodeACP) UnsupportedHookEvents() []string { return unsupported(nil) }
 func (opencodeACP) HookLaunchArgs(string) []string  { return nil }
 
+// ExtraEnv injects the yolo permission config for skip=true (techspec §2.3):
+// OPENCODE_CONFIG_CONTENT carries a full config JSON so the CLI auto-allows
+// edit/bash/webfetch without raising ACP permission requests. Env-only — nothing
+// on disk, torn down with the process. skip=false injects nothing (the CLI then
+// raises requests, handled by the runtime permission gate). GATED: the exact key
+// set is re-verified in 7.4. (The runtime gate also auto-approves as a backstop.)
+func (opencodeACP) ExtraEnv(modelID string, skipPerms bool) []string {
+	if !skipPerms {
+		return nil
+	}
+	return []string{`OPENCODE_CONFIG_CONTENT={"permission":{"edit":"allow","bash":"allow","webfetch":"allow"}}`}
+}
+
 // openhandsACP is the adapter for the OpenHands CLI (`openhands acp`). Its one
 // distinguishing trait is that model selection rides the LLM_MODEL env var
 // rather than the ACP session param (techspec §2.2).
@@ -246,8 +259,16 @@ func (openhandsACP) UnsupportedHookEvents() []string { return unsupported(nil) }
 func (openhandsACP) HookLaunchArgs(string) []string  { return nil }
 
 // ExtraEnv sets LLM_MODEL from the resolved model id (OpenHands selects the
-// model via env, not the ACP session param — techspec §2.2). The skip=true yolo
-// mapping (§2.3) is wired in subphase 7.2.
+// model via env, not the ACP session param — techspec §2.2).
+//
+// skip=true (yolo) is deliberately NOT injected here: OpenHands exposes yolo as
+// an ACP session permission mode / TUI flag (§2.3), but the session-mode arm
+// would require a change to the shared sessionNewParams (forbidden by §1's
+// "no runtime changes" rule, and claude's path doesn't select a mode), and the
+// CLI's ACP always-approve flag is unverified. Meanwhile the shared runtime
+// permission gate already auto-approves every request when SkipPerms is true
+// (permission.go — backend-agnostic), so skip is functionally honored today.
+// The CLI-side always-approve arm is GATED to 7.4 (its first question).
 func (openhandsACP) ExtraEnv(modelID string, skipPerms bool) []string {
 	if modelID == "" {
 		return nil

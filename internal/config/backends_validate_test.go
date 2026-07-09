@@ -152,6 +152,22 @@ func TestValidateBackendsConfig_UnknownBackendType(t *testing.T) {
 	}
 }
 
+func TestValidateBackendsConfig_NewBackendTypesAccepted(t *testing.T) {
+	// The Phase 7 backends are part of the four-value type union; a document using
+	// them must validate (so a seeded opencode/openhands survives a Settings save).
+	for _, typ := range []string{"opencode-acp", "openhands-acp"} {
+		b := BackendsConfig{
+			Version: 2,
+			Backends: map[string]Backend{
+				"x": {Type: typ, Default: true, DefaultModel: "m", Models: map[string]Model{"m": {Model: "prov/model"}}},
+			},
+		}
+		if ve := ValidateBackendsConfig(&b); ve != nil {
+			t.Fatalf("%s should validate, got %v", typ, ve.Errors)
+		}
+	}
+}
+
 func TestValidateBackendsConfig_EmptyModelField(t *testing.T) {
 	b := BackendsConfig{
 		Version: 2,
