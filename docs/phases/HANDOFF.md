@@ -150,9 +150,80 @@ GOCACHE=/Users/mcnoam/Projects/AgentDeck/.gocache go test ./...` and `go test -t
 bind `tcp6 [::1]:0` under this sandbox. The prior cancel-escalation BLOCKING finding is fixed in
 current code (`permission.go` captures `turnSeq`); the permission-resolution race remains open.
 
+**Source (2026-07-09 usability review):** first behavior-driven top-to-bottom `/usability-review`
+run against the **running** binary (built `-tags sqlite_fts5` + untagged fallback for J8; fixtures
+under a review-owned `AGENTDECK_HOME`; deterministic agent = `fakeacp` on PATH as `claude-code-acp`;
+Playwright/Chromium for visual checks). Full run report + screenshots:
+[`usability-review-run-2026-07-09.md`](usability-review-run-2026-07-09.md). Findings below are
+prefixed `J#`/`S#`; repros live in that report.
+
 ### BLOCKING
 
+- **BLOCKING — J8/S1 empty/no-match Archive crashes the whole dashboard on a fresh install.**
+  `internal/archive/archive.go:155` `scanResults` returns a nil `[]Result` when there are no rows →
+  `Search` → JSON `results: null`; `ui/src/features/archive/ArchivePage.tsx:74,115,120` does
+  `results.length`/`results.map` unguarded → `TypeError: Cannot read properties of null` →
+  ErrorBoundary "Something went wrong in dashboard." Reachable by a first-time user clicking
+  **Archive**. MSW mock returns `results: []` so tests never see it (same class as the `order: null`
+  escape). Verified via running app (`run/J8-archive-empty/paint.png`, console TypeError, `curl
+  /api/archive` → `results:null`). Fix: return `[]Result{}` when empty (as `files_commands.go` does)
+  and/or `resp.results ?? []` in the UI; test: empty-archive render asserts an empty state, not a throw.
+- **BLOCKING — J9/S2 the entire Settings/config surface renders unstyled (the wizard escape migrated
+  here).** Global hand-written CSS only; `SettingsPage.tsx:11-24`, `RolesEditor`, `ProjectsEditor`,
+  `BackendsEditor.tsx:183-223`, `ModelRow.tsx:36-91` reference `.settings-tabs*`, `.config-editor`,
+  `.config-list*`, `.config-form`, `.backend-card`, `.backend-*`, `.model-row`, `.env-row`,
+  `.string-list`, `.btn-danger/-link/-sm` — defined in no stylesheet. Tabs are default browser
+  buttons; the Backends editor's labels/inputs **overlap** ("sonnet-4-6default"). Verified
+  (`run/J9-settings/paint.png`, `run/J9-backends/click1-Backends.png`). Fix: define the referenced
+  selectors (mirror the styled `.dialog-*`/`.wizard-*` families).
+- **BLOCKING — J3/S3 first launch from the shipped defaults fails with a misleading error.** The
+  seeded default project ships `cwd:"~/Projects/my-app"`, nonexistent on a fresh machine; launch →
+  `runtime_start_failed: fork/exec …/claude-code-acp: no such file or directory` (Go reports the
+  `cmd.Dir` ENOENT against the exec target, so the message blames the adapter, not the missing dir).
+  `~` expansion works (`config/paths.go`); the dir simply doesn't exist. Verified (launch succeeds
+  once the dir is created). Fix: pre-check the resolved cwd and return a cwd-specific error; ship a
+  default project cwd that exists (or create on first run / leave `default_project` unset until
+  onboarding sets a real one); test: launch with a missing cwd asserts a directory-named error.
+- **BLOCKING — S5 core mutating actions swallow failures silently (INVARIANTS §8).**
+  `CardGrid.tsx:94` `void releaseGroup(...)` (also drops the `stopped[].ok=false` partial-failure
+  body); `Composer.tsx:37` `void cancelTurn(agentId)`; `NotificationsEditor.tsx:20`
+  `putConfig.mutate` with no `onError` (checkbox snaps back silently); `RolesEditor`/`ProjectsEditor`
+  delete handlers branch only on `status===409` with no `else`; config editors render `String(e)` =
+  "HTTP 400" discarding the `.body` that names the field. A failed action looks like it worked. Fix:
+  route every mutation error through `pushError`, read `e.body.error.message` like `NewAgentModal`
+  already does; test: a rejected release/cancel/save/delete surfaces a toast.
+
 ### ADVISORY
+
+- **ADVISORY — S3 claude credcheck fragile to CLI wording/subcommand variance (re-opens the
+  `--no-color` class).** `internal/backend/credcheck/claude.go:30` gates the flag-drop fallback on the
+  exact substring `unknown option '--no-color'` (other phrasings → valid login reported **failed**);
+  `:43,54` assume the `auth status` subcommand exists and treat any non-zero exit lacking two phrases
+  as failed; `:46-50` treat exit-0 + absence of "not logged in"/"not authenticated" as **ok** (false
+  PASS). ENV-DEPENDENT. Fix: broad unknown-flag regex; unknown-subcommand/unexpected-exit → `skipped`;
+  require a positive logged-in signal for `ok`.
+- **ADVISORY — S3 `--settings` appended to the claude-code-acp launch with no capability
+  check/fallback.** `internal/backend/adapter.go:130` + `internal/runtime/chat.go:99` always append
+  `--settings <path>`; an older/variant adapter that rejects it fails **every** launch with an error
+  that doesn't name the flag. ENV-DEPENDENT. Fix: probe support or degrade to launch-without-hooks.
+- **ADVISORY — J8 (untagged build) no-FTS5 fallback surfaces a raw internal error on search.** On a
+  plain `go build`, `/api/archive?q=…` returns 500 `archive: count search: no such module: fts5` and
+  the UI prints the raw string (`run/J8-untagged-search/2-after-search.png`). Mitigated —
+  `install.sh`/`make build` carry the tag — but the fallback should degrade (LIKE scan or a
+  "search unavailable on this build" message), not 500.
+- **ADVISORY — S1 hand-edited config with missing collection maps crashes editors.** A `backends.json`
+  backend with no `models`, or `config.json` `notifications` with no `muted`, serializes `null`;
+  `BackendsEditor.tsx:240,268` `Object.entries/keys(backend.models)` and `NotificationsEditor.tsx:51,55`
+  `notifications.muted[…]` throw. Requires hand-edit. Fix: normalize nil maps on read or `?? {}` at the
+  consumer.
+- **ADVISORY — S2 secondary undefined classes (partial degradation).** `.transcript-item`, `.turn-end`,
+  `.assistant-message`, `.tool-call`, `.permission-error` (chat renderers), `.app-logo` (header),
+  `.interface-controls/-option/-disabled`, `.gate-loading` referenced but undefined; parents defined so
+  degradation is partial (missing spacing/emphasis).
+- **ADVISORY — S5 secondary error-surfacing gaps.** `CardGrid.tsx:41` layout autosave `void putLayout`
+  no catch (silent persistence loss on reorder/density); onboarding `LaunchStep/ProjectStep/BackendStep`
+  `setError(String(e))` discard the body; permission/send catch blocks show fixed strings discarding the
+  real `err.message`.
 
 - **ADVISORY — archive `matched_in` can go empty on mixed metadata+transcript hits.**
   `internal/archive/archive.go:207-219`: `matchedIn` only returns `metadata` or `transcript` when *all* query terms are
