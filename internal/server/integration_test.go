@@ -436,9 +436,13 @@ func TestResumeHappyPath(t *testing.T) {
 		t.Fatalf("resume status = %d: %s", resp.StatusCode, body)
 	}
 	var resumed struct {
-		Agent   struct{ AgentID string `json:"agent_id"` } `json:"agent"`
-		Running *struct{ SessionID string `json:"session_id"` } `json:"running"`
-		Resumed bool                                           `json:"resumed"`
+		Agent struct {
+			AgentID string `json:"agent_id"`
+		} `json:"agent"`
+		Running *struct {
+			SessionID string `json:"session_id"`
+		} `json:"running"`
+		Resumed bool `json:"resumed"`
 	}
 	if err := json.Unmarshal(body, &resumed); err != nil {
 		t.Fatalf("resume body JSON: %v", err)
@@ -550,7 +554,9 @@ func TestResumeAlreadyRunning(t *testing.T) {
 		t.Fatalf("resume while running: status = %d, want 409: %s", resp.StatusCode, body)
 	}
 	var errEnv struct {
-		Error struct{ Code string `json:"code"` } `json:"error"`
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
 	}
 	json.Unmarshal(body, &errEnv)
 	if errEnv.Error.Code != "conflict" {
@@ -575,7 +581,9 @@ func TestResumeNoPersistedSession(t *testing.T) {
 		t.Fatalf("resume no session: status = %d, want 422: %s", resp.StatusCode, body)
 	}
 	var errEnv struct {
-		Error struct{ Code string `json:"code"` } `json:"error"`
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
 	}
 	json.Unmarshal(body, &errEnv)
 	if errEnv.Error.Code != "validation" {

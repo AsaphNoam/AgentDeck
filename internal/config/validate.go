@@ -111,10 +111,13 @@ func isDirExist(path string) bool {
 
 // ---- Backends validators (§3.3 invariants 1–6) ----
 
-// knownBackendTypes are the accepted values for Backend.Type.
+// knownBackendTypes are the accepted values for Backend.Type (the four-value
+// union: two ACP CLIs from Phase 1/6 plus the Phase 7 OpenCode/OpenHands).
 var knownBackendTypes = map[string]bool{
-	"claude-acp": true,
-	"codex-acp":  true,
+	"claude-acp":    true,
+	"codex-acp":     true,
+	"opencode-acp":  true,
+	"openhands-acp": true,
 }
 
 // ValidateBackendsConfig validates the structural invariants for a BackendsConfig
@@ -160,7 +163,7 @@ func ValidateBackendsConfig(b *BackendsConfig) *ValidationErrors {
 			errs = append(errs, FieldError{
 				Field:   fmt.Sprintf("backends.%s.type", id),
 				Code:    "unknown_backend_type",
-				Message: fmt.Sprintf("unknown backend type %q; must be claude-acp or codex-acp", bk.Type),
+				Message: fmt.Sprintf("unknown backend type %q; must be one of claude-acp, codex-acp, opencode-acp, openhands-acp", bk.Type),
 			})
 		}
 		// Invariant 4: at least one model.
