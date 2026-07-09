@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useBackends, usePutBackends } from "../../api/config";
 import type { BackendsConfig, Backend, Model, CredResult } from "../../schemas/backends";
+import { BACKEND_TYPE_LABELS, BACKEND_TYPE_OPTIONS } from "../../lib/backendTypes";
 import { ModelRow } from "./ModelRow";
 
 type Pair = { key: string; value: string };
@@ -212,8 +213,11 @@ export function BackendsEditor() {
               onChange={(e) => updateBackend(id, { type: e.target.value as Backend["type"] })}
               className="backend-type-select"
             >
-              <option value="claude-acp">Claude (claude-acp)</option>
-              <option value="codex-acp">Codex / OpenAI (codex-acp)</option>
+              {BACKEND_TYPE_OPTIONS.map((t) => (
+                <option key={t} value={t}>
+                  {BACKEND_TYPE_LABELS[t]} ({t})
+                </option>
+              ))}
             </select>
             {credentials[id] && credChip(credentials[id])}
             <button type="button" className="btn-danger btn-sm" onClick={() => removeBackend(id)}>

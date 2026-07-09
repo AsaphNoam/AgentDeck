@@ -6,6 +6,7 @@ import { useProjects } from "../../api/config";
 import { useBackends } from "../../api/config";
 import { useConfig } from "../../api/config";
 import { useLaunchAgent } from "../../api/config";
+import { terminalSupported } from "../../lib/backendTypes";
 import { useSuggestedName } from "./useSuggestedName";
 
 interface NewAgentModalProps {
@@ -82,6 +83,16 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject }: Ne
 
   const selectedBackend = backendsData?.backends[backendId];
   const modelEntries = Object.entries(selectedBackend?.models ?? {});
+
+  // Terminal is offered only when the host advertises it AND the selected backend
+  // type supports it (only claude-acp — mirrors the server terminalSupported gate).
+  const backendTerminalOK = !selectedBackend || terminalSupported(selectedBackend.type);
+  const canTerminal = terminalAvailable && backendTerminalOK;
+
+  // A backend that can't run terminal must not leave a stale terminal selection.
+  useEffect(() => {
+    if (!canTerminal && agentInterface === "terminal") setAgentInterface("chat");
+  }, [canTerminal, agentInterface]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,8 +175,8 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject }: Ne
                   <input type="radio" name="interface" value="chat" checked={agentInterface === "chat"} onChange={() => setAgentInterface("chat")} />
                   Chat
                 </label>
-                <label className={terminalAvailable ? "interface-option" : "interface-option interface-disabled"} title={terminalAvailable ? "Terminal runtime" : "Terminal unavailable"}>
-                  <input type="radio" name="interface" value="terminal" checked={agentInterface === "terminal"} disabled={!terminalAvailable} onChange={() => setAgentInterface("terminal")} />
+                <label className={canTerminal ? "interface-option" : "interface-option interface-disabled"} title={canTerminal ? "Terminal runtime" : !backendTerminalOK ? "Terminal is only supported by the Claude backend" : "Terminal unavailable"}>
+                  <input type="radio" name="interface" value="terminal" checked={agentInterface === "terminal"} disabled={!canTerminal} onChange={() => setAgentInterface("terminal")} />
                   Terminal
                 </label>
               </div>
