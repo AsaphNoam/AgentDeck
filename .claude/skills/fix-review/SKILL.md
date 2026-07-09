@@ -27,7 +27,8 @@ title/keyword (just that one). Otherwise work **all** unresolved findings, **BLO
 2. **False positives get no code change — and get deleted.** If a finding doesn't reproduce (or was
    already fixed since the review), make no code change: **delete its bullet** and add a one-line
    changelog entry (`dismissed <title> — false positive: <evidence>`). Your validation is the verdict;
-   **call it out in your summary** — a dismissal is a judgment call — but it does not linger in the handoff.
+   the brief carries the dismissal count (plus one plain line for any dismissed BLOCKING finding) —
+   dismissals do not linger in the handoff.
 3. **Delegate freely, but own the checkpoint.** You may spawn coding subagents for self-contained
    fixes — they have full tool access (Bash, Edit, Write). The constraint: **you** must run the
    full GREEN checkpoint yourself before committing to confirm integration. Tier the quota: farm
@@ -44,9 +45,11 @@ title/keyword (just that one). Otherwise work **all** unresolved findings, **BLO
 6. **Stop only for real STOP conditions (§3).** A real finding you can't get green, or whose fix needs
    a human decision/info, is a STOP: leave the bullet as-is, record it under `## Blocked on human`,
    and move to the next finding rather than abandoning the run.
-7. **Flag every judgment call (§3).** If a fix forced *you* to make a design/implementation decision
-   the finding didn't dictate, record it under `## Autonomous decisions (please review)` and say so
-   explicitly in your closing summary.
+7. **Record every judgment call; surface only the few that matter (§3, §10).** If a fix forced *you*
+   to make a design/implementation decision the finding didn't dictate, record it in full under
+   `## Autonomous decisions (please review)` — the next review peer-reviews these. Promote to the
+   human brief only calls that change user-visible behavior, are costly to reverse, or deviate from
+   spec, with the default you applied.
 8. **Feed the catalog.** Most real findings are instances of a class in
    [`docs/phases/INVARIANTS.md`](../../../docs/phases/INVARIANTS.md) — name the class in the
    changelog line. If the root cause is a genuinely new class, or the fix produced a new canonical
@@ -54,6 +57,9 @@ title/keyword (just that one). Otherwise work **all** unresolved findings, **BLO
 
 ## When you finish a session (any exit)
 
-Leave the tree at a GREEN checkpoint, `HANDOFF.md` updated + condensed, work committed. Tell the user
-what you **fixed**, what you **dismissed as a false positive (and why)**, and anything that became a
-blocker — and **explicitly list any autonomous decisions** you made, or say plainly there were none.
+Leave the tree at a GREEN checkpoint, `HANDOFF.md` updated + condensed, work committed. Then **write
+the human brief** (workflow §10): prepend a ≤250-word plain-language entry to `docs/phases/BRIEFS.md`
+— TL;DR (what got fixed, tree green?), a short architecture re-orientation (the user is zoomed out;
+gloss every project term), the dismissal count with a line for any dismissed BLOCKING finding, any
+above-the-bar decisions with their applied defaults, and anything that became a blocker — and paste
+that same brief as your end-of-turn message. The brief IS the summary: no walls of text.

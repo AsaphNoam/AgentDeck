@@ -14,7 +14,8 @@ quota runs out, and you keep [`HANDOFF.md`](HANDOFF.md) so accurate that the nex
 
 ## 0. The map (read once, then trust the handoff)
 
-- [`HANDOFF.md`](HANDOFF.md) — **live state.** Where we are, what's next, decisions, blockers. Read first, every session.
+- [`HANDOFF.md`](HANDOFF.md) — **live state, agent-facing.** Where we are, what's next, decisions, blockers. Read first, every session.
+- [`BRIEFS.md`](BRIEFS.md) — **the human's only channel** (§10). Every session ends by writing one short plain-language brief there.
 - [`README.md`](README.md) — phase plan, dependency graph, build order.
 - `phase-N-*.md` — phase PRD (the *what* + acceptance criteria).
 - `tech/phase-N-*-techspec.md` — tech spec (the *how*). Each ends in a **`## Subphase plan`** section — this is your task list.
@@ -36,7 +37,7 @@ quota-sized step that ends at a **GREEN checkpoint** so work is never left half-
 3. VERIFY  → run the GREEN checkpoint (§2). Not green → fix. Can't fix → STOP (§3).
 4. RECORD  → update HANDOFF.md, condense (§5), commit at the checkpoint (§6).
 5. REPEAT  → next subphase. Phase done? Roll to the next phase per the build order.
-6. EXIT    → on stop/quota/blocker: leave HANDOFF green and accurate, summarize what's next.
+6. EXIT    → on stop/quota/blocker: leave HANDOFF green and accurate, write the human brief (§10).
 ```
 
 **Keep going.** Do not stop just because one subphase finished — a finished subphase at a
@@ -79,22 +80,26 @@ Stop when:
 Do **not** stop for: a subphase finishing, a normal failing test you can fix, a design choice the
 tech spec already makes for you, or routine multi-step work.
 
-### Judgment calls you made anyway — always flag them
+### Judgment calls you made anyway — record all, surface few
 
 Sometimes an issue doesn't rise to a STOP (it wasn't blocking, or stopping would waste a whole
 session) but it still forced **you** to make a design or implementation decision the specs didn't
 dictate — you resolved an ambiguity, picked between reasonable options, worked around a spec gap or
-a contradiction, or named/structured something the spec left open. **Never let those pass silently.**
+a contradiction, or named/structured something the spec left open. **Never let those pass silently —
+but the human is not the audience for most of them** (§10).
 
 For each such call:
 
 - Record it under **`## Autonomous decisions (please review)`** in `HANDOFF.md`: what was ambiguous/
-  missing, the options, **what you chose and why**, and how to reverse it if the human disagrees.
-- Call it out **explicitly in your end-of-turn summary** to the human — don't bury it in the handoff
-  and assume they'll find it. The human should never discover a self-made decision by reading the diff.
+  missing, the options, **what you chose and why**, and how to reverse it. This is the agent-facing
+  record; the §8 review agent — not the human — is its first reviewer (§10).
+- Promote to the human brief (§10) **only** the calls that clear the brief bar: a user-visible
+  behavior change, a call that is costly to reverse, or a deviation from spec. Translate it to plain
+  language and state the default you applied. Do **not** dump every call on the human — a 15-bullet
+  decision list is a wall they will not read, which is worse than silence.
 
-When in doubt about whether a choice is "obvious" or a real judgment call, flag it. Over-reporting a
-decision costs a sentence; an unflagged wrong assumption costs a rebuild.
+When in doubt whether a call clears the brief bar, one plain-language line in the brief costs little.
+The full technical detail always goes to `HANDOFF.md`, never the brief.
 
 ---
 
@@ -125,13 +130,16 @@ The handoff must always reflect *current* truth and nothing stale. Condense as y
 - **A whole phase is done** (all subphases green, acceptance criteria met) → collapse it to a single
   line in "Phase status" (`[x] Phase 5 — Coordination ✅`) and **delete its subphase breakdown entirely.**
 - **Decisions / blockers** that still matter → keep them, tersely, in their sections. Drop ones that no longer apply.
-- **Autonomous decisions** → keep each until the human has clearly acknowledged it; only then fold the durable
-  ones into "Decisions & notes" and drop the rest. Never silently delete one the human hasn't seen.
+- **Autonomous decisions** → keep each until the §8 review agent has peer-reviewed it (`— peer-reviewed <date>`
+  tag, §8) *and*, for brief-worthy calls, it has appeared in a brief (§10); then fold the durable contracts into
+  "Decisions & notes" and delete the rest. Do **not** hold entries waiting for human acknowledgment — the human
+  reviews via briefs and objects by replying to one; silence is consent (§10).
 - **Review findings** → the section holds **only open findings.** The moment the fix agent (§9) resolves a
   finding (fixed + green + committed) **or** dismisses it as a validated false positive, **delete the bullet**
-  and drop a one-line entry in the changelog. The commit/changelog + the end-of-turn summary are the record —
+  and drop a one-line entry in the changelog. The commit/changelog + the brief (§10) are the record —
   do not keep a `✅ RESOLVED` / `❌ DISMISSED` graveyard here.
 - **Changelog** → keep only the last ~10 entries; older history lives in git.
+- **Briefs** (`BRIEFS.md`, §10) → keep the last 4; delete older ones when adding a new one.
 
 What survives long-term: the one-line-per-phase status, the *active* subphase detail, durable
 decisions, open blockers, a short recent changelog. Everything else is junk — remove it.
@@ -161,8 +169,9 @@ Commits are the recovery anchor across spaced sessions, so the work survives a h
 
 1. Tree at a GREEN checkpoint (or, if cut off mid-step, handoff clearly says what's half-done and how to finish it).
 2. `HANDOFF.md` updated + condensed; `Last GREEN checkpoint` and changelog current.
-3. Committed (if green). Summary to the human of what moved and what's next — and **explicitly list any
-   autonomous decisions** (§3) you made, or state plainly that there were none.
+3. Committed (if green). **Write the human brief** (§10): prepend it to `BRIEFS.md` and paste the same
+   brief as your end-of-turn message. The brief *is* the summary — do not follow it with a longer
+   technical report.
 
 ---
 
@@ -191,6 +200,17 @@ Cross-reference against:
 
 The bar is: **would this cause a real problem during normal usage?**
 
+### Audit the pending autonomous decisions — you are the reviewer of record
+
+The human is zoomed out and no longer reviews judgment calls (§10); this review is where they get
+checked instead. Sweep every un-endorsed entry under `## Autonomous decisions` in `HANDOFF.md`
+against the specs and shipped code:
+
+- **Sound** → append `— peer-reviewed <date>` to the bullet (this is the one handoff write a review
+  may make besides findings; it lets §5 condensation fold the entry).
+- **Unsound / spec-violating** → write a normal finding (BLOCKING or ADVISORY) that names the
+  decision entry, so the §9 fix agent reverses it.
+
 ### Output
 
 Categorize every finding as one of:
@@ -198,11 +218,15 @@ Categorize every finding as one of:
 - **BLOCKING** — must fix before the next phase starts (spec violation, data-loss risk, crash under normal use).
 - **ADVISORY** — worth fixing but not blocking; next agent should address it when convenient.
 
-Report findings directly to the human **and** write **every** finding — BLOCKING *and*
-ADVISORY — to `## Review findings` in `HANDOFF.md`, each tagged with its severity. This is the
-hand-off contract: the fix agent (§9) and the next build agent can only act on findings that land
-in the handoff, so an advisory spoken only to the human is lost. Use the entry shape in §9.
-If there are no findings, say so plainly and write nothing to the handoff. Do not pad the report.
+Write **every** finding — BLOCKING *and* ADVISORY — to `## Review findings` in `HANDOFF.md`, each
+tagged with its severity. This is the hand-off contract: the fix agent (§9) and the next build agent
+can only act on findings that land in the handoff, so an advisory recorded nowhere else is lost.
+Use the entry shape below.
+
+Report to the human **via the brief** (§10), at digest granularity: severity counts, each BLOCKING
+finding as one plain-language sentence (what breaks, for whom), and advisories summarized as a count
+plus dominant theme — never an enumerated list. The full technical detail lives only in the handoff.
+If there are no findings, the brief says so plainly and nothing is written to the handoff. Do not pad.
 
 ### Review-findings entry shape (written by §8, consumed by §9)
 
@@ -256,9 +280,9 @@ both proves the finding and becomes the regression guard once you fix it.
   - **Real** → proceed to fix.
   - **False positive / not reproducible / already fixed since the review** → make **no code change**.
     Your validation is the verdict — **delete the bullet** and record a one-line changelog entry
-    (`dismissed <title> — false positive: <one-line evidence>`). Call it out in your end-of-turn
-    summary too — a dismissal is a judgment call (§3), so the human should see it there, but it does
-    not linger in the findings section.
+    (`dismissed <title> — false positive: <one-line evidence>`). Dismissals are judgment calls (§3):
+    the brief (§10) carries the dismissal count, plus one plain-language line for any dismissal of a
+    BLOCKING finding; they do not linger in the findings section.
 
 **Gate 2 — FIX.** Same rules as building a subphase: implement the fix yourself (**no coding
 §4**), add/keep the regression test, and reach a **GREEN checkpoint** (§2). A fix is only
@@ -276,6 +300,57 @@ record it under `## Blocked on human`, and move to the next finding.
   a design call the finding didn't dictate, record it under `## Autonomous decisions` and say so.
 - **Condensation (§5):** delete each finding's bullet as you resolve or dismiss it (changelog +
   summary carry the record); the findings section trends to empty, never a graveyard of stale tags.
-- **End-of-session (§7 checklist):** tree green, handoff updated, work committed, summary to the human
-  listing what was fixed, what was **dismissed as a false positive** (and why), and anything that
-  became a blocker.
+- **End-of-session (§7 checklist):** tree green, handoff updated, work committed, and the human brief
+  (§10) written: what was fixed in plain language, the dismissal count (with a line for any dismissed
+  BLOCKING finding), and anything that became a blocker.
+
+---
+
+## 10. The human brief — how the human stays in the loop
+
+The human running this project is **zoomed out**: they do not read `HANDOFF.md`, the diffs, the
+changelog, or the specs, and they will not "go over the handoff" to catch up. The only channel they
+reliably read is [`BRIEFS.md`](BRIEFS.md) — short, self-contained digests they can take in small
+chunks. `HANDOFF.md` stays the agent-to-agent record; `BRIEFS.md` is the agent-to-human interface.
+
+**Every session exit** — build (§1), review (§8), fix (§9), usability review — prepends one brief to
+`BRIEFS.md` and pastes that same brief as the end-of-turn message. One text, two places; never write
+a second, longer report in chat.
+
+### Writing rules (this is the hard part — respect them)
+
+- **Assume a cold reader.** The human forgot the architecture and the vocabulary since the last
+  chunk. Re-anchor every brief: name the component you touched and remind them in one clause what
+  it does ("the *nudger* — the background loop that pokes an idle agent when it has unread mail").
+- **No walls of text.** Hard cap ~25 lines / ~250 words. Short sentences, plain language. No file
+  paths, symbol names, test names, or flag lists without a gloss — those belong in the handoff and
+  changelog for the next agent, not in the brief.
+- **Decide, then report.** Never hand the human an open decision without a default. Every
+  "needs your input" item states what happens if they never answer.
+
+### Entry shape
+
+```
+## <date> — <build|review|fix|usability> — <one-line title>
+**TL;DR:** ≤3 sentences — what changed / what was found, and whether the tree is green.
+**Where this fits:** 2–4 sentences of architecture re-orientation (see writing rules).
+**Decisions made for you:** 0–3 bullets, ≤2 sentences each — only calls that change user-visible
+  behavior, are costly to reverse, or deviate from spec; what was chosen and why, in plain language.
+  (Every other call is recorded in HANDOFF only.)
+**Needs your input:** 0–2 bullets — a direct question, a recommended answer, and the default applied
+  if you stay silent. Restate every open `Blocked on human` item here as one line until resolved.
+**Next up:** 1 sentence.
+```
+
+Omit any section with nothing to say (except the TL;DR). Keep the last 4 briefs; delete older ones
+when adding a new one — git keeps history.
+
+### The zoomed-out decision contract
+
+- The human no longer reviews every autonomous decision. **The §8 review agent is the reviewer of
+  record**: it audits `## Autonomous decisions` entries against the specs, endorsing each
+  (`— peer-reviewed <date>`) or converting it into a finding.
+- The brief carries only above-the-bar decisions (shape above). **Silence is consent:** once an
+  entry is peer-reviewed — and, if brief-worthy, has appeared in a brief — the next session folds
+  or deletes it per §5. The human objects by replying to a brief; that objection is a new
+  instruction to act on, not a standing review queue.

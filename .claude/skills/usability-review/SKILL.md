@@ -29,6 +29,8 @@ That's the single source of truth. The reminders below just help you start fast.
    can't reproduce to *unconfirmed*.
 6. **Report** (§6): severity-mapped findings (BLOCKER/MAJOR → BLOCKING, MINOR → ADVISORY) into
    `## Review findings` in `HANDOFF.md` using the AGENT-WORKFLOW §8 entry shape (prefix titles with
-   `J#`/`S#`), so `/fix-review` consumes them unchanged. New systemic classes → `INVARIANTS.md`.
-   Give the human the checkpoint matrix + top-5 executive summary. All-PASS journeys are stated,
-   not omitted.
+   `J#`/`S#`), so the fix step consumes them unchanged. New systemic classes → `INVARIANTS.md`.
+   Save the full run report (checkpoint matrix, findings, evidence paths) as a file; report to the
+   human via the **brief** (workflow §10): a ≤250-word plain-language entry in `docs/phases/BRIEFS.md`
+   — what was driven, severity counts, each blocker as one plain sentence, link to the run report —
+   pasted as your end-of-turn message. All-PASS journeys are stated in the matrix, not omitted.

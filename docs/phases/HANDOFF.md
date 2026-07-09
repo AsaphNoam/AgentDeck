@@ -3,6 +3,8 @@
 **Live state. Read this first, every session. Update it after every change.**
 Protocol: [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) (Claude Code or Codex, whichever the human runs).
 Keep this lean — apply the condensation rules (workflow §5); old detail lives in git, not here.
+**This file is agent-facing.** The human reads only [`BRIEFS.md`](BRIEFS.md) (workflow §10) —
+never point them here to catch up, and end every session by writing a brief.
 
 ---
 
@@ -135,7 +137,7 @@ Details in git history (`6.1`–`6.7`) and changelog.
 > Written by the review agent (workflow §8), one bullet per finding tagged with its severity
 > (`BLOCKING` / `ADVISORY`). Consumed by the fix agent (`/fix-review`, workflow §9), which validates
 > each is actually true, then **deletes the bullet** once it's fixed-and-green or dismissed as a
-> validated false positive — recording the outcome in the changelog + its end-of-turn summary (§5).
+> validated false positive — recording the outcome in the changelog + the human brief (§5, §10).
 > **This section holds only OPEN findings** — no resolved/dismissed graveyard.
 > Blocking items must be fixed before the next phase starts; advisory items when convenient.
 
@@ -382,7 +384,10 @@ prefixed `J#`/`S#`; repros live in that report.
 
 ## Autonomous decisions (please review)
 
-> Resolved without stopping; the human should still see them. Remove once acknowledged (workflow §3, §5).
+> Resolved without stopping. Agent-facing record: the §8 review agent is the reviewer of record —
+> it endorses each entry (`— peer-reviewed <date>`) or converts it to a finding; brief-worthy calls
+> are also surfaced to the human in [`BRIEFS.md`](BRIEFS.md) (workflow §10). Fold/delete per §5 once
+> peer-reviewed — do **not** hold entries waiting for human acknowledgment; silence is consent.
 
 - **NEW (7.1): the terminal-rejection gate was ADDED to the resume composer, which previously had none.** The spec
   (§4) says `terminalSupported` must guard all three composers (launch/switch/resume), but before 7.1 only launch and
@@ -745,6 +750,15 @@ prefixed `J#`/`S#`; repros live in that report.
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
+
+- 2026-07-09 — **docs: human-brief workflow — reporting granularity rezoomed.** The human no longer reads this
+  file; new [`BRIEFS.md`](BRIEFS.md) + workflow **§10** define the ≤250-word plain-language brief every session
+  (build/review/fix/usability) must end with. §3 judgment calls: record all here, promote only above-the-bar calls
+  (user-visible / costly-to-reverse / spec deviation) to the brief with an applied default. §8 reviews now
+  peer-review pending autonomous decisions (`— peer-reviewed <date>` endorsement or a finding) — the review agent
+  replaces the human as reviewer of record; §5 folds entries after peer review + brief exposure, no human-ack gate.
+  §8 human reporting is digest-only (counts + one-liners); full findings still land here. Touched: AGENT-WORKFLOW,
+  BRIEFS (new), AGENTS.md, CLAUDE.md, USABILITY-REVIEW §6, all four twinned skills (both copies). Docs-only.
 
 - 2026-07-09 — **phase 7.3: OpenCode/OpenHands UI plumbing — green.** `schemas/backends.ts` now exports
   `backendTypeSchema`/`BackendType` (four-value enum — the single source of the union); new `lib/backendTypes.ts`
