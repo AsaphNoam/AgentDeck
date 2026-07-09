@@ -26,15 +26,20 @@ type LaunchSpec struct {
 	// primer path sets this so the one-time history primer reaches the new backend
 	// without baking into (or stacking onto) the durable snapshot.
 	RuntimeSystemPrompt string
-	BackendType         string          // "claude-acp" | "codex-acp"
-	ModelID             string          // provider model id, e.g. "claude-sonnet-4-6"
-	Env                 []string        // composed env layering (backend then per-model override), "K=V"
-	SkipPerms           bool            // effective skip_permissions after role/global resolution
-	HookToken           string          // per-launch one-time token passed to the agent's hooks
-	MCPServers          []MCPServerSpec // messaging MCP server registration; one entry this phase
-	ExtraArgs           []string        // reserved (e.g. extra adapter flags) — empty this phase
-	LastSessionID       string          // prior CLI session id; Resume tries session/load with this
-	LastContextPct      float64         // last-known context pct; Resume restores it to the status row
+	BackendType         string // "claude-acp" | "codex-acp"
+	ModelID             string // provider model id, e.g. "claude-sonnet-4-6"
+	// Driver selects the terminal TerminalDriver ("" | "xterm" | "tmux" | "iterm2");
+	// ignored by the chat runtime. Empty defaults to the cross-platform xterm/PTY
+	// driver. The server validates availability against the capability probe before
+	// launch (§3.5), so an unavailable driver never reaches the runtime.
+	Driver         string
+	Env            []string        // composed env layering (backend then per-model override), "K=V"
+	SkipPerms      bool            // effective skip_permissions after role/global resolution
+	HookToken      string          // per-launch one-time token passed to the agent's hooks
+	MCPServers     []MCPServerSpec // messaging MCP server registration; one entry this phase
+	ExtraArgs      []string        // reserved (e.g. extra adapter flags) — empty this phase
+	LastSessionID  string          // prior CLI session id; Resume tries session/load with this
+	LastContextPct float64         // last-known context pct; Resume restores it to the status row
 }
 
 // StartSystemPrompt is the system prompt handed to the backend process for this

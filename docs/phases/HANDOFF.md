@@ -8,10 +8,10 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 
 ## Current position
 
-- **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
-- **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
-- **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** review fix (advisory batch: inbox newest-N + CLI operand validation): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
+- **Active phase:** 7 — Additional features: OpenHands & OpenCode backends (Phase 6 complete ✅)
+- **Active subphase:** 7.1 (next) — see [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) §"Subphase plan" (not started; expand its steps on ORIENT)
+- **Spec:** [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) (PRD: [`phase-7-additional-features.md`](phase-7-additional-features.md))
+- **Last GREEN checkpoint:** phase 6.7 (iTerm2/AppleScript driver + driver-selection plumbing): `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, `go test -race ./internal/runtime/terminal`.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -24,7 +24,7 @@ Keep this lean — apply the condensation rules (workflow §5); old detail lives
 - [x] Phase 3 — Config CRUD & onboarding ✅
 - [x] Phase 4 — Persistence: archive, search, resume, file/command tracking ✅
 - [x] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications ✅
-- [ ] Phase 6 — Flexibility: terminal runtime, switch-runtime, task groups
+- [x] Phase 6 — Flexibility: terminal runtime, switch-runtime, task groups, drivers (xterm/tmux/iterm2) ✅
 - [ ] Phase 7 — Additional features: OpenHands & OpenCode backends — candidate selected 2026-07-07; PRD [`phase-7-additional-features.md`](phase-7-additional-features.md), spec [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md); not started
 
 Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent after 2).
@@ -39,55 +39,16 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 **Phase 5 complete ✅.** MCP messaging server, message store/tools, per-agent registration, nudger, per-turn budgets, janitor, notification SSE, config-backed notification mutes, Web Notification/in-app toast client, message badges/outbound pulse, and read-only inbox endpoint are all green. Details live in git history (`5.1`–`5.4`) and changelog.
 
-**Subphase 6.1 ✅ — hook ingest hardened + backend adapter + Codex (chat).** `internal/backend/adapter.go`
-(`BackendAdapter` for `claude-acp`/`codex-acp`: binary, env-strip keys, `ResolveResumeID`, `CanSwitchModelOnResume`,
-`HookMap`/`UnsupportedHookEvents`); chat runtime resolves spawn binary/env-strip per adapter (codex now runs through
-the chat runtime); `/api/hook` accepts the terminal lifecycle events + 401-on-stale-token. Details in changelog.
+**Phase 6 complete ✅.** Backend adapter + Codex chat (6.1), hook scripts/registration + interface gate (6.2),
+terminal runtime behind the `TerminalDriver` seam with xterm/PTY + tmux + iTerm2 drivers and the PTY↔WS bridge
+(6.3/6.7), same-backend switch-runtime (6.4), backend-swap history primer (6.5), task groups + endpoints + UI (6.6),
+and driver-selection plumbing (`driver` field on launch/switch → per-agent runtime dispatch, `422
+terminal_unavailable` for unavailable drivers) are all green. `GET /api/capabilities` advertises xterm/tmux/iterm2.
+Details in git history (`6.1`–`6.7`) and changelog.
 
-**Subphase 6.2 ✅ — hook scripts + registration + interface gate.** New `internal/hooks`: embedded `_post.sh`
-(jq-encoded `curl POST /api/hook`, interface gate) + 5 event wrappers, `Install(home)` (rewritten on dashboard
-startup), `ClaudeSettings`/`WriteAgentSettings`. Launch + resume inject `AGENTDECK_*` env and write a per-agent
-settings file; `BackendAdapter.HookLaunchArgs` (claude `--settings <path>`, codex gated). The `--settings`
-passthrough is gated behind `AGENTDECK_HOOK_REGISTRATION=1` (default off) so real launches aren't regressed. Details
-in changelog.
-
-**Subphase 6.3 ✅ — terminal runtime (xterm/PTY default + tmux).** New `internal/runtime/terminal`: `Runtime`
-(`Start/SendPrompt/Cancel/Stop/Resume/CheckMessages/Permission/Subscribe/Transcript`) behind the `TerminalDriver`
-seam (`StartTab/WriteText/ReadTTY/CloseTab/RevealTab`); xterm/PTY driver (`creack/pty`, Setsid+Setctty, pgid signal)
-+ tmux driver (new-session/send-keys/display-message). PTY↔WS bridge at `GET /api/sessions/{id}/terminal/ws`
-(`coder/websocket`; binary frames↔master, JSON `{cols,rows}`→`pty.Setsize`). `terminal.Probe()` + `GET
-/api/capabilities`. Running row gained `driver`/`driver_ids` (state migration v6). Registry gets the real terminal
-runtime via `SetTerminalRuntime` (subpackage→avoids import cycle); status flows from hooks only (runtime writes the
-race-guarded initial idle + a `done` on Stop). Details in changelog + Autonomous decisions.
-
-**Subphase 6.4 ✅ — switch-runtime: same-backend (interface/model swap).** `POST /api/sessions/{id}/switch-runtime`
-(`internal/server/switch.go`): per-agent switch lock (`Server.switching` set → `409 switch_in_progress`); merge target
-over current (`400 no_change` if identical, `400 invalid_field` for bad interface); validate→cancel-and-wait→
-`registry.Stop`→cleanup old MCP/hook→persist new identity (`WriteAgent`, agent_id UNCHANGED)→`registry.Resume` (dispatch
-by new interface). `resolveResumeId` via the adapter (same-backend→prev native id; `CanSwitchModelOnResume` gate);
-chat↔terminal works. Rollback on Resume-after-Stop failure re-launches the previous identity (`500
-switch_failed_rolled_back`; double-fault → status `error` + `500 switch_failed`). New switch-runtime error codes added to
-`runtime/errors.go` (`no_change`/`invalid_field`→400, `switch_in_progress`/`agent_not_running`→409,
-`terminal_unavailable`→422, `switch_failed*`→500). Details in changelog + Autonomous decisions.
-
-**Subphase 6.5 ✅ — switch-runtime: backend-swap history primer.** Cross-backend and non-native-resumable model swaps now
-route to `history_handoff:"primer"`: no native resume id, bounded transcript primer appended to this launch's
-`SystemPrompt` only, `switch.primer_token_budget` default 8k, tail N=6 turns, summary fallback to local truncation, and
-`backend_switch` transcript marker. Claude→Codex fake-backend integration proves marker + new Codex runtime prompt.
-Details in changelog + Autonomous decisions.
-
-**Subphase 6.6 ✅ — task groups + remaining endpoints + UI.** Added identity/group endpoints, bounded group release,
-liveness pruning, layout group-collapse persistence, grouped card sections with Release group, functional Move-to-group
-and switch-runtime context actions, terminal badges/reveal link, terminal tab attached to the PTY WebSocket, terminal
-launch option via capabilities, and refreshed embedded UI. Details in changelog + Autonomous decisions.
-
-**Subphase 6.7 — next to implement (optional)** (iTerm2/AppleScript driver; techspec §2.2, §3.6, task 6):
-- [ ] iTerm2 `TerminalDriver` implementation via `osascript`.
-- [ ] AppleScript templates rendered with `text/template` for create-tab, set-appearance, write-text.
-- [ ] Escaping + shell-quote helper with tests for quotes/backslashes/newlines/argv shell-quoting.
-- [ ] Capability probe wiring; explicit unavailable `driver:"iterm2"` returns `422 terminal_unavailable` with reason.
-- **Checkpoint:** `go build ./...` + `go test ./...` + `go test -tags sqlite_fts5 ./...` (Go-only unless UI driver picker changes).
-- **Resume note:** xterm/tmux drivers and capabilities are green. 6.7 is fully skippable; if skipped, roll Phase 6 complete and start Phase 7 (selected candidate: OpenHands & OpenCode backends — [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md), subphase plan §7).
+**Phase 7 — next to implement (7.1).** OpenHands & OpenCode backends. Read
+[`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) §"Subphase plan" on
+ORIENT and expand 7.1's granular steps here before building.
 
 ---
 
@@ -240,10 +201,12 @@ current code (`permission.go` captures `turnSeq`); the permission-resolution rac
   append). Add a per-agent request token or max-seq compare before `setTranscript`.
 - **ADVISORY — archive search UI hardcodes limit 50 / offset 0** (`ArchivePage.tsx:72`) while
   displaying the true total; matches past 50 are unreachable. Add pagination.
-- **ADVISORY — tmux driver is implemented+tested but unselectable, while `/api/capabilities`
-  advertises `tmux:true`** (no `driver` field in launch/switch API or UI; `DriverAvailable`'s 422
-  is unreachable). Wire a driver field or stop advertising. Related: `config.terminal.max_tabs` /
-  `429 terminal_tab_limit` (techspec §9) is entirely unimplemented and untracked — implement or
+- **ADVISORY — terminal `driver` field is wired at the API/runtime level but not in the UI, and
+  `config.terminal.max_tabs` is unimplemented.** 6.7 added the `driver` field to launch + switch
+  (validated → `422 terminal_unavailable`, `DriverAvailable`'s 422 now reachable) and per-agent
+  runtime dispatch, so tmux/iterm2 are selectable via the API. Still open: the New-Agent modal /
+  switch dialog have no driver picker (UI always sends the default), and `config.terminal.max_tabs`
+  / `429 terminal_tab_limit` (techspec §9) is entirely unimplemented and untracked — implement or
   record as a deviation.
 - **ADVISORY — liveness/identity checks trust bare PIDs.** The pidfile (`cli/pidfile.go:83-95`)
   and the running-row sweeps (`server/reconcile.go:202-207`, `runtime/reconcile.go:43-50`) use
@@ -314,6 +277,33 @@ current code (`permission.go` captures `turnSeq`); the permission-resolution rac
 ## Autonomous decisions (please review)
 
 > Resolved without stopping; the human should still see them. Remove once acknowledged (workflow §3, §5).
+
+- **NEW (6.7): went beyond the checkpoint's minimum — full driver-selection plumbing, not just the 422 gate.**
+  6.7's "done when" only strictly required an explicit unavailable `driver:"iterm2"` request to return `422`. I also
+  plumbed the `driver` field through launch + switch into per-agent runtime dispatch (`runtime.LaunchSpec.Driver`;
+  `Runtime.driverFor`; each `termAgent` carries the driver that launched it, so `WriteText`/`CloseTab` dispatch
+  correctly). **Why a judgment call:** accepting a `driver` field but ignoring it (always launching xterm) would be a
+  new silent lie — exactly the standing advisory that tmux was "advertised but unselectable." Doing it properly makes an
+  accepted non-xterm driver actually launch, and closes the API/runtime half of that advisory as a side effect.
+  **Tradeoff:** tmux is now launchable via the public API (previously only via the `SetDriver` test override), and the
+  runtime holds a driver per agent instead of one global driver. The UI still sends no driver (no picker) and
+  `config.terminal.max_tabs` is still unimplemented — both remain in the trimmed advisory. **To reverse:** revert to a
+  single `r.driver` and validate-only in the server (drop `spec.Driver` threading + `driverFor`).
+- **NEW (6.7, GATED): iTerm2 AppleScript templates/verbs are unverified against a live iTerm2.** The escaping
+  (`escapeAppleScript`: `\`→`\\`, `"`→`\"`, newlines→`" & return & "`), the shell-quote layer (`shellJoin`/`shellQuote`,
+  reused from tmux), the color scaling (0–255→0–65535), template rendering, and the capability gating ARE tested. The
+  live AppleScript semantics (`create window`, `session id` addressing, `write text`, `close`) are NOT — same
+  credential-gated class as every other Phase 6 terminal-CLI behavior (real CLI login, Codex hooks, `--settings`).
+  `osascript` runs via `osascript -` (script over stdin) with a 4s timeout + stderr capture. On non-macOS the driver is
+  never invoked (the `422` gate rejects it first). **To reverse/refine:** adjust the three templates in
+  `applescript.go` once verified on a real macOS + iTerm2 host.
+- **NEW (6.7): iTerm2 background color is left unset (title only).** `TabSpec.Color` is populated from nothing —
+  `runtime.LaunchSpec` carries no project accent color, so `set-appearance` sets only the session name and skips
+  `background color` (driver.go already documents "zero value means unset"). Threading `project.color` through the
+  LaunchSpec was out of 6.7 scope. **To reverse/complete:** add the project color to `LaunchSpec`→`TabSpec.Color`; the
+  scaling + the color-gated template branch already handle the rest. Also minor: switch **rollback** re-launches the
+  previous identity under the default (xterm) driver, since the prior driver isn't persisted in the session snapshot —
+  correct for the only shipped default, revisit if a non-xterm driver must survive a rollback.
 
 - **NEW (review fix, finding 4 — terminal LaunchSpec contract): hybrid fix — HONOR claude terminal fields, REJECT
   codex terminal with 422.** The finding offered two arms (honor via adapter, or 422-reject); I split by backend
@@ -618,6 +608,19 @@ current code (`permission.go` captures `turnSeq`); the permission-resolution rac
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
+
+- 2026-07-09 — **phase 6.7: iTerm2/AppleScript driver + driver-selection plumbing — green (Phase 6 complete).**
+  New `internal/runtime/terminal/iterm2.go` (`iterm2Driver` via `osascript -`, 4s timeout + stderr capture, best-effort
+  title/color) + `applescript.go` (three `text/template` templates; mandatory `escapeAppleScript` + reused `shellJoin`
+  shell-quote layer; 0–255→0–65535 color scale). `probeITerm2` now advertises the driver on macOS+iTerm. Wired a
+  `driver` field through launch (`launchRequest`) + switch (`switchRuntimeRequest`) → `runtime.LaunchSpec.Driver` →
+  per-agent runtime dispatch (`Runtime.driverFor`, `termAgent.driver`), with `validateTerminalDriver` returning `422
+  terminal_unavailable` + reason for any unavailable driver (closes the API/runtime half of the "tmux unselectable"
+  advisory). Tests: `applescript_test.go` (escaping quotes/backslashes/newlines, argv shell-quoting, color scale,
+  injection-defeat, template rendering), `TestTerminalDriverUnavailableRejected` (launch+switch 422+reason), updated
+  `TestProbeXtermAlwaysAvailable` (GOOS-guarded iterm2 contract). Green: `go build ./...`, `go test ./...`, `go test
+  -tags sqlite_fts5 ./...`, `go test -race ./internal/runtime/terminal`. GATED: live AppleScript semantics unverified
+  (see Autonomous decisions).
 
 - 2026-07-07 — **review fix: advisory batch (inbox newest-N + CLI operand validation) — green.** Two ADVISORY,
   both confirmed real. (1) Invariant §7: the inbox endpoint returned the OLDEST N when the mailbox exceeded

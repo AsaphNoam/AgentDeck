@@ -8,6 +8,34 @@ import (
 	"github.com/coder/websocket"
 )
 
+// validateTerminalDriver returns a 422 terminal_unavailable APIError when an
+// explicitly requested terminal driver is unavailable on this host (§3.5). The
+// empty driver (the always-available xterm default) passes. Used by both the
+// launch and switch-runtime paths so the two agree on driver honesty.
+func validateTerminalDriver(driver string) *runtime.APIError {
+	caps := terminal.Probe()
+	if caps.DriverAvailable(driver) {
+		return nil
+	}
+	return apiError(runtime.CodeTerminalUnavailable, terminalDriverReason(caps, driver))
+}
+
+// terminalDriverReason returns the UI-facing reason an unavailable driver was
+// rejected, preferring the capability probe's own reason for iterm2 (§3.5).
+func terminalDriverReason(caps terminal.Capabilities, driver string) string {
+	switch driver {
+	case "iterm2":
+		if r := caps.Terminal.Drivers.ITerm2.Reason; r != "" {
+			return r
+		}
+		return "iTerm2 driver is not available on this host"
+	case "tmux":
+		return "tmux is not installed on this host"
+	default:
+		return "unknown terminal driver: " + driver
+	}
+}
+
 // handleCapabilities implements GET /api/capabilities (techspec §8.5): which
 // terminal drivers this host can use. The xterm default is always available, so
 // the terminal interface is never globally disabled; tmux/iTerm2 are reported

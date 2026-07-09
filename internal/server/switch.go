@@ -12,7 +12,6 @@ import (
 	"github.com/agentdeck/agentdeck/internal/backend"
 	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/runtime/terminal"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
@@ -26,6 +25,7 @@ type switchRuntimeRequest struct {
 	Interface string `json:"interface"`
 	Backend   string `json:"backend"`
 	Model     string `json:"model"`
+	Driver    string `json:"driver"` // target terminal driver: ""/"xterm" | "tmux" | "iterm2" (§3.5)
 }
 
 // switchRuntimeResponse is the 200 body (techspec §8.1).
@@ -79,9 +79,11 @@ func (s *Server) handleSwitchRuntime(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError(runtime.CodeInvalidField, "invalid interface: "+target.Interface))
 		return
 	}
-	if target.Interface == "terminal" && !terminal.Probe().DriverAvailable("xterm") {
-		writeAPIError(w, apiError(runtime.CodeTerminalUnavailable, "no terminal driver available on this host"))
-		return
+	if target.Interface == "terminal" {
+		if ae := validateTerminalDriver(req.Driver); ae != nil {
+			writeAPIError(w, ae)
+			return
+		}
 	}
 
 	// Per-agent switch lock (§5.4).
@@ -157,6 +159,10 @@ func (s *Server) handleSwitchRuntime(w http.ResponseWriter, r *http.Request) {
 		s.rollbackSwitch(r.Context(), w, agent, prev.SessionID, errors.New(ae.Message))
 		return
 	}
+	// Carry the requested terminal driver into the resume (validated above); chat
+	// targets ignore it. Rollback re-launches the previous identity under the
+	// default driver, which is correct for the only shipped terminal driver.
+	spec.Driver = req.Driver
 	if usePrimer {
 		primer, err := s.buildHistoryPrimer(r.Context(), spec, s.switchPrimerTokenBudget())
 		if err != nil {
