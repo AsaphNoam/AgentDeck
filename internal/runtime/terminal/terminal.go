@@ -26,7 +26,7 @@ const defaultInitialIdleDelay = 500 * time.Millisecond
 // a turn — only the initial idle (race-guarded) and a terminal done on Stop.
 type Runtime struct {
 	store  *state.Store
-	driver TerminalDriver
+	driver TerminalDriver // explicit override (SetDriver/tests); nil → resolve per-spec.Driver
 
 	command string   // launch binary OVERRIDE (tests); empty → interactiveBinary()
 	cmdArgs []string // override args
@@ -51,6 +51,7 @@ type Runtime struct {
 type termAgent struct {
 	agentID string
 	tab     *Tab
+	driver  TerminalDriver // the driver that launched this tab; WriteText/CloseTab dispatch here
 	hub     *rt.Hub
 	ptyHub  *ptyHub             // per-agent PTY broadcast hub (nil for non-PTY drivers, e.g. tmux)
 	writer  rt.TranscriptWriter // durable transcript handle; nil when persistence is off
@@ -96,19 +97,42 @@ func (a *termAgent) isStopped() bool {
 	return a.stopped
 }
 
-// New builds the terminal runtime bound to the state store, defaulting to the
-// xterm/PTY driver.
+// New builds the terminal runtime bound to the state store. It resolves the
+// per-launch driver from spec.Driver (defaulting to the cross-platform xterm/PTY
+// driver) unless an explicit override is installed via SetDriver.
 func New(s *state.Store) *Runtime {
 	return &Runtime{
 		store:            s,
-		driver:           xtermDriver{},
 		initialIdleDelay: defaultInitialIdleDelay,
 		agents:           map[string]*termAgent{},
 	}
 }
 
-// SetDriver overrides the terminal driver (e.g. tmux, or a fake in tests).
+// SetDriver installs an explicit driver override used for EVERY launch regardless
+// of spec.Driver (a fake in tests, or forcing tmux). Leave it unset in production
+// so each launch resolves its driver from spec.Driver via driverFor.
 func (r *Runtime) SetDriver(d TerminalDriver) { r.driver = d }
+
+// driverFor resolves the TerminalDriver for a launch: the explicit SetDriver
+// override wins; otherwise dispatch by name. The server validates availability
+// against the capability probe (§3.5) before launch, so an unavailable optional
+// driver never reaches here — an unknown name is a programming error, surfaced as
+// a launch failure rather than a silent xterm fallback.
+func (r *Runtime) driverFor(name string) (TerminalDriver, error) {
+	if r.driver != nil {
+		return r.driver, nil
+	}
+	switch name {
+	case "", "xterm":
+		return xtermDriver{}, nil
+	case "tmux":
+		return tmuxDriver{}, nil
+	case "iterm2":
+		return iterm2Driver{}, nil
+	default:
+		return nil, fmt.Errorf("terminal: unknown driver %q", name)
+	}
+}
 
 // SetCommand overrides the launch binary + args (tests point at a harmless
 // process; production resolves the interactive CLI per backend).
@@ -167,16 +191,20 @@ func (r *Runtime) openPersistence(a *termAgent, spec rt.LaunchSpec, sessionID st
 // Start launches the CLI under the driver, records the running row (tty, driver,
 // driver_ids), and schedules the race-guarded initial idle (§3.1).
 func (r *Runtime) Start(ctx context.Context, spec rt.LaunchSpec) (*rt.Handle, error) {
-	tab, err := r.driver.StartTab(r.tabSpec(spec, false, ""))
+	drv, err := r.driverFor(spec.Driver)
 	if err != nil {
 		return nil, err
 	}
-	a := &termAgent{agentID: spec.Agent.AgentID, tab: tab, hub: rt.NewHub()}
+	tab, err := drv.StartTab(r.tabSpec(spec, false, ""))
+	if err != nil {
+		return nil, err
+	}
+	a := &termAgent{agentID: spec.Agent.AgentID, tab: tab, driver: drv, hub: rt.NewHub()}
 
 	// Open the transcript + upsert the sessions row BEFORE the running row so a
 	// launched terminal agent is a first-class archive/resume citizen (Finding 7).
 	if err := r.openPersistence(a, spec, ""); err != nil {
-		_ = r.driver.CloseTab(tab)
+		_ = drv.CloseTab(tab)
 		return nil, err
 	}
 
@@ -192,7 +220,7 @@ func (r *Runtime) Start(ctx context.Context, spec rt.LaunchSpec) (*rt.Handle, er
 	}); err != nil {
 		a.closePTYHub()
 		a.closePersistence()
-		_ = r.driver.CloseTab(tab)
+		_ = drv.CloseTab(tab)
 		return nil, fmt.Errorf("terminal: write running: %w", err)
 	}
 
@@ -208,17 +236,21 @@ func (r *Runtime) Start(ctx context.Context, spec rt.LaunchSpec) (*rt.Handle, er
 // Resume re-launches under the driver in resume form on the same agent_id. Used
 // by switch-runtime (6.4) and Phase 4 archive resume when the target is terminal.
 func (r *Runtime) Resume(ctx context.Context, spec rt.LaunchSpec, sessionID string) (*rt.Handle, error) {
-	tab, err := r.driver.StartTab(r.tabSpec(spec, true, sessionID))
+	drv, err := r.driverFor(spec.Driver)
 	if err != nil {
 		return nil, err
 	}
-	a := &termAgent{agentID: spec.Agent.AgentID, tab: tab, hub: rt.NewHub()}
+	tab, err := drv.StartTab(r.tabSpec(spec, true, sessionID))
+	if err != nil {
+		return nil, err
+	}
+	a := &termAgent{agentID: spec.Agent.AgentID, tab: tab, driver: drv, hub: rt.NewHub()}
 
 	// Re-open the transcript in append mode and re-upsert the sessions row with the
 	// resumed session_id, mirroring the chat runtime so archive resume of a terminal
 	// agent stays a first-class citizen (Finding 7).
 	if err := r.openPersistence(a, spec, sessionID); err != nil {
-		_ = r.driver.CloseTab(tab)
+		_ = drv.CloseTab(tab)
 		return nil, err
 	}
 
@@ -233,7 +265,7 @@ func (r *Runtime) Resume(ctx context.Context, spec rt.LaunchSpec, sessionID stri
 	}); err != nil {
 		a.closePTYHub()
 		a.closePersistence()
-		_ = r.driver.CloseTab(tab)
+		_ = drv.CloseTab(tab)
 		return nil, fmt.Errorf("terminal: write running: %w", err)
 	}
 
@@ -253,7 +285,7 @@ func (r *Runtime) SendPrompt(ctx context.Context, agentID, text string) error {
 	if err != nil {
 		return err
 	}
-	return r.driver.WriteText(a.tab, text)
+	return a.driver.WriteText(a.tab, text)
 }
 
 // Cancel sends SIGINT to the agent's process group (§3.1). Reports interrupted
@@ -304,7 +336,7 @@ func (r *Runtime) Stop(ctx context.Context, agentID string) error {
 	// on the master close — closePTYHub blocks nothing, but readLoop unblocks and
 	// tears down its subscribers with no leak.
 	a.closePTYHub()
-	_ = r.driver.CloseTab(a.tab)
+	_ = a.driver.CloseTab(a.tab)
 	a.closePersistence()
 	_ = r.store.DeleteRunning(agentID)
 	r.setDone(agentID)
@@ -350,7 +382,7 @@ func (r *Runtime) CheckMessages(ctx context.Context, pid int) error {
 	if err != nil {
 		return err
 	}
-	return r.driver.WriteText(a.tab, "You have new messages. Call the check_messages tool and handle them.")
+	return a.driver.WriteText(a.tab, "You have new messages. Call the check_messages tool and handle them.")
 }
 
 // Permission has no terminal analogue: an approval prompt surfaces as

@@ -26,6 +26,7 @@ type launchRequest struct {
 	Backend   string `json:"backend"`
 	Model     string `json:"model"`
 	Interface string `json:"interface"`
+	Driver    string `json:"driver"` // terminal driver: ""/"xterm" | "tmux" | "iterm2" (§3.5)
 	Name      string `json:"name"`
 	Group     string `json:"group"`
 }
@@ -161,6 +162,15 @@ func (s *Server) composeLaunch(req launchRequest) (runtime.LaunchSpec, state.Age
 	if iface == "terminal" && backend.Type == "codex-acp" {
 		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeTerminalUnavailable, "codex terminal is not supported (no verified hook-registration or CLI-flag path)")
 	}
+	// An explicitly-requested terminal driver must be available on this host; an
+	// unavailable optional driver (e.g. iterm2 off macOS) is a 422 with a reason so
+	// the UI can disable it (§3.5). Chat launches ignore the driver field.
+	driver := req.Driver
+	if iface == "terminal" {
+		if ae := validateTerminalDriver(driver); ae != nil {
+			return runtime.LaunchSpec{}, state.Agent{}, ae
+		}
+	}
 
 	cwd, err := config.ExpandTilde(project.Cwd)
 	if err != nil {
@@ -206,6 +216,7 @@ func (s *Server) composeLaunch(req launchRequest) (runtime.LaunchSpec, state.Age
 		SystemPrompt: joinSystemPrompt(project.ContextPrompt, role.SystemPrompt),
 		BackendType:  backend.Type,
 		ModelID:      model.Model,
+		Driver:       driver,
 		Env:          composeEnv(os.Environ(), backend.Env, model.Env, hookEnv),
 		SkipPerms:    resolveSkip(s.cfg.SkipPermissions, role.SkipPermissions),
 		HookToken:    token,
