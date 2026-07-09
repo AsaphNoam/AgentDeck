@@ -16,6 +16,7 @@ import (
 	"github.com/agentdeck/agentdeck/internal/hooks"
 	"github.com/agentdeck/agentdeck/internal/messaging"
 	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/agentdeck/agentdeck/internal/runtime/terminal"
 	"github.com/agentdeck/agentdeck/internal/transcript"
 )
 
@@ -576,6 +577,62 @@ func TestCodexTerminalRejected(t *testing.T) {
 	if !strings.Contains(string(body), "terminal_unavailable") {
 		t.Fatalf("switch codex terminal error = %s, want terminal_unavailable", body)
 	}
+}
+
+// TestTerminalDriverUnavailableRejected covers the 6.7 capability-probe wiring:
+// an explicit terminal driver the host does not advertise (iterm2 off macOS) is
+// rejected with 422 terminal_unavailable AND a non-empty reason for the UI, on
+// both the launch and switch paths (§3.5). The default xterm driver is never
+// affected (it is always available).
+func TestTerminalDriverUnavailableRejected(t *testing.T) {
+	_, ts := switchTestServer(t)
+
+	// iTerm2 is the spec's example (unavailable off macOS). On the rare host where
+	// it IS available, fall back to a name that is never advertised so the test
+	// stays host-independent.
+	driver := "iterm2"
+	if terminal.Probe().DriverAvailable("iterm2") {
+		driver = "definitely-not-a-real-driver"
+	}
+
+	assertTerminalUnavailable := func(t *testing.T, body []byte, where string) {
+		t.Helper()
+		var env struct {
+			Error struct {
+				Code    string `json:"code"`
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(body, &env); err != nil {
+			t.Fatalf("%s: bad error envelope %s: %v", where, body, err)
+		}
+		if env.Error.Code != "terminal_unavailable" {
+			t.Fatalf("%s: error code = %q, want terminal_unavailable (%s)", where, env.Error.Code, body)
+		}
+		if strings.TrimSpace(env.Error.Message) == "" {
+			t.Fatalf("%s: terminal_unavailable must carry a reason (%s)", where, body)
+		}
+	}
+
+	// Launch: interface=terminal + unavailable driver → 422 + reason.
+	resp, body := post(t, ts.URL+"/api/sessions", map[string]string{
+		"role": "impl", "project": "tmpproj", "interface": "terminal", "driver": driver,
+	})
+	if resp.StatusCode != http.StatusUnprocessableEntity {
+		t.Fatalf("launch unavailable-driver status = %d, want 422: %s", resp.StatusCode, body)
+	}
+	assertTerminalUnavailable(t, body, "launch")
+
+	// Switch: a live chat agent → terminal with the unavailable driver → same 422
+	// (rejected before any teardown, so the agent stays a live chat agent).
+	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+	resp, body = post(t, ts.URL+"/api/sessions/"+id+"/switch-runtime", map[string]string{
+		"interface": "terminal", "driver": driver,
+	})
+	if resp.StatusCode != http.StatusUnprocessableEntity {
+		t.Fatalf("switch unavailable-driver status = %d, want 422: %s", resp.StatusCode, body)
+	}
+	assertTerminalUnavailable(t, body, "switch")
 }
 
 func containsStr(ss []string, want string) bool {
