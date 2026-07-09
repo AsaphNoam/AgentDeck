@@ -280,6 +280,30 @@ external `exec.Command` for this class.
 
 ---
 
+## 13. Every referenced className must have a defined selector (the test suite can't see CSS)
+
+**Rule:** the UI styles itself with hand-written global CSS (`ui/src/styles/global.css`, tokens in
+`tokens.css`) — no Tailwind, no CSS modules. A `className="x"` with **no** matching selector renders
+as unstyled default-browser markup. Testing Library never evaluates CSS and MSW/Vitest render into
+jsdom, so a whole surface can reference dozens of undefined classes and every unit test stays green;
+the breakage is only visible in a real browser. Any TSX className string literal must have a
+selector in a stylesheet (utility/state classes applied via template literals are the exception — they
+carry their own defined selectors).
+
+Paid for by:
+- The first-run onboarding wizard referenced `.dialog-overlay`/`.wizard-*`/`.form-field` that were
+  never defined → unstyled soup on first launch (`353e940`).
+- **Regression (2026-07-09 usability review):** the same class re-escaped onto the entire
+  Settings/config surface — `.settings-tabs*`, `.config-*`, `.backend-card`, `.model-row`,
+  `.env-row`, `.string-list`, `.btn-danger/-link/-sm` referenced, defined nowhere; tabs render as
+  default buttons and the Backends editor's controls overlap.
+
+**Canonical guard:** the `/usability-review` S2 sweep three-ways the referenced-className set against
+defined selectors (both directions) and every journey renders the surface in a real browser and
+checks computed styles / stylesheet rule count, not just DOM presence.
+
+---
+
 ## Canonical helpers registry (reuse, don't re-derive)
 
 | Helper | Where | Use for |
