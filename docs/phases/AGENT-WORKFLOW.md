@@ -219,6 +219,15 @@ The §9 fix agent **deletes** a bullet once it has resolved the finding (fixed +
 as a validated false positive, recording the outcome in the changelog + its summary (§5) — the section
 holds only open findings.
 
+### Companion action: the usability review
+
+This §8 review is a **static diff review** — it structurally cannot see what only running the app
+reveals (fresh-install crashes, unstyled surfaces, real-CLI variance; all three escaped every diff
+review once). The separate **behavior-driven usability review** — build the real binary, drive
+every user journey on fresh/seeded/lived-in fixtures — has its own spec:
+[`USABILITY-REVIEW.md`](USABILITY-REVIEW.md) (Claude Code: `/usability-review`). Its findings land
+in the same `## Review findings` shape above, so §9 consumes them unchanged.
+
 ---
 
 ## 9. Fix action — validate, then fix the review findings
