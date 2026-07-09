@@ -38,7 +38,7 @@ type BackendsConfig struct {
 // Backend is one provider entry. Exactly one backend should have Default == true.
 type Backend struct {
 	Name         string            `json:"name"`
-	Type         string            `json:"type"`              // "claude-acp" | "codex-acp"
+	Type         string            `json:"type"`              // "claude-acp" | "codex-acp" | "opencode-acp" | "openhands-acp"
 	Default      bool              `json:"default,omitempty"` // exactly one backend default
 	DefaultModel string            `json:"default_model"`
 	Models       map[string]Model  `json:"models"`        // keyed by model id

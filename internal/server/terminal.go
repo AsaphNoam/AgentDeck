@@ -8,6 +8,22 @@ import (
 	"github.com/coder/websocket"
 )
 
+// terminalSupported reports whether a backend type can run under the terminal
+// interface. Only claude-acp has a verified interactive-CLI hook-registration
+// path; codex/opencode/openhands would launch a statusless terminal agent that
+// silently drops the composed spec, so the launch/resume/switch composers reject
+// terminal for them with 422 terminal_unavailable (§6 capability honesty). This
+// is the single source of that gate — all three composers call it.
+func terminalSupported(backendType string) bool {
+	return backendType == "claude-acp"
+}
+
+// terminalUnsupportedReason is the UI-facing reason a backend type cannot run in
+// the terminal interface, used by all three composers' terminal gate.
+func terminalUnsupportedReason(backendType string) string {
+	return backendType + " terminal is not supported (no verified hook-registration or CLI-flag path; only claude-acp has one)"
+}
+
 // validateTerminalDriver returns a 422 terminal_unavailable APIError when an
 // explicitly requested terminal driver is unavailable on this host (§3.5). The
 // empty driver (the always-available xterm default) passes. Used by both the

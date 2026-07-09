@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agentdeck/agentdeck/internal/backend"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
@@ -167,6 +168,125 @@ func TestChatCodexBackendEndToEnd(t *testing.T) {
 	}
 	if _, err := c.store.ReadRunning(rh.AgentID); err != nil {
 		t.Fatalf("running row missing after resume: %v", err)
+	}
+}
+
+// TestOpenCodeChatE2E and TestOpenHandsChatE2E exercise the Phase 7 backends
+// through the chat runtime end-to-end (launch → prompt → stream → stop → native
+// resume). Like the codex e2e, fakeacp stands in for the real CLI (the
+// credentialed live run is gated, §7.4); the only difference from claude is the
+// per-backend adapter, so a green run proves the adapters ride the shared
+// runtime with no runtime branch.
+func TestOpenCodeChatE2E(t *testing.T) {
+	runNewBackendChatE2E(t, "opencode-acp", "opencode", "anthropic/claude-sonnet-4-5")
+}
+func TestOpenHandsChatE2E(t *testing.T) {
+	runNewBackendChatE2E(t, "openhands-acp", "openhands", "anthropic/claude-sonnet-4-5")
+}
+
+func runNewBackendChatE2E(t *testing.T, backendType, backendID, modelID string) {
+	t.Helper()
+	c, spec := newChatTest(t, "stream_text")
+	ctx := context.Background()
+	spec.BackendType = backendType
+	spec.Agent.Backend = backendID
+	spec.ModelID = modelID
+
+	h, err := c.Start(ctx, spec)
+	if err != nil {
+		t.Fatalf("%s Start: %v", backendType, err)
+	}
+	if st, err := c.store.ReadStatus(h.AgentID); err != nil || st.State != "idle" {
+		t.Fatalf("%s post-start status = %+v err=%v, want idle", backendType, st, err)
+	}
+
+	ch, unsub, err := c.Subscribe(h.AgentID)
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+	if err := c.SendPrompt(ctx, h.AgentID, "hello"); err != nil {
+		t.Fatalf("SendPrompt: %v", err)
+	}
+	evs := drainTurn(t, ch)
+	if evs[len(evs)-1].Type != EvTurnEnd {
+		t.Fatalf("%s turn last event = %q, want turn_end", backendType, evs[len(evs)-1].Type)
+	}
+	var texts int
+	for _, e := range evs {
+		if e.Type == EvAssistantText {
+			texts++
+		}
+	}
+	if texts < 1 {
+		t.Fatalf("%s turn produced no assistant text", backendType)
+	}
+	unsub()
+
+	if err := c.Stop(ctx, h.AgentID); err != nil {
+		t.Fatalf("%s Stop: %v", backendType, err)
+	}
+	if _, err := c.store.ReadRunning(h.AgentID); err == nil {
+		t.Fatalf("running row should be gone after Stop")
+	}
+
+	// Native resume: same agent_id, fresh running row.
+	spec.LastSessionID = h.SessionID
+	rh, err := c.Resume(ctx, spec, h.SessionID)
+	if err != nil {
+		t.Fatalf("%s Resume: %v", backendType, err)
+	}
+	t.Cleanup(func() { c.Stop(ctx, rh.AgentID) })
+	if rh.AgentID != h.AgentID {
+		t.Fatalf("%s resume agent_id = %q, want %q (stable)", backendType, rh.AgentID, h.AgentID)
+	}
+	if _, err := c.store.ReadRunning(rh.AgentID); err != nil {
+		t.Fatalf("%s running row missing after resume: %v", backendType, err)
+	}
+}
+
+// TestSkipPermissionsEnvOpenCode proves the yolo mapping reaches the spawned
+// process env: OpenCode gets OPENCODE_CONFIG_CONTENT only when skip=true, and
+// OpenHands always carries LLM_MODEL (model-via-env). Asserted on the real
+// exec.Cmd spawnCmd builds, so the adapter→runtime wiring is covered end to end.
+func TestSkipPermissionsEnvOpenCode(t *testing.T) {
+	st, err := state.Open(t.TempDir())
+	if err != nil {
+		t.Fatalf("state.Open: %v", err)
+	}
+	t.Cleanup(func() { st.Close() })
+	c := NewChatRuntime(st)
+
+	hasEnv := func(env []string, key string) (string, bool) {
+		for _, kv := range env {
+			if strings.HasPrefix(kv, key+"=") {
+				return strings.TrimPrefix(kv, key+"="), true
+			}
+		}
+		return "", false
+	}
+
+	ocAd, _ := backend.For("opencode-acp")
+	base := LaunchSpec{Cwd: t.TempDir(), ModelID: "anthropic/claude-sonnet-4-5", Env: []string{"HOME=/x"}}
+
+	// skip=false → no OPENCODE_CONFIG_CONTENT.
+	if _, ok := hasEnv(c.spawnCmd(ocAd, base).Env, "OPENCODE_CONFIG_CONTENT"); ok {
+		t.Fatal("opencode skip=false must not set OPENCODE_CONFIG_CONTENT")
+	}
+	// skip=true → yolo config injected.
+	yolo := base
+	yolo.SkipPerms = true
+	v, ok := hasEnv(c.spawnCmd(ocAd, yolo).Env, "OPENCODE_CONFIG_CONTENT")
+	if !ok || !strings.Contains(v, `"permission"`) {
+		t.Fatalf("opencode skip=true OPENCODE_CONFIG_CONTENT = %q, want a permission config", v)
+	}
+
+	// OpenHands: LLM_MODEL carries the model regardless of skip; a shell LLM_MODEL
+	// is stripped so the adapter value is authoritative.
+	ohAd, _ := backend.For("openhands-acp")
+	ohSpec := LaunchSpec{Cwd: t.TempDir(), ModelID: "anthropic/claude-sonnet-4-5", Env: []string{"HOME=/x", "LLM_MODEL=shell-leak"}}
+	got, ok := hasEnv(c.spawnCmd(ohAd, ohSpec).Env, "LLM_MODEL")
+	if !ok || got != "anthropic/claude-sonnet-4-5" {
+		t.Fatalf("openhands LLM_MODEL = %q (ok=%v), want the adapter model, not the shell leak", got, ok)
 	}
 }
 

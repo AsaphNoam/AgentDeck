@@ -104,4 +104,19 @@ describe("BackendStep", () => {
 
     await waitFor(() => expect(onDone).toHaveBeenCalled());
   });
+
+  it("offers all four backend types and shows LLM fields for OpenHands", async () => {
+    renderWithQuery(<BackendStep onDone={vi.fn()} />);
+    await screen.findByDisplayValue("claude-sonnet-4-6");
+
+    const typeSelect = screen.getByRole("combobox") as HTMLSelectElement;
+    const values = Array.from(typeSelect.options).map((o) => o.value);
+    expect(values).toEqual(["claude-acp", "codex-acp", "opencode-acp", "openhands-acp"]);
+
+    // No LLM key field until OpenHands is selected.
+    expect(screen.queryByText("LLM API key")).toBeNull();
+    fireEvent.change(typeSelect, { target: { value: "openhands-acp" } });
+    expect(screen.getByText("LLM API key")).toBeInTheDocument();
+    expect(screen.getByText(/LLM base URL/i)).toBeInTheDocument();
+  });
 });

@@ -29,8 +29,10 @@ type Prober interface {
 }
 
 var probers = map[string]Prober{
-	"claude-acp": claudeProber{},
-	"codex-acp":  codexProber{},
+	"claude-acp":    claudeProber{},
+	"codex-acp":     codexProber{},
+	"opencode-acp":  opencodeProber{},
+	"openhands-acp": openhandsProber{},
 }
 
 // Check dispatches to the backend-type-specific prober. Unknown backend types
