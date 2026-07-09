@@ -237,6 +237,46 @@ Paid for by:
 - `.claude/skills` vs `.agents/skills` twin drift ("Codex **or** Codex" — since fixed).
 - Dead-code removal requires a tree-wide call-site check first; soft-cancel to an external peer
   needs a time-bounded escalation tier (grace → SIGINT) distinct from Stop's hard kill.
+- Every className shipped in a component must resolve to a defined selector — `npm run build` and
+  Testing Library are both blind to CSS, so a missing stylesheet is green everywhere and unusable
+  on screen. The onboarding wizard/dialogs shipped referencing `.dialog-overlay`/`.wizard-*`/
+  `.form-field` with no definitions anywhere (`353e940`). The `/usability-review` S2 sweep audits
+  this both directions (referenced-but-undefined, defined-but-unreferenced).
+
+## 11. Cross-boundary serialization contracts: nil marshals to `null`, and mocks must tell the truth
+
+**Rule:** Go nil slices/maps marshal to JSON `null`, not `[]`/`{}`. Any collection field the UI
+iterates must be non-nil at the marshal boundary (initialize with `make`/literal, or
+`append([]T{}, …)` — **never** `append([]T(nil), …)`, which stays nil for empty input), and the UI
+API layer defends with `?? []` regardless. Symmetrically: **test doubles must mirror what the real
+marshaler emits, not the idealized contract** — an MSW mock returning `[]` where the server sends
+`null` makes every UI test pass against a server that doesn't exist.
+
+Paid for by:
+- `layoutFromConfig`/`toConfig` (`internal/server/handlers.go`) built `Order` via
+  `append([]string(nil), l.Order...)` → fresh install served `order: null` →
+  `CardGrid.tsx`/`agentStore.ts` called `.filter`/`.includes` on it → TypeError, dead dashboard on
+  first launch (`353e940`). The MSW fixtures returned `order: []`, so no UI test could see it.
+
+**Canonical patterns:** `append([]T{}, src...)` at marshal boundaries; `?? []` where the UI first
+touches a server collection; when adding a response field, add the null-shape case to the mock.
+
+## 12. External-CLI invocations must tolerate version and environment variance
+
+**Rule:** any `exec.Command` of a user-installed tool (agent CLIs, probers) runs against whatever
+version the user has, not the one the author tested. Optional flags need a detect-and-retry
+fallback; output parsing is defensive (substring vocabulary, not exact format); a tool that can't
+be interrogated reports "unknown"/"skipped", **never** "failed" — a wrongly failed gate blocks the
+user harder than no gate at all.
+
+Paid for by:
+- `internal/backend/credcheck/claude.go` ran `claude auth status --no-color`; older Claude builds
+  don't have `--no-color`, so a logged-in user failed the onboarding credential check (`353e940`).
+  Fix: retry without the flag on `unknown option` (`runClaudeAuthStatus`).
+
+**Canonical pattern:** `runClaudeAuthStatus` (`internal/backend/credcheck/claude.go`) — try with
+optional flags, sniff the error output, retry bare. The `/usability-review` S3 sweep audits every
+external `exec.Command` for this class.
 
 ---
 
