@@ -16,7 +16,7 @@ Claude and Codex taking turns). Do **not** improvise a process — follow the sh
 
 - **GREEN checkpoint = `go build ./...` + `go test ./...` pass** (`+ cd ui && npm run build` if you touched `ui/`). Never record a subphase done or commit on red.
 - **Keep `HANDOFF.md` lean and current** — update after every change; collapse finished subphases/phases (workflow §5). It's the only thing the next agent has.
-- **Commit at every checkpoint directly on `main`** (trunk-based: no per-phase branches, no PRs); don't push unless the human asked.
+- **Commit at every checkpoint directly on `main`** (trunk-based: no per-phase branches, no PRs) and **push to origin when the task completes** — no approval needed; only force-pushes require an explicit human request.
 - **Only stop for real blockers** (workflow §3: unresolvable ambiguity, a checkpoint you can't fix, missing credentials, destructive actions). Write the blocker under `## Blocked on human`, then stop.
 - **Record every judgment call; surface only the few that matter.** If an ambiguity or spec gap forced *you* to make a design/implementation decision (without stopping), record it in full under `## Autonomous decisions (please review)` — the review step peer-reviews these. Promote to the human brief only calls that change user-visible behavior, are costly to reverse, or deviate from spec (workflow §10).
 - **End every session with a human brief.** The human is zoomed out and reads **only** `docs/phases/BRIEFS.md` — not the handoff, not the diff. Prepend a ≤250-word plain-language brief per workflow §10 (TL;DR, architecture re-orientation, decisions with applied defaults, what needs input, next up) and paste the same brief as your end-of-turn message. No walls of text, no unglossed jargon.
@@ -34,7 +34,8 @@ nits, not micro-optimizations). Also **peer-review the pending `## Autonomous de
 the reviewer of record now that the human is zoomed out: endorse each sound entry
 (`— peer-reviewed <date>`) or convert it into a finding. Write **every** finding (both severities,
 tagged) to `## Review findings` in `HANDOFF.md` — that's the contract the fix step reads. Report to
-the human at digest granularity via the brief (workflow §10). No code changes, no commits.
+the human at digest granularity via the brief (workflow §10). No code changes; commit the doc writes
+together on `main` (`docs: review <date> — <scope>`) and push at exit.
 
 ## If you're here to fix the review findings
 

@@ -34,3 +34,5 @@ That's the single source of truth. The reminders below just help you start fast.
    human via the **brief** (workflow §10): a ≤250-word plain-language entry in `docs/phases/BRIEFS.md`
    — what was driven, severity counts, each blocker as one plain sentence, link to the run report —
    pasted as your end-of-turn message. All-PASS journeys are stated in the matrix, not omitted.
+   Commit the doc updates together on `main` (`docs: usability review <date> — findings`) and push
+   at session exit — product code stays untouched.

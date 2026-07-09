@@ -41,7 +41,8 @@ title/keyword (just that one). Otherwise work **all** unresolved findings, **BLO
    changelog entry (fix + the test that covers it) — the section holds only open findings (§5). Commit
    code + `HANDOFF.md` together **directly on `main`** (trunk-based: no branches, no PRs), message
    `review fix: <short title> — green checkpoint`, with a `Co-Authored-By:` trailer naming the model
-   that did the work. Don't push unless the user asked.
+   that did the work. **Push to origin at session exit** — no approval needed; only force-pushes
+   require an explicit human request.
 6. **Stop only for real STOP conditions (§3).** A real finding you can't get green, or whose fix needs
    a human decision/info, is a STOP: leave the bullet as-is, record it under `## Blocked on human`,
    and move to the next finding rather than abandoning the run.

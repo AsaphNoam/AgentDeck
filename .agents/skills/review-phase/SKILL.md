@@ -5,7 +5,9 @@ description: Review the last commit or merged PR on this repo against the AgentD
 
 # Review the last agent's work
 
-You are reviewing another agent's commit or PR — not your own. **Read-only: no code changes, no commits.**
+You are reviewing another agent's commit or PR — not your own. **Read-only toward code: no code
+changes.** Your doc writes (findings, peer-review tags, INVARIANTS, the brief) are committed together
+on `main` (`docs: review <date> — <scope>`) and pushed at session exit — never left as a dirty tree.
 
 Follow the full review protocol in [`docs/phases/AGENT-WORKFLOW.md`](../../../docs/phases/AGENT-WORKFLOW.md) **§8**. That's the single source of truth. The reminders below just help you start fast.
 

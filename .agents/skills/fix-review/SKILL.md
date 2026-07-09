@@ -40,7 +40,8 @@ title/keyword (just that one). Otherwise work **all** unresolved findings, **BLO
 5. **Record + commit per finding.** When green, **delete the finding's bullet** and add a one-line
    changelog entry (fix + the test that covers it) — the section holds only open findings (§5). Commit
    code + `HANDOFF.md` together **directly on `main`** (trunk-based: no branches, no PRs), message
-   `review fix: <short title> — green checkpoint`. Don't push unless the user asked.
+   `review fix: <short title> — green checkpoint`. **Push to origin at session exit** — no approval
+   needed; only force-pushes require an explicit human request.
 6. **Stop only for real STOP conditions (§3).** A real finding you can't get green, or whose fix needs
    a human decision/info, is a STOP: leave the bullet as-is, record it under `## Blocked on human`,
    and move to the next finding rather than abandoning the run.

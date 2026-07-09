@@ -154,7 +154,9 @@ Commits are the recovery anchor across spaced sessions, so the work survives a h
   checkpoint is a commit on `main` — that's the recovery anchor. (Only commit on a red checkpoint never.)
 - At each GREEN checkpoint, commit the code **and** the updated `HANDOFF.md` together.
 - Message: `phase N.M: <subphase title> — green checkpoint`.
-- **Pushing** is a STOP-style action — don't push unless the human has asked for it.
+- **Push to origin `main` when the task completes** — at session exit (§7), after the final green
+  commit; no human approval needed (intermediate pushes are fine too). Only **force-pushes** remain
+  a STOP-style destructive action (§3).
 
 ---
 
@@ -169,16 +171,19 @@ Commits are the recovery anchor across spaced sessions, so the work survives a h
 
 1. Tree at a GREEN checkpoint (or, if cut off mid-step, handoff clearly says what's half-done and how to finish it).
 2. `HANDOFF.md` updated + condensed; `Last GREEN checkpoint` and changelog current.
-3. Committed (if green). **Write the human brief** (§10): prepend it to `BRIEFS.md` and paste the same
-   brief as your end-of-turn message. The brief *is* the summary — do not follow it with a longer
-   technical report.
+3. Committed (if green) and **pushed to origin** (§6). **Write the human brief** (§10): prepend it to
+   `BRIEFS.md` and paste the same brief as your end-of-turn message. The brief *is* the summary — do
+   not follow it with a longer technical report.
 
 ---
 
 ## 8. Review action (separate from the build loop)
 
 Triggered independently (Claude Code: `/review-phase`; Codex: `"Review the last commit per AGENTS.md"`).
-Reviews the other agent's work — not your own. This is a **read-only action**: no code changes, no commits.
+Reviews the other agent's work — not your own. This is **read-only toward code**: no code changes.
+Its doc writes (findings, peer-review tags, `INVARIANTS.md`, the brief) are committed together on
+`main` with a `docs: review <date> — <scope>` message and pushed at session exit (§6) — never left
+as a dirty tree.
 
 ### What to review
 
