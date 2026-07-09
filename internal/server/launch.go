@@ -154,13 +154,12 @@ func (s *Server) composeLaunch(req launchRequest) (runtime.LaunchSpec, state.Age
 	if iface != "chat" && iface != "terminal" {
 		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeValidation, "invalid interface: "+iface)
 	}
-	// Codex terminal is unsupported: the codex interactive CLI has no verified
-	// hook-registration path (so terminal status never flows) and its model/
-	// add_dir/resume flags differ from claude's and are unverified. Reject it
-	// rather than launch a statusless agent that silently drops the composed spec
-	// (§6 capability honesty). Claude terminal is honored in the terminal runtime.
-	if iface == "terminal" && backend.Type == "codex-acp" {
-		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeTerminalUnavailable, "codex terminal is not supported (no verified hook-registration or CLI-flag path)")
+	// Only claude-acp has a verified interactive-CLI hook path; codex/opencode/
+	// openhands terminal launches would be statusless and silently drop the
+	// composed spec, so reject them rather than land them (§6 capability honesty).
+	// Claude terminal is honored in the terminal runtime.
+	if iface == "terminal" && !terminalSupported(backend.Type) {
+		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeTerminalUnavailable, terminalUnsupportedReason(backend.Type))
 	}
 	// An explicitly-requested terminal driver must be available on this host; an
 	// unavailable optional driver (e.g. iterm2 off macOS) is a 422 with a reason so
