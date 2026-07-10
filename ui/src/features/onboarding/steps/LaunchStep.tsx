@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
-import { useRoles, useProjects, useBackends, useLaunchAgent, usePutConfig } from "../../../api/config";
+import { useRoles, useProjects, useBackends, useLaunchAgent, usePutConfig, configErrorMessage } from "../../../api/config";
 import { useSuggestedName } from "../../launch/useSuggestedName";
 
 interface LaunchStepProps {
   onDone: () => void;
+  /** Slug of the project created in ProjectStep. Preferred over the seeded
+   * default so onboarding launches a project whose cwd actually exists. */
+  initialProject?: string;
 }
 
-export function LaunchStep({ onDone }: LaunchStepProps) {
+export function LaunchStep({ onDone, initialProject }: LaunchStepProps) {
   const { data: rolesData } = useRoles();
   const { data: projectsData } = useProjects();
   const { data: backendsData } = useBackends();
@@ -22,7 +25,7 @@ export function LaunchStep({ onDone }: LaunchStepProps) {
     "";
 
   const defaultRole = roleEntries.find(([id]) => id === "implementer")?.[0] ?? roleEntries[0]?.[0] ?? "";
-  const defaultProject = projectEntries[0]?.[0] ?? "";
+  const defaultProject = initialProject ?? projectEntries[0]?.[0] ?? "";
 
   const [role, setRole] = useState(defaultRole);
   const [project, setProject] = useState(defaultProject);
@@ -36,8 +39,10 @@ export function LaunchStep({ onDone }: LaunchStepProps) {
   }, [roleEntries.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!project && projectEntries.length > 0) setProject(projectEntries[0][0]);
-  }, [projectEntries.length]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (project) return;
+    if (initialProject) setProject(initialProject);
+    else if (projectEntries.length > 0) setProject(projectEntries[0][0]);
+  }, [projectEntries.length, initialProject]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLaunch = () => {
     setError(null);
@@ -50,7 +55,7 @@ export function LaunchStep({ onDone }: LaunchStepProps) {
             onError: () => onDone(), // still dismiss even if config write fails
           });
         },
-        onError: (e) => setError(String(e)),
+        onError: (e) => setError(configErrorMessage(e)),
       },
     );
   };

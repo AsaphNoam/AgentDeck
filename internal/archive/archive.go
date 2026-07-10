@@ -152,7 +152,7 @@ func activeWhere(active *bool, prefix string) (string, []any) {
 }
 
 func scanResults(rows *sql.Rows) ([]Result, error) {
-	var out []Result
+	out := make([]Result, 0)
 	for rows.Next() {
 		var r Result
 		var active int

@@ -220,6 +220,12 @@ func (s *Server) handleCheckMessages(_ context.Context, req *mcp.CallToolRequest
 	if err != nil {
 		return storeUnavailable(err)
 	}
+	// When this check actually mutated read/delete state, refresh the recipient
+	// so its unread_messages badge reflects the new count (otherwise the badge,
+	// bumped by send_message, never clears).
+	if (markRead || deleteAfter) && len(msgs) > 0 {
+		s.messagesRead(self)
+	}
 	return jsonResult(map[string]any{
 		"messages":           out,
 		"remaining":          remaining,

@@ -55,9 +55,9 @@ function markResolved(
 // which is never rendered on its own). Live append folds incrementally; a REST
 // refetch / archive reload replays the whole list, so it must fold the same way
 // or a resolved request would render as still-pending.
-export function foldTranscript(raw: TranscriptEvent[]): TranscriptEvent[] {
+export function foldTranscript(raw: TranscriptEvent[] | null | undefined): TranscriptEvent[] {
   const out: TranscriptEvent[] = [];
-  for (const r of raw) {
+  for (const r of raw ?? []) {
     const event = normalizeEvent(r);
     if (kindOf(event) === "permission_resolved") {
       const toolCallId = String(event.tool_call_id ?? "");

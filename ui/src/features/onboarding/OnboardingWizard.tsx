@@ -18,6 +18,7 @@ interface OnboardingWizardProps {
 
 export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
   const [step, setStep] = useState(() => initialStep(steps));
+  const [createdProject, setCreatedProject] = useState<string | undefined>(undefined);
 
   const advance = () => setStep((s) => Math.min(s + 1, 2));
 
@@ -43,8 +44,8 @@ export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
             ))}
           </div>
           {step === 0 && <BackendStep onDone={advance} />}
-          {step === 1 && <ProjectStep onDone={advance} />}
-          {step === 2 && <LaunchStep onDone={onComplete} />}
+          {step === 1 && <ProjectStep onDone={(projectId) => { setCreatedProject(projectId); advance(); }} />}
+          {step === 2 && <LaunchStep onDone={onComplete} initialProject={createdProject} />}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

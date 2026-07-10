@@ -33,6 +33,7 @@ type Server struct {
 
 	onBudgetExceeded  func(agentID, turnID string, used int)
 	onMessageInserted func(fromAgentID, toAgentID string)
+	onMessagesRead    func(agentID string)
 
 	mcp     *mcp.Server
 	handler http.Handler
@@ -62,6 +63,24 @@ func (s *Server) messageInserted(fromAgentID, toAgentID string) {
 	s.mu.RUnlock()
 	if fn != nil {
 		fn(fromAgentID, toAgentID)
+	}
+}
+
+// SetMessagesReadSink wires check_messages read/delete to a recipient state
+// refresh so the unread_messages badge clears the moment mail is read. Without
+// it the send path bumps the badge but nothing ever recomputes it back down.
+func (s *Server) SetMessagesReadSink(fn func(agentID string)) {
+	s.mu.Lock()
+	s.onMessagesRead = fn
+	s.mu.Unlock()
+}
+
+func (s *Server) messagesRead(agentID string) {
+	s.mu.RLock()
+	fn := s.onMessagesRead
+	s.mu.RUnlock()
+	if fn != nil {
+		fn(agentID)
 	}
 }
 

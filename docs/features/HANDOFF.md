@@ -11,7 +11,7 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
 - **Active phase:** 7 — Additional features: OpenHands & OpenCode backends (Phase 6 complete ✅)
 - **Active subphase:** 7.4 (next) — GATED live acceptance, **blocked on human** (needs `opencode`+`openhands` CLIs + provider keys); 7.1–7.3 done ✅. All fakeacp/UI paths green.
 - **Spec:** [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) (PRD: [`phase-7-additional-features.md`](phase-7-additional-features.md))
-- **Last GREEN checkpoint:** `70bc4e9` — merge of `origin/main` (Phase 6.7 + Phase 7.1–7.3) with the local docs restructure; both Go test variants, tagged build, and UI tests (80) all pass.
+- **Last GREEN checkpoint:** `review fix: eight usability BLOCKERs — green checkpoint` — both Go test variants + both builds + UI (83 tests) + `npm run build` + embed all pass.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Push normal commits to `origin/main` on task completion; force-pushes still ask.
 
 ---
@@ -109,18 +109,11 @@ None. This section holds only genuine STOP conditions, never nonblocking accepta
 > [`usability-review-run-2026-07-09.md`](usability-review-run-2026-07-09.md) ·
 > [`usability-review-run-2026-07-10.md`](usability-review-run-2026-07-10.md) (+ [`usability-review-2026-07-10-evidence/`](usability-review-2026-07-10-evidence/)).
 
-**Open BLOCKING** (all re-verified still-open on the 2026-07-10 build):
-- J8/S1 — empty/no-match Archive crashes the dashboard on a fresh install *(2026-07-09 §BLOCKING)*.
-- J9/S2 — the Settings/config surface renders unstyled *(2026-07-09 §BLOCKING)*.
-- J3/S3 — first launch from shipped defaults fails with a misleading error *(2026-07-09 §BLOCKING)*.
-- S5 — core mutating actions swallow failures silently *(2026-07-09 §BLOCKING)*.
-- J3b — first-agent launch leaves the New-Agent modal stuck open *(2026-07-10 §4 BLOCKER)*.
-- S1/S4 — a just-launched (meta-only) agent's transcript marshals `events:null`, crashing the chat panel *(2026-07-10 §4 BLOCKER)*.
-- J10 — unread badge never clears after mail is read *(2026-07-10 §4 BLOCKER)*.
-- J2 — onboarding can never complete on a fresh install *(2026-07-10 §4 BLOCKER)*.
-
-Advisory/polish items and the 2026-07-10 coverage-closure notes (J6 terminal, F10 Files/Commands,
-F11 budgets, CLI parity — all now DRIVEN and PASS) are itemized in the two reports' findings sections.
+**Open BLOCKING:** none — all eight usability BLOCKERs were fixed to a GREEN checkpoint on
+2026-07-10 (see changelog). Advisory/polish items from both runs remain open in the reports'
+findings sections (unstyled-error MINORs, pagination, double-toast, etc.) and in the legacy ADVISORY
+batch below; address them when convenient. The 2026-07-10 coverage-closure notes (J6 terminal, F10
+Files/Commands, F11 budgets, CLI parity — all DRIVEN and PASS) are itemized in the reports.
 
 ### Review through `8667fe2` — 2026-07-04 (legacy batch)
 
@@ -265,6 +258,26 @@ remaining open set; every surviving item is ADVISORY.
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-10 — **review fix: eight usability BLOCKERs cleared — green.** All eight open usability
+  BLOCKERs validated real and fixed, each with a regression test; both Go variants + both builds + UI
+  (83) + build + embed green. (1) **J8/S1 empty-Archive crash** — `scanResults`/`readAll` returned nil
+  slices → `results:null`/`events:null` → UI `.map`/`for..of` on null; both now init `make([]T,0)` and
+  the UI guards `?? []` (`TestEmptyArchiveMarshalsResultsArray`, `TestReadAllMetaOnlyReturnsEmptySlice`).
+  (2) **S1/S4 transcript `events:null`** — same class, fixed alongside (1). (3) **J9/S2 unstyled Settings**
+  — defined every referenced-but-missing selector family (`.settings-tabs*`, `.config-*`, `.backend-card*`,
+  `.model-row*` incl. the id/label overlap fix, `.env-*`, `.string-list*`, `.color-*`, `.btn-danger/-link/-sm`,
+  base `button`) in `global.css`. (4) **J3/S3 misleading first-launch error** — `composeLaunch` now
+  pre-checks the resolved project cwd exists and returns a 422 naming the directory instead of the
+  fork/exec-blames-the-adapter error (`TestComposeLaunchRejectsMissingCwd`). (5) **J3b stuck New-Agent
+  modal** — hoisted a single `NewAgentModal` to a stable tree position so it survives the 0→1 first-launch
+  transition (`CardGrid.test.tsx`). (6) **S5 silent mutation failures** — releaseGroup/putLayout/cancelTurn/
+  notifications save/config-editor create+update+delete now surface errors; added `configErrorMessage`
+  extractor so editors show the server's field-level message, not "HTTP 400" (`RolesEditor.test.tsx`).
+  (7) **J10 unread badge never clears** — added a `SetMessagesReadSink` fired by `check_messages` and wired
+  to `stateMgr.Touch(self)`, so reading mail republishes `unread_messages` (`TestCheckMessagesFiresReadSink`).
+  (8) **J2 onboarding never completes** — ProjectStep now passes the created project id through the wizard to
+  LaunchStep, which launches that project (valid cwd) instead of seeded `my-app` (`LaunchStep.test.tsx`).
+
 - 2026-07-10 — **workflow review: low-attention briefs and deterministic routing.** Added the bounded
   human brief contract and usability-review role; split HUMAN from PEER decisions; made reviews persist
   all findings and state commits; repaired cold-resume/path references; thinned and synchronized role
@@ -344,13 +357,4 @@ _(most recent first; keep ~10, older history is in git)_
   `TestTakePendingReportsAlreadyResolved`, and server mapping coverage in
   `TestPermissionErrorAlreadyResolved`. Green: `go build ./...`, `go test ./...`,
   `go test -tags sqlite_fts5 ./...`.
-- 2026-07-03 — **review fix: switch primer one-shot (finding 6) — green.** BLOCKING, confirmed real (reproduced: the
-  frozen snapshot absorbed the primer; a second cross-backend switch stacked another). Decoupled "prompt fed to the
-  backend process this launch" from "prompt persisted to the frozen snapshot": new `LaunchSpec.RuntimeSystemPrompt`
-  (one-shot, NOT persisted) + `LaunchSpec.StartSystemPrompt()`; `session/new` + `session/load` params now use
-  `StartSystemPrompt()`, while `runtimeMeta`/`UpsertSessionMeta` still snapshot the pristine `SystemPrompt`. The
-  switch backend-swap path sets `spec.RuntimeSystemPrompt = join(SystemPrompt, primer)` instead of mutating
-  `spec.SystemPrompt`, so `sessions.system_prompt` stays pre-primer and successive switches prime from the clean base
-  (no stacking). Test: `TestSwitchRuntimePrimerKeepsFrozenSystemPrompt` (primer switch → snapshot unchanged; second
-  switch → still no primer). Green: `go build/test`, `-tags sqlite_fts5`.
 - _(Older checkpoint detail lives in git.)_

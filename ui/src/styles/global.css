@@ -971,3 +971,406 @@ body {
   display: flex;
   gap: 16px;
 }
+
+/* ---- Shared controls: buttons, hints (previously browser-default) ---- */
+button {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  padding: 8px 14px;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--muted);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.btn-sm {
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+.btn-danger {
+  border-color: var(--badge-error);
+  color: var(--badge-error);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: rgb(220 38 38 / 8%);
+  border-color: var(--badge-error);
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--badge-waiting);
+  font-weight: 500;
+  padding: 4px 6px;
+}
+
+.btn-link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.form-hint {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0;
+}
+
+/* ---- Settings page: tabs ---- */
+.settings-page {
+  display: grid;
+  gap: 20px;
+  max-width: 880px;
+}
+
+.settings-tabs {
+  display: grid;
+  gap: 16px;
+}
+
+.settings-tabs-list {
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 4px;
+}
+
+.settings-tabs-list button {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--muted);
+  padding: 8px 14px;
+}
+
+.settings-tabs-list button[data-state="active"] {
+  border-bottom-color: var(--badge-waiting);
+  color: var(--text);
+}
+
+.settings-tab-content {
+  display: grid;
+  gap: 12px;
+}
+
+/* ---- Config editors (roles / projects / notifications) ---- */
+.config-editor {
+  display: grid;
+  gap: 16px;
+}
+
+.config-editor-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.config-editor-header h2 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.config-empty {
+  color: var(--muted);
+  margin: 0;
+}
+
+.config-list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.config-list-item {
+  align-items: center;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px 14px;
+}
+
+.config-list-item-main {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.config-list-item-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.config-slug {
+  background: var(--bg);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 2px 6px;
+}
+
+.config-cwd {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.config-excerpt {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+  width: 100%;
+}
+
+.config-badge {
+  background: rgb(37 99 235 / 12%);
+  border-radius: 999px;
+  color: var(--badge-waiting);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+}
+
+.project-color-swatch {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  flex-shrink: 0;
+  height: 18px;
+  width: 18px;
+}
+
+.config-form {
+  display: grid;
+  gap: 14px;
+}
+
+/* ---- Backends editor ---- */
+.backends-editor {
+  display: grid;
+  gap: 16px;
+}
+
+.env-editor {
+  display: grid;
+  gap: 12px;
+}
+
+.backend-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.backend-card-header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.backend-default-label {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  font-size: 12px;
+  gap: 4px;
+}
+
+.backend-name-input {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  padding: 8px 10px;
+}
+
+.backend-type-select {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  padding: 8px 10px;
+}
+
+.backend-models-section,
+.backend-env-section {
+  display: grid;
+  gap: 8px;
+}
+
+.backend-models-header {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.backends-footer {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+/* ---- Model rows (fix the id/label overlap) ---- */
+.model-row {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.model-row-header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.model-default-label {
+  align-items: center;
+  display: flex;
+}
+
+.model-display-name,
+.model-provider-string {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  flex: 1 1 140px;
+  font: inherit;
+  min-width: 0;
+  padding: 6px 10px;
+}
+
+.model-default-label,
+.model-row-header > .config-slug,
+.model-row-header > .config-badge {
+  flex-shrink: 0;
+}
+
+.model-env-editor {
+  display: grid;
+  gap: 8px;
+  padding-left: 12px;
+}
+
+/* ---- Env var rows ---- */
+.env-row {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.env-key,
+.env-value {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  flex: 1 1 auto;
+  font: inherit;
+  min-width: 0;
+  padding: 6px 10px;
+}
+
+.sensitive-wrap {
+  align-items: center;
+  display: flex;
+  flex: 1 1 auto;
+  gap: 6px;
+  min-width: 0;
+}
+
+.form-input-disabled {
+  background: var(--bg);
+  color: var(--muted);
+}
+
+/* ---- String list (add_dirs etc.) ---- */
+.string-list {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.string-list li {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.string-list-add {
+  display: flex;
+  gap: 8px;
+}
+
+/* ---- Color picker ---- */
+.color-picker {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.color-swatch {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  flex-shrink: 0;
+  height: 32px;
+  width: 32px;
+}
+
+.color-channel {
+  color: var(--muted);
+  display: grid;
+  font-size: 12px;
+  gap: 4px;
+}
+
+/* ---- Chat transcript renderers (secondary: missing spacing/emphasis) ---- */
+.transcript-item {
+  margin-bottom: 10px;
+}
+
+.assistant-message {
+  white-space: pre-wrap;
+}
+
+.turn-end {
+  border-top: 1px dashed var(--line);
+  margin: 8px 0;
+}
+
+.tool-call {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 13px;
+  padding: 6px 10px;
+}
+
+.permission-error {
+  color: var(--badge-error);
+  font-size: 13px;
+}

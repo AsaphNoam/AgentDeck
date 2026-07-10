@@ -46,7 +46,7 @@ func (r *Reader) ReadAll(opts ReadOptions) ([]runtime.Event, error) {
 
 func readAll(rd io.Reader, opts ReadOptions) ([]runtime.Event, error) {
 	br := bufio.NewReaderSize(rd, 64*1024)
-	var out []runtime.Event
+	out := make([]runtime.Event, 0)
 	for {
 		line, oversized, err := readLine(br)
 		if !oversized && len(line) > 0 {

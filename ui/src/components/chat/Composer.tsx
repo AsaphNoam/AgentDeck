@@ -34,7 +34,15 @@ export function Composer({ agentId, busy }: { agentId: string; busy: boolean }) 
         }}
       />
       {busy ? (
-        <button type="button" onClick={() => void cancelTurn(agentId)}>Cancel</button>
+        <button
+          type="button"
+          onClick={() => {
+            setError(null);
+            cancelTurn(agentId).catch(() => setError("Failed to cancel — the turn may have already finished."));
+          }}
+        >
+          Cancel
+        </button>
       ) : (
         <button type="submit">Send</button>
       )}

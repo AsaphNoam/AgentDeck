@@ -1,6 +1,7 @@
 import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { useRoles, useCreateRole, useUpdateRole, useDeleteRole } from "../../api/config";
+import { useRoles, useCreateRole, useUpdateRole, useDeleteRole, configErrorMessage } from "../../api/config";
+import { useUiStore } from "../../store/uiStore";
 import type { RoleResponse } from "../../schemas/role";
 import { RoleForm } from "./RoleForm";
 
@@ -9,6 +10,7 @@ export function RolesEditor() {
   const createRole = useCreateRole();
   const updateRole = useUpdateRole();
   const deleteRole = useDeleteRole();
+  const pushError = useUiStore((state) => state.pushError);
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<RoleResponse | null>(null);
@@ -35,13 +37,13 @@ export function RolesEditor() {
         { id: editing.role, data: fields },
         {
           onSuccess: () => setOpen(false),
-          onError: (e) => setFormError(String(e)),
+          onError: (e) => setFormError(configErrorMessage(e)),
         },
       );
     } else {
       createRole.mutate(data, {
         onSuccess: () => setOpen(false),
-        onError: (e) => setFormError(String(e)),
+        onError: (e) => setFormError(configErrorMessage(e)),
       });
     }
   }
@@ -60,7 +62,11 @@ export function RolesEditor() {
                 ? `Role "${id}" is used by ${agents.length} running agent(s):\n${agents.join(", ")}\n\nDelete the role definition anyway? Running agents are unaffected.`
                 : `Role "${id}" is in use. Delete the definition anyway?`;
             if (confirm(msg)) deleteRole.mutate({ id, force: true });
+            return;
           }
+          // Any other failure (500/offline) previously vanished silently, so a
+          // failed delete looked like it worked. Surface it.
+          pushError("Delete role failed", configErrorMessage(err));
         },
       },
     );

@@ -3,12 +3,40 @@ package server
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/hooks"
+	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
+
+// TestComposeLaunchRejectsMissingCwd guards the J3/S3 blocker: launching a
+// project whose cwd does not exist must fail with a clear validation error that
+// names the directory, instead of the misleading fork/exec error naming the
+// adapter binary that surfaced when the runtime tried to chdir into it.
+func TestComposeLaunchRejectsMissingCwd(t *testing.T) {
+	srv := testServer(t, true)
+	missing := filepath.Join(t.TempDir(), "does-not-exist")
+	if err := srv.configStore.WriteProject("ghost", config.Project{
+		Title: "Ghost", Color: [3]int{1, 2, 3}, Cwd: missing,
+	}); err != nil {
+		t.Fatalf("WriteProject: %v", err)
+	}
+
+	_, _, ae := srv.composeLaunch(launchRequest{Role: "implementer", Project: "ghost"})
+	if ae == nil {
+		t.Fatal("composeLaunch succeeded; want validation error for missing cwd")
+	}
+	if ae.Code != runtime.CodeValidation {
+		t.Fatalf("error code = %q, want %q", ae.Code, runtime.CodeValidation)
+	}
+	if !strings.Contains(ae.Message, missing) || !strings.Contains(ae.Message, "does not exist") {
+		t.Fatalf("error message = %q, want it to name %q and 'does not exist'", ae.Message, missing)
+	}
+}
 
 func TestHookEnvInjected(t *testing.T) {
 	srv := testServer(t, true)
