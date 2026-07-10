@@ -32,7 +32,7 @@ func Open(home, agentID string, meta *runtime.SessionMetaData) (*Writer, error) 
 		return nil, fmt.Errorf("transcript: agent id is required")
 	}
 	dir := filepath.Join(home, dirSessions, agentID)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, fmt.Errorf("transcript: mkdir: %w", err)
 	}
 	path := filepath.Join(dir, fileLog)
@@ -47,7 +47,7 @@ func Open(home, agentID string, meta *runtime.SessionMetaData) (*Writer, error) 
 	if err != nil {
 		return nil, err
 	}
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("transcript: open: %w", err)
 	}

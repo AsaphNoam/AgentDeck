@@ -17,12 +17,18 @@ func (s *Store) EnsureLayout() error {
 		return fmt.Errorf("config: stat home %q: %w", s.home, err)
 	}
 
-	if err := os.MkdirAll(s.home, 0o755); err != nil {
+	if err := os.MkdirAll(s.home, 0o700); err != nil {
 		return fmt.Errorf("config: create home %q: %w", s.home, err)
+	}
+	// The home tree holds secrets (backend env/API keys, hook + MCP tokens,
+	// transcripts), so it is owner-only. MkdirAll never re-modes an existing
+	// dir, so tighten homes created by older builds explicitly.
+	if err := os.Chmod(s.home, 0o700); err != nil {
+		return fmt.Errorf("config: chmod home %q: %w", s.home, err)
 	}
 	for _, d := range dataDirs {
 		p := s.dirPath(d)
-		if err := os.MkdirAll(p, 0o755); err != nil {
+		if err := os.MkdirAll(p, 0o700); err != nil {
 			return fmt.Errorf("config: create dir %q: %w", p, err)
 		}
 	}
