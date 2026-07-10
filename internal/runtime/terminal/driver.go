@@ -35,6 +35,11 @@ type Tab struct {
 
 	// tmux driver handles.
 	tmuxName string // named tmux session, e.g. "agentdeck-a_8f3c12"
+
+	// iTerm2 driver handles (AppleScript object ids, §3.6). The window id addresses
+	// the tab for CloseTab; the session id addresses it for write-text.
+	itermWindowID  string
+	itermSessionID string
 }
 
 // TerminalDriver is the seam (§2.1). The xterm/PTY and tmux drivers are

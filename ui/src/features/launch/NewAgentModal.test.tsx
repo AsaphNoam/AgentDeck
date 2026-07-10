@@ -128,6 +128,36 @@ describe("NewAgentModal", () => {
     await waitFor(() => expect(terminalRadio).toBeEnabled());
   });
 
+  it("disables the Terminal option for a non-claude backend", async () => {
+    renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
+    await screen.findByText(/Implementer/);
+
+    const terminalRadio = screen.getByRole("radio", { name: /Terminal/i }) as HTMLInputElement;
+    // Default backend is claude-acp → terminal enabled.
+    await waitFor(() => expect(terminalRadio).toBeEnabled());
+
+    // Switch to codex (codex-acp, no verified terminal path) → terminal disabled.
+    const backendSelect = screen.getAllByRole("combobox")[2];
+    fireEvent.change(backendSelect, { target: { value: "codex" } });
+    await waitFor(() => expect(terminalRadio).toBeDisabled());
+  });
+
+  it("resets a terminal selection to chat when switching to a non-claude backend", async () => {
+    renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
+    await screen.findByText(/Implementer/);
+
+    const terminalRadio = screen.getByRole("radio", { name: /Terminal/i }) as HTMLInputElement;
+    const chatRadio = screen.getByRole("radio", { name: /Chat/i }) as HTMLInputElement;
+    await waitFor(() => expect(terminalRadio).toBeEnabled());
+    fireEvent.click(terminalRadio);
+    expect(terminalRadio.checked).toBe(true);
+
+    const backendSelect = screen.getAllByRole("combobox")[2];
+    fireEvent.change(backendSelect, { target: { value: "codex" } });
+    await waitFor(() => expect(chatRadio.checked).toBe(true));
+    expect(terminalRadio.checked).toBe(false);
+  });
+
   it("preselects configured default_role / default_project over the first entry", async () => {
     server.use(
       http.get("/api/config", () =>

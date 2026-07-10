@@ -74,4 +74,13 @@ describe("BackendsEditor", () => {
 
     expect(await screen.findByText("failed")).toBeInTheDocument();
   });
+
+  it("offers all four backend types in the type dropdown", async () => {
+    renderWithQuery(<BackendsEditor />);
+    await screen.findByDisplayValue("Claude");
+
+    const typeSelect = screen.getByDisplayValue(/Claude \(claude-acp\)/) as HTMLSelectElement;
+    const values = Array.from(typeSelect.options).map((o) => o.value);
+    expect(values).toEqual(["claude-acp", "codex-acp", "opencode-acp", "openhands-acp"]);
+  });
 });
