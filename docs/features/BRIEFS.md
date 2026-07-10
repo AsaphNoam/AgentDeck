@@ -6,6 +6,35 @@ Older entries are immutable history; agents resume from [`HANDOFF.md`](HANDOFF.m
 
 ---
 
+### 2026-07-10 — fix-review: all eight usability BLOCKERs cleared (complete)
+
+All eight open blocking usability findings (2026-07-09 & 2026-07-10 runs) are fixed, each with a
+regression test, at a green checkpoint (both Go test variants, both builds, UI 83 tests + build;
+pushed as `062cb5d`).
+
+What changed:
+- **Two crash-on-null bugs** (empty Archive, a new agent's chat): the server sent JSON `null` where the
+  UI expected a list — fixed at the source and guarded in the UI.
+- **Settings was unstyled**: the components referenced ~40 CSS classes no stylesheet defined; I wrote
+  them, including the fix for ids overlapping model labels.
+- **Misleading first-launch error**: launching a project whose folder is missing now says so by name,
+  not blaming the agent binary.
+- **First "New agent" dialog stuck open**: now a single stable element that survives the empty→populated
+  switch, so it closes on success.
+- **Silent failures**: release-group, cancel, notifications, and the config editors now show real errors
+  instead of vanishing or printing "HTTP 400".
+- **Unread badge never cleared / onboarding never finished**: reading mail now refreshes the badge;
+  onboarding launches the project you just created, so setup completes.
+
+**Needs attention:** No new blockers. Carried: the six open HUMAN decisions in HANDOFF (terminal-support
+boundary, HTTP-only messaging, immediate/prompt-based UI, runtime-switch fallbacks, unbounded transcript
+indexing, API/model compatibility) are unchanged, still awaiting your acknowledgement.
+
+**Next:** Agent can take the remaining ADVISORY items, or you can proceed to Phase 7.4 (gated on your
+`opencode`/`openhands` CLIs + provider keys).
+
+---
+
 ### 2026-07-10 — usability review: mock-driven test of the "needs-a-login" features (complete)
 
 **TL;DR:** No product code changed. Your ask was to usability-test the features that normally need a
