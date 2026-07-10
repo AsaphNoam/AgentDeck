@@ -2,6 +2,7 @@ package terminal
 
 import (
 	"context"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -27,13 +28,19 @@ func TestProbeXtermAlwaysAvailable(t *testing.T) {
 	if caps.DriverAvailable("bogus") {
 		t.Fatal("DriverAvailable(bogus) = true")
 	}
-	// iTerm2 driver is not wired until 6.7, so it must report unavailable with a
-	// reason for the UI tooltip.
-	if caps.Terminal.Drivers.ITerm2.Available {
-		t.Fatal("iterm2 must report unavailable in 6.3")
+	// iTerm2 (6.7) is a macOS-only optional driver: unavailable off darwin, and
+	// when unavailable it must carry a reason for the UI tooltip. On darwin it is
+	// available iff iTerm2 is installed — either way availability and reason are
+	// mutually exclusive.
+	iterm := caps.Terminal.Drivers.ITerm2
+	if runtime.GOOS != "darwin" && iterm.Available {
+		t.Fatalf("iterm2 must be unavailable off macOS (GOOS=%s)", runtime.GOOS)
 	}
-	if caps.Terminal.Drivers.ITerm2.Reason == "" {
-		t.Fatal("unavailable iterm2 must carry a reason")
+	if iterm.Available == (iterm.Reason != "") {
+		t.Fatalf("iterm2 availability/reason must be exclusive: available=%v reason=%q", iterm.Available, iterm.Reason)
+	}
+	if !iterm.Available && caps.DriverAvailable("iterm2") {
+		t.Fatal("DriverAvailable(iterm2) must be false when the probe reports it unavailable")
 	}
 }
 

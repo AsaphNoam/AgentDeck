@@ -6,9 +6,20 @@ export const modelSchema = z.object({
   env: z.record(z.string()).optional(),
 });
 
+// backendTypeSchema is the single source of the backend type union; every other
+// mapping (labels, per-type fields) derives from it.
+export const backendTypeSchema = z.enum([
+  "claude-acp",
+  "codex-acp",
+  "opencode-acp",
+  "openhands-acp",
+]);
+
+export type BackendType = z.infer<typeof backendTypeSchema>;
+
 export const backendSchema = z.object({
   name: z.string(),
-  type: z.enum(["claude-acp", "codex-acp"]),
+  type: backendTypeSchema,
   default: z.boolean().optional(),
   default_model: z.string(),
   models: z.record(modelSchema),

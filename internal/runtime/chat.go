@@ -106,6 +106,12 @@ func (c *ChatRuntime) spawnCmd(ad backend.BackendAdapter, spec LaunchSpec) *exec
 	for _, k := range ad.StripEnvKeys() {
 		env = stripEnv(env, k)
 	}
+	// Adapter-contributed env (e.g. OpenHands LLM_MODEL, OpenCode yolo config)
+	// is applied AFTER stripping so it is the single authoritative value for its
+	// keys (each such key is listed in StripEnvKeys — see backend.ExtraEnvProvider).
+	if ep, ok := ad.(backend.ExtraEnvProvider); ok {
+		env = append(env, ep.ExtraEnv(spec.ModelID, spec.SkipPerms)...)
+	}
 	cmd.Env = env
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	return cmd

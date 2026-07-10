@@ -10,15 +10,15 @@ func TestValidSlug(t *testing.T) {
 		}
 	}
 	invalid := []string{
-		"",          // empty
-		"-abc",      // leading hyphen
-		"ABC",       // uppercase
-		"a b",       // space
-		"a/b",       // slash
-		"../etc",    // path traversal
-		"a.b",       // dot
-		"a_b",       // underscore
-		"A",         // uppercase single
+		"",                             // empty
+		"-abc",                         // leading hyphen
+		"ABC",                          // uppercase
+		"a b",                          // space
+		"a/b",                          // slash
+		"../etc",                       // path traversal
+		"a.b",                          // dot
+		"a_b",                          // underscore
+		"A",                            // uppercase single
 		"a" + string(make([]byte, 63)), // too long (64 total)
 	}
 	for _, s := range invalid {

@@ -21,8 +21,8 @@ type TerminalCapabilities struct {
 }
 
 type DriverAvailability struct {
-	Xterm  bool          `json:"xterm"`
-	Tmux   bool          `json:"tmux"`
+	Xterm  bool           `json:"xterm"`
+	Tmux   bool           `json:"tmux"`
 	ITerm2 OptionalDriver `json:"iterm2"`
 }
 
@@ -66,9 +66,9 @@ func onPath(bin string) bool {
 	return err == nil
 }
 
-// probeITerm2 reports iTerm2 availability. The driver itself lands in 6.7; until
-// then it is reported unavailable, but the probe path (macOS-only, app present)
-// is already wired so the UI gating is correct.
+// probeITerm2 reports iTerm2 availability (§3.5). The AppleScript driver (6.7) is
+// wired, so the driver is offered whenever the host is macOS AND iTerm2 is
+// installed; any other host reports unavailable with a reason for the UI tooltip.
 func probeITerm2() OptionalDriver {
 	if runtime.GOOS != "darwin" {
 		return OptionalDriver{Reason: "iTerm2 is only available on macOS"}
@@ -76,6 +76,5 @@ func probeITerm2() OptionalDriver {
 	if _, err := os.Stat("/Applications/iTerm.app"); err != nil {
 		return OptionalDriver{Reason: "iTerm2 is not installed"}
 	}
-	// The macOS app is present, but the AppleScript driver is not wired until 6.7.
-	return OptionalDriver{Reason: "iTerm2 driver not yet enabled"}
+	return OptionalDriver{Available: true}
 }
