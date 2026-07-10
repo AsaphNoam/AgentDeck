@@ -8,27 +8,34 @@ Agent-to-agent state lives in [`HANDOFF.md`](HANDOFF.md) — never point the hum
 
 ---
 
-## 2026-07-10 — usability review — Mock-driven test of the "needs-a-login" features (run cut short)
+## 2026-07-10 — usability review — Mock-driven test of the "needs-a-login" features (complete)
 
 **TL;DR:** No product code changed. Your ask was to usability-test the features that normally need a
 real Claude/Codex login — creating a chat, choosing a model, sending messages, switching agents — by
-faking the agent CLI. I built that fake and **proved it works**: a real chat now launches, streams a
-reply, and shows the right busy→done status entirely through the running app, no login required. So
-those previously-untestable features are now testable. Then a **monthly spending limit shut down the
-automated testers partway through**, so this run is partial — I verified the big items myself and
-documented the rest.
+faking the agent CLI. I built that fake, **proved it works** (a real chat launches, streams a reply, and
+shows the right busy→done status entirely through the running app, no login), and then drove **every
+screen end-to-end** with it. A monthly spending limit interrupted the run twice; I resumed both times, so
+coverage is complete (93 screenshots).
 
-**What I found (nothing genuinely new that was blocking — the two known blockers are still there):**
-- The **Archive page still crashes the whole dashboard** the moment you open it on a fresh install
-  (I reproduced it — screenshot in the report).
-- The **Settings page is still completely unstyled** — the Backends editor's model names literally
-  overlap their labels ("sonnet-4-6default").
-- Confirmed several **buttons that fail silently** (a save or reorder can quietly not happen).
+**New blocking problems found this run:**
+- **Your very first "New agent" leaves the dialog stuck open** covering the screen — the agent is
+  actually created, but you get no confirmation and the still-live button invites a duplicate. (Only the
+  first launch; later ones close fine.)
+- **Opening a brand-new agent's chat can crash the panel** (the empty transcript comes back malformed).
+- **Message "unread" badges never clear** after the recipient reads the mail.
+- **Onboarding can't actually finish** on a fresh install — the last step tries to launch a sample
+  project whose folder doesn't exist, so it errors out and the wizard won't close.
 
-**Honest gap:** three areas *can't* be faked yet — the terminal agents, fully-automatic agent-to-agent
-chatter, and usage budgets — so "every feature tested" isn't reachable until small extra fakes exist.
+**Still-there from last time (all re-confirmed):** the Archive page still crashes on open, the Settings
+page is still completely unstyled, and several buttons still fail silently.
 
-**Next up:** the two blockers are already queued for `/fix-review`. Full report:
+**Also worth knowing:** switching a running agent's model works and keeps the right model; resume,
+restart-durability, and crash-recovery all behaved correctly.
+
+**Honest gap:** three areas can't be faked yet — terminal agents, fully-automatic agent-to-agent chatter,
+and usage budgets — so "every feature tested" isn't 100% until small extra fakes exist.
+
+**Next up:** these are queued for `/fix-review`. Full report:
 [`usability-review-run-2026-07-10.md`](usability-review-run-2026-07-10.md).
 
 ---

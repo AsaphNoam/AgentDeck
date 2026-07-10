@@ -24,3 +24,7 @@ mcp/node_modules/
 # usability-review harness (binaries, fixtures, node_modules, screenshots) — never commit
 /.review/
 /scratch-fakeacp
+
+# usability-review harness (binaries, fixtures, screenshots) — evidence is copied into docs/
+.review/
+scratch-fakeacp
