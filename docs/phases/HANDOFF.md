@@ -209,11 +209,17 @@ re-verified as still-open on this build.** New items this run:
   "Done/thinking stopped"; [NEW] J9 a stale server error lingers under a field; [NEW] S1 PUT-config
   `muted:null` echo; [NEW] S4 `BackendsEditor Object.entries(backend.models)` throws on a model-less backend;
   [POLISH][NEW] J2 onboarding CTA button unstyled.** Detail + evidence in the run report §4.
-- **ADVISORY (coverage gap) — "every feature through usability testing" needs three more fakes.** Terminal
-  runtime (J6) launches the interactive `claude` CLI in a PTY, not the ACP adapter — needs a fake PTY/
-  interactive binary. Agent-initiated messaging needs a scriptable tool-calling fake (`fakeacp` never calls
-  the MCP tools; traffic had to be injected via `/mcp`). Per-turn budgets (F11), Files/Commands tabs (F10),
-  and CLI parity have no journey charter. Add these charters + fakes (USABILITY-REVIEW §7). Also latent:
+- **COVERAGE CLOSED (gap-closure pass, run report §5) — J6 terminal, F10 Files/Commands, F11 budgets, and
+  CLI parity are all now DRIVEN and PASS.** J6: a 6-line fake interactive `claude` on PATH (terminal execs
+  `interactiveBinary=="claude"` in a PTY) → real PTY, keystrokes/resize over `/api/sessions/{id}/terminal/ws`,
+  output stream, scrollback replay on reattach, browser xterm render, zero console errors. F10: `tool_flow`
+  populates `tracked_files`, `/api/hook` `command` events populate `tracked_commands`, both tabs render. F11:
+  `/mcp` `send_message` ×16 → 15 ok, #16 `message_budget_exceeded` + a `budget_exceeded` SSE notification.
+  CLI: `agentdeck <role>@<project>`/`resume`/`reindex` match the modal/API. **Remaining true gap:** only a
+  *fully autonomous* multi-agent loop (an agent calling the MCP tools itself), which adds nothing over `/mcp`
+  injection; plus terminal driver selection (no UI picker) and macOS-only iterm2. **[NEW] minor foot-gun:**
+  two distinct per-launch tokens — the messaging token (`<HOME>/mcp/<id>.mcp.json`) vs the hook token
+  (`running.hook_token`); using the wrong one on `/api/hook` → 403 `token mismatch`. Also latent:
   `PUT /api/backends` replaces the whole document (safe only because the editor re-sends the full set).
 
 ### BLOCKING
