@@ -159,6 +159,33 @@ Playwright/Chromium for visual checks). Full run report + screenshots:
 [`usability-review-run-2026-07-09.md`](usability-review-run-2026-07-09.md). Findings below are
 prefixed `J#`/`S#`; repros live in that report.
 
+**Source (2026-07-10 usability review — mock-driven / config-dependent focus, PARTIAL run):** second
+`/usability-review`, themed on exercising the config-dependent surface (create chat, choose models, send
+messages, inter-thread actions) via the deterministic `fakeacp` mock so those features stop being SKIPPED.
+The **mock recipe is proven and now documented** (put `fakeacp` on PATH as `claude-code-acp`; select the
+scenario via the server's `FAKEACP_SCENARIO` env — chat launch/prompt/stream/status-transition round-trips
+end-to-end through the real server + browser). A **monthly-spend limit terminated 7 of 8 subagents
+mid-run**, so coverage is partial; the orchestrator directly verified the two BLOCKERs below. Full report +
+evidence: [`usability-review-run-2026-07-10.md`](usability-review-run-2026-07-10.md). Net new vs 2026-07-09:
+
+- **CONFIRMED still-open (re-verified this build, not new bullets):** the J8 empty/no-match Archive
+  `results:null` crash (curl → `results:null`; browser → ErrorBoundary `run/J1/2-archive.png`) and the J9
+  whole-Settings-unstyled BLOCKER (Backends model rows overlap "sonnet-4-6default"; `run/J9/02-backends-tab.png`).
+  Both remain OPEN from 2026-07-09; this run adds fresh evidence and, for S2, the complete undefined-class
+  set (adds `.color-picker/-swatch/-channel`, `.string-list*`, `.sensitive-wrap`, `.form-hint`,
+  `.interface-controls/-option/-disabled`, and the secondary chat-renderer classes).
+- **ADVISORY (coverage gap) — the mock cannot reach three surfaces; "every feature through usability
+  testing" is not achievable until fakes exist for them.** (1) **Terminal runtime (J6)** launches the
+  interactive `claude` CLI in a PTY, not the ACP adapter — needs a tiny fake PTY/interactive binary
+  registered as the interactive command. (2) **Agent-initiated messaging (J10)** — `fakeacp` streams canned
+  text and never calls the MCP tools, so the autonomous nudge/unread-badge/budget loop can't be driven;
+  needs a scriptable tool-calling fake (messaging IS reachable via `/mcp`+token, confirmed: `list_agents`,
+  `send_message` `m_4ae0ac`). (3) **Per-turn budgets, Files/Commands tabs (F10), and CLI parity** have no
+  journey charter at all. Add these charters + fakes so the matrix covers the shipped feature set (§7).
+- **ADVISORY (unconfirmed) — J3 New-Agent dialog overlay may persist after submit and intercept the next
+  card click** (`run/J3/04-after-launch.png`, seen once; subagent died before a second repro). Re-drive to
+  confirm before acting.
+
 ### BLOCKING
 
 - **BLOCKING — J8/S1 empty/no-match Archive crashes the whole dashboard on a fresh install.**
