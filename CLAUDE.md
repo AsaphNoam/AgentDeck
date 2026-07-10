@@ -40,8 +40,9 @@ The exact GREEN checkpoint lives in the canonical workflow §2; do not redefine 
 - `.gocache/` at the repo root is a gitignored local Go build cache — ignore it; never `git add` it.
 
 ## Commits & history
-- Trunk-based: commit directly to `main`; no branches, no PRs. **Never push to origin unless the
-  human explicitly asked** (a hook will prompt if you try).
+- Trunk-based: commit directly to `main`; no branches, no PRs. Normal pushes to `origin/main` are
+  part of task completion; only force-pushes (which rewrite history) require an explicit human
+  request — a hook will prompt for those.
 - Commit messages and model attribution follow the canonical workflow. Use plain `docs:`/`feat:`
   prefixes only for work outside its named roles.
 - Mining history: a past rehash-and-merge left many **tree-identical duplicate** commit pairs —

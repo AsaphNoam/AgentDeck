@@ -159,7 +159,9 @@ Commits are the recovery anchor across spaced sessions, so the work survives a h
 - At each GREEN checkpoint, commit the code **and** the updated `HANDOFF.md` together.
 - Message: `phase N.M: <subphase title> — green checkpoint`.
 - Add a `Co-Authored-By:` trailer naming the model that actually did the work.
-- **Pushing** is a STOP-style action — don't push unless the human has asked for it.
+- **Push** the new commits to `origin/main` on task completion — normal pushes are part of the
+  loop. Force-pushing is the STOP-style exception: it rewrites history, so don't force-push unless
+  the human has asked for it (§3).
 
 ---
 
