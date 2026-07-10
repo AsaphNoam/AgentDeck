@@ -1067,6 +1067,21 @@ func sessionNewParams(spec LaunchSpec) map[string]any {
 	for _, m := range spec.MCPServers {
 		mcp = append(mcp, mcpServerParam(m))
 	}
+	if spec.BackendType == "claude-acp" {
+		return map[string]any{
+			"cwd":        spec.Cwd,
+			"mcpServers": mcp,
+			"_meta": map[string]any{
+				"systemPrompt": spec.StartSystemPrompt(),
+				"claudeCode": map[string]any{
+					"options": map[string]any{
+						"model":                 spec.ModelID,
+						"additionalDirectories": spec.AddDirs,
+					},
+				},
+			},
+		}
+	}
 	return map[string]any{
 		"cwd":                   spec.Cwd,
 		"mcpServers":            mcp,
@@ -1087,6 +1102,23 @@ func sessionLoadParams(spec LaunchSpec, sessionID string) map[string]any {
 	for _, m := range spec.MCPServers {
 		mcp = append(mcp, mcpServerParam(m))
 	}
+	if spec.BackendType == "claude-acp" {
+		return map[string]any{
+			"sessionId":  sessionID,
+			"cwd":        spec.Cwd,
+			"mcpServers": mcp,
+			"_meta": map[string]any{
+				"systemPrompt": spec.StartSystemPrompt(),
+				"claudeCode": map[string]any{
+					"options": map[string]any{
+						"resume":                sessionID,
+						"model":                 spec.ModelID,
+						"additionalDirectories": spec.AddDirs,
+					},
+				},
+			},
+		}
+	}
 	return map[string]any{
 		"sessionId":             sessionID,
 		"cwd":                   spec.Cwd,
@@ -1103,10 +1135,38 @@ func mcpServerParam(m MCPServerSpec) map[string]any {
 			"name":    m.Name,
 			"type":    "http",
 			"url":     m.URL,
-			"headers": m.Headers,
+			"headers": namedPairs(m.Headers),
 		}
 	}
-	return map[string]any{
-		"name": m.Name, "command": m.Command, "args": m.Args, "env": m.Env,
+	param := map[string]any{
+		"name": m.Name, "command": m.Command, "args": m.Args,
 	}
+	if len(m.Env) > 0 {
+		param["env"] = envPairs(m.Env)
+	}
+	return param
+}
+
+func namedPairs(m map[string]string) []map[string]string {
+	if len(m) == 0 {
+		return nil
+	}
+	out := make([]map[string]string, 0, len(m))
+	for k, v := range m {
+		out = append(out, map[string]string{"name": k, "value": v})
+	}
+	return out
+}
+
+func envPairs(env []string) []map[string]string {
+	if len(env) == 0 {
+		return nil
+	}
+	out := make([]map[string]string, 0, len(env))
+	for _, kv := range env {
+		if i := strings.IndexByte(kv, '='); i >= 0 {
+			out = append(out, map[string]string{"name": kv[:i], "value": kv[i+1:]})
+		}
+	}
+	return out
 }

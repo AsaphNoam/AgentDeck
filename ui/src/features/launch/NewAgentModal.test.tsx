@@ -77,6 +77,15 @@ describe("NewAgentModal", () => {
     expect(await screen.findByText(/My App/)).toBeInTheDocument();
   });
 
+  it("shows project titles without internal project ids in the chooser", async () => {
+    renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
+    await screen.findByText(/My App/);
+
+    const projectSelect = screen.getAllByRole("combobox")[1] as HTMLSelectElement;
+    expect(projectSelect).toHaveTextContent("My App");
+    expect(projectSelect).not.toHaveTextContent("My App (my-app)");
+  });
+
   it("auto-suggests name from role and project", async () => {
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
     // Wait for both role and project data to load — the suggested name is empty

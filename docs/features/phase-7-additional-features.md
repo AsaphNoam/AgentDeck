@@ -1,13 +1,16 @@
-# Phase 7 — Additional features: OpenHands & OpenCode backends
+# Phase 7 — Additional features: backend import, OpenHands & OpenCode
 
 **Status:** selected Phase 7 candidate (from the future-phase bucket) — ready to build after Phase 6
-**Features:** F14 (OpenCode backend), F15 (OpenHands backend); extends F7 (switch-runtime backend matrix)
+**Features:** F16 (import backend models/config from Claude Code and Codex), F14 (OpenCode backend), F15 (OpenHands backend); extends F7 (switch-runtime backend matrix)
 **Depends on:** Phases 1, 2, 6 (chat runtime, adapter seam, switch-runtime)
 **Enables:** remaining future-phase candidates
 
 ---
 
 ## 1. Goal
+
+First, remove backend setup guesswork by letting AgentDeck import backend models/defaults from the
+user's existing **Claude Code** and **Codex** configs as a one-time action from Settings/Onboarding.
 
 Widen AgentDeck from a two-backend (Claude, Codex) dashboard to a four-backend one by adding
 **OpenCode** (opencode.ai, `opencode` CLI) and **OpenHands** (openhands.dev, `openhands` CLI) as
@@ -20,6 +23,8 @@ adapters, config/seed/UI plumbing, and extending the switch-runtime matrix, not 
 ## 2. Scope
 
 ### In scope
+- One-time import of backend defaults/models from existing Claude Code and Codex user config so a
+  fresh AgentDeck setup can start from real local values instead of seeded placeholders.
 - OpenCode chat backend: `opencode acp` through the existing ACP chat runtime; launch, stream,
   cancel, stop, resume on a stable `agent_id`.
 - OpenHands chat backend: `openhands acp` through the same runtime, same lifecycle.
@@ -32,6 +37,8 @@ adapters, config/seed/UI plumbing, and extending the switch-runtime matrix, not 
 - Gated live acceptance against the real CLIs (same class as the Phase 1 / Codex gates).
 
 ### Out of scope
+- Continuous two-way sync with Claude Code/Codex config after import; Phase 7 only covers explicit
+  one-time import into AgentDeck's own config.
 - Terminal (PTY) interface for OpenHands/OpenCode — no verified hook-registration path, so both
   are rejected with `422 terminal_unavailable` exactly like Codex terminal (Phase 6 decision).
 - Agent-to-agent messaging for the new backends beyond what the existing HTTP MCP registration
@@ -44,7 +51,18 @@ adapters, config/seed/UI plumbing, and extending the switch-runtime matrix, not 
 
 ## 3. Detailed requirements
 
-### 3.1 OpenCode backend (F14)
+### 3.1 Backend import from Claude Code / Codex (F16)
+- Settings and onboarding expose an explicit "Import from Claude/Codex" action.
+- Import reads each tool's user config, extracts backend/model defaults plus any non-secret backend
+  parameters AgentDeck understands, and writes a normalized AgentDeck `backends.json`.
+- AgentDeck remains the source of truth after import; imported values can be edited locally
+  without mutating Claude/Codex config files.
+- Secret material is never silently copied unless the user explicitly opted into importing env
+  vars/keys.
+- If an external config is missing, malformed, or only partially understood, the import is
+  best-effort and reports exactly what was imported vs skipped.
+
+### 3.2 OpenCode backend (F14)
 - New backend type `opencode-acp`, seeded backend id `opencode`, binary `opencode`, launch args
   `["acp"]`; runs through the existing chat runtime with no runtime branching.
 - Model selection via OpenCode's `provider/model` ids (e.g. `anthropic/claude-sonnet-4-5`).
@@ -53,7 +71,7 @@ adapters, config/seed/UI plumbing, and extending the switch-runtime matrix, not 
 - Native resume of the same logical session where ACP `session/load` supports it; otherwise the
   Phase 6 primer path.
 
-### 3.2 OpenHands backend (F15)
+### 3.3 OpenHands backend (F15)
 - New backend type `openhands-acp`, seeded backend id `openhands`, binary `openhands`, launch
   args `["acp"]`.
 - Model/auth via OpenHands env (`LLM_MODEL`, `LLM_API_KEY`, `LLM_BASE_URL`) composed from backend
@@ -62,7 +80,7 @@ adapters, config/seed/UI plumbing, and extending the switch-runtime matrix, not 
   per-action prompts flowing through the existing permission gate.
 - Resume as in 3.1: native where supported, primer otherwise.
 
-### 3.3 Shared integration rules
+### 3.4 Shared integration rules
 - Everything agent-specific lives in a `BackendAdapter` (Phase 6 §6.3 rule); the chat runtime,
   state, persistence, and SSE paths stay backend-agnostic.
 - Permission requests flow through the existing ACP withhold-the-response gate; both backends'
@@ -73,7 +91,7 @@ adapters, config/seed/UI plumbing, and extending the switch-runtime matrix, not 
 - Credential checks (Settings "Validate") for both backends; a fresh machine without the CLI
   installed gets a clear, non-blocking error.
 
-### 3.4 Switch-runtime matrix (extends F7)
+### 3.5 Switch-runtime matrix (extends F7)
 - Same-backend model swap for the new types follows each adapter's `CanSwitchModelOnResume`.
 - Cross-backend swaps (any of the four ↔ any other) preserve history via native resume or the
   Phase 6 primer; no new switch endpoint semantics.
@@ -96,6 +114,8 @@ rejected terminal combinations.
 
 - [ ] A user can add/validate an OpenCode backend and launch a chat agent that streams a turn.
 - [ ] A user can add/validate an OpenHands backend and launch a chat agent that streams a turn.
+- [ ] A user can import Claude Code and Codex backend defaults/models into AgentDeck in one action
+      from onboarding or settings.
 - [ ] Stop → resume continues the same logical session on the same `agent_id` for both backends.
 - [ ] A permission request from either backend surfaces as a dashboard permission card and can be
       approved/denied.

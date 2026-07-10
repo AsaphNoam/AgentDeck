@@ -22,10 +22,11 @@ and all role entrypoints follow the moved canonical documents.
 
 **Needs attention:** **Carried:** Terminal support boundary; HTTP-only agent messaging;
 Immediate/prompt-based UI; Runtime-switch fallbacks; Unbounded transcript indexing; and API/model
-compatibility. There is no actual blocker.
+compatibility. **New/changed:** The workflow commit was created locally, but the requested push was
+rejected because this Codex environment hit its usage limit; product work is not blocked.
 
-**Next:** An agent implements the optional iTerm2 driver, then begins Phase 7; the human can explicitly
-skip the optional driver. Live-CLI acceptance gates must pass before claiming full compatibility.
+**Next:** The human commits this brief update and pushes `main`. Then an agent implements the optional
+iTerm2 driver (unless skipped) and begins Phase 7; live-CLI gates must pass before compatibility claims.
 
 **What this teaches:** Agent recovery context and human re-entry context are different products. Keeping
 one precise and one bounded prevents both agent context debt and owner attention debt.
