@@ -6,6 +6,36 @@ Older entries are immutable history; agents resume from [`HANDOFF.md`](HANDOFF.m
 
 ---
 
+### 2026-07-10 — usability review: mock-driven test of the "needs-a-login" features (complete)
+
+**TL;DR:** No product code changed. Your ask was to usability-test the features that normally need a
+real Claude/Codex login — creating a chat, choosing a model, sending messages, switching agents — by
+faking the agent CLI. I built that fake, **proved it works** (a real chat launches, streams a reply, and
+shows the right busy→done status entirely through the running app, no login), and then drove **every
+screen end-to-end** with it. A monthly spending limit interrupted the run twice; I resumed both times, so
+coverage is complete (93 screenshots).
+
+**New blocking problems found this run:**
+- **Your very first "New agent" leaves the dialog stuck open** covering the screen — the agent is
+  actually created, but you get no confirmation and the still-live button invites a duplicate. (Only the
+  first launch; later ones close fine.)
+- **Opening a brand-new agent's chat can crash the panel** (the empty transcript comes back malformed).
+- **Message "unread" badges never clear** after the recipient reads the mail.
+- **Onboarding can't actually finish** on a fresh install — the last step tries to launch a sample
+  project whose folder doesn't exist, so it errors out and the wizard won't close.
+
+**Still-there from last time (all re-confirmed):** the Archive page still crashes on open, the Settings
+page is still completely unstyled, and several buttons still fail silently.
+
+**Also worth knowing:** switching a running agent's model works and keeps the right model; resume,
+restart-durability, and crash-recovery all behaved correctly. A gap-closure pass also drove the terminal
+agents, Files/Commands tabs, the per-turn message budget, and the CLI — all passed.
+
+**Next up:** the blocking problems above are queued for `/fix-review`. Full report:
+[`usability-review-run-2026-07-10.md`](usability-review-run-2026-07-10.md).
+
+---
+
 ### 2026-07-10 — workflow review: low-attention agent operation
 
 The core build/review/fix loop was sound, but its intended human-facing brief layer was absent and the
