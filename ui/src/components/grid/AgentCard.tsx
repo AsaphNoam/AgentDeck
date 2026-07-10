@@ -23,10 +23,19 @@ export function AgentCard({ agent, lastLine }: { agent: AgentState; lastLine?: s
         event.preventDefault();
         openContextMenu(agent.agent_id, event.clientX, event.clientY);
       }}
-      {...attributes}
-      {...listeners}
     >
       <div className="agent-card-top">
+        <button
+          type="button"
+          className="drag-handle"
+          aria-label={`Reorder ${agent.name}`}
+          onClick={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
+          {...attributes}
+          {...listeners}
+        >
+          ::
+        </button>
         <strong>{agent.name}</strong>
         <StateBadge state={agent.state} />
       </div>

@@ -131,7 +131,7 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject }: Ne
               <select value={project} onChange={(e) => setProject(e.target.value)}>
                 {projectEntries.length === 0 && <option value="">No projects</option>}
                 {projectEntries.map(([id, p]) => (
-                  <option key={id} value={id}>{p.title} ({id})</option>
+                  <option key={id} value={id}>{p.title}</option>
                 ))}
               </select>
             </div>
