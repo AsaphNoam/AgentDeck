@@ -90,92 +90,136 @@ Additional shipped surfaces without a dedicated charter (flagged for matrix main
 
 ## 3. Checkpoint matrix
 
-**Run cut short:** a monthly-spend limit terminated 7 of 8 journey/sweep subagents mid-run. One sweep
-(S2+S5) completed fully; the rest returned partial results. The orchestrator (main thread) directly
-verified the two headline BLOCKERs (curl + browser screenshot). Coverage is therefore PARTIAL — the
-matrix below distinguishes verified / partial / not-reached honestly.
+The run was **interrupted twice by a monthly-spend limit** and resumed twice; on completion **every
+journey J1–J12 and all five sweeps S1–S5 were driven** against the running app (J6 is a documented
+coverage gap — not mockable). Blockers were orchestrator-verified (curl + browser screenshot).
 
 | Journey | Fixture | Result |
 |---|---|---|
-| J1 Install & first paint | fresh | **PARTIAL-PASS** — first paint styled, zero console errors (subagent). Archive-from-fresh reproduces the BLOCKER (verified, screenshot `run/J1/2-archive.png`). |
-| J2 Onboarding | fresh | NOT-REACHED (subagent died before Settings/onboarding drive). |
-| J3 Chat round-trip | seeded+fakeacp | **PARTIAL-PASS** — launch + modal + streamed reply captured (`run/J3/01-04`); the mock round-trip is independently proven (§0). Unconfirmed possible finding: New-Agent dialog overlay persisted after submit and intercepted the card click. |
-| J4 Permission flow | seeded+fakeacp | NOT-REACHED (same subagent died before J4). |
-| J5 Grid & layout | seeded | NOT-REACHED (subagent died after J1). |
-| J6 Terminal | seeded | **COVERAGE GAP** — not mockable with fakeacp (interactive PTY CLI). |
-| J7 Stop/resume/switch | lived-in+fakeacp | NOT-REACHED (subagent died writing its Playwright script). |
-| J8 Archive & search | lived-in (tagged+untagged) | **BLOCKER VERIFIED** (empty/no-match `results:null`, orchestrator curl). Untagged fallback + resume-from-archive NOT-REACHED. |
-| J9 Settings & config | seeded | **BLOCKER VERIFIED** — whole Settings surface unstyled; Backends model rows overlap ("sonnet-4-6default"), tabs are raw buttons (`run/J9/02-backends-tab.png`). Round-trip/merge checks NOT-REACHED. |
-| J10 Multi-agent messaging | seeded+fakeacp | **PARTIAL-PASS** — messaging reachable & functional via `/mcp` + token: `list_agents` showed `bob@reviewer@my-app`, `send_message` succeeded (`m_4ae0ac`). Badge-clear / nudge / stale checks NOT-REACHED. |
-| J11 Failure & recovery | seeded+fakeacp | NOT-REACHED (subagent died locating the SSE indicator). |
-| J12 Restart durability | lived-in | NOT-REACHED. |
+| J1 Install & first paint | fresh | **PASS** (styled shell, zero console errors, `run/J1/1-firstpaint.png`) **+ BLOCKER**: Archive-from-fresh crashes the dashboard (`run/J1/2-archive.png`). |
+| J2 Onboarding | fresh | **PASS w/ caveats** — with mock creds satisfied it goes straight to the dashboard (no wizard); forced-render wizard is styled except the primary CTA button (POLISH); **completion is blocked** because LaunchStep launches the default `my-app` project whose cwd doesn't exist → 502 (ties to J3/cwd BLOCKER). |
+| J3 Chat round-trip | seeded+fakeacp | **PASS** — launch, model choice, streamed reply, busy→done transitions all observed (§0 proof; `run/J3/`). |
+| J3b First-launch modal | seeded+fakeacp | **MAJOR (new)** — launching the *first* agent leaves the New-Agent modal stuck open (overlay covers the page). |
+| J4 Permission flow | seeded+fakeacp | **PASS** approve/deny/sentinel + status match; **MINOR** double-toast; **MINOR** stopped agent keeps a live Approve/Deny prompt. |
+| J5 Grid & layout | seeded | **PASS** — grid stays sane on stop; reorder/density/group-collapse persistence confirmed via J12. (No per-card remove in the UI — only Stop; empty state covered by J1.) |
+| J6 Terminal | seeded | **COVERAGE GAP** — not mockable with fakeacp (interactive PTY CLI). Modal correctly disables Terminal for non-claude backends. |
+| J7 Stop/resume/switch | lived-in+fakeacp | **PASS** — resume & switch preserve the frozen model (opus-4-7 not reset to default); stop clean; model dropdown swaps per backend. **MINOR** Codex-not-installed shows a raw exec error. |
+| J8 Archive & search | lived-in (tagged+untagged) | **PASS** tagged search + resume-from-archive; **BLOCKER** empty/no-match `results:null` (verified); **MAJOR** untagged no-FTS5 build returns raw 500 and leaves stale rows visible; **MINOR** pagination fixed at limit 50. |
+| J9 Settings & config | seeded | **BLOCKER** whole surface unstyled (verified); **PASS** round-trip + merge-preserve via the UI; **MAJOR** validation/duplicate errors show bare "HTTP 4xx" discarding the field-naming body; **MINOR** stale server error lingers under a field. |
+| J10 Multi-agent messaging | seeded+fakeacp | **PASS** list_agents/send_message/nudge; **MAJOR** unread badge never clears after read (server counter stays stale); **MINOR** no `notification` event for mail; **MINOR** terminal-recipient wording; token only in a 0600 file (observability gap). |
+| J11 Failure & recovery | seeded+fakeacp | **PASS** — SSE reconnect accurate, crash→error card, `ignore_cancel` stop escalates <0.2s, all garbage inputs 422/404 (no 500s). **MINOR** force-stopped card labeled "Done/thinking stopped". |
+| J12 Restart durability | lived-in | **PASS** — custom order + density + group-collapse and all agents survive a server restart. |
 
-Static sweeps: **S2+S5 COMPLETE** (17 findings). **S1/S3/S4 PARTIAL** (subagent died after enumerating
-the Go-side nil-slice set, before the UI cross-check).
+Static sweeps **S1–S5 all COMPLETE** (S2+S5 first pass, 17 findings; S1/S3/S4 second pass, 10 findings).
 
 ---
 
 ## 4. Findings (this run)
 
-Severity bar: *a first-time or daily user hits this*. Blockers below were orchestrator-verified.
+Severity bar: *a first-time or daily user hits this*. Blockers were orchestrator-verified. Findings are
+marked **[NEW]** (not in the 2026-07-09 list), **[CONFIRMED]** (known-open, reproduced this build), or
+plain (this run's detail on an existing item).
 
-### BLOCKER (verified)
-- **J8 — Empty / no-match Archive crashes the whole dashboard.** On the tagged build, `GET /api/archive`
-  and `?q=<no-match>` both return `{"results":null}` (orchestrator curl, seeded fixture, 0 sessions).
-  Clicking **Archive** on a fresh install throws in `ArchivePage` (`results.length`/`.map` on null) →
-  ErrorBoundary "Something went wrong in dashboard." Evidence: `run/J1/2-archive.png`. Reproduces the
-  2026-07-09 known-open finding — **still unfixed.** Fix: return `[]Result{}` when empty; `results ?? []`
-  in the UI.
-- **J9 / S2 — The entire Settings surface renders unstyled.** Backends/Roles/Projects/Notifications tabs
-  are raw browser buttons; the Backends editor's model rows overlap the id into the default label
-  ("sonnet-4-6default", "gpt-5.5default", "sonnet-4-5default"); env/model widgets collapse to a raw stack.
-  Evidence: `run/J9/02-backends-tab.png`. S2 enumerated the undefined class families:
-  `.settings-tabs*`, `.config-editor/-list/-form/-badge/-cwd/-slug/-excerpt/-empty`, `.backend-card/-*`,
-  `.model-row/-*`, `.env-editor/-row/-key/-value`, plus shared `.btn-danger/-link/-sm`, `.string-list*`,
-  `.color-picker/-swatch/-channel`, `.sensitive-wrap`, `.form-hint`. Reproduces the 2026-07-09 known-open
-  finding — **still unfixed.** Fix: define these selectors (mirror the styled `.dialog-*`/`.wizard-*`).
+### BLOCKER
+- **[CONFIRMED] J8/S1 — Empty / no-match Archive crashes the whole dashboard.** Tagged build,
+  `GET /api/archive` and `?q=<no-match>` both return `{"results":null}` (orchestrator curl) → `ArchivePage`
+  `.length`/`.map` on null → ErrorBoundary "Something went wrong in dashboard." `run/J1/2-archive.png`.
+  Fix: `[]Result{}` when empty + `results ?? []`.
+- **[CONFIRMED] J9/S2 — The entire Settings surface renders unstyled.** Tabs are raw buttons; Backends model
+  rows overlap the id into the default label ("sonnet-4-6default"). `run/J9/02-backends-tab.png`. Undefined
+  class families: `.settings-tabs*`, `.config-editor/-list/-form/-badge/-cwd/-slug/-excerpt/-empty`,
+  `.backend-card/-*`, `.model-row/-*`, `.env-editor/-row/-key/-value`, `.btn-danger/-link/-sm`,
+  `.string-list*`, `.color-picker/-swatch/-channel`, `.sensitive-wrap`, `.form-hint`.
+- **[CONFIRMED] J2/J3 — Fresh first launch fails with a misleading error.** Seeded default project `my-app`
+  has cwd `~/Projects/my-app` (missing on a fresh machine); Go can't chdir so exec fails and the message
+  blames the adapter: `runtime_start_failed: …/claude-code-acp: no such file or directory` (`run/J2/06`).
+  **[NEW] wrinkle:** onboarding LaunchStep launches `my-app` (not the project the user just created in
+  ProjectStep), so **onboarding can never complete** — `onboarding_complete` never flips. Fix: pre-check the
+  resolved cwd → cwd-named error; ship a default cwd that exists / create on first run; LaunchStep should
+  launch the just-created project.
 
-### MAJOR (S5 — silent / misleading mutation failures, static-confirmed against running behavior)
-- `CardGrid.tsx:41` `void putLayout` and `:94` `void releaseGroup` — reorder/density/group-collapse
-  persistence and Release-group fail **silently**; change is lost on reload with no error.
-- `NotificationsEditor.tsx:20` `putConfig.mutate` with no `onError` — a notification toggle that fails to
-  save snaps back silently.
-- `RolesEditor.tsx:53-64` / `ProjectsEditor.tsx:66-77` delete `onError` handles only `409`; any 500/403/
-  network delete failure (and the `force:true` retry) is swallowed.
-- Config editors + onboarding steps (`RolesEditor:38,44`, `ProjectsEditor:50,59`, `BackendsEditor:176`,
-  `ProjectStep:41`, `BackendStep:100`, `LaunchStep:53`) surface `String(e)` = "HTTP 500", discarding the
-  `err.body.error.message` that names the offending field — `NewAgentModal` already does this correctly;
-  generalize it.
+### MAJOR
+- **[NEW] J3b — First-agent launch leaves the New-Agent modal stuck open.** On an empty dashboard, launching
+  the first agent creates it but the modal never dismisses: `.dialog-overlay` persists (opacity 1,
+  pointer-events auto, covers the viewport ≥6s), blocking clicks on the new card / nav until Escape or
+  reload. Root cause: `CardGrid` renders two `<NewAgentModal>` in mutually-exclusive branches
+  (`ids.length===0` vs the grid); the first launch swaps 0→1 and unmounts the open instance mid-mutation, so
+  its `onSuccess→onClose` never fires. A *second* launch closes cleanly. No success feedback; the live
+  Launch button invites a duplicate launch. `run/J3b/05-series-final.png`, `06-second-agent.png`. Fix:
+  hoist a single modal instance above the branch, or key it so it survives the 0→1 transition.
+- **[NEW] S1/S4 — A just-launched (meta-only) agent's transcript marshals `events:null` → the chat panel
+  throws.** `transcript/reader.go readAll` returns a nil slice when the file holds only a `session_meta`
+  record → `handleTranscript` emits `"events":null`; `transcriptStore.foldTranscript` does `for (const r of
+  raw)` → "not iterable". The `.then/.catch` sites swallow it (transcript blank) but `refetchOpenTranscript`
+  is awaited without a local catch. Fix: `readAll` init `out := []Event{}`; `foldTranscript(raw ?? [])`.
+- **[NEW] J10 — Unread badge never clears after mail is read.** alice→bob `send_message`; bob card shows
+  "Mail 1"; bob `check_messages` (mark_read) returns remaining:0; badge still "Mail 1" and a fresh SSE
+  snapshot still reports bob `unread_messages:1` — the server counter is stale and no `unread:0` update is
+  ever emitted. `run/J10b/step3_badge_cleared.png`. (Elevates the 2026-07-09 stale-badge advisory to a
+  reproduced MAJOR.)
+- **[NEW] J8 — Untagged (no-FTS5) build returns a raw 500 on search AND leaves stale rows visible.**
+  `agentdeck-notags`: `/api/archive?q=…` → HTTP 500 `no such module: fts5`, rendered verbatim in
+  `.archive-error` while the previous result rows stay on screen (looks like results + an error).
+  `run/J8/2-search-auth.png`. Fix: degrade (LIKE scan / "search unavailable on this build") and clear rows.
+- **[CONFIRMED] J9/S5 — Validation & duplicate errors surface as bare "HTTP 4xx", discarding the body that
+  names the field.** New role with an existing slug → "Error: HTTP 409"; blank model provider → "Error: HTTP
+  400" — the server sends a specific message on `.body` but the editors call `setError(String(e))`.
+  `run/J9b/5-dup-role-409.png`, `7-backend-400.png`. (Delete-in-use 409 *is* handled well — a named confirm
+  dialog.) Also the general S5 set: `CardGrid` `void putLayout`/`void releaseGroup`, `NotificationsEditor` no
+  `onError`, delete `onError` 409-only, `Composer` `void cancelTurn`.
+- **[NEW] S3 — The Phase-7 backend cred-checks repeat the claude fragility class → onboarding gate can wedge.**
+  `credcheck/claude.go` any non-zero exit (renamed/absent subcommand) → `failed` not `skipped`;
+  `codex.go` hardcodes `GET /v1/models` (Azure/gateways 404 → `skipped`, a valid key reads unusable);
+  `opencode.go` hardcodes `~/.local/share/opencode/auth.json` (ignores `XDG_DATA_HOME` + macOS path → a
+  logged-in mac user reads `not_logged_in`); `openhands.go` treats mere existence of `settings.json` as `ok`
+  (false PASS). Each can leave `computeBackendStep` un-Done for a correctly-configured user.
 
-### MINOR / POLISH (S2/S5)
-- New-Agent modal runtime picker (`.interface-controls/-option/-disabled`) undefined — partial degradation
-  choosing chat vs terminal.
-- Secondary chat/renderer classes undefined but co-occur with a defined parent (`.transcript-item`,
-  `.turn-end`, `.assistant-message`, `.tool-call`, `.permission-error`, `.app-logo`, `.grid-view`).
-- `Composer.tsx:37` `void cancelTurn` — a failed Cancel is silent.
-- `PermissionPrompt.tsx:19-21` / `Composer.tsx:16-18` show a fixed "the agent may have stopped" string,
-  discarding the real error message.
-- S2 direction-b: **zero dead selectors** — no CSS drift to clean up.
+### MINOR / POLISH
+- **[NEW] J7** — launching a Codex chat with no `codex-acp` installed shows the raw
+  `exec: "codex-acp": … not found in $PATH` (accurate but developer-facing; no setup guidance). `run/J7/04`.
+- **[CONFIRMED] J4** — one permission request fires **two** toasts (`waiting_input` + `permission_required`).
+  `run/J4/01c-toasts.png`.
+- **[NEW] J4** — a stopped agent still shows a live Approve/Deny prompt; clicking it → "Failed to send
+  decision — the agent may have stopped." (stale but diagnosable). `run/J4/04c`.
+- **[NEW] J10** — no `notification` SSE event fires for incoming mail (badge relies solely on
+  `state_update.unread_messages`, which goes stale per the MAJOR above).
+- **[NEW] J10** — `send_message` to a running *terminal* agent → "recipient_not_found: No live agent matches"
+  — sane but misleading (the agent IS live, just not a messaging target).
+- **[NEW] J11** — a user force-stopped card is labeled "Done" (green) with sub-detail "thinking / stopped"
+  (the stop itself works in <0.2s; label only). `run/J11/step3_stopped_card.png`.
+- **[NEW] J9** — a stale server error ("HTTP 409") lingers under a field alongside a fresh client-side
+  validation error, because client-side blocking skips the `setFormError("")` reset. `run/J9b/6`.
+- **[CONFIRMED] J8** — archive UI hardcodes limit 50 / offset 0 while showing the true total; matches past 50
+  are unreachable (no pagination UI).
+- **[NEW] S1** — `handlePutConfig` normalizes `notifications` only when the body includes it; a PUT that
+  changes only default project/role can echo `"muted":null` in its response.
+- **[NEW] S4** — `BackendsEditor` `Object.entries(backend.models)` / `Object.keys(...)` throw on a
+  model-less backend (`models` marshals null; no zod parse coerces it); `Object.entries(cfg.backends)` same
+  class one level up. Fix: `?? {}`.
+- **[POLISH][NEW] J2** — onboarding primary CTA (`.form-actions button`) is a browser-default button
+  (no `button` or `.form-actions button` rule). `run/J2/01-wizard-backend.png`.
+- S2 direction-b: **zero dead selectors** — no CSS drift.
 
-### Coverage gaps (matrix maintenance, §7) — several directly answer the human's charter
-- **Terminal runtime (J6) is not usability-testable with the current mocks** — it launches the interactive
-  `claude` CLI in a PTY, not the ACP adapter. Needs a tiny fake interactive/PTY binary registered as the
-  interactive command. Today the whole terminal surface is only reachable with a real login.
-- **Agent-initiated messaging (J10) needs a scriptable tool-calling fake.** fakeacp streams canned text and
-  never calls `send_message`/`check_messages`; agent→agent traffic had to be injected via `/mcp`. The
-  autonomous nudge/badge/budget loop can't be driven without a fake that calls the MCP tools.
-- **Per-turn budgets (F11: budget 15, `budget_exceeded`) — no journey.**
-- **Files/Commands tabs (F10) — no dedicated charter**, despite multiple standing advisories about them.
-- **CLI parity (`agentdeck launch/resume/reindex`) — no journey**, though CLI≡modal is a shipped contract.
-- **Terminal driver selection** (tmux/iterm2) has no UI picker; iterm2 is macOS-only (untestable here).
+### Notable PASSES (an unexercised journey and a passing one must be distinguishable)
+- J1 first paint: styled, zero console errors. J3: full mock chat round-trip. J4: approve/deny/sentinel +
+  status all correct. J7: frozen-config invariant holds across resume & switch; modal swaps model list per
+  backend and disables Terminal for non-claude. J8: tagged search + resume-from-archive. J9: round-trip +
+  merge-preserve through the UI. J10: list_agents/send_message/near-instant nudge. J11: SSE reconnect,
+  crash→error, stop escalation, garbage-input handling all correct. J12: full layout + agent durability.
 
-### Unconfirmed (subagent died before confirming — do NOT treat as fact)
-- **J3 — New-Agent dialog overlay may persist after submit and intercept the next card click.** Seen once
-  in `run/J3/04-after-launch.png`; the subagent was terminated before a second repro. Re-drive to confirm.
+### API-layer notes (not user-reachable today, but latent)
+- `PUT /api/backends` **replaces** the whole document (a subset curl body dropped the other 3 backends);
+  safe only because the editor re-sends the full set. A future partial writer would destroy seeded state
+  (INVARIANTS §3). The messaging per-launch token lives only in `<HOME>/mcp/<agent_id>.mcp.json` (0600) —
+  no API/UI surface exposes it, so agent-messaging is effectively unobservable to a normal user.
 
-### Evidence index
-`run/J1/{1-firstpaint,2-archive,3-back}.png`, `run/J3/{01-dashboard,02-modal,03-modal-filled,04-after-launch}.png`,
-`run/J9/{01-roles,02-backends,03-projects,04-notifications}-tab.png`. Committed copies:
-[`usability-review-2026-07-10-evidence/`](usability-review-2026-07-10-evidence/) (same `J#/…png` layout).
-The live harness (binaries, fakeacp shim, fixtures, full `run/`) lived under a gitignored `.review/` and is
-not committed.
+### Coverage gaps (matrix maintenance §7) — several answer the human's charter directly
+- **Terminal runtime (J6)** not mockable with fakeacp (interactive PTY CLI) — needs a fake interactive/PTY
+  binary. **Agent-initiated messaging** needs a scriptable tool-calling fake (fakeacp never calls the MCP
+  tools). **Per-turn budgets (F11)**, **Files/Commands tabs (F10)**, and **CLI parity** have no charter.
+  **Terminal driver selection** (tmux/iterm2) has no UI picker; iterm2 is macOS-only.
+
+### Evidence
+Committed under [`usability-review-2026-07-10-evidence/`](usability-review-2026-07-10-evidence/) — one
+subfolder per journey (`J1 J2 J3 J3b J4 J5 J7 J8 J9 J9b J10 J10b J11 J12`, 93 screenshots). The live harness
+(binaries, fakeacp shim, fixtures, full `run/`) lived under a gitignored `.review/` and is not committed.
