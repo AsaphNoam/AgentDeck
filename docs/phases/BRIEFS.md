@@ -8,6 +8,31 @@ Agent-to-agent state lives in [`HANDOFF.md`](HANDOFF.md) — never point the hum
 
 ---
 
+## 2026-07-10 — usability review — Mock-driven test of the "needs-a-login" features (run cut short)
+
+**TL;DR:** No product code changed. Your ask was to usability-test the features that normally need a
+real Claude/Codex login — creating a chat, choosing a model, sending messages, switching agents — by
+faking the agent CLI. I built that fake and **proved it works**: a real chat now launches, streams a
+reply, and shows the right busy→done status entirely through the running app, no login required. So
+those previously-untestable features are now testable. Then a **monthly spending limit shut down the
+automated testers partway through**, so this run is partial — I verified the big items myself and
+documented the rest.
+
+**What I found (nothing genuinely new that was blocking — the two known blockers are still there):**
+- The **Archive page still crashes the whole dashboard** the moment you open it on a fresh install
+  (I reproduced it — screenshot in the report).
+- The **Settings page is still completely unstyled** — the Backends editor's model names literally
+  overlap their labels ("sonnet-4-6default").
+- Confirmed several **buttons that fail silently** (a save or reorder can quietly not happen).
+
+**Honest gap:** three areas *can't* be faked yet — the terminal agents, fully-automatic agent-to-agent
+chatter, and usage budgets — so "every feature tested" isn't reachable until small extra fakes exist.
+
+**Next up:** the two blockers are already queued for `/fix-review`. Full report:
+[`usability-review-run-2026-07-10.md`](usability-review-run-2026-07-10.md).
+
+---
+
 ## 2026-07-09 — docs — Reporting rezoomed: you read short briefs now, not the handoff
 
 **TL;DR:** No product code changed. The workflow now ends every session with a short plain-language
