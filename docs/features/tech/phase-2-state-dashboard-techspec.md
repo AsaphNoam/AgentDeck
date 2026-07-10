@@ -1,6 +1,6 @@
 # Phase 2 — Implementation Tech Spec: State manager + SSE event bus + Dashboard card grid + Chat panel
 
-**Mirrors:** `docs/phases/phase-2-state-dashboard.md`
+**Mirrors:** `docs/features/phase-2-state-dashboard.md`
 **Features:** F1 (multi-agent dashboard, full), F3 (streaming chat panel, full)
 **Depends on:** Phase 0 (file store, server skeleton), Phase 1 (Runtime, transcript events, hook reporting, per-agent SSE)
 **Enables:** Phases 3–7 (the UI shell + multiplexed event bus they all plug into)

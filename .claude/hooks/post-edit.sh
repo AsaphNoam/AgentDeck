@@ -1,6 +1,6 @@
 #!/bin/sh
 # PostToolUse[Edit|Write]: cheap, repo-specific feedback on the exact mistakes
-# past reviews kept re-catching (see docs/phases/INVARIANTS.md). Exit 2 feeds
+# past reviews kept re-catching (see docs/features/INVARIANTS.md). Exit 2 feeds
 # stderr back to the agent; the edit itself has already been applied.
 command -v jq >/dev/null 2>&1 || exit 0
 fp=$(jq -r '.tool_input.file_path // empty' 2>/dev/null) || exit 0
@@ -30,13 +30,17 @@ esac
 case "$fp" in
 */.claude/skills/*)
   twin=$(printf '%s' "$fp" | sed 's|/\.claude/skills/|/.agents/skills/|')
-  msgs="${msgs}skills are twinned: apply the matching edit to $twin (.claude and .agents copies intentionally differ only in the Claude co-author trailer instruction).
+  if [ ! -f "$twin" ] || ! cmp -s "$fp" "$twin"; then
+    msgs="${msgs}skill drift: $fp and $twin must be byte-identical; update the twin before finishing.
 "
+  fi
   ;;
 */.agents/skills/*)
   twin=$(printf '%s' "$fp" | sed 's|/\.agents/skills/|/.claude/skills/|')
-  msgs="${msgs}skills are twinned: apply the matching edit to $twin (.claude and .agents copies intentionally differ only in the Claude co-author trailer instruction).
+  if [ ! -f "$twin" ] || ! cmp -s "$fp" "$twin"; then
+    msgs="${msgs}skill drift: $fp and $twin must be byte-identical; update the twin before finishing.
 "
+  fi
   ;;
 esac
 

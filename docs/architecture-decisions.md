@@ -33,9 +33,12 @@ The load-bearing architecture choices for AgentDeck and *why* they were made. Th
 
 ---
 
-## D3 — Host the messaging MCP server in-process in Go; no runtime Node or python3
+## D3 — Host the messaging Model Context Protocol server in-process in Go; no runtime Node or python3
 
-**Decision.** Implement the agent-to-agent messaging MCP server **inside the Go binary** using the official Go MCP SDK, instead of a separate Node.js process. Drop **python3** entirely.
+**Decision.** Implement the agent-to-agent messaging Model Context Protocol (MCP) server **inside the
+Go binary** using the official Go MCP SDK, instead of a separate Node.js process. The dashboard mounts
+the streamable HTTP transport at loopback-only `/mcp`; each launched agent receives a scoped registration
+and token. Drop **python3** entirely.
 
 **Precise scope.** This drops **runtime** Node only:
 - **Build-time Node stays** — the React/Vite UI compiles with it. Unavoidable and fine.
@@ -43,17 +46,19 @@ The load-bearing architecture choices for AgentDeck and *why* they were made. Th
 
 **Why.** Fewer moving parts and a simpler install: one process supervises itself, and the MCP tools (`list_agents` / `send_message` / `check_messages`) become **in-process** reads/writes of `state.db` with no serialization boundary — which is exactly what makes D2 trivial (hooks-calling-back is just a function call away from the same state). python3's only use was installer JSON-escaping, replaceable by the Go binary or `jq`.
 
-**Feasibility (researched).** The official [`modelcontextprotocol/go-sdk`](https://github.com/modelcontextprotocol/go-sdk) is **v1.0.0 stable (compatibility-frozen), v1.5.0 as of Apr 2026**, maintained with Google, with **stdio transport** and typed tool handlers — the right shape for a stdio-registered messaging server.
-
-**Open item (Phase 5 spike, ~1h).** Confirm the SDK registers cleanly over stdio with **both** Claude Code and Codex before committing the implementation. Low risk — both consume standard stdio MCP servers, so this swaps the binary, not the mechanism — but verify it first.
+**Interoperability boundary.** The in-process HTTP server and tool calls are tested, but real Claude Code
+and Codex registration remains a credentialed acceptance gate. If either CLI rejects loopback HTTP MCP,
+the fallback must be a working stdio proxy into this same server—not a second state-owning MCP process.
 
 **Why the "Node ecosystem" argument doesn't block this.** External MCP servers a user adds are launched by *their agent CLI* as independent processes regardless of our language — hosting Node ourselves buys nothing for those. Our messaging server is the only Node we'd ship at runtime, and it is small.
 
 ---
 
-## D4 — Terminal runtime: deferred, and cross-platform when built
+## D4 — Terminal runtime is cross-platform by default
 
-Keep the terminal runtime deferred to Phase 6. When built, make a **cross-platform** path the default — an embedded xterm.js terminal in the UI, or tmux — and treat iTerm2/AppleScript as an optional macOS-only extra behind a capability probe, never the core. AppleScript-driven control is the most brittle, least portable option and should not sit in the core.
+The built terminal path uses an embedded xterm.js terminal over a pseudo-terminal, with tmux available
+as another cross-platform driver. iTerm2/AppleScript remains an optional macOS-only extra behind a
+capability probe, never the core. AppleScript-driven control is the most brittle, least portable option.
 
 ## D5 — UI delivery: browser for v1; native desktop shell deferred
 

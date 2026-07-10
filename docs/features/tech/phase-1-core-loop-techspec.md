@@ -1,6 +1,6 @@
 # Phase 1 — Core Loop — Implementation Tech Spec
 
-**Mirrors:** `docs/phases/phase-1-core-loop.md` (phase PRD)
+**Mirrors:** `docs/features/phase-1-core-loop.md` (phase PRD)
 **Master PRD:** `agent-dashboard-prd.md` (source of truth — §4.1 runtime abstraction, §4.4 hooks, §4.5 storage, F3, F4)
 **Builds on:** Phase 0 (config file store + `state.db` + `127.0.0.1` server skeleton + CLI)
 **Status:** ready to implement

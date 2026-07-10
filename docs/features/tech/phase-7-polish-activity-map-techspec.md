@@ -1,6 +1,6 @@
 # Phase 7 Candidate — Implementation Tech Spec: Activity Map / Ambient Visualization (F13)
 
-**Mirrors:** `docs/phases/phase-7-future-phase.md` (future phase bucket) and remains the implementation baseline if the activity-map candidate is selected.
+**Mirrors:** `docs/features/future-phase.md` (future feature bucket) and remains the implementation baseline if the activity-map candidate is selected.
 **Feature:** F13 (activity map)
 **Depends on:** Phase 2 (`/api/events` SSE bus, React app shell, global agent store) and Phase 5 (`new_message` / `notification` events that drive animations)
 **Status:** optional / lowest priority. Pure frontend. No server changes.

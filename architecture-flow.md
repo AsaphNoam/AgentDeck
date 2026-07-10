@@ -9,13 +9,16 @@ how they talk, and the main happy-path flows. Read this alongside
 
 AgentDeck is a **local dashboard for launching and orchestrating coding agents**
 (Claude Code, Codex). It ships as a **single Go binary** that serves an embedded
-**React UI** and a `127.0.0.1`-only **REST + SSE API**. The Go server spawns each
-agent as a child **CLI process** and talks to it over **stdio (ACP)** for chat,
-or a **PTY** for terminal. Config is **hand-editable JSON files**; machine state
+**React UI** and a `127.0.0.1`-only **REST plus Server-Sent Events (SSE) API**. The Go
+server spawns each agent as a child **command-line interface (CLI) process** and talks
+to it over **stdio using Agent Client Protocol (ACP)** for chat, or a
+**pseudo-terminal (PTY)** for terminal. ACP is the structured chat/session link between
+AgentDeck and an agent CLI, while SSE pushes live state from the server to the browser. Config is
+**hand-editable JSON files**; machine state
 is a **SQLite database the server alone writes**. Agents report progress back
 through **lifecycle hooks that POST to the server**, and agents coordinate with
-each other through an **in-process MCP messaging server** hosted inside the same
-binary. The UI stays live via a single **Server-Sent Events** stream.
+each other through an **in-process Model Context Protocol (MCP) messaging server** hosted inside the same
+binary. The UI stays live via a single **SSE** stream.
 
 ---
 
@@ -361,6 +364,6 @@ graph TB
 | The full spec & rationale | [docs/agent-dashboard-prd.md](docs/agent-dashboard-prd.md), [docs/architecture-decisions.md](docs/architecture-decisions.md) |
 
 > The build is phased (0→7); see [MAP.md](MAP.md) and
-> [docs/phases/HANDOFF.md](docs/phases/HANDOFF.md) for current state. Some
+> [docs/features/HANDOFF.md](docs/features/HANDOFF.md) for current state. Some
 > features in this doc (terminal runtime, switch, messaging) belong to later
 > phases — check the handoff for what's live today.

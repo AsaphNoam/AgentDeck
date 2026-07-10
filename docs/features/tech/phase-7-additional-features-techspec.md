@@ -1,6 +1,6 @@
 # Phase 7 — Implementation Tech Spec: OpenHands & OpenCode backends
 
-**Mirrors:** `docs/phases/phase-7-additional-features.md` (phase PRD)
+**Mirrors:** `docs/features/phase-7-additional-features.md` (phase PRD)
 **Features:** F14 (OpenCode backend), F15 (OpenHands backend); extends F7 (switch-runtime matrix)
 **Depends on:** Phase 1 (chat runtime), Phase 6 (`BackendAdapter` seam, switch-runtime, terminal gates)
 **Audience:** the engineer implementing this phase. Prescriptive; no further design decisions required.

@@ -1,6 +1,6 @@
 # Phase 3 — Implementation Tech Spec: Config CRUD & Onboarding
 
-**Mirrors:** `docs/phases/phase-3-config-onboarding.md` (phase PRD)
+**Mirrors:** `docs/features/phase-3-config-onboarding.md` (phase PRD)
 **Master PRD refs:** §3.2 (roles), §3.3 (projects), §3.4 (backends), F4, F5, F6, F12
 **Depends on:** Phase 0 (file store, GET stubs), Phase 1 (launch endpoint + composition), Phase 2 (UI shell, agent store, SSE client)
 **Status:** ready to build after Phase 2
