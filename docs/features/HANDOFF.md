@@ -102,73 +102,25 @@ None. This section holds only genuine STOP conditions, never nonblocking accepta
 > **This section holds only OPEN findings** — no resolved/dismissed graveyard.
 > Blocking items must be fixed before the next phase starts; advisory items when convenient.
 
-### Usability review — 2026-07-10 (mock-driven / config-dependent focus)
+### Usability findings — 2026-07-09 & 2026-07-10 reviews (open worklist)
 
-**Source (2026-07-10 usability review — mock-driven / config-dependent focus):** second `/usability-review`,
-themed on exercising the config-dependent surface (create chat, choose models, send messages, inter-thread
-actions) via the deterministic `fakeacp` mock so those features stop being SKIPPED. The **mock recipe is
-proven and documented** (put `fakeacp` on PATH as `claude-code-acp`; select the scenario via the server's
-`FAKEACP_SCENARIO` env — chat launch/prompt/stream/status round-trips end-to-end through the real server +
-browser). The run was interrupted twice by a monthly-spend limit and resumed; **on completion all journeys
-J1–J12 and sweeps S1–S5 were driven** (J6 = documented coverage gap). Full report + 93 screenshots:
-[`usability-review-run-2026-07-10.md`](usability-review-run-2026-07-10.md) +
-[`usability-review-2026-07-10-evidence/`](usability-review-2026-07-10-evidence/). The pre-existing BLOCKING
-items (J8 archive null, J9 unstyled Settings, J3 missing-cwd, S5 silent mutations — detail in
-[`usability-review-run-2026-07-09.md`](usability-review-run-2026-07-09.md)) were **all
-re-verified as still-open on this build.** New items this run:
+> Full findings, repros, severities, and evidence live in the run reports — recorded there, **not
+> duplicated here.** This is only the open-blocker worklist for `/fix-review`, pointing at them:
+> [`usability-review-run-2026-07-09.md`](usability-review-run-2026-07-09.md) ·
+> [`usability-review-run-2026-07-10.md`](usability-review-run-2026-07-10.md) (+ [`usability-review-2026-07-10-evidence/`](usability-review-2026-07-10-evidence/)).
 
-- **BLOCKING — [NEW] J3b first-agent launch leaves the New-Agent modal stuck open.** On an empty dashboard,
-  launching the first agent creates it but the modal never dismisses — `.dialog-overlay` persists (opacity 1,
-  pointer-events auto, covers the viewport) and blocks the next click until Escape/reload; no success
-  feedback, live Launch button invites a duplicate. Root cause: `CardGrid` renders two `<NewAgentModal>` in
-  mutually-exclusive branches (`ids.length===0` vs the grid); the first launch swaps 0→1 and unmounts the
-  open instance mid-mutation so `onSuccess→onClose` never fires (a *second* launch closes cleanly). Evidence
-  `usability-review-2026-07-10-evidence/J3b/05-series-final.png`, `06-second-agent.png`. Fix: one modal
-  instance hoisted above the branch (or keyed to survive the 0→1 transition). Test: first-launch success
-  dismisses the modal.
-- **BLOCKING — [NEW] S1/S4 a just-launched (meta-only) agent's transcript marshals `events:null`, crashing
-  the chat panel.** `transcript/reader.go readAll` returns nil when only a `session_meta` record exists →
-  `handleTranscript` emits `"events":null` → `transcriptStore.foldTranscript` `for (const r of raw)` → "not
-  iterable" (`refetchOpenTranscript` awaited without a local catch). Same class as the archive null crash.
-  Fix: `readAll` init `out := []Event{}`; `foldTranscript(raw ?? [])`. Test: open a just-launched agent
-  before its first event.
-- **BLOCKING — [NEW] J10 unread badge never clears after mail is read.** `check_messages` (mark_read)
-  returns remaining:0 but the card badge stays "Mail 1" and a fresh SSE snapshot still reports
-  `unread_messages:1` — the server-side counter is stale and no `unread:0` update is emitted (elevates the
-  2026-07-09 stale-badge advisory to a reproduced blocker). Evidence
-  `usability-review-2026-07-10-evidence/J10b/step3_badge_cleared.png`. Fix:
-  publish/touch the recipient after read/delete/expiry. Test: reading mail immediately emits `unread:0`.
-- **BLOCKING — [NEW] J2 onboarding can never complete on a fresh install.** LaunchStep launches the seeded
-  `my-app` project (not the project the user just created in ProjectStep); `my-app`'s cwd `~/Projects/my-app`
-  doesn't exist → 502, so `onboarding_complete` never flips and the wizard doesn't dismiss. (Compounds the
-  J3 missing-cwd BLOCKER.) Fix: LaunchStep launches the created project; pre-check cwd. Test: fresh onboarding
-  end-to-end flips `onboarding_complete`.
-- **ADVISORY — [NEW] S3 the Phase-7 backend cred-checks repeat the claude `--no-color` fragility class**
-  (`credcheck/{codex,opencode,openhands}.go`): codex hardcodes `GET /v1/models` (Azure/gateway 404 → a valid
-  key reads unusable); opencode hardcodes `~/.local/share/opencode/auth.json` (ignores `XDG_DATA_HOME` +
-  macOS path → logged-in mac user reads not_logged_in); openhands treats `settings.json` existence as ok
-  (false PASS); claude any non-zero exit → `failed` not `skipped`. Each can wedge the onboarding Backend gate
-  for a correctly-configured user. ENV-DEPENDENT.
-- **ADVISORY — [NEW] J8 untagged no-FTS5 build leaves stale rows visible under the raw 500 search error**
-  (extends the existing untagged-500 advisory); **[NEW] J7 Codex-not-installed shows a raw `exec: codex-acp
-  not found` with no setup guidance; [NEW] J4 a stopped agent still shows a live Approve/Deny prompt; [NEW]
-  J10 no `notification` event fires for mail + terminal-recipient wording is misleading + the messaging token
-  lives only in a 0600 file (unobservable to a normal user); [NEW] J11 force-stopped card is labeled
-  "Done/thinking stopped"; [NEW] J9 a stale server error lingers under a field; [NEW] S1 PUT-config
-  `muted:null` echo; [NEW] S4 `BackendsEditor Object.entries(backend.models)` throws on a model-less backend;
-  [POLISH][NEW] J2 onboarding CTA button unstyled.** Detail + evidence in the run report §4.
-- **COVERAGE CLOSED (gap-closure pass, run report §5) — J6 terminal, F10 Files/Commands, F11 budgets, and
-  CLI parity are all now DRIVEN and PASS.** J6: a 6-line fake interactive `claude` on PATH (terminal execs
-  `interactiveBinary=="claude"` in a PTY) → real PTY, keystrokes/resize over `/api/sessions/{id}/terminal/ws`,
-  output stream, scrollback replay on reattach, browser xterm render, zero console errors. F10: `tool_flow`
-  populates `tracked_files`, `/api/hook` `command` events populate `tracked_commands`, both tabs render. F11:
-  `/mcp` `send_message` ×16 → 15 ok, #16 `message_budget_exceeded` + a `budget_exceeded` SSE notification.
-  CLI: `agentdeck <role>@<project>`/`resume`/`reindex` match the modal/API. **Remaining true gap:** only a
-  *fully autonomous* multi-agent loop (an agent calling the MCP tools itself), which adds nothing over `/mcp`
-  injection; plus terminal driver selection (no UI picker) and macOS-only iterm2. **[NEW] minor foot-gun:**
-  two distinct per-launch tokens — the messaging token (`<HOME>/mcp/<id>.mcp.json`) vs the hook token
-  (`running.hook_token`); using the wrong one on `/api/hook` → 403 `token mismatch`. Also latent:
-  `PUT /api/backends` replaces the whole document (safe only because the editor re-sends the full set).
+**Open BLOCKING** (all re-verified still-open on the 2026-07-10 build):
+- J8/S1 — empty/no-match Archive crashes the dashboard on a fresh install *(2026-07-09 §BLOCKING)*.
+- J9/S2 — the Settings/config surface renders unstyled *(2026-07-09 §BLOCKING)*.
+- J3/S3 — first launch from shipped defaults fails with a misleading error *(2026-07-09 §BLOCKING)*.
+- S5 — core mutating actions swallow failures silently *(2026-07-09 §BLOCKING)*.
+- J3b — first-agent launch leaves the New-Agent modal stuck open *(2026-07-10 §4 BLOCKER)*.
+- S1/S4 — a just-launched (meta-only) agent's transcript marshals `events:null`, crashing the chat panel *(2026-07-10 §4 BLOCKER)*.
+- J10 — unread badge never clears after mail is read *(2026-07-10 §4 BLOCKER)*.
+- J2 — onboarding can never complete on a fresh install *(2026-07-10 §4 BLOCKER)*.
+
+Advisory/polish items and the 2026-07-10 coverage-closure notes (J6 terminal, F10 Files/Commands,
+F11 budgets, CLI parity — all now DRIVEN and PASS) are itemized in the two reports' findings sections.
 
 ### Review through `8667fe2` — 2026-07-04 (legacy batch)
 

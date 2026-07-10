@@ -60,3 +60,30 @@ iTerm2 driver (unless skipped) and begins Phase 7; live-CLI gates must pass befo
 
 **What this teaches:** Agent recovery context and human re-entry context are different products. Keeping
 one precise and one bounded prevents both agent context debt and owner attention debt.
+
+---
+
+### 2026-07-09 — docs — Reporting rezoomed: you read short briefs now, not the handoff
+
+**TL;DR:** No product code changed. The workflow now ends every session with a short plain-language
+brief in this file — you read only this, never `HANDOFF.md`. Agents decide more on their own: the
+review agent audits their judgment calls (a job that used to be yours), your silence on a brief
+counts as consent, and per your instruction agents now work on `main` and push to origin
+automatically when a task completes (force-pushes still ask).
+
+**Where this fits:** AgentDeck is the multi-agent dashboard (a Go server with an embedded React UI)
+being built phase by phase by autonomous agents. `HANDOFF.md` is the agents' shared memory between
+sessions; until now it was also your review queue, which assumed reading time you don't have. That
+role moves here, at digest granularity.
+
+**Where the project stands:** Phases 0–6 are done — chat runtime, dashboard, settings, archive/search,
+agent-to-agent messaging, terminal agents. Phase 7 (two new backends: OpenCode and OpenHands) is
+code-complete and green against test fakes. A recent in-browser usability review left open findings,
+four blocking: a fresh-install crash on the Archive page, an unstyled Settings page, a misleading
+error on first launch, and UI actions that fail silently. They're queued for `/fix-review`.
+
+**Needs your input:** Live verification of the new backends is blocked on you installing the
+`opencode`/`openhands` CLIs plus provider keys (older siblings: the Codex CLI and MCP-registration
+checks). Default if you never get to it: Phase 7 ships tested against fakes, gaps documented.
+
+**Next up:** Run `/fix-review` to burn down the blocking findings before Phase 7 wraps.
