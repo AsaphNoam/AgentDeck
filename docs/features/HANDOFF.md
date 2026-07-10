@@ -8,11 +8,10 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
 
 ## Current position
 
-- **Active phase:** 6 — Flexibility: terminal runtime, switch-runtime, task groups
-- **Active subphase:** 6.7 (next, optional) — iTerm2/AppleScript driver
-- **Spec:** [`tech/phase-6-flexibility-techspec.md`](tech/phase-6-flexibility-techspec.md) (PRD: [`phase-6-flexibility.md`](phase-6-flexibility.md)); subphase plan at §"Subphase plan"
-- **Last GREEN checkpoint:** `0f7e680` — review fix (advisory batch: inbox newest-N + CLI operand validation); build and both test variants passed.
-- **Last code review:** `8667fe2` (the parent reviewed by `d12bbb6`; next review covers later GREEN checkpoints).
+- **Active phase:** 7 — Additional features: OpenHands & OpenCode backends (Phase 6 complete ✅)
+- **Active subphase:** 7.4 (next) — GATED live acceptance, **blocked on human** (needs `opencode`+`openhands` CLIs + provider keys); 7.1–7.3 done ✅. All fakeacp/UI paths green.
+- **Spec:** [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) (PRD: [`phase-7-additional-features.md`](phase-7-additional-features.md))
+- **Last GREEN checkpoint:** `70bc4e9` — merge of `origin/main` (Phase 6.7 + Phase 7.1–7.3) with the local docs restructure; both Go test variants, tagged build, and UI tests (80) all pass.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Don't push to origin unless asked.
 
 ---
@@ -25,8 +24,8 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
 - [x] Phase 3 — Config CRUD & onboarding ✅
 - [x] Phase 4 — Persistence: archive, search, resume, file/command tracking ✅
 - [x] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications ✅
-- [ ] Phase 6 — Flexibility: terminal runtime, switch-runtime, task groups
-- [ ] Phase 7 — Additional features: OpenHands & OpenCode backends — candidate selected 2026-07-07; PRD [`phase-7-additional-features.md`](phase-7-additional-features.md), spec [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md); not started
+- [x] Phase 6 — Flexibility: terminal runtime, switch-runtime, task groups, drivers (xterm/tmux/iterm2) ✅
+- [ ] Phase 7 — Additional features: OpenHands & OpenCode backends — **7.1–7.3 ✅** (adapters, config, terminal gates, yolo/credchecks/switch matrix, UI); **7.4 GATED** (live acceptance, blocked on human credentials). PRD [`phase-7-additional-features.md`](phase-7-additional-features.md), spec [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md)
 
 Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent after 2).
 
@@ -36,13 +35,19 @@ Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent af
 
 > The ONLY place granular steps live.
 
-**Subphase 6.7 — next to implement (optional)** (iTerm2/AppleScript driver; techspec §2.2, §3.6, task 6):
-- [ ] iTerm2 `TerminalDriver` implementation via `osascript`.
-- [ ] AppleScript templates rendered with `text/template` for create-tab, set-appearance, write-text.
-- [ ] Escaping + shell-quote helper with tests for quotes/backslashes/newlines/argv shell-quoting.
-- [ ] Capability probe wiring; explicit unavailable `driver:"iterm2"` returns `422 terminal_unavailable` with reason.
-- **Checkpoint:** `go build ./...` + `go test ./...` + `go test -tags sqlite_fts5 ./...` (Go-only unless UI driver picker changes).
-- **Resume note:** xterm/tmux drivers and capabilities are green. 6.7 is fully skippable; if skipped, roll Phase 6 complete and start Phase 7 (selected candidate: OpenHands & OpenCode backends — [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md), subphase plan §7).
+**Phases 0–6 complete ✅** (all subphases green; details in git history & Phase status above). Phase 6 shipped
+the terminal runtime behind the `TerminalDriver` seam with xterm/PTY + tmux + iTerm2 drivers, same-backend
+switch-runtime, backend-swap history primer, task groups, and driver-selection plumbing. `GET /api/capabilities`
+advertises xterm/tmux/iterm2.
+
+**Phase 7 — OpenHands & OpenCode backends. 7.1–7.3 ✅, 7.4 GATED:**
+- [x] 7.1 — OpenCode/OpenHands adapters + config + terminal gates.
+- [x] 7.2 — permissions + credchecks + switch matrix (yolo/credchecks).
+- [x] 7.3 — OpenCode/OpenHands UI plumbing (onboarding BackendStep, settings BackendsEditor).
+- [ ] 7.4 — **GATED live acceptance, blocked on human:** needs `opencode`+`openhands` CLIs installed plus
+  provider keys; all fakeacp/UI paths are already green. Default if never unblocked: Phase 7 ships tested
+  against fakes, gaps documented.
+- **Checkpoint:** `go build ./...` + `go test ./...` + `go test -tags sqlite_fts5 ./...` + `cd ui && npm run test` + `npm run build` + embed.
 
 ---
 
