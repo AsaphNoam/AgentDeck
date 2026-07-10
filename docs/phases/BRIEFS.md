@@ -32,10 +32,13 @@ page is still completely unstyled, and several buttons still fail silently.
 **Also worth knowing:** switching a running agent's model works and keeps the right model; resume,
 restart-durability, and crash-recovery all behaved correctly.
 
-**Honest gap:** three areas can't be faked yet — terminal agents, fully-automatic agent-to-agent chatter,
-and usage budgets — so "every feature tested" isn't 100% until small extra fakes exist.
+**Update — I went back and closed the gaps I'd punted on.** With a tiny extra fake I drove the **terminal
+agents** (typing into a real embedded terminal, output comes back, survives reconnect), the **Files &
+Commands tabs**, the **per-turn message budget** (the 16th message is correctly blocked with a warning), and
+the **command-line** (`agentdeck implementer@my-app`, resume, reindex all match the app). All passed. The
+only thing left un-tested is a fully hands-off multi-agent conversation, which wouldn't show anything new.
 
-**Next up:** these are queued for `/fix-review`. Full report:
+**Next up:** the blocking problems above are queued for `/fix-review`. Full report:
 [`usability-review-run-2026-07-10.md`](usability-review-run-2026-07-10.md).
 
 ---

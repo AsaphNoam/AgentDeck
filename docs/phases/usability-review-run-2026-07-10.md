@@ -32,13 +32,14 @@ Prior runs marked the chat/permission/switch/messaging journeys ENV-DEPENDENT an
 dashboard card rendered the streamed text with a Done badge and context %. So chat creation, model
 selection, message send, streamed render, and status transitions ARE usability-testable under the mock.
 
-**What the mock still cannot cover (honest boundaries — reported as coverage gaps, not passes):**
-- **Terminal runtime (J6):** launches the *interactive* `claude` CLI in a PTY, not the ACP adapter — the
-  shim does not stand in. Needs a separate tiny fake interactive/PTY binary.
-- **Agent-initiated messaging (J10):** fakeacp streams canned text and never *calls* the MCP tools
-  (`send_message`/`check_messages`), so agent→agent traffic must be injected through the messaging
-  API/`/mcp` to observe the UI reaction; a fully autonomous multi-agent conversation needs a scriptable
-  tool-calling fake.
+**Boundaries (initially called gaps; four were closed in §5 with small additional fakes):**
+- **Terminal runtime (J6):** execs the *interactive* `claude` in a PTY, not the ACP shim — **closed** with a
+  6-line fake `claude` on PATH (§5).
+- **Files/Commands (F10), per-turn budgets (F11), CLI parity:** **closed** via `tool_flow` + `/api/hook`,
+  `/mcp` `send_message`, and the CLI binary respectively (§5).
+- **Agent-initiated messaging (J10):** fakeacp never *calls* the MCP tools, so agent→agent traffic was
+  injected through `/mcp` (with the real token) to observe every UI reaction; only a *fully autonomous*
+  multi-agent loop remains undriven, and it reveals nothing the injection didn't.
 - **Real-CLI variance (J2 cred branches):** not-logged-in / old-flag branches stay ENV-DEPENDENT.
 
 ## 1. Harness
@@ -102,7 +103,10 @@ coverage gap — not mockable). Blockers were orchestrator-verified (curl + brow
 | J3b First-launch modal | seeded+fakeacp | **MAJOR (new)** — launching the *first* agent leaves the New-Agent modal stuck open (overlay covers the page). |
 | J4 Permission flow | seeded+fakeacp | **PASS** approve/deny/sentinel + status match; **MINOR** double-toast; **MINOR** stopped agent keeps a live Approve/Deny prompt. |
 | J5 Grid & layout | seeded | **PASS** — grid stays sane on stop; reorder/density/group-collapse persistence confirmed via J12. (No per-card remove in the UI — only Stop; empty state covered by J1.) |
-| J6 Terminal | seeded | **COVERAGE GAP** — not mockable with fakeacp (interactive PTY CLI). Modal correctly disables Terminal for non-claude backends. |
+| J6 Terminal | seeded | **PASS** (§5) — via a fake interactive `claude`: real PTY, keystrokes, resize, output stream, scrollback replay on reattach, browser xterm render, zero console errors (`J6/terminal-tab.png`). Modal correctly disables Terminal for non-claude backends. |
+| F10 Files/Commands | seeded+fakeacp | **PASS** (§5) — Files via `tool_flow` tool_call, Commands via `/api/hook`; both tabs render styled. |
+| F11 Budgets | seeded+fakeacp | **PASS** (§5) — 15 sends ok, #16 `message_budget_exceeded` + `budget_exceeded` notification. |
+| CLI parity | seeded+fakeacp | **PASS** (§5) — `launch`/`resume`/`reindex` match the modal/API. |
 | J7 Stop/resume/switch | lived-in+fakeacp | **PASS** — resume & switch preserve the frozen model (opus-4-7 not reset to default); stop clean; model dropdown swaps per backend. **MINOR** Codex-not-installed shows a raw exec error. |
 | J8 Archive & search | lived-in (tagged+untagged) | **PASS** tagged search + resume-from-archive; **BLOCKER** empty/no-match `results:null` (verified); **MAJOR** untagged no-FTS5 build returns raw 500 and leaves stale rows visible; **MINOR** pagination fixed at limit 50. |
 | J9 Settings & config | seeded | **BLOCKER** whole surface unstyled (verified); **PASS** round-trip + merge-preserve via the UI; **MAJOR** validation/duplicate errors show bare "HTTP 4xx" discarding the field-naming body; **MINOR** stale server error lingers under a field. |
@@ -213,13 +217,50 @@ plain (this run's detail on an existing item).
   (INVARIANTS §3). The messaging per-launch token lives only in `<HOME>/mcp/<agent_id>.mcp.json` (0600) —
   no API/UI surface exposes it, so agent-messaging is effectively unobservable to a normal user.
 
-### Coverage gaps (matrix maintenance §7) — several answer the human's charter directly
-- **Terminal runtime (J6)** not mockable with fakeacp (interactive PTY CLI) — needs a fake interactive/PTY
-  binary. **Agent-initiated messaging** needs a scriptable tool-calling fake (fakeacp never calls the MCP
-  tools). **Per-turn budgets (F11)**, **Files/Commands tabs (F10)**, and **CLI parity** have no charter.
-  **Terminal driver selection** (tmux/iterm2) has no UI picker; iterm2 is macOS-only.
+### Coverage gaps — mostly CLOSED in the §5 gap-closure pass
+The initial run labeled five surfaces "gaps." A follow-up pass (§5) drove four of them; only a *fully
+autonomous* multi-agent conversation loop remains uncovered (and it reveals nothing beyond the injected
+messaging behavior already tested). **Terminal driver selection** (tmux/iterm2) still has no UI picker;
+iterm2 is macOS-only (untestable on this Linux host).
 
 ### Evidence
 Committed under [`usability-review-2026-07-10-evidence/`](usability-review-2026-07-10-evidence/) — one
-subfolder per journey (`J1 J2 J3 J3b J4 J5 J7 J8 J9 J9b J10 J10b J11 J12`, 93 screenshots). The live harness
-(binaries, fakeacp shim, fixtures, full `run/`) lived under a gitignored `.review/` and is not committed.
+subfolder per journey (`J1 J2 J3 J3b J4 J5 J6 J7 J8 J9 J9b J10 J10b J11 J12 F10`, 96 screenshots). The live
+harness (binaries, fakeacp shim, fixtures, full `run/`) lived under a gitignored `.review/`, not committed.
+
+---
+
+## 5. Gap-closure pass — four "gaps" driven with new/extended fakes
+
+The five surfaces the first pass called "coverage gaps" were re-examined; four are in fact drivable and were
+driven. The takeaway is a correction to my earlier framing: the only surface that genuinely needs a new,
+non-trivial fake is a fully-autonomous multi-agent conversation loop — and even that reveals nothing beyond
+the messaging behavior already exercised by `/mcp` injection.
+
+- **J6 Terminal runtime — PASS (new fake: a 6-line interactive `claude`).** The terminal path execs
+  `interactiveBinary("claude-acp") == "claude"` in a PTY (xterm driver), so a fake `claude` on PATH (echoes
+  input, ignores the appended `--model/--add-dir/--append-system-prompt` flags) unlocks it. Launched a
+  terminal agent (real PTY `/dev/pts/*`, driver xterm); over `/api/sessions/{id}/terminal/ws` a `{cols,rows}`
+  text frame resized and binary keystroke frames reached the shell, PTY output streamed back; a fresh WS
+  attach **replayed scrollback** (102 bytes incl. prompt); the browser xterm panel rendered the session
+  (earlier keystrokes visible), zero console errors. `J6/terminal-tab.png`.
+- **F10 Files & Commands tabs — PASS (fakeacp `tool_flow` + `/api/hook`).** `tool_flow`'s `Edit main.go`
+  tool_call populated `tracked_files` (Files tab shows `main.go`, "2 edits", "has diff", Copy/Diff); two
+  `command` hooks populated `tracked_commands` (`git status`, `go test ./...`); both tabs render styled, zero
+  console errors. `F10/Files.png`, `F10/Commands.png`. **Minor note:** there are two distinct per-launch
+  tokens — the **messaging** token (in `<HOME>/mcp/<agent_id>.mcp.json`) and the **hook** token
+  (`running.hook_token` in state.db); using the wrong one → 403 `token mismatch`. Fine for the shipped hook
+  scripts (which read `$AGENTDECK_HOOK_TOKEN`), but a foot-gun for anyone integrating a custom hook source.
+- **F11 Per-turn message budget — PASS (drove `/mcp` `send_message` ×16).** With alice's full messaging
+  token, sends 1–15 returned `ok:true`; #16 returned `message_budget_exceeded` "Per-turn message budget (15)
+  reached. This message was not sent." and a `budget_exceeded` **notification fired on `/api/events`** — the
+  budget and its notification work correctly. (Also confirms `send_message` address resolution:
+  `to_address:"teammate@my-app"`.)
+- **CLI parity — PASS.** `agentdeck implementer@my-app --name cli-agent` launched an agent that appears via
+  the API exactly like the modal (`launched cli-agent (a_…)`); `agentdeck resume <id>` correctly 409s while
+  running and resumes after stop; `agentdeck reindex` rebuilt the archive (server stopped). CLI≡modal parity
+  holds.
+
+**Correction to §4:** the earlier "coverage gap — three surfaces the mock cannot reach" bullet was too
+pessimistic. Terminal, Files/Commands, budgets, and the CLI are all drivable with the harness (a fake
+`claude`, `tool_flow`, hooks, `/mcp`). The remaining true gap is only a self-driving multi-agent loop.
