@@ -11,7 +11,7 @@ and let agents message each other. A high-level tour of the moving pieces lives
 in [architecture-flow.md](architecture-flow.md).
 
 **Status:** Phases 0–5 complete; Phase 6 (terminal runtime, switch-runtime, task
-groups) is in progress. See [docs/phases/HANDOFF.md](docs/phases/HANDOFF.md) for
+groups) is in progress. See [docs/features/HANDOFF.md](docs/features/HANDOFF.md) for
 live state. Working today: launch, streaming chat, the state dashboard, config
 CRUD & onboarding, archive/search/resume, agent↔agent MCP messaging, the
 terminal runtime, and switch-runtime.

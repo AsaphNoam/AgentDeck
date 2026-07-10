@@ -1,6 +1,6 @@
 # Phase 6 — Flexibility: Implementation Tech Spec
 
-**Mirrors:** `docs/phases/phase-6-flexibility.md` (phase PRD)
+**Mirrors:** `docs/features/phase-6-flexibility.md` (phase PRD)
 **Features:** F7 (switch runtime on a live agent), F2 (task groups)
 **Depends on:** Phase 1 (Runtime interface, chat runtime, launch composition), Phase 2 (state manager, SSE bus, card grid, layout), Phase 4 (resume machinery, transcript persistence)
 **Enables:** Future-phase candidates

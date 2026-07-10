@@ -23,7 +23,7 @@ EMBED_DIR="internal/server/ui/dist"
 
 # Pinned ACP adapter for the Claude Code chat runtime (techspec §12.1). The Go
 # runtime targets the ACP protocol version this adapter negotiates; bump this pin
-# deliberately and re-run the gated acceptance test (see docs/phases/phase-1-acceptance.md).
+# deliberately and re-run the gated acceptance test (see docs/features/phase-1-acceptance.md).
 # Install it (Node required) with: INSTALL_ACP=1 ./install.sh
 CLAUDE_ACP_PKG="@zed-industries/claude-code-acp"
 CLAUDE_ACP_VERSION="0.16.2"

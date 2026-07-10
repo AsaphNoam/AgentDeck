@@ -6,28 +6,22 @@ SQLite via `mattn/go-sqlite3` with FTS5 behind the `sqlite_fts5` build tag, `cre
 (Zustand, React Query, Radix, `@xterm/xterm`; UI tests: Vitest + Testing Library + MSW).
 
 ## Read first
-- **`docs/phases/HANDOFF.md`** — live state. Read it before doing anything; update it after every
+- **`docs/features/HANDOFF.md`** — live state. Read it before doing anything; update it after every
   change. (The session-start hook injects its "Current position" header — that is not a substitute
   for reading the file.)
-- **`docs/phases/AGENT-WORKFLOW.md`** — the canonical work/review/fix protocol (GREEN checkpoints,
+- **`docs/features/AGENT-WORKFLOW.md`** — the canonical work/review/fix/usability protocol (GREEN checkpoints,
   STOP conditions, condensation rules). If any skill or doc disagrees with it, it wins.
-- **`docs/phases/INVARIANTS.md`** — the catalog of bug classes this codebase already paid for.
+- **`docs/features/INVARIANTS.md`** — the catalog of bug classes this codebase already paid for.
   Before touching a hot-spot area (below), read the matching sections; reviews here exist largely
   to catch regressions of exactly these classes.
 - Orientation: `MAP.md` (doc index + load-bearing concepts), `architecture-flow.md` (diagrams and
   sequence flows). `AGENTS.md` is the Codex-facing entry point to the same protocol.
-- `DecisionsToReview.md` (repo root) is a **stale, human-facing snapshot** of two HANDOFF sections.
-  Never read or update it as live state — `docs/phases/HANDOFF.md` wins.
+- **`docs/features/BRIEFS.md`** — human-facing session history. Agents write the newest brief but
+  resume from HANDOFF, not old briefs.
 
-## Build & verify — the GREEN checkpoint
-A change is done only when ALL of these pass (never commit on red):
+## Build & verify
 
-```sh
-go build ./...
-go test ./...
-go test -tags sqlite_fts5 ./...
-cd ui && npm run build        # only if the change touched ui/
-```
+The exact GREEN checkpoint lives in the canonical workflow §2; do not redefine it here.
 
 - Both test variants matter: the untagged run covers the shipped **no-FTS5 fallback path**. A fix
   that only passes under `-tags sqlite_fts5` is not green, and vice versa.
@@ -48,9 +42,8 @@ cd ui && npm run build        # only if the change touched ui/
 ## Commits & history
 - Trunk-based: commit directly to `main`; no branches, no PRs. **Never push to origin unless the
   human explicitly asked** (a hook will prompt if you try).
-- Message templates: `phase N.M: <title> — green checkpoint` (build loop), `review fix: <title> —
-  green checkpoint` (fix loop); plain `docs:`/`feat:` prefixes for out-of-loop commits. Add a
-  `Co-Authored-By:` trailer naming the model that actually did the work.
+- Commit messages and model attribution follow the canonical workflow. Use plain `docs:`/`feat:`
+  prefixes only for work outside its named roles.
 - Mining history: a past rehash-and-merge left many **tree-identical duplicate** commit pairs —
   dedupe by commit subject, not SHA.
 - Test conventions: one `_test.go` per source file; regression tests are named after the defect they
@@ -74,8 +67,8 @@ cd ui && npm run build        # only if the change touched ui/
 
 ## Skills are twinned
 `.claude/skills/*` (Claude) and `.agents/skills/*` (Codex) are parallel copies. Any edit to one
-requires the matching edit to the other — they intentionally differ only in the Claude co-author
-trailer instruction. Drift has already happened once; a post-edit hook reminds you.
+requires the matching edit to the other. Matching skill files must be byte-identical; a post-edit
+hook checks them.
 
 ## Developer Preferences
 Answer directly. No preamble, hedging, or meta-commentary about the question—start with the substance, not phrases like "it's worth being precise about why."

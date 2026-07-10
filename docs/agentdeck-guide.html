@@ -1704,7 +1704,7 @@ cd ui && npm run build</pre>
         tags: ["roles", "projects", "backends"],
         user: "You define reusable roles, projects, and backend/model choices. AgentDeck should know where work happens, which persona to use, and which CLI/model should run.",
         behind: "The config package reads and writes JSON under ~/.agentdeck. Launch composes project cwd/context, role system prompt, backend env, selected model, permission policy, and interface. Resume/switch keep the frozen prompt/cwd snapshot while re-resolving live identity/backend/model/env details.",
-        paths: ["internal/config", "ui/src/features/settings", "docs/phases/tech/phase-3-config-onboarding-techspec.md"],
+        paths: ["internal/config", "ui/src/features/settings", "docs/features/tech/phase-3-config-onboarding-techspec.md"],
         rows: [
           ["Project", "AgentDeck · cwd ~/Projects/AgentDeck · context prompt"],
           ["Role", "agentdecker · implementer · reviewer · researcher · pm · teammate"],
@@ -1921,7 +1921,7 @@ cd ui && npm run build</pre>
         debug: "If launch fails, check backend binary/env, project cwd, config validation, and adapter launch args.",
         lanes: ["UI/CLI request", "server launch", "config + adapter", "runtime starts CLI", "state.db + SSE"],
         paths: ["internal/server/launch.go", "internal/config", "internal/backend/adapter.go", "internal/runtime/registry.go"],
-        source: "docs/phases/tech/phase-1-core-loop-techspec.md"
+        source: "docs/features/tech/phase-1-core-loop-techspec.md"
       },
       {
         title: "Chat turn and ACP normalization",
@@ -1930,7 +1930,7 @@ cd ui && npm run build</pre>
         debug: "If a message renders wrong, inspect the normalized Event first, then acpmap.go. If your own prompt is missing from Archive/search, that is the current persistence gap.",
         lanes: ["Prompt REST", "ACP stdio", "event mapping", "hub/transcript", "SSE/UI render"],
         paths: ["internal/runtime/chat.go", "internal/runtime/acpmap.go", "internal/runtime/event.go", "ui/src/components/chat/renderers"],
-        source: "docs/phases/tech/phase-1-core-loop-techspec.md"
+        source: "docs/features/tech/phase-1-core-loop-techspec.md"
       },
       {
         title: "Permission gate",
@@ -1939,7 +1939,7 @@ cd ui && npm run build</pre>
         debug: "If approval seems ignored, check the pending tool_call_id and whether the runtime was canceled or timed out while waiting.",
         lanes: ["ACP permission request", "pending gate", "UI prompt", "POST decision", "ACP resumes/denies"],
         paths: ["internal/runtime/permission.go", "internal/server/sessions.go", "ui/src/components/chat/renderers/PermissionPrompt.tsx"],
-        source: "docs/phases/tech/phase-1-core-loop-techspec.md"
+        source: "docs/features/tech/phase-1-core-loop-techspec.md"
       },
       {
         title: "Hooks to dashboard status",
@@ -1948,7 +1948,7 @@ cd ui && npm run build</pre>
         debug: "If terminal status is stale, check AGENTDECK_* env, generated settings file, hook token freshness, and hook endpoint response.",
         lanes: ["CLI lifecycle", "shell hook", "/api/hook", "state/index", "SSE card update"],
         paths: ["internal/hooks/hooks.go", "internal/hooks/scripts", "internal/server/hook.go", "internal/index/indexer.go"],
-        source: "docs/phases/tech/phase-6-flexibility-techspec.md"
+        source: "docs/features/tech/phase-6-flexibility-techspec.md"
       },
       {
         title: "MCP messaging and nudger",
@@ -1957,7 +1957,7 @@ cd ui && npm run build</pre>
         debug: "If messages do not deliver, check HTTP MCP registration, token-to-agent binding, unread row state, recipient interface/status, and per-turn budget.",
         lanes: ["/mcp tool call", "identity binding", "message row", "budget/nudger", "recipient check"],
         paths: ["internal/messaging/tools.go", "internal/state/messages.go", "internal/server/messaging_loops.go"],
-        source: "docs/phases/tech/phase-5-coordination-techspec.md"
+        source: "docs/features/tech/phase-5-coordination-techspec.md"
       },
       {
         title: "Archive search and resume",
@@ -1966,7 +1966,7 @@ cd ui && npm run build</pre>
         debug: "If search misses assistant/tool content, run reindex and inspect transcript append records versus FTS rows. If it misses your own prompt, that prompt was not persisted yet.",
         lanes: ["transcript append", "indexer", "FTS5 query", "resume endpoint", "runtime.Resume"],
         paths: ["internal/transcript/writer.go", "internal/index/indexer.go", "internal/archive/archive.go", "internal/server/resume.go"],
-        source: "docs/phases/tech/phase-4-persistence-archive-techspec.md"
+        source: "docs/features/tech/phase-4-persistence-archive-techspec.md"
       },
       {
         title: "Terminal PTY and WebSocket",
@@ -1975,7 +1975,7 @@ cd ui && npm run build</pre>
         debug: "If terminal is blank, check capabilities, driver selection, PTY process, PTY hub/WS frames, and hook status separately. Raw terminal bytes are not ACP transcript events.",
         lanes: ["terminal launch", "PTY child", "PTY hub + WS", "xterm.js panel", "hooks status"],
         paths: ["internal/runtime/terminal", "internal/server/terminal.go", "ui/src/components/chat/TerminalTab.tsx"],
-        source: "docs/phases/tech/phase-6-flexibility-techspec.md"
+        source: "docs/features/tech/phase-6-flexibility-techspec.md"
       },
       {
         title: "Switch runtime",
@@ -1984,7 +1984,7 @@ cd ui && npm run build</pre>
         debug: "If switch loses history, inspect agent_id stability, resume ID resolution, primer generation, and whether rollback path fired.",
         lanes: ["switch request", "per-agent lock", "stop old runtime", "persist target", "resume/relaunch"],
         paths: ["internal/server/switch.go", "internal/server/primer.go", "internal/backend/adapter.go", "internal/runtime/registry.go"],
-        source: "docs/phases/tech/phase-6-flexibility-techspec.md"
+        source: "docs/features/tech/phase-6-flexibility-techspec.md"
       },
       {
         title: "Task groups",
@@ -1993,13 +1993,13 @@ cd ui && npm run build</pre>
         debug: "If a card appears in the wrong group, check identity update endpoint and layout collapse state separately.",
         lanes: ["identity edit", "agent row", "layout state", "group render", "release stop batch"],
         paths: ["internal/server/groups.go", "internal/state/agents.go", "ui/src/components/grid/CardGrid.tsx"],
-        source: "docs/phases/tech/phase-6-flexibility-techspec.md"
+        source: "docs/features/tech/phase-6-flexibility-techspec.md"
       }
     ];
 
     const protocols = [
       ["ACP", "Chat runtime protocol", "What it is: structured chat over stdio. Why AgentDeck uses it: assistant text, tool calls, diffs, permissions, and turn boundaries arrive as machine-readable events. What can break: provider wire-shape changes, permission races, or missing user-prompt persistence.", ["internal/runtime/chat.go", "internal/runtime/acpmap.go"]],
-      ["MCP", "Agent-to-agent tools", "What it is here: streamable HTTP MCP mounted at /mcp. Why AgentDeck uses it: agents call list_agents, send_message, and check_messages without a user copy-paste relay. What can break: live CLI registration is still gated and no working stdio proxy fallback is shipped.", ["internal/messaging/tools.go", "docs/phases/tech/phase-5-coordination-techspec.md"]],
+      ["MCP", "Agent-to-agent tools", "What it is here: streamable HTTP MCP mounted at /mcp. Why AgentDeck uses it: agents call list_agents, send_message, and check_messages without a user copy-paste relay. What can break: live CLI registration is still gated and no working stdio proxy fallback is shipped.", ["internal/messaging/tools.go", "docs/features/tech/phase-5-coordination-techspec.md"]],
       ["SSE", "Live browser updates", "What it is: one-way server push from /api/events. Why AgentDeck uses it: dashboard cards, transcript deltas, notifications, and pings update without polling. What can break: stale store state, missed reconnect fetches, or subscriber lifecycle bugs.", ["internal/server/sse.go", "internal/bus/bus.go", "ui/src/api/sse.ts"]],
       ["PTY/WS", "Interactive terminal path", "What it is: real CLI bytes over pseudo-terminal plus WebSocket. Why AgentDeck uses it: terminal mode can drive CLIs that are not ACP-structured. What can break: capabilities, PTY hub/drain, WebSocket attach, and hook status are separate concerns.", ["internal/runtime/terminal", "internal/server/terminal.go"]],
       ["Hooks", "Lifecycle status producers", "What they are: tiny shell scripts registered with agent CLIs. Why AgentDeck uses them: lifecycle/status events POST to /api/hook with a per-launch token, especially for terminal agents. What can break: missing jq/curl, gated chat passthrough, Codex hook names, or stale tokens.", ["internal/hooks/hooks.go", "internal/server/hook.go"]],

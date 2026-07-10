@@ -1,6 +1,6 @@
 # Phase 4 — Implementation Tech Spec: Persistence — transcript archive, full-text search, resume, file/command tracking
 
-**Mirrors:** `docs/phases/phase-4-persistence-archive.md` (phase PRD)
+**Mirrors:** `docs/features/phase-4-persistence-archive.md` (phase PRD)
 **Master PRD:** `agent-dashboard-prd.md` (source of truth — F9, F10, §3.5 `sessions/` layout, §4.1 `Runtime.Resume`, §6 REST surface)
 **Builds on:** Phase 1 (Runtime interface, normalized transcript `Event`s, `LaunchSpec` + composition, `state.db` agent/running/status rows), Phase 2 (state manager, SSE bus, `state_update`/`new_message`, `GET /api/sessions/{id}/transcript` minimal in-memory endpoint)
 **Status:** ready to implement after Phase 2

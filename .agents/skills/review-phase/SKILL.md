@@ -1,21 +1,14 @@
 ---
 name: review-phase
-description: Review the last commit or merged PR on this repo against the AgentDeck phase specs — checking spec adherence, dead code, bad practices, and flagrant bugs. Does NOT chase micro-optimizations or rare edge cases; only flags real issues from normal usage. Use when the user says "/review-phase", "review the last commit", "review the other agent's work", "check what was just built", or similar.
+description: Review the other agent's latest AgentDeck GREEN-checkpoint work for spec adherence, dead code, bad practices, flagrant normal-use bugs, and pending peer decisions. Use when the user says "/review-phase", "review the last commit", "review the other agent's work", or similar.
 ---
 
 # Review the last agent's work
 
-You are reviewing another agent's commit or PR — not your own. **Read-only: no code changes, no commits.**
+Read [`docs/features/AGENT-WORKFLOW.md`](../../../docs/features/AGENT-WORKFLOW.md) §§2–3, §5, §7,
+and §8 plus [`docs/features/HANDOFF.md`](../../../docs/features/HANDOFF.md) completely, then follow
+the canonical review action. The workflow wins over this launcher.
 
-Follow the full review protocol in [`docs/phases/AGENT-WORKFLOW.md`](../../../docs/phases/AGENT-WORKFLOW.md) **§8**. That's the single source of truth. The reminders below just help you start fast.
-
-## Steps
-
-1. **Find the target.** Check for a recently merged PR (`gh pr list --state merged --limit 3`); if none, use the last commit (`git log -1`). The human may also name a specific commit or range — use that.
-2. **Get the diff.** `git show <sha>` or `git diff <base>..<head>`.
-3. **Read HANDOFF.md** to know which phase was just completed, then open its PRD (`docs/phases/phase-N-*.md`) and tech spec (`docs/phases/tech/phase-N-*-techspec.md`).
-4. **Review against the four criteria** (§8): spec adherence · dead code · bad practices · flagrant bugs.
-5. **Sweep against the paid-for bug classes.** Check the diff against every class in [`docs/phases/INVARIANTS.md`](../../../docs/phases/INVARIANTS.md) and tag each finding with its class number — a match is strong evidence the finding is real.
-6. **Skip** style nits, micro-optimizations, and edge cases that won't arise in normal use. The bar: *would this cause a real problem during regular usage?*
-7. **Categorize** each finding as **BLOCKING** or **ADVISORY**.
-8. **Report** to the human — every finding with file + line, what's wrong, and why it matters. For BLOCKING items, also write them to `## Review findings` in `HANDOFF.md`. If a finding reveals a genuinely new systemic class, append it to `INVARIANTS.md` (doc writes are allowed; code writes are not). If nothing found, say so plainly.
+The human may name a commit/range in `$ARGUMENTS`; otherwise use the handoff's review markers.
+Do not change product code. Persist every finding and decision disposition, make the required
+workflow-state commit, and close with the exact stored human brief.

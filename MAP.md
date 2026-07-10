@@ -8,34 +8,35 @@ Central index of the planning docs: what each file is, the build order, and the 
 |------|-----------|
 | [docs/agent-dashboard-prd.md](docs/agent-dashboard-prd.md) | **Master PRD.** Full product spec: concepts, data model, architecture, all features (F1–F13), REST/SSE surface, tech stack, open questions. Source of truth. |
 | [docs/architecture-decisions.md](docs/architecture-decisions.md) | **Architecture decisions & rationale.** Why config=files/state=SQLite, hooks→HTTP, in-process Go MCP. The "why" behind the PRD's design. |
-| [docs/phases/README.md](docs/phases/README.md) | Phase plan overview: phase map, dependency graph, milestone mapping, how to brief an agent per phase. |
-| [docs/phases/HANDOFF.md](docs/phases/HANDOFF.md) | **Live implementation state.** Where the build is, what's next, decisions, blockers. Agents read/update this every session. |
-| [docs/phases/AGENT-WORKFLOW.md](docs/phases/AGENT-WORKFLOW.md) | **Spaced-session build protocol.** The fire-and-forget loop both Claude Code & Codex follow, one at a time. Drives `HANDOFF.md`. |
-| [docs/phases/INVARIANTS.md](docs/phases/INVARIANTS.md) | **Paid-for bug-class catalog.** The systemic defect classes three full review cycles kept re-finding, with the canonical helpers/patterns that fix them. Build agents read the matching sections before touching hot spots; review agents sweep diffs against it; fix agents feed it. |
-| [docs/phases/phase-0-foundation.md](docs/phases/phase-0-foundation.md) | Data model, file store, server & CLI skeleton. Substrate. |
-| [docs/phases/phase-1-core-loop.md](docs/phases/phase-1-core-loop.md) | ACP chat runtime, launch, streaming chat. (F4, F3 min) |
-| [docs/phases/phase-2-state-dashboard.md](docs/phases/phase-2-state-dashboard.md) | State manager, SSE bus, dashboard card grid. (F1) |
-| [docs/phases/phase-3-config-onboarding.md](docs/phases/phase-3-config-onboarding.md) | Config CRUD & onboarding. (F5, F6, F12) |
-| [docs/phases/phase-4-persistence-archive.md](docs/phases/phase-4-persistence-archive.md) | Archive, search, resume, file/command tracking. (F9, F10) |
-| [docs/phases/phase-5-coordination.md](docs/phases/phase-5-coordination.md) | MCP messaging, nudger, budgets, notifications. (F8, F11) |
-| [docs/phases/phase-6-flexibility.md](docs/phases/phase-6-flexibility.md) | Terminal runtime, switch-runtime, task groups. (F7, F2) |
-| [docs/phases/phase-7-future-phase.md](docs/phases/phase-7-future-phase.md) | Future phase candidate bucket. Start here for post-core feature selection. |
-| [docs/phases/phase-7-feature-candidates.md](docs/phases/phase-7-feature-candidates.md) | Candidate backlog for Phase 7; currently prioritizes launch templates/task bundles and session notes. |
+| [docs/features/README.md](docs/features/README.md) | Phase plan overview: phase map, dependency graph, milestone mapping, how to brief an agent per phase. |
+| [docs/features/HANDOFF.md](docs/features/HANDOFF.md) | **Live implementation state.** Where the build is, what's next, decisions, blockers. Agents read/update this every session. |
+| [docs/features/BRIEFS.md](docs/features/BRIEFS.md) | **Human session briefs.** Read the newest entry to return cold without the handoff, diff, or chat history. |
+| [docs/features/AGENT-WORKFLOW.md](docs/features/AGENT-WORKFLOW.md) | **Spaced-session build protocol.** The fire-and-forget loop both Claude Code & Codex follow, one at a time. Drives `HANDOFF.md`. |
+| [docs/features/INVARIANTS.md](docs/features/INVARIANTS.md) | **Paid-for bug-class catalog.** The systemic defect classes three full review cycles kept re-finding, with the canonical helpers/patterns that fix them. Build agents read the matching sections before touching hot spots; review agents sweep diffs against it; fix agents feed it. |
+| [docs/features/phase-0-foundation.md](docs/features/phase-0-foundation.md) | Data model, file store, server & CLI skeleton. Substrate. |
+| [docs/features/phase-1-core-loop.md](docs/features/phase-1-core-loop.md) | ACP chat runtime, launch, streaming chat. (F4, F3 min) |
+| [docs/features/phase-2-state-dashboard.md](docs/features/phase-2-state-dashboard.md) | State manager, SSE bus, dashboard card grid. (F1) |
+| [docs/features/phase-3-config-onboarding.md](docs/features/phase-3-config-onboarding.md) | Config CRUD & onboarding. (F5, F6, F12) |
+| [docs/features/phase-4-persistence-archive.md](docs/features/phase-4-persistence-archive.md) | Archive, search, resume, file/command tracking. (F9, F10) |
+| [docs/features/phase-5-coordination.md](docs/features/phase-5-coordination.md) | MCP messaging, nudger, budgets, notifications. (F8, F11) |
+| [docs/features/phase-6-flexibility.md](docs/features/phase-6-flexibility.md) | Terminal runtime, switch-runtime, task groups. (F7, F2) |
+| [docs/features/future-phase.md](docs/features/future-phase.md) | Future feature candidate bucket. |
+| [docs/features/phase-7-additional-features.md](docs/features/phase-7-additional-features.md) | Selected Phase 7 scope: additional agent backends. |
 
 ### Implementation tech specs
 
-Each phase PRD above has a mirror **tech spec** under `docs/phases/tech/` — the implementation-ready companion (concrete libs, package/file layout, in-code data structures, exact API/SSE JSON, algorithms, ordered task breakdown, tests, resolved open questions). Build from these; the phase PRD is the *what*, the tech spec is the *how*.
+Each phase PRD above has a mirror **tech spec** under `docs/features/tech/` — the implementation-ready companion (concrete libs, package/file layout, in-code data structures, exact API/SSE JSON, algorithms, ordered task breakdown, tests, resolved open questions). Build from these; the phase PRD is the *what*, the tech spec is the *how*.
 
 | Tech spec | Mirrors |
 |-----------|---------|
-| [tech/phase-0-foundation-techspec.md](docs/phases/tech/phase-0-foundation-techspec.md) | Phase 0 |
-| [tech/phase-1-core-loop-techspec.md](docs/phases/tech/phase-1-core-loop-techspec.md) | Phase 1 |
-| [tech/phase-2-state-dashboard-techspec.md](docs/phases/tech/phase-2-state-dashboard-techspec.md) | Phase 2 |
-| [tech/phase-3-config-onboarding-techspec.md](docs/phases/tech/phase-3-config-onboarding-techspec.md) | Phase 3 |
-| [tech/phase-4-persistence-archive-techspec.md](docs/phases/tech/phase-4-persistence-archive-techspec.md) | Phase 4 |
-| [tech/phase-5-coordination-techspec.md](docs/phases/tech/phase-5-coordination-techspec.md) | Phase 5 |
-| [tech/phase-6-flexibility-techspec.md](docs/phases/tech/phase-6-flexibility-techspec.md) | Phase 6 |
-| [tech/phase-7-polish-activity-map-techspec.md](docs/phases/tech/phase-7-polish-activity-map-techspec.md) | Optional activity-map candidate for Phase 7 |
+| [tech/phase-0-foundation-techspec.md](docs/features/tech/phase-0-foundation-techspec.md) | Phase 0 |
+| [tech/phase-1-core-loop-techspec.md](docs/features/tech/phase-1-core-loop-techspec.md) | Phase 1 |
+| [tech/phase-2-state-dashboard-techspec.md](docs/features/tech/phase-2-state-dashboard-techspec.md) | Phase 2 |
+| [tech/phase-3-config-onboarding-techspec.md](docs/features/tech/phase-3-config-onboarding-techspec.md) | Phase 3 |
+| [tech/phase-4-persistence-archive-techspec.md](docs/features/tech/phase-4-persistence-archive-techspec.md) | Phase 4 |
+| [tech/phase-5-coordination-techspec.md](docs/features/tech/phase-5-coordination-techspec.md) | Phase 5 |
+| [tech/phase-6-flexibility-techspec.md](docs/features/tech/phase-6-flexibility-techspec.md) | Phase 6 |
+| [tech/phase-7-polish-activity-map-techspec.md](docs/features/tech/phase-7-polish-activity-map-techspec.md) | Optional activity-map candidate for Phase 7 |
 
 ## Build order
 
@@ -55,7 +56,7 @@ F1→2 · F2→6 · F3→1(min)+2(full) · F4→1(API)+3(modal) · F5→3 · F6�
 
 ## Architecture in one breath
 
-Two runtime processes (+ agent CLIs): **React/Vite UI** ⇄ REST + SSE ⇄ **Go server** (binds `127.0.0.1` only) ⇄ stdio ⇄ **agent CLI** (Claude Code / Codex). The **messaging MCP server is hosted in-process in the Go binary** (Go MCP SDK, stdio) — no runtime Node. Hooks **POST to `/api/hook`** (+ per-launch token). No cloud, no auth.
+Two runtime processes (+ agent CLIs): **React/Vite UI** ⇄ REST + SSE ⇄ **Go server** (binds `127.0.0.1` only) ⇄ stdio ⇄ **agent CLI** (Claude Code / Codex). The **messaging Model Context Protocol (MCP) server is hosted in-process in the Go binary** and exposed to agents over loopback HTTP at `/mcp` — no runtime Node. Hooks **POST to `/api/hook`** (+ per-launch token). No cloud, no auth.
 
 ## Source of truth: `~/.agentdeck/` (config = files, state = SQLite)
 

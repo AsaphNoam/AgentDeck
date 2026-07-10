@@ -1,6 +1,6 @@
 # Phase 5 — Coordination: Implementation Tech Spec
 
-**Mirrors:** `docs/phases/phase-5-coordination.md` (phase PRD)
+**Mirrors:** `docs/features/phase-5-coordination.md` (phase PRD)
 **Master PRD refs:** §4.5 (MCP messaging server, nudger, message budget), F8, F11
 **Status:** ready to implement after Phases 1 and 2
 **Features:** F8 (agent-to-agent messaging), F11 (notifications)
