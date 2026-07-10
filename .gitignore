@@ -21,3 +21,6 @@ mcp/node_modules/
 .gocache
 
 .agentdeck-dev/
+# usability-review harness (binaries, fixtures, node_modules, screenshots) — never commit
+/.review/
+/scratch-fakeacp
