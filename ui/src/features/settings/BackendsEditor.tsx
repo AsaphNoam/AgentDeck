@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useBackends, usePutBackends } from "../../api/config";
+import { useBackends, usePutBackends, configErrorMessage } from "../../api/config";
 import type { BackendsConfig, Backend, Model, CredResult } from "../../schemas/backends";
 import { BACKEND_TYPE_LABELS, BACKEND_TYPE_OPTIONS } from "../../lib/backendTypes";
 import { ModelRow } from "./ModelRow";
@@ -173,7 +173,7 @@ export function BackendsEditor() {
         const def = es.find((e) => e.backend.default)?.id ?? es[0]?.id ?? "";
         setDefaultId(def);
       },
-      onError: (e) => setError(String(e)),
+      onError: (e) => setError(configErrorMessage(e)),
     });
   };
 

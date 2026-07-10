@@ -2,7 +2,9 @@ import { useState } from "react";
 import { useCreateProject } from "../../../api/config";
 
 interface ProjectStepProps {
-  onDone: () => void;
+  /** Receives the slug of the project just created, so the launch step can
+   * default to it instead of the seeded my-app (whose cwd may not exist). */
+  onDone: (projectId: string) => void;
 }
 
 export function ProjectStep({ onDone }: ProjectStepProps) {
@@ -36,7 +38,7 @@ export function ProjectStep({ onDone }: ProjectStepProps) {
           if (cwdWarn) {
             setWarning(cwdWarn.message);
           }
-          onDone();
+          onDone(slug.trim());
         },
         onError: (e) => setError(String(e)),
       },

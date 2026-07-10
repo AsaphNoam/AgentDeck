@@ -5,7 +5,9 @@ import {
   useCreateProject,
   useUpdateProject,
   useDeleteProject,
+  configErrorMessage,
 } from "../../api/config";
+import { useUiStore } from "../../store/uiStore";
 import type { ProjectResponse, FieldWarning } from "../../schemas/project";
 import { ProjectForm } from "./ProjectForm";
 
@@ -14,6 +16,7 @@ export function ProjectsEditor() {
   const createProject = useCreateProject();
   const updateProject = useUpdateProject();
   const deleteProject = useDeleteProject();
+  const pushError = useUiStore((state) => state.pushError);
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ProjectResponse | null>(null);
@@ -47,7 +50,7 @@ export function ProjectsEditor() {
             setWarnings(resp.warnings ?? []);
             setOpen(false);
           },
-          onError: (e) => setFormError(String(e)),
+          onError: (e) => setFormError(configErrorMessage(e)),
         },
       );
     } else {
@@ -75,7 +78,9 @@ export function ProjectsEditor() {
                 ? `Project "${id}" is used by ${agents.length} running agent(s):\n${agents.join(", ")}\n\nDelete the project definition anyway? Running agents are unaffected.`
                 : `Project "${id}" is in use. Delete the definition anyway?`;
             if (confirm(msg)) deleteProject.mutate({ id, force: true });
+            return;
           }
+          pushError("Delete project failed", configErrorMessage(err));
         },
       },
     );

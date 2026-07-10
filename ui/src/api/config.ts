@@ -25,6 +25,35 @@ async function httpError(res: Response): Promise<Error> {
   return Object.assign(new Error(`HTTP ${res.status}`), { status: res.status, body });
 }
 
+// configErrorMessage extracts a human-readable reason from the structured error
+// httpError attaches, so the editors stop showing a bare "HTTP 400"/"HTTP 409"
+// and instead surface the field-level validation message or conflict reason the
+// server actually sent. Handles all three server envelopes: validation_failed
+// ({errors:[{field,message}]}), in-use/duplicate ({message}), and the runtime
+// APIError shape ({error:{message}}), falling back to the raw Error message.
+export function configErrorMessage(err: unknown): string {
+  const e = err as {
+    message?: string;
+    body?: {
+      error?: string | { message?: string };
+      message?: string;
+      errors?: Array<{ field?: string; message?: string }>;
+    };
+  };
+  const body = e?.body;
+  if (body) {
+    if (Array.isArray(body.errors) && body.errors.length > 0) {
+      const parts = body.errors
+        .map((fe) => (fe.field ? `${fe.field}: ${fe.message ?? ""}` : fe.message ?? ""))
+        .filter(Boolean);
+      if (parts.length > 0) return parts.join("; ");
+    }
+    if (typeof body.message === "string" && body.message) return body.message;
+    if (body.error && typeof body.error === "object" && body.error.message) return body.error.message;
+  }
+  return e?.message ?? String(err);
+}
+
 async function json<T>(input: string, init?: RequestInit): Promise<T> {
   const res = await fetch(input, init);
   if (!res.ok) {

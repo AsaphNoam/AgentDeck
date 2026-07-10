@@ -71,7 +71,7 @@ export function ArchivePage() {
     try {
       const resp = await searchArchive(query, 50, 0, ac.signal);
       if (!ac.signal.aborted) {
-        setResults(resp.results);
+        setResults(resp.results ?? []);
         setTotal(resp.total);
       }
     } catch (err: unknown) {

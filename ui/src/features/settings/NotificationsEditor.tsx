@@ -1,4 +1,5 @@
 import { useConfig, usePutConfig } from "../../api/config";
+import { useUiStore } from "../../store/uiStore";
 import type { NotificationType } from "../../api/types";
 
 const notificationTypes: Array<{ type: NotificationType; label: string }> = [
@@ -11,13 +12,20 @@ const notificationTypes: Array<{ type: NotificationType; label: string }> = [
 export function NotificationsEditor() {
   const { data: config } = useConfig();
   const putConfig = usePutConfig();
+  const pushError = useUiStore((state) => state.pushError);
   const notifications = config?.notifications ?? {
     desktop_enabled: true,
     muted: { done: false, waiting_input: false, permission_required: false, budget_exceeded: false },
   };
 
   const save = (next: typeof notifications) => {
-    putConfig.mutate({ notifications: next });
+    putConfig.mutate(
+      { notifications: next },
+      {
+        onError: (err: unknown) =>
+          pushError("Saving notifications failed", err instanceof Error ? err.message : String(err)),
+      },
+    );
   };
   const requestDesktop = async () => {
     if (!("Notification" in window)) return;

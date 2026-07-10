@@ -76,6 +76,31 @@ describe("RolesEditor", () => {
     expect(await screen.findByText("New Role")).toBeInTheDocument();
   });
 
+  it("surfaces the server's field-level message on a 400 instead of a bare HTTP status", async () => {
+    // S5/J9 regression: create/update onError used to render String(e) = "HTTP 400",
+    // discarding the validation body that names the offending field. It must now
+    // show the server's actual message.
+    server.use(
+      http.post("/api/roles", () =>
+        HttpResponse.json(
+          { error: "validation_failed", errors: [{ field: "title", code: "required", message: "title is required" }] },
+          { status: 400 },
+        ),
+      ),
+    );
+
+    renderWithQuery(<RolesEditor />);
+    expect(await screen.findByText("Implementer")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("New role"));
+    fireEvent.change(screen.getByPlaceholderText("e.g. security-reviewer"), { target: { value: "new-role" } });
+    fireEvent.change(screen.getByPlaceholderText("e.g. Security Reviewer"), { target: { value: "New Role" } });
+    fireEvent.click(screen.getByText("Create"));
+
+    expect(await screen.findByText("title: title is required")).toBeInTheDocument();
+    expect(screen.queryByText(/HTTP 400/)).not.toBeInTheDocument();
+  });
+
   it("delete mutation rejects with a structured {status, body} error on 409", async () => {
     // The editor's force-retry branch reads err.status === 409 and
     // err.body.agents; a plain Error would silently disable it. This guards

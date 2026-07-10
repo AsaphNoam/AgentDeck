@@ -58,6 +58,32 @@ func TestReadAllSkipsOversizedRecord(t *testing.T) {
 	}
 }
 
+// TestReadAllMetaOnlyReturnsEmptySlice guards the S1/S4 blocker: a just-launched
+// agent's transcript holds only a session_meta record. With IncludeMeta:false
+// that record is filtered out, and the result must be a non-nil empty slice so
+// the HTTP layer emits "events":[] (not null) — a null crashes foldTranscript.
+func TestReadAllMetaOnlyReturnsEmptySlice(t *testing.T) {
+	var buf bytes.Buffer
+	e := event(t, 0, runtime.EvSessionMeta, runtime.SessionMetaData{})
+	b, err := json.Marshal(e)
+	if err != nil {
+		t.Fatalf("marshal meta: %v", err)
+	}
+	buf.Write(b)
+	buf.WriteByte('\n')
+
+	events, err := readAll(&buf, ReadOptions{IncludeMeta: false})
+	if err != nil {
+		t.Fatalf("readAll: %v", err)
+	}
+	if events == nil {
+		t.Fatal("events is nil; want non-nil empty slice")
+	}
+	if len(events) != 0 {
+		t.Fatalf("events len = %d, want 0", len(events))
+	}
+}
+
 // TestReadAllOversizedTrailingRecordNoAbort ensures an oversized record as the
 // final line (no trailing content after it) still yields the earlier records.
 func TestReadAllOversizedTrailingRecordNoAbort(t *testing.T) {

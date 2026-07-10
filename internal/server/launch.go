@@ -175,6 +175,14 @@ func (s *Server) composeLaunch(req launchRequest) (runtime.LaunchSpec, state.Age
 	if err != nil {
 		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeValidation, "bad project cwd: "+err.Error())
 	}
+	// Pre-check the resolved cwd exists. Without this the process launch fails
+	// deep in the runtime with a fork/exec ENOENT that names the adapter binary,
+	// not the missing directory, so the user cannot self-diagnose (e.g. the
+	// shipped my-app project points at ~/Projects/my-app, absent on a fresh box).
+	if info, statErr := os.Stat(cwd); statErr != nil || !info.IsDir() {
+		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeValidation,
+			fmt.Sprintf("project directory %q does not exist — set project %q to an existing path", cwd, req.Project))
+	}
 	addDirs := expandAddDirs(project.AddDirs)
 
 	agentID, err := s.stateStore.NewAgentID()

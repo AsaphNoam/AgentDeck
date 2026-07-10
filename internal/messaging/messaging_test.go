@@ -151,6 +151,47 @@ func TestSendAndCheckRoundTrip(t *testing.T) {
 	}
 }
 
+// TestCheckMessagesFiresReadSink guards the J10 blocker: reading mail must
+// refresh the recipient's state so its unread_messages badge clears. Without
+// the sink, send_message bumps the badge but check_messages never recomputes it.
+func TestCheckMessagesFiresReadSink(t *testing.T) {
+	st := newStore(t)
+	liveAgent(t, st, "a_impl", "Atlas", "implementer", "my-app")
+	liveAgent(t, st, "a_rev", "Nova", "reviewer", "my-app")
+
+	srv := New(st, nil)
+	srv.Register("tok-impl", "a_impl")
+	srv.Register("tok-rev", "a_rev")
+
+	var readAgents []string
+	srv.SetMessagesReadSink(func(agentID string) { readAgents = append(readAgents, agentID) })
+
+	implCS := connect(t, srv, "tok-impl")
+	if res, isErr := call(t, implCS, "send_message", map[string]any{"to": "reviewer@my-app", "body": "hi"}); isErr || res["ok"] != true {
+		t.Fatalf("send_message failed: %v", res)
+	}
+
+	// A check that returns no messages must NOT fire the sink (nothing changed).
+	revCS := connect(t, srv, "tok-rev")
+	if _, isErr := call(t, revCS, "check_messages", map[string]any{"unread_only": true, "mark_read": false}); isErr {
+		t.Fatalf("check_messages (no mutation) errored")
+	}
+	if len(readAgents) != 0 {
+		t.Fatalf("read sink fired without marking read: %v", readAgents)
+	}
+
+	// The default check marks read → the sink fires for the reader so the badge clears.
+	if _, isErr := call(t, revCS, "check_messages", nil); isErr {
+		t.Fatalf("check_messages errored")
+	}
+	if len(readAgents) != 1 || readAgents[0] != "a_rev" {
+		t.Fatalf("read sink fired = %v, want [a_rev]", readAgents)
+	}
+	if unread, err := st.UnreadCount("a_rev"); err != nil || unread != 0 {
+		t.Fatalf("UnreadCount(a_rev) = %d, %v; want 0", unread, err)
+	}
+}
+
 // TestSendIdentityNotSpoofable: `from` is the session's agent_id regardless of
 // any argument, and an unknown token is rejected with session_unknown.
 func TestSendIdentityNotSpoofable(t *testing.T) {

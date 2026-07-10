@@ -128,6 +128,9 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 			eventBus.PublishStateUpdate(update)
 		}
 	})
+	// When an agent reads/deletes its mail, recompute + publish its state so the
+	// unread_messages badge clears immediately (mirrors the send-side touch).
+	msg.SetMessagesReadSink(touch)
 	// Route budget breaches through the bus so the toast names the agent
 	// (agent_name/address) like every other notification type.
 	msg.SetBudgetExceededSink(eventBus.PublishBudgetExceeded)

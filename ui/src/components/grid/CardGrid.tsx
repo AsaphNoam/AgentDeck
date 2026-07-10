@@ -22,6 +22,7 @@ export function CardGrid() {
   const setGroupLayout = useUiStore((state) => state.setGroupLayout);
   const toggleGroupCollapsed = useUiStore((state) => state.toggleGroupCollapsed);
   const transcripts = useTranscriptStore((state) => state.byAgent);
+  const pushError = useUiStore((state) => state.pushError);
   const [showNewAgent, setShowNewAgent] = useState(false);
 
   const loaded = useRef(false);
@@ -38,7 +39,9 @@ export function CardGrid() {
   useEffect(() => {
     if (!loaded.current) return;
     const handle = window.setTimeout(() => {
-      void putLayout({ order, density, groups: groupLayout });
+      putLayout({ order, density, groups: groupLayout }).catch((err: unknown) =>
+        pushError("Saving layout failed", err instanceof Error ? err.message : String(err)),
+      );
     }, 400);
     return () => window.clearTimeout(handle);
   }, [density, groupLayout, order]);
@@ -58,15 +61,11 @@ export function CardGrid() {
     setOrder(arrayMove(ids, oldIndex, newIndex));
   };
 
-  if (ids.length === 0) return (
-    <>
+  const body =
+    ids.length === 0 ? (
       <EmptyState onNewAgent={() => setShowNewAgent(true)} />
-      <NewAgentModal open={showNewAgent} onClose={() => setShowNewAgent(false)} />
-    </>
-  );
-
-  return (
-    <section className="grid-view">
+    ) : (
+      <section className="grid-view">
       <div className="grid-toolbar">
         <h1>Agents</h1>
         <button type="button" onClick={() => setShowNewAgent(true)}>New agent</button>
@@ -91,7 +90,10 @@ export function CardGrid() {
                         type="button"
                         className="group-release"
                         onClick={() => {
-                          if (window.confirm(`Release group ${group.label}?`)) void releaseGroup(group.key);
+                          if (window.confirm(`Release group ${group.label}?`))
+                            releaseGroup(group.key).catch((err: unknown) =>
+                              pushError("Release group failed", err instanceof Error ? err.message : String(err)),
+                            );
                         }}
                       >
                         Release group
@@ -112,8 +114,19 @@ export function CardGrid() {
         </SortableContext>
       </DndContext>
       <CardContextMenu />
-      <NewAgentModal open={showNewAgent} onClose={() => setShowNewAgent(false)} />
     </section>
+    );
+
+  // The NewAgentModal is kept at a stable position in the returned tree (always
+  // the second child of this fragment) so it is NOT remounted when `body` flips
+  // between the empty and populated branches. A remount during the 0→1 launch
+  // transition would unmount the open modal mid-mutation, so its
+  // onSuccess→onClose would never fire and the overlay would stay stuck.
+  return (
+    <>
+      {body}
+      <NewAgentModal open={showNewAgent} onClose={() => setShowNewAgent(false)} />
+    </>
   );
 }
 
