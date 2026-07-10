@@ -93,5 +93,9 @@ func (s *Server) routes() http.Handler {
 	// conflict with "GET /api/"; a HEAD "/" would, per the mux precedence rules.)
 	mux.Handle("GET /", withMiddleware(s.log, s.staticHandler()))
 
-	return mux
+	// The localOnly guard (security.go) wraps the WHOLE mux — including the
+	// raw-mounted /mcp and terminal-WS routes above — so Host-header (DNS
+	// rebinding) and Origin (cross-site WS / simple-request CSRF) enforcement
+	// cannot be bypassed by a route that skips the per-route API middleware.
+	return localOnly(mux)
 }
