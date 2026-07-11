@@ -11,8 +11,9 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
 - **Active phase:** 7 — Configuration federation + OpenHands & OpenCode backends (Phase 6 complete ✅)
 - **Active subphase:** Phase 7 un-gated work COMPLETE ✅ — 7.1–7.3, 7.5, 7.6, 7.7 done. Only the
   credential-gated acceptance subphases remain: **7.4** (OpenCode/OpenHands live CLIs) and **7.8**
-  (live Claude/Codex federation). Two ADVISORY UI refinements noted under 7.7 (override-edit on a bound
-  source; NewAgentModal invalid-source pre-warn) — non-blocking.
+  (live Claude/Codex federation). **7.9** (binary-versioned AgentDeck knowledge MCP) remains planned,
+  following completed Claude/Codex federation. Two ADVISORY UI refinements noted under 7.7
+  (override-edit on a bound source; NewAgentModal invalid-source pre-warn) — non-blocking.
 - **Spec:** [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) (PRD: [`phase-7-additional-features.md`](phase-7-additional-features.md))
 - **Last GREEN checkpoint:** Phase 7.7 federation UI COMPLETE (3 commits: `ee5b6a7` data layer →
   `5b818de` Settings panel → `79b8c7a` onboarding step + embed). `schemas/configSources.ts` +
@@ -35,7 +36,7 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
 - [x] Phase 4 — Persistence: archive, search, resume, file/command tracking ✅
 - [x] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications ✅
 - [x] Phase 6 — Flexibility: terminal runtime, switch-runtime, task groups, drivers (xterm/tmux/iterm2) ✅
-- [ ] Phase 7 — Configuration federation + additional backends — **7.1–7.3, 7.5, 7.6, 7.7 ✅** (OpenHands/OpenCode integration; federation schema + pure resolvers; source manager + API + SSE + launch/resume/switch integration; federation onboarding + Settings UI); **7.4 + 7.8 GATED** (backend + federation live acceptance, credential-gated). PRD [`phase-7-additional-features.md`](phase-7-additional-features.md), spec [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md)
+- [ ] Phase 7 — Configuration federation + additional backends — **7.1–7.3, 7.5, 7.6, 7.7 ✅** (OpenHands/OpenCode integration; federation schema + pure resolvers; source manager + API + SSE + launch/resume/switch integration; federation onboarding + Settings UI); **7.4 + 7.8 GATED** (backend + federation live acceptance, credential-gated); **7.9 pending** (binary-versioned AgentDeck knowledge MCP). PRD [`phase-7-additional-features.md`](phase-7-additional-features.md), spec [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md)
 
 Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent after 2).
 
@@ -95,6 +96,9 @@ advertises xterm/tmux/iterm2.
     generation, health, changed[], stale).
 - [ ] 7.7 — Add onboarding + Settings federation UI, provenance/health/inventory and override/detach flows.
 - [ ] 7.8 — GATED read-only acceptance against pinned real Claude/Codex CLIs/config surfaces.
+- [ ] 7.9 — After federation acceptance, add binary-versioned AgentDeck product topics and the
+  registered `agentdeck_docs` MCP tool; fresh AgentDecker seeds consult it while existing roles
+  remain user-owned and untouched.
 - **Checkpoint:** `go build ./...` + `go test ./...` + `go test -tags sqlite_fts5 ./...` + `cd ui && npm run test` + `npm run build` + embed.
 
 ---
@@ -323,6 +327,13 @@ remaining open set; every surviving item is ADVISORY.
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
+
+- 2026-07-11 — **Phase 7.9 knowledge MCP specified; workflow guardrails refined.** After
+  Claude/Codex federation acceptance, AgentDeck will serve binary-versioned, non-secret product
+  topics through registered agents' `agentdeck_docs` MCP tool while leaving existing role files
+  user-owned. A Sol review rejected the stale fable branch wholesale but added four compatible
+  canonical safeguards: no weakening tests for GREEN, pre-commit full-diff self-review, spec-first
+  review, and an evidence/normal-use trigger for every finding.
 
 - 2026-07-11 — **Phase 7.5 federation schema + pure provider resolvers — green.** Added the
   validated, owner-only `config-sources.json` v1 store and a pure `configsource` boundary for Claude

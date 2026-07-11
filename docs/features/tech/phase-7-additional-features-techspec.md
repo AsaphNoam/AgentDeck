@@ -290,6 +290,31 @@ Add a **Configuration source** panel to Claude/Codex backend cards and onboardin
   with repair, refresh, detach and override actions;
 - only Claude/Codex show federation controls in this phase. OpenCode/OpenHands remain locally managed.
 
+### 2.9 Binary-versioned product knowledge MCP
+
+After the Claude/Codex federation work is complete, add a small server-owned knowledge package for
+AgentDeck itself. Its purpose is to prevent the seeded `agentdecker` role from carrying a frozen
+copy of product facts: role files are intentionally written once and must not be silently replaced.
+
+- `internal/knowledge/docs/*.md` contains curated, product-facing Markdown topics and is compiled
+  into the binary with `go:embed`. A topic is a stable filename-derived name plus its first-heading
+  title. The initial inventory covers overview, launching, configuration, dashboard, interfaces,
+  archive, messaging, notifications and troubleshooting.
+- `internal/knowledge` exposes copy-safe `Topics`, `Get`, and `Index` operations. It reads no
+  checkout files, config files, homes, source bindings or credentials at runtime. Topic lookup
+  rejects path separators and unknown names; content is static for the running binary.
+- Register `agentdeck_docs` on the existing messaging MCP server, through the same per-agent MCP
+  registration used for live agents. Its optional `topic` argument returns the index when empty,
+  exact Markdown for a known topic, or an `IsError` response that lists valid names. Do not add a
+  separate HTTP documentation route or expose it to an unregistered/revoked MCP caller.
+- Replace the fresh seed's long factual `agentdecker` prompt with persona, orchestration behavior,
+  and a short instruction to consult `agentdeck_docs` before answering non-trivial questions about
+  AgentDeck. Never rewrite a pre-existing role file; the MCP tool is independently available to
+  all live registered agents.
+- Topics describe only released behavior and safe operational guidance. They contain no literal
+  secrets, auth-store paths or copied external-config contents, and Phase 7 work remains absent
+  until it ships. Product changes update their matching topic in the same checkpoint.
+
 ---
 
 ## 3. Backend adapters
@@ -534,6 +559,23 @@ Every subphase ends GREEN: `go build ./...`, `go test ./...`, `go test -tags sql
   moved to mirrored or explicitly reported rather than silently copied.
 - **Size:** S (code) + human time
 
+### Subphase 7.9 — Binary-versioned AgentDeck knowledge MCP
+
+- **Goal:** Live agents can retrieve concise, authoritative AgentDeck product guidance that matches
+  the running binary, without AgentDeck overwriting a user's seeded role prompt or reading mutable
+  repository documentation at runtime.
+- **Deliverables:** embedded topic package and tests (§2.9); registered `agentdeck_docs` MCP tool
+  with index, known-topic, unknown-topic and revoked-caller coverage; fresh AgentDecker seed-prompt
+  reduction; release-facing topic set covering every shipped product surface (tasks 27–30).
+- **Depends on:** 7.5–7.8. It intentionally follows completed Claude/Codex federation so the
+  published configuration guidance describes the shipped, verified behavior rather than a plan.
+- **Done when (checkpoint):** full GREEN; tests prove the binary serves its embedded topic index,
+  rejects traversal/unknown topics and unregistered callers, never emits sentinel secret values,
+  and leaves existing role files untouched during seeding.
+- **Resume note:** This is an AgentDeck-owned, read-only MCP capability, not another configuration
+  source. Do not copy the old knowledge branch's docs without revalidating every product claim.
+- **Size:** S
+
 ---
 
 ## 9. Implementation task breakdown
@@ -565,6 +607,11 @@ Every subphase ends GREEN: `go build ./...`, `go test ./...`, `go test -tags sql
 24. SSE query invalidation, launch gates, dist build and `make embed`.
 25. Acceptance fixtures against pinned CLI versions using disposable homes/projects.
 26. Opt-in read-only smoke against real user sources; record/reconcile verdicts.
+27. `internal/knowledge`: embedded topic index/lookup package and unit tests.
+28. `internal/messaging`: registered `agentdeck_docs` MCP tool with registered-caller and error-path tests.
+29. `internal/config/seed.go`: fresh AgentDecker persona prompt points to the tool without changing
+    existing role files.
+30. Curated release-matched topics plus secret/future-feature content sweep.
 
 ## 10. Testing strategy
 
@@ -583,6 +630,9 @@ Every subphase ends GREEN: `go build ./...`, `go test ./...`, `go test -tags sql
 - Concurrency test resolves while files change and proves readers see generation N or N+1, never a
   mixed view. API tests prove preview-token expiry and fingerprint/TOCTOU rejection.
 - Live behavior exclusively behind `//go:build acceptance` (§8.4 and §8.8).
+- Knowledge tests invoke the MCP tool through a registered and a revoked session, assert a
+  deterministic index and topic body, and scan every result for injected secret sentinels. Seed
+  tests prove an existing `agentdecker` role remains byte-identical after an upgrade.
 
 ## 11. Resolved decisions (answers to PRD §6)
 

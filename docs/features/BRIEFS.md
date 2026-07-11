@@ -31,6 +31,28 @@ invalid-source pre-warn). Live acceptance 7.4 + 7.8 remain credential-gated.
 **Next:** human — provide `opencode`/`openhands` + Claude/Codex credentials to clear gated 7.4/7.8, or
 an agent picks up the two ADVISORY UI refinements.
 
+---
+
+### 2026-07-11 — planning: Phase 7 knowledge MCP and workflow guardrails
+
+On `feature/phase-7-knowledge-base`, removed the three superseded review/usability branches from
+origin. Phase 7 now reserves 7.9, after Claude/Codex federation acceptance, for a binary-versioned
+AgentDeck knowledge base: registered live agents will retrieve release-matched, non-secret product
+topics through `agentdeck_docs`, while existing role files remain user-owned. A Sol review rejected
+the stale fable workflow branch wholesale but carried forward four compatible canonical safeguards:
+do not weaken tests to reach GREEN, self-review the full diff before checkpoint commits, read specs
+before review diffs, and require a concrete normal-use trigger for every finding.
+
+**Needs attention:** New/changed: none. Carried: Terminal support boundary; HTTP-only agent
+messaging; Immediate/prompt-based UI; Runtime-switch fallbacks; Unbounded transcript indexing; Agent
+env inheritance by design; Local API trusts same-machine callers; API/model compatibility. Live
+acceptance 7.4 and 7.8 remain credential-gated.
+
+**Next:** Agent — implement 7.6 federation manager/API/launch integration; implement 7.9 only after
+the federation acceptance scope is complete.
+
+---
+
 ### 2026-07-11 — implementation: Phase 7.5 configuration federation
 
 Phase 7.5 is GREEN in the working tree. AgentDeck now has a validated, owner-only source-binding

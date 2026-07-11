@@ -1,7 +1,7 @@
 # Phase 7 — Additional features: configuration federation, OpenHands & OpenCode
 
 **Status:** active — backend work 7.1–7.3 complete; configuration federation added to remaining scope
-**Features:** F16 (link/sync/import Claude Code and Codex configuration), F14 (OpenCode backend), F15 (OpenHands backend); extends F7 (switch-runtime backend matrix)
+**Features:** F16 (link/sync/import Claude Code and Codex configuration), F14 (OpenCode backend), F15 (OpenHands backend); extends F7 (switch-runtime backend matrix) and the seeded AgentDecker guide
 **Depends on:** Phases 1, 2, 3, 6 (chat runtime, config UI, adapter seam, switch-runtime)
 **Enables:** one setup shared with the native CLIs instead of a third drifting copy
 
@@ -46,6 +46,11 @@ Phase 7 also widens AgentDeck from two backends (Claude, Codex) to four by addin
 - Native setup surfaces: Claude `CLAUDE.md`, `.claude/rules/`, skills, subagents, settings/hooks,
   plugins and MCP declarations; Codex `AGENTS.md`, `.agents/skills/`, `.codex/config.toml`, profiles,
   agents, rules/hooks, plugins and MCP declarations. The UI inventories their source and status.
+- A binary-versioned AgentDeck knowledge base, exposed to live agents through the existing MCP
+  registration as `agentdeck_docs`. It supplies a topic index plus named, version-matched Markdown
+  topics covering the shipped product (launching, configuration, dashboard, interfaces, archive,
+  messaging, notifications and troubleshooting). The seeded AgentDecker role keeps its persona and
+  orchestration guidance short and points agents to this tool for product facts.
 - Preserve each CLI's documented user/project/local/managed precedence and project trust rules.
 - Explicit per-field AgentDeck overrides layered above the linked baseline without modifying the
   external files; the UI distinguishes inherited values from overrides and can reset an override.
@@ -67,6 +72,9 @@ Phase 7 also widens AgentDeck from two backends (Claude, Codex) to four by addin
   keeps its frozen model/provider/effort snapshot. Native instruction/setup files may be reread by
   the CLI when a process starts or resumes, according to that CLI's own behavior.
 - Terminal (PTY) interface for OpenHands/OpenCode and alternative non-ACP transports.
+- Treating repository documentation or an installed user's role prompt as the runtime source of
+  truth. Product knowledge ships in the binary; AgentDeck does not overwrite an existing user-owned
+  role just to refresh its guidance.
 
 ---
 
@@ -114,19 +122,36 @@ Phase 7 also widens AgentDeck from two backends (Claude, Codex) to four by addin
   selected AgentDeck project therefore changes the effective project layer without rebinding the
   user's global source.
 
-### 3.3 OpenCode backend (F14)
+### 3.3 Binary-versioned product knowledge
+
+- Ship a small, curated set of AgentDeck product topics inside the executable, not from the
+  checkout or a mutable config directory. A released binary therefore serves documentation for the
+  behavior it actually contains.
+- Add `agentdeck_docs` to the MCP tools registered for each live agent. Calling it without a topic
+  returns the stable topic index; a valid topic returns that Markdown; an unknown topic returns an
+  actionable tool error that includes the valid names. It must use the existing per-agent MCP
+  registration rather than add an unauthenticated documentation endpoint.
+- Keep documentation contents product-facing and non-secret. It may name supported configuration
+  files and user-visible workflows, but must not embed credential values, source-file contents, or
+  future/unshipped behavior. Every release-changing product surface updates the relevant topic in
+  the same change.
+- Slim the fresh `agentdecker` seed prompt to persona, orchestration behavior, and an instruction
+  to consult `agentdeck_docs` before answering non-trivial product questions. Existing role files
+  remain user-owned and unchanged; the tool itself remains available to their live agents.
+
+### 3.4 OpenCode backend (F14)
 
 - Backend type `opencode-acp`, binary `opencode`, launch args `["acp"]`; model selection uses
   `provider/model` ids. Permission config is injected per launch and never written to user config.
 - Native ACP resume where supported; otherwise the Phase 6 primer path.
 
-### 3.4 OpenHands backend (F15)
+### 3.5 OpenHands backend (F15)
 
 - Backend type `openhands-acp`, binary `openhands`, launch args `["acp"]`.
 - Model/auth via `LLM_MODEL`, `LLM_API_KEY`, and `LLM_BASE_URL` composed from backend config.
 - Always-approve mode maps from `skip_permissions`; native resume where supported, primer otherwise.
 
-### 3.5 Shared backend integration rules
+### 3.6 Shared backend integration rules
 
 - Agent-specific differences live in `BackendAdapter`; runtime, persistence and SSE stay generic.
 - OpenCode/OpenHands permission prompts use the existing ACP permission gate; neither exposes the
@@ -172,6 +197,9 @@ composition use the effective resolver; writes continue to edit AgentDeck-owned 
       newly resolved values and records provenance/fingerprints.
 - [ ] Existing OpenCode/OpenHands launch, permission, resume, switch and terminal-gate acceptance
       criteria remain green.
+- [ ] A fresh seeded AgentDecker role can list and retrieve binary-versioned product documentation
+      through `agentdeck_docs`; the served topics match the running build and never expose secrets
+      or unshipped Phase 7 behavior.
 
 ---
 
@@ -184,5 +212,7 @@ composition use the effective resolver; writes continue to edit AgentDeck-owned 
   lowest-common-denominator skill/agent/MCP schema.
 - Auto-sync means future-launch consistency, not mutation of a process already running.
 - Model discovery is honest about its boundary: configured/catalogued is not account-entitled.
+- Product guidance is binary-versioned and MCP-served, while role files remain user-owned. This
+  avoids silently rewriting a user's prompt just to correct stale product facts.
 
 Implementation details and provider surface mappings are prescriptive in the mirror tech spec.
