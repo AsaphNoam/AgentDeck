@@ -11,7 +11,13 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
 - **Active phase:** 7 — Configuration federation + OpenHands & OpenCode backends (Phase 6 complete ✅)
 - **Active subphase:** 7.6 (in progress) — source manager, API and launch integration. 7.1–7.3 and 7.5 done ✅; 7.4 remains an independent live-acceptance gate. SourceManager core landed (see 7.6 detail).
 - **Spec:** [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) (PRD: [`phase-7-additional-features.md`](phase-7-additional-features.md))
-- **Last GREEN checkpoint:** Phase 7.6 config-source REST API + SSE wired into the server
+- **Last GREEN checkpoint:** Phase 7.6 migration v8 + frozen launch-config plumbing —
+  `sessions.launch_config_json` added; `LaunchSpec.LaunchConfig` (json.RawMessage) flows through
+  `runtimeMeta`/`SessionMetaData` → transcript session_meta + `UpsertSessionMeta` → `SessionSnapshot`,
+  and resume/switch composers carry the frozen object. No behavior yet (composeLaunch still leaves it
+  empty — that is 7.6c-2). Round-trip regression `TestLaunchConfigRoundTrips`. Both Go variants green.
+  State tests bumped to expect migration 8. UI untouched. **Superseded prior checkpoint entry below.**
+- **Prior checkpoint:** Phase 7.6 config-source REST API + SSE wired into the server
   (`internal/server/config_sources.go`, routes, `newConfigSourceManager` in `server.go`, `Watch`
   started in `Start`). GET discovery+bindings, POST preview (mints token), PUT bind (rebuilds from
   token, validates, persists, resolves fresh), POST refresh (synchronous ResolveFresh), DELETE
@@ -66,10 +72,14 @@ advertises xterm/tmux/iterm2.
   - [x] Preview-token consent plus list/bind/refresh/detach routes and redacted error mapping.
         (`config_sources.go` + routes + `config_source_update` SSE. detach=true → 501 gated: no
         verified launch-injection path for Claude/Codex assets yet — see Decisions.)
-  - [ ] Migration v8 and fresh launch vs frozen resume/switch provenance semantics.
+  - [x] Migration v8 (`sessions.launch_config_json`) + frozen launch-config plumbed end-to-end:
+        `LaunchSpec.LaunchConfig` → `SessionMetaData` → transcript session_meta + `UpsertSessionMeta`
+        → `SessionSnapshot`; resume/switch composers carry the frozen object (round-trip test in index).
+  - [ ] Populate the launch-config in `composeLaunch` via `ResolveFresh` (effective model/effort
+        layering, requested-vs-resolved provenance/fingerprints), stale-invalid launch blocking.
   - [ ] Native Claude/Codex home/cwd pass-through and reserved messaging-MCP collision preflight.
-  - [ ] Launch/resume/switch integration + TOCTOU/freshness/stale-block/no-secret regression tests
-        at the server-launch level (manager + route tests done; launch-composition tests remain — 7.6c).
+  - [ ] `config_refresh:true` resume path + launch-composition regression tests (freshness, stale-block,
+        frozen resume, no-secret in snapshot).
 - [ ] 7.7 — Add onboarding + Settings federation UI, provenance/health/inventory and override/detach flows.
 - [ ] 7.8 — GATED read-only acceptance against pinned real Claude/Codex CLIs/config surfaces.
 - **Checkpoint:** `go build ./...` + `go test ./...` + `go test -tags sqlite_fts5 ./...` + `cd ui && npm run test` + `npm run build` + embed.

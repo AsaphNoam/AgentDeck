@@ -130,7 +130,11 @@ type SessionMetaData struct {
 	// "a running agent's spec is frozen; edits affect future launches only").
 	SkipPermissions bool     `json:"skip_permissions,omitempty"`
 	AddDirs         []string `json:"add_dirs,omitempty"`
-	CreatedAt       string   `json:"created_at"`
-	ResumedAt       *string  `json:"resumed_at"`
-	SessionID       string   `json:"session_id,omitempty"`
+	// LaunchConfig is the frozen federation launch object (§2.5), redacted; empty
+	// when the backend has no active source binding. Mirrored here so reindex can
+	// rebuild sessions.launch_config_json from the transcript.
+	LaunchConfig json.RawMessage `json:"launch_config,omitempty"`
+	CreatedAt    string          `json:"created_at"`
+	ResumedAt    *string         `json:"resumed_at"`
+	SessionID    string          `json:"session_id,omitempty"`
 }

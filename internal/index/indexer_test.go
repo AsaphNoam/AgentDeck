@@ -330,3 +330,41 @@ func TestReindexMissingSessionsDirIsNoop(t *testing.T) {
 		t.Fatalf("sessions rows = %+v, want empty", rows)
 	}
 }
+
+// TestLaunchConfigRoundTrips proves the frozen federation launch object survives
+// UpsertSessionMeta → sessions.launch_config_json → state.ReadSession, and that
+// an empty object normalizes to nil (migration v8).
+func TestLaunchConfigRoundTrips(t *testing.T) {
+	st, _ := openTestDB(t)
+	ix := New(st.DB())
+
+	m := meta()
+	m.LaunchConfig = json.RawMessage(`{"version":1,"binding":{"backend":"claude","provider":"claude-code"},"resolved":{"model":"user-model"}}`)
+	if err := ix.UpsertSessionMeta("a_lc", m); err != nil {
+		t.Fatalf("UpsertSessionMeta: %v", err)
+	}
+	snap, err := st.ReadSession("a_lc")
+	if err != nil {
+		t.Fatalf("ReadSession: %v", err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(snap.LaunchConfig, &decoded); err != nil {
+		t.Fatalf("launch config did not round-trip: %v (raw=%q)", err, snap.LaunchConfig)
+	}
+	if decoded["version"] != float64(1) {
+		t.Fatalf("launch config = %+v", decoded)
+	}
+
+	// A meta with no binding stores the default object and reads back as nil.
+	empty := meta()
+	if err := ix.UpsertSessionMeta("a_empty", empty); err != nil {
+		t.Fatalf("UpsertSessionMeta empty: %v", err)
+	}
+	snap2, err := st.ReadSession("a_empty")
+	if err != nil {
+		t.Fatalf("ReadSession empty: %v", err)
+	}
+	if snap2.LaunchConfig != nil {
+		t.Fatalf("empty launch config = %q, want nil", snap2.LaunchConfig)
+	}
+}

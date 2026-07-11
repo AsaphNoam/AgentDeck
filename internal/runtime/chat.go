@@ -870,6 +870,7 @@ func runtimeMeta(spec LaunchSpec, sessionID string) SessionMetaData {
 		EnvKeys:         envKeys(spec.Env),
 		SkipPermissions: spec.SkipPerms,
 		AddDirs:         spec.AddDirs,
+		LaunchConfig:    spec.LaunchConfig,
 		CreatedAt:       spec.Agent.CreatedAt.UTC().Format(time.RFC3339),
 		SessionID:       sessionID,
 	}
