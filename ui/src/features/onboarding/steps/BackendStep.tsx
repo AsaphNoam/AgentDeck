@@ -4,7 +4,9 @@ import type { BackendsConfig, BackendType } from "../../../schemas/backends";
 import { BACKEND_TYPE_LABELS, BACKEND_TYPE_OPTIONS } from "../../../lib/backendTypes";
 
 interface BackendStepProps {
-  onDone: () => void;
+  // Reports the chosen seeded backend so later steps (e.g. the federation Config
+  // step) target the right provider instead of assuming Claude.
+  onDone: (backend: { id: string; type: BackendType }) => void;
 }
 
 // seededIdForType maps a backend type to its seeded backend id (onboarding
@@ -95,7 +97,7 @@ export function BackendStep({ onDone }: BackendStepProps) {
         const status = cred?.status ?? null;
         setCredStatus(status);
         setCredDetail(cred?.detail ?? null);
-        if (status === "ok") onDone();
+        if (status === "ok") onDone({ id: backendId, type });
       },
       onError: (e) => setError(String(e)),
     });
