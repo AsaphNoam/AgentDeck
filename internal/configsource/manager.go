@@ -70,14 +70,16 @@ type genKey struct {
 	projectID string
 }
 
-// previewToken authorizes a single bind, tying the client's later PUT to the
-// exact provider/root/profile/fingerprints the server showed during preview.
+// previewToken authorizes a single bind. It carries the exact binding the server
+// showed during preview so PUT can rebuild it from {preview_token, overrides}
+// alone (§2.7) without trusting client-submitted paths after preview, plus the
+// previewed source digest for the TOCTOU recheck.
 type previewToken struct {
-	provider string
-	root     string
-	profile  string
-	digest   string // report.SourceDigest at preview time
-	expires  time.Time
+	binding   Binding
+	projectID string
+	project   config.Project
+	digest    string // report.SourceDigest at preview time
+	expires   time.Time
 }
 
 // Manager owns config-source resolution for the server: immutable per-binding
@@ -173,9 +175,11 @@ func (m *Manager) ResolveFresh(ctx context.Context, backendID, projectID string,
 }
 
 // Preview resolves read-only for the given (not-yet-persisted) binding and mints
-// a preview token the caller must echo back on PUT. It never touches the stored
-// generation or cache.
-func (m *Manager) Preview(ctx context.Context, b Binding, project config.Project) (Effective, Report, string, time.Time, error) {
+// a preview token the caller echoes back on PUT. The discovered approved roots
+// and canonical root are frozen into the token's binding so the later bind
+// rebuilds exactly what the user saw. It never touches the stored generation or
+// cache.
+func (m *Manager) Preview(ctx context.Context, b Binding, projectID string, project config.Project) (Effective, Report, string, time.Time, error) {
 	resolver, err := m.resolverFor(b.Provider)
 	if err != nil {
 		return Effective{}, Report{}, "", time.Time{}, err
@@ -184,15 +188,20 @@ func (m *Manager) Preview(ctx context.Context, b Binding, project config.Project
 	if err != nil {
 		return eff, rep, "", time.Time{}, err
 	}
-	token, expires := m.mintToken(b, rep.SourceDigest)
+	bound := b
+	bound.Approved = append([]string{}, rep.ApprovedRoots...)
+	if canonical, cErr := canonicalRoot(b.Root); cErr == nil {
+		bound.Root = canonical
+	}
+	token, expires := m.mintToken(bound, projectID, project, rep.SourceDigest)
 	return eff, rep, token, expires, nil
 }
 
-// ConsumePreviewToken validates and one-time-consumes a preview token against the
-// binding being persisted. The provider/root/profile must match what was
-// previewed, the token must be unexpired, and (TOCTOU guard) the live source
-// digest must still equal the previewed digest.
-func (m *Manager) ConsumePreviewToken(ctx context.Context, token string, b Binding, project config.Project) error {
+// ConsumeBind validates and one-time-consumes a preview token, returning the
+// binding to persist (with overrides applied) plus its project context. The
+// token must be unexpired and (TOCTOU guard) the live source digest must still
+// equal the previewed digest, so a write between preview and bind is rejected.
+func (m *Manager) ConsumeBind(ctx context.Context, token string, overrides config.SourceOverrides) (Binding, string, config.Project, error) {
 	m.mu.Lock()
 	pt, ok := m.tokens[token]
 	if ok {
@@ -200,36 +209,35 @@ func (m *Manager) ConsumePreviewToken(ctx context.Context, token string, b Bindi
 	}
 	m.mu.Unlock()
 	if !ok {
-		return fmt.Errorf("%w: unknown or spent preview token", ErrApprovalRequired)
+		return Binding{}, "", config.Project{}, fmt.Errorf("%w: unknown or spent preview token", ErrApprovalRequired)
 	}
 	if m.now().After(pt.expires) {
-		return fmt.Errorf("%w: preview token expired", ErrApprovalRequired)
+		return Binding{}, "", config.Project{}, fmt.Errorf("%w: preview token expired", ErrApprovalRequired)
 	}
-	if pt.provider != b.Provider || pt.root != b.Root || pt.profile != b.Profile {
-		return fmt.Errorf("%w: preview token does not match binding", ErrApprovalRequired)
-	}
-	resolver, err := m.resolverFor(b.Provider)
+	resolver, err := m.resolverFor(pt.binding.Provider)
 	if err != nil {
-		return err
+		return Binding{}, "", config.Project{}, err
 	}
-	_, rep, err := resolver.Preview(ctx, b, project)
+	_, rep, err := resolver.Preview(ctx, pt.binding, pt.project)
 	if err != nil {
-		return err
+		return Binding{}, "", config.Project{}, err
 	}
 	if rep.SourceDigest != pt.digest {
-		return ErrSourceChanged
+		return Binding{}, "", config.Project{}, ErrSourceChanged
 	}
-	return nil
+	bound := pt.binding
+	bound.Overrides = overrides
+	return bound, pt.projectID, pt.project, nil
 }
 
-func (m *Manager) mintToken(b Binding, digest string) (string, time.Time) {
+func (m *Manager) mintToken(b Binding, projectID string, project config.Project, digest string) (string, time.Time) {
 	var raw [24]byte
 	_, _ = rand.Read(raw[:])
 	token := hex.EncodeToString(raw[:])
 	expires := m.now().Add(previewTokenTTL)
 	m.mu.Lock()
 	m.pruneTokensLocked()
-	m.tokens[token] = &previewToken{provider: b.Provider, root: b.Root, profile: b.Profile, digest: digest, expires: expires}
+	m.tokens[token] = &previewToken{binding: b, projectID: projectID, project: project, digest: digest, expires: expires}
 	m.mu.Unlock()
 	return token, expires
 }
@@ -294,6 +302,40 @@ func (m *Manager) markStale(backendID, projectID string, cause error) {
 		BackendID: backendID, ProjectID: projectID, Generation: genID,
 		Health: health, Changed: nil, Stale: true,
 	})
+}
+
+// Discover returns candidate native roots for a provider without binding
+// anything. discovery is not consent (§2.2).
+func (m *Manager) Discover(ctx context.Context, provider string, project config.Project) ([]Candidate, error) {
+	resolver, err := m.resolverFor(provider)
+	if err != nil {
+		return nil, err
+	}
+	return resolver.Discover(ctx, project), nil
+}
+
+// Status returns the display health of the last committed generation for a
+// (backend, project). ok is false when nothing has resolved yet.
+func (m *Manager) Status(backendID, projectID string) (health string, stale bool, generation int, ok bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	gen := m.gens[genKey{backendID, projectID}]
+	if gen == nil {
+		return "", false, 0, false
+	}
+	return gen.health, gen.stale, gen.id, true
+}
+
+// ForgetBackend drops every generation for a backend, used when its binding is
+// detached so the watcher stops re-resolving a source the user unbound.
+func (m *Manager) ForgetBackend(backendID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for k := range m.gens {
+		if k.backendID == backendID {
+			delete(m.gens, k)
+		}
+	}
 }
 
 // Cached returns the last-known-good generation for display (may be stale). The

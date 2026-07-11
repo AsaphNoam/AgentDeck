@@ -1,0 +1,179 @@
+package server
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/agentdeck/agentdeck/internal/configsource"
+)
+
+// federationServer builds a seeded test server whose SourceManager resolves a
+// fixture Claude tree (rather than the real user home) and registers a project
+// pointing at a real directory so preview/bind work deterministically.
+func federationServer(t *testing.T) (*Server, string, string) {
+	t.Helper()
+	srv := testServer(t, true)
+
+	userHome := t.TempDir()
+	root := filepath.Join(userHome, ".claude")
+	if err := os.MkdirAll(root, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "settings.json"),
+		[]byte(`{"model":"user-model","env":{"ANTHROPIC_API_KEY":"user-secret"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	projectDir := t.TempDir()
+	if err := srv.configStore.WriteProject("fed", config.Project{Title: "Fed", Cwd: projectDir}); err != nil {
+		t.Fatalf("WriteProject: %v", err)
+	}
+
+	srv.sourceMgr = configsource.NewManager(srv.configStore, map[string]configsource.Resolver{
+		configsource.ProviderClaude: configsource.NewClaudeResolver(userHome),
+	}, nil)
+	return srv, root, projectDir
+}
+
+func doJSON(t *testing.T, h http.Handler, method, target, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := newLocalRequest(method, target, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestConfigSourcePreviewBindRefreshDelete(t *testing.T) {
+	srv, root, _ := federationServer(t)
+	h := srv.routes()
+
+	// Preview (root=auto discovers ~/.claude).
+	rec := doJSON(t, h, http.MethodPost, "/api/config-sources/preview",
+		`{"provider":"claude-code","root":"auto","mode":"linked","claims":["launch_defaults"],"project":"fed"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("preview status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	var pv previewResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &pv); err != nil {
+		t.Fatalf("preview body: %v", err)
+	}
+	if pv.PreviewToken == "" {
+		t.Fatal("empty preview token")
+	}
+	if pv.Effective.Model == nil || *pv.Effective.Model != "user-model" {
+		t.Fatalf("preview model = %v", pv.Effective.Model)
+	}
+	// The preview must not leak the secret env value.
+	if strings.Contains(rec.Body.String(), "user-secret") {
+		t.Fatalf("preview leaked a secret:\n%s", rec.Body.String())
+	}
+
+	// Bind with the token.
+	rec = doJSON(t, h, http.MethodPut, "/api/config-sources/claude",
+		`{"preview_token":"`+pv.PreviewToken+`","overrides":{}}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("bind status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	var bound configSourceBindingView
+	if err := json.Unmarshal(rec.Body.Bytes(), &bound); err != nil {
+		t.Fatalf("bind body: %v", err)
+	}
+	if bound.Root != root || bound.Health != configsource.HealthOK {
+		t.Fatalf("bound = %+v (want root=%s health=ok)", bound, root)
+	}
+
+	// GET lists the binding.
+	rec = doGET(t, h, "/api/config-sources?project=fed")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("get status = %d", rec.Code)
+	}
+	var list configSourcesResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil {
+		t.Fatalf("get body: %v", err)
+	}
+	if len(list.Bindings) != 1 || list.Bindings[0].BackendID != "claude" {
+		t.Fatalf("bindings = %+v", list.Bindings)
+	}
+
+	// Refresh re-resolves.
+	rec = doJSON(t, h, http.MethodPost, "/api/config-sources/claude/refresh?project=fed", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("refresh status = %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	// Delete unbinds.
+	rec = doJSON(t, h, http.MethodDelete, "/api/config-sources/claude", "")
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("delete status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	// The binding is gone.
+	sources, _ := srv.readConfigSources()
+	if _, ok := sources.Sources["claude"]; ok {
+		t.Fatal("binding survived delete")
+	}
+}
+
+func TestConfigSourceBindRejectsBadToken(t *testing.T) {
+	srv, _, _ := federationServer(t)
+	h := srv.routes()
+	rec := doJSON(t, h, http.MethodPut, "/api/config-sources/claude",
+		`{"preview_token":"deadbeef","overrides":{}}`)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("bad-token status = %d, want 409 body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestConfigSourcePreviewUnknownProject(t *testing.T) {
+	srv, _, _ := federationServer(t)
+	h := srv.routes()
+	rec := doJSON(t, h, http.MethodPost, "/api/config-sources/preview",
+		`{"provider":"claude-code","root":"auto","mode":"linked","project":"nope"}`)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("unknown-project status = %d, want 400 body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestConfigSourceDetachNotImplemented(t *testing.T) {
+	srv, _, _ := federationServer(t)
+	// Persist a binding directly so DELETE has something to act on.
+	sources, _ := srv.readConfigSources()
+	sources.Sources["claude"] = config.SourceBinding{
+		Provider: configsource.ProviderClaude, Mode: configsource.ModeLinked,
+		Root: filepath.Join(t.TempDir(), ".claude"), Claims: []string{}, Approved: []string{},
+	}
+	if err := srv.configStore.WriteConfigSources(sources); err != nil {
+		t.Fatal(err)
+	}
+	h := srv.routes()
+	rec := doJSON(t, h, http.MethodDelete, "/api/config-sources/claude?detach=true", "")
+	if rec.Code != http.StatusNotImplemented {
+		t.Fatalf("detach status = %d, want 501 body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestConfigSourceTOCTOURejectedAtBind(t *testing.T) {
+	srv, root, _ := federationServer(t)
+	h := srv.routes()
+	rec := doJSON(t, h, http.MethodPost, "/api/config-sources/preview",
+		`{"provider":"claude-code","root":"auto","mode":"linked","claims":["launch_defaults"],"project":"fed"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("preview status = %d", rec.Code)
+	}
+	var pv previewResponse
+	_ = json.Unmarshal(rec.Body.Bytes(), &pv)
+	// Mutate the source between preview and bind.
+	if err := os.WriteFile(filepath.Join(root, "settings.json"), []byte(`{"model":"changed"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	rec = doJSON(t, h, http.MethodPut, "/api/config-sources/claude",
+		`{"preview_token":"`+pv.PreviewToken+`","overrides":{}}`)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("TOCTOU bind status = %d, want 409 body=%s", rec.Code, rec.Body.String())
+	}
+}

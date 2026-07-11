@@ -11,12 +11,15 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
 - **Active phase:** 7 — Configuration federation + OpenHands & OpenCode backends (Phase 6 complete ✅)
 - **Active subphase:** 7.6 (in progress) — source manager, API and launch integration. 7.1–7.3 and 7.5 done ✅; 7.4 remains an independent live-acceptance gate. SourceManager core landed (see 7.6 detail).
 - **Spec:** [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) (PRD: [`phase-7-additional-features.md`](phase-7-additional-features.md))
-- **Last GREEN checkpoint:** Phase 7.6 SourceManager core (`internal/configsource/manager.go`,
-  `watch.go`) — immutable per-(backend,project) generations, `ResolveFresh` (double-read stable
-  digest, never serves stale), mirrored redacted cache (0600/0700), preview-token consent with
-  TOCTOU + expiry, fsnotify watch + 250 ms debounce + 30 s sweep. `go build ./...` + both Go test
-  variants pass; `-race` clean on `internal/configsource`. UI untouched. Not yet wired into the
-  server (7.6b next).
+- **Last GREEN checkpoint:** Phase 7.6 config-source REST API + SSE wired into the server
+  (`internal/server/config_sources.go`, routes, `newConfigSourceManager` in `server.go`, `Watch`
+  started in `Start`). GET discovery+bindings, POST preview (mints token), PUT bind (rebuilds from
+  token, validates, persists, resolves fresh), POST refresh (synchronous ResolveFresh), DELETE
+  unbind (detach=true → 501, gated). Federation error codes added to `internal/runtime/errors.go`
+  (source_not_found/source_changed/source_conflict/approval_required/source_invalid).
+  `config_source_update` published on the SSE bus. Both Go test variants + `-race` on
+  configsource/server pass. UI untouched. Remaining in 7.6: launch/resume/switch integration +
+  migration v8 + native home + MCP collision preflight (7.6c).
 - **Branch:** `claude/work-phase-hwv0z6` — session working branch (harness-designated). Commit here; push to `origin/claude/work-phase-hwv0z6` on completion.
 
 ---
@@ -60,12 +63,13 @@ advertises xterm/tmux/iterm2.
   native home/cwd pass-through, frozen provenance and SSE.
   - [x] Immutable per-binding/project generations, fsnotify debounce + stat sweep, and mirrored cache.
         (`internal/configsource/manager.go`, `watch.go` — plus preview-token consent + TOCTOU/expiry.)
-  - [ ] Preview-token consent plus list/bind/refresh/detach routes and redacted error mapping.
-        (token mint/consume logic exists in the manager; REST wiring + SSE bus + MCP preflight remain — 7.6b.)
+  - [x] Preview-token consent plus list/bind/refresh/detach routes and redacted error mapping.
+        (`config_sources.go` + routes + `config_source_update` SSE. detach=true → 501 gated: no
+        verified launch-injection path for Claude/Codex assets yet — see Decisions.)
   - [ ] Migration v8 and fresh launch vs frozen resume/switch provenance semantics.
   - [ ] Native Claude/Codex home/cwd pass-through and reserved messaging-MCP collision preflight.
-  - [ ] Watch, TOCTOU, freshness, stale-block, no-write/no-secret and integration regression tests.
-        (manager-level tests done; server integration tests remain.)
+  - [ ] Launch/resume/switch integration + TOCTOU/freshness/stale-block/no-secret regression tests
+        at the server-launch level (manager + route tests done; launch-composition tests remain — 7.6c).
 - [ ] 7.7 — Add onboarding + Settings federation UI, provenance/health/inventory and override/detach flows.
 - [ ] 7.8 — GATED read-only acceptance against pinned real Claude/Codex CLIs/config surfaces.
 - **Checkpoint:** `go build ./...` + `go test ./...` + `go test -tags sqlite_fts5 ./...` + `cd ui && npm run test` + `npm run build` + embed.
@@ -107,6 +111,13 @@ advertises xterm/tmux/iterm2.
   + `/mcp` require per-launch tokens, but any local process (including other OS users) that can
   connect to the port can read transcripts/config and drive agents. Adding real API auth (token
   file + UI handshake) is a product-scope decision. (2026-07-11 security review, findings 3/5.)
+- **HUMAN — Detached config-source import deferred.** `DELETE /api/config-sources/{id}?detach=true`
+  returns `501 not_implemented` instead of materializing an AgentDeck-owned copy. The spec (§2.6)
+  scopes detached materialization to assets marked `copyable`, but every Claude/Codex setup asset the
+  resolver inventories is `reference_only`/`unsupported` until a provider-specific launch-injection
+  path passes acceptance (7.4/7.8) — so there is nothing to copy without silently breaking the
+  copy promise. `detach=false` (plain unbind) works. Reverse by wiring high-level model/effort into
+  `backends.json` and copying `copyable` assets once an injection path is verified. (2026-07-11, 7.6.)
 - **HUMAN — API/model compatibility.** Older endpoints still use a different error-envelope
   shape, and the current Agent Client Protocol adapter can ignore AgentDeck's requested model in favor of its
   own model identifiers. Standardize the API envelope and map model IDs before promising those contracts.
