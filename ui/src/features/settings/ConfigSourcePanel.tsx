@@ -141,19 +141,42 @@ export function ConfigSourcePanel({
   // rendered from a cached secret — the server only ever sends redacted fields.
   const [effective, setEffective] = useState<Effective | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The mode the current preview token was minted for. The server derives the bound
+  // mode SOLELY from the token, so binding must use a token minted for the requested
+  // mode — otherwise "Link (Mirrored)" silently persists Linked (no mirror cache).
+  const [previewMode, setPreviewMode] = useState<"linked" | "mirrored" | null>(null);
 
   // Federation applies to Claude/Codex only.
   if (!provider) return null;
 
   const binding = (sources?.bindings ?? []).find((b) => b.backend_id === backendId);
+  const claims = ["launch_defaults", "model_catalog", "setup"];
 
   const runPreview = (mode: "linked" | "mirrored") => {
     setError(null);
     setEffective(null);
+    setPreviewMode(null);
     preview.mutate(
-      { provider, root: "auto", mode, claims: ["launch_defaults", "model_catalog", "setup"], project: projectId },
+      { provider, root: "auto", mode, claims, project: projectId },
       {
-        onSuccess: (res) => setEffective(res.effective),
+        onSuccess: (res) => {
+          setEffective(res.effective);
+          setPreviewMode(mode);
+        },
+        onError: (e) => setError(configErrorMessage(e)),
+      },
+    );
+  };
+
+  const bindWithToken = (token: string) => {
+    bind.mutate(
+      { backendId, previewToken: token, overrides: {} },
+      {
+        onSuccess: () => {
+          setEffective(null);
+          setPreviewMode(null);
+          preview.reset();
+        },
         onError: (e) => setError(configErrorMessage(e)),
       },
     );
@@ -162,16 +185,21 @@ export function ConfigSourcePanel({
   const runBind = (mode: "linked" | "mirrored") => {
     setError(null);
     const token = preview.data?.preview_token;
-    if (!token) {
-      runPreview(mode);
+    // Bind only with a token minted for THIS mode. If none exists yet (first click)
+    // or the discovery preview was minted for a different mode, re-preview for the
+    // requested mode and bind with that fresh token, so the persisted mode matches
+    // the button the user clicked.
+    if (token && previewMode === mode) {
+      bindWithToken(token);
       return;
     }
-    bind.mutate(
-      { backendId, previewToken: token, overrides: {} },
+    preview.mutate(
+      { provider, root: "auto", mode, claims, project: projectId },
       {
-        onSuccess: () => {
-          setEffective(null);
-          preview.reset();
+        onSuccess: (res) => {
+          setEffective(res.effective);
+          setPreviewMode(mode);
+          bindWithToken(res.preview_token);
         },
         onError: (e) => setError(configErrorMessage(e)),
       },
