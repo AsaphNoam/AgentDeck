@@ -155,35 +155,45 @@ func TestMirroredCacheIsRedactedAndOwnerOnly(t *testing.T) {
 
 func TestPreviewTokenRoundTrip(t *testing.T) {
 	m, _, _, root, project := managerFixture(t)
-	b := Binding{Provider: ProviderClaude, Mode: ModeLinked, Root: root,
-		Claims: []string{"launch_defaults"}, Approved: []string{root, project.Cwd}}
-	_, _, token, expires, err := m.Preview(context.Background(), b, project)
+	b := Binding{Provider: ProviderClaude, Mode: ModeLinked, Root: root, Claims: []string{"launch_defaults"}}
+	overrideModel := "override-model"
+	_, _, token, expires, err := m.Preview(context.Background(), b, "proj", project)
 	if err != nil {
 		t.Fatalf("Preview: %v", err)
 	}
 	if token == "" || !expires.After(time.Now()) {
 		t.Fatalf("token=%q expires=%v", token, expires)
 	}
-	if err := m.ConsumePreviewToken(context.Background(), token, b, project); err != nil {
-		t.Fatalf("ConsumePreviewToken: %v", err)
+	bound, projectID, _, err := m.ConsumeBind(context.Background(), token, config.SourceOverrides{Model: &overrideModel})
+	if err != nil {
+		t.Fatalf("ConsumeBind: %v", err)
+	}
+	if projectID != "proj" {
+		t.Fatalf("projectID = %q, want proj", projectID)
+	}
+	// The frozen binding carries the discovered approved roots + the override.
+	if len(bound.Approved) == 0 || bound.Overrides.Model == nil || *bound.Overrides.Model != "override-model" {
+		t.Fatalf("bound = %+v", bound)
+	}
+	if !containsString(bound.Approved, root) {
+		t.Fatalf("approved roots %v missing root %s", bound.Approved, root)
 	}
 	// A spent token cannot be reused.
-	if err := m.ConsumePreviewToken(context.Background(), token, b, project); !errors.Is(err, ErrApprovalRequired) {
+	if _, _, _, err := m.ConsumeBind(context.Background(), token, config.SourceOverrides{}); !errors.Is(err, ErrApprovalRequired) {
 		t.Fatalf("reused token err = %v, want ErrApprovalRequired", err)
 	}
 }
 
 func TestPreviewTokenTOCTOURejected(t *testing.T) {
 	m, _, _, root, project := managerFixture(t)
-	b := Binding{Provider: ProviderClaude, Mode: ModeLinked, Root: root,
-		Claims: []string{"launch_defaults"}, Approved: []string{root, project.Cwd}}
-	_, _, token, _, err := m.Preview(context.Background(), b, project)
+	b := Binding{Provider: ProviderClaude, Mode: ModeLinked, Root: root, Claims: []string{"launch_defaults"}}
+	_, _, token, _, err := m.Preview(context.Background(), b, "proj", project)
 	if err != nil {
 		t.Fatalf("Preview: %v", err)
 	}
 	// The source changes between preview and bind.
 	writeClaudeTestFile(t, filepath.Join(root, "settings.json"), `{"model":"changed-model"}`)
-	if err := m.ConsumePreviewToken(context.Background(), token, b, project); !errors.Is(err, ErrSourceChanged) {
+	if _, _, _, err := m.ConsumeBind(context.Background(), token, config.SourceOverrides{}); !errors.Is(err, ErrSourceChanged) {
 		t.Fatalf("TOCTOU err = %v, want ErrSourceChanged", err)
 	}
 }
@@ -192,30 +202,21 @@ func TestPreviewTokenExpiry(t *testing.T) {
 	m, _, _, root, project := managerFixture(t)
 	now := time.Now()
 	m.now = func() time.Time { return now }
-	b := Binding{Provider: ProviderClaude, Mode: ModeLinked, Root: root,
-		Claims: []string{"launch_defaults"}, Approved: []string{root, project.Cwd}}
-	_, _, token, _, err := m.Preview(context.Background(), b, project)
+	b := Binding{Provider: ProviderClaude, Mode: ModeLinked, Root: root, Claims: []string{"launch_defaults"}}
+	_, _, token, _, err := m.Preview(context.Background(), b, "proj", project)
 	if err != nil {
 		t.Fatalf("Preview: %v", err)
 	}
 	now = now.Add(previewTokenTTL + time.Second)
-	if err := m.ConsumePreviewToken(context.Background(), token, b, project); !errors.Is(err, ErrApprovalRequired) {
+	if _, _, _, err := m.ConsumeBind(context.Background(), token, config.SourceOverrides{}); !errors.Is(err, ErrApprovalRequired) {
 		t.Fatalf("expired token err = %v, want ErrApprovalRequired", err)
 	}
 }
 
-func TestPreviewTokenBindingMismatch(t *testing.T) {
-	m, _, _, root, project := managerFixture(t)
-	b := Binding{Provider: ProviderClaude, Mode: ModeLinked, Root: root,
-		Claims: []string{"launch_defaults"}, Approved: []string{root, project.Cwd}}
-	_, _, token, _, err := m.Preview(context.Background(), b, project)
-	if err != nil {
-		t.Fatalf("Preview: %v", err)
-	}
-	other := b
-	other.Root = filepath.Join(root, "elsewhere")
-	if err := m.ConsumePreviewToken(context.Background(), token, other, project); !errors.Is(err, ErrApprovalRequired) {
-		t.Fatalf("mismatch err = %v, want ErrApprovalRequired", err)
+func TestConsumeBindUnknownToken(t *testing.T) {
+	m, _, _, _, _ := managerFixture(t)
+	if _, _, _, err := m.ConsumeBind(context.Background(), "nope", config.SourceOverrides{}); !errors.Is(err, ErrApprovalRequired) {
+		t.Fatalf("unknown token err = %v, want ErrApprovalRequired", err)
 	}
 }
 
