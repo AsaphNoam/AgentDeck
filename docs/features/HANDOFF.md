@@ -11,7 +11,7 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
 - **Active phase:** 7 — Configuration federation + OpenHands & OpenCode backends (Phase 6 complete ✅)
 - **Active subphase:** 7.5 (next) — Claude/Codex federation schema + pure provider resolvers. 7.1–7.3 done ✅; 7.4 remains an independent live-acceptance gate.
 - **Spec:** [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) (PRD: [`phase-7-additional-features.md`](phase-7-additional-features.md))
-- **Last GREEN checkpoint:** `phase 7: specify Claude/Codex configuration federation` — both Go test variants + Go build + UI (83 tests) + UI build pass; documentation diff check clean.
+- **Last GREEN checkpoint:** merge of `main` (federation spec, `f0c14d3`) into the 2026-07-11 security-review batch — `go build ./...` + both Go test variants pass (the incoming side was docs-only; UI untouched). NOTE: the security batch + this merge live on branch `claude/agentdecker-security-review-urhvp2` (that session was hard-scoped to the branch); merging it to `main` restores the trunk invariant and is now a fast-forward.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Push normal commits to `origin/main` on task completion; force-pushes still ask.
 
 ---
@@ -81,6 +81,17 @@ advertises xterm/tmux/iterm2.
 - **HUMAN — Unbounded transcript indexing.** Full-text indexing keeps the
   whole transcript in memory and rewrites it at turn boundaries so old content remains searchable. Very long
   sessions can become expensive; a chunked index would reverse the trade-off without dropping search data.
+- **HUMAN — Agent env inheritance by design.** Child agent processes inherit the full server
+  `os.Environ()` (minus each backend's `StripEnvKeys`), per the phase-1 techspec's `composeEnv`
+  contract — so unrelated host credentials (cloud tokens, DB URLs) are visible to agents and their
+  adapters. Deliberate: agent CLIs need PATH/HOME/locale plus arbitrary provider keys, and an
+  allowlist would silently break real backends. Reverse by defining a per-backend env allowlist in
+  config and defaulting new backends to it. (2026-07-11 security review, finding 4.)
+- **HUMAN — Local API trusts same-machine callers.** The dashboard API is unauthenticated on
+  loopback: browser attack paths are now closed (Host/Origin guard, invariant §14) and `/api/hook`
+  + `/mcp` require per-launch tokens, but any local process (including other OS users) that can
+  connect to the port can read transcripts/config and drive agents. Adding real API auth (token
+  file + UI handshake) is a product-scope decision. (2026-07-11 security review, findings 3/5.)
 - **HUMAN — API/model compatibility.** Older endpoints still use a different error-envelope
   shape, and the current Agent Client Protocol adapter can ignore AgentDeck's requested model in favor of its
   own model identifiers. Standardize the API envelope and map model IDs before promising those contracts.
@@ -266,14 +277,29 @@ remaining open set; every surviving item is ADVISORY.
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-11 — **merged `origin/main` (federation spec) into the security branch — green.** Docs-only
+  conflicts (HANDOFF/BRIEFS state entries from the two parallel 2026-07-11 sessions); both sides kept.
 - 2026-07-11 — **Phase 7 configuration federation specified — green.** Replaced the orphaned
   one-time F16 import promise with linked (preferred), mirrored and detached ownership modes;
   specified provider-native precedence/setup inventory, redaction/trust boundaries, watch+sweep+
   launch freshness, immutable provenance, REST/SSE/UI contracts and subphases 7.5–7.8. Updated the
   phase map, master PRD and architecture source-of-truth rationale. Go build + both test variants +
   UI 83 tests/build green; initial sandbox-only localhost bind failure passed on unrestricted rerun.
-  Checkpoint `cf3a68f` is local; direct `origin/main` push requires explicit human authorization.
-
+  Checkpoint `cf3a68f` has since been pushed to `origin/main`.
+- 2026-07-11 — **review fix: security review batch (7 findings) — green; new invariant §14.** On branch
+  `claude/agentdecker-security-review-urhvp2` (session-scoped; needs merge to `main`). (1–3, 6) **DNS
+  rebinding / WS origin / CORS-as-auth / raw-mount bypass** — all one root cause: no server-side
+  Host/Origin enforcement. Added the `localOnly` guard (`internal/server/security.go`) wrapping the
+  ENTIRE mux (API, `/mcp`, terminal WS, static UI): non-local `Host` → 403 (kills rebinding), non-local
+  `Origin` → 403 (kills cross-site WS + simple-request CSRF); Origin-less non-browser clients and the
+  Vite dev origin pass. Tests: `TestDNSRebindingHostRejected`, `TestCrossOriginRequestRejected`,
+  `TestIsLocalHost/Origin`; server tests now use `newLocalRequest`. (7) **World-readable home** —
+  confirmed real (config/backends env keys, state.db, transcripts, hook settings, log were 0o755/0o644):
+  home tree now 0o700/0o600 incl. explicit `Chmod` of pre-existing home + state.db
+  (`TestHomeTreeIsOwnerOnly`, `TestStateDBIsOwnerOnly`, `TestTranscriptIsOwnerOnly`). (4, 5) validated
+  as deliberate design / product-scope → recorded as the two new HUMAN decisions above, no code change.
+  Also observed: pre-existing `TestResumeTerminalAgent` failure under `-race` only (fails 10/10 on the
+  untouched baseline too; normal `go test` green) — left for review.
 - 2026-07-10 — **review fix: eight usability BLOCKERs cleared — green.** All eight open usability
   BLOCKERs validated real and fixed, each with a regression test; both Go variants + both builds + UI
   (83) + build + embed green. (1) **J8/S1 empty-Archive crash** — `scanResults`/`readAll` returned nil

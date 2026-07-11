@@ -47,9 +47,17 @@ func testServer(t *testing.T, seed bool) *Server {
 	return New(cfgStore, stateStore, registry, config.DefaultConfig(), log)
 }
 
+// newLocalRequest is httptest.NewRequest with a loopback Host: httptest's
+// default Host is example.com, which the localOnly guard rejects by design.
+func newLocalRequest(method, target string, body io.Reader) *http.Request {
+	req := httptest.NewRequest(method, target, body)
+	req.Host = "127.0.0.1:4317"
+	return req
+}
+
 func doGET(t *testing.T, h http.Handler, path string) *httptest.ResponseRecorder {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodGet, path, nil)
+	req := newLocalRequest(http.MethodGet, path, nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	return rec
@@ -186,7 +194,7 @@ func TestPutLayoutValidatesAndPersists(t *testing.T) {
 	srv := testServer(t, false)
 	h := srv.routes()
 	body := bytes.NewBufferString(`{"order":["a_1","a_2"],"density":{"perRow":4,"gap":20}}`)
-	req := httptest.NewRequest(http.MethodPut, "/api/layout", body)
+	req := newLocalRequest(http.MethodPut, "/api/layout", body)
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -201,7 +209,7 @@ func TestPutLayoutValidatesAndPersists(t *testing.T) {
 		t.Fatalf("persisted layout = %+v", got)
 	}
 
-	req = httptest.NewRequest(http.MethodPut, "/api/layout", bytes.NewBufferString(`{"order":[],"density":{"perRow":9,"gap":20}}`))
+	req = newLocalRequest(http.MethodPut, "/api/layout", bytes.NewBufferString(`{"order":[],"density":{"perRow":9,"gap":20}}`))
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusBadRequest {
@@ -223,7 +231,7 @@ func TestRenameSession(t *testing.T) {
 	srv := testServer(t, true)
 	agentID := seedHookAgent(t, srv)
 	h := srv.routes()
-	req := httptest.NewRequest(http.MethodPost, "/api/sessions/"+agentID+"/rename", bytes.NewBufferString(`{"name":"Vega"}`))
+	req := newLocalRequest(http.MethodPost, "/api/sessions/"+agentID+"/rename", bytes.NewBufferString(`{"name":"Vega"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -248,7 +256,7 @@ func TestIdentityHandlerUpdatesGroupAndPublishesState(t *testing.T) {
 	if err := srv.stateStore.WriteAgent(agent); err != nil {
 		t.Fatalf("WriteAgent: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodPost, "/api/sessions/a_ident/identity", bytes.NewBufferString(`{"group":"auth","name":"Vega"}`))
+	req := newLocalRequest(http.MethodPost, "/api/sessions/a_ident/identity", bytes.NewBufferString(`{"group":"auth","name":"Vega"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	srv.routes().ServeHTTP(rec, req)
@@ -273,7 +281,7 @@ func TestIdentityRejectsReservedUngrouped(t *testing.T) {
 	if err := srv.stateStore.WriteAgent(agent); err != nil {
 		t.Fatalf("WriteAgent: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodPost, "/api/sessions/a_ident/identity", bytes.NewBufferString(`{"group":"_ungrouped"}`))
+	req := newLocalRequest(http.MethodPost, "/api/sessions/a_ident/identity", bytes.NewBufferString(`{"group":"_ungrouped"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	srv.routes().ServeHTTP(rec, req)
@@ -293,7 +301,7 @@ func TestReleaseGroupStopsMembers(t *testing.T) {
 			t.Fatalf("WriteAgent %s: %v", id, err)
 		}
 	}
-	req := httptest.NewRequest(http.MethodPost, "/api/groups/auth/release", nil)
+	req := newLocalRequest(http.MethodPost, "/api/groups/auth/release", nil)
 	rec := httptest.NewRecorder()
 	srv.routes().ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
@@ -451,7 +459,7 @@ func TestUnknownAPIPath404(t *testing.T) {
 
 func TestPostToGetRoute405(t *testing.T) {
 	h := testServer(t, true).routes()
-	req := httptest.NewRequest(http.MethodPost, "/api/health", nil)
+	req := newLocalRequest(http.MethodPost, "/api/health", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusMethodNotAllowed {
@@ -461,7 +469,7 @@ func TestPostToGetRoute405(t *testing.T) {
 
 func TestCORSPreflight(t *testing.T) {
 	h := testServer(t, true).routes()
-	req := httptest.NewRequest(http.MethodOptions, "/api/health", nil)
+	req := newLocalRequest(http.MethodOptions, "/api/health", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusNoContent {

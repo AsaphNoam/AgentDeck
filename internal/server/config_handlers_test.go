@@ -28,7 +28,7 @@ func doRequest(t *testing.T, h http.Handler, method, path string, body any) *htt
 	} else {
 		reqBody = bytes.NewBuffer(nil)
 	}
-	req := httptest.NewRequest(method, path, reqBody)
+	req := newLocalRequest(method, path, reqBody)
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)

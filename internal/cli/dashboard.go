@@ -159,7 +159,7 @@ func startDetached(home string, port int) error {
 	}
 
 	logPath := filepath.Join(home, "dashboard.log")
-	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return err
 	}

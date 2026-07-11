@@ -6,6 +6,24 @@ Older entries are immutable history; agents resume from [`HANDOFF.md`](HANDOFF.m
 
 ---
 
+### 2026-07-11 — maintenance: merged main into the security branch (complete)
+
+Branch `claude/agentdecker-security-review-urhvp2` had drifted behind `main`, which gained the Phase 7
+configuration-federation spec (`cf3a68f`, `f0c14d3`) while the security batch sat on the branch. Merged
+`origin/main` into the branch and resolved the conflicts — all were in the two state docs (HANDOFF,
+BRIEFS), where both sessions had prepended same-day entries; both sides were kept, and the federation
+changelog entry's stale "push not yet authorized" note was corrected (it is on `origin/main`). No code
+conflicts: the incoming side was documentation-only. Verified green after the merge (Go build + both
+test variants).
+
+**Needs attention:** *Carried:* the two 2026-07-11 security HUMAN decisions (Agent env inheritance by
+design; Local API trusts same-machine callers) and the six older HUMAN items still await your verdict;
+7.4/7.8 acceptance remain credential-gated.
+
+**Next:** human — merge the branch to `main` (now a clean fast-forward); agents then resume 7.5 on trunk.
+
+---
+
 ### 2026-07-11 — specification: Phase 7 configuration federation
 
 Phase 7 now treats Claude Code/Codex setup as federated configuration rather than a one-time copy.
@@ -31,6 +49,33 @@ unchanged. Live OpenHands/OpenCode and federation compatibility checks remain ac
 
 **What this teaches:** A pointer-based source of truth still needs explicit snapshot and freshness
 semantics; otherwise resume behavior and watcher misses quietly recreate configuration drift.
+
+---
+
+### 2026-07-11 — fix-review: security review, all 7 findings resolved (complete)
+
+All seven security findings are dispositioned at a green checkpoint (both Go test variants; UI
+untouched). The work lives on branch `claude/agentdecker-security-review-urhvp2` — this session was
+restricted to that branch, so it needs a merge to `main` to restore the trunk rule.
+
+Fixed (5 of 7, one root cause each):
+- **DNS rebinding, WebSocket origin, CORS-as-auth, middleware bypass** (findings 1–3, 6): the
+  loopback server never checked *which site* the victim's browser was acting for. A new `localOnly`
+  guard now wraps every route (API, `/mcp`, terminal WebSocket, static UI): requests whose Host or
+  Origin isn't localhost get 403, closing rebinding, cross-site terminal keystrokes, and no-preflight
+  CSRF. Regression tests cover each path; new invariant §14 documents the boundary.
+- **World-readable `~/.agentdeck`** (finding 7): confirmed real — API keys, state.db, and transcripts
+  were group/other-readable. The whole tree is now owner-only, including re-tightening homes created
+  by older builds.
+
+**Needs attention:** *New this session:* **Agent env inheritance by design** (agents see the full
+server environment per spec; allowlist would break provider keys) and **Local API trusts
+same-machine callers** (no API auth; browser paths closed, other local OS users not) — both need
+your verdict. *Carried:* Terminal support boundary, HTTP-only agent messaging, Immediate/prompt-based
+UI, Runtime-switch fallbacks, Unbounded transcript indexing, API/model compatibility; 7.4 live
+acceptance still blocked on credentials.
+
+**Next:** human — merge the branch to `main` and rule on the two new HUMAN items.
 
 ---
 

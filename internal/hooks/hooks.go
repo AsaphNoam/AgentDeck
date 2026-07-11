@@ -46,12 +46,14 @@ func ScriptPath(home, event string) string {
 	return filepath.Join(Dir(home), name)
 }
 
-// Install (re)writes every embedded hook script into {home}/hooks with 0o755
-// perms. Idempotent and overwriting — the scripts always match the running
-// binary so a server upgrade never leaves a stale script behind.
+// Install (re)writes every embedded hook script into {home}/hooks with 0o700
+// perms (owner-only like the rest of the home tree; the agent CLIs that exec
+// them run as the same user). Idempotent and overwriting — the scripts always
+// match the running binary so a server upgrade never leaves a stale script
+// behind.
 func Install(home string) error {
 	dir := Dir(home)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("hooks: create dir %q: %w", dir, err)
 	}
 	for _, name := range allScripts {
@@ -63,10 +65,10 @@ func Install(home string) error {
 		// Write atomically (temp + rename) so a concurrent agent never reads a
 		// half-written script.
 		tmp := dst + ".tmp"
-		if err := os.WriteFile(tmp, data, 0o755); err != nil {
+		if err := os.WriteFile(tmp, data, 0o700); err != nil {
 			return fmt.Errorf("hooks: write %q: %w", dst, err)
 		}
-		if err := os.Chmod(tmp, 0o755); err != nil {
+		if err := os.Chmod(tmp, 0o700); err != nil {
 			_ = os.Remove(tmp)
 			return fmt.Errorf("hooks: chmod %q: %w", dst, err)
 		}
@@ -109,7 +111,7 @@ func ClaudeSettings(home string, hookMap map[string]string) map[string]any {
 // CLI at this file at launch so the agent's hooks fire for the right events.
 func WriteAgentSettings(home, agentID string, settings map[string]any) (string, error) {
 	dir := filepath.Join(Dir(home), "agents")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", fmt.Errorf("hooks: create agent settings dir: %w", err)
 	}
 	path := filepath.Join(dir, agentID+".json")
@@ -117,7 +119,7 @@ func WriteAgentSettings(home, agentID string, settings map[string]any) (string, 
 	if err != nil {
 		return "", fmt.Errorf("hooks: marshal settings: %w", err)
 	}
-	if err := os.WriteFile(path, data, 0o644); err != nil {
+	if err := os.WriteFile(path, data, 0o600); err != nil {
 		return "", fmt.Errorf("hooks: write settings %q: %w", path, err)
 	}
 	return path, nil

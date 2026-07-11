@@ -20,7 +20,7 @@ func Open(home string) (*Store, error) {
 	if home == "" {
 		return nil, fmt.Errorf("state: home is empty")
 	}
-	if err := os.MkdirAll(home, 0o755); err != nil {
+	if err := os.MkdirAll(home, 0o700); err != nil {
 		return nil, fmt.Errorf("state: create home: %w", err)
 	}
 
@@ -50,6 +50,13 @@ func Open(home string) (*Store, error) {
 	if err := migrate(db); err != nil {
 		db.Close()
 		return nil, err
+	}
+	// SQLite creates the db (and its -wal/-shm siblings, which inherit the db's
+	// mode) umask-relative; the state holds transcripts/commands/tokens, so make
+	// it owner-only regardless of umask or the perms an older build left behind.
+	if err := os.Chmod(dbPath, 0o600); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("state: chmod db: %w", err)
 	}
 
 	return &Store{db: db}, nil

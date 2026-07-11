@@ -18,7 +18,7 @@ import (
 // visible under the real name.
 func writeJSONAtomic(path string, v any) error {
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("config: mkdir %s: %w", dir, err)
 	}
 

@@ -250,7 +250,7 @@ func TestCommandsEndpointUnknownAgent(t *testing.T) {
 
 func postHookJSON(t *testing.T, h http.Handler, body string, token string) *httptest.ResponseRecorder {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodPost, "/api/hook", bytes.NewBufferString(body))
+	req := newLocalRequest(http.MethodPost, "/api/hook", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	if token != "" {
 		req.Header.Set("X-AgentDeck-Token", token)
