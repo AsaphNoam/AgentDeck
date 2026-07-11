@@ -182,6 +182,40 @@ func TestClaudeResolverRejectsUnapprovedSymlinkTarget(t *testing.T) {
 	}
 }
 
+// Regression (review fix, §2.4): a binding is per backend and reused across
+// projects. A binding whose frozen Approved holds only project A's root must still
+// resolve project B's native config (B's canonical root is approved per resolution),
+// or a normal A→B project change is wrongly rejected with approval_required.
+func TestClaudeResolverResolvesDifferentProjectThanPreview(t *testing.T) {
+	home, projectA := claudeFixture(t)
+	root := filepath.Join(home, ".claude")
+	writeClaudeTestFile(t, filepath.Join(root, "settings.json"), `{"model":"user-model"}`)
+
+	projectB, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeClaudeTestFile(t, filepath.Join(projectB, ".claude", "settings.json"), `{"model":"project-b-model"}`)
+
+	// Approved is frozen to project A only (as it would be after a preview against A).
+	binding := Binding{Provider: ProviderClaude, Mode: ModeLinked, Root: root,
+		Claims: []string{"launch_defaults"}, Approved: []string{root, projectA}}
+
+	effective, report, err := NewClaudeResolver(home).Resolve(context.Background(), binding, config.Project{Cwd: projectB})
+	if err != nil {
+		t.Fatalf("Resolve on project B: %v report=%+v", err, report)
+	}
+	for _, skip := range report.Skipped {
+		if skip.Reason == "approval_required" {
+			t.Fatalf("project B read rejected as approval_required: %+v", report.Skipped)
+		}
+	}
+	// Project B's settings must take effect (precedence: project over user).
+	if effective.Model == nil || *effective.Model != "project-b-model" {
+		t.Fatalf("model = %v, want project-b-model (project B config applied)", effective.Model)
+	}
+}
+
 func claudeFixture(t *testing.T) (home, project string) {
 	t.Helper()
 	home, project = filepath.Join(t.TempDir(), "home"), filepath.Join(t.TempDir(), "project")

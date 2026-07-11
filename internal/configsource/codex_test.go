@@ -224,6 +224,43 @@ Authorization = "`+secret+`"
 	assertCodexResultDoesNotContain(t, secret, effective, report, err)
 }
 
+// Regression (review fix, §2.4): a Codex binding is per backend and reused across
+// projects. A binding whose frozen Approved holds only project A's root must still
+// resolve project B's native config, or a normal A→B project change is wrongly
+// rejected with approval_required.
+func TestCodexResolverResolvesDifferentProjectThanPreview(t *testing.T) {
+	home, root, projectA := codexFixture(t)
+	projectB, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeCodexTestFile(t, filepath.Join(root, "config.toml"), `
+model = "user-model"
+[projects."`+projectB+`"]
+trust_level = "trusted"
+`)
+	projectBConfig := filepath.Join(projectB, ".codex", "config.toml")
+	writeCodexTestFile(t, projectBConfig, `model = "project-b-model"`)
+
+	// Approved is frozen to project A only (as after a preview against A).
+	binding := Binding{Provider: ProviderCodex, Mode: ModeLinked, Root: root,
+		Claims: []string{"launch_defaults"}, Approved: []string{root, projectA}}
+
+	effective, report, err := NewCodexResolver(CodexOptions{UserHome: home, CodexHome: root}).Resolve(
+		context.Background(), binding, config.Project{Cwd: projectB})
+	if err != nil {
+		t.Fatalf("Resolve on project B: %v report=%+v", err, report)
+	}
+	for _, skip := range report.Skipped {
+		if skip.Reason == "approval_required" {
+			t.Fatalf("project B read rejected as approval_required: %+v", report.Skipped)
+		}
+	}
+	if effective.Model == nil || *effective.Model != "project-b-model" {
+		t.Fatalf("model = %v, want project-b-model (project B config applied)", effective.Model)
+	}
+}
+
 func codexFixture(t *testing.T) (home, root, project string) {
 	t.Helper()
 	base := t.TempDir()
