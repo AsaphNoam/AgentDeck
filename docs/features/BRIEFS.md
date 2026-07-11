@@ -48,8 +48,8 @@ messaging; Immediate/prompt-based UI; Runtime-switch fallbacks; Unbounded transc
 env inheritance by design; Local API trusts same-machine callers; API/model compatibility. Live
 acceptance 7.4 and 7.8 remain credential-gated.
 
-**Next:** Agent — implement 7.6 federation manager/API/launch integration; implement 7.9 only after
-the federation acceptance scope is complete.
+**Next:** Human — explicitly authorize publishing `feature/phase-7-knowledge-base`; then agent
+implements 7.6 federation manager/API/launch integration, with 7.9 following federation acceptance.
 
 ---
 
