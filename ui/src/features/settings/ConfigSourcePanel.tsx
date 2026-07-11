@@ -31,12 +31,15 @@ function provenanceLabel(effective: Effective, field: "model" | "effort", value:
   return `${value} — inherited from ${where}`;
 }
 
+// Asset kinds differ per provider: Claude emits singular kinds (instruction, rule,
+// mcp) while Codex emits plural ones (instructions, rules, mcp_servers). Each group
+// lists both so a Codex user actually sees AGENTS.md instructions and MCP servers.
 const INVENTORY_GROUPS: { label: string; kinds: string[] }[] = [
-  { label: "Instructions", kinds: ["instruction", "instruction_import"] },
+  { label: "Instructions", kinds: ["instruction", "instruction_import", "instructions"] },
   { label: "Skills", kinds: ["skill"] },
   { label: "Agents", kinds: ["agent"] },
-  { label: "Rules", kinds: ["rule"] },
-  { label: "MCP", kinds: ["mcp"] },
+  { label: "Rules", kinds: ["rule", "rules"] },
+  { label: "MCP", kinds: ["mcp", "mcp_servers"] },
   { label: "Hooks", kinds: ["hooks"] },
   { label: "Plugins", kinds: ["plugins"] },
 ];

@@ -111,6 +111,36 @@ describe("ConfigSourcePanel", () => {
     expect(previewedModes).toContain("mirrored");
   });
 
+  // Regression (review fix): Codex emits plural asset kinds (instructions,
+  // mcp_servers), so the inventory groups must match them or a Codex user sees
+  // neither AGENTS.md nor MCP servers.
+  it("renders Codex plural asset kinds (instructions, mcp_servers)", async () => {
+    server.use(
+      http.get("/api/config-sources", () =>
+        HttpResponse.json({
+          bindings: [{ backend_id: "codex", provider: "codex", mode: "linked", root: "/h/.codex", claims: [], approved_roots: [], health: "ok", stale: false }],
+          candidates: [],
+        }),
+      ),
+      http.post("/api/config-sources/codex/refresh", () =>
+        HttpResponse.json({
+          binding: { backend_id: "codex", provider: "codex", mode: "linked", root: "/h/.codex", health: "ok", stale: false },
+          effective: {
+            ...emptyEffective,
+            assets: [
+              { kind: "instructions", name: "AGENTS.md", path: "/p/AGENTS.md", scope: "project", detachability: "copyable", status: "native_passthrough" },
+              { kind: "mcp_servers", name: "my-server", path: "/h/.codex/config.toml", scope: "user", detachability: "reference_only", status: "native_passthrough" },
+            ],
+          },
+        }),
+      ),
+    );
+    renderWithQuery(<ConfigSourcePanel backendId="codex" backendType="codex-acp" />);
+    fireEvent.click(await screen.findByText("Load effective view"));
+    expect(await screen.findByText("AGENTS.md")).toBeInTheDocument();
+    expect(screen.getByText("my-server")).toBeInTheDocument();
+  });
+
   it("shows a bound source with health and an unlink action", async () => {
     server.use(
       http.get("/api/config-sources", () =>
