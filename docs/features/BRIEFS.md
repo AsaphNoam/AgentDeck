@@ -33,6 +33,29 @@ an agent picks up the two ADVISORY UI refinements.
 
 ---
 
+### 2026-07-11 — documentation: AgentDeck learning atlas
+
+A standalone, searchable [AgentDeck learning atlas](/Users/mcnoam/Projects/AgentDeck/docs/agentdeck-learning-atlas.html)
+now teaches the repository through modern AI-tool development first (ACP, MCP, lifecycle,
+permissions, provenance), then architecture, then Go. It uses AgentDeck’s own flows and linked
+source ownership rather than line-by-line code, distinguishes delivered Phase 7.5 federation
+foundations from planned 7.6+ work, and passed HTML/link checks plus the full Go test checkpoint.
+
+**Needs attention:** New/changed: the local checkpoint is staged but cannot be committed because
+the execution environment's Git escalation reached its usage limit. Carried: Terminal support
+boundary; HTTP-only agent messaging; Immediate/prompt-based UI; Runtime-switch fallbacks;
+Unbounded transcript indexing; Agent env inheritance by design; Local API trusts same-machine
+callers; API/model compatibility. Live 7.4 and 7.8 acceptance remain credential-gated.
+
+**Next:** Agent — create the staged local checkpoint when Git access resumes; Human — decide
+whether the atlas should be linked from broader user-facing documentation.
+
+**What this teaches:** ACP controls an agent session while MCP equips an agent with tools; a
+reliable AI product also needs explicit state ownership, recoverable live streaming, and
+launch-scoped authority.
+
+---
+
 ### 2026-07-11 — planning: Phase 7 knowledge MCP and workflow guardrails
 
 On `feature/phase-7-knowledge-base`, removed the three superseded review/usability branches from

@@ -1,0 +1,1520 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A practical learning atlas for understanding AgentDeck, modern AI-tool development, its architecture, and Go.">
+  <title>AgentDeck Learning Atlas</title>
+  <style>
+    :root {
+      --canvas: #f7f4ed;
+      --paper: #fffdf9;
+      --paper-strong: #ffffff;
+      --ink: #18202b;
+      --muted: #5f6b79;
+      --line: #dfe4e8;
+      --line-strong: #c7d0d7;
+      --nav: #102635;
+      --nav-muted: #a9c1cf;
+      --nav-active: #dff7f2;
+      --teal: #007c78;
+      --teal-soft: #e4f4f1;
+      --blue: #315e9e;
+      --blue-soft: #eaf1fb;
+      --violet: #704cad;
+      --violet-soft: #f1ebfb;
+      --orange: #a54c13;
+      --orange-soft: #fff0e4;
+      --rose: #a63655;
+      --rose-soft: #fcecf0;
+      --green: #267259;
+      --green-soft: #e8f5ed;
+      --shadow: 0 14px 34px rgba(26, 39, 49, 0.08);
+      --radius: 16px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 90% 0%, rgba(79, 179, 169, 0.14), transparent 27rem),
+        linear-gradient(180deg, #faf8f3 0%, var(--canvas) 45rem, #f1f5f3 100%);
+      line-height: 1.58;
+    }
+
+    a { color: var(--blue); text-underline-offset: 0.16em; }
+    a:hover { color: var(--teal); }
+    button, input { font: inherit; }
+    button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visible {
+      outline: 3px solid #f3bd54;
+      outline-offset: 3px;
+    }
+
+    .skip-link {
+      position: absolute;
+      left: 1rem;
+      top: -5rem;
+      z-index: 20;
+      padding: 0.6rem 0.8rem;
+      border-radius: 8px;
+      background: var(--paper-strong);
+      color: var(--ink);
+      box-shadow: var(--shadow);
+    }
+    .skip-link:focus { top: 1rem; }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 282px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      padding: 1.4rem 1rem 2rem;
+      color: white;
+      background:
+        radial-gradient(circle at 15% 4%, rgba(86, 213, 197, 0.18), transparent 16rem),
+        linear-gradient(180deg, #102635 0%, #0c1b26 100%);
+    }
+    .brand {
+      display: grid;
+      grid-template-columns: 2.55rem minmax(0, 1fr);
+      gap: 0.7rem;
+      align-items: center;
+      padding: 0.35rem 0.5rem 1.1rem;
+      border-bottom: 1px solid rgba(223, 247, 242, 0.15);
+    }
+    .mark {
+      display: grid;
+      place-items: center;
+      width: 2.55rem;
+      height: 2.55rem;
+      border-radius: 0.72rem;
+      color: #08222c;
+      font-weight: 900;
+      background: linear-gradient(135deg, #c0f5e8, #7fd6ec);
+    }
+    .brand strong { display: block; letter-spacing: -0.02em; }
+    .brand span { display: block; color: var(--nav-muted); font-size: 0.77rem; }
+
+    .nav-label {
+      margin: 1.25rem 0 0.4rem;
+      padding: 0 0.55rem;
+      color: #8eabb9;
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .nav { display: grid; gap: 0.14rem; }
+    .nav a {
+      display: block;
+      padding: 0.48rem 0.58rem;
+      border: 1px solid transparent;
+      border-radius: 0.55rem;
+      color: var(--nav-muted);
+      font-size: 0.88rem;
+      text-decoration: none;
+    }
+    .nav a:hover, .nav a.active {
+      border-color: rgba(223, 247, 242, 0.16);
+      color: var(--nav-active);
+      background: rgba(223, 247, 242, 0.09);
+    }
+    .sidebar-note {
+      margin: 1.4rem 0.5rem 0;
+      padding: 0.8rem;
+      border: 1px solid rgba(223, 247, 242, 0.13);
+      border-radius: 0.7rem;
+      color: var(--nav-muted);
+      background: rgba(255, 255, 255, 0.04);
+      font-size: 0.79rem;
+    }
+    .sidebar-note strong { color: white; }
+
+    main { min-width: 0; }
+    .hero {
+      padding: clamp(2.5rem, 7vw, 6.2rem) clamp(1.3rem, 6vw, 6.8rem) 3.1rem;
+      border-bottom: 1px solid var(--line);
+    }
+    .eyebrow {
+      margin: 0 0 0.7rem;
+      color: var(--teal);
+      font-size: 0.73rem;
+      font-weight: 800;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3, h4 { color: var(--ink); line-height: 1.12; }
+    h1 {
+      max-width: 900px;
+      margin: 0;
+      font-size: clamp(2.7rem, 6.2vw, 5.7rem);
+      letter-spacing: -0.065em;
+    }
+    h2 {
+      margin: 0;
+      max-width: 800px;
+      font-size: clamp(2rem, 3.8vw, 3.25rem);
+      letter-spacing: -0.045em;
+    }
+    h3 { margin: 0; font-size: 1.16rem; letter-spacing: -0.02em; }
+    h4 { margin: 0; font-size: 0.95rem; }
+    p { margin: 0.55rem 0 0; color: var(--muted); }
+    .lead {
+      max-width: 840px;
+      color: #364654;
+      font-size: clamp(1.08rem, 1.8vw, 1.31rem);
+    }
+    .pill-row, .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+    }
+    .pill-row { margin-top: 1.5rem; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.36rem;
+      padding: 0.33rem 0.58rem;
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      color: #405463;
+      background: rgba(255, 255, 255, 0.66);
+      font-size: 0.79rem;
+      font-weight: 650;
+    }
+    .pill b { color: var(--teal); }
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-top: 1.65rem;
+    }
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 2.55rem;
+      padding: 0.58rem 0.86rem;
+      border: 1px solid var(--line-strong);
+      border-radius: 0.65rem;
+      color: var(--ink);
+      background: var(--paper-strong);
+      cursor: pointer;
+      font-weight: 750;
+      text-decoration: none;
+    }
+    .button.primary {
+      border-color: #006f6b;
+      color: white;
+      background: var(--teal);
+    }
+    .button:hover { transform: translateY(-1px); box-shadow: 0 5px 12px rgba(26, 39, 49, 0.12); }
+
+    .chapter {
+      padding: clamp(2.8rem, 6vw, 5.5rem) clamp(1.3rem, 6vw, 6.8rem);
+      border-bottom: 1px solid var(--line);
+      scroll-margin-top: 1rem;
+    }
+    .chapter-heading {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+      gap: 1rem;
+      margin-bottom: 1.55rem;
+    }
+    .chapter-copy { max-width: 760px; }
+    .priority {
+      padding: 0.36rem 0.64rem;
+      border-radius: 999px;
+      color: #005f5c;
+      background: var(--teal-soft);
+      font-size: 0.76rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .priority.architecture { color: #315e9e; background: var(--blue-soft); }
+    .priority.go { color: #704cad; background: var(--violet-soft); }
+
+    .callout {
+      margin: 1.15rem 0 1.45rem;
+      padding: 1rem 1.05rem;
+      border: 1px solid #beded8;
+      border-left: 4px solid var(--teal);
+      border-radius: 0.75rem;
+      background: rgba(228, 244, 241, 0.72);
+    }
+    .callout p { color: #315460; }
+    .callout strong { color: #175c5b; }
+    .callout.warning {
+      border-color: #edc596;
+      border-left-color: var(--orange);
+      background: rgba(255, 240, 228, 0.7);
+    }
+    .callout.warning strong { color: #874112; }
+
+    .grid {
+      display: grid;
+      gap: 1rem;
+    }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .concept-card, .path-card, .reference-card, .definition-card {
+      min-width: 0;
+      padding: 1.12rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 253, 249, 0.78);
+      box-shadow: 0 1px 0 rgba(23, 32, 43, 0.02);
+    }
+    .concept-card { border-top: 4px solid var(--teal); }
+    .concept-card.architecture { border-top-color: var(--blue); }
+    .concept-card.go { border-top-color: var(--violet); }
+    .concept-card.security { border-top-color: var(--orange); }
+    .concept-card h3 { margin-top: 0.2rem; }
+    .card-kicker {
+      margin: 0;
+      color: var(--teal);
+      font-size: 0.69rem;
+      font-weight: 850;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+    }
+    .architecture .card-kicker { color: var(--blue); }
+    .go .card-kicker { color: var(--violet); }
+    .security .card-kicker { color: var(--orange); }
+    .concept-card ul, .path-card ul {
+      margin: 0.8rem 0 0;
+      padding-left: 1.1rem;
+      color: var(--muted);
+    }
+    .concept-card li + li, .path-card li + li { margin-top: 0.38rem; }
+    .label {
+      display: inline-block;
+      margin-top: 0.9rem;
+      color: #4d5b67;
+      font-size: 0.73rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .tag {
+      display: inline-flex;
+      padding: 0.2rem 0.43rem;
+      border-radius: 999px;
+      color: #286763;
+      background: var(--teal-soft);
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+    .tag.blue { color: var(--blue); background: var(--blue-soft); }
+    .tag.violet { color: var(--violet); background: var(--violet-soft); }
+    .tag.orange { color: var(--orange); background: var(--orange-soft); }
+    .tag.rose { color: var(--rose); background: var(--rose-soft); }
+    .tag.green { color: var(--green); background: var(--green-soft); }
+    .repo-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.38rem 0.7rem;
+      margin-top: 0.7rem;
+      font-size: 0.83rem;
+    }
+
+    .system-map {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr;
+      gap: 0.6rem;
+      align-items: stretch;
+      margin: 1.4rem 0;
+    }
+    .node {
+      display: grid;
+      align-content: center;
+      min-height: 9rem;
+      padding: 1rem;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: var(--paper-strong);
+    }
+    .node span {
+      display: block;
+      margin-bottom: 0.2rem;
+      color: var(--teal);
+      font-size: 0.71rem;
+      font-weight: 850;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .node p { font-size: 0.91rem; }
+    .arrow {
+      display: grid;
+      place-items: center;
+      color: #78919c;
+      font-size: 1.55rem;
+      font-weight: 900;
+    }
+    .plane-key {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+      margin-top: 1rem;
+    }
+    .plane-key span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.81rem;
+      color: var(--muted);
+    }
+    .dot { width: 0.68rem; height: 0.68rem; border-radius: 999px; background: var(--teal); }
+    .dot.blue { background: var(--blue); }
+    .dot.violet { background: var(--violet); }
+
+    .protocol-table {
+      width: 100%;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      border-collapse: separate;
+      border-spacing: 0;
+      background: var(--paper-strong);
+    }
+    .protocol-table th, .protocol-table td {
+      padding: 0.82rem 0.9rem;
+      vertical-align: top;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+    }
+    .protocol-table th {
+      color: #3d4d5a;
+      background: #f3f6f7;
+      font-size: 0.75rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .protocol-table tr:last-child td { border-bottom: 0; }
+    .protocol-table td { color: var(--muted); font-size: 0.91rem; }
+    .protocol-table b { color: var(--ink); }
+    code {
+      padding: 0.08rem 0.27rem;
+      border-radius: 0.28rem;
+      color: #3f2e64;
+      background: #f2eef8;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.88em;
+    }
+
+    .trace {
+      display: grid;
+      grid-template-columns: 0.9fr auto 1.25fr auto 1fr;
+      gap: 0.55rem;
+      align-items: center;
+      margin: 1.45rem 0 0;
+    }
+    .trace-step {
+      padding: 0.84rem;
+      border: 1px solid var(--line);
+      border-radius: 0.75rem;
+      background: var(--paper-strong);
+      font-size: 0.87rem;
+    }
+    .trace-step b { display: block; color: var(--ink); }
+    .trace-step span { color: var(--muted); }
+    .trace-arrow { color: var(--teal); font-weight: 900; font-size: 1.3rem; }
+
+    .timeline {
+      display: grid;
+      grid-template-columns: 2.2rem minmax(0, 1fr);
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    .step-number {
+      display: grid;
+      place-items: center;
+      width: 2.2rem;
+      height: 2.2rem;
+      border-radius: 999px;
+      color: white;
+      background: var(--teal);
+      font-size: 0.8rem;
+      font-weight: 850;
+    }
+    .timeline > div:nth-child(even) {
+      padding: 0.08rem 0 0.85rem;
+      border-bottom: 1px dashed var(--line-strong);
+    }
+    .timeline > div:nth-last-child(-n+2) { border-bottom: 0; }
+    .timeline h4 { margin-top: 0.15rem; }
+    .timeline p { font-size: 0.93rem; }
+
+    .comparison {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      overflow: hidden;
+      margin-top: 1rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper-strong);
+    }
+    .comparison > div { padding: 1rem; }
+    .comparison > div + div { border-left: 1px solid var(--line); }
+    .comparison h3 { font-size: 1.05rem; }
+    .comparison .wrong { background: #fff9f5; }
+    .comparison .right { background: #f5fbfa; }
+
+    .details {
+      margin-top: 0.85rem;
+      border-top: 1px solid var(--line);
+    }
+    details { padding: 0.68rem 0 0; }
+    summary {
+      cursor: pointer;
+      color: #3b5665;
+      font-size: 0.9rem;
+      font-weight: 750;
+    }
+    details p { font-size: 0.9rem; }
+
+    .reading-paths {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1rem;
+      margin-top: 1.35rem;
+    }
+    .path-card { border-top: 4px solid var(--blue); }
+    .path-card:nth-child(2) { border-top-color: var(--teal); }
+    .path-card:nth-child(3) { border-top-color: var(--violet); }
+    .duration {
+      margin: 0 0 0.38rem;
+      color: var(--blue);
+      font-size: 0.75rem;
+      font-weight: 850;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .path-card:nth-child(2) .duration { color: var(--teal); }
+    .path-card:nth-child(3) .duration { color: var(--violet); }
+
+    .search-wrap {
+      position: relative;
+      margin: 0.9rem 0 1rem;
+    }
+    .search-wrap input {
+      width: min(100%, 640px);
+      padding: 0.75rem 0.9rem;
+      border: 1px solid var(--line-strong);
+      border-radius: 0.7rem;
+      color: var(--ink);
+      background: var(--paper-strong);
+    }
+    .search-status { display: block; margin-top: 0.45rem; color: var(--muted); font-size: 0.83rem; }
+    .is-filtered { display: none; }
+
+    .glossary {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.8rem;
+    }
+    .definition-card { padding: 0.92rem; }
+    .definition-card dt { color: var(--ink); font-weight: 850; }
+    .definition-card dd { margin: 0.3rem 0 0; color: var(--muted); font-size: 0.91rem; }
+
+    .reference-list {
+      display: grid;
+      gap: 0.68rem;
+    }
+    .reference-card {
+      display: grid;
+      grid-template-columns: minmax(9rem, 0.33fr) minmax(0, 1fr);
+      gap: 1rem;
+      align-items: start;
+      padding: 0.9rem;
+    }
+    .reference-card h3 { font-size: 0.98rem; }
+    .reference-card p { margin: 0; font-size: 0.9rem; }
+
+    .footer {
+      padding: 2rem clamp(1.3rem, 6vw, 6.8rem) 3rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .footer p { max-width: 860px; }
+    .footer button {
+      margin-top: 0.8rem;
+      padding: 0;
+      border: 0;
+      color: var(--blue);
+      background: transparent;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 0.16em;
+    }
+
+    @media (max-width: 1050px) {
+      .shell { grid-template-columns: 1fr; }
+      .sidebar {
+        position: sticky;
+        z-index: 10;
+        height: auto;
+        overflow: visible;
+        padding: 0.75rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.14rem;
+        overflow-x: auto;
+      }
+      .brand { flex: 0 0 auto; margin-right: 0.45rem; padding: 0; border: 0; }
+      .sidebar .nav-label, .sidebar-note { display: none; }
+      .nav { display: inline-flex; flex: 0 0 auto; }
+      .nav a { flex: 0 0 auto; }
+      .chapter-heading { grid-template-columns: 1fr; }
+      .priority { justify-self: start; }
+    }
+    @media (max-width: 780px) {
+      .grid.two, .grid.three, .reading-paths, .glossary { grid-template-columns: 1fr; }
+      .system-map, .trace { grid-template-columns: 1fr; }
+      .arrow, .trace-arrow { transform: rotate(90deg); min-height: 1rem; }
+      .node { min-height: auto; }
+      .protocol-table { display: block; overflow-x: auto; white-space: normal; }
+      .comparison { grid-template-columns: 1fr; }
+      .comparison > div + div { border-top: 1px solid var(--line); border-left: 0; }
+      .reference-card { grid-template-columns: 1fr; gap: 0.32rem; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to the atlas</a>
+  <div class="shell">
+    <aside class="sidebar" aria-label="Atlas navigation">
+      <div class="brand">
+        <div class="mark" aria-hidden="true">A</div>
+        <div>
+          <strong>AgentDeck Atlas</strong>
+          <span>AI tools · architecture · Go</span>
+        </div>
+      </div>
+
+      <p class="nav-label">Orientation</p>
+      <nav class="nav">
+        <a href="#start">Start here</a>
+        <a href="#map">The one-page model</a>
+        <a href="#protocols">Protocol map</a>
+      </nav>
+
+      <p class="nav-label">Priority 1 · AI development</p>
+      <nav class="nav">
+        <a href="#ai">AI-tool development</a>
+        <a href="#acp">ACP</a>
+        <a href="#mcp">MCP</a>
+        <a href="#agent-loop">One agent turn</a>
+        <a href="#safety">Safety &amp; provenance</a>
+      </nav>
+
+      <p class="nav-label">Priority 2 · Architecture</p>
+      <nav class="nav">
+        <a href="#architecture">Architecture</a>
+        <a href="#state">State &amp; identity</a>
+        <a href="#events">Live event recovery</a>
+        <a href="#federation">Config federation</a>
+      </nav>
+
+      <p class="nav-label">Priority 3 · Go</p>
+      <nav class="nav">
+        <a href="#go">Why Go here</a>
+        <a href="#go-concurrency">Concurrency &amp; cancellation</a>
+        <a href="#go-practice">Go practices</a>
+      </nav>
+
+      <p class="nav-label">Reference</p>
+      <nav class="nav">
+        <a href="#mistakes">Mental-model checks</a>
+        <a href="#glossary">Glossary</a>
+        <a href="#explore">Where to explore</a>
+      </nav>
+
+      <div class="sidebar-note">
+        <strong>How to use this:</strong> read the bold first sentence in each card, then follow the “In AgentDeck” and “Watch for” bullets when you want depth.
+      </div>
+    </aside>
+
+    <main id="main">
+      <header class="hero" id="start">
+        <p class="eyebrow">A learning atlas for experienced software engineers</p>
+        <h1>Understand the machine around the model.</h1>
+        <p class="lead">AgentDeck is a local control plane for coding agents. It starts external agent CLIs, gives them governed tools, preserves their history, and makes their work visible in a browser. This atlas explains the modern-AI concepts first, then the architecture that holds them together, then the Go choices that make the design practical.</p>
+        <div class="pill-row" aria-label="Atlas focus">
+          <span class="pill"><b>1</b> AI development</span>
+          <span class="pill"><b>2</b> System architecture</span>
+          <span class="pill"><b>3</b> Go in practice</span>
+          <span class="pill">5-YOE SWE starting point</span>
+        </div>
+        <div class="hero-actions">
+          <a class="button primary" href="#map">Get the one-page model</a>
+          <a class="button" href="#ai">Start with ACP vs MCP</a>
+          <a class="button" href="#explore">Open the repo map</a>
+        </div>
+      </header>
+
+      <section class="chapter" aria-labelledby="orientation-heading">
+        <div class="chapter-heading">
+          <div class="chapter-copy">
+            <p class="eyebrow">Orientation</p>
+            <h2 id="orientation-heading">What AgentDeck is—and is not</h2>
+            <p>It is not a chatbot UI calling a model API directly. It is a supervisor around existing coding-agent command-line tools such as Claude Code and Codex. The intelligence and many provider-specific behaviors live in those CLIs; AgentDeck owns the lifecycle, shared state, user controls, observability, and coordination surface.</p>
+          </div>
+        </div>
+
+        <div class="comparison">
+          <div class="wrong">
+            <h3>Misleading mental model</h3>
+            <p>“The browser sends a prompt to an LLM, then renders its answer.” That misses the agent process, tool calls, permission pauses, durable history, and all the failure modes around them.</p>
+          </div>
+          <div class="right">
+            <h3>Useful mental model</h3>
+            <p>“The browser talks to a local supervisor. The supervisor runs agent processes, translates protocols, owns product state, and publishes a recoverable live view.” The model is one participant in a larger distributed system.</p>
+          </div>
+        </div>
+
+        <div class="reading-paths">
+          <article class="path-card">
+            <p class="duration">25–35 minutes</p>
+            <h3>Get oriented</h3>
+            <ul>
+              <li>The one-page model</li>
+              <li>ACP vs MCP</li>
+              <li>Stable identity vs session</li>
+              <li>Why the browser is not in the critical path</li>
+            </ul>
+          </article>
+          <article class="path-card">
+            <p class="duration">60–90 minutes</p>
+            <h3>Build a real mental model</h3>
+            <ul>
+              <li>One agent-turn trace</li>
+              <li>State, transcripts, and SSE recovery</li>
+              <li>Runtime seams and lifecycle control</li>
+              <li>Permissions, tokens, and coordination</li>
+            </ul>
+          </article>
+          <article class="path-card">
+            <p class="duration">2–3 hours</p>
+            <h3>Prepare to change it</h3>
+            <ul>
+              <li>Configuration federation and provenance</li>
+              <li>Go concurrency and process groups</li>
+              <li>Test strategy and invariants</li>
+              <li>Read the linked source files by ownership</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="chapter" id="map" aria-labelledby="map-heading">
+        <div class="chapter-heading">
+          <div class="chapter-copy">
+            <p class="eyebrow">The one-page model</p>
+            <h2 id="map-heading">Three actors, four interfaces, one local source of truth</h2>
+            <p>Think of AgentDeck as an orchestrator positioned between a human-facing web app and one or more agent CLIs. It makes different communication modes explicit instead of pretending everything is one request/response API.</p>
+          </div>
+        </div>
+
+        <div class="system-map" role="img" aria-label="Browser communicates with a Go supervisor, which supervises agent CLI processes">
+          <article class="node">
+            <span>Human surface</span>
+            <h3>Browser UI</h3>
+            <p>React views, REST commands, one SSE stream for live state, and a WebSocket only for raw terminal I/O.</p>
+          </article>
+          <div class="arrow" aria-hidden="true">↔</div>
+          <article class="node">
+            <span>Control plane</span>
+            <h3>Go binary</h3>
+            <p>HTTP server, lifecycle supervisor, runtime registry, event bus, SQLite owner, and in-process MCP server.</p>
+          </article>
+          <div class="arrow" aria-hidden="true">↔</div>
+          <article class="node">
+            <span>Agent execution</span>
+            <h3>Agent CLIs</h3>
+            <p>Claude/Codex-style processes that reason, call tools, manage native sessions, and emit structured or terminal output.</p>
+          </article>
+        </div>
+        <div class="plane-key">
+          <span><i class="dot"></i> REST / commands and queries</span>
+          <span><i class="dot blue"></i> SSE / live projection</span>
+          <span><i class="dot violet"></i> ACP, MCP, hooks, PTY / agent integration</span>
+        </div>
+
+        <div class="callout">
+          <strong>Boundary rule:</strong> the browser never talks directly to an agent CLI or to SQLite. That keeps agent supervision, security checks, state transitions, and recovery logic in one place: the Go server.
+        </div>
+      </section>
+
+      <section class="chapter" id="protocols" aria-labelledby="protocol-heading">
+        <div class="chapter-heading">
+          <div class="chapter-copy">
+            <p class="eyebrow">Protocol map</p>
+            <h2 id="protocol-heading">The abbreviations that unlock modern AI-tool development</h2>
+            <p>The names matter less than the direction of control. ACP lets a host control an agent. MCP lets an agent call tools offered by a host. REST/SSE and hooks connect the product around them.</p>
+          </div>
+        </div>
+
+        <div style="overflow-x:auto">
+          <table class="protocol-table">
+            <thead>
+              <tr>
+                <th>Interface</th>
+                <th>Who initiates it?</th>
+                <th>What it is for</th>
+                <th>How AgentDeck uses it</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><b>REST</b></td>
+                <td>Browser or CLI client</td>
+                <td>Finite commands and reads</td>
+                <td>Launch, prompt, stop, settings, archive, and configuration actions.</td>
+              </tr>
+              <tr>
+                <td><b>SSE</b></td>
+                <td>Server pushes after browser subscribes</td>
+                <td>Live, one-way UI updates</td>
+                <td>State updates, transcript events, notifications, and keepalive pings.</td>
+              </tr>
+              <tr>
+                <td><b>ACP</b><br><small>Agent Client Protocol</small></td>
+                <td>Host and agent, bidirectionally</td>
+                <td>Run and control an agent session</td>
+                <td>Go spawns an ACP CLI over stdio, prompts it, receives updates, and answers permission requests.</td>
+              </tr>
+              <tr>
+                <td><b>MCP</b><br><small>Model Context Protocol</small></td>
+                <td>Agent calls a tool server</td>
+                <td>Give an agent external capabilities</td>
+                <td>The Go binary exposes a local messaging server with <code>list_agents</code>, <code>send_message</code>, and <code>check_messages</code>.</td>
+              </tr>
+              <tr>
+                <td><b>Hook POST</b></td>
+                <td>Agent-side script</td>
+                <td>Report lifecycle/activity</td>
+                <td>Terminal-style agent hooks report status, file, and command activity to <code>/api/hook</code> with a launch-scoped token.</td>
+              </tr>
+              <tr>
+                <td><b>PTY / WebSocket</b></td>
+                <td>Browser and terminal runtime</td>
+                <td>Interactive terminal bytes</td>
+                <td>Used only where an agent runs in a real terminal rather than structured ACP chat.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="chapter" id="ai" aria-labelledby="ai-heading">
+        <div class="chapter-heading">
+          <div class="chapter-copy">
+            <p class="eyebrow">Priority 1 · AI development</p>
+            <h2 id="ai-heading">Build around agents as stateful, tool-using processes</h2>
+            <p>Modern AI-tool engineering is as much about orchestration, authority, observability, and lifecycle as it is about prompts or model selection. AgentDeck is a particularly concrete example because it treats the agent CLI as an external system with a protocol contract.</p>
+          </div>
+          <span class="priority">Highest priority</span>
+        </div>
+
+        <article class="concept-card" id="acp" data-search="acp agent client protocol json rpc ndjson stdio session prompt permission tool call">
+          <p class="card-kicker">Core protocol</p>
+          <h3>ACP: a programmable, bidirectional agent session</h3>
+          <p><strong>ACP is not a model API.</strong> It is a control protocol that turns an agent CLI into something a host application can start, prompt, observe, interrupt, resume, and answer permission requests for.</p>
+          <div class="grid two">
+            <div>
+              <span class="label">In AgentDeck</span>
+              <ul>
+                <li>The chat runtime starts an ACP-compatible CLI and speaks JSON-RPC as newline-delimited JSON over stdin/stdout.</li>
+                <li>It initializes a session, sends prompts, receives streamed updates, and may receive an agent-originated permission request that needs a response.</li>
+                <li>It converts provider-shaped updates into AgentDeck events such as text, tool call, diff, permission request, turn end, and error.</li>
+              </ul>
+            </div>
+            <div>
+              <span class="label">Why it matters</span>
+              <ul>
+                <li>Structured events are safer and richer than screen-scraping a terminal.</li>
+                <li>The host can own lifecycle, user approval, and durable history while the CLI remains responsible for its agent behavior.</li>
+                <li>ACP compatibility is still adapter- and version-specific; a protocol name does not erase integration testing.</li>
+              </ul>
+            </div>
+          </div>
+          <details class="details">
+            <summary>Watch for the bidirectional part</summary>
+            <p>In a normal HTTP API, the client asks and the server responds. ACP can reverse that direction: while handling a prompt, the agent asks the host for permission. AgentDeck pauses the request until the user approves, denies, times out, or cancels it. Treating this as merely a UI notification would let the agent continue before the decision reaches its execution boundary.</p>
+          </details>
+          <div class="repo-links">
+            <a href="../internal/runtime/chat.go">chat runtime</a>
+            <a href="../internal/runtime/transport.go">JSON-RPC transport</a>
+            <a href="../internal/runtime/acpmap.go">ACP normalization</a>
+            <a href="features/tech/phase-1-core-loop-techspec.md">ACP design spec</a>
+          </div>
+        </article>
+
+        <article class="concept-card" id="mcp" data-search="mcp model context protocol tools server capability token list agents send message check messages">
+          <p class="card-kicker">Tool protocol</p>
+          <h3>MCP: capabilities exposed to an agent</h3>
+          <p><strong>MCP equips an agent; ACP controls an agent.</strong> MCP is the tool-server side of an agentic system: an agent discovers and calls capabilities that a host makes available.</p>
+          <div class="grid two">
+            <div>
+              <span class="label">In AgentDeck</span>
+              <ul>
+                <li>The Go binary hosts one in-process, loopback HTTP MCP server at <code>/mcp</code>.</li>
+                <li>It gives agents a narrow coordination toolbox: list live peers, send mailbox messages, and read their own pending messages.</li>
+                <li>The MCP server is registered in an ACP session so an agent can use it while doing its work.</li>
+              </ul>
+            </div>
+            <div>
+              <span class="label">Design lesson</span>
+              <ul>
+                <li>An MCP tool is an authorization surface, not just a convenience function.</li>
+                <li>AgentDeck binds a token to the caller’s server-side <code>agent_id</code>; it does not trust a sender identity supplied in a tool argument.</li>
+                <li>The tool server reads/writes the same state store as the rest of the product, avoiding a second messaging authority.</li>
+              </ul>
+            </div>
+          </div>
+          <details class="details">
+            <summary>Current interoperability boundary</summary>
+            <p>The shipped messaging transport is local streamable HTTP. Real CLI acceptance for HTTP MCP registration remains a credentialed gate, so the atlas distinguishes tested product wiring from verified behavior against every external CLI version. A hypothetical stdio proxy is not shipped.</p>
+          </details>
+          <div class="repo-links">
+            <a href="../internal/messaging/messaging.go">MCP server</a>
+            <a href="../internal/messaging/tools.go">message tools</a>
+            <a href="../internal/server/messaging_registration.go">token registration</a>
+            <a href="features/HANDOFF.md">live acceptance gates</a>
+          </div>
+        </article>
+
+        <article class="concept-card" data-search="adapter normalization event boundary provider claude codex opencode openhands runtime">
+          <p class="card-kicker">Boundary design</p>
+          <h3>Normalize once; adapt at the edge</h3>
+          <p><strong>External agent protocols are vendor-shaped; product behavior should be domain-shaped.</strong> Translate ACP updates and backend quirks at a single boundary before UI, persistence, and business logic consume them.</p>
+          <div class="grid two">
+            <div>
+              <span class="label">In AgentDeck</span>
+              <p>ACP mapping produces stable transcript events. A backend adapter contains variation in command invocation, environment cleanup, model handling, resume semantics, hooks, and permission behavior across Claude, Codex, OpenCode, and OpenHands.</p>
+            </div>
+            <div>
+              <span class="label">Watch for</span>
+              <p>A common failure is assuming “all backends use ACP” means “all backends support every feature.” An interface reduces blast radius; it does not manufacture terminal hooks, resume support, or trustworthy model mapping where a CLI lacks them.</p>
+            </div>
+          </div>
+          <div class="repo-links">
+            <a href="../internal/runtime/event.go">normalized event vocabulary</a>
+            <a href="../internal/backend/adapter.go">backend adapter seam</a>
+            <a href="features/INVARIANTS.md">integration invariants</a>
+          </div>
+        </article>
+
+        <article class="concept-card" data-search="context prompt role project launch spec frozen snapshot model config">
+          <p class="card-kicker">Context engineering</p>
+          <h3>An agent run is more than a prompt</h3>
+          <p><strong>Context engineering is the discipline of deciding what an agent sees, when it sees it, and which inputs are allowed to change.</strong> It includes working directory, system instructions, project context, model selection, permissions, external tools, and native agent setup—not only the visible prompt box.</p>
+          <div class="grid two">
+            <div>
+              <span class="label">In AgentDeck</span>
+              <p>At launch, a project contributes its working directory and context; a role contributes its system prompt and policy; a backend/model contributes provider configuration; AgentDeck adds identity, hooks, and MCP registration. The composed input becomes a <code>LaunchSpec</code>.</p>
+            </div>
+            <div>
+              <span class="label">Why freeze it</span>
+              <p>Running and resumed sessions must not silently change because somebody edited a role or project later. AgentDeck keeps a session snapshot for the high-level launch inputs, while launch-scoped credentials are rotated and native runtime behavior can remain provider-owned.</p>
+            </div>
+          </div>
+          <div class="repo-links">
+            <a href="../internal/runtime/runtime.go">LaunchSpec</a>
+            <a href="../internal/server/launch.go">launch composition</a>
+            <a href="../internal/state/session.go">session snapshot</a>
+            <a href="../architecture-flow.md">architecture flow</a>
+          </div>
+        </article>
+
+        <article class="concept-card" id="agent-loop" data-search="agent turn streaming prompt lifecycle acp event sse transcript state permission">
+          <p class="card-kicker">End-to-end trace</p>
+          <h3>Follow one agent turn from click to durable history</h3>
+          <p>This is the best single sequence to rehearse. Notice that the browser triggers work but is never responsible for keeping the agent alive or remembering what happened.</p>
+          <div class="timeline">
+            <div class="step-number">1</div>
+            <div><h4>Launch is composed once</h4><p>The server validates the requested role, project, backend, model, and interface; builds the launch snapshot; and mints launch-scoped artifacts such as hook/MCP tokens.</p></div>
+            <div class="step-number">2</div>
+            <div><h4>The runtime supervises the CLI</h4><p>The registry selects chat or terminal runtime. Chat starts the ACP process and obtains an ephemeral native session identifier.</p></div>
+            <div class="step-number">3</div>
+            <div><h4>The user submits a prompt</h4><p>The browser sends one REST command to the Go server. The runtime serializes the corresponding ACP write to the agent process.</p></div>
+            <div class="step-number">4</div>
+            <div><h4>Protocol updates become product events</h4><p>Text chunks, tool activity, diffs, permission requests, turn completion, and errors are normalized into AgentDeck’s event vocabulary.</p></div>
+            <div class="step-number">5</div>
+            <div><h4>Durable state and live view diverge deliberately</h4><p>State/transcript paths persist what needs recovery; the event bus fans a bounded, live projection to the browser over SSE.</p></div>
+            <div class="step-number">6</div>
+            <div><h4>The UI can reconnect and catch up</h4><p>If an SSE event is missed, the UI hydrates current state and refetches durable transcript data rather than assuming perfect live delivery.</p></div>
+          </div>
+        </article>
+
+        <article class="concept-card" data-search="multi agent mailbox nudger budget prompt injection coordination">
+          <p class="card-kicker">Multi-agent systems</p>
+          <h3>Coordination is a durable mailbox plus a bounded wake-up loop</h3>
+          <p><strong>Agent-to-agent messaging is not model-to-model RPC.</strong> It is a product-owned mailbox: messages survive independently of a recipient’s current turn, and a nudger can ask an eligible idle chat agent to drain its mail.</p>
+          <div class="grid two">
+            <div>
+              <span class="label">In AgentDeck</span>
+              <p>Messages are stored in SQLite. A sender calls MCP <code>send_message</code>; the server records it, updates the recipient’s unread state, and signals the nudger. The recipient is prompted to call <code>check_messages</code>.</p>
+            </div>
+            <div>
+              <span class="label">Control-loop lesson</span>
+              <p>Each agent turn has a combined message budget, and the nudger uses eligibility/cooldown rules. Those are guardrails against runaway feedback loops, not proof that natural-language messages are safe or that every wake-up will succeed.</p>
+            </div>
+          </div>
+          <div class="repo-links">
+            <a href="../internal/state/messages.go">durable mailbox</a>
+            <a href="../internal/server/messaging_loops.go">nudger loop</a>
+            <a href="features/tech/phase-5-coordination-techspec.md">coordination design</a>
+          </div>
+        </article>
+
+        <article class="concept-card security" id="safety" data-search="permission security credentials token hook mcp local host origin environment provenance">
+          <p class="card-kicker">Safety and reproducibility</p>
+          <h3>Guard the execution boundary—and record where AI configuration came from</h3>
+          <p><strong>“Local” is a deployment choice, not a complete security model.</strong> AI supervision has two related jobs: authorize the actions an agent can take, and preserve enough redacted provenance to explain why it behaved as it did.</p>
+          <div class="grid two">
+            <div>
+              <span class="label">Permission &amp; tokens</span>
+              <p>ACP permission requests pause the agent until a chosen response is relayed. Hook and MCP callers use launch-scoped tokens. The server binds to loopback and validates browser Host/Origin around all routes, including MCP and terminal paths.</p>
+            </div>
+            <div>
+              <span class="label">Provenance &amp; limits</span>
+              <p>Phase 7.5 ships read-only Claude/Codex source resolvers that report redacted effective values, source paths, fingerprints, and per-field provenance. Its watcher/API/launch integration remains planned for 7.6+, and it must never ingest secrets or create a second writable native-config authority.</p>
+            </div>
+          </div>
+          <details class="details">
+            <summary>Important product-boundary caveat</summary>
+            <p>The dashboard API intentionally trusts same-machine callers, and child agent processes inherit the server environment except for adapter-specific stripping. That is a documented trade-off, not a guarantee that arbitrary local processes or unrelated credentials are isolated from an agent.</p>
+          </details>
+          <div class="repo-links">
+            <a href="../internal/server/security.go">local server guard</a>
+            <a href="../internal/runtime/permission.go">permission gate</a>
+            <a href="../internal/configsource/security.go">source trust boundary</a>
+            <a href="features/HANDOFF.md">current human-tier trade-offs</a>
+          </div>
+        </article>
+      </section>
+
+      <section class="chapter" id="architecture" aria-labelledby="architecture-heading">
+        <div class="chapter-heading">
+          <div class="chapter-copy">
+            <p class="eyebrow">Priority 2 · Architecture</p>
+            <h2 id="architecture-heading">Design the control plane, then make the live view recoverable</h2>
+            <p>AgentDeck is a local system, but it still has distributed-systems concerns: multiple processes, asynchronous event delivery, crashes, reconnects, mutable configuration, and external protocols. Its architecture works by assigning clear ownership to each concern.</p>
+          </div>
+          <span class="priority architecture">Second priority</span>
+        </div>
+
+        <article class="concept-card architecture" data-search="control plane data plane rest sse websocket browser ui server">
+          <p class="card-kicker">Control vs live data</p>
+          <h3>REST expresses intent; SSE expresses what is happening</h3>
+          <p><strong>Long-running agent work should not be modeled as one giant HTTP response.</strong> A REST request begins or controls an operation; the live data plane communicates its evolving state.</p>
+          <div class="grid two">
+            <div>
+              <span class="label">In AgentDeck</span>
+              <p>REST is used for launch, prompt, stop, configuration, archive, and other finite operations. The multiplexed SSE stream carries live card updates, transcript events, notification events, and pings. The terminal is the narrow exception: raw interactive bytes use a WebSocket.</p>
+            </div>
+            <div>
+              <span class="label">Why the separation helps</span>
+              <p>The server can keep supervising a process after a browser tab disappears. The UI can reconnect and rehydrate instead of polling every agent or holding the operation hostage to a single request.</p>
+            </div>
+          </div>
+          <div class="repo-links">
+            <a href="../internal/server/routes.go">route ownership</a>
+            <a href="../internal/server/sse.go">SSE endpoint</a>
+            <a href="../ui/src/api/sse.ts">browser SSE client</a>
+          </div>
+        </article>
+
+        <article class="concept-card architecture" id="state" data-search="sqlite json config state transcript fts source of truth agent identity session launch snapshot">
+          <p class="card-kicker">Data ownership</p>
+          <h3>Store data by its writer and access pattern—not by what it is “about”</h3>
+          <p><strong>Human-edited configuration, machine-generated state, and agent-owned transcript files have different owners.</strong> Giving each a distinct authority reduces accidental contention and makes the system explainable.</p>
+          <div class="grid three">
+            <div>
+              <span class="label">Config files</span>
+              <p>Roles, projects, backend settings, layout, and app settings are small JSON files: human-readable, hand-editable, and atomically written.</p>
+            </div>
+            <div>
+              <span class="label">SQLite state</span>
+              <p>The Go server is the only writer of product state: agent identity, running registry, statuses, messages, session metadata, and full-text index.</p>
+            </div>
+            <div>
+              <span class="label">Transcripts</span>
+              <p>Normalized NDJSON session history is append-oriented and indexed into SQLite for archive search. The index improves discovery; it is not a second truth source.</p>
+            </div>
+          </div>
+          <div class="callout">
+            <strong>Stable identity is load-bearing:</strong> <code>agent_id</code> identifies the logical worker and survives stop, resume, model/backend/interface switch, archive, and mail. A CLI <code>session_id</code>, PID, and launch token describe one ephemeral incarnation.
+          </div>
+          <div class="repo-links">
+            <a href="architecture-decisions.md">storage rationale</a>
+            <a href="../internal/state/state.go">SQLite owner</a>
+            <a href="../internal/transcript/writer.go">transcript writer</a>
+            <a href="../internal/index/indexer.go">FTS indexer</a>
+          </div>
+        </article>
+
+        <article class="concept-card architecture" id="events" data-search="event bus sse snapshot subscribe sequence gap bounded channel backpressure hydration">
+          <p class="card-kicker">Event recovery</p>
+          <h3>Live delivery may be lossy; recovery must be durable</h3>
+          <p><strong>A slow browser must not slow an agent.</strong> AgentDeck’s live bus uses bounded per-client buffers and can drop old events for a lagging consumer; the design works because clients can rebuild from current state and transcript reads.</p>
+          <div class="grid two">
+            <div>
+              <span class="label">The key pattern</span>
+              <p>When an SSE client connects, the bus captures a current state snapshot and subscribes the client atomically. This avoids the “snapshot first, subscribe second” hole where an update could fall between both actions.</p>
+            </div>
+            <div>
+              <span class="label">The browser’s job</span>
+              <p>On reconnect, reset connection-scoped bookkeeping, hydrate current state, and refetch transcript data if per-agent event sequence numbers show a gap. SSE is a live projection—not the durable event log.</p>
+            </div>
+          </div>
+          <details class="details">
+            <summary>Why this matters beyond AgentDeck</summary>
+            <p>This is a reusable streaming-system pattern: apply backpressure boundaries at the UI edge, preserve a canonical read path elsewhere, and make reconnection a first-class protocol. “Never drop an event” is often costlier and less robust than “detect, then catch up.”</p>
+          </details>
+          <div class="repo-links">
+            <a href="../internal/bus/bus.go">event bus</a>
+            <a href="../internal/state/manager.go">state projection</a>
+            <a href="../ui/src/api/sse.ts">rehydration logic</a>
+          </div>
+        </article>
+
+        <article class="concept-card architecture" data-search="runtime interface registry adapter terminal driver port adapter seam">
+          <p class="card-kicker">Ports and adapters</p>
+          <h3>Keep the orchestration contract stable; put variability behind seams</h3>
+          <p><strong>The dashboard should not care whether a run uses ACP/stdio, a PTY, Claude, Codex, tmux, or iTerm.</strong> It speaks to narrow interfaces and normalized events; specialized components handle provider or driver differences.</p>
+          <div class="grid two">
+            <div>
+              <span class="label">Seams in this repo</span>
+              <ul>
+                <li><code>Runtime</code> handles lifecycle operations such as start, prompt, cancel, stop, resume, and subscribe.</li>
+                <li>The registry dispatches by agent interface, such as chat versus terminal.</li>
+                <li><code>BackendAdapter</code> captures CLI-specific behavior; <code>TerminalDriver</code> captures xterm/PTY, tmux, or optional iTerm behavior.</li>
+              </ul>
+            </div>
+            <div>
+              <span class="label">Architecture trade-off</span>
+              <p>The interface contains change, but it also creates a contract checklist. A new runtime must join persistence, state updates, registration teardown, capabilities, security, and tests—not merely implement a Start method.</p>
+            </div>
+          </div>
+          <div class="repo-links">
+            <a href="../internal/runtime/runtime.go">runtime contract</a>
+            <a href="../internal/runtime/registry.go">runtime registry</a>
+            <a href="../internal/runtime/terminal/driver.go">terminal driver seam</a>
+            <a href="../internal/backend/adapter.go">backend adapter seam</a>
+          </div>
+        </article>
+
+        <article class="concept-card architecture" data-search="process lifecycle cancel stop switch generation pid process group context mutex cleanup crash">
+          <p class="card-kicker">Lifecycle architecture</p>
+          <h3>Start, switch, crash, and stop are races—not simple functions</h3>
+          <p><strong>A reliable supervisor must know which launch generation owns a resource at every moment.</strong> External processes can exit late, commands can overlap, and old cleanup can accidentally destroy artifacts for a new run unless ownership is explicit.</p>
+          <div class="grid two">
+            <div>
+              <span class="label">In AgentDeck</span>
+              <p>The registry atomically claims launch/resume ownership; per-agent locks prevent overlapping switches; JSON-RPC writes are serialized; child CLIs run in process groups so Stop can signal the full process tree; crash paths remove registry ownership and launch-scoped registrations.</p>
+            </div>
+            <div>
+              <span class="label">A useful distinction</span>
+              <p><strong>Cancel</strong> asks an in-progress turn to stop while keeping the agent process alive. <strong>Stop</strong> tears down the process group and runtime ownership. Confusing the two produces either orphaned children or unnecessarily lost sessions.</p>
+            </div>
+          </div>
+          <div class="repo-links">
+            <a href="../internal/runtime/registry.go">atomic ownership</a>
+            <a href="../internal/runtime/chat.go">process group supervision</a>
+            <a href="../internal/server/switch.go">switch lifecycle</a>
+            <a href="features/INVARIANTS.md">lifecycle invariants</a>
+          </div>
+        </article>
+
+        <article class="concept-card architecture" id="federation" data-search="configuration federation source provenance linked mirrored detached claude codex config roots">
+          <p class="card-kicker">External configuration</p>
+          <h3>Federation means reference, provenance, and one-way authority—not two-way sync</h3>
+          <p><strong>When a provider CLI owns its configuration, copying it into AgentDeck would create two writable sources of truth and an unsolvable merge story.</strong> The federation design reads native configuration while retaining AgentDeck’s ownership boundaries.</p>
+          <div class="grid three">
+            <div>
+              <span class="label">Linked</span>
+              <p>AgentDeck stores a binding and reads current native configuration. The native files remain authoritative.</p>
+            </div>
+            <div>
+              <span class="label">Mirrored</span>
+              <p>Native configuration remains authoritative; AgentDeck may retain a redacted, disposable derived cache for compatibility.</p>
+            </div>
+            <div>
+              <span class="label">Detached import</span>
+              <p>Selected non-secret values/assets become AgentDeck-owned and automatic sync stops. It is a deliberate ownership transfer.</p>
+            </div>
+          </div>
+          <div class="callout warning">
+            <strong>Status matters:</strong> the typed schema and pure Claude/Codex resolver foundations are present in Phase 7.5. Watch/sweep, API/UI, freshness gates, and launch integration are planned in 7.6+. Do not read the design document as proof that every federation behavior is already live.
+          </div>
+          <div class="repo-links">
+            <a href="../internal/config/sources.go">binding schema</a>
+            <a href="../internal/configsource/types.go">resolver types</a>
+            <a href="features/tech/phase-7-additional-features-techspec.md">federation tech spec</a>
+            <a href="features/HANDOFF.md">current delivery status</a>
+          </div>
+        </article>
+
+        <article class="concept-card architecture security" data-search="security localhost host origin cros dns rebinding token local process auth credentials test fake acp">
+          <p class="card-kicker">Reliability &amp; security</p>
+          <h3>Local-first reduces operations; it does not remove trust boundaries</h3>
+          <p><strong>Loopback binding helps, but browser-origin attacks, stale tokens, malformed protocol streams, and child-process access still need explicit handling.</strong></p>
+          <div class="grid two">
+            <div>
+              <span class="label">Defenses in AgentDeck</span>
+              <p>The server binds to <code>127.0.0.1</code>, applies Host/Origin validation across routes, gives hook/MCP producers per-launch tokens, and keeps state/transcripts/registration artifacts owner-readable only.</p>
+            </div>
+            <div>
+              <span class="label">How it tests the boundary</span>
+              <p>A fake ACP executable lets tests exercise real process, HTTP, SSE, permission, and protocol paths without credentials. Targeted tests also cover malformed and large protocol frames, event backpressure, security guards, FTS variants, and UI behavior.</p>
+            </div>
+          </div>
+          <div class="repo-links">
+            <a href="../internal/server/security.go">security guard</a>
+            <a href="../internal/runtime/testdata/fakeacp/main.go">fake agent executable</a>
+            <a href="../internal/server/integration_test.go">integration tests</a>
+            <a href="../Makefile">build/test entry points</a>
+          </div>
+        </article>
+      </section>
+
+      <section class="chapter" id="go" aria-labelledby="go-heading">
+        <div class="chapter-heading">
+          <div class="chapter-copy">
+            <p class="eyebrow">Priority 3 · Go</p>
+            <h2 id="go-heading">Go fits because AgentDeck is a small operating environment</h2>
+            <p>The Go choice is not about a fashionable language preference. AgentDeck needs a compact local HTTP server, child-process supervisor, concurrent event router, SQLite owner, MCP host, and distributable binary. Go’s standard library and deployment model match that shape unusually well. The module currently declares Go 1.25.</p>
+          </div>
+          <span class="priority go">Third priority</span>
+        </div>
+
+        <article class="concept-card go" data-search="go single binary standard library net http embed os exec sqlite cgo">
+          <p class="card-kicker">Why Go</p>
+          <h3>One binary can own the whole local control plane</h3>
+          <p><strong>Go makes the supervisory layer boring to distribute.</strong> A compiled binary can serve HTTP, host MCP, manage processes, operate SQLite, and embed the built UI without asking end users to run a Node or Python service at runtime.</p>
+          <div class="grid two">
+            <div>
+              <span class="label">What Go provides here</span>
+              <ul>
+                <li><code>net/http</code> for REST, SSE, middleware, static assets, and local server lifetime.</li>
+                <li><code>os/exec</code> and POSIX process controls for the external agent boundary.</li>
+                <li><code>embed</code> to ship the compiled UI inside the binary.</li>
+                <li>Static types and explicit data shapes at protocol, state, and HTTP boundaries.</li>
+                <li>Packages—and the compiler-enforced <code>internal/</code> boundary—to make ownership visible in the code layout.</li>
+              </ul>
+            </div>
+            <div>
+              <span class="label">Trade-offs</span>
+              <p>SQLite uses a cgo-backed driver in this project, so native build tooling still matters. Go also does not make concurrency safe automatically: goroutines are cheap, but shared maps, lifecycle state, and shutdown still need deliberate synchronization.</p>
+            </div>
+          </div>
+          <div class="repo-links">
+            <a href="../go.mod">module dependencies</a>
+            <a href="../internal/server/static.go">embedded UI</a>
+            <a href="../internal/state/state.go">SQLite connection</a>
+            <a href="../cmd/agentdeck/main.go">binary entry point</a>
+          </div>
+        </article>
+
+        <article class="concept-card go" id="go-concurrency" data-search="go goroutine channel mutex context cancellation race process group concurrency">
+          <p class="card-kicker">Concurrency</p>
+          <h3>Goroutines do work; ownership rules make that work correct</h3>
+          <p><strong>Use goroutines for independent waiting, not as a substitute for a design.</strong> AgentDeck has readers for process output, request/response handling, SSE subscribers, background reconciliation, and shutdown work. Correctness comes from defining who owns each state transition.</p>
+          <div class="grid three">
+            <div>
+              <span class="label">Context</span>
+              <p>A <code>context.Context</code> carries cancellation/deadlines through a request or server lifetime. It tells cooperative work when to stop; it does not magically terminate a stubborn child process.</p>
+            </div>
+            <div>
+              <span class="label">Mutex</span>
+              <p>A <code>sync.Mutex</code> protects critical shared state: pending RPCs, permissions, registry ownership, event snapshots, and write ordering. Keep the protected operation small and explicit.</p>
+            </div>
+            <div>
+              <span class="label">Channel</span>
+              <p>A channel communicates or queues work. Bounded subscriber channels make backpressure visible. They do not remove the need for a mutex when multiple goroutines share a map or lifecycle invariant.</p>
+            </div>
+          </div>
+          <div class="callout">
+            <strong>Good Go question:</strong> “Which goroutine owns this resource, and what happens if cancellation or a crash arrives between these two steps?” That question exposes most lifecycle bugs earlier than a clever abstraction does.
+          </div>
+          <div class="repo-links">
+            <a href="../internal/runtime/transport.go">serialized protocol I/O</a>
+            <a href="../internal/runtime/registry.go">ownership locking</a>
+            <a href="../internal/bus/bus.go">bounded event channels</a>
+            <a href="../internal/server/server.go">server cancellation</a>
+          </div>
+        </article>
+
+        <article class="concept-card go" data-search="go process group syscall exec child process signal stop cancel sigterm sigkill">
+          <p class="card-kicker">Systems programming</p>
+          <h3>Process groups turn “stop the agent” into “stop the tree”</h3>
+          <p><strong>An agent CLI may spawn shells, language servers, or tool processes.</strong> Killing only the direct parent risks leaving children running after AgentDeck believes the session is gone.</p>
+          <div class="grid two">
+            <div>
+              <span class="label">In AgentDeck</span>
+              <p>Chat processes are started as a POSIX process group. A stop sequence signals the group, waits briefly, and escalates if needed. That makes lifecycle cleanup a system responsibility rather than a best-effort UI gesture.</p>
+            </div>
+            <div>
+              <span class="label">Nuance worth learning</span>
+              <p><code>CommandContext</code> and context cancellation are useful but are not a replacement for an explicit process-tree policy. Supervising external programs means handling graceful exit, timeouts, reaping, late exits, and stale PID records.</p>
+            </div>
+          </div>
+          <div class="repo-links">
+            <a href="../internal/runtime/chat.go">chat process supervision</a>
+            <a href="../internal/runtime/orphan_stop_test.go">orphan-stop test</a>
+            <a href="../internal/runtime/terminal/terminal.go">terminal lifecycle</a>
+          </div>
+        </article>
+
+        <article class="concept-card go" id="go-practice" data-search="go interface error testing race build tag sqlite fts test fake dependency injection">
+          <p class="card-kicker">Go practices in the repo</p>
+          <h3>Narrow interfaces, explicit errors, realistic fakes, and race checks</h3>
+          <p><strong>Go’s strongest contribution here is mechanical clarity.</strong> Packages expose small contracts, errors can be matched and mapped at the HTTP boundary, and tests can drive real protocol/process paths with a controlled fake agent.</p>
+          <div class="grid two">
+            <div>
+              <span class="label">Practices to notice</span>
+              <ul>
+                <li>Interfaces such as <code>Runtime</code> and narrow persistence sinks mark real variation points, avoid import cycles, and make isolated tests possible.</li>
+                <li>Typed structs plus <code>encoding/json</code> keep public data shapes explicit; raw JSON is retained only where an external protocol requires flexibility.</li>
+                <li>Build tags exercise the shipped SQLite FTS5 path instead of assuming default tests cover it.</li>
+              </ul>
+            </div>
+            <div>
+              <span class="label">Verification mindset</span>
+              <ul>
+                <li>Run normal tests plus the FTS5 tag variant for persistence/search changes.</li>
+                <li>Use the race detector around concurrent lifecycle or bus changes.</li>
+                <li>Test the real boundary with fakes: a fake ACP process catches framing, process, and event-flow bugs that a mocked method call cannot.</li>
+              </ul>
+            </div>
+          </div>
+          <details class="details">
+            <summary>Two quiet Go lessons: filesystem durability and watcher skepticism</summary>
+            <p>AgentDeck’s JSON configuration writes use a temp file, sync, rename, and directory sync because “rename is atomic” is not the full crash-durability story. Transcripts are append-only NDJSON and repair a crash-torn final record on reopening. Conversely, filesystem watcher events are treated as hints: transcript reconciliation also has a periodic fallback, while authenticated hook POSTs are the primary status path.</p>
+          </details>
+          <div class="repo-links">
+            <a href="../internal/runtime/acceptance_test.go">agent acceptance harness</a>
+            <a href="../internal/runtime/transport_test.go">protocol tests</a>
+            <a href="../internal/index/indexer_fts_test.go">FTS build-tag test</a>
+            <a href="../internal/config/atomic.go">atomic config writes</a>
+            <a href="features/AGENT-WORKFLOW.md">project verification contract</a>
+          </div>
+        </article>
+      </section>
+
+      <section class="chapter" id="mistakes" aria-labelledby="mistakes-heading">
+        <div class="chapter-heading">
+          <div class="chapter-copy">
+            <p class="eyebrow">Mental-model checks</p>
+            <h2 id="mistakes-heading">Six distinctions worth getting exactly right</h2>
+            <p>These pairs are easy to blur at first. Keeping them separate will make the codebase and most modern agent-tool designs much easier to reason about.</p>
+          </div>
+        </div>
+        <div class="grid two">
+          <article class="concept-card" data-search="acp mcp distinction">
+            <p class="card-kicker">Protocols</p>
+            <h3>ACP ≠ MCP</h3>
+            <p><strong>ACP is the host-to-agent session contract; MCP is the agent-to-tool-server contract.</strong> AgentDeck composes them: it controls an agent over ACP and provides it a messaging toolset over MCP.</p>
+          </article>
+          <article class="concept-card architecture" data-search="state config distinction">
+            <p class="card-kicker">Persistence</p>
+            <h3>Config ≠ machine state</h3>
+            <p><strong>Config is a human-owned declaration of future behavior; state is a server-owned record of what is or was true.</strong> Editing config should not rewrite an active session’s history or silently change its frozen launch inputs.</p>
+          </article>
+          <article class="concept-card architecture" data-search="agent identity session id launch generation">
+            <p class="card-kicker">Identity</p>
+            <h3><code>agent_id</code> ≠ CLI <code>session_id</code></h3>
+            <p><strong>The logical worker survives; a provider session does not.</strong> This is why AgentDeck can preserve its card, archive, messages, and history while relaunching on a different backend or interface.</p>
+          </article>
+          <article class="concept-card" data-search="permission security skip permission sandbox">
+            <p class="card-kicker">Safety</p>
+            <h3>Permission policy ≠ sandbox</h3>
+            <p><strong>Approve/deny governs one protocol execution point; it does not create OS-level isolation.</strong> Environment inheritance, filesystem access, network access, and tool permissions remain part of the larger trust model.</p>
+          </article>
+          <article class="concept-card architecture" data-search="sse event state durable recovery">
+            <p class="card-kicker">Streaming</p>
+            <h3>SSE ≠ durable truth</h3>
+            <p><strong>SSE is the live projection; state and transcripts are the recovery paths.</strong> A reconnecting UI should hydrate and refetch when needed, rather than assuming every message arrived in order.</p>
+          </article>
+          <article class="concept-card go" data-search="go channel mutex concurrency">
+            <p class="card-kicker">Go</p>
+            <h3>Channel ≠ ownership model</h3>
+            <p><strong>A channel moves data or signals work; it does not by itself define who may mutate shared state.</strong> AgentDeck combines channels with mutexes, atomically claimed lifecycle state, and context-aware teardown.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="chapter" id="glossary" aria-labelledby="glossary-heading">
+        <div class="chapter-heading">
+          <div class="chapter-copy">
+            <p class="eyebrow">Glossary</p>
+            <h2 id="glossary-heading">Fast definitions for the terms you will meet most</h2>
+            <p>Search the atlas when you need a refresher. Each definition is deliberately tied to how the term changes the engineering problem in AgentDeck.</p>
+          </div>
+        </div>
+        <div class="search-wrap">
+          <label for="atlas-search" class="eyebrow">Find a concept</label>
+          <input id="atlas-search" type="search" placeholder="Try: MCP, process group, provenance, SSE, goroutine…" autocomplete="off">
+          <span class="search-status" id="search-status" aria-live="polite">Search filters the concept cards and glossary terms on this page.</span>
+        </div>
+        <dl class="glossary">
+          <div class="definition-card" data-search="acp agent client protocol">
+            <dt>ACP — Agent Client Protocol</dt>
+            <dd>A bidirectional protocol for a host application to run and supervise an agent session. AgentDeck uses it over stdio for chat runtimes.</dd>
+          </div>
+          <div class="definition-card" data-search="mcp model context protocol">
+            <dt>MCP — Model Context Protocol</dt>
+            <dd>A protocol for exposing tools/capabilities to an agent. AgentDeck’s in-process MCP server supplies coordination tools.</dd>
+          </div>
+          <div class="definition-card" data-search="json rpc ndjson stdio">
+            <dt>JSON-RPC over NDJSON</dt>
+            <dd>Request/response and notification messages encoded as one JSON object per line on a byte stream. ACP uses this style in AgentDeck’s chat runtime.</dd>
+          </div>
+          <div class="definition-card" data-search="launch spec launch snapshot">
+            <dt>Launch snapshot</dt>
+            <dd>The frozen, redacted description of the high-level inputs used to start a session. It protects a resume from later configuration edits.</dd>
+          </div>
+          <div class="definition-card" data-search="provenance fingerprint source">
+            <dt>Provenance</dt>
+            <dd>Evidence of which configuration layer supplied a value and which source inputs were used. It is reproducibility for mutable AI configuration.</dd>
+          </div>
+          <div class="definition-card" data-search="source of truth projection">
+            <dt>Source of truth / projection</dt>
+            <dd>The authoritative record versus a derived, replaceable view. SQLite/transcripts are durable sources; browser stores and search indexes are projections.</dd>
+          </div>
+          <div class="definition-card" data-search="sse server sent events">
+            <dt>SSE — Server-Sent Events</dt>
+            <dd>A simple persistent HTTP stream from server to browser. It is ideal for live UI updates but needs reconnect and catch-up behavior.</dd>
+          </div>
+          <div class="definition-card" data-search="pty pseudo terminal websocket">
+            <dt>PTY — pseudo-terminal</dt>
+            <dd>An OS interface that lets a program behave as if it is attached to a terminal. AgentDeck uses it for its terminal runtime.</dd>
+          </div>
+          <div class="definition-card" data-search="adapter port interface seam">
+            <dt>Adapter / seam</dt>
+            <dd>A boundary that hides provider- or platform-specific variation behind a stable internal contract, such as BackendAdapter or TerminalDriver.</dd>
+          </div>
+          <div class="definition-card" data-search="capability token bearer">
+            <dt>Capability token</dt>
+            <dd>A secret bearer value that grants a narrow right. AgentDeck maps launch-scoped MCP/hook tokens to an agent identity server-side.</dd>
+          </div>
+          <div class="definition-card" data-search="goroutine channel mutex context">
+            <dt>Goroutine / channel / mutex / context</dt>
+            <dd>Go’s basic concurrency vocabulary: independent work, communication, shared-state protection, and cancellation/deadline propagation.</dd>
+          </div>
+          <div class="definition-card" data-search="fts5 sqlite search">
+            <dt>FTS5</dt>
+            <dd>SQLite’s full-text-search engine. AgentDeck indexes transcript-derived text so archived sessions can be searched without scanning every file.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="chapter" id="explore" aria-labelledby="explore-heading">
+        <div class="chapter-heading">
+          <div class="chapter-copy">
+            <p class="eyebrow">Repo explorer</p>
+            <h2 id="explore-heading">Read by ownership, not by random file order</h2>
+            <p>When you are ready for source, begin with a behavior and follow the owner of that behavior. These links are intentionally high-level entry points, not a demand to read every line.</p>
+          </div>
+        </div>
+        <div class="reference-list">
+          <article class="reference-card" data-search="architecture start docs flow map">
+            <h3>System overview</h3>
+            <p><a href="../architecture-flow.md">Architecture &amp; flows</a> is the best next document for the system diagram and main happy paths. <a href="../MAP.md">MAP.md</a> indexes specifications and phases. <a href="architecture-decisions.md">Architecture decisions</a> explains why the storage, hook, and MCP choices were made.</p>
+          </article>
+          <article class="reference-card" data-search="agent launch acp runtime chat">
+            <h3>Launch and ACP chat</h3>
+            <p>Start at <a href="../internal/server/launch.go">server launch composition</a>, then <a href="../internal/runtime/registry.go">runtime registry</a>, <a href="../internal/runtime/chat.go">chat runtime</a>, and <a href="../internal/runtime/acpmap.go">protocol normalization</a>.</p>
+          </article>
+          <article class="reference-card" data-search="mcp messaging agent coordination">
+            <h3>MCP coordination</h3>
+            <p>Read <a href="../internal/messaging/messaging.go">MCP server construction</a>, <a href="../internal/messaging/tools.go">tool handlers</a>, and <a href="../internal/server/messaging_loops.go">the nudger loop</a>. The <a href="features/tech/phase-5-coordination-techspec.md">Phase 5 tech spec</a> gives the conceptual contract.</p>
+          </article>
+          <article class="reference-card" data-search="state sqlite events sse transcript">
+            <h3>State and live UI</h3>
+            <p>Start at <a href="../internal/state/manager.go">state manager</a>, <a href="../internal/bus/bus.go">event bus</a>, and <a href="../internal/server/sse.go">SSE endpoint</a>; then see how the browser recovers in <a href="../ui/src/api/sse.ts">the SSE client</a>.</p>
+          </article>
+          <article class="reference-card" data-search="configuration federation provenance claude codex phase 7">
+            <h3>Federated configuration</h3>
+            <p>Read the <a href="features/tech/phase-7-additional-features-techspec.md">Phase 7 federation design</a>, then <a href="../internal/config/sources.go">source bindings</a> and <a href="../internal/configsource/">resolver package</a>. Check <a href="features/HANDOFF.md">HANDOFF.md</a> to distinguish delivered foundations from the next implementation steps.</p>
+          </article>
+          <article class="reference-card" data-search="go testing race fts make">
+            <h3>Go confidence loop</h3>
+            <p><a href="../Makefile">Makefile</a> is the command map. The project’s <a href="features/AGENT-WORKFLOW.md">workflow</a> explains its green checkpoint, including Go build/tests and the FTS5 variant. Use <a href="features/INVARIANTS.md">invariants</a> as a catalog of failure patterns the project has already paid to learn.</p>
+          </article>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <p><strong>Scope note.</strong> This page describes the repository’s architecture and the current Phase 7 configuration-federation boundary at the time it was written. External AI CLIs and protocol support evolve quickly; use <a href="features/HANDOFF.md">the live handoff</a> for delivery status and real-CLI acceptance gates.</p>
+        <button type="button" id="copy-link">Copy a link to this atlas</button>
+      </footer>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      var navLinks = Array.prototype.slice.call(document.querySelectorAll('.nav a'));
+      var sections = navLinks
+        .map(function (link) { return document.querySelector(link.getAttribute('href')); })
+        .filter(Boolean);
+
+      if ('IntersectionObserver' in window) {
+        var observer = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (!entry.isIntersecting) return;
+            navLinks.forEach(function (link) {
+              link.classList.toggle('active', link.getAttribute('href') === '#' + entry.target.id);
+            });
+          });
+        }, { rootMargin: '-18% 0px -70% 0px', threshold: 0.01 });
+        sections.forEach(function (section) { observer.observe(section); });
+      }
+
+      var input = document.getElementById('atlas-search');
+      var status = document.getElementById('search-status');
+      var searchable = Array.prototype.slice.call(document.querySelectorAll('[data-search]'));
+      input.addEventListener('input', function () {
+        var term = input.value.trim().toLowerCase();
+        var shown = 0;
+        searchable.forEach(function (element) {
+          var haystack = (element.getAttribute('data-search') + ' ' + element.textContent).toLowerCase();
+          var match = !term || haystack.indexOf(term) !== -1;
+          element.classList.toggle('is-filtered', !match);
+          if (match) shown += 1;
+        });
+        status.textContent = term
+          ? shown + ' matching concept cards or glossary terms. Clear the search to show everything.'
+          : 'Search filters the concept cards and glossary terms on this page.';
+      });
+
+      var copy = document.getElementById('copy-link');
+      copy.addEventListener('click', function () {
+        var url = window.location.href;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url).then(function () {
+            copy.textContent = 'Link copied';
+          }, function () {
+            copy.textContent = 'Copy the page URL from your browser';
+          });
+        } else {
+          copy.textContent = 'Copy the page URL from your browser';
+        }
+      });
+    }());
+  </script>
+</body>
+</html>
