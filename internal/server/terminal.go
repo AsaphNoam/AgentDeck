@@ -82,8 +82,11 @@ func (s *Server) handleTerminalWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Loopback-only server (§ bind), so the browser origin is trusted; skip the
-	// origin check that would otherwise reject the same-machine UI.
+	// Origin enforcement happens in the localOnly guard (security.go) that
+	// wraps the whole mux: a cross-origin handshake is rejected with 403 before
+	// this handler runs. Skip the library's own check, which compares the
+	// Origin host to r.Host and would wrongly reject the allowed local Vite
+	// dev origin (localhost:5173 vs 127.0.0.1:4317).
 	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
 	if err != nil {
 		s.log.Debug("terminal ws accept failed", "agent", id, "err", err)
