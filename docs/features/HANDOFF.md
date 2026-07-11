@@ -183,7 +183,6 @@ reports' findings sections and in the legacy ADVISORY batch below; address them 
 
 ### Review through `27d4b7d` — 2026-07-11 (scoped Phase 7.5–7.7 federation batch)
 
-- **BLOCKING — linked source defaults are recorded but never applied.** `internal/server/launch.go:143-149,195,231-244` always selects and sends the AgentDeck backend default; `internal/server/config_sources.go:377-414` only serializes the resolved source model/effort, while `internal/runtime/chat.go:1077-1098` sends that default in ACP. Normal trigger: link a Claude/Codex setup whose model differs from `backends.json`, then launch without choosing a model—the ACP request overrides the native default, so external changes have no effect. Implement the documented explicit-request/source-override/native-inherit composition and prove emitted `session/new` params plus `config_refresh` resume use or omit the intended model.
 - **BLOCKING — one source binding rejects normal project changes.** `internal/configsource/claude.go:37-48,72-86` and `internal/configsource/codex.go:46-94` persist only the preview project's canonical approved roots even though bindings are reused per backend. Normal trigger: bind while project A is selected, then launch/refresh the same backend on project B with native project config—B is rejected `approval_required`. Safely derive/validate the selected project's approved root per resolution (or scope bindings per project); test A→B for both providers.
 - **BLOCKING — the Mirrored action silently saves Linked.** `ui/src/features/settings/ConfigSourcePanel.tsx:150-178,226-236` previews Linked first, then reuses that token when “Link (Mirrored)” is clicked; `PUT` derives mode solely from the token. Normal trigger: choose Mirrored compatibility mode and receive no mirror cache. Re-preview with Mirrored (or otherwise bind an approved mirrored token) and test the persisted/GET mode.
 - **BLOCKING — onboarding links the wrong provider.** `ui/src/features/onboarding/steps/SourceStep.tsx:23-28` hard-codes the Claude backend although BackendStep permits Codex, OpenCode and OpenHands. Normal trigger: choose Codex and reach Config—the wizard previews/links Claude; non-federated choices see irrelevant controls. Carry the selected backend through onboarding and test Codex plus non-federated paths.
@@ -337,6 +336,19 @@ remaining open set; every surviving item is ADVISORY.
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
+
+- 2026-07-11 — **review fix: linked source model defaults now applied (native inheritance).** BLOCKING,
+  confirmed real: launch always sent the AgentDeck backend default over ACP, so a bound source whose model
+  differs from `backends.json` had no effect. Implemented the §2.4 explicit/override/native-inherit
+  composition: `composeFederation` returns a `federationModel` decision; `composeLaunch` sends the explicit
+  model, else a source override, else omits the model ("" → native inherit) so the CLI resolves its own.
+  `sessionNewParams`/`sessionLoadParams` now omit the model key when `ModelID==""` (claude `_meta.options`
+  and generic top-level). Resume honors the frozen (or config_refresh-resolved) `native_inherited` via
+  `frozenModelInherited`; interface/driver-only switches (same backend+model) do too, so no path silently
+  reinstates the backend default. `agent.Model`/`sessions.model` stay the display projection (§2.5).
+  Tests: `TestComposeLaunchFreezesFederationConfig` (ModelID empty), `TestComposeLaunchExplicitModelOverridesSource`,
+  `TestSessionParamsOmitModelWhenInherited`. Green: both Go variants. **Acceptance gate:** the CLIs honoring
+  an omitted `session/new` model (native resolution) is still 7.8 credential-gated.
 
 - 2026-07-11 — **review fix: Go federation checkpoint restored to green.** BLOCKING, confirmed real:
   four `internal/server` federation tests failed on canonical macOS temp paths. Root cause was

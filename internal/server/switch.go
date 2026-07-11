@@ -163,6 +163,13 @@ func (s *Server) handleSwitchRuntime(w http.ResponseWriter, r *http.Request) {
 	// targets ignore it. Rollback re-launches the previous identity under the
 	// default driver, which is correct for the only shipped terminal driver.
 	spec.Driver = req.Driver
+	// A switch that changes only the interface/driver (same backend+model) must keep
+	// a native-inherited model inherited (§2.4): the frozen federation object carries
+	// over unchanged, so re-send no model rather than forcing the frozen backend id.
+	// A backend/model change is an explicit new identity and keeps its chosen model.
+	if target.Backend == agent.Backend && target.Model == agent.Model && frozenModelInherited(spec.LaunchConfig) {
+		spec.ModelID = ""
+	}
 	if usePrimer {
 		primer, err := s.buildHistoryPrimer(r.Context(), spec, s.switchPrimerTokenBudget())
 		if err != nil {

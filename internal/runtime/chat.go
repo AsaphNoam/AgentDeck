@@ -1075,27 +1075,33 @@ func sessionNewParams(spec LaunchSpec) map[string]any {
 		mcp = append(mcp, mcpServerParam(m))
 	}
 	if spec.BackendType == "claude-acp" {
+		options := map[string]any{"additionalDirectories": spec.AddDirs}
+		// An empty ModelID means "inherit native resolution" (federation §2.3):
+		// omit the model flag so the CLI resolves its own configured model rather
+		// than being overridden by an AgentDeck default. A non-empty id is either an
+		// explicit launch choice or a source override, and is passed through.
+		if spec.ModelID != "" {
+			options["model"] = spec.ModelID
+		}
 		return map[string]any{
 			"cwd":        spec.Cwd,
 			"mcpServers": mcp,
 			"_meta": map[string]any{
 				"systemPrompt": spec.StartSystemPrompt(),
-				"claudeCode": map[string]any{
-					"options": map[string]any{
-						"model":                 spec.ModelID,
-						"additionalDirectories": spec.AddDirs,
-					},
-				},
+				"claudeCode":   map[string]any{"options": options},
 			},
 		}
 	}
-	return map[string]any{
+	params := map[string]any{
 		"cwd":                   spec.Cwd,
 		"mcpServers":            mcp,
-		"model":                 spec.ModelID,
 		"systemPrompt":          spec.StartSystemPrompt(),
 		"additionalDirectories": spec.AddDirs,
 	}
+	if spec.ModelID != "" {
+		params["model"] = spec.ModelID
+	}
+	return params
 }
 
 // sessionLoadParams builds the session/load params. It carries the SAME fields as
@@ -1110,30 +1116,31 @@ func sessionLoadParams(spec LaunchSpec, sessionID string) map[string]any {
 		mcp = append(mcp, mcpServerParam(m))
 	}
 	if spec.BackendType == "claude-acp" {
+		options := map[string]any{"resume": sessionID, "additionalDirectories": spec.AddDirs}
+		if spec.ModelID != "" { // inherit native model when empty (§2.3); see sessionNewParams.
+			options["model"] = spec.ModelID
+		}
 		return map[string]any{
 			"sessionId":  sessionID,
 			"cwd":        spec.Cwd,
 			"mcpServers": mcp,
 			"_meta": map[string]any{
 				"systemPrompt": spec.StartSystemPrompt(),
-				"claudeCode": map[string]any{
-					"options": map[string]any{
-						"resume":                sessionID,
-						"model":                 spec.ModelID,
-						"additionalDirectories": spec.AddDirs,
-					},
-				},
+				"claudeCode":   map[string]any{"options": options},
 			},
 		}
 	}
-	return map[string]any{
+	params := map[string]any{
 		"sessionId":             sessionID,
 		"cwd":                   spec.Cwd,
 		"mcpServers":            mcp,
-		"model":                 spec.ModelID,
 		"systemPrompt":          spec.StartSystemPrompt(),
 		"additionalDirectories": spec.AddDirs,
 	}
+	if spec.ModelID != "" {
+		params["model"] = spec.ModelID
+	}
+	return params
 }
 
 func mcpServerParam(m MCPServerSpec) map[string]any {

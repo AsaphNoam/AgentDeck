@@ -192,9 +192,23 @@ func (s *Server) composeLaunch(ctx context.Context, req launchRequest) (runtime.
 	// cache). The resolved high-level view is frozen into the session snapshot as
 	// redacted provenance. Placed before any registration side effects so a source
 	// error returns cleanly with nothing to unwind.
-	launchConfig, ae := s.composeFederation(ctx, backendID, req, backend, project, modelID)
+	launchConfig, fedModel, ae := s.composeFederation(ctx, backendID, req, backend, project, modelID)
 	if ae != nil {
 		return runtime.LaunchSpec{}, state.Agent{}, ae
+	}
+	// Compose the effective model sent over ACP (§2.4). An explicit launch model
+	// always wins (keeps model.Model, below). For a bound source with no explicit
+	// choice: a source override is applied verbatim; otherwise the model is left to
+	// native inheritance ("" → omitted over ACP). agent.Model keeps the resolved
+	// backend model id as the display/search projection (§2.5).
+	acpModelID := model.Model
+	if fedModel != nil && req.Model == "" {
+		switch {
+		case fedModel.override != nil:
+			acpModelID = *fedModel.override
+		case fedModel.inherit:
+			acpModelID = ""
+		}
 	}
 
 	agentID, err := s.stateStore.NewAgentID()
@@ -234,7 +248,7 @@ func (s *Server) composeLaunch(ctx context.Context, req launchRequest) (runtime.
 		AddDirs:      addDirs,
 		SystemPrompt: joinSystemPrompt(project.ContextPrompt, role.SystemPrompt),
 		BackendType:  backend.Type,
-		ModelID:      model.Model,
+		ModelID:      acpModelID,
 		Driver:       driver,
 		Env:          composeEnv(os.Environ(), backend.Env, model.Env, hookEnv),
 		SkipPerms:    resolveSkip(s.cfg.SkipPermissions, role.SkipPermissions),

@@ -91,6 +91,39 @@ func TestClaudeSessionNewParamsUseMetaOptions(t *testing.T) {
 	}
 }
 
+// Regression (review fix, federation §2.4): an empty ModelID means "inherit native
+// resolution" — the model flag must be OMITTED so a bound source's native model
+// takes effect instead of AgentDeck forcing a default over ACP. Both backend
+// shapes (claude _meta options and the generic top-level) must drop the key.
+func TestSessionParamsOmitModelWhenInherited(t *testing.T) {
+	t.Run("claude session/new", func(t *testing.T) {
+		params := sessionNewParams(LaunchSpec{Cwd: "/work", BackendType: "claude-acp"})
+		options := params["_meta"].(map[string]any)["claudeCode"].(map[string]any)["options"].(map[string]any)
+		if _, ok := options["model"]; ok {
+			t.Fatalf("inherited claude session/new must omit model: %#v", options)
+		}
+	})
+	t.Run("claude session/load", func(t *testing.T) {
+		params := sessionLoadParams(LaunchSpec{Cwd: "/work", BackendType: "claude-acp"}, "sess-1")
+		options := params["_meta"].(map[string]any)["claudeCode"].(map[string]any)["options"].(map[string]any)
+		if _, ok := options["model"]; ok {
+			t.Fatalf("inherited claude session/load must omit model: %#v", options)
+		}
+	})
+	t.Run("generic session/new", func(t *testing.T) {
+		params := sessionNewParams(LaunchSpec{Cwd: "/work", BackendType: "codex-acp"})
+		if _, ok := params["model"]; ok {
+			t.Fatalf("inherited generic session/new must omit model: %#v", params)
+		}
+	})
+	t.Run("generic session/load", func(t *testing.T) {
+		params := sessionLoadParams(LaunchSpec{Cwd: "/work", BackendType: "codex-acp"}, "sess-1")
+		if _, ok := params["model"]; ok {
+			t.Fatalf("inherited generic session/load must omit model: %#v", params)
+		}
+	})
+}
+
 func TestMCPServerParamUsesNamedPairs(t *testing.T) {
 	httpParam := mcpServerParam(MCPServerSpec{
 		Name:    "agentdeck-messaging",
