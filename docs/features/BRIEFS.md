@@ -6,6 +6,30 @@ Older entries are immutable history; agents resume from [`HANDOFF.md`](HANDOFF.m
 
 ---
 
+### 2026-07-11 — implementation: Phase 7.5 configuration federation
+
+Phase 7.5 is GREEN in the working tree. AgentDeck now has a validated, owner-only source-binding
+manifest and pure Claude Code/Codex resolvers. They preserve provider-native precedence, field
+provenance and setup fingerprints while enforcing explicit canonical-root approval; setup walks are
+allowlisted and bounded, malformed inputs retain sanitized partial reports, and secrets never enter
+resolver outputs. Tera implemented Claude discovery/resolution, Luna implemented the manifest and
+Codex regression matrix, and the primary context owned architecture, Codex integration and the full
+checkpoint. Whole-module build, both Go test variants and focused race tests pass.
+
+**Needs attention:** **New:** the required checkpoint commit/push is pending because Git escalation
+was rejected when the execution environment hit its usage limit; the tree is green and must be
+committed unchanged. **Carried:** Terminal support boundary; HTTP-only agent messaging;
+Immediate/prompt-based UI; Runtime-switch fallbacks; Unbounded transcript indexing; Agent env
+inheritance by design; Local API trusts same-machine callers; API/model compatibility. Live
+acceptance 7.4/7.8 remains credential-gated.
+
+**Next:** agent — commit the Phase 7.5 GREEN tree, then implement 7.6 source manager/API/launch integration.
+
+**What this teaches:** Treating native CLI setup as metadata-bearing federation—not copied universal
+config—preserves each provider’s semantics while keeping consent, provenance and redaction enforceable.
+
+---
+
 ### 2026-07-11 — maintenance: merged main into the security branch (complete)
 
 Branch `claude/agentdecker-security-review-urhvp2` had drifted behind `main`, which gained the Phase 7
