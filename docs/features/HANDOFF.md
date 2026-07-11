@@ -11,12 +11,16 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
 - **Active phase:** 7 — Configuration federation + OpenHands & OpenCode backends (Phase 6 complete ✅)
 - **Active subphase:** 7.6 (in progress) — source manager, API and launch integration. 7.1–7.3 and 7.5 done ✅; 7.4 remains an independent live-acceptance gate. SourceManager core landed (see 7.6 detail).
 - **Spec:** [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) (PRD: [`phase-7-additional-features.md`](phase-7-additional-features.md))
-- **Last GREEN checkpoint:** Phase 7.6 migration v8 + frozen launch-config plumbing —
-  `sessions.launch_config_json` added; `LaunchSpec.LaunchConfig` (json.RawMessage) flows through
-  `runtimeMeta`/`SessionMetaData` → transcript session_meta + `UpsertSessionMeta` → `SessionSnapshot`,
-  and resume/switch composers carry the frozen object. No behavior yet (composeLaunch still leaves it
-  empty — that is 7.6c-2). Round-trip regression `TestLaunchConfigRoundTrips`. Both Go variants green.
-  State tests bumped to expect migration 8. UI untouched. **Superseded prior checkpoint entry below.**
+- **Last GREEN checkpoint:** Phase 7.6 federation launch integration — `composeLaunch` now calls
+  `composeFederation` (ctx-threaded): a bound backend resolves FRESH at launch (the correctness
+  boundary), a stale/invalid/unapproved source blocks the launch (422 source_invalid / 409
+  approval_required), and the redacted resolved view (binding, requested-vs-resolved model/effort/
+  provider, source generation + fingerprints, native_inherited) freezes into
+  `sessions.launch_config_json`. AgentDeck keeps its own model over ACP; Claude/Codex apply native
+  config via cwd/home pass-through (already inherited via `os.Environ()`), so the source model is
+  recorded as provenance not forced. Both Go variants green; `-race` clean on the new packages (the
+  only `-race` failure, `TestResumeTerminalAgent`, is the documented pre-existing baseline flake). UI
+  untouched. Remaining 7.6: MCP-name collision preflight + `config_refresh:true` resume (both small).
 - **Prior checkpoint:** Phase 7.6 config-source REST API + SSE wired into the server
   (`internal/server/config_sources.go`, routes, `newConfigSourceManager` in `server.go`, `Watch`
   started in `Start`). GET discovery+bindings, POST preview (mints token), PUT bind (rebuilds from
@@ -75,11 +79,17 @@ advertises xterm/tmux/iterm2.
   - [x] Migration v8 (`sessions.launch_config_json`) + frozen launch-config plumbed end-to-end:
         `LaunchSpec.LaunchConfig` → `SessionMetaData` → transcript session_meta + `UpsertSessionMeta`
         → `SessionSnapshot`; resume/switch composers carry the frozen object (round-trip test in index).
-  - [ ] Populate the launch-config in `composeLaunch` via `ResolveFresh` (effective model/effort
-        layering, requested-vs-resolved provenance/fingerprints), stale-invalid launch blocking.
-  - [ ] Native Claude/Codex home/cwd pass-through and reserved messaging-MCP collision preflight.
-  - [ ] `config_refresh:true` resume path + launch-composition regression tests (freshness, stale-block,
-        frozen resume, no-secret in snapshot).
+  - [x] Populate the launch-config in `composeLaunch` via `ResolveFresh` — freshness-enforced launch
+        (`composeFederation`), frozen redacted provenance (binding, requested-vs-resolved model/effort/
+        provider, generation, fingerprints, native_inherited), stale/invalid launch blocking (422/409).
+        Tests: freeze, no-secret, invalid-blocks, no-binding-empty.
+  - [x] Native Claude/Codex home/cwd pass-through — already satisfied: `composeEnv(os.Environ()…)`
+        inherits the user's real `CODEX_HOME`/`HOME`; no isolated-home code was ever built to remove.
+  - [ ] Reserved messaging-MCP collision preflight (`409 source_conflict`) — DEFERRED: the resolver
+        inventories MCP *presence* but not server *names*, so a literal `agentdeck-messaging` collision
+        can't be detected without extending the resolver. Low risk (reserved constant id). Next.
+  - [ ] `config_refresh:true` resume path ("Resume with latest setup") — resume defaults to the frozen
+        snapshot today; the optional refresh flag is not yet wired. Next.
 - [ ] 7.7 — Add onboarding + Settings federation UI, provenance/health/inventory and override/detach flows.
 - [ ] 7.8 — GATED read-only acceptance against pinned real Claude/Codex CLIs/config surfaces.
 - **Checkpoint:** `go build ./...` + `go test ./...` + `go test -tags sqlite_fts5 ./...` + `cd ui && npm run test` + `npm run build` + embed.

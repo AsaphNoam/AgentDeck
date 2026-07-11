@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -335,6 +336,72 @@ func (s *Server) readProjectOptional(projectID string) (config.Project, bool) {
 		return config.Project{}, false
 	}
 	return project, true
+}
+
+// launchConfigDoc is the redacted, versioned federation launch object frozen into
+// sessions.launch_config_json (§2.5). It records the binding, the model AgentDeck
+// requested vs what the source resolved, the source generation + fingerprints, and
+// whether the model was left to native resolution. It carries no secret values:
+// the effective model/effort/provider are display-safe and fingerprints are only
+// path + hash + size.
+type launchConfigDoc struct {
+	Version         int                        `json:"version"`
+	Binding         launchConfigBinding        `json:"binding"`
+	RequestedModel  string                     `json:"requested_model"`
+	Resolved        launchConfigResolved       `json:"resolved"`
+	Generation      string                     `json:"generation"`
+	Fingerprints    []configsource.Fingerprint `json:"fingerprints"`
+	NativeInherited bool                       `json:"native_inherited"`
+}
+
+type launchConfigBinding struct {
+	BackendID string `json:"backend_id"`
+	Provider  string `json:"provider"`
+	Profile   string `json:"profile,omitempty"`
+	Mode      string `json:"mode"`
+}
+
+type launchConfigResolved struct {
+	Model    *string `json:"model,omitempty"`
+	Effort   *string `json:"effort,omitempty"`
+	Provider *string `json:"provider,omitempty"`
+}
+
+// composeFederation resolves a backend's active source binding fresh at launch and
+// returns the frozen launch-config JSON. It returns (nil, nil) when the backend is
+// not federation-capable or has no binding (a plain launch). A stale/invalid/
+// unapproved source returns an APIError so the launch is blocked, never composed
+// from cache (§2.5). AgentDeck keeps its own resolved model over ACP; the CLI
+// applies its native config itself via cwd/home pass-through (§2.4), so the source
+// model is recorded as provenance rather than forced as a flag.
+func (s *Server) composeFederation(ctx context.Context, backendID string, req launchRequest, backend config.Backend, project config.Project, requestedModelID string) (json.RawMessage, *runtime.APIError) {
+	if s.sourceMgr == nil {
+		return nil, nil
+	}
+	if _, ok := config.ProviderForBackendType(backend.Type); !ok {
+		return nil, nil
+	}
+	eff, rep, binding, err := s.sourceMgr.ResolveFresh(ctx, backendID, req.Project, project)
+	if errors.Is(err, configsource.ErrNoBinding) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, sourceAPIError(err)
+	}
+	doc := launchConfigDoc{
+		Version:         1,
+		Binding:         launchConfigBinding{BackendID: backendID, Provider: binding.Provider, Profile: binding.Profile, Mode: binding.Mode},
+		RequestedModel:  requestedModelID,
+		Resolved:        launchConfigResolved{Model: eff.Model, Effort: eff.Effort, Provider: eff.Provider},
+		Generation:      rep.SourceDigest,
+		Fingerprints:    rep.Fingerprints,
+		NativeInherited: req.Model == "" && binding.Overrides.Model == nil,
+	}
+	data, err := json.Marshal(doc)
+	if err != nil {
+		return nil, apiError(runtime.CodeInternal, "marshal launch config: "+err.Error())
+	}
+	return data, nil
 }
 
 // sourceAPIError maps a configsource error to the §2.7 API envelope. Resolver
