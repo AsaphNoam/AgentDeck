@@ -145,6 +145,11 @@ advertises xterm/tmux/iterm2.
 
 ## Acceptance gates (not blockers)
 
+- **HUMAN — Complete the full E2E journey sweep.** The 2026-07-11 full-scope run verified first launch/chat,
+  persisted layout density, Settings round-trip, and the repaired Claude source-linking flow, but the browser
+  control channel stalled during Stop and the local approval service then rejected further loopback checks for
+  account usage limits. J2 and J4–J12 therefore remain unexercised, not inferred-pass. Resume from
+  [`usability-review-run-2026-07-11-e2e.md`](usability-review-run-2026-07-11-e2e.md) when access is restored.
 - Confirm real Claude Code and Codex accept the local HTTP MCP registration and can call `ping`; if either
   rejects it, implement the documented stdio proxy before claiming messaging compatibility for that CLI.
 - Run real Codex chat launch, turn, stop, and resume with credentials; reconcile model/resume/hook behavior.
@@ -155,7 +160,9 @@ release claims the affected live-CLI compatibility.
 
 ## Blocked on human
 
-None.
+- **Review-state commit.** The 2026-07-11 full-E2E report, handoff, and brief are updated locally, but the
+  environment rejected `git add`/`git commit` escalation because the account reached its usage limit. Commit
+  `docs/features/{HANDOFF.md,BRIEFS.md,usability-review-run-2026-07-11-e2e.md}` when access is restored.
 
 ## Review findings (from the last review — BLOCKING and ADVISORY)
 
@@ -172,7 +179,8 @@ None.
 > duplicated here.** This is only the open-blocker worklist for `/fix-review`, pointing at them:
 > [`usability-review-run-2026-07-09.md`](usability-review-run-2026-07-09.md) ·
 > [`usability-review-run-2026-07-10.md`](usability-review-run-2026-07-10.md) (+ [`usability-review-2026-07-10-evidence/`](usability-review-2026-07-10-evidence/)) ·
-> [`usability-review-run-2026-07-11.md`](usability-review-run-2026-07-11.md).
+> [`usability-review-run-2026-07-11.md`](usability-review-run-2026-07-11.md) ·
+> [`usability-review-run-2026-07-11-e2e.md`](usability-review-run-2026-07-11-e2e.md).
 
 **Open BLOCKING:** none. The two 2026-07-11 usability BLOCKERs — **Mirrored selection silently becomes
 Linked** and **a bound source has no repair path** — shared root causes with the federation-review bullets
@@ -331,6 +339,13 @@ remaining open set; every surviving item is ADVISORY.
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
+
+- 2026-07-11 — **usability review: full journey sweep partially exercised — state recorded.** Tagged build,
+  both Go variants, and 94 UI tests were green. Live UI verified first-agent launch/modal dismissal, streamed
+  chat, density persistence, Settings project round-trip, and repaired source discovery/redaction/Mirrored
+  binding. No new product finding was asserted: the browser control channel stalled during Stop and the local
+  approval service rejected the remaining loopback checks for account usage limits. J2 and J4–J12 remain an
+  explicit HUMAN E2E acceptance gate; full matrix and evidence are in `usability-review-run-2026-07-11-e2e.md`.
 
 - 2026-07-11 — **review fix (advisory): Codex inventory shows instructions + MCP servers.** Confirmed real:
   the panel's inventory groups matched only Claude's singular kinds (`instruction`/`mcp`/`rule`), so a Codex
