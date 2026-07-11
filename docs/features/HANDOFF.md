@@ -71,10 +71,12 @@ advertises xterm/tmux/iterm2.
         `["config-sources"]`. UI build + 84 tests green (incl. new SSE-invalidation test).
   - [ ] Onboarding source step (discovery → preview → **Link setup**; Linked recommended, Mirrored =
         compatibility, **Import detached copy** currently disabled/501 — reflect that honestly).
-  - [ ] Settings **Configuration source** panel on Claude/Codex backend cards: inventory (Instructions/
-        Skills/Agents/MCP/Hooks/Rules/Plugins) with source/scope/status; model/effort controls showing
-        `Inherited from <scope/path>` / `AgentDeck override` / `Inherit CLI default`; configured-models
-        "not an entitlement check" note; stale/approval/conflict repair (refresh/detach/override).
+  - [x] Settings **Configuration source** panel (`ConfigSourcePanel.tsx`, mounted in `BackendsEditor`
+        for claude-acp/codex-acp only): project selector, discover→preview→Link (Linked recommended /
+        Mirrored compatibility / detached-import disabled), bound-state health+root, `EffectiveView`
+        (model/effort provenance labels, configured-models "not an entitlement check" note, inventory
+        groups Instructions/Skills/Agents/Rules/MCP/Hooks/Plugins + env-key names), Refresh + Unlink.
+        Never renders source contents/secrets. CSS added. 87 UI tests pass (3 new panel tests).
   - [ ] Never render source contents or secret values — paths + field names only. Rebuild + `make embed`.
   - [ ] Only Claude/Codex show federation controls; OpenCode/OpenHands stay locally managed.
   - Server API shapes to bind against: `configSourcesResponse{bindings[],candidates[]}`,
