@@ -69,16 +69,25 @@ advertises xterm/tmux/iterm2.
   - [x] `schemas/configSources.ts` + `api/configSources.ts` hooks for `/api/config-sources`
         (GET/preview/PUT/refresh/DELETE); React Query + SSE `config_source_update` → invalidate
         `["config-sources"]`. UI build + 84 tests green (incl. new SSE-invalidation test).
-  - [ ] Onboarding source step (discovery → preview → **Link setup**; Linked recommended, Mirrored =
-        compatibility, **Import detached copy** currently disabled/501 — reflect that honestly).
+  - [x] Onboarding source step (`SourceStep.tsx`) — optional, skippable, client-side step inserted
+        between Project and Launch (4-step wizard now: Backend/Project/Config/Launch). Reuses
+        `ConfigSourcePanel` (defaultOpen, seeded to the just-created project). Not tracked in the
+        server onboarding step flags. Test asserts optional + Continue advances.
   - [x] Settings **Configuration source** panel (`ConfigSourcePanel.tsx`, mounted in `BackendsEditor`
         for claude-acp/codex-acp only): project selector, discover→preview→Link (Linked recommended /
         Mirrored compatibility / detached-import disabled), bound-state health+root, `EffectiveView`
         (model/effort provenance labels, configured-models "not an entitlement check" note, inventory
         groups Instructions/Skills/Agents/Rules/MCP/Hooks/Plugins + env-key names), Refresh + Unlink.
         Never renders source contents/secrets. CSS added. 87 UI tests pass (3 new panel tests).
-  - [ ] Never render source contents or secret values — paths + field names only. Rebuild + `make embed`.
-  - [ ] Only Claude/Codex show federation controls; OpenCode/OpenHands stay locally managed.
+  - [x] Never render source contents or secret values — paths + field names only. `make embed` done
+        (tracked `internal/server/ui/dist/index.html` refreshed; assets are gitignored, rebuilt at build).
+  - [x] Only Claude/Codex show federation controls (panel returns null otherwise); OpenCode/OpenHands
+        stay locally managed.
+  - [ ] **Deferred refinements (ADVISORY):** editing model/effort overrides on an already-bound source
+        (today overrides are set only during the link/preview flow; changing them means Unlink + re-link)
+        and a NewAgentModal launch-gate that blocks launch when the selected backend's source is
+        stale/invalid (server already blocks at `composeLaunch`; the UI could pre-warn). Reset-to-inherit
+        follows from the override-edit work. Neither blocks Phase 7; do when convenient.
   - Server API shapes to bind against: `configSourcesResponse{bindings[],candidates[]}`,
     `previewResponse{preview_token,expires_at,effective,report}`, bind body `{preview_token,overrides}`,
     `configSourceBindingView`. SSE event type `config_source_update` (payload: backend_id, project_id,
