@@ -184,7 +184,6 @@ reports' findings sections and in the legacy ADVISORY batch below; address them 
 ### Review through `27d4b7d` — 2026-07-11 (scoped Phase 7.5–7.7 federation batch)
 
 - **ADVISORY — advanced custom-root/profile linking is unreachable in the UI.** `ui/src/features/settings/ConfigSourcePanel.tsx:150-155` always sends `root:"auto"` and no profile, despite the API supporting both. A user with a nonstandard root/profile cannot link it without raw API calls. Add controls and a custom-root/profile preview test.
-- **ADVISORY — Codex inventory hides instructions and MCP servers.** `ui/src/features/settings/ConfigSourcePanel.tsx:34-42` groups `instruction`/`mcp`, but `internal/configsource/codex.go:229,315-320` emits `instructions`/`mcp_servers`. Normal Codex users do not see AGENTS.md or MCP inventory. Add the aliases and a Codex inventory UI test.
 - **ADVISORY — an SSE update leaves the displayed effective view stale.** `ui/src/api/sse.ts:102-106` invalidates only the binding query while `ui/src/features/settings/ConfigSourcePanel.tsx:140-143,262` keeps Effective in local state. Normal trigger: load the view, change native config, receive SSE—the health can update but model/inventory remains old until manual refresh. Clear/refetch that view on source update and test it.
 - **ADVISORY — newly bound sources are not fsnotify-watched for up to 30 seconds.** `internal/configsource/watch.go:33-56` registers watches only at start/tick; `internal/configsource/manager.go:256-279` commits a new binding without registration. Normal trigger: bind then edit native config promptly—the UI does not receive the 250 ms update until the sweep (launch freshness still protects correctness). Register new watch directories at commit and test Watch-before-bind.
 - **ADVISORY — preview consent can cross the selected project.** `ui/src/features/settings/ConfigSourcePanel.tsx:122-178` retains a preview token when the project selector changes, so an approved preview for A can bind while B is displayed. Clear/re-preview on project changes and test it.
@@ -332,6 +331,12 @@ remaining open set; every surviving item is ADVISORY.
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
+
+- 2026-07-11 — **review fix (advisory): Codex inventory shows instructions + MCP servers.** Confirmed real:
+  the panel's inventory groups matched only Claude's singular kinds (`instruction`/`mcp`/`rule`), so a Codex
+  source's plural kinds (`instructions`/`mcp_servers`/`rules`) rendered nothing — a Codex user saw no AGENTS.md
+  or MCP inventory. Added the plural aliases to the Instructions/MCP/Rules groups. Test: Codex assets with
+  `instructions`/`mcp_servers` now render. UI 94 tests + build + embed green.
 
 - 2026-07-11 — **review fix: federation repair controls — override/reset/launch-gate landed; detach stays
   deferred (HUMAN).** BLOCKING, confirmed real: a bound source had no override/reset UX and launch had no
