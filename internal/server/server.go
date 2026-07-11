@@ -12,6 +12,7 @@ import (
 	"github.com/agentdeck/agentdeck/internal/backend/credcheck"
 	"github.com/agentdeck/agentdeck/internal/bus"
 	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/agentdeck/agentdeck/internal/configsource"
 	"github.com/agentdeck/agentdeck/internal/hooks"
 	persistindex "github.com/agentdeck/agentdeck/internal/index"
 	"github.com/agentdeck/agentdeck/internal/messaging"
@@ -48,6 +49,7 @@ type Server struct {
 
 	indexer   *persistindex.Indexer
 	messaging *messaging.Server
+	sourceMgr *configsource.Manager
 	nudgeCh   chan string
 
 	hookMu      sync.Mutex
@@ -134,6 +136,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	// Route budget breaches through the bus so the toast names the agent
 	// (agent_name/address) like every other notification type.
 	msg.SetBudgetExceededSink(eventBus.PublishBudgetExceeded)
+	sourceMgr := newConfigSourceManager(cfgStore, eventBus)
 	s := &Server{
 		configStore:      cfgStore,
 		stateStore:       stateStore,
@@ -143,6 +146,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		terminal:         term,
 		indexer:          ix,
 		messaging:        msg,
+		sourceMgr:        sourceMgr,
 		nudgeCh:          nudgeCh,
 		cfg:              cfg,
 		log:              log,
@@ -202,6 +206,9 @@ func (s *Server) Start(ctx context.Context) error {
 	defer stopSweep()
 	s.startReconciliationSweep(sweepCtx)
 	s.startMessagingLoops(sweepCtx)
+	if s.sourceMgr != nil {
+		go s.sourceMgr.Watch(sweepCtx)
+	}
 
 	go func() {
 		if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {

@@ -1224,6 +1224,118 @@ button:disabled {
   justify-content: space-between;
 }
 
+/* ---- Configuration source (federation) panel ---- */
+.backend-source-section {
+  display: grid;
+  gap: 8px;
+}
+
+.source-panel {
+  display: grid;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.source-project-select {
+  color: var(--muted);
+  font-size: 0.9em;
+}
+
+.source-hint {
+  color: var(--muted);
+  font-size: 0.9em;
+  margin: 0;
+}
+
+.source-note {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.source-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.source-status-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.source-root {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.source-health {
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  font-size: 0.8em;
+  padding: 1px 6px;
+  text-transform: uppercase;
+}
+
+.source-health-ok {
+  border-color: #2e7d32;
+  color: #2e7d32;
+}
+
+.source-health-source_invalid,
+.source-health-approval_required {
+  border-color: #c62828;
+  color: #c62828;
+}
+
+.source-mode {
+  color: var(--muted);
+  font-size: 0.8em;
+}
+
+.source-warning {
+  color: #c62828;
+  font-size: 0.9em;
+  margin: 0;
+}
+
+.source-effective {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+}
+
+.source-field-row {
+  display: flex;
+  gap: 8px;
+}
+
+.source-field-label {
+  color: var(--muted);
+  min-width: 120px;
+}
+
+.source-inventory {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.source-inventory-group ul {
+  margin: 2px 0 0;
+  padding-left: 18px;
+}
+
+.source-scope,
+.source-status {
+  color: var(--muted);
+  font-size: 0.85em;
+}
+
 .backends-footer {
   align-items: center;
   display: flex;

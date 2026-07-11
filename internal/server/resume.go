@@ -27,6 +27,10 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 		Interface string `json:"interface"`
 		Backend   string `json:"backend"`
 		Model     string `json:"model"`
+		// ConfigRefresh selects "Resume with latest setup" (Phase 7 §2.5): re-resolve
+		// the source fresh and freeze the new high-level object instead of the frozen
+		// snapshot. Absent/false preserves the snapshot's frozen federation config.
+		ConfigRefresh bool `json:"config_refresh"`
 	}
 	if r.ContentLength != 0 {
 		if err := json.NewDecoder(r.Body).Decode(&override); err != nil {
@@ -109,6 +113,26 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 5b. "Resume with latest setup" (§2.5): re-resolve the source fresh and freeze
+	// the new object. Done before composeResumeSpec so a source error blocks the
+	// resume with nothing registered to unwind. Absent/false keeps the frozen
+	// snapshot; a backend without an active binding leaves the snapshot untouched.
+	var refreshedConfig json.RawMessage
+	if override.ConfigRefresh {
+		project, perr := s.configStore.ReadProject(agent.Project)
+		if perr != nil {
+			writeAPIError(w, apiError(runtime.CodeValidation, "unknown project: "+agent.Project))
+			return
+		}
+		lc, ae := s.composeFederation(r.Context(), backendID,
+			launchRequest{Project: agent.Project, Model: override.Model}, backend, project, modelKey)
+		if ae != nil {
+			writeAPIError(w, ae)
+			return
+		}
+		refreshedConfig = lc
+	}
+
 	// 6. Build the resume LaunchSpec entirely from the frozen snapshot — including
 	//    skip_permissions and add_dirs, which are persisted at launch so a later
 	//    role/project edit cannot change a resumed agent's permission policy or
@@ -128,6 +152,11 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 	if ae != nil {
 		writeAPIError(w, ae)
 		return
+	}
+	// Override the frozen federation object with the freshly-resolved one when the
+	// caller asked to resume with the latest setup.
+	if refreshedConfig != nil {
+		spec.LaunchConfig = refreshedConfig
 	}
 
 	// 7. Resume via the registry (double-resume is guarded by the registry sentinel).
@@ -183,6 +212,9 @@ func (s *Server) composeResumeSpec(agent state.Agent, snap state.SessionSnapshot
 		ExtraArgs:      extraArgs,
 		LastSessionID:  snap.LastSessionID,
 		LastContextPct: snap.LastContextPct,
+		// Resume reproduces the frozen federation launch object by default
+		// (techspec §2.5); "Resume with latest setup" re-resolves it (handleResume).
+		LaunchConfig: snap.LaunchConfig,
 	}, nil
 }
 

@@ -52,6 +52,13 @@ const (
 	CodeEmptyName        = "empty_name"         // 400
 	CodeInvalidGroupName = "invalid_group_name" // 400
 	CodeGroupNotFound    = "group_not_found"    // 404
+
+	// configuration-federation error codes (Phase 7 techspec §2.7).
+	CodeSourceNotFound   = "source_not_found"  // 404
+	CodeSourceChanged    = "source_changed"    // 409
+	CodeSourceConflict   = "source_conflict"   // 409
+	CodeApprovalRequired = "approval_required" // 409
+	CodeSourceInvalid    = "source_invalid"    // 422
 )
 
 // APIError is the normalized error payload. It serializes to the §7.7 envelope:
@@ -76,13 +83,14 @@ func (e *APIError) HTTPStatus() int {
 // statusForCode maps an error code to its HTTP status. Unknown codes map to 500.
 func statusForCode(code string) int {
 	switch code {
-	case CodeValidation, CodeTerminalUnavailable:
+	case CodeValidation, CodeTerminalUnavailable, CodeSourceInvalid:
 		return http.StatusUnprocessableEntity // 422
 	case CodeNoChange, CodeInvalidField, CodeEmptyName, CodeInvalidGroupName:
 		return http.StatusBadRequest // 400
-	case CodeNotFound, CodeGroupNotFound:
+	case CodeNotFound, CodeGroupNotFound, CodeSourceNotFound:
 		return http.StatusNotFound // 404
-	case CodeConflict, CodeAgentNotRunning, CodeSwitchInProgress:
+	case CodeConflict, CodeAgentNotRunning, CodeSwitchInProgress,
+		CodeSourceChanged, CodeSourceConflict, CodeApprovalRequired:
 		return http.StatusConflict // 409
 	case CodeNotImplemented:
 		return http.StatusNotImplemented // 501

@@ -87,6 +87,7 @@ func walkInventory(ctx context.Context, effective *Effective, report *Report, di
 }
 
 func finalize(effective *Effective, report *Report) {
+	sort.Strings(effective.MCPServers)
 	sort.Slice(effective.Models, func(i, j int) bool {
 		if effective.Models[i].ID == effective.Models[j].ID {
 			return effective.Models[i].Source < effective.Models[j].Source

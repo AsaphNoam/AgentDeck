@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -47,7 +48,7 @@ func (s *Server) handleLaunch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Resolve config + defaults; validate (§6.1 step 1, §6.5).
-	spec, agent, ae := s.composeLaunch(req)
+	spec, agent, ae := s.composeLaunch(r.Context(), req)
 	if ae != nil {
 		writeAPIError(w, ae)
 		return
@@ -106,7 +107,7 @@ func (s *Server) readSession(id string) sessionResponse {
 
 // composeLaunch resolves config + defaults, validates, and builds the LaunchSpec
 // and identity Agent (techspec §6.2). On validation failure it returns an APIError.
-func (s *Server) composeLaunch(req launchRequest) (runtime.LaunchSpec, state.Agent, *runtime.APIError) {
+func (s *Server) composeLaunch(ctx context.Context, req launchRequest) (runtime.LaunchSpec, state.Agent, *runtime.APIError) {
 	if req.Role == "" || req.Project == "" {
 		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeValidation, "role and project are required")
 	}
@@ -185,6 +186,17 @@ func (s *Server) composeLaunch(req launchRequest) (runtime.LaunchSpec, state.Age
 	}
 	addDirs := expandAddDirs(project.AddDirs)
 
+	// Configuration federation (Phase 7 §2.5): when this backend has an active
+	// source binding, resolve it FRESH at launch — the correctness boundary. A
+	// stale/invalid/unapproved source blocks the launch (never composed from
+	// cache). The resolved high-level view is frozen into the session snapshot as
+	// redacted provenance. Placed before any registration side effects so a source
+	// error returns cleanly with nothing to unwind.
+	launchConfig, ae := s.composeFederation(ctx, backendID, req, backend, project, modelID)
+	if ae != nil {
+		return runtime.LaunchSpec{}, state.Agent{}, ae
+	}
+
 	agentID, err := s.stateStore.NewAgentID()
 	if err != nil {
 		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeInternal, "mint agent id: "+err.Error())
@@ -229,6 +241,7 @@ func (s *Server) composeLaunch(req launchRequest) (runtime.LaunchSpec, state.Age
 		HookToken:    token,
 		MCPServers:   []runtime.MCPServerSpec{mcpSpec},
 		ExtraArgs:    extraArgs,
+		LaunchConfig: launchConfig,
 	}
 	return spec, agent, nil
 }

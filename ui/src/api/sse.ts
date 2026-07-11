@@ -43,6 +43,7 @@ class SseClient {
     this.es.addEventListener("state_update", (event) => this.onStateUpdate(event as MessageEvent<string>));
     this.es.addEventListener("new_message", (event) => this.onNewMessage(event as MessageEvent<string>));
     this.es.addEventListener("notification", (event) => this.onNotification(event as MessageEvent<string>));
+    this.es.addEventListener("config_source_update", () => this.onConfigSourceUpdate());
     this.es.addEventListener("ping", () => {
       this.lastPing = Date.now();
     });
@@ -94,6 +95,14 @@ class SseClient {
       }
     }
     useTranscriptStore.getState().appendMessage(agentId, envelope.data);
+  }
+
+  // A federation source changed on disk (or was refreshed/bound): invalidate the
+  // project-scoped config-source queries so the Settings panel re-fetches the
+  // effective view, health and inventory. Invalidating the prefix key covers
+  // every project's query.
+  private onConfigSourceUpdate() {
+    queryClient.invalidateQueries({ queryKey: ["config-sources"] });
   }
 
   private onNotification(event: MessageEvent<string>) {

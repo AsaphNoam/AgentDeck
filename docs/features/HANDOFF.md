@@ -9,13 +9,20 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
 ## Current position
 
 - **Active phase:** 7 — Configuration federation + OpenHands & OpenCode backends (Phase 6 complete ✅)
-- **Active subphase:** 7.6 (next) — source manager, API and launch integration. 7.1–7.3 and 7.5 done ✅; 7.4 remains an independent live-acceptance gate.
+- **Active subphase:** Phase 7 un-gated work COMPLETE ✅ — 7.1–7.3, 7.5, 7.6, 7.7 done. Only the
+  credential-gated acceptance subphases remain: **7.4** (OpenCode/OpenHands live CLIs) and **7.8**
+  (live Claude/Codex federation). Two ADVISORY UI refinements noted under 7.7 (override-edit on a bound
+  source; NewAgentModal invalid-source pre-warn) — non-blocking.
 - **Spec:** [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) (PRD: [`phase-7-additional-features.md`](phase-7-additional-features.md))
-- **Last GREEN checkpoint:** Phase 7.5 federation schema + pure Claude/Codex resolvers in the current
-  working tree — `go build ./...` + both Go test variants pass; resolver/config package race tests pass.
-  UI untouched. **Recovery:** the checkpoint is not committed because the Git escalation was rejected
-  when the execution environment hit its usage limit; commit it before starting 7.6.
-- **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Push normal commits to `origin/main` on task completion; force-pushes still ask.
+- **Last GREEN checkpoint:** Phase 7.7 federation UI COMPLETE (3 commits: `ee5b6a7` data layer →
+  `5b818de` Settings panel → `79b8c7a` onboarding step + embed). `schemas/configSources.ts` +
+  `api/configSources.ts` hooks; SSE `config_source_update` → invalidate `["config-sources"]`;
+  `ConfigSourcePanel` on Claude/Codex backend cards (discover→preview→Link, health, Refresh, Unlink,
+  redacted `EffectiveView` with provenance labels + inventory groups, never source contents/secrets);
+  optional onboarding Config step reusing the panel. `make embed` refreshed the tracked
+  `index.html`. UI: 88 tests + build green. Both Go variants green after embed. Backend federation
+  surface (7.6) unchanged. Phase 7's remaining work is only the credential-gated 7.4 + 7.8 acceptances.
+- **Branch:** `claude/work-phase-hwv0z6` — session working branch (harness-designated). Commit here; push to `origin/claude/work-phase-hwv0z6` on completion.
 
 ---
 
@@ -28,7 +35,7 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
 - [x] Phase 4 — Persistence: archive, search, resume, file/command tracking ✅
 - [x] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications ✅
 - [x] Phase 6 — Flexibility: terminal runtime, switch-runtime, task groups, drivers (xterm/tmux/iterm2) ✅
-- [ ] Phase 7 — Configuration federation + additional backends — **7.1–7.3, 7.5 ✅** (OpenHands/OpenCode integration; federation schema + pure resolvers); **7.4 GATED** (backend live acceptance); **7.6–7.8 pending** (manager/API/UI/live federation acceptance). PRD [`phase-7-additional-features.md`](phase-7-additional-features.md), spec [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md)
+- [ ] Phase 7 — Configuration federation + additional backends — **7.1–7.3, 7.5, 7.6, 7.7 ✅** (OpenHands/OpenCode integration; federation schema + pure resolvers; source manager + API + SSE + launch/resume/switch integration; federation onboarding + Settings UI); **7.4 + 7.8 GATED** (backend + federation live acceptance, credential-gated). PRD [`phase-7-additional-features.md`](phase-7-additional-features.md), spec [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md)
 
 Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent after 2).
 
@@ -43,9 +50,7 @@ the terminal runtime behind the `TerminalDriver` seam with xterm/PTY + tmux + iT
 switch-runtime, backend-swap history primer, task groups, and driver-selection plumbing. `GET /api/capabilities`
 advertises xterm/tmux/iterm2.
 
-**Phase 7 — Configuration federation + OpenHands & OpenCode. 7.1–7.3 and 7.5 ✅, 7.4 GATED, 7.6 next:**
-- **Recovery first:** preserve the current green tree and create the required 7.5 checkpoint commit;
-  no 7.6 implementation has started.
+**Phase 7 — Configuration federation + OpenHands & OpenCode. 7.1–7.3, 7.5, 7.6 ✅, 7.4 GATED, 7.7 next:**
 - [x] 7.1 — OpenCode/OpenHands adapters + config + terminal gates.
 - [x] 7.2 — permissions + credchecks + switch matrix (yolo/credchecks).
 - [x] 7.3 — OpenCode/OpenHands UI plumbing (onboarding BackendStep, settings BackendsEditor).
@@ -54,13 +59,40 @@ advertises xterm/tmux/iterm2.
   against fakes, gaps documented.
 - [x] 7.5 — `config-sources.json` v1 + pure redacted Claude/Codex resolvers, provenance,
   fingerprints, approved-root enforcement and fixture coverage.
-- [ ] 7.6 — Add source manager/watch+sweep, preview/bind/refresh/detach APIs, launch-time freshness,
-  native home/cwd pass-through, frozen provenance and SSE.
-  - [ ] Immutable per-binding/project generations, fsnotify debounce + stat sweep, and mirrored cache.
-  - [ ] Preview-token consent plus list/bind/refresh/detach routes and redacted error mapping.
-  - [ ] Migration v8 and fresh launch vs frozen resume/switch provenance semantics.
-  - [ ] Native Claude/Codex home/cwd pass-through and reserved messaging-MCP collision preflight.
-  - [ ] Watch, TOCTOU, freshness, stale-block, no-write/no-secret and integration regression tests.
+- [x] 7.6 — SourceManager (immutable generations, `ResolveFresh` freshness boundary, fsnotify+250ms
+  debounce+30s sweep, mirrored redacted 0600/0700 cache, preview-token consent w/ TOCTOU+expiry) +
+  REST routes (GET/preview/PUT/refresh/DELETE) + `config_source_update` SSE + federation error codes;
+  launch integration (`composeFederation`: fresh resolve, stale/invalid launch block 422/409, frozen
+  redacted `launch_config_json`, migration v8, reserved-MCP-id collision preflight → 409); resume
+  frozen-by-default + `config_refresh:true`; switch carries frozen object; native cwd/home pass-through
+  (already inherited via `os.Environ()`). detach=true → 501 (gated, see Decisions).
+- [ ] 7.7 (**in progress**) — Federation onboarding + Settings UI (`ui/src`). Deliverables:
+  - [x] `schemas/configSources.ts` + `api/configSources.ts` hooks for `/api/config-sources`
+        (GET/preview/PUT/refresh/DELETE); React Query + SSE `config_source_update` → invalidate
+        `["config-sources"]`. UI build + 84 tests green (incl. new SSE-invalidation test).
+  - [x] Onboarding source step (`SourceStep.tsx`) — optional, skippable, client-side step inserted
+        between Project and Launch (4-step wizard now: Backend/Project/Config/Launch). Reuses
+        `ConfigSourcePanel` (defaultOpen, seeded to the just-created project). Not tracked in the
+        server onboarding step flags. Test asserts optional + Continue advances.
+  - [x] Settings **Configuration source** panel (`ConfigSourcePanel.tsx`, mounted in `BackendsEditor`
+        for claude-acp/codex-acp only): project selector, discover→preview→Link (Linked recommended /
+        Mirrored compatibility / detached-import disabled), bound-state health+root, `EffectiveView`
+        (model/effort provenance labels, configured-models "not an entitlement check" note, inventory
+        groups Instructions/Skills/Agents/Rules/MCP/Hooks/Plugins + env-key names), Refresh + Unlink.
+        Never renders source contents/secrets. CSS added. 87 UI tests pass (3 new panel tests).
+  - [x] Never render source contents or secret values — paths + field names only. `make embed` done
+        (tracked `internal/server/ui/dist/index.html` refreshed; assets are gitignored, rebuilt at build).
+  - [x] Only Claude/Codex show federation controls (panel returns null otherwise); OpenCode/OpenHands
+        stay locally managed.
+  - [ ] **Deferred refinements (ADVISORY):** editing model/effort overrides on an already-bound source
+        (today overrides are set only during the link/preview flow; changing them means Unlink + re-link)
+        and a NewAgentModal launch-gate that blocks launch when the selected backend's source is
+        stale/invalid (server already blocks at `composeLaunch`; the UI could pre-warn). Reset-to-inherit
+        follows from the override-edit work. Neither blocks Phase 7; do when convenient.
+  - Server API shapes to bind against: `configSourcesResponse{bindings[],candidates[]}`,
+    `previewResponse{preview_token,expires_at,effective,report}`, bind body `{preview_token,overrides}`,
+    `configSourceBindingView`. SSE event type `config_source_update` (payload: backend_id, project_id,
+    generation, health, changed[], stale).
 - [ ] 7.7 — Add onboarding + Settings federation UI, provenance/health/inventory and override/detach flows.
 - [ ] 7.8 — GATED read-only acceptance against pinned real Claude/Codex CLIs/config surfaces.
 - **Checkpoint:** `go build ./...` + `go test ./...` + `go test -tags sqlite_fts5 ./...` + `cd ui && npm run test` + `npm run build` + embed.
@@ -102,6 +134,13 @@ advertises xterm/tmux/iterm2.
   + `/mcp` require per-launch tokens, but any local process (including other OS users) that can
   connect to the port can read transcripts/config and drive agents. Adding real API auth (token
   file + UI handshake) is a product-scope decision. (2026-07-11 security review, findings 3/5.)
+- **HUMAN — Detached config-source import deferred.** `DELETE /api/config-sources/{id}?detach=true`
+  returns `501 not_implemented` instead of materializing an AgentDeck-owned copy. The spec (§2.6)
+  scopes detached materialization to assets marked `copyable`, but every Claude/Codex setup asset the
+  resolver inventories is `reference_only`/`unsupported` until a provider-specific launch-injection
+  path passes acceptance (7.4/7.8) — so there is nothing to copy without silently breaking the
+  copy promise. `detach=false` (plain unbind) works. Reverse by wiring high-level model/effort into
+  `backends.json` and copying `copyable` assets once an injection path is verified. (2026-07-11, 7.6.)
 - **HUMAN — API/model compatibility.** Older endpoints still use a different error-envelope
   shape, and the current Agent Client Protocol adapter can ignore AgentDeck's requested model in favor of its
   own model identifiers. Standardize the API envelope and map model IDs before promising those contracts.

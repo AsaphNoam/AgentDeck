@@ -7,6 +7,7 @@ package runtime
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/agentdeck/agentdeck/internal/state"
 )
@@ -40,6 +41,13 @@ type LaunchSpec struct {
 	ExtraArgs      []string        // reserved (e.g. extra adapter flags) — empty this phase
 	LastSessionID  string          // prior CLI session id; Resume tries session/load with this
 	LastContextPct float64         // last-known context pct; Resume restores it to the status row
+	// LaunchConfig is the frozen configuration-federation launch object (Phase 7
+	// techspec §2.5): redacted requested-vs-resolved model/effort/provider, binding
+	// backend/provider/profile, source generation + fingerprints, native-inherit
+	// flag. Persisted verbatim into sessions.launch_config_json and the transcript
+	// session_meta so resume reproduces the frozen high-level snapshot. Empty when
+	// the backend has no active source binding.
+	LaunchConfig json.RawMessage
 }
 
 // StartSystemPrompt is the system prompt handed to the backend process for this

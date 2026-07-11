@@ -131,6 +131,20 @@ describe("SseClient watchdog reconnect", () => {
     expect(agents["a_gone"]).toBeUndefined();
   });
 
+  it("invalidates config-source queries on a config_source_update event", async () => {
+    const { sseClient } = await import("./sse");
+    const { queryClient } = await import("./config");
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+    sseClient.connect();
+    FakeEventSource.instances[0].onopen?.();
+
+    FakeEventSource.instances[0].emit(
+      "config_source_update",
+      JSON.stringify({ backend_id: "claude", project_id: "app", generation: 3, health: "ok", changed: ["model"], stale: false }),
+    );
+    expect(spy).toHaveBeenCalledWith({ queryKey: ["config-sources"] });
+  });
+
   it("drops muted notification types", async () => {
     const { sseClient } = await import("./sse");
     const { queryClient } = await import("./config");
