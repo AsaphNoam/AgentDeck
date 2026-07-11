@@ -76,6 +76,41 @@ describe("ConfigSourcePanel", () => {
     await waitFor(() => expect(bound).toBe(true));
   });
 
+  // Regression (review fix): "Discover" previews Linked to show the effective view;
+  // clicking "Link (Mirrored)" must bind a token minted FOR mirrored (the server
+  // derives the bound mode from the token), not reuse the linked discovery token.
+  it("Link (Mirrored) binds a mirrored-minted token, not the linked discovery token", async () => {
+    const previewedModes: string[] = [];
+    let boundToken: string | null = null;
+    server.use(
+      http.post("/api/config-sources/preview", async ({ request }) => {
+        const body = (await request.json()) as { mode: string };
+        previewedModes.push(body.mode);
+        return HttpResponse.json({
+          preview_token: `tok-${body.mode}`,
+          expires_at: new Date(Date.now() + 600000).toISOString(),
+          effective: { ...emptyEffective, model: "user-model", provenance: { model: { scope: "user", path: "/h/.claude/settings.json", key: "model" } } },
+          report: { source_digest: "abc", files_read: [], skipped: [], unknown_keys: [], warnings: [], fingerprints: [], approved_roots: [] },
+        });
+      }),
+      http.put("/api/config-sources/:id", async ({ request }) => {
+        const body = (await request.json()) as { preview_token: string };
+        boundToken = body.preview_token;
+        return HttpResponse.json({ backend_id: "claude", provider: "claude-code", mode: "mirrored", root: "/h/.claude", health: "ok", stale: false });
+      }),
+    );
+
+    renderWithQuery(<ConfigSourcePanel backendId="claude" backendType="claude-acp" />);
+    const discover = (await screen.findByText("Discover native config")) as HTMLButtonElement;
+    await waitFor(() => expect(discover).not.toBeDisabled());
+    fireEvent.click(discover); // discovery previews Linked
+    expect(await screen.findByText(/user-model/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText(/Link \(Mirrored/));
+    await waitFor(() => expect(boundToken).toBe("tok-mirrored"));
+    expect(previewedModes).toContain("mirrored");
+  });
+
   it("shows a bound source with health and an unlink action", async () => {
     server.use(
       http.get("/api/config-sources", () =>
