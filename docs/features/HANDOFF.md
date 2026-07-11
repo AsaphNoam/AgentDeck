@@ -167,18 +167,19 @@ None.
 > **This section holds only OPEN findings** — no resolved/dismissed graveyard.
 > Blocking items must be fixed before the next phase starts; advisory items when convenient.
 
-### Usability findings — 2026-07-09 & 2026-07-10 reviews (open worklist)
+### Usability findings — 2026-07-09 through 2026-07-11 reviews (open worklist)
 
 > Full findings, repros, severities, and evidence live in the run reports — recorded there, **not
 > duplicated here.** This is only the open-blocker worklist for `/fix-review`, pointing at them:
 > [`usability-review-run-2026-07-09.md`](usability-review-run-2026-07-09.md) ·
-> [`usability-review-run-2026-07-10.md`](usability-review-run-2026-07-10.md) (+ [`usability-review-2026-07-10-evidence/`](usability-review-2026-07-10-evidence/)).
+> [`usability-review-run-2026-07-10.md`](usability-review-run-2026-07-10.md) (+ [`usability-review-2026-07-10-evidence/`](usability-review-2026-07-10-evidence/)) ·
+> [`usability-review-run-2026-07-11.md`](usability-review-run-2026-07-11.md).
 
-**Open BLOCKING:** none — all eight usability BLOCKERs were fixed to a GREEN checkpoint on
-2026-07-10 (see changelog). Advisory/polish items from both runs remain open in the reports'
-findings sections (unstyled-error MINORs, pagination, double-toast, etc.) and in the legacy ADVISORY
-batch below; address them when convenient. The 2026-07-10 coverage-closure notes (J6 terminal, F10
-Files/Commands, F11 budgets, CLI parity — all DRIVEN and PASS) are itemized in the reports.
+**Open BLOCKING:** **Usability — Mirrored selection silently becomes Linked** and **Usability — a bound
+source has no repair path** (both confirmed in the running dashboard on 2026-07-11; see the new run
+report and the corresponding federation-review bullets below). All eight older usability BLOCKERs were
+fixed to a GREEN checkpoint on 2026-07-10. Advisory/polish items from the older runs remain open in the
+reports' findings sections and in the legacy ADVISORY batch below; address them when convenient.
 
 ### Review through `27d4b7d` — 2026-07-11 (scoped Phase 7.5–7.7 federation batch)
 
@@ -337,6 +338,13 @@ remaining open set; every surviving item is ADVISORY.
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
+
+- 2026-07-11 — **usability review: federation source linking — state recorded.** In an isolated
+  live fixture, source preview and Effective view redacted the secret value correctly while retaining
+  provenance and env-key names. Choosing **Link (Mirrored — compatibility)** visibly and persistently
+  bound **linked** instead; a bound source exposed only Refresh/Unlink, not override/reset/detach or
+  invalid-source repair. Both reproduce the open federation BLOCKING findings. The satisfied onboarding
+  gate prevented a browser-driven Codex/non-federated source-step run; it remains required after repair.
 
 - 2026-07-11 — **review: Phase 7.5–7.7 federation — BLOCKING findings recorded.** Source
   defaults are provenance-only, one binding fails on a different project, Mirrored saves Linked,
