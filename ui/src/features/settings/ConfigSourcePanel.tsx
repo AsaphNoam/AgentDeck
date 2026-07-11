@@ -103,20 +103,33 @@ function EffectiveView({ effective }: { effective: Effective }) {
   );
 }
 
-export function ConfigSourcePanel({ backendId, backendType }: { backendId: string; backendType: BackendType }) {
+export function ConfigSourcePanel({
+  backendId,
+  backendType,
+  initialProjectId,
+  defaultOpen,
+}: {
+  backendId: string;
+  backendType: BackendType;
+  initialProjectId?: string;
+  defaultOpen?: boolean;
+}) {
   const provider = PROVIDER_FOR_TYPE[backendType];
   const { data: projects } = useProjects();
   const { data: config } = useConfig();
 
   const projectIds = useMemo(() => Object.keys(projects ?? {}).sort(), [projects]);
-  const [projectId, setProjectId] = useState<string>("");
+  const [projectId, setProjectId] = useState<string>(initialProjectId ?? "");
   useEffect(() => {
     if (projectId || projectIds.length === 0) return;
-    const preferred = config?.default_project && projectIds.includes(config.default_project)
-      ? config.default_project
-      : projectIds[0];
+    const preferred =
+      initialProjectId && projectIds.includes(initialProjectId)
+        ? initialProjectId
+        : config?.default_project && projectIds.includes(config.default_project)
+          ? config.default_project
+          : projectIds[0];
     setProjectId(preferred);
-  }, [projectId, projectIds, config?.default_project]);
+  }, [projectId, projectIds, config?.default_project, initialProjectId]);
 
   const { data: sources } = useConfigSources(projectId || undefined);
   const preview = usePreviewConfigSource();
@@ -180,7 +193,7 @@ export function ConfigSourcePanel({ backendId, backendType }: { backendId: strin
   };
 
   return (
-    <details className="backend-source-section">
+    <details className="backend-source-section" open={defaultOpen}>
       <summary>Configuration source ({providerLabel(provider)})</summary>
 
       <div className="source-panel">
