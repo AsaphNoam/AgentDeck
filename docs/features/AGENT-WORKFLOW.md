@@ -104,7 +104,7 @@ The review action (§8) accepts, rejects, or escalates PEER items. It never clea
 Accepted durable rationale belongs in the existing architecture/spec/invariant documentation;
 accepted routine choices disappear from live state after a terse changelog entry.
 If the human acknowledges only part of a compound HUMAN item, split it and retain the unacknowledged
-part. If the required attention titles alone no longer fit the 250-word brief, STOP accumulating new
+part. If the required attention titles alone would overload a focused brief, STOP accumulating new
 HUMAN decisions and use the brief to ask the human to triage them.
 
 ---
@@ -191,8 +191,11 @@ one brief covering the recovery; do not invent a blocker or pretend the interrup
 
 ### Human brief — every session, one bounded report
 
-Every implementation, review, fix-review, and usability-review session produces exactly one brief,
-at most **250 words including its heading**. Prepend it to [`BRIEFS.md`](BRIEFS.md), commit it with
+Every implementation, review, fix-review, and usability-review session produces exactly one brief.
+Optimize for **a focused, intuitive explanation that rebuilds the reader's mental model**, not for a
+word count: long enough to make the current state and what changed genuinely click, short enough that
+every sentence earns its place — a few compact paragraphs, never padded to fill space or truncated to
+hit a number. Prepend it to [`BRIEFS.md`](BRIEFS.md), commit it with
 the session's final state, then send that exact Markdown verbatim as the final chat response with
 nothing before or after it. Do not add a second report.
 
@@ -205,7 +208,8 @@ Write for someone returning cold who may have forgotten project vocabulary. In p
    finding, and any spec deviation or material risk. Mention a nonblocking acceptance gate only when
    it affects the next action or a compatibility/release claim.
 4. State the next concrete action and whether it belongs to the human or an agent.
-5. Add the optional learning item below only when it earns space inside the same 250-word budget.
+5. Add the optional learning item below only when it earns its place without crowding out the required
+   state and attention above.
 
 Use this minimal shape. `Needs attention` is always present as a safety check; only the learning heading
 is optional. Avoid changed-file lists, raw symbols, validation-command inventories, routine decisions,

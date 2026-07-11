@@ -1,7 +1,8 @@
 # AgentDeck — Human Briefs
 
 Read only the first entry to return to the project after time away. Each session prepends one
-standalone brief (maximum 250 words) and returns that exact text as its final chat response.
+standalone brief — focused on rebuilding the reader's mental model rather than hitting a word count —
+and returns that exact text as its final chat response.
 Older entries are immutable history; agents resume from [`HANDOFF.md`](HANDOFF.md), not this file.
 
 ---
