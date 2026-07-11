@@ -19,7 +19,7 @@ const reconcileInterval = 30 * time.Second
 func (s *Server) startReconciliationSweep(ctx context.Context) {
 	go func() {
 		sessionsDir := filepath.Join(s.configStore.Home(), "sessions")
-		_ = os.MkdirAll(sessionsDir, 0o755)
+		_ = os.MkdirAll(sessionsDir, 0o700)
 		s.reconcileSessionsOnce(time.Now().Add(-reconcileInterval))
 		s.pruneStaleRunning()
 

@@ -528,3 +528,27 @@ func TestDeleteMethodsAreIdempotent(t *testing.T) {
 		t.Fatalf("MarkRead missing: %v", err)
 	}
 }
+
+// TestStateDBIsOwnerOnly guards the security fix for a world-readable
+// state.db: SQLite creates the file umask-relative, so Open must chmod it
+// (and thereby its -wal/-shm siblings, which inherit its mode) to 0600.
+func TestStateDBIsOwnerOnly(t *testing.T) {
+	home := t.TempDir()
+	// Simulate an old install's loose db before reopening.
+	loose := filepath.Join(home, "state.db")
+	if err := os.WriteFile(loose, nil, 0o644); err != nil {
+		t.Fatalf("seed loose db: %v", err)
+	}
+	st, err := Open(home)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer st.Close()
+	fi, err := os.Stat(loose)
+	if err != nil {
+		t.Fatalf("stat db: %v", err)
+	}
+	if perm := fi.Mode().Perm(); perm&0o077 != 0 {
+		t.Errorf("state.db perms = %04o, want no group/other bits", perm)
+	}
+}

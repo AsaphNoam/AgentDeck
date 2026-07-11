@@ -304,6 +304,37 @@ checks computed styles / stylesheet rule count, not just DOM presence.
 
 ---
 
+## 14. A loopback bind is not a browser or filesystem security boundary
+
+**Rule:** binding 127.0.0.1 keeps remote *sockets* out, but not remote *attackers*. A malicious
+web page can still reach the server through the victim's own browser (DNS rebinding makes
+attacker.com resolve to 127.0.0.1, so the page becomes "same-origin" with the dashboard;
+cross-origin WebSocket handshakes and "simple" no-preflight POSTs are sent regardless of CORS
+response headers). And any other account on the machine can read world-readable files. Therefore:
+
+- Every HTTP route — API, raw-mounted transports (`/mcp`), WebSockets, static UI — must sit behind
+  the `localOnly` guard (`internal/server/security.go`), which rejects non-local `Host` headers
+  (DNS rebinding) and non-local `Origin` headers (cross-site WS/CSRF) with 403. The guard wraps
+  the **entire mux** in `routes.go`; never mount a handler outside it, and never rely on CORS
+  headers as access control — they only gate what a compliant browser lets a page *read*.
+- Everything under `~/.agentdeck` (config with backend env/API keys, `state.db`, transcripts,
+  hook/MCP token files, logs) is owner-only: `0o700` dirs, `0o600` files (hook scripts `0o700`).
+  `MkdirAll` never re-modes an existing dir and SQLite creates files umask-relative, so creation
+  paths must pass tight modes AND `EnsureLayout`/`state.Open` explicitly `Chmod` what may already
+  exist from older builds.
+
+Paid for by: the 2026-07-11 security review — unauthenticated dashboard API exposed to DNS
+rebinding, terminal WS accepting any origin (`InsecureSkipVerify` with no outer check), `/mcp` and
+the WS route mounted outside the API middleware, and a world-readable home tree
+(`TestDNSRebindingHostRejected`, `TestCrossOriginRequestRejected`, `TestHomeTreeIsOwnerOnly`,
+`TestStateDBIsOwnerOnly`, `TestTranscriptIsOwnerOnly`).
+
+**Canonical guard:** `localOnly` + `isLocalHost`/`isLocalOrigin` (`internal/server/security.go`).
+Test requests must carry a loopback Host — use `newLocalRequest` (`server_test.go`), not bare
+`httptest.NewRequest` (whose default Host, example.com, is rejected by design).
+
+---
+
 ## Canonical helpers registry (reuse, don't re-derive)
 
 | Helper | Where | Use for |
@@ -316,5 +347,6 @@ checks computed styles / stylesheet rule count, not just DOM presence.
 | PTY hub pattern | `internal/runtime/terminal/ptyhub.go` | any shared-fd broadcast need (§6) |
 | `seedLocked` | `internal/index/indexer.go` | in-memory buffers feeding replace-style writes (§9) |
 | `config.ValidSlug` | `internal/config/validate.go` | every path-param on every verb (§2) |
+| `localOnly` | `internal/server/security.go` | wraps the whole mux; every new route inherits it (§14) |
 | `notificationPayload` | `internal/bus/` | all notification payloads (§8) |
 | `fakeacp` test double | `internal/runtime/testdata/fakeacp` | env-driven protocol-level repros (`FAKEACP_LOAD_DUMP`, `FAKEACP_PROTO_VERSION`, `ignore_cancel`) |
