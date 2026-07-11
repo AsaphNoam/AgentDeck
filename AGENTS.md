@@ -13,7 +13,8 @@ or usability-review work. The workflow is the single behavioral contract; do not
 - **Fix review:** follow §9. Validate each finding before changing code; fix real ones and dismiss false positives.
 - **Usability review:** follow §10. Exercise normal user journeys without changing product code.
 
-Every role updates the agent-facing handoff and closes with the same <=250-word human brief stored in
+Every role updates the agent-facing handoff and closes with the same focused human brief — optimized to
+rebuild the reader's mental model, not to hit a word count — stored in
 [`docs/features/BRIEFS.md`](docs/features/BRIEFS.md). The exact stored brief is the entire final response.
 
 ## Project orientation
