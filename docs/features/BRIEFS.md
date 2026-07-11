@@ -6,6 +6,26 @@ Older entries are immutable history; agents resume from [`HANDOFF.md`](HANDOFF.m
 
 ---
 
+### 2026-07-11 — usability review: configuration-source linking
+
+Phase 7 federation remains blocked. A live, isolated dashboard run confirmed that source preview and
+the Effective view expose provenance, model, and environment-key names without leaking a configured
+secret. But choosing “Link (Mirrored — compatibility)” visibly binds a **linked** source, and the API
+persists `mode:"linked"`; the user’s chosen ownership mode is silently ignored. Once bound, the only
+repair actions are Refresh and Unlink—there is no override/reset, detach explanation, or stale-source
+repair before launch. The onboarding wizard was already satisfied in this fixture, so alternate backend
+selection needs browser coverage after the existing provider fix.
+
+**Needs attention:** New/changed: **BLOCKING Usability — Mirrored selection silently becomes Linked**;
+**BLOCKING Usability — bound source has no repair path**. Carried: Terminal support boundary; HTTP
+messaging; immediate/prompt UI; runtime-switch fallbacks; transcript indexing; agent environment
+inheritance; same-machine API trust; detached import; API/model compatibility.
+
+**Next:** Agent — run `/fix-review` to validate and repair the federation findings, then browser-test
+Mirrored, stale repair, Codex onboarding, and non-federated onboarding.
+
+---
+
 ### 2026-07-11 — review: Phase 7.5–7.7 configuration federation
 
 Phase 7’s federation slice is not ready to close. Review through `27d4b7d` found that linked native
