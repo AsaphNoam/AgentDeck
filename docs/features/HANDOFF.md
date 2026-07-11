@@ -8,10 +8,10 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
 
 ## Current position
 
-- **Active phase:** 7 — Additional features: OpenHands & OpenCode backends (Phase 6 complete ✅)
-- **Active subphase:** 7.4 (next) — GATED live acceptance, **blocked on human** (needs `opencode`+`openhands` CLIs + provider keys); 7.1–7.3 done ✅. All fakeacp/UI paths green.
+- **Active phase:** 7 — Configuration federation + OpenHands & OpenCode backends (Phase 6 complete ✅)
+- **Active subphase:** 7.5 (next) — Claude/Codex federation schema + pure provider resolvers. 7.1–7.3 done ✅; 7.4 remains an independent live-acceptance gate.
 - **Spec:** [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) (PRD: [`phase-7-additional-features.md`](phase-7-additional-features.md))
-- **Last GREEN checkpoint:** `review fix: owner-only ~/.agentdeck permissions — green checkpoint` — `go build ./...` + both Go test variants pass (UI untouched). NOTE: this security-review batch lives on branch `claude/agentdecker-security-review-urhvp2` (the session was hard-scoped to that branch); merge it to `main` to restore the trunk invariant.
+- **Last GREEN checkpoint:** merge of `main` (federation spec, `f0c14d3`) into the 2026-07-11 security-review batch — `go build ./...` + both Go test variants pass (the incoming side was docs-only; UI untouched). NOTE: the security batch + this merge live on branch `claude/agentdecker-security-review-urhvp2` (that session was hard-scoped to the branch); merging it to `main` restores the trunk invariant and is now a fast-forward.
 - **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Push normal commits to `origin/main` on task completion; force-pushes still ask.
 
 ---
@@ -25,7 +25,7 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
 - [x] Phase 4 — Persistence: archive, search, resume, file/command tracking ✅
 - [x] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications ✅
 - [x] Phase 6 — Flexibility: terminal runtime, switch-runtime, task groups, drivers (xterm/tmux/iterm2) ✅
-- [ ] Phase 7 — Additional features: OpenHands & OpenCode backends — **7.1–7.3 ✅** (adapters, config, terminal gates, yolo/credchecks/switch matrix, UI); **7.4 GATED** (live acceptance, blocked on human credentials). PRD [`phase-7-additional-features.md`](phase-7-additional-features.md), spec [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md)
+- [ ] Phase 7 — Configuration federation + additional backends — **7.1–7.3 ✅** (OpenHands/OpenCode adapters, config, gates, UI); **7.4 GATED** (their live acceptance); **7.5–7.8 pending** (Claude/Codex linked/mirrored/detached config federation). PRD [`phase-7-additional-features.md`](phase-7-additional-features.md), spec [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md)
 
 Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent after 2).
 
@@ -40,13 +40,19 @@ the terminal runtime behind the `TerminalDriver` seam with xterm/PTY + tmux + iT
 switch-runtime, backend-swap history primer, task groups, and driver-selection plumbing. `GET /api/capabilities`
 advertises xterm/tmux/iterm2.
 
-**Phase 7 — OpenHands & OpenCode backends. 7.1–7.3 ✅, 7.4 GATED:**
+**Phase 7 — Configuration federation + OpenHands & OpenCode. 7.1–7.3 ✅, 7.4 GATED, 7.5 next:**
 - [x] 7.1 — OpenCode/OpenHands adapters + config + terminal gates.
 - [x] 7.2 — permissions + credchecks + switch matrix (yolo/credchecks).
 - [x] 7.3 — OpenCode/OpenHands UI plumbing (onboarding BackendStep, settings BackendsEditor).
-- [ ] 7.4 — **GATED live acceptance, blocked on human:** needs `opencode`+`openhands` CLIs installed plus
+- [ ] 7.4 — **GATED live acceptance:** needs `opencode`+`openhands` CLIs installed plus
   provider keys; all fakeacp/UI paths are already green. Default if never unblocked: Phase 7 ships tested
   against fakes, gaps documented.
+- [ ] 7.5 — Add `config-sources.json` v1 and pure, redacted Claude/Codex provider resolvers with
+  fixture coverage for precedence, profiles, project trust, setup inventory, symlinks and malformed input.
+- [ ] 7.6 — Add source manager/watch+sweep, preview/bind/refresh/detach APIs, launch-time freshness,
+  native home/cwd pass-through, frozen provenance and SSE.
+- [ ] 7.7 — Add onboarding + Settings federation UI, provenance/health/inventory and override/detach flows.
+- [ ] 7.8 — GATED read-only acceptance against pinned real Claude/Codex CLIs/config surfaces.
 - **Checkpoint:** `go build ./...` + `go test ./...` + `go test -tags sqlite_fts5 ./...` + `cd ui && npm run test` + `npm run build` + embed.
 
 ---
@@ -102,7 +108,9 @@ release claims the affected live-CLI compatibility.
 
 ## Blocked on human
 
-None. This section holds only genuine STOP conditions, never nonblocking acceptance work.
+- **Publish checkpoint `cf3a68f`.** The documentation work is complete and committed locally, but
+  direct push to `origin/main` was policy-rejected because the request authorized editing specs, not
+  publishing to the shared default branch. Push only after the human explicitly authorizes it.
 
 ## Review findings (from the last review — BLOCKING and ADVISORY)
 
@@ -269,6 +277,15 @@ remaining open set; every surviving item is ADVISORY.
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-11 — **merged `origin/main` (federation spec) into the security branch — green.** Docs-only
+  conflicts (HANDOFF/BRIEFS state entries from the two parallel 2026-07-11 sessions); both sides kept.
+- 2026-07-11 — **Phase 7 configuration federation specified — green.** Replaced the orphaned
+  one-time F16 import promise with linked (preferred), mirrored and detached ownership modes;
+  specified provider-native precedence/setup inventory, redaction/trust boundaries, watch+sweep+
+  launch freshness, immutable provenance, REST/SSE/UI contracts and subphases 7.5–7.8. Updated the
+  phase map, master PRD and architecture source-of-truth rationale. Go build + both test variants +
+  UI 83 tests/build green; initial sandbox-only localhost bind failure passed on unrestricted rerun.
+  Checkpoint `cf3a68f` has since been pushed to `origin/main`.
 - 2026-07-11 — **review fix: security review batch (7 findings) — green; new invariant §14.** On branch
   `claude/agentdecker-security-review-urhvp2` (session-scoped; needs merge to `main`). (1–3, 6) **DNS
   rebinding / WS origin / CORS-as-auth / raw-mount bypass** — all one root cause: no server-side

@@ -1,137 +1,188 @@
-# Phase 7 — Additional features: backend import, OpenHands & OpenCode
+# Phase 7 — Additional features: configuration federation, OpenHands & OpenCode
 
-**Status:** selected Phase 7 candidate (from the future-phase bucket) — ready to build after Phase 6
-**Features:** F16 (import backend models/config from Claude Code and Codex), F14 (OpenCode backend), F15 (OpenHands backend); extends F7 (switch-runtime backend matrix)
-**Depends on:** Phases 1, 2, 6 (chat runtime, adapter seam, switch-runtime)
-**Enables:** remaining future-phase candidates
+**Status:** active — backend work 7.1–7.3 complete; configuration federation added to remaining scope
+**Features:** F16 (link/sync/import Claude Code and Codex configuration), F14 (OpenCode backend), F15 (OpenHands backend); extends F7 (switch-runtime backend matrix)
+**Depends on:** Phases 1, 2, 3, 6 (chat runtime, config UI, adapter seam, switch-runtime)
+**Enables:** one setup shared with the native CLIs instead of a third drifting copy
 
 ---
 
 ## 1. Goal
 
-First, remove backend setup guesswork by letting AgentDeck import backend models/defaults from the
-user's existing **Claude Code** and **Codex** configs as a one-time action from Settings/Onboarding.
+Make AgentDeck a supervisor over the user's existing **Claude Code** and **Codex** setup, not a
+competing configuration silo. A user can link either backend to its native configuration and have
+new AgentDeck launches automatically see changes to model/provider/effort defaults and native setup
+assets such as instructions, skills, subagents, rules, hooks, and MCP servers.
 
-Widen AgentDeck from a two-backend (Claude, Codex) dashboard to a four-backend one by adding
-**OpenCode** (opencode.ai, `opencode` CLI) and **OpenHands** (openhands.dev, `openhands` CLI) as
-first-class chat backends. Both CLIs natively speak ACP over stdio (`opencode acp`,
-`openhands acp`), so they ride the existing chat runtime unchanged — the work is two new backend
-adapters, config/seed/UI plumbing, and extending the switch-runtime matrix, not a new runtime.
+The preferred design is **federation by reference**: Claude Code or Codex remains authoritative,
+AgentDeck stores only a source binding, explicit AgentDeck overrides, provenance, and fingerprints.
+Where a surface cannot safely remain live-linked, AgentDeck may maintain a rebuildable mirror. The
+original one-time import remains available as a detached snapshot for users who want AgentDeck to
+own and edit an independent copy.
+
+Phase 7 also widens AgentDeck from two backends (Claude, Codex) to four by adding **OpenCode** and
+**OpenHands** as first-class chat backends through the existing ACP runtime.
 
 ---
 
 ## 2. Scope
 
 ### In scope
-- One-time import of backend defaults/models from existing Claude Code and Codex user config so a
-  fresh AgentDeck setup can start from real local values instead of seeded placeholders.
-- OpenCode chat backend: `opencode acp` through the existing ACP chat runtime; launch, stream,
-  cancel, stop, resume on a stable `agent_id`.
-- OpenHands chat backend: `openhands acp` through the same runtime, same lifecycle.
-- Backend adapters capturing all per-agent differences: binary/args, env passthrough, model
-  selection, resume mechanism, permission/yolo mapping, hook capability (none), MCP registration.
-- Config: seeded backend entries, type validation, credential checks for both.
-- UI: backend type union, onboarding + settings editors, launch modal labels.
-- Switch-runtime: the new backends join the backend-swap matrix (cross-backend swaps use the
-  Phase 6 history primer).
-- Gated live acceptance against the real CLIs (same class as the Phase 1 / Codex gates).
+
+- Discover the standard user and selected-project configuration roots for Claude Code and Codex,
+  with an advanced option to link a different root/profile.
+- Three explicit ownership modes per Claude/Codex backend:
+  - **Linked (recommended):** the native CLI files are authoritative; AgentDeck resolves them at
+    read/launch time and does not persist a normalized copy as configuration.
+  - **Mirrored:** the native files remain authoritative, while AgentDeck maintains a disposable,
+    auto-refreshed normalized cache for a surface that cannot be consumed by reference.
+  - **Detached snapshot:** a one-time, user-confirmed import into AgentDeck-owned config/assets;
+    later external changes do not apply.
+- Auto-refresh linked/mirrored sources through file watching plus a periodic reconciliation pass;
+  every launch performs a synchronous freshness check so a missed watch event cannot launch stale.
+- High-level launch settings: configured model/default, model catalog or allowlist when present,
+  provider/base URL metadata, reasoning/effort, and selected profile. “Available models” means
+  configured/allowlisted/catalogued models, not a promise to enumerate account entitlements.
+- Native setup surfaces: Claude `CLAUDE.md`, `.claude/rules/`, skills, subagents, settings/hooks,
+  plugins and MCP declarations; Codex `AGENTS.md`, `.agents/skills/`, `.codex/config.toml`, profiles,
+  agents, rules/hooks, plugins and MCP declarations. The UI inventories their source and status.
+- Preserve each CLI's documented user/project/local/managed precedence and project trust rules.
+- Explicit per-field AgentDeck overrides layered above the linked baseline without modifying the
+  external files; the UI distinguishes inherited values from overrides and can reset an override.
+- Immutable launch provenance: each session records requested values, resolved high-level values,
+  selected source/profile and content fingerprints (never secret values).
+- Existing OpenCode/OpenHands backend, permission, credential, UI and switch-runtime work.
 
 ### Out of scope
-- Continuous two-way sync with Claude Code/Codex config after import; Phase 7 only covers explicit
-  one-time import into AgentDeck's own config.
-- Terminal (PTY) interface for OpenHands/OpenCode — no verified hook-registration path, so both
-  are rejected with `422 terminal_unavailable` exactly like Codex terminal (Phase 6 decision).
-- Agent-to-agent messaging for the new backends beyond what the existing HTTP MCP registration
-  provides; any stdio-MCP fallback work.
-- OpenCode `serve`/HTTP-server mode and OpenHands headless (`--headless`) mode as alternative
-  transports — ACP is the only integration path this phase.
-- Other future-phase candidates (activity map, templates, notes, triage filters).
+
+- Two-way sync or writing into Claude Code/Codex configuration. AgentDeck never edits external
+  settings, instructions, skills, agent definitions, MCP declarations, hooks, profiles, or secrets.
+- Translating a Claude skill/agent/config into a Codex skill/agent/config (or the reverse). Each CLI
+  consumes its own native surfaces; shared files or symlinks remain a user/repository choice.
+- Copying credentials, auth stores, literal secret environment values, telemetry, usage history,
+  conversation state, UI preferences, or managed enterprise policy into AgentDeck.
+- Guaranteeing that a locally named model is enabled for the user's account; native CLI validation
+  and launch errors remain authoritative.
+- Hot-mutating a running agent. High-level changes apply to the next new launch; explicit resume
+  keeps its frozen model/provider/effort snapshot. Native instruction/setup files may be reread by
+  the CLI when a process starts or resumes, according to that CLI's own behavior.
+- Terminal (PTY) interface for OpenHands/OpenCode and alternative non-ACP transports.
 
 ---
 
 ## 3. Detailed requirements
 
-### 3.1 Backend import from Claude Code / Codex (F16)
-- Settings and onboarding expose an explicit "Import from Claude/Codex" action.
-- Import reads each tool's user config, extracts backend/model defaults plus any non-secret backend
-  parameters AgentDeck understands, and writes a normalized AgentDeck `backends.json`.
-- AgentDeck remains the source of truth after import; imported values can be edited locally
-  without mutating Claude/Codex config files.
-- Secret material is never silently copied unless the user explicitly opted into importing env
-  vars/keys.
-- If an external config is missing, malformed, or only partially understood, the import is
-  best-effort and reports exactly what was imported vs skipped.
+### 3.1 Configuration federation from Claude Code / Codex (F16)
 
-### 3.2 OpenCode backend (F14)
-- New backend type `opencode-acp`, seeded backend id `opencode`, binary `opencode`, launch args
-  `["acp"]`; runs through the existing chat runtime with no runtime branching.
-- Model selection via OpenCode's `provider/model` ids (e.g. `anthropic/claude-sonnet-4-5`).
-- `skip_permissions` maps to OpenCode's per-tool `permission` config (injected, never written
-  into the user's `opencode.json`).
-- Native resume of the same logical session where ACP `session/load` supports it; otherwise the
-  Phase 6 primer path.
+- Onboarding offers **Use my Claude Code setup** and **Use my Codex setup** after a read-only
+  preview. Settings exposes source mode, resolved root/profile, last refresh, health, provenance,
+  discovered assets, overrides, **Refresh now**, **Detach**, and **Relink**.
+- Enabling a link is explicit and shows every root AgentDeck will read. It never silently enables a
+  newly discovered custom root, follows a changed symlink target, or expands to another project.
+- Linked is the default recommendation. Mirrored is used only when the adapter cannot pass a
+  surface through natively; the cache is labelled derived, can be deleted/rebuilt, and is never a
+  conflict peer. Detached snapshot is the only mode in which AgentDeck becomes authoritative.
+- AgentDeck delegates native setup loading to the launched CLI whenever possible: launch with the
+  real project working directory and native user config environment, then add only AgentDeck's
+  per-session overlays (identity, messaging MCP, role/project prompt, and explicit user overrides).
+- A resolver parses only the documented subset needed for preview, model controls and provenance.
+  Unknown keys are preserved externally and reported as native/pass-through, not dropped or
+  rewritten. Unsupported fields never make the whole source look successfully imported.
+- External changes invalidate the effective view and notify the UI. A parse failure retains the
+  last-known-good value for display only, marks the binding stale/invalid, and blocks a new launch
+  that depends on that source until it is fixed, detached, or explicitly overridden.
+- Name collisions follow the native CLI's precedence. AgentDeck's injected messaging MCP uses a
+  reserved per-session id; a conflicting external id produces a preflight error instead of being
+  overwritten. Managed policy always wins over AgentDeck overrides.
+- Secrets are neither returned by the preview/status APIs nor stored in the mirror/session
+  snapshot. Secret-bearing settings are represented as redacted key names or “configured”.
 
-### 3.3 OpenHands backend (F15)
-- New backend type `openhands-acp`, seeded backend id `openhands`, binary `openhands`, launch
-  args `["acp"]`.
-- Model/auth via OpenHands env (`LLM_MODEL`, `LLM_API_KEY`, `LLM_BASE_URL`) composed from backend
-  config env, not the user's `config.toml`.
-- `skip_permissions` maps to OpenHands' always-approve approval mode over ACP; default mode keeps
-  per-action prompts flowing through the existing permission gate.
-- Resume as in 3.1: native where supported, primer otherwise.
+### 3.2 Effective configuration and session semantics
 
-### 3.4 Shared integration rules
-- Everything agent-specific lives in a `BackendAdapter` (Phase 6 §6.3 rule); the chat runtime,
-  state, persistence, and SSE paths stay backend-agnostic.
-- Permission requests flow through the existing ACP withhold-the-response gate; both backends'
-  approval prompts appear as normal dashboard permission cards.
-- Hooks: neither CLI has a Claude-shaped hook surface; adapters report no hook support and chat
-  status derives from the ACP stream (as it already does for chat agents).
-- Terminal interface for both types is rejected at launch and switch validation.
-- Credential checks (Settings "Validate") for both backends; a fresh machine without the CLI
-  installed gets a clear, non-blocking error.
+- Effective config is resolved in this order: managed/native constraints → AgentDeck explicit
+  launch choice → AgentDeck stored override → native project/local layer → selected native profile
+  → native user layer → AgentDeck seed fallback. The provider resolver must preserve any
+  provider-specific exception to this simplified ordering and expose provenance per field.
+- “Inherit CLI default” is a first-class model/effort choice. AgentDeck must not convert a missing
+  external model into a guessed model id. When the runtime reports the actual model, store it as
+  observed state without turning it into an override.
+- New launches resolve the latest valid source. Resume and same-session model switches retain the
+  frozen high-level snapshot unless the user explicitly chooses **Resume with latest setup**;
+  source fingerprints still show whether native setup assets changed.
+- A project can use linked user defaults while its own checked-in `.claude`, `.codex`,
+  `.agents/skills`, `CLAUDE.md`, and `AGENTS.md` layers remain project-relative. Switching the
+  selected AgentDeck project therefore changes the effective project layer without rebinding the
+  user's global source.
 
-### 3.5 Switch-runtime matrix (extends F7)
-- Same-backend model swap for the new types follows each adapter's `CanSwitchModelOnResume`.
-- Cross-backend swaps (any of the four ↔ any other) preserve history via native resume or the
-  Phase 6 primer; no new switch endpoint semantics.
+### 3.3 OpenCode backend (F14)
+
+- Backend type `opencode-acp`, binary `opencode`, launch args `["acp"]`; model selection uses
+  `provider/model` ids. Permission config is injected per launch and never written to user config.
+- Native ACP resume where supported; otherwise the Phase 6 primer path.
+
+### 3.4 OpenHands backend (F15)
+
+- Backend type `openhands-acp`, binary `openhands`, launch args `["acp"]`.
+- Model/auth via `LLM_MODEL`, `LLM_API_KEY`, and `LLM_BASE_URL` composed from backend config.
+- Always-approve mode maps from `skip_permissions`; native resume where supported, primer otherwise.
+
+### 3.5 Shared backend integration rules
+
+- Agent-specific differences live in `BackendAdapter`; runtime, persistence and SSE stay generic.
+- OpenCode/OpenHands permission prompts use the existing ACP permission gate; neither exposes the
+  required terminal hook surface, so terminal launch/switch remains rejected.
+- Cross-backend swaps preserve history through native resume or the Phase 6 primer.
 
 ---
 
 ## 4. REST surface added
 
-```
-(none — no new endpoints)
-```
+- `GET /api/config-sources` — discovery, binding mode, health, fingerprints, redacted inventory and
+  field provenance for each Claude/Codex source in the selected project.
+- `POST /api/config-sources/preview` — read-only preview of a proposed provider/root/profile/mode;
+  performs no persistence and returns exact read/skipped/error paths.
+- `PUT /api/config-sources/{backend_id}` — save or replace an explicit binding and overrides after
+  preview; never mutates the external source.
+- `POST /api/config-sources/{backend_id}/refresh` — invalidate and synchronously resolve now.
+- `DELETE /api/config-sources/{backend_id}` — remove the binding; optional `?detach=true` first
+  materializes the previewed non-secret snapshot into AgentDeck-owned config.
 
-The existing config CRUD (`PUT /api/backends`), launch (`POST /api/sessions`), resume, and
-switch-runtime endpoints gain two accepted backend types; `422 terminal_unavailable` covers the
-rejected terminal combinations.
+Existing `GET/PUT /api/backends`, launch, resume and switch APIs remain. Backend reads and launch
+composition use the effective resolver; writes continue to edit AgentDeck-owned fallback/overrides.
 
 ---
 
 ## 5. Acceptance criteria
 
-- [ ] A user can add/validate an OpenCode backend and launch a chat agent that streams a turn.
-- [ ] A user can add/validate an OpenHands backend and launch a chat agent that streams a turn.
-- [ ] A user can import Claude Code and Codex backend defaults/models into AgentDeck in one action
-      from onboarding or settings.
-- [ ] Stop → resume continues the same logical session on the same `agent_id` for both backends.
-- [ ] A permission request from either backend surfaces as a dashboard permission card and can be
-      approved/denied.
-- [ ] `skip_permissions` launches run without permission prompts on both backends.
-- [ ] Switching backend Claude → OpenCode (and back) preserves history via the primer path.
-- [ ] Requesting a terminal-interface launch for either new backend fails with a clear
-      `terminal_unavailable` error; the UI never offers the combination.
-- [ ] Onboarding and Settings list all four backend types; seeded config round-trips untouched.
+- [ ] Linking a standard Claude Code or Codex setup requires one preview/confirm flow and does not
+      modify any external file.
+- [ ] Editing a linked model/default/effort or setup asset outside AgentDeck updates Settings and
+      the next new launch without re-import; a missed watch event is caught by launch preflight.
+- [ ] Claude/Codex launches see their native project instructions, skills, agents and MCP servers
+      from the selected project without AgentDeck copying them.
+- [ ] Settings shows inherited versus overridden values with source path/scope, and reset restores
+      inheritance. “Inherit CLI default” works when no concrete model is configured.
+- [ ] A detached high-level snapshot and every asset explicitly reported copyable keep working after
+      the source changes or disappears; reference-only assets are excluded before confirmation.
+      Linked/mirrored modes report source failure rather than silently becoming detached.
+- [ ] Malformed or unsupported source content produces a redacted partial report; dependent new
+      launches cannot silently use stale last-known-good config.
+- [ ] Secrets/auth stores are absent from API bodies, mirrors, logs and session snapshots.
+- [ ] Existing sessions keep their frozen high-level launch settings; a new launch receives the
+      newly resolved values and records provenance/fingerprints.
+- [ ] Existing OpenCode/OpenHands launch, permission, resume, switch and terminal-gate acceptance
+      criteria remain green.
 
 ---
 
-## 6. Open questions (for the techspec)
-- Does each CLI's ACP implementation support `session/load` (native resume) — and if not, does
-  `ResolveResumeID` return empty to force the primer path?
-- Exact yolo mapping: OpenCode config injection (`OPENCODE_CONFIG_CONTENT`?) vs a session mode;
-  OpenHands always-approve as ACP session mode vs launch flag.
-- Do the CLIs accept the `mcpServers` entries the runtime already passes in `session/new` (for
-  the messaging MCP), or does registration need per-agent config injection?
-- Which env vars must be stripped (nested-session guards, `CLAUDECODE`-class issues) for each CLI?
+## 6. Product decisions fixed by this revision
+
+- External CLI config is authoritative in linked/mirrored modes; there is no two-way merge.
+- Pointer/native pass-through is preferred over copying. A cache is implementation state, not a
+  source of truth; detached snapshot is the explicit escape hatch.
+- Setup assets remain provider-native. AgentDeck inventories and composes them but does not invent a
+  lowest-common-denominator skill/agent/MCP schema.
+- Auto-sync means future-launch consistency, not mutation of a process already running.
+- Model discovery is honest about its boundary: configured/catalogued is not account-entitled.
+
+Implementation details and provider surface mappings are prescriptive in the mirror tech spec.

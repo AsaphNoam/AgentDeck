@@ -19,6 +19,14 @@ The load-bearing architecture choices for AgentDeck and *why* they were made. Th
 
 **Local-first is preserved.** One SQLite file under `~/.agentdeck/`, no server process, no cloud, user owns the file; config remains plain text. The agent CLI's own transcript files (written by Claude Code / Codex, outside our control) stay where the CLI writes them under `sessions/`; we **index** those into FTS5, but our own state is SQLite-native.
 
+**Phase 7 federation refinement.** “Config in files” does not require AgentDeck to duplicate config
+already owned by Claude Code or Codex. For linked backends, the native user/project files remain the
+authoritative plain-text configuration; AgentDeck stores a small `config-sources.json` binding plus
+explicit overrides and derives a redacted effective view. A mirror, when native pass-through is not
+possible, is disposable cache rather than a second authority. Only an explicit detached import makes
+AgentDeck authoritative for the copied values/assets. This one-way authority rule avoids an
+irreconcilable two-writer merge while retaining local ownership, inspectability and hand editing.
+
 ---
 
 ## D2 — Hooks report to the server over localhost HTTP (+ per-launch token)

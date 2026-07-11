@@ -8,7 +8,7 @@
 
 ## 1. Summary
 
-AgentDeck is a **local-first desktop tool for running and supervising many AI coding-agent sessions in parallel**. It wraps existing agent CLIs (Claude Code, OpenAI Codex) and gives every session a persistent identity, live status, full chat history, file/command tracking, and a messaging channel so agents can coordinate with each other. Everything runs on `localhost`; all data is local (config as plain files, machine state in a local SQLite database); there is no cloud component and no account.
+AgentDeck is a **local-first desktop tool for running and supervising many AI coding-agent sessions in parallel**. It wraps existing agent CLIs (Claude Code, OpenAI Codex) and gives every session a persistent identity, live status, full chat history, file/command tracking, and a messaging channel so agents can coordinate with each other. Everything runs on `localhost`; all data is local (AgentDeck-owned config and Phase 7 native-CLI source bindings as plain files, machine state in a local SQLite database); there is no cloud component and no account.
 
 The product is for a developer who delegates several concurrent tasks to AI agents and needs one place to see what each is doing, intervene when needed, and resume past work — without juggling a dozen terminal tabs.
 
@@ -161,6 +161,7 @@ Storage is split by *who writes the data*: human-edited **config is plain JSON f
   roles/{role}.json           role definitions
   projects/{project}.json     project definitions
   backends.json               provider + model config
+  config-sources.json         Phase 7 Claude/Codex source bindings + overrides
   layout.json                 dashboard card order + density
   config.json                 port, default_project, default_role, skip_permissions
 
@@ -360,7 +361,7 @@ GET    /events                          SSE stream (state_update, new_message, n
 - **Hooks:** thin shell scripts registered with the agent CLI that `POST /api/hook` with a per-launch token.
 - **Platforms:** macOS and Linux. Terminal runtime is optional and deferred; when built, prefer a cross-platform path (embedded xterm.js / tmux) over macOS-only iTerm2/AppleScript. Chat runtime is the cross-platform default.
 - **Prereqs:** at least one authenticated agent CLI (Claude Code and/or Codex). For source builds: Go 1.22+, Node 18+, npm. No runtime Node and no python3.
-- **State:** human-edited **config as plain JSON files**; machine state in a single **SQLite** file (`state.db`, FTS5 search), server is sole writer — under `~/.agentdeck/`. No cloud, no account; user owns all data.
+- **State:** human-edited **config as plain JSON files**; Phase 7 may bind selected backend fields/assets to native Claude/Codex files without copying them. Machine state stays in a single **SQLite** file (`state.db`, FTS5 search), server is sole writer — under `~/.agentdeck/`. No cloud, no account; user owns all data.
 - **Distribution:** `install.sh` builds binary + UI (UI embedded) and installs an `agentdeck` CLI; `agentdeck dashboard start && agentdeck dashboard open` launches and opens the UI. Prebuilt binary needs no Node/python at runtime.
 
 ---

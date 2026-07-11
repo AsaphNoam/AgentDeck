@@ -21,7 +21,7 @@ Central index of the planning docs: what each file is, the build order, and the 
 | [docs/features/phase-5-coordination.md](docs/features/phase-5-coordination.md) | MCP messaging, nudger, budgets, notifications. (F8, F11) |
 | [docs/features/phase-6-flexibility.md](docs/features/phase-6-flexibility.md) | Terminal runtime, switch-runtime, task groups. (F7, F2) |
 | [docs/features/future-phase.md](docs/features/future-phase.md) | Future feature candidate bucket. |
-| [docs/features/phase-7-additional-features.md](docs/features/phase-7-additional-features.md) | Selected Phase 7 scope: additional agent backends. |
+| [docs/features/phase-7-additional-features.md](docs/features/phase-7-additional-features.md) | Phase 7: Claude/Codex configuration federation plus additional agent backends. |
 
 ### Implementation tech specs
 
@@ -36,6 +36,7 @@ Each phase PRD above has a mirror **tech spec** under `docs/features/tech/` — 
 | [tech/phase-4-persistence-archive-techspec.md](docs/features/tech/phase-4-persistence-archive-techspec.md) | Phase 4 |
 | [tech/phase-5-coordination-techspec.md](docs/features/tech/phase-5-coordination-techspec.md) | Phase 5 |
 | [tech/phase-6-flexibility-techspec.md](docs/features/tech/phase-6-flexibility-techspec.md) | Phase 6 |
+| [tech/phase-7-additional-features-techspec.md](docs/features/tech/phase-7-additional-features-techspec.md) | Phase 7 configuration federation + backends |
 | [tech/phase-7-polish-activity-map-techspec.md](docs/features/tech/phase-7-polish-activity-map-techspec.md) | Optional activity-map candidate for Phase 7 |
 
 ## Build order
@@ -48,25 +49,26 @@ Each phase PRD above has a mirror **tech spec** under `docs/features/tech/` — 
 
 - **0 → 1 → 2** is a strict chain — each requires the previous.
 - **3, 4, 5** all sit on 2 and are independent of each other → parallelizable / reorderable by priority.
-- **6** needs 4 (reuses resume machinery). **7** is candidate-driven; dependencies depend on the selected candidate.
+- **6** needs 4 (reuses resume machinery). **7** also uses Phase 3's config/onboarding surface for federation.
 
 ## Feature → phase
 
-F1→2 · F2→6 · F3→1(min)+2(full) · F4→1(API)+3(modal) · F5→3 · F6→3 · F7→6 · F8→5 · F9→4 · F10→4 · F11→5 · F12→3 · F13→7 candidate
+F1→2 · F2→6 · F3→1(min)+2(full) · F4→1(API)+3(modal) · F5→3 · F6→3 · F7→6 · F8→5 · F9→4 · F10→4 · F11→5 · F12→3 · F13→7 candidate · F14/F15/F16→7
 
 ## Architecture in one breath
 
 Two runtime processes (+ agent CLIs): **React/Vite UI** ⇄ REST + SSE ⇄ **Go server** (binds `127.0.0.1` only) ⇄ stdio ⇄ **agent CLI** (Claude Code / Codex). The **messaging Model Context Protocol (MCP) server is hosted in-process in the Go binary** and exposed to agents over loopback HTTP at `/mcp` — no runtime Node. Hooks **POST to `/api/hook`** (+ per-launch token). No cloud, no auth.
 
-## Source of truth: `~/.agentdeck/` (config = files, state = SQLite)
+## Source of truth: local files + federated native config (state = SQLite)
 
-Config is plain JSON (hand-editable, git-friendly). Machine state is SQLite, written **only** by the server. Producers (hooks via `/api/hook`, chat runtime via ACP) and consumers (UI via SSE) are decoupled through the server.
+AgentDeck-owned config is plain JSON (hand-editable, git-friendly). Phase 7 can instead bind Claude/Codex fields and setup assets to their native user/project files; those external files remain authoritative and AgentDeck stores only bindings, overrides and derived fingerprints/cache. Machine state is SQLite, written **only** by the server. Producers (hooks via `/api/hook`, chat runtime via ACP) and consumers (UI via SSE) are decoupled through the server.
 
 ```
 # config — plain JSON files
 roles/{role}.json    persona: system_prompt + permission policy
 projects/{p}.json    workspace: cwd + context_prompt + add_dirs
 backends.json        providers + models + per-model env/keys (version 2)
+config-sources.json  Claude/Codex source bindings + explicit overrides (Phase 7)
 layout.json          card order + density
 config.json          port, default_project, default_role, skip_permissions
 
