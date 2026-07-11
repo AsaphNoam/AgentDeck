@@ -6,6 +6,31 @@ Older entries are immutable history; agents resume from [`HANDOFF.md`](HANDOFF.m
 
 ---
 
+### 2026-07-11 — fix-review: Phase 7.5–7.7 federation BLOCKING findings
+
+All six BLOCKING findings from the Phase 7.5–7.7 federation review are fixed and committed to `main`
+(both usability BLOCKERs — Mirrored→Linked and no-repair-path — were the same root causes and are also
+cleared). Both Go test variants and the UI (94 tests + build + embed) are green.
+
+What changed: (1) linked source model defaults are now *applied* — launch omits the model over ACP when
+a bound source has no explicit/override choice, so the CLI resolves its own model instead of AgentDeck
+forcing a default; resume/switch honor this. (2) A binding now resolves *any* selected project, not only
+the one it was previewed against. (3) "Link (Mirrored)" persists Mirrored. (4) Onboarding links the
+chosen provider, not hard-coded Claude. (5) A bound source has override / reset-to-inherit controls and
+launch preflights a broken source. Plus one advisory: Codex inventory now shows instructions/MCP.
+
+**Needs attention:** New/changed: **Detached config-source import deferred** — I implemented override/
+reset/launch-gate but NOT detach; it stays a server 501 with an honest "unavailable" affordance, per this
+existing HUMAN decision (reverse once 7.4/7.8 acceptance yields a copyable-asset injection path). Carried:
+Terminal support boundary; HTTP messaging; immediate/prompt UI; runtime-switch fallbacks; transcript
+indexing; agent env inheritance; same-machine API trust; API/model compatibility. Acceptance gate: CLIs
+honoring an omitted `session/new` model is still 7.8 credential-gated.
+
+**Next:** Agent — address remaining ADVISORY findings (5 federation + legacy batch) when convenient, or
+proceed to gated 7.4/7.8 acceptance.
+
+---
+
 ### 2026-07-11 — usability review: configuration-source linking
 
 Phase 7 federation remains blocked. A live, isolated dashboard run confirmed that source preview and
