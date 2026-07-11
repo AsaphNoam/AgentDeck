@@ -328,6 +328,15 @@ remaining open set; every surviving item is ADVISORY.
 
 _(most recent first; keep ~10, older history is in git)_
 
+- 2026-07-11 — **Learning atlas added — green.** Added
+  [docs/agentdeck-learning-atlas.html](../agentdeck-learning-atlas.html), a standalone,
+  searchable reference for experienced SWEs learning AgentDeck. It leads with ACP/MCP and
+  agent-tooling concepts, connects them to architecture and Go design choices, labels the
+  incomplete Phase 7 federation boundary accurately, and links each topic to its owning docs/code.
+  HTML parsing, anchor/local-link checks, and both Go test variants pass. **Recovery:** the
+  local checkpoint is staged; Git commit is pending because the execution environment's approval
+  quota rejected the Git escalation.
+
 - 2026-07-11 — **Phase 7.9 knowledge MCP specified; workflow guardrails refined.** After
   Claude/Codex federation acceptance, AgentDeck will serve binary-versioned, non-secret product
   topics through registered agents' `agentdeck_docs` MCP tool while leaving existing role files
