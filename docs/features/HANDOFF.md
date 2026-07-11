@@ -9,13 +9,15 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
 ## Current position
 
 - **Active phase:** 7 — Configuration federation + OpenHands & OpenCode backends (Phase 6 complete ✅)
-- **Active subphase:** 7.6 (next) — source manager, API and launch integration. 7.1–7.3 and 7.5 done ✅; 7.4 remains an independent live-acceptance gate.
+- **Active subphase:** 7.6 (in progress) — source manager, API and launch integration. 7.1–7.3 and 7.5 done ✅; 7.4 remains an independent live-acceptance gate. SourceManager core landed (see 7.6 detail).
 - **Spec:** [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) (PRD: [`phase-7-additional-features.md`](phase-7-additional-features.md))
-- **Last GREEN checkpoint:** Phase 7.5 federation schema + pure Claude/Codex resolvers in the current
-  working tree — `go build ./...` + both Go test variants pass; resolver/config package race tests pass.
-  UI untouched. **Recovery:** the checkpoint is not committed because the Git escalation was rejected
-  when the execution environment hit its usage limit; commit it before starting 7.6.
-- **Branch:** `main` — **trunk-based: all work commits directly to `main`, no per-phase branches, no PRs** (workflow §6). Push normal commits to `origin/main` on task completion; force-pushes still ask.
+- **Last GREEN checkpoint:** Phase 7.6 SourceManager core (`internal/configsource/manager.go`,
+  `watch.go`) — immutable per-(backend,project) generations, `ResolveFresh` (double-read stable
+  digest, never serves stale), mirrored redacted cache (0600/0700), preview-token consent with
+  TOCTOU + expiry, fsnotify watch + 250 ms debounce + 30 s sweep. `go build ./...` + both Go test
+  variants pass; `-race` clean on `internal/configsource`. UI untouched. Not yet wired into the
+  server (7.6b next).
+- **Branch:** `claude/work-phase-hwv0z6` — session working branch (harness-designated). Commit here; push to `origin/claude/work-phase-hwv0z6` on completion.
 
 ---
 
@@ -56,11 +58,14 @@ advertises xterm/tmux/iterm2.
   fingerprints, approved-root enforcement and fixture coverage.
 - [ ] 7.6 — Add source manager/watch+sweep, preview/bind/refresh/detach APIs, launch-time freshness,
   native home/cwd pass-through, frozen provenance and SSE.
-  - [ ] Immutable per-binding/project generations, fsnotify debounce + stat sweep, and mirrored cache.
+  - [x] Immutable per-binding/project generations, fsnotify debounce + stat sweep, and mirrored cache.
+        (`internal/configsource/manager.go`, `watch.go` — plus preview-token consent + TOCTOU/expiry.)
   - [ ] Preview-token consent plus list/bind/refresh/detach routes and redacted error mapping.
+        (token mint/consume logic exists in the manager; REST wiring + SSE bus + MCP preflight remain — 7.6b.)
   - [ ] Migration v8 and fresh launch vs frozen resume/switch provenance semantics.
   - [ ] Native Claude/Codex home/cwd pass-through and reserved messaging-MCP collision preflight.
   - [ ] Watch, TOCTOU, freshness, stale-block, no-write/no-secret and integration regression tests.
+        (manager-level tests done; server integration tests remain.)
 - [ ] 7.7 — Add onboarding + Settings federation UI, provenance/health/inventory and override/detach flows.
 - [ ] 7.8 — GATED read-only acceptance against pinned real Claude/Codex CLIs/config surfaces.
 - **Checkpoint:** `go build ./...` + `go test ./...` + `go test -tags sqlite_fts5 ./...` + `cd ui && npm run test` + `npm run build` + embed.
