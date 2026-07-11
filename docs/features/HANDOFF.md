@@ -65,9 +65,10 @@ advertises xterm/tmux/iterm2.
   redacted `launch_config_json`, migration v8, reserved-MCP-id collision preflight → 409); resume
   frozen-by-default + `config_refresh:true`; switch carries frozen object; native cwd/home pass-through
   (already inherited via `os.Environ()`). detach=true → 501 (gated, see Decisions).
-- [ ] 7.7 (**next**) — Federation onboarding + Settings UI (`ui/src`). Deliverables:
-  - [ ] `schemas/` + API hooks for `/api/config-sources` (GET/preview/PUT/refresh/DELETE); React Query
-        + SSE invalidation on `config_source_update`.
+- [ ] 7.7 (**in progress**) — Federation onboarding + Settings UI (`ui/src`). Deliverables:
+  - [x] `schemas/configSources.ts` + `api/configSources.ts` hooks for `/api/config-sources`
+        (GET/preview/PUT/refresh/DELETE); React Query + SSE `config_source_update` → invalidate
+        `["config-sources"]`. UI build + 84 tests green (incl. new SSE-invalidation test).
   - [ ] Onboarding source step (discovery → preview → **Link setup**; Linked recommended, Mirrored =
         compatibility, **Import detached copy** currently disabled/501 — reflect that honestly).
   - [ ] Settings **Configuration source** panel on Claude/Codex backend cards: inventory (Instructions/
