@@ -124,7 +124,7 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, apiError(runtime.CodeValidation, "unknown project: "+agent.Project))
 			return
 		}
-		lc, ae := s.composeFederation(r.Context(), backendID,
+		lc, _, ae := s.composeFederation(r.Context(), backendID,
 			launchRequest{Project: agent.Project, Model: override.Model}, backend, project, modelKey)
 		if ae != nil {
 			writeAPIError(w, ae)
@@ -157,6 +157,14 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 	// caller asked to resume with the latest setup.
 	if refreshedConfig != nil {
 		spec.LaunchConfig = refreshedConfig
+	}
+	// Honor native model inheritance across resume (§2.4): if the effective launch
+	// object left the model to native resolution and the caller supplied no explicit
+	// model override, omit the model over ACP so the CLI keeps resolving its own —
+	// otherwise a resume would silently reinstate the backend default. config_refresh
+	// uses the freshly-resolved doc (set above); the default path uses the frozen one.
+	if override.Model == "" && frozenModelInherited(spec.LaunchConfig) {
+		spec.ModelID = ""
 	}
 
 	// 7. Resume via the registry (double-resume is guarded by the registry sentinel).

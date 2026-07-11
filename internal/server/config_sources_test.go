@@ -235,8 +235,45 @@ func TestComposeLaunchFreezesFederationConfig(t *testing.T) {
 	if !doc.NativeInherited {
 		t.Error("expected native_inherited=true for a default (unspecified) model")
 	}
+	// The composition must OMIT the model over ACP for a native-inherited launch so
+	// the CLI resolves its own configured model instead of AgentDeck forcing the
+	// backend default (federation §2.4 — the core of the "defaults never applied" bug).
+	if spec.ModelID != "" {
+		t.Fatalf("native-inherited launch ModelID = %q, want empty (omitted)", spec.ModelID)
+	}
 	if strings.Contains(string(spec.LaunchConfig), "user-secret") {
 		t.Fatalf("launch config leaked a secret:\n%s", spec.LaunchConfig)
+	}
+}
+
+// TestComposeLaunchExplicitModelOverridesSource proves an explicitly chosen model
+// wins over native inheritance: the ACP model is the chosen backend model's CLI id
+// and the frozen object records native_inherited=false.
+func TestComposeLaunchExplicitModelOverridesSource(t *testing.T) {
+	srv, root, projectDir := federationServer(t)
+	bindFixture(t, srv, root, projectDir)
+
+	backends, err := srv.configStore.ReadBackends()
+	if err != nil {
+		t.Fatalf("ReadBackends: %v", err)
+	}
+	be := backends.Backends["claude"]
+	model := be.Models[be.DefaultModel]
+
+	spec, _, ae := srv.composeLaunch(context.Background(),
+		launchRequest{Role: "implementer", Project: "fed", Model: be.DefaultModel})
+	if ae != nil {
+		t.Fatalf("composeLaunch: %s", ae.Message)
+	}
+	if spec.ModelID != model.Model {
+		t.Fatalf("explicit-model ModelID = %q, want %q", spec.ModelID, model.Model)
+	}
+	var doc launchConfigDoc
+	if err := json.Unmarshal(spec.LaunchConfig, &doc); err != nil {
+		t.Fatalf("launch config decode: %v", err)
+	}
+	if doc.NativeInherited {
+		t.Error("expected native_inherited=false when a model was explicitly chosen")
 	}
 }
 

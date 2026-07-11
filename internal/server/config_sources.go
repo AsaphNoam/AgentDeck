@@ -367,26 +367,42 @@ type launchConfigResolved struct {
 	Provider *string `json:"provider,omitempty"`
 }
 
+// federationModel carries a bound source's model-composition decision back to the
+// launch composer (§2.3/§2.4). Exactly one of the intents applies per launch:
+//   - inherit: the user chose no model and the binding has no override, so the
+//     model flag is OMITTED over ACP and the CLI resolves its own native model.
+//   - override != nil: the binding carries an AgentDeck source override, applied
+//     when the user chose no explicit model.
+//   - neither: an explicit launch model was chosen and wins over the source.
+type federationModel struct {
+	inherit  bool
+	override *string
+}
+
 // composeFederation resolves a backend's active source binding fresh at launch and
-// returns the frozen launch-config JSON. It returns (nil, nil) when the backend is
-// not federation-capable or has no binding (a plain launch). A stale/invalid/
-// unapproved source returns an APIError so the launch is blocked, never composed
-// from cache (§2.5). AgentDeck keeps its own resolved model over ACP; the CLI
-// applies its native config itself via cwd/home pass-through (§2.4), so the source
-// model is recorded as provenance rather than forced as a flag.
-func (s *Server) composeFederation(ctx context.Context, backendID string, req launchRequest, backend config.Backend, project config.Project, requestedModelID string) (json.RawMessage, *runtime.APIError) {
+// returns the frozen launch-config JSON plus the source's model-composition
+// decision. It returns (nil, nil, nil) when the backend is not federation-capable
+// or has no binding (a plain launch). A stale/invalid/unapproved source returns an
+// APIError so the launch is blocked, never composed from cache (§2.5).
+//
+// Model composition (§2.4) layers explicit launch choice / source override above
+// native resolution: when neither an explicit model nor an override applies the
+// model flag is omitted so the CLI applies its own native config via cwd/home
+// pass-through, rather than AgentDeck forcing its backend default over ACP. The
+// resolved high-level model is still recorded as redacted provenance.
+func (s *Server) composeFederation(ctx context.Context, backendID string, req launchRequest, backend config.Backend, project config.Project, requestedModelID string) (json.RawMessage, *federationModel, *runtime.APIError) {
 	if s.sourceMgr == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if _, ok := config.ProviderForBackendType(backend.Type); !ok {
-		return nil, nil
+		return nil, nil, nil
 	}
 	eff, rep, binding, err := s.sourceMgr.ResolveFresh(ctx, backendID, req.Project, project)
 	if errors.Is(err, configsource.ErrNoBinding) {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if err != nil {
-		return nil, sourceAPIError(err)
+		return nil, nil, sourceAPIError(err)
 	}
 	// Reserved messaging-MCP collision preflight (§2.4): AgentDeck injects an MCP
 	// server with the reserved id messagingMCPName. If the native config already
@@ -394,10 +410,11 @@ func (s *Server) composeFederation(ctx context.Context, backendID string, req la
 	// the launch with 409 source_conflict rather than silently colliding.
 	for _, name := range eff.MCPServers {
 		if name == messagingMCPName {
-			return nil, apiError(runtime.CodeSourceConflict,
+			return nil, nil, apiError(runtime.CodeSourceConflict,
 				"native configuration already declares the reserved MCP server id "+messagingMCPName)
 		}
 	}
+	inherited := req.Model == "" && binding.Overrides.Model == nil
 	doc := launchConfigDoc{
 		Version:         1,
 		Binding:         launchConfigBinding{BackendID: backendID, Provider: binding.Provider, Profile: binding.Profile, Mode: binding.Mode},
@@ -405,13 +422,33 @@ func (s *Server) composeFederation(ctx context.Context, backendID string, req la
 		Resolved:        launchConfigResolved{Model: eff.Model, Effort: eff.Effort, Provider: eff.Provider},
 		Generation:      rep.SourceDigest,
 		Fingerprints:    rep.Fingerprints,
-		NativeInherited: req.Model == "" && binding.Overrides.Model == nil,
+		NativeInherited: inherited,
 	}
 	data, err := json.Marshal(doc)
 	if err != nil {
-		return nil, apiError(runtime.CodeInternal, "marshal launch config: "+err.Error())
+		return nil, nil, apiError(runtime.CodeInternal, "marshal launch config: "+err.Error())
 	}
-	return data, nil
+	fed := &federationModel{inherit: inherited}
+	if req.Model == "" && binding.Overrides.Model != nil {
+		fed.override = binding.Overrides.Model
+	}
+	return data, fed, nil
+}
+
+// frozenModelInherited reports whether a frozen federation launch object marks the
+// model as native-inherited — i.e. launch composition omitted the model over ACP so
+// the CLI resolves its own. Resume and same-identity switch honor this so a launch
+// that deferred to native config does not silently regain an AgentDeck default. A
+// missing/malformed doc means "not inherited" (send the model normally).
+func frozenModelInherited(launchConfig json.RawMessage) bool {
+	if len(launchConfig) == 0 {
+		return false
+	}
+	var doc launchConfigDoc
+	if err := json.Unmarshal(launchConfig, &doc); err != nil {
+		return false
+	}
+	return doc.NativeInherited
 }
 
 // sourceAPIError maps a configsource error to the §2.7 API envelope. Resolver
