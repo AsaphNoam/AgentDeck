@@ -113,6 +113,32 @@ func recordUnknown(report *Report, path string, values map[string]any, known map
 	}
 }
 
+// collectMCPNames appends the ids of MCP servers declared in a settings map to
+// the effective set (names only — never their config or secret values), deduped.
+// Claude uses "mcpServers"/"mcp"; Codex uses "mcp_servers".
+func collectMCPNames(effective *Effective, values map[string]any) {
+	for _, key := range []string{"mcpServers", "mcp", "mcp_servers"} {
+		table, ok := values[key].(map[string]any)
+		if !ok {
+			continue
+		}
+		for name := range table {
+			if !containsExact(effective.MCPServers, name) {
+				effective.MCPServers = append(effective.MCPServers, name)
+			}
+		}
+	}
+}
+
+func containsExact(values []string, want string) bool {
+	for _, v := range values {
+		if v == want {
+			return true
+		}
+	}
+	return false
+}
+
 func appendEnvMetadata(effective *Effective, scope string, value any) {
 	env, ok := value.(map[string]any)
 	if !ok {

@@ -9,27 +9,18 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
 ## Current position
 
 - **Active phase:** 7 — Configuration federation + OpenHands & OpenCode backends (Phase 6 complete ✅)
-- **Active subphase:** 7.6 (in progress) — source manager, API and launch integration. 7.1–7.3 and 7.5 done ✅; 7.4 remains an independent live-acceptance gate. SourceManager core landed (see 7.6 detail).
+- **Active subphase:** 7.7 (next) — federation onboarding + Settings UI. 7.1–7.3, 7.5, 7.6 done ✅; 7.4 remains an independent live-acceptance gate. Backend federation surface (manager, REST, SSE, launch/resume/switch) is complete and green.
 - **Spec:** [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) (PRD: [`phase-7-additional-features.md`](phase-7-additional-features.md))
-- **Last GREEN checkpoint:** Phase 7.6 federation launch integration — `composeLaunch` now calls
-  `composeFederation` (ctx-threaded): a bound backend resolves FRESH at launch (the correctness
-  boundary), a stale/invalid/unapproved source blocks the launch (422 source_invalid / 409
-  approval_required), and the redacted resolved view (binding, requested-vs-resolved model/effort/
-  provider, source generation + fingerprints, native_inherited) freezes into
-  `sessions.launch_config_json`. AgentDeck keeps its own model over ACP; Claude/Codex apply native
-  config via cwd/home pass-through (already inherited via `os.Environ()`), so the source model is
-  recorded as provenance not forced. Both Go variants green; `-race` clean on the new packages (the
-  only `-race` failure, `TestResumeTerminalAgent`, is the documented pre-existing baseline flake). UI
-  untouched. Remaining 7.6: MCP-name collision preflight + `config_refresh:true` resume (both small).
-- **Prior checkpoint:** Phase 7.6 config-source REST API + SSE wired into the server
-  (`internal/server/config_sources.go`, routes, `newConfigSourceManager` in `server.go`, `Watch`
-  started in `Start`). GET discovery+bindings, POST preview (mints token), PUT bind (rebuilds from
-  token, validates, persists, resolves fresh), POST refresh (synchronous ResolveFresh), DELETE
-  unbind (detach=true → 501, gated). Federation error codes added to `internal/runtime/errors.go`
-  (source_not_found/source_changed/source_conflict/approval_required/source_invalid).
-  `config_source_update` published on the SSE bus. Both Go test variants + `-race` on
-  configsource/server pass. UI untouched. Remaining in 7.6: launch/resume/switch integration +
-  migration v8 + native home + MCP collision preflight (7.6c).
+- **Last GREEN checkpoint:** Phase 7.6 COMPLETE — full backend configuration-federation surface across
+  five commits (`de25cb7` SourceManager core → `771f1dd` REST+SSE → `01b4f76` migration v8 plumbing →
+  `f410449` launch integration → this commit: `config_refresh` resume + reserved-MCP-id preflight).
+  `composeFederation` resolves a bound backend FRESH at launch (correctness boundary; stale/invalid →
+  422/409, never launches from cache), freezes a redacted `launch_config_json` (binding, requested-vs-
+  resolved model/effort/provider, generation, fingerprints, native_inherited), and blocks a reserved
+  `agentdeck-messaging` MCP-id collision with 409. Resume is frozen-by-default with an opt-in
+  `config_refresh:true`; switch carries the frozen object. Both Go test variants green; `-race` clean
+  on configsource/server/state/index (the only `-race` failure, `TestResumeTerminalAgent`, is the
+  documented pre-existing baseline flake, unrelated). UI untouched — that is 7.7.
 - **Branch:** `claude/work-phase-hwv0z6` — session working branch (harness-designated). Commit here; push to `origin/claude/work-phase-hwv0z6` on completion.
 
 ---
@@ -43,7 +34,7 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
 - [x] Phase 4 — Persistence: archive, search, resume, file/command tracking ✅
 - [x] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications ✅
 - [x] Phase 6 — Flexibility: terminal runtime, switch-runtime, task groups, drivers (xterm/tmux/iterm2) ✅
-- [ ] Phase 7 — Configuration federation + additional backends — **7.1–7.3, 7.5 ✅** (OpenHands/OpenCode integration; federation schema + pure resolvers); **7.4 GATED** (backend live acceptance); **7.6–7.8 pending** (manager/API/UI/live federation acceptance). PRD [`phase-7-additional-features.md`](phase-7-additional-features.md), spec [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md)
+- [ ] Phase 7 — Configuration federation + additional backends — **7.1–7.3, 7.5, 7.6 ✅** (OpenHands/OpenCode integration; federation schema + pure resolvers; source manager + API + SSE + launch/resume/switch integration); **7.4 GATED** (backend live acceptance); **7.7–7.8 pending** (federation UI + live federation acceptance). PRD [`phase-7-additional-features.md`](phase-7-additional-features.md), spec [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md)
 
 Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent after 2).
 
@@ -58,9 +49,7 @@ the terminal runtime behind the `TerminalDriver` seam with xterm/PTY + tmux + iT
 switch-runtime, backend-swap history primer, task groups, and driver-selection plumbing. `GET /api/capabilities`
 advertises xterm/tmux/iterm2.
 
-**Phase 7 — Configuration federation + OpenHands & OpenCode. 7.1–7.3 and 7.5 ✅, 7.4 GATED, 7.6 next:**
-- **Recovery first:** preserve the current green tree and create the required 7.5 checkpoint commit;
-  no 7.6 implementation has started.
+**Phase 7 — Configuration federation + OpenHands & OpenCode. 7.1–7.3, 7.5, 7.6 ✅, 7.4 GATED, 7.7 next:**
 - [x] 7.1 — OpenCode/OpenHands adapters + config + terminal gates.
 - [x] 7.2 — permissions + credchecks + switch matrix (yolo/credchecks).
 - [x] 7.3 — OpenCode/OpenHands UI plumbing (onboarding BackendStep, settings BackendsEditor).
@@ -69,27 +58,28 @@ advertises xterm/tmux/iterm2.
   against fakes, gaps documented.
 - [x] 7.5 — `config-sources.json` v1 + pure redacted Claude/Codex resolvers, provenance,
   fingerprints, approved-root enforcement and fixture coverage.
-- [ ] 7.6 — Add source manager/watch+sweep, preview/bind/refresh/detach APIs, launch-time freshness,
-  native home/cwd pass-through, frozen provenance and SSE.
-  - [x] Immutable per-binding/project generations, fsnotify debounce + stat sweep, and mirrored cache.
-        (`internal/configsource/manager.go`, `watch.go` — plus preview-token consent + TOCTOU/expiry.)
-  - [x] Preview-token consent plus list/bind/refresh/detach routes and redacted error mapping.
-        (`config_sources.go` + routes + `config_source_update` SSE. detach=true → 501 gated: no
-        verified launch-injection path for Claude/Codex assets yet — see Decisions.)
-  - [x] Migration v8 (`sessions.launch_config_json`) + frozen launch-config plumbed end-to-end:
-        `LaunchSpec.LaunchConfig` → `SessionMetaData` → transcript session_meta + `UpsertSessionMeta`
-        → `SessionSnapshot`; resume/switch composers carry the frozen object (round-trip test in index).
-  - [x] Populate the launch-config in `composeLaunch` via `ResolveFresh` — freshness-enforced launch
-        (`composeFederation`), frozen redacted provenance (binding, requested-vs-resolved model/effort/
-        provider, generation, fingerprints, native_inherited), stale/invalid launch blocking (422/409).
-        Tests: freeze, no-secret, invalid-blocks, no-binding-empty.
-  - [x] Native Claude/Codex home/cwd pass-through — already satisfied: `composeEnv(os.Environ()…)`
-        inherits the user's real `CODEX_HOME`/`HOME`; no isolated-home code was ever built to remove.
-  - [ ] Reserved messaging-MCP collision preflight (`409 source_conflict`) — DEFERRED: the resolver
-        inventories MCP *presence* but not server *names*, so a literal `agentdeck-messaging` collision
-        can't be detected without extending the resolver. Low risk (reserved constant id). Next.
-  - [ ] `config_refresh:true` resume path ("Resume with latest setup") — resume defaults to the frozen
-        snapshot today; the optional refresh flag is not yet wired. Next.
+- [x] 7.6 — SourceManager (immutable generations, `ResolveFresh` freshness boundary, fsnotify+250ms
+  debounce+30s sweep, mirrored redacted 0600/0700 cache, preview-token consent w/ TOCTOU+expiry) +
+  REST routes (GET/preview/PUT/refresh/DELETE) + `config_source_update` SSE + federation error codes;
+  launch integration (`composeFederation`: fresh resolve, stale/invalid launch block 422/409, frozen
+  redacted `launch_config_json`, migration v8, reserved-MCP-id collision preflight → 409); resume
+  frozen-by-default + `config_refresh:true`; switch carries frozen object; native cwd/home pass-through
+  (already inherited via `os.Environ()`). detach=true → 501 (gated, see Decisions).
+- [ ] 7.7 (**next**) — Federation onboarding + Settings UI (`ui/src`). Deliverables:
+  - [ ] `schemas/` + API hooks for `/api/config-sources` (GET/preview/PUT/refresh/DELETE); React Query
+        + SSE invalidation on `config_source_update`.
+  - [ ] Onboarding source step (discovery → preview → **Link setup**; Linked recommended, Mirrored =
+        compatibility, **Import detached copy** currently disabled/501 — reflect that honestly).
+  - [ ] Settings **Configuration source** panel on Claude/Codex backend cards: inventory (Instructions/
+        Skills/Agents/MCP/Hooks/Rules/Plugins) with source/scope/status; model/effort controls showing
+        `Inherited from <scope/path>` / `AgentDeck override` / `Inherit CLI default`; configured-models
+        "not an entitlement check" note; stale/approval/conflict repair (refresh/detach/override).
+  - [ ] Never render source contents or secret values — paths + field names only. Rebuild + `make embed`.
+  - [ ] Only Claude/Codex show federation controls; OpenCode/OpenHands stay locally managed.
+  - Server API shapes to bind against: `configSourcesResponse{bindings[],candidates[]}`,
+    `previewResponse{preview_token,expires_at,effective,report}`, bind body `{preview_token,overrides}`,
+    `configSourceBindingView`. SSE event type `config_source_update` (payload: backend_id, project_id,
+    generation, health, changed[], stale).
 - [ ] 7.7 — Add onboarding + Settings federation UI, provenance/health/inventory and override/detach flows.
 - [ ] 7.8 — GATED read-only acceptance against pinned real Claude/Codex CLIs/config surfaces.
 - **Checkpoint:** `go build ./...` + `go test ./...` + `go test -tags sqlite_fts5 ./...` + `cd ui && npm run test` + `npm run build` + embed.
