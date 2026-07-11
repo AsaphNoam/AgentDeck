@@ -183,6 +183,9 @@ func (s *Server) composeResumeSpec(agent state.Agent, snap state.SessionSnapshot
 		ExtraArgs:      extraArgs,
 		LastSessionID:  snap.LastSessionID,
 		LastContextPct: snap.LastContextPct,
+		// Resume reproduces the frozen federation launch object by default
+		// (techspec §2.5); "Resume with latest setup" re-resolves it (handleResume).
+		LaunchConfig: snap.LaunchConfig,
 	}, nil
 }
 

@@ -178,4 +178,17 @@ ALTER TABLE sessions ADD COLUMN skip_permissions INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE sessions ADD COLUMN add_dirs         TEXT    NOT NULL DEFAULT '[]';
 `,
 	},
+	{
+		// Freeze the resolved configuration-federation launch object into the
+		// session snapshot (Phase 7 techspec §2.5): a redacted, versioned JSON of
+		// requested-vs-resolved model/effort/provider, the binding
+		// backend/provider/profile, the source generation + fingerprints, and
+		// whether native defaults were inherited. Resume reads this frozen
+		// high-level object; an ACP-observed model is separate runtime state and
+		// must never rewrite it. Pre-existing rows default to an empty object.
+		version: 8,
+		sql: `
+ALTER TABLE sessions ADD COLUMN launch_config_json TEXT NOT NULL DEFAULT '{}';
+`,
+	},
 }

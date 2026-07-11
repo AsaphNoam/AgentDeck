@@ -337,6 +337,9 @@ func (s *Server) composeSwitchSpec(target state.Agent, resumeID string) (runtime
 		ExtraArgs:      extraArgs,
 		LastSessionID:  resumeID,
 		LastContextPct: snap.LastContextPct,
+		// Switch continues the same logical session, so the frozen federation launch
+		// object carries over unchanged — switch never re-resolves the source (§2.5).
+		LaunchConfig: snap.LaunchConfig,
 	}, nil
 }
 

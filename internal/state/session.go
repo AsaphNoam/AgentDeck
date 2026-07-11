@@ -25,10 +25,24 @@ type SessionSnapshot struct {
 	// resume/switch (techspec §12.4). NOT re-derived from current role/project.
 	SkipPermissions bool
 	AddDirs         []string
-	LastSessionID   string
-	LastSeq         int64
-	LastContextPct  float64
-	CreatedAt       string
+	// LaunchConfig is the frozen federation launch object (Phase 7 §2.5), stored
+	// verbatim as sessions.launch_config_json. Resume rebuilds from this rather
+	// than re-resolving the source. Empty object when the backend was unbound.
+	LaunchConfig   json.RawMessage
+	LastSessionID  string
+	LastSeq        int64
+	LastContextPct float64
+	CreatedAt      string
+}
+
+// normalizeLaunchConfig returns the stored launch-config JSON as a RawMessage,
+// collapsing the empty/default document to nil so callers can treat "no binding"
+// uniformly.
+func normalizeLaunchConfig(raw string) json.RawMessage {
+	if raw == "" || raw == "{}" {
+		return nil
+	}
+	return json.RawMessage(raw)
 }
 
 // ReadSession returns the frozen launch snapshot for the given agent_id.
@@ -37,13 +51,14 @@ func (s *Store) ReadSession(agentID string) (SessionSnapshot, error) {
 	var snap SessionSnapshot
 	var envKeysJSON string
 	var addDirsJSON string
+	var launchConfigJSON string
 	err := s.db.QueryRow(`
 SELECT agent_id, name, role, project, backend, model, interface, grp, cwd, system_prompt,
-       env_keys, skip_permissions, add_dirs, last_session_id, last_seq, last_context_pct, created_at
+       env_keys, skip_permissions, add_dirs, launch_config_json, last_session_id, last_seq, last_context_pct, created_at
 FROM sessions WHERE agent_id = ?`, agentID).Scan(
 		&snap.AgentID, &snap.Name, &snap.Role, &snap.Project,
 		&snap.Backend, &snap.Model, &snap.Interface, &snap.Group,
-		&snap.Cwd, &snap.SystemPrompt, &envKeysJSON, &snap.SkipPermissions, &addDirsJSON,
+		&snap.Cwd, &snap.SystemPrompt, &envKeysJSON, &snap.SkipPermissions, &addDirsJSON, &launchConfigJSON,
 		&snap.LastSessionID, &snap.LastSeq, &snap.LastContextPct, &snap.CreatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -58,6 +73,7 @@ FROM sessions WHERE agent_id = ?`, agentID).Scan(
 	if err := json.Unmarshal([]byte(addDirsJSON), &snap.AddDirs); err != nil {
 		snap.AddDirs = nil
 	}
+	snap.LaunchConfig = normalizeLaunchConfig(launchConfigJSON)
 	return snap, nil
 }
 
@@ -66,7 +82,7 @@ FROM sessions WHERE agent_id = ?`, agentID).Scan(
 func (s *Store) ListInactiveSessions(role, project string) ([]SessionSnapshot, error) {
 	q := `
 SELECT s.agent_id, s.name, s.role, s.project, s.backend, s.model, s.interface, s.grp,
-       s.cwd, s.system_prompt, s.env_keys, s.skip_permissions, s.add_dirs,
+       s.cwd, s.system_prompt, s.env_keys, s.skip_permissions, s.add_dirs, s.launch_config_json,
        s.last_session_id, s.last_seq, s.last_context_pct, s.created_at
 FROM sessions s
 LEFT JOIN running r ON r.agent_id = s.agent_id
@@ -90,11 +106,11 @@ WHERE r.agent_id IS NULL`
 	var out []SessionSnapshot
 	for rows.Next() {
 		var snap SessionSnapshot
-		var envKeysJSON, addDirsJSON string
+		var envKeysJSON, addDirsJSON, launchConfigJSON string
 		if err := rows.Scan(
 			&snap.AgentID, &snap.Name, &snap.Role, &snap.Project,
 			&snap.Backend, &snap.Model, &snap.Interface, &snap.Group,
-			&snap.Cwd, &snap.SystemPrompt, &envKeysJSON, &snap.SkipPermissions, &addDirsJSON,
+			&snap.Cwd, &snap.SystemPrompt, &envKeysJSON, &snap.SkipPermissions, &addDirsJSON, &launchConfigJSON,
 			&snap.LastSessionID, &snap.LastSeq, &snap.LastContextPct, &snap.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("state: scan inactive session: %w", err)
@@ -105,6 +121,7 @@ WHERE r.agent_id IS NULL`
 		if err := json.Unmarshal([]byte(addDirsJSON), &snap.AddDirs); err != nil {
 			snap.AddDirs = nil
 		}
+		snap.LaunchConfig = normalizeLaunchConfig(launchConfigJSON)
 		out = append(out, snap)
 	}
 	if err := rows.Err(); err != nil {
