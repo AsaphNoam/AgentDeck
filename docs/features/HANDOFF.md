@@ -184,7 +184,6 @@ reports' findings sections and in the legacy ADVISORY batch below; address them 
 ### Review through `27d4b7d` — 2026-07-11 (scoped Phase 7.5–7.7 federation batch)
 
 - **BLOCKING — the Mirrored action silently saves Linked.** `ui/src/features/settings/ConfigSourcePanel.tsx:150-178,226-236` previews Linked first, then reuses that token when “Link (Mirrored)” is clicked; `PUT` derives mode solely from the token. Normal trigger: choose Mirrored compatibility mode and receive no mirror cache. Re-preview with Mirrored (or otherwise bind an approved mirrored token) and test the persisted/GET mode.
-- **BLOCKING — onboarding links the wrong provider.** `ui/src/features/onboarding/steps/SourceStep.tsx:23-28` hard-codes the Claude backend although BackendStep permits Codex, OpenCode and OpenHands. Normal trigger: choose Codex and reach Config—the wizard previews/links Claude; non-federated choices see irrelevant controls. Carry the selected backend through onboarding and test Codex plus non-federated paths.
 - **BLOCKING — required federation repair controls are absent.** `ui/src/features/settings/ConfigSourcePanel.tsx:162-178,239-241,263-270` always sends empty overrides, offers no reset-to-inherit or detach confirmation, and disables detached import; `ui/src/features/launch/NewAgentModal.tsx:97-111,189-194` has no stale/invalid-source preflight/repair UX. Normal trigger: need an override/reset, detach snapshot, or launch after a source breaks—only a late server error/unlink is possible. This conflicts with 7.7’s required override/reset/detach/gate contract; implement and test all four flows (the existing HUMAN detached-deferral decision remains unresolved).
 - **ADVISORY — advanced custom-root/profile linking is unreachable in the UI.** `ui/src/features/settings/ConfigSourcePanel.tsx:150-155` always sends `root:"auto"` and no profile, despite the API supporting both. A user with a nonstandard root/profile cannot link it without raw API calls. Add controls and a custom-root/profile preview test.
 - **ADVISORY — Codex inventory hides instructions and MCP servers.** `ui/src/features/settings/ConfigSourcePanel.tsx:34-42` groups `instruction`/`mcp`, but `internal/configsource/codex.go:229,315-320` emits `instructions`/`mcp_servers`. Normal Codex users do not see AGENTS.md or MCP inventory. Add the aliases and a Codex inventory UI test.
@@ -335,6 +334,14 @@ remaining open set; every surviving item is ADVISORY.
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
+
+- 2026-07-11 — **review fix: onboarding links the chosen provider, not a hard-coded Claude.** BLOCKING,
+  confirmed real: `SourceStep` hard-coded `backendId="claude"`/`claude-acp`, so choosing Codex (or a
+  non-federated backend) at the Backend step reached Config and previewed/linked Claude. `BackendStep.onDone`
+  now reports `{id,type}`; the wizard threads it to `SourceStep`, which renders `ConfigSourcePanel` for the
+  actual backend and shows a "configured in Settings" note (no federation controls) for OpenCode/OpenHands.
+  Tests: SourceStep now covers Claude, Codex (panel titled "Codex"), and a non-federated backend. UI 92 tests
+  + build + embed green.
 
 - 2026-07-11 — **review fix: a binding resolves any project, not just the previewed one.** BLOCKING,
   confirmed real: approved roots gate every read, but only `Preview` augmented them with the source root
