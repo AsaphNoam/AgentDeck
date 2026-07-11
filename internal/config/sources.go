@@ -46,6 +46,14 @@ var knownSourceClaims = map[string]bool{
 	"setup":           true,
 }
 
+// ProviderForBackendType maps a backend type to its federation provider, and
+// reports whether the type supports configuration federation at all. Only
+// claude-acp and codex-acp participate (techspec §2.2).
+func ProviderForBackendType(backendType string) (string, bool) {
+	p, ok := sourceProviderByBackendType[backendType]
+	return p, ok
+}
+
 // ReadConfigSources reads config-sources.json. A missing file yields
 // ErrNotFound and an unparseable file yields ErrCorrupt. Nil collections are
 // normalized for callers so an empty document can be safely amended and

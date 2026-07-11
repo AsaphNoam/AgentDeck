@@ -6,6 +6,31 @@ Older entries are immutable history; agents resume from [`HANDOFF.md`](HANDOFF.m
 
 ---
 
+### 2026-07-11 — implementation: Phase 7.6 + 7.7 configuration federation (backend + UI)
+
+Phase 7's entire un-gated scope is COMPLETE on branch `claude/work-phase-hwv0z6` (8 green commits this
+session). **7.6 (backend):** a `SourceManager` holds immutable per-(backend,project) generations and
+resolves sources FRESH at launch — the correctness boundary: a stale/invalid/unapproved source blocks
+the launch (422/409) instead of composing from cache. It watches files (fsnotify + 250 ms debounce +
+30 s sweep) and mirrors a redacted cache. REST routes cover discover/preview/bind/refresh/detach with
+preview-token consent (TOCTOU + expiry) and publish `config_source_update` over SSE. Launch freezes a
+redacted `launch_config_json` (migration v8); resume is frozen-by-default with opt-in
+`config_refresh:true`; a reserved `agentdeck-messaging` MCP-id collision returns 409. **7.7 (UI):**
+zod schemas + React Query hooks + SSE invalidation; a `ConfigSourcePanel` on Claude/Codex backend
+cards (discover→preview→Link, health, Refresh, Unlink, redacted effective view with provenance labels
++ inventory — never source contents/secrets); an optional onboarding Config step reusing it. Both Go
+variants + 88 UI tests + build green; `make embed` done.
+
+**Needs attention:** **New:** Detached config-source import deferred (`DELETE ?detach=true` → 501; no
+verified launch-injection path for Claude/Codex assets yet — unbind works). **Carried:** Terminal
+support boundary; HTTP-only agent messaging; Immediate/prompt-based UI; Runtime-switch fallbacks;
+Unbounded transcript indexing; Agent env inheritance by design; Local API trusts same-machine callers;
+API/model compatibility. Two ADVISORY 7.7 UI refinements (bound-source override editing; NewAgentModal
+invalid-source pre-warn). Live acceptance 7.4 + 7.8 remain credential-gated.
+
+**Next:** human — provide `opencode`/`openhands` + Claude/Codex credentials to clear gated 7.4/7.8, or
+an agent picks up the two ADVISORY UI refinements.
+
 ### 2026-07-11 — implementation: Phase 7.5 configuration federation
 
 Phase 7.5 is GREEN in the working tree. AgentDeck now has a validated, owner-only source-binding

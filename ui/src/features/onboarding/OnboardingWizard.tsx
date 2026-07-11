@@ -3,7 +3,14 @@ import * as Dialog from "@radix-ui/react-dialog";
 import type { Onboarding } from "../../schemas/config";
 import { BackendStep } from "./steps/BackendStep";
 import { ProjectStep } from "./steps/ProjectStep";
+import { SourceStep } from "./steps/SourceStep";
 import { LaunchStep } from "./steps/LaunchStep";
+
+// The optional Config (federation) step lives between Project and Launch. It is
+// purely client-side and skippable, so it is not tracked in the server-side
+// onboarding step flags; a returning user who finished project setup resumes at
+// it and can simply Continue.
+const LAST_STEP = 3;
 
 function initialStep(steps: Onboarding["steps"]): number {
   if (!steps.backend.done) return 0;
@@ -20,7 +27,7 @@ export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
   const [step, setStep] = useState(() => initialStep(steps));
   const [createdProject, setCreatedProject] = useState<string | undefined>(undefined);
 
-  const advance = () => setStep((s) => Math.min(s + 1, 2));
+  const advance = () => setStep((s) => Math.min(s + 1, LAST_STEP));
 
   return (
     <Dialog.Root open modal>
@@ -34,7 +41,7 @@ export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
         >
           <Dialog.Title>Welcome to AgentDeck</Dialog.Title>
           <div className="wizard-progress">
-            {["Backend", "Project", "Launch"].map((label, i) => (
+            {["Backend", "Project", "Config", "Launch"].map((label, i) => (
               <div
                 key={label}
                 className={`wizard-step-indicator ${i < step ? "done" : i === step ? "active" : ""}`}
@@ -45,7 +52,8 @@ export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
           </div>
           {step === 0 && <BackendStep onDone={advance} />}
           {step === 1 && <ProjectStep onDone={(projectId) => { setCreatedProject(projectId); advance(); }} />}
-          {step === 2 && <LaunchStep onDone={onComplete} initialProject={createdProject} />}
+          {step === 2 && <SourceStep project={createdProject} onDone={advance} />}
+          {step === 3 && <LaunchStep onDone={onComplete} initialProject={createdProject} />}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

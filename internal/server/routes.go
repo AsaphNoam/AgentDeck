@@ -58,6 +58,15 @@ func (s *Server) routes() http.Handler {
 	// OPTIONS short-circuit / header rewriting would interfere with the upgrade.
 	api("GET /api/capabilities", s.handleCapabilities)
 	api("POST /api/groups/{group}/release", s.handleReleaseGroup)
+
+	// Phase 7 configuration federation (techspec §2.7): discovery/preview/bind/
+	// refresh/detach over Claude/Codex native config. Method-specific patterns keep
+	// POST .../preview distinct from PUT .../{backend_id} and POST .../{id}/refresh.
+	api("GET /api/config-sources", s.handleGetConfigSources)
+	api("POST /api/config-sources/preview", s.handlePreviewConfigSource)
+	api("PUT /api/config-sources/{backend_id}", s.handleBindConfigSource)
+	api("POST /api/config-sources/{backend_id}/refresh", s.handleRefreshConfigSource)
+	api("DELETE /api/config-sources/{backend_id}", s.handleDeleteConfigSource)
 	mux.Handle("GET /api/sessions/{id}/terminal/ws", http.HandlerFunc(s.handleTerminalWS))
 
 	// Catch-all for any other /api/* path → 404 JSON (more specific GET routes

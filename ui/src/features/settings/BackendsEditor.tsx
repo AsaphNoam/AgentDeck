@@ -3,6 +3,7 @@ import { useBackends, usePutBackends, configErrorMessage } from "../../api/confi
 import type { BackendsConfig, Backend, Model, CredResult } from "../../schemas/backends";
 import { BACKEND_TYPE_LABELS, BACKEND_TYPE_OPTIONS } from "../../lib/backendTypes";
 import { ModelRow } from "./ModelRow";
+import { ConfigSourcePanel } from "./ConfigSourcePanel";
 
 type Pair = { key: string; value: string };
 
@@ -232,6 +233,10 @@ export function BackendsEditor() {
               onChange={(next) => updateEntry(id, { envPairs: next })}
             />
           </details>
+
+          {(backend.type === "claude-acp" || backend.type === "codex-acp") && (
+            <ConfigSourcePanel backendId={id} backendType={backend.type} />
+          )}
 
           <div className="backend-models-section">
             <div className="backend-models-header">

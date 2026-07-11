@@ -93,6 +93,7 @@ func (r *ClaudeResolver) resolve(ctx context.Context, binding Binding, project c
 		}
 		recordUnknown(&report, canonical, values, known)
 		applyClaudeLayer(&effective, values, layer.scope, canonical, binding)
+		collectMCPNames(&effective, values)
 		if hasClaim(binding, "setup") {
 			inventorySettingsDeclarations(&effective, values, layer.scope, canonical, reportFingerprint(report, canonical))
 		}
@@ -114,6 +115,7 @@ func (r *ClaudeResolver) resolve(ctx context.Context, binding Binding, project c
 	if err == nil {
 		recordUnknown(&report, canonical, values, known)
 		applyClaudeLayer(&effective, values, "managed", canonical, binding)
+		collectMCPNames(&effective, values)
 		if hasClaim(binding, "setup") {
 			inventorySettingsDeclarations(&effective, values, "managed", canonical, reportFingerprint(report, canonical))
 		}
@@ -261,6 +263,7 @@ func inventoryClaudeDir(ctx context.Context, dir, scope, kind string, approved [
 }
 
 func finalizeClaude(e *Effective, report *Report) {
+	sort.Strings(e.MCPServers)
 	sort.Slice(e.Models, func(i, j int) bool { return e.Models[i].ID < e.Models[j].ID })
 	sort.Slice(e.Assets, func(i, j int) bool {
 		if e.Assets[i].Kind != e.Assets[j].Kind {

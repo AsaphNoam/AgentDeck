@@ -157,6 +157,7 @@ func (r *CodexResolver) resolve(ctx context.Context, binding Binding, project co
 			finalize(&effective, &report)
 			return effective, report, err
 		}
+		collectMCPNames(&effective, layer.data)
 	}
 	applyOverrides(&effective, binding.Overrides)
 	if effective.Model != nil && *effective.Model != "" {
