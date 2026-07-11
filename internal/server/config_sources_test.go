@@ -16,6 +16,15 @@ import (
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
+func canonicalPath(t *testing.T, path string) string {
+	t.Helper()
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		t.Fatalf("EvalSymlinks(%s): %v", path, err)
+	}
+	return resolved
+}
+
 func bindFixture(t *testing.T, srv *Server, root, projectDir string) {
 	t.Helper()
 	sources, _ := srv.readConfigSources()
@@ -52,7 +61,10 @@ func federationServer(t *testing.T) (*Server, string, string) {
 	srv.sourceMgr = configsource.NewManager(srv.configStore, map[string]configsource.Resolver{
 		configsource.ProviderClaude: configsource.NewClaudeResolver(userHome),
 	}, nil)
-	return srv, root, projectDir
+	// Federation persists canonical (symlink-resolved) roots; on macOS t.TempDir()
+	// returns /var/... which is a symlink to /private/var/.... Canonicalize the
+	// fixture paths so bound roots and approved-root fixtures match the resolver.
+	return srv, canonicalPath(t, root), canonicalPath(t, projectDir)
 }
 
 func doJSON(t *testing.T, h http.Handler, method, target, body string) *httptest.ResponseRecorder {

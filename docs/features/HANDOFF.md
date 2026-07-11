@@ -13,9 +13,9 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
   Fix its BLOCKING findings before treating the un-gated Phase 7 work as complete; **7.4** and **7.8**
   remain credential-gated and **7.9** remains planned after verified federation.
 - **Spec:** [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) (PRD: [`phase-7-additional-features.md`](phase-7-additional-features.md))
-- **Last code checkpoint:** Phase 7.7 (through `27d4b7d`) is under review. Both Go variants currently
-  fail four `internal/server` federation tests on canonical macOS temp paths; UI: 88 tests + build pass.
-  See the current review batch below.
+- **Last code checkpoint:** Phase 7.7 (through `27d4b7d`) is under review; `/fix-review` in progress.
+  Both Go variants are green again (federation canonical-temp-path test fix landed); UI: 88 tests + build pass.
+  See the current review batch below for the remaining open findings.
 - **Last contiguous code review:** `8667fe2` (2026-07-04). The 2026-07-11 Phase 7.5–7.7 review is
   intentionally scoped and therefore does not advance this marker across the unreviewed intervening work.
 - **Branch:** `main` (the review-state commit is local); the prior
@@ -188,7 +188,6 @@ reports' findings sections and in the legacy ADVISORY batch below; address them 
 - **BLOCKING — the Mirrored action silently saves Linked.** `ui/src/features/settings/ConfigSourcePanel.tsx:150-178,226-236` previews Linked first, then reuses that token when “Link (Mirrored)” is clicked; `PUT` derives mode solely from the token. Normal trigger: choose Mirrored compatibility mode and receive no mirror cache. Re-preview with Mirrored (or otherwise bind an approved mirrored token) and test the persisted/GET mode.
 - **BLOCKING — onboarding links the wrong provider.** `ui/src/features/onboarding/steps/SourceStep.tsx:23-28` hard-codes the Claude backend although BackendStep permits Codex, OpenCode and OpenHands. Normal trigger: choose Codex and reach Config—the wizard previews/links Claude; non-federated choices see irrelevant controls. Carry the selected backend through onboarding and test Codex plus non-federated paths.
 - **BLOCKING — required federation repair controls are absent.** `ui/src/features/settings/ConfigSourcePanel.tsx:162-178,239-241,263-270` always sends empty overrides, offers no reset-to-inherit or detach confirmation, and disables detached import; `ui/src/features/launch/NewAgentModal.tsx:97-111,189-194` has no stale/invalid-source preflight/repair UX. Normal trigger: need an override/reset, detach snapshot, or launch after a source breaks—only a late server error/unlink is possible. This conflicts with 7.7’s required override/reset/detach/gate contract; implement and test all four flows (the existing HUMAN detached-deferral decision remains unresolved).
-- **BLOCKING — the claimed Go checkpoint is red on canonical macOS temp paths.** `internal/server/config_sources_test.go:19-29,67-135,199-241,286-302` uses raw `/var/...` fixture roots while federation intentionally persists canonical `/private/var/...` roots. Both `go test ./...` variants fail four server tests (root mismatch or premature `approval_required`). Normalize fixtures/expectations through the same canonical-root boundary and restore the required checkpoint.
 - **ADVISORY — advanced custom-root/profile linking is unreachable in the UI.** `ui/src/features/settings/ConfigSourcePanel.tsx:150-155` always sends `root:"auto"` and no profile, despite the API supporting both. A user with a nonstandard root/profile cannot link it without raw API calls. Add controls and a custom-root/profile preview test.
 - **ADVISORY — Codex inventory hides instructions and MCP servers.** `ui/src/features/settings/ConfigSourcePanel.tsx:34-42` groups `instruction`/`mcp`, but `internal/configsource/codex.go:229,315-320` emits `instructions`/`mcp_servers`. Normal Codex users do not see AGENTS.md or MCP inventory. Add the aliases and a Codex inventory UI test.
 - **ADVISORY — an SSE update leaves the displayed effective view stale.** `ui/src/api/sse.ts:102-106` invalidates only the binding query while `ui/src/features/settings/ConfigSourcePanel.tsx:140-143,262` keeps Effective in local state. Normal trigger: load the view, change native config, receive SSE—the health can update but model/inventory remains old until manual refresh. Clear/refetch that view on source update and test it.
@@ -338,6 +337,15 @@ remaining open set; every surviving item is ADVISORY.
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
+
+- 2026-07-11 — **review fix: Go federation checkpoint restored to green.** BLOCKING, confirmed real:
+  four `internal/server` federation tests failed on canonical macOS temp paths. Root cause was
+  test-only — `federationServer` returned raw `/var/...` fixture roots while the resolver canonicalizes
+  via `filepath.EvalSymlinks` (Preview appends canonical `binding.Root`/`project.Cwd` to approved),
+  so bound roots came back `/private/var/...` and `bindFixture`'s raw approved roots produced premature
+  `approval_required`. Fixed by canonicalizing the returned `root`/`projectDir` through a new
+  `canonicalPath` helper so fixtures cross the same canonical-root boundary. No product change.
+  Green: `go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`.
 
 - 2026-07-11 — **usability review: federation source linking — state recorded.** In an isolated
   live fixture, source preview and Effective view redacted the secret value correctly while retaining
