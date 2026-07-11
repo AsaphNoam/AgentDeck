@@ -304,3 +304,24 @@ func TestLargeLineRoundTrips(t *testing.T) {
 		t.Fatalf("large diff lengths = %d/%d, want %d", len(diff.NewText), len(diff.Patch), len(large))
 	}
 }
+
+// TestTranscriptIsOwnerOnly guards the security fix for world-readable
+// transcripts: the per-agent session dir and transcript.ndjson must carry no
+// group/other permission bits.
+func TestTranscriptIsOwnerOnly(t *testing.T) {
+	home := t.TempDir()
+	w, err := Open(home, "a_perms", meta())
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer w.Close()
+	for _, p := range []string{w.Path(), strings.TrimSuffix(w.Path(), "/transcript.ndjson")} {
+		fi, err := os.Stat(p)
+		if err != nil {
+			t.Fatalf("stat %s: %v", p, err)
+		}
+		if perm := fi.Mode().Perm(); perm&0o077 != 0 {
+			t.Errorf("%s perms = %04o, want no group/other bits", p, perm)
+		}
+	}
+}
