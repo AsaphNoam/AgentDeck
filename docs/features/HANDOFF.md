@@ -183,7 +183,6 @@ reports' findings sections and in the legacy ADVISORY batch below; address them 
 
 ### Review through `27d4b7d` — 2026-07-11 (scoped Phase 7.5–7.7 federation batch)
 
-- **BLOCKING — one source binding rejects normal project changes.** `internal/configsource/claude.go:37-48,72-86` and `internal/configsource/codex.go:46-94` persist only the preview project's canonical approved roots even though bindings are reused per backend. Normal trigger: bind while project A is selected, then launch/refresh the same backend on project B with native project config—B is rejected `approval_required`. Safely derive/validate the selected project's approved root per resolution (or scope bindings per project); test A→B for both providers.
 - **BLOCKING — the Mirrored action silently saves Linked.** `ui/src/features/settings/ConfigSourcePanel.tsx:150-178,226-236` previews Linked first, then reuses that token when “Link (Mirrored)” is clicked; `PUT` derives mode solely from the token. Normal trigger: choose Mirrored compatibility mode and receive no mirror cache. Re-preview with Mirrored (or otherwise bind an approved mirrored token) and test the persisted/GET mode.
 - **BLOCKING — onboarding links the wrong provider.** `ui/src/features/onboarding/steps/SourceStep.tsx:23-28` hard-codes the Claude backend although BackendStep permits Codex, OpenCode and OpenHands. Normal trigger: choose Codex and reach Config—the wizard previews/links Claude; non-federated choices see irrelevant controls. Carry the selected backend through onboarding and test Codex plus non-federated paths.
 - **BLOCKING — required federation repair controls are absent.** `ui/src/features/settings/ConfigSourcePanel.tsx:162-178,239-241,263-270` always sends empty overrides, offers no reset-to-inherit or detach confirmation, and disables detached import; `ui/src/features/launch/NewAgentModal.tsx:97-111,189-194` has no stale/invalid-source preflight/repair UX. Normal trigger: need an override/reset, detach snapshot, or launch after a source breaks—only a late server error/unlink is possible. This conflicts with 7.7’s required override/reset/detach/gate contract; implement and test all four flows (the existing HUMAN detached-deferral decision remains unresolved).
@@ -336,6 +335,16 @@ remaining open set; every surviving item is ADVISORY.
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
+
+- 2026-07-11 — **review fix: a binding resolves any project, not just the previewed one.** BLOCKING,
+  confirmed real: approved roots gate every read, but only `Preview` augmented them with the source root
+  and project cwd — `Resolve` (launch/refresh) used the frozen `binding.Approved` (project A only). Since a
+  binding is per backend and reused across projects, launching/refreshing the same backend on project B was
+  rejected `approval_required`. Both resolvers now always approve the source root + the *currently selected*
+  project's canonical root per resolution (Claude's `resolve` augments; Codex drops the `preview`-only gate
+  on `root`/`projectRoot`, keeping the skills tree preview-only). Safe because the project is user-selected
+  from AgentDeck's own project list. Tests: `TestClaudeResolverResolvesDifferentProjectThanPreview`,
+  `TestCodexResolverResolvesDifferentProjectThanPreview` (A-approved binding resolves B). Green: both Go variants.
 
 - 2026-07-11 — **review fix: linked source model defaults now applied (native inheritance).** BLOCKING,
   confirmed real: launch always sent the AgentDeck backend default over ACP, so a bound source whose model

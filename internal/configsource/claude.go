@@ -34,18 +34,12 @@ func (r *ClaudeResolver) Discover(ctx context.Context, _ config.Project) []Candi
 	return []Candidate{{Provider: ProviderClaude, Root: root, Found: err == nil, Health: health, Warnings: []string{}}}
 }
 
+// Preview and Resolve are identical for Claude: both resolve read-only against the
+// binding, and resolve() augments the approved roots with the source root and the
+// currently selected project's canonical root (see resolve). The two entry points
+// are kept distinct to satisfy the Resolver interface and mirror the Codex resolver.
 func (r *ClaudeResolver) Preview(ctx context.Context, binding Binding, project config.Project) (Effective, Report, error) {
-	preview := binding
-	preview.Approved = append([]string{}, binding.Approved...)
-	for _, path := range []string{binding.Root, project.Cwd} {
-		if canonical, err := canonicalExisting(path); err == nil && !containsString(preview.Approved, canonical) {
-			preview.Approved = append(preview.Approved, canonical)
-		}
-	}
-	effective, report, err := r.resolve(ctx, preview, project)
-	report.ApprovedRoots = append([]string{}, preview.Approved...)
-	sort.Strings(report.ApprovedRoots)
-	return effective, report, err
+	return r.resolve(ctx, binding, project)
 }
 
 func (r *ClaudeResolver) Resolve(ctx context.Context, binding Binding, project config.Project) (Effective, Report, error) {
@@ -60,8 +54,6 @@ type claudeLayer struct {
 
 func (r *ClaudeResolver) resolve(ctx context.Context, binding Binding, project config.Project) (Effective, Report, error) {
 	effective, report := emptyEffective(), emptyReport()
-	report.ApprovedRoots = append(report.ApprovedRoots, binding.Approved...)
-	sort.Strings(report.ApprovedRoots)
 	if binding.Provider != ProviderClaude {
 		return effective, report, fmt.Errorf("%w: provider is not Claude Code", ErrInvalidSource)
 	}
@@ -73,6 +65,20 @@ func (r *ClaudeResolver) resolve(ctx context.Context, binding Binding, project c
 	if expanded, err := config.ExpandTilde(projectRoot); err == nil {
 		projectRoot = expanded
 	}
+
+	// Approved roots gate every read. Beyond the frozen binding.Approved (captured at
+	// preview against ONE project), always approve the source root and the currently
+	// selected project's canonical root: a binding is per backend and reused across
+	// projects, so it must resolve on whatever project the user launches/refreshes
+	// against. Without this, an A→B project change was rejected with approval_required.
+	binding.Approved = append([]string{}, binding.Approved...)
+	for _, path := range []string{binding.Root, projectRoot} {
+		if canonical, err := canonicalExisting(path); err == nil && !containsString(binding.Approved, canonical) {
+			binding.Approved = append(binding.Approved, canonical)
+		}
+	}
+	report.ApprovedRoots = append(report.ApprovedRoots, binding.Approved...)
+	sort.Strings(report.ApprovedRoots)
 	layers := []claudeLayer{
 		{filepath.Join(binding.Root, "settings.json"), "user", false},
 		{filepath.Join(projectRoot, ".claude", "settings.json"), "project", false},

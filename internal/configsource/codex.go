@@ -75,9 +75,15 @@ func (r *CodexResolver) resolve(ctx context.Context, binding Binding, project co
 	if err != nil {
 		return effective, report, classifyPathError(err)
 	}
+	// Approved roots gate every read. The source root and the *currently selected*
+	// project's canonical root are always approved for this resolution — a binding is
+	// per backend, not per project, so it must resolve on whatever project the user
+	// launches/refreshes against, not only the one it was previewed with. (Freezing
+	// only the preview project's roots rejected a normal A→B project change with
+	// approval_required.) The skills tree is inventoried at preview only.
 	approved := append([]string{}, binding.Approved...)
+	approved = append(approved, root, projectRoot)
 	if preview {
-		approved = append(approved, root, projectRoot)
 		if r.userHome != "" {
 			if skills, skillsErr := canonicalRoot(filepath.Join(r.userHome, ".agents", "skills")); skillsErr == nil {
 				approved = append(approved, skills)
