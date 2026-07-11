@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -11,7 +12,20 @@ import (
 
 	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/configsource"
+	"github.com/agentdeck/agentdeck/internal/runtime"
 )
+
+func bindFixture(t *testing.T, srv *Server, root, projectDir string) {
+	t.Helper()
+	sources, _ := srv.readConfigSources()
+	sources.Sources["claude"] = config.SourceBinding{
+		Provider: configsource.ProviderClaude, Mode: configsource.ModeLinked, Root: root,
+		Claims: []string{"launch_defaults"}, Approved: []string{root, projectDir},
+	}
+	if err := srv.configStore.WriteConfigSources(sources); err != nil {
+		t.Fatalf("WriteConfigSources: %v", err)
+	}
+}
 
 // federationServer builds a seeded test server whose SourceManager resolves a
 // fixture Claude tree (rather than the real user home) and registers a project
@@ -175,5 +189,67 @@ func TestConfigSourceTOCTOURejectedAtBind(t *testing.T) {
 		`{"preview_token":"`+pv.PreviewToken+`","overrides":{}}`)
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("TOCTOU bind status = %d, want 409 body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestComposeLaunchFreezesFederationConfig proves a launch against a bound source
+// resolves fresh and freezes the redacted provenance into the session's launch
+// config, without leaking any secret value.
+func TestComposeLaunchFreezesFederationConfig(t *testing.T) {
+	srv, root, projectDir := federationServer(t)
+	bindFixture(t, srv, root, projectDir)
+
+	spec, _, ae := srv.composeLaunch(context.Background(), launchRequest{Role: "implementer", Project: "fed"})
+	if ae != nil {
+		t.Fatalf("composeLaunch: %s", ae.Message)
+	}
+	if len(spec.LaunchConfig) == 0 {
+		t.Fatal("launch config was not frozen for a bound source")
+	}
+	var doc launchConfigDoc
+	if err := json.Unmarshal(spec.LaunchConfig, &doc); err != nil {
+		t.Fatalf("launch config decode: %v", err)
+	}
+	if doc.Binding.BackendID != "claude" || doc.Binding.Provider != configsource.ProviderClaude {
+		t.Fatalf("binding = %+v", doc.Binding)
+	}
+	if doc.Resolved.Model == nil || *doc.Resolved.Model != "user-model" {
+		t.Fatalf("resolved model = %v, want user-model", doc.Resolved.Model)
+	}
+	if doc.Generation == "" || len(doc.Fingerprints) == 0 {
+		t.Fatalf("missing provenance: %+v", doc)
+	}
+	if !doc.NativeInherited {
+		t.Error("expected native_inherited=true for a default (unspecified) model")
+	}
+	if strings.Contains(string(spec.LaunchConfig), "user-secret") {
+		t.Fatalf("launch config leaked a secret:\n%s", spec.LaunchConfig)
+	}
+}
+
+// TestComposeLaunchBlocksInvalidSource proves an invalid bound source blocks the
+// launch (never composes from stale cache), returning 422 source_invalid.
+func TestComposeLaunchBlocksInvalidSource(t *testing.T) {
+	srv, root, projectDir := federationServer(t)
+	bindFixture(t, srv, root, projectDir)
+	if err := os.WriteFile(filepath.Join(root, "settings.json"), []byte(`{bad json`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, _, ae := srv.composeLaunch(context.Background(), launchRequest{Role: "implementer", Project: "fed"})
+	if ae == nil || ae.Code != runtime.CodeSourceInvalid {
+		t.Fatalf("ae = %+v, want source_invalid", ae)
+	}
+}
+
+// TestComposeLaunchNoBindingLeavesConfigEmpty proves an unbound backend launches
+// normally with no frozen federation object.
+func TestComposeLaunchNoBindingLeavesConfigEmpty(t *testing.T) {
+	srv, _, _ := federationServer(t)
+	spec, _, ae := srv.composeLaunch(context.Background(), launchRequest{Role: "implementer", Project: "fed"})
+	if ae != nil {
+		t.Fatalf("composeLaunch: %s", ae.Message)
+	}
+	if len(spec.LaunchConfig) != 0 {
+		t.Fatalf("launch config = %s, want empty for an unbound backend", spec.LaunchConfig)
 	}
 }

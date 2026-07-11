@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,7 +27,7 @@ func TestComposeLaunchRejectsMissingCwd(t *testing.T) {
 		t.Fatalf("WriteProject: %v", err)
 	}
 
-	_, _, ae := srv.composeLaunch(launchRequest{Role: "implementer", Project: "ghost"})
+	_, _, ae := srv.composeLaunch(context.Background(), launchRequest{Role: "implementer", Project: "ghost"})
 	if ae == nil {
 		t.Fatal("composeLaunch succeeded; want validation error for missing cwd")
 	}
