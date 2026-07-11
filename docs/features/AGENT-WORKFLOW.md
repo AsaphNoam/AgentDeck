@@ -61,7 +61,9 @@ cd ui && npm run build         # ONLY for subphases that touch ui/
 
 `make build` / `make test` / `make dist` wrap these. Each subphase's **"Done when
 (checkpoint)"** line in the tech spec may add specific tests that must pass — treat those
-as part of green. Never record a subphase as done, and never commit, on a red checkpoint.
+as part of green. Never record a subphase as done, and never commit, on a red checkpoint. Never
+buy GREEN by skipping tests, weakening assertions, or removing regression coverage unless the spec
+and a focused review establish that the test itself is obsolete.
 
 ---
 
@@ -173,6 +175,9 @@ Commits are the recovery anchor across spaced sessions, so the work survives a h
 3. Confirm the committed baseline is green before new work. If the dirty tree prevents a clean
    baseline run, preserve and document it first. Red on arrival is the first problem to resolve.
 4. Open the active subphase's tech-spec section. Build. Verify. Record. Repeat.
+5. Before a checkpoint commit, self-review the complete diff against the subphase's **Done when**
+   requirements: look for missing deliverables, unchecked error paths, boundary validation gaps,
+   leftover debug/TODO code, and unintended scope. Fix any issue found before recording GREEN.
 
 ## End-of-session checklist (every exit, including quota cut-off mid-work)
 
@@ -248,6 +253,10 @@ the subject alone (this also excludes state-only dismissal/brief commits). When 
 `Last code review` to the newest contiguous code/content commit actually reviewed. A scoped or
 noncontiguous review does not advance it past an unreviewed gap.
 
+Read the relevant phase PRD and tech-spec section **before** opening the diff, and note the expected
+deliverables. A diff can show an incorrect implementation, but it cannot reveal work that was never
+attempted. Then inspect changed code in its caller, error-path and concurrency context.
+
 Cross-reference against:
 - **Phase spec adherence** — does the code match the phase PRD and tech spec? Any required deliverable missing or wrong?
 - **Dead code** — exported symbols never referenced, unreachable paths, leftover stubs or TODOs that should be done.
@@ -295,6 +304,9 @@ fix agent can triage at a glance. Include `file:line` + what's wrong + why it ma
 - **BLOCKING — <one-line title>.** <where: file:line> <what's wrong> <why it matters under normal use> <fix hint + what test would prove it>
 - **ADVISORY — <one-line title>.** <same shape>
 ```
+
+Every finding must also state the concrete normal-use trigger or evidence that proves it. If the
+reviewer cannot describe that path after re-reading the cited code, it is not a finding.
 
 The §9 fix agent **deletes** a bullet once it has resolved the finding (fixed + green) or dismissed it
 as a validated false positive, recording the outcome in the changelog + its brief (§5, §7) — the section
