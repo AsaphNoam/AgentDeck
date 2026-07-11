@@ -97,7 +97,9 @@ release claims the affected live-CLI compatibility.
 
 ## Blocked on human
 
-None. This section holds only genuine STOP conditions, never nonblocking acceptance work.
+- **Publish checkpoint `cf3a68f`.** The documentation work is complete and committed locally, but
+  direct push to `origin/main` was policy-rejected because the request authorized editing specs, not
+  publishing to the shared default branch. Push only after the human explicitly authorizes it.
 
 ## Review findings (from the last review — BLOCKING and ADVISORY)
 
@@ -270,6 +272,7 @@ _(most recent first; keep ~10, older history is in git)_
   launch freshness, immutable provenance, REST/SSE/UI contracts and subphases 7.5–7.8. Updated the
   phase map, master PRD and architecture source-of-truth rationale. Go build + both test variants +
   UI 83 tests/build green; initial sandbox-only localhost bind failure passed on unrestricted rerun.
+  Checkpoint `cf3a68f` is local; direct `origin/main` push requires explicit human authorization.
 
 - 2026-07-10 — **review fix: eight usability BLOCKERs cleared — green.** All eight open usability
   BLOCKERs validated real and fixed, each with a regression test; both Go variants + both builds + UI

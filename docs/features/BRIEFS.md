@@ -22,7 +22,9 @@ never imported. Existing sessions retain frozen high-level settings, while new l
 latest valid source. Phase 7 adds implementation-ready API/SSE/UI contracts and subphases 7.5–7.8;
 7.5 is now next. Go build, both Go test variants, all 83 UI tests, and UI build pass.
 
-**Needs attention:** New/changed: none. Carried: the six existing HUMAN decisions in HANDOFF remain
+**Needs attention:** New/changed: checkpoint `cf3a68f` is committed locally, but direct push to
+`origin/main` was rejected because this request did not explicitly authorize publishing to the shared
+default branch; authorize it if you want it pushed. Carried: the six existing HUMAN decisions remain
 unchanged. Live OpenHands/OpenCode and federation compatibility checks remain acceptance gates.
 
 **Next:** Agent implements 7.5: the source-binding schema and pure, redacted Claude/Codex resolvers.
