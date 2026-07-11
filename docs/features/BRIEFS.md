@@ -6,6 +6,26 @@ Older entries are immutable history; agents resume from [`HANDOFF.md`](HANDOFF.m
 
 ---
 
+### 2026-07-11 — usability review: full end-to-end journey sweep
+
+The shipped binary, both Go variants, and 94 UI tests are green. In an isolated live dashboard, first-agent
+launch closed cleanly, chat streamed and updated context, grid density survived reload, Settings persisted a
+project edit, and the repaired Claude configuration-source flow redacted a secret while preserving Mirrored
+mode and repair controls. No new product defect is asserted. The browser-control channel stalled while stopping
+the test agent, then local-loopback approval was denied for account usage limits; J2 and J4–J12 are unexercised,
+not inferred-pass. The review-state documents remain uncommitted because the environment rejected the required
+git escalation for the same usage limit. Full checkpoint matrix: `usability-review-run-2026-07-11-e2e.md`.
+
+**Needs attention:** New/changed: **Complete the full E2E journey sweep** after browser and local-loopback
+access are restored. Carried: terminal support boundary; HTTP-only messaging; immediate/prompt UI;
+runtime-switch fallbacks; unbounded transcript indexing; agent env inheritance; same-machine API trust;
+detached config-source import; API/model compatibility.
+
+**Next:** Agent — resume J2 and J4–J12 from the run report when the local review environment is available.
+Then commit the three updated review-state documents.
+
+---
+
 ### 2026-07-11 — fix-review: Phase 7.5–7.7 federation BLOCKING findings
 
 All six BLOCKING findings from the Phase 7.5–7.7 federation review are fixed and committed to `main`
