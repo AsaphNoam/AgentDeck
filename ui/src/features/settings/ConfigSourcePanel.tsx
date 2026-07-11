@@ -145,11 +145,22 @@ export function ConfigSourcePanel({
   // mode SOLELY from the token, so binding must use a token minted for the requested
   // mode — otherwise "Link (Mirrored)" silently persists Linked (no mirror cache).
   const [previewMode, setPreviewMode] = useState<"linked" | "mirrored" | null>(null);
+  // AgentDeck override inputs for a bound source (empty = inherit the native value).
+  const [overrideModel, setOverrideModel] = useState("");
+  const [overrideEffort, setOverrideEffort] = useState("");
+
+  const binding = (sources?.bindings ?? []).find((b) => b.backend_id === backendId);
+
+  // Seed the override inputs from the persisted binding so the fields reflect the
+  // current override and "Reset to inherit" is meaningful.
+  useEffect(() => {
+    setOverrideModel(binding?.overrides?.model ?? "");
+    setOverrideEffort(binding?.overrides?.effort ?? "");
+  }, [binding?.overrides?.model, binding?.overrides?.effort]);
 
   // Federation applies to Claude/Codex only.
   if (!provider) return null;
 
-  const binding = (sources?.bindings ?? []).find((b) => b.backend_id === backendId);
   const claims = ["launch_defaults", "model_catalog", "setup"];
 
   const runPreview = (mode: "linked" | "mirrored") => {
@@ -220,6 +231,40 @@ export function ConfigSourcePanel({
     del.mutate({ backendId, detach: false }, { onError: (e) => setError(configErrorMessage(e)) });
   };
 
+  // applyOverrides changes the AgentDeck model/effort overrides on a bound source by
+  // re-previewing the SAME source (its root/profile/mode) for a fresh consent token,
+  // then re-binding with the new overrides. Passing null for both resets to native
+  // inheritance. The server derives the mode from the token, so the token is minted
+  // for the binding's current mode.
+  const applyOverrides = (overrides: { model: string | null; effort: string | null }) => {
+    if (!binding) return;
+    setError(null);
+    preview.mutate(
+      {
+        provider,
+        root: binding.root,
+        profile: binding.profile,
+        mode: binding.mode as "linked" | "mirrored",
+        claims,
+        project: projectId,
+      },
+      {
+        onSuccess: (res) =>
+          bind.mutate(
+            { backendId, previewToken: res.preview_token, overrides },
+            {
+              onSuccess: () => {
+                setEffective(null);
+                preview.reset();
+              },
+              onError: (e) => setError(configErrorMessage(e)),
+            },
+          ),
+        onError: (e) => setError(configErrorMessage(e)),
+      },
+    );
+  };
+
   return (
     <details className="backend-source-section" open={defaultOpen}>
       <summary>Configuration source ({providerLabel(provider)})</summary>
@@ -288,9 +333,58 @@ export function ConfigSourcePanel({
               </p>
             )}
             {effective && <EffectiveView effective={effective} />}
+            <div className="source-overrides">
+              <div className="source-field-row">
+                <label className="source-field-label" htmlFor={`src-override-model-${backendId}`}>Model override</label>
+                <input
+                  id={`src-override-model-${backendId}`}
+                  value={overrideModel}
+                  placeholder="inherit native"
+                  onChange={(e) => setOverrideModel(e.target.value)}
+                />
+              </div>
+              <div className="source-field-row">
+                <label className="source-field-label" htmlFor={`src-override-effort-${backendId}`}>Effort override</label>
+                <input
+                  id={`src-override-effort-${backendId}`}
+                  value={overrideEffort}
+                  placeholder="inherit native"
+                  onChange={(e) => setOverrideEffort(e.target.value)}
+                />
+              </div>
+              <div className="source-actions">
+                <button
+                  type="button"
+                  disabled={bind.isPending || preview.isPending}
+                  onClick={() => applyOverrides({ model: overrideModel.trim() || null, effort: overrideEffort.trim() || null })}
+                >
+                  Apply override
+                </button>
+                <button
+                  type="button"
+                  className="btn-link"
+                  disabled={bind.isPending || preview.isPending}
+                  onClick={() => {
+                    setOverrideModel("");
+                    setOverrideEffort("");
+                    applyOverrides({ model: null, effort: null });
+                  }}
+                >
+                  Reset to inherit
+                </button>
+              </div>
+            </div>
             <div className="source-actions">
               <button type="button" disabled={refresh.isPending} onClick={runRefresh}>
                 {refresh.isPending ? "Refreshing…" : effective ? "Refresh" : "Load effective view"}
+              </button>
+              <button
+                type="button"
+                className="btn-link"
+                disabled
+                title="Detached import (materializing an AgentDeck-owned copy) is not available yet — deferred until a verified launch-injection path exists"
+              >
+                Detach copy (unavailable)
               </button>
               <button type="button" className="btn-danger btn-sm" disabled={del.isPending} onClick={runUnlink}>
                 Unlink

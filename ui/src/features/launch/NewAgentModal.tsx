@@ -6,6 +6,7 @@ import { useProjects } from "../../api/config";
 import { useBackends } from "../../api/config";
 import { useConfig } from "../../api/config";
 import { useLaunchAgent } from "../../api/config";
+import { useConfigSources } from "../../api/configSources";
 import { terminalSupported } from "../../lib/backendTypes";
 import { useSuggestedName } from "./useSuggestedName";
 
@@ -83,6 +84,17 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject }: Ne
 
   const selectedBackend = backendsData?.backends[backendId];
   const modelEntries = Object.entries(selectedBackend?.models ?? {});
+
+  // Federation preflight: if the chosen backend has a linked configuration source
+  // that is stale or broken, launch will be blocked server-side (422/409). Warn the
+  // user up front so they can refresh/fix it in Settings instead of only hitting a
+  // late error after clicking Launch.
+  const { data: sources } = useConfigSources(project || undefined);
+  const sourceBinding = (sources?.bindings ?? []).find((b) => b.backend_id === backendId);
+  const sourceNeedsAttention =
+    !!sourceBinding &&
+    (sourceBinding.stale ||
+      ["source_invalid", "approval_required", "source_conflict"].includes(sourceBinding.health ?? ""));
 
   // Terminal is offered only when the host advertises it AND the selected backend
   // type supports it (only claude-acp — mirrors the server terminalSupported gate).
@@ -182,6 +194,13 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject }: Ne
               </div>
             </div>
 
+            {sourceNeedsAttention && (
+              <p className="source-warning">
+                This backend's linked configuration needs attention
+                {sourceBinding!.health ? ` (${sourceBinding!.health}${sourceBinding!.stale ? ", stale" : ""})` : ""}.
+                Launch may be blocked — refresh or fix it in Settings → Backends → Configuration source first.
+              </p>
+            )}
             {launchError && <p className="form-error">{launchError}</p>}
 
             <div className="form-actions">

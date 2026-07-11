@@ -223,4 +223,24 @@ describe("NewAgentModal", () => {
     expect(body.interface).toBe("chat");
     await waitFor(() => expect(onClose.called).toBe(true));
   });
+
+  it("warns before launch when the chosen backend's linked source needs attention", async () => {
+    server.use(
+      http.get("/api/config-sources", () =>
+        HttpResponse.json({
+          bindings: [
+            { backend_id: "claude", provider: "claude-code", mode: "linked", root: "/h/.claude", claims: [], approved_roots: [], health: "source_invalid", stale: true },
+          ],
+          candidates: [],
+        }),
+      ),
+    );
+
+    renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
+    await screen.findByText(/Implementer/);
+    // The stale/invalid bound source for the default (claude) backend is flagged
+    // BEFORE launch, rather than only surfacing as a late server error.
+    expect(await screen.findByText(/linked configuration needs attention/)).toBeInTheDocument();
+    expect(screen.getByText(/source_invalid/)).toBeInTheDocument();
+  });
 });

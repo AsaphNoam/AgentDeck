@@ -9,13 +9,12 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
 ## Current position
 
 - **Active phase:** 7 — Configuration federation + OpenHands & OpenCode backends (Phase 6 complete ✅)
-- **Active subphase:** Phase 7.7 review findings are OPEN — its federation backend/UI is not complete.
-  Fix its BLOCKING findings before treating the un-gated Phase 7 work as complete; **7.4** and **7.8**
-  remain credential-gated and **7.9** remains planned after verified federation.
+- **Active subphase:** Phase 7.7 — all BLOCKING review findings are now CLEARED (2026-07-11 `/fix-review`);
+  only ADVISORY findings remain (federation + legacy batches below), addressable when convenient. **7.4**
+  and **7.8** remain credential-gated and **7.9** remains planned after verified federation.
 - **Spec:** [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) (PRD: [`phase-7-additional-features.md`](phase-7-additional-features.md))
-- **Last code checkpoint:** Phase 7.7 (through `27d4b7d`) is under review; `/fix-review` in progress.
-  Both Go variants are green again (federation canonical-temp-path test fix landed); UI: 88 tests + build pass.
-  See the current review batch below for the remaining open findings.
+- **Last code checkpoint:** Phase 7.7 `/fix-review` cleared all six BLOCKING findings (+2 usability BLOCKERs).
+  Both Go variants green; UI 93 tests + build + embed green. Only ADVISORY findings remain (batches below).
 - **Last contiguous code review:** `8667fe2` (2026-07-04). The 2026-07-11 Phase 7.5–7.7 review is
   intentionally scoped and therefore does not advance this marker across the unreviewed intervening work.
 - **Branch:** `main` (the review-state commit is local); the prior
@@ -32,8 +31,8 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
 - [x] Phase 4 — Persistence: archive, search, resume, file/command tracking ✅
 - [x] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications ✅
 - [x] Phase 6 — Flexibility: terminal runtime, switch-runtime, task groups, drivers (xterm/tmux/iterm2) ✅
-- [ ] Phase 7 — Configuration federation + additional backends — **7.1–7.3 ✅; 7.5–7.7 have
-  BLOCKING review findings** (federation resolver/manager/API/UI); **7.4 + 7.8 GATED** (backend +
+- [ ] Phase 7 — Configuration federation + additional backends — **7.1–7.3 ✅; 7.5–7.7 implemented,
+  BLOCKING review findings cleared** (federation resolver/manager/API/UI); **7.4 + 7.8 GATED** (backend +
   federation live acceptance, credential-gated); **7.9 pending**. PRD
   [`phase-7-additional-features.md`](phase-7-additional-features.md), spec
   [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md)
@@ -67,8 +66,8 @@ advertises xterm/tmux/iterm2.
   redacted `launch_config_json`, migration v8, reserved-MCP-id collision preflight → 409); resume
   frozen-by-default + `config_refresh:true`; switch carries frozen object; native cwd/home pass-through
   (already inherited via `os.Environ()`). detach=true → 501 (gated, see Decisions).
-- [ ] 7.7 (**BLOCKING review findings open**) — Federation onboarding + Settings UI (`ui/src`). Delivered
-  code is listed below; the outstanding work is authoritative in the review batch.
+- [x] 7.7 — Federation onboarding + Settings UI (`ui/src`). BLOCKING review findings cleared (2026-07-11
+  `/fix-review`); remaining ADVISORY items are tracked in the review batches below.
   - [x] `schemas/configSources.ts` + `api/configSources.ts` hooks for `/api/config-sources`
         (GET/preview/PUT/refresh/DELETE); React Query + SSE `config_source_update` → invalidate
         `["config-sources"]`. UI build + 84 tests green (incl. new SSE-invalidation test).
@@ -175,15 +174,15 @@ None.
 > [`usability-review-run-2026-07-10.md`](usability-review-run-2026-07-10.md) (+ [`usability-review-2026-07-10-evidence/`](usability-review-2026-07-10-evidence/)) ·
 > [`usability-review-run-2026-07-11.md`](usability-review-run-2026-07-11.md).
 
-**Open BLOCKING:** **Usability — Mirrored selection silently becomes Linked** and **Usability — a bound
-source has no repair path** (both confirmed in the running dashboard on 2026-07-11; see the new run
-report and the corresponding federation-review bullets below). All eight older usability BLOCKERs were
-fixed to a GREEN checkpoint on 2026-07-10. Advisory/polish items from the older runs remain open in the
+**Open BLOCKING:** none. The two 2026-07-11 usability BLOCKERs — **Mirrored selection silently becomes
+Linked** and **a bound source has no repair path** — shared root causes with the federation-review bullets
+and were fixed in this `/fix-review` (Mirrored now persists Mirrored; a bound source has override / reset /
+refresh / unlink, and detach stays honestly deferred per the standing HUMAN decision). All eight older
+usability BLOCKERs were fixed on 2026-07-10. Advisory/polish items from the older runs remain open in the
 reports' findings sections and in the legacy ADVISORY batch below; address them when convenient.
 
 ### Review through `27d4b7d` — 2026-07-11 (scoped Phase 7.5–7.7 federation batch)
 
-- **BLOCKING — required federation repair controls are absent.** `ui/src/features/settings/ConfigSourcePanel.tsx:162-178,239-241,263-270` always sends empty overrides, offers no reset-to-inherit or detach confirmation, and disables detached import; `ui/src/features/launch/NewAgentModal.tsx:97-111,189-194` has no stale/invalid-source preflight/repair UX. Normal trigger: need an override/reset, detach snapshot, or launch after a source breaks—only a late server error/unlink is possible. This conflicts with 7.7’s required override/reset/detach/gate contract; implement and test all four flows (the existing HUMAN detached-deferral decision remains unresolved).
 - **ADVISORY — advanced custom-root/profile linking is unreachable in the UI.** `ui/src/features/settings/ConfigSourcePanel.tsx:150-155` always sends `root:"auto"` and no profile, despite the API supporting both. A user with a nonstandard root/profile cannot link it without raw API calls. Add controls and a custom-root/profile preview test.
 - **ADVISORY — Codex inventory hides instructions and MCP servers.** `ui/src/features/settings/ConfigSourcePanel.tsx:34-42` groups `instruction`/`mcp`, but `internal/configsource/codex.go:229,315-320` emits `instructions`/`mcp_servers`. Normal Codex users do not see AGENTS.md or MCP inventory. Add the aliases and a Codex inventory UI test.
 - **ADVISORY — an SSE update leaves the displayed effective view stale.** `ui/src/api/sse.ts:102-106` invalidates only the binding query while `ui/src/features/settings/ConfigSourcePanel.tsx:140-143,262` keeps Effective in local state. Normal trigger: load the view, change native config, receive SSE—the health can update but model/inventory remains old until manual refresh. Clear/refetch that view on source update and test it.
@@ -333,6 +332,18 @@ remaining open set; every surviving item is ADVISORY.
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
+
+- 2026-07-11 — **review fix: federation repair controls — override/reset/launch-gate landed; detach stays
+  deferred (HUMAN).** BLOCKING, confirmed real: a bound source had no override/reset UX and launch had no
+  stale/invalid preflight. `ConfigSourcePanel` now edits AgentDeck model/effort overrides on a bound source
+  (re-previews the same root/profile/mode for a fresh consent token, then re-binds with the overrides; "Reset
+  to inherit" re-binds null overrides). `NewAgentModal` preflights the chosen backend's bound source via
+  `useConfigSources` and warns before launch when it is stale/`source_invalid`/`approval_required`/
+  `source_conflict`, instead of only a late server error. Tests: panel override-apply + reset-to-inherit;
+  modal stale-source warning. The **detach/materialize** flow is NOT implemented: it maps to the standing
+  HUMAN "detached config-source import deferred" decision (server 501 until a verified launch-injection path
+  exists); the panel now shows an honest disabled "Detach (unavailable)" affordance rather than nothing.
+  UI 93 tests + build + embed green.
 
 - 2026-07-11 — **review fix: "Link (Mirrored)" actually persists Mirrored.** BLOCKING, confirmed real:
   discovery previewed Linked, and clicking "Link (Mirrored)" reused that linked token; the server derives

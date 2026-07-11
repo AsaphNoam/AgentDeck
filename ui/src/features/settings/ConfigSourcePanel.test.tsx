@@ -124,4 +124,41 @@ describe("ConfigSourcePanel", () => {
     expect(await screen.findByText("Unlink")).toBeInTheDocument();
     expect(screen.getByText("linked")).toBeInTheDocument();
   });
+
+  // Regression (review fix): a bound source must offer override + reset-to-inherit.
+  // Apply re-previews the same source for a token, then re-binds with the overrides;
+  // Reset re-binds with null overrides.
+  it("applies a model override and resets a bound source to inherit", async () => {
+    const boundOverrides: Array<{ model: string | null; effort: string | null }> = [];
+    server.use(
+      http.get("/api/config-sources", () =>
+        HttpResponse.json({
+          bindings: [{ backend_id: "claude", provider: "claude-code", mode: "linked", root: "/h/.claude", claims: [], approved_roots: [], overrides: { model: null, effort: null }, health: "ok", stale: false }],
+          candidates: [],
+        }),
+      ),
+      http.post("/api/config-sources/preview", () =>
+        HttpResponse.json({
+          preview_token: "tokX",
+          expires_at: new Date(Date.now() + 600000).toISOString(),
+          effective: { ...emptyEffective },
+          report: { source_digest: "abc", files_read: [], skipped: [], unknown_keys: [], warnings: [], fingerprints: [], approved_roots: [] },
+        }),
+      ),
+      http.put("/api/config-sources/:id", async ({ request }) => {
+        const body = (await request.json()) as { overrides: { model: string | null; effort: string | null } };
+        boundOverrides.push(body.overrides);
+        return HttpResponse.json({ backend_id: "claude", provider: "claude-code", mode: "linked", root: "/h/.claude", health: "ok", stale: false });
+      }),
+    );
+
+    renderWithQuery(<ConfigSourcePanel backendId="claude" backendType="claude-acp" />);
+    const modelInput = (await screen.findByLabelText("Model override")) as HTMLInputElement;
+    fireEvent.change(modelInput, { target: { value: "opus" } });
+    fireEvent.click(screen.getByText("Apply override"));
+    await waitFor(() => expect(boundOverrides).toContainEqual({ model: "opus", effort: null }));
+
+    fireEvent.click(screen.getByText("Reset to inherit"));
+    await waitFor(() => expect(boundOverrides).toContainEqual({ model: null, effort: null }));
+  });
 });
