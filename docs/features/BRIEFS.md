@@ -6,6 +6,32 @@ Older entries are immutable history; agents resume from [`HANDOFF.md`](HANDOFF.m
 
 ---
 
+### 2026-07-11 — specification: Phase 7 configuration federation
+
+Phase 7 now treats Claude Code/Codex setup as federated configuration rather than a one-time copy.
+Linked mode is preferred: native files remain authoritative, while AgentDeck stores bindings,
+overrides, provenance and fingerprints. Mirrored mode is a rebuildable compatibility cache; detached
+snapshot preserves the old independent-import option. The specs cover models/provider/effort plus
+native instructions, skills, agents, rules/hooks/plugins and MCP servers, following the documented
+[Claude configuration hierarchy](https://code.claude.com/docs/en/settings) and
+[Codex precedence](https://developers.openai.com/codex/config-basic).
+
+Auto-sync is defined as watch + reconciliation + mandatory launch-time freshness, with stale config
+blocking dependent launches. External files are never written; auth stores and secret values are
+never imported. Existing sessions retain frozen high-level settings, while new launches resolve the
+latest valid source. Phase 7 adds implementation-ready API/SSE/UI contracts and subphases 7.5–7.8;
+7.5 is now next. Go build, both Go test variants, all 83 UI tests, and UI build pass.
+
+**Needs attention:** New/changed: none. Carried: the six existing HUMAN decisions in HANDOFF remain
+unchanged. Live OpenHands/OpenCode and federation compatibility checks remain acceptance gates.
+
+**Next:** Agent implements 7.5: the source-binding schema and pure, redacted Claude/Codex resolvers.
+
+**What this teaches:** A pointer-based source of truth still needs explicit snapshot and freshness
+semantics; otherwise resume behavior and watcher misses quietly recreate configuration drift.
+
+---
+
 ### 2026-07-10 — fix-review: all eight usability BLOCKERs cleared (complete)
 
 All eight open blocking usability findings (2026-07-09 & 2026-07-10 runs) are fixed, each with a
