@@ -9,18 +9,19 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
 ## Current position
 
 - **Active phase:** 7 — Configuration federation + OpenHands & OpenCode backends (Phase 6 complete ✅)
-- **Active subphase:** 7.7 (next) — federation onboarding + Settings UI. 7.1–7.3, 7.5, 7.6 done ✅; 7.4 remains an independent live-acceptance gate. Backend federation surface (manager, REST, SSE, launch/resume/switch) is complete and green.
+- **Active subphase:** Phase 7 un-gated work COMPLETE ✅ — 7.1–7.3, 7.5, 7.6, 7.7 done. Only the
+  credential-gated acceptance subphases remain: **7.4** (OpenCode/OpenHands live CLIs) and **7.8**
+  (live Claude/Codex federation). Two ADVISORY UI refinements noted under 7.7 (override-edit on a bound
+  source; NewAgentModal invalid-source pre-warn) — non-blocking.
 - **Spec:** [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) (PRD: [`phase-7-additional-features.md`](phase-7-additional-features.md))
-- **Last GREEN checkpoint:** Phase 7.6 COMPLETE — full backend configuration-federation surface across
-  five commits (`de25cb7` SourceManager core → `771f1dd` REST+SSE → `01b4f76` migration v8 plumbing →
-  `f410449` launch integration → this commit: `config_refresh` resume + reserved-MCP-id preflight).
-  `composeFederation` resolves a bound backend FRESH at launch (correctness boundary; stale/invalid →
-  422/409, never launches from cache), freezes a redacted `launch_config_json` (binding, requested-vs-
-  resolved model/effort/provider, generation, fingerprints, native_inherited), and blocks a reserved
-  `agentdeck-messaging` MCP-id collision with 409. Resume is frozen-by-default with an opt-in
-  `config_refresh:true`; switch carries the frozen object. Both Go test variants green; `-race` clean
-  on configsource/server/state/index (the only `-race` failure, `TestResumeTerminalAgent`, is the
-  documented pre-existing baseline flake, unrelated). UI untouched — that is 7.7.
+- **Last GREEN checkpoint:** Phase 7.7 federation UI COMPLETE (3 commits: `ee5b6a7` data layer →
+  `5b818de` Settings panel → `79b8c7a` onboarding step + embed). `schemas/configSources.ts` +
+  `api/configSources.ts` hooks; SSE `config_source_update` → invalidate `["config-sources"]`;
+  `ConfigSourcePanel` on Claude/Codex backend cards (discover→preview→Link, health, Refresh, Unlink,
+  redacted `EffectiveView` with provenance labels + inventory groups, never source contents/secrets);
+  optional onboarding Config step reusing the panel. `make embed` refreshed the tracked
+  `index.html`. UI: 88 tests + build green. Both Go variants green after embed. Backend federation
+  surface (7.6) unchanged. Phase 7's remaining work is only the credential-gated 7.4 + 7.8 acceptances.
 - **Branch:** `claude/work-phase-hwv0z6` — session working branch (harness-designated). Commit here; push to `origin/claude/work-phase-hwv0z6` on completion.
 
 ---
@@ -34,7 +35,7 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
 - [x] Phase 4 — Persistence: archive, search, resume, file/command tracking ✅
 - [x] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications ✅
 - [x] Phase 6 — Flexibility: terminal runtime, switch-runtime, task groups, drivers (xterm/tmux/iterm2) ✅
-- [ ] Phase 7 — Configuration federation + additional backends — **7.1–7.3, 7.5, 7.6 ✅** (OpenHands/OpenCode integration; federation schema + pure resolvers; source manager + API + SSE + launch/resume/switch integration); **7.4 GATED** (backend live acceptance); **7.7–7.8 pending** (federation UI + live federation acceptance). PRD [`phase-7-additional-features.md`](phase-7-additional-features.md), spec [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md)
+- [ ] Phase 7 — Configuration federation + additional backends — **7.1–7.3, 7.5, 7.6, 7.7 ✅** (OpenHands/OpenCode integration; federation schema + pure resolvers; source manager + API + SSE + launch/resume/switch integration; federation onboarding + Settings UI); **7.4 + 7.8 GATED** (backend + federation live acceptance, credential-gated). PRD [`phase-7-additional-features.md`](phase-7-additional-features.md), spec [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md)
 
 Build order: `0 → 1 → 2 → {3, 4, 5} → 6 → 7` (3/4/5 are independent after 2).
 
