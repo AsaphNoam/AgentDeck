@@ -388,6 +388,16 @@ func (s *Server) composeFederation(ctx context.Context, backendID string, req la
 	if err != nil {
 		return nil, sourceAPIError(err)
 	}
+	// Reserved messaging-MCP collision preflight (§2.4): AgentDeck injects an MCP
+	// server with the reserved id messagingMCPName. If the native config already
+	// declares that exact id, injecting ours would shadow/duplicate it, so block
+	// the launch with 409 source_conflict rather than silently colliding.
+	for _, name := range eff.MCPServers {
+		if name == messagingMCPName {
+			return nil, apiError(runtime.CodeSourceConflict,
+				"native configuration already declares the reserved MCP server id "+messagingMCPName)
+		}
+	}
 	doc := launchConfigDoc{
 		Version:         1,
 		Binding:         launchConfigBinding{BackendID: backendID, Provider: binding.Provider, Profile: binding.Profile, Mode: binding.Mode},

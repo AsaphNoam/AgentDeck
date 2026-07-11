@@ -13,6 +13,7 @@ import (
 	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/configsource"
 	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/agentdeck/agentdeck/internal/state"
 )
 
 func bindFixture(t *testing.T, srv *Server, root, projectDir string) {
@@ -251,5 +252,51 @@ func TestComposeLaunchNoBindingLeavesConfigEmpty(t *testing.T) {
 	}
 	if len(spec.LaunchConfig) != 0 {
 		t.Fatalf("launch config = %s, want empty for an unbound backend", spec.LaunchConfig)
+	}
+}
+
+// TestComposeResumeSpecCarriesFrozenLaunchConfig proves resume reproduces the
+// frozen federation object from the snapshot (the default, no config_refresh).
+func TestComposeResumeSpecCarriesFrozenLaunchConfig(t *testing.T) {
+	srv := testServer(t, true)
+	backends, err := srv.configStore.ReadBackends()
+	if err != nil {
+		t.Fatalf("ReadBackends: %v", err)
+	}
+	be := backends.Backends["claude"]
+	model := be.Models[be.DefaultModel]
+
+	frozen := json.RawMessage(`{"version":1,"binding":{"backend_id":"claude"}}`)
+	snap := state.SessionSnapshot{
+		AgentID: "a_res", Name: "Nova", Role: "implementer", Project: "fed",
+		Backend: "claude", Model: be.DefaultModel, Interface: "chat",
+		Cwd: t.TempDir(), LaunchConfig: frozen,
+	}
+	agent := state.Agent{
+		AgentID: "a_res", Name: "Nova", Role: "implementer", Project: "fed",
+		Backend: "claude", Model: be.DefaultModel, Interface: "chat",
+	}
+	spec, ae := srv.composeResumeSpec(agent, snap, be, model)
+	if ae != nil {
+		t.Fatalf("composeResumeSpec: %s", ae.Message)
+	}
+	if string(spec.LaunchConfig) != string(frozen) {
+		t.Fatalf("resume LaunchConfig = %s, want frozen %s", spec.LaunchConfig, frozen)
+	}
+}
+
+// TestComposeLaunchRejectsReservedMCPCollision proves that a native config
+// declaring the reserved messaging-MCP id blocks the launch with source_conflict.
+func TestComposeLaunchRejectsReservedMCPCollision(t *testing.T) {
+	srv, root, projectDir := federationServer(t)
+	// Rewrite the fixture settings to declare the reserved MCP id.
+	if err := os.WriteFile(filepath.Join(root, "settings.json"),
+		[]byte(`{"model":"user-model","mcpServers":{"`+messagingMCPName+`":{"type":"http","url":"http://x"}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	bindFixture(t, srv, root, projectDir)
+	_, _, ae := srv.composeLaunch(context.Background(), launchRequest{Role: "implementer", Project: "fed"})
+	if ae == nil || ae.Code != runtime.CodeSourceConflict {
+		t.Fatalf("ae = %+v, want source_conflict", ae)
 	}
 }

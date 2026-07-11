@@ -6,6 +6,27 @@ Older entries are immutable history; agents resume from [`HANDOFF.md`](HANDOFF.m
 
 ---
 
+### 2026-07-11 — implementation: Phase 7.6 configuration-federation backend
+
+Phase 7.6 is COMPLETE and committed on branch `claude/work-phase-hwv0z6` (5 green commits; 7.5's
+pending checkpoint was already committed as `ab7dedc`). AgentDeck's whole backend federation surface
+now works: a `SourceManager` holds immutable per-(backend,project) generations, resolves sources FRESH
+at launch (the correctness boundary — a stale/invalid/unapproved source blocks the launch with 422/409
+rather than composing from cache), watches files (fsnotify + 250ms debounce + 30s sweep), and writes a
+redacted last-known-good cache for mirrored bindings. REST routes cover discover/preview/bind/refresh/
+detach with preview-token consent (TOCTOU + expiry); changes publish `config_source_update` over SSE.
+Launch freezes a redacted `launch_config_json` (migration v8) of requested-vs-resolved model/effort/
+provider + source fingerprints; resume is frozen-by-default with opt-in `config_refresh:true`; a
+reserved `agentdeck-messaging` MCP-id collision is blocked with 409. Both Go test variants green.
+
+**Needs attention:** **New:** Detached config-source import deferred — `DELETE ?detach=true` returns
+501 because no verified launch-injection path exists for Claude/Codex assets yet (`detach=false`
+unbind works). **Carried:** Terminal support boundary; HTTP-only agent messaging; Immediate/prompt-based
+UI; Runtime-switch fallbacks; Unbounded transcript indexing; Agent env inheritance by design; Local API
+trusts same-machine callers; API/model compatibility. Live acceptance 7.4/7.8 remains credential-gated.
+
+**Next:** agent — implement 7.7 (federation onboarding + Settings UI in `ui/src`); no backend changes needed.
+
 ### 2026-07-11 — implementation: Phase 7.5 configuration federation
 
 Phase 7.5 is GREEN in the working tree. AgentDeck now has a validated, owner-only source-binding

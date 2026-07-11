@@ -37,15 +37,19 @@ type Candidate struct {
 }
 
 type Effective struct {
-	Model         *string                    `json:"model,omitempty"`
-	FallbackModel *string                    `json:"fallback_model,omitempty"`
-	Effort        *string                    `json:"effort,omitempty"`
-	Verbosity     *string                    `json:"verbosity,omitempty"`
-	Provider      *string                    `json:"provider,omitempty"`
-	Models        []Model                    `json:"models"`
-	Assets        []Asset                    `json:"assets"`
-	EnvKeys       []EnvironmentKey           `json:"environment_keys"`
-	Provenance    map[string]FieldProvenance `json:"provenance"`
+	Model         *string          `json:"model,omitempty"`
+	FallbackModel *string          `json:"fallback_model,omitempty"`
+	Effort        *string          `json:"effort,omitempty"`
+	Verbosity     *string          `json:"verbosity,omitempty"`
+	Provider      *string          `json:"provider,omitempty"`
+	Models        []Model          `json:"models"`
+	Assets        []Asset          `json:"assets"`
+	EnvKeys       []EnvironmentKey `json:"environment_keys"`
+	// MCPServers is the set of MCP server ids declared natively (names only, never
+	// their config/secret values). Used for the reserved-id collision preflight so
+	// AgentDeck's injected messaging MCP never clashes with a user's own (§2.4).
+	MCPServers []string                   `json:"mcp_servers"`
+	Provenance map[string]FieldProvenance `json:"provenance"`
 }
 
 type Model struct {
@@ -114,6 +118,7 @@ func emptyEffective() Effective {
 		Models:     make([]Model, 0),
 		Assets:     make([]Asset, 0),
 		EnvKeys:    make([]EnvironmentKey, 0),
+		MCPServers: make([]string, 0),
 		Provenance: make(map[string]FieldProvenance),
 	}
 }
