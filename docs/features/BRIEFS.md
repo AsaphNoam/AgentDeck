@@ -6,6 +6,26 @@ Older entries are immutable history; agents resume from [`HANDOFF.md`](HANDOFF.m
 
 ---
 
+### 2026-07-11 — review: Phase 7.5–7.7 configuration federation
+
+Phase 7’s federation slice is not ready to close. Review through `27d4b7d` found that linked native
+model defaults are recorded but not applied, a binding cannot reliably follow the user to another
+project, Mirrored silently saves Linked, and onboarding always presents Claude. Required override,
+reset, detach and invalid-source repair paths are also absent. Both Go test variants currently fail
+four canonical-temp-path federation tests; the UI’s 88 tests and production build pass. Six advisory
+findings cover custom roots/profiles, Codex inventory, stale displayed effective config, watcher delay,
+preview-project drift, and OpenHands credential guidance.
+
+**Needs attention:** **New BLOCKING:** federation default application, cross-project binding,
+Mirrored mode, onboarding provider, repair controls, and Go checkpoint. **Carried:** Terminal support;
+HTTP messaging; immediate/prompt UI; runtime-switch fallbacks; transcript indexing; agent environment
+inheritance; same-machine API trust; detached import; API/model compatibility.
+
+**Next:** human — authorize pushing the local review-state commit to `origin/main`; then agent runs
+`/fix-review` before Phase 7 proceeds. Live 7.4/7.8 acceptance still needs authenticated CLIs.
+
+---
+
 ### 2026-07-11 — implementation: Phase 7.6 + 7.7 configuration federation (backend + UI)
 
 Phase 7's entire un-gated scope is COMPLETE on branch `claude/work-phase-hwv0z6` (8 green commits this
