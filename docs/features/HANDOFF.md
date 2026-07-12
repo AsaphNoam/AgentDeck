@@ -13,8 +13,9 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
   only ADVISORY findings remain (federation + legacy batches below), addressable when convenient. **7.4**
   and **7.8** remain credential-gated and **7.9** remains planned after verified federation.
 - **Spec:** [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) (PRD: [`phase-7-additional-features.md`](phase-7-additional-features.md))
-- **Last code checkpoint:** Phase 7.7 `/fix-review` cleared all six BLOCKING findings (+2 usability BLOCKERs).
-  Both Go variants green; UI 93 tests + build + embed green. Only ADVISORY findings remain (batches below).
+- **Last code checkpoint:** 2026-07-12 review fix cleared the final BLOCKING usability finding (J8: untagged Archive
+  search fallback added). Go untagged + tagged + UI 93 tests + build + embed green. All BLOCKERs cleared;
+  only ADVISORY findings remain (batches below).
 - **Last contiguous code review:** `8667fe2` (2026-07-04). The 2026-07-11 Phase 7.5–7.7 review is
   intentionally scoped and therefore does not advance this marker across the unreviewed intervening work.
 - **Branch:** `main` (the review-state commit is local); the prior
@@ -175,22 +176,14 @@ None.
 > [`usability-review-run-2026-07-11.md`](usability-review-run-2026-07-11.md) ·
 > [`usability-review-run-2026-07-11-e2e.md`](usability-review-run-2026-07-11-e2e.md).
 
-**Open BLOCKING:** **Usability J8 — untagged Archive search exposes an FTS5 error and stale results** (below).
-The two 2026-07-11 usability BLOCKERs — **Mirrored selection silently becomes
-Linked** and **a bound source has no repair path** — shared root causes with the federation-review bullets
-and were fixed in this `/fix-review` (Mirrored now persists Mirrored; a bound source has override / reset /
-refresh / unlink, and detach stays honestly deferred per the standing HUMAN decision). All eight older
-usability BLOCKERs were fixed on 2026-07-10. Advisory/polish items from the older runs remain open in the
-reports' findings sections and in the legacy ADVISORY batch below; address them when convenient.
+**Open BLOCKING:** None. All usability BLOCKERs have been fixed:
+The two 2026-07-11 BLOCKERs — **Mirrored selection silently becomes Linked** and **a bound source has no repair
+path** — shared root causes with the federation-review bullets and were fixed in the 2026-07-11 `/fix-review`
+(Mirrored now persists Mirrored; a bound source has override/reset/refresh/unlink, detach honestly deferred).
+The 2026-07-12 BLOCKER — **untagged Archive search fails** (J8) — was fixed by adding a LIKE-based fallback when
+FTS5 is unavailable; both Go variants + untagged build green. All eight 2026-07-10 BLOCKERs were also fixed then.
+Advisory/polish items from all runs remain open in reports' sections and the legacy batch below; address when convenient.
 
-### Usability review — full journey sweep resumed 2026-07-12
-
-- **BLOCKING — Usability J8: untagged Archive search fails and preserves stale rows.** In the real untagged
-  `go build ./cmd/agentdeck` dashboard, opening Archive with existing sessions then searching `Permission`
-  visibly renders `archive: count search: no such module: fts5` while continuing to show all pre-search rows.
-  A normal user on the documented fallback build cannot search and is misled by stale results. Add a non-FTS5
-  search fallback (or an honest unavailable state that clears rows) and browser-test it; full repro is in
-  `usability-review-run-2026-07-11-e2e.md`.
 
 ### Review through `27d4b7d` — 2026-07-11 (scoped Phase 7.5–7.7 federation batch)
 
@@ -342,6 +335,8 @@ remaining open set; every surviving item is ADVISORY.
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
+
+- 2026-07-12 — **review fix: untagged Archive search falls back to LIKE when FTS5 unavailable — green checkpoint.** BLOCKING, confirmed real: the untagged `go build ./cmd/agentdeck` build displayed `archive: count search: no such module: fts5` and retained stale pre-search rows. Added `isFTS5Missing` error detector + `searchFallback` method that queries metadata fields (name/role/project/backend) using LIKE-based substring matching. Both error paths (count query and main query) trigger the fallback. Regression test: `TestSearchFallbackFiltersMetadata` (untagged build only, via `//go:build !sqlite_fts5`). Green: `go test ./...`, `go test -tags sqlite_fts5 ./...`, `go build ./cmd/agentdeck`, `go build -o agentdeck-notags ./cmd/agentdeck`.
 
 - 2026-07-12 — **usability review: restored-access sweep — J8 fallback search BLOCKING.** Browser and
   loopback access returned: fresh onboarding, permission approve/deny, tagged archive search, archive resume,

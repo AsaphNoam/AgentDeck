@@ -110,6 +110,9 @@ FROM sessions_fts
 JOIN sessions s ON s.agent_id = sessions_fts.agent_id
 LEFT JOIN running r ON r.agent_id = s.agent_id
 WHERE sessions_fts MATCH ?`+where, countArgs...).Scan(&total); err != nil {
+		if isFTS5Missing(err) {
+			return a.searchFallback(q, raw)
+		}
 		return 0, nil, fmt.Errorf("archive: count search: %w", err)
 	}
 	queryArgs := append([]any{match}, args...)
@@ -127,6 +130,9 @@ WHERE sessions_fts MATCH ?`+where+`
 ORDER BY bm25(sessions_fts, 8.0, 4.0, 4.0, 2.0, 1.0, 1.0, 1.0, 1.0), s.updated_at DESC, s.agent_id
 LIMIT ? OFFSET ?`, queryArgs...)
 	if err != nil {
+		if isFTS5Missing(err) {
+			return a.searchFallback(q, raw)
+		}
 		return 0, nil, fmt.Errorf("archive: search: %w", err)
 	}
 	defer rows.Close()
@@ -139,6 +145,74 @@ LIMIT ? OFFSET ?`, queryArgs...)
 		results[i].content = ""
 	}
 	return total, results, nil
+}
+
+func (a *Archive) searchFallback(q Query, raw string) (int, []Result, error) {
+	terms := splitTerms(raw)
+	if len(terms) == 0 {
+		return a.list(q)
+	}
+
+	where, args := activeWhere(q.Active, "WHERE")
+	var total int
+
+	placeholders := make([]string, 0, len(terms))
+	for range terms {
+		placeholders = append(placeholders, `(s.name LIKE ? OR s.role LIKE ? OR s.project LIKE ? OR s.backend LIKE ?)`)
+	}
+	textFilter := " (" + strings.Join(placeholders, " AND ") + ")"
+
+	var whereClause string
+	if where == "" {
+		whereClause = " WHERE" + textFilter
+	} else {
+		whereClause = where + " AND" + textFilter
+	}
+
+	countArgs := args
+	for _, t := range terms {
+		likePattern := "%" + strings.ReplaceAll(t, "%", "\\%") + "%"
+		countArgs = append(countArgs, likePattern, likePattern, likePattern, likePattern)
+	}
+
+	if err := a.db.QueryRow(`SELECT COUNT(*) FROM sessions s LEFT JOIN running r ON r.agent_id = s.agent_id`+whereClause, countArgs...).Scan(&total); err != nil {
+		return 0, nil, fmt.Errorf("archive: fallback count: %w", err)
+	}
+
+	queryArgs := append([]any{}, args...)
+	for _, t := range terms {
+		likePattern := "%" + strings.ReplaceAll(t, "%", "\\%") + "%"
+		queryArgs = append(queryArgs, likePattern, likePattern, likePattern, likePattern)
+	}
+	queryArgs = append(queryArgs, q.Limit, q.Offset)
+
+	rows, err := a.db.Query(`
+SELECT s.agent_id, s.name, s.role, s.project, s.backend, s.model, s.interface, s.grp,
+       s.created_at, s.updated_at, s.turn_count, s.files_touched, s.commands_run,
+       (r.agent_id IS NOT NULL) AS active, '' AS snippet, '' AS content
+FROM sessions s
+LEFT JOIN running r ON r.agent_id = s.agent_id`+whereClause+`
+ORDER BY s.updated_at DESC, s.agent_id
+LIMIT ? OFFSET ?`, queryArgs...)
+	if err != nil {
+		return 0, nil, fmt.Errorf("archive: fallback search: %w", err)
+	}
+	defer rows.Close()
+	results, err := scanResults(rows)
+	if err != nil {
+		return 0, nil, err
+	}
+	for i := range results {
+		results[i].MatchedIn = matchedIn(results[i], raw)
+	}
+	return total, results, nil
+}
+
+func isFTS5Missing(err error) bool {
+	errStr := err.Error()
+	return strings.Contains(errStr, "no such table: sessions_fts") ||
+		strings.Contains(errStr, "no such column: sessions_fts") ||
+		strings.Contains(errStr, "no such module")
 }
 
 func activeWhere(active *bool, prefix string) (string, []any) {
