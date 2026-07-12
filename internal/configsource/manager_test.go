@@ -270,3 +270,60 @@ func TestWatchReresolvesOnFilesystemEvent(t *testing.T) {
 		}
 	}
 }
+
+// TestHydrateBindingsPopulatesGenerations guards the BLOCKING finding that
+// persisted config-source bindings are never rehydrated into watch/sweep after
+// restart (invariant §1 — generators populated at startup or on first access).
+// After a fresh Manager is created, HydrateBindings loads persisted bindings so
+// the watcher immediately monitors them for external edits.
+func TestHydrateBindingsPopulatesGenerations(t *testing.T) {
+	_, store, _, root, project := managerFixture(t)
+	// Write a binding to config-sources.json.
+	writeBinding(t, store, "claude", Binding{
+		Provider: ProviderClaude, Mode: ModeLinked, Root: root,
+		Claims: []string{"launch_defaults"}, Approved: []string{root, project.Cwd},
+	})
+
+	// Create a fresh Manager (simulating a server restart).
+	rec := &recorder{}
+	m2 := NewManager(store, map[string]Resolver{
+		ProviderClaude: NewClaudeResolver(root[:strings.LastIndex(root, string(os.PathSeparator))]),
+	}, rec.publish)
+
+	// Before hydration, m.gens is empty (nothing watches yet).
+	if _, _, _, ok := m2.Status("claude", "proj"); ok {
+		t.Fatal("m2.Status before hydration: want no generation")
+	}
+
+	// Hydrate the persisted binding.
+	m2.HydrateBindings(context.Background(), map[string]config.Project{"proj": project})
+
+	// After hydration, the binding is loaded and cached.
+	eff, _, health, stale, ok := m2.Cached("claude", "proj")
+	if !ok || health != HealthOK || stale {
+		t.Fatalf("Cached after hydrate = ok:%v health:%q stale:%v, want ok:true health:ok stale:false", ok, health, stale)
+	}
+	if eff.Model == nil || *eff.Model != "user-model" {
+		t.Fatalf("hydrated model = %v, want user-model", eff.Model)
+	}
+
+	// The watcher can now detect external changes (no need to ResolveFresh first).
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go m2.Watch(ctx)
+	time.Sleep(150 * time.Millisecond)
+	writeClaudeTestFile(t, filepath.Join(root, "settings.json"), `{"model":"hydrate-watch-model"}`)
+
+	deadline := time.After(3 * time.Second)
+	for {
+		eff, _, _, _, ok := m2.Cached("claude", "proj")
+		if ok && eff.Model != nil && *eff.Model == "hydrate-watch-model" {
+			return
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("watch after hydrate did not re-resolve; model=%v", eff.Model)
+		case <-time.After(50 * time.Millisecond):
+		}
+	}
+}
