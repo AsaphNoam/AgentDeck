@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRoles, useProjects, useBackends, useLaunchAgent, usePutConfig, configErrorMessage } from "../../../api/config";
 import { useSuggestedName } from "../../launch/useSuggestedName";
+import { useUiStore } from "../../../store/uiStore";
 
 interface LaunchStepProps {
   onDone: () => void;
@@ -15,6 +16,7 @@ export function LaunchStep({ onDone, initialProject }: LaunchStepProps) {
   const { data: backendsData } = useBackends();
   const launch = useLaunchAgent();
   const putConfig = usePutConfig();
+  const pushError = useUiStore((state) => state.pushError);
 
   const roleEntries = Object.entries(rolesData ?? {});
   const projectEntries = Object.entries(projectsData ?? {});
@@ -30,6 +32,7 @@ export function LaunchStep({ onDone, initialProject }: LaunchStepProps) {
   const [role, setRole] = useState(defaultRole);
   const [project, setProject] = useState(defaultProject);
   const [error, setError] = useState<string | null>(null);
+  const [launchSucceeded, setLaunchSucceeded] = useState(false);
 
   const [name, setName] = useSuggestedName(role, project);
 
@@ -50,9 +53,14 @@ export function LaunchStep({ onDone, initialProject }: LaunchStepProps) {
       { name: name || undefined, role, project, backend: defaultBackendId || undefined, interface: "chat" },
       {
         onSuccess: () => {
+          setLaunchSucceeded(true);
           putConfig.mutate({ onboarding_complete: true }, {
             onSuccess: onDone,
-            onError: () => onDone(), // still dismiss even if config write fails
+            onError: (e) => {
+              pushError("Failed to mark onboarding complete", configErrorMessage(e));
+              // Agent launched successfully; keep the wizard visible but show the error.
+              // User can manually dismiss or the service will eventually reconcile the state.
+            },
           });
         },
         onError: (e) => setError(configErrorMessage(e)),
@@ -98,8 +106,11 @@ export function LaunchStep({ onDone, initialProject }: LaunchStepProps) {
 
       <div className="form-actions">
         <button type="button" onClick={handleLaunch} disabled={launch.isPending || putConfig.isPending || !role || !project}>
-          {launch.isPending || putConfig.isPending ? "Launching…" : "Launch"}
+          {launch.isPending ? "Launching…" : putConfig.isPending ? "Completing setup…" : "Launch"}
         </button>
+        {launchSucceeded && !putConfig.isSuccess && (
+          <p className="form-info">Agent launched successfully. Completing setup…</p>
+        )}
       </div>
     </div>
   );
