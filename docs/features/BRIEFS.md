@@ -7,6 +7,16 @@ Older entries are immutable history; agents resume from [`HANDOFF.md`](HANDOFF.m
 
 ---
 
+### 2026-07-12 — review: end-to-end Phase 0–7
+
+The first contiguous end-to-end code review now covers the current product through `4036e78`, rather than only recent phase slices. The complete Go checkpoint, all 94 UI tests and production UI build, plus concurrency-focused race suites are green, but tracing restart boundaries across phases found two release-blocking integration defects. If the dashboard crashes while an agent process survives, the restarted server has a live database row but no runtime owner; Stop and Release report success without killing it, while Switch can start a second process under the same identity. Separately, a saved Claude/Codex configuration binding is not resolved back into the watcher after restart, so native edits produce neither health updates nor Server-Sent Events until a manual Refresh or launch.
+
+**Needs attention:** New/changed this session — **BLOCKING crash-restart lifecycle orphan reaping** and **BLOCKING persisted federation watch rehydration**. Carried HUMAN — **Terminal support boundary**, **HTTP-only agent messaging**, **Immediate/prompt-based UI**, **Runtime-switch fallbacks**, **Unbounded transcript indexing**, **Agent env inheritance by design**, **Local API trusts same-machine callers**, **Detached config-source import deferred**, and **API/model compatibility**. Real-backend and federation acceptance remain credential-gated in 7.4/7.8.
+
+**Next:** Agent — run `/fix-review` for the two new BLOCKING findings before starting 7.9.
+
+---
+
 ### 2026-07-12 — usability review: comprehensive e2e journey suite
 
 Comprehensive end-to-end exercise of all ten key user journeys (onboarding, federation, backend/project config, launch via fakeACP, archive/search, project CRUD, settings, UI state, error handling, edge cases) confirms the shipped product is **green across the board**. Both Go variants (untagged and sqlite_fts5-tagged), all 94 UI tests, dev server archive/search, and full API flow testing reveal no new BLOCKING findings—all prior blockers from earlier this week (J1–J10, S1–S5) are confirmed fixed. The untagged Archive fallback (J8) is working: LIKE-based metadata search succeeds when FTS5 module is unavailable.
