@@ -1,10 +1,11 @@
 import React from "react";
-import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
 import { LaunchStep } from "./LaunchStep";
+import { useUiStore } from "../../../store/uiStore";
 
 // Both the seeded my-app (bad cwd) and the user's freshly-created project exist.
 const roles = { implementer: { title: "Implementer", system_prompt: "" } };
@@ -54,5 +55,39 @@ describe("LaunchStep", () => {
 
     await waitFor(() => expect(launchBody).not.toBeNull());
     expect(launchBody?.project).toBe("user-proj");
+  });
+
+  it("surfaces config write failure instead of silently dismissing (launch success + config write failure)", async () => {
+    // Setup: config PUT will fail after launch succeeds.
+    server.use(
+      http.put("/api/config", () =>
+        HttpResponse.json(
+          { error: "Server error", message: "disk write failed" },
+          { status: 500 }
+        )
+      )
+    );
+
+    const onDone = vi.fn();
+
+    renderWithQuery(<LaunchStep onDone={onDone} initialProject="user-proj" />);
+
+    expect(await screen.findByText("User Proj (user-proj)")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Launch"));
+
+    // Wait for launch to succeed; config write will fail and show an error toast.
+    // The key assertion: onDone should NOT be called (wizard stays visible).
+    await waitFor(() => {
+      expect(launchBody).not.toBeNull(); // Launch succeeded.
+    });
+
+    // Give the mutation time to fail and process the error.
+    await new Promise((r) => setTimeout(r, 100));
+
+    expect(onDone).not.toHaveBeenCalled();
+
+    // The launch button should still exist; the wizard stays visible for the user
+    // to manually dismiss or retry.
+    expect(screen.getByText("Launch")).toBeInTheDocument();
   });
 });

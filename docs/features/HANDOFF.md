@@ -187,24 +187,16 @@ release claims the affected live-CLI compatibility.
 > [`usability-review-run-2026-07-12-comprehensive-e2e.md`](usability-review-run-2026-07-12-comprehensive-e2e.md) ·
 > [`usability-review-run-2026-07-12-canonical-e2e.md`](usability-review-run-2026-07-12-canonical-e2e.md).
 
-**Open BLOCKING:** One. The canonical 12-journey review found the onboarding completion failure below.
-Earlier usability BLOCKERs remain fixed:
-The two 2026-07-11 BLOCKERs — **Mirrored selection silently becomes Linked** and **a bound source has no repair
-path** — shared root causes with the federation-review bullets and were fixed in the 2026-07-11 `/fix-review`
-(Mirrored now persists Mirrored; a bound source has override/reset/refresh/unlink, detach honestly deferred).
-The 2026-07-12 BLOCKER — **untagged Archive search fails** (J8) — was fixed by adding a LIKE-based fallback when
-FTS5 is unavailable; both Go variants + untagged build green. All eight 2026-07-10 BLOCKERs were also fixed then.
+**Open BLOCKING:** Two cross-phase lifecycle defects remain (restart runtimes not reaped; federation bindings not
+rehydrated). All usability BLOCKERs from the 12-journey canonical review are now fixed:
+The 2026-07-12 BLOCKING — **onboarding completion write failure treated as success** — was fixed by surfacing
+the config write error instead of silently dismissing; `onDone` now fires only after persistence succeeds.
+Earlier usability BLOCKERs: **Mirrored selection silently becomes Linked** and **a bound source has no repair
+path** (2026-07-11, fixed by federation repair controls); **untagged Archive search fails** (2026-07-12,
+fixed by LIKE fallback). All eight 2026-07-10 BLOCKERs were also fixed.
 Advisory/polish items from all runs remain open in reports' sections and the legacy batch below; address when convenient.
 
 ### Usability review — 2026-07-12 (canonical Phase 0–7 E2E)
-
-- **BLOCKING — Usability S5/J2 onboarding completion write failure is treated as success.**
-  `ui/src/features/onboarding/steps/LaunchStep.tsx:53-56`: after the first agent launches, the separate
-  `PUT /api/config {onboarding_complete:true}` mutation routes `onError` to `onDone()`, exactly like success.
-  Normal trigger: a first-time user's launch succeeds but that config write hits a disconnect, disk error,
-  or server 500. The wizard disappears with no error/retry while the only completion bit stays false, so it
-  can return after reload. Surface the structured error and retry while preserving the launched agent; call
-  `onDone` only after persistence succeeds, with a regression test for launch-success/config-write-failure.
 - **ADVISORY — Usability J3 reloaded assistant text is split into one card per streamed delta.**
   `ui/src/store/transcriptStore.ts` hydration/normalization path (live evidence in
   `usability-review-2026-07-12-canonical-e2e-evidence/J3-roundtrip.png` and
@@ -420,6 +412,8 @@ remaining open set; every surviving item is ADVISORY.
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
+
+- 2026-07-12 — **review fix: onboarding completion write failure surfaces error instead of silent dismissal — green checkpoint.** BLOCKING, confirmed real: after launch succeeds, the separate `PUT /api/config {onboarding_complete:true}` routed `onError` to `onDone()` like success, so a config write failure (network/500/disk error) silently dismissed the wizard while the flag stayed false, returning the user to onboarding on reload. Changed the error handler to surface a structured error toast via `pushError` and keep the wizard visible; `onDone` now fires only after the config write succeeds. The launched agent is preserved either way. Regression test: config-write-failure-after-launch-success asserts `onDone` is not called and the wizard stays visible. UI 95 tests + build + embed green; Go checkpoint green.
 
 - 2026-07-12 — **usability review: canonical Phase 0–7 E2E — findings recorded.** The real tagged and
   untagged builds, both Go test variants, all 94 UI tests/build, static S1–S5 sweeps, and live browser
