@@ -7,6 +7,24 @@ Older entries are immutable history; agents resume from [`HANDOFF.md`](HANDOFF.m
 
 ---
 
+### 2026-07-12 — usability review: restored-access end-to-end sweep
+
+Restored browser and local-loopback access let the review complete fresh onboarding, streamed chat,
+permission approve/deny, stop→archive→resume, tagged archive search, multi-agent mail send/read/clear, and
+restart durability. The only newly confirmed release blocker is the **untagged Archive fallback**: searching
+shows a raw `no such module: fts5` error while leaving unrelated old rows visible, so a user cannot trust
+results on that build. Full matrix and repro: `usability-review-run-2026-07-11-e2e.md`.
+
+**Needs attention:** New/changed: **BLOCKING Usability J8 — untagged Archive search** must gain a fallback
+or honest empty error state. Carried: terminal support boundary; HTTP-only messaging; immediate/prompt UI;
+runtime-switch fallbacks; unbounded transcript indexing; agent env inheritance; same-machine API trust;
+detached config-source import; API/model compatibility. Real Claude/Codex acceptance remains credential-gated.
+
+**Next:** Agent — run `/fix-review` for the J8 blocker, then cover the remaining terminal, native-switch,
+crash, invalid-form, and group/reorder variants.
+
+---
+
 ### 2026-07-11 — usability review: full end-to-end journey sweep
 
 The shipped binary, both Go variants, and 94 UI tests are green. In an isolated live dashboard, first-agent
