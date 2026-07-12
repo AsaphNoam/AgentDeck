@@ -7,6 +7,16 @@ Older entries are immutable history; agents resume from [`HANDOFF.md`](HANDOFF.m
 
 ---
 
+### 2026-07-12 — fix-review: untagged Archive search fallback
+
+All remaining BLOCKING findings have been cleared. The final one—untagged Archive search showing a raw FTS5 error—was fixed by adding a fallback that uses LIKE-based metadata search (name, role, project, backend fields) when FTS5 is unavailable. Both query paths (count and main) now gracefully degrade when `sessions_fts` table or FTS5 module is missing, so users on the documented no-FTS5 build get working search results instead of errors + stale rows. Added `TestSearchFallbackFiltersMetadata` to guard against regression.
+
+**Needs attention:** None—all BLOCKING findings cleared. Remaining items are ADVISORY (federation UI gaps, legacy optimizations, documentation drift). Nine open HUMAN decisions carry forward.
+
+**Next:** Either continue with ADVISORY findings when convenient, or hand off. Phase 7.4 and 7.8 remain credential-gated (real backend acceptance); 7.9 (agentdeck_docs MCP) is planned after federation verification.
+
+---
+
 ### 2026-07-12 — usability review: restored-access end-to-end sweep
 
 Restored browser and local-loopback access let the review complete fresh onboarding, streamed chat,
