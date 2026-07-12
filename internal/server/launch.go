@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/agentdeck/agentdeck/internal/backend"
@@ -476,4 +477,31 @@ func (s *Server) cleanupHookSettings(agentID string) {
 	if err := hooks.RemoveAgentSettings(s.configStore.Home(), agentID); err != nil {
 		s.log.Warn("cleanup hook settings", "agent_id", agentID, "err", err)
 	}
+}
+
+// reapOrphanRuntime checks if there is a live orphan running row (a process that
+// survived a dashboard crash), kills it if so, and deletes the running row.
+// Called when registry.Stop returns ErrNoHandle (no handler in the registry),
+// which means the runtime exited and deregistered, but the running row persists.
+// If the PID is still alive, it's an orphan left by a prior crash.
+func (s *Server) reapOrphanRuntime(agentID string) error {
+	running, err := s.stateStore.ReadRunning(agentID)
+	if err != nil {
+		// No running row: already cleaned up or never existed.
+		return nil
+	}
+
+	// Check if the PID is actually still alive.
+	if runtime.PidAlive(running.PID) {
+		// Kill it with SIGKILL to ensure it dies (SIGTERM can be ignored).
+		s.log.Info("reaping orphan runtime", "agent_id", agentID, "pid", running.PID)
+		_ = syscall.Kill(running.PID, syscall.SIGKILL)
+	}
+
+	// Delete the running row.
+	if err := s.stateStore.DeleteRunning(agentID); err != nil {
+		s.log.Warn("delete running row", "agent_id", agentID, "err", err)
+		return err
+	}
+	return nil
 }

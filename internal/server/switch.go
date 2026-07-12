@@ -135,9 +135,15 @@ func (s *Server) handleSwitchRuntime(w http.ResponseWriter, r *http.Request) {
 	// 1. Cancel any in-flight turn and let it settle (streamed events already
 	//    persisted), then stop the old runtime (removes running row, status done).
 	s.cancelAndWait(r.Context(), id, switchCancelTimeout)
-	if err := s.registry.Stop(r.Context(), id); err != nil && !errors.Is(err, runtime.ErrNoHandle) {
-		writeAPIError(w, apiError(runtime.CodeInternal, "stop current runtime: "+err.Error()))
-		return
+	if err := s.registry.Stop(r.Context(), id); err != nil {
+		if !errors.Is(err, runtime.ErrNoHandle) {
+			writeAPIError(w, apiError(runtime.CodeInternal, "stop current runtime: "+err.Error()))
+			return
+		}
+		// ErrNoHandle: no handler in registry, but check for orphan runtimes (invariant §4).
+		if rerr := s.reapOrphanRuntime(id); rerr != nil {
+			s.log.Warn("reap orphan during switch", "agent_id", id, "err", rerr)
+		}
 	}
 
 	// 2. Clean the OLD runtime's MCP token + hook settings (keyed by agent_id)

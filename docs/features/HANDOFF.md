@@ -187,8 +187,8 @@ release claims the affected live-CLI compatibility.
 > [`usability-review-run-2026-07-12-comprehensive-e2e.md`](usability-review-run-2026-07-12-comprehensive-e2e.md) ·
 > [`usability-review-run-2026-07-12-canonical-e2e.md`](usability-review-run-2026-07-12-canonical-e2e.md).
 
-**Open BLOCKING:** Two cross-phase lifecycle defects remain (restart runtimes not reaped; federation bindings not
-rehydrated). All usability BLOCKERs from the 12-journey canonical review are now fixed:
+**Open BLOCKING:** One cross-phase defect remains (federation bindings not rehydrated after restart). All usability
+BLOCKERs from the 12-journey canonical review are now fixed; the restart-orphan-runtimes BLOCKING was also just fixed:
 The 2026-07-12 BLOCKING — **onboarding completion write failure treated as success** — was fixed by surfacing
 the config write error instead of silently dismissing; `onDone` now fires only after persistence succeeds.
 Earlier usability BLOCKERs: **Mirrored selection silently becomes Linked** and **a bound source has no repair
@@ -412,6 +412,8 @@ remaining open set; every surviving item is ADVISORY.
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
+
+- 2026-07-12 — **review fix: orphan runtimes reaped on restart → stop/switch/release — green checkpoint.** BLOCKING, confirmed real: after a dashboard crash, if the agent CLI survives, the running row persists but the runtime handler is gone. Stop/Switch/Release ignore the `ErrNoHandle` result and return success, leaving the orphan alive—violating invariant §4. Added `reapOrphanRuntime()` helper that checks for live running rows when `ErrNoHandle` is returned, kills any live PID with SIGKILL, and deletes the row. Wired it into all three lifecycle paths: `handleStop` (sessions.go), `handleSwitch` (switch.go), and `releaseAgents` (groups.go). Regression test: `TestStopReapsOrphanRuntimeAfterRestart` simulates a restart with an orphaned running row and verifies Stop succeeds and cleans it up. Both Go variants + UI tests green.
 
 - 2026-07-12 — **review fix: onboarding completion write failure surfaces error instead of silent dismissal — green checkpoint.** BLOCKING, confirmed real: after launch succeeds, the separate `PUT /api/config {onboarding_complete:true}` routed `onError` to `onDone()` like success, so a config write failure (network/500/disk error) silently dismissed the wizard while the flag stayed false, returning the user to onboarding on reload. Changed the error handler to surface a structured error toast via `pushError` and keep the wizard visible; `onDone` now fires only after the config write succeeds. The launched agent is preserved either way. Regression test: config-write-failure-after-launch-success asserts `onDone` is not called and the wizard stays visible. UI 95 tests + build + embed green; Go checkpoint green.
 

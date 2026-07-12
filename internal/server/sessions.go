@@ -125,8 +125,9 @@ func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 			// Not currently running. If the identity still exists, the agent is
 			// already stopped — make stop idempotent so a double-click or a
 			// lost-response retry reads as success, not a phantom "unknown agent".
-			// 404 is reserved for ids with no identity row at all.
+			// Check for orphan runtimes left by a prior crash (invariant §4).
 			if _, rerr := s.stateStore.ReadAgent(id); rerr == nil {
+				s.reapOrphanRuntime(id)
 				s.teardownAgentRegistration(id)
 				writeJSON(w, http.StatusOK, map[string]any{"stopped": true})
 				return
