@@ -9,16 +9,18 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
 ## Current position
 
 - **Active phase:** 7 — Configuration federation + OpenHands & OpenCode backends (Phase 6 complete ✅)
-- **Active subphase:** Phase 7.7 — an end-to-end Phase 0–7 review found two BLOCKING cross-phase
-  lifecycle/federation restart defects; fix-review must clear them before **7.9**. **7.4** and **7.8**
+- **Active subphase:** Phase 7.7 — end-to-end code + usability reviews found three BLOCKING cross-phase
+  defects (lifecycle restart, federation restart, onboarding completion); fix-review must clear them
+  before **7.9**. **7.4** and **7.8**
   remain credential-gated.
 - **Spec:** [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) (PRD: [`phase-7-additional-features.md`](phase-7-additional-features.md))
-- **Last code checkpoint:** 2026-07-12 review fix added the untagged Archive search fallback. The subsequent
-  end-to-end review ran Go untagged + tagged, UI 94 tests/build, and focused race suites green; it recorded
-  two new BLOCKING findings without changing product code.
+- **Last code checkpoint:** 2026-07-12 review fix added the untagged Archive search fallback. Subsequent
+  end-to-end code/usability reviews ran both Go variants and UI 94 tests/build green; they recorded two
+  restart BLOCKING findings plus one onboarding-completion BLOCKING finding without changing product code.
 - **Last contiguous code review:** `4036e78` (2026-07-12), end-to-end across the current Phase 0–7
   product code and every intervening code/content commit.
-- **Branch:** `main` (the review-state commit is local); the prior
+- **Branch:** `main` (the prior review-state commit is local; the canonical usability-review state
+  is written but uncommitted because Git escalation hit the environment usage limit); the prior
   `claude/work-phase-hwv0z6` branch note was stale. Push to `origin/main` awaits explicit human approval.
 
 ---
@@ -150,13 +152,20 @@ advertises xterm/tmux/iterm2.
   rejects it, implement the documented stdio proxy before claiming messaging compatibility for that CLI.
 - Run real Codex chat launch, turn, stop, and resume with credentials; reconcile model/resume/hook behavior.
 - Run real Claude terminal launch/switch with the composed flags and hooks; reconcile any CLI flag mismatch.
+- Re-run the canonical E2E checkpoints gated by the exhausted local browser/loopback approval quota:
+  J5 many/group/reorder, J6 live xterm, J7 browser resume/switch, J8 live untagged many/resume,
+  J9 rendered Settings/federation, J10 two-agent mail, J11 crash/reconnect, and J12 restart durability.
 
 These gates require credentials but do not block subphase 6.7 or Phase 7. They must be cleared before a
 release claims the affected live-CLI compatibility.
 
 ## Blocked on human
 
-None.
+- **Canonical usability-review state commit pending.** The report, four screenshots, handoff and exact
+  brief are written and `git diff --check` passes, but `.git` is sandbox-read-only and the required
+  escalation was rejected because the approval service exhausted its usage quota (next retry window shown
+  by the service: 19:08 local). Commit the existing state-only changes as
+  `usability review: canonical Phase 0-7 E2E — state recorded`; do not discard or regenerate them.
 
 ## Review findings (from the last review — BLOCKING and ADVISORY)
 
@@ -175,15 +184,68 @@ None.
 > [`usability-review-run-2026-07-10.md`](usability-review-run-2026-07-10.md) (+ [`usability-review-2026-07-10-evidence/`](usability-review-2026-07-10-evidence/)) ·
 > [`usability-review-run-2026-07-11.md`](usability-review-run-2026-07-11.md) ·
 > [`usability-review-run-2026-07-11-e2e.md`](usability-review-run-2026-07-11-e2e.md) ·
-> [`usability-review-run-2026-07-12-comprehensive-e2e.md`](usability-review-run-2026-07-12-comprehensive-e2e.md).
+> [`usability-review-run-2026-07-12-comprehensive-e2e.md`](usability-review-run-2026-07-12-comprehensive-e2e.md) ·
+> [`usability-review-run-2026-07-12-canonical-e2e.md`](usability-review-run-2026-07-12-canonical-e2e.md).
 
-**Open BLOCKING:** None. All usability BLOCKERs have been fixed:
+**Open BLOCKING:** One. The canonical 12-journey review found the onboarding completion failure below.
+Earlier usability BLOCKERs remain fixed:
 The two 2026-07-11 BLOCKERs — **Mirrored selection silently becomes Linked** and **a bound source has no repair
 path** — shared root causes with the federation-review bullets and were fixed in the 2026-07-11 `/fix-review`
 (Mirrored now persists Mirrored; a bound source has override/reset/refresh/unlink, detach honestly deferred).
 The 2026-07-12 BLOCKER — **untagged Archive search fails** (J8) — was fixed by adding a LIKE-based fallback when
 FTS5 is unavailable; both Go variants + untagged build green. All eight 2026-07-10 BLOCKERs were also fixed then.
 Advisory/polish items from all runs remain open in reports' sections and the legacy batch below; address when convenient.
+
+### Usability review — 2026-07-12 (canonical Phase 0–7 E2E)
+
+- **BLOCKING — Usability S5/J2 onboarding completion write failure is treated as success.**
+  `ui/src/features/onboarding/steps/LaunchStep.tsx:53-56`: after the first agent launches, the separate
+  `PUT /api/config {onboarding_complete:true}` mutation routes `onError` to `onDone()`, exactly like success.
+  Normal trigger: a first-time user's launch succeeds but that config write hits a disconnect, disk error,
+  or server 500. The wizard disappears with no error/retry while the only completion bit stays false, so it
+  can return after reload. Surface the structured error and retry while preserving the launched agent; call
+  `onDone` only after persistence succeeds, with a regression test for launch-success/config-write-failure.
+- **ADVISORY — Usability J3 reloaded assistant text is split into one card per streamed delta.**
+  `ui/src/store/transcriptStore.ts` hydration/normalization path (live evidence in
+  `usability-review-2026-07-12-canonical-e2e-evidence/J3-roundtrip.png` and
+  `J3-reload-transcript.png`): a live fake-ACP reply rendered as one paragraph, but reloading the same chat
+  rendered “Sure,” / “I'll” / “do that.” as three separate articles. Fold contiguous text deltas identically
+  on live and transcript-hydration paths; test one streamed reply before and after remount.
+- **ADVISORY — Usability S2 New Agent interface choices are visually ungrouped.**
+  `ui/src/features/launch/NewAgentModal.tsx:185-190` references `.interface-controls`, `.interface-option`,
+  and `.interface-disabled`, but no stylesheet defines them. Live computed styles were inline, transparent,
+  borderless and zero-padding, so Chat/Terminal and disabled states rely on browser-default radios. Add the
+  intended grouped/disabled styles and rendered-state coverage.
+- **ADVISORY — Usability S5 confirmed force-delete retries fail silently.**
+  `ui/src/features/settings/RolesEditor.tsx:64` and `ProjectsEditor.tsx:80`: after the user accepts an in-use
+  role/project force-delete confirmation, the `force:true` retry has no `onError`. A normal disconnect/500
+  leaves the item present with no feedback. Route retry failure through the existing structured error toast.
+- **ADVISORY — Usability S5 Files/Commands Copy has no success or failure feedback.**
+  `ui/src/components/chat/FilesTab.tsx:5-18` and `CommandsTab.tsx:5-15` discard the clipboard promise. A
+  denied/unavailable clipboard silently does nothing and may raise an unhandled rejection. Catch and surface
+  failure through the existing toast; acknowledge success.
+- **ADVISORY — Usability S3 ACP launch readiness is unbounded.**
+  `internal/server/launch.go:68`, `internal/runtime/chat.go:201-203`, and
+  `internal/runtime/transport.go:198-234`: an old/interactive adapter that starts but never answers ACP
+  `initialize` leaves New Agent pending indefinitely with the child alive. Add a bounded readiness context,
+  terminate on expiry, and return actionable compatibility/auth guidance.
+- **ADVISORY — Usability S3 rejected CLI flags collapse to generic transport errors.**
+  `internal/backend/adapter.go:130-134` and `internal/runtime/terminal/terminal.go:590-615` pass optional
+  integration flags without a capability probe/fallback; startup stderr is omitted, so valid older CLIs can
+  fail as `runtime: initialize: transport closed`. Probe/retry a documented degraded path and name the flag.
+- **ADVISORY — Usability S3 OpenCode/OpenHands executable overrides validate but are ignored at launch.**
+  `internal/backend/credcheck/opencode.go:18-24` and `openhands.go:17-23` honor `OPENCODE_PATH` /
+  `OPENHANDS_PATH`, while `internal/backend/adapter.go:190-192,237-239` launches bare names. A CLI outside
+  service PATH can validate then fail to launch. Carry the validated executable into the adapter and test it.
+- **ADVISORY — Usability S3 missing adapters surface a raw, malformed launch error.**
+  `internal/runtime/chat.go:93-100,201-203,471-473`: a fresh machine without the selected adapter receives
+  `runtime: start : exec: ... not found`; the wrapper prints its empty override instead of the resolved binary
+  and gives no install/PATH guidance. Preflight `LookPath` and return backend-specific recovery copy.
+- **ADVISORY — Usability S3 credential checks are version/storage fragile.**
+  `internal/backend/credcheck/claude.go:27-50` relies on exact English auth text and one unknown-flag spelling;
+  `opencode.go:30-40` and `openhands.go:29-36` infer auth from fixed-path file existence. Valid alternate CLI
+  versions/platform paths can be rejected, and stale files can pass. Prefer provider-native/platform-aware
+  checks and treat unfamiliar output conservatively; cover old/missing/localized/XDG variants.
 
 ### Review through `4036e78` — 2026-07-12 (end-to-end Phase 0–7)
 
@@ -358,6 +420,14 @@ remaining open set; every surviving item is ADVISORY.
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
+
+- 2026-07-12 — **usability review: canonical Phase 0–7 E2E — findings recorded.** The real tagged and
+  untagged builds, both Go test variants, all 94 UI tests/build, static S1–S5 sweeps, and live browser
+  first-paint/launch/chat/reload were exercised. One new BLOCKING finding was recorded: onboarding hides a
+  failed completion write after successful first launch. Ten new advisories cover reload message grouping,
+  missing interface CSS, silent retry/copy failures and CLI readiness/compatibility diagnostics. J5–J12
+  checkpoints requiring further browser/listener/restart access remain an explicit acceptance gate after the
+  local approval service exhausted its quota; the run does not infer them as passed.
 
 - 2026-07-12 — **review: end-to-end Phase 0–7 through `4036e78` — state recorded.** Full Go checkpoint,
   all 94 UI tests/build, and concurrency-focused race suites are green. Two new BLOCKING cross-phase defects
