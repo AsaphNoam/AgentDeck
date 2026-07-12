@@ -145,11 +145,6 @@ advertises xterm/tmux/iterm2.
 
 ## Acceptance gates (not blockers)
 
-- **HUMAN — Complete the full E2E journey sweep.** The 2026-07-11 full-scope run verified first launch/chat,
-  persisted layout density, Settings round-trip, and the repaired Claude source-linking flow, but the browser
-  control channel stalled during Stop and the local approval service then rejected further loopback checks for
-  account usage limits. J2 and J4–J12 therefore remain unexercised, not inferred-pass. Resume from
-  [`usability-review-run-2026-07-11-e2e.md`](usability-review-run-2026-07-11-e2e.md) when access is restored.
 - Confirm real Claude Code and Codex accept the local HTTP MCP registration and can call `ping`; if either
   rejects it, implement the documented stdio proxy before claiming messaging compatibility for that CLI.
 - Run real Codex chat launch, turn, stop, and resume with credentials; reconcile model/resume/hook behavior.
@@ -160,9 +155,7 @@ release claims the affected live-CLI compatibility.
 
 ## Blocked on human
 
-- **Review-state commit.** The 2026-07-11 full-E2E report, handoff, and brief are updated locally, but the
-  environment rejected `git add`/`git commit` escalation because the account reached its usage limit. Commit
-  `docs/features/{HANDOFF.md,BRIEFS.md,usability-review-run-2026-07-11-e2e.md}` when access is restored.
+None.
 
 ## Review findings (from the last review — BLOCKING and ADVISORY)
 
@@ -182,12 +175,22 @@ release claims the affected live-CLI compatibility.
 > [`usability-review-run-2026-07-11.md`](usability-review-run-2026-07-11.md) ·
 > [`usability-review-run-2026-07-11-e2e.md`](usability-review-run-2026-07-11-e2e.md).
 
-**Open BLOCKING:** none. The two 2026-07-11 usability BLOCKERs — **Mirrored selection silently becomes
+**Open BLOCKING:** **Usability J8 — untagged Archive search exposes an FTS5 error and stale results** (below).
+The two 2026-07-11 usability BLOCKERs — **Mirrored selection silently becomes
 Linked** and **a bound source has no repair path** — shared root causes with the federation-review bullets
 and were fixed in this `/fix-review` (Mirrored now persists Mirrored; a bound source has override / reset /
 refresh / unlink, and detach stays honestly deferred per the standing HUMAN decision). All eight older
 usability BLOCKERs were fixed on 2026-07-10. Advisory/polish items from the older runs remain open in the
 reports' findings sections and in the legacy ADVISORY batch below; address them when convenient.
+
+### Usability review — full journey sweep resumed 2026-07-12
+
+- **BLOCKING — Usability J8: untagged Archive search fails and preserves stale rows.** In the real untagged
+  `go build ./cmd/agentdeck` dashboard, opening Archive with existing sessions then searching `Permission`
+  visibly renders `archive: count search: no such module: fts5` while continuing to show all pre-search rows.
+  A normal user on the documented fallback build cannot search and is misled by stale results. Add a non-FTS5
+  search fallback (or an honest unavailable state that clears rows) and browser-test it; full repro is in
+  `usability-review-run-2026-07-11-e2e.md`.
 
 ### Review through `27d4b7d` — 2026-07-11 (scoped Phase 7.5–7.7 federation batch)
 
@@ -339,6 +342,11 @@ remaining open set; every surviving item is ADVISORY.
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
+
+- 2026-07-12 — **usability review: restored-access sweep — J8 fallback search BLOCKING.** Browser and
+  loopback access returned: fresh onboarding, permission approve/deny, tagged archive search, archive resume,
+  mailbox send/read/clear, and restart durability were driven. The untagged fallback still displays a raw FTS5
+  module error and stale Archive rows after a search; recorded for `/fix-review`.
 
 - 2026-07-11 — **usability review: full journey sweep partially exercised — state recorded.** Tagged build,
   both Go variants, and 94 UI tests were green. Live UI verified first-agent launch/modal dismissal, streamed
