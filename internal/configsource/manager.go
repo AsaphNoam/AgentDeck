@@ -304,6 +304,45 @@ func (m *Manager) markStale(backendID, projectID string, cause error) {
 	})
 }
 
+// HydrateBindings loads all persisted bindings from config-sources.json into
+// m.gens so the watcher can detect external config edits. Called on startup
+// before Watch() is launched (invariant §1 — generators are populated at startup
+// or on first access). Resolves each binding for all known projects; resolution
+// errors are marked stale (not fatal) so watch/sweep can still detect later changes.
+func (m *Manager) HydrateBindings(ctx context.Context, projects map[string]config.Project) {
+	sources, err := m.store.ReadConfigSources()
+	if err != nil {
+		// No persisted sources yet (fresh install).
+		return
+	}
+	for backendID, binding := range sources.Sources {
+		resolver, err := m.resolverFor(binding.Provider)
+		if err != nil {
+			// Provider mismatch or unknown resolver; mark stale.
+			m.markStale(backendID, "", err)
+			continue
+		}
+
+		// Resolve for each project. The binding applies per backend and can be used
+		// with any project; hydrate all known projects so watch covers all use cases.
+		projectsToHydrate := projects
+		if len(projectsToHydrate) == 0 {
+			// No projects; hydrate with an empty project so watch still registers directories.
+			projectsToHydrate = map[string]config.Project{"": {}}
+		}
+
+		for projectID, project := range projectsToHydrate {
+			eff, rep, err := resolveStable(ctx, resolver, binding, project)
+			if err != nil {
+				// Resolution failed; mark stale for display but the watch can re-try.
+				m.markStale(backendID, projectID, err)
+				continue
+			}
+			m.commit(backendID, projectID, project, binding, eff, rep)
+		}
+	}
+}
+
 // Discover returns candidate native roots for a provider without binding
 // anything. discovery is not consent (§2.2).
 func (m *Manager) Discover(ctx context.Context, provider string, project config.Project) ([]Candidate, error) {

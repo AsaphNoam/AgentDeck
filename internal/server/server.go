@@ -207,6 +207,9 @@ func (s *Server) Start(ctx context.Context) error {
 	s.startReconciliationSweep(sweepCtx)
 	s.startMessagingLoops(sweepCtx)
 	if s.sourceMgr != nil {
+		// Hydrate persisted bindings so the watcher detects external edits (invariant §1).
+		projects, _ := s.configStore.ListProjects()
+		s.sourceMgr.HydrateBindings(ctx, projects)
 		go s.sourceMgr.Watch(sweepCtx)
 	}
 
