@@ -54,9 +54,15 @@ func (s *Server) releaseAgents(ctx context.Context, ids []string) []releaseGroup
 			for idx := range jobs {
 				id := ids[idx]
 				res := releaseGroupResult{AgentID: id, OK: true}
-				if err := s.registry.Stop(ctx, id); err != nil && !errors.Is(err, runtime.ErrNoHandle) {
-					res.OK = false
-					res.Error = err.Error()
+				if err := s.registry.Stop(ctx, id); err != nil {
+					if !errors.Is(err, runtime.ErrNoHandle) {
+						res.OK = false
+						res.Error = err.Error()
+					}
+					// ErrNoHandle: check for orphan runtimes (invariant §4).
+					if rerr := s.reapOrphanRuntime(id); rerr != nil {
+						s.log.Warn("reap orphan during release", "agent_id", id, "err", rerr)
+					}
 				}
 				if res.OK {
 					s.cleanupMessagingMCP(id)
