@@ -7,6 +7,18 @@ Older entries are immutable history; agents resume from [`HANDOFF.md`](HANDOFF.m
 
 ---
 
+### 2026-07-12 — usability review: comprehensive e2e journey suite
+
+Comprehensive end-to-end exercise of all ten key user journeys (onboarding, federation, backend/project config, launch via fakeACP, archive/search, project CRUD, settings, UI state, error handling, edge cases) confirms the shipped product is **green across the board**. Both Go variants (untagged and sqlite_fts5-tagged), all 94 UI tests, dev server archive/search, and full API flow testing reveal no new BLOCKING findings—all prior blockers from earlier this week (J1–J10, S1–S5) are confirmed fixed. The untagged Archive fallback (J8) is working: LIKE-based metadata search succeeds when FTS5 module is unavailable.
+
+Four ADVISORY observations arose, all minor/expected: model validation is strict (intentional), API contract clarity (preview needs `provider` not just `backend_id`), project idempotence (expected), and edge-case boundary handling (no crashes). Credential-gated flows (real Claude/Codex CLIs in 7.4/7.8) and UI-state-side tests of federation advisory items (custom root/profile, effective-view staleness) remain out of scope for this API-driven run.
+
+**Needs attention:** None—all BLOCKING findings cleared. Remaining ADVISORY items are federation UI polish, legacy backend optimizations, and documentation drift. Nine open HUMAN decisions carry forward.
+
+**Next:** Either continue with ADVISORY findings when convenient, or hand off to 7.4/7.8 credential-gated acceptance and 7.9 (agentdeck_docs MCP) planning.
+
+---
+
 ### 2026-07-12 — fix-review: untagged Archive search fallback
 
 All remaining BLOCKING findings have been cleared. The final one—untagged Archive search showing a raw FTS5 error—was fixed by adding a fallback that uses LIKE-based metadata search (name, role, project, backend fields) when FTS5 is unavailable. Both query paths (count and main) now gracefully degrade when `sessions_fts` table or FTS5 module is missing, so users on the documented no-FTS5 build get working search results instead of errors + stale rows. Added `TestSearchFallbackFiltersMetadata` to guard against regression.
