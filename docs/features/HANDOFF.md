@@ -9,15 +9,15 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
 ## Current position
 
 - **Active phase:** 7 — Configuration federation + OpenHands & OpenCode backends (Phase 6 complete ✅)
-- **Active subphase:** Phase 7.7 — all BLOCKING review findings are now CLEARED (2026-07-11 `/fix-review`);
-  only ADVISORY findings remain (federation + legacy batches below), addressable when convenient. **7.4**
-  and **7.8** remain credential-gated and **7.9** remains planned after verified federation.
+- **Active subphase:** Phase 7.7 — an end-to-end Phase 0–7 review found two BLOCKING cross-phase
+  lifecycle/federation restart defects; fix-review must clear them before **7.9**. **7.4** and **7.8**
+  remain credential-gated.
 - **Spec:** [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md) (PRD: [`phase-7-additional-features.md`](phase-7-additional-features.md))
-- **Last code checkpoint:** 2026-07-12 review fix cleared the final BLOCKING usability finding (J8: untagged Archive
-  search fallback added). Go untagged + tagged + UI 93 tests + build + embed green. All BLOCKERs cleared;
-  only ADVISORY findings remain (batches below).
-- **Last contiguous code review:** `8667fe2` (2026-07-04). The 2026-07-11 Phase 7.5–7.7 review is
-  intentionally scoped and therefore does not advance this marker across the unreviewed intervening work.
+- **Last code checkpoint:** 2026-07-12 review fix added the untagged Archive search fallback. The subsequent
+  end-to-end review ran Go untagged + tagged, UI 94 tests/build, and focused race suites green; it recorded
+  two new BLOCKING findings without changing product code.
+- **Last contiguous code review:** `4036e78` (2026-07-12), end-to-end across the current Phase 0–7
+  product code and every intervening code/content commit.
 - **Branch:** `main` (the review-state commit is local); the prior
   `claude/work-phase-hwv0z6` branch note was stale. Push to `origin/main` awaits explicit human approval.
 
@@ -33,7 +33,7 @@ Human-facing session state lives in [`BRIEFS.md`](BRIEFS.md); agents do not read
 - [x] Phase 5 — Coordination: MCP messaging, nudger, budgets, notifications ✅
 - [x] Phase 6 — Flexibility: terminal runtime, switch-runtime, task groups, drivers (xterm/tmux/iterm2) ✅
 - [ ] Phase 7 — Configuration federation + additional backends — **7.1–7.3 ✅; 7.5–7.7 implemented,
-  BLOCKING review findings cleared** (federation resolver/manager/API/UI); **7.4 + 7.8 GATED** (backend +
+  two BLOCKING end-to-end review findings open** (restart lifecycle + federation watch hydration); **7.4 + 7.8 GATED** (backend +
   federation live acceptance, credential-gated); **7.9 pending**. PRD
   [`phase-7-additional-features.md`](phase-7-additional-features.md), spec
   [`tech/phase-7-additional-features-techspec.md`](tech/phase-7-additional-features-techspec.md)
@@ -67,8 +67,8 @@ advertises xterm/tmux/iterm2.
   redacted `launch_config_json`, migration v8, reserved-MCP-id collision preflight → 409); resume
   frozen-by-default + `config_refresh:true`; switch carries frozen object; native cwd/home pass-through
   (already inherited via `os.Environ()`). detach=true → 501 (gated, see Decisions).
-- [x] 7.7 — Federation onboarding + Settings UI (`ui/src`). BLOCKING review findings cleared (2026-07-11
-  `/fix-review`); remaining ADVISORY items are tracked in the review batches below.
+- [x] 7.7 — Federation onboarding + Settings UI (`ui/src`). The 2026-07-11 scoped review blockers were
+  cleared; the 2026-07-12 end-to-end review found two new cross-phase BLOCKING items tracked below.
   - [x] `schemas/configSources.ts` + `api/configSources.ts` hooks for `/api/config-sources`
         (GET/preview/PUT/refresh/DELETE); React Query + SSE `config_source_update` → invalidate
         `["config-sources"]`. UI build + 84 tests green (incl. new SSE-invalidation test).
@@ -184,6 +184,28 @@ path** — shared root causes with the federation-review bullets and were fixed 
 The 2026-07-12 BLOCKER — **untagged Archive search fails** (J8) — was fixed by adding a LIKE-based fallback when
 FTS5 is unavailable; both Go variants + untagged build green. All eight 2026-07-10 BLOCKERs were also fixed then.
 Advisory/polish items from all runs remain open in reports' sections and the legacy batch below; address when convenient.
+
+### Review through `4036e78` — 2026-07-12 (end-to-end Phase 0–7)
+
+- **BLOCKING — crash-restart lifecycle actions leave live orphan runtimes running (invariant §4).**
+  `internal/runtime/reconcile.go:15-23` deliberately preserves a still-live `running` PID on startup, but
+  the new registry has no owner and `internal/runtime/registry.go:243-251` therefore returns `ErrNoHandle`.
+  `internal/server/sessions.go:123-132`, `internal/server/switch.go:135-141`, and
+  `internal/server/groups.go:54-64` all treat that result as already stopped/success. Normal trigger: the
+  dashboard crashes while an agent CLI survives, the user restarts it, then clicks Stop, Switch runtime,
+  or Release group. Stop/Release report success while the process and `running` row survive; Switch can
+  launch a second process under the same `agent_id`. Add one generation/PID-corroborated orphan-reap helper
+  used by all three lifecycle paths, and regression-test restart → live orphan → stop/switch/release.
+- **BLOCKING — persisted config-source bindings are never rehydrated into watch/sweep after restart
+  (invariants §1/§10).** `internal/configsource/manager.go:107-124` always starts with an empty generation
+  map; `internal/server/server.go:204-210` starts `Watch` without resolving stored bindings; and
+  `internal/configsource/watch.go:33-85` derives both fsnotify registrations and the 30-second sweep only
+  from those generations. `GET /api/config-sources` merely reads `Status`
+  (`internal/server/config_sources.go:58-91`) and does not populate one. Normal trigger: link a Claude/Codex
+  source, restart AgentDeck, then edit the native config. Settings stays at unknown health and receives no
+  refresh event indefinitely (until a manual Refresh or launch happens), violating linked/mirrored
+  auto-refresh. Hydrate each persisted backend/project binding at startup (or on first project GET) and test
+  that a fresh manager over an existing binding detects and publishes an external edit.
 
 
 ### Review through `27d4b7d` — 2026-07-11 (scoped Phase 7.5–7.7 federation batch)
@@ -336,6 +358,12 @@ remaining open set; every surviving item is ADVISORY.
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
+
+- 2026-07-12 — **review: end-to-end Phase 0–7 through `4036e78` — state recorded.** Full Go checkpoint,
+  all 94 UI tests/build, and concurrency-focused race suites are green. Two new BLOCKING cross-phase defects
+  were recorded: crash-surviving runtimes are not reaped by Stop/Switch/Release after restart, and persisted
+  federation bindings are not rehydrated into watch/sweep after restart. The contiguous review marker now
+  covers the complete current product-code history.
 
 - 2026-07-12 — **usability review: comprehensive e2e journey suite (10 flows) — state recorded.** Both Go variants, all 94 UI tests, and live dev server exercise covered: onboarding, federation discovery/preview, backend/project config, launch (fakeACP), archive/search, project CRUD, settings, UI state, error handling, edge cases. No new BLOCKING findings; 4 minor ADVISORY (model validation strict, API contract clarity, state persistence, edge cases all expected). All prior BLOCKERs (J1–J10, S1–S5) confirmed fixed. Credential-gated flows (7.4/7.8 real CLIs) remain out of scope.
 
