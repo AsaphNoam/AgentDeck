@@ -167,14 +167,15 @@ None.
 > **This section holds only OPEN findings** — no resolved/dismissed graveyard.
 > Blocking items must be fixed before the next phase starts; advisory items when convenient.
 
-### Usability findings — 2026-07-09 through 2026-07-11 reviews (open worklist)
+### Usability findings — 2026-07-09 through 2026-07-12 reviews (open worklist)
 
 > Full findings, repros, severities, and evidence live in the run reports — recorded there, **not
 > duplicated here.** This is only the open-blocker worklist for `/fix-review`, pointing at them:
 > [`usability-review-run-2026-07-09.md`](usability-review-run-2026-07-09.md) ·
 > [`usability-review-run-2026-07-10.md`](usability-review-run-2026-07-10.md) (+ [`usability-review-2026-07-10-evidence/`](usability-review-2026-07-10-evidence/)) ·
 > [`usability-review-run-2026-07-11.md`](usability-review-run-2026-07-11.md) ·
-> [`usability-review-run-2026-07-11-e2e.md`](usability-review-run-2026-07-11-e2e.md).
+> [`usability-review-run-2026-07-11-e2e.md`](usability-review-run-2026-07-11-e2e.md) ·
+> [`usability-review-run-2026-07-12-comprehensive-e2e.md`](usability-review-run-2026-07-12-comprehensive-e2e.md).
 
 **Open BLOCKING:** None. All usability BLOCKERs have been fixed:
 The two 2026-07-11 BLOCKERs — **Mirrored selection silently becomes Linked** and **a bound source has no repair
@@ -335,6 +336,8 @@ remaining open set; every surviving item is ADVISORY.
 ## Changelog
 
 _(most recent first; keep ~10, older history is in git)_
+
+- 2026-07-12 — **usability review: comprehensive e2e journey suite (10 flows) — state recorded.** Both Go variants, all 94 UI tests, and live dev server exercise covered: onboarding, federation discovery/preview, backend/project config, launch (fakeACP), archive/search, project CRUD, settings, UI state, error handling, edge cases. No new BLOCKING findings; 4 minor ADVISORY (model validation strict, API contract clarity, state persistence, edge cases all expected). All prior BLOCKERs (J1–J10, S1–S5) confirmed fixed. Credential-gated flows (7.4/7.8 real CLIs) remain out of scope.
 
 - 2026-07-12 — **review fix: untagged Archive search falls back to LIKE when FTS5 unavailable — green checkpoint.** BLOCKING, confirmed real: the untagged `go build ./cmd/agentdeck` build displayed `archive: count search: no such module: fts5` and retained stale pre-search rows. Added `isFTS5Missing` error detector + `searchFallback` method that queries metadata fields (name/role/project/backend) using LIKE-based substring matching. Both error paths (count query and main query) trigger the fallback. Regression test: `TestSearchFallbackFiltersMetadata` (untagged build only, via `//go:build !sqlite_fts5`). Green: `go test ./...`, `go test -tags sqlite_fts5 ./...`, `go build ./cmd/agentdeck`, `go build -o agentdeck-notags ./cmd/agentdeck`.
 
