@@ -1,50 +1,66 @@
-# AgentDeck — Spaced-Session Implementation Workflow
+# AgentDeck — Spec-Driven Session Workflow
 
-**Canonical protocol for autonomous, quota-limited phase work.** Both Claude Code
+**Canonical protocol for autonomous, quota-limited, spec-driven work.** Both Claude Code
 and Codex follow this exact loop (the human runs one at a time). The goal is **fire-and-forget**:
-you are handed a phase, you build subphase by subphase until the phase is done or your
+you are handed a change, you drive it spec-first to GREEN checkpoints until it is done or your
 quota runs out, and you keep [`HANDOFF.md`](HANDOFF.md) so accurate that the next agent
 (possibly a different CLI) can resume cold without you explaining anything.
 
 > Claude Code reaches this loop via the `/work-phase` skill. Codex reaches it via the
 > repo-root [`AGENTS.md`](../../AGENTS.md). Both land here. This file is the single source
-> of truth — if the skill and this doc ever disagree, this doc wins.
+> of truth for *process* — if a skill and this doc ever disagree, this doc wins. The
+> **specs** ([`docs/specs/`](../specs/README.md)) are the single source of truth for the
+> *product*: what it does and how it is built.
 
 ---
 
 ## 0. The map (read once, then trust the handoff)
 
+- [`../specs/README.md`](../specs/README.md) — **the spec system.** Feature specs (`FS-nn`,
+  product behavior) and technical specs (`TS-nn`, architecture & constraints) are the source of
+  truth; the constitution defines IDs, statuses, templates, and the spec lifecycle. Read the
+  governing specs *before* the code.
 - [`HANDOFF.md`](HANDOFF.md) — **agent-facing live state.** Where we are, what's next, open findings,
   decisions, and blockers. Read first, every session.
 - [`BRIEFS.md`](BRIEFS.md) — **human-facing session log.** The newest entry is the only thing the
   human should need for a quick return. Agents do not read old briefs to resume.
-- [`README.md`](README.md) — phase plan, dependency graph, build order.
-- `phase-N-*.md` — phase PRD (the *what* + acceptance criteria).
-- `tech/phase-N-*-techspec.md` — tech spec (the *how*). Each ends in a **`## Subphase plan`** section — this is your task list.
-- [`INVARIANTS.md`](INVARIANTS.md) — the paid-for bug-class catalog. Its intro lists the hot-spot
-  areas and how each loop role uses it: build reads the matching class first, review (§8) sweeps
-  the diff against every class, fix (§9) names the class it closes and appends new ones.
-- [`../../MAP.md`](../../MAP.md) — top-level index. [`../agent-dashboard-prd.md`](../agent-dashboard-prd.md) — master PRD.
+- [`INVARIANTS.md`](INVARIANTS.md) — the paid-for bug-class catalog, part of the technical spec
+  set (cited `INV §n`). Its intro lists the hot-spot areas and how each loop role uses it: build
+  reads the matching class first, review (§8) sweeps the diff against every class, fix (§9) names
+  the class it closes and appends new ones.
+- Plans: the active work's checklist lives in `HANDOFF.md`'s **Active work detail**; a large
+  change may carry a `docs/plans/<change>.md`. Plans are disposable sequencing, never truth.
+- [`../../MAP.md`](../../MAP.md) — top-level index. [`../archive/`](../archive/) — superseded
+  planning history (phase PRDs/techspecs, master PRD); never build from it.
 
-A **phase** is split into **subphases** (e.g. `5.1`, `5.2`). Each subphase is a single
-quota-sized step that ends at a **GREEN checkpoint** so work is never left half-done.
+A **change** is split into checkpoint-sized steps. Each step ends at a **GREEN checkpoint** so
+work is never left half-done.
 
 ---
 
 ## 1. The loop
 
 ```
-1. ORIENT  → read HANDOFF.md; find the active phase + next incomplete subphase; open its spec section.
-2. BUILD   → implement the subphase (coding subagents OK — see §4).
-3. VERIFY  → run the GREEN checkpoint (§2). Not green → fix. Can't fix → STOP (§3).
-4. RECORD  → update HANDOFF.md, condense (§5), commit at the checkpoint (§6).
-5. REPEAT  → next subphase. Phase done? Roll to the next phase per the build order.
-6. EXIT    → on stop/quota/blocker: leave HANDOFF green and accurate; write the human brief (§7).
+1. ORIENT  → read HANDOFF.md; find the active change + next incomplete step;
+             open the governing FS/TS sections named there.
+2. SPEC    → if the work alters user-visible behavior or an architectural contract,
+             draft the spec delta first (§11): add/update R/A items, tag unshipped ones
+             `(planned)`. No governing spec? Create or extend one.
+3. BUILD   → implement the step (coding subagents OK — see §4).
+4. VERIFY  → run the GREEN checkpoint (§2). Not green → fix. Can't fix → STOP (§3).
+5. RECORD  → flip the delta's `(planned)` tags for what shipped, update HANDOFF.md,
+             condense (§5), commit at the checkpoint (§6).
+6. REPEAT  → next step. Change done? Take the next change from the handoff/backlog
+             the human queued.
+7. EXIT    → on stop/quota/blocker: leave HANDOFF green and accurate; write the human brief (§7).
 ```
 
-**Keep going.** Do not stop just because one subphase finished — a finished subphase at a
-GREEN checkpoint is the *ideal* place to be cut off, not a reason to quit. Continue until
-the phase is complete, you hit a STOP condition (§3), or your quota is exhausted.
+**Keep going.** Do not stop just because one step finished — a finished step at a GREEN
+checkpoint is the *ideal* place to be cut off, not a reason to quit. Continue until the change is
+complete, you hit a STOP condition (§3), or your quota is exhausted.
+
+**Bug fixes that restore specified behavior skip step 2** — the spec already says what the code
+should do; cite the R/A item you are restoring instead.
 
 ---
 
@@ -53,17 +69,25 @@ the phase is complete, you hit a STOP condition (§3), or your quota is exhauste
 A checkpoint is GREEN when **all** of these pass:
 
 ```bash
-go build ./...                 # whole module compiles
-go test ./...                  # all existing + new tests pass
-go test -tags sqlite_fts5 ./... # shipped FTS5 path also passes
-cd ui && npm run build         # ONLY for subphases that touch ui/
+make test                      # spec lint + untagged and sqlite_fts5 Go suites
+make build                     # shipped, sqlite_fts5-tagged binary
+cd ui && npm test && npm run build # ONLY for steps that touch ui/
 ```
 
-`make build` / `make test` / `make dist` wrap these. Each subphase's **"Done when
-(checkpoint)"** line in the tech spec may add specific tests that must pass — treat those
-as part of green. Never record a subphase as done, and never commit, on a red checkpoint. Never
-buy GREEN by skipping tests, weakening assertions, or removing regression coverage unless the spec
-and a focused review establish that the test itself is obsolete.
+`TS-06` owns these targets and their release tags; `make dist` additionally rebuilds and embeds the
+UI. The
+active plan's **"Done when"** line may add specific tests that must pass — treat those as part of
+green. And green has a documentation clause: **the governing specs reflect what shipped** — no
+R/A item still tagged `(planned)` for behavior that landed, no shipped behavior the spec
+contradicts. A stale governing spec is a red checkpoint. Never record a step as done, and never
+commit, on a red checkpoint. Never buy GREEN by skipping tests, weakening assertions, or removing
+regression coverage unless the spec and a focused review establish that the test itself is obsolete.
+
+For a **docs-only spec/workflow change**, GREEN is proportional: run `make check-specs`, syntax or
+render checks for changed tooling/docs, and `git diff --check`, plus enough targeted inspection to
+validate factual claims. Do not rerun unrelated product/UI suites merely for ceremony. If the docs
+change build/test commands or assert behavior needing executable confirmation, run that command.
+Any product-code change still runs the full checkpoint above.
 
 ---
 
@@ -75,19 +99,23 @@ to answer cold, leave the checkpoint green, and make the blocker the leading att
 
 Stop when:
 
-- **Ambiguity the specs don't resolve.** The PRD/techspec genuinely doesn't say, and guessing
-  would be expensive to undo. (First *try* to resolve it from the docs — most "ambiguities" are answered in the tech spec.)
+- **A spec gap that is a product call.** The governing FS/TS genuinely doesn't say, writing the
+  delta yourself would decide user-visible scope, security posture, or compatibility, and guessing
+  would be expensive to undo. (First *try* to resolve it from the specs — most "ambiguities" are
+  answered by an existing R-item or `INV` class. A gap you can fill with a reversible, local
+  choice is a PEER-decision spec delta, not a STOP.)
 - **A checkpoint won't go green** after a reasonable, honest effort, and the fix needs a decision or info you don't have.
-- **Missing credentials / external input** (e.g. a real CLI login for a credential-gated acceptance subphase).
+- **Missing credentials / external input** (e.g. a real CLI login for a credential-gated acceptance item).
 - **A destructive or irreversible action** would be required (force-push, deleting user data, rewriting history, anything outward-facing).
-- **Scope conflict** — the spec contradicts itself or contradicts already-shipped code in a way that needs a human call.
+- **Spec conflict** — two specs contradict each other, or a spec contradicts already-shipped code
+  in a way that needs a human call about which one is wrong.
 
-Do **not** stop for: a subphase finishing, a normal failing test you can fix, a design choice the
-tech spec already makes for you, or routine multi-step work.
+Do **not** stop for: a step finishing, a normal failing test you can fix, a design choice the
+specs already make for you, or routine multi-step work.
 
 ### Decisions the specs do not make
 
-Record only choices caused by genuine under-specification. Do not record choices dictated by the
+Record only choices caused by genuine under-specification. Do not record choices dictated by a
 spec, established repository convention, or ordinary implementation mechanics. Put unresolved
 choices under **`## Decisions awaiting review`** in `HANDOFF.md` with one of these tags:
 
@@ -101,28 +129,23 @@ choices under **`## Decisions awaiting review`** in `HANDOFF.md` with one of the
   the next independent review, not in the human brief. The originating session cannot clear it.
 
 The review action (§8) accepts, rejects, or escalates PEER items. It never clears HUMAN items.
-Accepted durable rationale belongs in the existing architecture/spec/invariant documentation;
-accepted routine choices disappear from live state after a terse changelog entry.
+Shipped behavior is already described in its governing spec; the HUMAN item carries only the
+pending reversal/confirmation question. When the human resolves it, update/promote/retire the spec
+contract and drop the live question (§11). Accepted routine PEER choices disappear after a terse
+changelog entry; a binding accepted PEER choice becomes a spec-gap finding for fix-review.
 If the human acknowledges only part of a compound HUMAN item, split it and retain the unacknowledged
 part. If the required attention titles alone would overload a focused brief, STOP accumulating new
 HUMAN decisions and use the brief to ask the human to triage them.
 
 ---
 
-## 4. Delegate freely — tier the quota
+## 4. Delegate bounded work when available
 
-Subagents in this environment have full tool access (Bash, Edit, Write) and **can** run
-`go build`, `go test`, and `npm run build`. You may delegate coding work to them — especially
-self-contained pieces (a new file, a test, a migration) where the subagent can build and
-verify in isolation. The constraint: **the main thread owns the GREEN checkpoint.** Before
-committing, *you* must run the full checkpoint (§2) yourself to confirm integration.
-
-**Tier the quota.** Sessions run on a premium, quota-limited model (Opus-class or above);
-its turns and context are the scarce resource. Farm discovery and self-contained coding out
-to subagents on a cheaper model (Sonnet, or Opus if the work requires deeper reasoning):
-repo/doc sweeps, diff audits, isolated implementations, test writing. Have them return
-structured results so the main thread spends its quota and context on design, judgment,
-and integration.
+When the environment supports delegation, use it for bounded independent work: repository sweeps,
+diff audits, isolated implementations, fixtures, and tests. State file ownership before parallel
+edits and require structured evidence. The main agent owns spec meaning, integration, self-review,
+and the final GREEN checkpoint; subagents may draft spec text but do not establish authority by
+themselves. In environments without delegation, run the same steps sequentially.
 
 ---
 
@@ -130,15 +153,17 @@ and integration.
 
 The handoff must always reflect *current* truth and nothing stale. Condense as you go:
 
-- **A step finishes** → tick it. The active subphase is the **only** place granular steps live.
-- **A subphase reaches GREEN and is fully done** → delete its per-step list, mark it done in the
-  phase line (`5.2 ✅`), and expand the next subphase's steps in the "Active subphase detail" block.
-- **A whole phase is done** (all subphases green, acceptance criteria met) → collapse it to a single
-  line in "Phase status" (`[x] Phase 5 — Coordination ✅`) and **delete its subphase breakdown entirely.**
+- **A step finishes** → tick it. The active change is the **only** place granular steps live.
+- **A step reaches GREEN and is fully done** → delete its per-step list, mark it done in the
+  change line, and expand the next step's checklist in the "Active work detail" block.
+- **A whole change is done** (all steps green, its FS acceptance criteria pass, specs Current) →
+  collapse it to one changelog line and **delete its breakdown entirely**; delete its
+  `docs/plans/<change>.md` if one existed (git keeps the history). Durable knowledge produced by
+  the change belongs in the specs, not the handoff.
 - **Decisions / blockers** that still matter → keep them, tersely, in their sections. Drop ones that no longer apply.
-- **Decisions awaiting review** → HUMAN items stay until explicit human acknowledgement. PEER items
-  stay only until the next independent review accepts, rejects, or escalates them. Promote durable
-  accepted rationale to an existing architecture/spec/invariant document; do not grow a decision graveyard.
+- **Decisions awaiting review** → HUMAN items stay until explicit human resolution, linked to the
+  shipped contract already in the governing spec. PEER items stay only until review accepts,
+  rejects, or escalates them. Do not grow a decision graveyard.
 - **Review findings** → the section holds **only open findings.** The moment the fix agent (§9) resolves a
   finding (fixed + green + committed) **or** dismisses it as a validated false positive, **delete the bullet**
   and drop a one-line entry in the changelog. The commit/changelog + the session brief are the record —
@@ -147,7 +172,7 @@ The handoff must always reflect *current* truth and nothing stale. Condense as y
 - **Last GREEN checkpoint** → record the commit subject plus verification before committing; do not
   create another commit merely to embed a commit's own SHA.
 
-What survives in live state: the one-line-per-phase status, the *active* subphase detail, unresolved
+What survives in live state: the one-line-per-change status, the *active* work detail, unresolved
 decisions, open blockers/findings, and a short recent changelog. Everything else is junk — remove it.
 
 ---
@@ -156,14 +181,15 @@ decisions, open blockers/findings, and a short recent changelog. Everything else
 
 Commits are the recovery anchor across spaced sessions, so the work survives a hard quota cut-off.
 
-- **Commit directly to `main`.** This repo is trunk-based: no per-phase branches, no PRs. Each GREEN
+- **Commit directly to `main`.** This repo is trunk-based: no per-change branches, no PRs. Each GREEN
   checkpoint is a commit on `main` — that's the recovery anchor. Never commit a red checkpoint.
-- At each GREEN checkpoint, commit the code **and** the updated `HANDOFF.md` together.
-- Message: `phase N.M: <subphase title> — green checkpoint`.
+- At each GREEN checkpoint, commit the code, the spec delta, **and** the updated `HANDOFF.md` together.
+- Message: `work: <step title> — green checkpoint`, naming the governing spec IDs in the subject
+  or a `Spec: FS-nn.Rk, TS-nn` trailer. A commit that only lands a spec delta is
+  `spec: <what changed and why>`.
 - Add a `Co-Authored-By:` trailer naming the model that actually did the work.
-- **Push** the new commits to `origin/main` on task completion — normal pushes are part of the
-  loop. Force-pushing is the STOP-style exception: it rewrites history, so don't force-push unless
-  the human has asked for it (§3).
+- Push only when the human request or execution environment authorizes publishing. A local GREEN
+  commit is a valid recovery anchor; never force-push unless the human explicitly asks.
 
 ---
 
@@ -172,17 +198,21 @@ Commits are the recovery anchor across spaced sessions, so the work survives a h
 1. Read `HANDOFF.md` top to bottom.
 2. Inspect `git status` and the diff before editing. A dirty tree is presumed interrupted or
    user-owned work: reconcile it with the active detail and last GREEN checkpoint; never discard it.
-3. Confirm the committed baseline is green before new work. If the dirty tree prevents a clean
-   baseline run, preserve and document it first. Red on arrival is the first problem to resolve.
-4. Open the active subphase's tech-spec section. Build. Verify. Record. Repeat.
-5. Before a checkpoint commit, self-review the complete diff against the subphase's **Done when**
-   requirements: look for missing deliverables, unchecked error paths, boundary validation gaps,
-   leftover debug/TODO code, and unintended scope. Fix any issue found before recording GREEN.
+3. Trust a recent recorded GREEN checkpoint unless the tree/environment/marker changed or the next
+   step touches a high-risk seam. Otherwise confirm the committed baseline before new work. If a
+   dirty tree prevents that run, preserve and document it first; red on arrival is the first problem.
+4. Open the governing FS/TS sections named in the active work detail, then the active plan/step.
+   Spec first, then build. Verify. Record. Repeat.
+5. Before a checkpoint commit, self-review the complete diff against the step's **Done when**
+   requirements and the governing spec sections: look for missing deliverables, unchecked error
+   paths, boundary validation gaps, leftover debug/TODO code, unintended scope, and spec text
+   left stale by the diff. Fix any issue found before recording GREEN.
 
 ## End-of-session checklist (every exit, including quota cut-off mid-work)
 
 1. Tree at a GREEN checkpoint (or, if cut off mid-step, handoff clearly says what's half-done and how to finish it).
-2. `HANDOFF.md` updated + condensed; `Last GREEN checkpoint` and changelog current.
+2. `HANDOFF.md` updated + condensed; `Last GREEN checkpoint` and changelog current; governing
+   specs not left contradicting shipped code.
 3. Committed (if green). The session's exact human brief is stored and returned as defined below.
 
 Reserve enough quota for this closeout. If the process is terminated too abruptly to record state,
@@ -237,13 +267,13 @@ behavior; or a reusable failure/debugging lesson that will improve future decisi
 this session's work, expand the first relevant acronym, and do not reteach it unless the new work adds a
 new consequence. It remains lower priority than required state and attention items; omit it if it would
 make those vague. Omit it for routine work, however technically complex. If the fact is needed by future
-agents, also update an existing architecture/spec/invariant document—never create a learning log.
+agents, also update the governing spec or invariant document—never create a learning log.
 
 ---
 
 ## 8. Review action (separate from the build loop)
 
-Triggered independently (Claude Code: `/review-phase`; Codex: `"Review the last commit per AGENTS.md"`).
+Triggered independently (Claude Code: `/review-phase`; Codex: `"Review the unreviewed work per AGENTS.md"`).
 Reviews the other agent's work — not your own. This is **product-code-read-only**: it must update
 workflow state, but it does not change product code, specs, plans, or the invariant catalog.
 
@@ -257,12 +287,19 @@ the subject alone (this also excludes state-only dismissal/brief commits). When 
 `Last code review` to the newest contiguous code/content commit actually reviewed. A scoped or
 noncontiguous review does not advance it past an unreviewed gap.
 
-Read the relevant phase PRD and tech-spec section **before** opening the diff, and note the expected
-deliverables. A diff can show an incorrect implementation, but it cannot reveal work that was never
-attempted. Then inspect changed code in its caller, error-path and concurrency context.
+Read the governing FS/TS sections **before**
+opening the diff, and note the expected deliverables. A diff can show an incorrect implementation,
+but it cannot reveal work that was never attempted. Then inspect changed code in its caller,
+error-path and concurrency context.
 
-Cross-reference against:
-- **Phase spec adherence** — does the code match the phase PRD and tech spec? Any required deliverable missing or wrong?
+Cross-reference against — **traceability runs in both directions**:
+
+- **Code → spec:** does the diff do what the governing R/A items say? Any required deliverable
+  missing or wrong? Cite the violated ID in the finding.
+- **Spec → code:** did user-visible behavior or an architectural contract ship that **no spec
+  covers**, or that the spec still tags `(planned)`, or that contradicts an R-item without a
+  recorded deviation? That is a **spec-gap finding** — the fix is a spec delta (or a code revert),
+  decided by §9.
 - **Dead code** — exported symbols never referenced, unreachable paths, leftover stubs or TODOs that should be done.
 - **Bad practices** — error swallowing, obvious data races, magic strings, hardcoded paths, missing input validation at system boundaries.
 - **Flagrant bugs** — nil dereference risks, wrong status codes, logic inversions, off-by-ones in critical paths, missing error checks on writes.
@@ -275,13 +312,14 @@ Cross-reference against:
 - One-in-a-million edge cases that won't arise in regular personal use.
 - Theoretical issues with no realistic trigger path.
 
-The bar is: **would this cause a real problem during normal usage?**
+The bar is: **would this cause a real problem during normal usage?** (For spec-gap findings the
+bar is: would the next agent, building from the spec alone, produce the wrong thing?)
 
 ### Output
 
 Categorize every finding as one of:
 
-- **BLOCKING** — must fix before the next phase starts (spec violation, data-loss risk, crash under normal use).
+- **BLOCKING** — must fix before the next change starts (spec violation, data-loss risk, crash under normal use).
 - **ADVISORY** — worth fixing but not blocking; next agent should address it when convenient.
 
 Write **every** finding — BLOCKING *and*
@@ -291,10 +329,11 @@ in the handoff, so an advisory spoken only in chat is lost. Use the entry shape 
 no findings, write nothing to the findings section. Group a review's open bullets under
 `### Review through <sha> — <date>`; delete the heading when its last bullet is resolved. Update
 `Last code review`, disposition every PEER item, write the brief, and commit only workflow-state files
-(plus an allowed architecture-rationale update) as
+as
 `review: through <sha> — state recorded`. A suspected new invariant remains a finding until fix-review
-validates it; review does not edit product specs or the invariant catalog. It may record accepted durable
-PEER rationale in the existing architecture decision/flow documents and include them in the state commit.
+validates it; review does not edit product specs or the invariant catalog. A PEER choice that would
+establish a binding contract becomes a spec-gap finding for fix-review; do not hide it in descriptive
+ADR or architecture-flow documents.
 
 The brief lists each BLOCKING finding and its normal-use impact. Summarize advisories by count/impact
 unless one is itself a material risk. It repeats every unresolved HUMAN item.
@@ -302,10 +341,11 @@ unless one is itself a material risk. It repeats every unresolved HUMAN item.
 ### Review-findings entry shape (written by §8, consumed by §9)
 
 Each finding lives as one bullet under `## Review findings`, opening with its severity tag so the
-fix agent can triage at a glance. Include `file:line` + what's wrong + why it matters + a fix hint:
+fix agent can triage at a glance. Include `file:line` + what's wrong + why it matters + a fix hint,
+and cite the governing spec ID (`FS-nn.Rk` / `TS-nn.Rk` / `INV §n`) when one exists:
 
 ```
-- **BLOCKING — <one-line title>.** <where: file:line> <what's wrong> <why it matters under normal use> <fix hint + what test would prove it>
+- **BLOCKING — <one-line title>.** <where: file:line> <what's wrong, citing FS/TS/INV ids> <why it matters under normal use> <fix hint + what test would prove it>
 - **ADVISORY — <one-line title>.** <same shape>
 ```
 
@@ -338,8 +378,9 @@ Work findings one at a time, BLOCKING before ADVISORY. For each:
 ```
 
 **Gate 1 — VALIDATE (don't trust the review).** Reviews produce false positives. Read the cited
-code at `file:line`, trace the actual path, and convince yourself the problem is real and would bite
-under **normal use** (the §8 bar). Where practical, reproduce it first with a **failing test** — that
+code at `file:line`, check the cited spec ID actually says what the finding claims, trace the actual
+path, and convince yourself the problem is real and would bite under **normal use** (the §8 bar).
+Where practical, reproduce it first with a **failing test** — that
 both proves the finding and becomes the regression guard once you fix it.
   - **Real** → proceed to fix.
   - **False positive / not reproducible / already fixed since the review** → make **no code change**.
@@ -350,15 +391,20 @@ both proves the finding and becomes the regression guard once you fix it.
     starting the next finding as `review fix: dismiss <title> — state recorded`; a hard cutoff must not
     resurrect or lose the validated dismissal.
 
-**Gate 2 — FIX.** Same rules as building a subphase: implement the fix, add/keep the regression
-test, and reach a **GREEN checkpoint** (§2). A fix is only
-done when green; never mark one resolved or commit on red. If a finding is real but you can't get it
-green, or the right fix needs a human decision, that's a **STOP** (§3) — leave the bullet as-is,
-record it under `## Blocked on human`, and stop after preserving the current safe state.
+**Gate 2 — FIX.** Same rules as the build loop: implement the fix, add/keep the regression
+test, and reach a **GREEN checkpoint** (§2). Two spec-aware cases:
+  - **Spec-gap finding, behavior is right** → the fix *is* a spec delta: bring the governing spec
+    up to date (or create the missing section) in the checkpoint commit.
+  - **The right fix changes specified behavior** (not just restores it) → update the governing
+    R/A items in the same commit as the code. If choosing the new behavior is a product call,
+    that's a **STOP** (§3) / HUMAN decision, not a silent spec edit.
+A fix is only done when green; never mark one resolved or commit on red. If a finding is real but
+you can't get it green, or the right fix needs a human decision, that's a **STOP** (§3) — leave the
+bullet as-is, record it under `## Blocked on human`, and stop after preserving the current safe state.
 
 **RECORD.** When green, **delete the finding's bullet** and add a one-line changelog entry
-(`review fix: <title> — <fix + the test that covers it>`). Commit code + `HANDOFF.md` together on
-`main` with message `review fix: <short title> — green checkpoint`. Then take the next finding.
+(`review fix: <title> — <fix + the test that covers it>`). Commit code + spec delta + `HANDOFF.md`
+together on `main` with message `review fix: <short title> — green checkpoint`. Then take the next finding.
 
 ### Carry over the same discipline
 
@@ -376,10 +422,37 @@ record it under `## Blocked on human`, and stop after preserving the current saf
 
 Triggered independently after a user-facing slice is runnable (Claude Code: `/usability-review`;
 Codex: `"Run a usability review per AGENTS.md"`). Exercise the normal user journey against the
-relevant acceptance criteria. Flag only friction or broken behavior a person is likely to encounter;
-do not redesign from taste or chase polish with no normal-use impact.
+governing feature spec's **acceptance criteria** (`FS-nn.Ak`) and the journey matrix in
+[`USABILITY-REVIEW.md`](USABILITY-REVIEW.md). Flag only friction or broken behavior a person is
+likely to encounter; do not redesign from taste or chase polish with no normal-use impact. A
+mismatch between observed behavior and an A-item is a finding citing that ID; observed behavior no
+A-item covers is a candidate spec-gap finding (§8 shape).
 
 Record every BLOCKING and ADVISORY usability finding in the same `## Review findings` contract as §8,
 tagging the title `Usability`. Do not fix product code in this action. Update workflow state, write the
 brief under §7, and commit it as `usability review: <journey> — state recorded`. If a browser or
 credentialed journey cannot be exercised, record a HUMAN acceptance gate rather than pretending it passed.
+
+---
+
+## 11. Spec maintenance — keeping the source of truth true
+
+The full rules live in the constitution ([`../specs/README.md`](../specs/README.md)); these are
+the process hooks that keep the specs and the repo in lockstep:
+
+- **Delta-first.** Draft behavior/architecture changes in the governing spec before implementation.
+  Tag unshipped items `(planned)` and normally commit the spec with the code at GREEN; a separately
+  committed spec-only checkpoint is also valid. A pure restore-the-spec bug fix needs no delta.
+- **IDs are append-only.** Never renumber R/A items; retire them in place with a dated one-liner.
+- **Deviations are explicit.** The only legitimate spec-vs-code mismatch is a `(planned)` tag or
+  an entry in the spec's "Deviations & open decisions". Anything else is a finding.
+- **Keep shipped truth in specs and questions in HANDOFF.** A provisional shipped boundary is
+  documented in FS/TS immediately. HANDOFF carries only the pending question, linked to that item.
+  When resolved, update/promote/retire the spec contract and drop the question.
+- **Traceability marks.** Regression tests that pin an acceptance criterion cite it
+  (`// FS-05.A2`); commits name the spec IDs they implement (§6); findings cite the IDs they
+  violate (§8). Don't annotate beyond that — traceability that nobody reads is bureaucracy.
+- **Lint.** `scripts/check-specs.sh` (in `make test`) keeps IDs, the index, and intra-spec links
+  consistent. It cannot judge truth — reviews do that (§8).
+- **Who edits specs:** build (§1) and fix (§9) sessions. Review sessions record spec-gap findings
+  but do not edit specs; usability sessions never edit them.

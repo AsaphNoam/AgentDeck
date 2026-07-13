@@ -24,7 +24,7 @@ EMBED_DIR := internal/server/ui/dist
 # MATCH errors at runtime — fine for the no-tag test checkpoint, not for release.
 TAGS := sqlite_fts5
 
-.PHONY: all build ui embed run test vet clean
+.PHONY: all build ui embed dist run check-specs test vet clean
 
 all: build
 
@@ -49,8 +49,12 @@ dist: embed build
 run: build
 	./bin/$(BINARY) dashboard start
 
-## test: run the Go test suite (no-tag fallback path + the sqlite_fts5 FTS path)
-test:
+## check-specs: validate the authoritative specification set
+check-specs:
+	@scripts/check-specs.sh
+
+## test: lint specs, then run the Go suite (no-tag fallback + sqlite_fts5 FTS)
+test: check-specs
 	go test ./...
 	go test -tags sqlite_fts5 ./...
 

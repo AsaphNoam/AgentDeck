@@ -19,6 +19,7 @@ func baseBackends() BackendsConfig {
 	}
 }
 
+// FS-09.A1: valid backend catalogs are accepted without losing their type/model union.
 func TestValidateBackendsConfig_Valid(t *testing.T) {
 	b := baseBackends()
 	if ve := ValidateBackendsConfig(&b); ve != nil {

@@ -76,6 +76,7 @@ func doJSON(t *testing.T, h http.Handler, method, target, body string) *httptest
 	return rec
 }
 
+// FS-08.A1: preview/bind/refresh/unlink preserves consent and read-only source ownership.
 func TestConfigSourcePreviewBindRefreshDelete(t *testing.T) {
 	srv, root, _ := federationServer(t)
 	h := srv.routes()

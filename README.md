@@ -1,29 +1,29 @@
 # AgentDeck
 
 A local dashboard for launching and orchestrating coding agents (Claude Code,
-Codex) from one place. Human-editable config lives as JSON files under
+Codex, OpenCode, and OpenHands) from one place. Human-editable config lives as JSON files under
 `~/.agentdeck/`; machine state lives in `state.db`. A Go single binary serves a
 React UI and a `127.0.0.1`-only REST API.
 
-Launch a Claude Code or Codex agent against any project/role, watch it work on a
-live dashboard, chat with it or drop into a real terminal, resume past sessions,
-and let agents message each other. A high-level tour of the moving pieces lives
+Launch a Claude Code or Codex chat agent against any project/role, watch it work on a
+live dashboard, resume past sessions, and let agents message each other. Claude Code
+can also run in the embedded interactive terminal. A high-level tour of the moving pieces lives
 in [architecture-flow.md](architecture-flow.md).
 
-**Status:** Phases 0–5 complete; Phase 6 (terminal runtime, switch-runtime, task
-groups) is in progress. See [docs/features/HANDOFF.md](docs/features/HANDOFF.md) for
-live state. Working today: launch, streaming chat, the state dashboard, config
-CRUD & onboarding, archive/search/resume, agent↔agent MCP messaging, the
-terminal runtime, and switch-runtime.
+**Status:** Core launch/chat/dashboard/config/archive/messaging/terminal/switch features and native
+configuration federation are implemented. Real-provider compatibility has explicit credentialed
+acceptance gates; see [the live handoff](docs/features/HANDOFF.md). Contributors start from the
+[feature and technical specifications](docs/specs/README.md), not archived phase plans.
 
 ## Prerequisites
 
-- **Go 1.22+** — server / single binary
-- **Node 18+ and npm** — UI build only
-- macOS or Linux. The default terminal runtime (embedded xterm.js / tmux) is
-  cross-platform; the optional iTerm2 driver is macOS-only.
-- At least one authenticated agent CLI (`claude-code-acp` for chat; the real
-  `claude`/`codex` CLI for the terminal interface).
+- **Go 1.25** — server / single binary (authoritative version: `go.mod`)
+- **Node 20+ and npm** — UI build only
+- macOS or Linux. The default terminal runtime is an embedded xterm.js/PTY bridge;
+  tmux is optional and the optional iTerm2 driver is macOS-only.
+- At least one authenticated agent CLI. `install.sh` does not install optional ACP adapters unless
+  requested (`INSTALL_ACP=1`); chat launch needs the selected adapter on `PATH`.
+- `curl` and `jq` for shell-hook integrations used by terminal agents.
 
 ## Quickstart
 
@@ -56,7 +56,7 @@ make dist      # build UI, embed it, build ./bin/agentdeck
 go run -tags dev ./cmd/agentdeck dashboard start
 
 # Terminal 2: Vite dev server (proxies /api to :4317)
-cd ui && npm install && npm run dev   # http://localhost:5173
+cd ui && npm ci && npm run dev   # http://localhost:5173
 ```
 
 ## CLI
@@ -77,10 +77,12 @@ cd ui && npm install && npm run dev   # http://localhost:5173
 roles/{role}.json     personas (seeded: agentdecker, implementer, reviewer, researcher, pm, teammate)
 projects/{p}.json     workspaces (seeded: my-app)
 backends.json         providers + models (version 2)
+config-sources.json   optional Claude/Codex native-config bindings
 layout.json           card order + density
 config.json           port, defaults (version 1)
 state.db              agent identity, running registry, status, messages
-sessions/{id}/        transcript history
+sessions/{id}/        normalized transcript + session artifacts
+cache/config-sources/ redacted, regenerable federation mirror data
 ```
 
 `AGENTDECK_HOME` overrides `~/.agentdeck/` (used by tests/CI).
@@ -95,7 +97,8 @@ directly in `roles/{role}.json`.
 - **`agentdecker`** — built-in AgentDeck expert. Ask it how anything works
   (launch syntax, config files, switch-runtime, archive, messaging), or hand it
   a goal: it can launch other agents via the `agentdeck` CLI and coordinate
-  them over MCP messaging.
+  them over MCP messaging when the selected real CLI passes the credentialed HTTP-MCP
+  compatibility gate recorded in the specifications.
 - **`implementer` / `reviewer` / `researcher` / `pm`** — the classic worker
   archetypes: ship focused changes with tests, review diffs, investigate before
   acting, break down and track work.
@@ -105,7 +108,8 @@ directly in `roles/{role}.json`.
 
 ## HTTP API (`127.0.0.1:{port}`)
 
-All routes are loopback-only and unauthenticated. Full surface in
+All routes are loopback-only. Browser API routes rely on the loopback/Host/Origin boundary;
+hook and MCP producer routes use per-launch tokens. Full surface in
 [internal/server/routes.go](internal/server/routes.go).
 
 - **Health/state:** `GET /api/health` · `GET /api/sessions` · `GET /api/archive`
@@ -118,15 +122,18 @@ All routes are loopback-only and unauthenticated. Full surface in
   shape for `/api/projects`) · `GET/PUT /api/backends` · `GET/PUT /api/config` ·
   `GET/PUT /api/layout`
 - **Groups:** `POST /api/groups/{group}/release`
+- **Config federation:** `GET /api/config-sources` · `POST .../preview` ·
+  `PUT .../{backend_id}` · `POST .../{backend_id}/refresh` · `DELETE .../{backend_id}`
 - **Producers / live channels:** `POST /api/hook` (agent lifecycle, token-authed)
   · `GET /api/events` (SSE: `state_update`, `new_message`, `notification`,
-  `ping`) · `GET /api/sessions/{id}/terminal/ws` (PTY↔WebSocket bridge) ·
+  `config_source_update`, `ping`) · `GET /api/sessions/{id}/terminal/ws` (PTY↔WebSocket bridge) ·
   `/mcp` (in-process MCP messaging server)
 
 ## Development tasks
 
 ```sh
-make test   # go test ./...
+make check-specs # validate the authoritative spec set
+make test   # spec lint + both Go variants
 make vet    # go vet ./...
 make ui     # build the UI only
 make dist   # full release build

@@ -119,6 +119,7 @@ func TestResolveRecipientAmbiguous(t *testing.T) {
 	}
 }
 
+// FS-06.A6: mailbox limits retain and return the newest messages first.
 func TestListMessagesOrderingAndLimit(t *testing.T) {
 	st, _ := newTestStore(t)
 	base := time.Date(2026, 6, 22, 10, 0, 0, 0, time.UTC)
