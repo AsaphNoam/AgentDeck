@@ -149,24 +149,25 @@ Keep specs lean: normative statements, shapes, and constraints — not tutorials
 ## Idea intake & promotion
 
 [`../product-backlog.md`](../product-backlog.md) is the only home for an unshipped human idea before
-it has a governing spec. It separates **Inbox** (captured ideas), **Discovery** (human-authorized
-design work), **Ready to build** (specified and human-authorized implementation), candidate features,
-and known gaps. It is deliberately outside `docs/specs/` so a queue item cannot be mistaken for an
-authoritative contract.
+it has a governing spec. It separates **Inbox**, **Discovery**, candidate features, and known gaps.
+It is deliberately outside `docs/specs/` so a queue item cannot be mistaken for an authoritative
+contract.
 
-The active handoff is the execution selector, not a second backlog. It must state an item’s source
-ID, stage (`Discovery` or `Implementation`), governing FS/TS/INV IDs, and a bounded **Done when**
-line. A work-phase agent implements only an active `Implementation` item; it never self-selects a
-candidate or known gap. A human request to “consider,” “design,” or “build” determines the promotion
-allowed by the backlog’s intake table.
+[`../implementation-queue/`](../implementation-queue/README.md) is the dedicated home for
+specified work that is ready to implement but has not started. Each package links to its governing
+FS/TS/INV IDs and acceptance evidence. `HANDOFF.md` is not a readiness queue: it tracks only an
+already-active package and its resumable checkpoint state. Agents interpret normal human intent in
+context and clarify only material ambiguity; they never rely on magic words or self-select a backlog
+candidate.
 
 ---
 
 ## Lifecycle — how a change flows through the specs
 
-1. **Capture and select.** A new human idea is recorded in the product backlog’s Inbox. A human
-   request to design promotes it to active Discovery; a request to build selects it for active
-   Implementation. An agent does not infer priority from the backlog.
+1. **Capture, discover, and queue.** A new human idea is recorded in the product backlog’s Inbox.
+   When the human’s intent is to explore it, discovery drafts the governing FS/TS delta. Once the
+   delta and acceptance criteria are adequate for a desired implementation, create a Ready package
+   in the implementation queue. An agent does not infer priority from the backlog.
 2. **Spec delta first.** Any change to user-visible behavior or to an architectural contract
    starts by editing the governing spec: add/modify R/A items (tag `(planned)` until shipped).
    If no spec governs the area, the delta includes creating or extending one. Pure bug fixes that

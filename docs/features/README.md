@@ -10,7 +10,9 @@ This directory contains process and live state, not product specifications.
 - [`INVARIANTS.md`](INVARIANTS.md) — normative technical-spec appendix for recurring bug classes,
   governed by TS-01 and cited as `INV §n`.
 - [`../product-backlog.md`](../product-backlog.md) — non-authoritative human idea intake and
-  unshipped-work queue. Only human-selected items become active work.
+  candidate/gap queue.
+- [`../implementation-queue/`](../implementation-queue/README.md) — specified features ready for
+  implementation; `HANDOFF.md` is used only after a package becomes active.
 
 Product truth lives only in [`../specs/`](../specs/README.md). Superseded phase plans, review runs,
 and snapshot guides live under [`../archive/`](../archive/README.md).

@@ -6,13 +6,13 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
-- **Active change:** none; the SDD foundation migration is complete. A human must select the next
-  idea/candidate/gap in [`../product-backlog.md`](../product-backlog.md); a work-phase agent does
-  not choose one autonomously.
+- **Active change:** none; the SDD foundation migration is complete. Ready-but-unstarted work lives
+  in [`../implementation-queue/`](../implementation-queue/README.md), not here. A work-phase agent
+  does not self-prioritize the [`../product-backlog.md`](../product-backlog.md).
 - **Governing contracts:** [`../specs/README.md`](../specs/README.md) and the FS/TS/INV items selected
   for the next change.
 - **State:** GREEN documentation checkpoint. `make check-specs`, shell syntax, twin work-phase skill
-  comparison, and `git diff --check` passed on 2026-07-13. The preceding SDD checkpoint also passed
+  comparison, and `git diff --check` passed on 2026-07-14. The preceding SDD checkpoint also passed
   `make test`, `make build`, `make vet`, all 95 UI tests, and the UI production build.
 - **Last contiguous code review:** `4036e78` (2026-07-12). The later code checkpoints fixed every
   BLOCKING finding from that review; no BLOCKING finding is currently open.
@@ -20,20 +20,21 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Active work detail
 
-No implementation plan is active. For the next item, replace this paragraph with:
+No work package is active. When an agent starts a Ready package from
+[`../implementation-queue/`](../implementation-queue/README.md), replace this paragraph with:
 
 ```md
-- **Source:** I<n> | B<n> | G<n> from `docs/product-backlog.md`
-- **Stage:** Discovery | Implementation
+- **Package:** W-<number>-<slug>
+- **Source:** I<n> | B<n> | G<n> from `docs/product-backlog.md` (or direct human request)
 - **Governing contracts:** FS-nn.Rk, TS-nn.Rk, INV §n
 - **Done when:** <observable completion and required verification>
 
 - [ ] <bounded next step>
 ```
 
-Only a human request to **consider**, **design**, or **build** authorizes the corresponding stage.
-Discovery drafts a proposal but changes no product code. Implementation starts only after its FS/TS
-delta is adequate. Plans sequence work; specs define truth.
+Interpret the human’s normal language in context; no special wording is required. Discovery drafts a
+proposal but changes no product code. A ready package is created after its FS/TS delta is adequate;
+the handoff begins only when implementation actually starts. Plans sequence work; specs define truth.
 
 ## Decisions awaiting review
 
@@ -66,7 +67,8 @@ None.
 ## Review findings
 
 No BLOCKING findings. Open product/quality debt is grouped in
-[`../product-backlog.md`](../product-backlog.md); only a human-selected item enters this handoff.
+[`../product-backlog.md`](../product-backlog.md); ready work packages live separately in
+[`../implementation-queue/`](../implementation-queue/README.md).
 
 ## Recent changelog
 
@@ -74,8 +76,8 @@ _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
 - 2026-07-13 — SDD foundation complete: authoritative FS/TS/INV contracts, lifecycle, archive
   manifest, traceability lint, local hook, CI, role workflows, and GREEN verification landed.
-- 2026-07-13 — Idea intake separated from specifications: product backlog now has explicit
-  Inbox/Discovery/Ready-to-build/candidate/gap lanes, and work-phase requires an active selected item.
+- 2026-07-14 — Ready-but-unstarted features moved from the product backlog/hand-off model to the
+  dedicated implementation queue; handoff now records only active checkpoint state.
 - 2026-07-12 — Federation bindings hydrate on restart so watch/sweep detects external edits.
 - 2026-07-12 — Restart-orphaned runtimes are reaped by Stop/Switch/Release.
 - 2026-07-12 — Onboarding completion write failures remain visible and retryable.

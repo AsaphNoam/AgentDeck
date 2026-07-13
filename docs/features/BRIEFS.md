@@ -4,6 +4,25 @@ Newest first. Each entry is the exact final response from an implementation, rev
 usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-14 — implementation: dedicated ready-work queue
+
+Ready-but-unstarted features now live in the dedicated
+[`../implementation-queue/`](../implementation-queue/README.md), one `W-<number>-<slug>.md` work
+package per feature. Each package links to its governing FS/TS/INV requirements and acceptance
+evidence, and has a simple Ready → Active → Shipped/Paused/Retired lifecycle. `HANDOFF.md` now holds
+only the checkpoint state of a package that has actually started; it is no longer a waiting list.
+
+The workflow no longer requires special wording such as “consider,” “design,” or “build.” Agents
+interpret the user’s normal language and conversation context, asking only when the desired level of
+commitment is materially unclear. An exploratory idea stays in the product backlog; a requested
+proposal enters discovery; a requested change becomes a Ready package once its FS/TS delta and
+acceptance criteria are adequate. Work-phase reads the active package named by the handoff and never
+self-prioritizes backlog items.
+
+Verified: `make check-specs`, shell syntax, all twinned skills, and `git diff --check`.
+
+::git-commit{cwd="/Users/mcnoam/Projects/AgentDeck"}
+
 ### 2026-07-13 — implementation: explicit idea intake and work selection
 
 The former `docs/specs/backlog.md` was a **new** SDD-migration file, not a migrated historical
