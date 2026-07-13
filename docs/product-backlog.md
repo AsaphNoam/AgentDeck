@@ -1,10 +1,54 @@
-# Specification backlog
+# AgentDeck product backlog
 
-This is a candidate queue, not an authoritative product spec. An item becomes buildable only after a
-delta creates or extends governing FS/TS requirements and acceptance criteria. Ordering here is not a
-commitment; active sequencing belongs in `docs/features/HANDOFF.md` or a disposable `docs/plans/` file.
+This is the durable intake and prioritization queue for **unshipped work**. It is not an FS/TS
+spec, it creates no commitment, and an agent must not implement an entry merely because it appears
+here. Shipped behavior lives only in [`specs/README.md`](specs/README.md) and its FS/TS/INV index.
 
-## Candidate product work
+## How an idea moves
+
+| Lane | Meaning | Who may move it |
+|---|---|---|
+| **Inbox** | A human idea captured faithfully; no implied priority, design, or commitment. | Any agent receiving the idea. |
+| **Discovery** | The human has asked for a spec/design proposal. The handoff names it as active discovery; no product code yet. | Human request promotes it; agent drafts the proposal. |
+| **Ready to build** | Governing FS/TS delta and acceptance criteria exist; the human has approved implementation. | The human selects it into `HANDOFF.md`. |
+| **Known gaps** | Shipped behavior is incomplete or a documented deviation. The owning FS/TS remains authoritative. | Human selects it into `HANDOFF.md`. |
+
+Use `I<n>` for newly captured inbox ideas, `B<n>` for triaged feature candidates, and `G<n>` for
+known gaps. Each non-inbox entry names its likely governing spec(s). Do not create a duplicate
+feature spec merely to hold an idea.
+
+Human intent determines the first move:
+
+- “Consider / add this idea” → add an **Inbox** item only.
+- “Design / spec this” → move it to **Discovery** and make that discovery the active handoff work.
+- “Build / implement this” → select it in the handoff, draft or approve the FS/TS delta first, then
+  move it to **Ready to build** while implementation is authorized.
+
+An implementation agent executes only an active handoff item at the `Implementation` stage. With no
+such item, it may triage a newly supplied idea but must not choose a backlog item by itself.
+
+## Inbox
+
+No untriaged ideas.
+
+New-item shape:
+
+```md
+- **I<n> — <short idea>.** Source: <human/task/date>. Desired outcome: <one sentence>.
+  Constraints or examples: <optional>. No governing spec yet.
+```
+
+## Discovery
+
+No discovery work is active. Promotion requires a human request to design/spec the named item.
+
+## Ready to build
+
+No specified, human-authorized implementation is waiting. An entry belongs here only after its
+governing FS/TS requirements and acceptance criteria exist; `HANDOFF.md` then selects the one
+active implementation item.
+
+## Candidate features
 
 - **B1 — Phase 7 real-provider acceptance.** Clear the credentialed OpenCode/OpenHands and
   Claude/Codex federation gates in FS-08, FS-09, TS-04, and TS-07; reconcile any observed provider
@@ -25,10 +69,11 @@ commitment; active sequencing belongs in `docs/features/HANDOFF.md` or a disposa
 - **B8 — Operational CLI.** Complete a feature spec for `dashboard start/stop/open`, install/update,
   pidfile concurrency, and actionable startup diagnostics.
 
-## Current gaps and implementation deviations
+## Known gaps and implementation deviations
 
 These have an owning spec but are not yet satisfied or fully specified. Selecting one for work means
-adding the exact R/A delta (when absent) and copying only its active checklist into the handoff.
+adding the exact R/A delta (when absent), obtaining implementation authorization, and copying only
+its active checklist into the handoff.
 
 - **G1 — Chat history fidelity (FS-03).** Persist user prompts; fold replayed streaming deltas like
   live deltas; generation-guard overlapping transcript refetches; surface initial load errors.
@@ -61,8 +106,16 @@ adding the exact R/A delta (when absent) and copying only its active checklist i
   API payloads, security claims, and persistence shapes; promote Partial specs only after their
   credentialed/manual gates and planned items are closed.
 
+## Provenance
+
+This file was created by the SDD migration in commit `735a4bf` (2026-07-13); it did **not** replace
+a pre-existing backlog file. `B1`–`B8` were synthesized from archived phase/future-work material
+and explicit unshipped feature ideas. `G1`–`G12` were synthesized from governing-spec deviations,
+manual acceptance gates, and the migration's semantic audits. Treat every item as a lead to be
+revalidated, not as an inherited product commitment.
+
 ## Maintenance rule
 
 Candidates may be clarified here, but normative behavior, data shapes, security choices, or
-implementation constraints belong only in feature and technical specs. Retire stale candidates with
-a dated one-line reason; do not turn this file into a shadow roadmap or phase plan.
+implementation constraints belong only in feature and technical specs. Retire stale entries with a
+dated one-line reason; do not turn this file into a shadow roadmap or phase plan.

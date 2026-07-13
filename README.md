@@ -14,6 +14,8 @@ in [architecture-flow.md](architecture-flow.md).
 configuration federation are implemented. Real-provider compatibility has explicit credentialed
 acceptance gates; see [the live handoff](docs/features/HANDOFF.md). Contributors start from the
 [feature and technical specifications](docs/specs/README.md), not archived phase plans.
+New product ideas belong in the non-authoritative [product backlog](docs/product-backlog.md) until a
+human selects them for discovery or implementation.
 
 ## Prerequisites
 

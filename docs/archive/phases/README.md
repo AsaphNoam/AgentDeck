@@ -21,6 +21,6 @@ maintained. Git history is the authority for their original context.
 | [`phase-6-flexibility.md`](phase-6-flexibility.md) and [`phase-6-flexibility-techspec.md`](phase-6-flexibility-techspec.md) | [FS-01](../../specs/features/FS-01-agent-lifecycle.md), [FS-02](../../specs/features/FS-02-dashboard.md), [FS-07](../../specs/features/FS-07-terminal.md) |
 | [`phase-7-additional-features.md`](phase-7-additional-features.md) §§7.1–7.4 and [`phase-7-additional-features-techspec.md`](phase-7-additional-features-techspec.md) | [FS-09](../../specs/features/FS-09-backends.md), [TS-04](../../specs/tech/TS-04-integration-protocols.md) |
 | Phase 7 §§7.5–7.8 | [FS-08](../../specs/features/FS-08-federation.md), [TS-07](../../specs/tech/TS-07-federation.md) |
-| Phase 7 §7.9 | [Backlog B2](../../specs/backlog.md) |
-| [`phase-7-polish-activity-map-techspec.md`](phase-7-polish-activity-map-techspec.md) | [Backlog B4](../../specs/backlog.md) |
-| [`future-phase.md`](future-phase.md) | Candidate ideas in the [spec backlog](../../specs/backlog.md); no authority unless promoted into an FS/TS delta |
+| Phase 7 §7.9 | [Backlog B2](../../product-backlog.md) |
+| [`phase-7-polish-activity-map-techspec.md`](phase-7-polish-activity-map-techspec.md) | [Backlog B4](../../product-backlog.md) |
+| [`future-phase.md`](future-phase.md) | Candidate ideas in the [product backlog](../../product-backlog.md); no authority unless promoted into an FS/TS delta |

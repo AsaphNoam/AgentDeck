@@ -25,6 +25,10 @@ provide navigation, rationale, history, or sequencing but do not override an FS/
 - **Usability review:** §10 plus `USABILITY-REVIEW.md`. Exercise FS acceptance criteria without
   changing product code or specs.
 
+`docs/product-backlog.md` is an intake queue, not implementation authorization. A work-phase agent
+implements only the `Implementation` item explicitly selected in `HANDOFF.md`; it never prioritizes
+or self-selects an Inbox, candidate, or known gap.
+
 Every role updates the live handoff and stores the exact bounded human brief in
 [`docs/features/BRIEFS.md`](docs/features/BRIEFS.md). The stored brief is the entire final response.
 

@@ -102,7 +102,8 @@ R1–R11 and must be reflected here when its contract changes.
 - Hook-only file/command activity does not consistently advance session recency. FS-05 records the
   user-visible consequence as an open gap.
 - Startup does not recursively repair permissions on an existing home tree, and role/project reads
-  do not reject valid-name symlink files. Both are recorded hardening gaps in `docs/specs/backlog.md`.
+  do not reject valid-name symlink files. Both are recorded hardening gaps in
+  [`product-backlog.md`](../../product-backlog.md).
 
 ## 6. Traceability
 
