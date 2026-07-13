@@ -10,6 +10,8 @@ Read [`HANDOFF.md`](../../../docs/features/HANDOFF.md), the
 [`AGENT-WORKFLOW.md`](../../../docs/features/AGENT-WORKFLOW.md) §§1–7 and §11 completely. Then
 follow the canonical loop; the workflow and specs win over this launcher.
 
-`$ARGUMENTS`, if present, names the change or requirement; otherwise use the handoff's active work.
-Continue until the change is done, a canonical STOP condition occurs, or quota requires a safe exit.
+`$ARGUMENTS`, if present, names the human-selected change or requirement; otherwise use the
+handoff's active `Implementation` work. If no such item exists, do not choose from the product
+backlog: capture a newly supplied idea or ask the human to select/design/build one. Continue until
+the change is done, a canonical STOP condition occurs, or quota requires a safe exit.
 Close every session with the workflow's HANDOFF update, checkpoint/commit rules, and exact human brief.

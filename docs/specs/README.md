@@ -50,10 +50,27 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | TS-07 | [tech/TS-07-federation.md](tech/TS-07-federation.md) | Partial | Native configuration authority, resolvers, consent, freshness, redaction, launch freezing |
 | INV | [../features/INVARIANTS.md](../features/INVARIANTS.md) | Current | Bug-class constraint catalog (path kept stable for hooks/history) |
 
-Related, non-spec: [`backlog.md`](backlog.md) (candidate features, not yet specified),
+Related, non-spec: [`../product-backlog.md`](../product-backlog.md) (human ideas, candidates, and
+known gaps — not specifications),
 [`../architecture-decisions.md`](../architecture-decisions.md) (ADR-style rationale behind TS-01;
 decisions D1–D5), [`../../architecture-flow.md`](../../architecture-flow.md) (orientation
 diagrams — descriptive, not authoritative; TS-01 wins on conflict).
+
+---
+
+## Shipped capability groups
+
+The FS index above is the catalog of completed product capability groups—not a roadmap. A
+**Current** spec contains only shipped behavior (plus explicit deviations); a **Partial** spec
+contains both shipped behavior and individually tagged `(planned)` requirements. Potential work that
+has not reached an FS/TS delta belongs only in the product backlog.
+
+| Capability group | Governing feature specs | Delivery state |
+|---|---|---|
+| Core agent operation | FS-00 product concepts; FS-01 lifecycle; FS-02 dashboard; FS-03 chat | Shipped |
+| Configuration and providers | FS-04 configuration/onboarding; FS-09 backends | Shipped core; FS-09 expansion remains Partial |
+| Durable supervision | FS-05 archive/tracking; FS-06 coordination | Shipped |
+| Extension boundaries | FS-07 terminal; FS-08 federation | Shipped core with explicitly tagged planned work; Partial |
 
 ---
 
@@ -129,26 +146,45 @@ Keep specs lean: normative statements, shapes, and constraints — not tutorials
 
 ---
 
+## Idea intake & promotion
+
+[`../product-backlog.md`](../product-backlog.md) is the only home for an unshipped human idea before
+it has a governing spec. It separates **Inbox** (captured ideas), **Discovery** (human-authorized
+design work), **Ready to build** (specified and human-authorized implementation), candidate features,
+and known gaps. It is deliberately outside `docs/specs/` so a queue item cannot be mistaken for an
+authoritative contract.
+
+The active handoff is the execution selector, not a second backlog. It must state an item’s source
+ID, stage (`Discovery` or `Implementation`), governing FS/TS/INV IDs, and a bounded **Done when**
+line. A work-phase agent implements only an active `Implementation` item; it never self-selects a
+candidate or known gap. A human request to “consider,” “design,” or “build” determines the promotion
+allowed by the backlog’s intake table.
+
+---
+
 ## Lifecycle — how a change flows through the specs
 
-1. **Spec delta first.** Any change to user-visible behavior or to an architectural contract
+1. **Capture and select.** A new human idea is recorded in the product backlog’s Inbox. A human
+   request to design promotes it to active Discovery; a request to build selects it for active
+   Implementation. An agent does not infer priority from the backlog.
+2. **Spec delta first.** Any change to user-visible behavior or to an architectural contract
    starts by editing the governing spec: add/modify R/A items (tag `(planned)` until shipped).
    If no spec governs the area, the delta includes creating or extending one. Pure bug fixes that
    *restore* specified behavior need no delta. If the right delta needs a product call, that is a
    STOP/HUMAN decision per the workflow — do not silently spec around it.
-2. **Plan.** Derive an implementation plan from the delta: the checklist in `HANDOFF.md`'s active
+3. **Plan.** Derive an implementation plan from the delta: the checklist in `HANDOFF.md`'s active
    work detail for small changes, or `docs/plans/<change>.md` for large ones. Plans are
    sequencing, not truth — delete the plan file (git keeps it) when the work completes.
-3. **Build to GREEN.** Implement per the workflow. Tests that pin an acceptance criterion cite it
+4. **Build to GREEN.** Implement per the workflow. Tests that pin an acceptance criterion cite it
    (`// FS-05.A2` / `# FS-05.A2`). Commits that implement or change spec'd behavior name the IDs
    in the subject or a `Spec:` trailer.
-4. **Ship the spec with the code.** In the checkpoint commit, flip the delta's `(planned)` tags,
+5. **Ship the spec with the code.** In the checkpoint commit, flip the delta's `(planned)` tags,
    update the spec's Traceability section, and keep status honest. A GREEN checkpoint with a stale
    governing spec is not green.
-5. **Review both directions.** Reviews check the diff against the governing spec (does the code do
+6. **Review both directions.** Reviews check the diff against the governing spec (does the code do
    what the spec says?) *and* the spec against the diff (did behavior ship that no spec covers, or
    that contradicts one?). Either mismatch is a finding.
-6. **Keep decisions in one state each.** Shipped behavior is described immediately in the governing
+7. **Keep decisions in one state each.** Shipped behavior is described immediately in the governing
    spec, even when a reversal is awaiting human direction. `HANDOFF.md` carries only the pending
    question and links to that contract. When resolved, update/promote/retire the spec item and remove
    the question from live state.

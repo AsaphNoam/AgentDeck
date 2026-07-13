@@ -22,6 +22,9 @@ quota runs out, and you keep [`HANDOFF.md`](HANDOFF.md) so accurate that the nex
   governing specs *before* the code.
 - [`HANDOFF.md`](HANDOFF.md) — **agent-facing live state.** Where we are, what's next, open findings,
   decisions, and blockers. Read first, every session.
+- [`../product-backlog.md`](../product-backlog.md) — **human idea intake.** Inbox ideas,
+  human-authorized discovery, ready-to-build work, candidates, and known gaps. It is not a spec and
+  is never an autonomous work queue.
 - [`BRIEFS.md`](BRIEFS.md) — **human-facing session log.** The newest entry is the only thing the
   human should need for a quick return. Agents do not read old briefs to resume.
 - [`INVARIANTS.md`](INVARIANTS.md) — the paid-for bug-class catalog, part of the technical spec
@@ -36,12 +39,27 @@ quota runs out, and you keep [`HANDOFF.md`](HANDOFF.md) so accurate that the nex
 A **change** is split into checkpoint-sized steps. Each step ends at a **GREEN checkpoint** so
 work is never left half-done.
 
+### 0.1 Human idea intake and work selection
+
+The human’s wording authorizes a different first move:
+
+| Human request | Agent action | May product code change? |
+|---|---|---|
+| “Consider” / “add this idea” | Capture an `I<n>` Inbox item faithfully. | No. |
+| “Design” / “spec this” | Promote the named item to active `Discovery` in `HANDOFF.md`; draft an FS/TS proposal and surface product decisions. | No. |
+| “Build” / “implement this” | Select the named item as active `Implementation`; draft/confirm its FS/TS delta before code. | Yes, after the delta is adequate. |
+
+`HANDOFF.md` is the single execution selector. An active item must state **Source**, **Stage**,
+governing IDs, and **Done when**. If there is no active `Implementation` item, `/work-phase` must
+not choose a candidate, gap, or Partial-spec `(planned)` item by itself. It may only capture a new
+human-supplied idea or report that selection is needed.
+
 ---
 
 ## 1. The loop
 
 ```
-1. ORIENT  → read HANDOFF.md; find the active change + next incomplete step;
+1. ORIENT  → read HANDOFF.md; confirm an active Implementation change + next incomplete step;
              open the governing FS/TS sections named there.
 2. SPEC    → if the work alters user-visible behavior or an architectural contract,
              draft the spec delta first (§11): add/update R/A items, tag unshipped ones
@@ -50,8 +68,8 @@ work is never left half-done.
 4. VERIFY  → run the GREEN checkpoint (§2). Not green → fix. Can't fix → STOP (§3).
 5. RECORD  → flip the delta's `(planned)` tags for what shipped, update HANDOFF.md,
              condense (§5), commit at the checkpoint (§6).
-6. REPEAT  → next step. Change done? Take the next change from the handoff/backlog
-             the human queued.
+6. REPEAT  → next step. Change done? Stop at the GREEN checkpoint unless the handoff already names
+             the next human-queued implementation change.
 7. EXIT    → on stop/quota/blocker: leave HANDOFF green and accurate; write the human brief (§7).
 ```
 

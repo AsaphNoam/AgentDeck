@@ -6,22 +6,34 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
-- **Active change:** none; the SDD foundation migration is complete. Select the next item from the
-  spec backlog and draft its governing delta before implementation.
+- **Active change:** none; the SDD foundation migration is complete. A human must select the next
+  idea/candidate/gap in [`../product-backlog.md`](../product-backlog.md); a work-phase agent does
+  not choose one autonomously.
 - **Governing contracts:** [`../specs/README.md`](../specs/README.md) and the FS/TS/INV items selected
   for the next change.
-- **State:** GREEN SDD checkpoint. `make check-specs`, `make test`, `make build`, `make vet`, all 95
-  UI tests, the UI production build, shell syntax, twin-skill comparison, and `git diff --check`
-  passed on 2026-07-13. The vet gate also prompted five narrow pre-existing test error checks.
+- **State:** GREEN documentation checkpoint. `make check-specs`, shell syntax, twin work-phase skill
+  comparison, and `git diff --check` passed on 2026-07-13. The preceding SDD checkpoint also passed
+  `make test`, `make build`, `make vet`, all 95 UI tests, and the UI production build.
 - **Last contiguous code review:** `4036e78` (2026-07-12). The later code checkpoints fixed every
   BLOCKING finding from that review; no BLOCKING finding is currently open.
 - **Branch:** `main`.
 
 ## Active work detail
 
-No implementation plan is active. Before building, move one bounded item from
-[`../specs/backlog.md`](../specs/backlog.md) here with governing IDs, a short checklist, and a
-testable **Done when** line. Plans sequence work; specs define truth.
+No implementation plan is active. For the next item, replace this paragraph with:
+
+```md
+- **Source:** I<n> | B<n> | G<n> from `docs/product-backlog.md`
+- **Stage:** Discovery | Implementation
+- **Governing contracts:** FS-nn.Rk, TS-nn.Rk, INV §n
+- **Done when:** <observable completion and required verification>
+
+- [ ] <bounded next step>
+```
+
+Only a human request to **consider**, **design**, or **build** authorizes the corresponding stage.
+Discovery drafts a proposal but changes no product code. Implementation starts only after its FS/TS
+delta is adequate. Plans sequence work; specs define truth.
 
 ## Decisions awaiting review
 
@@ -53,8 +65,8 @@ None.
 
 ## Review findings
 
-No BLOCKING findings. Open product/quality debt has moved to
-[`../specs/backlog.md`](../specs/backlog.md); select an item into this handoff before implementing it.
+No BLOCKING findings. Open product/quality debt is grouped in
+[`../product-backlog.md`](../product-backlog.md); only a human-selected item enters this handoff.
 
 ## Recent changelog
 
@@ -62,6 +74,8 @@ _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
 - 2026-07-13 — SDD foundation complete: authoritative FS/TS/INV contracts, lifecycle, archive
   manifest, traceability lint, local hook, CI, role workflows, and GREEN verification landed.
+- 2026-07-13 — Idea intake separated from specifications: product backlog now has explicit
+  Inbox/Discovery/Ready-to-build/candidate/gap lanes, and work-phase requires an active selected item.
 - 2026-07-12 — Federation bindings hydrate on restart so watch/sweep detects external edits.
 - 2026-07-12 — Restart-orphaned runtimes are reaped by Stop/Switch/Release.
 - 2026-07-12 — Onboarding completion write failures remain visible and retryable.

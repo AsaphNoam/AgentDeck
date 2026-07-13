@@ -4,6 +4,31 @@ Newest first. Each entry is the exact final response from an implementation, rev
 usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-13 — implementation: explicit idea intake and work selection
+
+The former `docs/specs/backlog.md` was a **new** SDD-migration file, not a migrated historical
+backlog. It has moved to [`../product-backlog.md`](../product-backlog.md), outside the authoritative
+spec tree. Its provenance now says exactly what happened: B1–B8 were synthesized from archived
+phase/future-work material and unshipped ideas; G1–G12 came from current-spec deviations, manual
+gates, and migration audits. They are leads to revalidate, not inherited commitments.
+
+The product backlog now separates **Inbox** (faithfully captured ideas), **Discovery**
+(human-authorized spec/design work), **Ready to build** (specified and human-authorized work),
+candidate features, and known gaps. FS/TS remain the grouped catalog of shipped capabilities:
+Current specs describe shipped behavior, while Partial specs mark only selected, unshipped
+requirements as `(planned)`.
+
+The workflow, handoff, AGENTS guidance, repository map, README, and twinned work-phase skills now
+enforce the selection boundary. “Consider” captures an Inbox item; “design” activates Discovery;
+“build” activates Implementation after an adequate FS/TS delta. A work-phase agent executes only an
+active `Implementation` item in `HANDOFF.md`; it cannot self-prioritize a candidate, gap, or
+planned requirement. The handoff template requires source ID, stage, governing IDs, and a testable
+Done-when line.
+
+Verified: `make check-specs`, shell syntax, twin work-phase skill parity, and `git diff --check`.
+
+::git-commit{cwd="/Users/mcnoam/Projects/AgentDeck"}
+
 ### 2026-07-13 — implementation: spec-driven development foundation
 
 AgentDeck now has two authoritative specification sets: feature specs FS-00–FS-09 for observable
