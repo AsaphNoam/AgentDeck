@@ -7,9 +7,11 @@ Guidance for coding agents working in this repository.
 Before implementation, review, fix-review, or usability-review work, read:
 
 1. [`docs/features/HANDOFF.md`](docs/features/HANDOFF.md) — resumable current state and governing IDs.
-2. [`docs/specs/README.md`](docs/specs/README.md) — the specification constitution and index.
-3. The feature (`FS-*`) and technical (`TS-*` / `INV`) requirements named by the handoff or request.
-4. [`docs/features/AGENT-WORKFLOW.md`](docs/features/AGENT-WORKFLOW.md) — the canonical role protocol.
+2. The active `W-<number>-<slug>.md` package named by the handoff, if one exists.
+3. [`docs/specs/README.md`](docs/specs/README.md) — the specification constitution and index.
+4. The feature (`FS-*`) and technical (`TS-*` / `INV`) requirements named by the package, handoff,
+   or request.
+5. [`docs/features/AGENT-WORKFLOW.md`](docs/features/AGENT-WORKFLOW.md) — the canonical role protocol.
 
 The workflow is the single process contract; the feature and technical specs are the only product/
 architecture authority. `MAP.md`, ADRs, archive files, plans, handoffs, briefs, and review reports
@@ -25,9 +27,10 @@ provide navigation, rationale, history, or sequencing but do not override an FS/
 - **Usability review:** §10 plus `USABILITY-REVIEW.md`. Exercise FS acceptance criteria without
   changing product code or specs.
 
-`docs/product-backlog.md` is an intake queue, not implementation authorization. A work-phase agent
-implements only the `Implementation` item explicitly selected in `HANDOFF.md`; it never prioritizes
-or self-selects an Inbox, candidate, or known gap.
+`docs/product-backlog.md` is idea intake, and `docs/implementation-queue/` holds specified work
+that is ready but has not started. `HANDOFF.md` records only an already-active work package. Agents
+interpret normal human intent in context, clarify only material ambiguity, and never self-prioritize
+an Inbox, candidate, or known gap.
 
 Every role updates the live handoff and stores the exact bounded human brief in
 [`docs/features/BRIEFS.md`](docs/features/BRIEFS.md). The stored brief is the entire final response.

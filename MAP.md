@@ -5,8 +5,9 @@ Start with the authority, then the live state:
 | Document | Role |
 |---|---|
 | [`docs/specs/README.md`](docs/specs/README.md) | **Product source of truth.** Index and lifecycle for feature specs (FS) and technical specs (TS/INV). |
-| [`docs/features/HANDOFF.md`](docs/features/HANDOFF.md) | **Live work state.** Active change, governing IDs, decisions, gates, findings, next checkpoint. |
-| [`docs/product-backlog.md`](docs/product-backlog.md) | **Unshipped work intake.** Ideas, discovery, ready-to-build items, candidates, and known gaps; never self-select from it. |
+| [`docs/features/HANDOFF.md`](docs/features/HANDOFF.md) | **Live work state.** An already-active package’s checkpoint, governing IDs, decisions, gates, findings, next step. |
+| [`docs/product-backlog.md`](docs/product-backlog.md) | **Idea intake.** Inbox, discovery, candidates, and known gaps; never self-select from it. |
+| [`docs/implementation-queue/`](docs/implementation-queue/README.md) | **Ready delivery work.** Specified features waiting to start, one package per feature. |
 | [`docs/features/AGENT-WORKFLOW.md`](docs/features/AGENT-WORKFLOW.md) | **Process source of truth.** Implementation/review/fix/usability roles and GREEN checkpoints. |
 | [`docs/features/INVARIANTS.md`](docs/features/INVARIANTS.md) | Normative technical appendix for recurring bug classes (`INV §n`). |
 | [`architecture-flow.md`](architecture-flow.md) | Descriptive architecture orientation; TS wins on conflict. |

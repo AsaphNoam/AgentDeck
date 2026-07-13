@@ -9,23 +9,22 @@ here. Shipped behavior lives only in [`specs/README.md`](specs/README.md) and it
 | Lane | Meaning | Who may move it |
 |---|---|---|
 | **Inbox** | A human idea captured faithfully; no implied priority, design, or commitment. | Any agent receiving the idea. |
-| **Discovery** | The human has asked for a spec/design proposal. The handoff names it as active discovery; no product code yet. | Human request promotes it; agent drafts the proposal. |
-| **Ready to build** | Governing FS/TS delta and acceptance criteria exist; the human has approved implementation. | The human selects it into `HANDOFF.md`. |
-| **Known gaps** | Shipped behavior is incomplete or a documented deviation. The owning FS/TS remains authoritative. | Human selects it into `HANDOFF.md`. |
+| **Discovery** | An agent is drafting a spec/design proposal; no product code yet. | The user’s clear intent or a clarification promotes it. |
+| **Implementation queue** | Governing FS/TS delta and acceptance criteria exist; the feature is ready but has not started. | The agent creates a work package in [`implementation-queue/`](implementation-queue/README.md). |
+| **Known gaps** | Shipped behavior is incomplete or a documented deviation. The owning FS/TS remains authoritative. | The user’s clear intent selects it for discovery or delivery. |
 
 Use `I<n>` for newly captured inbox ideas, `B<n>` for triaged feature candidates, and `G<n>` for
 known gaps. Each non-inbox entry names its likely governing spec(s). Do not create a duplicate
 feature spec merely to hold an idea.
 
-Human intent determines the first move:
+Agents interpret the user’s ordinary language and the surrounding conversation; there are no magic
+keywords. An idea that is merely being considered stays in **Inbox**. If the user clearly wants a
+proposal, it enters **Discovery**. If the user clearly wants it built, the agent drafts or confirms
+the FS/TS delta, then creates a ready work package. Ask a concise question only when the intended
+level of commitment would materially change the result.
 
-- “Consider / add this idea” → add an **Inbox** item only.
-- “Design / spec this” → move it to **Discovery** and make that discovery the active handoff work.
-- “Build / implement this” → select it in the handoff, draft or approve the FS/TS delta first, then
-  move it to **Ready to build** while implementation is authorized.
-
-An implementation agent executes only an active handoff item at the `Implementation` stage. With no
-such item, it may triage a newly supplied idea but must not choose a backlog item by itself.
+An implementation agent works from an active package in the implementation queue. With no active
+package, it may capture/clarify a newly supplied idea but must not self-prioritize a backlog item.
 
 ## Inbox
 
@@ -40,13 +39,8 @@ New-item shape:
 
 ## Discovery
 
-No discovery work is active. Promotion requires a human request to design/spec the named item.
-
-## Ready to build
-
-No specified, human-authorized implementation is waiting. An entry belongs here only after its
-governing FS/TS requirements and acceptance criteria exist; `HANDOFF.md` then selects the one
-active implementation item.
+No discovery work is active. A discovery outcome is either a clarified Inbox/candidate item, a
+retired idea, or a ready work package in [`implementation-queue/`](implementation-queue/README.md).
 
 ## Candidate features
 
@@ -71,9 +65,9 @@ active implementation item.
 
 ## Known gaps and implementation deviations
 
-These have an owning spec but are not yet satisfied or fully specified. Selecting one for work means
-adding the exact R/A delta (when absent), obtaining implementation authorization, and copying only
-its active checklist into the handoff.
+These have an owning spec but are not yet satisfied or fully specified. Moving one to delivery means
+adding the exact R/A delta (when absent), then creating a Ready work package in the implementation
+queue. The handoff is updated only when that package becomes active.
 
 - **G1 — Chat history fidelity (FS-03).** Persist user prompts; fold replayed streaming deltas like
   live deltas; generation-guard overlapping transcript refetches; surface initial load errors.
