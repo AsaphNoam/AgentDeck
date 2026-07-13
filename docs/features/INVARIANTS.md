@@ -1,9 +1,11 @@
-# AgentDeck invariants — bugs this repo already paid for
+# AgentDeck invariants — normative technical-spec appendix
 
 Every class below cost at least one review cycle; most recurred in two or more subsystems before
 being named. The evidence base is multiple full top-to-bottom reviews plus the repo's `review fix:`
 commit history. Treat these as **load-bearing rules, not suggestions**: a diff that violates one is
 wrong until proven otherwise, and a review finding that matches one is almost certainly real.
+This file is governed by TS-01 and indexed with the technical specs as `INV`; it is not a third
+product-spec set. Add or change a binding rule here through the same spec-delta lifecycle as a TS.
 
 The hot-spot areas: launch/resume/switch composition, `internal/runtime` concurrency,
 `internal/state`/`internal/index` persistence, terminal/PTY, UI forms over seeded config.
@@ -57,12 +59,13 @@ Paid for by:
 - POST-only slug validation: PUT/DELETE role/project handlers in
   `internal/server/config_handlers.go` took path ids unvalidated (path traversal, BLOCKING).
 
-**Canonical helpers:** `composeLaunch`, `resolveSkipForRole`, `resolveAddDirs`
+**Canonical helpers:** `composeLaunch`, `composeResumeSpec`, `composeSwitchSpec`, `resolveSkip`,
+`expandAddDirs`, `composeEnv`
 (`internal/server/launch.go`); keep `sessionNewParams`/`sessionLoadParams` in lockstep;
 `config.ValidSlug` on **every** verb of every path-keyed resource.
 
 Corollary: permission-relevant re-resolution **fails closed** — on a role-read error, refuse, never
-fall back to the permissive global default (`resolveSkipForRole`).
+fall back to the permissive global default (`resolveSkip`).
 
 ## 3. Persisted fields never receive one-shot data; forms merge, never replace
 
@@ -227,9 +230,9 @@ Paid for by:
 that describes it matches. Gating stubs are un-gated in the same effort that ships the gate.
 
 Paid for by:
-- Clone context-menu action stayed a disabled stub with an "Available in Phase 3" tooltip long
-  after Phase 3 shipped — a master-PRD promise dropped between phase specs; only a holistic
-  cross-project pass caught it. When closing a phase, check the master PRD for unowned promises.
+- Clone context-menu action stayed a disabled stub with an obsolete phase tooltip after the feature
+  shipped; only a holistic pass caught it. When closing a change, check both the governing FS
+  requirements and acceptance items for unowned promises.
 - `tmux` driver implemented + tested but unselectable from any API/UI while capabilities advertised
   it.
 - Docs drift: README omitted `install.sh` defaults/prereqs; `MAP.md` described the messaging MCP as
@@ -340,7 +343,7 @@ Test requests must carry a loopback Host — use `newLocalRequest` (`server_test
 | Helper | Where | Use for |
 |---|---|---|
 | `teardownAgentRegistration` | `internal/server/launch.go` | every agent exit/failure path (§4) |
-| `composeLaunch`, `resolveSkipForRole`, `resolveAddDirs` | `internal/server/launch.go` | any path that builds/rebuilds a LaunchSpec (§2) |
+| `composeLaunch`, `composeResumeSpec`, `composeSwitchSpec`, `resolveSkip`, `expandAddDirs`, `composeEnv` | `internal/server/{launch,resume,switch}.go` | any path that builds/rebuilds a LaunchSpec (§2) |
 | `takePending` | `internal/runtime/permission.go` | atomic claim for racy resolutions (§5) |
 | `SubscribeWithSnapshot` | `internal/bus/bus.go` | any snapshot+subscribe consumer (§5) |
 | `runtime.ReapOrphan` | `internal/runtime/` | stopping agents the registry doesn't own (§4) |

@@ -5,9 +5,10 @@ description: Validate the open AgentDeck review findings, dismiss false positive
 
 # Fix review findings
 
-Read [`docs/features/AGENT-WORKFLOW.md`](../../../docs/features/AGENT-WORKFLOW.md) §§2–7 and §9 plus
-[`docs/features/HANDOFF.md`](../../../docs/features/HANDOFF.md) completely, then follow the canonical
-two-gate fix action. The workflow wins over this launcher.
+Read [`HANDOFF.md`](../../../docs/features/HANDOFF.md), the
+[`spec constitution`](../../../docs/specs/README.md), governing FS/TS/INV items, and workflow
+§§2–7, §9, and §11 completely, then follow the two-gate fix action.
 
 `$ARGUMENTS` may scope the run to a severity or finding keyword; otherwise handle every open finding,
-BLOCKING first. Close with the canonical HANDOFF update, checkpoint/commit, and exact human brief.
+BLOCKING first. Spec-gap or behavior-changing fixes update the governing spec in the same GREEN
+checkpoint. Close with the canonical HANDOFF update, checkpoint/commit, and exact human brief.

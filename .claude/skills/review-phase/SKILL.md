@@ -1,14 +1,14 @@
 ---
 name: review-phase
-description: Review the other agent's latest AgentDeck GREEN-checkpoint work for spec adherence, dead code, bad practices, flagrant normal-use bugs, and pending peer decisions. Use when the user says "/review-phase", "review the last commit", "review the other agent's work", or similar.
+description: Review the other agent's unreviewed AgentDeck work bidirectionally against governing specs, plus normal-use bugs and pending peer decisions.
 ---
 
-# Review the last agent's work
+# Review the unreviewed work
 
-Read [`docs/features/AGENT-WORKFLOW.md`](../../../docs/features/AGENT-WORKFLOW.md) §§2–3, §5, §7,
-and §8 plus [`docs/features/HANDOFF.md`](../../../docs/features/HANDOFF.md) completely, then follow
-the canonical review action. The workflow wins over this launcher.
+Read [`HANDOFF.md`](../../../docs/features/HANDOFF.md), the
+[`spec constitution`](../../../docs/specs/README.md), governing FS/TS/INV items, and workflow
+§§2–3, §5, §7–8 completely. Review code→spec and spec→code across the handoff's unreviewed range.
 
 The human may name a commit/range in `$ARGUMENTS`; otherwise use the handoff's review markers.
-Do not change product code. Persist every finding and decision disposition, make the required
+Do not change product code or specs. Persist every finding and decision disposition, make the required
 workflow-state commit, and close with the exact stored human brief.

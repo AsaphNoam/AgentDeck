@@ -5,9 +5,10 @@ description: Review a runnable AgentDeck user journey for normal-use friction an
 
 # Review usability
 
-Read [`docs/features/AGENT-WORKFLOW.md`](../../../docs/features/AGENT-WORKFLOW.md) §§3, §5, §7,
-and §10 plus [`docs/features/HANDOFF.md`](../../../docs/features/HANDOFF.md) completely, then follow
-the canonical usability-review action. The workflow wins over this launcher.
+Read [`HANDOFF.md`](../../../docs/features/HANDOFF.md), the
+[`spec constitution`](../../../docs/specs/README.md), governing FS acceptance items,
+[`USABILITY-REVIEW.md`](../../../docs/features/USABILITY-REVIEW.md), and workflow §§3, §5, §7, and
+§10 completely, then follow the canonical usability-review action.
 
 `$ARGUMENTS` may name the journey or scope. Do not change product code. Persist every finding or
 acceptance gate, make the required workflow-state commit, and close with the exact stored human brief.

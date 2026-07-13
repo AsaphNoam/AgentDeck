@@ -1,6 +1,9 @@
 # Architecture Decisions & Rationale
 
-The load-bearing architecture choices for AgentDeck and *why* they were made. The [PRD](agent-dashboard-prd.md) and phase specs state these as fact; this doc records the reasoning and the alternatives weighed, so the choices can be revisited deliberately rather than re-litigated by accident.
+The rationale behind selected binding decisions in the
+[technical specs](specs/README.md#technical-specs). This record explains why and which alternatives
+were weighed; it is descriptive and never overrides a TS/INV requirement. The superseded master PRD
+is preserved in the [archive](archive/agent-dashboard-prd.md).
 
 ---
 
@@ -17,7 +20,9 @@ The load-bearing architecture choices for AgentDeck and *why* they were made. Th
 - *Everything in files (with a derived, rebuildable index).* Works, but leaves an index that can drift from the files and still needs reconciliation logic. Since the server is the sole writer (D2), SQLite can simply be **authoritative** for state — no drift, no reconciliation.
 - *Everything in SQLite, including config.* Loses the transparency/hand-editability that makes config pleasant to live with, for no real gain (config is low-volume and single-writer already).
 
-**Local-first is preserved.** One SQLite file under `~/.agentdeck/`, no server process, no cloud, user owns the file; config remains plain text. The agent CLI's own transcript files (written by Claude Code / Codex, outside our control) stay where the CLI writes them under `sessions/`; we **index** those into FTS5, but our own state is SQLite-native.
+**Local-first is preserved.** One SQLite file under `~/.agentdeck/`, no separate database service,
+no cloud, and user-owned plain-text config. AgentDeck appends its normalized chat transcript under
+`sessions/` and indexes it into FTS5; provider-owned session artifacts may coexist there.
 
 **Phase 7 federation refinement.** “Config in files” does not require AgentDeck to duplicate config
 already owned by Claude Code or Codex. For linked backends, the native user/project files remain the

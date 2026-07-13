@@ -190,6 +190,7 @@ func TestLayoutDefault(t *testing.T) {
 	}
 }
 
+// FS-02.A5: layout bounds are validated and accepted values persist.
 func TestPutLayoutValidatesAndPersists(t *testing.T) {
 	srv := testServer(t, false)
 	h := srv.routes()
@@ -322,6 +323,7 @@ func TestReleaseGroupStopsMembers(t *testing.T) {
 	}
 }
 
+// FS-01.A11: startup pruning removes a dead running row and leaves a done identity.
 func TestPruneStaleRunning(t *testing.T) {
 	srv := testServer(t, true)
 	agent := state.Agent{
@@ -334,11 +336,21 @@ func TestPruneStaleRunning(t *testing.T) {
 	if err := srv.stateStore.WriteRunning(state.RunningEntry{AgentID: agent.AgentID, PID: -42, Interface: "chat", StartedAt: time.Now().UTC()}); err != nil {
 		t.Fatalf("WriteRunning: %v", err)
 	}
+	if err := srv.stateStore.WriteStatus(state.Status{AgentID: agent.AgentID, State: "busy"}); err != nil {
+		t.Fatalf("WriteStatus: %v", err)
+	}
 	if n := srv.pruneStaleRunning(); n != 1 {
 		t.Fatalf("pruned = %d, want 1", n)
 	}
 	if _, err := srv.stateStore.ReadRunning(agent.AgentID); err == nil {
 		t.Fatal("stale running row still present")
+	}
+	status, err := srv.stateStore.ReadStatus(agent.AgentID)
+	if err != nil {
+		t.Fatalf("ReadStatus: %v", err)
+	}
+	if status.State != "done" {
+		t.Fatalf("status = %q, want done", status.State)
 	}
 }
 

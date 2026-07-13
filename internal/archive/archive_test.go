@@ -12,6 +12,7 @@ import (
 // must serialize results as [] (not null), or the dashboard crashes on
 // results.length/.map. This path (Search with no query -> list) does not need
 // FTS5, so the test runs on the shipped no-FTS5 fallback build too.
+// FS-05.A2: empty archive collections serialize as arrays, never null.
 func TestEmptyArchiveMarshalsResultsArray(t *testing.T) {
 	st, err := state.Open(t.TempDir())
 	if err != nil {

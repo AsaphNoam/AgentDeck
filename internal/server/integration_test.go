@@ -152,6 +152,7 @@ func post(t *testing.T, url string, body any) (*http.Response, []byte) {
 // TestLaunchPromptPermissionFlow drives the full HTTP surface against the fake
 // CLI: POST /sessions → /api/events → prompt → permission_request → permission
 // approve → sentinel created → turn_end (techspec §10.3, Appendix A).
+// FS-03.A3: prompt → permission → approval → durable transcript.
 func TestLaunchPromptPermissionFlow(t *testing.T) {
 	fake := buildFakeACP(t)
 	sentinel := filepath.Join(t.TempDir(), "sentinel")
@@ -227,7 +228,10 @@ func TestLaunchPromptPermissionFlow(t *testing.T) {
 	}
 
 	resp, body = func() (*http.Response, []byte) {
-		r, _ := http.Get(ts.URL + "/api/sessions/" + agentID + "/transcript")
+		r, err := http.Get(ts.URL + "/api/sessions/" + agentID + "/transcript")
+		if err != nil {
+			t.Fatalf("get transcript: %v", err)
+		}
 		defer r.Body.Close()
 		b := make([]byte, 8192)
 		n, _ := r.Body.Read(b)
@@ -245,7 +249,10 @@ func TestLaunchPromptPermissionFlow(t *testing.T) {
 
 	// GET detail reflects the agent.
 	resp, body = func() (*http.Response, []byte) {
-		r, _ := http.Get(ts.URL + "/api/sessions/" + agentID)
+		r, err := http.Get(ts.URL + "/api/sessions/" + agentID)
+		if err != nil {
+			t.Fatalf("get session detail: %v", err)
+		}
 		defer r.Body.Close()
 		b := make([]byte, 4096)
 		n, _ := r.Body.Read(b)
@@ -404,7 +411,10 @@ func TestResumeHappyPath(t *testing.T) {
 
 	// 3. Capture first running.session_id from GET /api/sessions.
 	firstSessionID := func() string {
-		r, _ := http.Get(ts.URL + "/api/sessions")
+		r, err := http.Get(ts.URL + "/api/sessions")
+		if err != nil {
+			t.Fatalf("get sessions: %v", err)
+		}
 		defer r.Body.Close()
 		var sessions []struct {
 			AgentID string `json:"agent_id"`
@@ -461,7 +471,10 @@ func TestResumeHappyPath(t *testing.T) {
 	}
 
 	// 6. GET /transcript?include_meta=true: prior events + new session_meta with resumed_at.
-	r, _ := http.Get(ts.URL + "/api/sessions/" + agentID + "/transcript?include_meta=true")
+	r, err := http.Get(ts.URL + "/api/sessions/" + agentID + "/transcript?include_meta=true")
+	if err != nil {
+		t.Fatalf("get transcript with metadata: %v", err)
+	}
 	defer r.Body.Close()
 	var txBody []byte
 	buf := make([]byte, 32*1024)
@@ -502,7 +515,10 @@ func TestResumeHappyPath(t *testing.T) {
 	waitForEventType(t, frames2, "turn_end")
 
 	// Read transcript again and verify seq is monotonically increasing.
-	r2, _ := http.Get(ts.URL + "/api/sessions/" + agentID + "/transcript?include_meta=true")
+	r2, err := http.Get(ts.URL + "/api/sessions/" + agentID + "/transcript?include_meta=true")
+	if err != nil {
+		t.Fatalf("get resumed transcript with metadata: %v", err)
+	}
 	defer r2.Body.Close()
 	var txBody2 []byte
 	for {

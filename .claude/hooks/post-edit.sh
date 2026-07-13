@@ -26,6 +26,21 @@ case "$fp" in
   ;;
 esac
 
+# Specs are edited across several tool calls, so this is post-edit feedback,
+# not a write blocker. --file checks the edited document locally; make test and
+# CI run the repository-wide index/reference check at the GREEN checkpoint.
+case "$fp" in
+*/docs/specs/*.md|docs/specs/*.md)
+  checker="${CLAUDE_PROJECT_DIR:-.}/scripts/check-specs.sh"
+  if [ -x "$checker" ]; then
+    if ! spec_output=$("$checker" --file "$fp" 2>&1); then
+      msgs="${msgs}spec lint: $spec_output
+"
+    fi
+  fi
+  ;;
+esac
+
 # Twin-skill drift guard: .claude/skills and .agents/skills already drifted once.
 case "$fp" in
 */.claude/skills/*)

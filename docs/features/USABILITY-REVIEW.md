@@ -1,15 +1,16 @@
 # AgentDeck — Usability Review Protocol
 
-**Canonical spec for the behavior-driven, top-to-bottom usability review.** A future orchestrating
-agent follows this document to review AgentDeck the way a user experiences it: by building the real
-binary, starting it on fresh state, and driving every journey through the actual UI. It complements —
-does not replace — the static diff review in [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) §8.
+**Verification protocol for the behavior-driven, top-to-bottom usability review.** It derives
+expected behavior from feature-spec acceptance criteria, builds the real binary, starts fresh state,
+and drives journeys through the actual UI. It complements the static diff review in
+[`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) §8; it is not a third product-spec set.
 
 > Claude Code reaches this via the `/usability-review` skill; Codex via
-> `.agents/skills/usability-review`. Both land here. This file is the single source of truth —
-> if the skill and this doc disagree, this doc wins.
+> `.agents/skills/usability-review`. Both land here. The workflow governs role behavior; feature
+> specs govern expected product behavior; this file governs the verification method.
 
-**Prime directive: findings come from running the app, never from reading the diff.**
+**Prime directive: user-impact findings are confirmed against the running app. Static sweeps produce
+risk leads, not product findings, until reproduced or routed to the §8 code-review path.**
 
 ---
 
@@ -52,9 +53,9 @@ app**, composed across all phases, starting from the states a real user actually
 
 ## 1. Scope, bar, and severity
 
-**The bar:** *a first-time or daily user hits this.* No spec violation is required — "the spec
-never promised styling" is not a defense. If a reasonable user would be stuck, misled, or confused,
-it's a finding.
+**The bar:** *a first-time or daily user hits this.* If an observed normal-use expectation is not
+covered by an FS requirement/acceptance item, record a spec-gap candidate alongside the finding so
+fix-review can decide whether behavior or spec must change.
 
 **Severity taxonomy** (every finding gets exactly one):
 
@@ -69,7 +70,7 @@ Mapping into the §8/§9 fix loop: BLOCKER/MAJOR → **BLOCKING**; MINOR → **A
 ADVISORY only if the fix is one-line-obvious, otherwise omit.
 
 **Non-goals** (do not spend tokens here): code-quality opinions, naming/style, performance
-micro-audits, redesign proposals, features the specs never promised. The §8 diff review and
+micro-audits, redesign proposals, or unverified feature ideas. The §8 diff review and
 `INVARIANTS.md` own code-level classes; this review owns *experienced behavior*.
 
 ---
@@ -109,9 +110,9 @@ treat the empty variant as mandatory, not optional.
 
 | # | Journey | Fixture | What must be observed |
 |---|---|---|---|
-| J1 | **Install & first paint** | `fresh/` | Build succeeds via the real build line; server starts; UI loads in a browser with **zero console errors** and a **styled** shell (computed styles on key elements, not just DOM presence). *This single journey would have caught all three escaped bugs.* |
+| J1 | **Install & first paint** | `fresh/` | Build succeeds via the real build line; server starts; UI loads in a browser with **zero console errors** and a **styled** shell (computed styles on key elements, not just DOM presence). This journey covers the historical build and missing-style escapes; J2 covers CLI-credential variance. |
 | J2 | **Onboarding wizard end-to-end** | `fresh/` | Every branch: no CLI installed → clear guidance; CLI installed but not logged in → failed check with actionable detail; logged in → pass (ENV-DEPENDENT). Back/skip/validate paths. Resulting config files on disk are sane and re-readable. |
-| J3 | **First agent launch + chat round-trip** | `seeded/` + fakeacp | Create agent, send a message, streamed response renders, card status transitions (idle → working → done) match reality. |
+| J3 | **First agent launch + chat round-trip** | `seeded/` + fakeacp | Create agent, send a message, streamed response renders, card status transitions (idle → busy → idle) match reality. |
 | J4 | **Permission prompt flow** | `seeded/` + fakeacp | Prompt appears; approve, deny, and timeout each leave UI and server state consistent; no double-fire, no stuck prompt. |
 | J5 | **Grid & layout** | `seeded/` | Reorder, density, groups, collapse; persists across page reload **and** server restart. Delete an agent that is in the saved order — grid stays sane. Empty grid renders a real empty state. |
 | J6 | **Terminal runtime** | `seeded/` | Launch terminal agent (xterm.js path), type, resize, detach/reattach; output intact, keystrokes not eaten. |
@@ -140,21 +141,22 @@ REPORT: per the schema in USABILITY-REVIEW.md §5 — checkpoints verdicts + fin
 
 ## 4. Cross-cutting static sweeps
 
-Cheap, greppable audits delegated to read-only subagents. They run **first** (§5 Phase A): their
-hits seed which journeys get extra attention, and some produce findings directly.
+Cheap, greppable audits that may be delegated read-only. They run **first** (§5 Phase A): hits seed
+which journeys get extra attention. A source-only defect routes to §8; a usability finding still
+requires observed behavior.
 
 - **S1 Serialization-contract audit.** For every JSON response struct in `internal/server`:
   nil-slice/nil-map fields (`[]T(nil)`, bare `var x []T`, `append([]T(nil), …)`, `omitempty` on
   collections) vs the TS types in `ui/src/api` vs the MSW mock fixtures. Three-way diff. Any field
-  where the mock is prettier than what the real marshaler emits is a finding (this is the exact
-  shape of the `order: null` escape).
+  where the mock is prettier than what the real marshaler emits is a risk lead. Reproduce it in a
+  journey for a usability finding, or route a source-only contract defect through §8.
 - **S2 CSS wiring audit.** Set of classNames referenced in `ui/src/**/*.tsx` vs selectors defined
   in the stylesheets. Report both directions: referenced-but-undefined (the wizard escape) and
   defined-but-unreferenced (drift).
 - **S3 External-CLI variance audit.** Every `exec.Command` of a user-machine binary: which flags
   are passed, what output format is assumed, PATH assumptions, and what happens when the tool is
-  old, missing, or non-interactive. Any optional flag without a fallback is a finding (the
-  `--no-color` escape).
+  old, missing, or non-interactive. Any optional flag without a fallback is a risk lead (the
+  historical `--no-color` escape); reproduce it in J2 or route a source-only defect through §8.
 - **S4 Null-hostility audit.** Every `.map`/`.filter`/`.length`/spread in `ui/src` on data that
   originates from a server response, cross-checked against S1's "can this actually be null" list.
 - **S5 Error-surfacing audit.** Every mutating call site in `ui/src`: `.catch → pushError` present,
@@ -166,25 +168,22 @@ hits seed which journeys get extra attention, and some produce findings directly
 
 ## 5. Execution architecture — token efficiency
 
-Sessions run on a premium, quota-limited model; subagent fan-out is how this review stays
-affordable (same tiering philosophy as AGENT-WORKFLOW §4).
+Use bounded delegation when the environment supports it. The main reviewer owns the binary/fixture
+baseline, charter scope, validation of material findings, deduplication, severity, workflow state,
+and final report. It may inspect source or evidence whenever needed to validate a claim. Without
+delegation, run the same phases sequentially.
 
-**The main thread is an orchestrator, nothing else.** It:
-- builds the binary (both variants) and fakeacp **once**; prepares the three fixtures **once**;
-- assigns charters and ports; aggregates, dedupes, and severity-ranks findings;
-- never reads source files beyond triage, never pastes transcripts or logs into its own context.
-
-**Phase A — static sweeps (cheap, parallel).** S1–S5 go to read-only Explore-type subagents on a
-cheaper model, each returning structured findings only. Their output re-prioritizes Phase B:
+**Phase A — static sweeps (parallel when available).** S1–S5 may go to bounded read-only agents,
+each returning structured risk leads. Their output re-prioritizes Phase B:
 a journey whose surface has sweep hits gets those hits injected as KNOWN RISKS in its charter.
 
-**Phase B — journey subagents (parallel where independent).** One subagent per journey; batch
-tightly-coupled pairs (J3+J4) into one charter. Isolation rule: **each journey gets its own port
+**Phase B — journeys (parallel where independent).** Assign one owner per journey and batch
+tightly-coupled pairs (J3+J4) when useful. Isolation rule: **each journey gets its own port
 and its own copy of its fixture dir**, so journeys run in parallel without interference (J12 is the
 exception: it deliberately reuses state left by earlier journeys, so it runs last, serially).
 A charter hands the subagent exactly the block in §3 — fixture path, port, binary path, fakeacp
-recipe, checkpoint list, report schema — and nothing else; the subagent must not re-derive project
-context by reading docs or source.
+recipe, checkpoint list, and report schema. The owner reads the governing FS acceptance items and
+may inspect evidence/source needed to validate a finding.
 
 **Browser protocol.** The UI is a SPA; DOM-level checks need a real browser. The fallback ladder,
 in order — the report must state which rung was used:
@@ -229,24 +228,23 @@ and flagged as such — never silently reported as fact.
   AGENT-WORKFLOW §8**, so the existing `/fix-review` (§9) loop consumes them unchanged. Prefix the
   title with the journey/sweep id (`J1`, `S2`) so the fix agent can find the repro in the run
   report.
-- If a finding reveals a **genuinely new systemic class**, append it to
-  [`INVARIANTS.md`](INVARIANTS.md) (curated — merge near-duplicates, per that file's own rules).
+- If a finding suggests a new systemic class, record it as a candidate finding. Usability review
+  does not edit specs/INV; fix-review validates and updates the technical-spec appendix.
 - Save the full run summary (checkpoint matrix per journey, all findings, evidence paths) as a file,
-  and report to the human via the **brief** (AGENT-WORKFLOW §10): a focused, plain-language entry in
+  and report to the human via the **brief** (AGENT-WORKFLOW §7): a focused, plain-language entry in
   [`BRIEFS.md`](BRIEFS.md) — what was driven, severity counts, each blocker as one plain sentence,
   link to the run summary file — pasted as the end-of-turn message. No enumerated advisory lists in
   the brief; those live in the handoff and the run file.
 - If a journey is all-PASS, say so in the matrix — an unexercised journey and a passing journey
   must be distinguishable.
-- Commit the doc updates together on `main` (`docs: usability review <date> — findings`) and push
+- Commit the state updates together on `main` (`usability review: <journey> — state recorded`) and push
   at session exit (AGENT-WORKFLOW §6) — product code stays untouched.
 
 ---
 
 ## 7. Maintenance — the matrix must track the product
 
-When a phase ships a new user-facing surface, closing that phase includes adding or extending a
-journey charter here (same discipline as INVARIANTS §10 "ship the wiring": a surface without a
-charter is unwired coverage). The reviewer's first step each run: diff the journey matrix against
-the shipped feature set (`MAP.md` feature→phase table) and flag uncovered surfaces as a gap in the
-run report — before running anything.
+When an FS adds or changes a user-facing acceptance item, the same checkpoint adds or extends a
+journey charter here when browser verification is appropriate. The reviewer's first step each run
+compares this matrix with the feature-spec index and relevant A-items, then records uncovered
+normal-use surfaces as coverage/spec-gap candidates before running anything.

@@ -94,6 +94,7 @@ func argvHasFlagValue(argv []string, flag, val string) bool {
 // A terminal agent launches under the xterm/PTY driver, records its tty + driver
 // in the running row, lands on idle, and then transitions idle→busy→idle purely
 // through hook POSTs (the manager's ApplyHook ingest path, §3.3/§4).
+// FS-07.A1: a terminal launch records its TTY and follows hook-driven state.
 func TestTerminalLaunchRecordsTTYAndHookStatusFlow(t *testing.T) {
 	store, err := state.Open(t.TempDir())
 	if err != nil {

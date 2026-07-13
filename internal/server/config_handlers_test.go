@@ -37,6 +37,7 @@ func doRequest(t *testing.T, h http.Handler, method, path string, body any) *htt
 
 // ---- Roles CRUD tests ----
 
+// FS-04.A1: role CRUD round-trips every owned field.
 func TestRolesCRUDRoundTrip(t *testing.T) {
 	srv := testServer(t, false)
 	h := srv.routes()

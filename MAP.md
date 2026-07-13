@@ -1,101 +1,44 @@
-# AgentDeck — Project Map
+# AgentDeck — Repository map
 
-Central index of the planning docs: what each file is, the build order, and the facts worth keeping in one place. Start here.
+Start with the authority, then the live state:
 
-## Documents
+| Document | Role |
+|---|---|
+| [`docs/specs/README.md`](docs/specs/README.md) | **Product source of truth.** Index and lifecycle for feature specs (FS) and technical specs (TS/INV). |
+| [`docs/features/HANDOFF.md`](docs/features/HANDOFF.md) | **Live work state.** Active change, governing IDs, decisions, gates, findings, next checkpoint. |
+| [`docs/features/AGENT-WORKFLOW.md`](docs/features/AGENT-WORKFLOW.md) | **Process source of truth.** Implementation/review/fix/usability roles and GREEN checkpoints. |
+| [`docs/features/INVARIANTS.md`](docs/features/INVARIANTS.md) | Normative technical appendix for recurring bug classes (`INV §n`). |
+| [`architecture-flow.md`](architecture-flow.md) | Descriptive architecture orientation; TS wins on conflict. |
+| [`docs/architecture-decisions.md`](docs/architecture-decisions.md) | Non-normative rationale behind selected TS decisions. |
+| [`docs/archive/README.md`](docs/archive/README.md) | Superseded phase plans, master PRD, review evidence, and snapshots. Never build from it. |
 
-| File | What it is |
-|------|-----------|
-| [docs/agent-dashboard-prd.md](docs/agent-dashboard-prd.md) | **Master PRD.** Full product spec: concepts, data model, architecture, all features (F1–F13), REST/SSE surface, tech stack, open questions. Source of truth. |
-| [docs/architecture-decisions.md](docs/architecture-decisions.md) | **Architecture decisions & rationale.** Why config=files/state=SQLite, hooks→HTTP, in-process Go MCP. The "why" behind the PRD's design. |
-| [docs/features/README.md](docs/features/README.md) | Phase plan overview: phase map, dependency graph, milestone mapping, how to brief an agent per phase. |
-| [docs/features/HANDOFF.md](docs/features/HANDOFF.md) | **Live implementation state.** Where the build is, what's next, decisions, blockers. Agents read/update this every session. |
-| [docs/features/BRIEFS.md](docs/features/BRIEFS.md) | **Human session briefs.** Read the newest entry to return cold without the handoff, diff, or chat history. |
-| [docs/features/AGENT-WORKFLOW.md](docs/features/AGENT-WORKFLOW.md) | **Spaced-session build protocol.** The fire-and-forget loop both Claude Code & Codex follow, one at a time. Drives `HANDOFF.md`. |
-| [docs/features/INVARIANTS.md](docs/features/INVARIANTS.md) | **Paid-for bug-class catalog.** The systemic defect classes three full review cycles kept re-finding, with the canonical helpers/patterns that fix them. Build agents read the matching sections before touching hot spots; review agents sweep diffs against it; fix agents feed it. |
-| [docs/features/phase-0-foundation.md](docs/features/phase-0-foundation.md) | Data model, file store, server & CLI skeleton. Substrate. |
-| [docs/features/phase-1-core-loop.md](docs/features/phase-1-core-loop.md) | ACP chat runtime, launch, streaming chat. (F4, F3 min) |
-| [docs/features/phase-2-state-dashboard.md](docs/features/phase-2-state-dashboard.md) | State manager, SSE bus, dashboard card grid. (F1) |
-| [docs/features/phase-3-config-onboarding.md](docs/features/phase-3-config-onboarding.md) | Config CRUD & onboarding. (F5, F6, F12) |
-| [docs/features/phase-4-persistence-archive.md](docs/features/phase-4-persistence-archive.md) | Archive, search, resume, file/command tracking. (F9, F10) |
-| [docs/features/phase-5-coordination.md](docs/features/phase-5-coordination.md) | MCP messaging, nudger, budgets, notifications. (F8, F11) |
-| [docs/features/phase-6-flexibility.md](docs/features/phase-6-flexibility.md) | Terminal runtime, switch-runtime, task groups. (F7, F2) |
-| [docs/features/future-phase.md](docs/features/future-phase.md) | Future feature candidate bucket. |
-| [docs/features/phase-7-additional-features.md](docs/features/phase-7-additional-features.md) | Phase 7: Claude/Codex configuration federation plus additional agent backends. |
+## Feature ownership
 
-### Implementation tech specs
+| ID | Area | Primary code |
+|---|---|---|
+| FS-00 | Product concepts and boundaries | repository-wide |
+| FS-01 | Agent lifecycle | `internal/server/{launch,resume,switch,sessions}.go`, `internal/runtime` |
+| FS-02 | Dashboard, layout, groups, notifications | `ui/src/components/grid`, `internal/state`, SSE |
+| FS-03 | Chat, streaming, permissions | `internal/runtime/chat.go`, `ui/src/components/chat` |
+| FS-04 | Configuration and onboarding | `internal/config`, Settings/onboarding UI |
+| FS-05 | Archive, search, tracking | `internal/archive`, `internal/index` |
+| FS-06 | Messaging, nudger, budgets | `internal/messaging`, `internal/state/messages.go` |
+| FS-07 | Terminal interface and drivers | `internal/runtime/terminal`, terminal UI |
+| FS-08 | Native configuration federation | `internal/configsource`, ConfigSourcePanel |
+| FS-09 | Backend/model catalog and capabilities | `internal/backend`, backend Settings/onboarding |
 
-Each phase PRD above has a mirror **tech spec** under `docs/features/tech/` — the implementation-ready companion (concrete libs, package/file layout, in-code data structures, exact API/SSE JSON, algorithms, ordered task breakdown, tests, resolved open questions). Build from these; the phase PRD is the *what*, the tech spec is the *how*.
+Technical ownership is split across TS-01 architecture, TS-02 persistence, TS-03 HTTP/SSE/WS,
+TS-04 external protocols, TS-05 security, TS-06 build/test/delivery, and TS-07 federation.
 
-| Tech spec | Mirrors |
-|-----------|---------|
-| [tech/phase-0-foundation-techspec.md](docs/features/tech/phase-0-foundation-techspec.md) | Phase 0 |
-| [tech/phase-1-core-loop-techspec.md](docs/features/tech/phase-1-core-loop-techspec.md) | Phase 1 |
-| [tech/phase-2-state-dashboard-techspec.md](docs/features/tech/phase-2-state-dashboard-techspec.md) | Phase 2 |
-| [tech/phase-3-config-onboarding-techspec.md](docs/features/tech/phase-3-config-onboarding-techspec.md) | Phase 3 |
-| [tech/phase-4-persistence-archive-techspec.md](docs/features/tech/phase-4-persistence-archive-techspec.md) | Phase 4 |
-| [tech/phase-5-coordination-techspec.md](docs/features/tech/phase-5-coordination-techspec.md) | Phase 5 |
-| [tech/phase-6-flexibility-techspec.md](docs/features/tech/phase-6-flexibility-techspec.md) | Phase 6 |
-| [tech/phase-7-additional-features-techspec.md](docs/features/tech/phase-7-additional-features-techspec.md) | Phase 7 configuration federation + backends |
-| [tech/phase-7-polish-activity-map-techspec.md](docs/features/tech/phase-7-polish-activity-map-techspec.md) | Optional activity-map candidate for Phase 7 |
+## Runtime in one breath
 
-## Build order
+Browser UI ⇄ loopback REST/SSE/WebSocket ⇄ one Go server ⇄ ACP stdio or terminal PTY ⇄ agent CLI.
+The server also hosts the loopback messaging MCP endpoint, is the sole SQLite writer, composes
+launch/resume/switch through shared boundaries, and embeds the built UI. Config remains local JSON;
+native Claude/Codex federation is one-way and read-only.
 
-```
-0 ─▶ 1 ─▶ 2 ─┬▶ 3   (config/onboarding)
-             ├▶ 4   (persistence) ─┐
-             └▶ 5   (coordination) ─┴▶ 6 (flexibility) ─▶ 7 (future)
-```
+## Working rule
 
-- **0 → 1 → 2** is a strict chain — each requires the previous.
-- **3, 4, 5** all sit on 2 and are independent of each other → parallelizable / reorderable by priority.
-- **6** needs 4 (reuses resume machinery). **7** also uses Phase 3's config/onboarding surface for federation.
-
-## Feature → phase
-
-F1→2 · F2→6 · F3→1(min)+2(full) · F4→1(API)+3(modal) · F5→3 · F6→3 · F7→6 · F8→5 · F9→4 · F10→4 · F11→5 · F12→3 · F13→7 candidate · F14/F15/F16→7
-
-## Architecture in one breath
-
-Two runtime processes (+ agent CLIs): **React/Vite UI** ⇄ REST + SSE ⇄ **Go server** (binds `127.0.0.1` only) ⇄ stdio ⇄ **agent CLI** (Claude Code / Codex). The **messaging Model Context Protocol (MCP) server is hosted in-process in the Go binary** and exposed to agents over loopback HTTP at `/mcp` — no runtime Node. Hooks **POST to `/api/hook`** (+ per-launch token). No cloud, no auth.
-
-## Source of truth: local files + federated native config (state = SQLite)
-
-AgentDeck-owned config is plain JSON (hand-editable, git-friendly). Phase 7 can instead bind Claude/Codex fields and setup assets to their native user/project files; those external files remain authoritative and AgentDeck stores only bindings, overrides and derived fingerprints/cache. Machine state is SQLite, written **only** by the server. Producers (hooks via `/api/hook`, chat runtime via ACP) and consumers (UI via SSE) are decoupled through the server.
-
-```
-# config — plain JSON files
-roles/{role}.json    persona: system_prompt + permission policy
-projects/{p}.json    workspace: cwd + context_prompt + add_dirs
-backends.json        providers + models + per-model env/keys (version 2)
-config-sources.json  Claude/Codex source bindings + explicit overrides (Phase 7)
-layout.json          card order + density
-config.json          port, default_project, default_role, skip_permissions
-
-# state — SQLite (server is sole writer)
-state.db             identity (stable agent_id), running registry (pid, session_id, tty),
-                     live status, messages, session/transcript metadata + FTS5 search index
-
-# agent-CLI-owned transcripts (indexed into state.db for search)
-sessions/{id}/       raw transcript history for resume
-```
-
-## Load-bearing concepts
-
-- **Stable `agent_id` vs ephemeral `session_id`.** Identity survives resume/clone/backend-swap; the CLI's session id changes. Everything that "switches" (model/backend/interface, F7) re-launches on the same `agent_id` and resumes. Get this right in Phase 0/1.
-- **Hook POST → server → SQLite → SSE.** Hooks `POST /api/hook` (token-authed); the server applies to `state.db` and emits `state_update`. A reconciliation watcher over `sessions/` is a fallback only. SSE event types: `state_update`, `new_message`, `notification`, `ping`.
-- **Server is sole SQLite writer.** No multi-process contention; `state.db` is authoritative (no derived-index drift).
-- **Two runtimes, one CLI, one identity.** Chat (ACP over stdio, cross-platform default) and Terminal (Phase 6; cross-platform xterm.js/tmux default, iTerm2 an optional macOS-only driver). Registry dispatches by `agent.interface`.
-- **Messaging in-process + nudger.** `list_agents`/`send_message`/`check_messages` are in-process reads/writes of `state.db`; the nudger wakes idle recipients. Per-turn budget (default 15) caps loops.
-- **Config composition at launch:** `project.cwd` + `project.context_prompt` + `role.system_prompt` + `backend/model` → CLI invocation. Edits affect future launches only.
-
-## Conventions / placeholders to confirm
-
-- **Port:** `4317` (placeholder — master PRD leaves it abstract).
-- **`AGENTDECK_HOME`** env var overrides `~/.agentdeck/` (for tests/CI).
-- Bind address must never be `0.0.0.0`.
-- Each phase PRD is self-contained: restates data shapes, lists the REST/SSE it adds, and has an acceptance checklist. Brief one coding agent per phase.
-
-## Stack & prereqs
-
-Go 1.22+ (single binary: server + in-process MCP + embedded UI), Node 18+ + npm (**build-time only**, for the Vite UI), ≥1 authenticated agent CLI. **No runtime Node, no python3.** Deps: `modelcontextprotocol/go-sdk` (MCP), `mattn/go-sqlite3` (state). Platforms: macOS + Linux (cross-platform xterm.js/tmux terminal runtime; iTerm2 driver optional, macOS-only). Install via `install.sh`; run `agentdeck dashboard start && agentdeck dashboard open`.
+Plans and handoffs must name governing FS/TS R/A IDs. If a behavior or architecture contract has no
+owner, create a spec delta before implementation. Historical phase numbers are useful git/archive
+context only and never determine current scope.
