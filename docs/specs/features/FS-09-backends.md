@@ -40,6 +40,16 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **R7** — New Agent lists configured backends and models, defaults to the configured default
   backend/model, and resets the selected model to that backend's default when the backend changes.
   The launch API rejects an unknown backend or model instead of guessing.
+- **R28** — A `codex-acp` backend may set `autosync_models: true`. On dashboard startup (after
+  seeding), AgentDeck reads the Codex CLI's local model cache
+  (`${CODEX_HOME:-~/.codex}/models_cache.json`) and **adds** every user-visible model
+  (`visibility:"list"`) not already present to that backend's `models` map, keyed by the Codex model
+  slug, with the slug as the provider string and the catalog `display_name` as the label. Sync is
+  **add-only**: it never edits or removes an existing model entry, never changes `default_model`, and
+  writes nothing when it finds nothing new. A missing, unreadable, or unparseable cache is a
+  non-fatal skip that never blocks startup or mutates the catalog. Backends without the flag, and
+  every non-`codex-acp` type, are untouched. Claude has no equivalent on-disk catalog (its list is
+  compiled into the CLI binary) and is intentionally out of scope.
 
 ### Adapter and capability matrix
 
@@ -145,6 +155,12 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **A7** `(GATED — real CLI credentials)` — Re-run live Codex chat launch/turn/stop/resume and
   Claude/Codex/OpenCode/OpenHands HTTP messaging-MCP registration against pinned versions before a
   release claims those external compatibility paths.
+- **A8** (R28) — A `codex-acp` backend with `autosync_models` gains newly available user-visible
+  Codex models on startup without duplicating or overwriting existing entries, changing the default,
+  or including hidden models; a disabled flag, a non-codex backend, and a missing cache leave the
+  catalog unchanged. *Verified by* `TestSyncCodexModelsAddsVisibleModels`,
+  `TestSyncCodexModelsPreservesExistingAndDefault`, `TestSyncCodexModelsRespectsFlagAndType`, and
+  `TestReadCodexModelCatalog`.
 
 ## 6. Deviations & open decisions
 
@@ -171,6 +187,9 @@ Configuration-source federation for Claude/Codex is FS-08.
 
 - **Catalog/validation/seeds:** `internal/config/types.go`, `internal/config/validate.go`,
   `internal/config/seed.go`, `internal/server/config_handlers.go`.
+- **Codex model autosync (R28):** `internal/config/codexmodels.go` (`ReadCodexModelCatalog`,
+  `syncCodexModels`, `Store.AutoSyncBackends`); invoked from `resolveConfig` in
+  `internal/cli/dashboard.go`.
 - **Adapters/credentials:** `internal/backend/adapter.go`, `internal/backend/credcheck/`;
   `internal/runtime/chat.go` (adapter consumption and shared ACP permission gate).
 - **Capability/composition:** `internal/server/terminal.go`, `launch.go`, `resume.go`, `switch.go`.

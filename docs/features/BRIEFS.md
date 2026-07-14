@@ -4,6 +4,35 @@ Newest first. Each entry is the exact final response from an implementation, rev
 usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-14 — Codex model autosync
+
+The New Agent model picker was stale (sonnet-4-6/gpt-5.5) while the native CLIs had moved on. It turns
+out the available models *are* stored on disk, but differently per provider: **Codex** publishes a
+machine-readable catalog at `${CODEX_HOME:-~/.codex}/models_cache.json`, while **Claude** compiles its
+list into the CLI binary (settings.json holds only the selected model). So the Codex half was cheap to
+automate and shipped; the Claude half stays an idea.
+
+New behavior (FS-09.R28/A8): a `codex-acp` backend can set `autosync_models: true` (a checkbox in
+Settings → Backends). On dashboard startup, after seeding, AgentDeck reads the Codex cache and
+**add-only** merges every user-visible model (`visibility:"list"`) into the backend's catalog, keyed by
+the Codex slug. It never edits or removes an existing entry, never changes `default_model`, writes
+nothing when there's nothing new, and treats a missing/unparseable cache as a silent skip that can't
+block startup. Implementation is `internal/config/codexmodels.go` (`ReadCodexModelCatalog`,
+`syncCodexModels`, `Store.AutoSyncBackends`) invoked from `resolveConfig` in the dashboard CLI, plus the
+`AutoSyncModels` config field and the UI toggle. Verified with new Go tests and a live restart that
+pulled gpt-5.6-sol/terra/luna and gpt-5.4/-mini into the catalog while leaving gpt-4o and a hand-added
+entry intact; full GREEN checkpoint (both Go variants, build, 95 UI tests, UI build) passed.
+
+**What this teaches:** on macOS, `cp`-ing a binary over itself *in place* while a copy is running
+corrupts its ad-hoc code signature, after which the kernel stalls or kills execs of that file (it
+looked like a hung binary despite an identical shasum). Reinstall with remove-then-copy to a fresh
+inode. This bit the `agentdeck` PATH binary mid-session until a clean `rm && cp` fixed it.
+
+**Needs attention:** None.
+
+**Next:** Restart your dashboard so the picker shows the synced Codex models. Optionally set your
+preferred new model (e.g. gpt-5.6-terra) as the Codex default in Settings → Backends.
+
 ### 2026-07-14 — auto-generated project ids
 
 Creating a project no longer asks you for a "Project ID (slug)". That field was the source of a

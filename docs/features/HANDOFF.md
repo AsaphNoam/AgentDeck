@@ -12,8 +12,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 - **Relevant requirements:** [`../specs/README.md`](../specs/README.md) and the FS/TS/INV items selected
   for the next change.
 - **State:** GREEN. On 2026-07-14 `make check-specs`, `make test` (both Go variants), `make build`,
-  all 95 UI tests, and the UI production build passed for the auto-generated-project-id change, which
-  was also verified end-to-end in the running dashboard.
+  all 95 UI tests, and the UI production build passed for the Codex model-autosync change (FS-09.R28),
+  verified end-to-end: enabling the toggle then restarting pulled the current Codex models into the
+  catalog without touching existing entries.
 - **Last reviewed code:** `4036e78` (2026-07-12). The later fixes addressed every must-fix finding
   from that review; no must-fix finding is currently open.
 - **Branch:** `main`.
@@ -75,6 +76,8 @@ No must-fix findings. Future ideas and known product improvements are in
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
+- 2026-07-14 — Codex backends can opt into `autosync_models`: on startup AgentDeck add-only merges
+  the Codex CLI's `models_cache.json` into the catalog (FS-09.R28/A8). Claude autosync stays an idea.
 - 2026-07-14 — New Agent modal now defaults the name to just the (capitalized) role instead of
   `Role-project` (FS-01.R1 auto-suggest; format not pinned).
 - 2026-07-14 — Project ids are now server-derived from the title (`slug(title)-<timestamp>`); the
