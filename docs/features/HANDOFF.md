@@ -49,22 +49,22 @@ that update.
   keys. Decide whether to trade provider compatibility for allowlists.
 - **Terminal and messaging support boundary:** FS-07/TS-04 document Claude-only terminal support and
   non-messageable terminal agents pending real-CLI verification.
-- **Detached federation import:** TS-07.R11 and FS-08 keep detach unshipped until a verified copy/
-  injection approach exists.
 - **API/model compatibility:** TS-03.R3–R4 preserve mixed legacy error envelopes; TS-04.R3 records
   provider model-ID ownership. Standardizing either is a compatibility change.
 
 ## Acceptance gates
 
-- Run pinned, credentialed Claude and Codex chat/MCP/resume checks before claiming those combinations.
-- Run pinned Claude terminal flags/hooks and live xterm journeys before claiming full terminal support.
-- Run pinned OpenCode/OpenHands launch/credential checks before claiming those backends beyond fakes.
-- Run the Phase 7 federation discovery/precedence/refresh/launch/resume matrix against real Claude and
+- [ ] Run pinned, credentialed Claude and Codex chat/MCP/resume checks before claiming those combinations.
+- [ ] Run pinned Claude terminal flags/hooks and live xterm journeys before claiming full terminal support.
+- [ ] Run pinned OpenCode/OpenHands launch/credential checks before claiming those backends beyond fakes.
+- [ ] Run the Phase 7 federation discovery/precedence/refresh/launch/resume matrix against real Claude and
   Codex installations before promoting FS-08/TS-07 from Partial.
 
 ## Blocked on human
 
-None.
+Live-provider acceptance is waiting for human authorization because it invokes real provider sessions
+and creates disposable local configuration homes. On 2026-07-15 this machine has Claude Code 2.1.202,
+Codex CLI 0.142.5, and `codex-acp` 1.1.2 installed; OpenCode and OpenHands are not installed.
 
 ## Review findings
 
@@ -78,6 +78,9 @@ _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
 - 2026-07-14 — Codex backends can opt into `autosync_models`: on startup AgentDeck add-only merges
   the Codex CLI's `models_cache.json` into the catalog (FS-09.R28/A8). Claude autosync stays an idea.
+- 2026-07-15 — Confirmed detached federation import remains deliberately unshipped: `detach=true`
+  returns `501 not_implemented`; source assets remain reference-only until a verified provider launch-
+  injection design exists. It is a known capability gap, not a human decision awaiting resolution.
 - 2026-07-14 — New Agent modal now defaults the name to just the (capitalized) role instead of
   `Role-project` (FS-01.R1 auto-suggest; format not pinned).
 - 2026-07-14 — Project ids are now server-derived from the title (`slug(title)-<timestamp>`); the

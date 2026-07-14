@@ -4,6 +4,21 @@ Newest first. Each entry is the exact final response from an implementation, rev
 usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-15 — verification status clarified
+
+Detached federation import has not shipped: asking AgentDeck to detach a linked Claude or Codex setup
+returns a clear “not implemented” response, and no native configuration is copied. It stays a known
+capability gap until there is a verified way to inject an AgentDeck-owned copy into each provider.
+
+The remaining real-world checks are now explicit: test Claude and Codex chat, messaging, resume,
+terminal behavior, and federation with real authenticated CLIs; OpenCode/OpenHands need installation
+before their equivalent checks. This machine already has Claude Code, Codex, and the Codex ACP adapter.
+
+**Needs attention:** Authorize a disposable, credentialed live-provider test run before AgentDeck makes
+compatibility claims for those CLI features.
+
+**Next:** Run the Claude/Codex acceptance checks against disposable configuration homes.
+
 ### 2026-07-14 — Codex model autosync
 
 The New Agent model picker was stale (sonnet-4-6/gpt-5.5) while the native CLIs had moved on. It turns
