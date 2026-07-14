@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
+	"time"
 )
 
 // ValidSlug reports whether s is a valid role/project id. The id must begin
@@ -13,6 +15,52 @@ import (
 var slugRE = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 
 func ValidSlug(s string) bool { return slugRE.MatchString(s) }
+
+// projectIDTimestamp is the length of the "-YYYYMMDDThhmmssz" suffix that
+// GenerateProjectID appends (hyphen + 8 date + "t" + 6 time + "z" = 17).
+const projectIDTimestamp = len("-20060102t150405z")
+
+// GenerateProjectID derives a unique, filesystem-safe project id from a title
+// (FS-04.R31). The result is a lowercase slug of the title plus a local-time
+// timestamp suffix, e.g. title "AgentDeck Demo" at 2026-07-14 20:28:25 local ->
+// "agentdeck-demo-20260714t202825z". The whole id always satisfies ValidSlug.
+// Callers that supply their own id bypass this; it is only used when POST
+// /api/projects omits the id.
+func GenerateProjectID(title string, now time.Time) string {
+	base := slugify(title)
+	if base == "" {
+		base = "project"
+	}
+	// Leave room for the timestamp suffix within the 63-char slug budget.
+	if maxBase := 63 - projectIDTimestamp; len(base) > maxBase {
+		base = strings.Trim(base[:maxBase], "-")
+		if base == "" {
+			base = "project"
+		}
+	}
+	ts := now.Format("20060102") + "t" + now.Format("150405") + "z"
+	return base + "-" + ts
+}
+
+// slugify lowercases s and collapses every run of characters outside [a-z0-9]
+// into a single hyphen, trimming leading/trailing hyphens. ASCII-only: other
+// runes are treated as separators (a title of only such runes yields "").
+func slugify(s string) string {
+	var b strings.Builder
+	pendingHyphen := false
+	for _, r := range strings.ToLower(s) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			if pendingHyphen && b.Len() > 0 {
+				b.WriteByte('-')
+			}
+			pendingHyphen = false
+			b.WriteRune(r)
+		} else {
+			pendingHyphen = true
+		}
+	}
+	return b.String()
+}
 
 // FieldError is one entry in the Phase 3 §5.6 validation error shape.
 type FieldError struct {

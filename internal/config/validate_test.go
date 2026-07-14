@@ -1,6 +1,46 @@
 package config
 
-import "testing"
+import (
+	"strings"
+	"testing"
+	"time"
+)
+
+// TestGenerateProjectID verifies id derivation from a title (FS-04.A11 / R31):
+// lowercase slug + timestamp, always a valid slug, with edge cases handled.
+func TestGenerateProjectID(t *testing.T) {
+	now := time.Date(2026, 7, 14, 20, 28, 25, 0, time.UTC)
+	const suffix = "20260714t202825z"
+
+	cases := []struct {
+		title string
+		want  string
+	}{
+		{"AgentDeck Demo", "agentdeck-demo-" + suffix},
+		{"demo", "demo-" + suffix},
+		{"My App!!", "my-app-" + suffix},
+		{"  spaces  around  ", "spaces-around-" + suffix},
+		{"Under_score/slash", "under-score-slash-" + suffix},
+		{"", "project-" + suffix},      // empty title
+		{"!@#$%", "project-" + suffix}, // no alphanumerics
+		{"---leading-trailing---", "leading-trailing-" + suffix},
+	}
+	for _, tc := range cases {
+		got := GenerateProjectID(tc.title, now)
+		if got != tc.want {
+			t.Errorf("GenerateProjectID(%q) = %q, want %q", tc.title, got, tc.want)
+		}
+		if !ValidSlug(got) {
+			t.Errorf("GenerateProjectID(%q) = %q is not a valid slug", tc.title, got)
+		}
+	}
+
+	// A very long title is truncated so the whole id still fits the slug rule.
+	long := GenerateProjectID(strings.Repeat("abcd-", 40), now)
+	if !ValidSlug(long) {
+		t.Errorf("long-title id %q is not a valid slug (len=%d)", long, len(long))
+	}
+}
 
 func TestValidSlug(t *testing.T) {
 	valid := []string{"a", "ab", "a1", "abc-def", "0abc", "a-b-c", "a" + "a" + "a", "implementer", "my-app"}
