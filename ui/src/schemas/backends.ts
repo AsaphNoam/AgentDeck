@@ -24,6 +24,8 @@ export const backendSchema = z.object({
   default_model: z.string(),
   models: z.record(modelSchema),
   env: z.record(z.string()).optional(),
+  // Opt-in Codex model-catalog autosync on startup (FS-09.R28); codex-acp only.
+  autosync_models: z.boolean().optional(),
 });
 
 export const backendsConfigSchema = z.object({

@@ -43,6 +43,9 @@ type Backend struct {
 	DefaultModel string            `json:"default_model"`
 	Models       map[string]Model  `json:"models"`        // keyed by model id
 	Env          map[string]string `json:"env,omitempty"` // backend-level env, applies to all models
+	// AutoSyncModels opts a codex-acp backend into startup model-catalog sync from
+	// the Codex CLI's local cache (FS-09.R28). Ignored for other backend types.
+	AutoSyncModels bool `json:"autosync_models,omitempty"`
 }
 
 // Model is one model under a backend. Per-model Env overrides backend-level Env.

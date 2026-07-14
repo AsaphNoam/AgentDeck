@@ -234,6 +234,17 @@ export function BackendsEditor() {
             />
           </details>
 
+          {backend.type === "codex-acp" && (
+            <label className="backend-autosync-label" title="On dashboard startup, add newly available Codex models from ~/.codex/models_cache.json. Existing entries and the default are never changed.">
+              <input
+                type="checkbox"
+                checked={backend.autosync_models ?? false}
+                onChange={(e) => updateBackend(id, { autosync_models: e.target.checked })}
+              />
+              Auto-sync models from Codex on startup
+            </label>
+          )}
+
           {(backend.type === "claude-acp" || backend.type === "codex-acp") && (
             <ConfigSourcePanel backendId={id} backendType={backend.type} />
           )}
