@@ -1,6 +1,6 @@
 ---
 name: work-phase
-description: Autonomously implement an AgentDeck spec-driven change in short or interrupted sessions. Use for "/work-phase", "continue the build", "pick up the implementation", or a named change/requirement.
+description: Explicit invocation only. Run only when the user sends `/work-phase`; do not trigger from a natural-language request.
 ---
 
 # Work a spec-driven change

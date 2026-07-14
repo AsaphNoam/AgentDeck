@@ -1,6 +1,6 @@
 ---
 name: usability-review
-description: Review a runnable AgentDeck user journey for normal-use friction and broken behavior without changing product code. Use for "/usability-review", "run a usability review", "test the latest user flow", or similar usability-review requests.
+description: Explicit invocation only. Run only when the user sends `/usability-review`; do not trigger from a natural-language request.
 ---
 
 # Review usability

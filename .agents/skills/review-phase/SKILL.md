@@ -1,6 +1,6 @@
 ---
 name: review-phase
-description: Review another agent's unreviewed AgentDeck work against relevant requirements, normal-use bugs, and unresolved local choices.
+description: Explicit invocation only. Run only when the user sends `/review-phase`; do not trigger from a natural-language request.
 ---
 
 # Review the unreviewed work
