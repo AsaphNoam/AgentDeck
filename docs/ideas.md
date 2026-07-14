@@ -14,7 +14,10 @@ Example:
 - **Pinned agents.** Let people keep frequently used agents at the top of the dashboard.
 ```
 
-No new ideas have been added yet.
+- **A regular AgentDecker installer.** Let people install and use AgentDecker without first cloning
+  the repository.
+- **Rich, selectable themes.** Offer several complete skins—such as basic, SaaS, and space
+  exploration—that can change more than colors or a light visual treatment.
 
 ## Ideas being defined
 
