@@ -14,6 +14,18 @@ Example:
 - **Pinned agents.** Let people keep frequently used agents at the top of the dashboard.
 ```
 
+- **Backend model autosync.** An opt-in per-backend toggle that, on dashboard startup (and maybe on
+  demand), refreshes a Claude/Codex backend's model catalog and default model to match what the
+  native CLI is actually configured to use, instead of the hand-maintained `backends.json` list going
+  stale. Prompted by the New Agent picker showing old models (sonnet-4-6/gpt-5.5) while the CLIs had
+  moved on (Claude→haiku, Codex→gpt-5.6-terra). Feasibility differs by provider and must be part of
+  defining this: Codex publishes a machine-readable catalog at `~/.codex/models_cache.json`
+  (`models` list + `etag`/`fetched_at`), so its available models are directly readable; Claude has no
+  on-disk catalog — `~/.claude/settings.json` holds only the *selected* model, and the full list is
+  baked into the CLI binary — so Claude autosync would need a different source (parse the binary,
+  ship a bundled list, or sync only the selected/default model). Keep it opt-in and never overwrite a
+  user's hand-edited entries silently; overlaps with FS-08 federation's read-only model inventory but
+  is a distinct "write it into the catalog" behavior.
 - **A regular AgentDecker installer.** Let people install and use AgentDecker without first cloning
   the repository.
 - **Rich, selectable themes.** Offer several complete skins—such as basic, SaaS, and space
