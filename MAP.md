@@ -5,9 +5,9 @@ Start with the authority, then the live state:
 | Document | Role |
 |---|---|
 | [`docs/specs/README.md`](docs/specs/README.md) | **Product source of truth.** Index and lifecycle for feature specs (FS) and technical specs (TS/INV). |
-| [`docs/features/HANDOFF.md`](docs/features/HANDOFF.md) | **Live work state.** An already-active package’s current step, relevant IDs, decisions, gates, findings, and next step. |
-| [`docs/product-backlog.md`](docs/product-backlog.md) | **Idea intake.** Inbox, discovery, candidates, and known gaps; never self-select from it. |
-| [`docs/implementation-queue/`](docs/implementation-queue/README.md) | **Ready delivery work.** Specified features waiting to start, one package per feature. |
+| [`docs/features/HANDOFF.md`](docs/features/HANDOFF.md) | **Live work state.** The current change’s next step, relevant requirements, decisions, checks, findings, and next step. |
+| [`docs/ideas.md`](docs/ideas.md) | **Ideas and improvements.** New thoughts, ideas being defined, and known things to improve. Agents never choose from it themselves. |
+| [`docs/ready-changes/`](docs/ready-changes/README.md) | **Ready changes.** Specified changes that are approved to start but have not started. |
 | [`docs/features/AGENT-WORKFLOW.md`](docs/features/AGENT-WORKFLOW.md) | **Process guide.** Implementation, review, fixing, usability review, and required checks. |
 | [`docs/features/INVARIANTS.md`](docs/features/INVARIANTS.md) | Normative technical appendix for recurring bug classes (`INV §n`). |
 | [`architecture-flow.md`](architecture-flow.md) | Descriptive architecture orientation; TS wins on conflict. |

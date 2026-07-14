@@ -4,6 +4,19 @@ Newest first. Each entry is the exact final response from an implementation, rev
 usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-14 — simpler future-work language
+
+Future work now uses plain names: [ideas and improvements](../ideas.md) for thoughts to keep or
+problems to improve, [ready changes](../ready-changes/README.md) for fully described work waiting to
+start, and the handoff for the one change currently in progress. The letter-number labels and
+“work package” terminology are gone. Specification requirement IDs remain because they link directly
+to the exact rule being changed or checked.
+
+**Needs attention:** None.
+
+**Next:** Add a new thought under “New ideas” in `docs/ideas.md`; define it further only when you
+want to explore it.
+
 ### 2026-07-14 — workflow skills: explicit invocation only
 
 The work, review, fix-review, and usability-review skills now run only when you use their matching slash command. Natural-language requests no longer trigger them automatically, in either the Claude or Codex skill copies.

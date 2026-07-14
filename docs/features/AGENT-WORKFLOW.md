@@ -8,12 +8,12 @@ says how agents work with them.
 
 1. Read [`HANDOFF.md`](HANDOFF.md) from top to bottom, then inspect `git status` and the diff. Treat
    a dirty tree as user or interrupted work; do not discard it.
-2. If work is active, read its package and the relevant feature, technical, and invariant requirements
-   before reading code. If no work is active, do not choose something from the backlog yourself.
+2. If a change is in progress, read its change file and the relevant feature, technical, and invariant
+   requirements before reading code. If no change is in progress, do not choose future work yourself.
 
-Use a small, ordinary set of statuses: `Ready`, `Active`, `Paused`, and `Done`. Requirement IDs such
-as `FS-05.A2` and `TS-03.R4` are kept because they are stable links to a precise requirement, not
-process vocabulary.
+Use plain status words: **waiting to start**, **in progress**, **paused**, and **finished**.
+Requirement IDs such as `FS-05.A2` and `TS-03.R4` are kept because they are stable links to a
+precise requirement, not process vocabulary.
 
 ## 2. Make a change
 
@@ -50,7 +50,7 @@ For a reversible local implementation choice, record a short note for the next i
 
 ## 4. Keep the handoff useful
 
-`HANDOFF.md` is current working state, not history. It contains one active package, its next small step, unresolved user questions, open review findings, the last reviewed code commit, and a short changelog. Remove finished steps and resolved findings. Keep completed details in specifications, tests, commits, and Git history.
+`HANDOFF.md` is current working state, not history. It contains one change in progress, its next small step, unresolved user questions, open review findings, the last reviewed code commit, and a short changelog. Remove finished steps and resolved findings. Keep completed details in specifications, tests, commits, and Git history.
 
 When delegation is available, use it for bounded independent work such as a repository search, a focused audit, or an isolated test. The main agent remains responsible for interpreting requirements, combining the work, and doing final verification.
 

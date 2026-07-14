@@ -103,7 +103,7 @@ R1–R11 and must be reflected here when its contract changes.
   user-visible consequence as an open gap.
 - Startup does not recursively repair permissions on an existing home tree, and role/project reads
   do not reject valid-name symlink files. Both are recorded hardening gaps in
-  [`product-backlog.md`](../../product-backlog.md).
+  [`ideas.md`](../../ideas.md).
 
 ## 6. Traceability
 
