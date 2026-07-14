@@ -4,6 +4,14 @@ Newest first. Each entry is the exact final response from an implementation, rev
 usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-14 — historical-document cleanup
+
+Archived handoffs and session updates now clearly say that their old labels and instructions describe a former process, not the one agents should follow today. The archive overview points readers back to the current workflow, specifications, and work state; older entries in this live brief file now carry the same reminder.
+
+**Needs attention:** None.
+
+**Next:** Agents should use the current workflow and handoff, and treat older records as context only.
+
 ### 2026-07-14 — workflow: remove redundant intent guidance
 
 The workflow no longer teaches agents how to interpret ordinary requests. It retains only the one rule that needs to be explicit: agents must not independently select work from the backlog. The backlog, specification overview, handoff, and both work-phase launchers now use the same concise rule.
@@ -21,6 +29,10 @@ Human updates are now explicitly written for you rather than for another agent: 
 **Needs attention:** None.
 
 **Next:** Future agents should follow the simplified workflow.
+
+> **Earlier briefs are historical messages, not current instructions.** They preserve the exact
+> language sent at the time and may use retired process labels. For current work, use
+> [`HANDOFF.md`](HANDOFF.md) and [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ### 2026-07-14 — implementation: dedicated ready-work queue
 
