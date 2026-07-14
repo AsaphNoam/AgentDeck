@@ -7,9 +7,9 @@ Guidance for coding agents working in this repository.
 Before implementation, review, fix-review, or usability-review work, read:
 
 1. [`docs/features/HANDOFF.md`](docs/features/HANDOFF.md) — current state and relevant requirement IDs.
-2. The active `W-<number>-<slug>.md` package named by the handoff, if one exists.
+2. The change file named by the handoff, if a change is in progress.
 3. [`docs/specs/README.md`](docs/specs/README.md) — the specification constitution and index.
-4. The feature (`FS-*`) and technical (`TS-*` / `INV`) requirements named by the package, handoff,
+4. The feature (`FS-*`) and technical (`TS-*` / `INV`) requirements named by the change file, handoff,
    or request.
 5. [`docs/features/AGENT-WORKFLOW.md`](docs/features/AGENT-WORKFLOW.md) — the canonical role protocol.
 
@@ -28,9 +28,9 @@ rationale, history, or sequencing but do not override an FS/TS requirement.
 - **Usability review:** §9 plus `USABILITY-REVIEW.md`. Exercise FS acceptance criteria without
   changing product code or specs.
 
-`docs/product-backlog.md` is idea intake, and `docs/implementation-queue/` holds specified work
-that is ready but has not started. `HANDOFF.md` records only an already-active work package. Agents
-never self-prioritize an Inbox, candidate, or known gap.
+`docs/ideas.md` holds new ideas and known product improvements. `docs/ready-changes/` holds changes
+that are specified and ready to start. `HANDOFF.md` records only the change already in progress.
+Agents never choose future work for themselves.
 
 Every role updates the live handoff and stores a short, plain-language human update in
 [`docs/features/BRIEFS.md`](docs/features/BRIEFS.md). The stored update is the entire final response.

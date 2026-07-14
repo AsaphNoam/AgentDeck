@@ -14,8 +14,8 @@ in [architecture-flow.md](architecture-flow.md).
 configuration federation are implemented. Real-provider compatibility has explicit credentialed
 acceptance gates; see [the live handoff](docs/features/HANDOFF.md). Contributors start from the
 [feature and technical specifications](docs/specs/README.md), not archived phase plans.
-New product ideas belong in the non-authoritative [product backlog](docs/product-backlog.md). Once
-specified, ready-but-unstarted work lives in the [implementation queue](docs/implementation-queue/README.md).
+New product ideas belong in [ideas and improvements](docs/ideas.md). Once specified and approved to
+start, a change lives in [ready changes](docs/ready-changes/README.md).
 
 ## Prerequisites
 

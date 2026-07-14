@@ -50,8 +50,8 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | TS-07 | [tech/TS-07-federation.md](tech/TS-07-federation.md) | Partial | Native configuration authority, resolvers, consent, freshness, redaction, launch freezing |
 | INV | [../features/INVARIANTS.md](../features/INVARIANTS.md) | Current | Bug-class constraint catalog (path kept stable for hooks/history) |
 
-Related, non-spec: [`../product-backlog.md`](../product-backlog.md) (human ideas, candidates, and
-known gaps — not specifications),
+Related, non-spec: [`../ideas.md`](../ideas.md) (new ideas and known things to improve — not
+specifications),
 [`../architecture-decisions.md`](../architecture-decisions.md) (ADR-style rationale behind TS-01;
 decisions D1–D5), [`../../architecture-flow.md`](../../architecture-flow.md) (orientation
 diagrams — descriptive, not authoritative; TS-01 wins on conflict).
@@ -63,7 +63,7 @@ diagrams — descriptive, not authoritative; TS-01 wins on conflict).
 The FS index above is the catalog of completed product capability groups—not a roadmap. A
 **Current** spec contains only shipped behavior (plus explicit deviations); a **Partial** spec
 contains both shipped behavior and individually tagged `(planned)` requirements. Potential work that
-has not reached an FS/TS update belongs only in the product backlog.
+has not reached an FS/TS update belongs only in `docs/ideas.md`.
 
 | Capability group | Relevant feature specs | Delivery state |
 |---|---|---|
@@ -148,23 +148,23 @@ Keep specs lean: normative statements, shapes, and constraints — not tutorials
 
 ## Idea intake & promotion
 
-[`../product-backlog.md`](../product-backlog.md) is the only home for an unshipped human idea before
-it has a relevant spec. It separates **Inbox**, **Discovery**, candidate features, and known gaps.
-It is deliberately outside `docs/specs/` so a queue item cannot be mistaken for a product requirement.
+[`../ideas.md`](../ideas.md) is the home for a new idea before it has a relevant specification. It
+separates raw ideas, ideas being defined, and known things to improve. It is deliberately outside
+`docs/specs/` so a future idea cannot be mistaken for a product requirement.
 
-[`../implementation-queue/`](../implementation-queue/README.md) is the dedicated home for
-specified work that is ready to implement but has not started. Each package links to its relevant
-FS/TS/INV IDs and acceptance evidence. `HANDOFF.md` is not a readiness queue: it tracks only an
-already-active package and its current work state. Agents do not self-select backlog candidates.
+[`../ready-changes/`](../ready-changes/README.md) is the home for specified work that is approved to
+start but has not started. Each change file links to its relevant FS/TS/INV requirements and
+acceptance evidence. `HANDOFF.md` is not a waiting list: it tracks only a change already in progress.
+Agents do not choose future work on their own.
 
 ---
 
 ## Lifecycle — how a change flows through the specs
 
-1. **Capture, discover, and queue.** A new idea is recorded in the product backlog’s Inbox.
-   Discovery drafts the needed FS/TS updates. Once the updates and acceptance criteria are adequate,
-   create a Ready package in the implementation queue. An agent does not infer priority from the
-   backlog.
+1. **Capture, define, and prepare.** Record a new idea in `docs/ideas.md`. Defining it drafts the
+   needed FS/TS updates. Once the updates and acceptance criteria are adequate and implementation is
+   wanted, create a change file in `docs/ready-changes/`. An agent does not decide which future work
+   matters most.
 2. **Update the specification first.** Any change to user-visible behavior or to an architectural rule
    starts by editing the relevant spec: add/modify R/A items (tag `(planned)` until shipped).
    If no spec covers the area, create or extend one. Pure bug fixes that restore specified behavior

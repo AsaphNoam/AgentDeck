@@ -6,9 +6,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
-- **Active change:** none; the SDD foundation migration is complete. Ready-but-unstarted work lives
-  in [`../implementation-queue/`](../implementation-queue/README.md), not here. A work-phase agent
-  does not self-prioritize the [`../product-backlog.md`](../product-backlog.md).
+- **Active change:** none; the SDD foundation migration is complete. Changes approved to start live
+  in [`../ready-changes/`](../ready-changes/README.md), not here. An agent does not choose work from
+  [`../ideas.md`](../ideas.md) on its own.
 - **Relevant requirements:** [`../specs/README.md`](../specs/README.md) and the FS/TS/INV items selected
   for the next change.
 - **State:** Documentation checks passed. `make check-specs`, shell syntax, twin work-phase skill
@@ -18,21 +18,21 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   from that review; no must-fix finding is currently open.
 - **Branch:** `main`.
 
-## Active work detail
+## Current change detail
 
-No work package is active. When an agent starts a Ready package from
-[`../implementation-queue/`](../implementation-queue/README.md), replace this paragraph with:
+No change is in progress. When an agent starts a change from
+[`../ready-changes/`](../ready-changes/README.md), replace this paragraph with:
 
 ```md
-- **Package:** W-<number>-<slug>
-- **Source:** I<n> | B<n> | G<n> from `docs/product-backlog.md` (or direct human request)
+- **Change:** <descriptive-file-name>
+- **Why now:** direct human request or a link to `docs/ideas.md`
 - **Relevant requirements:** FS-nn.Rk, TS-nn.Rk, INV §n
 - **Done when:** <observable completion and required verification>
 
 - [ ] <bounded next step>
 ```
 
-Discovery drafts a proposal but changes no product code. A ready package is created after its FS/TS
+Defining an idea drafts a proposal but changes no product code. A ready change is created after its FS/TS
 update is adequate; the handoff begins only when implementation actually starts. Plans order work;
 specifications define what the product must do.
 
@@ -67,14 +67,16 @@ None.
 
 ## Review findings
 
-No must-fix findings. Open product/quality debt is grouped in
-[`../product-backlog.md`](../product-backlog.md); ready work packages live separately in
-[`../implementation-queue/`](../implementation-queue/README.md).
+No must-fix findings. Future ideas and known product improvements are in
+[`../ideas.md`](../ideas.md); ready changes live in
+[`../ready-changes/`](../ready-changes/README.md).
 
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
+- 2026-07-14 — Replaced letter-number future-work labels with plain-language ideas, known
+  improvements, ready changes, and current-change records.
 - 2026-07-14 — Limited Claude and Codex workflow skills to their explicit slash-command triggers.
 - 2026-07-14 — Added archive notices explaining that old process labels are historical and must
   not be followed; older live briefs now carry the same context.
@@ -84,8 +86,8 @@ _(Newest first; durable product truth is in FS/TS and history is in git.)_
   stable requirement IDs and plain-language human updates.
 - 2026-07-13 — SDD foundation complete: authoritative FS/TS/INV contracts, lifecycle, archive
   manifest, requirement-link lint, local hook, CI, role workflows, and verification landed.
-- 2026-07-14 — Ready-but-unstarted features moved from the product backlog/hand-off model to the
-  dedicated implementation queue; handoff now records only active work state.
+- 2026-07-14 — Changes waiting to start moved out of the handoff; the handoff now records only the
+  change in progress.
 - 2026-07-12 — Federation bindings hydrate on restart so watch/sweep detects external edits.
 - 2026-07-12 — Restart-orphaned runtimes are reaped by Stop/Switch/Release.
 - 2026-07-12 — Onboarding completion write failures remain visible and retryable.
