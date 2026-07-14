@@ -1,3 +1,11 @@
+> **Archived process record — do not resume work from this file.** These briefs predate the
+> specification-driven workflow adopted on 2026-07-13. Their workflow instructions and labels such
+> as `GREEN`, `checkpoint`, `BLOCKING`, `ADVISORY`, `state-only`, and `/fix-review` describe the
+> former process. For the current human update and work state, use
+> [`../../features/BRIEFS.md`](../../features/BRIEFS.md),
+> [`../../features/HANDOFF.md`](../../features/HANDOFF.md), and
+> [`../../features/AGENT-WORKFLOW.md`](../../features/AGENT-WORKFLOW.md).
+
 # AgentDeck — Human Briefs
 
 Read only the first entry to return to the project after time away. Each session prepends one

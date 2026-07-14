@@ -75,6 +75,8 @@ No must-fix findings. Open product/quality debt is grouped in
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
+- 2026-07-14 — Added archive notices explaining that old process labels are historical and must
+  not be followed; older live briefs now carry the same context.
 - 2026-07-14 — Removed repeated user-intent classification from agent instructions; only the
   no-self-prioritization rule remains.
 - 2026-07-14 — Simplified agent instructions: removed specialist process labels while keeping

@@ -1,3 +1,10 @@
+> **Archived process record — do not resume work from this file.** This handoff was replaced by the
+> specification-driven workflow on 2026-07-13. Its statuses, instructions, workflow section links,
+> and labels such as `GREEN`, `checkpoint`, `BLOCKING`, `ADVISORY`, and `state-only` describe the
+> former process. For current work, use [`../../features/HANDOFF.md`](../../features/HANDOFF.md),
+> [`../../features/AGENT-WORKFLOW.md`](../../features/AGENT-WORKFLOW.md), and the relevant current
+> specifications.
+
 # AgentDeck — Implementation Handoff
 **Live state. Read this first, every session. Update it after every change.**
 Protocol: [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) (Claude Code or Codex, whichever the human runs).
