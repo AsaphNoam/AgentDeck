@@ -64,6 +64,10 @@ are clear.
   unreachable drivers; resolve the tab cap, shutdown grace, and partially typed-input nudge issues.
 - **Federation UI and watches.** Expose custom roots/profiles, refresh the effective view after
   source events, register prompt watches after binding, and clear preview consent on project change.
+- **Codex roles not applied.** Role/project personas reach Claude agents but not Codex ones: the
+  composed system prompt is delivered through a channel the Claude adapter is configured for, and the
+  Codex adapter has no equivalent, so Codex launches ignore the selected role. Needs a
+  backend-agnostic way to inject the persona.
 - **Backend launch diagnostics.** Use executable overrides consistently, bound ACP readiness,
   probe optional flags, and provide provider-specific missing/old CLI guidance.
 - **HTTP compatibility.** Decide and specify how mixed legacy error envelopes should converge.
