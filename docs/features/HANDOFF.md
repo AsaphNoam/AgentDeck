@@ -75,6 +75,8 @@ No must-fix findings. Future ideas and known product improvements are in
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
+- 2026-07-14 — New Agent modal now defaults the name to just the (capitalized) role instead of
+  `Role-project` (FS-01.R1 auto-suggest; format not pinned).
 - 2026-07-14 — Project ids are now server-derived from the title (`slug(title)-<timestamp>`); the
   Settings and onboarding project forms no longer ask for a slug (FS-04.R31/A11).
 - 2026-07-14 — Replaced letter-number future-work labels with plain-language ideas, known

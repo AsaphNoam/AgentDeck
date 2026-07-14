@@ -5,23 +5,24 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function suggest(role: string, project: string): string {
-  if (!role || !project) return "";
-  return `${capitalize(role)}-${project}`;
+function suggest(role: string): string {
+  // The default agent name is just the role (FS-01.R1 only requires that the
+  // modal auto-suggests some name; the user can always override it).
+  if (!role) return "";
+  return capitalize(role);
 }
 
 export function useSuggestedName(
   role: string,
-  project: string,
 ): [string, (v: string) => void] {
-  const [name, setName] = useState(() => suggest(role, project));
+  const [name, setName] = useState(() => suggest(role));
   const dirtyRef = useRef(false);
 
   useEffect(() => {
     if (!dirtyRef.current) {
-      setName(suggest(role, project));
+      setName(suggest(role));
     }
-  }, [role, project]);
+  }, [role]);
 
   const handleChange = (v: string) => {
     dirtyRef.current = true;

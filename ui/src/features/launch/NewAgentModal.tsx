@@ -42,7 +42,7 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject }: Ne
   const [terminalAvailable, setTerminalAvailable] = useState(true);
   const [launchError, setLaunchError] = useState<string | null>(null);
 
-  const [name, setName] = useSuggestedName(role, project);
+  const [name, setName] = useSuggestedName(role);
 
   // Set defaults once data loads: prefer the configured default_role/
   // default_project, falling back to the first available entry only when the
