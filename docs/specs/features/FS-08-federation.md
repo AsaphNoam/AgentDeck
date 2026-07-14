@@ -174,7 +174,7 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
 
 - **Detached import is planned, not shipped (R9).** Every discovered setup asset is currently
   `reference_only`; no verified provider-specific launch-injection path can honor an independent
-  copy. Implementing detach requires a new spec delta defining exactly which values/assets become
+  copy. Implementing detach requires a new specification update defining exactly which values/assets become
   AgentDeck-owned and how launches consume them.
 - **Custom root/profile UI is incomplete.** The API accepts an explicit root and profile, but the
   current Settings/onboarding panel discovers only `root:"auto"` and has no profile picker.
@@ -184,7 +184,7 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
 - **Live provider verification is gated (A7).** Provider mappings are fixture-tested but must be
   reconciled against pinned real Claude/Codex versions before making compatibility guarantees.
 - **Binary-versioned `agentdeck_docs` knowledge MCP is not shipped.** Legacy Phase 7.9 describes it,
-  but it is separate from configuration federation and requires its own feature-spec delta before
+  but it is separate from configuration federation and requires its own feature-spec update before
   implementation; current agents receive only the existing messaging MCP tools.
 
 ## 7. Traceability

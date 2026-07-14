@@ -2,22 +2,22 @@
 
 This directory is the dedicated home for **specified features that are ready to implement but have
 not started yet**. It is a delivery queue, not a product specification: the linked FS/TS requirements
-and acceptance criteria remain authoritative.
+and acceptance criteria remain the source for what to build.
 
 Each ready item has one small work package: `W-<number>-<slug>.md`. It exists only after the feature
-has an adequate FS/TS delta and the user has made clear that implementation is wanted. A package
+has an adequate FS/TS update and the user has made clear that implementation is wanted. A package
 moves through these states:
 
 ```text
-Ready → Active → Shipped | Paused | Retired
+Ready → Active → Done | Paused | Retired
 ```
 
 - **Ready** — eligible for implementation; sits in this directory and is not in the handoff.
 - **Active** — one agent has picked it up. `HANDOFF.md` points to the package and records only the
-  current checkpoint/resumption state.
-- **Shipped** — remove the package; Git history and the Current FS/TS record the result.
+  current work state and next step.
+- **Done** — remove the package; Git history and the Current FS/TS record the result.
 - **Paused** — retain the package with the blocker or decision needed.
-- **Retired** — remove it after recording the reason in the product backlog or governing spec.
+- **Retired** — remove it after recording the reason in the product backlog or relevant spec.
 
 ## Work-package shape
 
@@ -26,7 +26,7 @@ Ready → Active → Shipped | Paused | Retired
 
 **Status:** Ready | Active | Paused
 **Source:** I<n> | B<n> | G<n> from `docs/product-backlog.md` (or direct human request)
-**Governing contracts:** FS-nn.Rk, TS-nn.Rk, INV §n
+**Relevant requirements:** FS-nn.Rk, TS-nn.Rk, INV §n
 
 ## Intended outcome
 <one user-visible outcome>

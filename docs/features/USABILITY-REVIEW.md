@@ -3,7 +3,7 @@
 **Verification protocol for the behavior-driven, top-to-bottom usability review.** It derives
 expected behavior from feature-spec acceptance criteria, builds the real binary, starts fresh state,
 and drives journeys through the actual UI. It complements the static diff review in
-[`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) §8; it is not a third product-spec set.
+[`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) §7; it is not a third product-spec set.
 
 > Claude Code reaches this via the `/usability-review` skill; Codex via
 > `.agents/skills/usability-review`. Both land here. The workflow governs role behavior; feature
@@ -54,8 +54,8 @@ app**, composed across all phases, starting from the states a real user actually
 ## 1. Scope, bar, and severity
 
 **The bar:** *a first-time or daily user hits this.* If an observed normal-use expectation is not
-covered by an FS requirement/acceptance item, record a spec-gap candidate alongside the finding so
-fix-review can decide whether behavior or spec must change.
+covered by an FS requirement/acceptance item, note that the requirement may be missing alongside the
+finding so the fix can decide whether behavior or the specification must change.
 
 **Severity taxonomy** (every finding gets exactly one):
 
@@ -66,8 +66,8 @@ fix-review can decide whether behavior or spec must change.
 | **MINOR** | Friction: unclear copy, missing feedback, surprising-but-recoverable behavior. |
 | **POLISH** | Cosmetic. Report only when trivially fixable. |
 
-Mapping into the §8/§9 fix loop: BLOCKER/MAJOR → **BLOCKING**; MINOR → **ADVISORY**; POLISH →
-ADVISORY only if the fix is one-line-obvious, otherwise omit.
+When recording a finding: BLOCKER/MAJOR → **Must fix**; MINOR → **Worth fixing**; POLISH is worth
+recording only when the fix is obvious and tiny.
 
 **Non-goals** (do not spend tokens here): code-quality opinions, naming/style, performance
 micro-audits, redesign proposals, or unverified feature ideas. The §8 diff review and
@@ -95,15 +95,15 @@ micro-audits, redesign proposals, or unverified feature ideas. The §8 diff revi
 4. **Every finding is reproducible from its report alone**: fixture + exact steps + expected vs
    observed + evidence (screenshot path, DOM snippet, curl output, or console error). No evidence →
    not a finding.
-5. **Read-only toward the repo.** No product-code changes, no commits of fixes — same contract as
-   §8. Findings go to the handoff (§6); the `/fix-review` loop does the fixing.
+5. **Read-only toward the repo.** No product-code changes and no commits of fixes — same rule as
+   §7. Findings go to the handoff (§6); the `/fix-review` loop does the fixing.
 
 ---
 
 ## 3. The journey matrix
 
 The methodical top-to-bottom core. Each journey is a **charter**: a self-contained brief with an
-entry fixture, ordered steps, expected observations, and known-risk checkpoints. Where a journey
+entry fixture, ordered steps, expected observations, and known risks. Where a journey
 touches collections, exercise the **state variants**: *empty / first item / many items / stale
 (restart) items*. The fresh-install escape was structurally "the empty variant was never exercised" —
 treat the empty variant as mandatory, not optional.
@@ -128,11 +128,11 @@ treat the empty variant as mandatory, not optional.
 ```
 JOURNEY: J5 Grid & layout
 FIXTURE: <path>   PORT: <port>   BINARY: <path>   FAKEACP: <env recipe or n/a>
-CHECKPOINTS:
+STEPS:
   1. <step> → EXPECT <observable>
   2. ...
 KNOWN RISKS: <the 1–3 invariant classes / sweep hits to watch here>
-REPORT: per the schema in USABILITY-REVIEW.md §5 — checkpoints verdicts + findings only.
+REPORT: per the format in USABILITY-REVIEW.md §5 — step results and findings only.
 ```
 
 **Maintenance rule:** this matrix is only as good as its coverage. See §7.
@@ -182,18 +182,18 @@ tightly-coupled pairs (J3+J4) when useful. Isolation rule: **each journey gets i
 and its own copy of its fixture dir**, so journeys run in parallel without interference (J12 is the
 exception: it deliberately reuses state left by earlier journeys, so it runs last, serially).
 A charter hands the subagent exactly the block in §3 — fixture path, port, binary path, fakeacp
-recipe, checkpoint list, and report schema. The owner reads the governing FS acceptance items and
+recipe, step list, and report schema. The owner reads the relevant FS acceptance items and
 may inspect evidence/source needed to validate a finding.
 
 **Browser protocol.** The UI is a SPA; DOM-level checks need a real browser. The fallback ladder,
 in order — the report must state which rung was used:
 1. Playwright driving the environment's Chromium (preferred: screenshots + console-error capture);
 2. `curl`-level API assertions plus a targeted `npm run test` render for the specific component;
-3. API assertions alone (mark all visual checkpoints `BLOCKED(no browser)` — never inferred-pass).
+3. API assertions alone (mark all visual steps `BLOCKED(no browser)` — never inferred-pass).
 
-Screenshots at each checkpoint go to a run directory; reports carry **paths**, not images.
+Screenshots at each step go to a run directory; reports carry **paths**, not images.
 
-**Report contract (hard schema).** Per checkpoint: `PASS | FAIL | BLOCKED(reason) | SKIPPED(reason)`.
+**Report format.** Per step: `PASS | FAIL | BLOCKED(reason) | SKIPPED(reason)`.
 Per finding, max ~6 lines:
 
 ```
@@ -223,18 +223,18 @@ and flagged as such — never silently reported as fact.
 
 ## 6. Reporting & handoff
 
-- Write every BLOCKING and ADVISORY finding (after the §1 severity mapping) to
-  `## Review findings` in [`HANDOFF.md`](HANDOFF.md), in the **exact entry shape of
-  AGENT-WORKFLOW §8**, so the existing `/fix-review` (§9) loop consumes them unchanged. Prefix the
+- Write every **Must fix** and **Worth fixing** finding (after the §1 severity mapping) to
+  `## Review findings` in [`HANDOFF.md`](HANDOFF.md), using the format in AGENT-WORKFLOW §7 so the
+  existing `/fix-review` (§8) process can act on it. Prefix the
   title with the journey/sweep id (`J1`, `S2`) so the fix agent can find the repro in the run
   report.
 - If a finding suggests a new systemic class, record it as a candidate finding. Usability review
   does not edit specs/INV; fix-review validates and updates the technical-spec appendix.
-- Save the full run summary (checkpoint matrix per journey, all findings, evidence paths) as a file,
-  and report to the human via the **brief** (AGENT-WORKFLOW §7): a focused, plain-language entry in
+- Save the full run summary (journey results, all findings, evidence paths) as a file, and report to
+  the human via the **human update** (AGENT-WORKFLOW §6): a focused, plain-language entry in
   [`BRIEFS.md`](BRIEFS.md) — what was driven, severity counts, each blocker as one plain sentence,
-  link to the run summary file — pasted as the end-of-turn message. No enumerated advisory lists in
-  the brief; those live in the handoff and the run file.
+  link to the run summary file — pasted as the end-of-turn message. Do not list every lower-priority
+  item in the update; those live in the handoff and the run file.
 - If a journey is all-PASS, say so in the matrix — an unexercised journey and a passing journey
   must be distinguishable.
 - Commit the state updates together on `main` (`usability review: <journey> — state recorded`) and push
@@ -244,7 +244,7 @@ and flagged as such — never silently reported as fact.
 
 ## 7. Maintenance — the matrix must track the product
 
-When an FS adds or changes a user-facing acceptance item, the same checkpoint adds or extends a
+When an FS adds or changes a user-facing acceptance item, the same change adds or extends a
 journey charter here when browser verification is appropriate. The reviewer's first step each run
 compares this matrix with the feature-spec index and relevant A-items, then records uncovered
-normal-use surfaces as coverage/spec-gap candidates before running anything.
+normal-use surfaces as possible missing requirements before running anything.

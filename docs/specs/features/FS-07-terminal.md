@@ -108,7 +108,7 @@ terminal agents from becoming statusless or unmessageable.
   the archive/UI). Idempotent; the liveness watcher self-suppresses once stopped.
 - **Unexpected child exit (crash):** the runtime's watcher clears the running row, marks the agent
   `done`, drops registry ownership, and closes the PTY hub. A disappeared process becomes `done`
-  (not `error`) — see FS-01 and the standing HUMAN "Immediate/prompt-based UI" decision.
+  (not `error`) — see FS-01 and the standing "Immediate/prompt-based UI" decision.
 - **Post-restart orphan:** after a dashboard crash where the CLI survives, the runtime does not
   re-adopt the live PID. A subsequent Stop/Switch/Release detects the still-live process group,
   SIGTERM→SIGKILL's it, and clears the row rather than reporting a false success.

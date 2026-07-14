@@ -6,9 +6,9 @@ description: Review a runnable AgentDeck user journey for normal-use friction an
 # Review usability
 
 Read [`HANDOFF.md`](../../../docs/features/HANDOFF.md), the
-[`spec constitution`](../../../docs/specs/README.md), governing FS acceptance items,
-[`USABILITY-REVIEW.md`](../../../docs/features/USABILITY-REVIEW.md), and workflow §§3, §5, §7, and
-§10 completely, then follow the canonical usability-review action.
+[`spec overview`](../../../docs/specs/README.md), relevant FS acceptance items,
+[`USABILITY-REVIEW.md`](../../../docs/features/USABILITY-REVIEW.md), and workflow §§3, §5–6, and
+§9 completely, then follow the usability-review process.
 
-`$ARGUMENTS` may name the journey or scope. Do not change product code. Persist every finding or
-acceptance gate, make the required workflow-state commit, and close with the exact stored human brief.
+`$ARGUMENTS` may name the journey or scope. Do not change product code. Record every finding or
+unable-to-run journey, make the required state commit, and close with the exact stored human update.

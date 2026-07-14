@@ -2,7 +2,7 @@
 
 AgentDeck is developed **spec-driven**: two sets of specifications govern the product, and code,
 tests, plans, and documentation trace back to them. When a spec and the code disagree, that is a
-defect in one of them — a review names which, and the fix lands as a code change or a spec delta.
+defect in one of them — a review names which, and the fix lands as a code change or specification update.
 Nothing ships "because the code already does it."
 
 - **Feature specs** (`features/FS-nn-*.md`) — product behavior: what the user and the API client
@@ -63,9 +63,9 @@ diagrams — descriptive, not authoritative; TS-01 wins on conflict).
 The FS index above is the catalog of completed product capability groups—not a roadmap. A
 **Current** spec contains only shipped behavior (plus explicit deviations); a **Partial** spec
 contains both shipped behavior and individually tagged `(planned)` requirements. Potential work that
-has not reached an FS/TS delta belongs only in the product backlog.
+has not reached an FS/TS update belongs only in the product backlog.
 
-| Capability group | Governing feature specs | Delivery state |
+| Capability group | Relevant feature specs | Delivery state |
 |---|---|---|
 | Core agent operation | FS-00 product concepts; FS-01 lifecycle; FS-02 dashboard; FS-03 chat | Shipped |
 | Configuration and providers | FS-04 configuration/onboarding; FS-09 backends | Shipped core; FS-09 expansion remains Partial |
@@ -149,14 +149,13 @@ Keep specs lean: normative statements, shapes, and constraints — not tutorials
 ## Idea intake & promotion
 
 [`../product-backlog.md`](../product-backlog.md) is the only home for an unshipped human idea before
-it has a governing spec. It separates **Inbox**, **Discovery**, candidate features, and known gaps.
-It is deliberately outside `docs/specs/` so a queue item cannot be mistaken for an authoritative
-contract.
+it has a relevant spec. It separates **Inbox**, **Discovery**, candidate features, and known gaps.
+It is deliberately outside `docs/specs/` so a queue item cannot be mistaken for a product requirement.
 
 [`../implementation-queue/`](../implementation-queue/README.md) is the dedicated home for
-specified work that is ready to implement but has not started. Each package links to its governing
+specified work that is ready to implement but has not started. Each package links to its relevant
 FS/TS/INV IDs and acceptance evidence. `HANDOFF.md` is not a readiness queue: it tracks only an
-already-active package and its resumable checkpoint state. Agents interpret normal human intent in
+already-active package and its current work state. Agents interpret normal human intent in
 context and clarify only material ambiguity; they never rely on magic words or self-select a backlog
 candidate.
 
@@ -165,38 +164,36 @@ candidate.
 ## Lifecycle — how a change flows through the specs
 
 1. **Capture, discover, and queue.** A new human idea is recorded in the product backlog’s Inbox.
-   When the human’s intent is to explore it, discovery drafts the governing FS/TS delta. Once the
-   delta and acceptance criteria are adequate for a desired implementation, create a Ready package
+   When the human’s intent is to explore it, discovery drafts the needed FS/TS updates. Once the
+   updates and acceptance criteria are adequate for a desired implementation, create a Ready package
    in the implementation queue. An agent does not infer priority from the backlog.
-2. **Spec delta first.** Any change to user-visible behavior or to an architectural contract
-   starts by editing the governing spec: add/modify R/A items (tag `(planned)` until shipped).
-   If no spec governs the area, the delta includes creating or extending one. Pure bug fixes that
-   *restore* specified behavior need no delta. If the right delta needs a product call, that is a
-   STOP/HUMAN decision per the workflow — do not silently spec around it.
-3. **Plan.** Derive an implementation plan from the delta: the checklist in `HANDOFF.md`'s active
+2. **Update the specification first.** Any change to user-visible behavior or to an architectural rule
+   starts by editing the relevant spec: add/modify R/A items (tag `(planned)` until shipped).
+   If no spec covers the area, create or extend one. Pure bug fixes that restore specified behavior
+   need no update. If the right update needs a product call, ask the user rather than silently deciding it.
+3. **Plan.** Derive an implementation plan from the updates: the checklist in `HANDOFF.md`'s active
    work detail for small changes, or `docs/plans/<change>.md` for large ones. Plans are
    sequencing, not truth — delete the plan file (git keeps it) when the work completes.
-4. **Build to GREEN.** Implement per the workflow. Tests that pin an acceptance criterion cite it
+4. **Implement and verify.** Follow the workflow's required checks. Tests that pin an acceptance criterion cite it
    (`// FS-05.A2` / `# FS-05.A2`). Commits that implement or change spec'd behavior name the IDs
    in the subject or a `Spec:` trailer.
-5. **Ship the spec with the code.** In the checkpoint commit, flip the delta's `(planned)` tags,
-   update the spec's Traceability section, and keep status honest. A GREEN checkpoint with a stale
-   governing spec is not green.
-6. **Review both directions.** Reviews check the diff against the governing spec (does the code do
+5. **Ship the spec with the code.** In the completed change, flip `(planned)` tags,
+   update the spec's Traceability section, and keep status honest. Do not call work complete with a stale specification.
+6. **Review both directions.** Reviews check the diff against the relevant spec (does the code do
    what the spec says?) *and* the spec against the diff (did behavior ship that no spec covers, or
    that contradicts one?). Either mismatch is a finding.
-7. **Keep decisions in one state each.** Shipped behavior is described immediately in the governing
+7. **Keep decisions in one place.** Shipped behavior is described immediately in the relevant
    spec, even when a reversal is awaiting human direction. `HANDOFF.md` carries only the pending
-   question and links to that contract. When resolved, update/promote/retire the spec item and remove
+   question and links to that requirement. When resolved, update/promote/retire the spec item and remove
    the question from live state.
 
 ## Maintenance duties by role
 
-- **work-phase (build):** owns steps 1–4 above. Reads the governing specs *before* the code.
-- **review-phase:** enforces step 5. May record spec-gap findings; does not edit specs itself
+- **work-phase (build):** owns steps 1–4 above. Reads the relevant specs *before* the code.
+- **review-phase:** checks step 5. May record missing or incorrect specification coverage; does not edit specs itself
   (spec edits are fix/build work).
 - **fix-review:** when a validated fix changes behavior (not just restores it), updates the
-  governing spec in the same checkpoint commit.
+  relevant spec in the same completed change.
 - **usability-review:** exercises journeys against feature-spec acceptance criteria; a mismatch
   between observed behavior and an A-item is a finding tagged with that ID.
 

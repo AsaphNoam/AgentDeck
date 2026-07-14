@@ -148,8 +148,8 @@ row per live agent; live status (`state ∈ {busy, idle, waiting_input, done, er
 - **Federation** — binding AgentDeck to a backend's native Claude/Codex config files so those files
   stay authoritative and AgentDeck stores only bindings, overrides, and a derived redacted view.
   See FS-08.
-- **GREEN checkpoint** — the build/test gate a change must pass before it is considered done. Its
-  canonical definition lives in `docs/features/AGENT-WORKFLOW.md` §2, not here.
+- **Required checks** — the build and test work a change must pass before it is considered done. The
+  definition lives in `docs/features/AGENT-WORKFLOW.md` §2, not here.
 
 ## 5. Deviations & open decisions
 
