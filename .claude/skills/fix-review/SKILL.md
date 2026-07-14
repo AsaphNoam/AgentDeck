@@ -1,6 +1,6 @@
 ---
 name: fix-review
-description: Validate the open AgentDeck review findings, dismiss false positives, and fix real findings with regression tests and required checks. Use for "/fix-review", "fix the review findings", "address the review", or "validate and fix the findings".
+description: Explicit invocation only. Run only when the user sends `/fix-review`; do not trigger from a natural-language request.
 ---
 
 # Fix review findings
