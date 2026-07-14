@@ -6,7 +6,7 @@
 
 ## 1. Scope
 
-This spec owns supported toolchains, build tags, UI embedding, release/install constraints, GREEN
+This spec owns supported toolchains, build tags, UI embedding, release/install constraints, required
 verification, spec linting, and test conventions.
 
 ## 2. Design & constraints
@@ -25,14 +25,14 @@ app and copies `ui/dist` into `internal/server/ui/dist`; agents never edit the e
 runs spec lint plus both Go variants; `make dist` builds UI, refreshes embed output, and builds the
 tagged binary; `make check-specs` runs the mechanical spec contract.
 
-**R5 — GREEN is proportional but never selective.** A product-code checkpoint runs both Go test
-variants and any affected UI build/tests; concurrency hot spots add focused race tests. A docs-only
-spec/workflow checkpoint runs spec lint and link/reference checks plus any build/test needed to
+**R5 — Required checks match the work but are never selective.** A product-code change runs both Go
+test variants and any affected UI build/tests; concurrency hot spots add focused race tests. A docs-only
+spec/workflow change runs spec lint and link/reference checks plus any build/test needed to
 validate claims it changed. Failures may not be hidden by removing or weakening tests.
 
-**R6 — Acceptance tests name their contract.** New or materially touched tests that prove a feature
-acceptance item include an exact `FS-nn.Ak` comment. Specs point back to load-bearing tests/code;
-behavior/contract commits carry governing IDs in the subject or `Spec:` trailer.
+**R6 — Acceptance tests name the requirement they prove.** New or materially touched tests that prove
+a feature acceptance item include an exact `FS-nn.Ak` comment. Specs point back to load-bearing
+tests/code; behavior/architecture commits carry relevant IDs in the subject or `Spec:` trailer.
 
 **R7 — Spec lint enforces mechanics, review enforces truth.** Automated checks validate filenames,
 headers/status, local R/A uniqueness, index parity, planned/current consistency, relative links,
@@ -60,7 +60,7 @@ cd ui && npm test && npm run build
 make dist
 ```
 
-The exact GREEN selection for work/review roles is defined by
+The exact required checks for work/review roles are defined by
 [`../../features/AGENT-WORKFLOW.md`](../../features/AGENT-WORKFLOW.md); this spec owns what each
 shared target guarantees.
 

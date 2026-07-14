@@ -92,7 +92,7 @@ R1–R11 and must be reflected here when its contract changes.
 - **INV §7:** stream and SQL readers handle empty, truncated, oversized, and mid-iteration failure.
 - **INV §10:** caches and indexes declare their authority and refresh boundary.
 - **R12 — Migration/spec lockstep.** A migration that changes a durable shape or compatibility
-  promise must update this spec (and the owning FS/API spec) in the same GREEN checkpoint.
+  promise must update this spec (and the owning FS/API spec) in the same completed change.
 
 ## 5. Deviations & open decisions
 

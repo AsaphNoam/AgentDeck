@@ -140,7 +140,7 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **A6** `(GATED — real CLI credentials; Phase 7.4)` — With authenticated `opencode` and
   `openhands` CLIs, verify ACP handshake and one streamed turn, permission round-trip and
   skip-permissions behavior, stop, native resume or documented primer fallback, provider/model/env
-  mapping, and HTTP `mcpServers` registration. Until recorded, these backends are fake-ACP green but
+  mapping, and HTTP `mcpServers` registration. Until recorded, these backends pass fake-ACP tests but
   real-CLI compatibility is not claimed.
 - **A7** `(GATED — real CLI credentials)` — Re-run live Codex chat launch/turn/stop/resume and
   Claude/Codex/OpenCode/OpenHands HTTP messaging-MCP registration against pinned versions before a

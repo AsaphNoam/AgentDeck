@@ -10,17 +10,16 @@ here. Shipped behavior lives only in [`specs/README.md`](specs/README.md) and it
 |---|---|---|
 | **Inbox** | A human idea captured faithfully; no implied priority, design, or commitment. | Any agent receiving the idea. |
 | **Discovery** | An agent is drafting a spec/design proposal; no product code yet. | The user’s clear intent or a clarification promotes it. |
-| **Implementation queue** | Governing FS/TS delta and acceptance criteria exist; the feature is ready but has not started. | The agent creates a work package in [`implementation-queue/`](implementation-queue/README.md). |
+| **Implementation queue** | Relevant FS/TS requirements and acceptance criteria exist; the feature is ready but has not started. | The agent creates a work package in [`implementation-queue/`](implementation-queue/README.md). |
 | **Known gaps** | Shipped behavior is incomplete or a documented deviation. The owning FS/TS remains authoritative. | The user’s clear intent selects it for discovery or delivery. |
 
 Use `I<n>` for newly captured inbox ideas, `B<n>` for triaged feature candidates, and `G<n>` for
-known gaps. Each non-inbox entry names its likely governing spec(s). Do not create a duplicate
+known gaps. Each non-inbox entry names its likely relevant spec(s). Do not create a duplicate
 feature spec merely to hold an idea.
 
-Agents interpret the user’s ordinary language and the surrounding conversation; there are no magic
-keywords. An idea that is merely being considered stays in **Inbox**. If the user clearly wants a
+An idea that is merely being considered stays in **Inbox**. If the user clearly wants a
 proposal, it enters **Discovery**. If the user clearly wants it built, the agent drafts or confirms
-the FS/TS delta, then creates a ready work package. Ask a concise question only when the intended
+the needed FS/TS updates, then creates a ready work package. Ask a concise question only when the intended
 level of commitment would materially change the result.
 
 An implementation agent works from an active package in the implementation queue. With no active
@@ -34,7 +33,7 @@ New-item shape:
 
 ```md
 - **I<n> — <short idea>.** Source: <human/task/date>. Desired outcome: <one sentence>.
-  Constraints or examples: <optional>. No governing spec yet.
+  Constraints or examples: <optional>. No relevant spec yet.
 ```
 
 ## Discovery
@@ -66,7 +65,7 @@ retired idea, or a ready work package in [`implementation-queue/`](implementatio
 ## Known gaps and implementation deviations
 
 These have an owning spec but are not yet satisfied or fully specified. Moving one to delivery means
-adding the exact R/A delta (when absent), then creating a Ready work package in the implementation
+adding the exact R/A items (when absent), then creating a Ready work package in the implementation
 queue. The handoff is updated only when that package becomes active.
 
 - **G1 — Chat history fidelity (FS-03).** Persist user prompts; fold replayed streaming deltas like
@@ -87,8 +86,8 @@ queue. The handoff is updated only when that package becomes active.
   guidance. Make credential probes platform/version-aware.
 - **G7 — HTTP compatibility (TS-03.R3–R4).** Decide and specify a migration path from mixed legacy
   error envelopes before standardizing clients or handlers.
-- **G8 — Frontend state ownership.** Add a technical-spec delta for Zustand vs React Query ownership,
-  SSE hydration/refetch generations, and the mutation-error contract before broad frontend refactors.
+- **G8 — Frontend state ownership.** Add a technical-spec update for Zustand vs React Query ownership,
+  SSE hydration/refetch generations, and the mutation-error behavior before broad frontend refactors.
 - **G9 — Lifecycle/process hardening (FS-01/TS-04).** Corroborate PID identity, generation-scope
   crash teardown, serialize concurrent event dispatch, and specify/test detached-start pidfile races.
 - **G10 — Local filesystem hardening (TS-02/TS-05).** Decide whether startup should recursively
@@ -104,7 +103,7 @@ queue. The handoff is updated only when that package becomes active.
 
 This file was created by the SDD migration in commit `735a4bf` (2026-07-13); it did **not** replace
 a pre-existing backlog file. `B1`–`B8` were synthesized from archived phase/future-work material
-and explicit unshipped feature ideas. `G1`–`G12` were synthesized from governing-spec deviations,
+and explicit unshipped feature ideas. `G1`–`G12` were synthesized from relevant-spec deviations,
 manual acceptance gates, and the migration's semantic audits. Treat every item as a lead to be
 revalidated, not as an inherited product commitment.
 

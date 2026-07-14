@@ -5,10 +5,10 @@ Start with the authority, then the live state:
 | Document | Role |
 |---|---|
 | [`docs/specs/README.md`](docs/specs/README.md) | **Product source of truth.** Index and lifecycle for feature specs (FS) and technical specs (TS/INV). |
-| [`docs/features/HANDOFF.md`](docs/features/HANDOFF.md) | **Live work state.** An already-active package’s checkpoint, governing IDs, decisions, gates, findings, next step. |
+| [`docs/features/HANDOFF.md`](docs/features/HANDOFF.md) | **Live work state.** An already-active package’s current step, relevant IDs, decisions, gates, findings, and next step. |
 | [`docs/product-backlog.md`](docs/product-backlog.md) | **Idea intake.** Inbox, discovery, candidates, and known gaps; never self-select from it. |
 | [`docs/implementation-queue/`](docs/implementation-queue/README.md) | **Ready delivery work.** Specified features waiting to start, one package per feature. |
-| [`docs/features/AGENT-WORKFLOW.md`](docs/features/AGENT-WORKFLOW.md) | **Process source of truth.** Implementation/review/fix/usability roles and GREEN checkpoints. |
+| [`docs/features/AGENT-WORKFLOW.md`](docs/features/AGENT-WORKFLOW.md) | **Process guide.** Implementation, review, fixing, usability review, and required checks. |
 | [`docs/features/INVARIANTS.md`](docs/features/INVARIANTS.md) | Normative technical appendix for recurring bug classes (`INV §n`). |
 | [`architecture-flow.md`](architecture-flow.md) | Descriptive architecture orientation; TS wins on conflict. |
 | [`docs/architecture-decisions.md`](docs/architecture-decisions.md) | Non-normative rationale behind selected TS decisions. |
@@ -41,6 +41,6 @@ native Claude/Codex federation is one-way and read-only.
 
 ## Working rule
 
-Plans and handoffs must name governing FS/TS R/A IDs. If a behavior or architecture contract has no
-owner, create a spec delta before implementation. Historical phase numbers are useful git/archive
+Plans and handoffs must name relevant FS/TS R/A IDs. If a behavior or architecture rule has no
+owner, update the specification before implementation. Historical phase numbers are useful git/archive
 context only and never determine current scope.

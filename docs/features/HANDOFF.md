@@ -1,6 +1,6 @@
 # AgentDeck — Implementation handoff
 
-**Live agent state.** Read this first, then open the governing requirements named below. Historical
+**Live agent state.** Read this first, then open the relevant requirements named below. Historical
 phase state is archived in [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md).
 Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to resumable current state.
 
@@ -9,13 +9,13 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 - **Active change:** none; the SDD foundation migration is complete. Ready-but-unstarted work lives
   in [`../implementation-queue/`](../implementation-queue/README.md), not here. A work-phase agent
   does not self-prioritize the [`../product-backlog.md`](../product-backlog.md).
-- **Governing contracts:** [`../specs/README.md`](../specs/README.md) and the FS/TS/INV items selected
+- **Relevant requirements:** [`../specs/README.md`](../specs/README.md) and the FS/TS/INV items selected
   for the next change.
-- **State:** GREEN documentation checkpoint. `make check-specs`, shell syntax, twin work-phase skill
-  comparison, and `git diff --check` passed on 2026-07-14. The preceding SDD checkpoint also passed
+- **State:** Documentation checks passed. `make check-specs`, shell syntax, twin work-phase skill
+  comparison, and `git diff --check` passed on 2026-07-14. The preceding SDD update also passed
   `make test`, `make build`, `make vet`, all 95 UI tests, and the UI production build.
-- **Last contiguous code review:** `4036e78` (2026-07-12). The later code checkpoints fixed every
-  BLOCKING finding from that review; no BLOCKING finding is currently open.
+- **Last reviewed code:** `4036e78` (2026-07-12). The later fixes addressed every must-fix finding
+  from that review; no must-fix finding is currently open.
 - **Branch:** `main`.
 
 ## Active work detail
@@ -26,30 +26,32 @@ No work package is active. When an agent starts a Ready package from
 ```md
 - **Package:** W-<number>-<slug>
 - **Source:** I<n> | B<n> | G<n> from `docs/product-backlog.md` (or direct human request)
-- **Governing contracts:** FS-nn.Rk, TS-nn.Rk, INV §n
+- **Relevant requirements:** FS-nn.Rk, TS-nn.Rk, INV §n
 - **Done when:** <observable completion and required verification>
 
 - [ ] <bounded next step>
 ```
 
 Interpret the human’s normal language in context; no special wording is required. Discovery drafts a
-proposal but changes no product code. A ready package is created after its FS/TS delta is adequate;
-the handoff begins only when implementation actually starts. Plans sequence work; specs define truth.
+proposal but changes no product code. A ready package is created after its FS/TS update is adequate;
+the handoff begins only when implementation actually starts. Plans order work; specifications define
+what the product must do.
 
-## Decisions awaiting review
+## Decisions needing your input
 
-These are shipped boundaries documented in the specs, not blockers. A future reversal needs an
-explicit spec delta; remove an item when the human accepts the current contract or queues that delta.
+These are shipped boundaries documented in the specifications, not blockers. A future reversal needs
+an explicit specification update; remove an item when the human accepts the current rule or queues
+that update.
 
-- **HUMAN — Local API authentication:** TS-05.R3 documents the current same-machine trust boundary. Decide
+- **Local API authentication:** TS-05.R3 documents the current same-machine trust boundary. Decide
   whether a token/UI handshake is worth the added setup and compatibility cost.
-- **HUMAN — Child-process environment:** TS-05.R8 documents full environment inheritance minus backend strip
+- **Child-process environment:** TS-05.R8 documents full environment inheritance minus backend strip
   keys. Decide whether to trade provider compatibility for allowlists.
-- **HUMAN — Terminal and messaging support boundary:** FS-07/TS-04 document Claude-only terminal support and
+- **Terminal and messaging support boundary:** FS-07/TS-04 document Claude-only terminal support and
   non-messageable terminal agents pending real-CLI verification.
-- **HUMAN — Detached federation import:** TS-07.R11 and FS-08 keep detach unshipped until a verified copy/
-  injection contract exists.
-- **HUMAN — API/model compatibility:** TS-03.R3–R4 preserve mixed legacy error envelopes; TS-04.R3 records
+- **Detached federation import:** TS-07.R11 and FS-08 keep detach unshipped until a verified copy/
+  injection approach exists.
+- **API/model compatibility:** TS-03.R3–R4 preserve mixed legacy error envelopes; TS-04.R3 records
   provider model-ID ownership. Standardizing either is a compatibility change.
 
 ## Acceptance gates
@@ -66,7 +68,7 @@ None.
 
 ## Review findings
 
-No BLOCKING findings. Open product/quality debt is grouped in
+No must-fix findings. Open product/quality debt is grouped in
 [`../product-backlog.md`](../product-backlog.md); ready work packages live separately in
 [`../implementation-queue/`](../implementation-queue/README.md).
 
@@ -74,10 +76,12 @@ No BLOCKING findings. Open product/quality debt is grouped in
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
+- 2026-07-14 — Simplified agent instructions: removed specialist process labels while keeping
+  stable requirement IDs and plain-language human updates.
 - 2026-07-13 — SDD foundation complete: authoritative FS/TS/INV contracts, lifecycle, archive
-  manifest, traceability lint, local hook, CI, role workflows, and GREEN verification landed.
+  manifest, requirement-link lint, local hook, CI, role workflows, and verification landed.
 - 2026-07-14 — Ready-but-unstarted features moved from the product backlog/hand-off model to the
-  dedicated implementation queue; handoff now records only active checkpoint state.
+  dedicated implementation queue; handoff now records only active work state.
 - 2026-07-12 — Federation bindings hydrate on restart so watch/sweep detects external edits.
 - 2026-07-12 — Restart-orphaned runtimes are reaped by Stop/Switch/Release.
 - 2026-07-12 — Onboarding completion write failures remain visible and retryable.

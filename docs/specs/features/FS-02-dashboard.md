@@ -180,7 +180,7 @@ granted permission uses a Web Notification. — `sse.test.ts` "drops muted notif
   move-to-group collect their arguments through browser `window.prompt`/`confirm` dialogs rather than
   dedicated form modals; Clone launches immediately with no confirmation; and a disappeared process
   is surfaced as `done` rather than `error` (R11, R16, A11). Reversing any part requires an explicit
-  feature-spec delta plus dedicated dialogs/confirmations or changed process-exit semantics.
+  feature-spec update plus dedicated dialogs/confirmations or changed process-exit semantics.
 - **Context-menu items are all wired.** The Phase-2 tech spec specced Switch runtime / Clone / Move
   to group as visible-but-disabled stubs (tooltips "Available in Phase 3/6"). Phase 6 shipped, so
   current truth is that every menu item is functional; the stubbing described in the tech spec is

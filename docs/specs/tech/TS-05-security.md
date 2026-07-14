@@ -70,7 +70,7 @@ Their concrete payloads are owned by TS-03, TS-04, and TS-07.
 - **INV §13:** secrets never cross redaction or logging boundaries.
 - **INV §14:** loopback binding plus browser Host/Origin validation is mandatory on every route.
 - **R11 — Security-sensitive changes require adversarial tests.** Bind/origin/token/path/mode/redaction
-  changes include negative regression coverage and cite the governing requirement.
+  changes include negative regression coverage and cite the relevant requirement.
 
 ## 5. Deviations & open decisions
 

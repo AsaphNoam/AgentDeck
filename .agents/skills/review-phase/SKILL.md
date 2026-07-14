@@ -1,14 +1,15 @@
 ---
 name: review-phase
-description: Review the other agent's unreviewed AgentDeck work bidirectionally against governing specs, plus normal-use bugs and pending peer decisions.
+description: Review another agent's unreviewed AgentDeck work against relevant requirements, normal-use bugs, and unresolved local choices.
 ---
 
 # Review the unreviewed work
 
 Read [`HANDOFF.md`](../../../docs/features/HANDOFF.md), the
-[`spec constitution`](../../../docs/specs/README.md), governing FS/TS/INV items, and workflow
-§§2–3, §5, §7–8 completely. Review code→spec and spec→code across the handoff's unreviewed range.
+[`spec overview`](../../../docs/specs/README.md), relevant FS/TS/INV items, and workflow
+§§3–7 completely. Check whether code matches the specifications and whether the specifications cover
+the code across the handoff's unreviewed range.
 
 The human may name a commit/range in `$ARGUMENTS`; otherwise use the handoff's review markers.
-Do not change product code or specs. Persist every finding and decision disposition, make the required
-workflow-state commit, and close with the exact stored human brief.
+Do not change product code or specs. Record every finding and local-choice outcome, make the required
+state commit, and close with the exact stored human update.

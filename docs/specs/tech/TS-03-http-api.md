@@ -91,7 +91,7 @@ integers instead of silently applying defaults.
 - **INV §9:** cancellation and shutdown primitives reach long-lived HTTP handlers.
 - **INV §14:** Host/Origin validation wraps the entire mux, including raw `/mcp` and WebSocket paths.
 - **R11 — UI/API lockstep.** A payload field changed in the server is changed in `ui/src/api` schemas
-  and tests in the same checkpoint; permissive client parsing is not a substitute for a spec delta.
+  and tests in the same completed change; permissive client parsing is not a substitute for a specification update.
 
 ## 5. Deviations & open decisions
 
