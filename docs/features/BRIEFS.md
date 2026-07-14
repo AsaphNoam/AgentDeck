@@ -4,6 +4,14 @@ Newest first. Each entry is the exact final response from an implementation, rev
 usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-14 — workflow: remove redundant intent guidance
+
+The workflow no longer teaches agents how to interpret ordinary requests. It retains only the one rule that needs to be explicit: agents must not independently select work from the backlog. The backlog, specification overview, handoff, and both work-phase launchers now use the same concise rule.
+
+**Needs attention:** None.
+
+**Next:** Future agents should follow the specifications and active work state without adding intent-classification rules.
+
 ### 2026-07-14 — workflow simplification
 
 Agent instructions now use ordinary language instead of a private process dialect. They say “required checks,” “specification update,” “relevant requirement,” and “Must fix” where they previously used labels such as GREEN, checkpoint, spec delta, governing contract, and BLOCKING. Stable requirement IDs remain, because they are useful links to the exact behavior being discussed.

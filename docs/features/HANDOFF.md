@@ -32,10 +32,9 @@ No work package is active. When an agent starts a Ready package from
 - [ ] <bounded next step>
 ```
 
-Interpret the human’s normal language in context; no special wording is required. Discovery drafts a
-proposal but changes no product code. A ready package is created after its FS/TS update is adequate;
-the handoff begins only when implementation actually starts. Plans order work; specifications define
-what the product must do.
+Discovery drafts a proposal but changes no product code. A ready package is created after its FS/TS
+update is adequate; the handoff begins only when implementation actually starts. Plans order work;
+specifications define what the product must do.
 
 ## Decisions needing your input
 
@@ -76,6 +75,8 @@ No must-fix findings. Open product/quality debt is grouped in
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
+- 2026-07-14 — Removed repeated user-intent classification from agent instructions; only the
+  no-self-prioritization rule remains.
 - 2026-07-14 — Simplified agent instructions: removed specialist process labels while keeping
   stable requirement IDs and plain-language human updates.
 - 2026-07-13 — SDD foundation complete: authoritative FS/TS/INV contracts, lifecycle, archive

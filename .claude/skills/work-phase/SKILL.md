@@ -11,7 +11,6 @@ Read [`HANDOFF.md`](../../../docs/features/HANDOFF.md), its named active work pa
 follow the shared workflow; the workflow and specs take precedence over this launcher.
 
 `$ARGUMENTS`, if present, names a work package or the human’s requested change; otherwise use the
-handoff's active package. Interpret ordinary language in context. If no package is active, do not
-choose from the product backlog; capture or clarify a new idea, or prepare a package only when the
-human clearly wants it built. Continue until the change is done, a real blocker occurs, or quota
-requires a safe exit. Close every session with the handoff update, commit rules, and human update.
+handoff's active package. If no package is active, do not choose from the product backlog. Continue
+until the change is done, a real blocker occurs, or quota requires a safe exit. Close every session
+with the handoff update, commit rules, and human update.
