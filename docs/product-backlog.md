@@ -6,24 +6,20 @@ here. Shipped behavior lives only in [`specs/README.md`](specs/README.md) and it
 
 ## How an idea moves
 
-| Lane | Meaning | Who may move it |
-|---|---|---|
-| **Inbox** | A human idea captured faithfully; no implied priority, design, or commitment. | Any agent receiving the idea. |
-| **Discovery** | An agent is drafting a spec/design proposal; no product code yet. | The user’s clear intent or a clarification promotes it. |
-| **Implementation queue** | Relevant FS/TS requirements and acceptance criteria exist; the feature is ready but has not started. | The agent creates a work package in [`implementation-queue/`](implementation-queue/README.md). |
-| **Known gaps** | Shipped behavior is incomplete or a documented deviation. The owning FS/TS remains authoritative. | The user’s clear intent selects it for discovery or delivery. |
+| Lane | Meaning |
+|---|---|
+| **Inbox** | A human idea captured faithfully; no implied priority, design, or commitment. |
+| **Discovery** | A spec/design proposal is being drafted; no product code changes. |
+| **Implementation queue** | Relevant FS/TS requirements and acceptance criteria exist; the feature is ready but has not started. |
+| **Known gaps** | Shipped behavior is incomplete or a documented deviation. The owning FS/TS remains authoritative. |
 
 Use `I<n>` for newly captured inbox ideas, `B<n>` for triaged feature candidates, and `G<n>` for
 known gaps. Each non-inbox entry names its likely relevant spec(s). Do not create a duplicate
 feature spec merely to hold an idea.
 
-An idea that is merely being considered stays in **Inbox**. If the user clearly wants a
-proposal, it enters **Discovery**. If the user clearly wants it built, the agent drafts or confirms
-the needed FS/TS updates, then creates a ready work package. Ask a concise question only when the intended
-level of commitment would materially change the result.
-
-An implementation agent works from an active package in the implementation queue. With no active
-package, it may capture/clarify a newly supplied idea but must not self-prioritize a backlog item.
+Discovery produces the needed FS/TS updates without changing product code. A Ready work package is
+created only after those updates and acceptance criteria are adequate. Implementation works from an
+active package and never self-prioritizes a backlog item.
 
 ## Inbox
 

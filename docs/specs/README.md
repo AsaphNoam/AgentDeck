@@ -155,18 +155,16 @@ It is deliberately outside `docs/specs/` so a queue item cannot be mistaken for 
 [`../implementation-queue/`](../implementation-queue/README.md) is the dedicated home for
 specified work that is ready to implement but has not started. Each package links to its relevant
 FS/TS/INV IDs and acceptance evidence. `HANDOFF.md` is not a readiness queue: it tracks only an
-already-active package and its current work state. Agents interpret normal human intent in
-context and clarify only material ambiguity; they never rely on magic words or self-select a backlog
-candidate.
+already-active package and its current work state. Agents do not self-select backlog candidates.
 
 ---
 
 ## Lifecycle — how a change flows through the specs
 
-1. **Capture, discover, and queue.** A new human idea is recorded in the product backlog’s Inbox.
-   When the human’s intent is to explore it, discovery drafts the needed FS/TS updates. Once the
-   updates and acceptance criteria are adequate for a desired implementation, create a Ready package
-   in the implementation queue. An agent does not infer priority from the backlog.
+1. **Capture, discover, and queue.** A new idea is recorded in the product backlog’s Inbox.
+   Discovery drafts the needed FS/TS updates. Once the updates and acceptance criteria are adequate,
+   create a Ready package in the implementation queue. An agent does not infer priority from the
+   backlog.
 2. **Update the specification first.** Any change to user-visible behavior or to an architectural rule
    starts by editing the relevant spec: add/modify R/A items (tag `(planned)` until shipped).
    If no spec covers the area, create or extend one. Pure bug fixes that restore specified behavior

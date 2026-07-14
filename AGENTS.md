@@ -30,8 +30,7 @@ rationale, history, or sequencing but do not override an FS/TS requirement.
 
 `docs/product-backlog.md` is idea intake, and `docs/implementation-queue/` holds specified work
 that is ready but has not started. `HANDOFF.md` records only an already-active work package. Agents
-interpret normal human intent in context, clarify only material ambiguity, and never self-prioritize
-an Inbox, candidate, or known gap.
+never self-prioritize an Inbox, candidate, or known gap.
 
 Every role updates the live handoff and stores a short, plain-language human update in
 [`docs/features/BRIEFS.md`](docs/features/BRIEFS.md). The stored update is the entire final response.

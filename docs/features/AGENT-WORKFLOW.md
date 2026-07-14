@@ -9,10 +9,7 @@ says how agents work with them.
 1. Read [`HANDOFF.md`](HANDOFF.md) from top to bottom, then inspect `git status` and the diff. Treat
    a dirty tree as user or interrupted work; do not discard it.
 2. If work is active, read its package and the relevant feature, technical, and invariant requirements
-   before reading code. If no work is active, do not choose something from the backlog yourself. A
-   direct request from the user may start work; an exploratory request belongs in the backlog or
-   discovery instead.
-3. Interpret ordinary language in context. Ask one concise question only when a choice would materially change the result.
+   before reading code. If no work is active, do not choose something from the backlog yourself.
 
 Use a small, ordinary set of statuses: `Ready`, `Active`, `Paused`, and `Done`. Requirement IDs such
 as `FS-05.A2` and `TS-03.R4` are kept because they are stable links to a precise requirement, not
