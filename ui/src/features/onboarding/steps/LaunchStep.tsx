@@ -34,7 +34,7 @@ export function LaunchStep({ onDone, initialProject }: LaunchStepProps) {
   const [error, setError] = useState<string | null>(null);
   const [launchSucceeded, setLaunchSucceeded] = useState(false);
 
-  const [name, setName] = useSuggestedName(role, project);
+  const [name, setName] = useSuggestedName(role);
 
   // Apply defaults once data loads.
   useEffect(() => {
