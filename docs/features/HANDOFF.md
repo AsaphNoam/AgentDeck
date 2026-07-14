@@ -11,9 +11,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   [`../ideas.md`](../ideas.md) on its own.
 - **Relevant requirements:** [`../specs/README.md`](../specs/README.md) and the FS/TS/INV items selected
   for the next change.
-- **State:** Documentation checks passed. `make check-specs`, shell syntax, twin work-phase skill
-  comparison, and `git diff --check` passed on 2026-07-14. The preceding SDD update also passed
-  `make test`, `make build`, `make vet`, all 95 UI tests, and the UI production build.
+- **State:** GREEN. On 2026-07-14 `make check-specs`, `make test` (both Go variants), `make build`,
+  all 95 UI tests, and the UI production build passed for the auto-generated-project-id change, which
+  was also verified end-to-end in the running dashboard.
 - **Last reviewed code:** `4036e78` (2026-07-12). The later fixes addressed every must-fix finding
   from that review; no must-fix finding is currently open.
 - **Branch:** `main`.
@@ -75,6 +75,8 @@ No must-fix findings. Future ideas and known product improvements are in
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
+- 2026-07-14 — Project ids are now server-derived from the title (`slug(title)-<timestamp>`); the
+  Settings and onboarding project forms no longer ask for a slug (FS-04.R31/A11).
 - 2026-07-14 — Replaced letter-number future-work labels with plain-language ideas, known
   improvements, ready changes, and current-change records.
 - 2026-07-14 — Limited Claude and Codex workflow skills to their explicit slash-command triggers.

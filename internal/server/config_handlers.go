@@ -324,25 +324,38 @@ func (s *Server) handlePostProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	proj := body.toProject()
-	ve, warnings := config.ValidateProject(body.ProjectID, proj, true)
+	// Project ids are normally server-derived from the title (FS-04.R31): the UI
+	// no longer asks the user for one. An explicitly supplied id is still honored
+	// and validated below. A derived id needs no slug check (it is well-formed by
+	// construction) but the title is still required for it to be meaningful.
+	id := body.ProjectID
+	checkSlug := true
+	if id == "" {
+		// No id supplied: derive one from the title. The derived id is well-formed
+		// by construction, so skip the slug check — an empty title still fails the
+		// title-required check below with a clear message (not a cryptic slug error).
+		id = config.GenerateProjectID(proj.Title, time.Now())
+		checkSlug = false
+	}
+	ve, warnings := config.ValidateProject(id, proj, checkSlug)
 	if ve != nil {
 		writeValidationError(w, ve)
 		return
 	}
 	// 409 if already exists.
-	if _, err := s.configStore.ReadProject(body.ProjectID); err == nil {
+	if _, err := s.configStore.ReadProject(id); err == nil {
 		writeJSON(w, http.StatusConflict, map[string]any{
 			"error":   "already_exists",
-			"message": fmt.Sprintf("project '%s' exists", body.ProjectID),
+			"message": fmt.Sprintf("project '%s' exists", id),
 		})
 		return
 	}
-	if err := s.configStore.WriteProject(body.ProjectID, proj); err != nil {
+	if err := s.configStore.WriteProject(id, proj); err != nil {
 		s.log.Error("projects: write", "err", err)
 		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
-	writeJSON(w, http.StatusCreated, toProjectResponse(body.ProjectID, proj, warnings))
+	writeJSON(w, http.StatusCreated, toProjectResponse(id, proj, warnings))
 }
 
 // handlePutProject implements PUT /api/projects/{p} (§5.2).

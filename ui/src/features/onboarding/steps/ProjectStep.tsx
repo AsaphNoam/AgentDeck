@@ -9,7 +9,6 @@ interface ProjectStepProps {
 
 export function ProjectStep({ onDone }: ProjectStepProps) {
   const createProject = useCreateProject();
-  const [slug, setSlug] = useState("");
   const [title, setTitle] = useState("");
   const [cwd, setCwd] = useState("");
   const [context, setContext] = useState("");
@@ -17,15 +16,16 @@ export function ProjectStep({ onDone }: ProjectStepProps) {
   const [error, setError] = useState<string | null>(null);
 
   const handleCreate = () => {
-    if (!slug.trim() || !title.trim() || !cwd.trim()) {
-      setError("Project ID, title, and working directory are required.");
+    if (!title.trim() || !cwd.trim()) {
+      setError("Title and working directory are required.");
       return;
     }
     setError(null);
     setWarning(null);
     createProject.mutate(
       {
-        project: slug.trim(),
+        // Empty id: the server derives the project id from the title (R31).
+        project: "",
         title: title.trim(),
         color: [128, 128, 128],
         cwd: cwd.trim(),
@@ -38,7 +38,7 @@ export function ProjectStep({ onDone }: ProjectStepProps) {
           if (cwdWarn) {
             setWarning(cwdWarn.message);
           }
-          onDone(slug.trim());
+          onDone(resp.project);
         },
         onError: (e) => setError(String(e)),
       },
@@ -51,15 +51,6 @@ export function ProjectStep({ onDone }: ProjectStepProps) {
       <p className="wizard-step-desc">
         A project scopes your agents to a codebase directory.
       </p>
-
-      <div className="form-field">
-        <label>Project ID (slug)</label>
-        <input
-          value={slug}
-          onChange={(e) => setSlug(e.target.value)}
-          placeholder="e.g. my-app"
-        />
-      </div>
 
       <div className="form-field">
         <label>Title</label>

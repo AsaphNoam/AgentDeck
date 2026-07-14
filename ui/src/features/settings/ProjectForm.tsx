@@ -7,10 +7,8 @@ import type { ProjectResponse, FieldWarning } from "../../schemas/project";
 const colorChannel = z.number().int().min(0).max(255);
 
 const schema = z.object({
-  project: z
-    .string()
-    .regex(/^[a-z0-9][a-z0-9-]{0,62}$/, "must match ^[a-z0-9][a-z0-9-]{0,62}$")
-    .optional(),
+  // Project id is server-derived from the title (FS-04.R31); the create form no
+  // longer collects it. Edit mode shows the existing id read-only.
   title: z.string().min(1, "title is required").max(120),
   colorR: colorChannel,
   colorG: colorChannel,
@@ -52,7 +50,6 @@ export function ProjectForm({
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      project: initial?.project,
       title: initial?.title ?? "",
       colorR: initial?.color[0] ?? 128,
       colorG: initial?.color[1] ?? 128,
@@ -72,7 +69,8 @@ export function ProjectForm({
 
   const submit = (vals: FormValues) => {
     onSubmit({
-      project: isEdit ? initial!.project : vals.project!,
+      // Empty id on create tells the server to derive it from the title (R31).
+      project: isEdit ? initial!.project : "",
       title: vals.title,
       color: [vals.colorR, vals.colorG, vals.colorB],
       cwd: vals.cwd,
@@ -85,13 +83,6 @@ export function ProjectForm({
 
   return (
     <form onSubmit={handleSubmit(submit)} className="config-form">
-      {!isEdit && (
-        <div className="form-field">
-          <label>Project ID (slug)</label>
-          <input {...register("project")} placeholder="e.g. my-app" />
-          {errors.project && <span className="form-error">{errors.project.message}</span>}
-        </div>
-      )}
       {isEdit && (
         <div className="form-field">
           <label>Project ID</label>

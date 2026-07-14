@@ -64,10 +64,9 @@ describe("ProjectsEditor", () => {
 
     fireEvent.click(screen.getByText("New project"));
 
-    const slugInput = screen.getByPlaceholderText("e.g. my-app");
+    // Project id is server-derived (R31): the form no longer has a slug field.
     const titleInput = screen.getByPlaceholderText("e.g. My App");
     const cwdInput = screen.getByPlaceholderText("~/Projects/my-app");
-    fireEvent.change(slugInput, { target: { value: "billing" } });
     fireEvent.change(titleInput, { target: { value: "Billing" } });
     fireEvent.change(cwdInput, { target: { value: "/tmp/billing" } });
 
@@ -109,7 +108,6 @@ describe("ProjectsEditor", () => {
     await screen.findByText("Warn Project");
 
     fireEvent.click(screen.getByText("New project"));
-    fireEvent.change(screen.getByPlaceholderText("e.g. my-app"), { target: { value: "phantom" } });
     fireEvent.change(screen.getByPlaceholderText("e.g. My App"), { target: { value: "Phantom" } });
     fireEvent.change(screen.getByPlaceholderText("~/Projects/my-app"), {
       target: { value: "/no/such/dir" },
@@ -118,7 +116,7 @@ describe("ProjectsEditor", () => {
 
     // Dialog closes on success; warnings are non-blocking (A13).
     await waitFor(() =>
-      expect(screen.queryByPlaceholderText("e.g. my-app")).not.toBeInTheDocument()
+      expect(screen.queryByPlaceholderText("e.g. My App")).not.toBeInTheDocument()
     );
   });
 });
