@@ -4,6 +4,17 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-15 — review: macOS release installer
+
+The macOS release installer is not ready to publish: two installer or update runs can both activate
+a runtime, the stable command can be briefly truncated during an update, and the release workflow
+skips required integrity, update, rollback, and non-interactive checks. The automated specification,
+test, build, and distribution checks otherwise pass.
+
+**Needs attention:** Fix these release-path defects before publishing a release.
+
+**Next:** Run `/fix-review` to repair and verify the findings.
+
 ### 2026-07-15 — implementation: macOS release installer
 
 AgentDeck can now be installed from a macOS Apple-silicon GitHub Release without a source checkout,
