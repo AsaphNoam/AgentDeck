@@ -9,7 +9,7 @@
 # runs npm, builds the UI, or installs anything globally (FS-10.R1–R3, TS-06.R17).
 #
 # Requirements: macOS on Apple silicon (arm64) and the standard command-line
-# tools curl, shasum, tar, and mktemp. Go, Node, npm, Homebrew, and admin rights
+# tools curl, shasum, tar, mktemp, and lockf. Go, Node, npm, Homebrew, and admin rights
 # are NOT required. Release archives are checksum-verified but intentionally
 # unsigned and unnotarized: macOS may ask you to approve an unidentified
 # developer on first open (FS-10.R9, TS-05.R12).
@@ -23,12 +23,14 @@
 #   AGENTDECK_APP_ROOT  application root (default: ~/Library/Application Support/AgentDeck)
 
 set -euo pipefail
+umask 077
 
 REPO="${AGENTDECK_REPO:-AsaphNoam/AgentDeck}"
 VERSION="${AGENTDECK_VERSION:-}"
 TARGET="darwin-arm64"
 NO_START=0
 NONINTERACTIVE=0
+app_root="${AGENTDECK_APP_ROOT:-$HOME/Library/Application Support/AgentDeck}"
 
 die() { echo "error: $*" >&2; exit 1; }
 
@@ -94,9 +96,22 @@ Detected: ${os}/${arch}. Build from source instead: https://github.com/${REPO}#b
 fi
 
 # --- Tool check ------------------------------------------------------------
-for tool in curl shasum tar mktemp; do
+for tool in curl shasum tar mktemp lockf; do
   command -v "$tool" >/dev/null 2>&1 || die "required tool not found: ${tool}"
 done
+
+# Claim the shared install lock before resolving a release or downloading any
+# bytes. macOS's standard lockf keeps the flock alive for this child script;
+# the bundled binary receives --lock-held when it takes over activation. A
+# contender therefore exits before it can change the selected runtime or stage
+# another release (FS-10.R13, TS-06.R19).
+if [ "${AGENTDECK_INSTALL_LOCK_HELD:-}" != "1" ]; then
+  mkdir -p "$app_root" || die "could not create application root: ${app_root}"
+  chmod 700 "$app_root" || die "could not secure application root: ${app_root}"
+  : >"$app_root/install.lock" || die "could not create install lock"
+  exec lockf -k -t 0 "$app_root/install.lock" env \
+    AGENTDECK_INSTALL_LOCK_HELD=1 AGENTDECK_VERSION="$VERSION" "$0" "$@"
+fi
 
 api="https://api.github.com/repos/${REPO}"
 dl="https://github.com/${REPO}/releases/download"
@@ -148,10 +163,10 @@ bundled="${staging}/agentdeck-${VERSION}-${TARGET}/libexec/agentdeck"
 echo "==> Installing"
 "$bundled" release install \
   --archive "${staging}/${archive_name}" \
-  --manifest "${staging}/manifest.json"
+  --manifest "${staging}/manifest.json" \
+  --lock-held
 
 # --- Report the stable command --------------------------------------------
-app_root="${AGENTDECK_APP_ROOT:-$HOME/Library/Application Support/AgentDeck}"
 shim="${app_root}/bin/agentdeck"
 echo
 echo "AgentDeck ${VERSION} is installed."

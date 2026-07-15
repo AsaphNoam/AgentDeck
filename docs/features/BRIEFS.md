@@ -4,6 +4,16 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-15 — fix review: macOS release delivery
+
+The release installer and updater now prevent a second run from changing the selected runtime while
+another run is in progress. The stable command is replaced safely during updates, and the release
+workflow now exercises the release checks, including the fresh bootstrap path.
+
+**Needs attention:** Real provider sign-in and chat checks still require credentialed manual testing.
+
+**Next:** Run the credentialed provider acceptance checks before making release compatibility claims.
+
 ### 2026-07-15 — review: macOS release installer
 
 The macOS release installer is not ready to publish: two installer or update runs can both activate

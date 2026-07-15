@@ -70,6 +70,15 @@ func runRollback(cmd *cobra.Command, layout *release.Layout) error {
 // latest release. A failed download or verification leaves the current runtime
 // intact because Install stages and verifies before it activates (FS-10.R8).
 func runUpdate(cmd *cobra.Command, layout *release.Layout, f release.Fetcher, check, yes bool) error {
+	// Claim the install root before even resolving release metadata. Otherwise a
+	// second updater can download in parallel and activate after the first one
+	// releases Install's former activation-only lock (FS-10.R13, TS-06.R19).
+	lk, err := layout.Lock()
+	if err != nil {
+		return err
+	}
+	defer lk.Release()
+
 	out := cmd.OutOrStdout()
 	cur, hasCur, err := layout.CurrentVersion()
 	if err != nil {
@@ -112,7 +121,7 @@ func runUpdate(cmd *cobra.Command, layout *release.Layout, f release.Fetcher, ch
 	if err != nil {
 		return err
 	}
-	name, err := layout.Install(archive, m)
+	name, err := layout.InstallWithLock(archive, m)
 	if err != nil {
 		return err
 	}

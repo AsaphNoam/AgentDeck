@@ -128,3 +128,46 @@ func TestShimFollowsCurrentPointer(t *testing.T) {
 		t.Fatalf("shim did not follow current to %s:\n%s", v2, out)
 	}
 }
+
+// Rewriting the stable command replaces a complete executable shim and leaves
+// no temporary command visible in its directory (TS-06.R17, INV §9).
+func TestWriteShimReplacesStableCommandAtomically(t *testing.T) {
+	l := newLayout(t)
+	v1 := buildRunnableVersion(t, l, "1.0.0")
+	if err := l.Activate(v1); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.WriteShim(); err != nil {
+		t.Fatal(err)
+	}
+
+	v2 := buildRunnableVersion(t, l, "2.0.0")
+	if err := l.Activate(v2); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.WriteShim(); err != nil {
+		t.Fatal(err)
+	}
+
+	shim, err := os.ReadFile(l.ShimPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(shim), l.CurrentLink()) {
+		t.Fatalf("rewritten shim does not resolve current pointer: %q", shim)
+	}
+	info, err := os.Stat(l.ShimPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o755 {
+		t.Fatalf("shim permissions = %o, want 755", info.Mode().Perm())
+	}
+	leftovers, err := filepath.Glob(filepath.Join(l.BinDir(), ".agentdeck-*"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(leftovers) != 0 {
+		t.Fatalf("temporary shims left behind: %v", leftovers)
+	}
+}

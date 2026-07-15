@@ -15,7 +15,16 @@ func (l *Layout) Install(archivePath string, m ReleaseManifest) (string, error) 
 		return "", err
 	}
 	defer lk.Release()
+	return l.InstallWithLock(archivePath, m)
+}
 
+// InstallWithLock performs the install transaction while the caller holds l's
+// install lock. It lets an updater claim the lock before it resolves release
+// metadata or downloads an archive, and lets the bootstrap's lockf wrapper hold
+// the same claim from its initial release lookup through activation.
+//
+// Callers must not invoke this without a held Layout lock (TS-06.R19).
+func (l *Layout) InstallWithLock(archivePath string, m ReleaseManifest) (string, error) {
 	name, err := l.StageArchive(archivePath, m)
 	if err != nil {
 		return "", err
