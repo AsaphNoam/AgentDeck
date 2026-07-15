@@ -4,6 +4,16 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-15 — workflow: work and fix commands
+
+Use `/work` to build a change and `/fix` to repair recorded findings. When no change is active,
+`/work` now starts the only waiting ready change; if several are waiting, it asks you which one to
+start instead of silently choosing or claiming there is nothing to do.
+
+**Needs attention:** None.
+
+**Next:** Run `/work` to start the waiting project shared-resources change.
+
 ### 2026-07-15 — implementation: no active change
 
 There is no active change to implement, so no product work was started. The repository is clean and the next implementation must be selected explicitly from the ready changes.

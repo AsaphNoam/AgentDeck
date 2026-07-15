@@ -191,10 +191,10 @@ Agents do not choose future work on their own.
 
 - **design-feature:** owns steps 1–2 for a new feature and creates its ready-change file. It works
   with the human, writes planned FS/TS requirements, and does not change product code.
-- **work-phase (build):** owns steps 3–5 for a ready change. Reads the relevant specs *before* the code.
+- **work (build):** owns steps 3–5 for a ready change. Reads the relevant specs *before* the code.
 - **review-phase:** performs step 6. May record missing or incorrect specification coverage; does not edit specs itself
   (spec edits are fix/build work).
-- **fix-review:** when a validated fix changes behavior (not just restores it), updates the
+- **fix:** when a validated fix changes behavior (not just restores it), updates the
   relevant spec in the same completed change.
 - **usability-review:** exercises journeys against feature-spec acceptance criteria; a mismatch
   between observed behavior and an A-item is a finding tagged with that ID.

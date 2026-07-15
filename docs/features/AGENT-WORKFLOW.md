@@ -9,7 +9,10 @@ says how agents work with them.
 1. Read [`HANDOFF.md`](HANDOFF.md) from top to bottom, then inspect `git status` and the diff. Treat
    a dirty tree as user or interrupted work; do not discard it.
 2. If a change is in progress, read its change file and the relevant feature, technical, and invariant
-   requirements before reading code. If no change is in progress, do not choose future work yourself.
+   requirements before reading code. A `/work` request with no active change may start the sole
+   waiting ready change, or a ready change explicitly named in that request. If several ready changes
+   are waiting, ask the user to choose; do not prioritize one yourself. Outside that explicit request,
+   do not choose future work yourself.
 
 Use plain status words: **waiting to start**, **in progress**, **paused**, and **finished**.
 Requirement IDs such as `FS-05.A2` and `TS-03.R4` are kept because they are stable links to a

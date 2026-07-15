@@ -1,9 +1,9 @@
 ---
-name: fix-review
-description: Explicit invocation only. Run only when the user sends `/fix-review`; do not trigger from a natural-language request.
+name: fix
+description: Explicit invocation only. Run only when the user sends `/fix`; do not trigger from a natural-language request.
 ---
 
-# Fix review findings
+# Fix findings
 
 Read [`HANDOFF.md`](../../../docs/features/HANDOFF.md), the
 [`spec overview`](../../../docs/specs/README.md), relevant FS/TS/INV items, and workflow

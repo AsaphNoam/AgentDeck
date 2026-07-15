@@ -96,7 +96,7 @@ micro-audits, redesign proposals, or unverified feature ideas. The §8 diff revi
    observed + evidence (screenshot path, DOM snippet, curl output, or console error). No evidence →
    not a finding.
 5. **Read-only toward the repo.** No product-code changes and no commits of fixes — same rule as
-   §7. Findings go to the handoff (§6); the `/fix-review` loop does the fixing.
+   §7. Findings go to the handoff (§6); the `/fix` loop does the fixing.
 
 ---
 
@@ -225,11 +225,11 @@ and flagged as such — never silently reported as fact.
 
 - Write every **Must fix** and **Worth fixing** finding (after the §1 severity mapping) to
   `## Review findings` in [`HANDOFF.md`](HANDOFF.md), using the format in AGENT-WORKFLOW §7 so the
-  existing `/fix-review` (§8) process can act on it. Prefix the
+  existing `/fix` (§8) process can act on it. Prefix the
   title with the journey/sweep id (`J1`, `S2`) so the fix agent can find the repro in the run
   report.
 - If a finding suggests a new systemic class, record it as a candidate finding. Usability review
-  does not edit specs/INV; fix-review validates and updates the technical-spec appendix.
+  does not edit specs/INV; fix validates and updates the technical-spec appendix.
 - Save the full run summary (journey results, all findings, evidence paths) as a file, and report to
   the human via the **human update** (AGENT-WORKFLOW §6): a focused, plain-language entry in
   [`BRIEFS.md`](BRIEFS.md) — what was driven, severity counts, each blocker as one plain sentence,
