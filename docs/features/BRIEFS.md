@@ -4,15 +4,65 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-15 — feature design: project shared resources ready
+
+Project shared resources are now fully designed and waiting to build. Every project will get one
+private AgentDeck folder outside its repository, where people and its agents can share notes,
+specifications, research, test harnesses, and validation results without risking a commit. AgentDeck
+will make the folder available to every new, resumed, or switched agent, show its path in Settings,
+and retain it if the project configuration is removed. It will not inspect, search, sync, or expose
+the folder’s contents.
+
+**Needs attention:** None.
+
+**Next:** Start the waiting project shared-resources change when you want implementation.
+
+### 2026-07-15 — feature design: project shared resources clarification
+
+Proposed behavior:
+
+- Every project gets a stable folder at `~/.agentdeck/project-resources/<project-id>/` (or the
+  equivalent AgentDeck data home), outside the repository.
+- AgentDeck creates it with the project, or lazily when an existing project first launches an
+  agent. It stays empty until a person or agent writes something there.
+- Each new project agent receives the path and a clear instruction to use it for shared notes,
+  specifications, research, harnesses, and validation results. Its ordinary working directory stays
+  the repository.
+- Settings shows the path for copying, but does not let a person relocate it. AgentDeck does not
+  scan, search, sync, display, or otherwise interpret its contents.
+- Removing the project configuration retains the folder and its contents. That is the proposed safe
+  default, because deleting configuration should not quietly erase useful work.
+
+Repository-resident folders, configurable locations, cloud sync, content browsing, and automatic
+cleanup are not part of this feature.
+
+The feature-design instructions now require this concrete explanation in conversation before asking
+for confirmation.
+
+**Needs attention:** Confirm whether retained project folders after project deletion are the desired default.
+
+**Next:** Confirm the proposed behavior, or change the retention rule, then complete the technical design.
+
 ### 2026-07-15 — fix review: macOS release delivery
 
 The release installer and updater now prevent a second run from changing the selected runtime while
-another run is in progress. The stable command is replaced safely during updates, and the release
-workflow now exercises the release checks, including the fresh bootstrap path.
+another run is in progress. The stable command is replaced safely during updates, and the macOS
+release workflow now exercises the release checks, including the fresh bootstrap path.
 
 **Needs attention:** Real provider sign-in and chat checks still require credentialed manual testing.
 
 **Next:** Run the credentialed provider acceptance checks before making release compatibility claims.
+
+### 2026-07-15 — feature design: project shared resources
+
+The feature draft gives every project one stable, AgentDeck-owned folder outside its repository for
+shared agent material such as specifications, research, validation harnesses, and working notes.
+Agents will be told its path at launch while continuing to work in the repository; removing a
+project will retain the folder so useful material is not silently lost.
+
+**Needs attention:** Confirm this behavior before the technical design chooses the filesystem and launch-composition details.
+
+**Next:** Confirm the feature scope, or say what should change, then complete the technical design.
 
 ### 2026-07-15 — review: macOS release installer
 

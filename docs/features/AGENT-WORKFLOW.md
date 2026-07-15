@@ -125,8 +125,11 @@ specifications and planning documents, not product code.
    exclusions, edge cases, compatibility, and acceptance criteria.
 3. Draft the feature specification first. Extend an existing FS when it already owns the capability;
    create a new one only for a distinct capability. Mark every unshipped requirement `(planned)`.
-4. Summarize the feature behavior and wait for the user's confirmation before designing the
-   architecture.
+4. Explain the proposed feature behavior in the conversation before asking for confirmation: state
+   what changes, when it happens, where its data lives, what users and agents/API clients observe,
+   lifecycle/retention effects, exclusions, and each remaining product decision. Do not ask a
+   person to confirm an unspecified “behavior.” Then wait for their confirmation before designing
+   the architecture.
 5. Draft the matching technical specification. Read the relevant code and invariants first. For a
    non-trivial tradeoff, explain the options and recommendation and wait for the user's decision;
    do not silently choose security, privacy, persistence, compatibility, migration, or protocol
