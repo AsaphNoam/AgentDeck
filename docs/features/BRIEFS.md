@@ -4,6 +4,18 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-15 — review: macOS installer locking
+
+The updated macOS installer can lose explicit no-start and non-interactive choices when it restarts
+under its new concurrency lock. In an interactive terminal, that can unexpectedly prompt, edit the
+shell profile, run sign-in, or start the dashboard. The rest of the reviewed release, workflow, and
+planned project-resources work is consistent, and automated checks pass.
+
+**Needs attention:** Repair the installer flag handoff before publishing a release.
+
+**Next:** Run `/fix` to preserve those choices through the locked installer process and add
+interactive coverage.
+
 ### 2026-07-15 — workflow: review command
 
 Use `/review` to inspect the unreviewed completed work. The Codex and Claude workflow skills now

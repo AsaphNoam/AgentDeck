@@ -7,9 +7,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** none.
-- **State:** paused — no active change. The release-path review findings are fixed and verified;
-  credentialed provider acceptance remains a manual gate.
-- **Last reviewed code:** `d260f93` (2026-07-15), across the continuous range after `4036e78`.
+- **State:** paused — no active change. The latest review found an installer flag-preservation fix
+  required before a macOS release can be published; credentialed provider acceptance remains a
+  manual gate.
+- **Last reviewed code:** `ccd0a51` (2026-07-15), across the continuous range after `d260f93`.
 - **Branch:** `main`.
 
 ## Decisions needing your input
@@ -44,12 +45,22 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-None.
+- **Must fix — locking re-exec drops explicit non-interactive/no-start behavior.**
+  `scripts/release/install.sh:73-77` consumes `--non-interactive` and `--no-start` before
+  `scripts/release/install.sh:108-114` re-executes the script under `lockf`, but that command passes
+  only `AGENTDECK_VERSION` and the now-empty `"$@"`. On an interactive terminal, the locked child
+  resets both flags to zero and can prompt, edit `.zshrc`, run provider sign-in, and start the
+  dashboard despite the original flags. This violates FS-10.R6/R12 and makes the new locking path
+  unsafe for scripted use. Preserve the parsed flags across the re-exec (or acquire the lock before
+  parsing) and add a pseudo-terminal bootstrap test for both options.
 
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
+- 2026-07-15 — Review through `ccd0a51` found that the release-installer lock re-exec loses
+  explicit no-start/non-interactive flags. Specification, test, build, and distribution checks pass,
+  but the existing non-terminal bootstrap test does not cover the interactive trigger.
 - 2026-07-15 — Renamed the explicit review command to `/review` in the Codex and Claude skill
   copies; it retains the same unreviewed-range review behavior.
 - 2026-07-15 — Renamed the explicit build/finding-fix commands to `/work` and `/fix`. `/work`
