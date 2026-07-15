@@ -35,7 +35,9 @@ func buildArchive(t *testing.T, version string) (string, string) {
 	if err := release.WriteWrapper(dir); err != nil {
 		t.Fatal(err)
 	}
-	if err := release.WriteInternalManifest(dir, release.InternalManifest{Version: version, Target: release.Target}); err != nil {
+	if err := release.WriteInternalManifest(dir, release.InternalManifest{Version: version, Target: release.Target, Components: map[string]string{
+		"node": "22.0.0", "claude-agent-acp": "0.59.0", "codex-acp": "1.1.2", "agentdeck": version,
+	}}); err != nil {
 		t.Fatal(err)
 	}
 	archive := filepath.Join(work, "agentdeck-"+version+"-"+release.Target+".tar.gz")
