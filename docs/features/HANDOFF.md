@@ -7,11 +7,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** none.
-- **State:** GREEN. On 2026-07-15 the completed macOS release installer passed `make check-specs`,
-  `make test` (both Go variants), `make build`, and `make dist`. Credentialed provider acceptance
-  remains a manual gate.
-- **Last reviewed code:** `4036e78` (2026-07-12). The later fixes addressed every must-fix finding
-  from that review; no must-fix finding is currently open.
+- **State:** paused — no active change. The 2026-07-15 review found release-path fixes required
+  before a macOS release can be published. Credentialed provider acceptance remains a manual gate.
+- **Last reviewed code:** `d260f93` (2026-07-15), across the continuous range after `4036e78`.
 - **Branch:** `main`.
 
 ## Decisions needing your input
@@ -46,14 +44,35 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-No must-fix findings. Future ideas and known product improvements are in
-[`../ideas.md`](../ideas.md); ready changes live in
-[`../ready-changes/`](../ready-changes/README.md).
+- **Must fix — concurrent release operations can both activate a runtime.**
+  `scripts/release/install.sh:104-151` and `internal/cli/update.go:82-115` download and prepare an
+  install before calling `Layout.Install`, whose lock is acquired only at
+  `internal/release/install.go:11-15`. Start two installs/updates while the first is downloading:
+  once the first activation releases the lock, the second proceeds and changes `current` instead of
+  exiting. This violates FS-10.R13 and TS-06.R19's contender rule. Claim the install lock before
+  release resolution/download and hold it through activation (or use an equivalent full-operation
+  claim); cover bootstrap and updater contention.
+- **Must fix — the stable command shim is rewritten non-atomically.**
+  `internal/release/wrapper.go:42-53` uses `os.WriteFile`, which truncates the live
+  `bin/agentdeck` before replacing its contents. A person invoking `agentdeck` while an update
+  completes can execute an empty/partial shim even though the selected runtime is valid. This
+  violates INV §9's atomic-write rule and weakens TS-06.R17's stable-command guarantee. Write and
+  fsync a temporary shim, then rename it over the old shim and fsync the parent directory.
+- **Must fix — release CI omits required delivery verification.**
+  `.github/workflows/release.yml:35-51` only assembles, directly installs one archive, and checks a
+  version/home sentinel. It does not exercise the documented bootstrap installer, checksum
+  rejection, private-wrapper resolution, update/rollback, or no-start/non-interactive paths, even
+  though TS-06.R21 requires those release-CI checks on the arm64 macOS runner. Run the relevant
+  release/CLI test coverage and a fresh-home bootstrap journey in this workflow before publishing.
 
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
+- 2026-07-15 — Review through `d260f93` recorded three must-fix macOS release defects: full-operation
+  installer/update contention is not serialized, the stable shim is written in place, and release CI
+  omits required delivery checks. Shared specification, Go (both variants), build, and distribution
+  checks passed.
 - 2026-07-15 — Shipped the Apple-silicon macOS GitHub Releases installer: verified private Node and
   Claude/Codex ACP runtime, guided sign-in, stable shim, explicit update/rollback, no-start mode,
   release assembly/publish workflow, and release documentation. Automated checks are green; real
