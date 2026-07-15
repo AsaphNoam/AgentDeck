@@ -4,6 +4,16 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-15 — feature design: macOS release installer
+
+The installer is now fully specified and ready to build for Apple-silicon Macs. It will download a GitHub Release containing AgentDeck, its own Node runtime, and the official Claude and Codex adapters, so friends will not need a repository, Go, npm, or globally installed adapters. It keeps the app runtime separate from your existing AgentDeck data, offers provider sign-in without handling credentials itself, starts the dashboard after an interactive install, and supports manual check, update, and rollback commands.
+
+The MVP intentionally uses GitHub Release checksums but no code signing or notarization. That keeps publishing lightweight, but macOS may ask each friend to approve an unidentified developer, and checksums cannot independently prove publisher identity if the release account were compromised. There are no automatic updates, Homebrew package, Intel build, or other platforms in this first version.
+
+**Needs attention:** None.
+
+**Next:** Start the waiting macOS release-installer change when you want implementation to begin.
+
 ### 2026-07-15 — implementation: official Claude adapter
 
 AgentDeck now launches the official `claude-agent-acp` adapter instead of the retired Zed-era executable. Credential checks go through that adapter’s bundled Claude executable, and source installs pin the reviewed official package with its Node 22 requirement. The launch metadata AgentDeck already sends—system prompt, model, extra directories, and messaging registration—matches the new adapter’s contract.

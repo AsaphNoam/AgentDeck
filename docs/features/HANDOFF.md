@@ -78,6 +78,9 @@ _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
 - 2026-07-15 — Claude chat and credential checks now target the pinned official
   `@agentclientprotocol/claude-agent-acp` package; source installs enforce its Node 22 floor.
+- 2026-07-15 — Defined the waiting macOS arm64 GitHub Releases installer change: a private Node and
+  Claude/Codex ACP runtime, optional guided sign-in, explicit update/rollback, checksums, and no
+  signing/notarization. It is ready to start and does not make the release installer active yet.
 - 2026-07-15 — Added a collaborative feature-design workflow that turns one idea into confirmed
   planned specifications and a ready change without starting implementation.
 - 2026-07-14 — Codex backends can opt into `autosync_models`: on startup AgentDeck add-only merges
