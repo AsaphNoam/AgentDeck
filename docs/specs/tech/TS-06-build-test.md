@@ -49,6 +49,11 @@ real-CLI acceptance is an explicit manual gate and never silently substitutes fo
 **R10 — Distribution remains a single local binary.** The install path may install optional ACP
 adapters, but the AgentDeck server/UI/MCP runtime itself requires no Node or Python process.
 
+**R12 — Source installs pin the official Claude adapter.** When `INSTALL_ACP=1`,
+`install.sh` installs the exact reviewed `@agentclientprotocol/claude-agent-acp` version and checks
+for its Node 22 runtime floor. Ordinary source builds keep Node 20 as their UI-only baseline and do
+not mutate global adapter installations unless explicitly requested.
+
 ## 3. Interfaces & data shapes
 
 The canonical commands are:
@@ -80,7 +85,8 @@ shared target guarantees.
 
 ## 6. Traceability
 
-- Toolchains/targets: `go.mod`, `ui/package.json`, `Makefile`, `install.sh`.
+- Toolchains/targets and the pinned optional Claude adapter: `go.mod`, `ui/package.json`, `Makefile`,
+  `install.sh`.
 - Spec lint: `scripts/check-specs.sh`.
 - CI: `.github/workflows/ci.yml`.
 - Fake integration peer: `internal/runtime/testdata/fakeacp`, server integration tests.

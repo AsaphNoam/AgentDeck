@@ -427,6 +427,9 @@ func TestChatToolFlow(t *testing.T) {
 
 func TestChatBackendGate(t *testing.T) {
 	c := NewChatRuntime(nil)
+	// Keep this deterministic on developer machines that have codex-acp installed:
+	// the test needs a spawn failure before the nil store is ever reached.
+	c.SetCommand(filepath.Join(t.TempDir(), "missing-acp"))
 	if _, err := c.Start(context.Background(), LaunchSpec{BackendType: "codex-acp"}); err == nil {
 		t.Fatal("codex-acp Start should error")
 	}

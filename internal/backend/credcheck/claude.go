@@ -8,24 +8,20 @@ import (
 	"github.com/agentdeck/agentdeck/internal/config"
 )
 
-// claudeProber validates claude-acp credentials by running the Claude Code
-// CLI's non-interactive auth-status command (techspec §3.5).
+// claudeProber validates claude-acp credentials by delegating through the same
+// official adapter executable chat launch requires. The adapter's --cli mode
+// runs its bundled compatible Claude executable.
 type claudeProber struct{}
 
 func (claudeProber) Check(ctx context.Context, _ config.Backend, _ config.Model, mergedEnv map[string]string) CredResult {
-	// Find the claude CLI on PATH (or in the merged env if CLAUDE_PATH is set).
-	cliBin := "claude"
-	if p, ok := mergedEnv["CLAUDE_PATH"]; ok && p != "" {
-		cliBin = p
-	}
-
-	path, err := exec.LookPath(cliBin)
+	path, err := exec.LookPath("claude-agent-acp")
 	if err != nil {
 		return CredResult{Status: "skipped", Detail: "cli_not_installed"}
 	}
 
-	// Run `claude auth status` non-interactively. Older Claude builds may not
-	// support `--no-color`, so retry once without it before surfacing a failure.
+	// Run the adapter's bundled `claude auth status` non-interactively. Older
+	// bundled Claude builds may not support `--no-color`, so retry once without
+	// it before surfacing a failure.
 	out, err := runClaudeAuthStatus(ctx, path, mergedEnv, true)
 	if err != nil && strings.Contains(strings.ToLower(string(out)), "unknown option '--no-color'") {
 		out, err = runClaudeAuthStatus(ctx, path, mergedEnv, false)
@@ -51,7 +47,7 @@ func (claudeProber) Check(ctx context.Context, _ config.Backend, _ config.Model,
 }
 
 func runClaudeAuthStatus(ctx context.Context, path string, mergedEnv map[string]string, noColor bool) ([]byte, error) {
-	args := []string{"auth", "status"}
+	args := []string{"--cli", "auth", "status"}
 	if noColor {
 		args = append(args, "--no-color")
 	}

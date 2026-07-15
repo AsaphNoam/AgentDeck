@@ -1040,7 +1040,7 @@ func (as *agentState) shutdown() {
 }
 
 // Pinned ACP protocol range (§12.1). The Go client targets the version the
-// pinned claude-code-acp adapter negotiates; today that is exactly 1.
+// pinned claude-agent-acp adapter negotiates; today that is exactly 1.
 const (
 	minACPVersion = 1
 	maxACPVersion = 1

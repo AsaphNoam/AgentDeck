@@ -6,15 +6,14 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
-- **Active change:** none; the SDD foundation migration is complete. Changes approved to start live
-  in [`../ready-changes/`](../ready-changes/README.md), not here. An agent does not choose work from
+- **Active change:** none. Changes approved to start live in
+  [`../ready-changes/`](../ready-changes/README.md), not here. An agent does not choose work from
   [`../ideas.md`](../ideas.md) on its own.
 - **Relevant requirements:** [`../specs/README.md`](../specs/README.md) and the FS/TS/INV items selected
   for the next change.
-- **State:** GREEN. On 2026-07-14 `make check-specs`, `make test` (both Go variants), `make build`,
-  all 95 UI tests, and the UI production build passed for the Codex model-autosync change (FS-09.R28),
-  verified end-to-end: enabling the toggle then restarting pulled the current Codex models into the
-  catalog without touching existing entries.
+- **State:** GREEN. On 2026-07-15 `make check-specs`, `make test` (both Go variants), `make build`,
+  and `make dist` passed for the official Claude adapter migration. The pinned 0.59.0 package
+  manifest and entry point were inspected; credentialed provider acceptance remains gated.
 - **Last reviewed code:** `4036e78` (2026-07-12). The later fixes addressed every must-fix finding
   from that review; no must-fix finding is currently open.
 - **Branch:** `main`.
@@ -64,7 +63,8 @@ that update.
 
 Live-provider acceptance is waiting for human authorization because it invokes real provider sessions
 and creates disposable local configuration homes. On 2026-07-15 this machine has Claude Code 2.1.202,
-Codex CLI 0.142.5, and `codex-acp` 1.1.2 installed; OpenCode and OpenHands are not installed.
+the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installed; the new
+`claude-agent-acp`, OpenCode, and OpenHands are not installed globally.
 
 ## Review findings
 
@@ -76,6 +76,8 @@ No must-fix findings. Future ideas and known product improvements are in
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
+- 2026-07-15 — Claude chat and credential checks now target the pinned official
+  `@agentclientprotocol/claude-agent-acp` package; source installs enforce its Node 22 floor.
 - 2026-07-15 — Added a collaborative feature-design workflow that turns one idea into confirmed
   planned specifications and a ready change without starting implementation.
 - 2026-07-14 — Codex backends can opt into `autosync_models`: on startup AgentDeck add-only merges

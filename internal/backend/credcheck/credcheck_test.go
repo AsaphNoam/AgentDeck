@@ -140,13 +140,13 @@ func TestOpenHandsProber(t *testing.T) {
 
 func TestClaudeProberRetriesWithoutNoColor(t *testing.T) {
 	dir := t.TempDir()
-	cliPath := filepath.Join(dir, "claude")
+	cliPath := filepath.Join(dir, "claude-agent-acp")
 	script := `#!/bin/sh
-if [ "$1" = "auth" ] && [ "$2" = "status" ] && [ "$3" = "--no-color" ]; then
+if [ "$1" = "--cli" ] && [ "$2" = "auth" ] && [ "$3" = "status" ] && [ "$4" = "--no-color" ]; then
   echo "error: unknown option '--no-color'" >&2
   exit 1
 fi
-if [ "$1" = "auth" ] && [ "$2" = "status" ]; then
+if [ "$1" = "--cli" ] && [ "$2" = "auth" ] && [ "$3" = "status" ]; then
   echo "logged in"
   exit 0
 fi
@@ -156,12 +156,13 @@ exit 2
 	if err := os.WriteFile(cliPath, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake claude: %v", err)
 	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	result := claudeProber{}.Check(
 		context.Background(),
 		config.Backend{},
 		config.Model{},
-		map[string]string{"CLAUDE_PATH": cliPath},
+		map[string]string{},
 	)
 	if result.Status != "ok" {
 		t.Fatalf("status = %q, want ok (detail=%q)", result.Status, result.Detail)

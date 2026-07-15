@@ -58,6 +58,12 @@ leave launch pending forever. The current generic transport-close diagnostics ar
 Codex chat resume, Claude terminal flags/hooks, and OpenCode/OpenHands launch flows require pinned,
 credentialed acceptance before a release claims those combinations.
 
+**R13 — Claude chat uses the official adapter boundary.** The `claude-acp` backend
+executes the pinned `claude-agent-acp` package entry point and speaks ACP protocol version 1. The
+adapter owns its compatible native Claude executable; AgentDeck passes provider configuration only
+through documented ACP session metadata and uses the adapter's `--cli` delegation for credential
+checks. Interactive terminal launch and hook settings remain a direct-Claude-CLI path.
+
 ## 3. Interfaces & data shapes
 
 - ACP: JSON-RPC messages over newline-delimited child stdin/stdout; adapter determines exact
@@ -88,7 +94,8 @@ credentialed acceptance before a release claims those combinations.
 ## 6. Traceability
 
 - ACP/runtime: `internal/runtime/chat.go`, `transport.go`, `event.go`, `permission.go`.
-- Adapters: `internal/backend/adapter.go`; credential checks in `internal/backend/credcheck`.
+- Adapters: `internal/backend/adapter.go`; credential checks in `internal/backend/credcheck`;
+  official Claude session metadata pinned by `TestClaudeSessionNewParamsUseMetaOptions`.
 - Hooks: `internal/hooks`, `internal/server/hook.go`, registration in `launch.go`.
 - MCP: `internal/messaging/messaging.go`, `tools.go`, `internal/server/messaging_registration.go`.
 - Terminal: `internal/runtime/terminal`, `internal/server/terminal.go`.

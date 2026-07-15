@@ -273,22 +273,11 @@ func (s *Server) hookEnv(agent state.Agent, token string) map[string]string {
 	}
 }
 
-// composeHookRegistration writes the per-agent CLI hook settings file (mapping
-// each lifecycle event to its installed script via the backend adapter's
-// hookMap) and returns the adapter's launch args that point the CLI at it.
-//
-// The settings file + AGENTDECK_* env are always prepared; whether the CLI-flag
-// passthrough (claude's `--settings`, codex TBD) is added depends on interface:
-//
-//   - terminal: ON by default. The terminal runtime (6.3) runs the *real*
-//     interactive CLI directly under a PTY (not claude-code-acp), where
-//     `--settings` is a known-good flag, and hooks are the ONLY status producer —
-//     so registration must be active for terminal status to flow over /api/hook.
-//   - chat: gated behind AGENTDECK_HOOK_REGISTRATION=1 (default off). Chat runs
-//     through claude-code-acp (whose `--settings` forwarding is unverified) AND
-//     does not need registration: the runtime owns chat status and the `_post.sh`
-//     interface gate self-suppresses redundant POSTs. Keeping it off avoids
-//     regressing the currently-green real chat-launch path with an unconfirmed flag.
+// composeHookRegistration writes the per-agent CLI hook settings artifact that
+// launch/stop/crash cleanup owns symmetrically. For terminal it also returns the
+// direct interactive CLI's --settings args. Chat runs through claude-agent-acp,
+// which does not accept a per-launch --settings file and already provides status
+// through ACP, so chat keeps the lifecycle artifact but receives no hook args.
 func (s *Server) composeHookRegistration(agent state.Agent, backendType string) ([]string, error) {
 	ad, ok := backend.For(backendType)
 	if !ok {
@@ -299,7 +288,7 @@ func (s *Server) composeHookRegistration(agent state.Agent, backendType string) 
 	if err != nil {
 		return nil, err
 	}
-	if agent.Interface != "terminal" && os.Getenv("AGENTDECK_HOOK_REGISTRATION") != "1" {
+	if agent.Interface != "terminal" {
 		return nil, nil
 	}
 	return ad.HookLaunchArgs(settingsPath), nil

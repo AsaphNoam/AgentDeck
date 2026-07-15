@@ -6,7 +6,7 @@
 //
 //	go test -tags acceptance ./internal/runtime -v
 //
-// Override the adapter binary with ACP_CMD (default: claude-code-acp on PATH).
+// Override the adapter binary with ACP_CMD (default: claude-agent-acp on PATH).
 // These verify the §12.1 assumed wire shapes AND the Appendix A acceptance
 // checklist (stream, permission gate, cancel, stop) against reality. Any wire
 // drift is fixed in acpmap.go alone (the §12.1 isolation rule keeps it localized).
@@ -29,7 +29,7 @@ func acceptanceCmd() string {
 	if v := os.Getenv("ACP_CMD"); v != "" {
 		return v
 	}
-	return "claude-code-acp"
+	return "claude-agent-acp"
 }
 
 // startRealAgent spins up a ChatRuntime against the real adapter, seeds an
