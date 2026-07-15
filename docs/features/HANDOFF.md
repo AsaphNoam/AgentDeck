@@ -76,6 +76,8 @@ No must-fix findings. Future ideas and known product improvements are in
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
+- 2026-07-15 — Added a collaborative feature-design workflow that turns one idea into confirmed
+  planned specifications and a ready change without starting implementation.
 - 2026-07-14 — Codex backends can opt into `autosync_models`: on startup AgentDeck add-only merges
   the Codex CLI's `models_cache.json` into the catalog (FS-09.R28/A8). Claude autosync stays an idea.
 - 2026-07-15 — Confirmed detached federation import remains deliberately unshipped: `detach=true`

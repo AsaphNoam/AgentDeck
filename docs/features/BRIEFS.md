@@ -1,8 +1,25 @@
 # AgentDeck — Session briefs
 
-Newest first. Each entry is the exact final response from an implementation, review, fix-review, or
-usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
+Newest first. Each entry is the exact final response from a feature-design, implementation, review,
+fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
+
+### 2026-07-15 — feature design workflow
+
+The new `/design-feature` skill turns either a prompted idea, a named recorded idea, or—when no idea
+is given—the first item under “New ideas” into implementation-ready work. It first collaborates with
+you on the product behavior and acceptance criteria, then pauses for your confirmation before writing
+the technical design. Meaningful architectural tradeoffs come back to you with options and a
+recommendation instead of being decided silently.
+
+A completed run leaves planned feature and technical specifications plus a ready-change file. It
+does not write product code or mark implementation as started, and it will leave the idea in design
+instead of calling it ready while an important decision is unresolved.
+
+**Needs attention:** None.
+
+**Next:** Invoke `/design-feature` with an idea, the title of an existing idea, or no argument to
+start with the first new idea.
 
 ### 2026-07-15 — verification status clarified
 

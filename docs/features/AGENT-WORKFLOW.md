@@ -62,7 +62,7 @@ At the end of a session, either leave a verified commit or clearly describe unfi
 
 ## 6. Human update
 
-Every implementation, review, fix, and usability-review session adds one short update to [`BRIEFS.md`](BRIEFS.md) and sends that exact text as the final response.
+Every feature-design, implementation, review, fix, and usability-review session adds one short update to [`BRIEFS.md`](BRIEFS.md) and sends that exact text as the final response.
 
 Write for the person who asked for the work, not for the next agent. Use plain language. Explain a project abbreviation the first time it matters, or leave it out. Do not use internal process labels, requirement-ID strings, commit hashes, command inventories, or changed-file lists unless the person needs one to act. The handoff holds the internal detail.
 
@@ -113,3 +113,27 @@ Specifications describe shipped behavior and architecture. Requirement IDs are a
 Tests, commits, and review findings should cite a requirement ID only when that link helps someone find the rule being checked. The specification checker verifies the mechanics of these links, but people still need to judge whether the text and code agree.
 
 Build and fix sessions edit specifications. Review sessions report missing or incorrect specification coverage; usability reviews report observed behavior and do not edit specifications.
+
+## 11. Design a feature
+
+`/design-feature` turns one new or recorded idea into work that is ready to implement. It changes
+specifications and planning documents, not product code.
+
+1. Use the idea named by the user. If none is named, take the first entry under `New ideas` in
+   `docs/ideas.md`; this explicit default is the only time an agent selects future work itself.
+2. Move the idea to `Ideas being defined` and work with the user to understand its outcome, scope,
+   exclusions, edge cases, compatibility, and acceptance criteria.
+3. Draft the feature specification first. Extend an existing FS when it already owns the capability;
+   create a new one only for a distinct capability. Mark every unshipped requirement `(planned)`.
+4. Summarize the feature behavior and wait for the user's confirmation before designing the
+   architecture.
+5. Draft the matching technical specification. Read the relevant code and invariants first. For a
+   non-trivial tradeoff, explain the options and recommendation and wait for the user's decision;
+   do not silently choose security, privacy, persistence, compatibility, migration, or protocol
+   boundaries.
+6. When both specifications are complete, create a descriptive file in `docs/ready-changes/` with
+   the exact requirements and acceptance evidence, remove the source idea, and run the documentation
+   checks. Do not make the change active in `HANDOFF.md`; implementation has not started.
+
+If a material decision remains unresolved, leave the idea under `Ideas being defined` and do not
+call it ready. Keep partial specifications honest and record what is needed from the user.
