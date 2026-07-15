@@ -4,6 +4,14 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-15 — implementation: no active change
+
+There is no active change to implement, so no product work was started. The repository is clean and the next implementation must be selected explicitly from the ready changes.
+
+**Needs attention:** Choose which ready change to start.
+
+**Next:** Name a ready change, then run `/work-phase` again.
+
 ### 2026-07-15 — feature design: project shared resources ready
 
 Project shared resources are now fully designed and waiting to build. Every project will get one
