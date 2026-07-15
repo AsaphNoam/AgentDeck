@@ -50,6 +50,9 @@ None.
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
+- 2026-07-15 — Renamed the explicit build/finding-fix commands to `/work` and `/fix`. `/work`
+  now finds the sole waiting ready change (or asks the user to choose when several wait), so an
+  explicit request no longer reports no work while implementable work is available.
 - 2026-07-15 — Defined the waiting project shared-resources change: every project will receive an
   AgentDeck-owned owner-only folder outside its repository, injected consistently into agent
   launches and retained after project deletion. It is ready to start and is not active work.
