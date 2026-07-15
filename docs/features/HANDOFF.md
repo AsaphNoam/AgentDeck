@@ -6,11 +6,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
-- **Active change:** none. Changes approved to start live in
-  [`../ready-changes/`](../ready-changes/README.md), not here. An agent does not choose work from
-  [`../ideas.md`](../ideas.md) on its own.
-- **Relevant requirements:** [`../specs/README.md`](../specs/README.md) and the FS/TS/INV items selected
-  for the next change.
+- **Active change:** macOS release installer (in progress). Change file:
+  [`../ready-changes/macos-release-installer.md`](../ready-changes/macos-release-installer.md);
+  sequencing plan: [`../plans/macos-release-installer.md`](../plans/macos-release-installer.md).
+- **Relevant requirements:** FS-10.R1–R14, TS-05.R12, TS-06.R13–R21, INV §9, INV §10.
 - **State:** GREEN. On 2026-07-15 `make check-specs`, `make test` (both Go variants), `make build`,
   and `make dist` passed for the official Claude adapter migration. The pinned 0.59.0 package
   manifest and entry point were inspected; credentialed provider acceptance remains gated.
@@ -20,21 +19,18 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current change detail
 
-No change is in progress. When an agent starts a change from
-[`../ready-changes/`](../ready-changes/README.md), replace this paragraph with:
+- **Change:** macOS release installer (`docs/ready-changes/macos-release-installer.md`).
+- **Why now:** direct human request to work the ready change.
+- **Relevant requirements:** FS-10.R1–R14, TS-05.R12, TS-06.R13–R21, INV §9, INV §10.
+- **Done when:** FS-10.A1–A6 automated portions pass; `(planned)` tags flipped for shipped slices;
+  credentialed provider runs remain manual gates.
 
-```md
-- **Change:** <descriptive-file-name>
-- **Why now:** direct human request or a link to `docs/ideas.md`
-- **Relevant requirements:** FS-nn.Rk, TS-nn.Rk, INV §n
-- **Done when:** <observable completion and required verification>
+Sequencing lives in [`../plans/macos-release-installer.md`](../plans/macos-release-installer.md)
+(9 slices). Progress:
 
-- [ ] <bounded next step>
-```
-
-Defining an idea drafts a proposal but changes no product code. A ready change is created after its FS/TS
-update is adequate; the handoff begins only when implementation actually starts. Plans order work;
-specifications define what the product must do.
+- [x] Slice 1 — `internal/release` layout & activation core.
+- [ ] Slice 2 — archive/manifest/verification. ← next
+- [ ] Slices 3–9 — wrapper/shim, install+bootstrap, update/rollback, auth, interactive UX, CI, docs.
 
 ## Decisions needing your input
 
