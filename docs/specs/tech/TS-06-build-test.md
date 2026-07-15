@@ -1,7 +1,7 @@
 # TS-06 — Build, test & delivery
 
-**Status:** Current
-**Code:** `Makefile`, `go.mod`, `ui`, `internal/server/ui`, `install.sh`, `scripts`, `.github/workflows`
+**Status:** Partial
+**Code:** `Makefile`, `go.mod`, `ui`, `internal/server/ui`, `install.sh`, `scripts/`, `internal/cli/`, `.github/workflows`
 **Absorbed:** build/test sections in the [phase archive manifest](../../archive/phases/README.md) and contributor guidance formerly duplicated in [`CLAUDE.md`](../../../CLAUDE.md)
 
 ## 1. Scope
@@ -11,8 +11,8 @@ verification, spec linting, and test conventions.
 
 ## 2. Design & constraints
 
-**R1 — The declared toolchains are authoritative.** Go follows `go.mod` (currently Go 1.25); Node
-20 is the shared UI/CI baseline. Node is build-time only for a prebuilt AgentDeck binary.
+**R1 — retired 2026-07-15:** This described the source-build toolchain before the planned private
+Node runtime in R13. Source-build requirements remain part of R13.
 
 **R2 — Release builds enable FTS5.** Every distributed Go build uses the `sqlite_fts5` tag. The
 untagged path remains supported solely as the tested metadata-search fallback; a release command
@@ -46,13 +46,76 @@ and cancels superseded runs; it does not rewrite embedded tracked output.
 `AGENTDECK_HOME`, deterministic fake ACP peers, in-process HTTP handlers, and fixtures. Credentialed
 real-CLI acceptance is an explicit manual gate and never silently substitutes for automated tests.
 
-**R10 — Distribution remains a single local binary.** The install path may install optional ACP
-adapters, but the AgentDeck server/UI/MCP runtime itself requires no Node or Python process.
+**R10 — retired 2026-07-15:** This single-binary delivery assumption is superseded for the planned
+macOS release by R13–R21. Source-built AgentDeck remains a single Go binary.
 
 **R12 — Source installs pin the official Claude adapter.** When `INSTALL_ACP=1`,
 `install.sh` installs the exact reviewed `@agentclientprotocol/claude-agent-acp` version and checks
 for its Node 22 runtime floor. Ordinary source builds keep Node 20 as their UI-only baseline and do
 not mutate global adapter installations unless explicitly requested.
+
+**R13** `(planned)` — The release build has two supported delivery forms with separate contracts:
+source builds follow `go.mod` and the Node 20 UI/CI baseline, while the GitHub Releases MVP targets
+only `darwin/arm64` and ships a private Node 22-or-newer runtime. Every release AgentDeck binary is
+built with `sqlite_fts5`; an untagged binary is never packaged as a release runtime.
+
+**R14** `(planned)` — Release assembly is deterministic from a versioned packaging manifest and
+lockfile that pin the Node distribution, `@agentclientprotocol/claude-agent-acp`,
+`@agentclientprotocol/codex-acp`, and their runtime dependency closure. The release job verifies
+those pinned inputs before it creates an archive; an installer never runs npm, resolves a package
+range, builds the UI, or compiles Go on a recipient's Mac.
+
+**R15** `(planned)` — A release archive contains only this versioned layout:
+
+```text
+agentdeck-<version>-darwin-arm64/
+  bin/agentdeck                 # wrapper
+  libexec/agentdeck             # FTS5 Go binary
+  runtime/node/bin/node
+  runtime/node_modules/.bin/{claude-agent-acp,codex-acp}
+  runtime/                      # pinned adapter dependency closure
+  manifest.json                 # version, target, component versions and archive identity
+```
+
+The wrapper prepends only its `runtime/node/bin` and `runtime/node_modules/.bin` to the child PATH
+before executing `libexec/agentdeck`, leaving the remaining user PATH available to provider tooling.
+It does not use a globally installed Node or ACP adapter. Source builds retain their existing PATH
+behavior.
+
+**R16** `(planned)` — The installer places immutable version directories below
+`~/Library/Application Support/AgentDeck/versions/`, keeps the selected version through a `current`
+pointer, and exposes one stable user command shim. That application root is distinct from
+`AGENTDECK_HOME`; release assembly, install, update, rollback, and uninstall must never write user
+configuration, state, transcripts, or credentials there.
+
+**R17** `(planned)` — A GitHub Release publishes the archive, a SHA-256 checksum, and a small
+machine-readable manifest naming the exact version, `darwin-arm64` target, archive filename, size,
+and checksum. The installer and updater download to a same-filesystem staging directory, verify the
+checksum and internal manifest/layout before activation, then atomically install the version and
+switch `current`. No partial directory is reachable through the stable command.
+
+**R18** `(planned)` — Release activation retains the immediately preceding verified version as
+`previous`. `agentdeck update --rollback` atomically restores that version. A failed update, failed
+rollback, or an installer interrupted before activation leaves the old `current` pointer intact;
+activation never signals or replaces a running dashboard process.
+
+**R19** `(planned)` — `agentdeck update` is the only update mechanism. It obtains release metadata
+only when explicitly invoked, supports check-only/non-interactive confirmation behavior from
+FS-10.R7, and performs no background check, download, telemetry, or update. Concurrent installer or
+update invocations serialize around one install root; a contender exits without changing it.
+
+**R20** `(planned)` — Guided authentication is implemented as a CLI delegation boundary, not an
+installer credential protocol. `agentdeck auth claude|codex` resolves the selected private adapter
+and its compatible provider login path, attaches it to the caller's terminal, and returns a bounded
+success/cancel/failure result. It accepts no credential value flags, writes no credential material to
+the application runtime, and does not log child stdout/stderr except sanitized actionable failure
+detail. Interactive install may invoke this command; non-interactive install never does.
+
+**R21** `(planned)` — Release CI verifies archive contents, FTS5 tagging, pinned component versions,
+private-wrapper resolution, checksum rejection, fresh-home installation, explicit update/rollback,
+no-start/non-interactive behavior, and preservation of a pre-existing `AGENTDECK_HOME`. It runs the
+automated portion on a macOS arm64 runner or equivalent arm64 macOS environment. Credentialed Claude
+and Codex login/chat checks remain manual gates and cannot be represented as release CI success.
 
 ## 3. Interfaces & data shapes
 
@@ -81,12 +144,18 @@ shared target guarantees.
 - Credentialed Claude, Codex, OpenCode, and OpenHands acceptance remains manual/gated. Specs label
   affected claims rather than treating fake-provider success as real-provider certification.
 - Release/install documentation has historically drifted from actual optional adapter and shell-tool
-  prerequisites; README and install changes must now be reviewed against R1, R2, and R10.
+  prerequisites; README, source-install, and release-installer changes must now be reviewed against
+  R12–R21.
+- The macOS MVP deliberately has no signing, notarization, Homebrew formula, Intel build, Windows or
+  Linux archive. TS-05.R12 records the resulting delivery-trust limitation rather than implying a
+  publisher-authentication guarantee.
 
 ## 6. Traceability
 
-- Toolchains/targets and the pinned optional Claude adapter: `go.mod`, `ui/package.json`, `Makefile`,
+- Source toolchains/targets and the optional Claude adapter: `go.mod`, `ui/package.json`, `Makefile`,
   `install.sh`.
+- Planned release assembly/installer/update: `scripts/release/`, `internal/cli/`, release workflow,
+  `README.md` (FS-10).
 - Spec lint: `scripts/check-specs.sh`.
 - CI: `.github/workflows/ci.yml`.
 - Fake integration peer: `internal/runtime/testdata/fakeacp`, server integration tests.
