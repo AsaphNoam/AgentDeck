@@ -63,3 +63,4 @@ jobs:
           files: |
             dist/release/agentdeck-*-darwin-arm64.tar.gz
             dist/release/manifest.json
+            scripts/release/install.sh

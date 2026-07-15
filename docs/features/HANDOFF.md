@@ -6,31 +6,13 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
-- **Active change:** macOS release installer (in progress). Change file:
-  [`../ready-changes/macos-release-installer.md`](../ready-changes/macos-release-installer.md);
-  sequencing plan: [`../plans/macos-release-installer.md`](../plans/macos-release-installer.md).
-- **Relevant requirements:** FS-10.R1–R14, TS-05.R12, TS-06.R13–R21, INV §9, INV §10.
-- **State:** GREEN. On 2026-07-15 `make check-specs`, `make test` (both Go variants), `make build`,
-  and `make dist` passed for the official Claude adapter migration. The pinned 0.59.0 package
-  manifest and entry point were inspected; credentialed provider acceptance remains gated.
+- **Active change:** none.
+- **State:** GREEN. On 2026-07-15 the completed macOS release installer passed `make check-specs`,
+  `make test` (both Go variants), `make build`, and `make dist`. Credentialed provider acceptance
+  remains a manual gate.
 - **Last reviewed code:** `4036e78` (2026-07-12). The later fixes addressed every must-fix finding
   from that review; no must-fix finding is currently open.
 - **Branch:** `main`.
-
-## Current change detail
-
-- **Change:** macOS release installer (`docs/ready-changes/macos-release-installer.md`).
-- **Why now:** direct human request to work the ready change.
-- **Relevant requirements:** FS-10.R1–R14, TS-05.R12, TS-06.R13–R21, INV §9, INV §10.
-- **Done when:** FS-10.A1–A6 automated portions pass; `(planned)` tags flipped for shipped slices;
-  credentialed provider runs remain manual gates.
-
-Sequencing lives in [`../plans/macos-release-installer.md`](../plans/macos-release-installer.md)
-(9 slices). Progress:
-
-- [x] Slice 1 — `internal/release` layout & activation core.
-- [ ] Slice 2 — archive/manifest/verification. ← next
-- [ ] Slices 3–9 — wrapper/shim, install+bootstrap, update/rollback, auth, interactive UX, CI, docs.
 
 ## Decisions needing your input
 
@@ -72,6 +54,10 @@ No must-fix findings. Future ideas and known product improvements are in
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
+- 2026-07-15 — Shipped the Apple-silicon macOS GitHub Releases installer: verified private Node and
+  Claude/Codex ACP runtime, guided sign-in, stable shim, explicit update/rollback, no-start mode,
+  release assembly/publish workflow, and release documentation. Automated checks are green; real
+  provider sign-in remains credential-gated.
 - 2026-07-15 — Claude chat and credential checks now target the pinned official
   `@agentclientprotocol/claude-agent-acp` package; source installs enforce its Node 22 floor.
 - 2026-07-15 — Defined the waiting macOS arm64 GitHub Releases installer change: a private Node and

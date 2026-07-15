@@ -4,6 +4,18 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-15 — implementation: macOS release installer
+
+AgentDeck can now be installed from a macOS Apple-silicon GitHub Release without a source checkout,
+Go, Node, npm, or global ACP adapters. The installer verifies the release archive, keeps the app
+runtime separate from your AgentDeck data, offers guided provider sign-in, and supports explicit
+update, check, and rollback commands. Release publishing now builds and verifies the private runtime
+and documents the intentional no-signing/no-notarization and Gatekeeper limitations.
+
+**Needs attention:** A real Claude or Codex sign-in is still a credentialed manual acceptance check.
+
+**Next:** Publish a version tag when a release is ready for friends to install.
+
 ### 2026-07-15 — feature design: macOS release installer
 
 The installer is now fully specified and ready to build for Apple-silicon Macs. It will download a GitHub Release containing AgentDeck, its own Node runtime, and the official Claude and Codex adapters, so friends will not need a repository, Go, npm, or globally installed adapters. It keeps the app runtime separate from your existing AgentDeck data, offers provider sign-in without handling credentials itself, starts the dashboard after an interactive install, and supports manual check, update, and rollback commands.

@@ -20,11 +20,12 @@ type authProvider struct {
 	name        string
 	command     string
 	args        []string
+	statusArgs  []string
 	loginEnvVar string // overrides "command arg arg..." for the gated verifier
 }
 
 var authProviders = map[string]authProvider{
-	"claude": {name: "Claude", command: "claude-agent-acp", args: []string{"--cli", "auth", "login"}, loginEnvVar: "AGENTDECK_CLAUDE_LOGIN_CMD"},
+	"claude": {name: "Claude", command: "claude-agent-acp", args: []string{"--cli", "auth", "login"}, statusArgs: []string{"--cli", "auth", "status"}, loginEnvVar: "AGENTDECK_CLAUDE_LOGIN_CMD"},
 	"codex":  {name: "Codex", command: "codex-acp", args: []string{"login"}, loginEnvVar: "AGENTDECK_CODEX_LOGIN_CMD"},
 }
 
@@ -59,9 +60,27 @@ var authCommandFor = func(p authProvider) (*exec.Cmd, error) {
 	return c, nil
 }
 
+// authStatusCommandFor is separate from the login factory because a readiness
+// check must not inherit a test or operator login override. It keeps its output
+// out of AgentDeck's logs while the provider examines its own credential store.
+var authStatusCommandFor = func(p authProvider) (*exec.Cmd, error) {
+	path, err := exec.LookPath(p.command)
+	if err != nil {
+		return nil, fmt.Errorf("the %s sign-in tool %q was not found on PATH", p.name, p.command)
+	}
+	if len(p.statusArgs) == 0 {
+		return nil, fmt.Errorf("the %s adapter does not provide a non-interactive readiness check", p.name)
+	}
+	c := exec.Command(path, p.statusArgs...)
+	c.Stdin = nil
+	c.Stdout, c.Stderr = os.Stderr, os.Stderr
+	return c, nil
+}
+
 // newAuthCmd builds `agentdeck auth <claude|codex>`.
 func newAuthCmd() *cobra.Command {
-	return &cobra.Command{
+	var check bool
+	cmd := &cobra.Command{
 		Use:           "auth <claude|codex>",
 		Short:         "Sign in to a provider by delegating to its own login flow",
 		Args:          cobra.ExactArgs(1),
@@ -72,9 +91,28 @@ func newAuthCmd() *cobra.Command {
 			if !ok {
 				return fmt.Errorf("unknown provider %q; use 'claude' or 'codex'", args[0])
 			}
+			if check {
+				return runAuthCheck(cmd, p)
+			}
 			return runAuth(cmd, p)
 		},
 	}
+	cmd.Flags().BoolVar(&check, "check", false, "only check whether the provider is ready")
+	_ = cmd.Flags().MarkHidden("check")
+	return cmd
+}
+
+func runAuthCheck(cmd *cobra.Command, p authProvider) error {
+	c, err := authStatusCommandFor(p)
+	if err == nil {
+		err = c.Run()
+	}
+	if err == nil {
+		fmt.Fprintf(cmd.OutOrStdout(), "%s is ready.\n", p.name)
+		return nil
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "%s needs sign-in. Run 'agentdeck auth %s' to continue.\n", p.name, strings.ToLower(p.name))
+	return errAuthFailed
 }
 
 // runAuth delegates sign-in to the provider's own flow and reports a truthful,

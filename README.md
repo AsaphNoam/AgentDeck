@@ -17,6 +17,36 @@ acceptance gates; see [the live handoff](docs/features/HANDOFF.md). Contributors
 New product ideas belong in [ideas and improvements](docs/ideas.md). Once specified and approved to
 start, a change lives in [ready changes](docs/ready-changes/README.md).
 
+## Install a macOS release
+
+AgentDeck releases currently support **Apple-silicon Macs only**. They include the AgentDeck binary,
+private Node runtime, and pinned Claude/Codex ACP adapters—no repository checkout, Go, Node, npm,
+Homebrew, administrator access, or global adapter installation is needed.
+
+```sh
+curl -fsSL https://github.com/AsaphNoam/AgentDeck/releases/latest/download/install.sh | bash
+```
+
+Pass `--version X.Y.Z` to select a release, `--no-start` to install without launching the dashboard,
+or `--non-interactive` for scripts. The installer verifies the release archive against its published
+SHA-256 manifest before activation. It may offer to add its one command directory to your zsh profile
+and to sign in to Claude; it never collects credentials itself. After installation, use:
+
+```sh
+agentdeck auth claude       # or: agentdeck auth codex
+agentdeck dashboard start --detach
+agentdeck dashboard open
+agentdeck update --check
+agentdeck update            # asks before downloading
+agentdeck update --yes      # non-interactive update
+agentdeck update --rollback
+```
+
+Release artifacts are intentionally **not code-signed or notarized**. macOS may ask you to approve
+an unidentified developer on first open. Do not bypass Gatekeeper or enter an administrator password
+for AgentDeck—the installer never asks for either. Published checksums detect corruption, but without
+signing they do not independently authenticate a compromised release account or manifest.
+
 ## Prerequisites
 
 - **Go 1.25** — server / single binary (authoritative version: `go.mod`)
@@ -70,6 +100,8 @@ cd ui && npm ci && npm run dev   # http://localhost:5173
 | `agentdeck dashboard start [--port N] [--detach]` | start the server (foreground or backgrounded) |
 | `agentdeck dashboard stop` | stop the server via pidfile |
 | `agentdeck dashboard open` | open the UI in the default browser |
+| `agentdeck auth <claude\|codex>` | run the selected private adapter's provider sign-in flow |
+| `agentdeck update [--check\|--yes\|--rollback]` | explicitly check, install, or roll back a release |
 | `agentdeck <role>@<project> [--backend B] [--model M] [--name N]` | launch an agent (resumes a single inactive match by default; `--new` forces a fresh one) |
 | `agentdeck resume <agent_id>` | resume a specific inactive persisted session |
 | `agentdeck reindex` | rebuild the archive search index from `sessions/` |

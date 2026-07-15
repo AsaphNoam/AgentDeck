@@ -125,7 +125,9 @@ curl -fsSL --proto '=https' "${dl}/${tag}/manifest.json" -o "${staging}/manifest
   || die "download failed for the release manifest of ${tag}"
 
 # --- Verify checksum before touching anything (TS-05.R12) ------------------
-want="$(grep '"sha256"' "${staging}/manifest.json" | head -1 | cut -d'"' -f4)"
+# The manifest may be compact one-line JSON or pretty-printed JSON. Extract the
+# named field rather than relying on its position among other quoted fields.
+want="$(sed -n 's/.*"sha256"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "${staging}/manifest.json" | head -1)"
 [ -n "$want" ] || die "release manifest is missing a sha256 field"
 got="$(shasum -a 256 "${staging}/${archive_name}" | cut -d' ' -f1)"
 if [ "$want" != "$got" ]; then
@@ -166,9 +168,13 @@ if ! on_path "${app_root}/bin"; then
   fi
 fi
 
-if [ "$INTERACTIVE" = "1" ] && confirm "Sign in to Claude now?"; then
-  if ! "$shim" auth claude; then
-    echo "Claude sign-in did not complete. Installation succeeded; retry with: \"${shim}\" auth claude"
+if [ "$INTERACTIVE" = "1" ]; then
+  if "$shim" auth claude --check; then
+    : # already signed in
+  elif confirm "Sign in to Claude now?"; then
+    if ! "$shim" auth claude; then
+      echo "Claude sign-in did not complete. Installation succeeded; retry with: \"${shim}\" auth claude"
+    fi
   fi
 fi
 
