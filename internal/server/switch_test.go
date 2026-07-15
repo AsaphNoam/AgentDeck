@@ -225,13 +225,15 @@ func TestSwitchRuntimePrimerKeepsFrozenSystemPrompt(t *testing.T) {
 	srv, ts := switchTestServer(t)
 	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
 
-	// The frozen snapshot at launch: joinSystemPrompt(project.ContextPrompt="",
-	// role "impl".SystemPrompt="be helpful") == "be helpful".
+	// The frozen snapshot at launch is joinSystemPrompt(project.ContextPrompt="",
+	// role "impl".SystemPrompt="be helpful", project-resources instruction): it leads
+	// with the role persona and carries the shared-resources instruction (FS-11.R3).
 	original, err := srv.stateStore.ReadSession(id)
 	if err != nil {
 		t.Fatalf("ReadSession(original): %v", err)
 	}
-	if original.SystemPrompt != "be helpful" {
+	if !strings.HasPrefix(original.SystemPrompt, "be helpful") ||
+		!strings.Contains(original.SystemPrompt, "Shared project resources:") {
 		t.Fatalf("unexpected original system_prompt: %q", original.SystemPrompt)
 	}
 

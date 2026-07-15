@@ -1,10 +1,14 @@
 import React from "react";
-import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
 import { ProjectsEditor } from "./ProjectsEditor";
+
+// The server always sends the read-only resource_dir on every project payload
+// (TS-03.R12); the mock mirrors that so tests exercise the real shape (INV §11).
+const RESOURCE_DIR = "/home/u/.agentdeck/project-resources/my-app";
 
 const server = setupServer(
   http.get("/api/projects", () =>
@@ -15,6 +19,7 @@ const server = setupServer(
         cwd: "/tmp/my-app",
         add_dirs: [],
         context_prompt: "",
+        resource_dir: RESOURCE_DIR,
       },
     }),
   ),
@@ -74,6 +79,28 @@ describe("ProjectsEditor", () => {
 
     await waitFor(() => expect(calls).toBeGreaterThan(1));
     expect(await screen.findByText("Billing")).toBeInTheDocument();
+  });
+
+  it("shows the read-only shared-resources path when editing (FS-11.R4)", async () => {
+    renderWithQuery(<ProjectsEditor />);
+    await screen.findByText("My App");
+    fireEvent.click(screen.getByText("Edit"));
+
+    const field = (await screen.findByDisplayValue(RESOURCE_DIR)) as HTMLInputElement;
+    expect(field.readOnly).toBe(true);
+    expect(screen.getByText(/outside the repository/i)).toBeInTheDocument();
+  });
+
+  it("delete confirmation states the resources directory is retained (FS-11.R5)", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    try {
+      renderWithQuery(<ProjectsEditor />);
+      await screen.findByText("My App");
+      fireEvent.click(screen.getByText("Delete"));
+      expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining(RESOURCE_DIR));
+    } finally {
+      confirmSpy.mockRestore();
+    }
   });
 
   it("closes dialog on success even when cwd_not_found warnings are present", async () => {

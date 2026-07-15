@@ -1,6 +1,6 @@
 # TS-05 — Security & trust boundaries
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/server`, `internal/config`, `internal/configsource`, `internal/runtime`, `internal/messaging`, `internal/backend`
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md), the [phase archive manifest](../../archive/phases/README.md), and [`INVARIANTS.md`](../../features/INVARIANTS.md) §14
 
@@ -57,7 +57,7 @@ lines, CLI stderr, and MCP input are parsed as data and use boundary-specific va
 They cannot choose sender identity, HTML execution, or log format unchecked. Existing record/tool
 limits remain binding; TS-03 records the missing uniform HTTP-body bound.
 
-**R13** `(planned)` — A project-resources leaf is an AgentDeck-owned owner-only directory selected
+**R13** — A project-resources leaf is an AgentDeck-owned owner-only directory selected
 solely by a validated project id under AgentDeck home; it is never resolved from `cwd`, `add_dirs`,
 title, or client input. AgentDeck rejects an existing resource parent or leaf symlink/non-directory
 instead of following it. Its path may appear as non-secret launch/UI metadata, but its contents are
@@ -107,7 +107,7 @@ Their concrete payloads are owned by TS-03, TS-04, and TS-07.
 - Tokens/identity: `internal/state/manager.go`, `internal/messaging/messaging.go`,
   `internal/server/messaging_registration.go`.
 - Modes/path validation: `internal/config/atomic.go`, `validate.go`, `internal/configsource`.
-- Project-resource containment (planned): `internal/config` project-resource helper and
+- Project-resource containment: `internal/config` project-resource helper and
   `internal/server` project/lifecycle composers.
 - Env/redaction: `internal/server/launch.go`, `internal/runtime/chat.go`,
   `internal/configsource/security.go`.

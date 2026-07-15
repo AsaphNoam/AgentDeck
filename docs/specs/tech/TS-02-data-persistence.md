@@ -1,6 +1,6 @@
 # TS-02 — Data & persistence
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/config`, `internal/state`, `internal/transcript`, `internal/index`, `internal/archive`, `internal/configsource`
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -62,7 +62,7 @@ error. Behavior differences are explicitly specified by FS-05.
 state live in SQLite. A send either stores the message and updates its budget atomically or stores
 nothing; readers return newest-first bounded results as specified by FS-06.
 
-**R13** `(planned)` — Project resources are opaque filesystem data at
+**R13** — Project resources are opaque filesystem data at
 `$AGENTDECK_HOME/project-resources/{project-id}/`, not JSON configuration, SQLite state, a cache,
 or an index. `internal/config` owns one shared helper that validates the project id, returns the
 absolute path, and ensures the parent and leaf directories exist as owner-only directories. It
@@ -123,7 +123,7 @@ R1–R13 and must be reflected here when its contract changes.
 ## 6. Traceability
 
 - Config: `internal/config/atomic.go`, `seed.go`, `validate.go`, `types.go`.
-- Project resources (planned): `internal/config` path/layout helpers; project CRUD and lifecycle
+- Project resources: `internal/config` path/layout helpers; project CRUD and lifecycle
   composers in `internal/server`.
 - Schema/migrations: `internal/state/migrate.go`, `schema.go`, `state.go`, `running.go`, `session.go`.
 - Transcript: `internal/transcript/writer.go`, `reader.go`; runtime append in

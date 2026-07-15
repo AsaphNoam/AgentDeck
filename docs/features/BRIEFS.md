@@ -4,6 +4,23 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-15 — implementation: project shared resources
+
+Every project now gets its own AgentDeck-owned folder that lives outside the project's code
+repository, so agents have a reliable place to leave and reuse working material (specs, guides,
+research, test results) without any risk of it becoming an accidental commit. The folder is created
+when you make a project and is handed to every agent you launch — as an accessible directory, an
+environment variable, and a short instruction — while the agent still works in your actual project
+directory. Its path shows up in Settings as a read-only value you can copy, and deleting a project
+leaves the folder in place (Settings tells you the retained path first) so no saved work is lost by
+accident. The folder is owner-only and its contents are never read into the dashboard, its API, or
+logs; only the path is shown.
+
+**Needs attention:** None.
+
+**Next:** Nothing required. The one open item elsewhere is still the macOS installer flag fix
+(`/fix`) before a release.
+
 ### 2026-07-15 — review: macOS installer locking
 
 The updated macOS installer can lose explicit no-start and non-interactive choices when it restarts

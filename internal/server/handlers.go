@@ -99,7 +99,8 @@ func (s *Server) handleRoles(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, roles)
 }
 
-// handleProjects returns the project map.
+// handleProjects returns the project map, each value enriched with the
+// server-computed read-only resource_dir path (TS-03.R12).
 func (s *Server) handleProjects(w http.ResponseWriter, _ *http.Request) {
 	projects, err := s.configStore.ListProjects()
 	if err != nil {
@@ -107,7 +108,11 @@ func (s *Server) handleProjects(w http.ResponseWriter, _ *http.Request) {
 		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
-	writeJSON(w, http.StatusOK, projects)
+	out := make(map[string]projectResponse, len(projects))
+	for id, p := range projects {
+		out[id] = s.toProjectResponse(id, p, nil)
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 // handleBackends returns backends.json, falling back to the in-memory default on

@@ -37,17 +37,17 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-08 | [features/FS-08-federation.md](features/FS-08-federation.md) | Partial | Claude/Codex configuration federation: sources, binding modes, effective view |
 | FS-09 | [features/FS-09-backends.md](features/FS-09-backends.md) | Partial | Backend/model catalog, credential checks, per-backend capability matrix |
 | FS-10 | [features/FS-10-macos-installation.md](features/FS-10-macos-installation.md) | Current | macOS release installation, guided provider setup, explicit updates and rollback |
-| FS-11 | [features/FS-11-project-resources.md](features/FS-11-project-resources.md) | Partial | AgentDeck-owned, project-scoped shared resources outside repositories |
+| FS-11 | [features/FS-11-project-resources.md](features/FS-11-project-resources.md) | Current | AgentDeck-owned, project-scoped shared resources outside repositories |
 
 ### Technical specs
 
 | ID | Spec | Status | Covers |
 |----|------|--------|--------|
 | TS-01 | [tech/TS-01-architecture.md](tech/TS-01-architecture.md) | Partial | Process model, package boundaries, runtime abstraction, source-of-truth rules |
-| TS-02 | [tech/TS-02-data-persistence.md](tech/TS-02-data-persistence.md) | Partial | SQLite schema & migrations, config files, transcripts, FTS index |
-| TS-03 | [tech/TS-03-http-api.md](tech/TS-03-http-api.md) | Partial | REST surface, error envelope, SSE contract, status codes |
+| TS-02 | [tech/TS-02-data-persistence.md](tech/TS-02-data-persistence.md) | Current | SQLite schema & migrations, config files, transcripts, FTS index |
+| TS-03 | [tech/TS-03-http-api.md](tech/TS-03-http-api.md) | Current | REST surface, error envelope, SSE contract, status codes |
 | TS-04 | [tech/TS-04-integration-protocols.md](tech/TS-04-integration-protocols.md) | Partial | ACP, hooks, MCP messaging, PTY/WebSocket, external-CLI tolerance |
-| TS-05 | [tech/TS-05-security.md](tech/TS-05-security.md) | Partial | Loopback boundary, tokens, file modes, permission model, release-install trust notes |
+| TS-05 | [tech/TS-05-security.md](tech/TS-05-security.md) | Current | Loopback boundary, tokens, file modes, permission model, release-install trust notes |
 | TS-06 | [tech/TS-06-build-test.md](tech/TS-06-build-test.md) | Current | Build tags, embed pipeline, release runtime, install, test strategy & conventions |
 | TS-07 | [tech/TS-07-federation.md](tech/TS-07-federation.md) | Partial | Native configuration authority, resolvers, consent, freshness, redaction, launch freezing |
 | INV | [../features/INVARIANTS.md](../features/INVARIANTS.md) | Current | Bug-class constraint catalog (path kept stable for hooks/history) |

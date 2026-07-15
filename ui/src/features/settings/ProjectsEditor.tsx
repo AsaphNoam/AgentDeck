@@ -64,8 +64,13 @@ export function ProjectsEditor() {
     }
   }
 
-  function handleDelete(id: string) {
-    if (!confirm(`Delete project "${id}"?`)) return;
+  function handleDelete(id: string, resourceDir?: string) {
+    // The shared-resources directory is intentionally retained on delete (FS-11.R5);
+    // say so up front using the server-computed path so removing it stays deliberate.
+    const retained = resourceDir
+      ? `\n\nIts shared resources directory is kept:\n${resourceDir}`
+      : "";
+    if (!confirm(`Delete project "${id}"?${retained}`)) return;
     deleteProject.mutate(
       { id },
       {
@@ -118,7 +123,7 @@ export function ProjectsEditor() {
             </div>
             <div className="config-list-item-actions">
               <button onClick={() => openEdit(id, proj)}>Edit</button>
-              <button onClick={() => handleDelete(id)} className="btn-danger">
+              <button onClick={() => handleDelete(id, proj.resource_dir)} className="btn-danger">
                 Delete
               </button>
             </div>

@@ -42,4 +42,4 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-- [Project shared resources](project-shared-resources.md) — waiting to start.
+_None._

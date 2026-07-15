@@ -1,6 +1,6 @@
 # TS-03 — HTTP, SSE & WebSocket API
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/server`, `ui/src/api`
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) API sections and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -65,7 +65,7 @@ do not hold the server past its grace period.
 `GET /api/sessions/{id}/terminal/ws` upgrades. Pre-upgrade errors are JSON; an agent without an
 xterm PTY bridge receives a normal not-found response rather than a half-open socket.
 
-**R12** `(planned)` — Existing project read/create/update response shapes gain the server-computed,
+**R12** — Existing project read/create/update response shapes gain the server-computed,
 read-only `resource_dir` absolute-path string. It is computed from the response project's immutable
 id, is not stored in `projects/{id}.json`, and any client-supplied value is ignored. `DELETE
 /api/projects/{id}` remains `204`; before issuing it, Settings uses the read-only value to state
