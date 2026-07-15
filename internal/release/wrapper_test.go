@@ -44,7 +44,7 @@ func buildRunnableVersion(t *testing.T, l *Layout, version string) string {
 	if err := WriteWrapper(dir); err != nil {
 		t.Fatal(err)
 	}
-	if err := WriteInternalManifest(dir, InternalManifest{Version: version, Target: Target}); err != nil {
+	if err := WriteInternalManifest(dir, InternalManifest{Version: version, Target: Target, Components: testComponents(version)}); err != nil {
 		t.Fatal(err)
 	}
 	return name

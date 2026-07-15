@@ -1,0 +1,65 @@
+name: Release macOS installer
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version without the v prefix
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  assemble:
+    runs-on: macos-14
+    env:
+      NODE_VERSION: 22.22.0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Confirm Apple-silicon runner
+        run: test "$(uname -m)" = arm64
+      - name: Download private Node runtime
+        run: curl --fail --location --remote-name "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-darwin-arm64.tar.gz"
+      - name: Assemble release assets
+        env:
+          VERSION: ${{ inputs.version || github.ref_name }}
+          NODE_TARBALL: ${{ github.workspace }}/node-v22.22.0-darwin-arm64.tar.gz
+        run: |
+          VERSION="${VERSION#v}"
+          export VERSION
+          scripts/release/assemble.sh
+      - name: Verify release archive and fresh installation
+        env:
+          VERSION: ${{ inputs.version || github.ref_name }}
+        run: |
+          set -euo pipefail
+          test -f dist/release/manifest.json
+          test -f dist/release/agentdeck-${VERSION#v}-darwin-arm64.tar.gz
+          export AGENTDECK_APP_ROOT="$RUNNER_TEMP/agentdeck-app"
+          export AGENTDECK_HOME="$RUNNER_TEMP/agentdeck-home"
+          mkdir -p "$AGENTDECK_HOME"
+          printf 'keep\n' > "$AGENTDECK_HOME/sentinel"
+          archive="dist/release/agentdeck-${VERSION#v}-darwin-arm64.tar.gz"
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          "$RUNNER_TEMP/agentdeck-${VERSION#v}-darwin-arm64/libexec/agentdeck" release install --archive "$archive" --manifest dist/release/manifest.json
+          "$AGENTDECK_APP_ROOT/bin/agentdeck" --version
+          test "$(cat "$AGENTDECK_HOME/sentinel")" = keep
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: github.event_name == 'push'
+        with:
+          files: |
+            dist/release/agentdeck-*-darwin-arm64.tar.gz
+            dist/release/manifest.json

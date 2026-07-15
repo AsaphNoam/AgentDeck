@@ -114,5 +114,10 @@ func verifyInternalManifest(dir, wantVersion string) error {
 	if wantVersion != "" && m.Version != wantVersion {
 		return fmt.Errorf("internal manifest version %q does not match release %q", m.Version, wantVersion)
 	}
+	for _, component := range []string{"node", "claude-agent-acp", "codex-acp", "agentdeck"} {
+		if m.Components[component] == "" {
+			return fmt.Errorf("internal manifest is missing %s component version", component)
+		}
+	}
 	return nil
 }

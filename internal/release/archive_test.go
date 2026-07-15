@@ -3,6 +3,7 @@ package release
 import (
 	"archive/tar"
 	"compress/gzip"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,11 +30,43 @@ func buildFakeVersion(t *testing.T, parent, version string) string {
 	}
 	if err := WriteInternalManifest(dir, InternalManifest{
 		Version: version, Target: Target,
-		Components: map[string]string{"node": "22.0.0", "agentdeck": version},
+		Components: testComponents(version),
 	}); err != nil {
 		t.Fatal(err)
 	}
 	return dir
+}
+
+func testComponents(version string) map[string]string {
+	return map[string]string{
+		"node": "22.0.0", "claude-agent-acp": "0.59.0", "codex-acp": "1.1.2", "agentdeck": version,
+	}
+}
+
+// Release assembly produces an archive and a public manifest that fully agree
+// before either reaches GitHub Releases (TS-06.R17, R21).
+func TestPackageRelease(t *testing.T) {
+	version := "1.2.3"
+	versionDir := buildFakeVersion(t, t.TempDir(), version)
+	outDir := t.TempDir()
+	m, err := PackageRelease(versionDir, outDir, version)
+	if err != nil {
+		t.Fatalf("PackageRelease: %v", err)
+	}
+	if err := VerifyArchive(filepath.Join(outDir, m.Archive), m); err != nil {
+		t.Fatalf("packaged archive failed verification: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(outDir, "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fromDisk ReleaseManifest
+	if err := json.Unmarshal(data, &fromDisk); err != nil {
+		t.Fatal(err)
+	}
+	if fromDisk != m {
+		t.Fatalf("manifest = %+v, want %+v", fromDisk, m)
+	}
 }
 
 // releaseFrom packages a built version dir into an archive and returns its path
