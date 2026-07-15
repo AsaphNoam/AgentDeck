@@ -15,7 +15,7 @@
 # developer on first open (FS-10.R9, TS-05.R12).
 #
 # Usage:
-#   ./install.sh [--version X.Y.Z]
+#   ./install.sh [--version X.Y.Z] [--no-start] [--non-interactive]
 #
 # Environment overrides:
 #   AGENTDECK_VERSION   pin a version (same as --version)
@@ -27,18 +27,63 @@ set -euo pipefail
 REPO="${AGENTDECK_REPO:-AsaphNoam/AgentDeck}"
 VERSION="${AGENTDECK_VERSION:-}"
 TARGET="darwin-arm64"
+NO_START=0
+NONINTERACTIVE=0
 
 die() { echo "error: $*" >&2; exit 1; }
+
+on_path() {
+  case ":${PATH}:" in *":${1}:"*) return 0 ;; *) return 1 ;; esac
+}
+
+confirm() {
+  prompt="$1"
+  printf '%s [y/N] ' "$prompt"
+  IFS= read -r answer || return 1
+  case "$answer" in y|Y|yes|YES|Yes) return 0 ;; *) return 1 ;; esac
+}
+
+# append_path_entry adds exactly one AgentDeck-owned PATH entry. The installer
+# only calls it after an interactive confirmation, never in CI or a piped run
+# (FS-10.R12). The root is emitted in a double-quoted shell string with the
+# special characters escaped first, so a custom AGENTDECK_APP_ROOT cannot alter
+# the shell profile syntax.
+append_path_entry() {
+  profile="${ZDOTDIR:-$HOME}/.zshrc"
+  marker="# Added by AgentDeck installer"
+  if [ -f "$profile" ] && grep -Fqx "$marker" "$profile"; then
+    echo "==> AgentDeck PATH entry is already in ${profile}"
+    return 0
+  fi
+  parent="$(dirname "$profile")"
+  [ -d "$parent" ] || mkdir -p "$parent" || return 1
+  escaped_root="$(printf '%s' "$app_root/bin" | sed 's/[\\\\$`\"]/\\\\&/g')"
+  {
+    printf '\n%s\n' "$marker"
+    printf 'export PATH="%s:$PATH"\n' "$escaped_root"
+  } >>"$profile" || return 1
+  echo "==> Added ${app_root}/bin to PATH in ${profile}. Open a new terminal to use 'agentdeck'."
+}
 
 # --- Parse arguments -------------------------------------------------------
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --version) VERSION="${2:-}"; shift 2 ;;
     --version=*) VERSION="${1#*=}"; shift ;;
-    -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
+    --no-start) NO_START=1; shift ;;
+    --non-interactive) NONINTERACTIVE=1; shift ;;
+    -h|--help) sed -n '2,34p' "$0"; exit 0 ;;
     *) die "unknown argument: $1 (try --help)" ;;
   esac
 done
+
+# An install is interactive only with a real terminal and no override. A
+# non-interactive install never prompts, never edits a shell profile, and never
+# starts the dashboard (FS-10.R6, FS-10.R12).
+INTERACTIVE=1
+if [ ! -t 0 ] || [ "$NONINTERACTIVE" = "1" ]; then
+  INTERACTIVE=0
+fi
 
 # --- Platform guard (FS-10.R1) --------------------------------------------
 os="$(uname -s)"
@@ -110,12 +155,40 @@ echo
 echo "AgentDeck ${VERSION} is installed."
 echo "  command: ${shim}"
 echo
-echo "Next:"
-echo "  \"${shim}\" auth claude       # sign in to a provider when ready"
-echo "  \"${shim}\" dashboard start   # start the dashboard on 127.0.0.1"
-echo "  \"${shim}\" dashboard open    # open the UI in your browser"
-if ! command -v agentdeck >/dev/null 2>&1; then
+
+if ! on_path "${app_root}/bin"; then
   echo
-  echo "note: ${app_root}/bin is not on your PATH. Add it to use 'agentdeck' directly,"
-  echo "      or run the absolute command path above."
+  echo "note: ${app_root}/bin is not on your PATH."
+  if [ "$INTERACTIVE" = "1" ] && confirm "Add the AgentDeck command directory to ${ZDOTDIR:-$HOME}/.zshrc?"; then
+    append_path_entry || echo "could not update your zsh profile; use the absolute command path above."
+  else
+    echo "Use the absolute command path above, or add it to your shell profile later."
+  fi
+fi
+
+if [ "$INTERACTIVE" = "1" ] && confirm "Sign in to Claude now?"; then
+  if ! "$shim" auth claude; then
+    echo "Claude sign-in did not complete. Installation succeeded; retry with: \"${shim}\" auth claude"
+  fi
+fi
+
+if [ "$NO_START" = "1" ] || [ "$INTERACTIVE" != "1" ]; then
+  echo
+  echo "Start AgentDeck when ready: \"${shim}\" dashboard start --detach"
+  exit 0
+fi
+
+echo
+echo "==> Starting the dashboard"
+if "$shim" dashboard start --detach; then
+  if "$shim" dashboard open; then
+    echo "Dashboard is running and opening in your browser."
+  else
+    echo "Dashboard is running, but the browser could not be opened. Open http://127.0.0.1:4317/ yourself."
+  fi
+else
+  home="${AGENTDECK_HOME:-$HOME/.agentdeck}"
+  echo "Installation succeeded, but the dashboard did not start."
+  echo "Retry with: \"${shim}\" dashboard start --detach"
+  echo "Log: ${home}/dashboard.log"
 fi

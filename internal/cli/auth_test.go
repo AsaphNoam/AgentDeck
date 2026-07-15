@@ -92,6 +92,17 @@ func TestAuthUnknownProvider(t *testing.T) {
 	}
 }
 
+// Provider sign-in must resolve the selected release's private ACP adapter,
+// never a globally installed Claude/Codex executable (FS-10.A2, A3).
+func TestAuthUsesPrivateAdapterCommands(t *testing.T) {
+	if got := authProviders["claude"]; got.command != "claude-agent-acp" || strings.Join(got.args, " ") != "--cli auth login" {
+		t.Fatalf("Claude login = %s %q, want claude-agent-acp --cli auth login", got.command, got.args)
+	}
+	if got := authProviders["codex"]; got.command != "codex-acp" || strings.Join(got.args, " ") != "login" {
+		t.Fatalf("Codex login = %s %q, want codex-acp login", got.command, got.args)
+	}
+}
+
 func TestClassifyAuth(t *testing.T) {
 	if got := classifyAuth(nil); got != authSuccess {
 		t.Fatalf("nil err = %v, want success", got)
