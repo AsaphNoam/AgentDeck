@@ -103,6 +103,20 @@ func TestAuthUsesPrivateAdapterCommands(t *testing.T) {
 	}
 }
 
+func TestAuthCheckReportsReadiness(t *testing.T) {
+	prev := authStatusCommandFor
+	authStatusCommandFor = func(authProvider) (*exec.Cmd, error) {
+		c := exec.Command("sh", "-c", "exit 0")
+		c.Stdout, c.Stderr = io.Discard, io.Discard
+		return c, nil
+	}
+	t.Cleanup(func() { authStatusCommandFor = prev })
+	out, err := runAuthCmd(t, "claude", "--check")
+	if err != nil || !strings.Contains(out, "Claude is ready") {
+		t.Fatalf("auth check = %q, %v", out, err)
+	}
+}
+
 func TestClassifyAuth(t *testing.T) {
 	if got := classifyAuth(nil); got != authSuccess {
 		t.Fatalf("nil err = %v, want success", got)

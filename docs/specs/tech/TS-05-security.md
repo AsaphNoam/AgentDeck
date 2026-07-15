@@ -1,6 +1,6 @@
 # TS-05 — Security & trust boundaries
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/server`, `internal/config`, `internal/configsource`, `internal/runtime`, `internal/messaging`, `internal/backend`
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md), the [phase archive manifest](../../archive/phases/README.md), and [`INVARIANTS.md`](../../features/INVARIANTS.md) §14
 
@@ -71,7 +71,7 @@ Their concrete payloads are owned by TS-03, TS-04, and TS-07.
 - **INV §14:** loopback binding plus browser Host/Origin validation is mandatory on every route.
 - **R11 — Security-sensitive changes require adversarial tests.** Bind/origin/token/path/mode/redaction
   changes include negative regression coverage and cite the relevant requirement.
-- **R12** `(planned)` — The macOS release installer has an explicit, limited delivery trust model.
+- **R12** — The macOS release installer has an explicit, limited delivery trust model.
   Before unpacking or activating a release it verifies the archive's SHA-256 against the matching
   GitHub Release manifest, stages it outside the selected runtime, and preserves the prior runtime on
   any verification or extraction failure. It never collects, copies, logs, or transmits provider
