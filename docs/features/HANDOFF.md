@@ -50,6 +50,9 @@ None.
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
+- 2026-07-15 — Defined the waiting project shared-resources change: every project will receive an
+  AgentDeck-owned owner-only folder outside its repository, injected consistently into agent
+  launches and retained after project deletion. It is ready to start and is not active work.
 - 2026-07-15 — Fixed the release-path review findings (INV §9): bootstrap and updater lock claims
   now cover resolution/download through activation, the stable shim is fsynced then atomically
   renamed, and the arm64 macOS release workflow runs release/CLI coverage plus a bootstrap journey.

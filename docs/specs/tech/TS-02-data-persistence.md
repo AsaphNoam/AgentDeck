@@ -1,6 +1,6 @@
 # TS-02 — Data & persistence
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/config`, `internal/state`, `internal/transcript`, `internal/index`, `internal/archive`, `internal/configsource`
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -62,6 +62,18 @@ error. Behavior differences are explicitly specified by FS-05.
 state live in SQLite. A send either stores the message and updates its budget atomically or stores
 nothing; readers return newest-first bounded results as specified by FS-06.
 
+**R13** `(planned)` — Project resources are opaque filesystem data at
+`$AGENTDECK_HOME/project-resources/{project-id}/`, not JSON configuration, SQLite state, a cache,
+or an index. `internal/config` owns one shared helper that validates the project id, returns the
+absolute path, and ensures the parent and leaf directories exist as owner-only directories. It
+rejects a parent or leaf that is a non-directory or symlink. To prove an existing leaf is writable,
+it creates and removes one private zero-byte probe; otherwise it never lists, reads, writes, deletes,
+or repairs resource contents. Project creation calls this helper after validation and before writing
+the project JSON, so a resource-creation failure leaves no new definition. New launch, resume, and
+switch call the same helper before registration or process start; the immutable project id lets their
+existing frozen `add_dirs` and system-prompt snapshot carry the identical path without a database
+migration.
+
 ## 3. Interfaces & data shapes
 
 The durable layout is:
@@ -74,6 +86,7 @@ $AGENTDECK_HOME/
   layout.json
   roles/{id}.json
   projects/{id}.json
+  project-resources/{id}/     opaque agent/person shared material; never indexed or scanned
   state.db
   sessions/{agent_id}/transcript.ndjson
   cache/config-sources/**
@@ -82,7 +95,7 @@ $AGENTDECK_HOME/
 The binding schemas for roles, projects, backends, and global config are defined by FS-04 and
 FS-09. Federation binding/effective-view shapes are defined by TS-07. SQLite table definitions and
 migration order live in `internal/state/schema.go` and execute through `migrate.go`; that executable schema is subordinate to
-R1–R11 and must be reflected here when its contract changes.
+R1–R13 and must be reflected here when its contract changes.
 
 ## 4. Invariants
 
@@ -93,6 +106,8 @@ R1–R11 and must be reflected here when its contract changes.
 - **INV §10:** caches and indexes declare their authority and refresh boundary.
 - **R12 — Migration/spec lockstep.** A migration that changes a durable shape or compatibility
   promise must update this spec (and the owning FS/API spec) in the same completed change.
+- **INV §2:** launch, resume, and switch use the same project-resource composition helper rather
+  than independently rebuilding the environment, prompt, or additional directories.
 
 ## 5. Deviations & open decisions
 
@@ -108,6 +123,8 @@ R1–R11 and must be reflected here when its contract changes.
 ## 6. Traceability
 
 - Config: `internal/config/atomic.go`, `seed.go`, `validate.go`, `types.go`.
+- Project resources (planned): `internal/config` path/layout helpers; project CRUD and lifecycle
+  composers in `internal/server`.
 - Schema/migrations: `internal/state/migrate.go`, `schema.go`, `state.go`, `running.go`, `session.go`.
 - Transcript: `internal/transcript/writer.go`, `reader.go`; runtime append in
   `internal/runtime/chat.go`.

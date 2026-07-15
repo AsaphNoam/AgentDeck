@@ -42,7 +42,13 @@ rules in `docs/specs/README.md`:
 - keep scope exclusions, edge cases, and errors explicit;
 - update the spec index and status when required.
 
-Show the user a concise summary of the drafted feature behavior and remaining product questions.
+Explain the proposed behavior **in the conversation**, not only in the draft specification or a
+generic request for confirmation. Use a short `Proposed behavior` summary that says, in plain
+language: what is created or changed; when it happens; where any data lives; what a person and an
+agent/API client will see or receive; lifecycle/retention consequences; and explicit exclusions.
+Name each remaining product decision, its practical consequence, and the recommendation where one
+is appropriate. Never ask the user to “confirm this behavior” without first stating that behavior.
+
 Do not begin the technical specification until the user confirms the feature scope or explicitly
 asks to proceed. The feature specification is done only when its behavior and acceptance criteria
 are adequate for technical design.
