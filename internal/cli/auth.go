@@ -10,12 +10,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// authProvider names a provider and the login command AgentDeck delegates to.
-// The command is only ever attached to the user's terminal — AgentDeck accepts
-// no credential flags, captures no child stdout/stderr, and writes no credential
-// material of its own (TS-06.R20). The exact provider login invocation is
-// verified under the gated real-provider run and can be corrected without a code
-// change via the env overrides below (INV §12: tolerate CLI variance).
+// authProvider names a provider and the private adapter command AgentDeck
+// delegates to. The command is only ever attached to the user's terminal —
+// AgentDeck accepts no credential flags, captures no child stdout/stderr, and
+// writes no credential material of its own (TS-06.R20). The release wrapper
+// resolves these commands from the selected private runtime, rather than a
+// globally installed provider or ACP adapter (FS-10.R3, R5).
 type authProvider struct {
 	name        string
 	command     string
@@ -24,8 +24,8 @@ type authProvider struct {
 }
 
 var authProviders = map[string]authProvider{
-	"claude": {name: "Claude", command: "claude", args: []string{"login"}, loginEnvVar: "AGENTDECK_CLAUDE_LOGIN_CMD"},
-	"codex":  {name: "Codex", command: "codex", args: []string{"login"}, loginEnvVar: "AGENTDECK_CODEX_LOGIN_CMD"},
+	"claude": {name: "Claude", command: "claude-agent-acp", args: []string{"--cli", "auth", "login"}, loginEnvVar: "AGENTDECK_CLAUDE_LOGIN_CMD"},
+	"codex":  {name: "Codex", command: "codex-acp", args: []string{"login"}, loginEnvVar: "AGENTDECK_CODEX_LOGIN_CMD"},
 }
 
 // authOutcome is the bounded result of a delegated sign-in (FS-10.R11).
