@@ -1,6 +1,6 @@
 ---
-name: review-phase
-description: Explicit invocation only. Run only when the user sends `/review-phase`; do not trigger from a natural-language request.
+name: review
+description: Explicit invocation only. Run only when the user sends `/review`; do not trigger from a natural-language request.
 ---
 
 # Review the unreviewed work
