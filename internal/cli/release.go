@@ -106,6 +106,7 @@ func readReleaseManifest(path string) (release.ReleaseManifest, error) {
 
 func newReleaseInstallCmd() *cobra.Command {
 	var archive, manifest string
+	var lockHeld bool
 	cmd := &cobra.Command{
 		Use:   "install",
 		Short: "Verify and activate a downloaded release archive",
@@ -118,7 +119,15 @@ func newReleaseInstallCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			name, err := layout.Install(archive, m)
+			var name string
+			if lockHeld {
+				// scripts/release/install.sh uses macOS lockf to claim this
+				// exact root before release lookup/download, then hands the
+				// held transaction to this bundled binary (TS-06.R19).
+				name, err = layout.InstallWithLock(archive, m)
+			} else {
+				name, err = layout.Install(archive, m)
+			}
 			if err != nil {
 				return err
 			}
@@ -130,7 +139,9 @@ func newReleaseInstallCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&archive, "archive", "", "path to the downloaded release archive")
 	cmd.Flags().StringVar(&manifest, "manifest", "", "path to the release manifest JSON")
+	cmd.Flags().BoolVar(&lockHeld, "lock-held", false, "bootstrap installer already holds the install lock")
 	_ = cmd.MarkFlagRequired("archive")
 	_ = cmd.MarkFlagRequired("manifest")
+	_ = cmd.Flags().MarkHidden("lock-held")
 	return cmd
 }

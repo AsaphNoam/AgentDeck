@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -34,6 +35,18 @@ func (f fakeFetcher) Download(_ context.Context, m release.ReleaseManifest, dest
 	defer out.Close()
 	_, err = io.Copy(out, in)
 	return dest, err
+}
+
+// observedFetcher records whether an updater reached the release network
+// boundary. It proves a lock contender exits before metadata resolution.
+type observedFetcher struct {
+	fakeFetcher
+	latestCalls int
+}
+
+func (f *observedFetcher) Latest(ctx context.Context) (release.ReleaseManifest, error) {
+	f.latestCalls++
+	return f.fakeFetcher.Latest(ctx)
 }
 
 // manifestOf reads a manifest.json path into a ReleaseManifest.
@@ -198,5 +211,32 @@ func TestUpdateCorruptDownloadPreservesCurrent(t *testing.T) {
 	}
 	if v, _, _ := release.NewLayout(appRoot).CurrentVersion(); v != "1.0.0" {
 		t.Fatalf("failed update changed current to %s, want 1.0.0", v)
+	}
+}
+
+// A competing update exits before it contacts the release endpoint, so it
+// cannot prepare an archive that activates after the holder finishes
+// (FS-10.A4, FS-10.R13, TS-06.R19).
+func TestUpdateContenderExitsBeforeReleaseLookup(t *testing.T) {
+	appRoot := t.TempDir()
+	t.Setenv("AGENTDECK_APP_ROOT", appRoot)
+	installBase(t, appRoot, "1.0.0")
+
+	archive, manifest := buildArchive(t, "2.0.0")
+	fetcher := &observedFetcher{fakeFetcher: fakeFetcher{m: manifestOf(t, manifest), archive: archive}}
+	withFetcher(t, fetcher)
+
+	layout := release.NewLayout(appRoot)
+	lk, err := layout.Lock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lk.Release()
+
+	if _, err := runUpdateCmd(t, "--yes"); !errors.Is(err, release.ErrLocked) {
+		t.Fatalf("contending update err = %v, want ErrLocked", err)
+	}
+	if fetcher.latestCalls != 0 {
+		t.Fatalf("contending update resolved release metadata %d time(s)", fetcher.latestCalls)
 	}
 }

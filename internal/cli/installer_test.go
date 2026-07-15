@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/agentdeck/agentdeck/internal/release"
 )
@@ -125,5 +126,66 @@ case "$url" in *manifest.json) cp "$AGENTDECK_TEST_MANIFEST" "$out" ;; *) cp "$A
 	}
 	if !strings.Contains(string(out), "Start AgentDeck when ready") {
 		t.Fatalf("missing manual-start guidance: %s", out)
+	}
+}
+
+// A second bootstrap exits while the first holds the shared lock through its
+// download, so it cannot independently reach activation (FS-10.R13, TS-06.R19).
+func TestBootstrapContenderExitsDuringDownload(t *testing.T) {
+	if _, err := exec.LookPath("lockf"); err != nil {
+		t.Skip("macOS lockf is required for the bootstrap contention test")
+	}
+	fixture := t.TempDir()
+	archive, manifest := buildBootstrapFixture(t, "1.0.0", fixture)
+	fakeBin := filepath.Join(fixture, "bin")
+	if err := os.MkdirAll(fakeBin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeBootstrapCommand(t, fakeBin, "uname", `case "$1" in -s) echo Darwin ;; -m) echo arm64 ;; *) exit 1 ;; esac`)
+	writeBootstrapCommand(t, fakeBin, "curl", `
+if [ -n "${AGENTDECK_TEST_CURL_STARTED:-}" ]; then
+  : > "$AGENTDECK_TEST_CURL_STARTED"
+  sleep 2
+fi
+out=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in -o) out="$2"; shift 2 ;; *) url="$1"; shift ;; esac
+done
+case "$url" in *manifest.json) cp "$AGENTDECK_TEST_MANIFEST" "$out" ;; *) cp "$AGENTDECK_TEST_ARCHIVE" "$out" ;; esac`)
+
+	home := filepath.Join(fixture, "home")
+	appRoot := filepath.Join(fixture, "app")
+	started := filepath.Join(fixture, "curl-started")
+	installer := filepath.Join("..", "..", "scripts", "release", "install.sh")
+	baseEnv := append(os.Environ(),
+		"PATH="+fakeBin+":"+os.Getenv("PATH"),
+		"HOME="+home,
+		"AGENTDECK_APP_ROOT="+appRoot,
+		"AGENTDECK_TEST_ARCHIVE="+archive,
+		"AGENTDECK_TEST_MANIFEST="+manifest,
+	)
+	first := exec.Command("bash", installer, "--version", "1.0.0", "--non-interactive")
+	first.Env = append(baseEnv, "AGENTDECK_TEST_CURL_STARTED="+started)
+	if err := first.Start(); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 50; i++ {
+		if _, err := os.Stat(started); err == nil {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+		if i == 49 {
+			_ = first.Process.Kill()
+			t.Fatal("first bootstrap did not begin downloading")
+		}
+	}
+
+	second := exec.Command("bash", installer, "--version", "1.0.0", "--non-interactive")
+	second.Env = baseEnv
+	if out, err := second.CombinedOutput(); err == nil {
+		t.Fatalf("contending bootstrap unexpectedly succeeded: %s", out)
+	}
+	if err := first.Wait(); err != nil {
+		t.Fatalf("first bootstrap: %v", err)
 	}
 }

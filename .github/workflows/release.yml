@@ -40,6 +40,12 @@ jobs:
           VERSION="${VERSION#v}"
           export VERSION
           scripts/release/assemble.sh
+      - name: Verify release transaction coverage and bootstrap journey
+        run: |
+          set -euo pipefail
+          go test ./internal/release ./internal/cli
+          go test -tags sqlite_fts5 ./internal/release ./internal/cli
+          go test -run '^TestBootstrapNonInteractiveDoesNotStartOrEditProfile$' ./internal/cli
       - name: Verify release archive and fresh installation
         env:
           VERSION: ${{ inputs.version || github.ref_name }}

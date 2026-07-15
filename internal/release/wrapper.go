@@ -50,5 +50,41 @@ func (l *Layout) WriteShim() error {
 	script := "#!/bin/sh\n" +
 		"# AgentDeck command shim (generated; do not edit). Resolves the active release.\n" +
 		fmt.Sprintf("exec \"%s\" \"$@\"\n", target)
-	return os.WriteFile(l.ShimPath(), []byte(script), 0o755)
+
+	// Readers execute this path directly, so writing it in place would expose an
+	// empty or partial script after truncation. Publish a fully synced sibling
+	// with rename, then sync the directory entry (INV §9, TS-06.R17).
+	tmp, err := os.CreateTemp(l.BinDir(), ".agentdeck-*")
+	if err != nil {
+		return fmt.Errorf("create shim temp: %w", err)
+	}
+	tmpName := tmp.Name()
+	cleanup := func() { _ = os.Remove(tmpName) }
+	if err := tmp.Chmod(0o755); err != nil {
+		tmp.Close()
+		cleanup()
+		return fmt.Errorf("chmod shim temp: %w", err)
+	}
+	if _, err := tmp.WriteString(script); err != nil {
+		tmp.Close()
+		cleanup()
+		return fmt.Errorf("write shim temp: %w", err)
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		cleanup()
+		return fmt.Errorf("sync shim temp: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		cleanup()
+		return fmt.Errorf("close shim temp: %w", err)
+	}
+	if err := os.Rename(tmpName, l.ShimPath()); err != nil {
+		cleanup()
+		return fmt.Errorf("publish shim: %w", err)
+	}
+	if err := fsyncDir(l.BinDir()); err != nil {
+		return fmt.Errorf("sync shim directory: %w", err)
+	}
+	return nil
 }
