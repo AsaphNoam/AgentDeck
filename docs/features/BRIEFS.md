@@ -4,6 +4,15 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-15 — workflow: review command
+
+Use `/review` to inspect the unreviewed completed work. The Codex and Claude workflow skills now
+use that same command name; its review behavior is unchanged.
+
+**Needs attention:** None.
+
+**Next:** Use `/review` when you want the next completed change checked.
+
 ### 2026-07-15 — workflow: work and fix commands
 
 Use `/work` to build a change and `/fix` to repair recorded findings. When no change is active,

@@ -50,6 +50,8 @@ None.
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
+- 2026-07-15 — Renamed the explicit review command to `/review` in the Codex and Claude skill
+  copies; it retains the same unreviewed-range review behavior.
 - 2026-07-15 — Renamed the explicit build/finding-fix commands to `/work` and `/fix`. `/work`
   now finds the sole waiting ready change (or asks the user to choose when several wait), so an
   explicit request no longer reports no work while implementable work is available.

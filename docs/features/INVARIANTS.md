@@ -13,7 +13,7 @@ The hot-spot areas: launch/resume/switch composition, `internal/runtime` concurr
 How the loop uses this file:
 - **/work** — before building in a hot-spot area, read the matching class; new interfaces
   must complete the §6 contract checklist.
-- **/review-phase** — sweep the diff against every class; tag each finding with its class number.
+- **/review** — sweep the diff against every class; tag each finding with its class number.
 - **/fix** — note the class in the changelog line; if a fix reveals a genuinely new class
   (or a new canonical pattern), append it here. Keep this file curated — merge near-duplicates,
   don't let it become a graveyard.
