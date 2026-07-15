@@ -56,27 +56,29 @@ func TestComposeHookRegistration(t *testing.T) {
 	srv := testServer(t, true)
 	agent := state.Agent{AgentID: "a_h2", Interface: "chat"}
 
-	// Default (flag off): writes the per-agent settings file, returns no launch args.
+	// Chat status comes from ACP. The official adapter does not accept a
+	// per-launch --settings file, so the lifecycle-owned artifact is written for
+	// symmetric cleanup but no argv points the adapter at it.
 	args, err := srv.composeHookRegistration(agent, "claude-acp")
 	if err != nil {
 		t.Fatalf("composeHookRegistration: %v", err)
 	}
 	if len(args) != 0 {
-		t.Fatalf("args = %v, want none while registration flag is off", args)
+		t.Fatalf("args = %v, want none for chat", args)
 	}
 	settingsPath := fmt.Sprintf("%s/agents/%s.json", hooks.Dir(srv.configStore.Home()), agent.AgentID)
 	if _, err := os.Stat(settingsPath); err != nil {
 		t.Fatalf("settings file not written: %v", err)
 	}
 
-	// Flag on: claude points the CLI at the settings file.
+	// The retired opt-in flag cannot re-enable an unsupported adapter argv.
 	t.Setenv("AGENTDECK_HOOK_REGISTRATION", "1")
 	args, err = srv.composeHookRegistration(agent, "claude-acp")
 	if err != nil {
 		t.Fatalf("composeHookRegistration (on): %v", err)
 	}
-	if len(args) != 2 || args[0] != "--settings" || !strings.HasSuffix(args[1], ".json") {
-		t.Fatalf("args = %v, want [--settings <path>]", args)
+	if len(args) != 0 {
+		t.Fatalf("args = %v, want none for chat even with retired flag", args)
 	}
 }
 

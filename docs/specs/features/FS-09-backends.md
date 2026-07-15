@@ -56,9 +56,8 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **R8** — All four backend types use the common ACP chat runtime and normalized transcript,
   permission, persistence, SSE, stop and resume/switch surfaces. Provider differences are confined
   to the backend adapter and launch composition; they do not create a second chat runtime.
-- **R9** — `claude-acp` launches `claude-code-acp`, strips inherited `CLAUDECODE`, supports native
-  same-backend resume/model switch, and can register the composed Claude hook settings through
-  `--settings`.
+- **R9 — retired 2026-07-15:** The Zed-era `claude-code-acp` executable and its unverified chat
+  `--settings` passthrough were replaced by the official Agent Client Protocol adapter in R29.
 - **R10** — `codex-acp` launches `codex-acp`, attempts native same-backend resume/model switch, and
   uses ACP-derived chat status. Its real hook-settings registration remains unverified and no hook
   settings argv is injected.
@@ -87,10 +86,8 @@ Configuration-source federation for Claude/Codex is FS-08.
   credential probe is `failed` or `skipped`, then returns one best-effort bounded result per
   backend: `{status:"ok"|"failed"|"skipped", detail?}`. Network/tool absence cannot destroy or
   reject otherwise valid configuration.
-- **R17** — Claude probes `claude auth status` (retrying without `--no-color` for older CLIs);
-  Codex checks `OPENAI_API_KEY` against `${OPENAI_BASE_URL:-https://api.openai.com}/v1/models`;
-  OpenCode requires its executable plus either its standard auth file or a provider API key;
-  OpenHands requires its executable plus `LLM_API_KEY` or its standard settings file.
+- **R17 — retired 2026-07-15:** The direct system `claude auth status` probe was replaced by the
+  selected adapter's bundled-Claude probe in R30; the other provider probes are unchanged.
 - **R18** — Credential probes use the merged backend/model environment, have a six-second deadline,
   sanitize returned output, and classify missing CLIs/keys, timeouts, network errors and unfamiliar
   responses as `skipped` rather than inventing success.
@@ -118,13 +115,25 @@ Configuration-source federation for Claude/Codex is FS-08.
   result of `skipped` is not proof that launch will work. Backend-specific recovery copy is a known
   deviation in §6.
 - **R25** — Ambient adapter-specific environment that could override AgentDeck composition is
-  removed according to R9–R12 before backend/model/hook values are applied. Other host environment
+  removed according to R10–R12 and R29 before backend/model/hook values are applied. Other host environment
   variables remain inherited subject to the standing env-inheritance decision in FS-00/TS-05.
 - **R26** — OpenCode/OpenHands expose no terminal mode or native hook surface merely because their
   chat adapter exists. Capabilities remain explicit per backend and interface.
 - **R27** `(planned)` — `OPENCODE_PATH` and `OPENHANDS_PATH` select the executable consistently for
   both credential probing and launch, and a missing/rejected CLI fails with backend-specific
   installation or incompatible-flag guidance instead of a raw transport-closed error.
+- **R29** — `claude-acp` launches `claude-agent-acp` from the pinned official
+  `@agentclientprotocol/claude-agent-acp` package, strips inherited `CLAUDECODE`, supplies the
+  composed system prompt, model, additional directories and MCP registrations through the
+  adapter's ACP session metadata, and preserves native same-backend resume/model switch. Chat
+  status remains ACP-derived; Claude terminal launches continue to invoke the interactive Claude
+  executable directly with their generated `--settings` hook file.
+- **R30** — Claude credential feedback probes the same adapter dependency that chat
+  launch requires by running `claude-agent-acp --cli auth status` (retrying without `--no-color`
+  for older bundled Claude builds). Codex checks `OPENAI_API_KEY` against
+  `${OPENAI_BASE_URL:-https://api.openai.com}/v1/models`; OpenCode requires its executable plus
+  either its standard auth file or a provider API key; OpenHands requires its executable plus
+  `LLM_API_KEY` or its standard settings file.
 
 ## 5. Acceptance criteria
 
@@ -143,7 +152,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   identity/history and reject/roll back bad transitions. *Verified by* `TestResolveResumeID`,
   `TestSwitchClaudeToOpenCodePrimer`, `TestSwitchRuntimeBackendSwapUsesPrimer`, and
   `TestSwitchRuntimeRollbackOnResumeFailure`.
-- **A5** (R16–R19) — Saves persist independently of best-effort probe status; backend-specific
+- **A5** (R16, R18–R19, R30) — Saves persist independently of best-effort probe status; backend-specific
   probes, merged env and sanitized timeout/missing-auth outcomes are covered. *Verified by*
   `TestMergeEnv`, `TestOpenCodeProber`, `TestOpenHandsProber`,
   `TestClaudeProberRetriesWithoutNoColor`, and config-handler/onboarding credential tests.
@@ -152,15 +161,21 @@ Configuration-source federation for Claude/Codex is FS-08.
   skip-permissions behavior, stop, native resume or documented primer fallback, provider/model/env
   mapping, and HTTP `mcpServers` registration. Until recorded, these backends pass fake-ACP tests but
   real-CLI compatibility is not claimed.
-- **A7** `(GATED — real CLI credentials)` — Re-run live Codex chat launch/turn/stop/resume and
-  Claude/Codex/OpenCode/OpenHands HTTP messaging-MCP registration against pinned versions before a
-  release claims those external compatibility paths.
+- **A7** `(GATED — real CLI credentials)` — Re-run live Codex chat launch/turn/stop/resume and the
+  official Claude adapter plus Claude/Codex/OpenCode/OpenHands HTTP messaging-MCP registration
+  against pinned versions before a release claims those external compatibility paths.
 - **A8** (R28) — A `codex-acp` backend with `autosync_models` gains newly available user-visible
   Codex models on startup without duplicating or overwriting existing entries, changing the default,
   or including hidden models; a disabled flag, a non-codex backend, and a missing cache leave the
   catalog unchanged. *Verified by* `TestSyncCodexModelsAddsVisibleModels`,
   `TestSyncCodexModelsPreservesExistingAndDefault`, `TestSyncCodexModelsRespectsFlagAndType`, and
   `TestReadCodexModelCatalog`.
+- **A9** (R29–R30) — The Claude adapter resolves to `claude-agent-acp`; its ACP v1
+  initialize and session metadata shapes remain covered by the shared fake-adapter tests; and the
+  credential probe delegates through `--cli`, including the no-color compatibility retry. The
+  pinned package's real initialize/session/turn behavior remains part of the credentialed A7 gate.
+  *Verified by* adapter, runtime parameter, and Claude credential-probe tests plus the gated real
+  adapter acceptance suite.
 
 ## 6. Deviations & open decisions
 
@@ -180,6 +195,9 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **Missing/rejected CLI startup diagnostics are weak.** A missing executable or rejected optional
   flags can currently collapse into a raw/generic transport error; backend-specific installation
   and compatibility guidance is tracked usability work.
+- **Official Claude adapter acceptance remains credential-gated.** Automated tests pin the ACP v1
+  boundary and session metadata, but an authenticated streamed turn/resume/MCP run against the
+  exact packaged version is still required before release compatibility is claimed.
 - **Model/API compatibility remains partial.** The ACP adapter may ignore AgentDeck's requested
   model in favor of its own identifiers, and older endpoints do not yet share one error envelope.
 
@@ -191,6 +209,8 @@ Configuration-source federation for Claude/Codex is FS-08.
   `syncCodexModels`, `Store.AutoSyncBackends`); invoked from `resolveConfig` in
   `internal/cli/dashboard.go`.
 - **Adapters/credentials:** `internal/backend/adapter.go`, `internal/backend/credcheck/`;
+  the official Claude executable and delegated auth probe are pinned by
+  `TestClaudeAdapterUsesOfficialBinary` and `TestClaudeProberRetriesWithoutNoColor`;
   `internal/runtime/chat.go` (adapter consumption and shared ACP permission gate).
 - **Capability/composition:** `internal/server/terminal.go`, `launch.go`, `resume.go`, `switch.go`.
 - **UI:** `ui/src/schemas/backends.ts`, `ui/src/lib/backendTypes.ts`,

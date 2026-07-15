@@ -33,6 +33,18 @@ func TestForKnownAndUnknown(t *testing.T) {
 	}
 }
 
+// FS-09.A9: Claude chat resolves to the official adapter executable rather
+// than the retired Zed-era claude-code-acp entry point.
+func TestClaudeAdapterUsesOfficialBinary(t *testing.T) {
+	ad, ok := For("claude-acp")
+	if !ok {
+		t.Fatal("For(claude-acp) not found")
+	}
+	if got := ad.Binary(); got != "claude-agent-acp" {
+		t.Fatalf("claude Binary() = %q, want claude-agent-acp", got)
+	}
+}
+
 // TestNewBackendAdapters covers the Phase 7 opencode/openhands adapters: they
 // resolve, launch via `<bin> acp`, run hookless (chat status from the ACP
 // stream), and strip the env keys they own so a shell-level value never leaks.

@@ -1,4 +1,4 @@
-// Command fakeacp is a deterministic stand-in for the real claude-code-acp ACP
+// Command fakeacp is a deterministic stand-in for the real claude-agent-acp ACP
 // adapter, used by ChatRuntime integration tests (techspec §10.2). It speaks
 // JSON-RPC over NDJSON on stdin/stdout: it answers `initialize` and
 // `session/new`, and on `session/prompt` it replays the scenario named by the

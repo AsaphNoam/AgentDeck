@@ -44,6 +44,8 @@ func TestSessionLoadParamsCarriesModelAndSystemPrompt(t *testing.T) {
 	}
 }
 
+// FS-09.A9: the official Claude adapter receives AgentDeck's composed launch
+// values through its documented ACP session metadata shape.
 func TestClaudeSessionNewParamsUseMetaOptions(t *testing.T) {
 	spec := LaunchSpec{
 		Cwd:          "/work",

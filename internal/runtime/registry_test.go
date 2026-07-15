@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"testing"
 )
 
@@ -81,9 +82,13 @@ func TestTerminalStubReturnsNotImplemented(t *testing.T) {
 // with ErrNotImplemented before any process spawn (techspec §3.3, §6.3).
 func TestChatRuntimeBackendGate(t *testing.T) {
 	c := NewChatRuntime(nil)
+	// The gate test must not launch a real adapter merely because one happens to
+	// be installed on the machine running the suite.
+	c.SetCommand(filepath.Join(t.TempDir(), "missing-acp"))
 
 	// codex-acp is a real backend now: the gate accepts it. It fails downstream
-	// trying to exec the (absent) codex-acp binary, which is NOT ErrNotImplemented.
+	// trying to exec the deterministic missing override, which is NOT
+	// ErrNotImplemented.
 	_, err := c.Start(context.Background(), LaunchSpec{BackendType: "codex-acp"})
 	if errors.Is(err, ErrNotImplemented) {
 		t.Fatalf("codex-acp Start err = %v, want it to pass the backend gate", err)

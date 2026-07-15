@@ -9,7 +9,8 @@
 #   4. Install the binary into an on-PATH bin dir.
 #   5. Seed ~/.agentdeck on first run (the binary seeds lazily on `dashboard start`).
 #
-# Prereqs: Go 1.22+, Node 18+, npm. Node is build-time only.
+# Prereqs: Go 1.25+, Node 20+, npm. Node is build-time only unless the optional
+# Claude ACP adapter is installed; that adapter requires Node 22+ at runtime.
 
 set -euo pipefail
 
@@ -21,12 +22,12 @@ PKG="github.com/agentdeck/agentdeck"
 VERSION_PKG="${PKG}/internal/version"
 EMBED_DIR="internal/server/ui/dist"
 
-# Pinned ACP adapter for the Claude Code chat runtime (techspec §12.1). The Go
+# Pinned official ACP adapter for the Claude chat runtime (TS-04.R13). The Go
 # runtime targets the ACP protocol version this adapter negotiates; bump this pin
-# deliberately and re-run the gated acceptance test (see docs/features/phase-1-acceptance.md).
+# deliberately and re-run the gated real-provider acceptance checks (FS-09.A7).
 # Install it (Node required) with: INSTALL_ACP=1 ./install.sh
-CLAUDE_ACP_PKG="@zed-industries/claude-code-acp"
-CLAUDE_ACP_VERSION="0.16.2"
+CLAUDE_ACP_PKG="@agentclientprotocol/claude-agent-acp"
+CLAUDE_ACP_VERSION="0.59.0"
 
 VERSION="${VERSION:-0.1.0}"
 COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo none)"
@@ -37,14 +38,24 @@ LDFLAGS="-X ${VERSION_PKG}.Version=${VERSION} \
 -X ${VERSION_PKG}.Date=${DATE}"
 
 echo "==> Checking prerequisites"
-command -v go   >/dev/null 2>&1 || { echo "error: Go 1.22+ is required"; exit 1; }
-command -v node >/dev/null 2>&1 || { echo "error: Node 18+ is required"; exit 1; }
+command -v go   >/dev/null 2>&1 || { echo "error: Go 1.25+ is required"; exit 1; }
+command -v node >/dev/null 2>&1 || { echo "error: Node 20+ is required"; exit 1; }
 command -v npm  >/dev/null 2>&1 || { echo "error: npm is required"; exit 1; }
+
+NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
+if [ "${NODE_MAJOR}" -lt 20 ]; then
+  echo "error: Node 20+ is required to build AgentDeck"
+  exit 1
+fi
 
 # Optional: install the pinned ACP adapter so chat agents can launch. Off by
 # default (the Go binary builds + the test suite passes without it); the real-CLI
 # acceptance test needs it plus a logged-in Claude account.
 if [ "${INSTALL_ACP:-0}" = "1" ]; then
+  if [ "${NODE_MAJOR}" -lt 22 ]; then
+    echo "error: ${CLAUDE_ACP_PKG}@${CLAUDE_ACP_VERSION} requires Node 22+"
+    exit 1
+  fi
   echo "==> Installing ${CLAUDE_ACP_PKG}@${CLAUDE_ACP_VERSION}"
   npm install -g "${CLAUDE_ACP_PKG}@${CLAUDE_ACP_VERSION}"
 fi

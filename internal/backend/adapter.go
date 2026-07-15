@@ -24,7 +24,7 @@ type BackendAdapter interface {
 	LaunchArgs() []string
 
 	// StripEnvKeys lists env keys to drop from the spawned process env. The
-	// claude-code-acp adapter refuses a "nested" session when CLAUDECODE is set,
+	// claude-agent-acp adapter refuses a "nested" session when CLAUDECODE is set,
 	// so claude strips it; codex strips nothing.
 	StripEnvKeys() []string
 
@@ -92,11 +92,11 @@ func For(backendType string) (BackendAdapter, bool) {
 	}
 }
 
-// claudeACP is the adapter for Anthropic's claude-code-acp.
+// claudeACP is the adapter for the official claude-agent-acp package.
 type claudeACP struct{}
 
 func (claudeACP) Type() string         { return "claude-acp" }
-func (claudeACP) Binary() string       { return "claude-code-acp" }
+func (claudeACP) Binary() string       { return "claude-agent-acp" }
 func (claudeACP) LaunchArgs() []string { return nil }
 func (claudeACP) StripEnvKeys() []string {
 	// The adapter refuses a nested session when CLAUDECODE is set (true when

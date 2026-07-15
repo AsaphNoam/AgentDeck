@@ -20,11 +20,12 @@ start, a change lives in [ready changes](docs/ready-changes/README.md).
 ## Prerequisites
 
 - **Go 1.25** — server / single binary (authoritative version: `go.mod`)
-- **Node 20+ and npm** — UI build only
+- **Node 20+ and npm** — UI build only; Node 22+ is required at runtime when source-installing the
+  optional official Claude ACP adapter with `INSTALL_ACP=1`
 - macOS or Linux. The default terminal runtime is an embedded xterm.js/PTY bridge;
   tmux is optional and the optional iTerm2 driver is macOS-only.
-- At least one authenticated agent CLI. `install.sh` does not install optional ACP adapters unless
-  requested (`INSTALL_ACP=1`); chat launch needs the selected adapter on `PATH`.
+- At least one authenticated agent backend. `install.sh` installs the pinned official Claude ACP
+  adapter only when requested (`INSTALL_ACP=1`); chat launch needs the selected adapter on `PATH`.
 - `curl` and `jq` for shell-hook integrations used by terminal agents.
 
 ## Quickstart
