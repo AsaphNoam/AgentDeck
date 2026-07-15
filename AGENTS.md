@@ -4,7 +4,7 @@ Guidance for coding agents working in this repository.
 
 ## Read order
 
-Before implementation, review, fix-review, or usability-review work, read:
+Before feature design, implementation, review, fix-review, or usability-review work, read:
 
 1. [`docs/features/HANDOFF.md`](docs/features/HANDOFF.md) — current state and relevant requirement IDs.
 2. The change file named by the handoff, if a change is in progress.
@@ -19,6 +19,8 @@ rationale, history, or sequencing but do not override an FS/TS requirement.
 
 ## Roles
 
+- **Design feature:** workflow §11. Work with the human to turn one idea into planned feature and
+  technical specifications plus a ready change; do not write product code.
 - **Implement:** workflow §§1–6 and §10. Update the relevant specification before a behavior or
   architecture change, then keep working until done or a real blocker.
 - **Review:** §7. Check that code matches the specifications and that the specifications cover the
@@ -32,7 +34,7 @@ rationale, history, or sequencing but do not override an FS/TS requirement.
 that are specified and ready to start. `HANDOFF.md` records only the change already in progress.
 Agents never choose future work for themselves.
 
-Every role updates the live handoff and stores a short, plain-language human update in
+Every role keeps the live handoff accurate and stores a short, plain-language human update in
 [`docs/features/BRIEFS.md`](docs/features/BRIEFS.md). The stored update is the entire final response.
 
 ## Repository rules
