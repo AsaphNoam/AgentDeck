@@ -58,6 +58,7 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
+- 2026-07-16 — Review found no unreviewed product code after the recorded project-resources review boundary. The installer flag-preservation finding remains the only open review finding.
 - 2026-07-16 — Review through `87d6251` found the project shared-resources work sound: launch,
   resume, and switch inject the owner-only resource directory through one shared helper; project
   responses expose only the path and never the contents; and the specifications match the code in

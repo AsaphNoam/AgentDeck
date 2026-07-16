@@ -4,6 +4,17 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-16 — review: current review boundary
+
+There is no new product code to review: the recorded review boundary already reaches the latest
+implementation. The repository's specification checks still pass, and the earlier macOS installer
+flag issue remains the only open review finding.
+
+**Needs attention:** Repair the installer flag handoff before publishing a release.
+
+**Next:** Run `/fix` to preserve those choices through the locked installer process and add
+interactive coverage.
+
 ### 2026-07-16 — review: project shared resources
 
 The completed project shared-resources work holds up. Every project's AgentDeck-owned folder is
