@@ -7,7 +7,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** none.
-- **State:** paused — no active change. Project shared resources shipped (FS-11 Current). The open
+- **State:** paused — no active change. Codex role/project prompt delivery shipped through the
+  documented adapter config overlay. Project shared resources shipped (FS-11 Current). The open
   installer flag-preservation review finding still blocks a macOS release; credentialed provider
   acceptance remains a manual gate.
 - **Last reviewed code:** `87d6251` (2026-07-16), across the continuous range after `d260f93`.
@@ -50,6 +51,13 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-16 — Codex chat now receives the frozen composed project/role prompt through the
+  official `codex-acp` `CODEX_CONFIG.developer_instructions` overlay on launch and resume; invalid
+  overlays fail before spawn, unrelated config remains intact, and Codex no longer receives the
+  unsupported generic ACP `systemPrompt`. Runtime regression tests plus `make check-specs`,
+  `make test`, and `make build` pass. A real authenticated Codex role-adherence new-turn/resume
+  check remains an explicit acceptance gate.
 
 - 2026-07-16 — Fixed all recorded installer and usability findings: the locked bootstrap preserves
   no-start/non-interactive choices under a pseudo-terminal test; incomplete hand-edited backend

@@ -139,6 +139,12 @@ Configuration-source federation for Claude/Codex is FS-08.
   read path. `GET /api/backends` returns the in-memory default catalog just as it does for a missing
   or malformed file; the logged diagnostic names `backends.json`. The file is not overwritten until
   the person explicitly saves a valid catalog.
+- **R32** — `codex-acp` receives AgentDeck's frozen composed role/project prompt through its
+  documented `CODEX_CONFIG` session-config overlay as `developer_instructions`, on both new and
+  resumed chats. AgentDeck preserves unrelated keys from a valid existing `CODEX_CONFIG` object and
+  places a pre-existing string `developer_instructions` before the composed prompt. Malformed,
+  non-object config, or a non-string existing `developer_instructions` fails that launch with a
+  bounded configuration error; AgentDeck never silently drops the selected role.
 
 ## 5. Acceptance criteria
 
@@ -185,6 +191,10 @@ Configuration-source federation for Claude/Codex is FS-08.
   catalog at the API boundary, while the editor also safely handles null collections:
   `TestReadBackendsRejectsIncompleteDocument`, `TestGetBackendsFallsBackForIncompleteDocument`, and
   `BackendsEditor.test.tsx`.
+- **A11** (R32) — Codex new/resume process environments carry the frozen composed prompt in a
+  merged `CODEX_CONFIG` `developer_instructions` value, without an unsupported ACP `systemPrompt`
+  parameter; malformed overlays fail before spawning. *Verified by* runtime parameter and
+  process-environment regression tests. A real authenticated Codex turn/resume remains part of A7.
 
 ## 6. Deviations & open decisions
 
@@ -207,6 +217,9 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **Official Claude adapter acceptance remains credential-gated.** Automated tests pin the ACP v1
   boundary and session metadata, but an authenticated streamed turn/resume/MCP run against the
   exact packaged version is still required before release compatibility is claimed.
+- **Codex role delivery remains credential-gated.** Automated tests pin the documented
+  `CODEX_CONFIG` overlay used by the installed adapter, but A7 must still confirm role adherence on
+  a real new turn and native resume.
 - **Model/API compatibility remains partial.** The ACP adapter may ignore AgentDeck's requested
   model in favor of its own identifiers, and older endpoints do not yet share one error envelope.
 
@@ -220,7 +233,8 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **Adapters/credentials:** `internal/backend/adapter.go`, `internal/backend/credcheck/`;
   the official Claude executable and delegated auth probe are pinned by
   `TestClaudeAdapterUsesOfficialBinary` and `TestClaudeProberRetriesWithoutNoColor`;
-  `internal/runtime/chat.go` (adapter consumption and shared ACP permission gate).
+  `internal/runtime/chat.go` (adapter consumption, Codex config-overlay composition, and shared ACP
+  permission gate).
 - **Capability/composition:** `internal/server/terminal.go`, `launch.go`, `resume.go`, `switch.go`.
 - **UI:** `ui/src/schemas/backends.ts`, `ui/src/lib/backendTypes.ts`,
   `ui/src/features/settings/BackendsEditor.tsx`,

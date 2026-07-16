@@ -64,10 +64,18 @@ adapter owns its compatible native Claude executable; AgentDeck passes provider 
 through documented ACP session metadata and uses the adapter's `--cli` delegation for credential
 checks. Interactive terminal launch and hook settings remain a direct-Claude-CLI path.
 
+**R14 — Prompt delivery is adapter-specific and fail-closed.** Claude receives the composed prompt
+through its documented ACP metadata. `codex-acp` does not consume an ACP `systemPrompt` or prompt
+metadata field; AgentDeck instead merges the composed start prompt into the adapter's documented
+`CODEX_CONFIG` JSON object as `developer_instructions` before spawning it. A malformed overlay or
+conflicting non-string value is a launch error, not a best-effort prompt omission. The generic ACP
+shape omits `systemPrompt` for Codex.
+
 ## 3. Interfaces & data shapes
 
 - ACP: JSON-RPC messages over newline-delimited child stdin/stdout; adapter determines exact
-  `session/new`, `session/load`, prompt, cancel, and permission option shapes.
+  `session/new`, `session/load`, prompt, cancel, and permission option shapes. The Codex prompt
+  overlay is process configuration (`CODEX_CONFIG`), not an ACP metadata extension.
 - Hook: `POST /api/hook` with a bearer/scoped token; accepted status vocabulary is the FS-02 state
   set plus tracking events.
 - MCP: streamable HTTP at `/mcp`; tools accept only their documented arguments and return
@@ -95,7 +103,8 @@ checks. Interactive terminal launch and hook settings remain a direct-Claude-CLI
 
 - ACP/runtime: `internal/runtime/chat.go`, `transport.go`, `event.go`, `permission.go`.
 - Adapters: `internal/backend/adapter.go`; credential checks in `internal/backend/credcheck`;
-  official Claude session metadata pinned by `TestClaudeSessionNewParamsUseMetaOptions`.
+  official Claude session metadata and Codex `CODEX_CONFIG` prompt delivery are pinned by runtime
+  parameter/environment tests.
 - Hooks: `internal/hooks`, `internal/server/hook.go`, registration in `launch.go`.
 - MCP: `internal/messaging/messaging.go`, `tools.go`, `internal/server/messaging_registration.go`.
 - Terminal: `internal/runtime/terminal`, `internal/server/terminal.go`.
