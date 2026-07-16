@@ -10,7 +10,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 - **State:** paused — no active change. Project shared resources shipped (FS-11 Current). The open
   installer flag-preservation review finding still blocks a macOS release; credentialed provider
   acceptance remains a manual gate.
-- **Last reviewed code:** `ccd0a51` (2026-07-15), across the continuous range after `d260f93`.
+- **Last reviewed code:** `87d6251` (2026-07-16), across the continuous range after `d260f93`.
 - **Branch:** `main`.
 
 ## Decisions needing your input
@@ -58,6 +58,11 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
+- 2026-07-16 — Review through `87d6251` found the project shared-resources work sound: launch,
+  resume, and switch inject the owner-only resource directory through one shared helper; project
+  responses expose only the path and never the contents; and the specifications match the code in
+  both directions. No new findings. The open installer flag-preservation regression still stands.
+  Spec checks and the targeted config/server tests pass.
 - 2026-07-15 — Shipped project shared resources (FS-11 Current): every project gets an
   AgentDeck-owned owner-only `project-resources/{id}/` directory outside its repository, created on
   project creation and lazily before launch, injected into launch/resume/switch as
