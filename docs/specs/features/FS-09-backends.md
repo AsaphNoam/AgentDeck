@@ -134,6 +134,11 @@ Configuration-source federation for Claude/Codex is FS-08.
   `${OPENAI_BASE_URL:-https://api.openai.com}/v1/models`; OpenCode requires its executable plus
   either its standard auth file or a provider API key; OpenHands requires its executable plus
   `LLM_API_KEY` or its standard settings file.
+- **R31** — A hand-edited `backends.json` that is syntactically valid but structurally incomplete
+  (including a missing `backends` map or a backend with no models) is treated as unreadable on every
+  read path. `GET /api/backends` returns the in-memory default catalog just as it does for a missing
+  or malformed file; the logged diagnostic names `backends.json`. The file is not overwritten until
+  the person explicitly saves a valid catalog.
 
 ## 5. Acceptance criteria
 
@@ -176,6 +181,10 @@ Configuration-source federation for Claude/Codex is FS-08.
   pinned package's real initialize/session/turn behavior remains part of the credentialed A7 gate.
   *Verified by* adapter, runtime parameter, and Claude credential-probe tests plus the gated real
   adapter acceptance suite.
+- **A10** (R31) — Missing backend collections and null model maps fall back to a usable default
+  catalog at the API boundary, while the editor also safely handles null collections:
+  `TestReadBackendsRejectsIncompleteDocument`, `TestGetBackendsFallsBackForIncompleteDocument`, and
+  `BackendsEditor.test.tsx`.
 
 ## 6. Deviations & open decisions
 

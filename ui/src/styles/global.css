@@ -1333,6 +1333,30 @@ button:disabled {
   min-width: 120px;
 }
 
+.source-unbound,
+.source-bound,
+.source-preview {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.source-preview {
+  background: var(--panel);
+}
+
+.source-field-value {
+  overflow-wrap: anywhere;
+}
+
+[id^="src-override-model-"],
+[id^="src-override-effort-"] {
+  min-width: 0;
+}
+
 .source-inventory {
   display: grid;
   gap: 8px;

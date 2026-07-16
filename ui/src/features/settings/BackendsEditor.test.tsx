@@ -49,6 +49,15 @@ describe("BackendsEditor", () => {
     expect(await screen.findByDisplayValue("Claude")).toBeInTheDocument();
   });
 
+  it("does not crash when a malformed response contains null collections", async () => {
+    server.use(
+      http.get("/api/backends", () => HttpResponse.json({ version: 2, backends: { claude: { ...defaultBackendsDoc.backends.claude, models: null } } })),
+    );
+    renderWithQuery(<BackendsEditor />);
+    expect(await screen.findByDisplayValue("Claude")).toBeInTheDocument();
+    expect(screen.getByText("+ Add model")).toBeInTheDocument();
+  });
+
   it("shows ok cred chip after Save", async () => {
     renderWithQuery(<BackendsEditor />);
     await screen.findByDisplayValue("Claude");

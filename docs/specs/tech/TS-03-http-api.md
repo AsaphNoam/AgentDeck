@@ -99,6 +99,10 @@ integers instead of silently applying defaults.
 - **INV §14:** Host/Origin validation wraps the entire mux, including raw `/mcp` and WebSocket paths.
 - **R11 — UI/API lockstep.** A payload field changed in the server is changed in `ui/src/api` schemas
   and tests in the same completed change; permissive client parsing is not a substitute for a specification update.
+- **R13 — Config map normalization.** A config response with a map that the UI iterates, including
+  `backends` and each backend's `models`, must never expose a nil map as JSON `null`. A malformed or
+  structurally incomplete hand-edited document follows its feature-owned fallback/error path with a
+  diagnostic that names the source file; the UI still uses a null-safe boundary guard.
 - **INV §10:** the Settings surface, HTTP responses, client schema, and lifecycle composition ship
   together; no API field or directory is left unreachable or undocumented.
 

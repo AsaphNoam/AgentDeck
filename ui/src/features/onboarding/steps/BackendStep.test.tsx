@@ -119,4 +119,17 @@ describe("BackendStep", () => {
     expect(screen.getByText("LLM API key")).toBeInTheDocument();
     expect(screen.getByText(/LLM base URL/i)).toBeInTheDocument();
   });
+
+  it("explains a missing adapter in human terms", async () => {
+    server.use(
+      http.put("/api/backends", () =>
+        HttpResponse.json({ ...seededBackendsDoc, credentials: { claude: { status: "skipped", detail: "cli_not_installed" } } }),
+      ),
+    );
+    renderWithQuery(<BackendStep onDone={vi.fn()} />);
+    await screen.findByDisplayValue("claude-sonnet-4-6");
+    fireEvent.click(screen.getByText("Validate & Continue"));
+    expect(await screen.findByText(/adapter is not installed/i)).toBeInTheDocument();
+    expect(screen.queryByText(/cli_not_installed/)).toBeNull();
+  });
 });

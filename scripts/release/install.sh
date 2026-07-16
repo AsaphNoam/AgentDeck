@@ -109,6 +109,17 @@ if [ "${AGENTDECK_INSTALL_LOCK_HELD:-}" != "1" ]; then
   mkdir -p "$app_root" || die "could not create application root: ${app_root}"
   chmod 700 "$app_root" || die "could not secure application root: ${app_root}"
   : >"$app_root/install.lock" || die "could not create install lock"
+  # Argument parsing above consumes the original argv, so rebuild the behavioral
+  # flags for the lock-holding child. Without this, a TTY child would incorrectly
+  # become interactive and start the dashboard despite the caller's explicit
+  # --non-interactive or --no-start request (FS-10.R6, R12).
+  set --
+  if [ "$NO_START" = "1" ]; then
+    set -- "$@" --no-start
+  fi
+  if [ "$NONINTERACTIVE" = "1" ]; then
+    set -- "$@" --non-interactive
+  fi
   exec lockf -k -t 0 "$app_root/install.lock" env \
     AGENTDECK_INSTALL_LOCK_HELD=1 AGENTDECK_VERSION="$VERSION" "$0" "$@"
 fi

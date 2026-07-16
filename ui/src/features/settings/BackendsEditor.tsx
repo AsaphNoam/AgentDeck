@@ -84,7 +84,7 @@ interface BackendEntry {
 }
 
 function backendEntries(cfg: BackendsConfig): BackendEntry[] {
-  return Object.entries(cfg.backends)
+  return Object.entries(cfg.backends ?? {})
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([id, backend]) => ({ id, backend, envPairs: toPairs(backend.env) }));
 }
@@ -253,7 +253,7 @@ export function BackendsEditor() {
             <div className="backend-models-header">
               <strong>Models</strong>
             </div>
-            {Object.entries(backend.models).map(([modelId, model]) => (
+            {Object.entries(backend.models ?? {}).map(([modelId, model]) => (
               <ModelRow
                 key={modelId}
                 modelId={modelId}
@@ -263,11 +263,11 @@ export function BackendsEditor() {
                 onSetDefault={() => updateBackend(id, { default_model: modelId })}
                 onChange={(updatedModel) => {
                   updateBackend(id, {
-                    models: { ...backend.models, [modelId]: updatedModel },
+                    models: { ...(backend.models ?? {}), [modelId]: updatedModel },
                   });
                 }}
                 onRemove={() => {
-                  const next = { ...backend.models };
+                  const next = { ...(backend.models ?? {}) };
                   delete next[modelId];
                   updateBackend(id, { models: next });
                 }}
@@ -280,8 +280,8 @@ export function BackendsEditor() {
                 const newId = `model-${Date.now()}`;
                 const newModel: Model = { name: "New model", model: "" };
                 updateBackend(id, {
-                  models: { ...backend.models, [newId]: newModel },
-                  default_model: Object.keys(backend.models).length === 0 ? newId : backend.default_model,
+                  models: { ...(backend.models ?? {}), [newId]: newModel },
+                  default_model: Object.keys(backend.models ?? {}).length === 0 ? newId : backend.default_model,
                 });
               }}
             >

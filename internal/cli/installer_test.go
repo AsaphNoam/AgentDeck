@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +12,7 @@ import (
 	"time"
 
 	"github.com/agentdeck/agentdeck/internal/release"
+	"github.com/creack/pty"
 )
 
 // buildBootstrapFixture makes the small self-contained release the shell
@@ -126,6 +129,80 @@ case "$url" in *manifest.json) cp "$AGENTDECK_TEST_MANIFEST" "$out" ;; *) cp "$A
 	}
 	if !strings.Contains(string(out), "Start AgentDeck when ready") {
 		t.Fatalf("missing manual-start guidance: %s", out)
+	}
+}
+
+// Run each bootstrap mode through a pseudo-terminal: this is the path that
+// exposed the lockf re-exec losing parsed flags. A plain pipe would make the
+// child non-interactive even when it accidentally dropped --non-interactive.
+func TestBootstrapLockReexecPreservesNoStartAndNonInteractive(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		args       []string
+		wantNoAuth bool
+	}{
+		{name: "no start", args: []string{"--version", "1.0.0", "--no-start"}},
+		{name: "non interactive", args: []string{"--version", "1.0.0", "--non-interactive"}, wantNoAuth: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fixture := t.TempDir()
+			archive, manifest := buildBootstrapFixture(t, "1.0.0", fixture)
+			fakeBin := filepath.Join(fixture, "bin")
+			if err := os.MkdirAll(fakeBin, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			writeBootstrapCommand(t, fakeBin, "uname", `case "$1" in -s) echo Darwin ;; -m) echo arm64 ;; *) exit 1 ;; esac`)
+			writeBootstrapCommand(t, fakeBin, "lockf", "while [ \"$#\" -gt 0 ]; do\n  case \"$1\" in\n    -k) shift ;;\n    -t) shift 2 ;;\n    *) break ;;\n  esac\ndone\nshift\nexec \"$@\"")
+			writeBootstrapCommand(t, fakeBin, "curl", "out=\"\"\nwhile [ \"$#\" -gt 0 ]; do\n  case \"$1\" in -o) out=\"$2\"; shift 2 ;; *) url=\"$1\"; shift ;; esac\ndone\ncase \"$url\" in *manifest.json) cp \"$AGENTDECK_TEST_MANIFEST\" \"$out\" ;; *) cp \"$AGENTDECK_TEST_ARCHIVE\" \"$out\" ;; esac")
+
+			home := filepath.Join(fixture, "home")
+			appRoot := filepath.Join(fixture, "app")
+			callLog := filepath.Join(fixture, "calls")
+			installer := filepath.Join("..", "..", "scripts", "release", "install.sh")
+			cmd := exec.Command("bash", append([]string{installer}, tc.args...)...)
+			cmd.Env = append(os.Environ(),
+				"PATH="+fakeBin+":"+filepath.Join(appRoot, "bin")+":"+os.Getenv("PATH"),
+				"HOME="+home,
+				"AGENTDECK_APP_ROOT="+appRoot,
+				"AGENTDECK_TEST_ARCHIVE="+archive,
+				"AGENTDECK_TEST_MANIFEST="+manifest,
+				"AGENTDECK_TEST_CALL_LOG="+callLog,
+			)
+			ptmx, err := pty.Start(cmd)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer ptmx.Close()
+			// Keep a rejected answer queued in case a regression makes the locked
+			// child interactive. The regression must then continue far enough to
+			// expose its forbidden auth/dashboard call instead of hanging the test.
+			if _, err := ptmx.Write([]byte("n\n")); err != nil {
+				t.Fatal(err)
+			}
+			var output bytes.Buffer
+			go func() { _, _ = io.Copy(&output, ptmx) }()
+			wait := make(chan error, 1)
+			go func() { wait <- cmd.Wait() }()
+			select {
+			case err = <-wait:
+			case <-time.After(5 * time.Second):
+				_ = ptmx.Close()
+				t.Fatalf("bootstrap install did not finish: %s", output.String())
+			}
+			if err != nil {
+				t.Fatalf("bootstrap install: %v", err)
+			}
+			calls, err := os.ReadFile(callLog)
+			if err != nil && !os.IsNotExist(err) {
+				t.Fatal(err)
+			}
+			if strings.Contains(string(calls), "dashboard") {
+				t.Fatalf("%s bootstrap started dashboard after lock re-exec: %q", tc.name, calls)
+			}
+			if tc.wantNoAuth && strings.TrimSpace(string(calls)) != "" {
+				t.Fatalf("non-interactive bootstrap invoked post-install commands: %q", calls)
+			}
+		})
 	}
 }
 

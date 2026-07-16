@@ -330,12 +330,23 @@ func TestChatStreamText(t *testing.T) {
 
 	evs := drainTurn(t, ch)
 	var texts int
+	var userPrompts int
 	var seqs []int64
 	for _, e := range evs {
 		seqs = append(seqs, e.Seq)
 		if e.Type == EvAssistantText {
 			texts++
 		}
+		if e.Type == EvUserPrompt {
+			var prompt UserPromptData
+			if err := json.Unmarshal(e.Data, &prompt); err != nil || prompt.Text != "hello" {
+				t.Fatalf("user prompt event = %+v err=%v, want accepted prompt", prompt, err)
+			}
+			userPrompts++
+		}
+	}
+	if userPrompts != 1 {
+		t.Fatalf("want one durable user_text event, got %d", userPrompts)
 	}
 	if texts < 2 {
 		t.Fatalf("want >=2 assistant_text deltas (incremental), got %d", texts)

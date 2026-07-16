@@ -306,6 +306,10 @@ func (c *ChatRuntime) SendPrompt(ctx context.Context, agentID, text string) erro
 		as.mu.Unlock()
 		return err
 	}
+	// Persist the accepted user side of the turn before handing it to ACP. This
+	// gives it the same durable sequence, replay, and index path as assistant
+	// output, so a reconnect cannot replace the chat with a one-sided history.
+	c.emit(as, EvUserPrompt, UserPromptData{Text: text})
 
 	// busy / thinking (techspec §4.4).
 	now := time.Now().UTC()

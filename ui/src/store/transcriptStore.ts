@@ -94,6 +94,17 @@ export const useTranscriptStore = create<TranscriptStoreState>((set) => ({
       }
 
       const events = [...(state.byAgent[agentId] ?? [])];
+	      // The composer displays a local user bubble immediately. Replace that
+	      // exact unsequenced bubble when its durable runtime event arrives so a
+	      // live SSE delivery does not render the prompt twice.
+      if (kind === "user_text") {
+        for (let i = events.length - 1; i >= 0; i--) {
+          if (kindOf(events[i]) === "user_text" && events[i].seq == null && textOf(events[i]) === textOf(event)) {
+            events[i] = event;
+            return { byAgent: { ...state.byAgent, [agentId]: events }, pending: state.pending };
+          }
+        }
+      }
       const last = events[events.length - 1];
       // Streamed assistant deltas carry no message_id; merge consecutive
       // assistant_text events into a single bubble.
