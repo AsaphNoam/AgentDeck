@@ -4,6 +4,14 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-16 — implementation: Codex role and project prompts
+
+Codex chat agents now receive the selected role and project guidance. AgentDeck sends the frozen composed prompt through Codex’s supported session configuration instead of the ACP field Codex ignores, while preserving any other Codex configuration you already provide. Invalid configuration overlays stop the launch clearly instead of silently losing the role. Claude behavior is unchanged.
+
+**Needs attention:** A real authenticated Codex new-chat and resume check is still needed to confirm the adapter applies the prompt end to end.
+
+**Next:** Run that live Codex acceptance check before claiming provider-level compatibility.
+
 ### 2026-07-16 — fix: installer, chat history, and setup resilience
 
 The installer now keeps no-start and non-interactive choices when it takes its installation lock. Chat history now saves your messages as well as agent output, so reloads, archives, resumes, and search keep the complete conversation. Hand-edited incomplete backend settings no longer crash the dashboard; setup errors now explain the next step, and the configuration-source panel is styled correctly.
