@@ -4,6 +4,42 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-16 — usability review: first-run, chat, grid, archive, and settings in a real browser
+
+I built the app the way users get it and drove it through a browser: first launch and the full setup
+wizard, creating and chatting with an agent, the card grid, the session archive and search (on both
+build types we ship), and the Settings screens — including the new per-project shared folder. Most of
+it holds up well: the first screen loads cleanly and styled, the setup wizard walks all the way to a
+running agent, chat works, the grid layout survives a restart, archive search works on both builds,
+and the new shared-resources folder shows its path correctly as a read-only value. All of that ran
+with no browser errors.
+
+I did find four things worth fixing, two of them serious:
+
+- If you hand-edit the backend configuration file and leave out its main section (an easy slip, since
+  we tell people the config is editable), opening the Backends settings crashes the **entire**
+  dashboard to a generic "Something went wrong" — with no hint that a file is the cause.
+- The app never saves your own chat messages, only the agent's replies. So when you reopen, resume, or
+  archive a conversation, your side of it is gone, and searching the archive can't find a session by
+  what you asked — only by what the agent said. (A past review noted the reload glitch as minor; the
+  archive and search impact makes it bigger than that.)
+- When a credential check fails during setup, the message is a raw code like "cli_not_installed" plus
+  "check your settings," which doesn't tell you what to actually do.
+- One setup panel (linking your existing CLI config) renders unstyled.
+
+The permission-prompt, terminal, resume/switch, multi-agent messaging, and failure-recovery journeys
+were not exercised this session; they're recorded as not-run, not as passing.
+
+One disclosure: while setting up a test I accidentally stopped your own running dashboard for a moment
+and restarted it — it's back up on its normal port with its previous state intact.
+
+**Needs attention:** Two new must-fix issues — the config-file edit that kills the whole dashboard,
+and chat history that silently drops your messages — plus the still-open installer flag issue from
+before a macOS release.
+
+**Next:** Run `/fix` to work through the new findings, starting with the dashboard-crash and the
+missing chat history.
+
 ### 2026-07-16 — review: current review boundary
 
 There is no new product code to review: the recorded review boundary already reaches the latest
