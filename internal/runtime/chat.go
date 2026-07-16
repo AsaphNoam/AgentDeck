@@ -89,7 +89,7 @@ func (c *ChatRuntime) adapterFor(backendType string) (backend.BackendAdapter, er
 // spawnCmd builds the *exec.Cmd for a launch/resume: the adapter supplies the
 // default binary/args (unless overridden) and the env keys to strip; the process
 // runs in its own group so the runtime can signal the whole tree.
-func (c *ChatRuntime) spawnCmd(ad backend.BackendAdapter, spec LaunchSpec) *exec.Cmd {
+func (c *ChatRuntime) spawnCmd(ad backend.BackendAdapter, spec LaunchSpec) (*exec.Cmd, error) {
 	bin, args := c.command, c.cmdArgs
 	if bin == "" {
 		bin, args = ad.Binary(), ad.LaunchArgs()
@@ -112,9 +112,16 @@ func (c *ChatRuntime) spawnCmd(ad backend.BackendAdapter, spec LaunchSpec) *exec
 	if ep, ok := ad.(backend.ExtraEnvProvider); ok {
 		env = append(env, ep.ExtraEnv(spec.ModelID, spec.SkipPerms)...)
 	}
+	if spec.BackendType == "codex-acp" {
+		var err error
+		env, err = withCodexDeveloperInstructions(env, spec.StartSystemPrompt())
+		if err != nil {
+			return nil, err
+		}
+	}
 	cmd.Env = env
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	return cmd
+	return cmd, nil
 }
 
 // SetEventSink mirrors normalized runtime events into the Phase 2 bus.
@@ -184,7 +191,10 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 		return nil, err
 	}
 
-	cmd := c.spawnCmd(ad, spec)
+	cmd, err := c.spawnCmd(ad, spec)
+	if err != nil {
+		return nil, err
+	}
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -458,7 +468,10 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 	}
 
 	// Spawn process (identical to Start).
-	cmd := c.spawnCmd(ad, spec)
+	cmd, err := c.spawnCmd(ad, spec)
+	if err != nil {
+		return nil, err
+	}
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -975,6 +988,50 @@ func stripEnv(env []string, key string) []string {
 	return out
 }
 
+// withCodexDeveloperInstructions adds the composed AgentDeck launch prompt to
+// codex-acp's documented CODEX_CONFIG session-config overlay. The adapter does
+// not consume an ACP systemPrompt field, so passing it over session/new quietly
+// loses a role/project persona. Preserve the caller's valid overlay and place
+// its existing developer instructions before AgentDeck's frozen prompt.
+func withCodexDeveloperInstructions(env []string, prompt string) ([]string, error) {
+	if prompt == "" {
+		return env, nil
+	}
+
+	var raw string
+	for _, kv := range env {
+		if strings.HasPrefix(kv, "CODEX_CONFIG=") {
+			raw = strings.TrimPrefix(kv, "CODEX_CONFIG=")
+			break
+		}
+	}
+
+	config := map[string]any{}
+	if raw != "" {
+		if err := json.Unmarshal([]byte(raw), &config); err != nil {
+			return nil, fmt.Errorf("runtime: invalid CODEX_CONFIG JSON: %w", err)
+		}
+		if config == nil {
+			return nil, errors.New("runtime: CODEX_CONFIG must be a JSON object")
+		}
+	}
+	if existing, ok := config["developer_instructions"]; ok && existing != nil {
+		value, ok := existing.(string)
+		if !ok {
+			return nil, errors.New("runtime: CODEX_CONFIG developer_instructions must be a string")
+		}
+		if value != "" {
+			prompt = value + "\n\n" + prompt
+		}
+	}
+	config["developer_instructions"] = prompt
+	encoded, err := json.Marshal(config)
+	if err != nil {
+		return nil, fmt.Errorf("runtime: encode CODEX_CONFIG: %w", err)
+	}
+	return append(stripEnv(env, "CODEX_CONFIG"), "CODEX_CONFIG="+string(encoded)), nil
+}
+
 // clip truncates s to at most n bytes (for status detail fields, ≤120 chars).
 func clip(s string, n int) string {
 	if len(s) <= n {
@@ -1099,8 +1156,12 @@ func sessionNewParams(spec LaunchSpec) map[string]any {
 	params := map[string]any{
 		"cwd":                   spec.Cwd,
 		"mcpServers":            mcp,
-		"systemPrompt":          spec.StartSystemPrompt(),
 		"additionalDirectories": spec.AddDirs,
+	}
+	// codex-acp ignores generic ACP systemPrompt. Its prompt is supplied via the
+	// CODEX_CONFIG developer_instructions overlay in spawnCmd.
+	if spec.BackendType != "codex-acp" {
+		params["systemPrompt"] = spec.StartSystemPrompt()
 	}
 	if spec.ModelID != "" {
 		params["model"] = spec.ModelID
@@ -1109,11 +1170,11 @@ func sessionNewParams(spec LaunchSpec) map[string]any {
 }
 
 // sessionLoadParams builds the session/load params. It carries the SAME fields as
-// session/new (cwd, mcpServers, model, systemPrompt, additionalDirectories) plus
-// the sessionId to restore — so resuming applies the freshly-minted messaging MCP
-// server AND the current model/system-prompt on the native-resume path, not only
-// on the session/new fallback. Without model here, a same-backend model swap that
-// uses native resume (CanSwitchModelOnResume) would silently keep the old model.
+// session/new (cwd, mcpServers, model, additionalDirectories, and where
+// supported systemPrompt) plus the sessionId to restore. Codex obtains its
+// prompt through its process config overlay; other generic adapters retain the
+// top-level systemPrompt shape. Without model here, a same-backend model swap
+// that uses native resume would silently keep the old model.
 func sessionLoadParams(spec LaunchSpec, sessionID string) map[string]any {
 	mcp := make([]map[string]any, 0, len(spec.MCPServers))
 	for _, m := range spec.MCPServers {
@@ -1138,8 +1199,10 @@ func sessionLoadParams(spec LaunchSpec, sessionID string) map[string]any {
 		"sessionId":             sessionID,
 		"cwd":                   spec.Cwd,
 		"mcpServers":            mcp,
-		"systemPrompt":          spec.StartSystemPrompt(),
 		"additionalDirectories": spec.AddDirs,
+	}
+	if spec.BackendType != "codex-acp" {
+		params["systemPrompt"] = spec.StartSystemPrompt()
 	}
 	if spec.ModelID != "" {
 		params["model"] = spec.ModelID

@@ -93,6 +93,22 @@ func TestClaudeSessionNewParamsUseMetaOptions(t *testing.T) {
 	}
 }
 
+func TestCodexSessionParamsOmitUnsupportedSystemPrompt(t *testing.T) {
+	spec := LaunchSpec{
+		Cwd:          "/work",
+		SystemPrompt: "be helpful",
+		BackendType:  "codex-acp",
+	}
+	for name, params := range map[string]map[string]any{
+		"session/new":  sessionNewParams(spec),
+		"session/load": sessionLoadParams(spec, "sess-123"),
+	} {
+		if _, ok := params["systemPrompt"]; ok {
+			t.Fatalf("%s sends unsupported Codex systemPrompt: %#v", name, params)
+		}
+	}
+}
+
 // Regression (review fix, federation §2.4): an empty ModelID means "inherit native
 // resolution" — the model flag must be OMITTED so a bound source's native model
 // takes effect instead of AgentDeck forcing a default over ACP. Both backend

@@ -269,13 +269,21 @@ func TestSkipPermissionsEnvOpenCode(t *testing.T) {
 	base := LaunchSpec{Cwd: t.TempDir(), ModelID: "anthropic/claude-sonnet-4-5", Env: []string{"HOME=/x"}}
 
 	// skip=false → no OPENCODE_CONFIG_CONTENT.
-	if _, ok := hasEnv(c.spawnCmd(ocAd, base).Env, "OPENCODE_CONFIG_CONTENT"); ok {
+	cmd, err := c.spawnCmd(ocAd, base)
+	if err != nil {
+		t.Fatalf("spawn openCode: %v", err)
+	}
+	if _, ok := hasEnv(cmd.Env, "OPENCODE_CONFIG_CONTENT"); ok {
 		t.Fatal("opencode skip=false must not set OPENCODE_CONFIG_CONTENT")
 	}
 	// skip=true → yolo config injected.
 	yolo := base
 	yolo.SkipPerms = true
-	v, ok := hasEnv(c.spawnCmd(ocAd, yolo).Env, "OPENCODE_CONFIG_CONTENT")
+	cmd, err = c.spawnCmd(ocAd, yolo)
+	if err != nil {
+		t.Fatalf("spawn openCode skip=true: %v", err)
+	}
+	v, ok := hasEnv(cmd.Env, "OPENCODE_CONFIG_CONTENT")
 	if !ok || !strings.Contains(v, `"permission"`) {
 		t.Fatalf("opencode skip=true OPENCODE_CONFIG_CONTENT = %q, want a permission config", v)
 	}
@@ -284,9 +292,96 @@ func TestSkipPermissionsEnvOpenCode(t *testing.T) {
 	// is stripped so the adapter value is authoritative.
 	ohAd, _ := backend.For("openhands-acp")
 	ohSpec := LaunchSpec{Cwd: t.TempDir(), ModelID: "anthropic/claude-sonnet-4-5", Env: []string{"HOME=/x", "LLM_MODEL=shell-leak"}}
-	got, ok := hasEnv(c.spawnCmd(ohAd, ohSpec).Env, "LLM_MODEL")
+	cmd, err = c.spawnCmd(ohAd, ohSpec)
+	if err != nil {
+		t.Fatalf("spawn openHands: %v", err)
+	}
+	got, ok := hasEnv(cmd.Env, "LLM_MODEL")
 	if !ok || got != "anthropic/claude-sonnet-4-5" {
 		t.Fatalf("openhands LLM_MODEL = %q (ok=%v), want the adapter model, not the shell leak", got, ok)
+	}
+}
+
+// FS-09.A11 / TS-04.R14: codex-acp does not accept ACP systemPrompt. Its
+// documented per-process CODEX_CONFIG overlay must preserve user config while
+// carrying the frozen AgentDeck role/project prompt for both Start and Resume.
+func TestCodexDeveloperInstructionsEnv(t *testing.T) {
+	st, err := state.Open(t.TempDir())
+	if err != nil {
+		t.Fatalf("state.Open: %v", err)
+	}
+	t.Cleanup(func() { st.Close() })
+	c := NewChatRuntime(st)
+	ad, ok := backend.For("codex-acp")
+	if !ok {
+		t.Fatal("codex adapter missing")
+	}
+
+	base := LaunchSpec{
+		Cwd:          t.TempDir(),
+		BackendType:  "codex-acp",
+		SystemPrompt: "Project context\n\nAct as reviewer.",
+		Env: []string{
+			"HOME=/x",
+			`CODEX_CONFIG={"model":"gpt-5.5","developer_instructions":"Keep commits small."}`,
+		},
+	}
+	hasEnv := func(env []string, key string) (string, bool) {
+		for _, kv := range env {
+			if strings.HasPrefix(kv, key+"=") {
+				return strings.TrimPrefix(kv, key+"="), true
+			}
+		}
+		return "", false
+	}
+	assertPrompt := func(spec LaunchSpec) {
+		t.Helper()
+		cmd, err := c.spawnCmd(ad, spec)
+		if err != nil {
+			t.Fatalf("spawn Codex: %v", err)
+		}
+		raw, ok := hasEnv(cmd.Env, "CODEX_CONFIG")
+		if !ok {
+			t.Fatal("CODEX_CONFIG missing")
+		}
+		var config map[string]any
+		if err := json.Unmarshal([]byte(raw), &config); err != nil {
+			t.Fatalf("CODEX_CONFIG is not JSON: %v", err)
+		}
+		if config["model"] != "gpt-5.5" {
+			t.Fatalf("model = %#v, want preserved value", config["model"])
+		}
+		wantPrompt := "Keep commits small.\n\n" + spec.StartSystemPrompt()
+		if got := config["developer_instructions"]; got != wantPrompt {
+			t.Fatalf("developer_instructions = %#v", got)
+		}
+	}
+
+	assertPrompt(base)
+	resume := base
+	resume.RuntimeSystemPrompt = "Project context\n\nAct as reviewer.\n\nPrior-turn primer."
+	assertPrompt(resume)
+}
+
+func TestCodexDeveloperInstructionsRejectInvalidConfig(t *testing.T) {
+	c := NewChatRuntime(nil)
+	ad, _ := backend.For("codex-acp")
+	for name, config := range map[string]string{
+		"malformed JSON":                "{not-json",
+		"non-object":                    "[]",
+		"non-string instructions value": `{"developer_instructions":true}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := c.spawnCmd(ad, LaunchSpec{
+				Cwd:          t.TempDir(),
+				BackendType:  "codex-acp",
+				SystemPrompt: "Act as reviewer.",
+				Env:          []string{"CODEX_CONFIG=" + config},
+			})
+			if err == nil || strings.Contains(err.Error(), config) {
+				t.Fatalf("spawn error = %v, want bounded invalid CODEX_CONFIG error", err)
+			}
+		})
 	}
 }
 
