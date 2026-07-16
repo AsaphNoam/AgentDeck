@@ -4,6 +4,19 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-16 — review: project shared resources
+
+The completed project shared-resources work holds up. Every project's AgentDeck-owned folder is
+created before the project is saved and is handed to each agent you launch, resume, or switch in the
+same consistent way; the folder stays owner-only and outside the code repository, and its contents
+are never read into the dashboard, its API, or logs — only the path is shown, read-only in Settings,
+and reported before a project delete. The written specifications, the automated Go tests, and the
+specification checks all agree with what shipped, and I found no new problems in this range.
+
+**Needs attention:** The earlier macOS installer flag issue is still open and still blocks a release.
+
+**Next:** Run `/fix` to repair the installer flag handoff before publishing a release.
+
 ### 2026-07-15 — implementation: project shared resources
 
 Every project now gets its own AgentDeck-owned folder that lives outside the project's code
