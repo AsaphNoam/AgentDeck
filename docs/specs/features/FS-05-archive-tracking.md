@@ -79,7 +79,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 ### 2.5 Archived transcript viewing
 
 - **R14.** An inactive session opens in a **read-only** archived view that renders its recorded
-  transcript (assistant text, tool calls, tool results, file diffs, permission requests) via
+  transcript (user prompts, assistant text, tool calls, tool results, file diffs, permission requests) via
   `GET /api/sessions/{id}/transcript`, with no composer and no ability to send a prompt. The view
   exposes a Resume control (R11). An `active` session instead opens the live chat panel (FS-03).
 

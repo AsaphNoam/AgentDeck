@@ -76,7 +76,7 @@ func readJSON(path string, v any) error {
 	}
 	if err := json.Unmarshal(data, v); err != nil {
 		slog.Warn("config: corrupt file, treating as unreadable", "path", path, "err", err)
-		return ErrCorrupt
+		return fmt.Errorf("%s: %w", path, ErrCorrupt)
 	}
 	return nil
 }

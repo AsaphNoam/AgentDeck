@@ -7,6 +7,7 @@ import "encoding/json"
 // new backend never changes anything downstream. New types may be added; existing
 // payload fields are append-only (techspec §11).
 const (
+	EvUserPrompt         = "user_text"
 	EvAssistantText      = "assistant_text"
 	EvToolCall           = "tool_call"
 	EvToolResult         = "tool_result"
@@ -35,6 +36,13 @@ type Event struct {
 // appends successive deltas.
 type AssistantTextData struct {
 	Delta string `json:"delta"`
+}
+
+// UserPromptData is the accepted human prompt. It is persisted before the ACP
+// request begins so replay, archive, and full-text search retain both sides of
+// every conversation.
+type UserPromptData struct {
+	Text string `json:"text"`
 }
 
 // ToolCallData — the agent intends to / begins to run a tool.

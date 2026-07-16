@@ -4,6 +4,14 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-16 — fix: installer, chat history, and setup resilience
+
+The installer now keeps no-start and non-interactive choices when it takes its installation lock. Chat history now saves your messages as well as agent output, so reloads, archives, resumes, and search keep the complete conversation. Hand-edited incomplete backend settings no longer crash the dashboard; setup errors now explain the next step, and the configuration-source panel is styled correctly.
+
+**Needs attention:** None.
+
+**Next:** The remaining release gates are the already-recorded live provider checks.
+
 ### 2026-07-16 — usability review: first-run, chat, grid, archive, and settings in a real browser
 
 I built the app the way users get it and drove it through a browser: first launch and the full setup

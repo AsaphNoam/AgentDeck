@@ -102,7 +102,8 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   Escape. Its steps are **Backend → Project → Config → Launch**.
 - **R17.** The Backend step edits the seeded backend for the chosen type, saves via `PUT
   /api/backends`, and only advances when the returned credential status for that backend is `ok`; a
-  non-`ok` status is shown inline with its detail and blocks advance.
+  non-`ok` status is shown inline with provider-specific, human-readable next steps (install the
+  missing adapter, run guided sign-in, or add an API key) and blocks advance.
 - **R18.** The Project step creates the user's first real project (preferred over the seeded
   `my-app`, whose `cwd` may not exist). Its id is server-derived (R31) and read back from the create
   response, then carried into the Launch step's default selection.

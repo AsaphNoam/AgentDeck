@@ -21,7 +21,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 
 - **R1.** Opening a chat-interface agent shows its name, backend, model, context usage, and a
   Transcript tab. The same surface also exposes the session's Files and Commands tabs (FS-05).
-- **R2.** The Transcript renders normalized events in sequence: assistant text as sanitized
+- **R2.** The Transcript renders normalized events in sequence: user prompts; assistant text as sanitized
   GitHub-flavored Markdown with syntax-highlighted fenced code; tool calls with expandable JSON
   arguments; tool results with error styling and expandable content after the first 600 characters;
   unified file diffs; permission prompts; turn errors; turn boundaries; and backend-switch dividers.
@@ -41,8 +41,10 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `POST /api/sessions/{id}/prompt` with `{text}`. Enter submits and Shift+Enter inserts a newline.
   The accepted response is `202` with `{accepted:true, agent_id}`.
 - **R7.** The composer immediately displays the submitted user text for the current browser view
-  and clears its draft. If delivery fails, it shows an actionable error and restores the draft so
-  the user can retry; the optimistic bubble remains visible and is not presented as server-acknowledged.
+  and clears its draft. On acceptance, the runtime emits a sequenced `user_text` event that replaces
+  the optimistic bubble and joins the durable transcript. If delivery fails, it shows an actionable
+  error and restores the draft so the user can retry; the optimistic bubble remains visible and is
+  not presented as server-acknowledged.
 - **R8.** A prompt moves the agent synchronously to `busy`. ACP output is emitted as ordered
   transcript events and a final `turn_end`; successful completion returns the agent to `idle`,
   clears `busy_since`, and updates context usage. A runtime/protocol failure emits an error and
@@ -68,9 +70,10 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   reopens. If it detects a sequence gap for the currently-open agent, it refetches the authoritative
   transcript rather than appending a possibly incomplete delta stream. Permission decisions fold
   identically on live append and full replay.
-- **R13.** Every runtime event delivered before a crash is appended to the per-agent transcript
-  before it is published to the browser. A mid-turn crash therefore preserves already-delivered
-  assistant/tool output for reload, archive, and later resume.
+- **R13.** Every accepted user prompt and runtime event delivered before a crash is appended to the
+  per-agent transcript before it is published to the browser. A mid-turn crash therefore preserves
+  both sides of the conversation plus already-delivered assistant/tool output for reload, archive,
+  and later resume.
 
 ### 2.4 Permission decisions
 
@@ -135,20 +138,15 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   turn, and becomes a no-op once idle: `internal/runtime/permission_test.go::TestCancelDuringPendingPermission`.
 - **A6** (R4, R10–R12) — Nested wire events normalize, live assistant deltas fold, and permission
   resolutions fold on live append and replay: `ui/src/store/transcriptStore.test.ts`.
-- **A7** (R13) — Delivered partial output remains in both the transcript endpoint and NDJSON after
-  a mid-turn process crash: `internal/server/integration_test.go::TestCrashMidTurnPersistsDeliveredTranscript`.
+- **A7** (R7, R13) — Accepted user prompts and delivered partial output remain in both the transcript
+  endpoint and NDJSON after a mid-turn process crash:
+  `internal/server/integration_test.go::TestCrashMidTurnPersistsDeliveredTranscript`.
 - **A8** (R1–R18) — A user launches a fake-ACP chat agent, sends a prompt, observes streaming and
   status transitions, and completes approve/deny/timeout without a stuck prompt: journeys **J3**
   and **J4** in `docs/features/USABILITY-REVIEW.md`.
 
 ## 6. Deviations & open decisions
 
-- **User prompts are browser-local, not durable transcript events.** The composer appends an
-  optimistic `user_text` event only to the current Zustand store. The runtime has no durable
-  `user_text` event, so reload, reconnect refetch, archive view, search, and resume show the
-  assistant/tool side of prior turns but omit the user's prompts. This is shipped behavior and an
-  open advisory; making prompts durable requires emitting/persisting them in `SendPrompt` and nudge
-  turns, then reconciling optimistic events by server seq.
 - **Reloaded assistant deltas do not fold like live deltas.** Live append merges consecutive
   `assistant_text` events (R4), but `foldTranscript` currently normalizes a full transcript without
   coalescing adjacent deltas. A streamed reply that appeared as one live paragraph can reload as

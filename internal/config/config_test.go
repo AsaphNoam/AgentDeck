@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -159,6 +160,25 @@ func TestCorruptFileSurvival(t *testing.T) {
 	}
 	if _, err := s.ReadBackends(); !errors.Is(err, ErrCorrupt) {
 		t.Fatalf("ReadBackends corrupt: err = %v, want ErrCorrupt", err)
+	}
+}
+
+func TestReadBackendsRejectsIncompleteDocument(t *testing.T) {
+	s := newTestStore(t)
+	for name, body := range map[string]string{
+		"missing backends": `{"version":2}`,
+		"nil models":       `{"version":2,"backends":{"claude":{"type":"claude-acp","models":null}}}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := os.WriteFile(s.backendsPath(), []byte(body), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := s.ReadBackends(); !errors.Is(err, ErrCorrupt) {
+				t.Fatalf("ReadBackends error = %v, want ErrCorrupt", err)
+			} else if !strings.Contains(err.Error(), "backends.json") {
+				t.Fatalf("ReadBackends error = %q, want offending file name", err)
+			}
+		})
 	}
 }
 
