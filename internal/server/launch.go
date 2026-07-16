@@ -187,6 +187,16 @@ func (s *Server) composeLaunch(ctx context.Context, req launchRequest) (runtime.
 	}
 	addDirs := expandAddDirs(project.AddDirs)
 
+	// Ensure the project's shared-resources directory before any registration side
+	// effect so an unusable path fails the launch cleanly (FS-11.R6/R9). Its path is
+	// folded into the frozen add_dirs, prompt, and env below so resume/switch
+	// reproduce it from the snapshot (INV §2).
+	resourceDir, ae := s.ensureProjectResources(req.Project)
+	if ae != nil {
+		return runtime.LaunchSpec{}, state.Agent{}, ae
+	}
+	addDirs = appendResourceDir(addDirs, resourceDir)
+
 	// Configuration federation (Phase 7 §2.5): when this backend has an active
 	// source binding, resolve it FRESH at launch — the correctness boundary. A
 	// stale/invalid/unapproved source blocks the launch (never composed from
@@ -247,11 +257,11 @@ func (s *Server) composeLaunch(ctx context.Context, req launchRequest) (runtime.
 		Agent:        agent,
 		Cwd:          cwd,
 		AddDirs:      addDirs,
-		SystemPrompt: joinSystemPrompt(project.ContextPrompt, role.SystemPrompt),
+		SystemPrompt: joinSystemPrompt(project.ContextPrompt, role.SystemPrompt, projectResourcesInstruction(resourceDir)),
 		BackendType:  backend.Type,
 		ModelID:      acpModelID,
 		Driver:       driver,
-		Env:          composeEnv(os.Environ(), backend.Env, model.Env, hookEnv),
+		Env:          composeEnv(os.Environ(), backend.Env, model.Env, hookEnv, projectResourcesEnv(resourceDir)),
 		SkipPerms:    resolveSkip(s.cfg.SkipPermissions, role.SkipPermissions),
 		HookToken:    token,
 		MCPServers:   []runtime.MCPServerSpec{mcpSpec},
@@ -310,16 +320,74 @@ func defaultBackendID(b config.BackendsConfig) string {
 	return ""
 }
 
-// joinSystemPrompt joins project context then role persona, skipping empties so
+// joinSystemPrompt joins the given prompt segments in order (project context,
+// role persona, then the project-resources instruction), skipping empties so
 // there are no leading/trailing blank lines (techspec §6.2).
-func joinSystemPrompt(contextPrompt, systemPrompt string) string {
-	parts := make([]string, 0, 2)
-	for _, p := range []string{contextPrompt, systemPrompt} {
+func joinSystemPrompt(segments ...string) string {
+	parts := make([]string, 0, len(segments))
+	for _, p := range segments {
 		if strings.TrimSpace(p) != "" {
 			parts = append(parts, p)
 		}
 	}
 	return strings.Join(parts, "\n\n")
+}
+
+// envProjectResources is the env var carrying the project's shared-resources
+// directory to every launched agent (FS-11.R3).
+const envProjectResources = "AGENTDECK_PROJECT_RESOURCES"
+
+// ensureProjectResources ensures the project's AgentDeck-owned shared-resources
+// directory exists and is usable, returning its absolute path. Launch, resume,
+// and switch all call it before any registration side effect so an unusable path
+// fails the operation with nothing to unwind (FS-11.R6/R9, INV §2). The immutable
+// project id keeps the path identical across the whole lifecycle, so resume/switch
+// inherit the same add_dirs/prompt from the frozen snapshot and only re-add the
+// env var (env is recomposed each launch).
+func (s *Server) ensureProjectResources(projectID string) (string, *runtime.APIError) {
+	path, err := s.configStore.EnsureProjectResources(projectID)
+	if err != nil {
+		return "", apiError(runtime.CodeValidation, "project resources unavailable: "+err.Error())
+	}
+	return path, nil
+}
+
+// projectResourceDir returns the canonical resource-directory path for read-only
+// response metadata (TS-03.R12) without creating anything; a malformed id yields "".
+func (s *Server) projectResourceDir(id string) string {
+	p, err := s.configStore.ProjectResourcesPath(id)
+	if err != nil {
+		return ""
+	}
+	return p
+}
+
+// projectResourcesEnv is the single env layer carrying the resource path; shared
+// by launch/resume/switch so they never rebuild it independently (INV §2).
+func projectResourcesEnv(path string) map[string]string {
+	return map[string]string{envProjectResources: path}
+}
+
+// projectResourcesInstruction is the composed launch instruction telling the agent
+// the directory is the project's shared place for agent-created material, outside
+// the repository, readable and writable by project agents (FS-11.R3).
+func projectResourcesInstruction(path string) string {
+	return "Shared project resources: " + path + "\n" +
+		"This AgentDeck-owned directory is the project's shared place for agent-created " +
+		"material (specs, guides, research, test harnesses, results). It lives outside the " +
+		"project repository, so nothing written there can become an accidental commit. You " +
+		"and other agents on this project may read and write it freely; your working " +
+		"directory stays the project checkout."
+}
+
+// appendResourceDir appends the resource path to add_dirs exactly once (FS-11.R3).
+func appendResourceDir(dirs []string, resourceDir string) []string {
+	for _, d := range dirs {
+		if d == resourceDir {
+			return dirs
+		}
+	}
+	return append(dirs, resourceDir)
 }
 
 // resolveSkip computes the effective skip_permissions: role override if set, else

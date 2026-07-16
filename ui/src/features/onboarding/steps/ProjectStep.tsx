@@ -31,6 +31,8 @@ export function ProjectStep({ onDone }: ProjectStepProps) {
         cwd: cwd.trim(),
         add_dirs: [],
         context_prompt: context.trim(),
+        // Server-computed and read-only; ignored on create (TS-03.R12).
+        resource_dir: "",
       },
       {
         onSuccess: (resp) => {

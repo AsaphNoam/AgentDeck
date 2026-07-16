@@ -27,6 +27,9 @@ export const projectResponseSchema = z.object({
   cwd: z.string(),
   add_dirs: z.array(z.string()),
   context_prompt: z.string(),
+  // Server-computed, read-only absolute path to the project's AgentDeck-owned
+  // shared-resources directory (TS-03.R12). Never sent back on create/update.
+  resource_dir: z.string().default(""),
   warnings: z.array(fieldWarningSchema).optional(),
 });
 

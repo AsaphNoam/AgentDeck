@@ -289,16 +289,20 @@ func (b projectPutBody) toProject() config.Project {
 }
 
 type projectResponse struct {
-	ProjectID     string              `json:"project"`
-	Title         string              `json:"title"`
-	Color         [3]int              `json:"color"`
-	Cwd           string              `json:"cwd"`
-	AddDirs       []string            `json:"add_dirs"`
-	ContextPrompt string              `json:"context_prompt"`
-	Warnings      []config.FieldError `json:"warnings,omitempty"`
+	ProjectID     string   `json:"project"`
+	Title         string   `json:"title"`
+	Color         [3]int   `json:"color"`
+	Cwd           string   `json:"cwd"`
+	AddDirs       []string `json:"add_dirs"`
+	ContextPrompt string   `json:"context_prompt"`
+	// ResourceDir is the server-computed, read-only absolute path to the project's
+	// AgentDeck-owned shared-resources directory (TS-03.R12). It is derived from the
+	// immutable id, never stored in projects/{id}.json, and ignores any client value.
+	ResourceDir string              `json:"resource_dir"`
+	Warnings    []config.FieldError `json:"warnings,omitempty"`
 }
 
-func toProjectResponse(id string, p config.Project, warnings []config.FieldError) projectResponse {
+func (s *Server) toProjectResponse(id string, p config.Project, warnings []config.FieldError) projectResponse {
 	addDirs := p.AddDirs
 	if addDirs == nil {
 		addDirs = []string{}
@@ -310,6 +314,7 @@ func toProjectResponse(id string, p config.Project, warnings []config.FieldError
 		Cwd:           p.Cwd,
 		AddDirs:       addDirs,
 		ContextPrompt: p.ContextPrompt,
+		ResourceDir:   s.projectResourceDir(id),
 		Warnings:      warnings,
 	}
 }
@@ -350,12 +355,20 @@ func (s *Server) handlePostProject(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	// Ensure the shared-resources directory before writing the definition so a
+	// resource-creation failure leaves no new project behind (FS-11.R6).
+	if _, err := s.configStore.EnsureProjectResources(id); err != nil {
+		writeValidationError(w, &config.ValidationErrors{Errors: []config.FieldError{
+			{Field: "project", Code: "resource_dir_unavailable", Message: "cannot create project resources: " + err.Error()},
+		}})
+		return
+	}
 	if err := s.configStore.WriteProject(id, proj); err != nil {
 		s.log.Error("projects: write", "err", err)
 		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
-	writeJSON(w, http.StatusCreated, toProjectResponse(id, proj, warnings))
+	writeJSON(w, http.StatusCreated, s.toProjectResponse(id, proj, warnings))
 }
 
 // handlePutProject implements PUT /api/projects/{p} (§5.2).
@@ -401,7 +414,7 @@ func (s *Server) handlePutProject(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
-	writeJSON(w, http.StatusOK, toProjectResponse(id, proj, warnings))
+	writeJSON(w, http.StatusOK, s.toProjectResponse(id, proj, warnings))
 }
 
 // handleDeleteProject implements DELETE /api/projects/{p} (§5.2).

@@ -76,6 +76,9 @@ export function ProjectForm({
       cwd: vals.cwd,
       add_dirs: addDirs,
       context_prompt: vals.context_prompt,
+      // resource_dir is server-computed and read-only; the server ignores any value
+      // the client sends (FS-11.R4, TS-03.R12). Carried through only to satisfy the type.
+      resource_dir: initial?.resource_dir ?? "",
     });
   };
 
@@ -170,6 +173,21 @@ export function ProjectForm({
         <label>Context prompt</label>
         <textarea {...register("context_prompt")} rows={3} placeholder="Optional project context…" />
       </div>
+      {isEdit && initial?.resource_dir && (
+        <div className="form-field">
+          <label>Shared resources directory</label>
+          <input
+            value={initial.resource_dir}
+            readOnly
+            className="form-input-disabled"
+            onFocus={(e) => e.currentTarget.select()}
+          />
+          <span className="form-hint">
+            AgentDeck-owned, outside the repository, and shared by this project&apos;s agents.
+            Kept even if you delete the project.
+          </span>
+        </div>
+      )}
       {isEdit && (
         <p className="form-hint">Editing a project affects future launches only.</p>
       )}

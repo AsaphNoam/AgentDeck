@@ -322,6 +322,14 @@ func (s *Server) composeSwitchSpec(target state.Agent, resumeID string) (runtime
 		return runtime.LaunchSpec{}, apiError(runtime.CodeInvalidField, "unknown model: "+target.Model)
 	}
 
+	// Ensure the shared-resources directory before any registration side effect
+	// (FS-11.R6/R9). add_dirs/prompt carry over from the frozen snapshot; the env
+	// var is recomposed here (INV §2).
+	resourceDir, rae := s.ensureProjectResources(target.Project)
+	if rae != nil {
+		return runtime.LaunchSpec{}, rae
+	}
+
 	token := mintHookToken()
 	s.rememberHookToken(target.AgentID, token)
 	mcpSpec, err := s.registerMessagingMCP(target)
@@ -343,7 +351,7 @@ func (s *Server) composeSwitchSpec(target state.Agent, resumeID string) (runtime
 		SystemPrompt:   snap.SystemPrompt,
 		BackendType:    be.Type,
 		ModelID:        model.Model,
-		Env:            composeEnv(os.Environ(), be.Env, model.Env, s.hookEnv(target, token)),
+		Env:            composeEnv(os.Environ(), be.Env, model.Env, s.hookEnv(target, token), projectResourcesEnv(resourceDir)),
 		SkipPerms:      snap.SkipPermissions,
 		HookToken:      token,
 		MCPServers:     []runtime.MCPServerSpec{mcpSpec},

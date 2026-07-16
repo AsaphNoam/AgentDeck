@@ -193,6 +193,14 @@ func (s *Server) composeResumeSpec(agent state.Agent, snap state.SessionSnapshot
 	if agent.Interface == "terminal" && !terminalSupported(be.Type) {
 		return runtime.LaunchSpec{}, apiError(runtime.CodeTerminalUnavailable, terminalUnsupportedReason(be.Type))
 	}
+	// Ensure the shared-resources directory before any registration side effect
+	// (FS-11.R6/R9). The frozen snapshot already carries the path in add_dirs and
+	// the prompt for agents launched after the feature shipped; the env var is
+	// recomposed here every launch (INV §2).
+	resourceDir, ae := s.ensureProjectResources(agent.Project)
+	if ae != nil {
+		return runtime.LaunchSpec{}, ae
+	}
 	token := mintHookToken()
 	s.rememberHookToken(agent.AgentID, token)
 	mcpSpec, err := s.registerMessagingMCP(agent)
@@ -213,7 +221,7 @@ func (s *Server) composeResumeSpec(agent state.Agent, snap state.SessionSnapshot
 		SystemPrompt:   snap.SystemPrompt,
 		BackendType:    be.Type,
 		ModelID:        model.Model,
-		Env:            composeEnv(os.Environ(), be.Env, model.Env, s.hookEnv(agent, token)),
+		Env:            composeEnv(os.Environ(), be.Env, model.Env, s.hookEnv(agent, token), projectResourcesEnv(resourceDir)),
 		SkipPerms:      snap.SkipPermissions,
 		HookToken:      token,
 		MCPServers:     []runtime.MCPServerSpec{mcpSpec},
