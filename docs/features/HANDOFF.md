@@ -45,57 +45,18 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-- **Must fix — locking re-exec drops explicit non-interactive/no-start behavior.**
-  `scripts/release/install.sh:73-77` consumes `--non-interactive` and `--no-start` before
-  `scripts/release/install.sh:108-114` re-executes the script under `lockf`, but that command passes
-  only `AGENTDECK_VERSION` and the now-empty `"$@"`. On an interactive terminal, the locked child
-  resets both flags to zero and can prompt, edit `.zshrc`, run provider sign-in, and start the
-  dashboard despite the original flags. This violates FS-10.R6/R12 and makes the new locking path
-  unsafe for scripted use. Preserve the parsed flags across the re-exec (or acquire the lock before
-  parsing) and add a pseudo-terminal bootstrap test for both options.
-
-- **Must fix — J9: an incomplete `backends.json` kills the whole dashboard.** A syntactically valid
-  but incomplete `backends.json` (e.g. `{"version":2}` with no `backends` key, or a backend with
-  `"models":null`) is neither `ErrNotFound` nor `ErrCorrupt`, so `internal/config/backends.go`
-  `ReadBackends` / `internal/server/handlers.go` skip the `DefaultBackends()` fallback and
-  `GET /api/backends` returns `{"backends":null}`. `ui/src/features/settings/BackendsEditor.tsx:87`
-  then runs `Object.entries(cfg.backends)` unguarded (also `:256` on `models:null`), throwing
-  `TypeError: Cannot convert undefined or null to object`; the app-level ErrorBoundary replaces the
-  entire dashboard with "Something went wrong in dashboard." Reproduced live (config is documented as
-  hand-editable, so this is a realistic edit). Normalize an incomplete backends file to defaults (like
-  the missing/corrupt cases) and/or guard `cfg.backends ?? {}` / `backend.models ?? {}`, and name the
-  offending file in any error. Relevant: TS-03 serialization contract, FS-04 backends, INV
-  nil-collection class. Repro in the 2026-07-16 usability run report.
-
-- **Must fix — J8/J3: user prompts are never persisted to the durable transcript.** `SendPrompt`
-  (`internal/runtime/chat.go`) emits no user event and `internal/runtime/event.go` has no user/prompt
-  event type, so `GET /api/sessions/{id}/transcript` and the archive view contain only assistant/tool/
-  turn events. The chat panel shows the user's text optimistically (FS-03.R7) but FS-03.R12 replaces
-  the view with the durable transcript on every reconnect, so after any reload/resume/archive the
-  user's side of the conversation is gone, and FS-05.R5 transcript-content search cannot match what
-  the user typed (`q=<assistant word>` matches; `q=<user word>` returns 0). Extends the 2026-07-12
-  MINOR advisory with the archive-one-sided and unsearchable dimensions. Persist a user-prompt
-  transcript event (or explicitly document the omission in FS-03/FS-05). Repro in the 2026-07-16 run
-  report.
-
-- **Worth fixing — J2: credential-check failures show raw codes and a misleading fix hint.**
-  `ui/src/features/onboarding/steps/BackendStep.tsx` renders `Credential check: skipped —
-  cli_not_installed. Please check your settings and try again.` (and `failed — not_logged_in`,
-  `no_api_key`). The snake_case status codes and generic "check your settings" misdirect: a missing
-  adapter or a not-logged-in provider is not a settings problem and the copy names no next step.
-  Replace with human copy naming the specific problem and remediation (install the adapter / run
-  guided sign-in / add the API key). FS-04.R17 leaves the copy unspecified — candidate to pin.
-
-- **Worth fixing — S2/J9: the config-source panel renders unstyled.**
-  `ui/src/features/settings/ConfigSourcePanel.tsx` references `source-unbound`, `source-bound`,
-  `source-preview`, `source-field-value`, `src-override-model`, `src-override-effort` — none defined
-  in the stylesheets; `.source-unbound` computes with no border/padding/background. Adds to the
-  previously-noted `interface-controls` / `cred-chip` undefined cluster. Define or remove the classes.
-  Functional (degrades, no crash), so lower priority.
+- None.
 
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-16 — Fixed all recorded installer and usability findings: the locked bootstrap preserves
+  no-start/non-interactive choices under a pseudo-terminal test; incomplete hand-edited backend
+  catalogs fall back safely with the filename in diagnostics and the UI guards null collections;
+  accepted user prompts are sequenced, persisted, replayed, and indexed; onboarding names useful
+  credential recovery steps; and the config-source panel has its missing styles. Specifications,
+  focused Go/UI tests, `make test`, `make build`, and `make dist` pass.
 
 - 2026-07-16 — Usability review drove J1–J3, J5, J8 (tagged + untagged), and J9 (incl. FS-11) against
   the real binary in a browser. Four findings recorded: a hand-edited incomplete `backends.json`

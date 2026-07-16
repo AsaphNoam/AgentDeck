@@ -89,6 +89,18 @@ describe("transcriptStore", () => {
     expect(event.text ?? event.delta).toBe("hi");
   });
 
+  it("replaces an optimistic user bubble with its durable SSE event", () => {
+    useTranscriptStore.getState().appendMessage("a_5", {
+      kind: "user_text", text: "persist this", message_id: "local-1",
+    });
+    useTranscriptStore.getState().appendMessage("a_5", {
+      agent_id: "a_5", seq: 1, type: "user_text", ts: "t1", data: { text: "persist this" },
+    });
+    const events = useTranscriptStore.getState().byAgent.a_5;
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ kind: "user_text", seq: 1, text: "persist this" });
+  });
+
   it("folds permission_resolved on setTranscript (refetch/archive replay)", () => {
     useTranscriptStore.getState().setTranscript("a_6", [
       { agent_id: "a_6", seq: 1, type: "permission_request", ts: "t1", data: { tool_call_id: "tc_7", name: "Bash", reason: "run" } },

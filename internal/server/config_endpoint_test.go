@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/agentdeck/agentdeck/internal/backend/credcheck"
@@ -18,6 +20,25 @@ func testServerWithOkCreds(t *testing.T) *Server {
 		return credcheck.CredResult{Status: "ok"}
 	}
 	return srv
+}
+
+func TestGetBackendsFallsBackForIncompleteDocument(t *testing.T) {
+	srv := testServer(t, false)
+	if err := os.WriteFile(filepath.Join(srv.configStore.Home(), "backends.json"), []byte(`{"version":2}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	rec := doGET(t, srv.routes(), "/api/backends")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/backends status = %d body=%s, want 200", rec.Code, rec.Body)
+	}
+	var got config.BackendsConfig
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Version != 2 || len(got.Backends) == 0 {
+		t.Fatalf("GET /api/backends = %+v, want default catalog", got)
+	}
 }
 
 func TestGetConfigEmptyStoreNotSatisfied(t *testing.T) {

@@ -314,12 +314,18 @@ func TestCrashMidTurnPersistsDeliveredTranscript(t *testing.T) {
 	if !bytes.Contains(body, []byte("about to crash")) {
 		t.Fatalf("transcript missing pre-crash delivered text: %s", body)
 	}
+	if !bytes.Contains(body, []byte(`"type":"user_text"`)) || !bytes.Contains(body, []byte(`"text":"crash"`)) {
+		t.Fatalf("transcript missing durable user prompt: %s", body)
+	}
 	raw, err := os.ReadFile(filepath.Join(srv.configStore.Home(), "sessions", agentID, "transcript.ndjson"))
 	if err != nil {
 		t.Fatalf("read raw transcript: %v", err)
 	}
 	if !bytes.Contains(raw, []byte("about to crash")) {
 		t.Fatalf("raw transcript missing pre-crash delivered text: %s", raw)
+	}
+	if !bytes.Contains(raw, []byte(`"type":"user_text"`)) {
+		t.Fatalf("raw transcript missing durable user prompt: %s", raw)
 	}
 }
 

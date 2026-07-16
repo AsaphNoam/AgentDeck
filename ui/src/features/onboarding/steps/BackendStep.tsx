@@ -18,6 +18,21 @@ const seededIdForType: Record<BackendType, string> = {
   "openhands-acp": "openhands",
 };
 
+function credentialGuidance(status: string, detail: string | null, type: BackendType): string {
+  if (detail === "cli_not_installed") {
+    return `The ${BACKEND_TYPE_LABELS[type]} adapter is not installed. Install it, then validate again.`;
+  }
+  if (detail === "not_logged_in") {
+    return "This provider is not signed in. Run its guided sign-in, then validate again.";
+  }
+  if (detail === "no_api_key") {
+    return "No API key was found. Add the API key above, then validate again.";
+  }
+  return status === "failed"
+    ? "The credential check failed. Confirm this provider's sign-in or API key, then validate again."
+    : "The credential check could not run. Check the provider setup, then validate again.";
+}
+
 export function BackendStep({ onDone }: BackendStepProps) {
   const { data: existing, isLoading } = useBackends();
   const putBackends = usePutBackends();
@@ -183,8 +198,7 @@ export function BackendStep({ onDone }: BackendStepProps) {
 
       {credStatus && credStatus !== "ok" && (
         <p className="form-error">
-          Credential check: <strong>{credStatus}</strong>
-          {credDetail ? ` — ${credDetail}` : ""}. Please check your settings and try again.
+          {credentialGuidance(credStatus, credDetail, type)}
         </p>
       )}
       {error && <p className="form-error">{error}</p>}

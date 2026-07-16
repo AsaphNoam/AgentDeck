@@ -227,6 +227,12 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, agentID, name, role, project, grp, model, back
 
 func searchableText(ev runtime.Event) (string, error) {
 	switch ev.Type {
+	case runtime.EvUserPrompt:
+		var d runtime.UserPromptData
+		if err := json.Unmarshal(ev.Data, &d); err != nil {
+			return "", fmt.Errorf("index: user_text: %w", err)
+		}
+		return d.Text, nil
 	case runtime.EvAssistantText:
 		var d runtime.AssistantTextData
 		if err := json.Unmarshal(ev.Data, &d); err != nil {

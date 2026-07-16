@@ -97,8 +97,9 @@ person's provider credentials or AgentDeck configuration.
   `$AGENTDECK_HOME`; a simulated download/checksum/unpack interruption preserves the previous
   command; `agentdeck update --rollback` restores it. *Verified:* installer/update integration tests.
 - **A5** — `--no-start` and non-interactive installation neither launch a dashboard nor
-  edit a shell profile; interactive installation starts and opens the dashboard only after the
-  runtime activates. *Verified:* CLI integration tests and manual J1 run.
+  edit a shell profile, including after the installer re-executes under its operation lock;
+  interactive installation starts and opens the dashboard only after the runtime activates.
+  *Verified:* CLI integration tests (including a pseudo-terminal lock-re-exec test) and manual J1 run.
 - **A6** — The release page and install documentation state the macOS-arm64 limit,
   checksum verification, no-signing/no-notarization choice, Gatekeeper approval possibility, provider
   sign-in requirement, and explicit update/rollback commands. *Verified:* release-documentation

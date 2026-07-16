@@ -15,6 +15,7 @@ func TestPayloadRoundTrip(t *testing.T) {
 		name string
 		val  any
 	}{
+		{"user_text", UserPromptData{Text: "Please review this"}},
 		{"assistant_text", AssistantTextData{Delta: "Sure, I'll "}},
 		{"tool_call", ToolCallData{
 			ToolCallID: "tc_42", Name: "Edit", Title: "Edit main.go",
@@ -69,6 +70,7 @@ func TestPayloadRoundTrip(t *testing.T) {
 // part of the cross-phase contract (techspec §11) and must not drift silently.
 func TestEventTypeConstants(t *testing.T) {
 	want := map[string]string{
+		EvUserPrompt:        "user_text",
 		EvAssistantText:     "assistant_text",
 		EvToolCall:          "tool_call",
 		EvToolResult:        "tool_result",
