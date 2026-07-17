@@ -4,6 +4,21 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-17 — issue audit: known improvement list
+
+I verified every recorded known issue against the current specifications, implementation, and
+focused tests. I removed the fixed installer flag, Codex role-delivery, and user-prompt persistence
+claims; removed the unreachable terminal typed-input nudge and vague optional-flag/specification-audit
+claims; and narrowed partially fixed items to their exact remaining failures. Eleven evidence-backed
+areas remain, covering chat recovery, archive/tracking, coordination, terminal shutdown/capabilities,
+federation, backend startup, HTTP compatibility and limits, frontend state, process lifecycle, and
+filesystem policy. No product code changed, and the focused Go/UI tests and documentation checks pass.
+
+**Needs attention:** None; the remaining entries are verified but are not yet approved, fully
+specified changes.
+
+**Next:** Choose one retained item to define and move into the ready-changes queue.
+
 ### 2026-07-16 — implementation: Codex role and project prompts
 
 Codex chat agents now receive the selected role and project guidance. AgentDeck sends the frozen composed prompt through Codex’s supported session configuration instead of the ACP field Codex ignores, while preserving any other Codex configuration you already provide. Invalid configuration overlays stop the launch clearly instead of silently losing the role. Claude behavior is unchanged.

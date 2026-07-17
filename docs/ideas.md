@@ -41,8 +41,6 @@ the relevant feature and technical specifications; it does not change product co
   explicit threat model and UI/CLI handshake design.
 - **Chunked transcript indexing.** Replace whole-session in-memory rewrites without losing old
   search content or weakening the fallback search path.
-- **User-prompt persistence.** Define durable, searchable user messages and hydration behavior
-  before changing the current normalized transcript.
 - **Operational CLI.** Complete the specification for dashboard control, install/update, pidfile
   concurrency, and actionable startup diagnostics.
 
@@ -52,30 +50,27 @@ These describe incomplete or deliberately limited shipped behavior. Their owning
 the authority; move an item to ready changes only after its exact requirements and acceptance checks
 are clear.
 
-- **Chat history fidelity.** Persist user prompts; make replayed streaming deltas match live deltas;
-  prevent overlapping transcript reloads from winning out of order; show initial-load errors.
-- **Archive and tracking usability.** Define mixed metadata/transcript search locations, add UI
-  pagination, refresh visible files/commands safely, and let hook-only activity update recency.
+- **Chat history fidelity.** Make replayed streaming deltas match live deltas; prevent overlapping
+  transcript reloads from winning out of order; show initial-load errors.
+- **Archive and tracking usability.** Refine `matched_in` when search terms span metadata and
+  transcript content; add UI pagination; refresh visible files/commands without stale-request
+  overwrite; and let hook-only activity update recency.
 - **Coordination liveness.** Scope nudge cooldowns to a generation, limit repeated nudges, republish
-  unread changes, notify only on the first budget breach, and remove duplicate permission notices.
+  unread counts after janitor expiry, notify only on the first budget breach, and remove duplicate
+  permission notices.
 - **Terminal capability honesty.** Either add an optional driver picker or stop advertising
-  unreachable drivers; resolve the tab cap, shutdown grace, and partially typed-input nudge issues.
+  unreachable drivers; implement or retire the planned tab cap; and bound aggregate shutdown grace
+  across multiple agents.
 - **Federation UI and watches.** Expose custom roots/profiles, refresh the effective view after
   source events, register prompt watches after binding, and clear preview consent on project change.
-- **Codex roles not applied.** Role/project personas reach Claude agents but not Codex ones: the
-  composed system prompt is delivered through a channel the Claude adapter is configured for, and the
-  Codex adapter has no equivalent, so Codex launches ignore the selected role. Needs a
-  backend-agnostic way to inject the persona.
 - **Backend launch diagnostics.** Use executable overrides consistently, bound ACP readiness,
-  probe optional flags, and provide provider-specific missing/old CLI guidance.
+  and provide provider-specific missing/old CLI guidance.
 - **HTTP compatibility.** Decide and specify how mixed legacy error envelopes should converge.
-- **Frontend state ownership.** Define Zustand/React Query ownership, SSE reload generations, and
-  mutation-error behavior before broad frontend refactors.
+- **Frontend state ownership.** Define Zustand/React Query ownership and mutation-error behavior
+  before broad frontend refactors.
 - **Lifecycle and process hardening.** Corroborate process identity, scope crash cleanup by
   generation, serialize concurrent events, and define/test detached-start pidfile races.
-- **Local filesystem hardening.** Decide startup repair and symlink policy; document same-user threat
-  assumptions and add adversarial tests.
-- **HTTP request-size limits.** Define limits, the structured over-limit error, and streaming
-  exceptions before enforcing them.
-- **Specification semantic coverage.** Audit Current specifications against shipped code and add any
-  missing behavior or architecture rules.
+- **Local filesystem hardening.** Decide whether startup repairs existing descendant modes and
+  whether valid-name role/project files may be symlinks; add adversarial tests for the chosen rules.
+- **HTTP request-size limits.** Define shared JSON request limits and the structured over-limit error
+  before enforcing them.
