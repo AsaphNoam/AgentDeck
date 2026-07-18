@@ -1,13 +1,76 @@
+@layer ad-tokens {
 :root {
-  --bg: #f8fafc;
-  --panel: #ffffff;
-  --text: #111827;
-  --muted: #64748b;
-  --line: #d7dde6;
-  --badge-busy: #d97706;
-  --badge-idle: #64748b;
-  --badge-waiting: #2563eb;
-  --badge-done: #16a34a;
-  --badge-error: #dc2626;
-  --badge-unknown: #9ca3af;
+  --ad-core-canvas: #f2f0e9;
+  --ad-core-panel: #faf9f5;
+  --ad-core-raised: #ffffff;
+  --ad-core-ink: #15171a;
+  --ad-core-text: #25282d;
+  --ad-core-muted: #686d73;
+  --ad-core-line: #cbc7bd;
+  --ad-core-line-strong: #25282d;
+  --ad-core-primary: #ff5a36;
+  --ad-core-secondary: #2457f5;
+  --ad-core-highlight: #dfff4f;
+  --ad-core-busy: #c97900;
+  --ad-core-idle: #66717a;
+  --ad-core-waiting: #2457f5;
+  --ad-core-done: #16845b;
+  --ad-core-error: #c93636;
+  --ad-core-unknown: #93989d;
+  --ad-core-tech-bg: #171a1f;
+  --ad-core-tech-surface: #22262d;
+  --ad-core-tech-text: #f2f0e9;
+  --ad-core-tech-muted: #aab0ba;
+
+  --ad-surface-canvas: var(--ad-core-canvas);
+  --ad-surface-panel: var(--ad-core-panel);
+  --ad-surface-raised: var(--ad-core-raised);
+  --ad-surface-subtle: color-mix(in srgb, var(--ad-core-line) 32%, var(--ad-core-panel));
+  --ad-surface-emphasis: color-mix(in srgb, var(--ad-core-highlight) 45%, var(--ad-core-panel));
+  --ad-text-primary: var(--ad-core-ink);
+  --ad-text-secondary: var(--ad-core-text);
+  --ad-text-muted: var(--ad-core-muted);
+  --ad-text-inverse: var(--ad-core-raised);
+  --ad-border-default: var(--ad-core-line);
+  --ad-border-strong: var(--ad-core-line-strong);
+  --ad-action-primary: var(--ad-core-primary);
+  --ad-action-primary-ink: var(--ad-core-ink);
+  --ad-action-secondary: var(--ad-core-secondary);
+  --ad-highlight: var(--ad-core-highlight);
+  --ad-state-busy: var(--ad-core-busy);
+  --ad-state-idle: var(--ad-core-idle);
+  --ad-state-waiting: var(--ad-core-waiting);
+  --ad-state-done: var(--ad-core-done);
+  --ad-state-error: var(--ad-core-error);
+  --ad-state-unknown: var(--ad-core-unknown);
+  --ad-technical-background: var(--ad-core-tech-bg);
+  --ad-technical-surface: var(--ad-core-tech-surface);
+  --ad-technical-text: var(--ad-core-tech-text);
+  --ad-technical-muted: var(--ad-core-tech-muted);
+
+  --ad-font-display: "Instrument Sans", sans-serif;
+  --ad-font-text: "Instrument Sans", sans-serif;
+  --ad-font-mono: "IBM Plex Mono", monospace;
+
+  --ad-space-1: 4px;
+  --ad-space-2: 8px;
+  --ad-space-3: 12px;
+  --ad-space-4: 16px;
+  --ad-space-6: 24px;
+  --ad-space-8: 32px;
+  --ad-space-12: 48px;
+
+  --ad-radius-small: 2px;
+  --ad-radius-medium: 6px;
+  --ad-radius-large: 10px;
+  --ad-radius-round: 999px;
+  --ad-border-thin: 1px;
+  --ad-border-thick: 2px;
+  --ad-shadow-keyline: 1px 1px 0 var(--ad-border-strong);
+  --ad-shadow-offset: 4px 4px 0 var(--ad-border-strong);
+  --ad-shadow-project-edge: inset 7px 0 0 var(--ad-project-accent);
+  --ad-project-fallback: var(--ad-state-unknown);
+  --ad-project-accent: var(--ad-project-fallback);
+  --ad-terminal-font-size: 13px;
+}
 }

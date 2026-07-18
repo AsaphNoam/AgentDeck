@@ -2,6 +2,8 @@ import { useEffect, useRef } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
+import { resolvePresentationColors } from "../../presentation/resolveColors";
+import { xtermTheme } from "../../presentation/integrations";
 
 // TerminalTab renders a real xterm.js emulator bridged to the agent's PTY over a
 // WebSocket (§3.4, task 13). The bridge contract: keystrokes go to the PTY as
@@ -14,7 +16,15 @@ export function TerminalTab({ agentId }: { agentId: string }) {
     const container = containerRef.current;
     if (!container) return;
 
-    const term = new Terminal({ fontSize: 13, cursorBlink: true, convertEol: false });
+    const presentation = resolvePresentationColors(container);
+    const fontSize = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ad-terminal-font-size"));
+    const term = new Terminal({
+      fontFamily: presentation.fontFamily,
+      fontSize,
+      theme: xtermTheme(presentation),
+      cursorBlink: true,
+      convertEol: false,
+    });
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(container);
@@ -68,8 +78,8 @@ export function TerminalTab({ agentId }: { agentId: string }) {
   }, [agentId]);
 
   return (
-    <div className="terminal-panel">
-      <div className="terminal-xterm" ref={containerRef} />
+    <div className="terminal-panel" data-ui="terminal">
+      <div className="terminal-xterm" data-slot="viewport" ref={containerRef} />
     </div>
   );
 }

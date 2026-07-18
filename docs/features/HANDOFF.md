@@ -6,11 +6,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
-- **Active change:** none.
-- **State:** paused — no implementation change is active. The product-native core frontend redesign
-  is fully specified and waiting to start in `docs/ready-changes/redesign-core-interface.md`; the
-  human selected the layered plain-CSS contract with automated maintenance safeguards. All recorded
-  review findings remain fixed; credentialed provider acceptance remains a separate manual release gate.
+- **Active change:** None.
+- **State:** paused — no implementation change is active. The core interface redesign is shipped;
+  all recorded review findings remain fixed, and credentialed provider acceptance remains a
+  separate manual release gate.
 - **Last reviewed code:** `87d6251` (2026-07-16), across the continuous range after `d260f93`.
 - **Branch:** `main`.
 
@@ -51,6 +50,14 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-18 — Shipped the product-native core interface across the shell, Dashboard, agent screen,
+  Archive, Settings, onboarding, overlays, and third-party renderers. Layered semantic CSS, local
+  fonts and mark, shared presentation primitives, stable future-skin hooks, a development-only
+  visual matrix, Stylelint, and the TSX/CSS contract checker now form one maintained presentation
+  authority. Real-browser review covered baseline/high-variance fixtures and the embedded release;
+  it found and fixed hidden Settings panels consuming layout space. Specification, UI, both Go
+  variants, source build, and distribution checks pass.
 
 - 2026-07-18 — Finished the core frontend feature design after the human selected layered plain CSS.
   TS-08 now pins the cascade, exact core values/fonts/assets, stable manifest-backed skin hooks,

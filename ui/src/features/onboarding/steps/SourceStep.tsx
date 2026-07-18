@@ -22,7 +22,7 @@ const FEDERATED: Partial<Record<BackendType, true>> = { "claude-acp": true, "cod
 export function SourceStep({ project, backendId, backendType, onDone }: SourceStepProps) {
   const federated = !!FEDERATED[backendType];
   return (
-    <div className="onboarding-step source-step">
+    <div className="onboarding-step source-step" data-ui="onboarding" data-slot="step" data-variant="source">
       <h3>Link your CLI configuration (optional)</h3>
       {federated ? (
         <>
@@ -45,7 +45,7 @@ export function SourceStep({ project, backendId, backendType, onDone }: SourceSt
         </p>
       )}
 
-      <div className="onboarding-actions">
+      <div className="onboarding-actions" data-slot="actions">
         <button type="button" onClick={onDone}>
           Continue
         </button>

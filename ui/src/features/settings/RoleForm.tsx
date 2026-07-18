@@ -62,7 +62,7 @@ export function RoleForm({ initial, onSubmit, onCancel, submitting, error }: Rol
   };
 
   return (
-    <form onSubmit={handleSubmit(submit)} className="config-form">
+    <form onSubmit={handleSubmit(submit)} className="config-form" data-slot="form">
       {!isEdit && (
         <div className="form-field">
           <label>Role ID (slug)</label>

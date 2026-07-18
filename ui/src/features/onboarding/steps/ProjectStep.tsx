@@ -48,7 +48,7 @@ export function ProjectStep({ onDone }: ProjectStepProps) {
   };
 
   return (
-    <div className="wizard-step">
+    <div className="wizard-step" data-ui="onboarding" data-slot="step" data-variant="project">
       <h3>Create your first project</h3>
       <p className="wizard-step-desc">
         A project scopes your agents to a codebase directory.
@@ -85,7 +85,7 @@ export function ProjectStep({ onDone }: ProjectStepProps) {
       {warning && <p className="form-warning">{warning}</p>}
       {error && <p className="form-error">{error}</p>}
 
-      <div className="form-actions">
+      <div className="form-actions" data-slot="actions">
         <button type="button" onClick={handleCreate} disabled={createProject.isPending}>
           {createProject.isPending ? "Creating…" : "Create project"}
         </button>

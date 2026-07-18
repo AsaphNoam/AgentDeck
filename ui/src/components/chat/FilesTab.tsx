@@ -8,10 +8,10 @@ function copyToClipboard(text: string) {
 
 function FileRow({ file, onDiffClick }: { file: TrackedFile; onDiffClick: (seq: number) => void }) {
   return (
-    <li className="tracked-row">
-      <div className="tracked-row-top">
+    <li className="tracked-row" data-ui="tracked-list" data-slot="row" data-variant="files">
+      <div className="tracked-row-top" data-slot="metadata">
         <span className="tracked-path">{file.path}</span>
-        <div className="tracked-row-actions">
+        <div className="tracked-row-actions" data-slot="actions">
           <button
             type="button"
             title="Copy path"
@@ -72,12 +72,12 @@ export function FilesTab({ agentId, onReveal }: { agentId: string; onReveal?: (s
     if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
-  if (loading) return <p className="tab-placeholder">Loading…</p>;
-  if (error) return <p className="tab-error">{error}</p>;
+  if (loading) return <p className="tab-placeholder" data-ui="tracked-list" data-state="loading" data-variant="files">Loading…</p>;
+  if (error) return <p className="tab-error" data-ui="tracked-list" data-state="error" data-variant="files">{error}</p>;
 
   return (
-    <div className="tracked-tab">
-      <div className="tracked-filter">
+    <div className="tracked-tab" data-ui="tracked-list" data-state={filtered.length === 0 ? "empty" : undefined} data-variant="files">
+      <div className="tracked-filter" data-slot="filter">
         <input
           type="search"
           placeholder="Filter files…"
@@ -85,12 +85,12 @@ export function FilesTab({ agentId, onReveal }: { agentId: string; onReveal?: (s
           onChange={(e) => setFilter(e.target.value)}
           aria-label="Filter files"
         />
-        <span className="tracked-count">{filtered.length} file{filtered.length !== 1 ? "s" : ""}</span>
+        <span className="tracked-count" data-slot="count">{filtered.length} file{filtered.length !== 1 ? "s" : ""}</span>
       </div>
       {filtered.length === 0 ? (
         <p className="tab-placeholder">{filter ? "No matches." : "No files tracked yet."}</p>
       ) : (
-        <ul className="tracked-list">
+        <ul className="tracked-list" data-slot="items">
           {filtered.map((f) => (
             <FileRow key={f.path} file={f} onDiffClick={handleDiff} />
           ))}

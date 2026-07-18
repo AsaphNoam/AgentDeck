@@ -1,6 +1,6 @@
 # TS-08 — Frontend presentation architecture
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src`, `ui/package.json`, `ui/vite.config.ts`
 **Absorbed:** —
 
@@ -18,109 +18,109 @@ only React primitive seam; the rejected alternatives are recorded in §5.
 
 ## 2. Design & constraints
 
-- **R1** `(planned)` — Presentation is a leaf dependency. Feature components own data, state,
+- **R1** — Presentation is a leaf dependency. Feature components own data, state,
   validation, mutations, Radix behavior, drag behavior, terminal lifecycle, and routing; visual
   primitives and styles may receive those states but may not fetch, persist, or reinterpret them.
-- **R2** `(planned)` — The core interface is not implemented as an active/default skin. The
+- **R2** — The core interface is not implemented as an active/default skin. The
   production document has no skin id or skin provider, the core renders without optional skin code,
   and no skin preference is read or written in this change.
-- **R3** `(planned)` — One `styles/index.css` declares and imports these cascade layers in fixed
+- **R3** — One `styles/index.css` declares and imports these cascade layers in fixed
   low-to-high precedence: `ad-reset`, `ad-tokens`, `ad-base`, `ad-components`, `ad-features`,
   `ad-integrations`, `ad-skins`. The production `ad-skins` layer is empty; declaring it reserves
   precedence without loading a skin. Feature code imports only `index.css` (plus third-party CSS
   whose import contract requires component scope).
-- **R4** `(planned)` — Core styles are split by responsibility: foundation/reset and bundled fonts;
+- **R4** — Core styles are split by responsibility: foundation/reset and bundled fonts;
   raw and semantic visual values; shared component construction; per-feature composition; and
   explicit third-party adapters. A monolithic replacement `global.css` does not remain as a second
   authority after migration.
-- **R5** `(planned)` — Visual values use an `--ad-` namespace and flow one way: raw core palette,
+- **R5** — Visual values use an `--ad-` namespace and flow one way: raw core palette,
   type, spacing, radius, border, and shadow values → semantic surface/text/action/state values →
   component-local values. Feature styles do not introduce hard-coded colors, font families,
   shadows, radii, or spacing where a declared role applies.
-- **R6** `(planned)` — A small `ui/src/components/ui/` layer centralizes only repeated presentation
+- **R6** — A small `ui/src/components/ui/` layer centralizes only repeated presentation
   markup: button/icon-button variants, field frame, badge, page header, surface, and visually hidden
   label where already needed. Primitives preserve the underlying HTML element, forwarded props/ref,
   accessible name, Radix ownership, and event behavior. This is not a component-framework rewrite;
   one-off feature structure remains in its owning component.
-- **R7** `(planned)` — Major shared/feature surfaces expose stable presentation hooks independent of
+- **R7** — Major shared/feature surfaces expose stable presentation hooks independent of
   implementation class names: `data-ui` names the component, `data-slot` names an intentional
   subpart, and existing or explicit `data-state`/`data-variant` values describe visual state. Hooks
   use product-native names such as `agent-card` and `tool-result`, never a core-design or future-skin
   concept.
-- **R8** `(planned)` — `ui/src/presentation/contract.json` is the machine-readable public visual
+- **R8** — `ui/src/presentation/contract.json` is the machine-readable public visual
   contract. It has a schema/version, lists skin-overridable semantic tokens, lists each public
   `data-ui` hook with allowed slots/states/variants, and identifies permitted decorative asset
   slots. Adding, renaming, or removing a public item updates the manifest, its contract tests, and
   TS-08; undocumented hooks are not supported.
-- **R9** `(planned)` — Core CSS is complete without hook overrides. A future optional skin may use
+- **R9** — Core CSS is complete without hook overrides. A future optional skin may use
   only the manifest's approved semantic values, hooks, and decorative slots from the higher
   `ad-skins` layer; it cannot be required for layout, hide required content/actions, or become a
   source of product copy/state. Skin loading, compatibility negotiation, and trust remain future
   work.
-- **R10** `(planned)` — Fonts, icons, marks, and decorative assets required by the core are bundled
+- **R10** — Fonts, icons, marks, and decorative assets required by the core are bundled
   into the Vite build from repository-owned files with recorded licenses. The dashboard makes no
   runtime request to a font, icon, image, stylesheet, or script content-delivery network.
-- **R11** `(planned)` — Core typography uses locally bundled Instrument Sans variable font for
+- **R11** — Core typography uses locally bundled Instrument Sans variable font for
   display/text roles and IBM Plex Mono for technical roles, with their SIL Open Font License texts
   kept beside the assets. If implementation evidence makes either font unsuitable, changing it is a
   TS-08 visual-contract change rather than an inline component choice.
-- **R12** `(planned)` — The core mark is one repository-owned SVG React component: a simple
+- **R12** — The core mark is one repository-owned SVG React component: a simple
   geometric AgentDeck mark plus text wordmark, using `currentColor` and no embedded raster/text
   payload. Other repository-owned icons follow the same seam. Existing visible text and accessible
   names remain feature-owned; an icon never becomes the only programmatic label.
-- **R13** `(planned)` — Syntax highlighting, `react-diff-viewer-continued`, and xterm.js do not keep
+- **R13** — Syntax highlighting, `react-diff-viewer-continued`, and xterm.js do not keep
   independent default palettes. Small adapter modules map the core semantic values into each
   library. A canvas-backed integration that cannot resolve CSS custom properties directly reads the
   computed values through one shared `resolvePresentationColors` helper rather than duplicating
   literals in feature code.
-- **R14** `(planned)` — Dynamic values that express real feature data remain inline and narrowly
+- **R14** — Dynamic values that express real feature data remain inline and narrowly
   scoped: drag transforms, persisted grid columns/gap, context width, context-menu coordinates, and
   project RGB accents. They are listed in the presentation exception manifest, and the automated
   audit rejects any new inline presentational literal without a path, rule, and reason.
-- **R15** `(planned)` — The redesign does not move Zustand/React Query ownership, change route
+- **R15** — The redesign does not move Zustand/React Query ownership, change route
   composition, replace Radix behavior primitives, alter the terminal WebSocket, or modify API/SSE
   contracts. Existing feature tests remain behavioral regression gates.
-- **R16** `(planned)` — Production continues to use the Vite output embedded by TS-06.R3. Core
+- **R16** — Production continues to use the Vite output embedded by TS-06.R3. Core
   assets are content-hashed by Vite and included by `make embed`/`make dist`; source files under
   `ui/src` are the only hand-edited visual source.
 
 ### 2.1 Maintenance safeguards
 
-- **R17** `(planned)` — Stylelint and a repository-owned dependency-light contract checker run as
+- **R17** — Stylelint and a repository-owned dependency-light contract checker run as
   `npm run check:styles`. NPM `pretest` and `prebuild` both invoke it, so UI tests, CI, `make embed`,
   and `make dist` cannot bypass presentation validation. Tool versions are pinned in the UI lockfile.
-- **R18** `(planned)` — Stylelint rejects invalid CSS, duplicate properties/selectors where unsafe,
+- **R18** — Stylelint rejects invalid CSS, duplicate properties/selectors where unsafe,
   id selectors, unbounded specificity, `!important`, unknown custom properties, and rules outside
   the declared cascade layers. Narrow third-party exceptions live in the machine-readable exception
   manifest with a reason; blanket file or rule-family suppression is prohibited.
-- **R19** `(planned)` — `ui/scripts/check-presentation-contract.mjs` checks both TSX and CSS and
+- **R19** — `ui/scripts/check-presentation-contract.mjs` checks both TSX and CSS and
   fails on: a literal class without a selector (INV §13); a referenced `--ad-` value without one
   definition; an unused public token; raw color/font/shadow/radius/spacing values outside their
   allowed source; an inline visual literal outside R14; a `data-ui`/slot/state not present in the
   contract; a manifest entry with no implementation; core CSS dependent on `[data-skin]`; or a skin
   rule outside `ad-skins`.
-- **R20** `(planned)` — `ui/presentation-exceptions.json` is the only audit escape hatch. Every entry
+- **R20** — `ui/presentation-exceptions.json` is the only audit escape hatch. Every entry
   names an exact file and rule, states the non-visual/data-driven or third-party reason, and is
   rejected when its target no longer exists or no longer violates the rule. A new exception is a
   conscious contract change, not an inline disable comment.
-- **R21** `(planned)` — `ui/AGENTS.md` summarizes the presentation dependency direction, token
+- **R21** — `ui/AGENTS.md` summarizes the presentation dependency direction, token
   decision tree, stable-hook rules, exception policy, prohibited skin state/provider work, required
   checks, and the need to read FS-12/TS-08. It is created before surface migration so every later
   coding agent receives the rules while editing beneath `ui/`.
-- **R22** `(planned)` — A development-only visual matrix renders representative core components and
+- **R22** — A development-only visual matrix renders representative core components and
   feature surfaces from deterministic fixtures without calling provider CLIs or mutating user
   state. It is unreachable and absent from production routing/bundles, and supplies repeatable real-
   browser review input for FS-12.A1–A5.
-- **R23** `(planned)` — A contract fixture applies deliberately high-variance test values and
+- **R23** — A contract fixture applies deliberately high-variance test values and
   hook-scoped decoration in `ad-skins` to prove the seam without shipping a skin, selector,
   provider, preference, or production skin asset. The test asserts unchanged product copy, DOM
   order, actions, routes, state values, and feature-test behavior.
-- **R24** `(planned)` — Migration proceeds in behavior-preserving slices: contract/checker and local
+- **R24** — Migration proceeds in behavior-preserving slices: contract/checker and local
   agent guide first; foundation/tokens/assets/primitives second; then shell, Dashboard, agent screen,
   Archive, Settings, onboarding/overlays, and integrations. Each slice removes superseded selectors,
   passes the style contract plus affected tests/build, and does not combine a feature/state refactor
   with visual migration.
-- **R25** `(planned)` — Completion requires zero stale legacy authority: no imported
+- **R25** — Completion requires zero stale legacy authority: no imported
   `global.css`, no unexplained raw visual values, no literal class without a selector, no unreferenced
   public hook/token, no third-party default palette, and no production skin state, attribute,
   stylesheet, or asset.
@@ -137,7 +137,8 @@ only React primitive seam; the rejected alternatives are recorded in §5.
 
 ```text
 ui/src/
-  assets/{fonts,icons}/           bundled core assets + licenses
+  assets/fonts/                  bundled core fonts + licenses
+  components/shell/AgentDeckMark.tsx
   components/ui/                 small behavior-transparent presentation primitives
   presentation/
     contract.json                versioned public visual tokens/hooks/slots/states
@@ -245,13 +246,13 @@ Manifests are declarative build/test inputs only; production does not fetch or i
   normalization or mocks.
 - **INV §13 — Every literal class resolves.** R17–R20 automate and extend the existing binding rule;
   visual tests supplement rather than replace it.
-- **R26** `(planned)` — Presentation code has no authority over product state. Removing every
+- **R26** — Presentation code has no authority over product state. Removing every
   future skin override and every decorative asset must leave the core application structurally
   complete and behaviorally unchanged.
-- **R27** `(planned)` — There is exactly one definition path for each public token and hook. A
+- **R27** — There is exactly one definition path for each public token and hook. A
   second token file, parallel component theme object, ad-hoc provider, or undocumented override
   mechanism is architecture drift and fails the contract checks where mechanically detectable.
-- **R28** `(planned)` — Maintenance checks are part of the delivery contract, not optional review
+- **R28** — Maintenance checks are part of the delivery contract, not optional review
   guidance. An implementation is incomplete if a rule is documented but neither automated nor
   explicitly identified as a browser-only visual check.
 
@@ -272,15 +273,20 @@ Manifests are declarative build/test inputs only; production does not fetch or i
 
 ## 6. Traceability
 
-- Current entry/build: `ui/src/main.tsx`, `ui/vite.config.ts`, `ui/package.json`, TS-06.R3–R5.
-- Current visual source: `ui/src/styles/tokens.css`, `ui/src/styles/global.css` (38 distinct raw
-  color literals and 11 custom properties at design time).
-- Current presentation surface: 42 TSX files with literal `className` use and 65 raw button
-  elements at design time; Radix Dialog/Tabs/Select remain behavior owners.
+- Entry/build and cascade authority: `ui/src/main.tsx`, `ui/vite.config.ts`, `ui/package.json`,
+  `ui/src/styles/index.css`, TS-06.R3–R5.
+- Core visual source: `ui/src/styles/{foundation,tokens,base,integrations}.css`,
+  `ui/src/styles/components/`, `ui/src/styles/features/`.
+- Shared construction, public hooks, and local assets: `ui/src/components/ui/`,
+  `ui/src/presentation/contract.json`, `ui/src/assets/`.
 - Third-party renderers: `AssistantText.tsx` (`react-syntax-highlighter`), `DiffBlock.tsx`
-  (`react-diff-viewer-continued`), `TerminalTab.tsx` (xterm.js).
+  (`react-diff-viewer-continued`), `TerminalTab.tsx` (xterm.js),
+  `ui/src/presentation/{integrations,resolveColors}.ts`.
 - Data-driven inline styles retained by R14: `AgentCard.tsx`, `CardGrid.tsx`, `ContextBar.tsx`,
   `CardContextMenu.tsx`, `ProjectForm.tsx`, `ProjectsEditor.tsx`.
-- Planned anchors: `ui/AGENTS.md`, `ui/src/presentation/contract.json`,
-  `ui/presentation-exceptions.json`, `ui/scripts/check-presentation-contract.mjs`, Stylelint config,
-  the development visual matrix, and existing UI feature tests.
+- Maintenance contract: `ui/AGENTS.md`, `ui/presentation-exceptions.json`,
+  `ui/scripts/check-presentation-contract.mjs`, `ui/scripts/check-presentation-contract.test.mjs`,
+  `ui/stylelint.config.mjs`, `ui/scripts/stylelint-config.test.mjs`.
+- Deterministic visual evidence: `ui/src/presentation/VisualMatrix.tsx`,
+  `ui/src/presentation/contract-fixture.css`, `ui/src/presentation/VisualMatrix.test.tsx`; the route
+  is development-gated in `ui/src/routes.tsx` and absent from production bundles.

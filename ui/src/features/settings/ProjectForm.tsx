@@ -85,7 +85,7 @@ export function ProjectForm({
   const cwdWarning = warnings?.find((w) => w.code === "cwd_not_found");
 
   return (
-    <form onSubmit={handleSubmit(submit)} className="config-form">
+    <form onSubmit={handleSubmit(submit)} className="config-form" data-slot="form">
       {isEdit && (
         <div className="form-field">
           <label>Project ID</label>

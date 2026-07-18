@@ -29,10 +29,10 @@ export function ArchiveAgentPage() {
   };
 
   return (
-    <section className="chat-panel">
-      <header className="chat-header">
+    <section className="chat-panel" data-ui="agent-workspace" data-state="archived" data-variant="chat">
+      <header className="chat-header" data-slot="header">
         <Link to="/archive">Back to Archive</Link>
-        <div>
+        <div data-slot="identity">
           <h1>Archived session</h1>
           <span className="archive-readonly-label">read-only</span>
         </div>
@@ -46,7 +46,7 @@ export function ArchiveAgentPage() {
         </button>
       </header>
       {error && <p className="archive-error">{error}</p>}
-      <TranscriptView agentId={id} events={events} />
+      <div data-slot="content"><TranscriptView agentId={id} events={events} /></div>
       {/* No Composer — read-only view */}
       <div />
     </section>

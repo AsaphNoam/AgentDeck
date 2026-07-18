@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { searchArchive } from "../../api/client";
 import type { ArchiveResult } from "../../api/types";
+import { Badge } from "../../components/ui";
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -14,35 +15,34 @@ function useDebounce<T>(value: T, delay: number): T {
 
 function StateBadge({ active }: { active: boolean }) {
   return (
-    <span className={`state-badge ${active ? "idle" : "done"}`}>
-      <span />
+    <Badge className={`state-badge ${active ? "idle" : "done"}`} variant={active ? "info" : "success"} indicator>
       {active ? "active" : "inactive"}
-    </span>
+    </Badge>
   );
 }
 
 function ArchiveRow({ result, onClick }: { result: ArchiveResult; onClick: () => void }) {
   return (
-    <li className="archive-row" role="button" tabIndex={0} onClick={onClick} onKeyDown={(e) => e.key === "Enter" && onClick()}>
-      <div className="archive-row-top">
+    <li className="archive-row" data-slot="result" data-state={result.active ? "active" : "inactive"} role="button" tabIndex={0} onClick={onClick} onKeyDown={(e) => e.key === "Enter" && onClick()}>
+      <div className="archive-row-top" data-slot="metadata">
         <span className="archive-name">{result.name}</span>
         <StateBadge active={result.active} />
       </div>
-      <div className="archive-row-sub">
+      <div className="archive-row-sub" data-slot="metadata">
         <span>{result.role} · {result.project}</span>
         <span>{result.backend} · {result.model}</span>
       </div>
       {result.snippet && (
-        <p className="archive-snippet">…{result.snippet}…</p>
+        <p className="archive-snippet" data-slot="snippet">…{result.snippet}…</p>
       )}
       {result.matched_in && result.matched_in.length > 0 && (
-        <div className="archive-match-tags">
+        <div className="archive-match-tags" data-slot="tags">
           {result.matched_in.map((m) => (
             <span key={m} className="archive-match-tag">{m}</span>
           ))}
         </div>
       )}
-      <div className="archive-row-meta">
+      <div className="archive-row-meta" data-slot="metadata">
         <span>{result.turn_count} turns</span>
         <span>{result.files_touched} files</span>
         <span>{result.commands_run} cmds</span>
@@ -96,12 +96,12 @@ export function ArchivePage() {
   };
 
   return (
-    <section className="archive-page">
-      <div className="archive-header">
+    <section className="archive-page" data-ui="archive" data-state={error ? "error" : loading ? "loading" : results.length === 0 ? "empty" : undefined}>
+      <div className="archive-header" data-slot="header">
         <h1>Archive</h1>
         <Link to="/">Back to Dashboard</Link>
       </div>
-      <div className="archive-search">
+      <div className="archive-search" data-slot="search">
         <input
           type="search"
           placeholder="Search agents, roles, projects, transcript…"
@@ -116,7 +116,7 @@ export function ArchivePage() {
       {!loading && !error && results.length === 0 && (
         <p className="archive-empty">{q ? `No results for "${q}"` : "No sessions yet."}</p>
       )}
-      <ul className="archive-list">
+      <ul className="archive-list" data-slot="results">
         {results.map((r) => (
           <ArchiveRow key={r.agent_id} result={r} onClick={() => handleClick(r)} />
         ))}
