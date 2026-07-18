@@ -4,6 +4,19 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-18 — Fix: onboarding continuity and readable archived replies
+
+The first-run wizard now remains open through Project, Config, and Launch even when config polling
+reports setup satisfied after backend validation. Archived and resumed conversations now combine
+consecutive stored assistant stream fragments into the same single reply shown live. Regression
+coverage exercises the gate, transcript store, and Archive surface, and the release interface was
+rebuilt with all specification, interface, Go, and distribution checks passing.
+
+**Needs attention:** None.
+
+**Next:** Rerun the onboarding and Archive/resume journeys in a usability review; a maintainer can
+separately authorize the credentialed provider gates.
+
 ### 2026-07-18 — Usability review: core interface and previously skipped journeys
 
 Claude left no durable checkpoint, so I restarted the review against the real built app with fresh,

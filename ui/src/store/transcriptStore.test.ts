@@ -89,6 +89,20 @@ describe("transcriptStore", () => {
     expect(event.text ?? event.delta).toBe("hi");
   });
 
+  it("merges consecutive assistant deltas on transcript replay", () => {
+    useTranscriptStore.getState().setTranscript("a_replay", [
+      { agent_id: "a_replay", seq: 1, type: "assistant_text", ts: "t1", data: { delta: "Sure, " } },
+      { agent_id: "a_replay", seq: 2, type: "assistant_text", ts: "t2", data: { delta: "I'll " } },
+      { agent_id: "a_replay", seq: 3, type: "assistant_text", ts: "t3", data: { delta: "do that." } },
+      { agent_id: "a_replay", seq: 4, type: "turn_end", ts: "t4", data: { reason: "completed" } },
+    ]);
+
+    const events = useTranscriptStore.getState().byAgent.a_replay;
+    expect(events).toHaveLength(2);
+    expect(events[0]).toMatchObject({ kind: "assistant_text", text: "Sure, I'll do that." });
+    expect(events[1]).toMatchObject({ kind: "turn_end" });
+  });
+
   it("replaces an optimistic user bubble with its durable SSE event", () => {
     useTranscriptStore.getState().appendMessage("a_5", {
       kind: "user_text", text: "persist this", message_id: "local-1",

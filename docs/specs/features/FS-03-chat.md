@@ -29,9 +29,10 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 - **R3.** The transcript follows new events while the reader remains at the bottom. Scrolling away
   suspends auto-follow and exposes **Jump to latest**, so streaming output does not take control of
   the reader's scroll position.
-- **R4.** Consecutive live `assistant_text` deltas are folded into one rendered response. A
-  `permission_resolved` event is folded into its matching `permission_request`, which then renders
-  an Approved or Denied chip instead of active decision buttons.
+- **R4.** Consecutive `assistant_text` deltas are folded into one rendered response both while they
+  arrive live and when a durable transcript is replayed. A `permission_resolved` event is folded
+  into its matching `permission_request`, which then renders an Approved or Denied chip instead of
+  active decision buttons.
 - **R5.** One malformed or unrenderable event is isolated by an event-level error boundary; the
   remainder of the transcript stays usable and the failed item displays a fallback.
 
@@ -136,8 +137,8 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `internal/server/server_test.go::TestPermissionErrorAlreadyResolved`.
 - **A5** (R9) — Cancel claims a pending permission, prevents tool execution, records a cancelled
   turn, and becomes a no-op once idle: `internal/runtime/permission_test.go::TestCancelDuringPendingPermission`.
-- **A6** (R4, R10–R12) — Nested wire events normalize, live assistant deltas fold, and permission
-  resolutions fold on live append and replay: `ui/src/store/transcriptStore.test.ts`.
+- **A6** (R4, R10–R12) — Nested wire events normalize, assistant deltas fold on live append and
+  replay, and permission resolutions fold on both paths: `ui/src/store/transcriptStore.test.ts`.
 - **A7** (R7, R13) — Accepted user prompts and delivered partial output remain in both the transcript
   endpoint and NDJSON after a mid-turn process crash:
   `internal/server/integration_test.go::TestCrashMidTurnPersistsDeliveredTranscript`.
@@ -147,10 +148,6 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 
 ## 6. Deviations & open decisions
 
-- **Reloaded assistant deltas do not fold like live deltas.** Live append merges consecutive
-  `assistant_text` events (R4), but `foldTranscript` currently normalizes a full transcript without
-  coalescing adjacent deltas. A streamed reply that appeared as one live paragraph can reload as
-  several message cards. Tracked usability advisory; replay must reuse the live coalescing rule.
 - **Concurrent transcript refetches have no ordering token.** Open, reconnect, and gap-repair
   fetches can overlap; the last promise to resolve replaces the store even if it contains an older
   maximum seq. The next live event/refetch can self-heal, but a slow stale response can temporarily

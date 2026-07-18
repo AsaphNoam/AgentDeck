@@ -150,7 +150,8 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `internal/server/switch_test.go::TestComposeResumeSpecCarriesFrozenLaunchConfig`.
 - **A7** (R12, R14, and §3 index lifecycle) — Transcript/FTS content survives restart and resume:
   `internal/index/indexer_fts_test.go::TestResumeAfterRestartPreservesFTSContent`,
-  `internal/index/reindex_test.go::TestReindexPreservesFinalPartialTurn`.
+  `internal/index/reindex_test.go::TestReindexPreservesFinalPartialTurn`; archived assistant stream
+  fragments replay as one rendered message: `ui/src/features/archive/ArchiveAgentPage.test.tsx`.
 - **A8** (R15–R18) — File/command rollups from both ACP and hook sources:
   `internal/server/files_commands_test.go::TestFilesEndpointRows`, `TestCommandsEndpointRows`,
   `TestHookCommandCapture`, `TestHookCommandCaptureMultiple`.
@@ -191,4 +192,4 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   transcript + Resume), `ui/src/components/chat/{FilesTab,CommandsTab}.tsx`.
 - **Key regression tests:** `TestSearchFallbackFiltersMetadata`, `TestArchiveSearchFTSMetadataTranscriptAndPagination`,
   `TestResumeAfterRestartPreservesFTSContent`, `TestReindexPreservesFinalPartialTurn`,
-  `TestHookCommandCapture`.
+  `TestHookCommandCapture`, and `ui/src/features/archive/ArchiveAgentPage.test.tsx`.

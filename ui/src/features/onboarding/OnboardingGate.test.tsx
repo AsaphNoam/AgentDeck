@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/re
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
+import { QUERY_KEYS } from "../../api/config";
 import { OnboardingGate } from "./OnboardingGate";
 
 const notSatisfiedConfig = {
@@ -75,7 +76,10 @@ afterAll(() => server.close());
 
 function renderWithQuery(ui: React.ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
-  return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
+  return {
+    ...render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>),
+    queryClient: qc,
+  };
 }
 
 describe("OnboardingGate", () => {
@@ -119,6 +123,26 @@ describe("OnboardingGate", () => {
     );
     expect(await screen.findByText("Create your first project")).toBeInTheDocument();
     expect(screen.queryByText("Configure your AI backend")).toBeNull();
+  });
+
+  it("keeps an open wizard on Project when a config refresh becomes satisfied", async () => {
+    let currentConfig = backendDoneProjectNotDoneConfig;
+    server.use(http.get("/api/config", () => HttpResponse.json(currentConfig)));
+
+    const { queryClient } = renderWithQuery(
+      <OnboardingGate>
+        <div data-testid="dashboard">Dashboard</div>
+      </OnboardingGate>,
+    );
+    expect(await screen.findByText("Create your first project")).toBeInTheDocument();
+
+    currentConfig = satisfiedConfig;
+    await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.config });
+
+    await waitFor(() => {
+      expect(screen.getByText("Create your first project")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("dashboard")).toBeNull();
   });
 
   it("Esc key does not dismiss the wizard", async () => {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useConfig } from "../../api/config";
 import { OnboardingWizard } from "./OnboardingWizard";
 
@@ -9,15 +9,19 @@ interface OnboardingGateProps {
 export function OnboardingGate({ children }: OnboardingGateProps) {
   const { data: config, isLoading } = useConfig();
   const [dismissed, setDismissed] = useState(false);
+  const wizardOpened = useRef(false);
 
   if (isLoading) return <div className="gate-loading">Loading…</div>;
 
-  const satisfied =
-    dismissed ||
+  const serverSatisfied =
     config?.onboarding.satisfied === true ||
     config?.onboarding_complete === true;
+  if (config && !serverSatisfied) wizardOpened.current = true;
 
-  if (config && !satisfied) {
+  // Backend/project writes can make the computed server gate satisfied while
+  // this four-step walkthrough is still in progress. Keep an opened wizard
+  // mounted until Launch completes so polling cannot eject the user mid-flow.
+  if (config && !dismissed && wizardOpened.current) {
     return (
       <OnboardingWizard
         steps={config.onboarding.steps}
