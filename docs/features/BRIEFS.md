@@ -20,6 +20,8 @@ agents; approval worked normally.
 
 **Needs attention:** Fix the permission-denial state race before treating the deny path as reliable.
 Credentialed provider and real-Claude terminal compatibility remain separate manual release gates.
+The review state is committed locally; publishing it requires explicit approval to push the local
+commits currently ahead of `origin/main`.
 
 **Next:** Run `/fix` for the permission-denial finding, then rerun the deny journey; a maintainer can
 separately authorize the credentialed acceptance gates.
