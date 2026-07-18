@@ -31,12 +31,13 @@ export function CardContextMenu() {
   if (!menu || !agent) return null;
 
   return createPortal(
-    <div className="context-menu" style={{ left: menu.x, top: menu.y }} role="menu">
-      <button type="button" onClick={() => { navigate(`/agent/${agent.agent_id}`); close(); }}>
+    <div className="context-menu" data-ui="context-menu" style={{ left: menu.x, top: menu.y }} role="menu">
+      <button type="button" data-slot="item" onClick={() => { navigate(`/agent/${agent.agent_id}`); close(); }}>
         Open chat
       </button>
       <button
         type="button"
+        data-slot="item"
         onClick={() => {
           const name = window.prompt("Rename agent", agent.name);
           if (name)
@@ -50,6 +51,7 @@ export function CardContextMenu() {
       </button>
       <button
         type="button"
+        data-slot="item"
         disabled={!agent.running}
         onClick={() => {
           if (window.confirm(`Stop ${agent.name}?`))
@@ -64,6 +66,7 @@ export function CardContextMenu() {
       <hr />
       <button
         type="button"
+        data-slot="item"
         disabled={!agent.running}
         title={agent.running ? "Switch interface/backend/model" : "Agent must be running"}
         onClick={() => {
@@ -80,6 +83,7 @@ export function CardContextMenu() {
       </button>
       <button
         type="button"
+        data-slot="item"
         title="Launch a new agent with this one's role, project, backend, and model"
         onClick={() => {
           launchAgent({
@@ -99,6 +103,7 @@ export function CardContextMenu() {
       </button>
       <button
         type="button"
+        data-slot="item"
         onClick={() => {
           const group = window.prompt("Move to group (blank removes group)", agent.group ?? "");
           if (group !== null)
@@ -111,7 +116,7 @@ export function CardContextMenu() {
         Move to group
       </button>
       {agent.interface === "terminal" && (
-        <button type="button" onClick={() => { navigate(`/agent/${agent.agent_id}?tab=terminal`); close(); }}>
+        <button type="button" data-slot="item" onClick={() => { navigate(`/agent/${agent.agent_id}?tab=terminal`); close(); }}>
           Reveal terminal
         </button>
       )}

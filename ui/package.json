@@ -3,9 +3,15 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "scripts": {
     "dev": "vite",
+    "check:styles": "stylelint \"src/**/*.css\" --max-warnings 0 && node --test scripts/*.test.mjs && node scripts/check-presentation-contract.mjs",
+    "prebuild": "npm run check:styles",
     "build": "tsc -b && vite build",
+    "pretest": "npm run check:styles",
     "test": "vitest run",
     "preview": "vite preview"
   },
@@ -40,6 +46,11 @@
     "@vitejs/plugin-react": "^4.3.4",
     "jsdom": "^25.0.1",
     "msw": "^2.14.6",
+    "postcss": "8.5.16",
+    "postcss-selector-parser": "7.1.4",
+    "postcss-value-parser": "4.2.0",
+    "stylelint": "17.14.0",
+    "stylelint-config-recommended": "18.0.0",
     "typescript": "^5.6.3",
     "vite": "^5.4.11",
     "vitest": "^2.1.9"

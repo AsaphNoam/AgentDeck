@@ -1,0 +1,177 @@
+{
+  "version": 1,
+  "tokens": [
+    "--ad-surface-canvas",
+    "--ad-surface-panel",
+    "--ad-surface-raised",
+    "--ad-surface-subtle",
+    "--ad-surface-emphasis",
+    "--ad-text-primary",
+    "--ad-text-secondary",
+    "--ad-text-muted",
+    "--ad-text-inverse",
+    "--ad-border-default",
+    "--ad-border-strong",
+    "--ad-action-primary",
+    "--ad-action-primary-ink",
+    "--ad-action-secondary",
+    "--ad-highlight",
+    "--ad-state-busy",
+    "--ad-state-idle",
+    "--ad-state-waiting",
+    "--ad-state-done",
+    "--ad-state-error",
+    "--ad-state-unknown",
+    "--ad-technical-background",
+    "--ad-technical-surface",
+    "--ad-technical-text",
+    "--ad-technical-muted",
+    "--ad-font-display",
+    "--ad-font-text",
+    "--ad-font-mono",
+    "--ad-radius-small",
+    "--ad-radius-medium",
+    "--ad-radius-large",
+    "--ad-radius-round",
+    "--ad-shadow-keyline",
+    "--ad-shadow-offset"
+  ],
+  "components": {
+    "button": {
+      "slots": ["label"],
+      "states": ["disabled", "busy"],
+      "variants": ["primary", "secondary", "ghost", "danger", "icon"]
+    },
+    "badge": {
+      "slots": ["indicator", "label"],
+      "states": ["busy", "idle", "waiting_input", "done", "error", "unknown"],
+      "variants": ["neutral", "info", "success", "warning", "danger", "technical"]
+    },
+    "field": {
+      "slots": ["label", "control", "hint", "error"],
+      "states": ["disabled", "invalid"],
+      "variants": []
+    },
+    "page-header": {
+      "slots": ["eyebrow", "title", "description", "actions"],
+      "states": [],
+      "variants": ["default", "compact"]
+    },
+    "surface": {
+      "slots": [],
+      "states": [],
+      "variants": ["default", "raised", "technical"]
+    },
+    "app-shell": {
+      "slots": ["mark", "wordmark", "navigation", "connection", "main"],
+      "states": [],
+      "variants": []
+    },
+    "connection-indicator": {
+      "slots": ["indicator", "label"],
+      "states": ["connecting", "open", "reconnecting", "down"],
+      "variants": []
+    },
+    "dashboard": {
+      "slots": ["header", "groups", "empty"],
+      "states": [],
+      "variants": []
+    },
+    "agent-group": {
+      "slots": ["header", "summary", "grid"],
+      "states": ["expanded", "collapsed"],
+      "variants": []
+    },
+    "agent-card": {
+      "slots": ["header", "identity", "metadata", "indicators", "context", "preview"],
+      "states": ["busy", "idle", "waiting_input", "done", "error", "unknown", "stopped"],
+      "variants": ["default", "dragging"]
+    },
+    "context-meter": {
+      "slots": ["track", "fill", "label"],
+      "states": [],
+      "variants": ["low", "medium", "high"]
+    },
+    "context-menu": {
+      "slots": ["item"],
+      "states": [],
+      "variants": []
+    },
+    "toast": {
+      "slots": ["title", "body"],
+      "states": ["done", "waiting_input", "permission_required", "budget_exceeded", "error"],
+      "variants": []
+    },
+    "agent-workspace": {
+      "slots": ["header", "identity", "context", "tabs", "content", "composer"],
+      "states": ["active", "archived"],
+      "variants": ["chat", "terminal"]
+    },
+    "transcript": {
+      "slots": ["list", "event"],
+      "states": [],
+      "variants": ["assistant", "user", "tool-call", "tool-result", "diff", "permission", "error", "turn", "backend-switch", "unknown"]
+    },
+    "tool-call": {
+      "slots": ["trigger", "content"],
+      "states": ["collapsed", "expanded"],
+      "variants": []
+    },
+    "tool-result": {
+      "slots": ["content", "actions"],
+      "states": ["collapsed", "expanded", "error"],
+      "variants": []
+    },
+    "permission-prompt": {
+      "slots": ["title", "reason", "actions", "resolution", "error"],
+      "states": ["pending", "approved", "denied", "error"],
+      "variants": []
+    },
+    "tracked-list": {
+      "slots": ["filter", "count", "items", "row", "metadata", "actions"],
+      "states": ["loading", "empty", "error"],
+      "variants": ["files", "commands"]
+    },
+    "terminal": {
+      "slots": ["viewport"],
+      "states": [],
+      "variants": []
+    },
+    "archive": {
+      "slots": ["header", "search", "results", "result", "metadata", "snippet", "tags"],
+      "states": ["active", "inactive", "loading", "empty", "error"],
+      "variants": []
+    },
+    "settings": {
+      "slots": ["header", "navigation", "content"],
+      "states": [],
+      "variants": []
+    },
+    "config-editor": {
+      "slots": ["header", "list", "item", "form", "actions"],
+      "states": ["empty", "loading", "error"],
+      "variants": ["roles", "projects", "backends", "notifications"]
+    },
+    "config-source": {
+      "slots": ["status", "root", "warning", "overrides", "effective", "inventory", "actions"],
+      "states": ["unbound", "ok", "source_invalid", "approval_required", "source_conflict", "stale", "unknown"],
+      "variants": []
+    },
+    "dialog": {
+      "slots": ["overlay", "content", "title", "body", "actions"],
+      "states": ["open", "closed"],
+      "variants": ["default", "onboarding"]
+    },
+    "onboarding": {
+      "slots": ["progress", "step", "content", "actions"],
+      "states": ["current", "complete", "upcoming"],
+      "variants": ["source", "project", "backend", "launch"]
+    },
+    "error-state": {
+      "slots": ["message", "actions"],
+      "states": ["error"],
+      "variants": []
+    }
+  },
+  "decorative_slots": ["app-mark"]
+}

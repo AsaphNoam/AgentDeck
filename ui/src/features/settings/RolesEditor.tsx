@@ -72,13 +72,13 @@ export function RolesEditor() {
     );
   }
 
-  if (isLoading) return <p>Loading roles…</p>;
+  if (isLoading) return <p data-ui="config-editor" data-state="loading" data-variant="roles">Loading roles…</p>;
 
   const entries = Object.entries(roles ?? {});
 
   return (
-    <div className="config-editor">
-      <div className="config-editor-header">
+    <div className="config-editor" data-ui="config-editor" data-state={formError ? "error" : entries.length === 0 ? "empty" : undefined} data-variant="roles">
+      <div className="config-editor-header" data-slot="header">
         <h2>Roles</h2>
         <button onClick={openCreate}>New role</button>
       </div>
@@ -86,9 +86,9 @@ export function RolesEditor() {
       {entries.length === 0 && (
         <p className="config-empty">No roles defined. Create one to get started.</p>
       )}
-      <ul className="config-list">
+      <ul className="config-list" data-slot="list">
         {entries.map(([id, role]) => (
-          <li key={id} className="config-list-item">
+          <li key={id} className="config-list-item" data-slot="item">
             <div className="config-list-item-main">
               <strong>{role.title}</strong>
               <code className="config-slug">{id}</code>
@@ -101,7 +101,7 @@ export function RolesEditor() {
                 <p className="config-excerpt">{role.system_prompt.slice(0, 80)}</p>
               )}
             </div>
-            <div className="config-list-item-actions">
+            <div className="config-list-item-actions" data-slot="actions">
               <button onClick={() => openEdit(id, role)}>Edit</button>
               <button onClick={() => handleDelete(id)} className="btn-danger">
                 Delete
@@ -113,8 +113,8 @@ export function RolesEditor() {
 
       <Dialog.Root open={open} onOpenChange={setOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="dialog-overlay" />
-          <Dialog.Content className="dialog-content">
+          <Dialog.Overlay className="dialog-overlay" data-ui="dialog" data-slot="overlay" />
+          <Dialog.Content className="dialog-content" data-ui="dialog" data-slot="content" data-variant="default">
             <Dialog.Title>{editing ? "Edit role" : "New role"}</Dialog.Title>
             <RoleForm
               initial={editing ?? undefined}

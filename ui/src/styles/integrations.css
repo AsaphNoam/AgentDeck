@@ -1,0 +1,25 @@
+@layer ad-integrations {
+.assistant-message pre,
+.assistant-message div[class*="language-"] {
+  background: var(--ad-technical-background);
+  border: var(--ad-border-thin) solid var(--ad-technical-muted);
+  border-radius: var(--ad-radius-small) var(--ad-radius-large) var(--ad-radius-large) var(--ad-radius-large);
+  color: var(--ad-technical-text);
+  font-family: var(--ad-font-mono);
+  overflow: auto;
+}
+
+.diff-block > strong {
+  display: block;
+  margin-bottom: var(--ad-space-2);
+}
+
+.terminal-xterm .xterm,
+.terminal-xterm .xterm-viewport {
+  background: transparent;
+}
+
+.terminal-xterm .xterm-viewport {
+  scrollbar-color: var(--ad-technical-muted) var(--ad-technical-background);
+}
+}

@@ -5,8 +5,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { router } from "./routes";
 import { queryClient } from "./api/config";
 import { sseClient } from "./api/sse";
-import "./styles/tokens.css";
-import "./styles/global.css";
+import "./styles/index.css";
 
 sseClient.connect();
 

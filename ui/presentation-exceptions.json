@@ -1,0 +1,32 @@
+[
+  {
+    "file": "src/components/grid/AgentCard.tsx",
+    "rule": "inline-style",
+    "reason": "Transform/transition are live drag state and the accent is persisted project RGB data"
+  },
+  {
+    "file": "src/components/grid/CardGrid.tsx",
+    "rule": "inline-style",
+    "reason": "Grid columns and gap are persisted dashboard density data"
+  },
+  {
+    "file": "src/components/grid/ContextBar.tsx",
+    "rule": "inline-style",
+    "reason": "Width is live context usage data"
+  },
+  {
+    "file": "src/components/grid/CardContextMenu.tsx",
+    "rule": "inline-style",
+    "reason": "Coordinates are live pointer position data"
+  },
+  {
+    "file": "src/features/settings/ProjectForm.tsx",
+    "rule": "inline-style",
+    "reason": "Background is the project RGB value being edited"
+  },
+  {
+    "file": "src/features/settings/ProjectsEditor.tsx",
+    "rule": "inline-style",
+    "reason": "Background is the persisted project RGB accent"
+  }
+]

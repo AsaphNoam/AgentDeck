@@ -29,9 +29,9 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.error) {
       if (this.props.fallback) return this.props.fallback;
       return (
-        <div className="error-boundary" role="alert">
-          <p>Something went wrong{this.props.label ? ` in ${this.props.label}` : ""}.</p>
-          <button type="button" onClick={this.reset}>Try again</button>
+        <div className="error-boundary" data-ui="error-state" data-state="error" role="alert">
+          <p data-slot="message">Something went wrong{this.props.label ? ` in ${this.props.label}` : ""}.</p>
+          <div data-slot="actions"><button type="button" onClick={this.reset}>Try again</button></div>
         </div>
       );
     }

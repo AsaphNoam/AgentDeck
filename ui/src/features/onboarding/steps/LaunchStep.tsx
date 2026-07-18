@@ -69,7 +69,7 @@ export function LaunchStep({ onDone, initialProject }: LaunchStepProps) {
   };
 
   return (
-    <div className="wizard-step">
+    <div className="wizard-step" data-ui="onboarding" data-slot="step" data-variant="launch">
       <h3>Launch your first agent</h3>
       <p className="wizard-step-desc">
         You're all set! Launch an agent to complete setup.
@@ -104,7 +104,7 @@ export function LaunchStep({ onDone, initialProject }: LaunchStepProps) {
 
       {error && <p className="form-error">{error}</p>}
 
-      <div className="form-actions">
+      <div className="form-actions" data-slot="actions">
         <button type="button" onClick={handleLaunch} disabled={launch.isPending || putConfig.isPending || !role || !project}>
           {launch.isPending ? "Launching…" : putConfig.isPending ? "Completing setup…" : "Launch"}
         </button>

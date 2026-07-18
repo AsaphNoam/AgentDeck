@@ -1,17 +1,21 @@
-import { Link } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import { ConnectionDot } from "./ConnectionDot";
+import { AgentDeckMark } from "./AgentDeckMark";
 
 export function Header() {
   return (
-    <header className="app-header">
+    <header className="app-header" data-ui="app-shell">
       <Link to="/" className="app-logo">
-        <strong>AgentDeck</strong>
+        <AgentDeckMark />
       </Link>
-      <nav className="app-nav">
-        <Link to="/archive">Archive</Link>
-        <Link to="/settings">Settings</Link>
+      <nav className="app-nav" data-slot="navigation" aria-label="Primary navigation">
+        <NavLink to="/" end>Dashboard</NavLink>
+        <NavLink to="/archive">Archive</NavLink>
+        <NavLink to="/settings">Settings</NavLink>
       </nav>
-      <ConnectionDot />
+      <div className="app-connection" data-slot="connection">
+        <ConnectionDot />
+      </div>
     </header>
   );
 }

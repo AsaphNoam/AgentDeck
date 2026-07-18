@@ -4,6 +4,24 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-18 — Implementation: redesigned the core interface
+
+AgentDeck now has a complete product-native visual system across the shell, Dashboard, agent views,
+Archive, Settings, onboarding, dialogs, menus, notifications, technical renderers, and error states.
+The redesign preserves existing product behavior while adding local fonts and mark, semantic tokens,
+shared visual primitives, stable future-skin hooks, and automated safeguards against visual drift.
+
+The deterministic browser matrix and rebuilt release UI were exercised in baseline and high-variance
+modes, including the empty Dashboard, New Agent dialog, Archive, every Settings section, onboarding,
+transcript and terminal fixtures, overlays, long content, and every agent state. Browser review caught
+and fixed inactive Settings panels taking layout space. All presentation safeguards, 101 UI tests,
+both Go test variants, specification checks, source build, and distribution build pass.
+
+**Needs attention:** None.
+
+**Next:** An independent review can inspect the shipped change; live-provider acceptance remains the
+separate credentialed gate already recorded in the handoff.
+
 ### 2026-07-18 — feature design: core frontend ready
 
 The core frontend redesign is fully designed and waiting to build. It will give every existing

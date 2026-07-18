@@ -9,8 +9,8 @@ function copyToClipboard(text: string) {
 function CommandRow({ cmd }: { cmd: TrackedCommand }) {
   const failed = cmd.exit_status === "failed";
   return (
-    <li className={`tracked-row ${failed ? "tracked-failed" : ""}`}>
-      <div className="tracked-row-top">
+    <li className={`tracked-row ${failed ? "tracked-failed" : ""}`} data-ui="tracked-list" data-slot="row" data-variant="commands">
+      <div className="tracked-row-top" data-slot="metadata">
         <code className="tracked-command">{cmd.command}</code>
         <button type="button" title="Copy command" onClick={() => copyToClipboard(cmd.command)}>
           Copy
@@ -47,12 +47,12 @@ export function CommandsTab({ agentId }: { agentId: string }) {
     ? commands.filter((c) => c.command.toLowerCase().includes(filter.toLowerCase()))
     : commands;
 
-  if (loading) return <p className="tab-placeholder">Loading…</p>;
-  if (error) return <p className="tab-error">{error}</p>;
+  if (loading) return <p className="tab-placeholder" data-ui="tracked-list" data-state="loading" data-variant="commands">Loading…</p>;
+  if (error) return <p className="tab-error" data-ui="tracked-list" data-state="error" data-variant="commands">{error}</p>;
 
   return (
-    <div className="tracked-tab">
-      <div className="tracked-filter">
+    <div className="tracked-tab" data-ui="tracked-list" data-state={filtered.length === 0 ? "empty" : undefined} data-variant="commands">
+      <div className="tracked-filter" data-slot="filter">
         <input
           type="search"
           placeholder="Filter commands…"
@@ -60,12 +60,12 @@ export function CommandsTab({ agentId }: { agentId: string }) {
           onChange={(e) => setFilter(e.target.value)}
           aria-label="Filter commands"
         />
-        <span className="tracked-count">{filtered.length} command{filtered.length !== 1 ? "s" : ""}</span>
+        <span className="tracked-count" data-slot="count">{filtered.length} command{filtered.length !== 1 ? "s" : ""}</span>
       </div>
       {filtered.length === 0 ? (
         <p className="tab-placeholder">{filter ? "No matches." : "No commands tracked yet."}</p>
       ) : (
-        <ul className="tracked-list">
+        <ul className="tracked-list" data-slot="items">
           {filtered.map((c) => (
             <CommandRow key={`${c.seq}-${c.tool_call_id}`} cmd={c} />
           ))}

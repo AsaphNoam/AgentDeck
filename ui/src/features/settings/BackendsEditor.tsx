@@ -178,11 +178,11 @@ export function BackendsEditor() {
     });
   };
 
-  if (isLoading) return <p>Loading backends…</p>;
+  if (isLoading) return <p data-ui="config-editor" data-state="loading" data-variant="backends">Loading backends…</p>;
 
   return (
-    <div className="config-editor backends-editor">
-      <div className="config-editor-header">
+    <div className="config-editor backends-editor" data-ui="config-editor" data-state={error ? "error" : entries.length === 0 ? "empty" : undefined} data-variant="backends">
+      <div className="config-editor-header" data-slot="header">
         <h2>Backends</h2>
         <button type="button" onClick={addBackend}>Add backend</button>
       </div>
@@ -192,7 +192,7 @@ export function BackendsEditor() {
       )}
 
       {entries.map(({ id, backend, envPairs }) => (
-        <div key={id} className="backend-card">
+        <div key={id} className="backend-card" data-slot="item">
           <div className="backend-card-header">
             <label className="backend-default-label">
               <input
@@ -293,7 +293,7 @@ export function BackendsEditor() {
 
       {error && <p className="form-error">{error}</p>}
 
-      <div className="backends-footer">
+      <div className="backends-footer" data-slot="actions">
         <button type="button" onClick={handleSave} disabled={putBackends.isPending}>
           {putBackends.isPending ? "Saving…" : "Save"}
         </button>

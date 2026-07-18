@@ -91,13 +91,13 @@ export function ProjectsEditor() {
     );
   }
 
-  if (isLoading) return <p>Loading projects…</p>;
+  if (isLoading) return <p data-ui="config-editor" data-state="loading" data-variant="projects">Loading projects…</p>;
 
   const entries = Object.entries(projects ?? {});
 
   return (
-    <div className="config-editor">
-      <div className="config-editor-header">
+    <div className="config-editor" data-ui="config-editor" data-state={formError ? "error" : entries.length === 0 ? "empty" : undefined} data-variant="projects">
+      <div className="config-editor-header" data-slot="header">
         <h2>Projects</h2>
         <button onClick={openCreate}>New project</button>
       </div>
@@ -105,23 +105,23 @@ export function ProjectsEditor() {
       {entries.length === 0 && (
         <p className="config-empty">No projects defined. Create one to get started.</p>
       )}
-      <ul className="config-list">
+      <ul className="config-list" data-slot="list">
         {entries.map(([id, proj]) => (
-          <li key={id} className="config-list-item">
+          <li key={id} className="config-list-item" data-slot="item">
             <div className="config-list-item-main">
               <div
                 className="project-color-swatch"
                 style={{
                   background: proj.color
                     ? `rgb(${proj.color[0]},${proj.color[1]},${proj.color[2]})`
-                    : "#888",
+                    : "var(--ad-project-fallback)",
                 }}
               />
               <strong>{proj.title}</strong>
               <code className="config-slug">{id}</code>
               <span className="config-cwd">{proj.cwd}</span>
             </div>
-            <div className="config-list-item-actions">
+            <div className="config-list-item-actions" data-slot="actions">
               <button onClick={() => openEdit(id, proj)}>Edit</button>
               <button onClick={() => handleDelete(id, proj.resource_dir)} className="btn-danger">
                 Delete
@@ -133,8 +133,8 @@ export function ProjectsEditor() {
 
       <Dialog.Root open={open} onOpenChange={setOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="dialog-overlay" />
-          <Dialog.Content className="dialog-content">
+          <Dialog.Overlay className="dialog-overlay" data-ui="dialog" data-slot="overlay" />
+          <Dialog.Content className="dialog-content" data-ui="dialog" data-slot="content" data-variant="default">
             <Dialog.Title>{editing ? "Edit project" : "New project"}</Dialog.Title>
             <ProjectForm
               initial={editing ?? undefined}

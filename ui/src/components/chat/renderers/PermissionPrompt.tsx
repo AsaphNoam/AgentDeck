@@ -20,19 +20,21 @@ export function PermissionPrompt({ agentId, event }: { agentId: string; event: T
   const label = String(event.name ?? event.tool ?? "Permission required");
   if (resolved) {
     return (
-      <article className="permission-prompt resolved">
-        <strong>{label}</strong>
-        <span className="permission-chip">{resolved === "approve" ? "Approved" : "Denied"}</span>
+      <article className="permission-prompt resolved" data-ui="permission-prompt" data-state={resolved === "approve" ? "approved" : "denied"}>
+        <strong data-slot="title">{label}</strong>
+        <span className="permission-chip" data-slot="resolution">{resolved === "approve" ? "Approved" : "Denied"}</span>
       </article>
     );
   }
   return (
-    <article className="permission-prompt">
-      <strong>{label}</strong>
-      <p>{String(event.reason ?? "")}</p>
-      {error && <p className="permission-error">{error}</p>}
-      <button type="button" onClick={() => void decide("approve")}>Approve</button>
-      <button type="button" onClick={() => void decide("deny")}>Deny</button>
+    <article className="permission-prompt" data-ui="permission-prompt" data-state={error ? "error" : "pending"}>
+      <strong data-slot="title">{label}</strong>
+      <p data-slot="reason">{String(event.reason ?? "")}</p>
+      {error && <p className="permission-error" data-slot="error">{error}</p>}
+      <div data-slot="actions">
+        <button type="button" onClick={() => void decide("approve")}>Approve</button>
+        <button type="button" onClick={() => void decide("deny")}>Deny</button>
+      </div>
     </article>
   );
 }

@@ -11,10 +11,10 @@ export function ToolResult({ event }: { event: TranscriptEvent }) {
   const long = text.length > LIMIT;
   const shown = long && !expanded ? `${text.slice(0, LIMIT)}…` : text;
   return (
-    <article className={`tool-block tool-result ${isError ? "tool-result-error" : ""}`}>
-      <pre>{shown}</pre>
+    <article className={`tool-block tool-result ${isError ? "tool-result-error" : ""}`} data-ui="tool-result" data-state={isError ? "error" : expanded ? "expanded" : "collapsed"}>
+      <pre data-slot="content">{shown}</pre>
       {long && (
-        <button type="button" className="tool-toggle" onClick={() => setExpanded((v) => !v)}>
+        <button type="button" className="tool-toggle" data-slot="actions" onClick={() => setExpanded((v) => !v)}>
           {expanded ? "Show less" : "Show more"}
         </button>
       )}

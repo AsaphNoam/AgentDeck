@@ -34,8 +34,8 @@ export function NotificationsEditor() {
   };
 
   return (
-    <div className="config-editor notifications-editor">
-      <div className="config-editor-header">
+    <div className="config-editor notifications-editor" data-ui="config-editor" data-variant="notifications">
+      <div className="config-editor-header" data-slot="header">
         <h2>Notifications</h2>
         {"Notification" in window && Notification.permission !== "granted" && (
           <button type="button" onClick={() => void requestDesktop()}>

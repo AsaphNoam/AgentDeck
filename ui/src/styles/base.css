@@ -1,0 +1,70 @@
+@layer ad-base {
+:root {
+  color-scheme: light;
+  font-family: var(--ad-font-text);
+  font-synthesis: none;
+  text-rendering: optimizelegibility;
+}
+
+body {
+  background: var(--ad-surface-canvas);
+  color: var(--ad-text-primary);
+  font-family: var(--ad-font-text);
+  min-height: 100vh;
+}
+
+body::before {
+  background-image:
+    linear-gradient(var(--ad-border-default) var(--ad-border-thin), transparent var(--ad-border-thin)),
+    linear-gradient(90deg, var(--ad-border-default) var(--ad-border-thin), transparent var(--ad-border-thin));
+  background-size: var(--ad-space-12) var(--ad-space-12);
+  content: "";
+  inset: 0;
+  opacity: 0.16;
+  pointer-events: none;
+  position: fixed;
+  z-index: -1;
+}
+
+a {
+  color: var(--ad-text-primary);
+  text-decoration-color: var(--ad-action-primary);
+  text-decoration-thickness: var(--ad-border-thick);
+  text-underline-offset: var(--ad-space-1);
+}
+
+a:hover {
+  color: var(--ad-action-secondary);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--ad-font-display);
+  font-variation-settings: "wdth" 82;
+  letter-spacing: -0.035em;
+}
+
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--ad-font-mono);
+}
+
+::selection {
+  background: var(--ad-highlight);
+  color: var(--ad-text-primary);
+}
+
+:focus-visible {
+  outline: var(--ad-border-thick) solid var(--ad-action-secondary);
+  outline-offset: var(--ad-space-1);
+}
+
+hr {
+  border: 0;
+  border-top: var(--ad-border-thin) solid var(--ad-border-default);
+}
+}

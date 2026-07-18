@@ -7,6 +7,18 @@ import { OnboardingGate } from "./features/onboarding/OnboardingGate";
 import { ArchivePage } from "./features/archive/ArchivePage";
 import { ArchiveAgentPage } from "./features/archive/ArchiveAgentPage";
 
+const developmentRoutes = import.meta.env.DEV
+  ? [
+      {
+        path: "__visual-matrix",
+        lazy: async () => {
+          const { VisualMatrix } = await import("./presentation/VisualMatrix");
+          return { Component: VisualMatrix };
+        },
+      },
+    ]
+  : [];
+
 export const router = createBrowserRouter([
   {
     path: "/",
@@ -17,6 +29,7 @@ export const router = createBrowserRouter([
       { path: "archive", element: <ArchivePage /> },
       { path: "archive/:id", element: <ArchiveAgentPage /> },
       { path: "settings", element: <SettingsPage /> },
+      ...developmentRoutes,
       { path: "*", element: <Navigate to="/" replace /> },
     ],
   },

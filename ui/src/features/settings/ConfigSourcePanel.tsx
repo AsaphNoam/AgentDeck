@@ -8,7 +8,7 @@ import {
   useRefreshConfigSource,
 } from "../../api/configSources";
 import type { BackendType } from "../../schemas/backends";
-import type { Effective, SourceProvider } from "../../schemas/configSources";
+import type { BindingView, Effective, SourceProvider } from "../../schemas/configSources";
 
 const PROVIDER_FOR_TYPE: Partial<Record<BackendType, SourceProvider>> = {
   "claude-acp": "claude-code",
@@ -17,6 +17,17 @@ const PROVIDER_FOR_TYPE: Partial<Record<BackendType, SourceProvider>> = {
 
 function providerLabel(p: SourceProvider): string {
   return p === "claude-code" ? "Claude Code" : "Codex";
+}
+
+type ConfigSourceVisualState = "unbound" | "ok" | "source_invalid" | "approval_required" | "source_conflict" | "stale" | "unknown";
+
+function configSourceVisualState(binding?: BindingView): ConfigSourceVisualState {
+  if (!binding) return "unbound";
+  if (binding.stale) return "stale";
+  if (["ok", "source_invalid", "approval_required", "source_conflict"].includes(binding.health ?? "")) {
+    return binding.health as ConfigSourceVisualState;
+  }
+  return "unknown";
 }
 
 // modelProvenanceLabel turns the redacted per-field provenance into the honest
@@ -47,7 +58,7 @@ const INVENTORY_GROUPS: { label: string; kinds: string[] }[] = [
 function EffectiveView({ effective }: { effective: Effective }) {
   const assets = effective.assets ?? [];
   return (
-    <div className="source-effective">
+    <div className="source-effective" data-slot="effective">
       <div className="source-field-row">
         <span className="source-field-label">Model</span>
         <span className="source-field-value">{provenanceLabel(effective, "model", effective.model)}</span>
@@ -71,7 +82,7 @@ function EffectiveView({ effective }: { effective: Effective }) {
           </span>
         </div>
       )}
-      <div className="source-inventory">
+      <div className="source-inventory" data-slot="inventory">
         {INVENTORY_GROUPS.map((group) => {
           const items = assets.filter((a) => group.kinds.includes(a.kind));
           if (items.length === 0) return null;
@@ -153,6 +164,7 @@ export function ConfigSourcePanel({
   const [overrideEffort, setOverrideEffort] = useState("");
 
   const binding = (sources?.bindings ?? []).find((b) => b.backend_id === backendId);
+  const visualState = configSourceVisualState(binding);
 
   // Seed the override inputs from the persisted binding so the fields reflect the
   // current override and "Reset to inherit" is meaningful.
@@ -269,7 +281,7 @@ export function ConfigSourcePanel({
   };
 
   return (
-    <details className="backend-source-section" open={defaultOpen}>
+    <details className="backend-source-section" data-ui="config-source" data-state={visualState} open={defaultOpen}>
       <summary>Configuration source ({providerLabel(provider)})</summary>
 
       <div className="source-panel">
@@ -286,18 +298,18 @@ export function ConfigSourcePanel({
         </label>
 
         {!binding && (
-          <div className="source-unbound">
+          <div className="source-unbound" data-slot="status">
             <p className="source-hint">
               Link {providerLabel(provider)}'s native configuration so this backend reads its real model,
               instructions and tooling. Nothing is copied or modified.
             </p>
             {preview.data && effective && (
-              <div className="source-preview">
+              <div className="source-preview" data-slot="effective">
                 <p className="source-hint">Discovered at {preview.data.report.source_digest ? "the native root" : "—"}:</p>
                 <EffectiveView effective={effective} />
               </div>
             )}
-            <div className="source-actions">
+            <div className="source-actions" data-slot="actions">
               {!preview.data ? (
                 <button type="button" disabled={!projectId || preview.isPending} onClick={() => runPreview("linked")}>
                   {preview.isPending ? "Discovering…" : "Discover native config"}
@@ -321,22 +333,22 @@ export function ConfigSourcePanel({
 
         {binding && (
           <div className="source-bound">
-            <div className="source-status-row">
-              <span className={`source-health source-health-${binding.health ?? "unknown"}`}>
+            <div className="source-status-row" data-slot="status">
+              <span className={`source-health source-health-${visualState}`}>
                 {binding.stale ? "stale" : binding.health ?? "unknown"}
               </span>
               <span className="source-mode">{binding.mode}</span>
-              <code className="source-root" title={binding.root}>
+              <code className="source-root" data-slot="root" title={binding.root}>
                 {binding.root}
               </code>
             </div>
             {(binding.stale || binding.health === "source_invalid" || binding.health === "approval_required") && (
-              <p className="source-warning">
+              <p className="source-warning" data-slot="warning">
                 This source needs attention ({binding.health}). Refresh after fixing it, or unlink.
               </p>
             )}
             {effective && <EffectiveView effective={effective} />}
-            <div className="source-overrides">
+            <div className="source-overrides" data-slot="overrides">
               <div className="source-field-row">
                 <label className="source-field-label" htmlFor={`src-override-model-${backendId}`}>Model override</label>
                 <input
@@ -355,7 +367,7 @@ export function ConfigSourcePanel({
                   onChange={(e) => setOverrideEffort(e.target.value)}
                 />
               </div>
-              <div className="source-actions">
+              <div className="source-actions" data-slot="actions">
                 <button
                   type="button"
                   disabled={bind.isPending || preview.isPending}
@@ -377,7 +389,7 @@ export function ConfigSourcePanel({
                 </button>
               </div>
             </div>
-            <div className="source-actions">
+            <div className="source-actions" data-slot="actions">
               <button type="button" disabled={refresh.isPending} onClick={runRefresh}>
                 {refresh.isPending ? "Refreshing…" : effective ? "Refresh" : "Load effective view"}
               </button>

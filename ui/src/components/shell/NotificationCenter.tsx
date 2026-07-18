@@ -12,9 +12,9 @@ function Toast({ toast, dismiss }: { toast: ToastItem; dismiss: (id: string) => 
   }, [toast.id, dismiss]);
 
   return (
-    <button type="button" className={`toast ${toast.type}`} onClick={() => dismiss(toast.id)}>
-      <strong>{toast.title}</strong>
-      {toast.body && <span>{toast.body}</span>}
+    <button type="button" className={`toast ${toast.type}`} data-ui="toast" data-state={toast.type} onClick={() => dismiss(toast.id)}>
+      <strong data-slot="title">{toast.title}</strong>
+      {toast.body && <span data-slot="body">{toast.body}</span>}
     </button>
   );
 }
