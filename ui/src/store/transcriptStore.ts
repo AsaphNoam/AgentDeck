@@ -50,11 +50,23 @@ function markResolved(
   );
 }
 
-// foldTranscript normalizes a full event list AND folds each permission_resolved
-// into its matching prior permission_request (then drops the resolution event,
-// which is never rendered on its own). Live append folds incrementally; a REST
-// refetch / archive reload replays the whole list, so it must fold the same way
-// or a resolved request would render as still-pending.
+function appendRenderedEvent(events: TranscriptEvent[], event: TranscriptEvent) {
+  const last = events[events.length - 1];
+  if (kindOf(event) === "assistant_text" && last && kindOf(last) === "assistant_text") {
+    events[events.length - 1] = {
+      ...last,
+      kind: "assistant_text",
+      text: `${textOf(last)}${textOf(event)}`,
+    };
+    return;
+  }
+  events.push(event);
+}
+
+// foldTranscript normalizes a full event list, coalesces consecutive assistant
+// deltas, and folds each permission_resolved into its matching prior request.
+// Live append folds incrementally; REST refetch/archive replay must preserve the
+// same rendered message boundaries and resolved permission state.
 export function foldTranscript(raw: TranscriptEvent[] | null | undefined): TranscriptEvent[] {
   const out: TranscriptEvent[] = [];
   for (const r of raw ?? []) {
@@ -69,7 +81,7 @@ export function foldTranscript(raw: TranscriptEvent[] | null | undefined): Trans
       }
       continue;
     }
-    out.push(event);
+    appendRenderedEvent(out, event);
   }
   return out;
 }
@@ -105,14 +117,9 @@ export const useTranscriptStore = create<TranscriptStoreState>((set) => ({
           }
         }
       }
-      const last = events[events.length - 1];
       // Streamed assistant deltas carry no message_id; merge consecutive
-      // assistant_text events into a single bubble.
-      if (kind === "assistant_text" && last && kindOf(last) === "assistant_text") {
-        events[events.length - 1] = { ...last, kind, text: `${textOf(last)}${textOf(event)}` };
-      } else {
-        events.push(event);
-      }
+      // assistant_text events into a single bubble on the shared replay/live path.
+      appendRenderedEvent(events, event);
       return {
         byAgent: { ...state.byAgent, [agentId]: events },
         pending: kind === "permission_request" ? { ...state.pending, [agentId]: event } : state.pending,
