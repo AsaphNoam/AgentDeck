@@ -4,6 +4,18 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-18 — Fix: permission-denial completion
+
+Denying a tool permission can no longer leave a finished chat stuck on Cancel. AgentDeck records the
+temporary resolved state before the agent can end its turn, so the normal completion remains the final
+idle state. A full HTTP/SSE regression covers two fresh fake agents, and the release build and test
+suites pass.
+
+**Needs attention:** None. The existing credentialed provider, terminal, and federation release
+checks remain separate manual gates.
+
+**Next:** A maintainer can run the credentialed acceptance gates when authorized.
+
 ### 2026-07-18 — Usability review: post-fix core journeys
 
 The onboarding and archived-reply fixes now hold up in the real built app. The wizard stayed open

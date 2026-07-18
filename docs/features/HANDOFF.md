@@ -45,18 +45,15 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-- **Must fix — J4 denying a permission can leave a completed turn stuck busy.** In
-  `internal/runtime/permission.go:91-94`, the decision handler answers the adapter before writing
-  `PermissionResolved / busy`; a fast denial lets the prompt goroutine record `turn_end` and idle
-  first, then the decision handler overwrites that final state back to busy. A normal user sees the
-  denial resolved but the composer remains Cancel and cannot start another turn. This violates
-  FS-03.R8/R15 and A4/A8. Reproduced with two fresh fake-ACP agents; add a fast-deny integration
-  regression that asserts idle after `turn_end`, then order or generation-guard the transition.
-  Evidence: [`../archive/reviews/usability-review-run-2026-07-18-post-fix.md`](../archive/reviews/usability-review-run-2026-07-18-post-fix.md).
-
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-18 — Fixed the permission-denial completion race: the runtime now records the temporary
+  resolved/busy state before responding to ACP, so a fast peer can only write the final idle status
+  through normal `turn_end` completion. The same ordering protects timeout resolution. A two-agent
+  HTTP/SSE fake-ACP regression asserts idle after each denied `turn_end`; specification checks, both
+  Go test variants, source build, and distribution build pass.
 
 - 2026-07-18 — Re-ran the complete non-credentialed usability matrix after the onboarding and
   transcript-replay fixes. Both fixes now pass in the real built app: polling no longer ejects the

@@ -133,7 +133,8 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   resolution: `internal/runtime/permission_test.go::TestPermissionApprove`,
   `TestPermissionDeny`, `TestPermissionTimeout`, `TestPermissionSkip`,
   `TestPermissionUnknownToolCall`, `TestTakePendingSingleWinner`, and
-  `TestTakePendingReportsAlreadyResolved`; server mapping in
+  `TestTakePendingReportsAlreadyResolved`; HTTP/SSE denial completion in
+  `internal/server/integration_test.go::TestPermissionDenyReturnsIdleAfterTurnEnd`; server mapping in
   `internal/server/server_test.go::TestPermissionErrorAlreadyResolved`.
 - **A5** (R9) — Cancel claims a pending permission, prevents tool execution, records a cancelled
   turn, and becomes a no-op once idle: `internal/runtime/permission_test.go::TestCancelDuringPendingPermission`.

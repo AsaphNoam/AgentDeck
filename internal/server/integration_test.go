@@ -263,6 +263,66 @@ func TestLaunchPromptPermissionFlow(t *testing.T) {
 	}
 }
 
+// FS-03.A4: a fast deny must leave the completed turn idle, never overwrite
+// turn_end with the resolved-permission busy status. Exercise two fresh ACP
+// agents through the HTTP/SSE path that the composer uses.
+func TestPermissionDenyReturnsIdleAfterTurnEnd(t *testing.T) {
+	fake := buildFakeACP(t)
+	t.Setenv("FAKEACP_SCENARIO", "permission")
+
+	srv := testServer(t, true)
+	srv.registry.Chat().SetCommand(fake)
+	if err := srv.configStore.WriteProject("tmpproj", config.Project{Title: "Tmp", Cwd: t.TempDir()}); err != nil {
+		t.Fatalf("WriteProject: %v", err)
+	}
+	if err := srv.configStore.WriteRole("impl", config.Role{Title: "Impl", SystemPrompt: "be helpful"}); err != nil {
+		t.Fatalf("WriteRole: %v", err)
+	}
+
+	ts := httptest.NewServer(srv.routes())
+	defer ts.Close()
+	t.Cleanup(func() { srv.registry.Shutdown(context.Background()) })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	frames := streamSSE(t, ctx, ts.URL+"/api/events")
+	select {
+	case <-frames: // initial state_update
+	case <-time.After(3 * time.Second):
+		t.Fatal("no initial state_update")
+	}
+
+	for i := 0; i < 2; i++ {
+		agentID := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+		resp, body := post(t, ts.URL+"/api/sessions/"+agentID+"/prompt", map[string]string{"text": "run ls"})
+		if resp.StatusCode != http.StatusAccepted {
+			t.Fatalf("agent %d prompt status = %d: %s", i+1, resp.StatusCode, body)
+		}
+
+		pr := waitForEventType(t, frames, "permission_request")
+		var prd runtime.PermissionRequestData
+		if err := json.Unmarshal(pr.Data, &prd); err != nil {
+			t.Fatalf("agent %d permission request: %v", i+1, err)
+		}
+		resp, body = post(t, ts.URL+"/api/sessions/"+agentID+"/permission", map[string]string{
+			"tool_call_id": prd.ToolCallID,
+			"decision":     "deny",
+		})
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("agent %d deny status = %d: %s", i+1, resp.StatusCode, body)
+		}
+
+		waitForEventType(t, frames, "turn_end")
+		status, err := srv.stateStore.ReadStatus(agentID)
+		if err != nil {
+			t.Fatalf("agent %d read status: %v", i+1, err)
+		}
+		if status.State != "idle" {
+			t.Fatalf("agent %d status after denied turn_end = %q, want idle", i+1, status.State)
+		}
+	}
+}
+
 func TestCrashMidTurnPersistsDeliveredTranscript(t *testing.T) {
 	fake := buildFakeACP(t)
 	t.Setenv("FAKEACP_SCENARIO", "crash_midturn")

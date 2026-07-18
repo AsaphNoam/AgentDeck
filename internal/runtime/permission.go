@@ -88,10 +88,13 @@ func (c *ChatRuntime) Permission(ctx context.Context, agentID, toolCallID, decis
 		return nil
 	}
 
-	p.resolve("selected", optID)
 	c.markResolved(as, toolCallID)
-	c.emit(as, EvPermissionResolved, PermissionResolvedData{ToolCallID: toolCallID, Decision: decision})
+	// Write the resolved-but-active state before releasing the ACP peer. A peer
+	// may finish session/prompt as soon as it receives this response; writing busy
+	// afterwards could then overwrite the prompt goroutine's final idle status.
 	c.updateStatus(as, "busy", "thinking", "PermissionResolved", keepBusySince)
+	c.emit(as, EvPermissionResolved, PermissionResolvedData{ToolCallID: toolCallID, Decision: decision})
+	p.resolve("selected", optID)
 	return nil
 }
 
@@ -102,15 +105,17 @@ func (c *ChatRuntime) onPermissionTimeout(as *agentState, toolCallID string) {
 		return
 	}
 	optID, found := selectOption(p.optByKind, "deny")
+	c.markResolved(as, toolCallID)
+	// As with a user decision, write busy before answering the peer so a fast
+	// prompt completion is the final owner of the idle transition.
+	c.updateStatus(as, "busy", "thinking", "PermissionResolved", keepBusySince)
+	c.emit(as, EvPermissionResolved, PermissionResolvedData{ToolCallID: toolCallID, Decision: "timeout"})
+	c.emit(as, EvError, ErrorData{Scope: "tool", Message: "permission timed out"})
 	if found {
 		p.resolve("selected", optID)
 	} else {
 		p.resolve("cancelled", "")
 	}
-	c.markResolved(as, toolCallID)
-	c.emit(as, EvPermissionResolved, PermissionResolvedData{ToolCallID: toolCallID, Decision: "timeout"})
-	c.emit(as, EvError, ErrorData{Scope: "tool", Message: "permission timed out"})
-	c.updateStatus(as, "busy", "thinking", "PermissionResolved", keepBusySince)
 }
 
 // Cancel interrupts the in-progress turn. Any pending permission is first
