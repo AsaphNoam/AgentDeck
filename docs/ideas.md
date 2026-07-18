@@ -21,8 +21,6 @@ Example:
   different source: parse the model strings out of the `claude` binary, ship/maintain a bundled list
   updated per release, or sync only the single selected/default model. Same guardrails as the Codex
   one: opt-in per backend, never overwrite hand-edited entries, never change the default silently.
-- **Rich, selectable themes.** Offer several complete skins—such as basic, SaaS, and space
-  exploration—that can change more than colors or a light visual treatment.
 
 ## Ideas being defined
 
