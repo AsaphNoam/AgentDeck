@@ -45,11 +45,27 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-_None._
+- **Must fix — J4 denying a permission can leave a completed turn stuck busy.** In
+  `internal/runtime/permission.go:91-94`, the decision handler answers the adapter before writing
+  `PermissionResolved / busy`; a fast denial lets the prompt goroutine record `turn_end` and idle
+  first, then the decision handler overwrites that final state back to busy. A normal user sees the
+  denial resolved but the composer remains Cancel and cannot start another turn. This violates
+  FS-03.R8/R15 and A4/A8. Reproduced with two fresh fake-ACP agents; add a fast-deny integration
+  regression that asserts idle after `turn_end`, then order or generation-guard the transition.
+  Evidence: [`../archive/reviews/usability-review-run-2026-07-18-post-fix.md`](../archive/reviews/usability-review-run-2026-07-18-post-fix.md).
 
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-18 — Re-ran the complete non-credentialed usability matrix after the onboarding and
+  transcript-replay fixes. Both fixes now pass in the real built app: polling no longer ejects the
+  wizard, and Archive/resume folds streamed replies exactly like live chat. Grid reorder/restart,
+  tagged and fallback Archive search, Settings round-trips, two-agent MCP messaging and unread
+  durability, fake live xterm input/resize/reattach, reconnect, crash recovery, and the presentation
+  matrix passed. Found one new must-fix defect: a fast permission denial can race `turn_end` and
+  overwrite idle back to busy, leaving the composer stuck on Cancel. Full report:
+  [`../archive/reviews/usability-review-run-2026-07-18-post-fix.md`](../archive/reviews/usability-review-run-2026-07-18-post-fix.md).
 
 - 2026-07-18 — Fixed both must-fix usability findings. An opened onboarding wizard is now latched
   until successful Launch completion, so the 10-second config refresh cannot replace Project or

@@ -4,6 +4,26 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-18 — Usability review: post-fix core journeys
+
+The onboarding and archived-reply fixes now hold up in the real built app. The wizard stayed open
+through the config refresh and completed its first launch, and live, archived, and resumed chats all
+showed one streamed response as one readable message. Grid reorder and restart, both Archive search
+builds, Settings round-trips, two-agent messaging, unread clear and persistence, live fake-terminal
+input and reattach, disconnect/reconnect, agent crash recovery, and the full presentation matrix also
+passed. The full evidence and coverage limits are in
+[`../archive/reviews/usability-review-run-2026-07-18-post-fix.md`](../archive/reviews/usability-review-run-2026-07-18-post-fix.md).
+
+One must-fix issue remains: denying a permission can race the agent's normal turn completion, leaving
+the denial recorded but the agent stuck busy with a Cancel button. It reproduced with two fresh
+agents; approval worked normally.
+
+**Needs attention:** Fix the permission-denial state race before treating the deny path as reliable.
+Credentialed provider and real-Claude terminal compatibility remain separate manual release gates.
+
+**Next:** Run `/fix` for the permission-denial finding, then rerun the deny journey; a maintainer can
+separately authorize the credentialed acceptance gates.
+
 ### 2026-07-18 — Fix: onboarding continuity and readable archived replies
 
 The first-run wizard now remains open through Project, Config, and Launch even when config polling
