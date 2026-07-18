@@ -10,7 +10,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 - **State:** paused — no implementation change is active. The core interface redesign is shipped;
   all recorded review findings remain fixed, and credentialed provider acceptance remains a
   separate manual release gate.
-- **Last reviewed code:** `87d6251` (2026-07-16), across the continuous range after `d260f93`.
+- **Last reviewed code:** `4195ed0` (2026-07-18), across the continuous range after `87d6251`.
 - **Branch:** `main`.
 
 ## Decisions needing your input
@@ -50,6 +50,15 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-18 — Reviewed the continuous range after `87d6251` through `4195ed0`: the Codex
+  role-prompt delivery fix, the installer/usability fixes, and the full core-interface redesign.
+  The redesign is behavior-preserving presentation only — screens, data, routes, and actions are
+  unchanged, the development-only visual matrix stays out of the production bundle, and third-party
+  renderers read the shared semantic values. The two fixes match their specifications (Codex config
+  overlay, corrupt-backend fallback, persisted/searchable user prompts, installer flag
+  preservation). FS-12/TS-08 and the touched FS/TS agree with the code in both directions.
+  Specification, presentation, UI (101 tests), and Go checks pass. No findings.
 
 - 2026-07-18 — Shipped the product-native core interface across the shell, Dashboard, agent screen,
   Archive, Settings, onboarding, overlays, and third-party renderers. Layered semantic CSS, local
