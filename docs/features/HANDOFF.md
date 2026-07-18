@@ -8,8 +8,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 - **Active change:** None.
 - **State:** paused — no implementation change is active. The core interface redesign is shipped;
-  all recorded review findings remain fixed, and credentialed provider acceptance remains a
-  separate manual release gate.
+  two usability findings are open, and credentialed provider acceptance remains a separate manual
+  release gate.
 - **Last reviewed code:** `4195ed0` (2026-07-18), across the continuous range after `87d6251`.
 - **Branch:** `main`.
 
@@ -45,11 +45,37 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-- None.
+- **Must fix — J2 onboarding poll ejects the user before Project/Config/Launch.** On a fresh home,
+  make the missing Claude adapter available, validate Backend, reach Project, then wait for the
+  10-second config poll. Because the seeded role/project plus the valid backend make
+  `onboarding.satisfied=true`, `ui/src/features/onboarding/OnboardingGate.tsx:15-29` replaces the
+  wizard with an empty Dashboard before the first real project and agent can be created. This
+  violates FS-04.R16–R20/A10; FS-04.R23 also needs reconciliation with the promised walkthrough.
+  Latch an open wizard until its Launch completion and test a false→true config refresh while
+  Project is visible. Full repro: [`../archive/reviews/usability-review-run-2026-07-18.md`](../archive/reviews/usability-review-run-2026-07-18.md).
+- **Must fix — J8 archived/resumed assistant replies split into stream-fragment bubbles.** Send one
+  prompt through fake ACP `stream_text`, observe the live reply as one message, stop/restart, then
+  open Archive or Resume. `ui/src/store/transcriptStore.ts:58-74` replays `Sure, `, `I'll `, and
+  `do that.` as separate assistant articles because full-transcript folding omits the consecutive
+  `assistant_text` merge used for live SSE at lines 108-115. Real provider streams can create many
+  fragments, making history difficult to read. Make replay folding preserve the live message
+  boundary and add store/archive regression tests (FS-03.R4/R12, FS-05.R14). Full repro:
+  [`../archive/reviews/usability-review-run-2026-07-18.md`](../archive/reviews/usability-review-run-2026-07-18.md).
 
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-18 — Re-ran the behavior-driven usability review after an interrupted run left no durable
+  checkpoint. The tagged production binary, untagged archive fallback, isolated fake-ACP homes, and
+  development visual matrix covered first paint, onboarding, launch/chat, permission approve/deny,
+  layout/restart, Archive/search/resume, dense Settings, disconnect/reconnect, and agent crash.
+  Found two must-fix defects: config polling ejects a fresh user from the four-step wizard after
+  Backend succeeds, and Archive/resume renders each stored assistant stream delta as a separate
+  message. The redesigned presentation otherwise remained coherent and the presentation checks,
+  101 UI tests, production UI build, spec check, and tagged/untagged Go builds passed. J6 live
+  terminal and J10 messaging remain unexercised. Full report:
+  [`../archive/reviews/usability-review-run-2026-07-18.md`](../archive/reviews/usability-review-run-2026-07-18.md).
 
 - 2026-07-18 — Reviewed the continuous range after `87d6251` through `4195ed0`: the Codex
   role-prompt delivery fix, the installer/usability fixes, and the full core-interface redesign.
