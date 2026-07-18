@@ -4,6 +4,141 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-18 — feature design: core frontend ready
+
+The core frontend redesign is fully designed and waiting to build. It will give every existing
+surface one distinctive, product-native AgentDeck identity—light neutral canvas, near-black
+structure, energetic accent colors, Instrument Sans and IBM Plex Mono typography, crisp asymmetric
+geometry, and coordinated dark technical surfaces—without turning the default interface into a
+conceptual skin or changing product behavior.
+
+The selected architecture is layered plain CSS. The unskinned core renders independently; future
+skins will be able to override approved semantic values, stable component slots, geometry, and
+decoration without owning feature content, state, routes, or actions. There is still no skin picker,
+skin state, loader, persistence, or production skin in this change.
+
+Because this repository runs with little human supervision, maintenance safety is part of the design,
+not a note for reviewers. Style linting and a cross-code/CSS contract checker will run automatically
+before UI tests and builds. They will reject undefined classes or tokens, raw visual values outside
+the token boundary, undocumented or stale skin hooks, unapproved inline styling, excessive
+specificity, `!important`, stale exceptions, third-party palette drift, and accidental skin-provider
+or skin-state dependencies. A versioned manifest defines the public visual seam, every exception must
+name an exact file and reason, a deterministic visual matrix covers all major surfaces, and local
+frontend agent instructions explain the rules before later agents edit the UI.
+
+The scope remains presentation-only: no responsive, zoom, keyboard, accessibility, recovery-flow,
+browser-dialog, or feature behavior expansion is included.
+
+**Needs attention:** None.
+
+**Next:** Run `/work` when you want an implementation agent to start the waiting core frontend
+redesign.
+
+### 2026-07-18 — feature design: frontend architecture choice
+
+The product-native, presentation-only direction is confirmed. I audited the existing frontend and
+set the common technical boundaries: feature components keep all behavior and state; the core works
+with no active skin or theme preference; fonts, icons, and visual assets stay bundled and offline;
+code highlighting, diffs, and the terminal share the core palette instead of keeping independent
+defaults; and future skins get controlled visual hooks without owning product content or structure.
+
+One architectural choice remains:
+
+- **A — Layered plain CSS contract (recommended).** Split the current global stylesheet into ordered
+  foundation, token, shared-component, feature, integration, and reserved skin layers. Use semantic
+  custom properties plus stable `data-ui`/`data-slot` hooks, with a small set of presentation-only
+  React primitives. The core uses no provider or active-skin attribute. Future skins can change both
+  visual values and approved component geometry/decoration through those hooks.
+- **B — CSS Modules plus a React presentation provider.** This gives stronger local style isolation
+  and typed variants, but hashed classes make rich external skin overrides harder and the provider
+  risks treating the core itself as a theme.
+- **C — Runtime CSS-in-JS theme engine.** This offers the most dynamic overrides, but adds runtime
+  machinery and a broad component rewrite for a product that currently needs no runtime skin state.
+
+I recommend **A**. It fits the current React/Vite architecture, adds no styling runtime, preserves
+the distinction between core and skin, and still leaves enough controlled surface area for future
+skins to become much richer than palette swaps. Its cost is that the documented visual values and
+component hooks become a contract we must maintain deliberately.
+
+**Needs attention:** Choose A, B, or C. A short “A” is enough to accept the recommendation.
+
+**Next:** Once chosen, I’ll pin the exact visual system and file/component contracts, complete the
+technical specification, and leave the redesign ready for implementation.
+
+### 2026-07-18 — feature design: simplified core visual direction
+
+I revised the proposal around the distinction you made. The first design is now the **unskinned
+AgentDeck core**, not a concept applied to AgentDeck. Dashboard remains Dashboard, agent cards remain
+agent cards, chat remains chat, and Archive, Settings, onboarding, and every control keep their
+current names, meaning, and behavior. The expedition, dispatch, dossier, field-log, catalog,
+workshop, and journey framing has been removed completely.
+
+The proposed visual identity is distinctive through design fundamentals instead: a light neutral
+canvas, near-black structure, a small high-energy accent palette, characterful display typography,
+clear text and monospaced technical typography, precise rules, intentional asymmetry, crisp component
+geometry, and coordinated dark surfaces for code, diffs, commands, and terminal content. It avoids
+generic white SaaS cards, all-dark IDE chrome, purple/blue AI glow, glass panels, and soft gradient
+clouds without replacing the product with another concept.
+
+This step now changes presentation only. It does not add responsive or phone targets, keyboard-flow
+work, zoom support, accessibility policy, reduced-motion behavior, new loading/recovery states,
+dedicated replacements for browser prompts, new actions, or changed interaction flows. Existing
+screens and states receive a complete visual design; existing behavior stays where its owning feature
+already puts it.
+
+Future skins remain an architectural consideration beneath this work. The core must render fully
+with no active skin and no theme control. Later skins may provide the strong concepts and flavors;
+they will overlay approved visual values and decorative assets without owning AgentDeck's content,
+routes, actions, or component structure.
+
+**Needs attention:** Please confirm this revised product-native visual direction and presentation-
+only scope. A short “confirmed” is enough, or point to any remaining element that still feels too
+thematic or too broad.
+
+**Next:** After confirmation, I’ll define the technical core-versus-skin boundary, finish the design
+specifications and acceptance evidence, and leave the frontend redesign ready for implementation.
+
+### 2026-07-17 — feature design: frontend behavior proposal
+
+I drafted the user-visible half of a complete frontend redesign. The proposed direction is **Field
+Atlas**: a warm, tactile expedition desk built from chart-paper surfaces, deep ink, cartographic
+lines, clipped dossier shapes, dark instrument inserts, and restrained signal colors. It should feel
+like dispatching and supervising a capable field team—not like another dark integrated development
+environment, chat app, or generic software-as-a-service dashboard.
+
+The proposal covers the whole product:
+
+- A persistent, unmistakable shell makes Dashboard, Archive, Settings, New Agent, and the live
+  connection state clear.
+- The Dashboard becomes a dispatch board: groups are map sections and agent cards are information-
+  dense dossiers with prominent current activity, state, context pressure, mail, runtime, and project
+  identity. Empty, loading, disconnected, and failed states receive full designs too.
+- Chat becomes a chronological field log rather than a pile of chat bubbles. Tool calls, results,
+  diffs, permissions, errors, terminal, files, and commands each get a distinct instrument-like
+  treatment, with a persistent dispatch-style composer.
+- Archive becomes a searchable catalog; Settings becomes a consistent workshop for both simple and
+  very dense configuration; onboarding becomes a full-canvas four-stop expedition route instead of
+  a generic modal.
+- Rename, runtime switch, group moves, releases, stops, and destructive configuration actions use
+  designed AgentDeck dialogs instead of browser prompts. Clone remains immediate as it is today.
+- Keyboard use, visible focus, reduced motion, non-color state cues, 200% zoom, long content, and
+  1024×720 through large desktop windows are part of the design rather than cleanup work. A phone-
+  specific experience is excluded.
+
+No API, agent behavior, local data, persistence, retention, or security boundary changes in this
+proposal. This change would ship only Field Atlas: no theme picker, stored theme preference,
+project-specific theme, downloads, or marketplace. The next design half will define a skin-safe
+frontend boundary so later themes can change typography, color, spacing, geometry, texture,
+illustration, and motion without changing actions, state meaning, accessibility, or route structure.
+
+**Needs attention:** Please confirm three linked product calls: Field Atlas as the first visual
+direction, 1024×720 desktop-first support with no phone-specific design, and replacement of native
+browser prompts with dedicated dialogs. A short “confirmed” is enough, or tell me which part to
+change.
+
+**Next:** After confirmation, I’ll define the technical theme/component architecture, finish the
+specifications and acceptance evidence, and leave the redesign as a ready change for implementation.
+
 ### 2026-07-17 — issue audit: known improvement list
 
 I verified every recorded known issue against the current specifications, implementation, and

@@ -7,9 +7,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** none.
-- **State:** paused — no active change. Codex role/project prompt delivery shipped through the
-  documented adapter config overlay. Project shared resources shipped (FS-11 Current). All recorded
-  review findings are fixed; credentialed provider acceptance remains a manual release gate.
+- **State:** paused — no implementation change is active. The product-native core frontend redesign
+  is fully specified and waiting to start in `docs/ready-changes/redesign-core-interface.md`; the
+  human selected the layered plain-CSS contract with automated maintenance safeguards. All recorded
+  review findings remain fixed; credentialed provider acceptance remains a separate manual release gate.
 - **Last reviewed code:** `87d6251` (2026-07-16), across the continuous range after `d260f93`.
 - **Branch:** `main`.
 
@@ -50,6 +51,32 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-18 — Finished the core frontend feature design after the human selected layered plain CSS.
+  TS-08 now pins the cascade, exact core values/fonts/assets, stable manifest-backed skin hooks,
+  third-party renderer adapters, migration sequencing, and unattended-maintenance safeguards:
+  Stylelint, cross-TSX/CSS contract checks, stale-exception rejection, pretest/prebuild enforcement,
+  deterministic visual fixtures, and local frontend agent instructions. The source idea moved to the
+  ready change `redesign-core-interface.md`; specification and whitespace checks pass.
+
+- 2026-07-18 — The human confirmed the product-native, presentation-only FS-12 behavior. Audited
+  the current styling/build/component seams and added draft TS-08 with common constraints for local
+  assets, third-party renderer theming, data-driven inline styles, shared presentation primitives,
+  stable future-skin hooks, and visual/style-contract verification. Technical completion is paused
+  on the A/B/C presentation-contract choice; specification checks pass.
+
+- 2026-07-18 — Revised the planned frontend behavior after human feedback. FS-12 now makes the
+  default presentation AgentDeck's product-native core, removes all Field Atlas metaphors, and
+  excludes responsive/zoom/keyboard/accessibility expansion, new recovery states, and dedicated
+  browser-dialog replacements. It retains a distinctive editorial/technical visual direction and a
+  future-skin compatibility boundary. Specification checks pass; technical design still waits for
+  confirmation of this revision.
+
+- 2026-07-17 — Started the requested frontend redesign definition. Added planned FS-12 for a
+  cross-product Field Atlas interface covering the shell, dashboard, agent workspace, archive,
+  settings, onboarding, overlays, accessibility, responsive behavior, and the future-skin product
+  boundary. Technical architecture and ready-change creation wait for human confirmation of the
+  visual direction, desktop floor, and dedicated-dialog scope. Specification checks pass.
 
 - 2026-07-17 — Audited every entry under `Known things to improve` against the current
   specifications, implementation, and focused tests. Removed fixed Codex-role, user-prompt, and

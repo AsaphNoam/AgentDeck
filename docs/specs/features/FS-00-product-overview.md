@@ -5,7 +5,7 @@
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) §§1–3, §7
 
 This is the entry-point spec: it fixes the vocabulary and the object model that every other feature
-spec (FS-01…FS-09) builds on. It states product-level truths as R-items; detailed behavior lives in
+spec builds on. It states product-level truths as R-items; detailed behavior lives in
 the per-feature specs, and architecture lives in the TS-series.
 
 ## 1. Purpose
