@@ -4,6 +4,27 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-18 — Usability review: core interface and previously skipped journeys
+
+Claude left no durable checkpoint, so I restarted the review against the real built app with fresh,
+isolated state. The redesigned interface itself held up across first paint, Dashboard, chat,
+Settings, permissions, Archive, restart/reconnect, agent crash, and the full visual fixture; user
+messages are now durable and searchable, layout survives restart, and both archive-search builds
+behave as intended.
+
+Two must-fix problems were confirmed. First, after backend validation succeeds, the onboarding
+wizard is removed by its next config poll before a new user can finish Project, Config, and Launch.
+Second, Archive and resumed sessions render every stored assistant stream fragment as a separate
+message instead of the single readable reply shown live. The full evidence and honest coverage
+limits are in [`../archive/reviews/usability-review-run-2026-07-18.md`](../archive/reviews/usability-review-run-2026-07-18.md).
+
+**Needs attention:** The two findings should be fixed before treating first-run onboarding and
+archived conversation reading as reliable. Live terminal operation and multi-agent messaging were
+not completed in this run and remain unclaimed.
+
+**Next:** Run `/fix` to address the onboarding poll race and transcript replay folding, then rerun J2
+and J8; a maintainer can separately authorize the credentialed terminal and provider gates.
+
 ### 2026-07-18 — Review: core interface redesign and the two fixes before it
 
 Reviewed every unreviewed change since the last checkpoint: the Codex role-prompt delivery fix, the
