@@ -4,6 +4,23 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-18 — Review: core interface redesign and the two fixes before it
+
+Reviewed every unreviewed change since the last checkpoint: the Codex role-prompt delivery fix, the
+installer and usability fixes, and the full core-interface redesign. The redesign changes only how
+the product looks — every screen keeps its existing behavior, data, routes, and actions, and the
+development-only preview screen stays out of the shipped app. The two fixes do what they claim:
+Codex now receives its role and project instructions through the configuration channel it actually
+reads, an incomplete hand-edited backend file no longer crashes the dashboard, user messages are
+saved and searchable, and the installer keeps a no-start or non-interactive choice through its
+locked step. The written product rules and the shipped code agree in both directions, and the
+specification, presentation, interface, and Go checks all pass. No new problems found.
+
+**Needs attention:** None. Running real signed-in Claude and Codex sessions and the live terminal and
+federation journeys is still a manual release step that has not been done; this review did not change that.
+
+**Next:** Treat the reviewed work as ready; a maintainer runs the credentialed acceptance checks when authorized.
+
 ### 2026-07-18 — Implementation: redesigned the core interface
 
 AgentDeck now has a complete product-native visual system across the shell, Dashboard, agent views,
