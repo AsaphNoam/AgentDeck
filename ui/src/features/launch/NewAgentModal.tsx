@@ -126,8 +126,8 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject }: Ne
   return (
     <Dialog.Root open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <Dialog.Portal>
-        <Dialog.Overlay className="dialog-overlay" />
-        <Dialog.Content className="dialog-content">
+        <Dialog.Overlay className="dialog-overlay" data-ui="dialog" data-slot="overlay" />
+        <Dialog.Content className="dialog-content" data-ui="dialog" data-slot="content" data-variant="default">
           <Dialog.Title>New agent</Dialog.Title>
           <form onSubmit={handleSubmit} className="config-form">
             <div className="form-field">

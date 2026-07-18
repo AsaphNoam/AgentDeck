@@ -51,12 +51,12 @@ macOS release by R13–R21. Source-built AgentDeck remains a single Go binary.
 
 **R12 — Source installs pin the official Claude adapter.** When `INSTALL_ACP=1`,
 `install.sh` installs the exact reviewed `@agentclientprotocol/claude-agent-acp` version and checks
-for its Node 22 runtime floor. Ordinary source builds keep Node 20 as their UI-only baseline and do
-not mutate global adapter installations unless explicitly requested.
+for its Node 22 runtime floor. Ordinary source builds require Node 20.19 or newer for the UI
+toolchain and do not mutate global adapter installations unless explicitly requested.
 
 **R13** — The release build has two supported delivery forms with separate contracts:
-source builds follow `go.mod` and the Node 20 UI/CI baseline, while the GitHub Releases MVP targets
-only `darwin/arm64` and ships a private Node 22-or-newer runtime. Every release AgentDeck binary is
+source builds follow `go.mod` and the Node 20.19-or-newer UI/CI baseline, while the GitHub Releases
+MVP targets only `darwin/arm64` and ships a private Node 22-or-newer runtime. Every release binary is
 built with `sqlite_fts5`; an untagged binary is never packaged as a release runtime.
 
 **R14** — Release assembly is deterministic from a versioned packaging manifest and

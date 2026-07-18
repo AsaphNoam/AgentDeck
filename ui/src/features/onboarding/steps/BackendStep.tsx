@@ -119,7 +119,7 @@ export function BackendStep({ onDone }: BackendStepProps) {
   };
 
   return (
-    <div className="wizard-step">
+    <div className="wizard-step" data-ui="onboarding" data-slot="step" data-variant="backend">
       <h3>Configure your AI backend</h3>
       <p className="wizard-step-desc">
         Choose a backend and validate your credentials before continuing.
@@ -203,7 +203,7 @@ export function BackendStep({ onDone }: BackendStepProps) {
       )}
       {error && <p className="form-error">{error}</p>}
 
-      <div className="form-actions">
+      <div className="form-actions" data-slot="actions">
         <button
           type="button"
           onClick={handleValidate}

@@ -12,6 +12,7 @@ import { LaunchStep } from "./steps/LaunchStep";
 // onboarding step flags; a returning user who finished project setup resumes at
 // it and can simply Continue.
 const LAST_STEP = 3;
+const STEP_VARIANTS = ["backend", "project", "source", "launch"] as const;
 
 function initialStep(steps: Onboarding["steps"]): number {
   if (!steps.backend.done) return 0;
@@ -36,35 +37,42 @@ export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
   return (
     <Dialog.Root open modal>
       <Dialog.Portal>
-        <Dialog.Overlay className="dialog-overlay onboarding-overlay" />
+        <Dialog.Overlay className="dialog-overlay onboarding-overlay" data-ui="dialog" data-slot="overlay" />
         <Dialog.Content
           className="dialog-content onboarding-wizard"
+          data-ui="dialog"
+          data-variant="onboarding"
           onInteractOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
           aria-describedby={undefined}
         >
-          <Dialog.Title>Welcome to AgentDeck</Dialog.Title>
-          <div className="wizard-progress">
-            {["Backend", "Project", "Config", "Launch"].map((label, i) => (
-              <div
-                key={label}
-                className={`wizard-step-indicator ${i < step ? "done" : i === step ? "active" : ""}`}
-              >
-                {label}
-              </div>
-            ))}
+          <div className="onboarding-flow" data-ui="onboarding" data-variant={STEP_VARIANTS[step]}>
+            <Dialog.Title>Welcome to AgentDeck</Dialog.Title>
+            <div className="wizard-progress" data-slot="progress">
+              {["Backend", "Project", "Config", "Launch"].map((label, i) => (
+                <div
+                  key={label}
+                  className={`wizard-step-indicator ${i < step ? "done" : i === step ? "active" : ""}`}
+                  data-state={i < step ? "complete" : i === step ? "current" : "upcoming"}
+                >
+                  {label}
+                </div>
+              ))}
+            </div>
+            <div data-slot="content">
+              {step === 0 && <BackendStep onDone={(b) => { setBackend(b); advance(); }} />}
+              {step === 1 && <ProjectStep onDone={(projectId) => { setCreatedProject(projectId); advance(); }} />}
+              {step === 2 && (
+                <SourceStep
+                  project={createdProject}
+                  backendId={backend.id}
+                  backendType={backend.type}
+                  onDone={advance}
+                />
+              )}
+              {step === 3 && <LaunchStep onDone={onComplete} initialProject={createdProject} />}
+            </div>
           </div>
-          {step === 0 && <BackendStep onDone={(b) => { setBackend(b); advance(); }} />}
-          {step === 1 && <ProjectStep onDone={(projectId) => { setCreatedProject(projectId); advance(); }} />}
-          {step === 2 && (
-            <SourceStep
-              project={createdProject}
-              backendId={backend.id}
-              backendType={backend.type}
-              onDone={advance}
-            />
-          )}
-          {step === 3 && <LaunchStep onDone={onComplete} initialProject={createdProject} />}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

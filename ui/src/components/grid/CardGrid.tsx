@@ -11,6 +11,8 @@ import { CardContextMenu } from "./CardContextMenu";
 import { DensityControl } from "./DensityControl";
 import { EmptyState } from "./EmptyState";
 import { NewAgentModal } from "../../features/launch/NewAgentModal";
+import { useProjects } from "../../api/config";
+import { Button, PageHeader } from "../ui";
 
 export function CardGrid() {
   const agents = useAgentStore((state) => state.agents);
@@ -24,6 +26,7 @@ export function CardGrid() {
   const transcripts = useTranscriptStore((state) => state.byAgent);
   const pushError = useUiStore((state) => state.pushError);
   const [showNewAgent, setShowNewAgent] = useState(false);
+  const projects = useProjects();
 
   const loaded = useRef(false);
 
@@ -65,26 +68,28 @@ export function CardGrid() {
     ids.length === 0 ? (
       <EmptyState onNewAgent={() => setShowNewAgent(true)} />
     ) : (
-      <section className="grid-view">
-      <div className="grid-toolbar">
-        <h1>Agents</h1>
-        <button type="button" onClick={() => setShowNewAgent(true)}>New agent</button>
-        <DensityControl />
-      </div>
+      <section className="grid-view" data-ui="dashboard">
+      <PageHeader
+        className="grid-toolbar"
+        eyebrow="Live operations"
+        title="Agents"
+        actions={<><Button variant="primary" type="button" onClick={() => setShowNewAgent(true)}>New agent</Button><DensityControl /></>}
+        data-slot="header"
+      />
       <DndContext onDragEnd={onDragEnd}>
         <SortableContext items={ids} strategy={rectSortingStrategy}>
-          <div className="group-stack">
+          <div className="group-stack" data-slot="groups">
             {grouped.map((group) => {
               const collapsed = groupLayout[group.key]?.collapsed ?? false;
               return (
-                <section className="agent-group" key={group.key}>
-                  <header className="agent-group-header">
+                <section className="agent-group" data-ui="agent-group" data-state={collapsed ? "collapsed" : "expanded"} key={group.key}>
+                  <header className="agent-group-header" data-slot="header">
                     <button type="button" onClick={() => toggleGroupCollapsed(group.key)} aria-expanded={!collapsed}>
                       {collapsed ? ">" : "v"}
                     </button>
                     <strong>{group.label}</strong>
-                    <span>{group.agents.length} agents</span>
-                    <span>{summary(group.agents)}</span>
+                    <span data-slot="summary">{group.agents.length} agents</span>
+                    <span data-slot="summary">{summary(group.agents)}</span>
                     {group.key !== "_ungrouped" && (
                       <button
                         type="button"
@@ -101,9 +106,14 @@ export function CardGrid() {
                     )}
                   </header>
                   {!collapsed && (
-                    <div className="card-grid" style={{ gridTemplateColumns: `repeat(${density.perRow}, minmax(0, 1fr))`, gap: density.gap }}>
+                    <div className="card-grid" data-slot="grid" style={{ gridTemplateColumns: `repeat(${density.perRow}, minmax(0, 1fr))`, gap: density.gap }}>
                       {group.agents.map((agent) => (
-                        <AgentCard key={agent.agent_id} agent={agent} lastLine={lastAssistantLine(transcripts[agent.agent_id])} />
+                        <AgentCard
+                          key={agent.agent_id}
+                          agent={agent}
+                          lastLine={lastAssistantLine(transcripts[agent.agent_id])}
+                          projectColor={projects.data?.[agent.project]?.color}
+                        />
                       ))}
                     </div>
                   )}
