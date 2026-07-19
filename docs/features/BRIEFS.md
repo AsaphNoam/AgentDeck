@@ -4,6 +4,24 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-19 — Fix: stale permission prompt after cancelling a turn
+
+I fixed the issue where cancelling a turn while a permission question was still open left that
+question on screen with clickable Approve/Deny buttons forever — even after a reload — with a click
+just producing an error. The app now records that the question was withdrawn, the same way it already
+did when you deny a request or let it time out. The cancelled question turns into a resolved chip on
+both the live view and after a reload, and it can no longer be clicked.
+
+I added a test that reproduces the original problem and confirms the withdrawal is now recorded, and
+updated the chat specification to state this behavior. All automated checks pass. This was the only
+open issue from the recent usability review.
+
+**Needs attention:** None. A browser re-check of the cancel-during-permission journey and the
+credentialed provider gates are still open items for a future run, not blockers.
+
+**Next:** Run a usability pass to confirm the cancel journey in the real app when convenient, and
+authorize the credentialed provider gates when you're ready.
+
 ### 2026-07-19 — Usability review: full journey matrix and fix verification
 
 I drove every non-credentialed user journey against the real built app — first paint, onboarding,

@@ -86,7 +86,7 @@ type PermissionRequestData struct {
 // permission_request so archived transcripts do not replay dangling gates.
 type PermissionResolvedData struct {
 	ToolCallID string `json:"tool_call_id"`
-	Decision   string `json:"decision"` // "approve" | "deny" | "timeout" | "auto_approve"
+	Decision   string `json:"decision"` // "approve" | "deny" | "timeout" | "auto_approve" | "cancelled"
 }
 
 // PermOption is one ACP-offered permission option.
