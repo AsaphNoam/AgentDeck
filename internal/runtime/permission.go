@@ -186,15 +186,20 @@ func (c *ChatRuntime) escalateCancel(as *agentState, armedTurn int64) {
 	}()
 }
 
-// resolvePending answers a withheld permission request and removes it. Returns
-// false if no such pending request remains.
+// resolvePending answers a withheld permission request as cancelled and removes
+// it. Like the approve/deny and timeout paths, it emits and persists a
+// permission_resolved (decision "cancelled") before releasing the ACP peer, so
+// the live UI and the durable transcript both learn the prompt is dead and render
+// a resolved chip instead of leaving Approve/Deny actionable forever (FS-03.R9,
+// R14–R16). Returns false if no such pending request remains.
 func (c *ChatRuntime) resolvePending(as *agentState, toolCallID, outcome, optionID string) bool {
 	p, err := c.takePending(as, toolCallID)
 	if err != nil {
 		return false
 	}
-	p.resolve(outcome, optionID)
 	c.markResolved(as, toolCallID)
+	c.emit(as, EvPermissionResolved, PermissionResolvedData{ToolCallID: toolCallID, Decision: "cancelled"})
+	p.resolve(outcome, optionID)
 	return true
 }
 

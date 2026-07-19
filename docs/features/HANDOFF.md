@@ -8,8 +8,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 - **Active change:** None.
 - **State:** paused — no implementation change is active. The core interface redesign is shipped;
-  the two must-fix usability findings are fixed and browser-verified, one Worth-fixing finding is
-  open below, and credentialed provider acceptance remains a separate manual release gate.
+  the usability findings from the 2026-07-19 run (two must-fix, one worth-fixing) are all fixed, and
+  credentialed provider acceptance remains a separate manual release gate.
 - **Last reviewed code:** `4195ed0` (2026-07-18), across the continuous range after `87d6251`.
 - **Branch:** `main`.
 
@@ -45,22 +45,19 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-- **Worth fixing** — **J4: cancelling a turn with a pending permission leaves the prompt actionable
-  forever.** `Cancel` resolves the withheld request through `resolvePending(as, id, "cancelled", "")`
-  (`internal/runtime/permission.go`), which never emits `permission_resolved`, so neither the live
-  UI nor the durable transcript learns the prompt is dead: Approve/Deny stay clickable (also after
-  reload), and clicking one returns `409 permission already resolved` as an inline error. Normal-use
-  trigger: user sends a prompt, a permission gate appears, user clicks the composer Cancel instead
-  of deciding. Reproduced 3/3 at `c64d7bf` (J4.5,
-  [`../archive/reviews/usability-review-run-2026-07-19.md`](../archive/reviews/usability-review-run-2026-07-19.md)).
-  Relevant requirement: FS-03 permission flow (the deny/timeout paths emit resolution events; the
-  cancel path is the asymmetry). Suggested fix: emit and persist a `permission_resolved` (decision
-  `cancelled`) from the cancel path so the prompt renders a resolved chip; candidate systemic class:
-  state resolved internally without emitting/persisting the corresponding transcript event.
+None open.
 
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-19 — Fixed the worth-fixing J4 finding: cancelling a turn with a pending permission now
+  emits and persists a `permission_resolved` (decision `cancelled`), matching the deny and timeout
+  paths. The withheld prompt renders a resolved chip on the live view and after reload instead of
+  leaving Approve/Deny clickable forever (which returned `409 permission already resolved`). FS-03.R9
+  and A5 pin the behavior; `TestCancelDuringPendingPermission` now asserts the emitted event.
+  Specification checks, both Go test variants (incl. focused `-race` on the permission path), and the
+  source build pass. No open review findings remain.
 
 - 2026-07-19 — Drove the full non-credentialed usability matrix J1–J12 (J6 and the credentialed J2
   branch skipped as gated) with Playwright against the real binary, then re-verified J3/J4 on a

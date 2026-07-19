@@ -270,6 +270,15 @@ func TestCancelDuringPendingPermission(t *testing.T) {
 	} else if !cancelled {
 		t.Fatal("Cancel reported no-op, want cancelled=true (pending permission was in flight)")
 	}
+	// Cancelling a pending permission must emit/persist permission_resolved so the
+	// live UI and durable transcript render a resolved chip instead of leaving the
+	// prompt actionable forever (FS-03.R9, R14–R16).
+	prRes := waitForEvent(t, ch, EvPermissionResolved)
+	var prd PermissionResolvedData
+	json.Unmarshal(prRes.Data, &prd)
+	if prd.Decision != "cancelled" {
+		t.Fatalf("permission_resolved decision = %q, want cancelled", prd.Decision)
+	}
 	te := waitForEvent(t, ch, EvTurnEnd)
 	var td TurnEndData
 	json.Unmarshal(te.Data, &td)
