@@ -7,9 +7,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** paused — no implementation change is active. The core interface redesign is shipped;
-  the usability findings from the 2026-07-19 run (two must-fix, one worth-fixing) are all fixed, and
-  credentialed provider acceptance remains a separate manual release gate.
+- **State:** paused — no implementation change is active. A post-fix usability rerun found no open
+  product finding and confirmed the cancelled-permission fix in the built app. Credentialed provider
+  acceptance remains a separate manual release gate; native prompt/confirm actions also need replay
+  in a browser that supports those dialogs.
 - **Last reviewed code:** `4195ed0` (2026-07-18), across the continuous range after `87d6251`.
 - **Branch:** `main`.
 
@@ -50,6 +51,15 @@ None open.
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-19 — Re-ran every runnable non-credentialed journey J1–J12 against the release-style
+  build with isolated homes. The cancelled-permission prompt now resolves live and after reload;
+  approve, deny, the real timeout, double-fire rejection, grid/restart, both archive search builds,
+  Settings, messaging, recovery, and durability passed with no new finding. J6 and credentialed
+  provider branches remain human-gated. The in-app browser cannot execute native prompt/confirm
+  dialogs, so affected J5/J7/J9 UI actions are recorded as blocked while their backing operations
+  and rendered results passed. Full report:
+  [`../archive/reviews/usability-review-run-2026-07-19-post-fix.md`](../archive/reviews/usability-review-run-2026-07-19-post-fix.md).
 
 - 2026-07-19 — Fixed the worth-fixing J4 finding: cancelling a turn with a pending permission now
   emits and persists a `permission_resolved` (decision `cancelled`), matching the deny and timeout
