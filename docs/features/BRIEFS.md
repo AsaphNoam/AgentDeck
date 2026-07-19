@@ -4,6 +4,28 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-19 — Usability review: post-fix core journey rerun
+
+I re-ran the release-style app through fresh install and onboarding, first chat, all four permission
+outcomes, grid persistence, archive search in both builds, Settings round-trips, agent messaging,
+failure recovery, and restart durability. The cancelled-permission fix now holds in the browser: the
+question resolves, stays resolved after reload, and cannot be answered twice. No new product finding
+was reproduced. Full evidence is in
+[`../archive/reviews/usability-review-run-2026-07-19-post-fix.md`](../archive/reviews/usability-review-run-2026-07-19-post-fix.md).
+
+The live Claude terminal and signed-in provider checks remain unrun because they require explicit
+authorization and real credentials. This test browser also cannot execute browser-native prompt and
+confirm dialogs, so those specific UI actions were marked blocked; their backing operations passed
+through the local API and rendered correctly afterward.
+
+**Needs attention:** No product issue is open. The review-state commit is local and needs approval to
+push; the live-provider and terminal release gates still need authorization, and the native-dialog
+UI actions need replay in a browser that supports them.
+
+**Next:** Approve pushing the review state; after that, a maintainer should authorize the
+credentialed provider and terminal gates and replay the native prompt/confirm actions in a compatible
+browser.
+
 ### 2026-07-19 — Fix: stale permission prompt after cancelling a turn
 
 I fixed the issue where cancelling a turn while a permission question was still open left that
