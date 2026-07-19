@@ -4,6 +4,30 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-19 — Usability review: full journey matrix and fix verification
+
+I drove every non-credentialed user journey against the real built app — first paint, onboarding,
+launch and chat, permissions, the card grid, resume and runtime switching, both archive-search
+builds, every Settings form, agent-to-agent messaging, failure recovery, and restart durability —
+and re-drove the chat and permission journeys on a fresh build after yesterday's two fixes landed.
+Both fixes hold up in the browser: denying a permission now reliably returns the agent to a usable
+idle state (it previously stuck on Cancel in most attempts), and reloaded or archived conversations
+now show each streamed reply as one readable message.
+
+One new smaller issue: if you cancel a turn while a permission question is still open, the question
+stays on screen with clickable Approve/Deny buttons forever — even after a reload — and clicking
+one just produces an error, because the app never records that the question was withdrawn.
+Everything else passed. The terminal journey and real signed-in provider checks remain skipped
+until you authorize live-provider runs. Full evidence:
+[`../archive/reviews/usability-review-run-2026-07-19.md`](../archive/reviews/usability-review-run-2026-07-19.md).
+
+**Needs attention:** None urgent — the stale permission prompt is queued as a Worth-fixing finding.
+The review state is committed locally on top of the current remote history; publishing it needs
+your approval to push the one local commit ahead of `origin/main`.
+
+**Next:** Push the review-state commit, then run `/fix` for the stale cancelled-permission prompt;
+separately, authorize the credentialed provider gates when ready.
+
 ### 2026-07-18 — Fix: permission-denial completion
 
 Denying a tool permission can no longer leave a finished chat stuck on Cancel. AgentDeck records the
