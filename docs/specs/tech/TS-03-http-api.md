@@ -1,6 +1,6 @@
 # TS-03 — HTTP, SSE & WebSocket API
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/server`, `ui/src/api`
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) API sections and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -35,7 +35,7 @@ delta; clients must not assume every existing endpoint already uses R3.
 | Family | Routes |
 |---|---|
 | Health/live state | `GET /api/health`, `GET /api/sessions`, `GET /api/sessions/{id}`, `GET /api/events`, `GET /api/capabilities` |
-| Lifecycle/chat | `POST /api/sessions`, `prompt`, `cancel`, `stop`, `rename`, `identity`, `permission`, `resume`, `switch-runtime`; transcript read |
+| Lifecycle/chat | `POST /api/sessions`, `prompt`, `cancel`, `stop`, `rename`, `identity`, `permission`, `resume`, `switch-runtime`, `annotations` *(planned)*; transcript read |
 | Config | role/project CRUD; `GET/PUT /api/backends`, `/api/config`, `/api/layout` |
 | Archive/tracking | `GET /api/archive`, session files/commands/messages |
 | Coordination | `POST /api/groups/{group}/release`, `/mcp` GET/POST/DELETE |
@@ -71,6 +71,17 @@ id, is not stored in `projects/{id}.json`, and any client-supplied value is igno
 /api/projects/{id}` remains `204`; before issuing it, Settings uses the read-only value to state
 that the resource directory will be retained. The server schema, TypeScript schema, mocks, and
 Settings copy stay in lockstep; no resource-content route or SSE event is added.
+
+**R14 (planned) — Annotation batch endpoint.** `POST /api/sessions/{id}/annotations` accepts one
+batch — annotations, optional overall instruction, and a target of kind `self` or `agent` (with
+`agent_id`); the new-task flow is UI composition over the existing launch route plus an `agent`
+target. Input is validated per FS-13.R11 before any disk or process work; success returns `202`
+with the appended annotation event's `seq`, and a `self` target additionally mirrors the prompt
+route's acceptance. Errors use the R3 structured envelope; list fields serialize as arrays (R6).
+One shared annotation-block renderer composes the agent-visible content for both prompt-turn and
+mail delivery (INV §2). No new SSE event type is added: the annotation event reaches clients as an
+ordinary `new_message` and mail indicators reuse existing `state_update` publication (R8). The UI
+schema ships in lockstep (R11).
 
 ## 3. Interfaces & data shapes
 

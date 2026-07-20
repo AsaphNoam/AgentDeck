@@ -52,6 +52,16 @@ None open.
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
+- 2026-07-20 — Defined the annotate-and-assign feature with the human: new planned FS-13
+  (diff-line and transcript-event selection in live and archived transcripts, a per-browser pending
+  tray, batch send to the current agent, another chat agent, or a new prefilled launch, a durable
+  structured `annotation` transcript event, archive search), planned FS-06 reserved user-sender
+  mail (no turn-budget consumption, unforgeable), planned TS-02 annotation-event and user-mail
+  persistence, and the planned TS-03 annotations batch endpoint. The human confirmed all four scope
+  decisions (surfaces, batch tray, new-task-as-prefilled-launch, mail delivery) in conversation.
+  The ready change `annotate-and-assign.md` is waiting to start; no product code changed.
+  Specification, twin-skill, and whitespace checks pass.
+
 - 2026-07-19 — Re-ran every runnable non-credentialed journey J1–J12 against the release-style
   build with isolated homes. The cancelled-permission prompt now resolves live and after reload;
   approve, deny, the real timeout, double-fire rejection, grid/restart, both archive search builds,
