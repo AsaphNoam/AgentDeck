@@ -4,6 +4,23 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-20 — Feature design: annotate and assign
+
+We defined the annotate-and-assign feature you asked for, inspired by the Codex app's diff
+comments. You will be able to select lines inside a diff or a whole message in an agent's
+conversation — live or in the archive — attach a short instruction, collect several of these into a
+pending tray, and send the batch to the current agent, another running agent, or a brand-new agent
+launched with the details prefilled. Each annotation is preserved as structured context: the app
+captures the file, lines, and quoted excerpt for you, shows the batch as annotation cards in the
+conversation, makes it searchable in the archive, and delivers it to agents as a generated context
+block instead of pasted text. Sending to another agent rides the existing agent mailbox, so unread
+badges and automatic wake-ups work unchanged.
+
+Files on disk, screenshots, and web pages are excluded because AgentDeck has no viewer for them;
+terminal output is also out of this first version. The feature and technical specifications are
+written and marked as planned, and a ready-to-implement change file is waiting; no product code was
+changed. Nothing further is needed from you — say the word when you want implementation to start.
+
 ### 2026-07-19 — Usability review: post-fix core journey rerun
 
 I re-ran the release-style app through fresh install and onboarding, first chat, all four permission
