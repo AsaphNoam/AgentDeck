@@ -219,6 +219,54 @@ func TestExtractRejectsSymlink(t *testing.T) {
 	}
 }
 
+// CreateArchive dereferences a symlinked command entry (as the private Node
+// runtime and npm-installed adapters ship) into a runnable regular file, keeping
+// the archive symlink-free so extraction still accepts it (FS-10.R3, INV §9).
+func TestCreateArchiveDereferencesSymlink(t *testing.T) {
+	version := "1.2.3"
+	src := buildFakeVersion(t, t.TempDir(), version)
+
+	// A real target plus a symlink beside it, mirroring node/bin/npm ->
+	// ../lib/.../npm-cli.js. The target is not itself executable; the archived
+	// command entry must still be runnable.
+	binDir := filepath.Join(src, "runtime", "node", "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(binDir, "npm-cli.js")
+	if err := os.WriteFile(target, []byte("#!/usr/bin/env node\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("npm-cli.js", filepath.Join(binDir, "npm")); err != nil {
+		t.Fatal(err)
+	}
+
+	archive, _ := releaseFrom(t, src, version)
+	dest := t.TempDir()
+	if _, err := ExtractArchive(archive, dest); err != nil {
+		t.Fatalf("ExtractArchive rejected a dereferenced runtime: %v", err)
+	}
+
+	link := filepath.Join(dest, VersionDirName(version), "runtime", "node", "bin", "npm")
+	info, err := os.Lstat(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		t.Fatalf("npm entry is still a symlink after packaging")
+	}
+	if info.Mode().Perm()&0o111 == 0 {
+		t.Fatalf("dereferenced command entry lost its executable bit: %o", info.Mode().Perm())
+	}
+	got, err := os.ReadFile(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "#!/usr/bin/env node\n" {
+		t.Fatalf("dereferenced content = %q, want the target's content", got)
+	}
+}
+
 // writeTarGz builds a minimal gzip tar with the given name→content entries.
 func writeTarGz(t *testing.T, path string, entries map[string]string) {
 	t.Helper()

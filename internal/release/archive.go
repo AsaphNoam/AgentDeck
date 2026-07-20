@@ -80,6 +80,31 @@ func CreateArchive(srcDir, archivePath string) error {
 		if err != nil {
 			return err
 		}
+		// Dereference symlinks into their target file content. The private runtime
+		// ships command entries as symlinks (Node's bin/npm, bin/npx, bin/corepack
+		// and each npm-installed node_modules/.bin/* adapter), but the release
+		// layout is deliberately plain files and directories so the archive stays
+		// symlink-free and extraction can keep rejecting symlinks as a traversal
+		// vector (INV §9). Assembly input is our own trusted runtime, so
+		// materializing the target is safe. Command entries must stay runnable, so
+		// the archived mode keeps the target's bits and adds owner/group/other
+		// execute (macOS reports a symlink's own mode as 0777).
+		mode := info.Mode()
+		if mode&os.ModeSymlink != 0 {
+			resolved, err := filepath.EvalSymlinks(path)
+			if err != nil {
+				return fmt.Errorf("resolve symlink %q: %w", rel, err)
+			}
+			target, err := os.Stat(resolved)
+			if err != nil {
+				return err
+			}
+			if target.IsDir() {
+				return fmt.Errorf("symlink %q points to a directory; unsupported in release layout", rel)
+			}
+			info = target
+			path = resolved
+		}
 		hdr, err := tar.FileInfoHeader(info, "")
 		if err != nil {
 			return err
@@ -87,6 +112,9 @@ func CreateArchive(srcDir, archivePath string) error {
 		hdr.Name = filepath.ToSlash(filepath.Join(prefix, rel))
 		if info.IsDir() {
 			hdr.Name += "/"
+		}
+		if mode&os.ModeSymlink != 0 {
+			hdr.Mode = int64(info.Mode().Perm() | 0o111)
 		}
 		if err := tw.WriteHeader(hdr); err != nil {
 			return err
