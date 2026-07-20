@@ -18,12 +18,12 @@ jobs:
     env:
       NODE_VERSION: 22.22.0
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -63,7 +63,7 @@ jobs:
           "$AGENTDECK_APP_ROOT/bin/agentdeck" --version
           test "$(cat "$AGENTDECK_HOME/sentinel")" = keep
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         if: github.event_name == 'push'
         with:
           files: |
