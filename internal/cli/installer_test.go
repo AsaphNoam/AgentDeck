@@ -94,6 +94,10 @@ func TestBootstrapNonInteractiveDoesNotStartOrEditProfile(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeBootstrapCommand(t, fakeBin, "uname", `case "$1" in -s) echo Darwin ;; -m) echo arm64 ;; *) exit 1 ;; esac`)
+	// Stub lockf so this test is hermetic: it exercises the non-interactive
+	// activation path, not real lock contention, and CI runners (Linux) have no
+	// macOS lockf. The stub drops -k/-t and execs the guarded command.
+	writeBootstrapCommand(t, fakeBin, "lockf", "while [ \"$#\" -gt 0 ]; do\n  case \"$1\" in\n    -k) shift ;;\n    -t) shift 2 ;;\n    *) break ;;\n  esac\ndone\nshift\nexec \"$@\"")
 	writeBootstrapCommand(t, fakeBin, "curl", `
 out=""
 while [ "$#" -gt 0 ]; do
