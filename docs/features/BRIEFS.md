@@ -4,6 +4,22 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-21 — Release: installer fix published
+
+I pushed the two pending `main` commits — the installer fix and the already-committed
+annotate-and-assign specification work — and published [AgentDeck v0.1.1](https://github.com/AsaphNoam/AgentDeck/releases/tag/v0.1.1).
+Its Apple-silicon release workflow passed the runtime assembly, installer transaction, and clean-install
+checks, then uploaded the archive, manifest, and corrected installer. The normal command now serves
+the fixed bootstrap:
+
+```sh
+curl -fsSL https://github.com/AsaphNoam/AgentDeck/releases/latest/download/install.sh | bash
+```
+
+**Needs attention:** None.
+
+**Next:** Retry the normal installer command on the other Apple-silicon Mac.
+
 ### 2026-07-21 — Fix: piped release installer
 
 I found the installer failure: when the documented command pipes the script into Bash, the lock
