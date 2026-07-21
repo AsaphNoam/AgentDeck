@@ -44,6 +44,9 @@ and creates disposable local configuration homes. On 2026-07-15 this machine has
 the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installed; the new
 `claude-agent-acp`, OpenCode, and OpenHands are not installed globally.
 
+Publishing a new GitHub Release is needed to replace the already-published v0.1.0 `install.sh` asset;
+the verified local fix for piped installation does not alter that immutable asset.
+
 ## Review findings
 
 None open.
@@ -51,6 +54,14 @@ None open.
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-21 — Fixed the documented `curl | bash` release installer path. Its lock re-exec had
+  treated `bash` as the script pathname, causing the lock-holding child to resume midway through
+  the pipe with helpers such as `die` and `on_path` undefined. A piped invocation now first writes
+  an owner-only executable temporary bootstrap, then safely re-execs that complete file under the
+  lock. The new fake-release regression exercises the exact pipe → lock → install sequence;
+  specification checks, the full Go test suite, source build, and distribution build pass. The
+  v0.1.0 release asset remains unchanged until a new release is published.
 
 - 2026-07-20 — Defined the annotate-and-assign feature with the human: new planned FS-13
   (diff-line and transcript-event selection in live and archived transcripts, a per-browser pending

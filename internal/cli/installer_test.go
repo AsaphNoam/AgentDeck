@@ -136,6 +136,61 @@ case "$url" in *manifest.json) cp "$AGENTDECK_TEST_MANIFEST" "$out" ;; *) cp "$A
 	}
 }
 
+// The documented curl | bash form gives Bash no script filename. The bootstrap
+// must materialize itself before lockf re-execs it; otherwise the child can
+// resume reading the pipe mid-script without helpers such as die and on_path.
+func TestPipedBootstrapMaterializesBeforeLockReexec(t *testing.T) {
+	fixture := t.TempDir()
+	archive, manifest := buildBootstrapFixture(t, "1.0.0", fixture)
+	fakeBin := filepath.Join(fixture, "bin")
+	if err := os.MkdirAll(fakeBin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeBootstrapCommand(t, fakeBin, "uname", `case "$1" in -s) echo Darwin ;; -m) echo arm64 ;; *) exit 1 ;; esac`)
+	writeBootstrapCommand(t, fakeBin, "lockf", "while [ \"$#\" -gt 0 ]; do\n  case \"$1\" in\n    -k) shift ;;\n    -t) shift 2 ;;\n    *) break ;;\n  esac\ndone\nshift\nexec \"$@\"")
+	writeBootstrapCommand(t, fakeBin, "curl", `
+out=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in -o) out="$2"; shift 2 ;; *) url="$1"; shift ;; esac
+done
+case "$url" in
+  *install.sh) cp "$AGENTDECK_TEST_BOOTSTRAP" "$out" ;;
+  *manifest.json) cp "$AGENTDECK_TEST_MANIFEST" "$out" ;;
+  *) cp "$AGENTDECK_TEST_ARCHIVE" "$out" ;;
+esac`)
+
+	home := filepath.Join(fixture, "home")
+	appRoot := filepath.Join(fixture, "app")
+	callLog := filepath.Join(fixture, "calls")
+	installer := filepath.Join("..", "..", "scripts", "release", "install.sh")
+	source, err := os.Open(installer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer source.Close()
+	cmd := exec.Command("bash", "-s", "--", "--version", "1.0.0", "--non-interactive")
+	cmd.Stdin = source
+	cmd.Env = append(os.Environ(),
+		"PATH="+fakeBin+":"+os.Getenv("PATH"),
+		"HOME="+home,
+		"AGENTDECK_APP_ROOT="+appRoot,
+		"AGENTDECK_TEST_BOOTSTRAP="+installer,
+		"AGENTDECK_TEST_ARCHIVE="+archive,
+		"AGENTDECK_TEST_MANIFEST="+manifest,
+		"AGENTDECK_TEST_CALL_LOG="+callLog,
+	)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("piped bootstrap install: %v\n%s", err, out)
+	}
+	if _, err := os.Stat(filepath.Join(appRoot, "bin", "agentdeck")); err != nil {
+		t.Fatalf("stable shim missing: %v", err)
+	}
+	if calls, err := os.ReadFile(callLog); err == nil && strings.TrimSpace(string(calls)) != "" {
+		t.Fatalf("non-interactive piped install invoked post-install commands: %q", calls)
+	}
+}
+
 // Run each bootstrap mode through a pseudo-terminal: this is the path that
 // exposed the lockf re-exec losing parsed flags. A plain pipe would make the
 // child non-interactive even when it accidentally dropped --non-interactive.
