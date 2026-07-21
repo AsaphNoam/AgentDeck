@@ -44,9 +44,6 @@ and creates disposable local configuration homes. On 2026-07-15 this machine has
 the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installed; the new
 `claude-agent-acp`, OpenCode, and OpenHands are not installed globally.
 
-Publishing a new GitHub Release is needed to replace the already-published v0.1.0 `install.sh` asset;
-the verified local fix for piped installation does not alter that immutable asset.
-
 ## Review findings
 
 None open.
@@ -54,6 +51,13 @@ None open.
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-21 — Published the verified piped-installer fix in GitHub Release v0.1.1. The tag's
+  Apple-silicon release workflow completed successfully: it assembled the private runtime, passed
+  the release transaction/bootstrap and fresh-install checks, and uploaded the archive,
+  `manifest.json`, and corrected `install.sh`. The documented `releases/latest/download/install.sh`
+  endpoint now serves the fixed bootstrap. The two pending `main` commits (the installer fix and
+  the previously committed annotate-and-assign specification work) are pushed to `origin/main`.
 
 - 2026-07-21 — Fixed the documented `curl | bash` release installer path. Its lock re-exec had
   treated `bash` as the script pathname, causing the lock-holding child to resume midway through
