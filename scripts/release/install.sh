@@ -22,6 +22,30 @@
 #   AGENTDECK_REPO      GitHub owner/repo (default: AsaphNoam/AgentDeck)
 #   AGENTDECK_APP_ROOT  application root (default: ~/Library/Application Support/AgentDeck)
 
+# The documented `curl | bash` form gives Bash no script path: `$0` is simply
+# `bash`. The operation lock must re-execute the entire bootstrap, so first
+# materialize that input as a private temporary file. Running a downloaded file
+# directly skips this small bootstrap step.
+if [ ! -f "$0" ]; then
+  bootstrap="$(mktemp "${TMPDIR:-/tmp}/agentdeck-bootstrap.XXXXXX")" || {
+    echo "error: could not create a temporary installer file" >&2
+    exit 1
+  }
+  trap 'rm -f "$bootstrap"' EXIT
+  bootstrap_repo="${AGENTDECK_REPO:-AsaphNoam/AgentDeck}"
+  if ! curl -fsSL --proto '=https' \
+    "https://github.com/${bootstrap_repo}/releases/latest/download/install.sh" \
+    -o "$bootstrap"; then
+    echo "error: could not download the AgentDeck installer (check your network and retry)" >&2
+    exit 1
+  fi
+  chmod 700 "$bootstrap" || {
+    echo "error: could not prepare the temporary installer file" >&2
+    exit 1
+  }
+  exec bash "$bootstrap" "$@"
+fi
+
 set -euo pipefail
 umask 077
 

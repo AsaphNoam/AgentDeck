@@ -4,6 +4,33 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-21 — Fix: piped release installer
+
+I found the installer failure: when the documented command pipes the script into Bash, the lock
+re-executes `bash` instead of the script file. The child then resumes partway through the pipe with
+its error helpers missing, which explains the misleading cascade of 404, missing-command, checksum,
+and false-success messages. The installer now saves piped input to a private temporary executable
+file before taking the lock, and a regression test covers the full piped install path. All checks pass.
+
+The existing v0.1.0 release asset cannot be changed in place. Until the next release is published,
+use this safe workaround instead of piping to Bash:
+
+```sh
+installer="$(mktemp)"
+curl -fsSL https://github.com/AsaphNoam/AgentDeck/releases/latest/download/install.sh -o "$installer" &&
+  chmod 700 "$installer" &&
+  "$installer"
+status=$?
+rm -f "$installer"
+exit "$status"
+```
+
+**Needs attention:** A new GitHub Release must publish the fixed installer before the short documented
+command works for everyone.
+
+**Next:** Publish the verified installer fix in the next release, then retry the normal installation
+command on a clean Apple-silicon Mac.
+
 ### 2026-07-20 — Feature design: annotate and assign
 
 We defined the annotate-and-assign feature you asked for, inspired by the Codex app's diff
