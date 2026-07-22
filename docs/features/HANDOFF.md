@@ -20,12 +20,6 @@ These are shipped boundaries documented in the specifications, not blockers. A f
 an explicit specification update; remove an item when the human accepts the current rule or queues
 that update.
 
-- **Local API authentication:** TS-05.R3 documents the current same-machine trust boundary. Decide
-  whether a token/UI handshake is worth the added setup and compatibility cost.
-- **Child-process environment:** TS-05.R8 documents full environment inheritance minus backend strip
-  keys. Decide whether to trade provider compatibility for allowlists.
-- **Terminal and messaging support boundary:** FS-07/TS-04 document Claude-only terminal support and
-  non-messageable terminal agents pending real-CLI verification.
 - **API/model compatibility:** TS-03.R3–R4 preserve mixed legacy error envelopes; TS-04.R3 records
   provider model-ID ownership. Standardizing either is a compatibility change.
 
@@ -51,6 +45,11 @@ None open.
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-22 — The human accepted the current local-API trust and child-environment inheritance
+  boundaries for now, and moved those plus the terminal-capability boundary to the known-issues
+  backlog. Codex remains supported for chat; its terminal interface is intentionally rejected until
+  a Codex-specific interactive-CLI hook/flag path is verified.
 
 - 2026-07-22 — Defined the waiting onboarding-credentials change with the human. It adds an
   explicit Set up later completion path; removes onboarding model fields; gives Claude/Codex
