@@ -2,6 +2,8 @@ import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import type { Onboarding } from "../../schemas/config";
 import type { BackendType } from "../../schemas/backends";
+import { usePutConfig, configErrorMessage } from "../../api/config";
+import { useUiStore } from "../../store/uiStore";
 import { BackendStep } from "./steps/BackendStep";
 import { ProjectStep } from "./steps/ProjectStep";
 import { SourceStep } from "./steps/SourceStep";
@@ -31,8 +33,24 @@ export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
   // The backend chosen in step 0, so the federation Config step targets the right
   // provider (default Claude only until the user picks otherwise).
   const [backend, setBackend] = useState<{ id: string; type: BackendType }>({ id: "claude", type: "claude-acp" });
+  const putConfig = usePutConfig();
+  const pushError = useUiStore((state) => state.pushError);
 
   const advance = () => setStep((s) => Math.min(s + 1, LAST_STEP));
+
+  // Skip setup: leave onboarding without launching an agent (FS-04.R32). Marking
+  // onboarding_complete forces the gate satisfied (R22), so the user is not
+  // re-gated and can finish configuration in Settings. A failed write keeps the
+  // wizard open with the error surfaced rather than silently claiming completion.
+  const handleSkip = () => {
+    putConfig.mutate(
+      { onboarding_complete: true },
+      {
+        onSuccess: onComplete,
+        onError: (e) => pushError("Failed to skip setup", configErrorMessage(e)),
+      },
+    );
+  };
 
   return (
     <Dialog.Root open modal>
@@ -71,6 +89,11 @@ export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
                 />
               )}
               {step === 3 && <LaunchStep onDone={onComplete} initialProject={createdProject} />}
+            </div>
+            <div className="wizard-skip" data-slot="actions">
+              <button type="button" className="wizard-skip-button" onClick={handleSkip} disabled={putConfig.isPending}>
+                {putConfig.isPending ? "Skipping…" : "Skip setup"}
+              </button>
             </div>
           </div>
         </Dialog.Content>

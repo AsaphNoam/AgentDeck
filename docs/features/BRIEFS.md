@@ -4,6 +4,19 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-22 — Feature: skip the onboarding wizard
+
+New users can now leave the first-run setup wizard without launching an agent. Every step of the
+wizard shows a "Skip setup" control; choosing it marks setup as complete and drops the user straight
+onto the dashboard. Anyone who skips can still finish configuring a backend, project, or role later
+in Settings, and they will not be pushed back into the wizard. If saving that choice fails, the
+wizard stays put and shows the error instead of pretending it worked.
+
+**Needs attention:** None. A skipped dashboard can start with no working backend; that is the
+expected trade-off of skipping and is fixable in Settings.
+
+**Next:** None required. Optionally confirm the skip flow in a browser during the next usability pass.
+
 ### 2026-07-21 — Release: installer fix published
 
 I pushed the two pending `main` commits — the installer fix and the already-committed

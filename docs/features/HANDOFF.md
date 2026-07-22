@@ -52,6 +52,14 @@ None open.
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
+- 2026-07-22 — Added a Skip setup control to the onboarding wizard (FS-04.R16/R32, A12). It is
+  present on every step, writes `onboarding_complete: true` via `PUT /api/config`, and on success
+  dismisses the wizard to the dashboard without launching an agent; a failed write keeps the wizard
+  open and surfaces the error (reusing the R29 pattern). No server change — the existing config
+  endpoint and the R22 override already make a completed user un-gated. Two gate regressions cover
+  the dismiss and write-failure paths. UI tests (108), UI build, embedded output, both Go test
+  variants, source build, and specification checks pass.
+
 - 2026-07-21 — Published the verified piped-installer fix in GitHub Release v0.1.1. The tag's
   Apple-silicon release workflow completed successfully: it assembled the private runtime, passed
   the release transaction/bootstrap and fresh-install checks, and uploaded the archive,

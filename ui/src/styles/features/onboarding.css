@@ -82,6 +82,34 @@
   justify-content: flex-end;
 }
 
+.wizard-skip {
+  border-top: var(--ad-border-thin) solid var(--ad-border-default);
+  display: flex;
+  justify-content: center;
+  padding-top: var(--ad-space-4);
+}
+
+.wizard-skip-button {
+  background: transparent;
+  border: 0;
+  color: var(--ad-text-muted);
+  cursor: pointer;
+  font-family: var(--ad-font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-decoration: underline;
+  text-transform: uppercase;
+}
+
+.wizard-skip-button:hover:not(:disabled) {
+  color: var(--ad-text-primary);
+}
+
+.wizard-skip-button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
 .source-step {
   min-height: 300px;
 }

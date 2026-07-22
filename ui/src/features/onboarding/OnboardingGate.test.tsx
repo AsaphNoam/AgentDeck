@@ -48,6 +48,8 @@ const backendDoneProjectNotDoneConfig = {
   },
 };
 
+let putConfigBody: { onboarding_complete?: boolean } | null = null;
+
 const server = setupServer(
   http.get("/api/config", () => HttpResponse.json(notSatisfiedConfig)),
   http.get("/api/backends", () =>
@@ -65,11 +67,16 @@ const server = setupServer(
   http.post("/api/projects", () =>
     HttpResponse.json({ project: "test", title: "Test", color: [128, 128, 128], cwd: "/tmp", add_dirs: [], context_prompt: "" }, { status: 201 }),
   ),
+  http.put("/api/config", async ({ request }) => {
+    putConfigBody = (await request.json()) as { onboarding_complete?: boolean };
+    return HttpResponse.json(satisfiedConfig);
+  }),
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
 afterEach(() => {
   cleanup();
+  putConfigBody = null;
   server.resetHandlers();
 });
 afterAll(() => server.close());
@@ -157,6 +164,38 @@ describe("OnboardingGate", () => {
 
     // Wizard still visible
     expect(screen.getByText("Welcome to AgentDeck")).toBeInTheDocument();
+  });
+
+  it("Skip setup marks onboarding complete and reveals the dashboard without a launch (FS-04.R32)", async () => {
+    renderWithQuery(
+      <OnboardingGate>
+        <div data-testid="dashboard">Dashboard</div>
+      </OnboardingGate>,
+    );
+    fireEvent.click(await screen.findByText("Skip setup"));
+
+    expect(await screen.findByTestId("dashboard")).toBeInTheDocument();
+    expect(screen.queryByText("Welcome to AgentDeck")).toBeNull();
+    expect(putConfigBody?.onboarding_complete).toBe(true);
+  });
+
+  it("Skip setup keeps the wizard open when the config write fails (FS-04.R32)", async () => {
+    server.use(
+      http.put("/api/config", () =>
+        HttpResponse.json({ error: "Server error", message: "disk write failed" }, { status: 500 }),
+      ),
+    );
+    renderWithQuery(
+      <OnboardingGate>
+        <div data-testid="dashboard">Dashboard</div>
+      </OnboardingGate>,
+    );
+    fireEvent.click(await screen.findByText("Skip setup"));
+
+    // Give the failing mutation time to settle; wizard must stay, dashboard hidden.
+    await new Promise((r) => setTimeout(r, 100));
+    expect(screen.getByText("Welcome to AgentDeck")).toBeInTheDocument();
+    expect(screen.queryByTestId("dashboard")).toBeNull();
   });
 
   it("clicking overlay does not dismiss the wizard", async () => {
