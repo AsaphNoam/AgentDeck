@@ -4,6 +4,24 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-22 — Review: work since the core-interface redesign
+
+I reviewed everything built since the last review boundary: the chat permission fixes, the
+transcript-replay fix, the onboarding wizard fix, and the release-archive packaging fix. All of it does
+what the specifications say and nothing shipped that the specifications fail to describe. The two
+recent design-only changes (annotate-and-assign, and the onboarding credentials repair) add planned
+specifications only and ship no product code, as intended.
+
+I found one minor issue, worth fixing but not urgent: the one-line `curl | bash` installer leaves a
+small temporary file behind in the system temp folder each time it runs. It is harmless — owner-only
+and cleared on restart — but it should tidy up after itself.
+
+**Needs attention:** None. The installer temp-file leftover is queued as a Worth-fixing item, not a
+blocker.
+
+**Next:** A fix session can clear the installer leftover when convenient; nothing else is outstanding
+from this review.
+
 ### 2026-07-22 — Project decisions: current security and terminal boundaries
 
 The local API's same-machine trust model and broad child-process environment inheritance are accepted

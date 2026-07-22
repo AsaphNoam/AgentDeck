@@ -11,7 +11,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   product finding and confirmed the cancelled-permission fix in the built app. Credentialed provider
   acceptance remains a separate manual release gate; native prompt/confirm actions also need replay
   in a browser that supports those dialogs.
-- **Last reviewed code:** `4195ed0` (2026-07-18), across the continuous range after `87d6251`.
+- **Last reviewed code:** `ef4ee18` (2026-07-22), across the continuous range after `61b234d` (the
+  current-history equivalent of the earlier pre-rehash marker `4195ed0`).
 - **Branch:** `main`.
 
 ## Decisions needing your input
@@ -40,11 +41,31 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-None open.
+- **Worth fixing** — `scripts/release/install.sh`: the piped-install path (`curl | bash`) creates a
+  temporary bootstrap with `mktemp`, registers `trap 'rm -f "$bootstrap"' EXIT`, then
+  `exec bash "$bootstrap"`. `exec` replaces the shell image, so the EXIT trap never fires and the
+  owner-only temp file is left in `$TMPDIR` after every piped install (the re-exec'd child is a fresh
+  shell that neither knows the path nor carries the trap). Normal-use trigger: the documented
+  `curl | bash` install, on every run. Not data loss and cleaned at reboot, so low severity. Suggested
+  fix: have the re-exec'd bootstrap delete its own file once it no longer needs to re-read itself
+  (e.g. pass the temp path in an env var and `rm` it after the lock re-exec resolves, or sweep stale
+  `agentdeck-bootstrap.*` at start), guarded so a real `bash <install.sh>` invocation never deletes a
+  user-provided script. No requirement pins temp-file cleanup; this is a hygiene defect, not a
+  behavior-vs-spec mismatch.
 
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-22 — Reviewed the continuous range after `61b234d` through `ef4ee18` (the current-history
+  span since the last review; `61b234d` is the rehashed equivalent of the old `4195ed0` marker). The
+  shipped product code — the permission busy-before-release race fix and cancelled-decision emission,
+  the transcript-replay assistant-delta folding, the onboarding wizard latch, and the release-archive
+  symlink dereference — matches its requirements in both directions (FS-03.R4/R9/A4/A5/A6, FS-04.R23,
+  INV §9). The design/spec-only commits (annotate-and-assign, onboarding-credentials) carry consistent
+  `(planned)` tags and ship no code. One Worth-fixing finding recorded: the piped installer leaks its
+  temporary bootstrap file because `exec` discards the cleanup trap. Spec check, Go build, and the
+  touched runtime/release/cli package tests pass.
 
 - 2026-07-22 — The human accepted the current local-API trust and child-environment inheritance
   boundaries for now, and moved those plus the terminal-capability boundary to the known-issues
