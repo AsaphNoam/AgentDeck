@@ -4,6 +4,25 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-22 — Feature design: repair onboarding credentials and defaults
+
+The onboarding repair is fully specified and waiting to start; no product code changed. People will
+be able to choose **Set up later** and open the dashboard immediately, without creating a project,
+changing backend defaults, or launching an agent. The normal backend step will no longer expose model
+IDs or provider model strings. Instead, Claude and Codex will give provider-owned sign-in guidance
+and let the person check readiness again; Codex can also use an OpenAI API key.
+
+Fresh installs will use Claude `sonnet` and Codex `gpt-5.6-sol`; existing `backends.json` files are
+preserved exactly. There will be no embedded terminal, dashboard-started login, credential transport,
+or new auth API route. The `agentdeck auth` failure you saw is from the installed v0.1.0 binary, which
+predates that command; the current source and the planned release checks include it, but an older
+immutable release needs an explicit reinstall/update.
+
+**Needs attention:** None.
+
+**Next:** Run `/work` when you want to implement
+[`repair-onboarding-credentials.md`](../ready-changes/repair-onboarding-credentials.md).
+
 ### 2026-07-21 — Release: installer fix published
 
 I pushed the two pending `main` commits — the installer fix and the already-committed

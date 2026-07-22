@@ -52,6 +52,16 @@ None open.
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
+- 2026-07-22 — Defined the waiting onboarding-credentials change with the human. It adds an
+  explicit Set up later completion path; removes onboarding model fields; gives Claude/Codex
+  provider-owned sign-in guidance plus Check again; treats Codex native login or API key as ready;
+  updates fresh-only defaults to `sonnet`/`gpt-5.6-sol`; preserves existing `backends.json`; and
+  pins a private Codex CLI readiness probe. There is no embedded terminal, dashboard-started login,
+  credential transport, or new auth API. The observed `agentdeck auth` failure is an installed
+  v0.1.0 binary predating that command, not absent current source. FS-04, FS-09, TS-03, TS-04, and
+  TS-06 are planned/Partial; `repair-onboarding-credentials.md` waits to start. Spec, twin-skill,
+  and whitespace checks pass; no product code changed.
+
 - 2026-07-21 — Published the verified piped-installer fix in GitHub Release v0.1.1. The tag's
   Apple-silicon release workflow completed successfully: it assembled the private runtime, passed
   the release transaction/bootstrap and fresh-install checks, and uploaded the archive,

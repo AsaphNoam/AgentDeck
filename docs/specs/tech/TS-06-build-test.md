@@ -1,6 +1,6 @@
 # TS-06 — Build, test & delivery
 
-**Status:** Current
+**Status:** Partial
 **Code:** `Makefile`, `go.mod`, `ui`, `internal/server/ui`, `install.sh`, `scripts/`, `internal/cli/`, `.github/workflows`
 **Absorbed:** build/test sections in the [phase archive manifest](../../archive/phases/README.md) and contributor guidance formerly duplicated in [`CLAUDE.md`](../../../CLAUDE.md)
 
@@ -117,6 +117,14 @@ no-start/non-interactive behavior, and preservation of a pre-existing `AGENTDECK
 automated portion on a macOS arm64 runner or equivalent arm64 macOS environment. Credentialed Claude
 and Codex login/chat checks remain manual gates and cannot be represented as release CI success.
 
+**R22** `(planned)` — The release runtime declares and lockfiles the exact direct `@openai/codex`
+dependency required for Codex native `login status`, exposes its executable through the private
+wrapper PATH, and validates that executable alongside both ACP adapters before packaging. Source and
+release command-tree tests prove `agentdeck auth claude|codex` is present; release tests also prove
+the private Codex readiness command resolves without a globally installed Codex CLI. Existing
+installed release directories remain immutable: a command absent from an older version requires an
+explicit reinstall/update to a newer release.
+
 ## 3. Interfaces & data shapes
 
 The canonical commands are:
@@ -145,7 +153,7 @@ shared target guarantees.
   affected claims rather than treating fake-provider success as real-provider certification.
 - Release/install documentation has historically drifted from actual optional adapter and shell-tool
   prerequisites; README, source-install, and release-installer changes must now be reviewed against
-  R12–R21.
+  R12–R22.
 - The macOS MVP deliberately has no signing, notarization, Homebrew formula, Intel build, Windows or
   Linux archive. TS-05.R12 records the resulting delivery-trust limitation rather than implying a
   publisher-authentication guarantee.

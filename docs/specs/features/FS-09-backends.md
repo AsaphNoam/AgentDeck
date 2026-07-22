@@ -87,7 +87,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   backend: `{status:"ok"|"failed"|"skipped", detail?}`. Network/tool absence cannot destroy or
   reject otherwise valid configuration.
 - **R17 — retired 2026-07-15:** The direct system `claude auth status` probe was replaced by the
-  selected adapter's bundled-Claude probe in R30; the other provider probes are unchanged.
+  selected adapter's bundled-Claude probe; current provider readiness behavior is R34.
 - **R18** — Credential probes use the merged backend/model environment, have a six-second deadline,
   sanitize returned output, and classify missing CLIs/keys, timeouts, network errors and unfamiliar
   responses as `skipped` rather than inventing success.
@@ -128,12 +128,8 @@ Configuration-source federation for Claude/Codex is FS-08.
   adapter's ACP session metadata, and preserves native same-backend resume/model switch. Chat
   status remains ACP-derived; Claude terminal launches continue to invoke the interactive Claude
   executable directly with their generated `--settings` hook file.
-- **R30** — Claude credential feedback probes the same adapter dependency that chat
-  launch requires by running `claude-agent-acp --cli auth status` (retrying without `--no-color`
-  for older bundled Claude builds). Codex checks `OPENAI_API_KEY` against
-  `${OPENAI_BASE_URL:-https://api.openai.com}/v1/models`; OpenCode requires its executable plus
-  either its standard auth file or a provider API key; OpenHands requires its executable plus
-  `LLM_API_KEY` or its standard settings file.
+- **R30 — retired 2026-07-22:** Credential readiness limited Codex to `OPENAI_API_KEY`. Replaced
+  by the native-sign-in-or-API-key behavior in R34.
 - **R31** — A hand-edited `backends.json` that is syntactically valid but structurally incomplete
   (including a missing `backends` map or a backend with no models) is treated as unreadable on every
   read path. `GET /api/backends` returns the in-memory default catalog just as it does for a missing
@@ -145,6 +141,13 @@ Configuration-source federation for Claude/Codex is FS-08.
   places a pre-existing string `developer_instructions` before the composed prompt. Malformed,
   non-object config, or a non-string existing `developer_instructions` fails that launch with a
   bounded configuration error; AgentDeck never silently drops the selected role.
+- **R33** `(planned)` — Fresh homes seed Claude's default model as `sonnet` (labelled as the current
+  Claude Sonnet) and Codex's as `gpt-5.6-sol` (labelled `GPT-5.6-Sol`). Seed updates never rewrite an
+  existing `backends.json`, change an existing default, or replace a person’s model entry.
+- **R34** `(planned)` — Claude and Codex readiness recognize provider-native sign-in as well as the
+  applicable configured API-key path. AgentDeck does not start or proxy native login; it only probes
+  the resulting readiness and returns a bounded ready/unready/unavailable/failed outcome. For Codex,
+  a valid native login and a valid `OPENAI_API_KEY` are independent acceptable readiness paths.
 
 ## 5. Acceptance criteria
 
@@ -163,7 +166,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   identity/history and reject/roll back bad transitions. *Verified by* `TestResolveResumeID`,
   `TestSwitchClaudeToOpenCodePrimer`, `TestSwitchRuntimeBackendSwapUsesPrimer`, and
   `TestSwitchRuntimeRollbackOnResumeFailure`.
-- **A5** (R16, R18–R19, R30) — Saves persist independently of best-effort probe status; backend-specific
+- **A5** (R16, R18–R19, R34) — Saves persist independently of best-effort probe status; backend-specific
   probes, merged env and sanitized timeout/missing-auth outcomes are covered. *Verified by*
   `TestMergeEnv`, `TestOpenCodeProber`, `TestOpenHandsProber`,
   `TestClaudeProberRetriesWithoutNoColor`, and config-handler/onboarding credential tests.
@@ -181,7 +184,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   catalog unchanged. *Verified by* `TestSyncCodexModelsAddsVisibleModels`,
   `TestSyncCodexModelsPreservesExistingAndDefault`, `TestSyncCodexModelsRespectsFlagAndType`, and
   `TestReadCodexModelCatalog`.
-- **A9** (R29–R30) — The Claude adapter resolves to `claude-agent-acp`; its ACP v1
+- **A9** (R29, R34) — The Claude adapter resolves to `claude-agent-acp`; its ACP v1
   initialize and session metadata shapes remain covered by the shared fake-adapter tests; and the
   credential probe delegates through `--cli`, including the no-color compatibility retry. The
   pinned package's real initialize/session/turn behavior remains part of the credentialed A7 gate.
@@ -195,6 +198,12 @@ Configuration-source federation for Claude/Codex is FS-08.
   merged `CODEX_CONFIG` `developer_instructions` value, without an unsupported ACP `systemPrompt`
   parameter; malformed overlays fail before spawning. *Verified by* runtime parameter and
   process-environment regression tests. A real authenticated Codex turn/resume remains part of A7.
+- **A12** `(planned)` — A fresh backend catalog has the Claude `sonnet` and Codex `gpt-5.6-sol`
+  defaults, while a pre-existing catalog remains byte-for-byte unchanged by seeding. *Verified by*
+  seed/config tests.
+- **A13** `(planned)` — Fake provider-native Claude/Codex readiness produces bounded outcomes
+  without AgentDeck starting a login process or receiving credential bytes; Codex API-key readiness
+  remains supported. *Verified by* credential-check tests and FS-04.A14's UI test.
 
 ## 6. Deviations & open decisions
 
