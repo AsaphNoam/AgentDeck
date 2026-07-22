@@ -4,6 +4,18 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-22 — Project decisions: current security and terminal boundaries
+
+The local API's same-machine trust model and broad child-process environment inheritance are accepted
+for now and are tracked as future improvements rather than open decisions. Codex does work for chat;
+only Codex's terminal interface is unavailable because it lacks a verified interactive hook and flag
+integration. That terminal limitation, including terminal-agent messaging, is now in the backlog.
+
+**Needs attention:** The remaining open choices are API/model compatibility and whether to authorize
+credentialed provider, terminal, and federation release checks.
+
+**Next:** Revisit any backlog item when its trade-off becomes worth changing.
+
 ### 2026-07-22 — Feature design: repair onboarding credentials and defaults
 
 The onboarding repair is fully specified and waiting to start; no product code changed. People will

@@ -48,6 +48,11 @@ These describe incomplete or deliberately limited shipped behavior. Their owning
 the authority; move an item to ready changes only after its exact requirements and acceptance checks
 are clear.
 
+- **Local API authentication.** The loopback API currently relies on same-machine trust. Revisit a
+  token or browser/UI handshake only if the security benefit outweighs its setup and compatibility
+  cost.
+- **Child-process environment.** Agent processes currently inherit the full environment except for
+  backend strip keys. Revisit an allowlist only if it can preserve required provider compatibility.
 - **Chat history fidelity.** Make replayed streaming deltas match live deltas; prevent overlapping
   transcript reloads from winning out of order; show initial-load errors.
 - **Archive and tracking usability.** Refine `matched_in` when search terms span metadata and
@@ -56,9 +61,11 @@ are clear.
 - **Coordination liveness.** Scope nudge cooldowns to a generation, limit repeated nudges, republish
   unread counts after janitor expiry, notify only on the first budget breach, and remove duplicate
   permission notices.
-- **Terminal capability honesty.** Either add an optional driver picker or stop advertising
-  unreachable drivers; implement or retire the planned tab cap; and bound aggregate shutdown grace
-  across multiple agents.
+- **Terminal capability honesty.** Codex works as a chat backend, but its terminal interface is
+  intentionally rejected until a Codex-specific interactive-CLI hook/flag path is verified; terminal
+  agents are not messageable for the same reason. Also either add an optional driver picker or stop
+  advertising unreachable drivers; implement or retire the planned tab cap; and bound aggregate
+  shutdown grace across multiple agents.
 - **Federation UI and watches.** Expose custom roots/profiles, refresh the effective view after
   source events, register prompt watches after binding, and clear preview consent on project change.
 - **Backend launch diagnostics.** Use executable overrides consistently, bound ACP readiness,
