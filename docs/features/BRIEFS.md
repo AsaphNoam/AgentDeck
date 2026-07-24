@@ -4,6 +4,33 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-24 — Workflow: make the bug-class sweep impossible to skip silently
+
+I fixed the process hole that caused the earlier miss. The reading list every agent follows told them
+to open the bug-class catalog only when something already pointed them there — but the instruction to
+check work against it is written inside the catalog itself, so nothing ever pointed there and the step
+was skipped without a trace. The three command files for build, review, and fix work now name the
+catalog as something to always read, and say plainly what to do with it.
+
+Documentation alone would not have stopped me, so the check now also runs as code. The existing
+specification checker, which runs as part of the normal test command, now verifies that every recorded
+review finding is marked as must-fix or worth-fixing and that any finding pointing at real code names
+which known bug class it belongs to, or states plainly that none applies. Both of those were already
+required in writing; the difference is that skipping them now fails a command people actually run
+rather than passing silently. It checks the labelling, not the judgement behind it — its real value is
+that a review which never opened the catalog cannot quietly claim it did.
+
+Applying the new check immediately turned up one thing: the known installer leftover does belong to a
+recognised bug class, cleanup that gets skipped on one exit path, which nobody had recorded.
+
+**Needs attention:** Two related guards I deliberately did not add, because they are only words and
+words are what failed last time — one telling a repeat review to form its own conclusions before
+reading the previous review's, and one saying that "needs more tests" findings are not a substitute
+for finding actual defects. Both describe exactly how I went wrong. Say if you want them written down
+anyway.
+
+**Next:** The duplicate-delivery defect in annotate-and-assign is still the first thing to fix.
+
 ### 2026-07-24 — Review: annotate and assign, re-checked against the bug-class catalog
 
 At your request I re-reviewed the annotate-and-assign work. The first pass checked the feature only

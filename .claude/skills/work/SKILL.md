@@ -6,9 +6,14 @@ description: Explicit invocation only. Run only when the user sends `/work`; do 
 # Work a change
 
 Read [`HANDOFF.md`](../../../docs/features/HANDOFF.md), its named change in progress (if any), the
-[`spec overview`](../../../docs/specs/README.md), the relevant FS/TS/INV items, and
+[`spec overview`](../../../docs/specs/README.md), the FS/TS items named by the change or request,
+[`INVARIANTS.md`](../../../docs/features/INVARIANTS.md) — always, and the matching class in full
+before a hot-spot change — and
 [`AGENT-WORKFLOW.md`](../../../docs/features/AGENT-WORKFLOW.md) §§1–6 and §10 completely. Then
 follow the shared workflow; the workflow and specs take precedence over this launcher.
+
+A new interface, runtime, or driver completes the invariant §6 contract checklist line by line;
+silence on any line is a bug, not a default.
 
 `$ARGUMENTS`, if present, names a change or the human’s requested change. Otherwise use the
 handoff's active change. If there is no active change, inspect `docs/ready-changes/`:

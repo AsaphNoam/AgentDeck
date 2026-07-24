@@ -152,6 +152,43 @@ check_spec_file() {
   esac
 }
 
+# Review findings carry the two tags that are already required of them: the
+# priority prefix (workflow §7) and the invariant class (INVARIANTS.md, "/review
+# — sweep the diff against every class; tag each finding with its class number").
+# A review that never opened the invariant catalog cannot satisfy the second, so
+# an untagged code finding fails a command the loop already runs. This checks the
+# tag, not the thinking behind it; it exists so the omission cannot be silent.
+check_review_findings() {
+  file=$1
+  problems=$(awk '
+    function flush() {
+      if (buf == "") return
+      if (first !~ /^- \*\*(Must fix|Worth fixing)\*\*/) {
+        print "finding must start with **Must fix** or **Worth fixing**: " first
+      } else if (buf ~ /\.(go|ts|tsx|sh|css|json)/ &&
+                 buf !~ /INV §[0-9]/ && buf !~ /\(no invariant class\)/) {
+        print "finding cites code but has no INV §n tag or (no invariant class): " first
+      }
+      buf = ""
+      first = ""
+    }
+    /^## / { if (insection) { flush(); insection = 0 } }
+    /^## Review findings/ { insection = 1; next }
+    insection && /^- / { flush(); first = $0; buf = $0; next }
+    insection && buf != "" { buf = buf " " $0; next }
+    END { if (insection) flush() }
+  ' "$file")
+
+  [ -n "$problems" ] || return
+  old_ifs=$IFS
+  IFS='
+'
+  for problem in $problems; do
+    fail "${file#"$ROOT"/}: $problem"
+  done
+  IFS=$old_ifs
+}
+
 check_file() {
   file=$1
   if [ ! -f "$file" ]; then
@@ -165,6 +202,7 @@ check_file() {
 
   case "$(basename "$file")" in
     FS-[0-9][0-9]-*.md|TS-[0-9][0-9]-*.md) check_spec_file "$file" ;;
+    HANDOFF.md) check_review_findings "$file" ;;
   esac
   check_links "$file"
   check_refs "$file"
@@ -249,7 +287,7 @@ elif [ "$#" -eq 0 ]; then
     fail "docs/specs directory is missing"
   else
     check_index
-    for file in "$INDEX" "$SPECS"/features/*.md "$SPECS"/tech/*.md; do
+    for file in "$INDEX" "$SPECS"/features/*.md "$SPECS"/tech/*.md "$ROOT/docs/features/HANDOFF.md"; do
       [ -f "$file" ] || continue
       check_file "$file"
     done
