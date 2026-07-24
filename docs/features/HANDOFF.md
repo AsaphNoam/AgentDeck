@@ -7,9 +7,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** finished — Annotate and assign is implemented and verified. Credentialed provider
-  acceptance remains a separate manual release gate; native prompt/confirm actions also need replay
-  in a browser that supports those dialogs.
+- **State:** finished with open findings — Annotate and assign is implemented, but a re-review found
+  one Must-fix delivery/rollback defect and three Worth-fixing items (see Review findings).
+  Credentialed provider acceptance remains a separate manual release gate; native prompt/confirm
+  actions also need replay in a browser that supports those dialogs.
 - **Last reviewed code:** `8b84e4f` (2026-07-24), implements FS-13 annotate-and-assign through
   the continuous range after `61b234d`.
 - **Branch:** `main`.
@@ -40,6 +41,46 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
+- **Must fix** (INV §4; FS-13.R5) — `internal/server/sessions.go:108-131`: the agent-target
+  annotation path inserts reserved-sender mail, fires the nudge, and touches the recipient *before*
+  `appendAnnotation`, with no rollback and no idempotency key. `appendAnnotation` has four error
+  returns after the mail is committed (`sessions.go:235-246`); any of them returns `500` while the
+  mail is already delivered. The tray is preserved on failure by design (FS-13.R3,
+  `ui/src/components/chat/AnnotationTray.tsx:48-50`), so the natural retry inserts a **second** copy
+  of the same mail. Normal-use trigger: disk full, a transcript permission error, or an FTS flush
+  error on any assign-to-another-agent send. This also breaks FS-13.R5 — the batch can be delivered
+  and acted on with no durable `annotation` event on the source session. The self-target variant
+  differs: the prompt turn fires, the append fails, and the retry hits `ErrTurnInFlight`, leaving the
+  agent working on annotations the transcript never recorded. Suggested fix: append the event before
+  delivering, or carry a client-supplied batch id the insert dedupes on. Regression test: inject an
+  `appendAnnotation` failure and assert exactly one mail row after a retry.
+
+- **Worth fixing** (INV §2) — `ui/src/components/chat/TranscriptView.tsx:132`,
+  `ui/src/components/chat/renderers/DiffBlock.tsx:42`, `internal/server/sessions.go:163`:
+  `clipExcerpt` is duplicated verbatim in two components with a third, differently-behaved
+  implementation on the server. They have already drifted — the Go marker is
+  `"\n… [excerpt clipped]"` keeping 1980+20 = 2000 runes; the JS marker omits the leading newline and
+  keeps 1979+19 = 1998. Neither exceeds the limit, so nothing fails today; this is the drift §2
+  predicts, caught before it bites. `validateAnnotations` (`sessions.go:154`) already clips
+  server-side, so the client copies are redundant bounding for localStorage. Suggested fix: one
+  exported helper with the server marker authoritative.
+
+- **Worth fixing** (INV §2) — `ui/src/api/types.ts:82`,
+  `ui/src/components/chat/TranscriptView.tsx:111`, `ui/src/components/chat/renderers/DiffBlock.tsx:6`:
+  `AnnotationDraft` is declared three times and the copies have already diverged. The canonical
+  export (used by the store and tray) makes `path`/`side`/`start_line`/`end_line` optional;
+  `DiffBlock`'s local copy makes all four required; `TranscriptView`'s re-declares the optional
+  shape. TypeScript's structural typing accepts all three, so `npm run build` and the 105 UI tests
+  are blind to it. Suggested fix: delete both local declarations and import from `api/types`.
+
+- **Worth fixing** (INV §1) — `ui/src/store/annotationStore.ts:45`: the pending tray persists to
+  localStorage keyed by `agent_id` and is never cleaned up. No consumer outside `AnnotationTray`/
+  `TranscriptView` touches it; nothing clears it on agent stop, agent delete, or archive purge. A
+  deleted agent's drafts survive indefinitely and would resurface against a reused `agent_id`.
+  Growth is unbounded across agents (20 entries x 2,000 chars is roughly 40 KB each against a ~5 MB
+  quota); a full quota makes zustand's `persist` throw on every `setState`. Suggested fix: drop
+  trays for unknown agent ids on hydrate.
+
 - **Worth fixing** — `scripts/release/install.sh`: the piped-install path (`curl | bash`) creates a
   temporary bootstrap with `mktemp`, registers `trap 'rm -f "$bootstrap"' EXIT`, then
   `exec bash "$bootstrap"`. `exec` replaces the shell image, so the EXIT trap never fires and the
@@ -56,13 +97,24 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
+- 2026-07-24 — Re-reviewed the same range after `61b234d` through `8b84e4f` at the human's request,
+  this time sweeping the diff against every INVARIANTS class as `INV` requires of `/review`. The
+  earlier pass checked only FS/TS requirement conformance and test coverage, so it missed four
+  defects now recorded above: an unrolled-back partial delivery (INV §4, breaking FS-13.R5), two
+  duplicated-helper drifts (INV §2), and an unbounded per-agent tray with no lifecycle cleanup
+  (INV §1). Clean on the remaining classes: §13 all 15 new annotation selectors resolve; §14 the new
+  route inherits `localOnly`; §5 the self-target idle pre-check is advisory but `SendPrompt` claims
+  `turnActive` atomically; §10 both call sites gate `sourceActive`/`annotationsEnabled` correctly
+  (FS-13.R15); §11 an empty batch cannot marshal to `null`. Spec conformance findings from the first
+  pass stand unchanged; no product code or specs were edited.
+
 - 2026-07-24 — Reviewed the continuous range after `61b234d` through `8b84e4f`, validating
   the annotate-and-assign implementation. All specification requirements (FS-13.R1-R15,
   FS-06.R21, TS-02.R14-R15, TS-03.R14) match the code in both directions. Required tests pass:
   UI store persistence, message delivery and budget integrity, diff/event selection and clipping,
   archive indexing, endpoint validation and routing. Go test suite (both FTS5 and non-FTS5 variants),
   UI tests (105 tests), and full builds pass with no regressions. J13 real-browser usability journey
-  documented but pending. No findings recorded.
+  documented but pending. Recorded no findings — superseded by the re-review above, which found four.
 
 - 2026-07-24 — Implemented annotate-and-assign. Live and archived chat transcripts now support
   diff-line and event annotations in a browser-local pending tray, delivery to the current agent,
