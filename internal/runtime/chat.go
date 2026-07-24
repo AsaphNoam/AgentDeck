@@ -763,11 +763,11 @@ func (c *ChatRuntime) removeAgent(agentID string) {
 // emit stamps seq/agent_id/ts, marshals the payload, and publishes to the hub.
 // seq increment and transcript append are done under a single as.mu acquisition
 // so concurrent emitters cannot interleave their events in the in-memory log.
-func (c *ChatRuntime) emit(as *agentState, typ string, data any) {
+func (c *ChatRuntime) emit(as *agentState, typ string, data any) Event {
 	raw, err := json.Marshal(data)
 	if err != nil {
 		slog.Error("runtime: marshal event payload", "type", typ, "err", err)
-		return
+		return Event{}
 	}
 	as.mu.Lock()
 	as.seq++
@@ -791,6 +791,18 @@ func (c *ChatRuntime) emit(as *agentState, typ string, data any) {
 	if sink != nil {
 		sink(ev)
 	}
+	return ev
+}
+
+// AppendAnnotation records and publishes a dashboard annotation through the
+// live runtime's writer and sequence allocator. This keeps it ordered with ACP
+// events and avoids a second writer racing the active transcript.
+func (c *ChatRuntime) AppendAnnotation(agentID string, data AnnotationData) (Event, error) {
+	as, err := c.lookup(agentID)
+	if err != nil {
+		return Event{}, err
+	}
+	return c.emit(as, EvAnnotation, data), nil
 }
 
 func (c *ChatRuntime) openPersistence(as *agentState, spec LaunchSpec, sessionID string) error {

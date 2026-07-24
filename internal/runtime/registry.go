@@ -226,6 +226,20 @@ func (r *Registry) SendPrompt(ctx context.Context, agentID, text string) error {
 	return rt.SendPrompt(ctx, agentID, text)
 }
 
+// AppendAnnotation dispatches a structured dashboard annotation through the
+// live chat runtime. Terminal runtimes are intentionally excluded.
+func (r *Registry) AppendAnnotation(agentID string, data AnnotationData) (Event, error) {
+	rt, err := r.ownerFor(agentID)
+	if err != nil {
+		return Event{}, err
+	}
+	chat, ok := rt.(*ChatRuntime)
+	if !ok {
+		return Event{}, ErrNotImplemented
+	}
+	return chat.AppendAnnotation(agentID, data)
+}
+
 // Cancel routes a cancel to the owning runtime. The bool reports whether a turn
 // or pending permission was actually interrupted (false = idle no-op).
 func (r *Registry) Cancel(ctx context.Context, agentID string) (bool, error) {

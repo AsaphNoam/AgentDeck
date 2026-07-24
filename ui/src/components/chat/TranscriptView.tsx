@@ -7,11 +7,15 @@ import { PermissionPrompt } from "./renderers/PermissionPrompt";
 import { ToolCall } from "./renderers/ToolCall";
 import { ToolResult } from "./renderers/ToolResult";
 import { TurnError } from "./renderers/TurnError";
+import { AnnotationCard } from "./renderers/AnnotationCard";
+import { AnnotationTray } from "./AnnotationTray";
+import { useAnnotationStore } from "../../store/annotationStore";
 
-export function TranscriptView({ agentId, events }: { agentId: string; events: TranscriptEvent[] }) {
+export function TranscriptView({ agentId, events, sourceActive = false, annotationsEnabled = true }: { agentId: string; events: TranscriptEvent[]; sourceActive?: boolean; annotationsEnabled?: boolean }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
   const [atBottom, setAtBottom] = useState(true);
+  const addAnnotation = useAnnotationStore((state) => state.add);
 
   const onScroll = () => {
     const el = scrollRef.current;
@@ -42,7 +46,7 @@ export function TranscriptView({ agentId, events }: { agentId: string; events: T
               label="message"
               fallback={<pre className="tool-block tool-result-error">Failed to render this event.</pre>}
             >
-              <TranscriptItem agentId={agentId} event={event} />
+              <TranscriptItem agentId={agentId} event={event} annotationsEnabled={annotationsEnabled} onAnnotate={(draft) => addAnnotation(agentId, draft)} />
             </ErrorBoundary>
           </div>
         ))}
@@ -52,11 +56,12 @@ export function TranscriptView({ agentId, events }: { agentId: string; events: T
           Jump to latest
         </button>
       )}
+      {annotationsEnabled && <AnnotationTray sourceId={agentId} sourceActive={sourceActive} />}
     </div>
   );
 }
 
-type TranscriptVariant = "assistant" | "user" | "tool-call" | "tool-result" | "diff" | "permission" | "error" | "turn" | "backend-switch" | "unknown";
+type TranscriptVariant = "assistant" | "user" | "tool-call" | "tool-result" | "diff" | "permission" | "error" | "turn" | "backend-switch" | "annotation" | "unknown";
 
 function variantOf(event: TranscriptEvent): TranscriptVariant {
   const kind = String(event.kind ?? event.type ?? "");
@@ -69,6 +74,7 @@ function variantOf(event: TranscriptEvent): TranscriptVariant {
   if (kind === "error") return "error";
   if (kind === "turn_end") return "turn";
   if (kind === "backend_switch") return "backend-switch";
+  if (kind === "annotation") return "annotation";
   return "unknown";
 }
 
@@ -79,16 +85,18 @@ function keyOf(event: TranscriptEvent, index: number) {
   return `i${index}`;
 }
 
-function TranscriptItem({ agentId, event }: { agentId: string; event: TranscriptEvent }) {
+function TranscriptItem({ agentId, event, annotationsEnabled, onAnnotate }: { agentId: string; event: TranscriptEvent; annotationsEnabled: boolean; onAnnotate: (draft: AnnotationDraft) => void }) {
   const kind = String(event.kind ?? event.type ?? "");
-  if (kind === "assistant_text") return <AssistantText event={event} />;
+  const action = annotationsEnabled && canAnnotate(event) ? <button type="button" className="annotation-event-trigger" onClick={() => onAnnotate(eventDraft(event))}>Annotate</button> : null;
+  if (kind === "assistant_text") return <>{action}<AssistantText event={event} /></>;
   if (kind === "user_text")
-    return <article className="message user-message" data-ui="transcript" data-variant="user">{String(event.text ?? "")}</article>;
-  if (kind === "permission_request") return <PermissionPrompt agentId={agentId} event={event} />;
-  if (kind === "diff") return <DiffBlock event={event} />;
-  if (kind === "tool_call") return <ToolCall event={event} />;
-  if (kind === "tool_result") return <ToolResult event={event} />;
-  if (kind === "error") return <TurnError event={event} />;
+    return <>{action}<article className="message user-message" data-ui="transcript" data-variant="user">{String(event.text ?? "")}</article></>;
+  if (kind === "permission_request") return <>{action}<PermissionPrompt agentId={agentId} event={event} /></>;
+  if (kind === "diff") return <DiffBlock event={event} onAnnotate={onAnnotate} />;
+  if (kind === "tool_call") return <>{action}<ToolCall event={event} /></>;
+  if (kind === "tool_result") return <>{action}<ToolResult event={event} /></>;
+  if (kind === "error") return <>{action}<TurnError event={event} /></>;
+  if (kind === "annotation") return <AnnotationCard event={event} />;
   if (kind === "turn_end") return <hr className="turn-end" />;
   if (kind === "backend_switch") {
     const from = String(event.from ?? "");
@@ -98,4 +106,30 @@ function TranscriptItem({ agentId, event }: { agentId: string; event: Transcript
   // permission_resolved is folded into its prompt by the store; nothing to render.
   if (kind === "permission_resolved" || kind === "session_meta") return null;
   return <pre className="tool-block">{JSON.stringify(event, null, 2)}</pre>;
+}
+
+type AnnotationDraft = {
+  seq: number;
+  excerpt: string;
+  instruction: string;
+  path?: string;
+  side?: "old" | "new";
+  start_line?: number;
+  end_line?: number;
+};
+
+function canAnnotate(event: TranscriptEvent) {
+  const kind = String(event.kind ?? event.type ?? "");
+  return event.seq != null && !["session_meta", "permission_resolved", "turn_end", "annotation"].includes(kind);
+}
+
+function eventDraft(event: TranscriptEvent): AnnotationDraft {
+  const raw = event.text ?? event.delta ?? event.new_text ?? event.content ?? JSON.stringify(event, null, 2);
+  const excerpt = clipExcerpt(typeof raw === "string" ? raw : JSON.stringify(raw, null, 2));
+  return { seq: Number(event.seq), excerpt, instruction: "" };
+}
+
+function clipExcerpt(value: string) {
+  const chars = [...value];
+  return chars.length <= 2000 ? value : `${chars.slice(0, 1979).join("")}… [excerpt clipped]`;
 }

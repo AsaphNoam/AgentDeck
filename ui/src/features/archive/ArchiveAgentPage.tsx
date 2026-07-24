@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { getTranscript, resumeAgent } from "../../api/client";
 import { useTranscriptStore } from "../../store/transcriptStore";
+import { useAgentStore } from "../../store/agentStore";
 import { TranscriptView } from "../../components/chat/TranscriptView";
 
 export function ArchiveAgentPage() {
@@ -9,6 +10,7 @@ export function ArchiveAgentPage() {
   const navigate = useNavigate();
   const events = useTranscriptStore((state) => state.byAgent[id] ?? []);
   const setTranscript = useTranscriptStore((state) => state.setTranscript);
+  const agent = useAgentStore((state) => state.agents[id]);
   const [resuming, setResuming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,7 +48,7 @@ export function ArchiveAgentPage() {
         </button>
       </header>
       {error && <p className="archive-error">{error}</p>}
-      <div data-slot="content"><TranscriptView agentId={id} events={events} /></div>
+      <div data-slot="content"><TranscriptView agentId={id} events={events} sourceActive={false} annotationsEnabled={agent?.interface !== "terminal"} /></div>
       {/* No Composer — read-only view */}
       <div />
     </section>

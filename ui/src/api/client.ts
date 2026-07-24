@@ -1,4 +1,4 @@
-import type { ArchiveResult, Capabilities, Layout, TrackedCommand, TrackedFile, TranscriptEvent } from "./types";
+import type { AnnotationBatch, ArchiveResult, Capabilities, Layout, TrackedCommand, TrackedFile, TranscriptEvent } from "./types";
 
 async function json<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init);
@@ -108,6 +108,14 @@ export function decidePermission(agentId: string, toolCallId: string, decision: 
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ tool_call_id: toolCallId, decision }),
+  });
+}
+
+export function sendAnnotations(agentId: string, batch: AnnotationBatch) {
+  return json<{ accepted: true; seq: number }>(`/api/sessions/${agentId}/annotations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(batch),
   });
 }
 

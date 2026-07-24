@@ -126,6 +126,33 @@ FROM sessions WHERE agent_id = 'a_index'`).Scan(&turnCount, &eventCount, &lastSe
 	}
 }
 
+// FS-13.A5: annotation excerpts and instructions join archive search even
+// though a dashboard annotation does not finish an ACP turn.
+func TestAnnotationFlushesSearchableContent(t *testing.T) {
+	st, _ := openTestDB(t)
+	ix := New(st.DB())
+	m := meta()
+	if err := ix.UpsertSessionMeta("a_index", m); err != nil {
+		t.Fatalf("UpsertSessionMeta: %v", err)
+	}
+	annotation := ev(t, 1, runtime.EvAnnotation, runtime.AnnotationData{Annotations: []runtime.Annotation{{
+		Seq: 7, Excerpt: "suspect boundary condition", Instruction: "add a regression test for the annotation path",
+	}}, Target: runtime.AnnotationTarget{Kind: "self", AgentID: "a_index"}})
+	if err := ix.OnEvent("a_index", annotation); err != nil {
+		t.Fatalf("OnEvent annotation: %v", err)
+	}
+	if err := ix.FlushContent("a_index", annotation.Seq, annotation.Ts); err != nil {
+		t.Fatalf("FlushContent: %v", err)
+	}
+	var content string
+	if err := st.DB().QueryRow(`SELECT content FROM sessions_fts WHERE agent_id = ?`, "a_index").Scan(&content); err != nil {
+		t.Fatalf("read indexed annotation: %v", err)
+	}
+	if !strings.Contains(content, "regression test for the annotation path") {
+		t.Fatalf("annotation instruction not indexed: %q", content)
+	}
+}
+
 func TestResumeAfterRestartPreservesFTSContent(t *testing.T) {
 	st, _ := openTestDB(t)
 	db := st.DB()

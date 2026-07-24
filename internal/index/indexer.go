@@ -123,6 +123,13 @@ func (ix *Indexer) OnTurnEnd(agentID string, rollup runtime.TurnRollup) error {
 	return ix.flush(agentID, rollup, true)
 }
 
+// FlushContent persists indexed content that arrives outside an ACP turn, such
+// as a durable dashboard annotation. It intentionally does not increase the
+// turn count.
+func (ix *Indexer) FlushContent(agentID string, lastSeq int64, updatedAt string) error {
+	return ix.flush(agentID, runtime.TurnRollup{LastSeq: lastSeq, UpdatedAt: updatedAt}, false)
+}
+
 func (ix *Indexer) flush(agentID string, rollup runtime.TurnRollup, countTurn bool) error {
 	if agentID == "" {
 		return fmt.Errorf("index: agent id is required")
@@ -263,6 +270,17 @@ func searchableText(ev runtime.Event) (string, error) {
 			return "", fmt.Errorf("index: permission_request: %w", err)
 		}
 		return d.Reason, nil
+	case runtime.EvAnnotation:
+		var d runtime.AnnotationData
+		if err := json.Unmarshal(ev.Data, &d); err != nil {
+			return "", fmt.Errorf("index: annotation: %w", err)
+		}
+		parts := make([]string, 0, len(d.Annotations)*2+1)
+		for _, a := range d.Annotations {
+			parts = append(parts, a.Excerpt, a.Instruction)
+		}
+		parts = append(parts, d.OverallInstruction)
+		return strings.TrimSpace(strings.Join(parts, " ")), nil
 	default:
 		return "", nil
 	}

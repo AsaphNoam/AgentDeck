@@ -79,6 +79,27 @@ export interface TranscriptEvent {
   [key: string]: unknown;
 }
 
+export interface AnnotationDraft {
+  seq: number;
+  excerpt: string;
+  instruction: string;
+  path?: string;
+  side?: "old" | "new";
+  start_line?: number;
+  end_line?: number;
+}
+
+export interface AnnotationTarget {
+  kind: "self" | "agent";
+  agent_id?: string;
+}
+
+export interface AnnotationBatch {
+  annotations: AnnotationDraft[];
+  overall_instruction?: string;
+  target: AnnotationTarget;
+}
+
 export interface Layout {
   order: string[];
   density: { perRow: number; gap: number };

@@ -1,6 +1,6 @@
 # TS-02 — Data & persistence
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/config`, `internal/state`, `internal/transcript`, `internal/index`, `internal/archive`, `internal/configsource`
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -74,14 +74,14 @@ switch call the same helper before registration or process start; the immutable 
 existing frozen `add_dirs` and system-prompt snapshot carry the identical path without a database
 migration.
 
-**R14 (planned) — Annotation events are ordinary transcript records.** A new normalized event kind
+**R14 — Annotation events are ordinary transcript records.** A new normalized event kind
 `annotation` (payload: per-annotation anchor `seq`, diff path/side/line range when present, clipped
 excerpt, instruction; optional overall instruction; target descriptor) appends through the existing
 per-agent transcript writer and sequence allocation, for active and inactive sessions alike. Its
 instruction and excerpt text joins the session's indexed content (R9) so FS-13.R10 search works;
 payload fields are append-only once shipped.
 
-**R15 (planned) — User-originated mail rows.** The messages table accepts rows whose sender is the
+**R15 — User-originated mail rows.** The messages table accepts rows whose sender is the
 reserved user identity (FS-06.R21), written only through `internal/state` by the server-side
 annotation delivery path. The insert updates unread/indicator state in the same transaction but
 touches no `turn_budget` row. FS-06.R8 retention applies unchanged; any needed column arrives as a

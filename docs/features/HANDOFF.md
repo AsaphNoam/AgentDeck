@@ -7,8 +7,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** paused — no implementation change is active. A post-fix usability rerun found no open
-  product finding and confirmed the cancelled-permission fix in the built app. Credentialed provider
+- **State:** finished — Annotate and assign is implemented and verified. Credentialed provider
   acceptance remains a separate manual release gate; native prompt/confirm actions also need replay
   in a browser that supports those dialogs.
 - **Last reviewed code:** `ef4ee18` (2026-07-22), across the continuous range after `61b234d` (the
@@ -56,6 +55,14 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-24 — Implemented annotate-and-assign. Live and archived chat transcripts now support
+  diff-line and event annotations in a browser-local pending tray, delivery to the current agent,
+  another running chat agent, or a prefilled new-agent launch, durable annotation cards, reserved
+  dashboard-user mail, and archive indexing. The new regression coverage verifies validation,
+  mail-size clipping, no-budget reserved mail, durable delivery, and annotation search; spec, UI,
+  both Go test variants, source build, and distribution build pass. J13 is the remaining real-browser
+  usability journey for this new surface.
 
 - 2026-07-22 — Reviewed the continuous range after `61b234d` through `ef4ee18` (the current-history
   span since the last review; `61b234d` is the rehashed equivalent of the old `4195ed0` marker). The

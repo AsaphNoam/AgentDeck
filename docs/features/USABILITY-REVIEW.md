@@ -122,6 +122,7 @@ treat the empty variant as mandatory, not optional.
 | J10 | **Multi-agent + messaging** | `seeded/` + fakeacp ×2 | Two agents; send_message, nudge wakes the recipient, unread badges appear and clear correctly. |
 | J11 | **Failure & recovery** | `seeded/` + fakeacp | Kill the server mid-session → UI shows disconnect, reconnects with accurate state (SSE reset, INVARIANTS §1). Kill the agent process → card reflects the crash. Submit garbage into every form. Stop a non-running agent. |
 | J12 | **Restart durability** | state left by J3–J10 | Restart the server; everything the UI showed before (agents, layout, archive, unread state) is still true after. |
+| J13 | **Annotate & assign** | `lived-in/` + fakeacp ×2 | Select diff lines and a transcript event in both live and archived views; edit/reload the pending tray; send to self, another chat agent, and a prefilled new launch; verify cards, mail, nudging, and archive search. |
 
 **Charter shape** (what the orchestrator hands each journey subagent — nothing more):
 
