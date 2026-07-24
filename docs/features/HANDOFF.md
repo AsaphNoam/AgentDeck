@@ -81,7 +81,7 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
   quota); a full quota makes zustand's `persist` throw on every `setState`. Suggested fix: drop
   trays for unknown agent ids on hydrate.
 
-- **Worth fixing** — `scripts/release/install.sh`: the piped-install path (`curl | bash`) creates a
+- **Worth fixing** (INV §4) — `scripts/release/install.sh`: the piped-install path (`curl | bash`) creates a
   temporary bootstrap with `mktemp`, registers `trap 'rm -f "$bootstrap"' EXIT`, then
   `exec bash "$bootstrap"`. `exec` replaces the shell image, so the EXIT trap never fires and the
   owner-only temp file is left in `$TMPDIR` after every piped install (the re-exec'd child is a fresh
@@ -96,6 +96,21 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-24 — Closed the routing hole that let the invariant sweep be skipped. The read order in
+  every launcher said to read "the relevant FS/TS/INV items named by the handoff/request", so when no
+  INV item was named an agent resolved that to nothing and never opened the file where the sweep
+  instruction lives. `/review`, `/work`, and `/fix` (both twin copies) now name `INVARIANTS.md` as an
+  unconditional read and state the sweep, the §6 checklist, and the changelog class tag directly.
+  `check-specs.sh` gained a `## Review findings` check: each bullet starts with **Must fix**/**Worth
+  fixing**, and a bullet citing code carries an `INV §n` tag or the literal `(no invariant class)`.
+  Both rules were already documented (workflow §7 and INVARIANTS.md); the check only makes omitting
+  them fail a command the loop already runs, and it verifies the tag rather than the thinking. It
+  runs on the full sweep and on any `--file` HANDOFF edit, so the post-edit hook catches it too.
+  Applying it retro-tagged the open installer finding as INV §4 — `exec` replacing the process image
+  so the EXIT trap never fires is a cleanup that misses an exit path. Not done, and still open for a
+  decision: the workflow-text guards against inheriting a prior review's framing and against
+  test-coverage findings standing in for defect findings.
 
 - 2026-07-24 — Re-reviewed the same range after `61b234d` through `8b84e4f` at the human's request,
   this time sweeping the diff against every INVARIANTS class as `INV` requires of `/review`. The
