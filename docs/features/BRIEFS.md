@@ -4,6 +4,34 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-24 — Review: annotate and assign, re-checked against the bug-class catalog
+
+At your request I re-reviewed the annotate-and-assign work. The first pass checked the feature only
+against its written requirements and its test coverage. This pass also checked it against the
+project's catalog of recurring bug classes, which is what a review is meant to do. That catalog is
+where the real defects were.
+
+One must-fix problem: when you assign annotations to another agent, the mail goes out before the
+record of it is saved. If saving then fails, the delivery has already happened but the app reports an
+error — and because the tray deliberately keeps your work when a send fails, pressing Send again
+delivers the same batch a second time. The same gap lets an agent act on annotations that were never
+recorded in the transcript.
+
+Three smaller items: the text-shortening helper exists in three slightly different copies that have
+already begun to disagree; the shape describing an annotation is declared three times with two copies
+now out of step; and the pending tray is stored per agent in the browser and never cleaned up, so
+drafts for deleted agents accumulate indefinitely.
+
+**Needs attention:** Why the first pass missed these is worth fixing at the source. The instruction to
+check work against the bug-class catalog is written inside that catalog, while the reading list agents
+follow tells them to open it only when something already points them there — and for this change,
+nothing did. The step gets skipped silently, with no failing check to reveal it. I recommend making
+that sweep an explicit, unconditional step in the shared workflow and in the short command files for
+build, review, and fix work, so an agent that never opens the catalog still gets told to.
+
+**Next:** Fix the duplicate-delivery defect first, then the three smaller items. I can make the
+workflow change whenever you want it.
+
 ### 2026-07-24 — Implementation: annotate and assign
 
 You can now select diff lines or transcript events, add instructions to a browser-local tray, and
