@@ -43,9 +43,9 @@ the affected agent after any read/delete mutation; per-agent request tokens for 
 
 ## 2. Parallel paths that build "the same thing" must share one helper
 
-**Rule:** two code paths constructing the same logical artifact (a LaunchSpec, a session params
-struct, a pidfile guard, a validation) WILL drift. Extract the shared helper the moment the second
-path appears, and route both through it.
+**Rule:** two code paths constructing the same logical artifact or projection (a LaunchSpec, a
+session params struct, a pidfile guard, a validation, a live/replayed event stream) WILL drift.
+Extract the shared helper the moment the second path appears, and route both through it.
 
 Paid for by:
 - launch vs resume vs switch each rebuilding LaunchSpec: `SkipPerms`/`AddDirs` dropped on
@@ -58,11 +58,15 @@ Paid for by:
   live-pidfile refusal, so a doomed detached child clobbered a live server's pidfile.
 - POST-only slug validation: PUT/DELETE role/project handlers in
   `internal/server/config_handlers.go` took path ids unvalidated (path traversal, BLOCKING).
+- Live transcript append coalesced streamed assistant deltas, but full transcript replay did not,
+  so Archive and resume split one assistant reply into many bubbles. Fix: both paths use the same
+  `appendRenderedEvent` reducer (`ui/src/store/transcriptStore.ts`).
 
 **Canonical helpers:** `composeLaunch`, `composeResumeSpec`, `composeSwitchSpec`, `resolveSkip`,
 `expandAddDirs`, `composeEnv`
 (`internal/server/launch.go`); keep `sessionNewParams`/`sessionLoadParams` in lockstep;
-`config.ValidSlug` on **every** verb of every path-keyed resource.
+`config.ValidSlug` on **every** verb of every path-keyed resource; `foldTranscript` and live append
+share `appendRenderedEvent` for every render-affecting event transform.
 
 Corollary: permission-relevant re-resolution **fails closed** — on a role-read error, refuse, never
 fall back to the permissive global default (`resolveSkip`).
@@ -260,9 +264,14 @@ Paid for by:
   `append([]string(nil), l.Order...)` → fresh install served `order: null` →
   `CardGrid.tsx`/`agentStore.ts` called `.filter`/`.includes` on it → TypeError, dead dashboard on
   first launch (`353e940`). The MSW fixtures returned `order: []`, so no UI test could see it.
+- A syntactically valid hand-edited `backends.json` with a missing `backends` map or `models:null`
+  reached `Object.entries` and replaced the whole dashboard with its error boundary. Fix: validate
+  required nested collections on read, fall back server-side, and retain `?? {}` at the first UI
+  consumer (`internal/config/backends.go`, `ui/src/features/settings/BackendsEditor.tsx`).
 
-**Canonical patterns:** `append([]T{}, src...)` at marshal boundaries; `?? []` where the UI first
-touches a server collection; when adding a response field, add the null-shape case to the mock.
+**Canonical patterns:** `append([]T{}, src...)` at marshal boundaries; `?? []` / `?? {}` where the UI
+first touches a server collection; structurally validate required nested collections decoded from
+hand-editable files; when adding a response field, add the null-shape case to the mock.
 
 ## 12. External-CLI invocations must tolerate version and environment variance
 
@@ -338,6 +347,33 @@ Test requests must carry a loopback Host — use `newLocalRequest` (`server_test
 
 ---
 
+## 15. Commit local truth before releasing external side effects
+
+**Rule:** before an operation makes work externally observable or lets an external peer proceed,
+persist and publish the local state needed to explain that effect. A retryable mutation spanning
+multiple stores or processes must be atomic, roll back every partial effect, or carry a stable
+idempotency key that makes replay harmless. Never return a retryable failure after an irreversible
+effect if the natural retry can duplicate that effect.
+
+Paid for by:
+- Permission approve/deny and timeout answered the ACP peer before writing the resolved-but-active
+  status. A fast peer completed the turn and wrote `idle`, then the late local write overwrote it
+  back to `busy`. Fix: claim once, publish status and `permission_resolved`, then release the peer
+  (`internal/runtime/permission.go`).
+- Cancel released a pending permission without emitting `permission_resolved`, so the live UI and
+  durable transcript kept a dead Approve/Deny action after the peer had continued. Fix: persist the
+  terminal decision before responding.
+- **Current recurrence:** annotate-and-assign delivers reserved mail and fires its nudge before
+  appending the source annotation event. If that append fails, the API returns 500 after delivery
+  and a normal retry duplicates the mail. The open review finding remains a required fix under this
+  rule.
+
+**Canonical patterns:** durable event/outbox before notification; one transaction when stores share
+one database; otherwise compensating rollback or a caller-supplied idempotency key with a uniqueness
+constraint. Tests inject the failure after the first would-be side effect and retry the operation.
+
+---
+
 ## Canonical helpers registry (reuse, don't re-derive)
 
 | Helper | Where | Use for |
@@ -350,6 +386,7 @@ Test requests must carry a loopback Host — use `newLocalRequest` (`server_test
 | PTY hub pattern | `internal/runtime/terminal/ptyhub.go` | any shared-fd broadcast need (§6) |
 | `seedLocked` | `internal/index/indexer.go` | in-memory buffers feeding replace-style writes (§9) |
 | `config.ValidSlug` | `internal/config/validate.go` | every path-param on every verb (§2) |
+| `foldTranscript` / `appendRenderedEvent` | `ui/src/store/transcriptStore.ts` | identical live and replay event projection (§2) |
 | `localOnly` | `internal/server/security.go` | wraps the whole mux; every new route inherits it (§14) |
 | `notificationPayload` | `internal/bus/` | all notification payloads (§8) |
 | `fakeacp` test double | `internal/runtime/testdata/fakeacp` | env-driven protocol-level repros (`FAKEACP_LOAD_DUMP`, `FAKEACP_PROTO_VERSION`, `ignore_cancel`) |
