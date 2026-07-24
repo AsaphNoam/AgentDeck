@@ -110,7 +110,7 @@
     "transcript": {
       "slots": ["list", "event"],
       "states": [],
-      "variants": ["assistant", "user", "tool-call", "tool-result", "diff", "permission", "error", "turn", "backend-switch", "unknown"]
+      "variants": ["assistant", "user", "tool-call", "tool-result", "diff", "permission", "error", "turn", "backend-switch", "annotation", "unknown"]
     },
     "tool-call": {
       "slots": ["trigger", "content"],

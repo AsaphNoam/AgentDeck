@@ -1,6 +1,10 @@
 package runtime
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+)
 
 // EventType constants name the normalized transcript event kinds (techspec §4.2).
 // These are AgentDeck's own vocabulary, independent of the ACP wire shape, so a
@@ -18,6 +22,7 @@ const (
 	EvTurnEnd            = "turn_end"
 	EvError              = "error"
 	EvBackendSwitch      = "backend_switch"
+	EvAnnotation         = "annotation"
 )
 
 // Event is the normalized transcript event emitted to subscribers (techspec §3.1).
@@ -116,6 +121,62 @@ type BackendSwitchData struct {
 	From string `json:"from"`
 	To   string `json:"to"`
 	At   string `json:"at"`
+}
+
+// AnnotationData is a point-in-time capture that a dashboard user has assigned
+// to an agent. It deliberately stores the excerpt, rather than a live file
+// reference, so later file edits cannot change what was reviewed.
+type AnnotationData struct {
+	Annotations        []Annotation     `json:"annotations"`
+	OverallInstruction string           `json:"overall_instruction,omitempty"`
+	Target             AnnotationTarget `json:"target"`
+}
+
+type Annotation struct {
+	Seq         int64  `json:"seq"`
+	Path        string `json:"path,omitempty"`
+	Side        string `json:"side,omitempty"` // "old" | "new" for diff-line captures
+	StartLine   int    `json:"start_line,omitempty"`
+	EndLine     int    `json:"end_line,omitempty"`
+	Excerpt     string `json:"excerpt"`
+	Instruction string `json:"instruction"`
+}
+
+type AnnotationTarget struct {
+	Kind    string `json:"kind"` // "self" | "agent"
+	AgentID string `json:"agent_id,omitempty"`
+}
+
+// FormatAnnotationBlock is the sole machine-oriented rendering used for both a
+// prompt turn and reserved-sender mail. It intentionally includes the captured
+// excerpt and anchor rather than asking an agent to infer a location from prose.
+func FormatAnnotationBlock(data AnnotationData) string {
+	var b strings.Builder
+	b.WriteString("[AgentDeck annotations]\n")
+	for i, a := range data.Annotations {
+		fmt.Fprintf(&b, "\n%d. Transcript event %d", i+1, a.Seq)
+		if a.Path != "" {
+			fmt.Fprintf(&b, " — %s", a.Path)
+			if a.StartLine > 0 {
+				fmt.Fprintf(&b, " (%s lines %d", a.Side, a.StartLine)
+				if a.EndLine > a.StartLine {
+					fmt.Fprintf(&b, "–%d", a.EndLine)
+				}
+				b.WriteString(")")
+			}
+		}
+		b.WriteString("\nExcerpt:\n---\n")
+		b.WriteString(a.Excerpt)
+		b.WriteString("\n---\nInstruction: ")
+		b.WriteString(a.Instruction)
+		b.WriteByte('\n')
+	}
+	if data.OverallInstruction != "" {
+		b.WriteString("\nOverall instruction: ")
+		b.WriteString(data.OverallInstruction)
+		b.WriteByte('\n')
+	}
+	return b.String()
 }
 
 // SessionMetaData captures the launch/resume snapshot persisted as session_meta

@@ -101,6 +101,17 @@
 
 .transcript-item {
   margin-bottom: var(--ad-space-3);
+  position: relative;
+}
+
+.annotation-event-trigger {
+  background: var(--ad-surface-panel);
+  border: var(--ad-border-thin) solid var(--ad-border-strong);
+  font-family: var(--ad-font-mono);
+  font-size: 0.66rem;
+  margin-bottom: var(--ad-space-1);
+  min-height: auto;
+  padding: var(--ad-space-1) var(--ad-space-2);
 }
 
 .message,
@@ -165,6 +176,14 @@
   font-size: 0.76rem;
   overflow: hidden;
   padding: var(--ad-space-3);
+}
+
+.diff-heading {
+  align-items: center;
+  display: flex;
+  gap: var(--ad-space-2);
+  justify-content: space-between;
+  margin-bottom: var(--ad-space-2);
 }
 
 .tool-call {
@@ -264,6 +283,134 @@
 .turn-end {
   border-top-style: dashed;
   margin: var(--ad-space-4) 0;
+}
+
+.annotation-card,
+.annotation-tray {
+  background: var(--ad-surface-panel);
+  border: var(--ad-border-thick) solid var(--ad-action-secondary);
+  border-radius: var(--ad-radius-small) var(--ad-radius-large) var(--ad-radius-large) var(--ad-radius-large);
+  font-size: 0.86rem;
+  padding: var(--ad-space-4);
+}
+
+.annotation-card header,
+.annotation-draft-head,
+.annotation-tray-header,
+.annotation-tray-header > div,
+.annotation-targets {
+  align-items: center;
+  display: flex;
+  gap: var(--ad-space-2);
+}
+
+.annotation-card header,
+.annotation-tray-header {
+  justify-content: space-between;
+}
+
+.annotation-card header span,
+.annotation-tray-header span,
+.annotation-card section > p:first-child {
+  color: var(--ad-text-muted);
+  font-family: var(--ad-font-mono);
+  font-size: 0.66rem;
+}
+
+.annotation-card section {
+  border-top: var(--ad-border-thin) solid var(--ad-border-default);
+  margin-top: var(--ad-space-3);
+  padding-top: var(--ad-space-3);
+}
+
+.annotation-card blockquote,
+.annotation-draft blockquote {
+  background: var(--ad-surface-subtle);
+  border-left: var(--ad-border-thick) solid var(--ad-action-secondary);
+  margin: var(--ad-space-2) 0;
+  padding: var(--ad-space-2) var(--ad-space-3);
+  white-space: pre-wrap;
+}
+
+.annotation-card-overall {
+  border-top: var(--ad-border-thin) solid var(--ad-border-default);
+  margin: var(--ad-space-3) 0 0;
+  padding-top: var(--ad-space-3);
+}
+
+.annotation-tray {
+  bottom: var(--ad-space-4);
+  box-shadow: var(--ad-shadow-keyline);
+  max-height: min(72%, 640px);
+  overflow: auto;
+  position: absolute;
+  right: var(--ad-space-4);
+  width: min(420px, calc(100% - var(--ad-space-8)));
+}
+
+.annotation-link {
+  background: transparent;
+  border: 0;
+  color: var(--ad-action-secondary);
+  font-family: var(--ad-font-mono);
+  font-size: 0.68rem;
+  min-height: auto;
+  padding: 0;
+}
+
+.annotation-link:hover:not(:disabled) {
+  box-shadow: none;
+  transform: none;
+}
+
+.annotation-drafts {
+  display: grid;
+  gap: var(--ad-space-2);
+  list-style: none;
+  margin: var(--ad-space-3) 0;
+  padding: 0;
+}
+
+.annotation-draft {
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  padding: var(--ad-space-2);
+}
+
+.annotation-draft label,
+.annotation-overall {
+  display: grid;
+  font-family: var(--ad-font-mono);
+  font-size: 0.68rem;
+  gap: var(--ad-space-1);
+}
+
+.annotation-draft textarea,
+.annotation-overall textarea {
+  min-height: 54px;
+}
+
+.annotation-targets {
+  flex-wrap: wrap;
+  margin-top: var(--ad-space-3);
+}
+
+.annotation-targets label {
+  font-size: 0.78rem;
+}
+
+.annotation-targets select {
+  flex-basis: 100%;
+}
+
+.annotation-error {
+  color: var(--ad-state-error);
+  margin: var(--ad-space-2) 0 0;
+}
+
+.annotation-send {
+  background: var(--ad-action-primary);
+  margin-top: var(--ad-space-3);
+  width: 100%;
 }
 
 .jump-to-latest {

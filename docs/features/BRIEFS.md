@@ -4,6 +4,16 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-24 — Implementation: annotate and assign
+
+You can now select diff lines or transcript events, add instructions to a browser-local tray, and
+send the batch to the current agent, another running chat agent, or a newly launched agent. Each
+send is recorded as a searchable annotation card, and assignments arrive as normal agent mail.
+
+**Needs attention:** None.
+
+**Next:** A usability reviewer should run the new annotate-and-assign journey in a real browser.
+
 ### 2026-07-22 — Review: work since the core-interface redesign
 
 I reviewed everything built since the last review boundary: the chat permission fixes, the

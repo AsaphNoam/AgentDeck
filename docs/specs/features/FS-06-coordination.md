@@ -1,6 +1,6 @@
 # FS-06 — Agent coordination & notifications
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/messaging/`, `internal/state/messages.go`, `internal/server/` (`messaging_registration.go`, `messaging_loops.go`, `sessions.go`), `internal/bus/`, `ui/src/api/sse.ts`, `ui/src/components/grid/AgentCard.tsx`, `ui/src/components/shell/NotificationCenter.tsx`, `ui/src/features/settings/NotificationsEditor.tsx` · **Journeys:** J10, J11, J12
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) F8/F11 and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -117,7 +117,7 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   returns nothing does not emit a false read-state update.
 - **R20.** Multiple concurrent messaging calls cannot overrun the budget: budget consumption and
   message insert/read mutation share one SQLite transaction.
-- **R21 (planned).** Annotate-and-assign (FS-13) inserts mail from a reserved **user sender**:
+- **R21.** Annotate-and-assign (FS-13) inserts mail from a reserved **user sender**:
   sender id `user`, address `user@dashboard`, display name `Dashboard user`. That identity is
   minted only server-side by the annotation delivery path — it can never be supplied through MCP
   tool arguments and cannot collide with an agent id — and its sends consume no agent's per-turn
@@ -159,10 +159,9 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
 - **A9** (R1–R16) — Two fake-ACP chat agents send, nudge, read, and clear unread state without human
   relay, and state survives restart: journeys **J10** and **J12** in
   `docs/features/USABILITY-REVIEW.md`.
-- **A10 (planned)** (R21) — A reserved-sender insert raises the recipient's unread badge, nudges an
+- **A10** (R21) — A reserved-sender insert raises the recipient's unread badge, nudges an
   idle recipient, consumes no turn budget, and the user identity cannot be produced through MCP tool
-  arguments: planned tests in `internal/messaging` and `internal/state` created with the FS-13
-  implementation.
+  arguments: `internal/server/annotations_test.go::TestAnnotationAgentDeliveryPersistsUserMailAndTranscriptEvent`.
 
 ## 6. Deviations & open decisions
 

@@ -17,9 +17,11 @@ interface NewAgentModalProps {
   initialRole?: string;
   /** Pre-select project (e.g. from onboarding wizard). */
   initialProject?: string;
+  /** Called after a successful launch, before this modal closes. */
+  onLaunched?: (agentId: string) => void;
 }
 
-export function NewAgentModal({ open, onClose, initialRole, initialProject }: NewAgentModalProps) {
+export function NewAgentModal({ open, onClose, initialRole, initialProject, onLaunched }: NewAgentModalProps) {
   const { data: rolesData } = useRoles();
   const { data: projectsData } = useProjects();
   const { data: backendsData } = useBackends();
@@ -112,7 +114,10 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject }: Ne
     launch.mutate(
       { name: name || undefined, role, project, backend: backendId || undefined, model: modelId || undefined, interface: agentInterface },
       {
-        onSuccess: () => onClose(),
+        onSuccess: (result) => {
+          onLaunched?.(result.agent.agent_id);
+          onClose();
+        },
         onError: (err) => {
           // Surface the server's actual reason (e.g. a nonexistent project cwd
           // → runtime launch failure) instead of an opaque "HTTP 502".

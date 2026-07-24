@@ -35,7 +35,7 @@ delta; clients must not assume every existing endpoint already uses R3.
 | Family | Routes |
 |---|---|
 | Health/live state | `GET /api/health`, `GET /api/sessions`, `GET /api/sessions/{id}`, `GET /api/events`, `GET /api/capabilities` |
-| Lifecycle/chat | `POST /api/sessions`, `prompt`, `cancel`, `stop`, `rename`, `identity`, `permission`, `resume`, `switch-runtime`, `annotations` *(planned)*; transcript read |
+| Lifecycle/chat | `POST /api/sessions`, `prompt`, `cancel`, `stop`, `rename`, `identity`, `permission`, `resume`, `switch-runtime`, `annotations`; transcript read |
 | Config | role/project CRUD; `GET/PUT /api/backends`, `/api/config`, `/api/layout` |
 | Archive/tracking | `GET /api/archive`, session files/commands/messages |
 | Coordination | `POST /api/groups/{group}/release`, `/mcp` GET/POST/DELETE |
@@ -72,7 +72,7 @@ id, is not stored in `projects/{id}.json`, and any client-supplied value is igno
 that the resource directory will be retained. The server schema, TypeScript schema, mocks, and
 Settings copy stay in lockstep; no resource-content route or SSE event is added.
 
-**R14 (planned) — Annotation batch endpoint.** `POST /api/sessions/{id}/annotations` accepts one
+**R14 — Annotation batch endpoint.** `POST /api/sessions/{id}/annotations` accepts one
 batch — annotations, optional overall instruction, and a target of kind `self` or `agent` (with
 `agent_id`); the new-task flow is UI composition over the existing launch route plus an `agent`
 target. Input is validated per FS-13.R11 before any disk or process work; success returns `202`

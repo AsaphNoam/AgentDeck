@@ -3,12 +3,22 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/agentdeck/agentdeck/internal/state"
 	"github.com/agentdeck/agentdeck/internal/transcript"
+)
+
+const (
+	maxAnnotationCount      = 20
+	maxAnnotationChars      = 2000
+	maxAnnotationMailBytes  = 8000
+	annotationClippedMarker = "\n… [excerpt clipped]"
 )
 
 // handlePrompt implements POST /api/sessions/{id}/prompt (techspec §7.3).
@@ -30,6 +40,212 @@ func (s *Server) handlePrompt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusAccepted, map[string]any{"accepted": true, "agent_id": id})
+}
+
+// handleAnnotations accepts one point-in-time review batch. New-task delivery
+// composes the existing launch endpoint with this same agent target, keeping one
+// delivery path for mail and one event shape for replay/search.
+func (s *Server) handleAnnotations(w http.ResponseWriter, r *http.Request) {
+	sourceID := r.PathValue("id")
+	var body runtime.AnnotationData
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&body); err != nil {
+		writeAPIError(w, apiError(runtime.CodeValidation, "invalid JSON body"))
+		return
+	}
+	if err := validateAnnotations(&body); err != nil {
+		writeAPIError(w, apiError(runtime.CodeValidation, err.Error()))
+		return
+	}
+	source, err := s.stateStore.ReadAgent(sourceID)
+	if err != nil {
+		writeAPIError(w, apiError(runtime.CodeNotFound, "no such agent: "+sourceID))
+		return
+	}
+	if source.Interface != "chat" {
+		writeAPIError(w, apiError(runtime.CodeValidation, "terminal agents cannot be annotation sources"))
+		return
+	}
+
+	block := runtime.FormatAnnotationBlock(body)
+	var targetID string
+	switch body.Target.Kind {
+	case "self":
+		if _, err := s.stateStore.ReadRunning(sourceID); err != nil {
+			writeAPIError(w, apiError(runtime.CodeConflict, "the source agent is not running"))
+			return
+		}
+		status, err := s.stateStore.ReadStatus(sourceID)
+		if err != nil || status.State != "idle" {
+			writeAPIError(w, apiError(runtime.CodeConflict, "the source agent must be idle"))
+			return
+		}
+		if err := s.registry.SendPrompt(r.Context(), sourceID, block); err != nil {
+			writeAPIError(w, sessionOpError(err))
+			return
+		}
+		targetID = sourceID
+	case "agent":
+		targetID = body.Target.AgentID
+		if targetID == sourceID {
+			writeAPIError(w, apiError(runtime.CodeValidation, "use target self for the source agent"))
+			return
+		}
+		target, err := s.stateStore.ReadAgent(targetID)
+		if err != nil || target.Interface != "chat" {
+			writeAPIError(w, apiError(runtime.CodeValidation, "target must be a running chat agent"))
+			return
+		}
+		if _, err := s.stateStore.ReadRunning(targetID); err != nil {
+			writeAPIError(w, apiError(runtime.CodeConflict, "target agent is not running"))
+			return
+		}
+		mailBody, err := annotationMailBody(body)
+		if err != nil {
+			writeAPIError(w, apiError(runtime.CodeValidation, err.Error()))
+			return
+		}
+		if _, err := s.stateStore.InsertMessage(state.Message{
+			FromAgent: "user", FromAddress: "user@dashboard", FromName: "Dashboard user",
+			ToAgent: targetID, Subject: "Annotations", Body: mailBody,
+		}); err != nil {
+			writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
+			return
+		}
+		select {
+		case s.nudgeCh <- targetID:
+		default:
+		}
+		if _, err := s.stateMgr.Touch(targetID); err != nil {
+			s.log.Debug("touch annotation recipient failed", "agent", targetID, "err", err)
+		}
+	default:
+		writeAPIError(w, apiError(runtime.CodeValidation, "target kind must be self or agent"))
+		return
+	}
+	body.Target.AgentID = targetID
+	ev, err := s.appendAnnotation(sourceID, body)
+	if err != nil {
+		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"accepted": true, "seq": ev.Seq})
+}
+
+func validateAnnotations(data *runtime.AnnotationData) error {
+	if len(data.Annotations) == 0 || len(data.Annotations) > maxAnnotationCount {
+		return fmt.Errorf("annotations must contain 1..%d entries", maxAnnotationCount)
+	}
+	if runeCount(data.OverallInstruction) > maxAnnotationChars {
+		return fmt.Errorf("overall instruction must be at most %d characters", maxAnnotationChars)
+	}
+	for i := range data.Annotations {
+		a := &data.Annotations[i]
+		if a.Seq < 1 || strings.TrimSpace(a.Excerpt) == "" || strings.TrimSpace(a.Instruction) == "" {
+			return fmt.Errorf("annotation %d needs an event, excerpt, and instruction", i+1)
+		}
+		if runeCount(a.Instruction) > maxAnnotationChars {
+			return fmt.Errorf("annotation %d instruction must be at most %d characters", i+1, maxAnnotationChars)
+		}
+		if (a.StartLine > 0 || a.EndLine > 0 || a.Side != "") &&
+			(a.Path == "" || (a.Side != "old" && a.Side != "new") || a.StartLine < 1 || a.EndLine < a.StartLine) {
+			return fmt.Errorf("annotation %d has an invalid diff anchor", i+1)
+		}
+		a.Excerpt = clipAnnotationExcerpt(a.Excerpt, maxAnnotationChars)
+		a.Instruction = strings.TrimSpace(a.Instruction)
+	}
+	data.OverallInstruction = strings.TrimSpace(data.OverallInstruction)
+	return nil
+}
+
+func runeCount(s string) int { return len([]rune(s)) }
+
+func clipAnnotationExcerpt(s string, max int) string {
+	r := []rune(s)
+	if len(r) <= max {
+		return s
+	}
+	marker := []rune(annotationClippedMarker)
+	if max <= len(marker) {
+		return string(marker[:max])
+	}
+	return string(r[:max-len(marker)]) + annotationClippedMarker
+}
+
+func annotationMailBody(data runtime.AnnotationData) (string, error) {
+	if len(runtime.FormatAnnotationBlock(data)) <= maxAnnotationMailBytes {
+		return runtime.FormatAnnotationBlock(data), nil
+	}
+	trimmed := data
+	trimmed.Annotations = append([]runtime.Annotation{}, data.Annotations...)
+	for i := range trimmed.Annotations {
+		trimmed.Annotations[i].Excerpt = ""
+	}
+	if len(runtime.FormatAnnotationBlock(trimmed)) > maxAnnotationMailBytes {
+		return "", fmt.Errorf("annotation anchors and instructions exceed the %d-byte mail limit", maxAnnotationMailBytes)
+	}
+	for i := range trimmed.Annotations {
+		original := data.Annotations[i].Excerpt
+		lo, hi, best := 0, len([]rune(original)), ""
+		for lo <= hi {
+			mid := (lo + hi) / 2
+			candidate := clipAnnotationExcerpt(original, mid)
+			trimmed.Annotations[i].Excerpt = candidate
+			if len(runtime.FormatAnnotationBlock(trimmed)) <= maxAnnotationMailBytes {
+				best, lo = candidate, mid+1
+			} else {
+				hi = mid - 1
+			}
+		}
+		if best == "" && original != "" {
+			best = clipAnnotationExcerpt(original, 1)
+		}
+		trimmed.Annotations[i].Excerpt = best
+	}
+	body := runtime.FormatAnnotationBlock(trimmed)
+	if len(body) > maxAnnotationMailBytes {
+		return "", fmt.Errorf("annotation batch exceeds the %d-byte mail limit", maxAnnotationMailBytes)
+	}
+	return body, nil
+}
+
+func (s *Server) appendAnnotation(sourceID string, data runtime.AnnotationData) (runtime.Event, error) {
+	if _, err := s.stateStore.ReadRunning(sourceID); err == nil {
+		ev, err := s.registry.AppendAnnotation(sourceID, data)
+		if err != nil {
+			return runtime.Event{}, err
+		}
+		if err := s.indexer.FlushContent(sourceID, ev.Seq, ev.Ts); err != nil {
+			return runtime.Event{}, err
+		}
+		return ev, nil
+	} else if !errors.Is(err, state.ErrNotFound) {
+		return runtime.Event{}, err
+	}
+	w, err := transcript.Open(s.configStore.Home(), sourceID, nil)
+	if err != nil {
+		return runtime.Event{}, err
+	}
+	defer w.Close()
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return runtime.Event{}, err
+	}
+	ev := runtime.Event{AgentID: sourceID, Seq: w.NextSeq(), Type: runtime.EvAnnotation, Data: raw, Ts: time.Now().UTC().Format(time.RFC3339)}
+	if err := w.Append(ev); err != nil {
+		return runtime.Event{}, err
+	}
+	if err := w.Sync(); err != nil {
+		return runtime.Event{}, err
+	}
+	if err := s.indexer.OnEvent(sourceID, ev); err != nil {
+		return runtime.Event{}, err
+	}
+	if err := s.indexer.FlushContent(sourceID, ev.Seq, ev.Ts); err != nil {
+		return runtime.Event{}, err
+	}
+	s.eventBus.PublishRuntimeEvent(ev)
+	return ev, nil
 }
 
 func (s *Server) handleTranscript(w http.ResponseWriter, r *http.Request) {

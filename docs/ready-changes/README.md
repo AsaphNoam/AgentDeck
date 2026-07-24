@@ -42,6 +42,4 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-- [`annotate-and-assign.md`](annotate-and-assign.md) — select diff lines or transcript events,
-  instruct, and route to the current agent, another agent, or a new prefilled launch as structured
-  context.
+None.
