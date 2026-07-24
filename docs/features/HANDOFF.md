@@ -7,8 +7,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** finished with open findings — Annotate and assign is implemented, but a re-review found
-  one Must-fix delivery/rollback defect and three Worth-fixing items (see Review findings).
+- **State:** finished locally with open findings — the invariant update is committed but its push
+  needs explicit approval because local main contains four earlier unpushed commits. Annotate and
+  assign is implemented, but a re-review found one Must-fix delivery/rollback defect and three
+  Worth-fixing items (see Review findings).
   Credentialed provider acceptance remains a separate manual release gate; native prompt/confirm
   actions also need replay in a browser that supports those dialogs.
 - **Last reviewed code:** `8b84e4f` (2026-07-24), implements FS-13 annotate-and-assign through
@@ -34,6 +36,10 @@ that update.
 
 ## Blocked on human
 
+Publishing is waiting for explicit approval to push all five commits currently ahead of
+`origin/main`: the invariant update plus four previously completed annotate-and-assign/workflow
+commits. The remote safety gate rejected publishing that expanded scope without confirmation.
+
 Live-provider acceptance is waiting for human authorization because it invokes real provider sessions
 and creates disposable local configuration homes. On 2026-07-15 this machine has Claude Code 2.1.202,
 the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installed; the new
@@ -41,7 +47,7 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-- **Must fix** (INV §4; FS-13.R5) — `internal/server/sessions.go:108-131`: the agent-target
+- **Must fix** (INV §15; FS-13.R5) — `internal/server/sessions.go:108-131`: the agent-target
   annotation path inserts reserved-sender mail, fires the nudge, and touches the recipient *before*
   `appendAnnotation`, with no rollback and no idempotency key. `appendAnnotation` has four error
   returns after the mail is committed (`sessions.go:235-246`); any of them returns `500` while the
@@ -96,6 +102,16 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-25 — Audited the prior two weeks of fixes against the invariant catalog and kept only
+  repeatable, cross-cutting lessons. New INV §15 requires local durable state before releasing an
+  external peer or observable side effect, with atomicity, rollback, or idempotency for retryable
+  multi-store mutations; the open annotation partial-delivery finding now cites it. INV §2 now names
+  live/replay event projection as one logical artifact and records the shared transcript reducer.
+  INV §11 records the second null-collection recurrence from incomplete nested backend maps and
+  adds server validation plus `?? {}` to the canonical pattern. Release-only and provider-specific
+  fixes stayed in their narrower FS/TS requirements and regression tests rather than bloating INV.
+  Documentation checks and whitespace validation pass; no product code changed.
 
 - 2026-07-24 — Closed the routing hole that let the invariant sweep be skipped. The read order in
   every launcher said to read "the relevant FS/TS/INV items named by the handoff/request", so when no

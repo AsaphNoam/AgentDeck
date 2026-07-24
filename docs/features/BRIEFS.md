@@ -4,6 +4,26 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-25 — Specification maintenance: strengthen recurring bug guards
+
+The bug-class catalog now captures the two broadly repeatable lessons from the last two weeks without
+collecting one-off release or provider quirks. A new rule requires AgentDeck to record its local truth
+before releasing an external peer or visible side effect, and requires retryable multi-store work to
+be atomic, rolled back, or safely deduplicated. The existing annotation duplicate-delivery finding is
+now classified under that rule. The catalog also requires live and replay paths to share one event
+projection helper, and records the repeated dashboard crashes caused by nested null collections.
+
+The documentation-only change passed the specification and whitespace checks and was committed on
+local main; no product code was changed by this maintenance commit. The requested push is paused
+because it would publish this commit together with four already-completed local commits that were
+ahead of the remote, and that expanded scope needs explicit approval.
+
+**Needs attention:** Confirm whether to push all five local commits to origin/main. The annotation
+delivery path also still violates the new ordering rule and remains the outstanding must-fix defect.
+
+**Next:** Once the five-commit push is explicitly approved, push main; then a fix session should make
+annotation delivery atomic or idempotent before addressing the remaining smaller review findings.
+
 ### 2026-07-24 — Workflow: make the bug-class sweep impossible to skip silently
 
 I fixed the process hole that caused the earlier miss. The reading list every agent follows told them
