@@ -10,4 +10,7 @@ var (
 	// be parsed as JSON or fails its structural validation. List* never returns
 	// this — it skips corrupt files.
 	ErrCorrupt = errors.New("config: corrupt file")
+	// ErrTooLarge is wrapped when a bounded config reader refuses a file before
+	// decoding it. Pipeline templates use this to keep hand-edited JSON bounded.
+	ErrTooLarge = errors.New("config: file too large")
 )

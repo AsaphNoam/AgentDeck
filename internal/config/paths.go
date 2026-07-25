@@ -57,9 +57,10 @@ func ExpandTilde(p string) (string, error) {
 // Subdirectory and file names under the home directory. Centralised so every
 // path builder and EnsureLayout agree on the layout.
 const (
-	dirRoles    = "roles"
-	dirProjects = "projects"
-	dirSessions = "sessions"
+	dirRoles     = "roles"
+	dirProjects  = "projects"
+	dirPipelines = "pipelines"
+	dirSessions  = "sessions"
 
 	fileBackends      = "backends.json"
 	fileConfig        = "config.json"
@@ -71,6 +72,7 @@ const (
 var dataDirs = []string{
 	dirRoles,
 	dirProjects,
+	dirPipelines,
 	dirSessions,
 }
 
@@ -89,8 +91,9 @@ func (s *Store) filePath(name string) string {
 	return filepath.Join(s.home, name)
 }
 
-func (s *Store) rolePath(id string) string    { return s.objPath(dirRoles, id) }
-func (s *Store) projectPath(id string) string { return s.objPath(dirProjects, id) }
+func (s *Store) rolePath(id string) string     { return s.objPath(dirRoles, id) }
+func (s *Store) projectPath(id string) string  { return s.objPath(dirProjects, id) }
+func (s *Store) pipelinePath(id string) string { return s.objPath(dirPipelines, id) }
 
 func (s *Store) backendsPath() string      { return s.filePath(fileBackends) }
 func (s *Store) configPath() string        { return s.filePath(fileConfig) }

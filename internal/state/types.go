@@ -1,6 +1,9 @@
 package state
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // Agent is the stable identity of an agent. AgentID never changes.
 type Agent struct {
@@ -140,4 +143,81 @@ type AgentRef struct {
 	AgentID string `json:"agent_id"`
 	Name    string `json:"name"`
 	Address string `json:"address"`
+}
+
+// PipelineRunRecord is the durable machine-state row. JSON blobs contain the
+// immutable model-neutral template/run snapshot and are decoded by
+// internal/pipeline, keeping internal/state independent of the orchestrator.
+type PipelineRunRecord struct {
+	RunID            string          `json:"run_id"`
+	TemplateID       string          `json:"template_id"`
+	TemplateSnapshot json.RawMessage `json:"template_snapshot"`
+	DisplayName      string          `json:"display_name"`
+	Project          string          `json:"project"`
+	Goal             string          `json:"goal"`
+	Inputs           json.RawMessage `json:"inputs"`
+	Assignments      json.RawMessage `json:"assignments"`
+	State            string          `json:"state"`
+	Revision         int64           `json:"revision"`
+	PendingAction    string          `json:"pending_action"`
+	CurrentStageID   string          `json:"current_stage_id"`
+	CurrentAttemptID string          `json:"current_attempt_id"`
+	CurrentAgentID   string          `json:"current_agent_id"`
+	AttentionReason  string          `json:"attention_reason"`
+	FinalOutcome     string          `json:"final_outcome"`
+	CreatedAt        time.Time       `json:"created_at"`
+	UpdatedAt        time.Time       `json:"updated_at"`
+}
+
+type PipelineAttemptRecord struct {
+	AttemptID         string          `json:"attempt_id"`
+	RunID             string          `json:"run_id"`
+	StageID           string          `json:"stage_id"`
+	AttemptNo         int             `json:"attempt_no"`
+	VisitNo           int             `json:"visit_no"`
+	ParentAttemptID   string          `json:"parent_attempt_id,omitempty"`
+	AgentID           string          `json:"agent_id,omitempty"`
+	AgentGeneration   string          `json:"agent_generation,omitempty"`
+	Backend           string          `json:"backend"`
+	Model             string          `json:"model"`
+	State             string          `json:"state"`
+	AssignmentText    string          `json:"assignment_text"`
+	AssignmentHash    string          `json:"assignment_hash"`
+	AssignmentVersion int             `json:"assignment_version"`
+	ReportOutcome     string          `json:"report_outcome,omitempty"`
+	ReportSummary     string          `json:"report_summary,omitempty"`
+	ReportDetails     string          `json:"report_details,omitempty"`
+	ReportChecks      string          `json:"report_checks,omitempty"`
+	ReportOutputs     json.RawMessage `json:"report_outputs"`
+	ReportedAt        *time.Time      `json:"reported_at,omitempty"`
+	QuiescentAt       *time.Time      `json:"quiescent_at,omitempty"`
+	CreatedAt         time.Time       `json:"created_at"`
+	UpdatedAt         time.Time       `json:"updated_at"`
+}
+
+type PipelineValueRecord struct {
+	RunID           string    `json:"run_id"`
+	Name            string    `json:"name"`
+	Value           string    `json:"value"`
+	SourceKind      string    `json:"source_kind"`
+	SourceAttemptID string    `json:"source_attempt_id,omitempty"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+type CreatePipelineRunParams struct {
+	Run         PipelineRunRecord
+	RequestID   string
+	RequestHash string
+	Values      []PipelineValueRecord
+}
+
+type PipelineRunUpdate struct {
+	State            string
+	PendingAction    string
+	CurrentStageID   string
+	CurrentAttemptID string
+	CurrentAgentID   string
+	AttentionReason  string
+	FinalOutcome     string
+	UpdatedAt        time.Time
 }
