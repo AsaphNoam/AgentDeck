@@ -42,4 +42,4 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-None.
+- [Add configurable pipeline runs](configurable-pipeline-runs.md)

@@ -1,7 +1,7 @@
 # TS-01 — Architecture
 
 **Status:** Partial
-**Code:** `internal/server`, `internal/runtime`, `internal/state`, `internal/index`, `internal/bus`, `internal/config`, `internal/configsource`, `internal/messaging`, `internal/backend`, `internal/archive`, `internal/transcript`, `internal/cli`; `ui/src`
+**Code:** `internal/server`, `internal/runtime`, `internal/state`, `internal/index`, `internal/bus`, `internal/config`, `internal/configsource`, `internal/messaging`, `internal/backend`, `internal/archive`, `internal/transcript`, `internal/cli`; planned `internal/pipeline`; `ui/src`
 **Absorbed:** architecture contract from [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md); rationale remains in [`architecture-decisions.md`](../../architecture-decisions.md) D1–D5
 
 ## 1. Scope
@@ -30,7 +30,8 @@ runtime — the messaging MCP server and embedded UI live inside the Go binary (
 | `internal/bus` | In-process pub/sub bus backing SSE; snapshot+subscribe atomicity |
 | `internal/config` | Plain-JSON config store under `~/.agentdeck`, atomic writes, slug validation, layout/dir modes |
 | `internal/configsource` | Phase 7 federation: Claude/Codex native-config discovery, binding, effective view |
-| `internal/messaging` | In-process MCP server (`list_agents`/`send_message`/`check_messages`) + token→agent registry |
+| `internal/messaging` | In-process MCP server and token→agent registry; shipped messaging tools plus planned TS-09 pipeline result/proposal tools |
+| `internal/pipeline` `(planned)` | Template validation, durable sequential run state machine, transition reconciliation, stage-result and AgentDecker proposal services |
 | `internal/backend` | Backend/model adapter contracts, env layering, credential checks (`credcheck`) |
 | `internal/archive` | Session archive queries + FTS-backed search |
 | `internal/transcript` | Append-only normalized AgentDeck transcript reader/writer; tolerant reads of session artifacts |
@@ -57,6 +58,13 @@ switch re-launches on the same `agent_id`; `running` maps it to current pid/sess
 **R8 — Event flow: producer → server → `state.db` → SSE; reconciliation is fallback only.** Status producers are (a) lifecycle hooks that `POST /api/hook` with a per-launch token, and (b) the chat runtime deriving status from the ACP stream. The server applies every change to `state.db` and emits an SSE event over the `internal/bus`. SSE event types: `state_update`, `new_message`, `notification`, `ping`. The reconciliation watcher over `sessions/` (`internal/server/reconcile.go`) repairs missed projections from AgentDeck's own normalized `runtime.Event` NDJSON log; provider-native transcript formats are not compatible reconciliation inputs. It is not the primary status channel and must not stomp in-vocabulary status fields (INV §1, §8).
 
 **R9 — The composition seam is shared-helper-only (binding rule).** Launch, resume, and switch are the seam where config, runtime, state, hooks, and MCP registration compose. Any field or cleanup step added to one path must be added to all three, via the shared helpers of R6 — never as an inline subset. This rule is the mechanical form of INV §2 and is enforced by review, not by the compiler.
+
+**R11 `(planned)` — Pipeline orchestration stays inside the existing process and lifecycle seams.**
+The server constructs one `internal/pipeline` manager over the config/state stores and registry, fans
+persisted normalized turn boundaries and generation-scoped exits into it, and starts its bounded
+reconciler with the other server loops. Manual HTTP and pipeline launches/resumes/stops share
+server-owned lifecycle services; the pipeline manager does not call local HTTP or construct a
+partial `LaunchSpec`. TS-09 owns its state machine and data contracts.
 
 ## 3. Interfaces & data shapes
 

@@ -16,7 +16,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   metadata/session writes are split across transactions. Two smaller documentation/copy findings are
   also open. Specification checks, both Go test variants, 113 UI tests, source/UI builds, and the
   distribution build pass; the missing failure/interleaving cases explain why those green checks do
-  not close the findings. No ready change is waiting. Publishing still needs explicit approval and
+  not close the findings. `configurable-pipeline-runs.md` is waiting to start but is not active.
+  Publishing still needs explicit approval and
   should wait for the must-fix findings; this review-state commit makes local main nine commits ahead
   of `origin/main`.
   Credentialed provider acceptance remains a separate manual release gate; native prompt/confirm
@@ -79,6 +80,24 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-25 — Defined and received final human confirmation for the feature-side scope of
+  configurable pipeline runs. Draft FS-14 now specifies model-neutral
+  generic stage templates, run-time backend/model assignment, named opaque-text inputs/outputs,
+  sequential outcome routing with approval gates and bounded repair loops, explicit authenticated
+  stage results, restart-safe attempts, safe blocked/retry identity, retained run history, and
+  visible shared-workspace concurrency. The run-start editor changes only the run name, project,
+  goal, declared input values, and per-stage backend/model; structure and stage semantics remain
+  template-owned. A dedicated Pipelines page supports manual creation and a
+  provider/model-selected AgentDecker builder. AgentDecker can propose exact Save or Start actions;
+  each executes only after a separate one-time UI confirmation, as a soft interaction guard under
+  the existing same-user local-API trust model. TS-09 and small TS-01–TS-05 deltas now specify one
+  in-process transactional reconciler, JSON templates, SQLite run state, scoped MCP result/proposal
+  tools, shared lifecycle services, REST/SSE/CLI surfaces, restart recovery, and the Pipelines UI—no
+  queue, second service, parallel graph engine, or new authentication layer. Effort remains the first
+  separate idea. The source idea was promoted to the waiting `configurable-pipeline-runs.md` change;
+  specification/whitespace checks and the Claude/Codex design-skill comparison pass, and no product
+  code changed.
 
 - 2026-07-25 — Fixed six of eight open review findings. **INV §15** closed: live annotations
   now use AppendAnnotationAndSync to persist and flush index before publishing, ensuring

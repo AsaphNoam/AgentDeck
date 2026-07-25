@@ -4,6 +4,48 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-25 — Feature design: configurable pipeline runs ready
+
+Configurable pipeline runs are now fully specified and waiting to be implemented. Templates are
+reusable and model-neutral; each run supplies its project, goal, text inputs, and backend/model for
+each stage, so Codex and Claude can swap implementer and reviewer duties without changing the
+template. AgentDeck runs one chat agent at a time, advances only from an authenticated explicit
+success/failure/blocked result, supports approvals and bounded repair loops, and preserves attempts,
+outputs, recovery state, agents, and transcripts across restarts.
+
+AgentDecker can draft a template or run setup and request Save or Start. Each exact action requires
+its own one-time confirmation in the Pipelines page. This is intentionally a soft interaction guard,
+not a new authentication system. The technical design uses one in-process transactional reconciler,
+versioned JSON templates, SQLite run state, the existing agent lifecycle and MCP server, and ordinary
+REST, server-sent events, and CLI surfaces—without a queue, separate workflow service, or parallel
+graph engine. Effort selection remains a separate future idea.
+
+**Needs attention:** None.
+
+**Next:** Start the waiting configurable pipeline runs change when you want implementation to begin.
+
+### 2026-07-25 — Feature design: configurable pipeline runs
+
+The feature-side draft now describes reusable pipeline templates whose stages can each select a
+role, backend, and model, including Codex working with Claude reviewing or the reverse. Starting a
+run snapshots its goal, project, stages, and model choices; AgentDeck launches one chat agent at a
+time, gives it the relevant prior results, accepts an explicit passed/findings/failed/blocked report,
+and durably shows progression, pauses, retries, repair loops, and transcripts after restart. Runtime
+idle or process exit never counts as success, permissions and credentials keep their existing rules,
+and task groups remain presentation rather than pipeline authority. No product code or technical
+architecture has been written yet.
+
+**Needs attention:** Please choose the first three product boundaries: (1) sequential stages with
+outcome-based skips and bounded backward repair loops, but no parallel graph, as recommended — or a
+full parallel directed graph now; (2) runs start from the dashboard or local command/API, which lets
+AgentDecker invoke them after your request, as recommended — or agents also receive a direct
+start-run tool; and (3) versioned hand-editable JSON plus a simple Settings stage-list editor and
+Start Run form, as recommended — or JSON-only configuration for the first release.
+
+**Next:** Reply with your choices for those three boundaries; I will refine the feature behavior,
+then bring the remaining retention, retry-identity, and same-project concurrency decisions before
+designing the technical specification.
+
 ### 2026-07-25 — Review: recent annotation, onboarding, provider, and search work
 
 The full unreviewed range has now been checked against the product specifications and every recurring
