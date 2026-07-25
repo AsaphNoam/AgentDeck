@@ -6,20 +6,15 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
-- **Active change:** None.
-- **State:** finished locally with eight open review findings. The continuous range after `8b84e4f`
-  through `eb63dd5` is reviewed: the annotation/installer repairs, invariant and workflow updates,
-  onboarding credentials/defaults, and turn-document transcript indexing. Six findings are must-fix:
-  the live annotation path still cannot prove a durable append before delivery; index event/flush
-  boundaries can interleave; Set up later can race another wizard mutation; Claude failure output can
-  cross the API boundary; a hung Codex status probe consumes the API-key fallback's deadline; and
-  metadata/session writes are split across transactions. Two smaller documentation/copy findings are
-  also open. Specification checks, both Go test variants, 113 UI tests, source/UI builds, and the
-  distribution build pass; the missing failure/interleaving cases explain why those green checks do
-  not close the findings. `configurable-pipeline-runs.md` is waiting to start but is not active.
-  Publishing still needs explicit approval and
-  should wait for the must-fix findings; this review-state commit makes local main nine commits ahead
-  of `origin/main`.
+- **Active change:** Configurable pipeline runs (`docs/plans/configurable-pipeline-runs.md`).
+- **State:** in progress. The sole waiting ready change was started by the human's explicit `/work`.
+  Implementation begins with the template validator and durable state foundation, followed by the
+  shared lifecycle/reconciler, MCP/API/CLI surfaces, and Pipelines UI. Separately, the continuous
+  range after `8b84e4f` through `eb63dd5` is reviewed. Two must-fix findings remain: the onboarding
+  wizard's Set up later action can race a mounted-step mutation, and index event/flush boundaries can
+  interleave. Specification checks, both Go test variants, 113 UI tests, source/UI builds, and the
+  distribution build pass; the missing race/interleaving cases explain why those green checks do not
+  close the findings. Local `main` matches `origin/main` before this active change.
   Credentialed provider acceptance remains a separate manual release gate; native prompt/confirm
   actions also need replay in a browser that supports those dialogs.
   The onboarding change is verified by automated tests plus a real isolated-home run; **J2 has not
@@ -27,6 +22,17 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   against real rendering and pointer interaction.
 - **Last reviewed code:** `eb63dd5` (2026-07-25), the continuous range after `8b84e4f`.
 - **Branch:** `main`.
+
+## Active change
+
+Implement FS-14.R1-R30 and TS-09.R1-R23: reusable model-neutral pipeline templates, durable
+sequential runs and attempts, shared lifecycle execution, scoped result/proposal tools, REST/SSE/CLI
+controls, and the Pipelines page. The accepted scope excludes terminal stages, effort selection,
+parallel branches/joins, child pipelines, typed/file artifacts, worktree isolation, and automatic
+AgentDecker Save/Start.
+
+**Next small step:** land the versioned template store, canonical validation/limits, forward-only
+SQLite migration, and state-store operations with focused tests for FS-14.A1/A5/A9.
 
 ## Decisions needing your input
 
@@ -46,12 +52,6 @@ that update.
   Codex installations before promoting FS-08/TS-07 from Partial.
 
 ## Blocked on human
-
-Publishing is waiting for explicit approval to push all nine commits currently ahead of
-`origin/main`: this turn-document indexing change plus the onboarding, annotation/installer,
-invariant, annotate-and-assign, workflow, and review-state work. Resolve the must-fix review findings
-before publishing; the remote safety gate had already rejected publishing the expanded scope without
-confirmation.
 
 Live-provider acceptance is waiting for human authorization because it invokes real provider sessions
 and creates disposable local configuration homes. On 2026-07-15 this machine has Claude Code 2.1.202,
