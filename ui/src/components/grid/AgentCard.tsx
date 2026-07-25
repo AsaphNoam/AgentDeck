@@ -1,6 +1,6 @@
 import { CSS } from "@dnd-kit/utilities";
 import { useSortable } from "@dnd-kit/sortable";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import type { CSSProperties } from "react";
 import type { AgentState } from "../../api/types";
 import { ContextBar } from "./ContextBar";
@@ -53,6 +53,15 @@ export function AgentCard({ agent, lastLine, projectColor }: { agent: AgentState
       <span className="model-pill">
         {agent.backend} · {agent.model}
       </span>
+      {agent.pipeline && (
+        <Link
+          className="pipeline-association"
+          to={`/pipelines?run=${encodeURIComponent(agent.pipeline.run_id)}`}
+          onClick={(event) => event.stopPropagation()}
+        >
+          {agent.pipeline.run_name} · {agent.pipeline.stage_id} · attempt {agent.pipeline.attempt_no}
+        </Link>
+      )}
       {agent.interface === "terminal" && <span className="terminal-pill">terminal{agent.driver ? ` · ${agent.driver}` : ""}</span>}
       <div className="message-indicators" data-slot="indicators" aria-label="Message indicators">
         {agent.unread_messages ? <span className="mail-badge">Mail {agent.unread_messages}</span> : null}

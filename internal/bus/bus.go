@@ -177,6 +177,18 @@ func (b *Bus) PublishBudgetExceeded(agentID, turnID string, used int) {
 	b.Publish("notification", &agentID, payload)
 }
 
+// PublishPipelineNotification routes pipeline attention/completion through the
+// same bounded notification payload builder as agent lifecycle notifications.
+func (b *Bus) PublishPipelineNotification(runID, agentID, kind, reason string) {
+	update := state.AgentStateUpdate{AgentState: state.AgentState{AgentID: agentID, Name: "Pipeline " + runID, Detail: reason}}
+	typ := "pipeline_needs_attention"
+	if kind == "completed" {
+		typ = "pipeline_completed"
+	}
+	payload := notificationPayload(update, typ, map[string]any{"run_id": runID, "reason": reason})
+	b.Publish("notification", nil, payload)
+}
+
 func notificationPayload(update state.AgentStateUpdate, typ string, detail map[string]any) map[string]any {
 	name := update.Name
 	if name == "" {
@@ -192,6 +204,10 @@ func notificationPayload(update state.AgentStateUpdate, typ string, detail map[s
 		title = name + " requests permission"
 	case "budget_exceeded":
 		title = name + " hit its message budget"
+	case "pipeline_needs_attention":
+		title = name + " needs attention"
+	case "pipeline_completed":
+		title = name + " completed"
 	}
 	body := update.Detail
 	if body == "" && typ == "permission_required" && detail != nil {

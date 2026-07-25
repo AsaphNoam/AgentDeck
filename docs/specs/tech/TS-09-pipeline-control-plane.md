@@ -1,7 +1,7 @@
 # TS-09 — Pipeline control plane
 
-**Status:** Partial
-**Code:** planned `internal/pipeline`; `internal/config`, `internal/state`, `internal/server`, `internal/messaging`, `internal/cli`; `ui/src/features/pipelines`
+**Status:** Current
+**Code:** `internal/pipeline`, `internal/config`, `internal/state`, `internal/server`, `internal/messaging`, `internal/cli`, `ui/src/features/pipelines`
 **Absorbed:** —
 
 ## 1. Scope
@@ -17,19 +17,19 @@ workflow service, background job system, arbitrary expression engine, or paralle
 
 ## 2. Design & constraints
 
-**R1 `(planned)` — One in-process authority.** `internal/pipeline` owns template validation and one
+**R1 — One in-process authority.** `internal/pipeline` owns template validation and one
 server-resident manager/reconciler. The server process is the only pipeline-state writer and invokes
 the manager directly; there is no second daemon, embedded scheduler database, message broker, or
 self-HTTP call. Reconciliation is event-driven with a bounded startup sweep as recovery, not an
 unbounded polling loop.
 
-**R2 `(planned)` — Templates are versioned configuration.** Pipeline templates are filename-addressed
+**R2 — Templates are versioned configuration.** Pipeline templates are filename-addressed
 version-1 JSON under `$AGENTDECK_HOME/pipelines/{id}.json`, written through the config store's
 owner-only atomic-write path. The filename supplies the immutable validated slug id. Reads reject an
 unknown version and return per-template diagnostics without making other valid templates disappear.
 Create refuses an existing id; update never changes the id; delete removes only the template file.
 
-**R3 `(planned)` — One canonical validator.** Config reads, template CRUD/validation, run start, and
+**R3 — One canonical validator.** Config reads, template CRUD/validation, run start, and
 AgentDecker proposals call the same pure validator. It checks structural limits; unique stage/run-input
 and stage-local declaration names; existing roles on template save and run start; input/output
 bindings; complete success/failure routes; reachable destinations; final outcomes; and a positive
@@ -39,21 +39,21 @@ rejects it before side effects. Multiple stages may intentionally produce the sa
 key so a repair stage can supersede an earlier value. Validation itself performs no process or
 database side effect.
 
-**R4 `(planned)` — Runs are immutable snapshots plus mutable state.** Starting a run stores one
+**R4 — Runs are immutable snapshots plus mutable state.** Starting a run stores one
 canonical template snapshot, run display name, project, goal, declared input values, per-stage
 backend/model assignments, and initial transition state in `state.db` before any agent process is
 started. Later template/config edits cannot rewrite that snapshot. Run, attempt, report, current-value,
 and idempotency records are authoritative machine state; JSON templates and transcripts are not
 scanned to reconstruct them.
 
-**R5 `(planned)` — The durable state machine names every side-effect boundary.** A run transaction
+**R5 — The durable state machine names every side-effect boundary.** A run transaction
 records its current stage/attempt, monotonic revision, state, and one pending action such as
 `launch_stage`, `await_result`, `await_quiescence`, `stop_agent`, `await_approval`, `resume_blocked`,
 or `finish_run`. A compare-and-swap on run id plus revision claims each action once. The claim and
 resulting state are committed before process, notification, or next-stage effects; retrying a claimed
 operation is idempotent or generation-checked (INV §5, §15).
 
-**R6 `(planned)` — Pipeline launch reuses the lifecycle composition seam.** The ordinary HTTP launch
+**R6 — Pipeline launch reuses the lifecycle composition seam.** The ordinary HTTP launch
 handler and the pipeline manager call one server-owned launch service that wraps `composeLaunch`,
 identity/session persistence, registry launch, rollback, and registration teardown. A pipeline launch
 adds an immutable run/stage/attempt association and its assignment prompt; it does not reimplement
@@ -61,34 +61,34 @@ role/project/backend/model, permission, credential, environment, MCP, transcript
 The association is durable before the process can act and is exposed by session reads through a
 pipeline-state join rather than a group/name convention (INV §2, §4, §6).
 
-**R7 `(planned)` — Assignments are deterministic bounded text.** One renderer builds the first prompt
+**R7 — Assignments are deterministic bounded text.** One renderer builds the first prompt
 from the frozen goal, stage title/instruction, locally named resolved input values and descriptions,
 relevant prior structured results, scope, required result vocabulary, and declared outputs. It clips
 each field and the total prompt to documented limits, records a hash/version with the attempt, and
 never inserts unrelated transcripts or guesses at file contents.
 
-**R8 `(planned)` — Stage results use the existing scoped MCP identity.** The shared in-process MCP
+**R8 — Stage results use the existing scoped MCP identity.** The shared in-process MCP
 server adds `report_pipeline_stage_result`. Its arguments contain only outcome, bounded summary,
 bounded details/checks, and declared output text. Caller identity comes from the per-launch token;
 the store joins that identity to the current run/stage/attempt. A caller with no current assignment,
 an old generation, a stopped run, an undeclared output, or an accepted result receives a stable
 tool error and causes no mutation.
 
-**R9 `(planned)` — Result acceptance is one transaction.** Accepting a report validates the exact
-outcome and output set, writes the immutable attempt report, updates current named values with source
-provenance, computes the frozen template's selected route, verifies destination inputs and visit
-bounds when the outcome is success/failure, and records `await_quiescence` in one SQLite transaction.
-The result is visible before the tool returns. A missing destination value rejects the report without
-partially installing its outputs or route; blocked has no destination and becomes paused only after
-its reporting turn reaches quiescence.
+**R9 — Result acceptance is one transaction.** Accepting a report validates the exact
+outcome/output set and the frozen route's destination inputs, then writes the immutable attempt
+report, current named values with source provenance, and `await_quiescence` in one SQLite
+transaction. The result is visible before the tool returns. A missing destination value rejects the
+report without partially installing outputs. The selected route and destination visit bound are
+recomputed from the immutable snapshot and claimed with the next-attempt transaction only after
+quiescence; blocked has no destination and becomes paused at that boundary.
 
-**R10 `(planned)` — Quiescence is a normalized runtime event, not inferred status.** The server fans
+**R10 — Quiescence is a normalized runtime event, not inferred status.** The server fans
 the persisted normalized `turn_end` event to the pipeline manager in addition to the ordinary bus.
 Only a matching current attempt that already has an accepted report may cross the quiescent boundary.
 `idle`, `done`, hooks, free-form mail, process exit, and transcript text cannot synthesize a report.
 The fan-out is direct and lossless to the manager; SSE remains a lossy presentation channel.
 
-**R11 `(planned)` — Advancing is restart-safe and sequential.** After a success/failure report reaches
+**R11 — Advancing is restart-safe and sequential.** After a success/failure report reaches
 quiescence, reconciliation claims the transition, stops the reporting agent through the ordinary
 idempotent lifecycle path, commits that boundary, then either records an approval pause/final result
 or creates and launches one next attempt. A blocked report instead pauses with that same idle agent
@@ -96,7 +96,7 @@ available for continuation. At most one attempt per run may own an active agent.
 increments the destination's visit count and pauses with `loop_limit_reached` instead of exceeding
 `max_visits`.
 
-**R12 `(planned)` — Recovery actions preserve identity rules.** Blocked Continue stores the new user
+**R12 — Recovery actions preserve identity rules.** Blocked Continue stores the new user
 text and creates a new attempt record linked to the earlier attempt but associated with the same agent
 id. It sends the bounded continuation assignment to that agent when still live and idle, or uses the
 shared resume service after restart/inactivity before prompting it. Explicit Retry, launch/crash
@@ -105,49 +105,51 @@ already-durable transition. Stop atomically prevents future claims before invoki
 cancel/stop. Concurrent controls use the run revision so one wins and the others return conflict
 without duplicate effects.
 
-**R13 `(planned)` — Exit and restart reconcile from durable ownership.** The registry's server-owned
+**R13 — Exit and restart reconcile from durable ownership.** The registry's server-owned
 exit callback fans out to both ordinary teardown and the pipeline manager with agent generation and
-exit cause. Startup loads unfinished runs, corroborates any persisted running process through the
-ordinary lifecycle/reaper boundary, and resumes the recorded pending action. It never treats an empty
-in-memory registry as proof that a process is dead and never changes a missing report into success.
+exit cause. Startup loads every unfinished run and resumes restart-safe launch/stop actions. A run
+that was awaiting a result or reporting-turn quiescence is durably paused with a stable recovery
+reason and its persisted process is checked/stopped through the ordinary lifecycle/reaper boundary;
+malformed run detail is isolated the same way. Startup never treats an empty in-memory registry as
+proof that a process is dead and never changes a missing report into success.
 
-**R14 `(planned)` — Deletion separates pipeline records from agents.** Deleting a non-active run
+**R14 — Deletion separates pipeline records from agents.** Deleting a non-active run
 removes its run/attempt/value/idempotency rows transactionally but does not delete agent identities,
 session snapshots, transcripts, or archive/index records. Attempt-to-agent references therefore do
-not cascade into the existing agent tables. Template deletion is rejected while an operation on that
-template file is in flight, but existing run snapshots remain readable.
+not cascade into the existing agent tables. Template CRUD is serialized per store, and existing run
+snapshots remain readable after template deletion.
 
-**R15 `(planned)` — AgentDecker proposals are validated, soft-gated data.** The shared MCP server adds
+**R15 — AgentDecker proposals are validated, soft-gated data.** The shared MCP server adds
 proposal tools for a model-neutral template draft and a saved-template run configuration. They are
 available to a token-bound AgentDecker-role chat session, call the canonical validator, and return a
 canonical payload plus digest and proposal id without saving or starting anything. The Pipelines UI
 renders the exact payload and performs the normal Save or Start request only after a one-time explicit
 confirmation. Save and Start are separate; an edited/different digest cannot reuse confirmation.
 
-**R16 `(planned)` — Approval is interaction control, not authentication.** Proposal tools never call
+**R16 — Approval is interaction control, not authentication.** Proposal tools never call
 mutating pipeline methods and cannot approve themselves. Template PUT is naturally idempotent; run
 start also carries a client/proposal request id with a unique database constraint so confirmation
 retries return the original run instead of creating another. This guided path does not claim to stop
 a same-user shell process from calling the ordinary loopback API, consistent with TS-05.R3.
 
-**R17 `(planned)` — One publication path follows commits.** Every committed run mutation publishes a
+**R17 — One publication path follows commits.** Every committed run mutation publishes a
 bounded `pipeline_update` containing run id, revision, state, current stage/agent, and attention
 reason. The UI refetches detail for full history. Needs-attention and completion notifications use the
 existing notification builder and mute pipeline; transition updates do not create notifications.
 Restart hydration and reconnect list active runs from SQLite, so missing SSE events do not lose state.
 
-**R18 `(planned)` — Shared-workspace detection stays advisory.** Start-time validation queries active
+**R18 — Shared-workspace detection stays advisory.** Start-time validation queries active
 ordinary agents and runs by project and returns the conflicting ids/names for the UI warning. It does
 not lock a project directory, create worktrees, rewrite project configuration, or serialize separate
 runs.
 
-**R19 `(planned)` — Bounds are centralized.** Template count/size, stages, declarations, instruction,
+**R19 — Bounds are centralized.** Template count/size, stages, declarations, instruction,
 goal, value, summary/details/checks, proposal, and list-page limits live in one pipeline limits module
 used by JSON config, HTTP, MCP, assignment rendering, and tests. Collection fields are initialized as
 arrays/maps at every JSON boundary. Opaque text is stored and rendered as data; it is not treated as a
 secret field, filesystem authority, markup, command, or condition expression.
 
-**R21 `(planned)` — Builder sessions remain ordinary AgentDecker agents.** Create with AgentDecker
+**R21 — Builder sessions remain ordinary AgentDecker agents.** Create with AgentDecker
 launches the configured `agentdecker` role through the shared chat launch service with the user's
 chosen backend/model and the configured default project. The agent remains visible, transcript-backed,
 archivable, and stoppable through ordinary surfaces; its backend/model never enters the template. A
@@ -155,13 +157,13 @@ missing role, unusable default project, non-chat-capable backend, or failed read
 the builder launch with the ordinary bounded error. The seeded AgentDecker prompt gains the pipeline
 proposal and CLI behavior only when those capabilities ship.
 
-**R22 `(planned)` — The CLI is a thin API client.** `agentdeck pipeline` subcommands cover template
+**R22 — The CLI is a thin API client.** `agentdeck pipeline` subcommands cover template
 list/validate and run start/show/continue/retry/stop using the same local REST requests and structured
 errors as the Pipelines UI. They do not open SQLite or template files directly while the server is
 running, do not contain a second transition engine, and require the dashboard server like other live
 control commands.
 
-**R23 `(planned)` — The Pipelines page has no second state authority.** The React surface uses the
+**R23 — The Pipelines page has no second state authority.** The React surface uses the
 shared API client/schema, React Query for template/run server state, the existing transcript
 projection for builder proposal tool results, and revision-checked `pipeline_update` invalidation.
 Unsaved editor form state is local to the page; only template CRUD or an approved proposal writes a
@@ -237,13 +239,12 @@ new durable run revision or a structured validation/conflict result.
 - **INV §14:** all pipeline HTTP/MCP routes stay behind the existing `localOnly` wrapper.
 - **INV §15:** report, route, value, and action intent commit before tool success, process launch,
   notification, or another externally visible stage effect.
-- **R20 `(planned)` — Run monotonicity.** A run revision and attempt lineage only advance; accepted
+- **R20 — Run monotonicity.** A run revision and attempt lineage only advance; accepted
   reports and completed attempts are immutable. Recovery may continue from a pending action but may
   not rewrite history or decrement visit/attempt counters.
 
 ## 5. Deviations & open decisions
 
-- All requirements are planned; no native pipeline code or route is shipped.
 - The builder confirmation is deliberately a soft interaction guard under the existing unauthenticated
   same-user loopback API. Hard per-agent API capabilities remain outside this feature.
 - Effort, terminal-stage agents, parallel branches/joins, child pipelines, typed/file artifacts,
@@ -253,7 +254,10 @@ new durable run revision or a structured validation/conflict result.
 
 - Product behavior and acceptance: FS-14.R1–R30 and FS-14.A1–A10.
 - Existing lifecycle/composition: TS-01.R4–R9; FS-01.
-- Persistence and migrations: TS-02.R1–R8, R12; planned TS-02 pipeline delta.
-- HTTP/SSE and UI/API lockstep: TS-03.R1–R11; planned TS-03 pipeline delta.
-- MCP identity and process protocol: TS-04.R5–R9, R12; planned TS-04 pipeline-tool delta.
-- Trust boundary and redaction: TS-05.R1–R11, R13; planned TS-05 soft-approval delta.
+- Persistence and migrations: TS-02.R1–R8, R12, R17.
+- HTTP/SSE and UI/API lockstep: TS-03.R1–R11, R16–R17.
+- MCP identity and process protocol: TS-04.R5–R9, R12, R17.
+- Trust boundary and redaction: TS-05.R1–R11, R13–R14.
+- Regression anchors: `internal/pipeline`, `internal/state/pipelines_test.go`,
+  `internal/messaging/pipeline_tools_test.go`, `internal/server/pipeline_handlers_test.go`, and
+  `ui/src/{api,features/pipelines,schemas/pipeline.ts}`.

@@ -50,7 +50,7 @@ Requirements are user-observable.
 ### 2.2 Application shell
 
 - **R6** — The shell has a strong AgentDeck wordmark/mark treatment, clear current-route
-  navigation for Dashboard, Archive, and Settings, and an integrated connection indicator. It keeps
+  navigation for Dashboard, Pipelines, Archive, and Settings, and an integrated connection indicator. It keeps
   the existing routes and actions; the change is their composition and appearance.
 - **R7** — Main content uses a deliberate page frame, consistent route-heading pattern,
   and bounded content widths appropriate to each surface. Dense operational views may use the full
@@ -149,7 +149,7 @@ Requirements are user-observable.
 ## 5. Acceptance criteria
 
 - **A1** (R1–R19, R23–R25) — A real-browser visual review covers onboarding, empty and
-  populated Dashboard, all agent states, New Agent, chat event variants, Files, Commands, Terminal,
+  populated Dashboard, Pipelines, all agent states, New Agent, chat event variants, Files, Commands, Terminal,
   active and archived sessions, every Settings section, menus, notifications, permissions, and
   representative errors. Every first-party surface clearly belongs to one core AgentDeck design and
   none uses a metaphorical skin concept. *Verify:* visual fixture/screenshot matrix plus existing

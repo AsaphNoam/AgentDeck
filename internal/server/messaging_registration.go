@@ -18,7 +18,7 @@ const messagingMCPName = "agentdeck-messaging"
 // registerMessagingMCP wires one agent to the dashboard-owned MCP server
 // (techspec §3.6). The live CLI verdict is still gated, so both current chat
 // backends receive the preferred HTTP transport entry.
-func (s *Server) registerMessagingMCP(agent state.Agent) (runtime.MCPServerSpec, error) {
+func (s *Server) registerMessagingMCP(agent state.Agent, generation string) (runtime.MCPServerSpec, error) {
 	token, err := mintMessagingToken()
 	if err != nil {
 		return runtime.MCPServerSpec{}, err
@@ -26,7 +26,7 @@ func (s *Server) registerMessagingMCP(agent state.Agent) (runtime.MCPServerSpec,
 	if s.messaging == nil {
 		return runtime.MCPServerSpec{}, fmt.Errorf("messaging server is not configured")
 	}
-	s.messaging.Register(token, agent.AgentID)
+	s.messaging.RegisterSession(token, agent.AgentID, generation)
 
 	// Both current backends (claude-acp, codex-acp) take the in-process HTTP
 	// streamable transport. A stdio fallback (an `agentdeck mcp` proxy subcommand)

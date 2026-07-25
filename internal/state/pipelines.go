@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -104,6 +105,21 @@ VALUES (?, ?, ?, ?, ?, ?)`, run.RunID, value.Name, value.Value, value.SourceKind
 			return PipelineRunRecord{}, false, fmt.Errorf("state: insert pipeline value: %w", err)
 		}
 	}
+	if params.InitialAttempt != nil {
+		attempt := *params.InitialAttempt
+		if attempt.RunID == "" {
+			attempt.RunID = run.RunID
+		}
+		if attempt.CreatedAt.IsZero() {
+			attempt.CreatedAt = run.CreatedAt
+		}
+		if attempt.UpdatedAt.IsZero() {
+			attempt.UpdatedAt = attempt.CreatedAt
+		}
+		if err := insertPipelineAttemptTx(tx, attempt); err != nil {
+			return PipelineRunRecord{}, false, err
+		}
+	}
 	if _, err := tx.Exec(`
 INSERT INTO pipeline_requests(request_id, request_hash, run_id, created_at)
 VALUES (?, ?, ?, ?)`, params.RequestID, params.RequestHash, run.RunID, formatTime(run.CreatedAt)); err != nil {
@@ -113,6 +129,17 @@ VALUES (?, ?, ?, ?)`, params.RequestID, params.RequestHash, run.RunID, formatTim
 		return PipelineRunRecord{}, false, fmt.Errorf("state: commit pipeline run: %w", err)
 	}
 	return run, false, nil
+}
+
+func (s *Store) ReadPipelineRequest(requestID string) (runID, requestHash string, err error) {
+	err = s.db.QueryRow(`SELECT run_id, request_hash FROM pipeline_requests WHERE request_id = ?`, requestID).Scan(&runID, &requestHash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", "", ErrNotFound
+	}
+	if err != nil {
+		return "", "", fmt.Errorf("state: read pipeline request: %w", err)
+	}
+	return runID, requestHash, nil
 }
 
 func (s *Store) ReadPipelineRun(runID string) (PipelineRunRecord, error) {
@@ -193,6 +220,40 @@ SELECT run_id FROM pipeline_runs ORDER BY updated_at DESC, run_id LIMIT ? OFFSET
 	return out, nil
 }
 
+// ListActivePipelineRuns returns every non-terminal run for startup recovery
+// and shared-workspace checks. Those correctness paths must not silently stop
+// at the first UI page when more than MaxListPage historical rows exist.
+func (s *Store) ListActivePipelineRuns() ([]PipelineRunRecord, error) {
+	rows, err := s.db.Query(`
+SELECT run_id FROM pipeline_runs
+WHERE state NOT IN ('completed', 'stopped')
+ORDER BY created_at, run_id`)
+	if err != nil {
+		return nil, fmt.Errorf("state: list active pipeline runs: %w", err)
+	}
+	defer rows.Close()
+	ids := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("state: scan active pipeline run: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("state: iterate active pipeline runs: %w", err)
+	}
+	out := make([]PipelineRunRecord, 0, len(ids))
+	for _, id := range ids {
+		run, err := s.ReadPipelineRun(id)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, run)
+	}
+	return out, nil
+}
+
 func (s *Store) UpdatePipelineRunCAS(runID string, expectedRevision int64, update PipelineRunUpdate) (PipelineRunRecord, error) {
 	if update.UpdatedAt.IsZero() {
 		update.UpdatedAt = timeNow()
@@ -254,8 +315,20 @@ func (s *Store) InsertPipelineAttempt(attempt PipelineAttemptRecord) error {
 	if attempt.UpdatedAt.IsZero() {
 		attempt.UpdatedAt = attempt.CreatedAt
 	}
+	return insertPipelineAttemptExec(s.db, attempt)
+}
+
+type pipelineAttemptExecer interface {
+	Exec(query string, args ...any) (sql.Result, error)
+}
+
+func insertPipelineAttemptTx(tx *sql.Tx, attempt PipelineAttemptRecord) error {
+	return insertPipelineAttemptExec(tx, attempt)
+}
+
+func insertPipelineAttemptExec(exec pipelineAttemptExecer, attempt PipelineAttemptRecord) error {
 	attempt.ReportOutputs = nonEmptyJSON(attempt.ReportOutputs, `{}`)
-	_, err := s.db.Exec(`
+	_, err := exec.Exec(`
 INSERT INTO pipeline_attempts(
   attempt_id, run_id, stage_id, attempt_no, visit_no, parent_attempt_id,
   agent_id, agent_generation, backend, model, state, assignment_text,
@@ -275,8 +348,254 @@ INSERT INTO pipeline_attempts(
 	return nil
 }
 
+// CreatePipelineAttemptCAS installs one immutable next attempt and advances the
+// run pointer in the same transaction, so a retry/route/control race cannot
+// create an orphan or two current attempts.
+func (s *Store) CreatePipelineAttemptCAS(runID string, expectedRevision int64, attempt PipelineAttemptRecord, update PipelineRunUpdate) (PipelineRunRecord, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return PipelineRunRecord{}, fmt.Errorf("state: begin next pipeline attempt: %w", err)
+	}
+	defer tx.Rollback()
+	var revision int64
+	if err := tx.QueryRow(`SELECT revision FROM pipeline_runs WHERE run_id = ?`, runID).Scan(&revision); errors.Is(err, sql.ErrNoRows) {
+		return PipelineRunRecord{}, ErrNotFound
+	} else if err != nil {
+		return PipelineRunRecord{}, fmt.Errorf("state: read pipeline revision: %w", err)
+	}
+	if revision != expectedRevision {
+		return PipelineRunRecord{}, ErrPipelineConflict
+	}
+	if attempt.RunID == "" {
+		attempt.RunID = runID
+	}
+	if err := insertPipelineAttemptTx(tx, attempt); err != nil {
+		return PipelineRunRecord{}, err
+	}
+	if update.UpdatedAt.IsZero() {
+		update.UpdatedAt = timeNow()
+	}
+	result, err := tx.Exec(`
+UPDATE pipeline_runs SET
+  state = ?, revision = revision + 1, pending_action = ?, current_stage_id = ?,
+  current_attempt_id = ?, current_agent_id = ?, attention_reason = ?,
+  final_outcome = ?, updated_at = ?
+WHERE run_id = ? AND revision = ?`,
+		update.State, update.PendingAction, update.CurrentStageID, update.CurrentAttemptID,
+		update.CurrentAgentID, update.AttentionReason, update.FinalOutcome, formatTime(update.UpdatedAt),
+		runID, expectedRevision,
+	)
+	if err != nil {
+		return PipelineRunRecord{}, fmt.Errorf("state: point pipeline at attempt: %w", err)
+	}
+	if count, _ := result.RowsAffected(); count != 1 {
+		return PipelineRunRecord{}, ErrPipelineConflict
+	}
+	if err := tx.Commit(); err != nil {
+		return PipelineRunRecord{}, fmt.Errorf("state: commit next pipeline attempt: %w", err)
+	}
+	return s.ReadPipelineRun(runID)
+}
+
+func (s *Store) UpdatePipelineAttemptState(attemptID, stateValue, agentGeneration string, updatedAt time.Time) error {
+	if updatedAt.IsZero() {
+		updatedAt = timeNow()
+	}
+	result, err := s.db.Exec(`
+UPDATE pipeline_attempts SET state = ?, agent_generation = CASE WHEN ? = '' THEN agent_generation ELSE ? END, updated_at = ?
+WHERE attempt_id = ?`, stateValue, agentGeneration, agentGeneration, formatTime(updatedAt), attemptID)
+	if err != nil {
+		return fmt.Errorf("state: update pipeline attempt: %w", err)
+	}
+	if count, _ := result.RowsAffected(); count == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// UpdatePipelineAttemptAndRunCAS commits an attempt boundary and its run
+// projection together. Lifecycle launch/resume/exit handling uses this instead
+// of exposing split state where one side advanced without the other.
+func (s *Store) UpdatePipelineAttemptAndRunCAS(runID string, expectedRevision int64, attemptID, attemptState, agentGeneration string, update PipelineRunUpdate) (PipelineRunRecord, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return PipelineRunRecord{}, fmt.Errorf("state: begin pipeline attempt transition: %w", err)
+	}
+	defer tx.Rollback()
+	var currentAttempt string
+	var revision int64
+	if err := tx.QueryRow(`SELECT current_attempt_id, revision FROM pipeline_runs WHERE run_id = ?`, runID).Scan(&currentAttempt, &revision); errors.Is(err, sql.ErrNoRows) {
+		return PipelineRunRecord{}, ErrNotFound
+	} else if err != nil {
+		return PipelineRunRecord{}, fmt.Errorf("state: read pipeline attempt transition: %w", err)
+	}
+	if revision != expectedRevision || currentAttempt != attemptID {
+		return PipelineRunRecord{}, ErrPipelineConflict
+	}
+	if update.UpdatedAt.IsZero() {
+		update.UpdatedAt = timeNow()
+	}
+	result, err := tx.Exec(`
+UPDATE pipeline_attempts SET state = ?, agent_generation = CASE WHEN ? = '' THEN agent_generation ELSE ? END, updated_at = ?
+WHERE attempt_id = ? AND run_id = ?`, attemptState, agentGeneration, agentGeneration, formatTime(update.UpdatedAt), attemptID, runID)
+	if err != nil {
+		return PipelineRunRecord{}, fmt.Errorf("state: update pipeline attempt boundary: %w", err)
+	}
+	if count, _ := result.RowsAffected(); count != 1 {
+		return PipelineRunRecord{}, ErrPipelineConflict
+	}
+	result, err = tx.Exec(`
+UPDATE pipeline_runs SET
+  state = ?, revision = revision + 1, pending_action = ?, current_stage_id = ?,
+  current_attempt_id = ?, current_agent_id = ?, attention_reason = ?,
+  final_outcome = ?, updated_at = ?
+WHERE run_id = ? AND revision = ?`,
+		update.State, update.PendingAction, update.CurrentStageID, update.CurrentAttemptID,
+		update.CurrentAgentID, update.AttentionReason, update.FinalOutcome, formatTime(update.UpdatedAt),
+		runID, expectedRevision,
+	)
+	if err != nil {
+		return PipelineRunRecord{}, fmt.Errorf("state: update pipeline run boundary: %w", err)
+	}
+	if count, _ := result.RowsAffected(); count != 1 {
+		return PipelineRunRecord{}, ErrPipelineConflict
+	}
+	if err := tx.Commit(); err != nil {
+		return PipelineRunRecord{}, fmt.Errorf("state: commit pipeline attempt transition: %w", err)
+	}
+	return s.ReadPipelineRun(runID)
+}
+
+// AcceptPipelineReport commits the immutable report, output values, and
+// await-quiescence intent atomically before the MCP tool returns success.
+func (s *Store) AcceptPipelineReport(input PipelineReportInput) (PipelineRunRecord, PipelineAttemptRecord, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return PipelineRunRecord{}, PipelineAttemptRecord{}, fmt.Errorf("state: begin pipeline report: %w", err)
+	}
+	defer tx.Rollback()
+	run, err := readPipelineRunQuery(tx, input.RunID)
+	if err != nil {
+		return PipelineRunRecord{}, PipelineAttemptRecord{}, err
+	}
+	if run.Revision != input.ExpectedRevision || run.CurrentAttemptID != input.AttemptID || run.CurrentAgentID != input.AgentID || run.State == "stopped" || run.State == "completed" {
+		return PipelineRunRecord{}, PipelineAttemptRecord{}, ErrPipelineConflict
+	}
+	attempt, err := readPipelineAttemptQuery(tx, input.AttemptID)
+	if err != nil {
+		return PipelineRunRecord{}, PipelineAttemptRecord{}, err
+	}
+	if attempt.AgentID != input.AgentID || attempt.AgentGeneration != input.AgentGeneration || attempt.ReportOutcome != "" || attempt.State != "running" {
+		return PipelineRunRecord{}, PipelineAttemptRecord{}, ErrPipelineConflict
+	}
+	when := input.ReportedAt
+	if when.IsZero() {
+		when = timeNow()
+	}
+	outputs := map[string]string{}
+	for _, value := range input.Outputs {
+		outputs[value.Name] = value.Value
+	}
+	outputsJSON, err := json.Marshal(outputs)
+	if err != nil {
+		return PipelineRunRecord{}, PipelineAttemptRecord{}, fmt.Errorf("state: marshal pipeline outputs: %w", err)
+	}
+	result, err := tx.Exec(`
+UPDATE pipeline_attempts SET state = 'reported', report_outcome = ?, report_summary = ?,
+  report_details = ?, report_checks = ?, report_outputs_json = ?, reported_at = ?, updated_at = ?
+WHERE attempt_id = ? AND report_outcome = ''`,
+		input.Outcome, input.Summary, input.Details, input.Checks, string(outputsJSON), formatTime(when), formatTime(when), input.AttemptID)
+	if err != nil {
+		return PipelineRunRecord{}, PipelineAttemptRecord{}, fmt.Errorf("state: write pipeline report: %w", err)
+	}
+	if count, _ := result.RowsAffected(); count != 1 {
+		return PipelineRunRecord{}, PipelineAttemptRecord{}, ErrPipelineConflict
+	}
+	for _, value := range input.Outputs {
+		if _, err := tx.Exec(`
+INSERT INTO pipeline_values(run_id, name, value, source_kind, source_attempt_id, updated_at)
+VALUES (?, ?, ?, 'stage_output', ?, ?)
+ON CONFLICT(run_id, name) DO UPDATE SET
+  value = excluded.value, source_kind = excluded.source_kind,
+  source_attempt_id = excluded.source_attempt_id, updated_at = excluded.updated_at`,
+			input.RunID, value.Name, value.Value, input.AttemptID, formatTime(when)); err != nil {
+			return PipelineRunRecord{}, PipelineAttemptRecord{}, fmt.Errorf("state: write pipeline output value: %w", err)
+		}
+	}
+	result, err = tx.Exec(`
+UPDATE pipeline_runs SET revision = revision + 1, pending_action = 'await_quiescence',
+  attention_reason = '', updated_at = ? WHERE run_id = ? AND revision = ?`,
+		formatTime(when), input.RunID, input.ExpectedRevision)
+	if err != nil {
+		return PipelineRunRecord{}, PipelineAttemptRecord{}, fmt.Errorf("state: await pipeline quiescence: %w", err)
+	}
+	if count, _ := result.RowsAffected(); count != 1 {
+		return PipelineRunRecord{}, PipelineAttemptRecord{}, ErrPipelineConflict
+	}
+	if err := tx.Commit(); err != nil {
+		return PipelineRunRecord{}, PipelineAttemptRecord{}, fmt.Errorf("state: commit pipeline report: %w", err)
+	}
+	updatedRun, err := s.ReadPipelineRun(input.RunID)
+	if err != nil {
+		return PipelineRunRecord{}, PipelineAttemptRecord{}, err
+	}
+	updatedAttempt, err := s.ReadPipelineAttempt(input.AttemptID)
+	return updatedRun, updatedAttempt, err
+}
+
+// MarkPipelineQuiescent consumes the normalized turn boundary exactly once.
+// Blocked pauses with the same idle agent; success/failure records stop intent.
+func (s *Store) MarkPipelineQuiescent(runID, attemptID, agentID, generation string, expectedRevision int64, at time.Time) (PipelineRunRecord, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return PipelineRunRecord{}, fmt.Errorf("state: begin pipeline quiescence: %w", err)
+	}
+	defer tx.Rollback()
+	run, err := readPipelineRunQuery(tx, runID)
+	if err != nil {
+		return PipelineRunRecord{}, err
+	}
+	if run.Revision != expectedRevision || run.PendingAction != "await_quiescence" || run.CurrentAttemptID != attemptID || run.CurrentAgentID != agentID {
+		return PipelineRunRecord{}, ErrPipelineConflict
+	}
+	attempt, err := readPipelineAttemptQuery(tx, attemptID)
+	if err != nil {
+		return PipelineRunRecord{}, err
+	}
+	if attempt.AgentGeneration != generation || attempt.ReportOutcome == "" || attempt.QuiescentAt != nil {
+		return PipelineRunRecord{}, ErrPipelineConflict
+	}
+	if at.IsZero() {
+		at = timeNow()
+	}
+	if _, err := tx.Exec(`UPDATE pipeline_attempts SET state = 'completed', quiescent_at = ?, updated_at = ? WHERE attempt_id = ?`, formatTime(at), formatTime(at), attemptID); err != nil {
+		return PipelineRunRecord{}, fmt.Errorf("state: complete pipeline attempt: %w", err)
+	}
+	nextState, nextAction, reason := run.State, "stop_agent", ""
+	if attempt.ReportOutcome == "blocked" {
+		nextState, nextAction, reason = "paused", "", "blocked"
+	}
+	result, err := tx.Exec(`
+UPDATE pipeline_runs SET state = ?, revision = revision + 1, pending_action = ?, attention_reason = ?, updated_at = ?
+WHERE run_id = ? AND revision = ?`, nextState, nextAction, reason, formatTime(at), runID, expectedRevision)
+	if err != nil {
+		return PipelineRunRecord{}, fmt.Errorf("state: cross pipeline quiescence: %w", err)
+	}
+	if count, _ := result.RowsAffected(); count != 1 {
+		return PipelineRunRecord{}, ErrPipelineConflict
+	}
+	if err := tx.Commit(); err != nil {
+		return PipelineRunRecord{}, fmt.Errorf("state: commit pipeline quiescence: %w", err)
+	}
+	return s.ReadPipelineRun(runID)
+}
+
 func (s *Store) ReadPipelineAttempt(attemptID string) (PipelineAttemptRecord, error) {
-	row := s.db.QueryRow(`
+	return readPipelineAttemptQuery(s.db, attemptID)
+}
+
+func readPipelineAttemptQuery(q pipelineRunQueryer, attemptID string) (PipelineAttemptRecord, error) {
+	row := q.QueryRow(`
 SELECT attempt_id, run_id, stage_id, attempt_no, visit_no, COALESCE(parent_attempt_id, ''),
        agent_id, agent_generation, backend, model, state, assignment_text,
        assignment_hash, assignment_version, report_outcome, report_summary,
@@ -284,6 +603,49 @@ SELECT attempt_id, run_id, stage_id, attempt_no, visit_no, COALESCE(parent_attem
        quiescent_at, created_at, updated_at
 FROM pipeline_attempts WHERE attempt_id = ?`, attemptID)
 	return scanPipelineAttempt(row)
+}
+
+// CurrentPipelineAttemptForAgent resolves server-derived MCP/runtime identity to
+// the one current durable attempt. Old/non-current associations are rejected.
+func (s *Store) CurrentPipelineAttemptForAgent(agentID string) (PipelineRunRecord, PipelineAttemptRecord, error) {
+	var runID, attemptID string
+	err := s.db.QueryRow(`
+SELECT r.run_id, r.current_attempt_id
+FROM pipeline_runs r
+JOIN pipeline_attempts a ON a.attempt_id = r.current_attempt_id
+WHERE r.current_agent_id = ? AND a.agent_id = ? AND r.state NOT IN ('completed', 'stopped')
+ORDER BY r.updated_at DESC LIMIT 1`, agentID, agentID).Scan(&runID, &attemptID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return PipelineRunRecord{}, PipelineAttemptRecord{}, ErrNotFound
+	}
+	if err != nil {
+		return PipelineRunRecord{}, PipelineAttemptRecord{}, fmt.Errorf("state: resolve current pipeline agent: %w", err)
+	}
+	run, err := s.ReadPipelineRun(runID)
+	if err != nil {
+		return PipelineRunRecord{}, PipelineAttemptRecord{}, err
+	}
+	attempt, err := s.ReadPipelineAttempt(attemptID)
+	return run, attempt, err
+}
+
+func (s *Store) PipelineAssociationForAgent(agentID string) (*PipelineAssociation, error) {
+	var association PipelineAssociation
+	err := s.db.QueryRow(`
+SELECT a.run_id, r.display_name, a.stage_id, a.attempt_id, a.attempt_no
+FROM pipeline_attempts a
+JOIN pipeline_runs r ON r.run_id = a.run_id
+WHERE a.agent_id = ?
+ORDER BY a.created_at DESC, a.attempt_no DESC LIMIT 1`, agentID).Scan(
+		&association.RunID, &association.RunName, &association.StageID, &association.AttemptID, &association.AttemptNo,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("state: read pipeline association: %w", err)
+	}
+	return &association, nil
 }
 
 type rowScanner interface {

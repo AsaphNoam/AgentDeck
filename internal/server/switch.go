@@ -332,7 +332,7 @@ func (s *Server) composeSwitchSpec(target state.Agent, resumeID string) (runtime
 
 	token := mintHookToken()
 	s.rememberHookToken(target.AgentID, token)
-	mcpSpec, err := s.registerMessagingMCP(target)
+	mcpSpec, err := s.registerMessagingMCP(target, token)
 	if err != nil {
 		s.forgetHookToken(target.AgentID)
 		return runtime.LaunchSpec{}, apiError(runtime.CodeInternal, err.Error())
@@ -346,6 +346,7 @@ func (s *Server) composeSwitchSpec(target state.Agent, resumeID string) (runtime
 
 	return runtime.LaunchSpec{
 		Agent:          target,
+		Generation:     token,
 		Cwd:            snap.Cwd,
 		AddDirs:        snap.AddDirs,
 		SystemPrompt:   snap.SystemPrompt,

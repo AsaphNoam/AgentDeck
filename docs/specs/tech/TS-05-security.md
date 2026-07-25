@@ -1,6 +1,6 @@
 # TS-05 — Security & trust boundaries
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/server`, `internal/config`, `internal/configsource`, `internal/runtime`, `internal/messaging`, `internal/backend`
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md), the [phase archive manifest](../../archive/phases/README.md), and [`INVARIANTS.md`](../../features/INVARIANTS.md) §14
 
@@ -63,7 +63,7 @@ title, or client input. AgentDeck rejects an existing resource parent or leaf sy
 instead of following it. Its path may appear as non-secret launch/UI metadata, but its contents are
 never read into API, SSE, transcript, analytics, or log data merely by this feature.
 
-**R14 `(planned)` — Pipeline controls preserve the local trust boundary.** Pipeline REST routes stay
+**R14 — Pipeline controls preserve the local trust boundary.** Pipeline REST routes stay
 under the whole-mux Host/Origin guard and have the same unauthenticated same-user authority as the
 rest of `/api`. Stage-result and AgentDecker-proposal MCP calls additionally require the existing
 random launch token and server-derived caller identity; a role/id supplied in tool arguments is never

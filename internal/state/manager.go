@@ -502,6 +502,9 @@ WHERE a.agent_id = ?`, agentID)
 	if unread, err := m.store.UnreadCount(agentID); err == nil {
 		out.UnreadMessages = unread
 	}
+	if association, err := m.store.PipelineAssociationForAgent(agentID); err == nil {
+		out.Pipeline = association
+	}
 
 	m.setKnown(agentID, true)
 	return AgentStateUpdate{AgentState: out}, nil

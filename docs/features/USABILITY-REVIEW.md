@@ -123,6 +123,7 @@ treat the empty variant as mandatory, not optional.
 | J11 | **Failure & recovery** | `seeded/` + fakeacp | Kill the server mid-session → UI shows disconnect, reconnects with accurate state (SSE reset, INVARIANTS §1). Kill the agent process → card reflects the crash. Submit garbage into every form. Stop a non-running agent. |
 | J12 | **Restart durability** | state left by J3–J10 | Restart the server; everything the UI showed before (agents, layout, archive, unread state) is still true after. |
 | J13 | **Annotate & assign** | `lived-in/` + fakeacp ×2 | Select diff lines and a transcript event in both live and archived views; edit/reload the pending tray; send to self, another chat agent, and a prefilled new launch; verify cards, mail, nudging, and archive search. |
+| J14 | **Configurable pipelines** | `seeded/` + fakeacp | Create/edit a four-stage template; start runs with mixed/reversed stage runtimes; observe sequential result/quiescence routing, approval/blocked recovery, repair-loop bounds, shared-workspace confirmation, notifications, restart recovery, run deletion, and links to every retained stage transcript. Exercise Create with AgentDecker as an ordinary builder and verify exact Save/Start proposals require fresh one-time confirmation after edits. |
 
 **Charter shape** (what the orchestrator hands each journey subagent — nothing more):
 

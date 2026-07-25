@@ -1,0 +1,158 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { getTranscript, launchAgent, sendPrompt } from "../../api/client";
+import { useBackends, useConfig, useRoles } from "../../api/config";
+import type { TranscriptEvent } from "../../api/types";
+import { pipelineProposalSchema, type PipelineProposal } from "../../schemas/pipeline";
+import { useTranscriptStore } from "../../store/transcriptStore";
+
+const BUILDER_KEY = "agentdeck.pipeline-builder-agent";
+const EMPTY_EVENTS: TranscriptEvent[] = [];
+
+export function extractPipelineProposals(events: TranscriptEvent[]): PipelineProposal[] {
+  const toolNames = new Map<string, string>();
+  const proposals = new Map<string, PipelineProposal>();
+  for (const event of events) {
+    const kind = String(event.kind ?? event.type ?? "");
+    const callID = String(event.tool_call_id ?? "");
+    if (kind === "tool_call" && callID) {
+      const name = String(event.name ?? "");
+      const title = String(event.title ?? "");
+      toolNames.set(callID, [name, title].find((value) => ["propose_pipeline_template", "propose_pipeline_run"].includes(value)) ?? name);
+    }
+    if (kind !== "tool_result" || !callID || !["propose_pipeline_template", "propose_pipeline_run"].includes(toolNames.get(callID) ?? "")) continue;
+    for (const candidate of jsonCandidates(event.content ?? event.result)) {
+      try {
+        const parsed = JSON.parse(candidate) as { ok?: boolean; proposal?: unknown };
+        const result = pipelineProposalSchema.safeParse(parsed.proposal);
+        if (parsed.ok === true && result.success) proposals.set(result.data.digest, result.data);
+      } catch {
+        // Tool renderers accept arbitrary content; unrelated text is not a proposal.
+      }
+    }
+  }
+  return [...proposals.values()];
+}
+
+function jsonCandidates(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(jsonCandidates);
+  if (!value || typeof value !== "object") return [];
+  const object = value as Record<string, unknown>;
+  const direct = typeof object.text === "string" ? [object.text] : [];
+  return [...direct, ...Object.values(object).flatMap(jsonCandidates)];
+}
+
+export function AgentDeckerBuilder({
+  onTemplateProposal,
+  onRunProposal,
+}: {
+  onTemplateProposal: (proposal: Extract<PipelineProposal, { kind: "save_template" }>) => void;
+  onRunProposal: (proposal: Extract<PipelineProposal, { kind: "start_run" }>) => void;
+}) {
+  const navigate = useNavigate();
+  const roles = useRoles();
+  const backends = useBackends();
+  const config = useConfig();
+  const [open, setOpen] = useState(false);
+  const [backendID, setBackendID] = useState("");
+  const [modelID, setModelID] = useState("");
+  const [description, setDescription] = useState("");
+  const [builderID, setBuilderID] = useState<string | null>(() => localStorage.getItem(BUILDER_KEY));
+  const [launching, setLaunching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const events = useTranscriptStore((state) => builderID ? state.byAgent[builderID] ?? EMPTY_EVENTS : EMPTY_EVENTS);
+  const setTranscript = useTranscriptStore((state) => state.setTranscript);
+  const proposals = useMemo(() => extractPipelineProposals(events), [events]);
+
+  const backendEntries = Object.entries(backends.data?.backends ?? {});
+  const defaultBackend = backendEntries.find(([, backend]) => backend.default)?.[0] ?? backendEntries[0]?.[0] ?? "";
+
+  useEffect(() => {
+    if (!backendID && defaultBackend) setBackendID(defaultBackend);
+  }, [backendID, defaultBackend]);
+
+  useEffect(() => {
+    const backend = backends.data?.backends[backendID];
+    setModelID(backend?.default_model ?? Object.keys(backend?.models ?? {})[0] ?? "");
+  }, [backendID, backends.data]);
+
+  useEffect(() => {
+    if (!builderID) return;
+    void getTranscript(builderID)
+      .then((transcript) => setTranscript(transcript.agent_id, transcript.events))
+      .catch(() => undefined);
+  }, [builderID, setTranscript]);
+
+  const launchBuilder = async () => {
+    if (!description.trim()) return;
+    setLaunching(true);
+    setError(null);
+    try {
+      const response = await launchAgent({
+        role: "agentdecker",
+        project: config.data?.default_project ?? "",
+        backend: backendID,
+        model: modelID,
+        interface: "chat",
+        name: "Pipeline Builder",
+      });
+      const agentID = response.agent.agent_id;
+      localStorage.setItem(BUILDER_KEY, agentID);
+      setBuilderID(agentID);
+      await sendPrompt(agentID, [
+        "Help me design this AgentDeck pipeline:",
+        description.trim(),
+        "Ask any clarifying questions in chat. When the design is ready, call propose_pipeline_template with the exact model-neutral draft. Do not save or start anything yourself.",
+      ].join("\n\n"));
+      navigate(`/agent/${agentID}`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setLaunching(false);
+    }
+  };
+
+  const selectedBackend = backends.data?.backends[backendID];
+  const builderReady = Boolean(roles.data?.agentdecker && config.data?.default_project && backendID && modelID && description.trim());
+
+  return <section className="pipeline-panel pipeline-builder">
+    <div className="pipeline-panel-header">
+      <div><p className="pipeline-eyebrow">Guided drafting</p><h2>Create with AgentDecker</h2></div>
+      <button type="button" onClick={() => setOpen((value) => !value)}>{open ? "Close builder setup" : "Create with AgentDecker"}</button>
+    </div>
+    {open && <div className="pipeline-builder-form">
+      <p>Choose the chat runtime for the ordinary AgentDecker session. This choice is not stored in the model-neutral template.</p>
+      {!roles.data?.agentdecker && <p className="form-error">The configured <code>agentdecker</code> role is required.</p>}
+      {!config.data?.default_project && <p className="form-error">Configure a default project before launching the builder.</p>}
+      <div className="pipeline-form-grid">
+        <label className="form-field"><span>Configured backend</span><select value={backendID} onChange={(event) => setBackendID(event.target.value)}>
+          <option value="">Select backend</option>
+          {backendEntries.map(([id, backend]) => <option key={id} value={id}>{backend.name} ({id})</option>)}
+        </select></label>
+        <label className="form-field"><span>Configured model</span><select value={modelID} onChange={(event) => setModelID(event.target.value)}>
+          <option value="">Select model</option>
+          {Object.entries(selectedBackend?.models ?? {}).map(([id, model]) => <option key={id} value={id}>{model.name} ({id})</option>)}
+        </select></label>
+      </div>
+      <label className="form-field"><span>Describe the pipeline</span><textarea rows={4} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Implement a change, review it, validate it, and loop through a fix when validation fails." /></label>
+      {error && <p className="form-error">{error}</p>}
+      <div className="form-actions"><button type="button" disabled={!builderReady || launching} onClick={() => void launchBuilder()}>{launching ? "Launching…" : "Launch AgentDecker builder"}</button></div>
+    </div>}
+
+    {builderID && <div className="pipeline-builder-session">
+      <p>Builder session: <code>{builderID}</code></p>
+      <Link to={`/agent/${builderID}`}>Open AgentDecker chat</Link>
+    </div>}
+    {proposals.length > 0 && <div className="pipeline-proposal-list">
+      <h3>Pending exact proposals</h3>
+      {proposals.map((proposal) => <article className="pipeline-proposal" key={proposal.digest}>
+        <div><strong>{proposal.kind === "save_template" ? "Save template" : "Start run"}</strong><code>{proposal.proposal_id}</code></div>
+        <pre className="pipeline-proposal-payload">{JSON.stringify(proposal.payload, null, 2)}</pre>
+        {proposal.kind === "save_template"
+          ? <button type="button" onClick={() => onTemplateProposal(proposal)}>Review exact Save proposal</button>
+          : <button type="button" onClick={() => onRunProposal(proposal)}>Review exact Start proposal</button>}
+      </article>)}
+    </div>}
+  </section>;
+}

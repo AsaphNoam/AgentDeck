@@ -212,6 +212,9 @@ func TestSendIdentityNotSpoofable(t *testing.T) {
 		{"list_agents", nil},
 		{"send_message", map[string]any{"to": "reviewer@my-app", "body": "hi"}},
 		{"check_messages", nil},
+		{"report_pipeline_stage_result", map[string]any{"outcome": "success", "summary": "done"}},
+		{"propose_pipeline_template", map[string]any{"id": "quality", "template": map[string]any{"version": 1, "title": "Quality", "inputs": []any{}, "stages": []any{}}}},
+		{"propose_pipeline_run", map[string]any{"run": map[string]any{"request_id": "proposal", "template_id": "quality", "display_name": "Run", "project": "app", "goal": "goal", "inputs": map[string]any{}, "assignments": map[string]any{}}}},
 	}
 	for _, c := range anonCalls {
 		res, isErr := call(t, anonCS, c.tool, c.args)

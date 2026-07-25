@@ -8,6 +8,7 @@
 @import "./features/dashboard.css";
 @import "./features/agent.css";
 @import "./features/archive.css";
+@import "./features/pipelines.css";
 @import "./features/settings.css";
 @import "./features/onboarding.css";
 @import "./integrations.css";

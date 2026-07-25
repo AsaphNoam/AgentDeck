@@ -14,11 +14,11 @@ import (
 // caller resolves the calling agent_id from the per-request session token
 // (techspec §3.1). Identity is bound to the registered session, never to a tool
 // argument. Returns ok=false when the token is absent or unknown/revoked.
-func (s *Server) caller(req *mcp.CallToolRequest) (string, bool) {
+func (s *Server) caller(req *mcp.CallToolRequest) (SessionIdentity, bool) {
 	if req == nil || req.Extra == nil || req.Extra.Header == nil {
-		return "", false
+		return SessionIdentity{}, false
 	}
-	return s.Lookup(req.Extra.Header.Get(TokenHeader))
+	return s.LookupSession(req.Extra.Header.Get(TokenHeader))
 }
 
 // jsonResult marshals v into a single text-content tool result.
@@ -57,7 +57,7 @@ type listAgentsArgs struct {
 }
 
 func (s *Server) handleListAgents(_ context.Context, req *mcp.CallToolRequest, in listAgentsArgs) (*mcp.CallToolResult, any, error) {
-	self, ok := s.caller(req)
+	identity, ok := s.caller(req)
 	if !ok {
 		return sessionUnknown()
 	}
@@ -67,7 +67,7 @@ func (s *Server) handleListAgents(_ context.Context, req *mcp.CallToolRequest, i
 	}
 	agents := make([]state.LiveAgent, 0, len(live))
 	for _, a := range live {
-		if !in.IncludeSelf && a.AgentID == self {
+		if !in.IncludeSelf && a.AgentID == identity.AgentID {
 			continue
 		}
 		if in.State != "" && a.State != in.State {
@@ -88,7 +88,7 @@ type sendMessageArgs struct {
 }
 
 func (s *Server) handleSendMessage(_ context.Context, req *mcp.CallToolRequest, in sendMessageArgs) (*mcp.CallToolResult, any, error) {
-	self, ok := s.caller(req)
+	identity, ok := s.caller(req)
 	if !ok {
 		return sessionUnknown()
 	}
@@ -118,6 +118,7 @@ func (s *Server) handleSendMessage(_ context.Context, req *mcp.CallToolRequest, 
 		}
 	}
 
+	self := identity.AgentID
 	sender, err := s.store.ReadAgent(self)
 	if err != nil {
 		return storeUnavailable(err)
@@ -180,7 +181,7 @@ type outMessage struct {
 }
 
 func (s *Server) handleCheckMessages(_ context.Context, req *mcp.CallToolRequest, in checkMessagesArgs) (*mcp.CallToolResult, any, error) {
-	self, ok := s.caller(req)
+	identity, ok := s.caller(req)
 	if !ok {
 		return sessionUnknown()
 	}
@@ -194,6 +195,7 @@ func (s *Server) handleCheckMessages(_ context.Context, req *mcp.CallToolRequest
 	if limit > maxCheckLimit {
 		limit = maxCheckLimit
 	}
+	self := identity.AgentID
 	msgs, budget, breached, err := s.store.TakeMessagesWithBudget(self, unreadOnly, limit, MessageBudgetPerTurn, markRead, deleteAfter)
 	if err != nil {
 		return storeUnavailable(err)

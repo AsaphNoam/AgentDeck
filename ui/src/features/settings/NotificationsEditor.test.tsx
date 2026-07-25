@@ -53,7 +53,7 @@ describe("NotificationsEditor", () => {
       expect(lastPut).toEqual({
         notifications: {
           desktop_enabled: true,
-          muted: { done: true, waiting_input: false, permission_required: false, budget_exceeded: false },
+          muted: { done: true, waiting_input: false, permission_required: false, budget_exceeded: false, pipeline_needs_attention: false, pipeline_completed: false },
         },
       }),
     );

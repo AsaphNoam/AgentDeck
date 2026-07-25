@@ -1,7 +1,7 @@
 # TS-01 — Architecture
 
 **Status:** Partial
-**Code:** `internal/server`, `internal/runtime`, `internal/state`, `internal/index`, `internal/bus`, `internal/config`, `internal/configsource`, `internal/messaging`, `internal/backend`, `internal/archive`, `internal/transcript`, `internal/cli`; planned `internal/pipeline`; `ui/src`
+**Code:** `internal/server`, `internal/runtime`, `internal/state`, `internal/index`, `internal/bus`, `internal/config`, `internal/configsource`, `internal/messaging`, `internal/pipeline`, `internal/backend`, `internal/archive`, `internal/transcript`, `internal/cli`, `ui/src`
 **Absorbed:** architecture contract from [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md); rationale remains in [`architecture-decisions.md`](../../architecture-decisions.md) D1–D5
 
 ## 1. Scope
@@ -25,13 +25,13 @@ runtime — the messaging MCP server and embedded UI live inside the Go binary (
 |---|---|
 | `internal/server` | HTTP surface, launch/resume/switch composition, hook ingest, SSE fan-out, MCP registration wiring, reconciliation watcher |
 | `internal/runtime` | Process lifecycle: the `Runtime` interface, chat (ACP) + terminal (PTY) implementations, the interface-keyed `Registry`, permission/cancel races |
-| `internal/state` | `state.db` — sole SQLite writer: identity, running registry, live status, messages, session/transcript metadata |
+| `internal/state` | `state.db` — sole SQLite writer: identity, running registry, live status, messages, session/transcript metadata, pipeline run state |
 | `internal/index` | FTS5 full-text index over transcript content; in-memory accumulators feeding replace-style writes |
 | `internal/bus` | In-process pub/sub bus backing SSE; snapshot+subscribe atomicity |
-| `internal/config` | Plain-JSON config store under `~/.agentdeck`, atomic writes, slug validation, layout/dir modes |
+| `internal/config` | Plain-JSON config store under `~/.agentdeck`, atomic writes, slug validation, layout/dir modes, pipeline templates |
 | `internal/configsource` | Phase 7 federation: Claude/Codex native-config discovery, binding, effective view |
-| `internal/messaging` | In-process MCP server and token→agent registry; shipped messaging tools plus planned TS-09 pipeline result/proposal tools |
-| `internal/pipeline` `(planned)` | Template validation, durable sequential run state machine, transition reconciliation, stage-result and AgentDecker proposal services |
+| `internal/messaging` | In-process MCP server and token→agent registry; messaging plus TS-09 pipeline result/proposal tools |
+| `internal/pipeline` | Template validation, durable sequential run state machine, transition reconciliation, stage-result and AgentDecker proposal services |
 | `internal/backend` | Backend/model adapter contracts, env layering, credential checks (`credcheck`) |
 | `internal/archive` | Session archive queries + FTS-backed search |
 | `internal/transcript` | Append-only normalized AgentDeck transcript reader/writer; tolerant reads of session artifacts |
@@ -41,7 +41,7 @@ runtime — the messaging MCP server and embedded UI live inside the Go binary (
 **R4 — The `Runtime` abstraction is interface-keyed dispatch.** The server programs against a single `Runtime` interface (`internal/runtime/runtime.go`) with methods `Start`, `SendPrompt`, `Cancel`, `Stop`, `Resume`, `CheckMessages`, `Permission`, `Subscribe`, `Transcript`. Two implementations exist: **chat** (ACP JSON-RPC/NDJSON over stdio) and **terminal** (PTY-backed). The `Registry` dispatches every agent by `agent.interface` (`byIface["chat"]` / `byIface["terminal"]`, `internal/runtime/registry.go`). Both implementations wrap the **same** CLI under the **same** stable identity — that is what makes interface/backend/model switching non-destructive (D4).
 
 **R5 — Source-of-truth rules, split by writer (D1).**
-- **Config = plain JSON files** under `~/.agentdeck` (`roles/`, `projects/`, `backends.json`, `config.json`, `layout.json`, `config-sources.json`). Hand-editable, git-friendly, single-writer, low-volume.
+- **Config = plain JSON files** under `~/.agentdeck` (`roles/`, `projects/`, `pipelines/`, `backends.json`, `config.json`, `layout.json`, `config-sources.json`). Hand-editable, git-friendly, single-writer, low-volume.
 - **State = SQLite `state.db`, server-sole-writer.** Nothing else opens the DB for writing. This is what makes SQLite safe here (no multi-process write contention) and authoritative (no derived-index drift). Enabled by the hook-over-HTTP channel (R8) so only the server touches the DB.
 - **Transcripts = AgentDeck normalized log plus provider artifacts.** The chat runtime appends
   normalized events to `sessions/{id}/transcript.ndjson`; provider-owned session/history artifacts
@@ -55,11 +55,11 @@ runtime — the messaging MCP server and embedded UI live inside the Go binary (
 identity. `session_id` is the CLI-assigned ephemeral runtime id and changes on (re)launch. Every
 switch re-launches on the same `agent_id`; `running` maps it to current pid/session/tty.
 
-**R8 — Event flow: producer → server → `state.db` → SSE; reconciliation is fallback only.** Status producers are (a) lifecycle hooks that `POST /api/hook` with a per-launch token, and (b) the chat runtime deriving status from the ACP stream. The server applies every change to `state.db` and emits an SSE event over the `internal/bus`. SSE event types: `state_update`, `new_message`, `notification`, `ping`. The reconciliation watcher over `sessions/` (`internal/server/reconcile.go`) repairs missed projections from AgentDeck's own normalized `runtime.Event` NDJSON log; provider-native transcript formats are not compatible reconciliation inputs. It is not the primary status channel and must not stomp in-vocabulary status fields (INV §1, §8).
+**R8 — Event flow: producer → server → `state.db` → SSE; reconciliation is fallback only.** Status producers are (a) lifecycle hooks that `POST /api/hook` with a per-launch token, and (b) the chat runtime deriving status from the ACP stream. The server applies every change to `state.db` and emits an SSE event over the `internal/bus`. SSE event types include `state_update`, `new_message`, `pipeline_update`, `notification`, and `ping`. The reconciliation watcher over `sessions/` (`internal/server/reconcile.go`) repairs missed projections from AgentDeck's own normalized `runtime.Event` NDJSON log; provider-native transcript formats are not compatible reconciliation inputs. It is not the primary status channel and must not stomp in-vocabulary status fields (INV §1, §8).
 
 **R9 — The composition seam is shared-helper-only (binding rule).** Launch, resume, and switch are the seam where config, runtime, state, hooks, and MCP registration compose. Any field or cleanup step added to one path must be added to all three, via the shared helpers of R6 — never as an inline subset. This rule is the mechanical form of INV §2 and is enforced by review, not by the compiler.
 
-**R11 `(planned)` — Pipeline orchestration stays inside the existing process and lifecycle seams.**
+**R11 — Pipeline orchestration stays inside the existing process and lifecycle seams.**
 The server constructs one `internal/pipeline` manager over the config/state stores and registry, fans
 persisted normalized turn boundaries and generation-scoped exits into it, and starts its bounded
 reconciler with the other server loops. Manual HTTP and pipeline launches/resumes/stops share
@@ -88,11 +88,12 @@ type Runtime interface {
 ~/.agentdeck/            (0700; $AGENTDECK_HOME overrides)
   roles/{role}.json      persona: system_prompt + skip_permissions (null=inherit)
   projects/{p}.json      cwd + context_prompt + add_dirs
+  pipelines/{id}.json    reusable model-neutral pipeline templates
   backends.json          providers + models + per-model env/keys (version 2)
   config.json            port, default_project/role, skip_permissions, mutes
   layout.json            card order + density + group collapse
   config-sources.json    Claude/Codex bindings + overrides (Phase 7)
-  state.db               SQLite — server sole writer (identity, registry, status, messages, FTS5)
+  state.db               SQLite — server sole writer (identity, registry, status, messages, pipelines, FTS5)
   sessions/{id}/         AgentDeck normalized transcript + provider session artifacts
 ```
 
@@ -112,7 +113,7 @@ type Runtime interface {
 - **Optional terminal drivers are not selectable in the normal UI.** The terminal runtime itself is
   installed by `internal/server` and xterm is usable; tmux/iTerm2 APIs/capabilities exist but the UI
   has no driver picker (FS-07).
-- **Detached federation import is `(planned)`.** `detach=true` returns `501`; TS-07.R11 owns the
+- **Detached federation import is.** `detach=true` returns `501`; TS-07.R11 owns the
   future materialization boundary.
 - **Full env inheritance is deliberate.** Child agents inherit `os.Environ()` minus adapter strip
   keys, then composed overrides. TS-05.R8 owns the security/compatibility tradeoff.
