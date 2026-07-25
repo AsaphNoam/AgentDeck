@@ -67,8 +67,15 @@ func (s *Server) handleAnnotations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	block := runtime.FormatAnnotationBlock(body)
+	// Every target is validated and its delivery payload composed before anything
+	// is released, so the durable source event can be written first (invariant
+	// §15). Delivery is deferred into this closure rather than run inline: the
+	// tray is deliberately preserved on failure (FS-13.R3), so a 500 returned
+	// after mail was inserted or a turn was started makes the natural retry
+	// duplicate that irreversible effect — and FS-13.R5's durable record would be
+	// missing for work an agent is already acting on.
 	var targetID string
+	var deliver func() *runtime.APIError
 	switch body.Target.Kind {
 	case "self":
 		if _, err := s.stateStore.ReadRunning(sourceID); err != nil {
@@ -80,11 +87,14 @@ func (s *Server) handleAnnotations(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, apiError(runtime.CodeConflict, "the source agent must be idle"))
 			return
 		}
-		if err := s.registry.SendPrompt(r.Context(), sourceID, block); err != nil {
-			writeAPIError(w, sessionOpError(err))
-			return
-		}
+		block := runtime.FormatAnnotationBlock(body)
 		targetID = sourceID
+		deliver = func() *runtime.APIError {
+			if err := s.registry.SendPrompt(r.Context(), sourceID, block); err != nil {
+				return sessionOpError(err)
+			}
+			return nil
+		}
 	case "agent":
 		targetID = body.Target.AgentID
 		if targetID == sourceID {
@@ -105,19 +115,21 @@ func (s *Server) handleAnnotations(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, apiError(runtime.CodeValidation, err.Error()))
 			return
 		}
-		if _, err := s.stateStore.InsertMessage(state.Message{
-			FromAgent: "user", FromAddress: "user@dashboard", FromName: "Dashboard user",
-			ToAgent: targetID, Subject: "Annotations", Body: mailBody,
-		}); err != nil {
-			writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
-			return
-		}
-		select {
-		case s.nudgeCh <- targetID:
-		default:
-		}
-		if _, err := s.stateMgr.Touch(targetID); err != nil {
-			s.log.Debug("touch annotation recipient failed", "agent", targetID, "err", err)
+		deliver = func() *runtime.APIError {
+			if _, err := s.stateStore.InsertMessage(state.Message{
+				FromAgent: "user", FromAddress: "user@dashboard", FromName: "Dashboard user",
+				ToAgent: targetID, Subject: "Annotations", Body: mailBody,
+			}); err != nil {
+				return apiError(runtime.CodeInternal, err.Error())
+			}
+			select {
+			case s.nudgeCh <- targetID:
+			default:
+			}
+			if _, err := s.stateMgr.Touch(targetID); err != nil {
+				s.log.Debug("touch annotation recipient failed", "agent", targetID, "err", err)
+			}
+			return nil
 		}
 	default:
 		writeAPIError(w, apiError(runtime.CodeValidation, "target kind must be self or agent"))
@@ -127,6 +139,10 @@ func (s *Server) handleAnnotations(w http.ResponseWriter, r *http.Request) {
 	ev, err := s.appendAnnotation(sourceID, body)
 	if err != nil {
 		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
+		return
+	}
+	if apiErr := deliver(); apiErr != nil {
+		writeAPIError(w, apiErr)
 		return
 	}
 	writeJSON(w, http.StatusAccepted, map[string]any{"accepted": true, "seq": ev.Seq})

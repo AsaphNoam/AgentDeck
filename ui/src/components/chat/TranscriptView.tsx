@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { TranscriptEvent } from "../../api/types";
+import type { AnnotationDraft, TranscriptEvent } from "../../api/types";
+import { clipAnnotationExcerpt } from "../../lib/annotations";
 import { ErrorBoundary } from "../ErrorBoundary";
 import { AssistantText } from "./renderers/AssistantText";
 import { DiffBlock } from "./renderers/DiffBlock";
@@ -108,16 +109,6 @@ function TranscriptItem({ agentId, event, annotationsEnabled, onAnnotate }: { ag
   return <pre className="tool-block">{JSON.stringify(event, null, 2)}</pre>;
 }
 
-type AnnotationDraft = {
-  seq: number;
-  excerpt: string;
-  instruction: string;
-  path?: string;
-  side?: "old" | "new";
-  start_line?: number;
-  end_line?: number;
-};
-
 function canAnnotate(event: TranscriptEvent) {
   const kind = String(event.kind ?? event.type ?? "");
   return event.seq != null && !["session_meta", "permission_resolved", "turn_end", "annotation"].includes(kind);
@@ -125,11 +116,6 @@ function canAnnotate(event: TranscriptEvent) {
 
 function eventDraft(event: TranscriptEvent): AnnotationDraft {
   const raw = event.text ?? event.delta ?? event.new_text ?? event.content ?? JSON.stringify(event, null, 2);
-  const excerpt = clipExcerpt(typeof raw === "string" ? raw : JSON.stringify(raw, null, 2));
+  const excerpt = clipAnnotationExcerpt(typeof raw === "string" ? raw : JSON.stringify(raw, null, 2));
   return { seq: Number(event.seq), excerpt, instruction: "" };
-}
-
-function clipExcerpt(value: string) {
-  const chars = [...value];
-  return chars.length <= 2000 ? value : `${chars.slice(0, 1979).join("")}… [excerpt clipped]`;
 }

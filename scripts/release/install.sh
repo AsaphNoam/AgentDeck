@@ -43,6 +43,11 @@ if [ ! -f "$0" ]; then
     echo "error: could not prepare the temporary installer file" >&2
     exit 1
   }
+  # `exec` replaces this shell image, so the EXIT trap above never runs and
+  # cannot delete a file the replacement still has to read. Hand the path down
+  # instead: the last process to read the script — the lock-holding child —
+  # removes it on every exit path (invariant §4).
+  export AGENTDECK_BOOTSTRAP_FILE="$bootstrap"
   exec bash "$bootstrap" "$@"
 fi
 
@@ -148,6 +153,31 @@ if [ "${AGENTDECK_INSTALL_LOCK_HELD:-}" != "1" ]; then
     AGENTDECK_INSTALL_LOCK_HELD=1 AGENTDECK_VERSION="$VERSION" "$0" "$@"
 fi
 
+# Only the lock holder reaches this point, and it is the last process to read the
+# script, so it owns both temporary artifacts: the staging directory it is about
+# to create and the piped bootstrap's temporary copy of this file. One teardown
+# registered before either can fail covers every exit path (invariant §4). The
+# bootstrap path is accepted only when it matches the name this script's own
+# mktemp produces, so a real `bash install.sh` can never delete its own input.
+staging=""
+bootstrap_file=""
+case "${AGENTDECK_BOOTSTRAP_FILE:-}" in
+  */agentdeck-bootstrap.??????)
+    if [ -f "$AGENTDECK_BOOTSTRAP_FILE" ] && [ "$AGENTDECK_BOOTSTRAP_FILE" = "$0" ]; then
+      bootstrap_file="$AGENTDECK_BOOTSTRAP_FILE"
+    fi
+    ;;
+esac
+cleanup() {
+  if [ -n "$staging" ]; then
+    rm -rf "$staging"
+  fi
+  if [ -n "$bootstrap_file" ]; then
+    rm -f "$bootstrap_file"
+  fi
+}
+trap cleanup EXIT
+
 api="https://api.github.com/repos/${REPO}"
 dl="https://github.com/${REPO}/releases/download"
 
@@ -165,8 +195,6 @@ archive_name="agentdeck-${VERSION}-${TARGET}.tar.gz"
 
 # --- Download to a same-run staging dir ------------------------------------
 staging="$(mktemp -d "${TMPDIR:-/tmp}/agentdeck-install.XXXXXX")"
-cleanup() { rm -rf "$staging"; }
-trap cleanup EXIT
 
 echo "==> Downloading AgentDeck ${VERSION} (${TARGET})"
 curl -fSL --proto '=https' "${dl}/${tag}/${archive_name}" -o "${staging}/${archive_name}" \

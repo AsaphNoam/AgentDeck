@@ -37,6 +37,11 @@ Paid for by:
   with pre-switch chat text.
 - `ui/src/components/.../FilesTab.tsx`, `CommandsTab.tsx` — one-shot fetch-on-mount snapshots that
   also answer-raced across agent switches (fixed with a per-agent request token).
+- `ui/src/store/annotationStore.ts` — a per-agent persisted draft tray with no cleanup on any
+  lifecycle boundary: a deleted agent's drafts survived forever and could resurface against a reused
+  id, and growth across agents was unbounded against the localStorage quota. Browser-local state
+  needs the same boundary handling as server-derived state, plus its own retention bound when no
+  server event can be relied on (drop on the delete event; expire and cap on rehydration).
 
 **Canonical patterns:** reset connection-scoped state in `onopen`, not the constructor; republish
 the affected agent after any read/delete mutation; per-agent request tokens for async UI fetches.
@@ -61,6 +66,11 @@ Paid for by:
 - Live transcript append coalesced streamed assistant deltas, but full transcript replay did not,
   so Archive and resume split one assistant reply into many bubbles. Fix: both paths use the same
   `appendRenderedEvent` reducer (`ui/src/store/transcriptStore.ts`).
+- Annotation capture shipped `clipExcerpt` copied verbatim into two chat components plus a third
+  server implementation, and `AnnotationDraft` declared three times. Both had already drifted (the
+  JS marker kept 1,998 runes against the server's 2,000; one local type made the diff anchor fields
+  required and another optional) with nothing failing yet — structural typing and a CSS-blind test
+  suite see none of it. Fix: `ui/src/lib/annotations.ts` for the clip, `api/types.ts` for the type.
 
 **Canonical helpers:** `composeLaunch`, `composeResumeSpec`, `composeSwitchSpec`, `resolveSkip`,
 `expandAddDirs`, `composeEnv`
@@ -105,6 +115,11 @@ Paid for by:
   `TestSwitchRuntimeKeepsTargetRegistration`).
 - `handleSwitchRuntime` cleaned OLD artifacts *after* NEW registration (wiping the fresh token),
   and its rollback covered only the final failure branch.
+- `exec` discards the EXIT trap along with the shell image, so in `scripts/release/install.sh` the
+  process that created the piped bootstrap's temporary file could never be the one to remove it, and
+  every `curl | bash` install leaked it. Teardown belongs to the last process that still needs the
+  artifact — here the lock-holding child, guarded to the installer's own `mktemp` name so a real
+  `bash install.sh` cannot delete its own input.
 - Stop on an agent the registry didn't own silently deleted the DB row and orphaned the live
   process → `runtime.ReapOrphan`: confirm PID liveness and signal before clearing state ("not
   owned" ≠ "not running"). Also: 404 means "no identity row", never "not currently running" —
@@ -363,10 +378,11 @@ Paid for by:
 - Cancel released a pending permission without emitting `permission_resolved`, so the live UI and
   durable transcript kept a dead Approve/Deny action after the peer had continued. Fix: persist the
   terminal decision before responding.
-- **Current recurrence:** annotate-and-assign delivers reserved mail and fires its nudge before
-  appending the source annotation event. If that append fails, the API returns 500 after delivery
-  and a normal retry duplicates the mail. The open review finding remains a required fix under this
-  rule.
+- annotate-and-assign delivered reserved mail and fired its nudge before appending the source
+  annotation event, so a failed append returned 500 after delivery and the preserved-tray retry
+  inserted a second copy for the recipient to act on twice (`internal/server/sessions.go`). Fix:
+  validate the target and compose its payload, append the durable event, and only then deliver —
+  the delivery is deferred into a closure precisely so the ordering cannot drift back.
 
 **Canonical patterns:** durable event/outbox before notification; one transaction when stores share
 one database; otherwise compensating rollback or a caller-supplied idempotency key with a uniqueness
@@ -387,6 +403,7 @@ constraint. Tests inject the failure after the first would-be side effect and re
 | `seedLocked` | `internal/index/indexer.go` | in-memory buffers feeding replace-style writes (§9) |
 | `config.ValidSlug` | `internal/config/validate.go` | every path-param on every verb (§2) |
 | `foldTranscript` / `appendRenderedEvent` | `ui/src/store/transcriptStore.ts` | identical live and replay event projection (§2) |
+| `clipAnnotationExcerpt` | `ui/src/lib/annotations.ts` (server copy authoritative: `internal/server/sessions.go`) | every UI surface that captures an annotation excerpt (§2) |
 | `localOnly` | `internal/server/security.go` | wraps the whole mux; every new route inherits it (§14) |
 | `notificationPayload` | `internal/bus/` | all notification payloads (§8) |
 | `fakeacp` test double | `internal/runtime/testdata/fakeacp` | env-driven protocol-level repros (`FAKEACP_LOAD_DUMP`, `FAKEACP_PROTO_VERSION`, `ignore_cancel`) |

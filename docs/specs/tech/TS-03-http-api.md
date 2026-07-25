@@ -75,7 +75,10 @@ Settings copy stay in lockstep; no resource-content route or SSE event is added.
 **R14 — Annotation batch endpoint.** `POST /api/sessions/{id}/annotations` accepts one
 batch — annotations, optional overall instruction, and a target of kind `self` or `agent` (with
 `agent_id`); the new-task flow is UI composition over the existing launch route plus an `agent`
-target. Input is validated per FS-13.R11 before any disk or process work; success returns `202`
+target. Input is validated per FS-13.R11 before any disk or process work; the whole target is then
+validated and its delivery payload composed before the durable source annotation event is appended,
+and only then is the batch delivered (INV §15, FS-13.R5) — a `500` therefore never reports a failure
+the retry would deliver twice. Success returns `202`
 with the appended annotation event's `seq`, and a `self` target additionally mirrors the prompt
 route's acceptance. Errors use the R3 structured envelope; list fields serialize as arrays (R6).
 One shared annotation-block renderer composes the agent-visible content for both prompt-turn and

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +15,35 @@ import (
 	"github.com/agentdeck/agentdeck/internal/state"
 	"github.com/agentdeck/agentdeck/internal/transcript"
 )
+
+// writeAnnotationPair seeds an inactive chat source and a running, idle chat
+// recipient — the FS-13.R7 assign-to-another-agent shape.
+func writeAnnotationPair(t *testing.T, srv *Server) (state.Agent, state.Agent) {
+	t.Helper()
+	now := time.Now().UTC()
+	source := state.Agent{AgentID: "a_source", Name: "Source", Role: "implementer", Project: "demo", Backend: "claude", Model: "sonnet", Interface: "chat", CreatedAt: now}
+	target := state.Agent{AgentID: "a_target", Name: "Target", Role: "reviewer", Project: "demo", Backend: "claude", Model: "sonnet", Interface: "chat", CreatedAt: now}
+	for _, agent := range []state.Agent{source, target} {
+		if err := srv.stateStore.WriteAgent(agent); err != nil {
+			t.Fatalf("WriteAgent %s: %v", agent.AgentID, err)
+		}
+	}
+	if err := srv.stateStore.WriteRunning(state.RunningEntry{AgentID: target.AgentID, PID: 42, Interface: "chat", StartedAt: now}); err != nil {
+		t.Fatalf("WriteRunning: %v", err)
+	}
+	if err := srv.stateStore.WriteStatus(state.Status{AgentID: target.AgentID, State: "idle"}); err != nil {
+		t.Fatalf("WriteStatus: %v", err)
+	}
+	// The source needs an indexed session row: appending its annotation event
+	// flushes that event's text into the session's searchable content (FS-13.R10).
+	if err := srv.indexer.UpsertSessionMeta(source.AgentID, runtime.SessionMetaData{
+		Name: source.Name, Role: source.Role, Project: source.Project, Backend: source.Backend,
+		Model: source.Model, Interface: source.Interface, CreatedAt: now.Format(time.RFC3339),
+	}); err != nil {
+		t.Fatalf("UpsertSessionMeta: %v", err)
+	}
+	return source, target
+}
 
 func TestAnnotationMailBodyClipsOnlyExcerpts(t *testing.T) {
 	data := runtime.AnnotationData{
@@ -58,23 +89,7 @@ func TestValidateAnnotationsClipsLongExcerptAndRejectsEmptyInstruction(t *testin
 // impersonates an agent nor creates a turn-budget row.
 func TestAnnotationAgentDeliveryPersistsUserMailAndTranscriptEvent(t *testing.T) {
 	srv := testServer(t, true)
-	now := time.Now().UTC()
-	source := state.Agent{AgentID: "a_source", Name: "Source", Role: "implementer", Project: "demo", Backend: "claude", Model: "sonnet", Interface: "chat", CreatedAt: now}
-	target := state.Agent{AgentID: "a_target", Name: "Target", Role: "reviewer", Project: "demo", Backend: "claude", Model: "sonnet", Interface: "chat", CreatedAt: now}
-	for _, agent := range []state.Agent{source, target} {
-		if err := srv.stateStore.WriteAgent(agent); err != nil {
-			t.Fatalf("WriteAgent %s: %v", agent.AgentID, err)
-		}
-	}
-	if err := srv.stateStore.WriteRunning(state.RunningEntry{AgentID: target.AgentID, PID: 42, Interface: "chat", StartedAt: now}); err != nil {
-		t.Fatalf("WriteRunning: %v", err)
-	}
-	if err := srv.stateStore.WriteStatus(state.Status{AgentID: target.AgentID, State: "idle"}); err != nil {
-		t.Fatalf("WriteStatus: %v", err)
-	}
-	if err := srv.indexer.UpsertSessionMeta(source.AgentID, runtime.SessionMetaData{Name: source.Name, Role: source.Role, Project: source.Project, Backend: source.Backend, Model: source.Model, Interface: source.Interface, CreatedAt: now.Format(time.RFC3339)}); err != nil {
-		t.Fatalf("UpsertSessionMeta: %v", err)
-	}
+	source, target := writeAnnotationPair(t, srv)
 	body := runtime.AnnotationData{Annotations: []runtime.Annotation{{Seq: 4, Path: "main.go", Side: "new", StartLine: 9, EndLine: 10, Excerpt: "target phrase", Instruction: "review this branch"}}, Target: runtime.AnnotationTarget{Kind: "agent", AgentID: target.AgentID}}
 	raw, _ := json.Marshal(body)
 	req := newLocalRequest(http.MethodPost, "/api/sessions/a_source/annotations", bytes.NewReader(raw))
@@ -101,5 +116,58 @@ func TestAnnotationAgentDeliveryPersistsUserMailAndTranscriptEvent(t *testing.T)
 	var indexed string
 	if err := srv.stateStore.DB().QueryRow(`SELECT content FROM sessions_fts WHERE agent_id = ?`, source.AgentID).Scan(&indexed); err != nil || !strings.Contains(indexed, "review this branch") {
 		t.Fatalf("annotation index = %q, %v", indexed, err)
+	}
+}
+
+// FS-13.R5 and invariant §15: the durable source event precedes delivery. A
+// failed append must leave nothing delivered, because the tray is preserved on
+// failure (FS-13.R3) and the natural retry would otherwise insert a second copy
+// of the same mail for the recipient to act on twice.
+func TestAnnotationAppendFailureDeliversNoMailAndRetrySendsOnce(t *testing.T) {
+	srv := testServer(t, true)
+	source, target := writeAnnotationPair(t, srv)
+	// transcript.Open must MkdirAll the per-agent session directory; a regular
+	// file at that path fails it the way a full disk or a permission error would.
+	blocked := filepath.Join(srv.configStore.Home(), "sessions", source.AgentID)
+	if err := os.MkdirAll(filepath.Dir(blocked), 0o700); err != nil {
+		t.Fatalf("MkdirAll sessions: %v", err)
+	}
+	if err := os.WriteFile(blocked, nil, 0o600); err != nil {
+		t.Fatalf("block transcript dir: %v", err)
+	}
+
+	body := runtime.AnnotationData{Annotations: []runtime.Annotation{{Seq: 4, Excerpt: "target phrase", Instruction: "review this branch"}}, Target: runtime.AnnotationTarget{Kind: "agent", AgentID: target.AgentID}}
+	raw, _ := json.Marshal(body)
+	send := func() *httptest.ResponseRecorder {
+		req := newLocalRequest(http.MethodPost, "/api/sessions/"+source.AgentID+"/annotations", bytes.NewReader(raw))
+		rec := httptest.NewRecorder()
+		srv.routes().ServeHTTP(rec, req)
+		return rec
+	}
+	mailCount := func() int {
+		t.Helper()
+		mail, err := srv.stateStore.ListMessages(target.AgentID, false, 10)
+		if err != nil {
+			t.Fatalf("ListMessages: %v", err)
+		}
+		return len(mail)
+	}
+
+	if rec := send(); rec.Code != http.StatusInternalServerError {
+		t.Fatalf("blocked annotation status = %d: %s", rec.Code, rec.Body.String())
+	}
+	if got := mailCount(); got != 0 {
+		t.Fatalf("mail after a failed append = %d; want 0", got)
+	}
+
+	// The preserved tray is re-sent once the transcript is writable again.
+	if err := os.Remove(blocked); err != nil {
+		t.Fatalf("unblock transcript dir: %v", err)
+	}
+	if rec := send(); rec.Code != http.StatusAccepted {
+		t.Fatalf("retried annotation status = %d: %s", rec.Code, rec.Body.String())
+	}
+	if got := mailCount(); got != 1 {
+		t.Fatalf("mail after the retry = %d; want exactly 1", got)
 	}
 }
