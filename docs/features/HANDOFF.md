@@ -7,25 +7,24 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** finished locally with no open findings — transcript search now indexes one immutable
-  document per completed turn or explicit annotation flush, plus one replaceable metadata document.
-  The migration preserves old whole-session content as a legacy document; live indexing and reindex
-  share the same boundaries, reindex reads transcripts as a stream, and archive search collapses
-  document hits to one session. Searches deliberately no longer combine terms or phrases across
-  documents; the exact downside and evidence threshold for a more complex segmented design are in
-  `ideas.md`. Specification checks, both Go test variants, focused index race tests, source build,
-  and distribution build pass.
-  The onboarding-credentials repair is also
-  implemented and verified, and no ready change is waiting. Publishing still needs explicit approval
-  because this completed change makes local main eight commits ahead of `origin/main`.
+- **State:** finished locally with eight open review findings. The continuous range after `8b84e4f`
+  through `eb63dd5` is reviewed: the annotation/installer repairs, invariant and workflow updates,
+  onboarding credentials/defaults, and turn-document transcript indexing. Six findings are must-fix:
+  the live annotation path still cannot prove a durable append before delivery; index event/flush
+  boundaries can interleave; Set up later can race another wizard mutation; Claude failure output can
+  cross the API boundary; a hung Codex status probe consumes the API-key fallback's deadline; and
+  metadata/session writes are split across transactions. Two smaller documentation/copy findings are
+  also open. Specification checks, both Go test variants, 113 UI tests, source/UI builds, and the
+  distribution build pass; the missing failure/interleaving cases explain why those green checks do
+  not close the findings. No ready change is waiting. Publishing still needs explicit approval and
+  should wait for the must-fix findings; this review-state commit makes local main nine commits ahead
+  of `origin/main`.
   Credentialed provider acceptance remains a separate manual release gate; native prompt/confirm
-  actions also need replay in a browser that supports those dialogs. The annotation fixes and the
-  onboarding work are unreviewed code: a future `/review` starts after `8b84e4f`.
+  actions also need replay in a browser that supports those dialogs.
   The onboarding change is verified by automated tests plus a real isolated-home run; **J2 has not
   been replayed in a browser**, so the wizard's Set up later and Check again controls are unproven
   against real rendering and pointer interaction.
-- **Last reviewed code:** `8b84e4f` (2026-07-24), implements FS-13 annotate-and-assign through
-  the continuous range after `61b234d`.
+- **Last reviewed code:** `eb63dd5` (2026-07-25), the continuous range after `8b84e4f`.
 - **Branch:** `main`.
 
 ## Decisions needing your input
@@ -47,10 +46,11 @@ that update.
 
 ## Blocked on human
 
-Publishing is waiting for explicit approval to push all eight commits currently ahead of
+Publishing is waiting for explicit approval to push all nine commits currently ahead of
 `origin/main`: this turn-document indexing change plus the onboarding, annotation/installer,
-invariant, annotate-and-assign, and workflow work. The remote safety gate rejected publishing that
-expanded scope without confirmation.
+invariant, annotate-and-assign, workflow, and review-state work. Resolve the must-fix review findings
+before publishing; the remote safety gate had already rejected publishing the expanded scope without
+confirmation.
 
 Live-provider acceptance is waiting for human authorization because it invokes real provider sessions
 and creates disposable local configuration homes. On 2026-07-15 this machine has Claude Code 2.1.202,
@@ -59,11 +59,78 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-No open findings.
+- **Must fix** — `internal/server/sessions.go:228-237` treats
+  `Registry.AppendAnnotation` as a durable write for a running source, but
+  `internal/runtime/chat.go:766-805` routes it through ordinary `emit`: `persistEvent` logs and hides
+  an append failure, and annotation events are not synced. `FlushContent` can then succeed with no
+  annotation text and delivery still runs, so a full disk, closed writer, or crash can leave mail or
+  a prompt in flight with no durable source event. That still violates FS-13.R5, TS-03.R14, and
+  **INV §15**; the new append-failure test covers only the inactive `transcript.Open` branch. Give
+  live annotations a synchronous append-and-sync path that returns failures before publish/index/
+  delivery, and inject an active writer failure in a regression that proves the recipient gets
+  nothing until a successful retry.
+- **Must fix** — Turn and annotation document boundaries are two calls rather than one atomic index
+  operation: `internal/runtime/chat.go:845-859` calls `OnEvent` then `OnTurnEnd`, and
+  `internal/server/sessions.go:230-235` calls live `AppendAnnotation`/`OnEvent` then `FlushContent`.
+  `internal/index/indexer.go:93-181` releases the per-agent buffer lock between those calls, so a
+  concurrent next-turn prompt, nudge, or active-source event can enter the buffer before the prior
+  boundary flush. The later event is then stored in the wrong immutable document, while streaming
+  reindex processes sequence order and builds a different projection. Make event consumption plus a
+  boundary flush one sequence-aware atomic operation and add deterministic interleaving tests for
+  both turn-end and annotation boundaries (TS-02.R16, FS-05.R25, **INV §2/§5**).
+- **Must fix** — `ui/src/features/onboarding/OnboardingWizard.tsx:96-105` disables **Set up later**
+  only for its own config mutation; it has no knowledge of the backend, project, source, launch, or
+  launch-completion mutation in the mounted step. Clicking it while **Checking…**, **Creating…**, or
+  **Launching…** is pending closes the wizard as skipped, but the other request can still save the
+  backend, create a project, or launch an agent, contradicting FS-04.R32/A13. Serialize the wizard's
+  completion choices or propagate a shared pending/claimed state, with a deferred-request UI test
+  for every mutating step (**INV §5**).
+- **Must fix** — On an unclassified Claude status failure,
+  `internal/backend/credcheck/claude.go:42-48` returns the external CLI's output through
+  `sanitizeOutput`; that helper only drops lines containing `key`, `token`, or `secret`, and neither
+  removes an account/email nor bounds the remaining text. A normal provider error can therefore put
+  raw status/account output in `PUT /api/backends`, contrary to TS-04.R12/R15. Return only a fixed,
+  bounded outcome vocabulary and cover an error containing an account identity and long output
+  (**INV §8/§12**).
+- **Must fix** — `internal/backend/credcheck/codex.go:23-58` spends the caller's entire six-second
+  context on `codex login status` before attempting the independent API-key path. If that installed
+  CLI hangs or cannot terminate promptly, the fallback request is created with an expired context
+  and a valid `OPENAI_API_KEY` reports `skipped/timeout`, blocking onboarding despite FS-09.R34.
+  Reserve a bounded portion of the overall deadline for each path (or otherwise isolate them), and
+  test a hanging fake Codex CLI with a successful local models endpoint (**INV §12**).
+- **Must fix** — `internal/index/indexer.go:55-89` commits the authoritative `sessions` upsert before
+  opening a second transaction for the replaceable metadata document. Any begin/delete/insert/commit
+  failure returns a launch/resume error after the session mutation is already visible, leaving stale
+  or missing metadata and a partial failed-launch archive row even though both stores share SQLite.
+  Put the session upsert and metadata replacement in one transaction and inject the second-write
+  failure to prove rollback (TS-02.R16, **INV §15**).
+- **Worth fixing** — `internal/cli/auth.go:118-132` tells failed/unavailable sign-in users to "sign in
+  from the dashboard," but the newly shipped boundary explicitly provides only static dashboard
+  guidance and never starts or proxies sign-in (FS-04.R34, TS-04.R15). Point them to the onboarding
+  instructions or the provider's own tool instead so the recovery action is truthful (**INV §8**).
+- **Worth fixing** — `docs/specs/features/FS-13-annotate-assign.md:73-75` still says annotation
+  search is governed by FS-05.R5, but this range retired R5 and moved shipped FTS behavior to
+  FS-05.R25-R27. Update the citation so the annotation requirement does not use a superseded search
+  contract (**INV §10**).
 
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-25 — Reviewed the continuous range after `8b84e4f` through `eb63dd5` in both spec
+  directions and swept every invariant class. Six must-fix and two worth-fixing findings are recorded
+  above. **INV §15** caught that live annotation persistence still hides append/sync failures and that
+  metadata replacement is split from the session transaction. **INV §2/§5** caught non-atomic index
+  document boundaries; §5 also caught the competing onboarding completion actions. **INV §8/§12**
+  caught provider-output leakage, the exhausted Codex fallback deadline, and misleading sign-in copy;
+  **INV §10** caught FS-13's citation to retired search behavior. Clean on the remaining classes:
+  §1 annotation-tray lifecycle cleanup is bounded; §3 onboarding merge-preserves catalogs; §4 the
+  installer owns both temporary artifacts on all exits; §6 has no new interface/runtime/driver; §7
+  the new streaming/SQL readers check iteration errors; §9 migrations preserve legacy content and
+  probe liveness is bounded overall; §11 collection shapes stay non-null; §13 all new UI selectors
+  resolve; §14 adds no route and the existing annotation route remains under `localOnly`.
+  Specification lint, both Go variants, 113 UI tests, source/UI builds, and distribution build pass;
+  the open paths need new injected-failure and interleaving coverage.
 
 - 2026-07-25 — Replaced whole-session transcript indexing with immutable turn documents. **INV §10**
   keeps raw NDJSON authoritative and the FTS projection rebuildable: a migration splits the old row

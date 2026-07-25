@@ -4,6 +4,27 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-25 — Review: recent annotation, onboarding, provider, and search work
+
+The full unreviewed range has now been checked against the product specifications and every recurring
+bug class. I found six must-fix issues and two smaller accuracy issues. The most consequential are
+that a running agent's annotation can still be delivered after its transcript write failed, and the
+new search index can put a concurrent event on the wrong side of an immutable turn or annotation
+boundary. Setup can also complete as “later” while another wizard request is still creating or
+launching something; provider readiness can expose Claude status text or let a hung Codex check
+prevent a valid API-key fallback; and session metadata is committed in two transactions that can
+leave a partial result. The two smaller issues are misleading sign-in recovery copy and an annotation
+specification link that still points to retired search behavior.
+
+All existing automated checks pass, including both database variants, 113 interface tests, the
+source builds, and the distribution build. The findings are in failure and concurrency paths those
+tests do not currently exercise.
+
+**Needs attention:** Do not publish this batch until the six must-fix findings are resolved.
+
+**Next:** Run the fix workflow to handle the must-fix findings one at a time, adding the injected
+failure and deterministic interleaving tests described in the handoff.
+
 ### 2026-07-25 — Implementation: make transcript search scale by turn
 
 Archive indexing no longer keeps every touched session's complete transcript in memory or rewrites
