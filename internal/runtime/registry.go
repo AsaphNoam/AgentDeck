@@ -240,6 +240,20 @@ func (r *Registry) AppendAnnotation(agentID string, data AnnotationData) (Event,
 	return chat.AppendAnnotation(agentID, data)
 }
 
+// AppendAnnotationAndSync appends a dashboard annotation without publishing;
+// the caller is responsible for publishing after durability is confirmed.
+func (r *Registry) AppendAnnotationAndSync(agentID string, data AnnotationData) (Event, error) {
+	rt, err := r.ownerFor(agentID)
+	if err != nil {
+		return Event{}, err
+	}
+	chat, ok := rt.(*ChatRuntime)
+	if !ok {
+		return Event{}, ErrNotImplemented
+	}
+	return chat.AppendAnnotationAndSync(agentID, data)
+}
+
 // Cancel routes a cancel to the owning runtime. The bool reports whether a turn
 // or pending permission was actually interrupted (false = idle no-op).
 func (r *Registry) Cancel(ctx context.Context, agentID string) (bool, error) {

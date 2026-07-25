@@ -117,7 +117,7 @@ func runAuth(cmd *cobra.Command, p authProvider) error {
 	c, err := authCommandFor(p)
 	if err != nil {
 		fmt.Fprintf(out, "%s sign-in unavailable: %v.\n", p.Name, err)
-		fmt.Fprintf(out, "Your installation still works; retry with 'agentdeck auth %s' or sign in from the dashboard.\n", p.ID)
+		fmt.Fprintf(out, "Your installation still works; retry with 'agentdeck auth %s'.\n", p.ID)
 		return errAuthFailed
 	}
 	switch classifyAuth(c.Run()) {

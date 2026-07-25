@@ -227,17 +227,51 @@ func annotationMailBody(data runtime.AnnotationData) (string, error) {
 
 func (s *Server) appendAnnotation(sourceID string, data runtime.AnnotationData) (runtime.Event, error) {
 	if _, err := s.stateStore.ReadRunning(sourceID); err == nil {
-		ev, err := s.registry.AppendAnnotation(sourceID, data)
+		// For live agents: validate and append durably to the runtime transcript,
+		// then flush the index, and only then deliver through the event bus.
+		// This ordering ensures a failed append returns an error before any
+		// delivery happens, and a delivery failure after the append does not drop
+		// the annotation from the local source (FS-13.R5, TS-03.R14, INV §15).
+		if err := validateAnnotations(&data); err != nil {
+			return runtime.Event{}, err
+		}
+		// Verify the mail body will fit before persisting.
+		_, err := annotationMailBody(data)
 		if err != nil {
 			return runtime.Event{}, err
 		}
+
+		// AppendAnnotationAndSync appends to the runtime transcript and returns
+		// the event WITHOUT publishing. The caller is responsible for publishing
+		// after durability is confirmed.
+		ev, err := s.registry.AppendAnnotationAndSync(sourceID, data)
+		if err != nil {
+			return runtime.Event{}, err
+		}
+
+		// Flush the indexed content before publishing, ensuring the index is
+		// synchronized with what the event bus will deliver.
 		if err := s.indexer.FlushContent(sourceID, ev.Seq, ev.Ts); err != nil {
 			return runtime.Event{}, err
 		}
+
+		// Only after durability is confirmed, publish through the event bus.
+		s.eventBus.PublishRuntimeEvent(ev)
+
 		return ev, nil
 	} else if !errors.Is(err, state.ErrNotFound) {
 		return runtime.Event{}, err
 	}
+
+	// For archived/inactive agents: append durably to the frozen transcript.
+	if err := validateAnnotations(&data); err != nil {
+		return runtime.Event{}, err
+	}
+	_, err := annotationMailBody(data)
+	if err != nil {
+		return runtime.Event{}, err
+	}
+
 	w, err := transcript.Open(s.configStore.Home(), sourceID, nil)
 	if err != nil {
 		return runtime.Event{}, err

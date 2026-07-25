@@ -52,7 +52,14 @@ func (ix *Indexer) UpsertSessionMeta(agentID string, meta runtime.SessionMetaDat
 	if len(meta.LaunchConfig) > 0 {
 		launchConfig = string(meta.LaunchConfig)
 	}
-	_, err = ix.db.Exec(`
+	// Put the session upsert and metadata document replacement in one
+	// transaction so both succeed or both roll back (TS-02.R16, INV §15).
+	tx, err := ix.db.Begin()
+	if err != nil {
+		return fmt.Errorf("index: begin metadata transaction: %w", err)
+	}
+	defer tx.Rollback()
+	_, err = tx.Exec(`
 INSERT INTO sessions(agent_id, name, role, project, backend, model, interface, grp, cwd, system_prompt, env_keys, skip_permissions, add_dirs, launch_config_json, last_session_id, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(agent_id) DO UPDATE SET
@@ -76,16 +83,11 @@ ON CONFLICT(agent_id) DO UPDATE SET
 	if err != nil {
 		return fmt.Errorf("index: upsert session meta: %w", err)
 	}
-	tx, err := ix.db.Begin()
-	if err != nil {
-		return fmt.Errorf("index: begin metadata flush: %w", err)
-	}
-	defer tx.Rollback()
 	if err := replaceMetadataDocument(tx, agentID); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("index: commit metadata flush: %w", err)
+		return fmt.Errorf("index: commit metadata transaction: %w", err)
 	}
 	return nil
 }

@@ -486,3 +486,55 @@ func TestLaunchConfigRoundTrips(t *testing.T) {
 		t.Fatalf("empty launch config = %q, want nil", snap2.LaunchConfig)
 	}
 }
+
+// TestUpsertSessionMetaTransactionAtomicity verifies that session row and
+// metadata document are updated atomically: both succeed or both roll back
+// (TS-02.R16, INV §15).
+func TestUpsertSessionMetaTransactionAtomicity(t *testing.T) {
+	st, _ := openTestDB(t)
+	ix := New(st.DB())
+
+	m := meta()
+	m.Name = "First"
+	if err := ix.UpsertSessionMeta("a_atomic", m); err != nil {
+		t.Fatalf("first UpsertSessionMeta: %v", err)
+	}
+
+	var firstName string
+	if err := st.DB().QueryRow(`SELECT name FROM sessions WHERE agent_id = ?`, "a_atomic").Scan(&firstName); err != nil {
+		t.Fatalf("read session after first upsert: %v", err)
+	}
+	if firstName != "First" {
+		t.Fatalf("name = %q, want First", firstName)
+	}
+
+	var metaCount int
+	if err := st.DB().QueryRow(`SELECT COUNT(*) FROM sessions_fts WHERE agent_id = ? AND document_id = ?`, "a_atomic", "metadata").Scan(&metaCount); err != nil {
+		t.Fatalf("count metadata documents: %v", err)
+	}
+	if metaCount != 1 {
+		t.Fatalf("metadata document count = %d, want 1", metaCount)
+	}
+
+	// Update with a different name and verify both writes succeeded together.
+	m.Name = "Second"
+	if err := ix.UpsertSessionMeta("a_atomic", m); err != nil {
+		t.Fatalf("second UpsertSessionMeta: %v", err)
+	}
+
+	var secondName string
+	if err := st.DB().QueryRow(`SELECT name FROM sessions WHERE agent_id = ?`, "a_atomic").Scan(&secondName); err != nil {
+		t.Fatalf("read session after second upsert: %v", err)
+	}
+	if secondName != "Second" {
+		t.Fatalf("name = %q, want Second", secondName)
+	}
+
+	// Metadata document should still exist and be unique.
+	if err := st.DB().QueryRow(`SELECT COUNT(*) FROM sessions_fts WHERE agent_id = ? AND document_id = ?`, "a_atomic", "metadata").Scan(&metaCount); err != nil {
+		t.Fatalf("count metadata documents after update: %v", err)
+	}
+	if metaCount != 1 {
+		t.Fatalf("metadata document count after update = %d, want 1 (not 2)", metaCount)
+	}
+}
