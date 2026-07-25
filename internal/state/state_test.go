@@ -93,12 +93,35 @@ func TestOpenMigratesAndConfiguresSQLite(t *testing.T) {
 			t.Fatalf("table %s missing: %v", table, err)
 		}
 	}
+	rows, err := st.DB().Query(`PRAGMA table_info(sessions_fts)`)
+	if err != nil {
+		t.Fatalf("sessions_fts columns: %v", err)
+	}
+	var hasDocumentID bool
+	for rows.Next() {
+		var cid, notNull, pk int
+		var name, typ string
+		var defaultValue any
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &defaultValue, &pk); err != nil {
+			t.Fatalf("scan sessions_fts column: %v", err)
+		}
+		hasDocumentID = hasDocumentID || name == "document_id"
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate sessions_fts columns: %v", err)
+	}
+	if err := rows.Close(); err != nil {
+		t.Fatalf("close sessions_fts columns: %v", err)
+	}
+	if !hasDocumentID {
+		t.Fatal("sessions_fts.document_id missing")
+	}
 	var version int
 	if err := st.DB().QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil {
 		t.Fatalf("schema_migrations version: %v", err)
 	}
-	if version != 8 {
-		t.Fatalf("migration version = %d, want 8", version)
+	if version != 9 {
+		t.Fatalf("migration version = %d, want 9", version)
 	}
 }
 
@@ -129,8 +152,8 @@ func TestOpenIsIdempotentAndPreservesRows(t *testing.T) {
 	if err := reopened.DB().QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatalf("count migration: %v", err)
 	}
-	if count != 8 {
-		t.Fatalf("migration version rows = %d, want 8", count)
+	if count != 9 {
+		t.Fatalf("migration version rows = %d, want 9", count)
 	}
 }
 

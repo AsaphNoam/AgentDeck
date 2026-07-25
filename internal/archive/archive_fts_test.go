@@ -55,9 +55,14 @@ VALUES (?, ?, ?, ?, 'claude', 'sonnet', 'chat', ?, '/tmp/app', 'prompt', '2026-0
 	if err != nil {
 		return err
 	}
+	if _, err = db.Exec(`
+INSERT INTO sessions_fts(agent_id, document_id, name, role, project, grp, model, backend, content)
+VALUES (?, 'metadata', ?, ?, ?, ?, 'sonnet', 'claude', '')`, id, name, role, project, group); err != nil {
+		return err
+	}
 	_, err = db.Exec(`
-INSERT INTO sessions_fts(agent_id, name, role, project, grp, model, backend, content)
-VALUES (?, ?, ?, ?, ?, 'sonnet', 'claude', ?)`, id, name, role, project, group, content)
+INSERT INTO sessions_fts(agent_id, document_id, name, role, project, grp, model, backend, content)
+VALUES (?, 'turn:1', '', '', '', '', '', '', ?)`, id, content)
 	return err
 }
 
@@ -162,6 +167,51 @@ func TestArchiveSearchANDSemantics(t *testing.T) {
 	}
 	if resp.Total != 1 || resp.Results[0].AgentID != "a_active" {
 		t.Fatalf("AND same-session: got total=%d %+v, want 1 a_active", resp.Total, resp.Results)
+	}
+}
+
+// FS-05.A4: terms in different turn documents do not combine into a match.
+func TestArchiveSearchDoesNotCombineTurns(t *testing.T) {
+	db, cleanup := openArchiveTestDB(t)
+	defer cleanup()
+	if _, err := db.Exec(`
+INSERT INTO sessions_fts(agent_id, document_id, name, role, project, grp, model, backend, content)
+VALUES ('a_active', 'turn:2', '', '', '', '', '', '', 'separate migration marker')`); err != nil {
+		t.Fatalf("insert second turn: %v", err)
+	}
+
+	resp, err := New(db).Search(Query{Q: "distinctive migration", Limit: 10})
+	if err != nil {
+		t.Fatalf("cross-turn search: %v", err)
+	}
+	if resp.Total != 0 || len(resp.Results) != 0 {
+		t.Fatalf("cross-turn search = total %d %+v, want no match", resp.Total, resp.Results)
+	}
+}
+
+// FS-05.A11: multiple matching documents collapse to one paginated session,
+// while matched_in reports independent metadata and transcript matches.
+func TestArchiveSearchCollapsesMatchingDocuments(t *testing.T) {
+	db, cleanup := openArchiveTestDB(t)
+	defer cleanup()
+	if _, err := db.Exec(`
+INSERT INTO sessions_fts(agent_id, document_id, name, role, project, grp, model, backend, content)
+VALUES ('a_active', 'turn:2', '', '', '', '', '', '', 'Atlas distinctive quartz follow-up')`); err != nil {
+		t.Fatalf("insert second matching turn: %v", err)
+	}
+
+	resp, err := New(db).Search(Query{Q: "Atlas", Limit: 1})
+	if err != nil {
+		t.Fatalf("multi-document search: %v", err)
+	}
+	if resp.Total != 1 || len(resp.Results) != 1 || resp.Results[0].AgentID != "a_active" {
+		t.Fatalf("multi-document search = total %d %+v, want one session", resp.Total, resp.Results)
+	}
+	if got := resp.Results[0].MatchedIn; len(got) != 2 || got[0] != "metadata" || got[1] != "transcript" {
+		t.Fatalf("matched_in = %+v, want metadata and transcript", got)
+	}
+	if resp.Results[0].Snippet == "" {
+		t.Fatalf("snippet empty with a transcript match")
 	}
 }
 

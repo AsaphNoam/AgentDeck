@@ -4,6 +4,31 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-25 — Implementation: make transcript search scale by turn
+
+Archive indexing no longer keeps every touched session's complete transcript in memory or rewrites
+that growing text after every turn. Each completed turn is now inserted once as its own searchable
+document; metadata updates and annotation flushes use separate document boundaries. Existing
+installations keep all old
+search text through an automatic legacy-document migration, and rebuilding the index now streams the
+transcript instead of loading the whole file.
+
+The intentionally simpler design has one visible trade-off: all words in a search, including a quoted
+phrase, must occur in the same turn, annotation, metadata record, or migrated legacy record. A query
+cannot combine one word from an early turn with another from a later turn, and one exceptionally huge
+turn can still use substantial temporary memory. Those limits and the evidence that would justify the
+more elaborate size-bounded, cross-turn design are recorded in the ideas backlog.
+
+The complete test suite passes with and without full-text search enabled, as do focused concurrency
+tests and both production builds.
+
+**Needs attention:** Publishing remains paused; local main is eight commits ahead, and pushing that
+combined scope still needs your explicit approval.
+
+**Next:** Have an independent reviewer check the new indexing and migration path; revisit the more
+complex design only if real searches miss conversations across turns or individual turns become
+large enough to cause memory pressure.
+
 ### 2026-07-25 — Fix: the rest of the onboarding wizard
 
 You were half right that this was already done. The wizard's anti-eject fix and the readable

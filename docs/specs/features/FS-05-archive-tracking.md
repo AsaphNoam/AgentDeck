@@ -36,24 +36,18 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 
 ### 2.2 Search
 
-- **R5.** A non-empty `q` searches across session metadata (name, role, project, backend, model,
-  group) **and** transcript content. On a build compiled with the `sqlite_fts5` tag, search uses the
-  `sessions_fts` full-text index: query terms are matched as quoted FTS tokens combined with AND
-  semantics (every term must be present), results are ranked by BM25 with metadata columns weighted
-  above transcript content, then by `updated_at` descending.
+- **R5 — retired 2026-07-25:** Whole-session FTS documents and their cross-turn matching semantics
+  are superseded by R25; retaining them made indexing cost grow with the complete transcript.
 - **R6.** On a build compiled **without** the `sqlite_fts5` tag (the shipped no-FTS5 fallback path),
   search transparently falls back to a metadata `LIKE` substring filter over name, role, project, and
   backend, with AND semantics across terms. Transcript content is not searchable in this build; the
   query still returns correctly-filtered metadata results rather than an error. The fallback also
   triggers on a tagged binary whenever the FTS5 module is reported missing at runtime.
-- **R7.** Each search result carries `matched_in`: the array contains `"metadata"` when every query
-  term appears within the combined metadata fields, and `"transcript"` when every query term appears
-  within transcript content. Both may be present; the array may be empty when the terms are satisfied
-  only by being split across the two field groups.
+- **R7 — retired 2026-07-25:** Whole-session `matched_in` projection is superseded by the
+  document-scoped rule in R26.
 - **R8.** On the FTS5 path, a transcript-matching result carries `snippet`: a short excerpt of the
   matched transcript content with an ellipsis marker. The fallback path returns no snippet.
-- **R9.** Search accepts double-quoted phrases in `q` as single terms; unquoted whitespace separates
-  terms.
+- **R9 — retired 2026-07-25:** Phrase parsing is retained by R27 with an explicit document boundary.
 
 ### 2.3 Result limits & pagination
 
@@ -112,10 +106,11 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `inactive`. Stopping an agent flips it to inactive (still archived); resume (R11) flips it back to
   active under the same id. The archive listing derives `active` per-row from the running registry at
   query time.
-- **Search-index lifecycle.** The full-text content buffer for a session is (re)built in memory and
-  rewritten to `sessions_fts` at each turn boundary; on server restart or resume it is re-seeded from
-  the durable `sessions_fts` row before the next flush so previously-indexed transcript text is not
-  lost. A crash-truncated final partial turn is preserved by the read-path reindex.
+- **Search-index lifecycle.** Only the current turn's searchable text is buffered. A
+  completed turn or explicit non-turn flush inserts an immutable transcript document; metadata
+  updates replace only the small metadata document. Restart/resume begins a new buffer and never
+  reloads old transcript documents. A read-path reindex rebuilds the same document projection and
+  flushes a crash-truncated final partial turn as its own document.
 
 ## 4. Edge cases & errors
 
@@ -128,6 +123,20 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   replaced by the filtered result set.
 - **R24.** A file path recorded as an absolute path under the session cwd is displayed relative to the
   cwd; paths outside the cwd are displayed as their cleaned absolute form.
+- **R25.** On the FTS5 path, a non-empty `q` searches immutable documents: one current
+  metadata document per session, one transcript document per completed turn, and one document for
+  transcript content explicitly flushed outside a turn. Every query term must occur in the same
+  document. Matching documents collapse to one result per session; the best BM25 document supplies
+  rank and snippet, with metadata columns weighted above transcript content and `updated_at` then
+  `agent_id` breaking ties. Existing whole-session content migrates as one immutable legacy document,
+  so an upgrade does not discard previously searchable text.
+- **R26.** Each FTS5 search result carries `matched_in`: `"metadata"` appears when the
+  query independently matches the session's metadata document and `"transcript"` appears when it
+  independently matches at least one turn, annotation, or legacy transcript document. Both may be
+  present. Terms split between documents do not produce a result. The fallback path retains R6.
+- **R27.** Search accepts double-quoted phrases in `q` as single terms; unquoted
+  whitespace separates terms. A phrase must occur inside one indexed document and therefore does not
+  span completed turns or a separately flushed annotation boundary.
 
 ## 5. Acceptance criteria
 
@@ -138,47 +147,50 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `internal/archive/archive_no_fts5_test.go::TestEmptyArchiveMarshalsResultsArray`,
   `internal/server/files_commands_test.go::TestFilesEndpointEmptyList` and
   `TestCommandsEndpointEmptyList`.
-- **A3** (R5, R7, R8, R10) — FTS5 search matches metadata and transcript, sets `matched_in`, and
+- **A3** (R8, R10, R25, R26) — FTS5 search matches metadata and transcript documents, sets
+  `matched_in`, and
   paginates: `internal/archive/archive_fts_test.go::TestArchiveSearchFTSMetadataTranscriptAndPagination`.
-- **A4** (R5, R9) — Multi-term AND search semantics:
-  `internal/archive/archive_fts_test.go::TestArchiveSearchANDSemantics`.
+- **A4** (R25, R27) — Multi-term AND search semantics within one document, including no match when
+  terms are split across turns:
+  `internal/archive/archive_fts_test.go::TestArchiveSearchANDSemantics` and
+  `TestArchiveSearchDoesNotCombineTurns`.
 - **A5** (R6, R23) — Untagged build falls back to LIKE metadata search instead of erroring:
   `internal/archive/archive_no_fts5_test.go::TestSearchFallbackFiltersMetadata`.
 - **A6** (R11–R13) — Resume restores frozen config and history under the same id, and rejects
   already-running/missing/unknown: `internal/server/resume_test.go::TestResumeHappyPath`,
   `TestResumeAlreadyRunning`, `TestResumeNoPersistedSession`, `TestResumeUnknownAgent`;
   `internal/server/switch_test.go::TestComposeResumeSpecCarriesFrozenLaunchConfig`.
-- **A7** (R12, R14, and §3 index lifecycle) — Transcript/FTS content survives restart and resume:
-  `internal/index/indexer_fts_test.go::TestResumeAfterRestartPreservesFTSContent`,
-  `internal/index/reindex_test.go::TestReindexPreservesFinalPartialTurn`; archived assistant stream
+- **A7** (R12, R14, R25, and §3 index lifecycle) — Existing immutable transcript documents survive
+  restart and resume:
+  `internal/index/indexer_test.go::TestResumeAfterRestartPreservesFTSContent`,
+  `TestReindexPreservesFinalPartialTurn`; archived assistant stream
   fragments replay as one rendered message: `ui/src/features/archive/ArchiveAgentPage.test.tsx`.
 - **A8** (R15–R18) — File/command rollups from both ACP and hook sources:
   `internal/server/files_commands_test.go::TestFilesEndpointRows`, `TestCommandsEndpointRows`,
   `TestHookCommandCapture`, `TestHookCommandCaptureMultiple`.
 - **A9** (R19) — Unknown-agent tracking requests 404:
   `internal/server/files_commands_test.go::TestFilesEndpointUnknownAgent`, `TestCommandsEndpointUnknownAgent`.
-- **A10** (R1, R5, R11, R20) — End-to-end archive + search + resume + tracking through the running UI
+- **A10** (R1, R11, R20, R25) — End-to-end archive + search + resume + tracking through the running UI
   on both the FTS5 and untagged builds: journey **J8** (archive & search), **J7** (stop/resume/switch)
   in `docs/features/USABILITY-REVIEW.md`.
+- **A11** (R25–R27) — Indexing a later turn inserts a new transcript document without changing the
+  earlier document, metadata replacement touches only the metadata document, annotations flush as
+  independent documents, and archive pagination counts distinct sessions: focused regressions
+  `TestTurnsAppendWithoutRewritingEarlierDocuments`, `TestReindexPreservesAnnotationFlushBoundary`,
+  and `TestArchiveSearchCollapsesMatchingDocuments` under both SQLite build variants where applicable.
 
 ## 6. Deviations & open decisions
 
-- **Unbounded transcript indexing.** Full-text indexing keeps
-  the entire transcript for a session in memory and rewrites the whole `sessions_fts` row at every turn
-  boundary, so all previously-streamed content stays searchable (`internal/index/indexer.go`
-  `addContent`). Very long sessions make this progressively more expensive in memory and write cost; a
-  chunked/segmented index would bound the cost at the price of the "every phrase ever streamed is
-  searchable" guarantee. This is deliberate current behavior; a chunked replacement starts with a
-  TS-02/FS-05 delta.
+- **Turn documents deliberately narrow search context.** Terms and phrases do not span
+  turn/annotation documents. This is the simplifying trade-off that removes whole-session rewrites;
+  `ideas.md` records when evidence would justify a more complex size-bounded segmented index.
 - **No-FTS5 fallback is intentionally lossy for transcript search.** The untagged build (R6) can only
   match session metadata; transcript-body search requires the `sqlite_fts5` build tag. This is shipped,
   supported behavior, not a bug — the tag is present on every real build path (`make build`,
   `install.sh`), so shipped binaries retain transcript search; the fallback protects source/dev builds
   and any runtime where the FTS5 module is unavailable.
-- **`matched_in` is empty for terms split across field groups.** Per R7, a field group is reported only
-  when it contains *every* query term; a query whose terms are satisfied jointly by metadata and
-  transcript returns a valid hit with an empty `matched_in`. Current shipped behavior; a tracked
-  advisory covers refining per-field coverage.
+- **Cross-document matches are intentionally absent.** Per R25–R27, a query split across
+  metadata and transcript, or across two turns, returns no result instead of an empty `matched_in`.
 
 ## 7. Traceability
 
@@ -187,6 +199,8 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 - **Index & tracking:** `internal/index/indexer.go` (`UpsertSessionMeta`, `OnEvent`, `trackEvent`,
   `upsertFile`, `CaptureHookFile`, `CaptureHookCommand`, `bumpRollups`), `internal/index/reindex.go`;
   tracking endpoints `internal/server/files_commands.go`.
+- **Streaming replay:** `internal/transcript/reader.go` (`ForEach`, shared by `ReadAll`, sequence
+  recovery, and reindex).
 - **Resume:** `internal/server/resume.go`, `internal/server/switch.go` (`composeResumeSpec`).
 - **UI:** `ui/src/features/archive/ArchivePage.tsx` (list + search), `ArchiveAgentPage.tsx` (read-only
   transcript + Resume), `ui/src/components/chat/{FilesTab,CommandsTab}.tsx`.

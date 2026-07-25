@@ -33,20 +33,45 @@ func ReadFile(home, agentID string, opts ReadOptions) ([]runtime.Event, error) {
 }
 
 func (r *Reader) ReadAll(opts ReadOptions) ([]runtime.Event, error) {
+	out := make([]runtime.Event, 0)
+	if err := r.ForEach(opts, func(ev runtime.Event) error {
+		out = append(out, ev)
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ForEach streams transcript events without retaining the complete session in
+// memory. The same parser and filtering rules back ReadAll and index replays.
+func (r *Reader) ForEach(opts ReadOptions, visit func(runtime.Event) error) error {
 	f, err := os.Open(r.path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return []runtime.Event{}, nil
+			return nil
 		}
-		return nil, fmt.Errorf("transcript: open read: %w", err)
+		return fmt.Errorf("transcript: open read: %w", err)
 	}
 	defer f.Close()
-	return readAll(f, opts)
+	return forEach(f, opts, visit)
 }
 
 func readAll(rd io.Reader, opts ReadOptions) ([]runtime.Event, error) {
 	br := bufio.NewReaderSize(rd, 64*1024)
 	out := make([]runtime.Event, 0)
+	err := forEachBuffered(br, opts, func(ev runtime.Event) error {
+		out = append(out, ev)
+		return nil
+	})
+	return out, err
+}
+
+func forEach(rd io.Reader, opts ReadOptions, visit func(runtime.Event) error) error {
+	return forEachBuffered(bufio.NewReaderSize(rd, 64*1024), opts, visit)
+}
+
+func forEachBuffered(br *bufio.Reader, opts ReadOptions, visit func(runtime.Event) error) error {
 	for {
 		line, oversized, err := readLine(br)
 		if !oversized && len(line) > 0 {
@@ -60,7 +85,9 @@ func readAll(rd io.Reader, opts ReadOptions) ([]runtime.Event, error) {
 					keep = false
 				}
 				if keep {
-					out = append(out, ev)
+					if visitErr := visit(ev); visitErr != nil {
+						return fmt.Errorf("transcript: consume event seq %d: %w", ev.Seq, visitErr)
+					}
 				}
 			}
 		}
@@ -68,10 +95,10 @@ func readAll(rd io.Reader, opts ReadOptions) ([]runtime.Event, error) {
 			break
 		}
 		if err != nil {
-			return nil, fmt.Errorf("transcript: scan: %w", err)
+			return fmt.Errorf("transcript: scan: %w", err)
 		}
 	}
-	return out, nil
+	return nil
 }
 
 // readLine reads one newline-terminated record from br. A record whose length
@@ -119,14 +146,14 @@ func recoverMaxSeq(path string) (maxSeq int64, existed bool, err error) {
 		return 0, false, fmt.Errorf("transcript: open recover: %w", err)
 	}
 	defer f.Close()
-	events, err := readAll(f, ReadOptions{IncludeMeta: true})
-	if err != nil {
-		return 0, true, err
-	}
-	for _, ev := range events {
+	err = forEach(f, ReadOptions{IncludeMeta: true}, func(ev runtime.Event) error {
 		if ev.Seq > maxSeq {
 			maxSeq = ev.Seq
 		}
+		return nil
+	})
+	if err != nil {
+		return 0, true, err
 	}
 	return maxSeq, true, nil
 }

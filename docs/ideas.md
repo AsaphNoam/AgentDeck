@@ -37,8 +37,6 @@ the relevant feature and technical specifications; it does not change product co
   privacy, scale, and normal-user value boundaries.
 - **API authentication / multi-user boundary.** Revisit local API authentication only with an
   explicit threat model and UI/CLI handshake design.
-- **Chunked transcript indexing.** Replace whole-session in-memory rewrites without losing old
-  search content or weakening the fallback search path.
 - **Operational CLI.** Complete the specification for dashboard control, install/update, pidfile
   concurrency, and actionable startup diagnostics.
 
@@ -55,9 +53,17 @@ are clear.
   backend strip keys. Revisit an allowlist only if it can preserve required provider compatibility.
 - **Chat history fidelity.** Make replayed streaming deltas match live deltas; prevent overlapping
   transcript reloads from winning out of order; show initial-load errors.
-- **Archive and tracking usability.** Refine `matched_in` when search terms span metadata and
-  transcript content; add UI pagination; refresh visible files/commands without stale-request
-  overwrite; and let hook-only activity update recency.
+- **Archive and tracking usability.** Add UI pagination; refresh visible files/commands without
+  stale-request overwrite; and let hook-only activity update recency.
+- **Cross-turn transcript search.** Turn-document indexing intentionally chooses a small design over
+  the more complete segmented model: all query terms and quoted phrases must occur within one turn,
+  annotation flush, metadata document, or migrated legacy document. It does not combine a term from
+  one turn with a term from another, does not match a phrase across turn boundaries, and one
+  pathologically large turn can still use substantial temporary memory. Revisit with size-bounded
+  chunks, boundary overlap, and per-term session aggregation only if real sessions show oversized
+  individual turns or users repeatedly fail to find conversations because their query spans turns;
+  those additions otherwise impose more schema, ranking, pagination, and phrase-boundary machinery
+  than the observed long-session rewrite problem warrants.
 - **Coordination liveness.** Scope nudge cooldowns to a generation, limit repeated nudges, republish
   unread counts after janitor expiry, notify only on the first budget breach, and remove duplicate
   permission notices.

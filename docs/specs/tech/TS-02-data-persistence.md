@@ -87,6 +87,14 @@ annotation delivery path. The insert updates unread/indicator state in the same 
 touches no `turn_budget` row. FS-06.R8 retention applies unchanged; any needed column arrives as a
 forward-only migration (R6) and must not repurpose existing sender fields.
 
+**R16 — Turn-document search projection.** `sessions_fts` stores multiple derived
+documents per agent, distinguished by an unindexed stable document id: one replaceable metadata
+document plus immutable completed-turn, explicit non-turn-flush, and migrated legacy documents.
+Only the current turn is accumulated in memory; a flush inserts a new document and never reads or
+rewrites earlier transcript documents. Live indexing and reindex use the same searchable-event and
+document-flush helpers. Raw `transcript.ndjson` remains authoritative; the untagged build keeps its
+metadata-only fallback and does not depend on FTS transcript documents.
+
 ## 3. Interfaces & data shapes
 
 The durable layout is:
@@ -108,7 +116,7 @@ $AGENTDECK_HOME/
 The binding schemas for roles, projects, backends, and global config are defined by FS-04 and
 FS-09. Federation binding/effective-view shapes are defined by TS-07. SQLite table definitions and
 migration order live in `internal/state/schema.go` and execute through `migrate.go`; that executable schema is subordinate to
-R1–R15 and must be reflected here when its contract changes.
+R1–R16 and must be reflected here when its contract changes.
 
 ## 4. Invariants
 
@@ -124,9 +132,9 @@ R1–R15 and must be reflected here when its contract changes.
 
 ## 5. Deviations & open decisions
 
-- Full transcript indexing currently rewrites an in-memory whole-session projection at turn
-  boundaries. This is correct but can be expensive for very long sessions; chunking is backlog work,
-  not an alternative authority model.
+- Turn-document indexing deliberately cannot satisfy a query whose terms occur only in
+  different documents. That product limitation is specified by FS-05.R25–R27 and tracked for
+  evidence-based reconsideration in `ideas.md`; it does not change raw transcript authority.
 - Hook-only file/command activity does not consistently advance session recency. FS-05 records the
   user-visible consequence as an open gap.
 - Startup does not recursively repair permissions on an existing home tree, and role/project reads

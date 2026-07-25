@@ -22,12 +22,11 @@ type execer interface {
 type Indexer struct {
 	db      *sql.DB
 	mu      sync.Mutex
-	content map[string]string
-	seeded  map[string]bool
+	content map[string][]string
 }
 
 func New(db *sql.DB) *Indexer {
-	return &Indexer{db: db, content: map[string]string{}, seeded: map[string]bool{}}
+	return &Indexer{db: db, content: map[string][]string{}}
 }
 
 func (ix *Indexer) UpsertSessionMeta(agentID string, meta runtime.SessionMetaData) error {
@@ -77,7 +76,17 @@ ON CONFLICT(agent_id) DO UPDATE SET
 	if err != nil {
 		return fmt.Errorf("index: upsert session meta: %w", err)
 	}
-	ix.addContent(agentID, strings.Join([]string{meta.Name, meta.Role, meta.Project, meta.Backend, meta.Model, meta.Group}, " "))
+	tx, err := ix.db.Begin()
+	if err != nil {
+		return fmt.Errorf("index: begin metadata flush: %w", err)
+	}
+	defer tx.Rollback()
+	if err := replaceMetadataDocument(tx, agentID); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("index: commit metadata flush: %w", err)
+	}
 	return nil
 }
 
@@ -120,24 +129,23 @@ WHERE agent_id = ?`, ev.Seq, ev.Seq, ev.Ts, ev.Ts, agentID)
 }
 
 func (ix *Indexer) OnTurnEnd(agentID string, rollup runtime.TurnRollup) error {
-	return ix.flush(agentID, rollup, true)
+	return ix.flush(agentID, rollup, true, "turn")
 }
 
 // FlushContent persists indexed content that arrives outside an ACP turn, such
 // as a durable dashboard annotation. It intentionally does not increase the
 // turn count.
 func (ix *Indexer) FlushContent(agentID string, lastSeq int64, updatedAt string) error {
-	return ix.flush(agentID, runtime.TurnRollup{LastSeq: lastSeq, UpdatedAt: updatedAt}, false)
+	return ix.flush(agentID, runtime.TurnRollup{LastSeq: lastSeq, UpdatedAt: updatedAt}, false, "flush")
 }
 
-func (ix *Indexer) flush(agentID string, rollup runtime.TurnRollup, countTurn bool) error {
+func (ix *Indexer) flush(agentID string, rollup runtime.TurnRollup, countTurn bool, documentKind string) error {
 	if agentID == "" {
 		return fmt.Errorf("index: agent id is required")
 	}
 	ix.mu.Lock()
-	ix.seedLocked(agentID)
-	content := ix.content[agentID]
-	ix.mu.Unlock()
+	defer ix.mu.Unlock()
+	content := strings.Join(ix.content[agentID], "\n")
 
 	tx, err := ix.db.Begin()
 	if err != nil {
@@ -145,8 +153,11 @@ func (ix *Indexer) flush(agentID string, rollup runtime.TurnRollup, countTurn bo
 	}
 	defer tx.Rollback()
 
-	if err := replaceFTS(tx, agentID, content); err != nil {
-		return err
+	if content != "" {
+		documentID := fmt.Sprintf("%s:%d", documentKind, rollup.LastSeq)
+		if err := insertTranscriptDocument(tx, agentID, documentID, content); err != nil {
+			return err
+		}
 	}
 	turnInc := 0
 	if countTurn {
@@ -167,6 +178,7 @@ WHERE agent_id = ?`,
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("index: commit turn flush: %w", err)
 	}
+	delete(ix.content, agentID)
 	return nil
 }
 
@@ -177,57 +189,31 @@ func (ix *Indexer) addContent(agentID, text string) {
 	}
 	ix.mu.Lock()
 	defer ix.mu.Unlock()
-	ix.seedLocked(agentID)
-	cur := ix.content[agentID]
-	if cur == "" {
-		ix.content[agentID] = text
-		return
-	}
-	// Accumulate the COMPLETE transcript so the archive-search contract holds:
-	// every phrase ever streamed stays searchable. (A prior 1 MiB cap kept only
-	// the newest bytes, silently dropping older content from sessions_fts even
-	// though the raw transcript was intact.) See HANDOFF "Autonomous decisions"
-	// for the unbounded-growth tradeoff and the segment-model alternative.
-	ix.content[agentID] = cur + "\n" + text
+	ix.content[agentID] = append(ix.content[agentID], text)
 }
 
-// seedLocked primes the in-memory content buffer for an agent from the durable
-// sessions_fts row the first time it is touched in this process. Without it, a
-// server restart or resume starts with an empty buffer; the next turn_end flush
-// would replaceFTS() with only post-restart content, wiping previously-indexed
-// transcript text until a manual reindex. Caller must hold ix.mu.
-func (ix *Indexer) seedLocked(agentID string) {
-	if ix.seeded[agentID] {
-		return
-	}
-	ix.seeded[agentID] = true
-	if ix.content[agentID] != "" {
-		return
-	}
-	var existing string
-	err := ix.db.QueryRow(`SELECT content FROM sessions_fts WHERE agent_id = ?`, agentID).Scan(&existing)
-	if err != nil {
-		// No prior FTS row (new session) or read error: nothing to seed.
-		return
-	}
-	if existing != "" {
-		ix.content[agentID] = existing
-	}
-}
-
-func replaceFTS(tx *sql.Tx, agentID, content string) error {
+func replaceMetadataDocument(tx *sql.Tx, agentID string) error {
 	var name, role, project, grp, model, backend string
 	if err := tx.QueryRow(`SELECT name, role, project, grp, model, backend FROM sessions WHERE agent_id = ?`, agentID).
 		Scan(&name, &role, &project, &grp, &model, &backend); err != nil {
 		return fmt.Errorf("index: read session for fts: %w", err)
 	}
-	if _, err := tx.Exec(`DELETE FROM sessions_fts WHERE agent_id = ?`, agentID); err != nil {
-		return fmt.Errorf("index: delete fts row: %w", err)
+	if _, err := tx.Exec(`DELETE FROM sessions_fts WHERE agent_id = ? AND document_id = 'metadata'`, agentID); err != nil {
+		return fmt.Errorf("index: delete metadata document: %w", err)
 	}
 	if _, err := tx.Exec(`
-INSERT INTO sessions_fts(agent_id, name, role, project, grp, model, backend, content)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, agentID, name, role, project, grp, model, backend, content); err != nil {
-		return fmt.Errorf("index: insert fts row: %w", err)
+INSERT INTO sessions_fts(agent_id, document_id, name, role, project, grp, model, backend, content)
+VALUES (?, 'metadata', ?, ?, ?, ?, ?, ?, '')`, agentID, name, role, project, grp, model, backend); err != nil {
+		return fmt.Errorf("index: insert metadata document: %w", err)
+	}
+	return nil
+}
+
+func insertTranscriptDocument(tx *sql.Tx, agentID, documentID, content string) error {
+	if _, err := tx.Exec(`
+INSERT INTO sessions_fts(agent_id, document_id, name, role, project, grp, model, backend, content)
+VALUES (?, ?, '', '', '', '', '', '', ?)`, agentID, documentID, content); err != nil {
+		return fmt.Errorf("index: insert transcript document: %w", err)
 	}
 	return nil
 }

@@ -57,10 +57,6 @@ func Reindex(home string, db *sql.DB) error {
 // returned (not fatal to the whole reindex) so the caller can continue.
 func reindexAgent(ix *Indexer, root, agentID string) error {
 	path := filepath.Join(root, agentID, "transcript.ndjson")
-	events, err := transcript.NewReader(path).ReadAll(transcript.ReadOptions{IncludeMeta: true})
-	if err != nil {
-		return fmt.Errorf("index: replay %s: %w", agentID, err)
-	}
 	var lastSeq int64
 	var lastContext float64
 	var updatedAt string
@@ -70,7 +66,7 @@ func reindexAgent(ix *Indexer, root, agentID string) error {
 	// (crash-truncated) turn — otherwise the partial turn's assistant text sits
 	// only in the in-memory buffer and is silently dropped from sessions_fts.
 	var pendingFlush bool
-	for _, ev := range events {
+	err := transcript.NewReader(path).ForEach(transcript.ReadOptions{IncludeMeta: true}, func(ev runtime.Event) error {
 		if err := ix.OnEvent(agentID, ev); err != nil {
 			return fmt.Errorf("index: event %s seq %d: %w", agentID, ev.Seq, err)
 		}
@@ -79,6 +75,12 @@ func reindexAgent(ix *Indexer, root, agentID string) error {
 			updatedAt = ev.Ts
 		}
 		pendingFlush = true
+		if ev.Type == runtime.EvAnnotation {
+			if err := ix.FlushContent(agentID, ev.Seq, ev.Ts); err != nil {
+				return fmt.Errorf("index: annotation flush %s seq %d: %w", agentID, ev.Seq, err)
+			}
+			pendingFlush = false
+		}
 		if ev.Type == runtime.EvTurnEnd {
 			var d runtime.TurnEndData
 			_ = json.Unmarshal(ev.Data, &d)
@@ -88,9 +90,13 @@ func reindexAgent(ix *Indexer, root, agentID string) error {
 			}
 			pendingFlush = false
 		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("index: replay %s: %w", agentID, err)
 	}
 	if lastSeq > 0 && updatedAt != "" && pendingFlush {
-		if err := ix.flush(agentID, runtime.TurnRollup{LastSeq: lastSeq, LastContextPct: lastContext, UpdatedAt: updatedAt}, false); err != nil {
+		if err := ix.flush(agentID, runtime.TurnRollup{LastSeq: lastSeq, LastContextPct: lastContext, UpdatedAt: updatedAt}, false, "partial"); err != nil {
 			return fmt.Errorf("index: final flush %s: %w", agentID, err)
 		}
 	}
