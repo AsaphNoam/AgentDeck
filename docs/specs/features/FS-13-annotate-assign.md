@@ -71,7 +71,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 ### 2.3 Structure and search
 
 - **R10.** Annotation instructions and captured excerpts are transcript content: on an
-  FTS5 build they are searchable from the archive (FS-05.R5); the untagged fallback build limits
+  FTS5 build they are searchable from the archive (FS-05.R25-R27); the untagged fallback build limits
   search per FS-05.R6.
 
 ## 3. States & transitions

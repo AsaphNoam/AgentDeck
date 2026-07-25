@@ -805,6 +805,44 @@ func (c *ChatRuntime) AppendAnnotation(agentID string, data AnnotationData) (Eve
 	return c.emit(as, EvAnnotation, data), nil
 }
 
+// AppendAnnotationAndSync records a dashboard annotation without publishing;
+// the caller is responsible for publishing after durability is confirmed
+// (FS-13.R5, TS-03.R14, INV §15).
+func (c *ChatRuntime) AppendAnnotationAndSync(agentID string, data AnnotationData) (Event, error) {
+	as, err := c.lookup(agentID)
+	if err != nil {
+		return Event{}, err
+	}
+
+	// Build the event like emit() does, but WITHOUT publishing.
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return Event{}, fmt.Errorf("marshal annotation data: %w", err)
+	}
+
+	as.mu.Lock()
+	as.seq++
+	ev := Event{
+		AgentID: as.agentID,
+		Seq:     as.seq,
+		Type:    EvAnnotation,
+		Data:    raw,
+		Ts:      time.Now().UTC().Format(time.RFC3339),
+	}
+	as.transcript = append(as.transcript, ev)
+	as.mu.Unlock()
+
+	// Persist the event synchronously before returning. persistEvent logs and
+	// returns a bool indicating success; a failed append is an error that must
+	// not be suppressed (unlike the normal emit path where best-effort
+	// persistence does not suppress delivery).
+	if !c.persistEvent(as, ev) {
+		return Event{}, fmt.Errorf("persist annotation: transcript write failed")
+	}
+
+	return ev, nil
+}
+
 func (c *ChatRuntime) openPersistence(as *agentState, spec LaunchSpec, sessionID string) error {
 	c.mu.Lock()
 	home := c.transcriptHome

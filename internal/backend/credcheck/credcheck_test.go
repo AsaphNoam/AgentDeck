@@ -173,6 +173,38 @@ exit 2
 	}
 }
 
+// Status-check failures return only bounded vocabulary; raw CLI output and
+// account identity never cross the API boundary (TS-04.R15, INV §8/§12).
+func TestClaudeProberReturnsOnlyBoundedErrorOutput(t *testing.T) {
+	dir := t.TempDir()
+	cliPath := filepath.Join(dir, "claude-agent-acp")
+	script := `#!/bin/sh
+if [ "$1" = "--cli" ] && [ "$2" = "auth" ] && [ "$3" = "status" ]; then
+  echo "status call failed for user user@example.com with long raw diagnostic output that should never be exposed" >&2
+  exit 1
+fi
+echo "unexpected args: $@" >&2
+exit 2
+`
+	if err := os.WriteFile(cliPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake claude: %v", err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	result := claudeProber{}.Check(
+		context.Background(),
+		config.Backend{},
+		config.Model{},
+		map[string]string{},
+	)
+	if result.Status != "failed" {
+		t.Fatalf("status = %q, want failed", result.Status)
+	}
+	if result.Detail != "status_check_failed" {
+		t.Errorf("detail = %q, want status_check_failed: account identity and raw output must not cross the API boundary", result.Detail)
+	}
+}
+
 // fakeCodexCLI installs a fake `codex` on PATH whose `login status` prints out
 // and exits with code. It records every invocation so a test can prove no
 // interactive login was ever started (FS-09.A13).
@@ -274,6 +306,46 @@ func TestCodexProberFallsBackToAPIKeyWhenNotSignedIn(t *testing.T) {
 
 	if result.Status != "ok" {
 		t.Fatalf("status = %q, want ok (detail=%q)", result.Status, result.Detail)
+	}
+}
+
+// A hung Codex CLI must not consume the entire context deadline; the API-key
+// fallback must still have time to run (TS-04.R15, INV §12, FS-09.R34).
+func TestCodexProberAPIKeyFallbackAfterHungCLI(t *testing.T) {
+	dir := t.TempDir()
+	cliPath := filepath.Join(dir, "codex")
+	script := `#!/bin/sh
+if [ "$1" = "login" ] && [ "$2" = "status" ]; then
+  sleep 30 &
+  wait
+fi
+exit 1
+`
+	if err := os.WriteFile(cliPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake codex: %v", err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/models" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		if r.Header.Get("Authorization") != "Bearer sk-test" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	result := codexProber{}.Check(context.Background(), config.Backend{}, config.Model{}, map[string]string{
+		"OPENAI_API_KEY":  "sk-test",
+		"OPENAI_BASE_URL": srv.URL,
+	})
+
+	if result.Status != "ok" {
+		t.Fatalf("status = %q, want ok despite hung CLI (detail=%q)", result.Status, result.Detail)
 	}
 }
 

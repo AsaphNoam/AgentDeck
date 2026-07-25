@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/agentdeck/agentdeck/internal/backend/providerauth"
 	"github.com/agentdeck/agentdeck/internal/config"
@@ -23,7 +24,12 @@ type codexProber struct{}
 func (codexProber) Check(ctx context.Context, _ config.Backend, _ config.Model, mergedEnv map[string]string) CredResult {
 	native := nativeUnavailable
 	if p, ok := providerauth.ForBackendType("codex-acp"); ok {
-		native, _, _ = probeNativeLogin(ctx, p, mergedEnv)
+		// Reserve a bounded portion of the overall deadline for the native
+		// probe so a hung CLI cannot exhaust the fallback API-key path
+		// (TS-04.R15, INV §12).
+		nativeCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		native, _, _ = probeNativeLogin(nativeCtx, p, mergedEnv)
+		cancel()
 	}
 	if native == nativeReady {
 		return CredResult{Status: "ok"}

@@ -40,12 +40,9 @@ func (claudeProber) Check(ctx context.Context, _ config.Backend, _ config.Model,
 		return CredResult{Status: "failed", Detail: "not_logged_in"}
 	}
 	if err != nil {
-		output := strings.TrimSpace(string(out))
-		if output == "" {
-			output = err.Error()
-		}
-		// Mask any secrets before returning details.
-		return CredResult{Status: "failed", Detail: sanitizeOutput(output)}
+		// Return only a bounded vocabulary; raw CLI output and account
+		// identity never cross the API boundary (TS-04.R15, INV §8/§12).
+		return CredResult{Status: "failed", Detail: "status_check_failed"}
 	}
 	return CredResult{Status: "ok"}
 }
