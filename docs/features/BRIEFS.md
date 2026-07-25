@@ -4,6 +4,44 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-25 — Fix: the rest of the onboarding wizard
+
+You were half right that this was already done. The wizard's anti-eject fix and the readable
+credential messages had landed earlier as bug fixes, but the actual queued work had not started, and
+the specification still described all of it as unbuilt. That work is now finished.
+
+The most useful discovery was an outright broken path. Signing in to Codex from the command line
+never worked: AgentDeck ran `codex-acp login`, but that program is not a command-line tool — it is a
+background service that ignores whatever you type after it, so the command just hung forever instead
+of signing anyone in. The cause was that two parts of AgentDeck each kept their own private copy of
+"how to talk to a provider", and only one copy was right. There is now a single list both parts read,
+and a test that fails if they ever disagree again.
+
+That fed the bigger fix. If you had signed in to Codex with your ChatGPT account, AgentDeck still
+declared it not ready, because it only ever looked for an API key — which that kind of sign-in does
+not produce. It now asks Codex directly whether you are signed in, and only falls back to the API key
+if you are not. I confirmed this against your actual signed-in Codex: setup goes from blocked to
+ready with no key configured anywhere.
+
+Three things changed in the wizard itself. There is now a **Set up later** button, so a first run
+without working credentials is no longer a dead end — previously the wizard could not be dismissed by
+any means, and someone without a configured provider was simply stuck. The two boxes asking for model
+identifiers are gone; the wizard uses the backend's own default and you change models in Settings.
+And for Claude and Codex it now tells you the exact command to run to sign in, with a **Check again**
+button beside it, rather than asking you to guess and retry blind.
+
+New installs also get sensible current defaults, and re-running setup will not touch a backend file
+you have already edited. Alongside that, release packages now carry the Codex command-line tool
+directly instead of relying on it happening to come bundled with something else — that is what makes
+the sign-in check work on a machine with no Codex installed.
+
+**Needs attention:** I could not click through the finished wizard in a real browser, so Set up later
+and Check again are proven by tests and a live server run, not by a human using them. That is worth
+doing before you next hand AgentDeck to a new user. Publishing is also still waiting on you — there
+are now seven commits ready to push.
+
+**Next:** Replay the setup walkthrough in a browser, then decide whether to publish.
+
 ### 2026-07-25 — Fix: annotations are recorded before they are delivered
 
 The important one was a real double-work risk. When you sent a batch of annotations to another agent,

@@ -82,6 +82,26 @@
   justify-content: flex-end;
 }
 
+/* Provider-owned sign-in instructions: a quiet inset block, not an error. */
+.wizard-guidance {
+  background: var(--ad-surface-raised);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-radius: var(--ad-radius-medium);
+  display: grid;
+  gap: var(--ad-space-2);
+  line-height: 1.5;
+  max-width: 62ch;
+  padding: var(--ad-space-3);
+}
+
+.wizard-guidance code {
+  background: var(--ad-surface-subtle);
+  border-radius: var(--ad-radius-small);
+  font-family: var(--ad-font-mono);
+  padding: var(--ad-space-1) var(--ad-space-2);
+  user-select: all;
+}
+
 .source-step {
   min-height: 300px;
 }

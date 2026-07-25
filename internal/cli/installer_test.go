@@ -38,6 +38,7 @@ esac
 		"runtime/node/bin/node":                      "#!/bin/sh\n",
 		"runtime/node_modules/.bin/claude-agent-acp": "#!/bin/sh\n",
 		"runtime/node_modules/.bin/codex-acp":        "#!/bin/sh\n",
+		"runtime/node_modules/.bin/codex":            "#!/bin/sh\n",
 	}
 	for rel, body := range files {
 		path := filepath.Join(versionDir, rel)
@@ -53,7 +54,7 @@ esac
 	}
 	if err := release.WriteInternalManifest(versionDir, release.InternalManifest{
 		Version: version, Target: release.Target,
-		Components: map[string]string{"node": "22.0.0", "claude-agent-acp": "0.59.0", "codex-acp": "1.1.2", "agentdeck": version},
+		Components: map[string]string{"node": "22.0.0", "claude-agent-acp": "0.59.0", "codex-acp": "1.1.2", "codex": "0.144.4", "agentdeck": version},
 	}); err != nil {
 		t.Fatal(err)
 	}

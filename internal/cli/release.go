@@ -40,7 +40,7 @@ func newReleaseWrapperCmd() *cobra.Command {
 }
 
 func newReleaseManifestCmd() *cobra.Command {
-	var dir, version, node, claudeACP, codexACP string
+	var dir, version, node, claudeACP, codexACP, codexCLI string
 	cmd := &cobra.Command{
 		Use:   "manifest",
 		Short: "Write the internal identity manifest into an assembled version directory",
@@ -49,7 +49,8 @@ func newReleaseManifestCmd() *cobra.Command {
 				Version: version,
 				Target:  release.Target,
 				Components: map[string]string{
-					"node": node, "claude-agent-acp": claudeACP, "codex-acp": codexACP, "agentdeck": version,
+					"node": node, "claude-agent-acp": claudeACP, "codex-acp": codexACP,
+					"codex": codexCLI, "agentdeck": version,
 				},
 			})
 		},
@@ -59,7 +60,8 @@ func newReleaseManifestCmd() *cobra.Command {
 	cmd.Flags().StringVar(&node, "node", "", "private Node version")
 	cmd.Flags().StringVar(&claudeACP, "claude-acp", "", "Claude ACP adapter version")
 	cmd.Flags().StringVar(&codexACP, "codex-acp", "", "Codex ACP adapter version")
-	for _, flag := range []string{"dir", "version", "node", "claude-acp", "codex-acp"} {
+	cmd.Flags().StringVar(&codexCLI, "codex", "", "private Codex CLI version (sign-in and login status)")
+	for _, flag := range []string{"dir", "version", "node", "claude-acp", "codex-acp", "codex"} {
 		_ = cmd.MarkFlagRequired(flag)
 	}
 	return cmd

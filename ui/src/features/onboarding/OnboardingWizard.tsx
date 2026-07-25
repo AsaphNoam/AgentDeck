@@ -2,6 +2,7 @@ import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import type { Onboarding } from "../../schemas/config";
 import type { BackendType } from "../../schemas/backends";
+import { usePutConfig, configErrorMessage } from "../../api/config";
 import { BackendStep } from "./steps/BackendStep";
 import { ProjectStep } from "./steps/ProjectStep";
 import { SourceStep } from "./steps/SourceStep";
@@ -31,8 +32,28 @@ export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
   // The backend chosen in step 0, so the federation Config step targets the right
   // provider (default Claude only until the user picks otherwise).
   const [backend, setBackend] = useState<{ id: string; type: BackendType }>({ id: "claude", type: "claude-acp" });
+  const [skipError, setSkipError] = useState<string | null>(null);
+  const putConfig = usePutConfig();
 
   const advance = () => setStep((s) => Math.min(s + 1, LAST_STEP));
+
+  // Set up later is the escape hatch for someone who cannot finish now — an
+  // unconfigured provider, no credentials to hand, or simply wanting to look
+  // around first (FS-04.R32). It marks onboarding complete and nothing else: no
+  // project is created, no backend or model catalog is written, no agent is
+  // launched. A failed write leaves the wizard open with the reason, because
+  // silently closing would hand back a dashboard that reopens the wizard on the
+  // next poll (INV §8).
+  const handleSetUpLater = () => {
+    setSkipError(null);
+    putConfig.mutate(
+      { onboarding_complete: true },
+      {
+        onSuccess: onComplete,
+        onError: (e) => setSkipError(configErrorMessage(e)),
+      },
+    );
+  };
 
   return (
     <Dialog.Root open modal>
@@ -71,6 +92,17 @@ export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
                 />
               )}
               {step === 3 && <LaunchStep onDone={onComplete} initialProject={createdProject} />}
+            </div>
+            <div className="onboarding-actions" data-slot="footer">
+              {skipError && <p className="form-error">{skipError}</p>}
+              <button
+                type="button"
+                className="btn-link"
+                onClick={handleSetUpLater}
+                disabled={putConfig.isPending}
+              >
+                {putConfig.isPending ? "Saving…" : "Set up later"}
+              </button>
             </div>
           </div>
         </Dialog.Content>

@@ -51,23 +51,29 @@ func DefaultBackends() BackendsConfig {
 	return BackendsConfig{
 		Version: 2,
 		Backends: map[string]Backend{
+			// Fresh homes seed the providers' own moving aliases rather than a
+			// dated pin (FS-09.R33). A seed constant ships inside a binary and is
+			// never rewritten in an existing home, so a pinned generation rots
+			// into an obsolete default for every install made after that release.
+			// `sonnet`/`gpt-5.6-sol` keep naming the current model; people pin an
+			// exact generation in Settings → Backends.
 			"claude": {
 				Name:         "Claude",
 				Type:         "claude-acp",
 				Default:      true,
-				DefaultModel: "sonnet-4-6",
+				DefaultModel: "sonnet",
 				Models: map[string]Model{
-					"sonnet-4-6": {Name: "Sonnet 4.6", Model: "claude-sonnet-4-6"},
-					"opus-4-7":   {Name: "Opus 4.7", Model: "claude-opus-4-7"},
+					"sonnet": {Name: "Claude Sonnet", Model: "sonnet"},
+					"opus":   {Name: "Claude Opus", Model: "opus"},
 				},
 			},
 			"codex": {
 				Name:         "Codex",
 				Type:         "codex-acp",
-				DefaultModel: "gpt-5.5",
+				DefaultModel: "gpt-5.6-sol",
 				Models: map[string]Model{
-					"gpt-5.5": {Name: "GPT 5.5", Model: "gpt-5.5"},
-					"gpt-4o":  {Name: "GPT-4o", Model: "gpt-4o"},
+					"gpt-5.6-sol": {Name: "GPT-5.6-Sol", Model: "gpt-5.6-sol"},
+					"gpt-5.5":     {Name: "GPT-5.5", Model: "gpt-5.5"},
 				},
 			},
 			"opencode": {

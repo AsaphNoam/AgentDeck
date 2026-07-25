@@ -8,26 +8,19 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/agentdeck/agentdeck/internal/backend/providerauth"
 )
 
-// authProvider names a provider and the private adapter command AgentDeck
-// delegates to. The command is only ever attached to the user's terminal —
-// AgentDeck accepts no credential flags, captures no child stdout/stderr, and
-// writes no credential material of its own (TS-06.R20). The release wrapper
-// resolves these commands from the selected private runtime, rather than a
-// globally installed provider or ACP adapter (FS-10.R3, R5).
-type authProvider struct {
-	name        string
-	command     string
-	args        []string
-	statusArgs  []string
-	loginEnvVar string // overrides "command arg arg..." for the gated verifier
-}
-
-var authProviders = map[string]authProvider{
-	"claude": {name: "Claude", command: "claude-agent-acp", args: []string{"--cli", "auth", "login"}, statusArgs: []string{"--cli", "auth", "status"}, loginEnvVar: "AGENTDECK_CLAUDE_LOGIN_CMD"},
-	"codex":  {name: "Codex", command: "codex-acp", args: []string{"login"}, loginEnvVar: "AGENTDECK_CODEX_LOGIN_CMD"},
-}
+// authProvider is the provider sign-in metadata this command delegates to. It
+// is owned by internal/backend/providerauth so the CLI's login argv and the
+// backend readiness probe cannot drift apart (TS-04.R15, INV §2). The command is
+// only ever attached to the user's terminal — AgentDeck accepts no credential
+// flags, captures no child stdout/stderr, and writes no credential material of
+// its own (TS-06.R20). The release wrapper resolves these commands from the
+// selected private runtime, rather than a globally installed provider or ACP
+// adapter (FS-10.R3, R5).
+type authProvider = providerauth.Provider
 
 // authOutcome is the bounded result of a delegated sign-in (FS-10.R11).
 type authOutcome int
@@ -46,14 +39,14 @@ var errAuthFailed = errors.New("sign-in did not complete")
 // terminal. Overridable in tests so the outcome branches run against a fake
 // provider (FS-10.A3).
 var authCommandFor = func(p authProvider) (*exec.Cmd, error) {
-	command, args := p.command, p.args
-	if v := strings.TrimSpace(os.Getenv(p.loginEnvVar)); v != "" {
+	command, args := p.LoginCommand, p.LoginArgs
+	if v := strings.TrimSpace(os.Getenv(p.LoginEnvVar)); v != "" {
 		fields := strings.Fields(v)
 		command, args = fields[0], fields[1:]
 	}
 	path, err := exec.LookPath(command)
 	if err != nil {
-		return nil, fmt.Errorf("the %s sign-in tool %q was not found on PATH", p.name, command)
+		return nil, fmt.Errorf("the %s sign-in tool %q was not found on PATH", p.Name, command)
 	}
 	c := exec.Command(path, args...)
 	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
@@ -64,14 +57,14 @@ var authCommandFor = func(p authProvider) (*exec.Cmd, error) {
 // check must not inherit a test or operator login override. It keeps its output
 // out of AgentDeck's logs while the provider examines its own credential store.
 var authStatusCommandFor = func(p authProvider) (*exec.Cmd, error) {
-	path, err := exec.LookPath(p.command)
+	path, err := exec.LookPath(p.StatusCommand)
 	if err != nil {
-		return nil, fmt.Errorf("the %s sign-in tool %q was not found on PATH", p.name, p.command)
+		return nil, fmt.Errorf("the %s sign-in tool %q was not found on PATH", p.Name, p.StatusCommand)
 	}
-	if len(p.statusArgs) == 0 {
-		return nil, fmt.Errorf("the %s adapter does not provide a non-interactive readiness check", p.name)
+	if len(p.StatusArgs) == 0 {
+		return nil, fmt.Errorf("the %s adapter does not provide a non-interactive readiness check", p.Name)
 	}
-	c := exec.Command(path, p.statusArgs...)
+	c := exec.Command(path, p.StatusArgs...)
 	c.Stdin = nil
 	c.Stdout, c.Stderr = os.Stderr, os.Stderr
 	return c, nil
@@ -87,7 +80,7 @@ func newAuthCmd() *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			p, ok := authProviders[strings.ToLower(args[0])]
+			p, ok := providerauth.Lookup(strings.ToLower(args[0]))
 			if !ok {
 				return fmt.Errorf("unknown provider %q; use 'claude' or 'codex'", args[0])
 			}
@@ -108,10 +101,10 @@ func runAuthCheck(cmd *cobra.Command, p authProvider) error {
 		err = c.Run()
 	}
 	if err == nil {
-		fmt.Fprintf(cmd.OutOrStdout(), "%s is ready.\n", p.name)
+		fmt.Fprintf(cmd.OutOrStdout(), "%s is ready.\n", p.Name)
 		return nil
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "%s needs sign-in. Run 'agentdeck auth %s' to continue.\n", p.name, strings.ToLower(p.name))
+	fmt.Fprintf(cmd.OutOrStdout(), "%s needs sign-in. Run 'agentdeck auth %s' to continue.\n", p.Name, p.ID)
 	return errAuthFailed
 }
 
@@ -123,19 +116,19 @@ func runAuth(cmd *cobra.Command, p authProvider) error {
 	out := cmd.OutOrStdout()
 	c, err := authCommandFor(p)
 	if err != nil {
-		fmt.Fprintf(out, "%s sign-in unavailable: %v.\n", p.name, err)
-		fmt.Fprintf(out, "Your installation still works; retry with 'agentdeck auth %s' or sign in from the dashboard.\n", strings.ToLower(p.name))
+		fmt.Fprintf(out, "%s sign-in unavailable: %v.\n", p.Name, err)
+		fmt.Fprintf(out, "Your installation still works; retry with 'agentdeck auth %s' or sign in from the dashboard.\n", p.ID)
 		return errAuthFailed
 	}
 	switch classifyAuth(c.Run()) {
 	case authSuccess:
-		fmt.Fprintf(out, "Signed in to %s.\n", p.name)
+		fmt.Fprintf(out, "Signed in to %s.\n", p.Name)
 		return nil
 	case authCancelled:
-		fmt.Fprintf(out, "%s sign-in cancelled. Your installation is ready; retry any time with 'agentdeck auth %s' or from the dashboard.\n", p.name, strings.ToLower(p.name))
+		fmt.Fprintf(out, "%s sign-in cancelled. Your installation is ready; retry any time with 'agentdeck auth %s' or from the dashboard.\n", p.Name, p.ID)
 		return nil
 	default:
-		fmt.Fprintf(out, "%s sign-in did not complete. Retry with 'agentdeck auth %s' or sign in from the dashboard.\n", p.name, strings.ToLower(p.name))
+		fmt.Fprintf(out, "%s sign-in did not complete. Retry with 'agentdeck auth %s' or sign in from the dashboard.\n", p.Name, p.ID)
 		return errAuthFailed
 	}
 }

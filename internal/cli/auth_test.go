@@ -7,6 +7,10 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/spf13/cobra"
+
+	"github.com/agentdeck/agentdeck/internal/backend/providerauth"
 )
 
 // fakeAuthExit makes authCommandFor run a real process that exits with code,
@@ -86,20 +90,73 @@ func TestAuthToolNotFound(t *testing.T) {
 	}
 }
 
+// The command must exist in the built binary's tree, and accept exactly the
+// providers the shared table knows. A release whose `agentdeck auth` is missing
+// or narrower than the table sends people to a command that cannot help them
+// (TS-06.R22, FS-10.R5).
+func TestAuthCommandIsPresentForEveryProvider(t *testing.T) {
+	var auth *cobra.Command
+	for _, c := range NewRootCmd().Commands() {
+		if c.Name() == "auth" {
+			auth = c
+			break
+		}
+	}
+	if auth == nil {
+		t.Fatal("`agentdeck auth` is absent from the command tree")
+	}
+	fakeAuthExit(t, 0)
+	for _, id := range providerauth.IDs() {
+		out, err := runAuthCmd(t, id)
+		if err != nil {
+			t.Errorf("auth %s is not an accepted provider: %v (%s)", id, err, out)
+		}
+	}
+}
+
 func TestAuthUnknownProvider(t *testing.T) {
 	if _, err := runAuthCmd(t, "openai"); err == nil {
 		t.Fatal("unknown provider should error")
 	}
 }
 
-// Provider sign-in must resolve the selected release's private ACP adapter,
-// never a globally installed Claude/Codex executable (FS-10.A2, A3).
-func TestAuthUsesPrivateAdapterCommands(t *testing.T) {
-	if got := authProviders["claude"]; got.command != "claude-agent-acp" || strings.Join(got.args, " ") != "--cli auth login" {
-		t.Fatalf("Claude login = %s %q, want claude-agent-acp --cli auth login", got.command, got.args)
+// Provider sign-in resolves commands from the private runtime on the wrapper
+// PATH, never a globally installed provider (FS-10.A2, A3). Codex delegates to
+// the Codex CLI itself: `codex-acp` is a stdio ACP server that ignores argv, so
+// `codex-acp login` never signed anyone in — it started a server and hung
+// (TS-06.R22 pins that CLI into the release runtime).
+func TestAuthUsesPrivateRuntimeCommands(t *testing.T) {
+	claude, _ := providerauth.Lookup("claude")
+	if claude.LoginCommand != "claude-agent-acp" || strings.Join(claude.LoginArgs, " ") != "--cli auth login" {
+		t.Fatalf("Claude login = %s %q, want claude-agent-acp --cli auth login", claude.LoginCommand, claude.LoginArgs)
 	}
-	if got := authProviders["codex"]; got.command != "codex-acp" || strings.Join(got.args, " ") != "login" {
-		t.Fatalf("Codex login = %s %q, want codex-acp login", got.command, got.args)
+	if strings.Join(claude.StatusArgs, " ") != "--cli auth status" {
+		t.Fatalf("Claude status args = %q, want --cli auth status", claude.StatusArgs)
+	}
+	codex, _ := providerauth.Lookup("codex")
+	if codex.LoginCommand != "codex" || strings.Join(codex.LoginArgs, " ") != "login" {
+		t.Fatalf("Codex login = %s %q, want codex login", codex.LoginCommand, codex.LoginArgs)
+	}
+	if codex.StatusCommand != "codex" || strings.Join(codex.StatusArgs, " ") != "login status" {
+		t.Fatalf("Codex status = %s %q, want codex login status", codex.StatusCommand, codex.StatusArgs)
+	}
+}
+
+// Both verbs of a provider must come from one table, or the CLI can sign a user
+// in through a command the readiness probe never checks (TS-04.R15, INV §2).
+func TestAuthLoginAndStatusShareOneExecutable(t *testing.T) {
+	for _, id := range providerauth.IDs() {
+		p, ok := providerauth.Lookup(id)
+		if !ok {
+			t.Fatalf("provider %q missing from the shared table", id)
+		}
+		if p.LoginCommand != p.StatusCommand {
+			t.Errorf("%s: login uses %q but readiness probes %q; they must examine the same credential store",
+				id, p.LoginCommand, p.StatusCommand)
+		}
+		if len(p.StatusArgs) == 0 {
+			t.Errorf("%s: no non-interactive readiness argv", id)
+		}
 	}
 }
 

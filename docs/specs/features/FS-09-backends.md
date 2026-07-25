@@ -141,10 +141,10 @@ Configuration-source federation for Claude/Codex is FS-08.
   places a pre-existing string `developer_instructions` before the composed prompt. Malformed,
   non-object config, or a non-string existing `developer_instructions` fails that launch with a
   bounded configuration error; AgentDeck never silently drops the selected role.
-- **R33** `(planned)` — Fresh homes seed Claude's default model as `sonnet` (labelled as the current
+- **R33** — Fresh homes seed Claude's default model as `sonnet` (labelled as the current
   Claude Sonnet) and Codex's as `gpt-5.6-sol` (labelled `GPT-5.6-Sol`). Seed updates never rewrite an
   existing `backends.json`, change an existing default, or replace a person’s model entry.
-- **R34** `(planned)` — Claude and Codex readiness recognize provider-native sign-in as well as the
+- **R34** — Claude and Codex readiness recognize provider-native sign-in as well as the
   applicable configured API-key path. AgentDeck does not start or proxy native login; it only probes
   the resulting readiness and returns a bounded ready/unready/unavailable/failed outcome. For Codex,
   a valid native login and a valid `OPENAI_API_KEY` are independent acceptable readiness paths.
@@ -198,10 +198,10 @@ Configuration-source federation for Claude/Codex is FS-08.
   merged `CODEX_CONFIG` `developer_instructions` value, without an unsupported ACP `systemPrompt`
   parameter; malformed overlays fail before spawning. *Verified by* runtime parameter and
   process-environment regression tests. A real authenticated Codex turn/resume remains part of A7.
-- **A12** `(planned)` — A fresh backend catalog has the Claude `sonnet` and Codex `gpt-5.6-sol`
+- **A12** — A fresh backend catalog has the Claude `sonnet` and Codex `gpt-5.6-sol`
   defaults, while a pre-existing catalog remains byte-for-byte unchanged by seeding. *Verified by*
   seed/config tests.
-- **A13** `(planned)` — Fake provider-native Claude/Codex readiness produces bounded outcomes
+- **A13** — Fake provider-native Claude/Codex readiness produces bounded outcomes
   without AgentDeck starting a login process or receiving credential bytes; Codex API-key readiness
   remains supported. *Verified by* credential-check tests and FS-04.A14's UI test.
 
@@ -242,6 +242,12 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **Adapters/credentials:** `internal/backend/adapter.go`, `internal/backend/credcheck/`;
   the official Claude executable and delegated auth probe are pinned by
   `TestClaudeAdapterUsesOfficialBinary` and `TestClaudeProberRetriesWithoutNoColor`;
+  provider-native readiness lives in `credcheck/native.go` over the shared
+  `internal/backend/providerauth` command table (R34), covered by
+  `TestCodexProberAcceptsNativeLoginWithoutAPIKey`,
+  `TestCodexProberFallsBackToAPIKeyWhenNotSignedIn`, and
+  `TestClassifyNativeOutputPrefersTheNegative`; seeded defaults by
+  `TestSeededBackendDefaultsAreCurrentAndNeverRewritten` (R33);
   `internal/runtime/chat.go` (adapter consumption, Codex config-overlay composition, and shared ACP
   permission gate).
 - **Capability/composition:** `internal/server/terminal.go`, `launch.go`, `resume.go`, `switch.go`.

@@ -71,7 +71,7 @@ metadata field; AgentDeck instead merges the composed start prompt into the adap
 conflicting non-string value is a launch error, not a best-effort prompt omission. The generic ACP
 shape omits `systemPrompt` for Codex.
 
-**R15 (planned) — Native-auth readiness is a fixed-command probe, not a dashboard login flow.**
+**R15 — Native-auth readiness is a fixed-command probe, not a dashboard login flow.**
 One provider-metadata helper owns the CLI `agentdeck auth` login argv and each non-interactive
 readiness probe. The onboarding UI supplies only static provider guidance and reuses the ordinary
 backend save/check (TS-03.R15); the server never starts or proxies a login command. Each probe uses
@@ -103,7 +103,7 @@ account identity, and credential values never cross the process/log/API boundary
 - **INV §9:** process/cancel/readiness operations have real deadlines and terminate their resources.
 - **R12 — Boundary redaction.** Raw provider errors, stderr, tool inputs, and hook/MCP payloads are
   sanitized before logging or returning over HTTP; diagnostic value must not expose secrets.
-- **R16 (planned) — Auth probes cannot become command execution.** Provider id and argv are selected
+- **R16 — Auth probes cannot become command execution.** Provider id and argv are selected
   exclusively from the shared fixed metadata; request fields, backend names, models, environment
   values, and provider output cannot add an executable or argument. Probe processes receive no
   stdin, are cancelled on deadline/shutdown, and never become agent/session/runtime records.
