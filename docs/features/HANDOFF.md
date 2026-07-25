@@ -31,8 +31,13 @@ controls, and the Pipelines page. The accepted scope excludes terminal stages, e
 parallel branches/joins, child pipelines, typed/file artifacts, worktree isolation, and automatic
 AgentDecker Save/Start.
 
-**Next small step:** land the versioned template store, canonical validation/limits, forward-only
-SQLite migration, and state-store operations with focused tests for FS-14.A1/A5/A9.
+The first foundation slice is implemented: centralized limits, version-1 template shapes, canonical
+role/binding/route/cycle validation, bounded owner-only JSON storage with repairable diagnostics,
+and the forward-only run/attempt/value/request migration with restart, revision, idempotency, and
+non-cascading deletion coverage.
+
+**Next small step:** finish the transactional report/action state operations, extract the shared
+server lifecycle services, and implement the event-driven pipeline manager over those seams.
 
 ## Decisions needing your input
 

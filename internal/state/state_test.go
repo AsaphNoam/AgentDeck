@@ -83,7 +83,7 @@ func TestOpenMigratesAndConfiguresSQLite(t *testing.T) {
 		t.Fatalf("synchronous = %d, want 1 (NORMAL)", synchronous)
 	}
 
-	for _, table := range []string{"schema_migrations", "agents", "running", "status", "messages", "turn_budget", "sessions", "sessions_fts", "tracked_files", "tracked_commands"} {
+	for _, table := range []string{"schema_migrations", "agents", "running", "status", "messages", "turn_budget", "sessions", "sessions_fts", "tracked_files", "tracked_commands", "pipeline_runs", "pipeline_attempts", "pipeline_values", "pipeline_requests"} {
 		var name string
 		err := st.DB().QueryRow(
 			`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`,
@@ -120,8 +120,8 @@ func TestOpenMigratesAndConfiguresSQLite(t *testing.T) {
 	if err := st.DB().QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil {
 		t.Fatalf("schema_migrations version: %v", err)
 	}
-	if version != 9 {
-		t.Fatalf("migration version = %d, want 9", version)
+	if version != 10 {
+		t.Fatalf("migration version = %d, want 10", version)
 	}
 }
 
@@ -152,8 +152,8 @@ func TestOpenIsIdempotentAndPreservesRows(t *testing.T) {
 	if err := reopened.DB().QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatalf("count migration: %v", err)
 	}
-	if count != 9 {
-		t.Fatalf("migration version rows = %d, want 9", count)
+	if count != 10 {
+		t.Fatalf("migration version rows = %d, want 10", count)
 	}
 }
 

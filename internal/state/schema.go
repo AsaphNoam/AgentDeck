@@ -201,4 +201,83 @@ ALTER TABLE sessions ADD COLUMN launch_config_json TEXT NOT NULL DEFAULT '{}';
 		version: 9,
 		apply:   ensureSessionsFTS,
 	},
+	{
+		// Native pipeline control-plane state (TS-02.R17 / TS-09). Template JSON
+		// remains in the config store; these tables own immutable run snapshots,
+		// attempt lineage/reports, current named values, and idempotent starts.
+		// Agent ids are deliberately logical references with no foreign key so
+		// deleting a run cannot cascade into ordinary agents or transcripts.
+		version: 10,
+		sql: `
+CREATE TABLE pipeline_runs (
+  run_id                 TEXT PRIMARY KEY,
+  template_id            TEXT NOT NULL,
+  template_snapshot_json TEXT NOT NULL DEFAULT '{}',
+  display_name           TEXT NOT NULL,
+  project                TEXT NOT NULL,
+  goal                   TEXT NOT NULL,
+  inputs_json            TEXT NOT NULL DEFAULT '{}',
+  assignments_json       TEXT NOT NULL DEFAULT '{}',
+  state                  TEXT NOT NULL,
+  revision               INTEGER NOT NULL DEFAULT 1,
+  pending_action         TEXT NOT NULL DEFAULT '',
+  current_stage_id       TEXT NOT NULL DEFAULT '',
+  current_attempt_id     TEXT NOT NULL DEFAULT '',
+  current_agent_id       TEXT NOT NULL DEFAULT '',
+  attention_reason       TEXT NOT NULL DEFAULT '',
+  final_outcome          TEXT NOT NULL DEFAULT '',
+  created_at             TEXT NOT NULL,
+  updated_at             TEXT NOT NULL
+);
+CREATE INDEX idx_pipeline_runs_state_updated ON pipeline_runs(state, updated_at DESC);
+CREATE INDEX idx_pipeline_runs_project_state ON pipeline_runs(project, state);
+
+CREATE TABLE pipeline_attempts (
+  attempt_id          TEXT PRIMARY KEY,
+  run_id              TEXT NOT NULL REFERENCES pipeline_runs(run_id) ON DELETE CASCADE,
+  stage_id            TEXT NOT NULL,
+  attempt_no          INTEGER NOT NULL,
+  visit_no            INTEGER NOT NULL,
+  parent_attempt_id   TEXT,
+  agent_id            TEXT NOT NULL DEFAULT '',
+  agent_generation    TEXT NOT NULL DEFAULT '',
+  backend             TEXT NOT NULL,
+  model               TEXT NOT NULL,
+  state               TEXT NOT NULL,
+  assignment_text     TEXT NOT NULL DEFAULT '',
+  assignment_hash     TEXT NOT NULL DEFAULT '',
+  assignment_version  INTEGER NOT NULL DEFAULT 1,
+  report_outcome      TEXT NOT NULL DEFAULT '',
+  report_summary      TEXT NOT NULL DEFAULT '',
+  report_details      TEXT NOT NULL DEFAULT '',
+  report_checks       TEXT NOT NULL DEFAULT '',
+  report_outputs_json TEXT NOT NULL DEFAULT '{}',
+  reported_at         TEXT,
+  quiescent_at        TEXT,
+  created_at          TEXT NOT NULL,
+  updated_at          TEXT NOT NULL,
+  UNIQUE(run_id, attempt_no)
+);
+CREATE INDEX idx_pipeline_attempts_run_attempt ON pipeline_attempts(run_id, attempt_no);
+CREATE INDEX idx_pipeline_attempts_agent ON pipeline_attempts(agent_id, run_id);
+
+CREATE TABLE pipeline_values (
+  run_id            TEXT NOT NULL REFERENCES pipeline_runs(run_id) ON DELETE CASCADE,
+  name              TEXT NOT NULL,
+  value             TEXT NOT NULL,
+  source_kind       TEXT NOT NULL,
+  source_attempt_id TEXT NOT NULL DEFAULT '',
+  updated_at        TEXT NOT NULL,
+  PRIMARY KEY(run_id, name)
+);
+
+CREATE TABLE pipeline_requests (
+  request_id   TEXT PRIMARY KEY,
+  request_hash TEXT NOT NULL,
+  run_id       TEXT NOT NULL REFERENCES pipeline_runs(run_id) ON DELETE CASCADE,
+  created_at   TEXT NOT NULL
+);
+CREATE UNIQUE INDEX idx_pipeline_requests_run ON pipeline_requests(run_id);
+`,
+	},
 }
