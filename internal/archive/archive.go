@@ -105,7 +105,7 @@ func (a *Archive) search(q Query, match, raw string) (int, []Result, error) {
 	countArgs := append([]any{match}, args...)
 	var total int
 	if err := a.db.QueryRow(`
-SELECT COUNT(*)
+SELECT COUNT(DISTINCT sessions_fts.agent_id)
 FROM sessions_fts
 JOIN sessions s ON s.agent_id = sessions_fts.agent_id
 LEFT JOIN running r ON r.agent_id = s.agent_id
@@ -118,16 +118,48 @@ WHERE sessions_fts MATCH ?`+where, countArgs...).Scan(&total); err != nil {
 	queryArgs := append([]any{match}, args...)
 	queryArgs = append(queryArgs, q.Limit, q.Offset)
 	rows, err := a.db.Query(`
+WITH matching_documents AS (
+  SELECT agent_id,
+         document_id,
+         bm25(sessions_fts, 0.0, 0.0, 8.0, 4.0, 4.0, 2.0, 1.0, 1.0, 1.0) AS score,
+         snippet(sessions_fts, 8, '', '', '...', 12) AS snippet
+  FROM sessions_fts
+  WHERE sessions_fts MATCH ?
+),
+ranked_documents AS (
+  SELECT agent_id,
+         document_id,
+         score,
+         ROW_NUMBER() OVER (PARTITION BY agent_id ORDER BY score, document_id) AS document_rank
+  FROM matching_documents
+),
+match_summary AS (
+  SELECT agent_id,
+         MAX(document_id = 'metadata') AS metadata_match,
+         MAX(document_id <> 'metadata') AS transcript_match
+  FROM matching_documents
+  GROUP BY agent_id
+),
+transcript_snippets AS (
+  SELECT agent_id,
+         snippet,
+         ROW_NUMBER() OVER (PARTITION BY agent_id ORDER BY score, document_id) AS snippet_rank
+  FROM matching_documents
+  WHERE document_id <> 'metadata'
+)
 SELECT s.agent_id, s.name, s.role, s.project, s.backend, s.model, s.interface, s.grp,
        s.created_at, s.updated_at, s.turn_count, s.files_touched, s.commands_run,
        (r.agent_id IS NOT NULL) AS active,
-       snippet(sessions_fts, 7, '', '', '...', 12) AS snippet,
-       sessions_fts.content
-FROM sessions_fts
-JOIN sessions s ON s.agent_id = sessions_fts.agent_id
+       COALESCE(ts.snippet, '') AS snippet,
+       ms.metadata_match,
+       ms.transcript_match
+FROM ranked_documents rd
+JOIN match_summary ms ON ms.agent_id = rd.agent_id
+JOIN sessions s ON s.agent_id = rd.agent_id
 LEFT JOIN running r ON r.agent_id = s.agent_id
-WHERE sessions_fts MATCH ?`+where+`
-ORDER BY bm25(sessions_fts, 8.0, 4.0, 4.0, 2.0, 1.0, 1.0, 1.0, 1.0), s.updated_at DESC, s.agent_id
+LEFT JOIN transcript_snippets ts ON ts.agent_id = rd.agent_id AND ts.snippet_rank = 1
+WHERE rd.document_rank = 1`+where+`
+ORDER BY rd.score, s.updated_at DESC, s.agent_id
 LIMIT ? OFFSET ?`, queryArgs...)
 	if err != nil {
 		if isFTS5Missing(err) {
@@ -136,13 +168,9 @@ LIMIT ? OFFSET ?`, queryArgs...)
 		return 0, nil, fmt.Errorf("archive: search: %w", err)
 	}
 	defer rows.Close()
-	results, err := scanResults(rows)
+	results, err := scanSearchResults(rows)
 	if err != nil {
 		return 0, nil, err
-	}
-	for i := range results {
-		results[i].MatchedIn = matchedIn(results[i], raw)
-		results[i].content = ""
 	}
 	return total, results, nil
 }
@@ -239,6 +267,31 @@ func scanResults(rows *sql.Rows) ([]Result, error) {
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("archive: iterate results: %w", err)
+	}
+	return out, nil
+}
+
+func scanSearchResults(rows *sql.Rows) ([]Result, error) {
+	out := make([]Result, 0)
+	for rows.Next() {
+		var r Result
+		var active, metadataMatch, transcriptMatch int
+		if err := rows.Scan(&r.AgentID, &r.Name, &r.Role, &r.Project, &r.Backend, &r.Model, &r.Interface, &r.Group,
+			&r.CreatedAt, &r.UpdatedAt, &r.TurnCount, &r.FilesTouched, &r.CommandsRun, &active, &r.Snippet,
+			&metadataMatch, &transcriptMatch); err != nil {
+			return nil, fmt.Errorf("archive: scan search result: %w", err)
+		}
+		r.Active = active != 0
+		if metadataMatch != 0 {
+			r.MatchedIn = append(r.MatchedIn, "metadata")
+		}
+		if transcriptMatch != 0 {
+			r.MatchedIn = append(r.MatchedIn, "transcript")
+		}
+		out = append(out, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("archive: iterate search results: %w", err)
 	}
 	return out, nil
 }

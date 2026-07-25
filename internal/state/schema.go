@@ -1,8 +1,11 @@
 package state
 
+import "database/sql"
+
 type migration struct {
 	version int
 	sql     string
+	apply   func(*sql.Tx) error
 }
 
 var migrations = []migration{
@@ -190,5 +193,12 @@ ALTER TABLE sessions ADD COLUMN add_dirs         TEXT    NOT NULL DEFAULT '[]';
 		sql: `
 ALTER TABLE sessions ADD COLUMN launch_config_json TEXT NOT NULL DEFAULT '{}';
 `,
+	},
+	{
+		// Replace the single whole-session FTS document with a metadata document
+		// plus immutable transcript documents. The migration is capability-aware:
+		// tagged builds create FTS5, while untagged builds keep the plain fallback.
+		version: 9,
+		apply:   ensureSessionsFTS,
 	},
 }

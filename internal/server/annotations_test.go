@@ -114,7 +114,7 @@ func TestAnnotationAgentDeliveryPersistsUserMailAndTranscriptEvent(t *testing.T)
 		t.Fatalf("source annotation event = %#v, %v", events, err)
 	}
 	var indexed string
-	if err := srv.stateStore.DB().QueryRow(`SELECT content FROM sessions_fts WHERE agent_id = ?`, source.AgentID).Scan(&indexed); err != nil || !strings.Contains(indexed, "review this branch") {
+	if err := srv.stateStore.DB().QueryRow(`SELECT content FROM sessions_fts WHERE agent_id = ? AND document_id <> 'metadata'`, source.AgentID).Scan(&indexed); err != nil || !strings.Contains(indexed, "review this branch") {
 		t.Fatalf("annotation index = %q, %v", indexed, err)
 	}
 }

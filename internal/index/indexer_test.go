@@ -145,7 +145,7 @@ func TestAnnotationFlushesSearchableContent(t *testing.T) {
 		t.Fatalf("FlushContent: %v", err)
 	}
 	var content string
-	if err := st.DB().QueryRow(`SELECT content FROM sessions_fts WHERE agent_id = ?`, "a_index").Scan(&content); err != nil {
+	if err := st.DB().QueryRow(`SELECT content FROM sessions_fts WHERE agent_id = ? AND document_id = 'flush:1'`, "a_index").Scan(&content); err != nil {
 		t.Fatalf("read indexed annotation: %v", err)
 	}
 	if !strings.Contains(content, "regression test for the annotation path") {
@@ -157,11 +157,10 @@ func TestResumeAfterRestartPreservesFTSContent(t *testing.T) {
 	st, _ := openTestDB(t)
 	db := st.DB()
 
-	// First process: index a session and flush a turn. "distinctive quartz
-	// phrase" lands in the durable sessions_fts.content column.
+	// First process: index a session and flush a turn into an immutable document.
 	indexFixture(t, db)
 	var before string
-	if err := db.QueryRow(`SELECT content FROM sessions_fts WHERE agent_id = 'a_index'`).Scan(&before); err != nil {
+	if err := db.QueryRow(`SELECT content FROM sessions_fts WHERE agent_id = 'a_index' AND document_id = 'turn:6'`).Scan(&before); err != nil {
 		t.Fatalf("read fts content before restart: %v", err)
 	}
 	if !strings.Contains(before, "distinctive quartz") {
@@ -178,15 +177,62 @@ func TestResumeAfterRestartPreservesFTSContent(t *testing.T) {
 		t.Fatalf("OnTurnEnd after restart: %v", err)
 	}
 
+	var original, resumed string
+	if err := db.QueryRow(`SELECT content FROM sessions_fts WHERE agent_id = 'a_index' AND document_id = 'turn:6'`).Scan(&original); err != nil {
+		t.Fatalf("read original document after restart: %v", err)
+	}
+	if err := db.QueryRow(`SELECT content FROM sessions_fts WHERE agent_id = 'a_index' AND document_id = 'turn:7'`).Scan(&resumed); err != nil {
+		t.Fatalf("read resumed document: %v", err)
+	}
+	if original != before {
+		t.Fatalf("original document changed after resume: before %q after %q", before, original)
+	}
+	if !strings.Contains(resumed, "post restart marker") {
+		t.Fatalf("new phrase missing after resume: %q", resumed)
+	}
+}
+
+// FS-05.A11: later turns append documents and metadata updates replace only
+// the metadata document.
+func TestTurnsAppendWithoutRewritingEarlierDocuments(t *testing.T) {
+	st, _ := openTestDB(t)
+	ix := New(st.DB())
+	if err := ix.UpsertSessionMeta("a_index", meta()); err != nil {
+		t.Fatalf("UpsertSessionMeta: %v", err)
+	}
+	if err := ix.OnEvent("a_index", ev(t, 1, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "first immutable marker"})); err != nil {
+		t.Fatalf("first OnEvent: %v", err)
+	}
+	if err := ix.OnTurnEnd("a_index", runtime.TurnRollup{LastSeq: 2, UpdatedAt: "2026-06-28T10:00:02Z"}); err != nil {
+		t.Fatalf("first OnTurnEnd: %v", err)
+	}
+	if len(ix.content) != 0 {
+		t.Fatalf("turn buffer retained after flush: %+v", ix.content)
+	}
+	var first string
+	if err := st.DB().QueryRow(`SELECT content FROM sessions_fts WHERE agent_id = 'a_index' AND document_id = 'turn:2'`).Scan(&first); err != nil {
+		t.Fatalf("read first document: %v", err)
+	}
+
+	if err := ix.OnEvent("a_index", ev(t, 3, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "second separate marker"})); err != nil {
+		t.Fatalf("second OnEvent: %v", err)
+	}
+	if err := ix.OnTurnEnd("a_index", runtime.TurnRollup{LastSeq: 4, UpdatedAt: "2026-06-28T10:00:04Z"}); err != nil {
+		t.Fatalf("second OnTurnEnd: %v", err)
+	}
 	var after string
-	if err := db.QueryRow(`SELECT content FROM sessions_fts WHERE agent_id = 'a_index'`).Scan(&after); err != nil {
-		t.Fatalf("read fts content after restart: %v", err)
+	if err := st.DB().QueryRow(`SELECT content FROM sessions_fts WHERE agent_id = 'a_index' AND document_id = 'turn:2'`).Scan(&after); err != nil {
+		t.Fatalf("reread first document: %v", err)
 	}
-	if !strings.Contains(after, "distinctive quartz") {
-		t.Fatalf("original phrase wiped after resume: %q", after)
+	if after != first {
+		t.Fatalf("first document rewritten: before %q after %q", first, after)
 	}
-	if !strings.Contains(after, "post restart marker") {
-		t.Fatalf("new phrase missing after resume: %q", after)
+	var transcriptDocuments int
+	if err := st.DB().QueryRow(`SELECT COUNT(*) FROM sessions_fts WHERE agent_id = 'a_index' AND document_id <> 'metadata'`).Scan(&transcriptDocuments); err != nil {
+		t.Fatalf("count transcript documents: %v", err)
+	}
+	if transcriptDocuments != 2 {
+		t.Fatalf("transcript document count = %d, want 2", transcriptDocuments)
 	}
 }
 
@@ -329,6 +375,51 @@ func TestReindexPreservesFinalPartialTurn(t *testing.T) {
 	}
 	if agentID != "a_index" {
 		t.Fatalf("fts agent = %q, want a_index", agentID)
+	}
+}
+
+func TestReindexPreservesAnnotationFlushBoundary(t *testing.T) {
+	st, home := openTestDB(t)
+	w, err := transcript.Open(home, "a_index", nil)
+	if err != nil {
+		t.Fatalf("transcript.Open: %v", err)
+	}
+	m := meta()
+	metaRaw, err := json.Marshal(m)
+	if err != nil {
+		t.Fatalf("marshal meta: %v", err)
+	}
+	events := []runtime.Event{
+		{AgentID: "a_index", Seq: 0, Type: runtime.EvSessionMeta, Data: metaRaw, Ts: m.CreatedAt},
+		ev(t, 1, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "before annotation marker"}),
+		ev(t, 2, runtime.EvAnnotation, runtime.AnnotationData{OverallInstruction: "review this annotation boundary"}),
+		ev(t, 3, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "after annotation marker"}),
+		ev(t, 4, runtime.EvTurnEnd, runtime.TurnEndData{StopReason: "end_turn", ContextPct: 0.2}),
+	}
+	for _, event := range events {
+		if err := w.Append(event); err != nil {
+			t.Fatalf("append seq %d: %v", event.Seq, err)
+		}
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("close transcript: %v", err)
+	}
+	if err := Reindex(home, st.DB()); err != nil {
+		t.Fatalf("Reindex: %v", err)
+	}
+
+	var flushed, completed string
+	if err := st.DB().QueryRow(`SELECT content FROM sessions_fts WHERE agent_id = 'a_index' AND document_id = 'flush:2'`).Scan(&flushed); err != nil {
+		t.Fatalf("read annotation flush document: %v", err)
+	}
+	if err := st.DB().QueryRow(`SELECT content FROM sessions_fts WHERE agent_id = 'a_index' AND document_id = 'turn:4'`).Scan(&completed); err != nil {
+		t.Fatalf("read post-annotation turn document: %v", err)
+	}
+	if !strings.Contains(flushed, "before annotation marker") || !strings.Contains(flushed, "annotation boundary") {
+		t.Fatalf("annotation flush content = %q", flushed)
+	}
+	if strings.Contains(completed, "before annotation marker") || !strings.Contains(completed, "after annotation marker") {
+		t.Fatalf("post-annotation turn content = %q", completed)
 	}
 }
 

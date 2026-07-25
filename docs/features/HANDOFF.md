@@ -7,9 +7,17 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** finished locally with no open findings — the onboarding-credentials repair is
+- **State:** finished locally with no open findings — transcript search now indexes one immutable
+  document per completed turn or explicit annotation flush, plus one replaceable metadata document.
+  The migration preserves old whole-session content as a legacy document; live indexing and reindex
+  share the same boundaries, reindex reads transcripts as a stream, and archive search collapses
+  document hits to one session. Searches deliberately no longer combine terms or phrases across
+  documents; the exact downside and evidence threshold for a more complex segmented design are in
+  `ideas.md`. Specification checks, both Go test variants, focused index race tests, source build,
+  and distribution build pass.
+  The onboarding-credentials repair is also
   implemented and verified, and no ready change is waiting. Publishing still needs explicit approval
-  because local main is now seven commits ahead of `origin/main`.
+  because this completed change makes local main eight commits ahead of `origin/main`.
   Credentialed provider acceptance remains a separate manual release gate; native prompt/confirm
   actions also need replay in a browser that supports those dialogs. The annotation fixes and the
   onboarding work are unreviewed code: a future `/review` starts after `8b84e4f`.
@@ -39,10 +47,10 @@ that update.
 
 ## Blocked on human
 
-Publishing is waiting for explicit approval to push all six commits currently ahead of
-`origin/main`: the annotation/installer fixes, the invariant update, and four previously completed
-annotate-and-assign/workflow commits. The remote safety gate rejected publishing that expanded scope
-without confirmation.
+Publishing is waiting for explicit approval to push all eight commits currently ahead of
+`origin/main`: this turn-document indexing change plus the onboarding, annotation/installer,
+invariant, annotate-and-assign, and workflow work. The remote safety gate rejected publishing that
+expanded scope without confirmation.
 
 Live-provider acceptance is waiting for human authorization because it invokes real provider sessions
 and creates disposable local configuration homes. On 2026-07-15 this machine has Claude Code 2.1.202,
@@ -56,6 +64,20 @@ No open findings.
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-25 — Replaced whole-session transcript indexing with immutable turn documents. **INV §10**
+  keeps raw NDJSON authoritative and the FTS projection rebuildable: a migration splits the old row
+  into current metadata plus a preserved legacy content document, while new turns and annotation
+  flushes append deterministic documents and metadata updates replace only metadata. **INV §5** no
+  longer requires restart seeding because no replace-style transcript accumulator exists; the only
+  buffer is the current turn and it is cleared after commit. **INV §2/§7** route live and reindex
+  through the same event/document helpers, with `Reader.ForEach` making reindex and sequence recovery
+  streaming rather than whole-session reads. Archive FTS groups document hits back to one session,
+  counts/paginates distinct sessions, chooses the best transcript snippet, and intentionally requires
+  every term or phrase inside one document. Existing fallback metadata search is unchanged. FS-05 and
+  TS-02 return to Current; the more complete cross-turn/size-bounded alternative and its evidence
+  threshold remain in `ideas.md`. Specification checks, both Go variants, focused index `-race`,
+  source build, and distribution build pass.
 
 - 2026-07-25 — Repaired onboarding credentials and defaults, the last waiting ready change.
   **INV §2** was the load-bearing find: `agentdeck auth` and the credential prober each carried their
