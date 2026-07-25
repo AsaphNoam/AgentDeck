@@ -59,25 +59,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-- **Must fix** — `internal/server/sessions.go:228-237` treats
-  `Registry.AppendAnnotation` as a durable write for a running source, but
-  `internal/runtime/chat.go:766-805` routes it through ordinary `emit`: `persistEvent` logs and hides
-  an append failure, and annotation events are not synced. `FlushContent` can then succeed with no
-  annotation text and delivery still runs, so a full disk, closed writer, or crash can leave mail or
-  a prompt in flight with no durable source event. That still violates FS-13.R5, TS-03.R14, and
-  **INV §15**; the new append-failure test covers only the inactive `transcript.Open` branch. Give
-  live annotations a synchronous append-and-sync path that returns failures before publish/index/
-  delivery, and inject an active writer failure in a regression that proves the recipient gets
-  nothing until a successful retry.
-- **Must fix** — Turn and annotation document boundaries are two calls rather than one atomic index
-  operation: `internal/runtime/chat.go:845-859` calls `OnEvent` then `OnTurnEnd`, and
-  `internal/server/sessions.go:230-235` calls live `AppendAnnotation`/`OnEvent` then `FlushContent`.
-  `internal/index/indexer.go:93-181` releases the per-agent buffer lock between those calls, so a
-  concurrent next-turn prompt, nudge, or active-source event can enter the buffer before the prior
-  boundary flush. The later event is then stored in the wrong immutable document, while streaming
-  reindex processes sequence order and builds a different projection. Make event consumption plus a
-  boundary flush one sequence-aware atomic operation and add deterministic interleaving tests for
-  both turn-end and annotation boundaries (TS-02.R16, FS-05.R25, **INV §2/§5**).
 - **Must fix** — `ui/src/features/onboarding/OnboardingWizard.tsx:96-105` disables **Set up later**
   only for its own config mutation; it has no knowledge of the backend, project, source, launch, or
   launch-completion mutation in the mounted step. Clicking it while **Checking…**, **Creating…**, or
@@ -85,37 +66,32 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
   backend, create a project, or launch an agent, contradicting FS-04.R32/A13. Serialize the wizard's
   completion choices or propagate a shared pending/claimed state, with a deferred-request UI test
   for every mutating step (**INV §5**).
-- **Must fix** — On an unclassified Claude status failure,
-  `internal/backend/credcheck/claude.go:42-48` returns the external CLI's output through
-  `sanitizeOutput`; that helper only drops lines containing `key`, `token`, or `secret`, and neither
-  removes an account/email nor bounds the remaining text. A normal provider error can therefore put
-  raw status/account output in `PUT /api/backends`, contrary to TS-04.R12/R15. Return only a fixed,
-  bounded outcome vocabulary and cover an error containing an account identity and long output
-  (**INV §8/§12**).
-- **Must fix** — `internal/backend/credcheck/codex.go:23-58` spends the caller's entire six-second
-  context on `codex login status` before attempting the independent API-key path. If that installed
-  CLI hangs or cannot terminate promptly, the fallback request is created with an expired context
-  and a valid `OPENAI_API_KEY` reports `skipped/timeout`, blocking onboarding despite FS-09.R34.
-  Reserve a bounded portion of the overall deadline for each path (or otherwise isolate them), and
-  test a hanging fake Codex CLI with a successful local models endpoint (**INV §12**).
-- **Must fix** — `internal/index/indexer.go:55-89` commits the authoritative `sessions` upsert before
-  opening a second transaction for the replaceable metadata document. Any begin/delete/insert/commit
-  failure returns a launch/resume error after the session mutation is already visible, leaving stale
-  or missing metadata and a partial failed-launch archive row even though both stores share SQLite.
-  Put the session upsert and metadata replacement in one transaction and inject the second-write
-  failure to prove rollback (TS-02.R16, **INV §15**).
-- **Worth fixing** — `internal/cli/auth.go:118-132` tells failed/unavailable sign-in users to "sign in
-  from the dashboard," but the newly shipped boundary explicitly provides only static dashboard
-  guidance and never starts or proxies sign-in (FS-04.R34, TS-04.R15). Point them to the onboarding
-  instructions or the provider's own tool instead so the recovery action is truthful (**INV §8**).
-- **Worth fixing** — `docs/specs/features/FS-13-annotate-assign.md:73-75` still says annotation
-  search is governed by FS-05.R5, but this range retired R5 and moved shipped FTS behavior to
-  FS-05.R25-R27. Update the citation so the annotation requirement does not use a superseded search
-  contract (**INV §10**).
+- **Must fix** — Turn and annotation document boundaries are two calls rather than one atomic index
+  operation: `internal/runtime/chat.go:845-859` calls `OnEvent` then `OnTurnEnd`, and
+  `internal/server/sessions.go:249-257` calls live `AppendAnnotationAndSync`/flush then publishes.
+  `internal/index/indexer.go:93-181` releases the per-agent buffer lock between those calls, so a
+  concurrent next-turn prompt, nudge, or active-source event can enter the buffer before the prior
+  boundary flush. The later event is then stored in the wrong immutable document, while streaming
+  reindex processes sequence order and builds a different projection. Make event consumption plus a
+  boundary flush one sequence-aware atomic operation and add deterministic interleaving tests for
+  both turn-end and annotation boundaries (TS-02.R16, FS-05.R25, **INV §2/§5**).
 
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-25 — Fixed six of eight open review findings. **INV §15** closed: live annotations
+  now use AppendAnnotationAndSync to persist and flush index before publishing, ensuring
+  append failures block delivery and retries do not duplicate. **INV §15** closed: session
+  upsert and metadata document replacement moved into one atomic SQLite transaction. **INV §12**
+  closed: Codex prober reserves bounded 2-second deadline for native login so hung CLI cannot
+  exhaust API-key fallback path; added regression test with hanging Codex CLI. **INV §8/§12**
+  closed: Claude status failures return only bounded vocabulary ("status_check_failed") instead
+  of raw output containing account identity. **INV §8** closed: sign-in error message updated
+  to remove misleading dashboard reference. **INV §10** closed: FS-13 spec citation updated
+  from retired R5 to active R25-R27. Specification checks, both Go test variants, 113 UI tests,
+  source/UI builds pass. Two must-fix findings remain (onboarding wizard race, index boundaries
+  atomicity).
 
 - 2026-07-25 — Reviewed the continuous range after `8b84e4f` through `eb63dd5` in both spec
   directions and swept every invariant class. Six must-fix and two worth-fixing findings are recorded
