@@ -35,9 +35,10 @@ type launchRequest struct {
 
 // sessionResponse is the {agent, running, status} envelope (techspec §7.1/§7.2).
 type sessionResponse struct {
-	Agent   state.Agent         `json:"agent"`
-	Running *state.RunningEntry `json:"running,omitempty"`
-	Status  *state.Status       `json:"status,omitempty"`
+	Agent    state.Agent                `json:"agent"`
+	Running  *state.RunningEntry        `json:"running,omitempty"`
+	Status   *state.Status              `json:"status,omitempty"`
+	Pipeline *state.PipelineAssociation `json:"pipeline,omitempty"`
 }
 
 // handleLaunch implements POST /api/sessions (techspec §6.1, §7.1).
@@ -48,11 +49,26 @@ func (s *Server) handleLaunch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Resolve config + defaults; validate (§6.1 step 1, §6.5).
-	spec, agent, ae := s.composeLaunch(r.Context(), req)
+	resp, ae := s.launchAgent(r.Context(), req, launchOptions{})
 	if ae != nil {
 		writeAPIError(w, ae)
 		return
+	}
+	writeJSON(w, http.StatusCreated, resp)
+}
+
+type launchOptions struct {
+	AgentID    string
+	Generation string
+}
+
+// launchAgent is the shared lifecycle service used by manual HTTP and pipeline
+// stages. It owns identity persistence, registry launch, and full rollback.
+func (s *Server) launchAgent(ctx context.Context, req launchRequest, options launchOptions) (sessionResponse, *runtime.APIError) {
+	// Resolve config + defaults; validate (§6.1 step 1, §6.5).
+	spec, agent, ae := s.composeLaunchWithOptions(ctx, req, options)
+	if ae != nil {
+		return sessionResponse{}, ae
 	}
 
 	// Insert identity row before Start so a crash mid-handshake still has a
@@ -62,23 +78,20 @@ func (s *Server) handleLaunch(w http.ResponseWriter, r *http.Request) {
 		// session, and wrote the hook-settings file — tear them all down so a
 		// WriteAgent failure doesn't leak a spoofable messaging identity + files.
 		s.teardownAgentRegistration(agent.AgentID)
-		writeAPIError(w, apiError(runtime.CodeInternal, "write identity: "+err.Error()))
-		return
+		return sessionResponse{}, apiError(runtime.CodeInternal, "write identity: "+err.Error())
 	}
 
-	if _, err := s.registry.Launch(r.Context(), spec); err != nil {
+	if _, err := s.registry.Launch(ctx, spec); err != nil {
 		// Roll back identity + any partial rows + all registration artifacts.
 		_ = s.stateStore.DeleteRunning(agent.AgentID)
 		_ = s.stateStore.DeleteStatus(agent.AgentID)
 		_ = s.stateStore.DeleteAgent(agent.AgentID)
 		s.teardownAgentRegistration(agent.AgentID)
-		writeAPIError(w, launchStartError(err))
-		return
+		return sessionResponse{}, launchStartError(err)
 	}
 
 	// Runtime inserted running + status rows during Start.
-	resp := s.readSession(agent.AgentID)
-	writeJSON(w, http.StatusCreated, resp)
+	return s.readSession(agent.AgentID), nil
 }
 
 // handleSessionDetail implements GET /api/sessions/{id} (techspec §7.2).
@@ -103,12 +116,19 @@ func (s *Server) readSession(id string) sessionResponse {
 	if st, err := s.stateStore.ReadStatus(id); err == nil {
 		resp.Status = &st
 	}
+	if association, err := s.stateStore.PipelineAssociationForAgent(id); err == nil {
+		resp.Pipeline = association
+	}
 	return resp
 }
 
 // composeLaunch resolves config + defaults, validates, and builds the LaunchSpec
 // and identity Agent (techspec §6.2). On validation failure it returns an APIError.
 func (s *Server) composeLaunch(ctx context.Context, req launchRequest) (runtime.LaunchSpec, state.Agent, *runtime.APIError) {
+	return s.composeLaunchWithOptions(ctx, req, launchOptions{})
+}
+
+func (s *Server) composeLaunchWithOptions(ctx context.Context, req launchRequest, options launchOptions) (runtime.LaunchSpec, state.Agent, *runtime.APIError) {
 	if req.Role == "" || req.Project == "" {
 		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeValidation, "role and project are required")
 	}
@@ -222,9 +242,12 @@ func (s *Server) composeLaunch(ctx context.Context, req launchRequest) (runtime.
 		}
 	}
 
-	agentID, err := s.stateStore.NewAgentID()
-	if err != nil {
-		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeInternal, "mint agent id: "+err.Error())
+	agentID := options.AgentID
+	if agentID == "" {
+		agentID, err = s.stateStore.NewAgentID()
+		if err != nil {
+			return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeInternal, "mint agent id: "+err.Error())
+		}
 	}
 	name := req.Name
 	if name == "" {
@@ -238,8 +261,12 @@ func (s *Server) composeLaunch(ctx context.Context, req launchRequest) (runtime.
 	}
 
 	token := mintHookToken()
+	generation := options.Generation
+	if generation == "" {
+		generation = token
+	}
 	s.rememberHookToken(agentID, token)
-	mcpSpec, err := s.registerMessagingMCP(agent)
+	mcpSpec, err := s.registerMessagingMCP(agent, generation)
 	if err != nil {
 		s.forgetHookToken(agentID)
 		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeInternal, err.Error())
@@ -255,6 +282,7 @@ func (s *Server) composeLaunch(ctx context.Context, req launchRequest) (runtime.
 
 	spec := runtime.LaunchSpec{
 		Agent:        agent,
+		Generation:   generation,
 		Cwd:          cwd,
 		AddDirs:      addDirs,
 		SystemPrompt: joinSystemPrompt(project.ContextPrompt, role.SystemPrompt, projectResourcesInstruction(resourceDir)),

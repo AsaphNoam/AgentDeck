@@ -162,6 +162,27 @@ describe("SseClient watchdog reconnect", () => {
     expect(spy).toHaveBeenCalledWith({ queryKey: ["config-sources"] });
   });
 
+  it("uses pipeline revisions to invalidate stale run detail", async () => {
+    const { sseClient } = await import("./sse");
+    const { queryClient } = await import("./config");
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+    queryClient.setQueryData(["pipelines", "runs", "pr_1"], { run: { revision: 4 } });
+    sseClient.connect();
+    FakeEventSource.instances[0].onopen?.();
+    spy.mockClear();
+    const update = (revision: number) => JSON.stringify({
+      type: "pipeline_update", seq: revision, ts: revision, agent_id: null,
+      data: { run_id: "pr_1", revision, state: "running", current_stage_id: "work", current_agent_id: "a_1", attention_reason: "" },
+    });
+
+    FakeEventSource.instances[0].emit("pipeline_update", update(4));
+    expect(spy).not.toHaveBeenCalledWith({ queryKey: ["pipelines", "runs", "pr_1"] });
+
+    FakeEventSource.instances[0].emit("pipeline_update", update(5));
+    expect(spy).toHaveBeenCalledWith({ queryKey: ["pipelines", "runs", "pr_1"] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ["pipelines", "runs"] });
+  });
+
   it("drops muted notification types", async () => {
     const { sseClient } = await import("./sse");
     const { queryClient } = await import("./config");

@@ -35,6 +35,21 @@ func (s *Server) routes() http.Handler {
 	api("GET /api/events", s.handleEvents)
 	api("GET /api/archive", s.handleArchive)
 
+	// Native sequential pipeline templates and durable runs (FS-14 / TS-09).
+	api("GET /api/pipelines", s.handlePipelineTemplates)
+	api("POST /api/pipelines", s.handleCreatePipelineTemplate)
+	api("POST /api/pipelines/validate", s.handleValidatePipelineTemplate)
+	api("GET /api/pipelines/{id}", s.handlePipelineTemplate)
+	api("PUT /api/pipelines/{id}", s.handleUpdatePipelineTemplate)
+	api("DELETE /api/pipelines/{id}", s.handleDeletePipelineTemplate)
+	api("GET /api/pipeline-runs", s.handlePipelineRuns)
+	api("POST /api/pipeline-runs", s.handleStartPipelineRun)
+	api("GET /api/pipeline-runs/{id}", s.handlePipelineRun)
+	api("DELETE /api/pipeline-runs/{id}", s.handleDeletePipelineRun)
+	api("POST /api/pipeline-runs/{id}/continue", s.handleContinuePipelineRun)
+	api("POST /api/pipeline-runs/{id}/retry", s.handleRetryPipelineRun)
+	api("POST /api/pipeline-runs/{id}/stop", s.handleStopPipelineRun)
+
 	// Phase 1 session lifecycle (launch, control). The {id} routes
 	// are more specific than the GET /api/ catch-all and win via mux precedence.
 	api("POST /api/sessions", s.handleLaunch)

@@ -193,6 +193,10 @@ The exact hook list is curated in `contract.json` from the surfaces named by FS-
 descendants are not public skin hooks. Component state comes from existing props/Radix data
 attributes and is never parsed back from CSS.
 
+The public `toast` state list includes the FS-14 `pipeline_needs_attention` and
+`pipeline_completed` notification categories; they reuse the existing toast hook and do not create
+a pipeline-specific presentation authority.
+
 The dependency direction is:
 
 ```text

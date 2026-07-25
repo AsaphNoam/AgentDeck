@@ -186,6 +186,10 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 // composeSwitchSpec. On registration failure it rolls back its own side effects
 // and returns an APIError.
 func (s *Server) composeResumeSpec(agent state.Agent, snap state.SessionSnapshot, be config.Backend, model config.Model) (runtime.LaunchSpec, *runtime.APIError) {
+	return s.composeResumeSpecWithGeneration(agent, snap, be, model, "")
+}
+
+func (s *Server) composeResumeSpecWithGeneration(agent state.Agent, snap state.SessionSnapshot, be config.Backend, model config.Model, generation string) (runtime.LaunchSpec, *runtime.APIError) {
 	// Only claude-acp supports the terminal interface; a resume that lands (or is
 	// overridden to) terminal on any other backend would produce a statusless
 	// agent, so reject it here — the third of the three composers that gate on
@@ -202,8 +206,11 @@ func (s *Server) composeResumeSpec(agent state.Agent, snap state.SessionSnapshot
 		return runtime.LaunchSpec{}, ae
 	}
 	token := mintHookToken()
+	if generation == "" {
+		generation = token
+	}
 	s.rememberHookToken(agent.AgentID, token)
-	mcpSpec, err := s.registerMessagingMCP(agent)
+	mcpSpec, err := s.registerMessagingMCP(agent, generation)
 	if err != nil {
 		s.forgetHookToken(agent.AgentID)
 		return runtime.LaunchSpec{}, apiError(runtime.CodeInternal, err.Error())
@@ -216,6 +223,7 @@ func (s *Server) composeResumeSpec(agent state.Agent, snap state.SessionSnapshot
 	}
 	return runtime.LaunchSpec{
 		Agent:          agent,
+		Generation:     generation,
 		Cwd:            snap.Cwd,
 		AddDirs:        snap.AddDirs,
 		SystemPrompt:   snap.SystemPrompt,

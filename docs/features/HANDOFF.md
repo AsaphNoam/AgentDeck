@@ -6,17 +6,19 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
-- **Active change:** Configurable pipeline runs (`docs/plans/configurable-pipeline-runs.md`).
-- **State:** in progress. The sole waiting ready change was started by the human's explicit `/work`.
-  Implementation begins with the template validator and durable state foundation, followed by the
-  shared lifecycle/reconciler, MCP/API/CLI surfaces, and Pipelines UI. Separately, the continuous
-  range after `8b84e4f` through `eb63dd5` is reviewed. Two must-fix findings remain: the onboarding
-  wizard's Set up later action can race a mounted-step mutation, and index event/flush boundaries can
-  interleave. Specification checks, both Go test variants, 113 UI tests, source/UI builds, and the
-  distribution build pass; the missing race/interleaving cases explain why those green checks do not
-  close the findings. Local `main` matches `origin/main` before this active change.
-  Credentialed provider acceptance remains a separate manual release gate; native prompt/confirm
-  actions also need replay in a browser that supports those dialogs.
+- **Active change:** None.
+- **State:** configurable pipeline runs are complete. FS-14 and TS-09 are Current; the reusable
+  template store, durable sequential manager, shared lifecycle execution, scoped result/proposal
+  tools, REST/SSE/CLI controls, notification/association paths, and Pipelines UI are shipped.
+  Specification checks, both Go test variants, 120 UI tests, style/UI builds, focused pipeline/state/
+  messaging/server race tests, the distribution build, and an isolated real-browser Pipelines pass
+  succeed. The browser pass caught and closed a form overflow and an empty-run layout problem.
+  Separately, the continuous range after `8b84e4f` through `eb63dd5` is reviewed. Two must-fix
+  findings remain: the onboarding wizard's Set up later action can race a mounted-step mutation, and
+  index event/flush boundaries can interleave. Their missing race/interleaving cases explain why
+  green shared gates do not close those findings. Credentialed provider acceptance remains a
+  separate manual release gate; native prompt/confirm actions also need replay in a browser that
+  supports those dialogs.
   The onboarding change is verified by automated tests plus a real isolated-home run; **J2 has not
   been replayed in a browser**, so the wizard's Set up later and Check again controls are unproven
   against real rendering and pointer interaction.
@@ -25,19 +27,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Active change
 
-Implement FS-14.R1-R30 and TS-09.R1-R23: reusable model-neutral pipeline templates, durable
-sequential runs and attempts, shared lifecycle execution, scoped result/proposal tools, REST/SSE/CLI
-controls, and the Pipelines page. The accepted scope excludes terminal stages, effort selection,
-parallel branches/joins, child pipelines, typed/file artifacts, worktree isolation, and automatic
-AgentDecker Save/Start.
-
-The first foundation slice is implemented: centralized limits, version-1 template shapes, canonical
-role/binding/route/cycle validation, bounded owner-only JSON storage with repairable diagnostics,
-and the forward-only run/attempt/value/request migration with restart, revision, idempotency, and
-non-cascading deletion coverage.
-
-**Next small step:** finish the transactional report/action state operations, extract the shared
-server lifecycle services, and implement the event-driven pipeline manager over those seams.
+None. Agents do not choose future work for themselves.
 
 ## Decisions needing your input
 
@@ -85,6 +75,22 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-25 — Shipped configurable pipeline runs (FS-14, TS-09). Added reusable model-neutral
+  version-1 JSON templates with bounded repairable validation; forward-only SQLite run, attempt,
+  value, and idempotency state; a compare-and-swap sequential reconciler driven by explicit scoped
+  stage results and persisted turn quiescence; shared manual/pipeline launch, resume, stop, teardown,
+  and generation ownership; restart/crash/blocked/approval/retry/loop/stop recovery; exact
+  AgentDecker template/run proposals; and local REST, revisioned SSE, notifications, and thin CLI
+  controls. Added the Pipelines page with structured editing, run setup/supervision/history,
+  advisory shared-workspace confirmation, transcript/agent links, notification settings, and
+  ordinary-agent pipeline associations. Malformed run detail is isolated in summaries/startup,
+  collection shapes stay non-null, and all routes inherit Host/Origin enforcement. FS-14/TS-09 and
+  their TS-01–TS-05/TS-08/FS-12 deltas are Current; J14 now owns the composed usability charter.
+  Specification checks, both Go variants, 120 UI tests, presentation/UI builds, focused race tests,
+  distribution build, whitespace checks, and an isolated real-browser Pipelines pass succeed. The
+  browser pass caught and fixed form overflow and empty-run layout defects. Credentialed providers
+  remain the existing manual gate, and the two unrelated review findings remain open.
 
 - 2026-07-25 — Defined and received final human confirmation for the feature-side scope of
   configurable pipeline runs. Draft FS-14 now specifies model-neutral

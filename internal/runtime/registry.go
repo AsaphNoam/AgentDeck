@@ -18,17 +18,18 @@ var ErrAlreadyStarted = errors.New("runtime: agent already started")
 // live handles; the registry just remembers which runtime owns each agent so
 // control ops route correctly.
 type Registry struct {
-	mu        sync.Mutex
-	byIface   map[string]Runtime // "chat" -> ChatRuntime, "terminal" -> terminal runtime/stub
-	rtByAgent map[string]Runtime // agent_id -> owning runtime
-	chat      *ChatRuntime
-	term      Runtime // the registered terminal runtime (nil until SetTerminalRuntime)
-	store     *state.Store
+	mu                sync.Mutex
+	byIface           map[string]Runtime // "chat" -> ChatRuntime, "terminal" -> terminal runtime/stub
+	rtByAgent         map[string]Runtime // agent_id -> owning runtime
+	generationByAgent map[string]string  // agent_id -> concrete launch generation
+	chat              *ChatRuntime
+	term              Runtime // the registered terminal runtime (nil until SetTerminalRuntime)
+	store             *state.Store
 
 	// onExitExtra runs after forget on an unsolicited agent exit (crash). The
 	// server wires its teardownAgentRegistration here so a crash tears down the
 	// hook token / MCP session / hook files, not just registry ownership.
-	onExitExtra func(string)
+	onExitExtra func(string, string)
 }
 
 // exitNotifier is implemented by runtimes that can tell the Registry to drop
@@ -44,10 +45,11 @@ type stopAller interface{ StopAll(ctx context.Context) }
 func NewRegistry(s *state.Store) *Registry {
 	chat := NewChatRuntime(s)
 	r := &Registry{
-		byIface:   map[string]Runtime{},
-		rtByAgent: map[string]Runtime{},
-		chat:      chat,
-		store:     s,
+		byIface:           map[string]Runtime{},
+		rtByAgent:         map[string]Runtime{},
+		generationByAgent: map[string]string{},
+		chat:              chat,
+		store:             s,
 	}
 	r.byIface["chat"] = chat
 	r.byIface["terminal"] = notImplementedRuntime{name: "terminal"}
@@ -65,13 +67,14 @@ func NewRegistry(s *state.Store) *Registry {
 func (r *Registry) forget(agentID string) {
 	r.mu.Lock()
 	delete(r.rtByAgent, agentID)
+	delete(r.generationByAgent, agentID)
 	r.mu.Unlock()
 }
 
 // SetExitHook registers a callback run (after ownership forget) whenever an agent
 // exits unsolicited. The server uses it to tear down per-agent registration
 // artifacts on the crash path, mirroring a solicited stop.
-func (r *Registry) SetExitHook(fn func(string)) {
+func (r *Registry) SetExitHook(fn func(string, string)) {
 	r.mu.Lock()
 	r.onExitExtra = fn
 	r.mu.Unlock()
@@ -80,12 +83,14 @@ func (r *Registry) SetExitHook(fn func(string)) {
 // handleAgentExit is the runtimes' onExit callback: it drops registry ownership
 // and then runs the server's registration teardown, if wired.
 func (r *Registry) handleAgentExit(agentID string) {
-	r.forget(agentID)
 	r.mu.Lock()
+	generation := r.generationByAgent[agentID]
+	delete(r.rtByAgent, agentID)
+	delete(r.generationByAgent, agentID)
 	extra := r.onExitExtra
 	r.mu.Unlock()
 	if extra != nil {
-		extra(agentID)
+		extra(agentID, generation)
 	}
 }
 
@@ -161,12 +166,14 @@ func (r *Registry) Launch(ctx context.Context, spec LaunchSpec) (*Handle, error)
 		return nil, ErrAlreadyStarted
 	}
 	r.rtByAgent[spec.Agent.AgentID] = nil // sentinel: "launching in progress"
+	r.generationByAgent[spec.Agent.AgentID] = spec.Generation
 	r.mu.Unlock()
 
 	h, err := rt.Start(ctx, spec)
 	if err != nil {
 		r.mu.Lock()
 		delete(r.rtByAgent, spec.Agent.AgentID)
+		delete(r.generationByAgent, spec.Agent.AgentID)
 		r.mu.Unlock()
 		return nil, err
 	}
@@ -202,12 +209,14 @@ func (r *Registry) Resume(ctx context.Context, spec LaunchSpec) (*Handle, error)
 		return nil, ErrAlreadyStarted
 	}
 	r.rtByAgent[spec.Agent.AgentID] = nil // sentinel: "resuming in progress"
+	r.generationByAgent[spec.Agent.AgentID] = spec.Generation
 	r.mu.Unlock()
 
 	h, err := rt.Resume(ctx, spec, spec.LastSessionID)
 	if err != nil {
 		r.mu.Lock()
 		delete(r.rtByAgent, spec.Agent.AgentID)
+		delete(r.generationByAgent, spec.Agent.AgentID)
 		r.mu.Unlock()
 		return nil, err
 	}
@@ -272,6 +281,7 @@ func (r *Registry) Stop(ctx context.Context, agentID string) error {
 	r.mu.Lock()
 	rt, ok := r.rtByAgent[agentID]
 	delete(r.rtByAgent, agentID)
+	delete(r.generationByAgent, agentID)
 	r.mu.Unlock()
 	if !ok || rt == nil {
 		return ErrNoHandle
@@ -326,6 +336,23 @@ func (r *Registry) Transcript(agentID string) ([]Event, error) {
 	return rt.Transcript(agentID)
 }
 
+// Generation returns the current concrete launch generation for event fan-out.
+func (r *Registry) Generation(agentID string) string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.generationByAgent[agentID]
+}
+
+// Owns reports whether the current server process owns a fully-started runtime
+// handle for agentID. A stale running row from an earlier dashboard process is
+// deliberately not enough.
+func (r *Registry) Owns(agentID string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	rt, ok := r.rtByAgent[agentID]
+	return ok && rt != nil
+}
+
 // Shutdown stops every live agent (server shutdown, techspec §8.5).
 func (r *Registry) Shutdown(ctx context.Context) {
 	r.chat.StopAll(ctx)
@@ -337,6 +364,7 @@ func (r *Registry) Shutdown(ctx context.Context) {
 	}
 	r.mu.Lock()
 	r.rtByAgent = map[string]Runtime{}
+	r.generationByAgent = map[string]string{}
 	r.mu.Unlock()
 }
 

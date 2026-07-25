@@ -26,9 +26,16 @@ export interface AgentState {
   updated_at: number;
   removed?: boolean;
   hydrated?: boolean;
+  pipeline?: {
+    run_id: string;
+    run_name: string;
+    stage_id: string;
+    attempt_id: string;
+    attempt_no: number;
+  };
 }
 
-export type NotificationType = "done" | "waiting_input" | "permission_required" | "budget_exceeded";
+export type NotificationType = "done" | "waiting_input" | "permission_required" | "budget_exceeded" | "pipeline_needs_attention" | "pipeline_completed";
 
 export interface NotificationPayload {
   type: "notification";
@@ -43,7 +50,7 @@ export interface NotificationPayload {
 }
 
 export interface BusEvent<T = unknown> {
-  type: "state_update" | "new_message" | "notification" | "ping";
+  type: "state_update" | "new_message" | "notification" | "pipeline_update" | "ping";
   seq: number;
   ts: number;
   agent_id: string | null;

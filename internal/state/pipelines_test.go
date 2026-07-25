@@ -113,3 +113,25 @@ func TestPipelineAttemptLineageCASAndDeletionKeepsAgent(t *testing.T) {
 		t.Fatalf("attempts after delete = %+v err=%v", attempts, err)
 	}
 }
+
+func TestListActivePipelineRunsExcludesTerminalHistory(t *testing.T) {
+	store, _ := newTestStore(t)
+	now := time.Date(2026, 7, 25, 12, 0, 0, 0, time.UTC)
+	for i, stateName := range []string{"running", "paused", "completed", "stopped"} {
+		runID, err := store.NewPipelineRunID()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _, err = store.CreatePipelineRun(CreatePipelineRunParams{
+			Run:       PipelineRunRecord{RunID: runID, TemplateID: "quality", DisplayName: stateName, Project: "app", Goal: "goal", State: stateName, CreatedAt: now.Add(time.Duration(i) * time.Second), UpdatedAt: now},
+			RequestID: "active-list-" + stateName, RequestHash: stateName,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	runs, err := store.ListActivePipelineRuns()
+	if err != nil || len(runs) != 2 || runs[0].State != "running" || runs[1].State != "paused" {
+		t.Fatalf("active runs = %+v err=%v", runs, err)
+	}
+}

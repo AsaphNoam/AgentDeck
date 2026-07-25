@@ -7,6 +7,8 @@ const notificationTypes: Array<{ type: NotificationType; label: string }> = [
   { type: "waiting_input", label: "Needs input" },
   { type: "permission_required", label: "Permission" },
   { type: "budget_exceeded", label: "Budget" },
+  { type: "pipeline_needs_attention", label: "Pipeline needs attention" },
+  { type: "pipeline_completed", label: "Pipeline completed" },
 ];
 
 export function NotificationsEditor() {
@@ -15,7 +17,7 @@ export function NotificationsEditor() {
   const pushError = useUiStore((state) => state.pushError);
   const notifications = config?.notifications ?? {
     desktop_enabled: true,
-    muted: { done: false, waiting_input: false, permission_required: false, budget_exceeded: false },
+    muted: { done: false, waiting_input: false, permission_required: false, budget_exceeded: false, pipeline_needs_attention: false, pipeline_completed: false },
   };
 
   const save = (next: typeof notifications) => {

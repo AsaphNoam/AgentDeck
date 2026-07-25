@@ -404,6 +404,10 @@ func TestSeedIfAbsentNoClobber(t *testing.T) {
 	if len(roles) != 6 {
 		t.Fatalf("seeded roles = %d, want 6", len(roles))
 	}
+	agentdecker, err := s.ReadRole("agentdecker")
+	if err != nil || !strings.Contains(agentdecker.SystemPrompt, "propose_pipeline_template") || !strings.Contains(agentdecker.SystemPrompt, "propose_pipeline_run") {
+		t.Fatalf("seeded AgentDecker pipeline guidance missing: role=%+v err=%v", agentdecker, err)
+	}
 	if _, err := s.ReadProject("my-app"); err != nil {
 		t.Fatalf("seeded project: %v", err)
 	}

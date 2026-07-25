@@ -16,6 +16,7 @@ import (
 	"github.com/agentdeck/agentdeck/internal/hooks"
 	persistindex "github.com/agentdeck/agentdeck/internal/index"
 	"github.com/agentdeck/agentdeck/internal/messaging"
+	"github.com/agentdeck/agentdeck/internal/pipeline"
 	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/runtime/terminal"
 	"github.com/agentdeck/agentdeck/internal/state"
@@ -47,10 +48,12 @@ type Server struct {
 	cfg         config.Config
 	log         *slog.Logger
 
-	indexer   *persistindex.Indexer
-	messaging *messaging.Server
-	sourceMgr *configsource.Manager
-	nudgeCh   chan string
+	indexer           *persistindex.Indexer
+	messaging         *messaging.Server
+	pipelineMgr       *pipeline.Manager
+	pipelineTemplates *pipeline.TemplateStore
+	sourceMgr         *configsource.Manager
+	nudgeCh           chan string
 
 	hookMu      sync.Mutex
 	hookTokens  map[string]string // agent_id -> per-launch hook token (Phase 2 persists these)
@@ -97,7 +100,6 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		registry.SetPersistence(cfgStore.Home(), func(home, agentID string, meta *runtime.SessionMetaData) (runtime.TranscriptWriter, error) {
 			return transcript.Open(home, agentID, meta)
 		}, ix)
-		registry.SetEventSink(eventBus.PublishRuntimeEvent)
 		registry.SetStateTouch(touch)
 		// Construct + register the terminal runtime here (it lives in a subpackage
 		// that imports runtime, so the Registry can't build it without an import
@@ -156,11 +158,36 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		credCheck:        credcheck.Check,
 		primerSummarizer: defaultPrimerSummarizer,
 	}
+	s.pipelineTemplates = pipeline.NewTemplateStore(cfgStore)
+	s.pipelineMgr = pipeline.NewManager(stateStore, s.pipelineTemplates, s, s)
+	msg.SetPipelineManager(s.pipelineMgr)
+	if registry != nil {
+		registry.SetEventSink(func(ev runtime.Event) {
+			eventBus.PublishRuntimeEvent(ev)
+			if ev.Type == runtime.EvTurnEnd && s.pipelineMgr != nil {
+				generation := registry.Generation(ev.AgentID)
+				go func() {
+					if err := s.pipelineMgr.OnTurnEnd(ev.AgentID, generation); err != nil {
+						s.log.Warn("pipeline turn boundary", "agent_id", ev.AgentID, "err", err)
+					}
+				}()
+			}
+		})
+	}
 	// Tear down per-agent registration artifacts on the runtime crash path too,
 	// not only on solicited stop/switch — otherwise a crashed agent leaves a live
 	// hook token + MCP session (a spoofable messaging identity) and leaked files.
 	if registry != nil {
-		registry.SetExitHook(s.teardownAgentRegistration)
+		registry.SetExitHook(func(agentID, generation string) {
+			s.teardownAgentRegistration(agentID)
+			if s.pipelineMgr != nil {
+				go func() {
+					if err := s.pipelineMgr.OnExit(agentID, generation, "process_exit"); err != nil {
+						s.log.Warn("pipeline agent exit", "agent_id", agentID, "err", err)
+					}
+				}()
+			}
+		})
 	}
 	return s
 }
@@ -220,6 +247,13 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 		serveErr <- nil
 	}()
+	if s.pipelineMgr != nil {
+		if err := s.pipelineMgr.Startup(sweepCtx); err != nil {
+			cancelBase()
+			_ = srv.Shutdown(context.Background())
+			return fmt.Errorf("pipeline startup recovery: %w", err)
+		}
+	}
 
 	select {
 	case err := <-serveErr:

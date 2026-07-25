@@ -1,6 +1,6 @@
 # TS-02 — Data & persistence
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/config`, `internal/state`, `internal/transcript`, `internal/index`, `internal/archive`, `internal/configsource`
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -95,7 +95,7 @@ rewrites earlier transcript documents. Live indexing and reindex use the same se
 document-flush helpers. Raw `transcript.ndjson` remains authoritative; the untagged build keeps its
 metadata-only fallback and does not depend on FTS transcript documents.
 
-**R17 `(planned)` — Pipeline configuration and state use the existing authority split.** Version-1
+**R17 — Pipeline configuration and state use the existing authority split.** Version-1
 templates live in owner-only, atomically rewritten `pipelines/{id}.json`; durable run snapshots,
 attempt lineage/reports, current named values/provenance, and start idempotency records live in
 forward-only SQLite tables written only through `internal/state`. Pipeline-table foreign keys may
@@ -115,7 +115,7 @@ $AGENTDECK_HOME/
   layout.json
   roles/{id}.json
   projects/{id}.json
-  pipelines/{id}.json          planned reusable pipeline templates
+  pipelines/{id}.json         reusable pipeline templates
   project-resources/{id}/     opaque agent/person shared material; never indexed or scanned
   state.db
   sessions/{agent_id}/transcript.ndjson

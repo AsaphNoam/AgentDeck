@@ -4,6 +4,24 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-25 — Implementation: configurable pipeline runs
+
+Configurable pipeline runs are now implemented. AgentDeck has reusable model-neutral templates,
+durable sequential runs and attempt history, explicit token-bound stage results,
+approval/blocked/retry/stop recovery, restart reconciliation, REST/SSE/CLI controls, notifications,
+agent-to-run links, and a Pipelines page with manual editing and exact-payload AgentDecker proposals.
+
+Verification passed: specification checks, both Go test variants, 120 UI tests, UI style/build
+checks, focused race tests, the distribution build, and `git diff --check`. I also exercised the
+Pipelines page in an isolated real browser; that pass caught and fixed a form overflow and an
+empty-state layout issue.
+
+**Needs attention:** Credentialed Claude/Codex acceptance remains the existing manual release gate.
+The two previously recorded review findings—onboarding completion races and non-atomic index
+boundaries—are unchanged and remain in the handoff.
+
+**Next:** Run J14 when you want the full pipeline usability journey replayed.
+
 ### 2026-07-25 — Feature design: configurable pipeline runs ready
 
 Configurable pipeline runs are now fully specified and waiting to be implemented. Templates are

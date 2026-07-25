@@ -72,9 +72,10 @@ type AgentState struct {
 	BusySince  string  `json:"busy_since,omitempty"`
 	ContextPct float64 `json:"context_pct"`
 
-	UnreadMessages int    `json:"unread_messages,omitempty"`
-	LastSentAt     string `json:"last_sent_at,omitempty"`
-	UpdatedAt      int64  `json:"updated_at"`
+	UnreadMessages int                  `json:"unread_messages,omitempty"`
+	LastSentAt     string               `json:"last_sent_at,omitempty"`
+	UpdatedAt      int64                `json:"updated_at"`
+	Pipeline       *PipelineAssociation `json:"pipeline,omitempty"`
 }
 
 // AgentStateUpdate is the payload published after Manager recomputes an agent.
@@ -205,10 +206,11 @@ type PipelineValueRecord struct {
 }
 
 type CreatePipelineRunParams struct {
-	Run         PipelineRunRecord
-	RequestID   string
-	RequestHash string
-	Values      []PipelineValueRecord
+	Run            PipelineRunRecord
+	RequestID      string
+	RequestHash    string
+	Values         []PipelineValueRecord
+	InitialAttempt *PipelineAttemptRecord
 }
 
 type PipelineRunUpdate struct {
@@ -220,4 +222,26 @@ type PipelineRunUpdate struct {
 	AttentionReason  string
 	FinalOutcome     string
 	UpdatedAt        time.Time
+}
+
+type PipelineReportInput struct {
+	RunID            string
+	AttemptID        string
+	AgentID          string
+	AgentGeneration  string
+	ExpectedRevision int64
+	Outcome          string
+	Summary          string
+	Details          string
+	Checks           string
+	Outputs          []PipelineValueRecord
+	ReportedAt       time.Time
+}
+
+type PipelineAssociation struct {
+	RunID     string `json:"run_id"`
+	RunName   string `json:"run_name"`
+	StageID   string `json:"stage_id"`
+	AttemptID string `json:"attempt_id"`
+	AttemptNo int    `json:"attempt_no"`
 }

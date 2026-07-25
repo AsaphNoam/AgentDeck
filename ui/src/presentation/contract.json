@@ -99,7 +99,7 @@
     },
     "toast": {
       "slots": ["title", "body"],
-      "states": ["done", "waiting_input", "permission_required", "budget_exceeded", "error"],
+      "states": ["done", "waiting_input", "permission_required", "budget_exceeded", "pipeline_needs_attention", "pipeline_completed", "error"],
       "variants": []
     },
     "agent-workspace": {

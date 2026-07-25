@@ -6,6 +6,7 @@ import { SettingsPage } from "./features/settings/SettingsPage";
 import { OnboardingGate } from "./features/onboarding/OnboardingGate";
 import { ArchivePage } from "./features/archive/ArchivePage";
 import { ArchiveAgentPage } from "./features/archive/ArchiveAgentPage";
+import { PipelinesPage } from "./features/pipelines/PipelinesPage";
 
 const developmentRoutes = import.meta.env.DEV
   ? [
@@ -28,6 +29,7 @@ export const router = createBrowserRouter([
       { path: "agent/:id", element: <ChatPanel /> },
       { path: "archive", element: <ArchivePage /> },
       { path: "archive/:id", element: <ArchiveAgentPage /> },
+      { path: "pipelines", element: <PipelinesPage /> },
       { path: "settings", element: <SettingsPage /> },
       ...developmentRoutes,
       { path: "*", element: <Navigate to="/" replace /> },

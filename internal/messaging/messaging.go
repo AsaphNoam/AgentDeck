@@ -16,6 +16,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/agentdeck/agentdeck/internal/pipeline"
 	"github.com/agentdeck/agentdeck/internal/state"
 	"github.com/agentdeck/agentdeck/internal/version"
 )
@@ -34,12 +35,18 @@ type Server struct {
 	onBudgetExceeded  func(agentID, turnID string, used int)
 	onMessageInserted func(fromAgentID, toAgentID string)
 	onMessagesRead    func(agentID string)
+	pipelines         *pipeline.Manager
 
 	mcp     *mcp.Server
 	handler http.Handler
 
 	mu       sync.RWMutex
-	sessions map[string]string // session token -> agent_id
+	sessions map[string]SessionIdentity // session token -> server-derived identity
+}
+
+type SessionIdentity struct {
+	AgentID    string
+	Generation string
 }
 
 // SetBudgetExceededSink wires the Phase 5 budget breach notification path.
@@ -104,7 +111,7 @@ func New(store *state.Store, log *slog.Logger) *Server {
 	s := &Server{
 		store:    store,
 		log:      log,
-		sessions: map[string]string{},
+		sessions: map[string]SessionIdentity{},
 	}
 
 	s.mcp = mcp.NewServer(&mcp.Implementation{
@@ -123,6 +130,18 @@ func New(store *state.Store, log *slog.Logger) *Server {
 		Name:        "check_messages",
 		Description: "Read your pending messages; flags them read (or deletes) as requested.",
 	}, s.handleCheckMessages)
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "report_pipeline_stage_result",
+		Description: "Report the authoritative success, failure, or blocked result for your current pipeline stage attempt.",
+	}, s.handleReportPipelineStageResult)
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "propose_pipeline_template",
+		Description: "Validate and propose a model-neutral pipeline template for exact human approval; this never saves it.",
+	}, s.handleProposePipelineTemplate)
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "propose_pipeline_run",
+		Description: "Validate and propose an exact saved-template run configuration for human approval; this never starts it.",
+	}, s.handleProposePipelineRun)
 
 	// getServer resolves the per-request server. Reading the token header here
 	// proves the per-agent session binding arrives over the transport (§3.1);
@@ -145,8 +164,12 @@ func (s *Server) Handler() http.Handler { return s.handler }
 // Register records a token→agent_id mapping (called by RegisterMessagingMCP at
 // launch, 5.3). Revoke removes it on Stop.
 func (s *Server) Register(token, agentID string) {
+	s.RegisterSession(token, agentID, "")
+}
+
+func (s *Server) RegisterSession(token, agentID, generation string) {
 	s.mu.Lock()
-	s.sessions[token] = agentID
+	s.sessions[token] = SessionIdentity{AgentID: agentID, Generation: generation}
 	s.mu.Unlock()
 }
 
@@ -159,8 +182,19 @@ func (s *Server) Revoke(token string) {
 
 // Lookup resolves the agent_id bound to a session token.
 func (s *Server) Lookup(token string) (string, bool) {
+	identity, ok := s.LookupSession(token)
+	return identity.AgentID, ok
+}
+
+func (s *Server) LookupSession(token string) (SessionIdentity, bool) {
 	s.mu.RLock()
-	agentID, ok := s.sessions[token]
+	identity, ok := s.sessions[token]
 	s.mu.RUnlock()
-	return agentID, ok
+	return identity, ok
+}
+
+func (s *Server) SetPipelineManager(manager *pipeline.Manager) {
+	s.mu.Lock()
+	s.pipelines = manager
+	s.mu.Unlock()
 }

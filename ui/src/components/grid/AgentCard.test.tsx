@@ -44,4 +44,28 @@ describe("AgentCard", () => {
 
     expect(screen.getByText("Chat view")).toBeInTheDocument();
   });
+
+  it("links an associated stage agent back to its pipeline run", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <DndContext>
+          <SortableContext items={["a_1"]} strategy={rectSortingStrategy}>
+            <Routes>
+              <Route path="/" element={<AgentCard agent={{
+                agent_id: "a_1", name: "Atlas", role: "implementer", project: "my-app",
+                backend: "claude", model: "sonnet", interface: "chat", state: "busy",
+                detail: "working", running: true, context_pct: 0,
+                pipeline: { run_id: "pr_1", run_name: "Delivery", stage_id: "work", attempt_id: "pa_1", attempt_no: 2 },
+              }} />} />
+              <Route path="/pipelines" element={<div>Pipeline run</div>} />
+            </Routes>
+          </SortableContext>
+        </DndContext>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByText("Delivery · work · attempt 2"));
+
+    expect(screen.getByText("Pipeline run")).toBeInTheDocument();
+  });
 });

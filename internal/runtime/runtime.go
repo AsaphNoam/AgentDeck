@@ -16,10 +16,13 @@ import (
 // builds this from agent identity + project + role + backend/model so the Runtime
 // needs no further lookups; a running agent's spec is frozen.
 type LaunchSpec struct {
-	Agent        state.Agent // stable identity (agent_id, role, project, backend, model, interface)
-	Cwd          string      // resolved absolute working dir (project.cwd, ~-expanded)
-	AddDirs      []string    // project.add_dirs, ~-expanded
-	SystemPrompt string      // composed: context_prompt + role.system_prompt — the FROZEN, persisted snapshot
+	Agent state.Agent // stable identity (agent_id, role, project, backend, model, interface)
+	// Generation scopes teardown/exit callbacks to this concrete process launch.
+	// Pipeline attempts persist it; manual launches use their fresh hook token.
+	Generation   string
+	Cwd          string   // resolved absolute working dir (project.cwd, ~-expanded)
+	AddDirs      []string // project.add_dirs, ~-expanded
+	SystemPrompt string   // composed: context_prompt + role.system_prompt — the FROZEN, persisted snapshot
 	// RuntimeSystemPrompt, when non-empty, is the system prompt fed to the backend
 	// process for THIS launch only (session/new + session/load). It is deliberately
 	// NOT persisted: runtimeMeta/UpsertSessionMeta always snapshot SystemPrompt, so

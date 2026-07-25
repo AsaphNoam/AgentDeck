@@ -82,7 +82,7 @@ private Codex CLI for `login status`; a successful native result is sufficient, 
 configured `OPENAI_API_KEY` is checked through the existing models endpoint. Raw status output,
 account identity, and credential values never cross the process/log/API boundary.
 
-**R17 `(planned)` — Pipeline tools extend the one scoped MCP authority.** The existing `/mcp`
+**R17 — Pipeline tools extend the one scoped MCP authority.** The existing `/mcp`
 server adds `report_pipeline_stage_result`, `propose_pipeline_template`, and
 `propose_pipeline_run`; there is no `start_pipeline_run` tool. All derive caller identity from the
 per-launch token and return bounded structured results. Reporting delegates to TS-09's atomic
@@ -99,7 +99,7 @@ R6–R7 authority rather than a second MCP server.
 - Hook: `POST /api/hook` with a bearer/scoped token; accepted status vocabulary is the FS-02 state
   set plus tracking events.
 - MCP: streamable HTTP at `/mcp`; tools accept only their documented arguments and return
-  product-safe text/structured content. Planned pipeline tools use the same transport/token and add
+  product-safe text/structured content. Pipeline tools use the same transport/token and add
   no agent-callable start operation.
 - Terminal WebSocket: binary/text terminal bytes plus JSON resize control frames.
 - Native-auth readiness: no new HTTP shape; `PUT /api/backends` continues to return the existing

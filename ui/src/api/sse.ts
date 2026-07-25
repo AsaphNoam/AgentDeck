@@ -1,7 +1,9 @@
 import { getTranscript } from "./client";
 import { QUERY_KEYS, queryClient } from "./config";
+import { PIPELINE_QUERY_KEYS } from "./pipelines";
 import type { Config } from "../schemas/config";
 import type { AgentState, BusEvent, NotificationPayload, TranscriptEvent } from "./types";
+import { pipelineUpdateSchema, type PipelineRunDetail } from "../schemas/pipeline";
 import { useAgentStore } from "../store/agentStore";
 import { useAnnotationStore } from "../store/annotationStore";
 import { useTranscriptStore } from "../store/transcriptStore";
@@ -39,11 +41,13 @@ class SseClient {
       this.hydrationIds = [];
       this.lastAgentSeq = {};
       this.refetchOpenTranscript();
+      queryClient.invalidateQueries({ queryKey: ["pipelines", "runs"] });
     };
     this.es.onerror = () => useUiStore.getState().setConnection("reconnecting");
     this.es.addEventListener("state_update", (event) => this.onStateUpdate(event as MessageEvent<string>));
     this.es.addEventListener("new_message", (event) => this.onNewMessage(event as MessageEvent<string>));
     this.es.addEventListener("notification", (event) => this.onNotification(event as MessageEvent<string>));
+    this.es.addEventListener("pipeline_update", (event) => this.onPipelineUpdate(event as MessageEvent<string>));
     this.es.addEventListener("config_source_update", () => this.onConfigSourceUpdate());
     this.es.addEventListener("ping", () => {
       this.lastPing = Date.now();
@@ -127,6 +131,17 @@ class SseClient {
       return;
     }
     useUiStore.getState().pushToast(notification);
+  }
+
+  private onPipelineUpdate(event: MessageEvent<string>) {
+    const envelope = JSON.parse(event.data) as BusEvent<unknown>;
+    const update = pipelineUpdateSchema.parse(envelope.data);
+    const key = PIPELINE_QUERY_KEYS.run(update.run_id);
+    const cached = queryClient.getQueryData<PipelineRunDetail>(key);
+    if (!cached || cached.run.revision < update.revision) {
+      queryClient.invalidateQueries({ queryKey: key });
+    }
+    queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.runs });
   }
 
   private startWatchdog() {
