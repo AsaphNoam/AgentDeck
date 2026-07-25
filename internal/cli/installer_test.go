@@ -162,6 +162,12 @@ esac`)
 	home := filepath.Join(fixture, "home")
 	appRoot := filepath.Join(fixture, "app")
 	callLog := filepath.Join(fixture, "calls")
+	// A private TMPDIR makes the bootstrap's and staging dir's temporary files
+	// observable: `exec` discards the EXIT trap that was meant to remove them.
+	tmpDir := filepath.Join(fixture, "tmp")
+	if err := os.MkdirAll(tmpDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	installer := filepath.Join("..", "..", "scripts", "release", "install.sh")
 	source, err := os.Open(installer)
 	if err != nil {
@@ -173,6 +179,7 @@ esac`)
 	cmd.Env = append(os.Environ(),
 		"PATH="+fakeBin+":"+os.Getenv("PATH"),
 		"HOME="+home,
+		"TMPDIR="+tmpDir,
 		"AGENTDECK_APP_ROOT="+appRoot,
 		"AGENTDECK_TEST_BOOTSTRAP="+installer,
 		"AGENTDECK_TEST_ARCHIVE="+archive,
@@ -188,6 +195,13 @@ esac`)
 	}
 	if calls, err := os.ReadFile(callLog); err == nil && strings.TrimSpace(string(calls)) != "" {
 		t.Fatalf("non-interactive piped install invoked post-install commands: %q", calls)
+	}
+	leftovers, err := os.ReadDir(tmpDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range leftovers {
+		t.Errorf("piped install left a temporary file behind: %s", entry.Name())
 	}
 }
 

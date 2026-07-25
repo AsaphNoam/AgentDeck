@@ -131,6 +131,23 @@ describe("SseClient watchdog reconnect", () => {
     expect(agents["a_gone"]).toBeUndefined();
   });
 
+  // FS-13.R16: a deleted agent is gone as an annotation source too, and nothing
+  // else ever clears its browser-local tray.
+  it("drops a deleted agent's pending annotation tray", async () => {
+    const { sseClient } = await import("./sse");
+    const { useAnnotationStore } = await import("../store/annotationStore");
+    useAnnotationStore.getState().add("a_gone", { seq: 3, excerpt: "line", instruction: "look" });
+    useAnnotationStore.getState().add("a_keep", { seq: 4, excerpt: "line", instruction: "look" });
+    sseClient.connect();
+    const es = FakeEventSource.instances[0];
+    es.onopen?.();
+
+    es.emit("state_update", JSON.stringify({ type: "state_update", seq: 1, ts: 1, agent_id: "a_gone", data: { agent_id: "a_gone", removed: true } }));
+
+    expect(useAnnotationStore.getState().bySource["a_gone"]).toBeUndefined();
+    expect(useAnnotationStore.getState().bySource["a_keep"]).toHaveLength(1);
+  });
+
   it("invalidates config-source queries on a config_source_update event", async () => {
     const { sseClient } = await import("./sse");
     const { queryClient } = await import("./config");

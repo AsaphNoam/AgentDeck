@@ -1,17 +1,8 @@
 import { useState } from "react";
 import ReactDiffViewer from "react-diff-viewer-continued";
-import type { TranscriptEvent } from "../../../api/types";
+import type { AnnotationDraft, TranscriptEvent } from "../../../api/types";
+import { clipAnnotationExcerpt } from "../../../lib/annotations";
 import { diffTheme } from "../../../presentation/integrations";
-
-type AnnotationDraft = {
-  seq: number;
-  excerpt: string;
-  instruction: string;
-  path: string;
-  side: "old" | "new";
-  start_line: number;
-  end_line: number;
-};
 
 export function DiffBlock({ event, onAnnotate }: { event: TranscriptEvent; onAnnotate: (draft: AnnotationDraft) => void }) {
   const [selection, setSelection] = useState<{ side: "old" | "new"; start: number; end: number } | null>(null);
@@ -28,7 +19,7 @@ export function DiffBlock({ event, onAnnotate }: { event: TranscriptEvent; onAnn
     const end = Math.max(selection.start, selection.end);
     const text = selection.side === "old" ? String(event.old_text ?? event.old ?? "") : String(event.new_text ?? event.new ?? "");
     const excerpt = text.split("\n").slice(start - 1, end).join("\n");
-    onAnnotate({ seq: Number(event.seq), path: String(event.path ?? "diff"), side: selection.side, start_line: start, end_line: end, excerpt: clipExcerpt(excerpt), instruction: "" });
+    onAnnotate({ seq: Number(event.seq), path: String(event.path ?? "diff"), side: selection.side, start_line: start, end_line: end, excerpt: clipAnnotationExcerpt(excerpt), instruction: "" });
     setSelection(null);
   };
   return (
@@ -37,9 +28,4 @@ export function DiffBlock({ event, onAnnotate }: { event: TranscriptEvent; onAnn
       <ReactDiffViewer oldValue={String(event.old_text ?? event.old ?? "")} newValue={String(event.new_text ?? event.new ?? "")} splitView={false} styles={diffTheme} onLineNumberClick={chooseLine} />
     </article>
   );
-}
-
-function clipExcerpt(value: string) {
-  const chars = [...value];
-  return chars.length <= 2000 ? value : `${chars.slice(0, 1979).join("")}… [excerpt clipped]`;
 }

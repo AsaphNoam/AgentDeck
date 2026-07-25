@@ -7,12 +7,12 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** finished locally with open findings — the invariant update is committed but its push
-  needs explicit approval because local main contains four earlier unpushed commits. Annotate and
-  assign is implemented, but a re-review found one Must-fix delivery/rollback defect and three
-  Worth-fixing items (see Review findings).
+- **State:** finished locally with no open findings — every annotate-and-assign review finding plus
+  the installer temp-file leak is fixed and verified. Publishing still needs explicit approval
+  because local main is now six commits ahead of `origin/main`.
   Credentialed provider acceptance remains a separate manual release gate; native prompt/confirm
-  actions also need replay in a browser that supports those dialogs.
+  actions also need replay in a browser that supports those dialogs. The annotation fixes are
+  unreviewed code: a future `/review` starts after `8b84e4f`.
 - **Last reviewed code:** `8b84e4f` (2026-07-24), implements FS-13 annotate-and-assign through
   the continuous range after `61b234d`.
 - **Branch:** `main`.
@@ -36,9 +36,10 @@ that update.
 
 ## Blocked on human
 
-Publishing is waiting for explicit approval to push all five commits currently ahead of
-`origin/main`: the invariant update plus four previously completed annotate-and-assign/workflow
-commits. The remote safety gate rejected publishing that expanded scope without confirmation.
+Publishing is waiting for explicit approval to push all six commits currently ahead of
+`origin/main`: the annotation/installer fixes, the invariant update, and four previously completed
+annotate-and-assign/workflow commits. The remote safety gate rejected publishing that expanded scope
+without confirmation.
 
 Live-provider acceptance is waiting for human authorization because it invokes real provider sessions
 and creates disposable local configuration homes. On 2026-07-15 this machine has Claude Code 2.1.202,
@@ -47,61 +48,29 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-- **Must fix** (INV §15; FS-13.R5) — `internal/server/sessions.go:108-131`: the agent-target
-  annotation path inserts reserved-sender mail, fires the nudge, and touches the recipient *before*
-  `appendAnnotation`, with no rollback and no idempotency key. `appendAnnotation` has four error
-  returns after the mail is committed (`sessions.go:235-246`); any of them returns `500` while the
-  mail is already delivered. The tray is preserved on failure by design (FS-13.R3,
-  `ui/src/components/chat/AnnotationTray.tsx:48-50`), so the natural retry inserts a **second** copy
-  of the same mail. Normal-use trigger: disk full, a transcript permission error, or an FTS flush
-  error on any assign-to-another-agent send. This also breaks FS-13.R5 — the batch can be delivered
-  and acted on with no durable `annotation` event on the source session. The self-target variant
-  differs: the prompt turn fires, the append fails, and the retry hits `ErrTurnInFlight`, leaving the
-  agent working on annotations the transcript never recorded. Suggested fix: append the event before
-  delivering, or carry a client-supplied batch id the insert dedupes on. Regression test: inject an
-  `appendAnnotation` failure and assert exactly one mail row after a retry.
-
-- **Worth fixing** (INV §2) — `ui/src/components/chat/TranscriptView.tsx:132`,
-  `ui/src/components/chat/renderers/DiffBlock.tsx:42`, `internal/server/sessions.go:163`:
-  `clipExcerpt` is duplicated verbatim in two components with a third, differently-behaved
-  implementation on the server. They have already drifted — the Go marker is
-  `"\n… [excerpt clipped]"` keeping 1980+20 = 2000 runes; the JS marker omits the leading newline and
-  keeps 1979+19 = 1998. Neither exceeds the limit, so nothing fails today; this is the drift §2
-  predicts, caught before it bites. `validateAnnotations` (`sessions.go:154`) already clips
-  server-side, so the client copies are redundant bounding for localStorage. Suggested fix: one
-  exported helper with the server marker authoritative.
-
-- **Worth fixing** (INV §2) — `ui/src/api/types.ts:82`,
-  `ui/src/components/chat/TranscriptView.tsx:111`, `ui/src/components/chat/renderers/DiffBlock.tsx:6`:
-  `AnnotationDraft` is declared three times and the copies have already diverged. The canonical
-  export (used by the store and tray) makes `path`/`side`/`start_line`/`end_line` optional;
-  `DiffBlock`'s local copy makes all four required; `TranscriptView`'s re-declares the optional
-  shape. TypeScript's structural typing accepts all three, so `npm run build` and the 105 UI tests
-  are blind to it. Suggested fix: delete both local declarations and import from `api/types`.
-
-- **Worth fixing** (INV §1) — `ui/src/store/annotationStore.ts:45`: the pending tray persists to
-  localStorage keyed by `agent_id` and is never cleaned up. No consumer outside `AnnotationTray`/
-  `TranscriptView` touches it; nothing clears it on agent stop, agent delete, or archive purge. A
-  deleted agent's drafts survive indefinitely and would resurface against a reused `agent_id`.
-  Growth is unbounded across agents (20 entries x 2,000 chars is roughly 40 KB each against a ~5 MB
-  quota); a full quota makes zustand's `persist` throw on every `setState`. Suggested fix: drop
-  trays for unknown agent ids on hydrate.
-
-- **Worth fixing** (INV §4) — `scripts/release/install.sh`: the piped-install path (`curl | bash`) creates a
-  temporary bootstrap with `mktemp`, registers `trap 'rm -f "$bootstrap"' EXIT`, then
-  `exec bash "$bootstrap"`. `exec` replaces the shell image, so the EXIT trap never fires and the
-  owner-only temp file is left in `$TMPDIR` after every piped install (the re-exec'd child is a fresh
-  shell that neither knows the path nor carries the trap). Normal-use trigger: the documented
-  `curl | bash` install, on every run. Not data loss and cleaned at reboot, so low severity. Suggested
-  fix: have the re-exec'd bootstrap delete its own file once it no longer needs to re-read itself
-  (e.g. pass the temp path in an env var and `rm` it after the lock re-exec resolves, or sweep stale
-  `agentdeck-bootstrap.*` at start), guarded so a real `bash <install.sh>` invocation never deletes a
-  user-provided script. No requirement pins temp-file cleanup; this is a hygiene defect, not a
-  behavior-vs-spec mismatch.
+No open findings.
 
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-25 — Fixed all five open findings. **INV §15** (Must fix): the annotations endpoint
+  delivered reserved mail or started the prompt turn before appending the source annotation event, so
+  any append failure returned 500 after an irreversible effect and the preserved tray's retry
+  delivered a second copy. The handler now validates the target, composes its payload, appends the
+  durable event, and only then delivers through one deferred closure; FS-13.R5 and TS-03.R14 pin the
+  ordering, including the honest residue that a delivery failure after the append records a second
+  annotation event on retry. `TestAnnotationAppendFailureDeliversNoMailAndRetrySendsOnce` blocks the
+  transcript directory and asserts one mail row across the retry (new FS-13.A7). **INV §2**: the
+  duplicated `clipExcerpt` collapsed into `ui/src/lib/annotations.ts` with the server marker
+  authoritative, and both local `AnnotationDraft` re-declarations now import the canonical type.
+  **INV §1**: pending trays are dropped when an agent is deleted, and expire/cap on rehydration
+  (30 days, 20 sources) — new FS-13.R16/A8, since nothing on the server owns that state and the live
+  agent list deliberately excludes archived sources. **INV §4**: the piped installer's temporary
+  bootstrap is now removed by the lock-holding child, the last process that reads it, guarded to the
+  installer's own `mktemp` name; the piped-install regression runs under a private `TMPDIR` and
+  asserts nothing is left behind. Specification checks, both Go test variants, focused `-race` on the
+  annotation path, 107 UI tests, source build, and distribution build pass.
 
 - 2026-07-25 — Audited the prior two weeks of fixes against the invariant catalog and kept only
   repeatable, cross-cutting lessons. New INV §15 requires local durable state before releasing an

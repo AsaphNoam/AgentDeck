@@ -42,7 +42,11 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 
 - **R5.** Every successful send appends one durable `annotation` event to the **source**
   session's transcript — whether that session is active or inactive — recording the batch and its
-  target. Live chat and archive replay render it as quoted-excerpt annotation cards with their
+  target. The event is appended **before** the batch is delivered, so no agent ever receives
+  annotations the source transcript does not record. When delivery itself fails after that append,
+  the batch is undelivered and the tray is preserved (R3); re-sending it delivers exactly once and
+  records a second annotation event for the retried batch. Live chat and
+  archive replay render it as quoted-excerpt annotation cards with their
   instructions, not as pasted user prose; rendering is sanitized under the same rules as other
   transcript content (FS-03.R20).
 - **R6.** Target **current agent** requires the source agent to be a running, idle chat
@@ -96,6 +100,12 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 - **R15.** From an archived (inactive) source session, the current-agent target is
   unavailable; another-agent and new-task targets remain. The archived view stays composer-free
   (FS-05.R14); annotating never sends a prompt to the archived session itself.
+- **R16.** Pending trays are bounded browser-local drafts, not durable data. Deleting an
+  agent discards its tray, because no target can accept a batch from a source that no longer exists
+  (R11). Independently, stored trays expire 30 days after their last edit and only the 20
+  most-recently-edited sources are retained; both are applied when the browser reloads the stored
+  trays. This keeps a session's own tray across reloads (R3) — including an archived session's,
+  which is not in the live agent list — while bounding what accumulates in browser storage.
 
 ## 5. Acceptance criteria
 
@@ -117,6 +127,11 @@ Each acceptance item names its delivered verification.
 - **A6** (R1–R15) — A user annotates a diff and a message, sends to self, to a second
   agent, and to a new task, and sees structured cards and mail arrive: journey **J13** in
   `docs/features/USABILITY-REVIEW.md`.
+- **A7** (R5) — A failed source-transcript append delivers no mail, and the preserved tray's
+  retry delivers exactly one copy:
+  `internal/server/annotations_test.go::TestAnnotationAppendFailureDeliversNoMailAndRetrySendsOnce`.
+- **A8** (R16) — Deleting an agent drops its pending tray, and stored trays are capped and
+  expired on rehydration: `ui/src/store/annotationStore.test.ts`.
 
 ## 6. Deviations & open decisions
 

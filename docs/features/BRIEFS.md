@@ -4,6 +4,36 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-25 — Fix: annotations are recorded before they are delivered
+
+The important one was a real double-work risk. When you sent a batch of annotations to another agent,
+AgentDeck delivered the mail and woke that agent up *before* writing the annotation into the source
+session's own record. If that write then failed — a full disk, a permissions problem — you got an error
+message while the other agent had already received the work, and because the tray is deliberately kept
+after a failed send, pressing send again delivered a second copy for the agent to act on twice. The
+source transcript, meanwhile, had no record of any of it. Now the record is written first and delivery
+happens only after it succeeds, so a failure means nothing was sent and one retry sends exactly once.
+A new test blocks the write and proves the recipient ends up with a single copy.
+
+Three smaller cleanups came with it. Two copies of the excerpt-trimming code and three copies of the
+annotation data shape had already drifted apart without anything failing, so each now has a single
+definition. Pending annotation drafts kept in the browser had no cleanup at all: a deleted agent's
+drafts lived on forever and could reappear against a reused identity, and the drafts of every agent you
+ever opened accumulated until the browser's storage limit broke saving entirely. Drafts are now dropped
+when their agent is deleted, and old or excess drafts are cleared when you reload — while still keeping
+the drafts of an archived session, which is a supported place to annotate from. Finally, the
+`curl | bash` installer left one small temporary file in your system temp folder on every run; the
+right process now cleans it up.
+
+All automated checks pass: specification checks, both database build variants of the Go tests, a
+focused race check on the annotation path, the full browser test suite, and both application builds.
+
+**Needs attention:** Publishing is still paused. Pushing now would send six local commits to the shared
+repository, and that needs your explicit approval.
+
+**Next:** Approve or decline the six-commit push. After that, the only annotation work left is the
+real-browser walkthrough of annotating, sending, and receiving, which needs a person driving a browser.
+
 ### 2026-07-25 — Specification maintenance: strengthen recurring bug guards
 
 The bug-class catalog now captures the two broadly repeatable lessons from the last two weeks without
