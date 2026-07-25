@@ -163,7 +163,7 @@
       "variants": ["default", "onboarding"]
     },
     "onboarding": {
-      "slots": ["progress", "step", "content", "actions"],
+      "slots": ["progress", "step", "content", "actions", "guidance", "footer"],
       "states": ["current", "complete", "upcoming"],
       "variants": ["source", "project", "backend", "launch"]
     },

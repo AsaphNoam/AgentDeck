@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useBackends, usePutBackends } from "../../../api/config";
 import type { BackendsConfig, BackendType } from "../../../schemas/backends";
 import { BACKEND_TYPE_LABELS, BACKEND_TYPE_OPTIONS } from "../../../lib/backendTypes";
@@ -18,19 +18,30 @@ const seededIdForType: Record<BackendType, string> = {
   "openhands-acp": "openhands",
 };
 
+// signInProvider maps a backend type to the `agentdeck auth` selector for
+// providers that own an interactive sign-in. AgentDeck never runs, proxies, or
+// observes that flow — onboarding only tells the person which command to run in
+// their own terminal, then re-checks readiness (FS-04.R34, TS-04.R15).
+const signInProvider: Partial<Record<BackendType, string>> = {
+  "claude-acp": "claude",
+  "codex-acp": "codex",
+};
+
 function credentialGuidance(status: string, detail: string | null, type: BackendType): string {
   if (detail === "cli_not_installed") {
-    return `The ${BACKEND_TYPE_LABELS[type]} adapter is not installed. Install it, then validate again.`;
+    return `The ${BACKEND_TYPE_LABELS[type]} adapter is not installed. Install it, then check again.`;
   }
   if (detail === "not_logged_in") {
-    return "This provider is not signed in. Run its guided sign-in, then validate again.";
+    return `${BACKEND_TYPE_LABELS[type]} is not signed in. Complete its sign-in below, then check again.`;
   }
   if (detail === "no_api_key") {
-    return "No API key was found. Add the API key above, then validate again.";
+    return type === "codex-acp"
+      ? "No sign-in and no API key were found. Sign in below, or add an API key, then check again."
+      : "No API key was found. Add the API key above, then check again.";
   }
   return status === "failed"
-    ? "The credential check failed. Confirm this provider's sign-in or API key, then validate again."
-    : "The credential check could not run. Check the provider setup, then validate again.";
+    ? "The credential check failed. Confirm this provider's sign-in or API key, then check again."
+    : "The credential check could not run yet. Confirm the provider setup, then check again.";
 }
 
 export function BackendStep({ onDone }: BackendStepProps) {
@@ -38,9 +49,6 @@ export function BackendStep({ onDone }: BackendStepProps) {
   const putBackends = usePutBackends();
 
   const [type, setType] = useState<BackendType>("claude-acp");
-  const [modelKey, setModelKey] = useState("default");
-  const [modelName, setModelName] = useState("Default");
-  const [modelStr, setModelStr] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [llmApiKey, setLlmApiKey] = useState("");
   const [llmBaseUrl, setLlmBaseUrl] = useState("");
@@ -50,28 +58,24 @@ export function BackendStep({ onDone }: BackendStepProps) {
   const backendId = seededIdForType[type];
   const seeded = existing?.backends[backendId];
   const readyToValidate = !!existing && !isLoading;
-
-  // Pre-fill from the seeded backend entry for the selected type (once loaded), so an
-  // untouched submit reuses the seeded default model (name + model string) instead of a
-  // synthesized placeholder.
-  useEffect(() => {
-    if (!existing) return;
-    const seededModel = seeded?.default_model ? seeded.models[seeded.default_model] : undefined;
-    if (seeded && seeded.default_model && seededModel) {
-      setModelKey(seeded.default_model);
-      setModelName(seededModel.name);
-      setModelStr(seededModel.model);
-    }
-  }, [existing, type]);
-
-  // If existing backends already have a default with ok creds shown — just offer to continue.
-  // (The wizard calls onDone when the cred check comes back ok.)
+  // Once a readiness result came back non-ok, the same submit becomes a plain
+  // re-check: nothing about the document changed, only the provider's state.
+  const hasUnreadyResult = credStatus !== null && credStatus !== "ok";
+  const authProvider = signInProvider[type];
+  // A hand-edited catalog can leave the chosen backend with no usable default
+  // model. Onboarding no longer invents one (FS-04.R33), so say so plainly
+  // rather than silently saving a broken default (INV §8, §11).
+  const defaultModel = seeded?.default_model ?? "";
+  const defaultModelEntry = defaultModel ? seeded?.models?.[defaultModel] : undefined;
+  const catalogUnusable = readyToValidate && (!seeded || !defaultModelEntry);
 
   const handleValidate = () => {
-    if (!readyToValidate) return;
+    if (!readyToValidate || catalogUnusable) return;
     setError(null);
     setCredStatus(null);
-    const env: Record<string, string> = {};
+    // Credentials entered here belong to the backend, not to one model entry, so
+    // they survive a later model change in Settings.
+    const env: Record<string, string> = { ...(seeded?.env ?? {}) };
     if (type === "codex-acp" && apiKey) env["OPENAI_API_KEY"] = apiKey;
     if (type === "openhands-acp") {
       if (llmApiKey) env["LLM_API_KEY"] = llmApiKey;
@@ -79,24 +83,22 @@ export function BackendStep({ onDone }: BackendStepProps) {
     }
 
     const backends: BackendsConfig["backends"] = existing?.backends ?? {};
-    // Merge-preserve: keep the seeded backend's full `models` map (and other fields) and
-    // only overlay the one model the user is editing here. This avoids clobbering seeded
-    // models with a synthesized single-model map (which previously could persist the
-    // literal placeholder model string "default" when the form was left untouched).
+    // Merge-preserve (INV §3): the seeded catalog — every model entry and its
+    // default — is submitted unchanged. This step only marks the chosen backend
+    // default and overlays credentials; it never writes back a partial
+    // on-screen view of the model catalog.
     const config: BackendsConfig = {
       version: 2,
       backends: {
         ...backends,
         [backendId]: {
+          ...seeded,
           name: seeded?.name ?? BACKEND_TYPE_LABELS[type],
           type,
           default: true,
-          default_model: modelKey,
-          models: {
-            ...(seeded?.models ?? {}),
-            [modelKey]: { name: modelName, model: modelStr || modelKey, env },
-          },
-          env: seeded?.env ?? {},
+          default_model: defaultModel,
+          models: seeded?.models ?? {},
+          env,
         },
       },
     };
@@ -122,7 +124,8 @@ export function BackendStep({ onDone }: BackendStepProps) {
     <div className="wizard-step" data-ui="onboarding" data-slot="step" data-variant="backend">
       <h3>Configure your AI backend</h3>
       <p className="wizard-step-desc">
-        Choose a backend and validate your credentials before continuing.
+        Choose a backend and confirm it is ready. You can change models and add more backends later
+        in Settings.
       </p>
 
       <div className="form-field">
@@ -136,9 +139,32 @@ export function BackendStep({ onDone }: BackendStepProps) {
         </select>
       </div>
 
+      {defaultModelEntry && (
+        <p className="form-hint">
+          Using this backend's default model: {defaultModelEntry.name}.
+        </p>
+      )}
+
+      {authProvider && (
+        <div className="wizard-guidance" data-slot="guidance">
+          <p>
+            {BACKEND_TYPE_LABELS[type]} sign-in happens in {BACKEND_TYPE_LABELS[type]}'s own tool, not
+            in AgentDeck. In a terminal, run:
+          </p>
+          <p>
+            <code>agentdeck auth {authProvider}</code>
+          </p>
+          <p className="form-hint">
+            {type === "codex-acp"
+              ? "Already signed in to Codex? Nothing else is needed — an API key below is only an alternative."
+              : "AgentDeck never sees or stores your credentials."}
+          </p>
+        </div>
+      )}
+
       {type === "codex-acp" && (
         <div className="form-field">
-          <label>OpenAI API key</label>
+          <label>OpenAI API key (optional)</label>
           <input
             type="password"
             value={apiKey}
@@ -172,30 +198,12 @@ export function BackendStep({ onDone }: BackendStepProps) {
         </>
       )}
 
-      <div className="form-field">
-        <label>Default model ID</label>
-        <input
-          value={modelKey}
-          onChange={(e) => setModelKey(e.target.value)}
-          placeholder="e.g. sonnet"
-        />
-      </div>
-
-      <div className="form-field">
-        <label>Provider model string</label>
-        <input
-          value={modelStr}
-          onChange={(e) => setModelStr(e.target.value)}
-          placeholder={
-            type === "claude-acp"
-              ? "e.g. claude-sonnet-4-6"
-              : type === "codex-acp"
-                ? "e.g. gpt-4o"
-                : "e.g. anthropic/claude-sonnet-4-5"
-          }
-        />
-      </div>
-
+      {catalogUnusable && (
+        <p className="form-error">
+          This backend has no usable default model in <code>backends.json</code>. Fix its catalog in
+          Settings → Backends, or choose another backend.
+        </p>
+      )}
       {credStatus && credStatus !== "ok" && (
         <p className="form-error">
           {credentialGuidance(credStatus, credDetail, type)}
@@ -207,9 +215,13 @@ export function BackendStep({ onDone }: BackendStepProps) {
         <button
           type="button"
           onClick={handleValidate}
-          disabled={putBackends.isPending || !readyToValidate}
+          disabled={putBackends.isPending || !readyToValidate || catalogUnusable}
         >
-          {putBackends.isPending ? "Validating…" : "Validate & Continue"}
+          {putBackends.isPending
+            ? "Checking…"
+            : hasUnreadyResult
+              ? "Check again"
+              : "Validate & Continue"}
         </button>
       </div>
     </div>

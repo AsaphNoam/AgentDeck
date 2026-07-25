@@ -7,12 +7,15 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** finished locally with no open findings — every annotate-and-assign review finding plus
-  the installer temp-file leak is fixed and verified. Publishing still needs explicit approval
-  because local main is now six commits ahead of `origin/main`.
+- **State:** finished locally with no open findings — the onboarding-credentials repair is
+  implemented and verified, and no ready change is waiting. Publishing still needs explicit approval
+  because local main is now seven commits ahead of `origin/main`.
   Credentialed provider acceptance remains a separate manual release gate; native prompt/confirm
-  actions also need replay in a browser that supports those dialogs. The annotation fixes are
-  unreviewed code: a future `/review` starts after `8b84e4f`.
+  actions also need replay in a browser that supports those dialogs. The annotation fixes and the
+  onboarding work are unreviewed code: a future `/review` starts after `8b84e4f`.
+  The onboarding change is verified by automated tests plus a real isolated-home run; **J2 has not
+  been replayed in a browser**, so the wizard's Set up later and Check again controls are unproven
+  against real rendering and pointer interaction.
 - **Last reviewed code:** `8b84e4f` (2026-07-24), implements FS-13 annotate-and-assign through
   the continuous range after `61b234d`.
 - **Branch:** `main`.
@@ -53,6 +56,27 @@ No open findings.
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-25 — Repaired onboarding credentials and defaults, the last waiting ready change.
+  **INV §2** was the load-bearing find: `agentdeck auth` and the credential prober each carried their
+  own copy of the provider commands, and the CLI's copy was simply wrong — `codex-acp` is a stdio ACP
+  server that ignores argv, so `agentdeck auth codex` started a server and hung instead of signing
+  anyone in. One `internal/backend/providerauth` table now owns both verbs for both providers, with a
+  test asserting login and readiness share an executable. Codex readiness asks that CLI for
+  `login status` before falling back to the API key, so a ChatGPT-signed-in user with no
+  `OPENAI_API_KEY` is ready (FS-09.R34); verified against the real signed-in CLI and through
+  `PUT /api/backends` on an isolated home, where the gate went from held-closed to satisfied.
+  **INV §12** shapes the failure vocabulary: an uninterrogable CLI reports skipped, never failed, and
+  "not logged in" is matched before "logged in" so the substring read cannot invert. The wizard gained
+  the **Set up later** completion path (FS-04.R32) and lost both model-identifier fields (R33),
+  submitting the seeded catalog unchanged per **INV §3**; provider sign-in is now named guidance plus
+  Check again over the same backend save (R34, TS-03.R15). Fresh homes seed `sonnet`/`gpt-5.6-sol`
+  aliases rather than dated pins (FS-09.R33), and re-seeding still leaves an existing catalog
+  byte-for-byte intact. TS-06.R22 pins `@openai/codex` as a direct release dependency — the version
+  was already resolved transitively, so the lockfile moved three lines — validated before packaging
+  and proven to resolve with no global Codex installed. FS-04, TS-03, and TS-06 flip to Current.
+  Specification checks, both Go test variants, focused `-race`, 113 UI tests, source/UI/dist builds
+  pass. J2 in a real browser is the remaining unproven surface.
 
 - 2026-07-25 — Fixed all five open findings. **INV §15** (Must fix): the annotations endpoint
   delivered reserved mail or started the prompt turn before appending the source annotation event, so

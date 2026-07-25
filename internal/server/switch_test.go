@@ -77,7 +77,7 @@ func TestSwitchRuntimeModelSwapSameBackend(t *testing.T) {
 	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
 	first := runningSessionID(t, srv, id)
 
-	resp, body := post(t, ts.URL+"/api/sessions/"+id+"/switch-runtime", map[string]string{"model": "opus-4-7"})
+	resp, body := post(t, ts.URL+"/api/sessions/"+id+"/switch-runtime", map[string]string{"model": "opus"})
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("switch status = %d: %s", resp.StatusCode, body)
 	}
@@ -88,15 +88,15 @@ func TestSwitchRuntimeModelSwapSameBackend(t *testing.T) {
 	if sr.AgentID != id {
 		t.Fatalf("agent_id changed: %s != %s", sr.AgentID, id)
 	}
-	if sr.Model != "opus-4-7" || sr.Backend != "claude" || sr.Interface != "chat" {
+	if sr.Model != "opus" || sr.Backend != "claude" || sr.Interface != "chat" {
 		t.Fatalf("identity not as expected: %+v", sr)
 	}
 	if sr.HistoryHandoff != "native_resume" {
 		t.Fatalf("history_handoff = %q, want native_resume", sr.HistoryHandoff)
 	}
 	// Identity row persisted the new model; a fresh native session is running.
-	if a, _ := srv.stateStore.ReadAgent(id); a.Model != "opus-4-7" {
-		t.Fatalf("identity model = %q, want opus-4-7", a.Model)
+	if a, _ := srv.stateStore.ReadAgent(id); a.Model != "opus" {
+		t.Fatalf("identity model = %q, want opus", a.Model)
 	}
 	if second := runningSessionID(t, srv, id); second == "" || second == first {
 		t.Fatalf("expected a new session_id (was %q, now %q)", first, second)
@@ -173,7 +173,7 @@ func TestSwitchRuntimeBackendSwapUsesPrimer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read transcript: %v", err)
 	}
-	if !hasBackendSwitchMarker(events, "claude/sonnet-4-6", "codex/gpt-5.5") {
+	if !hasBackendSwitchMarker(events, "claude/sonnet", "codex/gpt-5.5") {
 		t.Fatalf("missing backend_switch marker in transcript: %+v", events)
 	}
 
@@ -209,7 +209,7 @@ func TestSwitchClaudeToOpenCodePrimer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read transcript: %v", err)
 	}
-	if !hasBackendSwitchMarker(events, "claude/sonnet-4-6", "opencode/sonnet-4-5") {
+	if !hasBackendSwitchMarker(events, "claude/sonnet", "opencode/sonnet-4-5") {
 		t.Fatalf("missing backend_switch marker in transcript: %+v", events)
 	}
 }
@@ -267,7 +267,7 @@ func TestSwitchRuntimePrimerKeepsFrozenSystemPrompt(t *testing.T) {
 	// Switch #2: codex → claude is again cross-backend → primer path. If the frozen
 	// snapshot had absorbed the first primer, this switch would prime primer-on-
 	// primer; with the fix it primes from the clean base and the snapshot stays clean.
-	resp, body = post(t, ts.URL+"/api/sessions/"+id+"/switch-runtime", map[string]string{"backend": "claude", "model": "sonnet-4-6"})
+	resp, body = post(t, ts.URL+"/api/sessions/"+id+"/switch-runtime", map[string]string{"backend": "claude", "model": "sonnet"})
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("switch#2 status = %d: %s", resp.StatusCode, body)
 	}

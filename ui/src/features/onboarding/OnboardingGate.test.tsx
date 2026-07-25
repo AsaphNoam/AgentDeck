@@ -173,4 +173,68 @@ describe("OnboardingGate", () => {
     }
     expect(screen.getByText("Welcome to AgentDeck")).toBeInTheDocument();
   });
+
+  // FS-04.R32/A13: someone who cannot finish setup now must be able to reach the
+  // dashboard. The escape hatch marks onboarding complete and touches nothing
+  // else — no project, no backend/catalog write, no launch.
+  it("Set up later reveals the dashboard without any other side effect", async () => {
+    let configPut: unknown = null;
+    const touched: string[] = [];
+    server.use(
+      http.put("/api/config", async ({ request }) => {
+        configPut = await request.json();
+        return HttpResponse.json({ ...satisfiedConfig, onboarding_complete: true });
+      }),
+      http.put("/api/backends", () => {
+        touched.push("PUT /api/backends");
+        return HttpResponse.json({ version: 2, backends: {}, credentials: {} });
+      }),
+      http.post("/api/projects", () => {
+        touched.push("POST /api/projects");
+        return HttpResponse.json({}, { status: 201 });
+      }),
+      http.post("/api/sessions", () => {
+        touched.push("POST /api/sessions");
+        return HttpResponse.json({}, { status: 201 });
+      }),
+    );
+
+    renderWithQuery(
+      <OnboardingGate>
+        <div data-testid="dashboard">Dashboard</div>
+      </OnboardingGate>,
+    );
+    fireEvent.click(await screen.findByText("Set up later"));
+
+    expect(await screen.findByTestId("dashboard")).toBeInTheDocument();
+    expect(screen.queryByText("Welcome to AgentDeck")).toBeNull();
+    expect(configPut).toEqual({ onboarding_complete: true });
+    expect(touched).toEqual([]);
+  });
+
+  // A completion write that fails must not silently close the wizard: the poll
+  // would reopen it and the person would never learn why (INV §8).
+  it("keeps the wizard open and explains a failed Set up later", async () => {
+    server.use(
+      http.put("/api/config", () =>
+        HttpResponse.json(
+          { error: { code: "internal", message: "disk is read-only" } },
+          { status: 500 },
+        ),
+      ),
+    );
+
+    renderWithQuery(
+      <OnboardingGate>
+        <div data-testid="dashboard">Dashboard</div>
+      </OnboardingGate>,
+    );
+    fireEvent.click(await screen.findByText("Set up later"));
+
+    expect(await screen.findByText(/disk is read-only/i)).toBeInTheDocument();
+    expect(screen.getByText("Welcome to AgentDeck")).toBeInTheDocument();
+    expect(screen.queryByTestId("dashboard")).toBeNull();
+    // Still retryable.
+    expect(screen.getByText("Set up later")).not.toBeDisabled();
+  });
 });

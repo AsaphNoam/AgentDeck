@@ -22,6 +22,7 @@ func buildArchive(t *testing.T, version string) (string, string) {
 		"runtime/node/bin/node":                      "#!/bin/sh\n",
 		"runtime/node_modules/.bin/claude-agent-acp": "#!/bin/sh\n",
 		"runtime/node_modules/.bin/codex-acp":        "#!/bin/sh\n",
+		"runtime/node_modules/.bin/codex":            "#!/bin/sh\n",
 	}
 	for rel, body := range files {
 		p := filepath.Join(dir, rel)
@@ -36,7 +37,8 @@ func buildArchive(t *testing.T, version string) (string, string) {
 		t.Fatal(err)
 	}
 	if err := release.WriteInternalManifest(dir, release.InternalManifest{Version: version, Target: release.Target, Components: map[string]string{
-		"node": "22.0.0", "claude-agent-acp": "0.59.0", "codex-acp": "1.1.2", "agentdeck": version,
+		"node": "22.0.0", "claude-agent-acp": "0.59.0", "codex-acp": "1.1.2",
+		"codex": "0.144.4", "agentdeck": version,
 	}}); err != nil {
 		t.Fatal(err)
 	}

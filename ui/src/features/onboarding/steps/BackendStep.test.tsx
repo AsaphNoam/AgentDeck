@@ -16,21 +16,30 @@ const seededBackendsDoc = {
       name: "Claude",
       type: "claude-acp",
       default: true,
-      default_model: "sonnet-4-6",
+      default_model: "sonnet",
       models: {
-        "sonnet-4-6": { name: "Sonnet 4.6", model: "claude-sonnet-4-6" },
-        "opus-4-7": { name: "Opus 4.7", model: "claude-opus-4-7" },
+        sonnet: { name: "Claude Sonnet", model: "sonnet" },
+        opus: { name: "Claude Opus", model: "opus" },
       },
+    },
+    codex: {
+      name: "Codex",
+      type: "codex-acp",
+      default: false,
+      default_model: "gpt-5.6-sol",
+      models: { "gpt-5.6-sol": { name: "GPT-5.6-Sol", model: "gpt-5.6-sol" } },
     },
   },
 };
 
 let lastPutBody: unknown = null;
+let putCount = 0;
 
 const server = setupServer(
   http.get("/api/backends", () => HttpResponse.json(seededBackendsDoc)),
   http.put("/api/backends", async ({ request }) => {
     lastPutBody = await request.json();
+    putCount += 1;
     return HttpResponse.json({
       ...seededBackendsDoc,
       credentials: { claude: { status: "ok", detail: "" } },
@@ -43,12 +52,19 @@ afterEach(() => {
   cleanup();
   server.resetHandlers();
   lastPutBody = null;
+  putCount = 0;
 });
 afterAll(() => server.close());
 
 function renderWithQuery(ui: React.ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
   return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
+}
+
+// The step is ready once the seeded catalog has loaded, which it signals by
+// naming the default model it will use.
+function waitForLoaded() {
+  return screen.findByText(/Using this backend's default model/i);
 }
 
 describe("BackendStep", () => {
@@ -66,48 +82,57 @@ describe("BackendStep", () => {
     expect(button).toBeDisabled();
     fireEvent.click(button);
 
-    await waitFor(() => {
-      expect(screen.getByDisplayValue("claude-sonnet-4-6")).toBeInTheDocument();
-    });
+    await waitForLoaded();
     expect(button).not.toBeDisabled();
     expect(lastPutBody).toBeNull();
   });
 
-  it("submitting without touching model inputs preserves the seeded models map (no 'default' placeholder)", async () => {
+  // FS-04.R33: onboarding no longer asks for model identifiers at all. The step
+  // must present neither an AgentDeck model id nor a provider model string.
+  it("asks for no model id or provider model string", async () => {
+    renderWithQuery(<BackendStep onDone={vi.fn()} />);
+    await waitForLoaded();
+
+    expect(screen.queryByText(/Default model ID/i)).toBeNull();
+    expect(screen.queryByText(/Provider model string/i)).toBeNull();
+    expect(screen.queryByDisplayValue("sonnet")).toBeNull();
+
+    // Only the backend type selector and no free-text model entry.
+    const textboxes = screen.queryAllByRole("textbox");
+    expect(textboxes).toHaveLength(0);
+  });
+
+  // INV §3: the step submits the seeded catalog unchanged and only marks the
+  // chosen backend default. It must never write back a partial on-screen view.
+  it("submits the seeded catalog unchanged and uses its existing default model", async () => {
     const onDone = vi.fn();
     renderWithQuery(<BackendStep onDone={onDone} />);
-
-    // Wait for the pre-fill effect to populate the model fields from the seeded backend.
-    await waitFor(() => {
-      expect(screen.getByDisplayValue("claude-sonnet-4-6")).toBeInTheDocument();
-    });
+    await waitForLoaded();
 
     fireEvent.click(screen.getByText("Validate & Continue"));
-
     await waitFor(() => expect(lastPutBody).not.toBeNull());
 
-    const body = lastPutBody as { backends: Record<string, { default_model: string; models: Record<string, { model: string }> }> };
+    const body = lastPutBody as {
+      backends: Record<
+        string,
+        { default: boolean; default_model: string; models: Record<string, { name: string; model: string }> }
+      >;
+    };
     const claude = body.backends.claude;
 
-    // The seeded models must survive untouched.
-    expect(claude.models["sonnet-4-6"]).toMatchObject({ name: "Sonnet 4.6", model: "claude-sonnet-4-6" });
-    expect(claude.models["opus-4-7"]).toEqual({ name: "Opus 4.7", model: "claude-opus-4-7" });
-
-    // default_model must point at a real seeded model, never the literal placeholder "default".
-    expect(claude.default_model).not.toBe("default");
-    expect(claude.models[claude.default_model]).toBeDefined();
-
-    // No model in the payload should ever be the literal string "default".
-    for (const model of Object.values(claude.models)) {
-      expect(model.model).not.toBe("default");
-    }
+    expect(claude.default_model).toBe("sonnet");
+    expect(claude.models).toEqual(seededBackendsDoc.backends.claude.models);
+    expect(claude.default).toBe(true);
+    // The other seeded backend survives, demoted but otherwise intact.
+    expect(body.backends.codex.models).toEqual(seededBackendsDoc.backends.codex.models);
+    expect(body.backends.codex.default).toBe(false);
 
     await waitFor(() => expect(onDone).toHaveBeenCalled());
   });
 
   it("offers all four backend types and shows LLM fields for OpenHands", async () => {
     renderWithQuery(<BackendStep onDone={vi.fn()} />);
-    await screen.findByDisplayValue("claude-sonnet-4-6");
+    await waitForLoaded();
 
     const typeSelect = screen.getByRole("combobox") as HTMLSelectElement;
     const values = Array.from(typeSelect.options).map((o) => o.value);
@@ -123,13 +148,76 @@ describe("BackendStep", () => {
   it("explains a missing adapter in human terms", async () => {
     server.use(
       http.put("/api/backends", () =>
-        HttpResponse.json({ ...seededBackendsDoc, credentials: { claude: { status: "skipped", detail: "cli_not_installed" } } }),
+        HttpResponse.json({
+          ...seededBackendsDoc,
+          credentials: { claude: { status: "skipped", detail: "cli_not_installed" } },
+        }),
       ),
     );
     renderWithQuery(<BackendStep onDone={vi.fn()} />);
-    await screen.findByDisplayValue("claude-sonnet-4-6");
+    await waitForLoaded();
     fireEvent.click(screen.getByText("Validate & Continue"));
     expect(await screen.findByText(/adapter is not installed/i)).toBeInTheDocument();
     expect(screen.queryByText(/cli_not_installed/)).toBeNull();
+  });
+
+  // FS-04.R34: Claude and Codex sign in with their own tooling, and an unready
+  // result must leave a retryable Check again rather than a dead end.
+  it("names the provider sign-in command and offers Check again when unready", async () => {
+    server.use(
+      http.put("/api/backends", async ({ request }) => {
+        lastPutBody = await request.json();
+        putCount += 1;
+        return HttpResponse.json({
+          ...seededBackendsDoc,
+          credentials: { claude: { status: "failed", detail: "not_logged_in" } },
+        });
+      }),
+    );
+    const onDone = vi.fn();
+    renderWithQuery(<BackendStep onDone={onDone} />);
+    await waitForLoaded();
+
+    expect(screen.getByText(/agentdeck auth claude/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Validate & Continue"));
+    expect(await screen.findByText(/is not signed in/i)).toBeInTheDocument();
+    expect(onDone).not.toHaveBeenCalled();
+
+    // The retry is the same backend save, not a new endpoint (TS-03.R15).
+    const again = screen.getByText("Check again");
+    fireEvent.click(again);
+    await waitFor(() => expect(putCount).toBe(2));
+  });
+
+  // A signed-in Codex has no API key; the field must be optional, and the copy
+  // must not imply a key is required (FS-09.R34).
+  it("treats the Codex API key as an alternative to native sign-in", async () => {
+    renderWithQuery(<BackendStep onDone={vi.fn()} />);
+    await waitForLoaded();
+
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "codex-acp" } });
+
+    expect(screen.getByText(/agentdeck auth codex/)).toBeInTheDocument();
+    expect(screen.getByText(/OpenAI API key \(optional\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/only an alternative/i)).toBeInTheDocument();
+  });
+
+  // INV §11/§8: a hand-edited catalog with no usable default must be explained,
+  // not silently saved with an empty default_model.
+  it("refuses to submit a backend whose catalog has no usable default model", async () => {
+    server.use(
+      http.get("/api/backends", () =>
+        HttpResponse.json({
+          version: 2,
+          backends: { claude: { name: "Claude", type: "claude-acp", default: true, default_model: "", models: {} } },
+        }),
+      ),
+    );
+    renderWithQuery(<BackendStep onDone={vi.fn()} />);
+
+    expect(await screen.findByText(/no usable default model/i)).toBeInTheDocument();
+    expect(screen.getByText("Validate & Continue")).toBeDisabled();
+    expect(lastPutBody).toBeNull();
   });
 });

@@ -28,7 +28,7 @@ func buildRunnableVersion(t *testing.T, l *Layout, version string) string {
 	if err := os.MkdirAll(adapters, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for _, a := range []string{"claude-agent-acp", "codex-acp"} {
+	for _, a := range []string{"claude-agent-acp", "codex-acp", "codex"} {
 		if err := os.WriteFile(filepath.Join(adapters, a), []byte("#!/bin/sh\n"), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -37,7 +37,7 @@ func buildRunnableVersion(t *testing.T, l *Layout, version string) string {
 	if err := os.MkdirAll(libexec, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	report := "#!/bin/sh\necho \"PATH=$PATH\"\necho \"NODE=$(command -v node)\"\necho \"ARGS=$*\"\n"
+	report := "#!/bin/sh\necho \"PATH=$PATH\"\necho \"NODE=$(command -v node)\"\necho \"CODEX=$(command -v codex)\"\necho \"ARGS=$*\"\n"
 	if err := os.WriteFile(filepath.Join(libexec, "agentdeck"), []byte(report), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -101,6 +101,64 @@ func TestShimRunsPrivateRuntime(t *testing.T) {
 			if got := strings.TrimPrefix(line, "ARGS="); got != "extra-arg" {
 				t.Fatalf("args not forwarded: %q", got)
 			}
+		}
+	}
+}
+
+// Onboarding readiness runs `codex login status`, so the Codex CLI must resolve
+// from the private runtime on a machine with no Codex installed globally
+// (TS-06.R22). Without this the readiness probe would silently depend on the
+// user's own PATH and report a signed-in person as unready.
+func TestPrivateCodexResolvesWithoutGlobalInstall(t *testing.T) {
+	l := newLayout(t)
+	name := buildRunnableVersion(t, l, "1.0.0")
+	if err := l.Activate(name); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.WriteShim(); err != nil {
+		t.Fatal(err)
+	}
+
+	// An empty-ish PATH with no codex anywhere: any resolution must come from
+	// the bundled runtime.
+	cmd := exec.Command(l.ShimPath())
+	cmd.Env = append(os.Environ(), "PATH=/usr/bin:/bin")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("shim run: %v\n%s", err, out)
+	}
+
+	versionDir, err := filepath.EvalSymlinks(l.VersionDir(name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantCodex := filepath.Join(versionDir, "runtime/node_modules/.bin/codex")
+
+	var got string
+	for _, line := range strings.Split(string(out), "\n") {
+		if strings.HasPrefix(line, "CODEX=") {
+			got = strings.TrimPrefix(line, "CODEX=")
+		}
+	}
+	if got == "" {
+		t.Fatalf("codex did not resolve at all under the wrapper PATH:\n%s", out)
+	}
+	if got != wantCodex {
+		t.Fatalf("codex resolved to %q, want the private %q", got, wantCodex)
+	}
+}
+
+// A required layout entry that no manifest component names (or the reverse) is
+// how the runtime and its own identity record drift apart (INV §2).
+func TestRequiredLayoutAndManifestComponentsAgree(t *testing.T) {
+	components := testComponents("1.0.0")
+	for _, rel := range requiredLayout {
+		base := filepath.Base(rel)
+		if base == "agentdeck" || base == "manifest.json" {
+			continue // wrapper/binary/manifest are versioned by the release itself
+		}
+		if _, ok := components[base]; !ok {
+			t.Errorf("required layout entry %q has no manifest component version", rel)
 		}
 	}
 }

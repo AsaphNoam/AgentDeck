@@ -1,6 +1,6 @@
 # TS-06 — Build, test & delivery
 
-**Status:** Partial
+**Status:** Current
 **Code:** `Makefile`, `go.mod`, `ui`, `internal/server/ui`, `install.sh`, `scripts/`, `internal/cli/`, `.github/workflows`
 **Absorbed:** build/test sections in the [phase archive manifest](../../archive/phases/README.md) and contributor guidance formerly duplicated in [`CLAUDE.md`](../../../CLAUDE.md)
 
@@ -61,9 +61,9 @@ built with `sqlite_fts5`; an untagged binary is never packaged as a release runt
 
 **R14** — Release assembly is deterministic from a versioned packaging manifest and
 lockfile that pin the Node distribution, `@agentclientprotocol/claude-agent-acp`,
-`@agentclientprotocol/codex-acp`, and their runtime dependency closure. The release job verifies
-those pinned inputs before it creates an archive; an installer never runs npm, resolves a package
-range, builds the UI, or compiles Go on a recipient's Mac.
+`@agentclientprotocol/codex-acp`, `@openai/codex`, and their runtime dependency closure. The release
+job verifies those pinned inputs before it creates an archive; an installer never runs npm, resolves a
+package range, builds the UI, or compiles Go on a recipient's Mac.
 
 **R15** — A release archive contains only this versioned layout:
 
@@ -72,7 +72,7 @@ agentdeck-<version>-darwin-arm64/
   bin/agentdeck                 # wrapper
   libexec/agentdeck             # FTS5 Go binary
   runtime/node/bin/node
-  runtime/node_modules/.bin/{claude-agent-acp,codex-acp}
+  runtime/node_modules/.bin/{claude-agent-acp,codex-acp,codex}
   runtime/                      # pinned adapter dependency closure
   manifest.json                 # version, target, component versions and archive identity
 ```
@@ -117,7 +117,7 @@ no-start/non-interactive behavior, and preservation of a pre-existing `AGENTDECK
 automated portion on a macOS arm64 runner or equivalent arm64 macOS environment. Credentialed Claude
 and Codex login/chat checks remain manual gates and cannot be represented as release CI success.
 
-**R22** `(planned)` — The release runtime declares and lockfiles the exact direct `@openai/codex`
+**R22** — The release runtime declares and lockfiles the exact direct `@openai/codex`
 dependency required for Codex native `login status`, exposes its executable through the private
 wrapper PATH, and validates that executable alongside both ACP adapters before packaging. Source and
 release command-tree tests prove `agentdeck auth claude|codex` is present; release tests also prove
@@ -164,6 +164,11 @@ shared target guarantees.
   `install.sh`.
 - Release assembly/installer/update: `scripts/release/`, `internal/release/`, `internal/cli/`,
   `.github/workflows/release.yml`, `internal/cli/{installer,release,update,auth}_test.go` (FS-10).
+- Private Codex CLI pin (R22): `scripts/release/package.json` + lockfile declare `@openai/codex`
+  directly, `scripts/release/assemble.sh` validates the executable before packaging, and
+  `requiredLayout`/`verifyInternalManifest` in `internal/release/manifest.go` enforce it. Proven by
+  `TestPrivateCodexResolvesWithoutGlobalInstall`, `TestRequiredLayoutAndManifestComponentsAgree`, and
+  `TestAuthCommandIsPresentForEveryProvider`.
 - Spec lint: `scripts/check-specs.sh`.
 - CI: `.github/workflows/ci.yml`.
 - Fake integration peer: `internal/runtime/testdata/fakeacp`, server integration tests.

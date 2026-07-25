@@ -2,8 +2,12 @@ package credcheck
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/agentdeck/agentdeck/internal/config"
@@ -166,5 +170,127 @@ exit 2
 	)
 	if result.Status != "ok" {
 		t.Fatalf("status = %q, want ok (detail=%q)", result.Status, result.Detail)
+	}
+}
+
+// fakeCodexCLI installs a fake `codex` on PATH whose `login status` prints out
+// and exits with code. It records every invocation so a test can prove no
+// interactive login was ever started (FS-09.A13).
+func fakeCodexCLI(t *testing.T, out string, code int) (calls string) {
+	t.Helper()
+	dir := t.TempDir()
+	log := filepath.Join(dir, "calls.log")
+	script := fmt.Sprintf(`#!/bin/sh
+echo "$@" >> %q
+cat >/dev/null 2>&1 &
+if [ "$1" = "login" ] && [ "$2" = "status" ]; then
+  echo %q
+  exit %d
+fi
+echo "unexpected args: $@" >&2
+exit 2
+`, log, out, code)
+	if err := os.WriteFile(filepath.Join(dir, "codex"), []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake codex: %v", err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	return log
+}
+
+func readCalls(t *testing.T, log string) string {
+	t.Helper()
+	b, err := os.ReadFile(log)
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+// A ChatGPT-signed-in Codex has no OPENAI_API_KEY at all; native sign-in alone
+// must be sufficient readiness, and the provider's status text (which names the
+// account) must not reach the result (FS-09.R34/A13, TS-04.R15).
+func TestCodexProberAcceptsNativeLoginWithoutAPIKey(t *testing.T) {
+	log := fakeCodexCLI(t, "Logged in using ChatGPT", 0)
+
+	result := codexProber{}.Check(context.Background(), config.Backend{}, config.Model{}, map[string]string{})
+
+	if result.Status != "ok" {
+		t.Fatalf("status = %q, want ok (detail=%q)", result.Status, result.Detail)
+	}
+	if result.Detail != "" {
+		t.Errorf("detail = %q, want empty: raw provider status must not cross the API boundary", result.Detail)
+	}
+	if calls := readCalls(t, log); !strings.Contains(calls, "login status") {
+		t.Errorf("probe argv = %q, want a non-interactive 'login status'", calls)
+	} else if strings.Contains(calls, "login\n") {
+		t.Errorf("probe started an interactive login: %q", calls)
+	}
+}
+
+// "The CLI says nobody is signed in" is actionable; it must not be reported as
+// the generic no-key skip that hides the real next step.
+func TestCodexProberReportsNativeNotLoggedIn(t *testing.T) {
+	fakeCodexCLI(t, "Not logged in", 1)
+
+	result := codexProber{}.Check(context.Background(), config.Backend{}, config.Model{}, map[string]string{})
+
+	if result.Status != "failed" || result.Detail != "not_logged_in" {
+		t.Fatalf("result = %+v, want failed/not_logged_in", result)
+	}
+}
+
+// An uninterrogable CLI is not a verdict about the user's credentials (INV §12).
+func TestCodexProberSkipsWhenCLIAbsentAndNoKey(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+
+	result := codexProber{}.Check(context.Background(), config.Backend{}, config.Model{}, map[string]string{})
+
+	if result.Status != "skipped" || result.Detail != "no_api_key" {
+		t.Fatalf("result = %+v, want skipped/no_api_key", result)
+	}
+}
+
+// Native sign-in and an API key are independent paths: an unsigned-in CLI with a
+// working key is still ready (FS-09.R34).
+func TestCodexProberFallsBackToAPIKeyWhenNotSignedIn(t *testing.T) {
+	fakeCodexCLI(t, "Not logged in", 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/models" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		if r.Header.Get("Authorization") != "Bearer sk-test" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	result := codexProber{}.Check(context.Background(), config.Backend{}, config.Model{}, map[string]string{
+		"OPENAI_API_KEY":  "sk-test",
+		"OPENAI_BASE_URL": srv.URL,
+	})
+
+	if result.Status != "ok" {
+		t.Fatalf("status = %q, want ok (detail=%q)", result.Status, result.Detail)
+	}
+}
+
+// "not logged in" contains "logged in": a substring vocabulary read in the wrong
+// order would call an unsigned-in provider ready.
+func TestClassifyNativeOutputPrefersTheNegative(t *testing.T) {
+	for _, tc := range []struct {
+		out  string
+		want nativeOutcome
+	}{
+		{"Not logged in", nativeNotLoggedIn},
+		{"not authenticated", nativeNotLoggedIn},
+		{"Logged in using ChatGPT", nativeReady},
+		{"totally unrecognized wording", nativeUnavailable},
+	} {
+		if got := classifyNativeOutput([]byte(tc.out), nativeUnavailable); got != tc.want {
+			t.Errorf("classify(%q) = %v, want %v", tc.out, got, tc.want)
+		}
 	}
 }

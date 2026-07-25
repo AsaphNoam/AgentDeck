@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"os"
@@ -339,6 +340,54 @@ func TestEnsureLayoutHomeIsFile(t *testing.T) {
 	s := NewWithHome(homeFile)
 	if err := s.EnsureLayout(); err == nil {
 		t.Fatal("EnsureLayout on a file home: want error, got nil")
+	}
+}
+
+// A fresh home gets the current provider aliases as defaults; an existing
+// catalog is not touched at all, so nobody's pinned model or edited entry is
+// replaced by a newer AgentDeck (FS-09.R33/A12).
+func TestSeededBackendDefaultsAreCurrentAndNeverRewritten(t *testing.T) {
+	s := newTestStore(t)
+	if err := s.SeedIfAbsent(); err != nil {
+		t.Fatalf("SeedIfAbsent: %v", err)
+	}
+	fresh, err := s.ReadBackends()
+	if err != nil {
+		t.Fatalf("ReadBackends: %v", err)
+	}
+	if got := fresh.Backends["claude"].DefaultModel; got != "sonnet" {
+		t.Errorf("fresh Claude default = %q, want sonnet", got)
+	}
+	if got := fresh.Backends["codex"].DefaultModel; got != "gpt-5.6-sol" {
+		t.Errorf("fresh Codex default = %q, want gpt-5.6-sol", got)
+	}
+	for id, want := range map[string]string{"claude": "sonnet", "codex": "gpt-5.6-sol"} {
+		if _, ok := fresh.Backends[id].Models[want]; !ok {
+			t.Errorf("%s default model %q has no catalog entry", id, want)
+		}
+	}
+
+	// A person pins an exact generation, then a later AgentDeck re-seeds.
+	bk := fresh.Backends["claude"]
+	bk.DefaultModel = "sonnet-4-6"
+	bk.Models = map[string]Model{"sonnet-4-6": {Name: "Sonnet 4.6", Model: "claude-sonnet-4-6"}}
+	fresh.Backends["claude"] = bk
+	if err := s.WriteBackends(fresh); err != nil {
+		t.Fatalf("WriteBackends: %v", err)
+	}
+	before, err := os.ReadFile(s.backendsPath())
+	if err != nil {
+		t.Fatalf("read backends: %v", err)
+	}
+	if err := s.SeedIfAbsent(); err != nil {
+		t.Fatalf("re-seed: %v", err)
+	}
+	after, err := os.ReadFile(s.backendsPath())
+	if err != nil {
+		t.Fatalf("re-read backends: %v", err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Errorf("re-seeding rewrote an existing catalog:\nbefore=%s\nafter=%s", before, after)
 	}
 }
 

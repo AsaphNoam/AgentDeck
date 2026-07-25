@@ -1,6 +1,6 @@
 # TS-03 — HTTP, SSE & WebSocket API
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/server`, `ui/src/api`
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) API sections and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -86,7 +86,7 @@ mail delivery (INV §2). No new SSE event type is added: the annotation event re
 ordinary `new_message` and mail indicators reuse existing `state_update` publication (R8). The UI
 schema ships in lockstep (R11).
 
-**R15 (planned) — Onboarding readiness reuses the backend-save contract.** **Check again** submits
+**R15 — Onboarding readiness reuses the backend-save contract.** **Check again** submits
 the existing normalized backend document to `PUT /api/backends` and consumes its existing bounded
 `credentials` result. It adds no auth/login route, WebSocket, SSE event, long-lived HTTP request, or
 server-started sign-in process.
