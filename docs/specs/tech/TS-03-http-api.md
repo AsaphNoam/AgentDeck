@@ -1,6 +1,6 @@
 # TS-03 — HTTP, SSE & WebSocket API
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/server`, `ui/src/api`
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) API sections and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -90,6 +90,22 @@ schema ships in lockstep (R11).
 the existing normalized backend document to `PUT /api/backends` and consumes its existing bounded
 `credentials` result. It adds no auth/login route, WebSocket, SSE event, long-lived HTTP request, or
 server-started sign-in process.
+
+**R16 `(planned)` — Pipelines add one conventional local REST family.** The route inventory gains
+template list/create/validate and item read/update/delete under `/api/pipelines`; run list/start and
+item read/delete under `/api/pipeline-runs`; and method-specific `continue`, `retry`, and `stop`
+actions on a run. Start accepts a caller-generated request id and returns the original run for an
+exact idempotent replay; reuse with different content is `409`. Invalid templates/run values are
+field-addressed R3 errors, stale run revisions are `409`, active-run deletion is `409`, creates are
+`201`, and successful deletes are `204`. Collection/detail payloads, TypeScript schemas, and mocks
+ship together under R6/R11; TS-09 owns their feature-specific fields.
+
+**R17 `(planned)` — Pipeline live state uses summary SSE plus refetch.** `pipeline_update` is added to
+the versioned SSE vocabulary after its authoritative SQLite commit. Its bounded payload contains run
+id, monotonic revision, state, current stage/agent, and attention reason; clients ignore stale
+revisions and refetch run detail for attempts/results/values. Existing `notification` events carry
+pipeline needs-attention/completed categories through the ordinary mute path. Reconnect hydrates
+pipeline lists through REST rather than replaying an unbounded event log.
 
 ## 3. Interfaces & data shapes
 

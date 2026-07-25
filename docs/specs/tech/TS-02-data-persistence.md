@@ -1,6 +1,6 @@
 # TS-02 — Data & persistence
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/config`, `internal/state`, `internal/transcript`, `internal/index`, `internal/archive`, `internal/configsource`
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -95,6 +95,14 @@ rewrites earlier transcript documents. Live indexing and reindex use the same se
 document-flush helpers. Raw `transcript.ndjson` remains authoritative; the untagged build keeps its
 metadata-only fallback and does not depend on FTS transcript documents.
 
+**R17 `(planned)` — Pipeline configuration and state use the existing authority split.** Version-1
+templates live in owner-only, atomically rewritten `pipelines/{id}.json`; durable run snapshots,
+attempt lineage/reports, current named values/provenance, and start idempotency records live in
+forward-only SQLite tables written only through `internal/state`. Pipeline-table foreign keys may
+cascade within a deleted run but must not cascade into `agents`, `sessions`, transcripts, or archive
+projections. The migration uses non-null JSON defaults/collection decoding, indexes for active-run
+and agent-attempt lookup, and a schema-version guard test. TS-09 owns the logical shapes.
+
 ## 3. Interfaces & data shapes
 
 The durable layout is:
@@ -107,6 +115,7 @@ $AGENTDECK_HOME/
   layout.json
   roles/{id}.json
   projects/{id}.json
+  pipelines/{id}.json          planned reusable pipeline templates
   project-resources/{id}/     opaque agent/person shared material; never indexed or scanned
   state.db
   sessions/{agent_id}/transcript.ndjson
@@ -116,7 +125,7 @@ $AGENTDECK_HOME/
 The binding schemas for roles, projects, backends, and global config are defined by FS-04 and
 FS-09. Federation binding/effective-view shapes are defined by TS-07. SQLite table definitions and
 migration order live in `internal/state/schema.go` and execute through `migrate.go`; that executable schema is subordinate to
-R1–R16 and must be reflected here when its contract changes.
+R1–R17 and must be reflected here when its contract changes.
 
 ## 4. Invariants
 

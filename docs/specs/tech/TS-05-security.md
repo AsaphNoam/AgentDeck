@@ -1,6 +1,6 @@
 # TS-05 — Security & trust boundaries
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/server`, `internal/config`, `internal/configsource`, `internal/runtime`, `internal/messaging`, `internal/backend`
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md), the [phase archive manifest](../../archive/phases/README.md), and [`INVARIANTS.md`](../../features/INVARIANTS.md) §14
 
@@ -62,6 +62,15 @@ solely by a validated project id under AgentDeck home; it is never resolved from
 title, or client input. AgentDeck rejects an existing resource parent or leaf symlink/non-directory
 instead of following it. Its path may appear as non-secret launch/UI metadata, but its contents are
 never read into API, SSE, transcript, analytics, or log data merely by this feature.
+
+**R14 `(planned)` — Pipeline controls preserve the local trust boundary.** Pipeline REST routes stay
+under the whole-mux Host/Origin guard and have the same unauthenticated same-user authority as the
+rest of `/api`. Stage-result and AgentDecker-proposal MCP calls additionally require the existing
+random launch token and server-derived caller identity; a role/id supplied in tool arguments is never
+authority. AgentDecker's exact-payload Save/Start confirmation is a UI interaction guard, not a claim
+that a shell-capable same-user process cannot invoke the ordinary CLI/API. Pipeline text is treated
+like prompt/transcript content: owner-only and bounded, but not a credential vault or automatically
+redacted secret field.
 
 ## 3. Interfaces & data shapes
 

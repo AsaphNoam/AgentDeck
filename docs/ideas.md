@@ -14,6 +14,11 @@ Example:
 - **Pinned agents.** Let people keep frequently used agents at the top of the dashboard.
 ```
 
+- **General agent effort selection.** Add an optional per-launch effort choice to AgentDeck's normal
+  backend/model selection, backed by honest per-model capability metadata and provider-specific
+  launch mapping. Today effort is only visible through Claude/Codex configuration federation and is
+  not a general launch field or an OpenCode capability; define that cross-backend contract before
+  exposing effort in New Agent, AgentDecker-assisted creation, or pipeline runs.
 - **Claude backend model autosync.** The Codex half shipped (FS-09.R28: opt-in `autosync_models`
   reads `~/.codex/models_cache.json` on startup and add-only merges the catalog). Claude has no
   equivalent on-disk catalog to sync from — `~/.claude/settings.json` holds only the *selected*
