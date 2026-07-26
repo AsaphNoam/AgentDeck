@@ -104,6 +104,8 @@ describe("ArchivePage", () => {
     const input = screen.getByRole("searchbox");
     fireEvent.change(input, { target: { value: "noresult" } });
     await screen.findByText(/No results for/);
+    expect(screen.getByText(/does not combine text across turns/)).toBeInTheDocument();
+    expect(input).toHaveAttribute("aria-describedby", "archive-search-scope");
   });
 
   it("renders snippet when present in search result", async () => {

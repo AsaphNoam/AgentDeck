@@ -7,9 +7,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** the week's work has now been driven end to end in a real browser. Eleven usability
-  findings are open above, one of them Must fix: a search spanning two turns answers
-  "No results" with no signal. Everything else driven passed: the whole pipeline lifecycle, the
+- **State:** the week's work has now been driven end to end in a real browser. All six Must-fix
+  findings are resolved; ten Worth-fixing findings remain. Everything else driven passed: the whole pipeline lifecycle, the
   annotation tray and its three delivery routes, archive search on both build variants, first paint
   on an empty home, chat round-trip and delta coalescing, all four permission outcomes, crash and
   disconnect recovery, and restart durability. Below is the state as of the preceding review.
@@ -64,14 +63,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 Recorded by the 2026-07-26 week usability review; repro steps and evidence paths are in
 [`../archive/reviews/usability-review-run-2026-07-26-week.md`](../archive/reviews/usability-review-run-2026-07-26-week.md).
 
-- **Must fix** — J8 a search whose terms span two turns answers "No results" with no signal
-  (**INV §8**). Searching an agent name plus a word from that same agent's transcript
-  ("Marlin barnacle") returns nothing, though either term alone returns the session. The per-turn
-  document behaviour itself is the accepted boundary recorded with FS-05's turn indexing, and the
-  cross-turn alternative stays in `docs/ideas.md`; the defect is that the UI gives an affirmatively
-  wrong answer with no vocabulary for why. Fix: signal the one-turn scope in the search affordance
-  or the empty state — a copy and affordance change, not an index redesign.
-
 - **Worth fixing** — J8 the untagged build still advertises transcript search it cannot perform
   (**INV §8**): the placeholder reads "Search agents, roles, projects, transcript…" while every
   transcript-only term returns nothing and no snippet is ever produced.
@@ -121,6 +112,11 @@ not reproduce, the untimed `tmux` driver calls, and the two onboarding steps tha
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-26 — Explained Archive search document boundaries. **INV §8** now gives
+  the search input an accessible scope note stating that all terms must match one metadata record,
+  transcript turn, or annotation and are not combined across turns, so an empty result no longer
+  implies absence from the whole session. FS-05.R29/A13 specify the affordance and its UI regression.
 
 - 2026-07-26 — Kept lifecycle usable across an FTS5 capability downgrade. **INV §8**
   now probes an existing virtual search table before each derived-document boundary; when the
