@@ -3,6 +3,7 @@ package index
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -625,5 +626,49 @@ func TestUpsertSessionMetaTransactionAtomicity(t *testing.T) {
 	}
 	if metaCount != 1 {
 		t.Fatalf("metadata document count after update = %d, want 1 (not 2)", metaCount)
+	}
+}
+
+// FS-01.A13 / TS-02.R10: a database whose FTS virtual table cannot be loaded
+// must not turn a derived-index failure into a launch or turn-rollup failure.
+func TestIndexerDegradesWhenFTS5WritesAreUnavailable(t *testing.T) {
+	st, _ := openTestDB(t)
+	ix := New(st.DB())
+	ix.ftsWritable = func(*sql.Tx) (bool, error) { return false, nil }
+
+	m := meta()
+	m.Name = "Downgraded home"
+	if err := ix.UpsertSessionMeta("a_downgraded", m); err != nil {
+		t.Fatalf("UpsertSessionMeta: %v", err)
+	}
+	event := ev(t, 1, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "still durable"})
+	if err := ix.OnEvent("a_downgraded", event); err != nil {
+		t.Fatalf("OnEvent: %v", err)
+	}
+	if err := ix.OnTurnEnd("a_downgraded", runtime.TurnRollup{LastSeq: 1, UpdatedAt: event.Ts}); err != nil {
+		t.Fatalf("OnTurnEnd: %v", err)
+	}
+
+	var name string
+	var turns int
+	if err := st.DB().QueryRow(`SELECT name, turn_count FROM sessions WHERE agent_id = 'a_downgraded'`).Scan(&name, &turns); err != nil {
+		t.Fatal(err)
+	}
+	if name != "Downgraded home" || turns != 1 {
+		t.Fatalf("authoritative session = name %q turns %d", name, turns)
+	}
+	var documents int
+	if err := st.DB().QueryRow(`SELECT COUNT(*) FROM sessions_fts WHERE agent_id = 'a_downgraded'`).Scan(&documents); err != nil {
+		t.Fatal(err)
+	}
+	if documents != 0 {
+		t.Fatalf("derived documents = %d, want 0", documents)
+	}
+}
+
+func TestClassifyFTSWritabilityTreatsMissingModuleAsDegraded(t *testing.T) {
+	writable, err := classifyFTSWritability("CREATE VIRTUAL TABLE sessions_fts USING fts5(content)", errors.New("no such module: fts5"))
+	if err != nil || writable {
+		t.Fatalf("writable = %v err = %v", writable, err)
 	}
 }

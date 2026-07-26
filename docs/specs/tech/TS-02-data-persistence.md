@@ -56,7 +56,10 @@ observe a knowingly mixed generation.
 
 **R10 — Both FTS capabilities are supported.** Release binaries compile with `sqlite_fts5`; the
 untagged test/build path must degrade to metadata `LIKE` search without surfacing a missing-module
-error. Behavior differences are explicitly specified by FS-05.
+error. When that build opens an existing FTS5 virtual table it cannot load, index write boundaries
+skip only the derived FTS metadata/transcript document while still committing authoritative session
+metadata, event counters, and turn rollups. A missing FTS5 module never blocks agent lifecycle.
+Behavior differences are explicitly specified by FS-01.R29 and FS-05.
 
 **R11 — Message persistence is transactional.** Messages, read state, expiry, and per-turn budget
 state live in SQLite. A send either stores the message and updates its budget atomically or stores

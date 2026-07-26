@@ -21,9 +21,10 @@ type execer interface {
 }
 
 type Indexer struct {
-	db      *sql.DB
-	mu      sync.Mutex
-	content map[string][]bufferedText
+	db          *sql.DB
+	mu          sync.Mutex
+	content     map[string][]bufferedText
+	ftsWritable func(*sql.Tx) (bool, error)
 
 	// Tests use this hook to prove that a later event cannot enter between a
 	// boundary event and its flush. It is nil in production.
@@ -36,7 +37,7 @@ type bufferedText struct {
 }
 
 func New(db *sql.DB) *Indexer {
-	return &Indexer{db: db, content: map[string][]bufferedText{}}
+	return &Indexer{db: db, content: map[string][]bufferedText{}, ftsWritable: ftsWritesAvailable}
 }
 
 func (ix *Indexer) UpsertSessionMeta(agentID string, meta runtime.SessionMetaData) error {
@@ -93,8 +94,14 @@ ON CONFLICT(agent_id) DO UPDATE SET
 	if err != nil {
 		return fmt.Errorf("index: upsert session meta: %w", err)
 	}
-	if err := replaceMetadataDocument(tx, agentID); err != nil {
+	ftsWritable, err := ix.ftsWritable(tx)
+	if err != nil {
 		return err
+	}
+	if ftsWritable {
+		if err := replaceMetadataDocument(tx, agentID); err != nil {
+			return err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("index: commit metadata transaction: %w", err)
@@ -218,9 +225,15 @@ func (ix *Indexer) flushLocked(agentID string, rollup runtime.TurnRollup, countT
 	defer tx.Rollback()
 
 	if content != "" {
-		documentID := fmt.Sprintf("%s:%d", documentKind, rollup.LastSeq)
-		if err := insertTranscriptDocument(tx, agentID, documentID, content); err != nil {
+		ftsWritable, err := ix.ftsWritable(tx)
+		if err != nil {
 			return err
+		}
+		if ftsWritable {
+			documentID := fmt.Sprintf("%s:%d", documentKind, rollup.LastSeq)
+			if err := insertTranscriptDocument(tx, agentID, documentID, content); err != nil {
+				return err
+			}
 		}
 	}
 	turnInc := 0
@@ -282,6 +295,29 @@ VALUES (?, ?, '', '', '', '', '', '', ?)`, agentID, documentID, content); err !=
 		return fmt.Errorf("index: insert transcript document: %w", err)
 	}
 	return nil
+}
+
+func ftsWritesAvailable(tx *sql.Tx) (bool, error) {
+	var createSQL string
+	if err := tx.QueryRow(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'sessions_fts'`).Scan(&createSQL); err != nil {
+		return false, fmt.Errorf("index: inspect sessions_fts: %w", err)
+	}
+	if !strings.Contains(strings.ToUpper(createSQL), "VIRTUAL") {
+		return true, nil
+	}
+	var count int
+	err := tx.QueryRow(`SELECT COUNT(*) FROM sessions_fts WHERE 0`).Scan(&count)
+	return classifyFTSWritability(createSQL, err)
+}
+
+func classifyFTSWritability(createSQL string, probeErr error) (bool, error) {
+	if !strings.Contains(strings.ToUpper(createSQL), "VIRTUAL") || probeErr == nil {
+		return true, nil
+	}
+	if strings.Contains(strings.ToLower(probeErr.Error()), "no such module") {
+		return false, nil
+	}
+	return false, fmt.Errorf("index: probe sessions_fts: %w", probeErr)
 }
 
 func searchableText(ev runtime.Event) (string, error) {
