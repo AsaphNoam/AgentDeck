@@ -7,7 +7,13 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** Stopped Dashboard cards now expose the existing resume operation through their right-click
+- **State:** The AgentDecker pipeline builder now picks its own project. It launched into
+  `default_project` with no picker, so the seeded `my-app` (whose `~/Projects/my-app` cwd is absent
+  on a fresh box) could only be discovered as a rejected launch, with nothing on the Pipelines page
+  able to change it; its readiness check also only asked whether a default was configured, not
+  whether that default still resolved. Both regressions were verified to fail against the old code,
+  and a real-browser check confirmed the picker renders and that a real project clears the
+  directory rejection while `my-app` still reports it. Stopped Dashboard cards now expose the existing resume operation through their right-click
   menu; running cards do not offer it, and a rejected resume surfaces an error toast. Dashboard state badges now visibly render their text labels; a broad selector had painted
   every nested span, including the label, as a solid state-coloured block. Component coverage and the
   browser visual matrix now exercise every state. Dashboard cards otherwise show configured project titles with a durable-id fallback, and every
@@ -76,6 +82,19 @@ are not promoted to findings without a repeatable failure.
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-27 — Gave the AgentDecker builder its own project selector. **INV §10** found the
+  shipped wiring incomplete: the builder launches an ordinary chat agent, which needs a real project
+  directory, but exposed only backend and model and sent `default_project` unconditionally — so the
+  seeded `my-app` produced a launch the page could not repair. **INV §2** supplied the fix shape: the
+  builder now uses the same existence-checked default seed and project `<select>` as `RunStartForm`,
+  rather than a second, weaker way of choosing the same thing. Readiness follows the selected
+  project, so a default naming a removed project holds the launch closed instead of enabling a button
+  whose only outcome is a rejected launch. FS-14.R26/A10 gained the project choice and that
+  boundary. Both regressions were verified to fail against the old code; all 158 UI tests, both Go
+  test variants, specification checks, the UI/source/distribution builds, and whitespace checks pass.
+  A real-browser check on an isolated home confirmed the picker renders and behaves in both
+  directions with no console error.
 
 - 2026-07-26 — Added direct Dashboard Resume. **INV §10** found no new invariant boundary: the
   existing resume operation already restores the frozen session snapshot, but was unnecessarily

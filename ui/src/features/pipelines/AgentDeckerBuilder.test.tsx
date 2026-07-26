@@ -1,6 +1,6 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
@@ -15,6 +15,10 @@ const BUILDER_KEY = "agentdeck.pipeline-builder-agent";
 const server = setupServer(
   http.get("/api/roles", () => HttpResponse.json({ agentdecker: { title: "AgentDecker", prompt: "" } })),
   http.get("/api/config", () => HttpResponse.json({ default_project: "app" })),
+  http.get("/api/projects", () => HttpResponse.json({
+    app: { title: "App", cwd: "~/Projects/app", color: [0, 0, 0], add_dirs: [], context_prompt: "", resource_dir: "" },
+    other: { title: "Other", cwd: "~/Projects/other", color: [0, 0, 0], add_dirs: [], context_prompt: "", resource_dir: "" },
+  })),
   http.get("/api/backends", () => HttpResponse.json({
     version: 2,
     backends: {
@@ -91,5 +95,51 @@ describe("AgentDeckerBuilder persisted session", () => {
 
     await screen.findByRole("link", { name: "Open AgentDecker chat" });
     expect(localStorage.getItem(BUILDER_KEY)).toBe("a_builder");
+  });
+});
+
+// FS-14.R26/A10: the builder launches an ordinary chat agent, which needs a real
+// project directory. It previously sent `default_project` with no picker, so a
+// seeded-but-absent default could only be discovered as a rejected launch and
+// could not be changed from this page.
+describe("AgentDeckerBuilder project selection", () => {
+  async function openSetup() {
+    renderBuilder();
+    fireEvent.click(await screen.findByRole("button", { name: "Create with AgentDecker" }));
+  }
+
+  it("launches into the chosen project rather than the configured default", async () => {
+    const launches: Array<Record<string, unknown>> = [];
+    server.use(http.post("/api/sessions", async ({ request }) => {
+      launches.push((await request.json()) as Record<string, unknown>);
+      return HttpResponse.json({ agent: { agent_id: "a_new" } });
+    }));
+    server.use(http.post("/api/sessions/:id/prompt", () => HttpResponse.json({ ok: true })));
+
+    await openSetup();
+    const select = await screen.findByLabelText("Project");
+    await waitFor(() => expect((select as HTMLSelectElement).value).toBe("app"));
+
+    fireEvent.change(select, { target: { value: "other" } });
+    fireEvent.change(screen.getByLabelText("Describe the pipeline"), { target: { value: "Build then review." } });
+    fireEvent.click(screen.getByRole("button", { name: "Launch AgentDecker builder" }));
+
+    await waitFor(() => expect(launches).toHaveLength(1));
+    expect(launches[0].project).toBe("other");
+  });
+
+  it("holds the launch closed when the default project no longer exists", async () => {
+    server.use(http.get("/api/projects", () => HttpResponse.json({
+      other: { title: "Other", cwd: "~/Projects/other", color: [0, 0, 0], add_dirs: [], context_prompt: "", resource_dir: "" },
+    })));
+
+    await openSetup();
+    fireEvent.change(await screen.findByLabelText("Describe the pipeline"), { target: { value: "Build then review." } });
+
+    // `default_project` is still "app", but it resolves to no configured project,
+    // so nothing is seeded and the launch stays disabled instead of enabling a
+    // button whose only outcome is a rejected launch.
+    expect((await screen.findByLabelText("Project") as HTMLSelectElement).value).toBe("");
+    expect(screen.getByRole("button", { name: "Launch AgentDecker builder" })).toBeDisabled();
   });
 });

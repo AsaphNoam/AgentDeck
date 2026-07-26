@@ -173,8 +173,11 @@ Every requirement in this specification is shipped and reflects the product boun
   runtime selectors, and run detail/history; and offers **Create manually** and **Create with
   AgentDecker**. It does not present a graph canvas. Templates are also hand-editable as versioned
   AgentDeck JSON through the same validation contract.
-- **R26.** Create with AgentDecker first lets the user choose one configured, chat-capable
-  backend and model for the template-building AgentDecker session. The picker shows configured
+- **R26.** Create with AgentDecker first lets the user choose one configured project,
+  backend, and model for the template-building AgentDecker session. The project picker lists every
+  configured project and defaults to the configured default project only when that project still
+  exists; the builder cannot be launched until a listed project is selected, so a stale or removed
+  default is visible before launch rather than only as a rejected launch. The picker shows configured
   readiness honestly; effort is absent until AgentDeck gains the separate general effort-selection
   capability. This creator choice is not written into the resulting model-neutral template.
 - **R27.** The AgentDecker builder accepts a natural-language pipeline description, asks
@@ -231,9 +234,11 @@ Every requirement in this specification is shipped and reflects the product boun
   stage's declared inputs; an unresolved required input prevents accepting the transition; text that
   names a nonexistent path remains opaque rather than receiving a false existence guarantee.
   *Verify:* template validation and run-transition tests.
-- **A10** — Create with AgentDecker offers configured backend/model choices for the
-  creator, supports a clarifying conversation, and places a valid model-neutral draft into the
-  editor. Its Save and Start requests show the exact payload for separate one-time approval; denial
+- **A10** — Create with AgentDecker offers configured project/backend/model choices for
+  the creator, launches the session into the selected project rather than an assumed default, holds
+  the launch closed while no listed project is selected, supports a clarifying conversation, and
+  places a valid model-neutral draft into the editor. Its Save and Start requests show the exact
+  payload for separate one-time approval; denial
   has no effect, payload edits invalidate approval, and an approved request executes once. *Verify:*
   fake-runtime server test and J14.
 
