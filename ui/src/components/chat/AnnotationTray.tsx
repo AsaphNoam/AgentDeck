@@ -68,26 +68,30 @@ export function AnnotationTray({ sourceId, sourceActive }: { sourceId: string; s
         <div><strong>Pending annotations</strong><span>{drafts.length}/20</span></div>
         <button type="button" className="annotation-link" onClick={() => discard(sourceId)} disabled={sending}>Discard all</button>
       </header>
-      <ol className="annotation-drafts">
-        {drafts.map((draft, index) => <AnnotationDraftRow key={`${draft.seq}-${index}`} draft={draft} index={index} sourceId={sourceId} onRemove={remove} onUpdate={updateInstruction} disabled={sending} />)}
-      </ol>
-      <label className="annotation-overall">
-        Overall instruction (optional)
-        <textarea value={overall} maxLength={2000} onChange={(event) => setOverall(sourceId, event.target.value)} disabled={sending} />
-      </label>
-      <div className="annotation-targets">
-        <label><input type="radio" checked={target === "self"} disabled={!sourceActive || sending} onChange={() => setTarget("self")} /> Current agent</label>
-        <label><input type="radio" checked={target === "agent"} disabled={sending} onChange={() => setTarget("agent")} /> Another agent</label>
-        <label><input type="radio" checked={target === "new"} disabled={!source || sending} onChange={() => setTarget("new")} /> New task</label>
-        {target === "agent" && (
-          <select value={recipientId} onChange={(event) => setRecipientId(event.target.value)} disabled={sending} aria-label="Annotation recipient">
-            <option value="">Choose an agent</option>
-            {recipients.map((agent) => <option key={agent.agent_id} value={agent.agent_id}>{agent.name} ({agent.role}@{agent.project})</option>)}
-          </select>
-        )}
+      <div className="annotation-tray-body">
+        <ol className="annotation-drafts">
+          {drafts.map((draft, index) => <AnnotationDraftRow key={`${draft.seq}-${index}`} draft={draft} index={index} sourceId={sourceId} onRemove={remove} onUpdate={updateInstruction} disabled={sending} />)}
+        </ol>
+        <label className="annotation-overall">
+          Overall instruction (optional)
+          <textarea value={overall} maxLength={2000} onChange={(event) => setOverall(sourceId, event.target.value)} disabled={sending} />
+        </label>
       </div>
-      {error && <p className="annotation-error">{error}</p>}
-      <button type="button" className="annotation-send" onClick={() => void send()} disabled={sending}>{sending ? "Sending…" : target === "new" ? "Continue to launch" : "Send annotations"}</button>
+      <footer className="annotation-tray-footer">
+        <div className="annotation-targets">
+          <label><input type="radio" checked={target === "self"} disabled={!sourceActive || sending} onChange={() => setTarget("self")} /> Current agent</label>
+          <label><input type="radio" checked={target === "agent"} disabled={sending} onChange={() => setTarget("agent")} /> Another agent</label>
+          <label><input type="radio" checked={target === "new"} disabled={!source || sending} onChange={() => setTarget("new")} /> New task</label>
+          {target === "agent" && (
+            <select value={recipientId} onChange={(event) => setRecipientId(event.target.value)} disabled={sending} aria-label="Annotation recipient">
+              <option value="">Choose an agent</option>
+              {recipients.map((agent) => <option key={agent.agent_id} value={agent.agent_id}>{agent.name} ({agent.role}@{agent.project})</option>)}
+            </select>
+          )}
+        </div>
+        {error && <p className="annotation-error">{error}</p>}
+        <button type="button" className="annotation-send" onClick={() => void send()} disabled={sending}>{sending ? "Sending…" : target === "new" ? "Continue to launch" : "Send annotations"}</button>
+      </footer>
       <NewAgentModal open={showLaunch} onClose={() => setShowLaunch(false)} initialRole={source?.role} initialProject={source?.project} onLaunched={onLaunched} />
     </aside>
   );
