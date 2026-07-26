@@ -173,6 +173,62 @@ exit 2
 	}
 }
 
+// Optional-flag rejection wording varies across compatible bundled Claude
+// versions (FS-04.A14, FS-09.A5, TS-04.R15, INV §12).
+func TestClaudeProberRetriesWithoutNoColorOnUnknownFlag(t *testing.T) {
+	dir := t.TempDir()
+	cliPath := filepath.Join(dir, "claude-agent-acp")
+	script := `#!/bin/sh
+if [ "$1" = "--cli" ] && [ "$2" = "auth" ] && [ "$3" = "status" ] && [ "$4" = "--no-color" ]; then
+  echo "unknown flag: --no-color" >&2
+  exit 1
+fi
+if [ "$1" = "--cli" ] && [ "$2" = "auth" ] && [ "$3" = "status" ]; then
+  echo "logged in"
+  exit 0
+fi
+echo "unexpected args: $@" >&2
+exit 2
+`
+	if err := os.WriteFile(cliPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake claude: %v", err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	result := claudeProber{}.Check(
+		context.Background(),
+		config.Backend{},
+		config.Model{},
+		map[string]string{},
+	)
+	if result.Status != "ok" {
+		t.Fatalf("status = %q, want ok (detail=%q)", result.Status, result.Detail)
+	}
+}
+
+func TestRejectsNoColorFlagRequiresFlagAndUnsupportedVocabulary(t *testing.T) {
+	tests := []struct {
+		name string
+		out  string
+		want bool
+	}{
+		{name: "unknown option", out: "error: unknown option '--no-color'", want: true},
+		{name: "unknown flag", out: "unknown flag: --no-color", want: true},
+		{name: "unrecognized option", out: "unrecognized option '--no-color'", want: true},
+		{name: "go flag wording", out: "flag provided but not defined: -no-color", want: true},
+		{name: "unexpected argument", out: "error: unexpected argument '--no-color' found", want: true},
+		{name: "different unknown flag", out: "unknown flag: --verbose", want: false},
+		{name: "unrelated status failure", out: "authentication failed while parsing --no-color output", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := rejectsNoColorFlag([]byte(tt.out)); got != tt.want {
+				t.Fatalf("rejectsNoColorFlag(%q) = %v, want %v", tt.out, got, tt.want)
+			}
+		})
+	}
+}
+
 // Status-check failures return only bounded vocabulary; raw CLI output and
 // account identity never cross the API boundary (TS-04.R15, INV §8/§12).
 func TestClaudeProberReturnsOnlyBoundedErrorOutput(t *testing.T) {
