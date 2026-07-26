@@ -137,6 +137,10 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 - **R27.** Search accepts double-quoted phrases in `q` as single terms; unquoted
   whitespace separates terms. A phrase must occur inside one indexed document and therefore does not
   span completed turns or a separately flushed annotation boundary.
+- **R28.** The Archive UI initially requests at most 50 matching sessions and offers **Load more**
+  while the server's `total` exceeds the number rendered. Each activation requests the next page
+  with `offset` equal to the rendered count and appends it; changing the query resets to the first
+  page. A later-page failure keeps the already-rendered results visible and surfaces the error.
 
 ## 5. Acceptance criteria
 
@@ -178,6 +182,9 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   independent documents, and archive pagination counts distinct sessions: focused regressions
   `TestTurnsAppendWithoutRewritingEarlierDocuments`, `TestReindexPreservesAnnotationFlushBoundary`,
   and `TestArchiveSearchCollapsesMatchingDocuments` under both SQLite build variants where applicable.
+- **A12** (R10, R28) — An Archive result set larger than one UI page exposes **Load more**, requests
+  the next `offset`, appends those sessions, and removes the control when all matching rows are
+  rendered: `ui/src/features/archive/ArchivePage.test.tsx`.
 
 ## 6. Deviations & open decisions
 

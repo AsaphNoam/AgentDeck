@@ -124,4 +124,27 @@ describe("ArchivePage", () => {
     renderArchive();
     await screen.findByText("2 results");
   });
+
+  it("loads the next result page using the rendered count as offset", async () => {
+    const offsets: string[] = [];
+    server.use(
+      http.get("/api/archive", ({ request }) => {
+        const offset = new URL(request.url).searchParams.get("offset") ?? "0";
+        offsets.push(offset);
+        const result = offset === "0"
+          ? { ...mockActive, agent_id: "a_page_1", name: "Page one" }
+          : { ...mockInactive, agent_id: "a_page_2", name: "Page two" };
+        return HttpResponse.json({ query: "", total: 2, limit: 1, offset: Number(offset), results: [result] });
+      }),
+    );
+
+    renderArchive();
+    expect(await screen.findByText("Page one")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+
+    expect(await screen.findByText("Page two")).toBeInTheDocument();
+    expect(screen.getByText("Page one")).toBeInTheDocument();
+    expect(offsets).toEqual(["0", "1"]);
+    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+  });
 });

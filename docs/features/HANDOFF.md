@@ -7,9 +7,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** the week's work has now been driven end to end in a real browser. Thirteen usability
-  findings are open above, three of them Must fix: the archive shows only the first 50 sessions
-  with no pager, a home opened by the
+- **State:** the week's work has now been driven end to end in a real browser. Twelve usability
+  findings are open above, two of them Must fix: a home opened by the
   FTS5 build cannot launch agents under the untagged build, and a search spanning two turns answers
   "No results" with no signal. Everything else driven passed: the whole pipeline lifecycle, the
   annotation tray and its three delivery routes, archive search on both build variants, first paint
@@ -65,13 +64,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 Recorded by the 2026-07-26 week usability review; repro steps and evidence paths are in
 [`../archive/reviews/usability-review-run-2026-07-26-week.md`](../archive/reviews/usability-review-run-2026-07-26-week.md).
-
-- **Must fix** — J8 the archive shows only the first 50 sessions and offers no pager (**INV §10**).
-  `ui/src/features/archive/ArchivePage.tsx:72` always calls `searchArchive(query, 50, 0)`; the
-  offset parameter FS-05 specifies is never used. Normal-use trigger: any install that accumulates
-  more than 50 archived sessions — with 55 the header truthfully reads "55 results" while five rows
-  are unreachable. Fix: wire paging (or load-more) to the existing offset, and add a UI test with
-  more than one page of results.
 
 - **Must fix** — J8 a home opened by the FTS5 build cannot launch agents under the untagged build
   (**INV §8**). Launch and resume return 502 with the raw internal message "runtime: index session
@@ -140,6 +132,12 @@ not reproduce, the untimed `tmux` driver calls, and the two onboarding steps tha
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-26 — Added Archive paging. **INV §10** now exposes **Load more** whenever
+  the reported match total exceeds the rendered rows, requests the next offset, appends the page,
+  and preserves the first page if a later request fails. FS-05.R28/A12 now specify the UI contract,
+  and TS-03 no longer records pagination as incomplete. A two-page UI regression verifies offset
+  progression and complete reachability.
 
 - 2026-07-26 — Fixed run-start validation feedback. **INV §8** now routes rejected
   start errors through the shared pipeline diagnostic parser and renders each field and repairable
