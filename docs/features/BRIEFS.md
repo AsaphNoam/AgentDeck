@@ -4,6 +4,36 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-27 — Fix: choose the project when building a pipeline with AgentDecker
+
+You hit a real gap, and the error message was telling the truth. **Create with AgentDecker** always
+started its session in whatever project was set as the default, and it offered no way to change
+that. On a new setup the default is the example project AgentDeck ships with, **My App**, which
+points at a folder that doesn't exist — so the launch was refused, and nothing on the Pipelines page
+could fix it. The Start Run form right below it already had a project picker; the builder had simply
+never been given one.
+
+The builder now has a **Project** dropdown listing every project you've configured, and it launches
+into the one you pick. It still starts on your default project when that project exists, so the
+common case is unchanged. If your default has been deleted or renamed, the picker now comes up
+empty and the launch button stays disabled, instead of letting you press a button whose only
+possible outcome was a rejected launch.
+
+You can still change a project's folder in **Settings → Projects**; that remains the place to point
+**My App** at a real directory, or you can just add a project and select it in the builder.
+
+I checked this in a real browser against a clean setup: picking a real project gets past the folder
+error, and picking **My App** still reports it — now right beside the dropdown that fixes it.
+
+**Needs attention:** Another session's work is sitting uncommitted in this repository — the live
+provider acceptance results and the planned per-stage effort specification. I left all of it
+untouched and committed only my own files, but it still needs its owner to finish and commit it.
+Also restart your running dashboard to pick up the rebuilt interface.
+
+**Next:** Restart the dashboard, open **Pipelines → Create with AgentDecker**, and pick your project
+from the new dropdown.
+
+
 ### 2026-07-26 — Fix: visible Dashboard state labels
 
 The top-right state badge is now readable. It was meant to show the agent state, but a CSS rule
