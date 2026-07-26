@@ -4,6 +4,46 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-26 — Usability review: the week's new features in a real browser
+
+I drove everything shipped in the last week through the actual app in a browser — pipelines,
+annotations, archive and search on both builds we ship, plus the ordinary launch, chat, permission,
+crash and restart paths. Most of it holds up well. The entire pipeline lifecycle works: stages run
+one at a time, results only advance the run when the stage agent actually reports and finishes its
+turn, approval pauses wait for you, a failed check loops through the repair stage and back, stopping
+a stage agent pauses the run with a working Retry, and everything survives a restart. Annotations,
+archive search, permissions and crash recovery also passed.
+
+Two shipped features, though, cannot be used at all, and both have been in the product for a while
+without anyone noticing. First, selecting lines in a diff to annotate them does nothing — clicking
+line numbers has never worked in a browser, because the code looks for a line label in a format the
+diff component does not produce. Whole-message annotation still works, so the feature looks alive
+until you try its main use. Second, no Codex model can be assigned to a pipeline stage: the app
+offers Codex and its models in the dropdown, then refuses the run with a message saying you must
+choose a backend and model. The cause is an internal name rule that forbids dots, and both Codex
+model names contain one. Our own written example of this feature is "Codex for the work, Claude for
+the review", so the headline case is impossible on a fresh install.
+
+Four more real dead ends: the archive only ever shows the first 50 sessions while truthfully saying
+there are more, with no way to reach the rest; the pipeline start form throws away the server's
+explanation of what is wrong and just says "run cannot start"; a search combining an agent's name
+with a word from its transcript wrongly reports no results, because terms have to appear in the same
+turn and nothing tells you that; and if a folder is ever opened by our standard build and then by the
+fallback build, no agent can launch at all. I also recorded ten smaller items, mostly missing
+validation and unclear wording.
+
+Worth saying plainly: the first two problems were invisible to every check we run. The test suite
+passes because nothing tests the diff component's connection to its third-party library, and the
+pipeline tests use a made-up model name with no dot in it. This is exactly the gap browser review
+exists to close.
+
+**Needs attention:** Six problems need fixing, and two of them make an advertised feature unusable
+rather than degraded. I did not change any code — the full list with reproduction steps and
+screenshots is recorded for the fix work.
+
+**Next:** Run the fix loop over the six must-fix items, starting with diff-line annotation and the
+Codex model rejection.
+
 ### 2026-07-26 — Fix: Claude onboarding compatibility
 
 Claude’s readiness check now handles the common ways different command-line versions reject the
