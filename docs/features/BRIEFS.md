@@ -4,6 +4,45 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-26 — Review: configurable pipeline runs and the preceding fix batch
+
+I reviewed everything built since the last review marker: the six-finding fix batch and the whole
+configurable pipeline runs feature. The design holds up. Templates really are reusable and
+model-neutral, a run really is frozen at start, and a stage only advances when the agent reports an
+explicit result through its own token and its turn then finishes — runtime status alone never
+completes anything. Every state change goes through a version check, so two clicks or a crashed
+retry cannot double-advance a run. All the promised surfaces exist: the page, the API, the command
+line, the agent tools, and the links from ordinary agent cards back to their run.
+
+I found five problems, three of which I'd fix before anyone relies on this.
+
+The most serious: if you press Stop on a stage agent's card — an ordinary action AgentDeck deliberately
+still offers — the run does not notice. It keeps waiting for a result from an agent that no longer
+exists, shows no warning, and will not let you retry the stage. Only stopping the whole run, or
+restarting the dashboard, gets you out.
+
+Second: the stage instructions AgentDeck writes for each agent are capped in length, and the
+mandatory "report your result when you're done" line sits at the end. Paste a long specification into
+a run input and that line gets cut off, so the agent never reports and the run hangs the same way.
+
+Third: in a finished run's attempt history, "Open transcript" points at the live-agent screen rather
+than the archive, so it shows "Agent not found" for every completed stage — exactly the transcripts
+you'd want to read after a run finishes.
+
+The two smaller ones: pipeline notifications name the run by its internal id instead of the name you
+gave it, and a completed-run toast doesn't say whether it succeeded or failed; and the AgentDecker
+builder remembers its chat session in the browser forever, so a dead session keeps showing a broken
+link.
+
+All the shared checks pass — specifications, both Go test variants, 120 interface tests, and both
+builds. That is the point worth noticing: none of these five paths has a test, which is why they came
+through green. I changed no product code or specifications.
+
+**Needs attention:** The stop-wedges-a-run problem is the one that will bite a real user first,
+because pressing Stop on a card is a normal thing to do.
+
+**Next:** Ask me to fix the open findings, starting with the stop and the truncated instruction.
+
 ### 2026-07-25 — Implementation: configurable pipeline runs
 
 Configurable pipeline runs are now implemented. AgentDeck has reusable model-neutral templates,
