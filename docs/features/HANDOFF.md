@@ -17,10 +17,13 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   the new boundaries; the other five restore existing requirements. Specification checks, both Go
   test variants, all 149 UI tests, presentation/source/UI builds, the distribution build, focused
   `-race` on the resume crash path, and whitespace checks pass. The post-fix browser rerun passed
-  J1–J4 and the exercised J5 layout paths, but J5 restart/delete and J6–J14 remain blocked by its
-  recorded browser/execution limits, so none of these fixes has been exercised in a real browser.
-  The exact browser coverage remains in
-  [`../archive/reviews/usability-review-run-2026-07-26-rerun.md`](../archive/reviews/usability-review-run-2026-07-26-rerun.md).
+  J1–J4 and the exercised J5 layout paths, but J5 restart/delete and J6–J14 remain unconfirmed, so
+  none of these fixes has been exercised end-to-end in a real browser. A follow-up retry showed
+  that native confirmation now completes, but prior tabs contaminated the reused J5 fixture and
+  the in-app browser then dropped its tab after each successful transition; J7's stopped-agent,
+  transcript, and Archive-list surfaces rendered before that new block. The exact coverage is in
+  [`../archive/reviews/usability-review-run-2026-07-26-rerun.md`](../archive/reviews/usability-review-run-2026-07-26-rerun.md)
+  and [`../archive/reviews/usability-review-run-2026-07-26-browser-retry.md`](../archive/reviews/usability-review-run-2026-07-26-browser-retry.md).
   Credentialed provider and terminal compatibility remain separate manual release gates.
 - **Last reviewed code:** `cc9d498` (2026-07-26), the continuous range after `ccc2b50`.
 - **Branch:** `main`.

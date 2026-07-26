@@ -4,6 +4,22 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-26 — Usability review: browser retry
+
+Browser confirmation of the seven repaired findings is still incomplete. The earlier native-confirm
+stall is gone: the confirmation interaction completed in the running app. But that run was attached
+to an older review home, so it cannot prove the intended layout result. A fresh isolated lifecycle
+fixture did render its stopped agents, transcript, and Archive list; immediately afterward, the
+in-app browser repeatedly lost its tab after each page transition. I stopped rather than calling
+the remaining Archive, pipeline, annotation, or validation paths browser-tested based on their
+automated coverage. The exact partial evidence and blocker are in
+[the retry report](../archive/reviews/usability-review-run-2026-07-26-browser-retry.md).
+
+**Needs attention:** The in-app browser needs a stable tab session before the remaining real-browser
+checks can be completed.
+
+**Next:** Re-run J5 restart/delete and J6–J14 using separate ports and a stable browser session.
+
 ### 2026-07-26 — Fix: the seven recorded review findings
 
 All seven problems from the last review are repaired, each with a test that was first confirmed to
