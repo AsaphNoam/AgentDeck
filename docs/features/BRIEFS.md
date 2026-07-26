@@ -4,6 +4,28 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-26 — Usability review: post-fix rerun
+
+The rerun found no new problem in the paths it completed. Fresh first paint, onboarding, the
+provider-version fallback, Set up later, first launch, chat replay, and all four permission outcomes
+worked in the real release build with zero unexpected browser errors. Dashboard density, collapse,
+pointer-drag reorder, reload persistence, and the group-release backing operation also behaved
+correctly. All 139 UI tests, the presentation checks and build, specification checks, and focused
+tagged and fallback-build regressions for the recent fixes pass.
+
+The run could not honestly cover the whole matrix: the browser stalled on a native confirmation
+dialog during the layout journey, then the execution account hit its usage limit and refused any
+further isolated server starts. The remaining layout restart/delete variants and the terminal,
+lifecycle, Archive, Settings, messaging, recovery, durability, annotation, and pipeline journeys are
+recorded as blocked—not passed—in [the full rerun report](../archive/reviews/usability-review-run-2026-07-26-rerun.md).
+
+**Needs attention:** The incomplete journeys still need a real-browser rerun after the execution
+limit resets; credentialed provider and terminal compatibility remain the existing manual gates.
+The review state is committed locally, but pushing it to `origin/main` needs your explicit
+authorization.
+
+**Next:** Re-run usability review starting at the remaining layout variants, then J6–J14 in order.
+
 ### 2026-07-26 — Fix: all usability review findings
 
 All sixteen findings from the week’s browser review are fixed. The final permission-label change
