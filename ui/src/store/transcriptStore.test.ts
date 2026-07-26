@@ -147,4 +147,22 @@ describe("transcriptStore", () => {
     useTranscriptStore.getState().resolvePermission("a_action", "tc_repeat", "approve");
     expect(useTranscriptStore.getState().byAgent.a_action.map((event) => event.resolved)).toEqual([undefined, "approve"]);
   });
+
+  it("preserves cancelled and timed-out permission outcomes live and on replay", () => {
+    useTranscriptStore.getState().appendMessage("a_cancel", {
+      agent_id: "a_cancel", seq: 1, type: "permission_request", ts: "t1",
+      data: { tool_call_id: "tc_cancel", name: "Bash", reason: "run" },
+    });
+    useTranscriptStore.getState().appendMessage("a_cancel", {
+      agent_id: "a_cancel", seq: 2, type: "permission_resolved", ts: "t2",
+      data: { tool_call_id: "tc_cancel", decision: "cancelled" },
+    });
+    expect(useTranscriptStore.getState().byAgent.a_cancel[0].resolved).toBe("cancelled");
+
+    useTranscriptStore.getState().setTranscript("a_timeout", [
+      { agent_id: "a_timeout", seq: 1, type: "permission_request", ts: "t1", data: { tool_call_id: "tc_timeout", name: "Edit", reason: "write" } },
+      { agent_id: "a_timeout", seq: 2, type: "permission_resolved", ts: "t2", data: { tool_call_id: "tc_timeout", decision: "timeout" } },
+    ]);
+    expect(useTranscriptStore.getState().byAgent.a_timeout[0].resolved).toBe("timeout");
+  });
 });

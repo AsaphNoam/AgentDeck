@@ -124,7 +124,7 @@
     },
     "permission-prompt": {
       "slots": ["title", "reason", "actions", "resolution", "error"],
-      "states": ["pending", "approved", "denied", "error"],
+      "states": ["pending", "approved", "denied", "cancelled", "timed-out", "error"],
       "variants": []
     },
     "tracked-list": {

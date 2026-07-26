@@ -8,8 +8,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 - **Active change:** None.
 - **State:** the week's work has now been driven end to end in a real browser. All six Must-fix
-  findings are resolved; one Worth-fixing finding remains and requires a product decision.
-  Everything else driven passed: the
+  and ten Worth-fixing findings are resolved. Everything else driven passed: the
   whole pipeline lifecycle, the
   annotation tray and its three delivery routes, archive search on both build variants, first paint
   on an empty home, chat round-trip and delta coalescing, all four permission outcomes, crash and
@@ -29,6 +28,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   ordinary project/config/launch path, and restart persistence pass. Its provider-version blocker is
   fixed: common diagnostics that reject optional `--no-color` now retry the fixed bare Claude status
   command without treating unrelated failures as compatibility errors.
+  The 2026-07-26 usability fix pass resolves all sixteen recorded findings. Final specification
+  checks, both Go test variants, 139 UI tests, source/UI and presentation builds, and the
+  distribution build succeed.
 - **Last reviewed code:** `ccc2b50` (2026-07-26), the continuous range after `eb63dd5`.
 - **Branch:** `main`.
 
@@ -60,19 +62,12 @@ and creates disposable local configuration homes. On 2026-07-15 this machine has
 the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installed; the new
 `claude-agent-acp`, OpenCode, and OpenHands are not installed globally.
 
-The review fix pass is waiting on one product decision: choose distinct permission chips
-**Approved**, **Denied**, **Cancelled**, and **Timed out** (recommended), or retain the specified
-two-state vocabulary where every non-approval reads **Denied**. The remaining review finding stays
-open until that choice is recorded.
-
 ## Review findings
 
 Recorded by the 2026-07-26 week usability review; repro steps and evidence paths are in
 [`../archive/reviews/usability-review-run-2026-07-26-week.md`](../archive/reviews/usability-review-run-2026-07-26-week.md).
 
-- **Worth fixing** — J4 a cancelled and a timed-out permission both render the chip "DENIED" (no
-  invariant class). This matches the two-state chip FS-03 specifies, so the fix is a spec decision
-  about whether those outcomes deserve their own vocabulary.
+All sixteen findings are resolved: six Must fix and ten Worth fixing.
 
 Three items were deliberately **not** promoted to findings and are carried for the next code review
 in the run report's "Unconfirmed" and "Static sweeps" sections: a one-off archive-search 500 that did
@@ -82,6 +77,12 @@ not reproduce, the untimed `tmux` driver calls, and the two onboarding steps tha
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-26 — Distinguished permission outcomes. **No invariant class** applied; FS-03.R4/R17/A6
+  now retain the runtime's approved, denied, cancelled, and timed-out outcomes through both live and
+  replay transcript projection. Permission chips render **Approved**, **Denied**, **Cancelled**, or
+  **Timed out** with declared presentation states. Store and renderer regressions cover all four;
+  unknown legacy decisions remain conservatively denied.
 
 - 2026-07-26 — Identified archived transcripts before Resume. **No invariant class** applied;
   FS-05.R31/A15 now require the read-only header to show recorded name, project, backend/model, and

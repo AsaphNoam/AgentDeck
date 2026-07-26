@@ -13,4 +13,18 @@ describe("PermissionPrompt", () => {
     expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: "POST" });
     fetchMock.mockRestore();
   });
+
+  it.each([
+    ["approve", "Approved", "approved"],
+    ["deny", "Denied", "denied"],
+    ["cancelled", "Cancelled", "cancelled"],
+    ["timeout", "Timed out", "timed-out"],
+  ] as const)("renders %s as a distinct resolved chip", (resolved, label, state) => {
+    const { container } = render(
+      <PermissionPrompt agentId="a_1" event={{ kind: "permission_request", tool_call_id: "tc_1", name: "Bash", resolved }} />,
+    );
+
+    expect(screen.getByText(label)).toBeInTheDocument();
+    expect(container.querySelector(".permission-prompt")).toHaveAttribute("data-state", state);
+  });
 });

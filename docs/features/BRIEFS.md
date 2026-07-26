@@ -4,6 +4,23 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-26 — Fix: all usability review findings
+
+All sixteen findings from the week’s browser review are fixed. The final permission-label change
+was genuinely small: AgentDeck already stored the distinct outcomes, so the live and replayed
+transcript projection now preserves them and the chips read **Approved**, **Denied**,
+**Cancelled**, or **Timed out**. Unknown legacy outcomes still fall back conservatively to Denied.
+
+The final specification checks, both Go test variants, all 139 UI tests, source and UI builds,
+presentation-contract checks, and the distribution build pass. The embedded production UI was
+regenerated from source.
+
+**Needs attention:** None for this review. Credentialed provider and terminal compatibility remain
+the existing manual release gates.
+
+**Next:** Run those credentialed acceptance gates when you are ready to authorize real provider
+sessions.
+
 ### 2026-07-26 — Fix: usability review findings, awaiting one decision
 
 Fifteen of the sixteen review findings are fixed and committed. Diff annotation, Codex pipeline
