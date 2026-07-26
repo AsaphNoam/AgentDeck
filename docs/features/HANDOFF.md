@@ -17,10 +17,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   boundaries consume and flush one sequence-bounded operation. Specification checks, both Go test
   variants, 126 UI tests, source/UI builds, focused race tests, and the distribution build succeed.
   Credentialed provider acceptance remains a separate manual release gate; native prompt/confirm
-  actions also need replay in a browser that supports those dialogs.
-  The onboarding change is verified by automated tests plus a real isolated-home run; **J2 has not
-  been replayed in a browser**, so the wizard's Set up later and Check again controls are unproven
-  against real rendering and pointer interaction.
+  actions also need replay in a browser that supports those dialogs. J2 onboarding has now been
+  replayed in a real browser: Set up later, missing/signed-out/ready Check again transitions, the
+  ordinary project/config/launch path, and restart persistence pass. One provider-version blocker
+  remains: alternate `--no-color` rejection wording wrongly fails a ready Claude adapter.
 - **Last reviewed code:** `ccc2b50` (2026-07-26), the continuous range after `eb63dd5`.
 - **Branch:** `main`.
 
@@ -54,11 +54,31 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-None.
+- **Must fix** — **J2 wrongly fails a ready Claude adapter on alternate optional-flag wording (INV §12).**
+  In a fresh isolated J2 run, use a compatible `claude-agent-acp` shim that exits 1 with
+  `unknown flag: --no-color` for `--cli auth status --no-color` but exits 0 with `logged in` for the
+  same fixed command without that optional flag, then click **Check again**. The wizard shows generic
+  credential failure and cannot advance; the result reproduced twice in the running browser. The
+  matcher at `internal/backend/credcheck/claude.go:28-31` retries only for the exact phrase
+  `unknown option '--no-color'`, contrary to FS-04.R17/R34/A14, FS-09.A5, TS-04.R15, and INV §12's
+  defensive output vocabulary. Accept common unsupported-flag wording (without accepting unrelated
+  failures), retry the fixed bare argv, and add a probe regression. Repro and screenshots:
+  [`../archive/reviews/usability-review-run-2026-07-26-j2.md`](../archive/reviews/usability-review-run-2026-07-26-j2.md).
 
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-26 — Replayed J2 onboarding through the real rendered UI against two fresh isolated homes.
+  Set up later closes the modal by pointer click, persists completion, leaves the seeded backend
+  catalog/defaults and project set unchanged, and launches no session. Missing-adapter, signed-out,
+  and ready Check again transitions work; the ordinary project, optional Config, first fake-ACP
+  launch, completion write, and restart reread also pass with no browser console error. **INV §12**
+  found one reproducible blocker: a ready Claude adapter that rejects optional `--no-color` as
+  `unknown flag` rather than the one hard-coded `unknown option` phrase is wrongly reported failed,
+  so the wizard cannot advance. The full report is
+  [`../archive/reviews/usability-review-run-2026-07-26-j2.md`](../archive/reviews/usability-review-run-2026-07-26-j2.md).
+  No product code or specifications were changed; credentialed providers remain gated.
 
 - 2026-07-26 — Fixed all seven open review findings. **INV §4** now carries the concrete launch
   generation through every runtime exit and tells pipeline-owned stops from ordinary user stops, so
