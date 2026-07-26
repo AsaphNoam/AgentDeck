@@ -432,8 +432,9 @@ func (s *Server) handleRename(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError(runtime.CodeValidation, "invalid JSON body"))
 		return
 	}
-	if strings.TrimSpace(body.Name) == "" {
-		writeAPIError(w, apiError(runtime.CodeEmptyName, "name is required"))
+	name, ae := normalizeAgentName(body.Name, false)
+	if ae != nil {
+		writeAPIError(w, ae)
 		return
 	}
 	agent, err := s.stateStore.ReadAgent(id)
@@ -441,7 +442,7 @@ func (s *Server) handleRename(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError(runtime.CodeNotFound, "no such agent: "+id))
 		return
 	}
-	agent.Name = strings.TrimSpace(body.Name)
+	agent.Name = name
 	if err := s.stateStore.WriteAgent(agent); err != nil {
 		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
 		return
@@ -468,9 +469,9 @@ func (s *Server) handleIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.Name != nil {
-		name := strings.TrimSpace(*body.Name)
-		if name == "" {
-			writeAPIError(w, apiError(runtime.CodeEmptyName, "name is required"))
+		name, ae := normalizeAgentName(*body.Name, false)
+		if ae != nil {
+			writeAPIError(w, ae)
 			return
 		}
 		agent.Name = name

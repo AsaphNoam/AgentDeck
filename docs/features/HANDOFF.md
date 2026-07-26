@@ -8,7 +8,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 - **Active change:** None.
 - **State:** the week's work has now been driven end to end in a real browser. All six Must-fix
-  findings are resolved; five Worth-fixing findings remain. Everything else driven passed: the
+  findings are resolved; four Worth-fixing findings remain. Everything else driven passed: the
   whole pipeline lifecycle, the
   annotation tray and its three delivery routes, archive search on both build variants, first paint
   on an empty home, chat round-trip and delta coalescing, all four permission outcomes, crash and
@@ -64,10 +64,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 Recorded by the 2026-07-26 week usability review; repro steps and evidence paths are in
 [`../archive/reviews/usability-review-run-2026-07-26-week.md`](../archive/reviews/usability-review-run-2026-07-26-week.md).
 
-- **Worth fixing** — J11 a whitespace-only agent name is accepted at launch (**INV §8**) and renders
-  a card with no title, while Rename rejects the identical value with "name is required";
-  5000-character and NUL-containing names are also accepted unvalidated.
-
 - **Worth fixing** — J11 a project saves silently with a whitespace-only title and cwd (**INV §8**)
   and then appears as a selectable target in New Agent.
 
@@ -91,6 +87,12 @@ not reproduce, the untimed `tmux` driver calls, and the two onboarding steps tha
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-26 — Unified agent display-name validation. **INV §8** now routes launch, rename, and
+  identity updates through one trim/nonblank/NUL-free/256-character boundary; omitted launch names
+  still receive a curated suggestion, while explicit whitespace can no longer create a titleless
+  card. FS-01.R4/R8/R22/A1/A6 pin the contract. Focused regressions cover the Unicode limit and
+  launch rejection for whitespace, NUL, and overlong input.
 
 - 2026-07-26 — Aligned live and replayed permission resolution. **INV §2** now makes the live
   resolver stop at the newest matching permission request, exactly like the durable transcript
