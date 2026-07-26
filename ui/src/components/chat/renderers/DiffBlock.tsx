@@ -7,7 +7,7 @@ import { diffTheme } from "../../../presentation/integrations";
 export function DiffBlock({ event, onAnnotate }: { event: TranscriptEvent; onAnnotate: (draft: AnnotationDraft) => void }) {
   const [selection, setSelection] = useState<{ side: "old" | "new"; start: number; end: number } | null>(null);
   const chooseLine = (lineId: string) => {
-    const match = /^([LR])(\d+)$/.exec(lineId);
+    const match = /^([LR])-(\d+)$/.exec(lineId);
     if (!match) return;
     const side = match[1] === "L" ? "old" : "new";
     const line = Number(match[2]);
