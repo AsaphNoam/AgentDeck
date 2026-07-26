@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useBackends, useConfig, useProjects } from "../../api/config";
 import {
+  pipelineDiagnostics,
   sharedWorkspaceConflicts,
   usePipelineTemplates,
   useStartPipelineRun,
 } from "../../api/pipelines";
 import type {
+  PipelineDiagnostic,
   PipelineProposal,
   PipelineStartRequest,
   PipelineWorkspaceConflict,
@@ -38,6 +40,7 @@ export function RunStartForm({
   const [proposal, setProposal] = useState<typeof proposalSeed>();
   const [pendingRequest, setPendingRequest] = useState<PipelineStartRequest | null>(null);
   const [conflicts, setConflicts] = useState<PipelineWorkspaceConflict[]>([]);
+  const [diagnostics, setDiagnostics] = useState<PipelineDiagnostic[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,6 +64,7 @@ export function RunStartForm({
     setProposal(proposalSeed);
     setPendingRequest(null);
     setConflicts([]);
+    setDiagnostics([]);
     setNotice("Review the exact AgentDecker run proposal before confirming Start.");
     setError(null);
   }, [proposalSeed]);
@@ -84,6 +88,7 @@ export function RunStartForm({
   const edit = () => {
     setPendingRequest(null);
     setConflicts([]);
+    setDiagnostics([]);
     if (proposal) {
       setProposal(undefined);
       setNotice("The proposed run changed. Its confirmation was invalidated; this is now a manual run setup.");
@@ -104,11 +109,13 @@ export function RunStartForm({
     const requestBody = pendingRequest ?? buildRequest();
     setPendingRequest(requestBody);
     setError(null);
+    setDiagnostics([]);
     start.mutate(
       { requestBody, acknowledge },
       {
         onSuccess: (response) => {
           setConflicts([]);
+          setDiagnostics([]);
           setNotice(response.replay ? "The original idempotent run was returned." : "Run started.");
           setProposal(undefined);
           onStarted(response.run.run.run_id);
@@ -116,6 +123,7 @@ export function RunStartForm({
         onError: (reason) => {
           const shared = sharedWorkspaceConflicts(reason);
           setConflicts(shared);
+          setDiagnostics(pipelineDiagnostics(reason));
           setError(shared.length === 0 ? (reason instanceof Error ? reason.message : String(reason)) : null);
         },
       },
@@ -193,6 +201,11 @@ export function RunStartForm({
         <button type="button" disabled={start.isPending} onClick={() => submit(true)}>Confirm shared workspace and start</button>
       </div>}
       {notice && <p className="form-info">{notice}</p>}
+      {diagnostics.length > 0 && (
+        <ul className="pipeline-diagnostics">
+          {diagnostics.map((diagnostic, index) => <li key={`${diagnostic.field}-${diagnostic.code}-${index}`}><code>{diagnostic.field}</code> — {diagnostic.message}</li>)}
+        </ul>
+      )}
       {error && <p className="form-error">{error}</p>}
       <div className="form-actions">
         <button type="button" disabled={cannotStart} onClick={() => submit(false)}>

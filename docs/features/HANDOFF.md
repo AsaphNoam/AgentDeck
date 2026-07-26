@@ -7,9 +7,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** the week's work has now been driven end to end in a real browser. Fourteen usability
-  findings are open above, four of them Must fix: the Start-run form drops the server's field
-  diagnostics, the archive shows only the first 50 sessions with no pager, a home opened by the
+- **State:** the week's work has now been driven end to end in a real browser. Thirteen usability
+  findings are open above, three of them Must fix: the archive shows only the first 50 sessions
+  with no pager, a home opened by the
   FTS5 build cannot launch agents under the untagged build, and a search spanning two turns answers
   "No results" with no signal. Everything else driven passed: the whole pipeline lifecycle, the
   annotation tray and its three delivery routes, archive search on both build variants, first paint
@@ -65,15 +65,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 Recorded by the 2026-07-26 week usability review; repro steps and evidence paths are in
 [`../archive/reviews/usability-review-run-2026-07-26-week.md`](../archive/reviews/usability-review-run-2026-07-26-week.md).
-
-- **Must fix** — J14 the Start-run form discards the server's field diagnostics (**INV §8**).
-  `ui/src/features/pipelines/RunStartForm.tsx:116-120` sets the error from `reason.message` alone, so
-  every run-start rejection renders as the bare words "run cannot start". Normal-use trigger: any
-  invalid run start — an unavailable backend, an undeclared or over-long input, or the Codex case
-  above. `pipelineDiagnostics()` already exists at `ui/src/api/pipelines.ts:209` and
-  `TemplateEditor.tsx:279-281` already renders the same shape, so the run form simply never calls
-  it. TS-09 requires bounded field diagnostics precisely so an invalid configuration stays
-  repairable. Fix: call `pipelineDiagnostics` in the run form's `onError` and render the list.
 
 - **Must fix** — J8 the archive shows only the first 50 sessions and offers no pager (**INV §10**).
   `ui/src/features/archive/ArchivePage.tsx:72` always calls `searchArchive(query, 50, 0)`; the
@@ -149,6 +140,12 @@ not reproduce, the untimed `tmux` driver calls, and the two onboarding steps tha
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-26 — Fixed run-start validation feedback. **INV §8** now routes rejected
+  start errors through the shared pipeline diagnostic parser and renders each field and repairable
+  message alongside the summary, matching the template editor. A UI regression submits a valid
+  form, injects an assignment diagnostic, and verifies the field and message remain visible. No
+  FS/TS delta was needed because the fix restores TS-09.R3/R23 and FS-14.R18.
 
 - 2026-07-26 — Fixed Codex pipeline assignments. **INV §2** no longer applies the
   role/project filename slug rule to backend and model catalog keys before the shared lifecycle
