@@ -8,7 +8,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 - **Active change:** None.
 - **State:** the week's work has now been driven end to end in a real browser. All six Must-fix
-  findings are resolved; six Worth-fixing findings remain. Everything else driven passed: the
+  findings are resolved; five Worth-fixing findings remain. Everything else driven passed: the
   whole pipeline lifecycle, the
   annotation tray and its three delivery routes, archive search on both build variants, first paint
   on an empty home, chat round-trip and delta coalescing, all four permission outcomes, crash and
@@ -64,11 +64,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 Recorded by the 2026-07-26 week usability review; repro steps and evidence paths are in
 [`../archive/reviews/usability-review-run-2026-07-26-week.md`](../archive/reviews/usability-review-run-2026-07-26-week.md).
 
-- **Worth fixing** — J4 the live view rewrites earlier permission chips that share a tool-call id
-  (**INV §2**): `markResolved` maps over every matching request while the transcript fold correctly
-  stops at the newest, so the live states read `["denied","denied"]` where a reload shows
-  `["approved","denied"]`. Live and replay projection must agree.
-
 - **Worth fixing** — J11 a whitespace-only agent name is accepted at launch (**INV §8**) and renders
   a card with no title, while Rename rejects the identical value with "name is required";
   5000-character and NUL-containing names are also accepted unvalidated.
@@ -96,6 +91,12 @@ not reproduce, the untimed `tmux` driver calls, and the two onboarding steps tha
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-26 — Aligned live and replayed permission resolution. **INV §2** now makes the live
+  resolver stop at the newest matching permission request, exactly like the durable transcript
+  fold, so a reused tool-call id cannot rewrite earlier chips. A store regression covers both an
+  incoming live resolution and the optimistic user-action path. No FS/TS delta was needed because
+  the fix restores FS-03.R4/R12/A6.
 
 - 2026-07-26 — Added stale annotation-tray recovery. **INV §1** now gives a missing-agent route a
   direct discard action with its retained draft count, and SSE reconnect contains the corresponding
