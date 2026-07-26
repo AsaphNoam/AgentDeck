@@ -126,4 +126,25 @@ describe("transcriptStore", () => {
     expect(events[0].kind).toBe("permission_request");
     expect(events[0].resolved).toBe("deny");
   });
+
+  it("resolves only the newest permission request when a tool-call id is reused", () => {
+    const request = (seq: number) => ({
+      agent_id: "a_repeat", seq, type: "permission_request", ts: `t${seq}`,
+      data: { tool_call_id: "tc_repeat", name: "Bash", reason: "run" },
+    });
+    const resolution = (seq: number, decision: "approve" | "deny") => ({
+      agent_id: "a_repeat", seq, type: "permission_resolved", ts: `t${seq}`,
+      data: { tool_call_id: "tc_repeat", decision },
+    });
+
+    useTranscriptStore.getState().appendMessage("a_repeat", request(1));
+    useTranscriptStore.getState().appendMessage("a_repeat", resolution(2, "approve"));
+    useTranscriptStore.getState().appendMessage("a_repeat", request(3));
+    useTranscriptStore.getState().appendMessage("a_repeat", resolution(4, "deny"));
+    expect(useTranscriptStore.getState().byAgent.a_repeat.map((event) => event.resolved)).toEqual(["approve", "deny"]);
+
+    useTranscriptStore.getState().setTranscript("a_action", [request(1), request(3)]);
+    useTranscriptStore.getState().resolvePermission("a_action", "tc_repeat", "approve");
+    expect(useTranscriptStore.getState().byAgent.a_action.map((event) => event.resolved)).toEqual([undefined, "approve"]);
+  });
 });

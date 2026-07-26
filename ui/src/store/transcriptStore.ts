@@ -43,11 +43,15 @@ function markResolved(
   toolCallId: string,
   resolved: "approve" | "deny",
 ) {
-  return events.map((event) =>
-    kindOf(event) === "permission_request" && String(event.tool_call_id ?? "") === toolCallId
-      ? { ...event, resolved }
-      : event,
-  );
+  const next = [...events];
+  for (let i = next.length - 1; i >= 0; i--) {
+    const event = next[i];
+    if (kindOf(event) === "permission_request" && String(event.tool_call_id ?? "") === toolCallId) {
+      next[i] = { ...event, resolved };
+      break;
+    }
+  }
+  return next;
 }
 
 function appendRenderedEvent(events: TranscriptEvent[], event: TranscriptEvent) {
