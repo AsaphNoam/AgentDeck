@@ -93,6 +93,10 @@ not reproduce, the untimed `tmux` driver calls, and the two onboarding steps tha
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
+- 2026-07-26 — Confirmed the `/fix` queue is empty. **No invariant class** applied: every
+  recorded Must-fix and Worth-fixing item is already resolved, no active change is selected, and
+  the worktree is clean. `make check-specs` passes; no product or specification change was needed.
+
 - 2026-07-26 — Re-ran the post-fix usability matrix at `c59dd2c`. **No invariant class** applied
   because the completed browser paths produced no finding. J1–J4 and the exercised J5 layout paths
   passed in the release build with new isolated homes and zero unexpected console errors; the
