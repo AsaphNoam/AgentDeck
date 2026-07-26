@@ -63,7 +63,7 @@ export function ArchivePage() {
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const load = useCallback(async (query: string, offset: number, append: boolean) => {
+  const load = useCallback(async (query: string, offset: number, append: boolean, rendered: ArchiveResult[] = []) => {
     if (abortRef.current) abortRef.current.abort();
     const ac = new AbortController();
     abortRef.current = ac;
@@ -71,8 +71,25 @@ export function ArchivePage() {
     setError(null);
     try {
       const resp = await searchArchive(query, 50, offset, ac.signal);
+      let page = resp.results ?? [];
+      let recovered: ArchiveResult[] = [];
+      if (append) {
+        // The Archive is ordered by the mutable updated_at, so a session resumed
+        // or touched between page requests moves ahead of this offset: the page
+        // repeats a boundary row and the moved session is never reached. A
+        // repeat is the proof that the prefix shifted, so refetch the first page
+        // and recover whatever moved into it (FS-05.R28).
+        const seen = new Set(rendered.map((result) => result.agent_id));
+        const shifted = page.some((result) => seen.has(result.agent_id));
+        page = page.filter((result) => !seen.has(result.agent_id));
+        if (shifted) {
+          const head = await searchArchive(query, 50, 0, ac.signal);
+          const pageIDs = new Set(page.map((result) => result.agent_id));
+          recovered = (head.results ?? []).filter((result) => !seen.has(result.agent_id) && !pageIDs.has(result.agent_id));
+        }
+      }
       if (!ac.signal.aborted) {
-        setResults((current) => append ? [...current, ...(resp.results ?? [])] : (resp.results ?? []));
+        setResults((current) => append ? [...recovered, ...current, ...page] : page);
         setTotal(resp.total);
         setSearchMode(resp.search_mode === "full_text" ? "full_text" : "metadata");
       }
@@ -139,7 +156,7 @@ export function ArchivePage() {
       </ul>
       {results.length < total && (
         <div className="form-actions">
-          <button type="button" disabled={loading} onClick={() => void load(debouncedQ, results.length, true)}>
+          <button type="button" disabled={loading} onClick={() => void load(debouncedQ, results.length, true, results)}>
             {loading ? "Loading…" : "Load more"}
           </button>
         </div>

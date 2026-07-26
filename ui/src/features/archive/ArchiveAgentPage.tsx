@@ -13,7 +13,10 @@ export function ArchiveAgentPage() {
   const agent = useAgentStore((state) => state.agents[id]);
   const [resuming, setResuming] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const metadata = events.find((event) => (event.kind ?? event.type) === "session_meta");
+  // Resume and runtime switch append newer session_meta boundaries, and Resume
+  // uses the most recent one. Reading the first record would show the original
+  // backend/model beside Resume for a switched session (FS-05.R31/A15).
+  const metadata = latestSessionMeta(events);
   const archivedName = textField(metadata?.name) || "Archived session";
   const project = textField(metadata?.project);
   const backend = textField(metadata?.backend);
@@ -63,6 +66,15 @@ export function ArchiveAgentPage() {
       <div />
     </section>
   );
+}
+
+// latestSessionMeta returns the newest session-metadata boundary in a transcript
+// — the identity a Resume would actually restore.
+export function latestSessionMeta<T extends { kind?: unknown; type?: unknown }>(events: T[]): T | undefined {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    if ((events[index].kind ?? events[index].type) === "session_meta") return events[index];
+  }
+  return undefined;
 }
 
 function textField(value: unknown) {

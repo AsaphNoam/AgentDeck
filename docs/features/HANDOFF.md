@@ -7,19 +7,19 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** the continuous code review after `ccc2b50` through `cc9d498` found two Must-fix and
-  five Worth-fixing defects in the week's fix batch. A resumed or switch-resumed chat runtime loses
-  its launch generation, so an unsolicited exit is rejected as stale and skips registry,
-  registration, and pipeline recovery cleanup. A deep-linked agent route can also offer to discard
-  retained annotation drafts before initial agent hydration proves the source is missing. The five
-  smaller findings are stopped pipeline attempts and builders classified as live by identity
-  presence, an archived header choosing the oldest rather than current session metadata, mutable
-  offset pagination that can skip/duplicate Archive rows, and onboarding validation errors reduced
-  to `Error: HTTP 400`. Specification checks, both Go test variants, all 139 UI tests,
-  presentation/source/UI builds, and the distribution build pass; those green checks do not cover
-  the failing seams. The post-fix browser rerun still passed J1–J4 and the exercised J5 layout paths,
-  but J5 restart/delete and J6–J14 remain blocked by its recorded browser/execution limits. The
-  exact browser coverage remains in
+- **State:** all seven findings from the review of `ccc2b50`→`cc9d498` are fixed and the queue is
+  empty. Chat Resume now carries its launch generation, so a resumed crash tears down ownership,
+  registration, and pauses its pipeline stage; the missing-agent annotation recovery waits for
+  hydration; pipeline attempt and builder links classify by `running`; the archived header reads the
+  newest session metadata; Archive paging de-duplicates and recovers rows that move between page
+  requests; and both onboarding steps render field-level validation detail. Each fix landed with a
+  regression that was verified to fail against the old code. FS-05.R28/A12 and FS-13.R16/A8 gained
+  the new boundaries; the other five restore existing requirements. Specification checks, both Go
+  test variants, all 149 UI tests, presentation/source/UI builds, the distribution build, focused
+  `-race` on the resume crash path, and whitespace checks pass. The post-fix browser rerun passed
+  J1–J4 and the exercised J5 layout paths, but J5 restart/delete and J6–J14 remain blocked by its
+  recorded browser/execution limits, so none of these fixes has been exercised in a real browser.
+  The exact browser coverage remains in
   [`../archive/reviews/usability-review-run-2026-07-26-rerun.md`](../archive/reviews/usability-review-run-2026-07-26-rerun.md).
   Credentialed provider and terminal compatibility remain separate manual release gates.
 - **Last reviewed code:** `cc9d498` (2026-07-26), the continuous range after `ccc2b50`.
@@ -58,50 +58,7 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 ## Review findings
 
-- **Must fix** — **INV §1 / INV §2 / INV §4** — `internal/runtime/chat.go:504` constructs a
-  resumed chat `agentState` without copying `spec.Generation`, unlike chat Start and both terminal
-  paths. When a resumed or switch-resumed peer exits unexpectedly, `internal/runtime/registry.go:85`
-  rejects the empty callback generation as stale: the runtime deletes its running row, but registry
-  ownership and hook/MCP/settings registration remain, a later Resume returns `ErrAlreadyStarted`,
-  and a resumed pipeline stage never receives its crash pause. This violates FS-01.R17/R28,
-  TS-01.R6/R9, and TS-09.R12/R13. Copy the generation on Resume and add a non-empty-generation
-  resume→crash regression that asserts ownership/registration teardown, successful re-resume, and
-  pipeline `agent_crash` recovery.
-- **Must fix** — **INV §1** — `ui/src/components/chat/ChatPanel.tsx:70` treats an absent agent as
-  permanently missing before the first SSE hydration completes. On a hard reload or deep link with
-  retained annotation drafts, it immediately says the source no longer exists and enables
-  **Discard pending annotations** even though `agentStore.hydrated` is still false; a normal click
-  can permanently delete valid drafts before the live source arrives. This violates FS-13.R16/A8.
-  Gate the missing-source recovery on completed hydration and test pre-hydration, present-after-
-  hydration, and genuinely-absent-after-hydration cases.
-- **Worth fixing** — **INV §10** — `ui/src/features/pipelines/RunBrowser.tsx:129` passes
-  `Boolean(liveAgents[item.agent_id])` to its transcript router. Hydration retains stopped agent
-  identities with `running:false`, so every completed attempt is still classified live and opens
-  `/agent/{id}`, which shows Agent not found, instead of its Archive transcript. This violates
-  FS-14.R8/R11. Route on `agent.running === true` and render-test both live and stopped attempts.
-- **Worth fixing** — **INV §1** — `ui/src/features/pipelines/AgentDeckerBuilder.tsx:90` likewise
-  treats hydrated identity presence as liveness. A stopped builder remains in the agent store, so
-  its persisted browser id is never expired and Pipelines keeps a stale **Open AgentDecker chat**
-  link to the dead live route. Classify by `running`, clear the key only after hydration, and
-  component-test stopped and running builder states.
-- **Worth fixing** — **INV §1** — `ui/src/features/archive/ArchiveAgentPage.tsx:16` selects the
-  first `session_meta` event. Resume and runtime switch append newer metadata, so a switched,
-  stopped session displays its original backend/model beside **Resume** instead of the current
-  recorded identity that Resume will use, contrary to FS-05.R31/A15. Select the latest metadata
-  boundary and test a transcript containing original and switched session metadata.
-- **Worth fixing** — **INV §10** — `ui/src/features/archive/ArchivePage.tsx:75` appends
-  `offset=results.length` pages from an Archive ordered by mutable `updated_at`. With more than 50
-  matches, if a later-page session is resumed or receives an event between page requests, it moves
-  ahead of the offset; the next page can duplicate a boundary row and omit the moved session, then
-  hide **Load more** because the rendered count equals `total`. This breaks FS-05.R28/A12 complete
-  reachability. Use a stable paging boundary or reconcile/refetch changed pages, with a 51+-session
-  regression that mutates ordering between requests and asserts unique complete reachability.
-- **Worth fixing** — **INV §8** — `ui/src/features/onboarding/steps/BackendStep.tsx:122` and
-  `ProjectStep.tsx:48` call `String(e)` even though the shared config client preserves field-level
-  validation details and `configErrorMessage` extracts them. A repairable 400 such as a project
-  title over 120 characters therefore renders only `Error: HTTP 400`, hiding FS-04.R26's field and
-  reason. Route both through the shared parser and inject backend/project validation envelopes in
-  UI regressions.
+None open.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
@@ -110,6 +67,25 @@ are not promoted to findings without a repeatable failure.
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-26 — Fixed all seven open review findings. **INV §4** now copies the launch generation
+  onto a resumed chat runtime, so a resumed or switch-resumed crash drops registry ownership, tears
+  down hook/MCP/settings registration, allows an immediate re-resume, and pauses its pipeline stage
+  as `agent_crash`; the resume→crash regression asserts the delivered generation and a matching
+  pipeline test pins that an empty generation is ignored. **INV §1** makes the missing-source
+  annotation recovery wait for completed agent hydration, so a deep link or reload shows a loading
+  state instead of offering to discard live drafts, and classifies pipeline attempt transcripts and
+  the persisted AgentDecker builder by `running` rather than identity presence, so finished attempts
+  reach Archive and a stopped builder's browser key expires. **INV §1** also selects the newest
+  session metadata for the archived header, so a switched session shows the identity Resume will
+  restore. **INV §10** makes Archive paging render every matching session exactly once: a repeated
+  row proves the `updated_at` ordering shifted, so the first page is refetched and whatever moved
+  into it is recovered. **INV §8** routes both onboarding steps through the shared config error
+  parser, so a repairable 400 names its field and reason instead of `Error: HTTP 400`. FS-13.R16/A8
+  and FS-05.R28/A12 gained the new hydration and reachability boundaries; the other five fixes
+  restore existing requirements. Every regression was verified to fail against the old code.
+  Specification checks, both Go variants, 149 UI tests, presentation/source/UI builds, the
+  distribution build, focused `-race` on the resume crash path, and whitespace checks pass.
 
 - 2026-07-26 — Reviewed the continuous range after `ccc2b50` through `cc9d498` in both
   specification directions and against every invariant class. Two Must-fix and five Worth-fixing

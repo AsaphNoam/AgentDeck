@@ -107,7 +107,10 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   trays. This keeps a session's own tray across reloads (R3) — including an archived session's,
   which is not in the live agent list — while bounding what accumulates in browser storage. If a
   retained tray's source can no longer be found, its missing-agent route identifies the pending
-  draft count and offers a direct discard action rather than trapping the retained slot.
+  draft count and offers a direct discard action rather than trapping the retained slot. Because
+  that discard is destructive, the route treats a source as missing only after the browser's first
+  agent hydration has completed; until then a deep link or reload shows a loading state and offers
+  no discard.
 - **R17.** A selectable diff block labels its line numbers as the selection control and presents
   them with a pointer cursor. Clicking one line starts a selection; clicking another line on the
   same side extends the contiguous range before **Annotate** captures it (R1–R2).
@@ -140,7 +143,8 @@ Each acceptance item names its delivered verification.
   retry delivers exactly one copy:
   `internal/server/annotations_test.go::TestAnnotationAppendFailureDeliversNoMailAndRetrySendsOnce`.
 - **A8** (R16) — Deleting an agent drops its pending tray, stored trays are capped and expired on
-  rehydration, and a missing-agent route can discard its retained tray:
+  rehydration, and a missing-agent route can discard its retained tray only after hydration
+  completes (pre-hydration, present-after-hydration, and absent-after-hydration are covered):
   `ui/src/store/annotationStore.test.ts`, `ui/src/api/sse.test.ts`, and
   `ui/src/components/chat/ChatPanel.test.tsx`.
 - **A9** (R1–R2, R17) — A diff block visibly explains line-number selection and applies the pointer

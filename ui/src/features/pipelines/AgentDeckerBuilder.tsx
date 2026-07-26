@@ -69,7 +69,10 @@ export function AgentDeckerBuilder({
   const [error, setError] = useState<string | null>(null);
   const events = useTranscriptStore((state) => builderID ? state.byAgent[builderID] ?? EMPTY_EVENTS : EMPTY_EVENTS);
   const setTranscript = useTranscriptStore((state) => state.setTranscript);
-  const liveBuilder = useAgentStore((state) => builderID ? state.agents[builderID] : undefined);
+  // A stopped builder keeps its identity row in the agent store, so presence is
+  // not liveness: classifying by presence never expires the persisted id and
+  // leaves a dead "Open AgentDecker chat" link behind (INV §1).
+  const builderRunning = useAgentStore((state) => (builderID ? state.agents[builderID]?.running === true : false));
   const agentsHydrated = useAgentStore((state) => state.hydrated);
   const agentsHydrating = useAgentStore((state) => state.hydrating);
   const proposals = useMemo(() => extractPipelineProposals(events), [events]);
@@ -87,18 +90,18 @@ export function AgentDeckerBuilder({
   }, [backendID, backends.data]);
 
   useEffect(() => {
-    if (!builderID || !agentsHydrated || agentsHydrating || !liveBuilder) return;
+    if (!builderID || !agentsHydrated || agentsHydrating || !builderRunning) return;
     if (justLaunchedBuilder.current === builderID) justLaunchedBuilder.current = null;
     void getTranscript(builderID)
       .then((transcript) => setTranscript(transcript.agent_id, transcript.events))
       .catch(() => undefined);
-  }, [agentsHydrated, agentsHydrating, builderID, liveBuilder, setTranscript]);
+  }, [agentsHydrated, agentsHydrating, builderID, builderRunning, setTranscript]);
 
   useEffect(() => {
-    if (!shouldDropBuilderSession(builderID, Boolean(liveBuilder), agentsHydrated, agentsHydrating, justLaunchedBuilder.current === builderID)) return;
+    if (!shouldDropBuilderSession(builderID, builderRunning, agentsHydrated, agentsHydrating, justLaunchedBuilder.current === builderID)) return;
     localStorage.removeItem(BUILDER_KEY);
     setBuilderID(null);
-  }, [agentsHydrated, agentsHydrating, builderID, liveBuilder]);
+  }, [agentsHydrated, agentsHydrating, builderID, builderRunning]);
 
   const launchBuilder = async () => {
     if (!description.trim()) return;
