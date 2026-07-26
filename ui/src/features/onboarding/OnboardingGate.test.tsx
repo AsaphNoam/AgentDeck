@@ -6,6 +6,7 @@ import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
 import { QUERY_KEYS } from "../../api/config";
 import { OnboardingGate } from "./OnboardingGate";
+import { OnboardingWizard } from "./OnboardingWizard";
 
 const notSatisfiedConfig = {
   version: 1,
@@ -46,6 +47,22 @@ const backendDoneProjectNotDoneConfig = {
       role: { done: true, detail: "4 roles" },
     },
   },
+};
+
+const readyBackends = {
+  version: 2,
+  backends: {
+    claude: {
+      name: "Claude", type: "claude-acp", default: true, default_model: "sonnet",
+      models: { sonnet: { name: "Sonnet", model: "sonnet" } },
+    },
+  },
+};
+
+const wizardSteps = {
+  backend: { done: true, detail: "ok" },
+  project: { done: true, detail: "ok" },
+  role: { done: true, detail: "ok" },
 };
 
 const server = setupServer(
@@ -236,5 +253,100 @@ describe("OnboardingGate", () => {
     expect(screen.queryByTestId("dashboard")).toBeNull();
     // Still retryable.
     expect(screen.getByText("Set up later")).not.toBeDisabled();
+  });
+
+  // FS-04.A13 / INV §5: Set up later and a mounted step mutation share one
+  // synchronous claim. The completion write cannot race any of the four
+  // mutating onboarding surfaces.
+  it("disables Set up later while backend validation is pending", async () => {
+    let release!: () => void;
+    let completionWrites = 0;
+    server.use(
+      http.get("/api/backends", () => HttpResponse.json(readyBackends)),
+      http.put("/api/backends", async () => {
+        await new Promise<void>((resolve) => { release = resolve; });
+        return HttpResponse.json({ ...readyBackends, credentials: { claude: { status: "ok", detail: "" } } });
+      }),
+      http.put("/api/config", () => { completionWrites += 1; return HttpResponse.json({}); }),
+    );
+    renderWithQuery(<OnboardingWizard steps={{ ...wizardSteps, backend: { done: false, detail: "missing" } }} onComplete={() => {}} />);
+    await screen.findByText(/Using this backend's default model/i);
+    fireEvent.click(screen.getByText("Validate & Continue"));
+    expect(screen.getByText("Set up later")).toBeDisabled();
+    fireEvent.click(screen.getByText("Set up later"));
+    expect(completionWrites).toBe(0);
+    await waitFor(() => expect(typeof release).toBe("function"));
+    release();
+  });
+
+  it("disables Set up later while project creation is pending", async () => {
+    let release!: () => void;
+    let completionWrites = 0;
+    server.use(
+      http.post("/api/projects", async () => {
+        await new Promise<void>((resolve) => { release = resolve; });
+        return HttpResponse.json({ project: "app", title: "App", color: [1, 2, 3], cwd: "/tmp/app", add_dirs: [], context_prompt: "" }, { status: 201 });
+      }),
+      http.put("/api/config", () => { completionWrites += 1; return HttpResponse.json({}); }),
+    );
+    renderWithQuery(<OnboardingWizard steps={{ ...wizardSteps, project: { done: false, detail: "missing" } }} onComplete={() => {}} />);
+    fireEvent.change(screen.getByPlaceholderText("e.g. My App"), { target: { value: "App" } });
+    fireEvent.change(screen.getByPlaceholderText("~/Projects/my-app"), { target: { value: "/tmp/app" } });
+    fireEvent.click(screen.getByText("Create project"));
+    expect(screen.getByText("Set up later")).toBeDisabled();
+    fireEvent.click(screen.getByText("Set up later"));
+    expect(completionWrites).toBe(0);
+    await waitFor(() => expect(typeof release).toBe("function"));
+    release();
+  });
+
+  it("disables Set up later while configuration-source discovery is pending", async () => {
+    let release!: () => void;
+    let completionWrites = 0;
+    server.use(
+      http.get("/api/projects", () => HttpResponse.json({ app: { title: "App", cwd: "/tmp/app" } })),
+      http.get("/api/config-sources", () => HttpResponse.json({ bindings: [], candidates: [] })),
+      http.post("/api/config-sources/preview", async () => {
+        await new Promise<void>((resolve) => { release = resolve; });
+        return HttpResponse.json({});
+      }),
+      http.put("/api/config", () => { completionWrites += 1; return HttpResponse.json({}); }),
+    );
+    renderWithQuery(<OnboardingWizard steps={wizardSteps} onComplete={() => {}} />);
+    const discover = await screen.findByText("Discover native config");
+    await waitFor(() => expect(discover).not.toBeDisabled());
+    fireEvent.click(discover);
+    expect(screen.getByText("Set up later")).toBeDisabled();
+    fireEvent.click(screen.getByText("Set up later"));
+    expect(completionWrites).toBe(0);
+    await waitFor(() => expect(typeof release).toBe("function"));
+    release();
+  });
+
+  it("disables Set up later while the first agent launch is pending", async () => {
+    let release!: () => void;
+    let completionWrites = 0;
+    server.use(
+      http.get("/api/roles", () => HttpResponse.json({ implementer: { title: "Implementer", system_prompt: "" } })),
+      http.get("/api/projects", () => HttpResponse.json({ app: { title: "App", cwd: "/tmp/app" } })),
+      http.get("/api/backends", () => HttpResponse.json(readyBackends)),
+      http.get("/api/config-sources", () => HttpResponse.json({ bindings: [], candidates: [] })),
+      http.post("/api/sessions", async () => {
+        await new Promise<void>((resolve) => { release = resolve; });
+        return HttpResponse.json({ agent: { agent_id: "a_1", name: "Atlas" } });
+      }),
+      http.put("/api/config", () => { completionWrites += 1; return HttpResponse.json({}); }),
+    );
+    renderWithQuery(<OnboardingWizard steps={wizardSteps} onComplete={() => {}} />);
+    fireEvent.click(await screen.findByText("Continue"));
+    await screen.findByText("App (app)");
+    const launchButton = screen.getByRole("button", { name: "Launch" });
+    await waitFor(() => expect(launchButton).not.toBeDisabled());
+    fireEvent.click(launchButton);
+    expect(screen.getByText("Set up later")).toBeDisabled();
+    fireEvent.click(screen.getByText("Set up later"));
+    expect(completionWrites).toBe(0);
+    await waitFor(() => expect(typeof release).toBe("function"));
+    release();
   });
 });

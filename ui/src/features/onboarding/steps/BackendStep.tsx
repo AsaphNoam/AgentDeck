@@ -7,6 +7,8 @@ interface BackendStepProps {
   // Reports the chosen seeded backend so later steps (e.g. the federation Config
   // step) target the right provider instead of assuming Claude.
   onDone: (backend: { id: string; type: BackendType }) => void;
+  claimMutation?: () => boolean;
+  releaseMutation?: () => void;
 }
 
 // seededIdForType maps a backend type to its seeded backend id (onboarding
@@ -44,7 +46,7 @@ function credentialGuidance(status: string, detail: string | null, type: Backend
     : "The credential check could not run yet. Confirm the provider setup, then check again.";
 }
 
-export function BackendStep({ onDone }: BackendStepProps) {
+export function BackendStep({ onDone, claimMutation, releaseMutation }: BackendStepProps) {
   const { data: existing, isLoading } = useBackends();
   const putBackends = usePutBackends();
 
@@ -71,6 +73,7 @@ export function BackendStep({ onDone }: BackendStepProps) {
 
   const handleValidate = () => {
     if (!readyToValidate || catalogUnusable) return;
+    if (claimMutation && !claimMutation()) return;
     setError(null);
     setCredStatus(null);
     // Credentials entered here belong to the backend, not to one model entry, so
@@ -117,6 +120,7 @@ export function BackendStep({ onDone }: BackendStepProps) {
         if (status === "ok") onDone({ id: backendId, type });
       },
       onError: (e) => setError(String(e)),
+      onSettled: releaseMutation,
     });
   };
 

@@ -6,6 +6,11 @@ import {
   usePipelineRuns,
 } from "../../api/pipelines";
 import { useState } from "react";
+import { useAgentStore } from "../../store/agentStore";
+
+export function attemptTranscriptPath(agentID: string, live: boolean) {
+  return `/${live ? "agent" : "archive"}/${agentID}`;
+}
 
 export function RunBrowser({ selectedID, onSelect }: { selectedID: string | null; onSelect: (id: string | null) => void }) {
   const runs = usePipelineRuns();
@@ -44,6 +49,7 @@ function RunDetail({ selectedID, onDeleted }: { selectedID: string | null; onDel
   const retryRun = usePipelineControl("retry");
   const stopRun = usePipelineControl("stop");
   const deleteRun = useDeletePipelineRun();
+  const liveAgents = useAgentStore((state) => state.agents);
   const [continuation, setContinuation] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -120,7 +126,7 @@ function RunDetail({ selectedID, onDeleted }: { selectedID: string | null; onDel
           {item.report_summary && <p>{item.report_summary}</p>}
           {item.report_details && <details><summary>Details</summary><pre>{item.report_details}</pre></details>}
           {item.report_checks && <details><summary>Checks</summary><pre>{item.report_checks}</pre></details>}
-          {item.agent_id && <Link to={`/agent/${item.agent_id}`}>Open transcript</Link>}
+          {item.agent_id && <Link to={attemptTranscriptPath(item.agent_id, Boolean(liveAgents[item.agent_id]))}>Open transcript</Link>}
         </li>)}
       </ol>
     </div>

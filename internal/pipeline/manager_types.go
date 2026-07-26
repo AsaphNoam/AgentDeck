@@ -63,11 +63,13 @@ type Publisher interface {
 
 type PipelineUpdate struct {
 	RunID           string `json:"run_id"`
+	DisplayName     string `json:"display_name"`
 	Revision        int64  `json:"revision"`
 	State           string `json:"state"`
 	CurrentStageID  string `json:"current_stage_id"`
 	CurrentAgentID  string `json:"current_agent_id"`
 	AttentionReason string `json:"attention_reason"`
+	FinalOutcome    string `json:"final_outcome"`
 }
 
 type RunDetail struct {

@@ -172,7 +172,7 @@ describe("SseClient watchdog reconnect", () => {
     spy.mockClear();
     const update = (revision: number) => JSON.stringify({
       type: "pipeline_update", seq: revision, ts: revision, agent_id: null,
-      data: { run_id: "pr_1", revision, state: "running", current_stage_id: "work", current_agent_id: "a_1", attention_reason: "" },
+      data: { run_id: "pr_1", display_name: "Run one", revision, state: "running", current_stage_id: "work", current_agent_id: "a_1", attention_reason: "", final_outcome: "" },
     });
 
     FakeEventSource.instances[0].emit("pipeline_update", update(4));

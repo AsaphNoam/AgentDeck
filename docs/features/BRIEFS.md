@@ -4,6 +4,24 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-26 — Fix: pipeline recovery, onboarding races, and transcript boundaries
+
+All seven open review findings are fixed. Stopping a pipeline stage from its ordinary agent card now
+pauses the run with a usable retry instead of leaving it stuck. Large stage inputs can no longer cut
+off the required result-reporting instruction. Finished attempt transcripts open from the archive,
+pipeline alerts use the run name and say success or failure, and dead AgentDecker builder sessions
+are removed from browser state.
+
+Set up later now shares one mutation claim with every onboarding step, so it cannot race backend
+checks, project creation, configuration-source work, or first-agent launch. Transcript search
+indexing now commits each turn or annotation boundary as one sequence-aware operation, keeping later
+events in the next document. Full automated tests, race detection, and release builds pass.
+
+**Needs attention:** The onboarding wizard still needs its recorded real-browser journey replay.
+
+**Next:** Replay the onboarding journey in a browser when you want to close that remaining manual
+evidence gap.
+
 ### 2026-07-26 — Review: configurable pipeline runs and the preceding fix batch
 
 I reviewed everything built since the last review marker: the six-finding fix batch and the whole

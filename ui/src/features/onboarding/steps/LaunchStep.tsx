@@ -8,9 +8,11 @@ interface LaunchStepProps {
   /** Slug of the project created in ProjectStep. Preferred over the seeded
    * default so onboarding launches a project whose cwd actually exists. */
   initialProject?: string;
+  claimMutation?: () => boolean;
+  releaseMutation?: () => void;
 }
 
-export function LaunchStep({ onDone, initialProject }: LaunchStepProps) {
+export function LaunchStep({ onDone, initialProject, claimMutation, releaseMutation }: LaunchStepProps) {
   const { data: rolesData } = useRoles();
   const { data: projectsData } = useProjects();
   const { data: backendsData } = useBackends();
@@ -48,6 +50,7 @@ export function LaunchStep({ onDone, initialProject }: LaunchStepProps) {
   }, [projectEntries.length, initialProject]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLaunch = () => {
+    if (claimMutation && !claimMutation()) return;
     setError(null);
     launch.mutate(
       { name: name || undefined, role, project, backend: defaultBackendId || undefined, interface: "chat" },
@@ -61,9 +64,13 @@ export function LaunchStep({ onDone, initialProject }: LaunchStepProps) {
               // Agent launched successfully; keep the wizard visible but show the error.
               // User can manually dismiss or the service will eventually reconcile the state.
             },
+            onSettled: releaseMutation,
           });
         },
-        onError: (e) => setError(configErrorMessage(e)),
+        onError: (e) => {
+          setError(configErrorMessage(e));
+          releaseMutation?.();
+        },
       },
     );
   };

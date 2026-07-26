@@ -36,7 +36,7 @@ type Runtime struct {
 	mu     sync.Mutex
 	agents map[string]*termAgent
 	touch  func(string)
-	onExit func(string)
+	onExit func(string, string)
 
 	// Persistence (mirrors the chat runtime): opening a per-agent transcript and
 	// upserting the sessions row on Start/Resume makes a terminal-origin agent a
@@ -49,12 +49,13 @@ type Runtime struct {
 
 // termAgent is the live state for one terminal agent.
 type termAgent struct {
-	agentID string
-	tab     *Tab
-	driver  TerminalDriver // the driver that launched this tab; WriteText/CloseTab dispatch here
-	hub     *rt.Hub
-	ptyHub  *ptyHub             // per-agent PTY broadcast hub (nil for non-PTY drivers, e.g. tmux)
-	writer  rt.TranscriptWriter // durable transcript handle; nil when persistence is off
+	agentID    string
+	generation string
+	tab        *Tab
+	driver     TerminalDriver // the driver that launched this tab; WriteText/CloseTab dispatch here
+	hub        *rt.Hub
+	ptyHub     *ptyHub             // per-agent PTY broadcast hub (nil for non-PTY drivers, e.g. tmux)
+	writer     rt.TranscriptWriter // durable transcript handle; nil when persistence is off
 
 	mu      sync.Mutex
 	stopped bool
@@ -149,7 +150,7 @@ func (r *Runtime) SetStateTouch(touch func(string)) { r.touch = touch }
 
 // SetOnExit lets the Registry drop ownership when a terminal agent's process
 // disappears outside a Stop (crash teardown), mirroring the chat runtime.
-func (r *Runtime) SetOnExit(fn func(string)) { r.onExit = fn }
+func (r *Runtime) SetOnExit(fn func(string, string)) { r.onExit = fn }
 
 // SetPersistence enables durable transcript writes and sessions-row indexing for
 // terminal agents, wired identically to the chat runtime (server layer). Without
@@ -199,7 +200,7 @@ func (r *Runtime) Start(ctx context.Context, spec rt.LaunchSpec) (*rt.Handle, er
 	if err != nil {
 		return nil, err
 	}
-	a := &termAgent{agentID: spec.Agent.AgentID, tab: tab, driver: drv, hub: rt.NewHub()}
+	a := &termAgent{agentID: spec.Agent.AgentID, generation: spec.Generation, tab: tab, driver: drv, hub: rt.NewHub()}
 
 	// Open the transcript + upsert the sessions row BEFORE the running row so a
 	// launched terminal agent is a first-class archive/resume citizen (Finding 7).
@@ -244,7 +245,7 @@ func (r *Runtime) Resume(ctx context.Context, spec rt.LaunchSpec, sessionID stri
 	if err != nil {
 		return nil, err
 	}
-	a := &termAgent{agentID: spec.Agent.AgentID, tab: tab, driver: drv, hub: rt.NewHub()}
+	a := &termAgent{agentID: spec.Agent.AgentID, generation: spec.Generation, tab: tab, driver: drv, hub: rt.NewHub()}
 
 	// Re-open the transcript in append mode and re-upsert the sessions row with the
 	// resumed session_id, mirroring the chat runtime so archive resume of a terminal
@@ -497,7 +498,7 @@ func (r *Runtime) startWatcher(a *termAgent) {
 		r.touchState(a.agentID)
 		r.removeAgent(a.agentID)
 		if r.onExit != nil {
-			r.onExit(a.agentID)
+			r.onExit(a.agentID, a.generation)
 		}
 		a.hub.Close()
 	}()

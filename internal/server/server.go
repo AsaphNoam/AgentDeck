@@ -178,11 +178,11 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	// not only on solicited stop/switch — otherwise a crashed agent leaves a live
 	// hook token + MCP session (a spoofable messaging identity) and leaked files.
 	if registry != nil {
-		registry.SetExitHook(func(agentID, generation string) {
+		registry.SetExitHook(func(agentID, generation, cause string) {
 			s.teardownAgentRegistration(agentID)
 			if s.pipelineMgr != nil {
 				go func() {
-					if err := s.pipelineMgr.OnExit(agentID, generation, "process_exit"); err != nil {
+					if err := s.pipelineMgr.OnExit(agentID, generation, cause); err != nil {
 						s.log.Warn("pipeline agent exit", "agent_id", agentID, "err", err)
 					}
 				}()

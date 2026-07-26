@@ -93,6 +93,8 @@ type PersistenceIndexer interface {
 	UpsertSessionMeta(agentID string, meta SessionMetaData) error
 	OnEvent(agentID string, ev Event) error
 	OnTurnEnd(agentID string, rollup TurnRollup) error
+	OnEventAndTurnEnd(agentID string, ev Event, rollup TurnRollup) error
+	OnEventAndFlushContent(agentID string, ev Event, lastSeq int64, updatedAt string) error
 }
 
 type TranscriptWriter interface {

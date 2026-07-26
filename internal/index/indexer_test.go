@@ -153,6 +153,95 @@ func TestAnnotationFlushesSearchableContent(t *testing.T) {
 	}
 }
 
+// TS-02.R16 / INV §2+§5: the boundary event and its immutable-document flush
+// are one sequence-aware critical section. A later event cannot leak backward
+// into the document even when it arrives while the flush is paused.
+func TestTurnEndBoundaryCannotCaptureNextEvent(t *testing.T) {
+	st, _ := openTestDB(t)
+	ix := New(st.DB())
+	if err := ix.UpsertSessionMeta("a_index", meta()); err != nil {
+		t.Fatal(err)
+	}
+	if err := ix.OnEvent("a_index", ev(t, 1, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "prior turn marker"})); err != nil {
+		t.Fatal(err)
+	}
+	assertAtomicBoundary(t, ix,
+		func() error {
+			boundary := ev(t, 2, runtime.EvTurnEnd, runtime.TurnEndData{StopReason: "end_turn", ContextPct: 0.4})
+			return ix.OnEventAndTurnEnd("a_index", boundary, runtime.TurnRollup{LastSeq: 2, LastContextPct: 0.4, UpdatedAt: boundary.Ts})
+		},
+		"turn:2",
+	)
+}
+
+func TestAnnotationBoundaryCannotCaptureNextEvent(t *testing.T) {
+	st, _ := openTestDB(t)
+	ix := New(st.DB())
+	if err := ix.UpsertSessionMeta("a_index", meta()); err != nil {
+		t.Fatal(err)
+	}
+	if err := ix.OnEvent("a_index", ev(t, 1, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "prior annotation marker"})); err != nil {
+		t.Fatal(err)
+	}
+	assertAtomicBoundary(t, ix,
+		func() error {
+			boundary := ev(t, 2, runtime.EvAnnotation, runtime.AnnotationData{Annotations: []runtime.Annotation{{Instruction: "review this boundary"}}})
+			return ix.OnEventAndFlushContent("a_index", boundary, boundary.Seq, boundary.Ts)
+		},
+		"flush:2",
+	)
+}
+
+func assertAtomicBoundary(t *testing.T, ix *Indexer, boundary func() error, documentID string) {
+	t.Helper()
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	ix.beforeBoundaryFlush = func() {
+		close(entered)
+		<-release
+	}
+	boundaryDone := make(chan error, 1)
+	go func() { boundaryDone <- boundary() }()
+	<-entered
+
+	nextEvent := ev(t, 3, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "next document marker"})
+	nextDone := make(chan error, 1)
+	go func() {
+		nextDone <- ix.OnEvent("a_index", nextEvent)
+	}()
+	select {
+	case err := <-nextDone:
+		t.Fatalf("next event entered the paused boundary: %v", err)
+	case <-time.After(25 * time.Millisecond):
+	}
+	close(release)
+	if err := <-boundaryDone; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-nextDone; err != nil {
+		t.Fatal(err)
+	}
+	ix.beforeBoundaryFlush = nil
+
+	var content string
+	if err := ix.db.QueryRow(`SELECT content FROM sessions_fts WHERE agent_id = ? AND document_id = ?`, "a_index", documentID).Scan(&content); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(content, "next document marker") {
+		t.Fatalf("later event leaked into %s: %q", documentID, content)
+	}
+	if err := ix.OnTurnEnd("a_index", runtime.TurnRollup{LastSeq: 3, UpdatedAt: nextEvent.Ts}); err != nil {
+		t.Fatal(err)
+	}
+	var next string
+	if err := ix.db.QueryRow(`SELECT content FROM sessions_fts WHERE agent_id = ? AND document_id = 'turn:3'`, "a_index").Scan(&next); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(next, "next document marker") {
+		t.Fatalf("later event missing from next document: %q", next)
+	}
+}
+
 func TestResumeAfterRestartPreservesFTSContent(t *testing.T) {
 	st, _ := openTestDB(t)
 	db := st.DB()

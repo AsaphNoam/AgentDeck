@@ -286,9 +286,15 @@ func (m *Manager) OnExit(agentID, generation, cause string) error {
 	}
 	lock := m.runLock(run.RunID)
 	lock.Lock()
-	updated, err := m.store.UpdatePipelineAttemptAndRunCAS(run.RunID, run.Revision, attempt.AttemptID, "crashed", generation, state.PipelineRunUpdate{
+	attemptState := "crashed"
+	attentionReason := "agent_crash"
+	if cause == "requested_stop" {
+		attemptState = "stopped"
+		attentionReason = "agent_stopped"
+	}
+	updated, err := m.store.UpdatePipelineAttemptAndRunCAS(run.RunID, run.Revision, attempt.AttemptID, attemptState, generation, state.PipelineRunUpdate{
 		State: "paused", PendingAction: "", CurrentStageID: run.CurrentStageID,
-		CurrentAttemptID: run.CurrentAttemptID, CurrentAgentID: run.CurrentAgentID, AttentionReason: "agent_crash",
+		CurrentAttemptID: run.CurrentAttemptID, CurrentAgentID: run.CurrentAgentID, AttentionReason: attentionReason,
 	})
 	if err == nil {
 		m.publish(updated)

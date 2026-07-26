@@ -349,7 +349,7 @@ func (m *Manager) pauseLifecycle(run state.PipelineRunRecord, reason string, cau
 
 func (m *Manager) notify(run state.PipelineRunRecord, kind string) {
 	if m.publisher != nil {
-		m.publisher.PublishPipelineNotification(PipelineUpdate{RunID: run.RunID, Revision: run.Revision, State: run.State, CurrentStageID: run.CurrentStageID, CurrentAgentID: run.CurrentAgentID, AttentionReason: run.AttentionReason}, kind)
+		m.publisher.PublishPipelineNotification(PipelineUpdate{RunID: run.RunID, DisplayName: run.DisplayName, Revision: run.Revision, State: run.State, CurrentStageID: run.CurrentStageID, CurrentAgentID: run.CurrentAgentID, AttentionReason: run.AttentionReason, FinalOutcome: run.FinalOutcome}, kind)
 	}
 }
 

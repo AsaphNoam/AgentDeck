@@ -249,12 +249,6 @@ func (s *Server) appendAnnotation(sourceID string, data runtime.AnnotationData) 
 			return runtime.Event{}, err
 		}
 
-		// Flush the indexed content before publishing, ensuring the index is
-		// synchronized with what the event bus will deliver.
-		if err := s.indexer.FlushContent(sourceID, ev.Seq, ev.Ts); err != nil {
-			return runtime.Event{}, err
-		}
-
 		// Only after durability is confirmed, publish through the event bus.
 		s.eventBus.PublishRuntimeEvent(ev)
 
@@ -288,10 +282,7 @@ func (s *Server) appendAnnotation(sourceID string, data runtime.AnnotationData) 
 	if err := w.Sync(); err != nil {
 		return runtime.Event{}, err
 	}
-	if err := s.indexer.OnEvent(sourceID, ev); err != nil {
-		return runtime.Event{}, err
-	}
-	if err := s.indexer.FlushContent(sourceID, ev.Seq, ev.Ts); err != nil {
+	if err := s.indexer.OnEventAndFlushContent(sourceID, ev, ev.Seq, ev.Ts); err != nil {
 		return runtime.Event{}, err
 	}
 	s.eventBus.PublishRuntimeEvent(ev)

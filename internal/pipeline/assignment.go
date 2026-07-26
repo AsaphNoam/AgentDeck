@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	assignmentVersion  = 1
+	assignmentVersion  = 2
 	maxAssignmentRunes = 48000
 )
 
@@ -21,13 +21,32 @@ func renderAssignment(run state.PipelineRunRecord, template Template, stage Stag
 	for _, value := range values {
 		valueMap[value.Name] = value.Value
 	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "# Pipeline stage assignment\n\nRun: %s (%s)\nGoal:\n%s\n\nStage: %s (%s)\nResponsibility:\n%s\n",
-		clipText(run.DisplayName, MaxTitleRunes), run.RunID, clipText(run.Goal, MaxGoalRunes), stage.Title, stage.ID, clipText(stage.Instruction, MaxInstructionRunes))
+	outputs := append([]StageOutput{}, stage.Outputs...)
+	sort.Slice(outputs, func(i, j int) bool { return outputs[i].Name < outputs[j].Name })
+
+	// Keep the protocol and every declared output name outside the variable-text
+	// budget. A single legal 64k input can exceed the whole assignment limit, so
+	// clipping the fully rendered prompt would otherwise remove the one instruction
+	// that lets the stage complete the run.
+	var fixed strings.Builder
+	fmt.Fprintf(&fixed, "# Pipeline stage assignment\n\nRun: %s (%s)\nStage: %s (%s)\n",
+		clipText(run.DisplayName, MaxTitleRunes), run.RunID, stage.Title, stage.ID)
+	fixed.WriteString("\nScope: perform only this stage's responsibility in the shared project workspace. Do not claim that runtime status alone completes the stage.\n")
+	fixed.WriteString("\nBefore finishing, call report_pipeline_stage_result exactly once with outcome success, failure, or blocked, plus a bounded summary, details/checks, and declared outputs.\n")
+	if len(outputs) > 0 {
+		fixed.WriteString("Declared outputs (use these local names):\n")
+		for _, output := range outputs {
+			fmt.Fprintf(&fixed, "- %s\n", output.Name)
+		}
+	}
+
+	var variable strings.Builder
+	fmt.Fprintf(&variable, "\nGoal:\n%s\n\nResponsibility:\n%s\n",
+		clipText(run.Goal, MaxGoalRunes), clipText(stage.Instruction, MaxInstructionRunes))
 	if len(stage.Inputs) > 0 {
-		b.WriteString("\nDeclared inputs:\n")
+		variable.WriteString("\nDeclared inputs:\n")
 		for _, input := range stage.Inputs {
-			fmt.Fprintf(&b, "- %s: %s\n", input.Name, clipText(valueMap[input.Value], MaxValueRunes))
+			fmt.Fprintf(&variable, "- %s: %s\n", input.Name, clipText(valueMap[input.Value], MaxValueRunes))
 		}
 	}
 	prior := make([]state.PipelineAttemptRecord, 0, len(attempts))
@@ -37,25 +56,26 @@ func renderAssignment(run state.PipelineRunRecord, template Template, stage Stag
 		}
 	}
 	if len(prior) > 0 {
-		b.WriteString("\nPrior structured results:\n")
+		variable.WriteString("\nPrior structured results:\n")
 		for _, attempt := range prior {
-			fmt.Fprintf(&b, "- %s attempt %d: %s — %s\n", attempt.StageID, attempt.AttemptNo, attempt.ReportOutcome, clipText(attempt.ReportSummary, MaxSummaryRunes))
+			fmt.Fprintf(&variable, "- %s attempt %d: %s — %s\n", attempt.StageID, attempt.AttemptNo, attempt.ReportOutcome, clipText(attempt.ReportSummary, MaxSummaryRunes))
 		}
 	}
 	if strings.TrimSpace(continuation) != "" {
-		fmt.Fprintf(&b, "\nHuman continuation input:\n%s\n", clipText(continuation, MaxValueRunes))
+		fmt.Fprintf(&variable, "\nHuman continuation input:\n%s\n", clipText(continuation, MaxValueRunes))
 	}
-	b.WriteString("\nScope: perform only this stage's responsibility in the shared project workspace. Do not claim that runtime status alone completes the stage.\n")
-	b.WriteString("\nBefore finishing, call report_pipeline_stage_result exactly once with outcome success, failure, or blocked, plus a bounded summary, details/checks, and declared outputs.\n")
-	if len(stage.Outputs) > 0 {
-		b.WriteString("Declared outputs (use these local names):\n")
-		outputs := append([]StageOutput{}, stage.Outputs...)
-		sort.Slice(outputs, func(i, j int) bool { return outputs[i].Name < outputs[j].Name })
+	if len(outputs) > 0 {
+		variable.WriteString("\nOutput guidance:\n")
 		for _, output := range outputs {
-			fmt.Fprintf(&b, "- %s: %s\n", output.Name, clipText(output.Description, MaxDescriptionRunes))
+			fmt.Fprintf(&variable, "- %s: %s\n", output.Name, clipText(output.Description, MaxDescriptionRunes))
 		}
 	}
-	text := clipText(b.String(), maxAssignmentRunes)
+	fixedText := fixed.String()
+	remaining := maxAssignmentRunes - utf8.RuneCountInString(fixedText)
+	if remaining < 0 {
+		remaining = 0
+	}
+	text := fixedText + clipText(variable.String(), remaining)
 	sum := sha256.Sum256([]byte(text))
 	return text, hex.EncodeToString(sum[:])
 }
