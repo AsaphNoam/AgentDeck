@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { TranscriptEvent } from "../api/types";
+import type { PermissionResolution, TranscriptEvent } from "../api/types";
 
 interface TranscriptStoreState {
   byAgent: Record<string, TranscriptEvent[]>;
@@ -32,16 +32,19 @@ function textOf(event: TranscriptEvent) {
   return event.text ?? event.delta ?? "";
 }
 
-// A runtime permission decision ("approve"|"deny"|"timeout"|"auto_approve") maps
-// onto the two-state chip the prompt renders.
-function decisionToResolved(decision: unknown): "approve" | "deny" {
-  return decision === "approve" || decision === "auto_approve" ? "approve" : "deny";
+// Preserve every user-visible outcome while grouping automatic approval with
+// explicit approval. Unknown legacy values retain the conservative Denied state.
+function decisionToResolved(decision: unknown): PermissionResolution {
+  if (decision === "approve" || decision === "auto_approve") return "approve";
+  if (decision === "cancelled") return "cancelled";
+  if (decision === "timeout") return "timeout";
+  return "deny";
 }
 
 function markResolved(
   events: TranscriptEvent[],
   toolCallId: string,
-  resolved: "approve" | "deny",
+  resolved: PermissionResolution,
 ) {
   const next = [...events];
   for (let i = next.length - 1; i >= 0; i--) {

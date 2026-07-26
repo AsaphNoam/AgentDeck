@@ -31,8 +31,9 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   the reader's scroll position.
 - **R4.** Consecutive `assistant_text` deltas are folded into one rendered response both while they
   arrive live and when a durable transcript is replayed. A `permission_resolved` event is folded
-  into its matching `permission_request`, which then renders an Approved or Denied chip instead of
-  active decision buttons.
+  into its matching `permission_request`, which then renders an **Approved**, **Denied**,
+  **Cancelled**, or **Timed out** chip instead of active decision buttons. Explicit approval and
+  auto-approval map to Approved; the other three runtime decisions retain their distinct outcome.
 - **R5.** One malformed or unrenderable event is isolated by an event-level error boundary; the
   remainder of the transcript stays usable and the failed item displays a fallback.
 
@@ -94,7 +95,8 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   attempts cannot execute both outcomes. Re-deciding an already-resolved request returns `409`;
   an unknown/no-longer-pending tool call returns a typed failure rather than fabricating success.
 - **R17.** An unanswered permission request auto-denies after the configured timeout, emits the
-  error `permission timed out`, and finishes the turn without executing the tool.
+  error `permission timed out`, renders **Timed out**, and finishes the turn without executing the
+  tool.
 - **R18.** When the frozen launch policy enables skip-permissions, a permission request is recorded
   as auto-approved, the agent never enters `waiting_input`, and the tool proceeds without a user
   click. Resume and switch retain that frozen policy under FS-01.
@@ -147,7 +149,9 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `internal/runtime/permission_test.go::TestCancelDuringPendingPermission` and
   `TestCancelEscalatesToSIGINT`.
 - **A6** (R4, R10–R12) — Nested wire events normalize, assistant deltas fold on live append and
-  replay, and permission resolutions fold on both paths: `ui/src/store/transcriptStore.test.ts`.
+  replay, and all four permission labels fold on live/replay paths and render distinctly:
+  `ui/src/store/transcriptStore.test.ts` and
+  `ui/src/components/chat/renderers/PermissionPrompt.test.tsx`.
 - **A7** (R7, R13) — Accepted user prompts and delivered partial output remain in both the transcript
   endpoint and NDJSON after a mid-turn process crash:
   `internal/server/integration_test.go::TestCrashMidTurnPersistsDeliveredTranscript`.

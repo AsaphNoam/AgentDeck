@@ -81,10 +81,12 @@ export interface TranscriptEvent {
   message_id?: string;
   text?: string;
   delta?: string;
-  resolved?: "approve" | "deny";
+  resolved?: PermissionResolution;
   data?: unknown;
   [key: string]: unknown;
 }
+
+export type PermissionResolution = "approve" | "deny" | "cancelled" | "timeout";
 
 export interface AnnotationDraft {
   seq: number;
