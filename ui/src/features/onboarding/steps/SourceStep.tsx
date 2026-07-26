@@ -9,6 +9,8 @@ interface SourceStepProps {
   backendId: string;
   backendType: BackendType;
   onDone: () => void;
+  claimMutation?: () => boolean;
+  releaseMutation?: () => void;
 }
 
 // Only Claude Code / Codex have a native configuration to federate; OpenCode and
@@ -19,8 +21,13 @@ const FEDERATED: Partial<Record<BackendType, true>> = { "claude-acp": true, "cod
 // Claude Code / Codex configuration up front, but linking can equally be done
 // later in Settings, so the step is always skippable. It reuses the same
 // ConfigSourcePanel as Settings so there is one federation UI, not two.
-export function SourceStep({ project, backendId, backendType, onDone }: SourceStepProps) {
+export function SourceStep({ project, backendId, backendType, onDone, claimMutation, releaseMutation }: SourceStepProps) {
   const federated = !!FEDERATED[backendType];
+  const handleContinue = () => {
+    if (claimMutation && !claimMutation()) return;
+    releaseMutation?.();
+    onDone();
+  };
   return (
     <div className="onboarding-step source-step" data-ui="onboarding" data-slot="step" data-variant="source">
       <h3>Link your CLI configuration (optional)</h3>
@@ -36,6 +43,8 @@ export function SourceStep({ project, backendId, backendType, onDone }: SourceSt
             backendType={backendType}
             initialProjectId={project}
             defaultOpen
+            claimMutation={claimMutation}
+            releaseMutation={releaseMutation}
           />
         </>
       ) : (
@@ -46,7 +55,7 @@ export function SourceStep({ project, backendId, backendType, onDone }: SourceSt
       )}
 
       <div className="onboarding-actions" data-slot="actions">
-        <button type="button" onClick={onDone}>
+        <button type="button" onClick={handleContinue}>
           Continue
         </button>
       </div>

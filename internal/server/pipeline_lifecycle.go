@@ -147,7 +147,7 @@ func (s *Server) PublishPipelineUpdate(update pipeline.PipelineUpdate) {
 }
 
 func (s *Server) PublishPipelineNotification(update pipeline.PipelineUpdate, kind string) {
-	s.eventBus.PublishPipelineNotification(update.RunID, update.CurrentAgentID, kind, update.AttentionReason)
+	s.eventBus.PublishPipelineNotification(update.RunID, update.DisplayName, update.CurrentAgentID, kind, update.AttentionReason, update.FinalOutcome)
 }
 
 var _ pipeline.Lifecycle = (*Server)(nil)

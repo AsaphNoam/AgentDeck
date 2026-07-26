@@ -361,7 +361,7 @@ func (m *Manager) publish(run state.PipelineRunRecord) {
 	if m.publisher == nil {
 		return
 	}
-	m.publisher.PublishPipelineUpdate(PipelineUpdate{RunID: run.RunID, Revision: run.Revision, State: run.State, CurrentStageID: run.CurrentStageID, CurrentAgentID: run.CurrentAgentID, AttentionReason: run.AttentionReason})
+	m.publisher.PublishPipelineUpdate(PipelineUpdate{RunID: run.RunID, DisplayName: run.DisplayName, Revision: run.Revision, State: run.State, CurrentStageID: run.CurrentStageID, CurrentAgentID: run.CurrentAgentID, AttentionReason: run.AttentionReason, FinalOutcome: run.FinalOutcome})
 }
 
 func stageByID(template Template, stageID string) (Stage, bool) {

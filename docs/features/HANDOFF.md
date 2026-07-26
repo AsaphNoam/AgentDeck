@@ -10,14 +10,12 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 - **State:** configurable pipeline runs are complete and now reviewed. FS-14 and TS-09 are Current;
   the reusable template store, durable sequential manager, shared lifecycle execution, scoped
   result/proposal tools, REST/SSE/CLI controls, notification/association paths, and Pipelines UI are
-  shipped. Specification checks, both Go test variants, 120 UI tests, source/UI builds, and the
-  distribution build succeed, and the review swept the diff against every invariant class.
-  Five findings are open from this range — a solicited stop that wedges a run, an assignment prompt
-  that can truncate away its own reporting instruction, attempt-history transcript links that point
-  at the live agent route, and two smaller presentation/lifecycle gaps. All five are paths the
-  current tests do not exercise, which is why the green gates do not close them. Two findings from
-  the previous range also remain: the onboarding wizard's Set up later action can race a
-  mounted-step mutation, and index event/flush boundaries can interleave.
+  shipped. All seven review findings are fixed: ordinary stage-agent stops pause runs with recovery,
+  assignment protocol survives maximum-size values, attempt transcripts route by liveness,
+  notifications carry the display name and final outcome, stale builder sessions expire at the live
+  agent boundary, onboarding completion is serialized with every mounted-step mutation, and index
+  boundaries consume and flush one sequence-bounded operation. Specification checks, both Go test
+  variants, 126 UI tests, source/UI builds, focused race tests, and the distribution build succeed.
   Credentialed provider acceptance remains a separate manual release gate; native prompt/confirm
   actions also need replay in a browser that supports those dialogs.
   The onboarding change is verified by automated tests plus a real isolated-home run; **J2 has not
@@ -56,73 +54,27 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-- **Must fix** — A solicited stop of a pipeline stage agent leaves its run wedged.
-  `internal/runtime/registry.go:281-287` deletes `generationByAgent` before the runtime exits, so
-  `handleAgentExit` hands the server's exit hook an empty generation and
-  `internal/pipeline/actions.go:281-283` returns early on the generation mismatch. That is correct
-  for the pipeline's own `StopStage`, but the ordinary `POST /api/sessions/{id}/stop`
-  (`internal/server/sessions.go:387-408`), a group stop, and `handleSwitchRuntime` take the same
-  path — and FS-14.R16 explicitly keeps stage agents as ordinary cards with those actions. After a
-  user stops the current stage agent the run stays `running`/`await_result` with a dead agent: no
-  attention reason, no notification, and `Manager.Retry` refuses because it requires
-  `state == "paused"` (`internal/pipeline/actions.go:90`). There is no periodic sweep (TS-09.R1), so
-  the run only recovers on dashboard restart. Distinguish pipeline-solicited stop from any other
-  exit — pass the generation through to `handleAgentExit` and let the manager decide — and add a
-  server test that stops a stage agent through the ordinary endpoint and asserts the run pauses with
-  a recovery action (FS-14.R12/R16, TS-09.R13, **INV §4**).
-- **Must fix** — A large named value silently truncates the assignment's own reporting instruction.
-  `internal/pipeline/assignment.go:19-60` writes the goal, declared inputs, and prior results first
-  and the mandatory "call `report_pipeline_stage_result` exactly once" line plus the declared-output
-  list last, then clips the whole prompt to `maxAssignmentRunes` (48000). `MaxValueRunes` is 64000
-  and `validateStart` accepts inputs up to that bound, so one pasted specification larger than the
-  prompt budget removes the protocol instruction the stage agent needs. The agent then never
-  reports, and the run hangs in `await_result` with the same missing recovery as the finding above.
-  Render the fixed protocol/outputs section before or independently of the variable body, budget the
-  variable fields against the prompt limit, and add a renderer test asserting the report instruction
-  survives a maximum-size input (FS-14.R5, TS-09.R7/R19, **INV §8**).
-- **Must fix** — Attempt-history transcript links cannot open a finished stage's transcript.
-  `ui/src/features/pipelines/RunBrowser.tsx:123` renders **Open transcript** for every attempt as
-  `/agent/{agent_id}`, but that route reads the live agent store
-  (`ui/src/components/chat/ChatPanel.tsx:30,67-73`) and stopped agents are removed from it
-  (`ui/src/store/agentStore.ts:34`). Every completed attempt in a finished run therefore lands on
-  "Agent not found" — the archive route `/archive/{agent_id}` is the working one. Route the link by
-  liveness (or always to the archive for a completed attempt) and cover it in the Pipelines UI test
-  that renders attempt history (FS-14.R8/R11, FS-14.A7, **INV §10**).
-- **Worth fixing** — Pipeline notifications identify the run by its opaque id and cannot tell success
-  from failure. `internal/server/pipeline_lifecycle.go:149-151` passes only the run id, so
-  `internal/bus/bus.go:180-189` builds a title of `Pipeline pr_<hex> needs attention` instead of the
-  run's display name, and the completion notification carries an empty body because
-  `AttentionReason` is cleared at completion — the terminal `success`/`failure` outcome FS-14.R29
-  names never reaches the toast. Carry the display name and final outcome on `PipelineUpdate` and
-  assert both in a bus test (FS-14.R29, TS-09.R17, **INV §8**).
-- **Worth fixing** — The AgentDecker builder agent id is persisted with no lifecycle cleanup.
-  `ui/src/features/pipelines/AgentDeckerBuilder.tsx:9,61,101` writes
-  `agentdeck.pipeline-builder-agent` to `localStorage` and never clears it, so once a builder has run
-  the Pipelines page permanently shows a "Builder session" block whose **Open AgentDecker chat** link
-  goes to the same "Agent not found" view after the agent is stopped or deleted, and re-fetches that
-  dead transcript on every mount. This is the annotation-tray class again: browser-local per-agent
-  state needs a boundary drop plus its own retention bound. Clear the key when the agent is gone and
-  add a store test for the stale-id case (TS-09.R21, **INV §1**).
-- **Must fix** — `ui/src/features/onboarding/OnboardingWizard.tsx:97-106` disables **Set up later**
-  only for its own config mutation; it has no knowledge of the backend, project, source, launch, or
-  launch-completion mutation in the mounted step. Clicking it while **Checking…**, **Creating…**, or
-  **Launching…** is pending closes the wizard as skipped, but the other request can still save the
-  backend, create a project, or launch an agent, contradicting FS-04.R32/A13. Serialize the wizard's
-  completion choices or propagate a shared pending/claimed state, with a deferred-request UI test
-  for every mutating step (**INV §5**).
-- **Must fix** — Turn and annotation document boundaries are two calls rather than one atomic index
-  operation: `internal/runtime/chat.go:883-897` calls `OnEvent` then `OnTurnEnd`, and
-  `internal/server/sessions.go:247-259` calls live `AppendAnnotationAndSync`/flush then publishes.
-  `internal/index/indexer.go:93-181` releases the per-agent buffer lock between those calls, so a
-  concurrent next-turn prompt, nudge, or active-source event can enter the buffer before the prior
-  boundary flush. The later event is then stored in the wrong immutable document, while streaming
-  reindex processes sequence order and builds a different projection. Make event consumption plus a
-  boundary flush one sequence-aware atomic operation and add deterministic interleaving tests for
-  both turn-end and annotation boundaries (TS-02.R16, FS-05.R25, **INV §2/§5**).
+None.
 
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-26 — Fixed all seven open review findings. **INV §4** now carries the concrete launch
+  generation through every runtime exit and tells pipeline-owned stops from ordinary user stops, so
+  stopping a stage card pauses the run as `agent_stopped` with Retry available instead of wedging
+  `await_result`. **INV §8** moved the immutable stage-reporting protocol and every declared output
+  name outside the variable prompt budget, and pipeline notifications now use the run display name
+  plus final outcome. **INV §10** routes stopped attempt transcripts to Archive; **INV §1** drops a
+  persisted AgentDecker builder id after live-agent hydration proves it stale. **INV §5** gives Set
+  up later, backend validation, project creation, source actions, and first launch/completion one
+  synchronous UI mutation claim. **INV §2/§5** makes turn-end and annotation consumption plus flush
+  one sequence-bounded index operation; later-sequence text remains buffered for the next immutable
+  document. No FS/TS delta was needed because each fix restores existing requirements. Regression
+  coverage includes the ordinary stage stop endpoint, a maximum-size Unicode input, route/lifecycle
+  presentation, notification payloads, four deferred onboarding mutations, and deterministic index
+  interleavings. Specification checks, both Go variants, 126 UI tests, source/UI builds, focused race
+  tests, the distribution build, and whitespace checks pass.
 
 - 2026-07-26 — Reviewed the continuous range after `eb63dd5` through `ccc2b50` — the six-finding fix
   batch and the whole configurable-pipeline-runs implementation — in both specification directions

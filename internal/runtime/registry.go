@@ -29,12 +29,12 @@ type Registry struct {
 	// onExitExtra runs after forget on an unsolicited agent exit (crash). The
 	// server wires its teardownAgentRegistration here so a crash tears down the
 	// hook token / MCP session / hook files, not just registry ownership.
-	onExitExtra func(string, string)
+	onExitExtra func(string, string, string)
 }
 
 // exitNotifier is implemented by runtimes that can tell the Registry to drop
 // ownership when an agent's process disappears outside a Stop (crash teardown).
-type exitNotifier interface{ SetOnExit(func(string)) }
+type exitNotifier interface{ SetOnExit(func(string, string)) }
 
 // stopAller is implemented by runtimes that can stop all their live agents on
 // server shutdown.
@@ -74,7 +74,7 @@ func (r *Registry) forget(agentID string) {
 // SetExitHook registers a callback run (after ownership forget) whenever an agent
 // exits unsolicited. The server uses it to tear down per-agent registration
 // artifacts on the crash path, mirroring a solicited stop.
-func (r *Registry) SetExitHook(fn func(string, string)) {
+func (r *Registry) SetExitHook(fn func(string, string, string)) {
 	r.mu.Lock()
 	r.onExitExtra = fn
 	r.mu.Unlock()
@@ -82,15 +82,18 @@ func (r *Registry) SetExitHook(fn func(string, string)) {
 
 // handleAgentExit is the runtimes' onExit callback: it drops registry ownership
 // and then runs the server's registration teardown, if wired.
-func (r *Registry) handleAgentExit(agentID string) {
+func (r *Registry) handleAgentExit(agentID, generation string) {
 	r.mu.Lock()
-	generation := r.generationByAgent[agentID]
+	if current, ok := r.generationByAgent[agentID]; !ok || current != generation {
+		r.mu.Unlock()
+		return
+	}
 	delete(r.rtByAgent, agentID)
 	delete(r.generationByAgent, agentID)
 	extra := r.onExitExtra
 	r.mu.Unlock()
 	if extra != nil {
-		extra(agentID, generation)
+		extra(agentID, generation, "process_exit")
 	}
 }
 
@@ -280,13 +283,21 @@ func (r *Registry) Cancel(ctx context.Context, agentID string) (bool, error) {
 func (r *Registry) Stop(ctx context.Context, agentID string) error {
 	r.mu.Lock()
 	rt, ok := r.rtByAgent[agentID]
+	generation := r.generationByAgent[agentID]
 	delete(r.rtByAgent, agentID)
 	delete(r.generationByAgent, agentID)
+	extra := r.onExitExtra
 	r.mu.Unlock()
 	if !ok || rt == nil {
 		return ErrNoHandle
 	}
-	return rt.Stop(ctx, agentID)
+	if err := rt.Stop(ctx, agentID); err != nil {
+		return err
+	}
+	if extra != nil {
+		extra(agentID, generation, "requested_stop")
+	}
+	return nil
 }
 
 // CheckMessages routes a nudger wake-up by process id. The nudger reads pids

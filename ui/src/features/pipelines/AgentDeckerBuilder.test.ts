@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractPipelineProposals } from "./AgentDeckerBuilder";
+import { extractPipelineProposals, shouldDropBuilderSession } from "./AgentDeckerBuilder";
 
 describe("extractPipelineProposals", () => {
   it("projects only validated proposal tool results from the transcript", () => {
@@ -39,5 +39,14 @@ describe("extractPipelineProposals", () => {
       { kind: "tool_call", tool_call_id: "tc_1", name: "propose_pipeline_run" },
       { kind: "tool_result", tool_call_id: "tc_1", content: "not json" },
     ])).toEqual([]);
+  });
+});
+
+describe("builder session lifecycle", () => {
+  it("drops a persisted builder id only after hydration proves the agent is gone", () => {
+    expect(shouldDropBuilderSession("a_stale", false, false, false, false)).toBe(false);
+    expect(shouldDropBuilderSession("a_stale", false, true, true, false)).toBe(false);
+    expect(shouldDropBuilderSession("a_stale", false, true, false, false)).toBe(true);
+    expect(shouldDropBuilderSession("a_live", true, true, false, false)).toBe(false);
   });
 });

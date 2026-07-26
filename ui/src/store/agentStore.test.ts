@@ -18,7 +18,7 @@ const agent = {
 };
 
 beforeEach(() => {
-  useAgentStore.setState({ agents: {}, order: [], hydrating: false });
+  useAgentStore.setState({ agents: {}, order: [], hydrating: false, hydrated: false });
 });
 
 describe("agentStore", () => {
@@ -35,6 +35,7 @@ describe("agentStore", () => {
     useAgentStore.getState().hydrateComplete(["a_2"]);
     expect(Object.keys(useAgentStore.getState().agents)).toEqual(["a_2"]);
     expect(useAgentStore.getState().order).toEqual(["a_2"]);
+    expect(useAgentStore.getState().hydrated).toBe(true);
   });
 
   it("clears last_sent_at only when the timestamp still matches", () => {

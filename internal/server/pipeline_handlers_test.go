@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -90,6 +91,68 @@ func TestPipelineStartRequiresSharedWorkspaceAcknowledgement(t *testing.T) {
 	}
 	if runs, err := srv.stateStore.ListPipelineRuns(10, 0); err != nil || len(runs) != 0 {
 		t.Fatalf("warning created a run: %+v err=%v", runs, err)
+	}
+}
+
+// FS-14.A4 / TS-09.R13: stopping a stage agent through its ordinary card/API
+// action is not the pipeline's own transition stop. It must pause the run with
+// a retryable recovery state instead of leaving await_result wedged forever.
+func TestOrdinaryStageAgentStopPausesPipelineRun(t *testing.T) {
+	srv := testServer(t, true)
+	t.Cleanup(func() { srv.registry.Shutdown(context.Background()) })
+	srv.registry.Chat().SetCommand(buildFakeACP(t))
+	if err := srv.configStore.WriteProject("pipeline-stop", config.Project{
+		Title: "Pipeline stop", Cwd: t.TempDir(), AddDirs: []string{},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.pipelineTemplates.Create("one-stage", apiTemplate()); err != nil {
+		t.Fatal(err)
+	}
+
+	handler := srv.routes()
+	rec := doRequest(t, handler, http.MethodPost, "/api/pipeline-runs", startPipelineRequest{StartRequest: pipeline.StartRequest{
+		RequestID: "request-stage-stop", TemplateID: "one-stage", Project: "pipeline-stop", Goal: "Do it",
+		Inputs: map[string]string{}, Assignments: map[string]pipeline.RuntimeAssignment{"work": {Backend: "claude", Model: "sonnet"}},
+	}})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("start run = %d %s", rec.Code, rec.Body.String())
+	}
+	var started struct {
+		Run pipeline.RunDetail `json:"run"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &started); err != nil {
+		t.Fatal(err)
+	}
+	agentID := started.Run.Run.CurrentAgentID
+	if agentID == "" || !srv.registry.Owns(agentID) {
+		t.Fatalf("started run has no live stage agent: %+v", started.Run.Run)
+	}
+
+	rec = doRequest(t, handler, http.MethodPost, "/api/sessions/"+agentID+"/stop", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("ordinary stop = %d %s", rec.Code, rec.Body.String())
+	}
+
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		detail, err := srv.pipelineMgr.Detail(started.Run.Run.RunID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if detail.Run.State == "paused" {
+			if detail.Run.AttentionReason != "agent_stopped" || detail.Run.PendingAction != "" {
+				t.Fatalf("paused run = %+v", detail.Run)
+			}
+			if _, err := srv.pipelineMgr.Retry(t.Context(), detail.Run.RunID, detail.Run.Revision); err != nil {
+				t.Fatalf("paused run is not retryable: %v", err)
+			}
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("run stayed wedged after ordinary stage stop: %+v", detail.Run)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 

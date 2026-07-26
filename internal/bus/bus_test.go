@@ -136,6 +136,22 @@ func TestPublishBudgetExceededFallsBackToAgentID(t *testing.T) {
 	}
 }
 
+func TestPipelineNotificationsUseDisplayNameAndFinalOutcome(t *testing.T) {
+	b := New()
+	ch, unsub := b.Subscribe()
+	defer unsub()
+	b.PublishPipelineNotification("pr_opaque", "Release verification", "", "completed", "", "failure")
+	ev := <-ch
+	payload := ev.Data.(map[string]any)
+	if payload["title"] != "Release verification completed" || payload["body"] != "failure" {
+		t.Fatalf("pipeline completion payload = %+v", payload)
+	}
+	detail := payload["detail"].(map[string]any)
+	if detail["run_id"] != "pr_opaque" || detail["outcome"] != "failure" {
+		t.Fatalf("pipeline completion detail = %+v", detail)
+	}
+}
+
 func TestPublishDropsOldestForSlowSubscriber(t *testing.T) {
 	b := New()
 	ch, unsub := b.Subscribe()

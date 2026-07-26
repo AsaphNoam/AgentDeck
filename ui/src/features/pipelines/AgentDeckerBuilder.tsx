@@ -1,13 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getTranscript, launchAgent, sendPrompt } from "../../api/client";
 import { useBackends, useConfig, useRoles } from "../../api/config";
 import type { TranscriptEvent } from "../../api/types";
 import { pipelineProposalSchema, type PipelineProposal } from "../../schemas/pipeline";
 import { useTranscriptStore } from "../../store/transcriptStore";
+import { useAgentStore } from "../../store/agentStore";
 
 const BUILDER_KEY = "agentdeck.pipeline-builder-agent";
 const EMPTY_EVENTS: TranscriptEvent[] = [];
+
+export function shouldDropBuilderSession(builderID: string | null, live: boolean, hydrated: boolean, hydrating: boolean, justLaunched: boolean) {
+  return Boolean(builderID && hydrated && !hydrating && !live && !justLaunched);
+}
 
 export function extractPipelineProposals(events: TranscriptEvent[]): PipelineProposal[] {
   const toolNames = new Map<string, string>();
@@ -59,10 +64,14 @@ export function AgentDeckerBuilder({
   const [modelID, setModelID] = useState("");
   const [description, setDescription] = useState("");
   const [builderID, setBuilderID] = useState<string | null>(() => localStorage.getItem(BUILDER_KEY));
+  const justLaunchedBuilder = useRef<string | null>(null);
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const events = useTranscriptStore((state) => builderID ? state.byAgent[builderID] ?? EMPTY_EVENTS : EMPTY_EVENTS);
   const setTranscript = useTranscriptStore((state) => state.setTranscript);
+  const liveBuilder = useAgentStore((state) => builderID ? state.agents[builderID] : undefined);
+  const agentsHydrated = useAgentStore((state) => state.hydrated);
+  const agentsHydrating = useAgentStore((state) => state.hydrating);
   const proposals = useMemo(() => extractPipelineProposals(events), [events]);
 
   const backendEntries = Object.entries(backends.data?.backends ?? {});
@@ -78,11 +87,18 @@ export function AgentDeckerBuilder({
   }, [backendID, backends.data]);
 
   useEffect(() => {
-    if (!builderID) return;
+    if (!builderID || !agentsHydrated || agentsHydrating || !liveBuilder) return;
+    if (justLaunchedBuilder.current === builderID) justLaunchedBuilder.current = null;
     void getTranscript(builderID)
       .then((transcript) => setTranscript(transcript.agent_id, transcript.events))
       .catch(() => undefined);
-  }, [builderID, setTranscript]);
+  }, [agentsHydrated, agentsHydrating, builderID, liveBuilder, setTranscript]);
+
+  useEffect(() => {
+    if (!shouldDropBuilderSession(builderID, Boolean(liveBuilder), agentsHydrated, agentsHydrating, justLaunchedBuilder.current === builderID)) return;
+    localStorage.removeItem(BUILDER_KEY);
+    setBuilderID(null);
+  }, [agentsHydrated, agentsHydrating, builderID, liveBuilder]);
 
   const launchBuilder = async () => {
     if (!description.trim()) return;
@@ -98,6 +114,7 @@ export function AgentDeckerBuilder({
         name: "Pipeline Builder",
       });
       const agentID = response.agent.agent_id;
+      justLaunchedBuilder.current = agentID;
       localStorage.setItem(BUILDER_KEY, agentID);
       setBuilderID(agentID);
       await sendPrompt(agentID, [

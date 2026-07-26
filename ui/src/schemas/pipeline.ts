@@ -169,11 +169,13 @@ export const pipelineStartResponseSchema = z.object({
 
 export const pipelineUpdateSchema = z.object({
   run_id: z.string(),
+  display_name: z.string(),
   revision: z.number().int(),
   state: z.string(),
   current_stage_id: z.string(),
   current_agent_id: z.string(),
   attention_reason: z.string(),
+  final_outcome: z.string(),
 });
 
 export const pipelineTemplateProposalSchema = z.object({

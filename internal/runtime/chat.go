@@ -40,7 +40,7 @@ type ChatRuntime struct {
 	// gone after an unsolicited teardown (crash). Without it, Registry.rtByAgent
 	// keeps stale ownership and blocks relaunch/resume until a manual Stop. Nil
 	// when the runtime is constructed standalone (tests). See registry.go.
-	onExit func(agentID string)
+	onExit func(agentID, generation string)
 
 	cancelGrace time.Duration // Cancel→SIGINT escalation window (§8.4)
 
@@ -150,14 +150,15 @@ func (c *ChatRuntime) SetPersistence(home string, open TranscriptOpener, ix Pers
 
 // agentState is the live, in-memory state for one running agent.
 type agentState struct {
-	agentID   string
-	cmd       *exec.Cmd
-	pgid      int
-	sessionID string
-	transport *Transport
-	hub       *Hub
-	stdin     interface{ Close() error }
-	stderr    *ringBuffer
+	agentID    string
+	generation string
+	cmd        *exec.Cmd
+	pgid       int
+	sessionID  string
+	transport  *Transport
+	hub        *Hub
+	stdin      interface{ Close() error }
+	stderr     *ringBuffer
 
 	ctx    context.Context // turn-scoped base context, cancelled on Stop
 	cancel context.CancelFunc
@@ -215,18 +216,19 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 
 	actx, acancel := context.WithCancel(context.Background())
 	as := &agentState{
-		agentID:   spec.Agent.AgentID,
-		cmd:       cmd,
-		pgid:      pgid,
-		hub:       NewHub(),
-		stdin:     stdin,
-		stderr:    newRingBuffer(16 * 1024),
-		ctx:       actx,
-		cancel:    acancel,
-		skipPerms: spec.SkipPerms,
-		toolNames: map[string]string{},
-		pending:   map[string]*pendingPerm{},
-		resolved:  map[string]struct{}{},
+		agentID:    spec.Agent.AgentID,
+		generation: spec.Generation,
+		cmd:        cmd,
+		pgid:       pgid,
+		hub:        NewHub(),
+		stdin:      stdin,
+		stderr:     newRingBuffer(16 * 1024),
+		ctx:        actx,
+		cancel:     acancel,
+		skipPerms:  spec.SkipPerms,
+		toolNames:  map[string]string{},
+		pending:    map[string]*pendingPerm{},
+		resolved:   map[string]struct{}{},
 	}
 	as.transport = NewTransport(stdin,
 		func(method string, params json.RawMessage) { c.onNotification(as, method, params) },
@@ -745,7 +747,7 @@ func (c *ChatRuntime) onTransportClosed(as *agentState) {
 	// the runtime has no handle to serve it (techspec §8.2). Done before the
 	// turn_end emit so a client reacting to turn_end can immediately relaunch.
 	if c.onExit != nil {
-		c.onExit(as.agentID)
+		c.onExit(as.agentID, as.generation)
 	}
 
 	c.emit(as, EvTurnEnd, TurnEndData{StopReason: "error", ContextPct: as.lastPct()})
@@ -837,7 +839,7 @@ func (c *ChatRuntime) AppendAnnotationAndSync(agentID string, data AnnotationDat
 	// not be suppressed (unlike the normal emit path where best-effort
 	// persistence does not suppress delivery).
 	if !c.persistEvent(as, ev) {
-		return Event{}, fmt.Errorf("persist annotation: transcript write failed")
+		return Event{}, fmt.Errorf("persist annotation: transcript or index sync failed")
 	}
 
 	return ev, nil
@@ -880,12 +882,6 @@ func (c *ChatRuntime) persistEvent(as *agentState, ev Event) bool {
 		slog.Error("runtime: append transcript", "agent", as.agentID, "seq", ev.Seq, "err", err)
 		return false
 	}
-	if err := ix.OnEvent(as.agentID, ev); err != nil {
-		slog.Error("runtime: index event", "agent", as.agentID, "seq", ev.Seq, "err", err)
-	}
-	if ev.Type == EvError {
-		_ = w.Sync()
-	}
 	if ev.Type == EvTurnEnd {
 		_ = w.Sync()
 		rollup := TurnRollup{LastSeq: ev.Seq, UpdatedAt: ev.Ts, LastContextPct: as.lastPct()}
@@ -893,9 +889,27 @@ func (c *ChatRuntime) persistEvent(as *agentState, ev Event) bool {
 		if err := json.Unmarshal(ev.Data, &td); err == nil {
 			rollup.LastContextPct = td.ContextPct
 		}
-		if err := ix.OnTurnEnd(as.agentID, rollup); err != nil {
+		if err := ix.OnEventAndTurnEnd(as.agentID, ev, rollup); err != nil {
 			slog.Error("runtime: index turn end", "agent", as.agentID, "seq", ev.Seq, "err", err)
 		}
+		return true
+	}
+	if ev.Type == EvAnnotation {
+		if err := w.Sync(); err != nil {
+			slog.Error("runtime: sync annotation", "agent", as.agentID, "seq", ev.Seq, "err", err)
+			return false
+		}
+		if err := ix.OnEventAndFlushContent(as.agentID, ev, ev.Seq, ev.Ts); err != nil {
+			slog.Error("runtime: index annotation", "agent", as.agentID, "seq", ev.Seq, "err", err)
+			return false
+		}
+		return true
+	}
+	if err := ix.OnEvent(as.agentID, ev); err != nil {
+		slog.Error("runtime: index event", "agent", as.agentID, "seq", ev.Seq, "err", err)
+	}
+	if ev.Type == EvError {
+		_ = w.Sync()
 	}
 	return true
 }

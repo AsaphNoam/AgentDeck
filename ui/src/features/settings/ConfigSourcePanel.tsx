@@ -122,11 +122,15 @@ export function ConfigSourcePanel({
   backendType,
   initialProjectId,
   defaultOpen,
+  claimMutation,
+  releaseMutation,
 }: {
   backendId: string;
   backendType: BackendType;
   initialProjectId?: string;
   defaultOpen?: boolean;
+  claimMutation?: () => boolean;
+  releaseMutation?: () => void;
 }) {
   const provider = PROVIDER_FOR_TYPE[backendType];
   const { data: projects } = useProjects();
@@ -179,6 +183,7 @@ export function ConfigSourcePanel({
   const claims = ["launch_defaults", "model_catalog", "setup"];
 
   const runPreview = (mode: "linked" | "mirrored") => {
+    if (claimMutation && !claimMutation()) return;
     setError(null);
     setEffective(null);
     setPreviewMode(null);
@@ -190,6 +195,7 @@ export function ConfigSourcePanel({
           setPreviewMode(mode);
         },
         onError: (e) => setError(configErrorMessage(e)),
+        onSettled: releaseMutation,
       },
     );
   };
@@ -204,11 +210,13 @@ export function ConfigSourcePanel({
           preview.reset();
         },
         onError: (e) => setError(configErrorMessage(e)),
+        onSettled: releaseMutation,
       },
     );
   };
 
   const runBind = (mode: "linked" | "mirrored") => {
+    if (claimMutation && !claimMutation()) return;
     setError(null);
     const token = preview.data?.preview_token;
     // Bind only with a token minted for THIS mode. If none exists yet (first click)
@@ -227,23 +235,29 @@ export function ConfigSourcePanel({
           setPreviewMode(mode);
           bindWithToken(res.preview_token);
         },
-        onError: (e) => setError(configErrorMessage(e)),
+        onError: (e) => {
+          setError(configErrorMessage(e));
+          releaseMutation?.();
+        },
       },
     );
   };
 
   const runRefresh = () => {
+    if (claimMutation && !claimMutation()) return;
     setError(null);
     refresh.mutate(backendId, {
       onSuccess: (res) => setEffective((res as { effective: Effective }).effective),
       onError: (e) => setError(configErrorMessage(e)),
+      onSettled: releaseMutation,
     });
   };
 
   const runUnlink = () => {
+    if (claimMutation && !claimMutation()) return;
     setError(null);
     setEffective(null);
-    del.mutate({ backendId, detach: false }, { onError: (e) => setError(configErrorMessage(e)) });
+    del.mutate({ backendId, detach: false }, { onError: (e) => setError(configErrorMessage(e)), onSettled: releaseMutation });
   };
 
   // applyOverrides changes the AgentDeck model/effort overrides on a bound source by
@@ -253,6 +267,7 @@ export function ConfigSourcePanel({
   // for the binding's current mode.
   const applyOverrides = (overrides: { model: string | null; effort: string | null }) => {
     if (!binding) return;
+    if (claimMutation && !claimMutation()) return;
     setError(null);
     preview.mutate(
       {
@@ -273,9 +288,13 @@ export function ConfigSourcePanel({
                 preview.reset();
               },
               onError: (e) => setError(configErrorMessage(e)),
+              onSettled: releaseMutation,
             },
           ),
-        onError: (e) => setError(configErrorMessage(e)),
+        onError: (e) => {
+          setError(configErrorMessage(e));
+          releaseMutation?.();
+        },
       },
     );
   };

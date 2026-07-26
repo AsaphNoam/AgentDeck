@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -22,11 +23,20 @@ type execer interface {
 type Indexer struct {
 	db      *sql.DB
 	mu      sync.Mutex
-	content map[string][]string
+	content map[string][]bufferedText
+
+	// Tests use this hook to prove that a later event cannot enter between a
+	// boundary event and its flush. It is nil in production.
+	beforeBoundaryFlush func()
+}
+
+type bufferedText struct {
+	seq  int64
+	text string
 }
 
 func New(db *sql.DB) *Indexer {
-	return &Indexer{db: db, content: map[string][]string{}}
+	return &Indexer{db: db, content: map[string][]bufferedText{}}
 }
 
 func (ix *Indexer) UpsertSessionMeta(agentID string, meta runtime.SessionMetaData) error {
@@ -106,12 +116,18 @@ func (ix *Indexer) OnEvent(agentID string, ev runtime.Event) error {
 		}
 		return ix.UpsertSessionMeta(agentID, meta)
 	}
+	ix.mu.Lock()
+	defer ix.mu.Unlock()
+	return ix.onEventLocked(agentID, ev)
+}
+
+func (ix *Indexer) onEventLocked(agentID string, ev runtime.Event) error {
 	text, err := searchableText(ev)
 	if err != nil {
 		return err
 	}
 	if text != "" {
-		ix.addContent(agentID, text)
+		ix.addContentLocked(agentID, ev.Seq, text)
 	}
 	if err := ix.trackEvent(agentID, ev); err != nil {
 		return err
@@ -134,11 +150,38 @@ func (ix *Indexer) OnTurnEnd(agentID string, rollup runtime.TurnRollup) error {
 	return ix.flush(agentID, rollup, true, "turn")
 }
 
+// OnEventAndTurnEnd consumes the persisted boundary event and flushes through
+// that exact sequence under one lock. Later events remain buffered for the next
+// immutable document even if their goroutine reached the indexer first.
+func (ix *Indexer) OnEventAndTurnEnd(agentID string, ev runtime.Event, rollup runtime.TurnRollup) error {
+	ix.mu.Lock()
+	defer ix.mu.Unlock()
+	if err := ix.onEventLocked(agentID, ev); err != nil {
+		return err
+	}
+	if ix.beforeBoundaryFlush != nil {
+		ix.beforeBoundaryFlush()
+	}
+	return ix.flushLocked(agentID, rollup, true, "turn")
+}
+
 // FlushContent persists indexed content that arrives outside an ACP turn, such
 // as a durable dashboard annotation. It intentionally does not increase the
 // turn count.
 func (ix *Indexer) FlushContent(agentID string, lastSeq int64, updatedAt string) error {
 	return ix.flush(agentID, runtime.TurnRollup{LastSeq: lastSeq, UpdatedAt: updatedAt}, false, "flush")
+}
+
+func (ix *Indexer) OnEventAndFlushContent(agentID string, ev runtime.Event, lastSeq int64, updatedAt string) error {
+	ix.mu.Lock()
+	defer ix.mu.Unlock()
+	if err := ix.onEventLocked(agentID, ev); err != nil {
+		return err
+	}
+	if ix.beforeBoundaryFlush != nil {
+		ix.beforeBoundaryFlush()
+	}
+	return ix.flushLocked(agentID, runtime.TurnRollup{LastSeq: lastSeq, UpdatedAt: updatedAt}, false, "flush")
 }
 
 func (ix *Indexer) flush(agentID string, rollup runtime.TurnRollup, countTurn bool, documentKind string) error {
@@ -147,7 +190,26 @@ func (ix *Indexer) flush(agentID string, rollup runtime.TurnRollup, countTurn bo
 	}
 	ix.mu.Lock()
 	defer ix.mu.Unlock()
-	content := strings.Join(ix.content[agentID], "\n")
+	return ix.flushLocked(agentID, rollup, countTurn, documentKind)
+}
+
+func (ix *Indexer) flushLocked(agentID string, rollup runtime.TurnRollup, countTurn bool, documentKind string) error {
+	entries := ix.content[agentID]
+	selected := make([]bufferedText, 0, len(entries))
+	retained := make([]bufferedText, 0, len(entries))
+	for _, entry := range entries {
+		if entry.seq <= rollup.LastSeq {
+			selected = append(selected, entry)
+		} else {
+			retained = append(retained, entry)
+		}
+	}
+	sort.SliceStable(selected, func(i, j int) bool { return selected[i].seq < selected[j].seq })
+	parts := make([]string, 0, len(selected))
+	for _, entry := range selected {
+		parts = append(parts, entry.text)
+	}
+	content := strings.Join(parts, "\n")
 
 	tx, err := ix.db.Begin()
 	if err != nil {
@@ -180,18 +242,20 @@ WHERE agent_id = ?`,
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("index: commit turn flush: %w", err)
 	}
-	delete(ix.content, agentID)
+	if len(retained) == 0 {
+		delete(ix.content, agentID)
+	} else {
+		ix.content[agentID] = retained
+	}
 	return nil
 }
 
-func (ix *Indexer) addContent(agentID, text string) {
+func (ix *Indexer) addContentLocked(agentID string, seq int64, text string) {
 	text = strings.TrimSpace(text)
 	if text == "" {
 		return
 	}
-	ix.mu.Lock()
-	defer ix.mu.Unlock()
-	ix.content[agentID] = append(ix.content[agentID], text)
+	ix.content[agentID] = append(ix.content[agentID], bufferedText{seq: seq, text: text})
 }
 
 func replaceMetadataDocument(tx *sql.Tx, agentID string) error {

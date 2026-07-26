@@ -5,6 +5,7 @@ interface AgentStoreState {
   agents: Record<string, AgentState>;
   order: string[];
   hydrating: boolean;
+  hydrated: boolean;
   applyStateUpdate: (agent: AgentState) => void;
   hydrateBegin: () => void;
   hydrateComplete: (seenIds: string[]) => void;
@@ -17,6 +18,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
   agents: {},
   order: [],
   hydrating: false,
+  hydrated: false,
   applyStateUpdate: (agent) =>
     set((state) => ({
       agents: { ...state.agents, [agent.agent_id]: agent },
@@ -27,7 +29,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
     set((state) => {
       const seen = new Set(seenIds);
       const agents = Object.fromEntries(Object.entries(state.agents).filter(([id]) => seen.has(id)));
-      return { agents, order: (state.order ?? []).filter((id) => seen.has(id)), hydrating: false };
+      return { agents, order: (state.order ?? []).filter((id) => seen.has(id)), hydrating: false, hydrated: true };
     }),
   removeAgent: (id) =>
     set((state) => {

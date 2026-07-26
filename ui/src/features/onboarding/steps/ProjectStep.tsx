@@ -5,9 +5,11 @@ interface ProjectStepProps {
   /** Receives the slug of the project just created, so the launch step can
    * default to it instead of the seeded my-app (whose cwd may not exist). */
   onDone: (projectId: string) => void;
+  claimMutation?: () => boolean;
+  releaseMutation?: () => void;
 }
 
-export function ProjectStep({ onDone }: ProjectStepProps) {
+export function ProjectStep({ onDone, claimMutation, releaseMutation }: ProjectStepProps) {
   const createProject = useCreateProject();
   const [title, setTitle] = useState("");
   const [cwd, setCwd] = useState("");
@@ -20,6 +22,7 @@ export function ProjectStep({ onDone }: ProjectStepProps) {
       setError("Title and working directory are required.");
       return;
     }
+    if (claimMutation && !claimMutation()) return;
     setError(null);
     setWarning(null);
     createProject.mutate(
@@ -43,6 +46,7 @@ export function ProjectStep({ onDone }: ProjectStepProps) {
           onDone(resp.project);
         },
         onError: (e) => setError(String(e)),
+        onSettled: releaseMutation,
       },
     );
   };

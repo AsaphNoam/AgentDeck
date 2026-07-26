@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import type { Onboarding } from "../../schemas/config";
 import type { BackendType } from "../../schemas/backends";
@@ -33,7 +33,20 @@ export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
   // provider (default Claude only until the user picks otherwise).
   const [backend, setBackend] = useState<{ id: string; type: BackendType }>({ id: "claude", type: "claude-acp" });
   const [skipError, setSkipError] = useState<string | null>(null);
+  const mutationClaimed = useRef(false);
+  const [stepPending, setStepPending] = useState(false);
   const putConfig = usePutConfig();
+
+  const claimMutation = () => {
+    if (mutationClaimed.current) return false;
+    mutationClaimed.current = true;
+    setStepPending(true);
+    return true;
+  };
+  const releaseMutation = () => {
+    mutationClaimed.current = false;
+    setStepPending(false);
+  };
 
   const advance = () => setStep((s) => Math.min(s + 1, LAST_STEP));
 
@@ -45,12 +58,14 @@ export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
   // silently closing would hand back a dashboard that reopens the wizard on the
   // next poll (INV §8).
   const handleSetUpLater = () => {
+    if (!claimMutation()) return;
     setSkipError(null);
     putConfig.mutate(
       { onboarding_complete: true },
       {
         onSuccess: onComplete,
         onError: (e) => setSkipError(configErrorMessage(e)),
+        onSettled: releaseMutation,
       },
     );
   };
@@ -81,17 +96,19 @@ export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
               ))}
             </div>
             <div data-slot="content">
-              {step === 0 && <BackendStep onDone={(b) => { setBackend(b); advance(); }} />}
-              {step === 1 && <ProjectStep onDone={(projectId) => { setCreatedProject(projectId); advance(); }} />}
+              {step === 0 && <BackendStep claimMutation={claimMutation} releaseMutation={releaseMutation} onDone={(b) => { setBackend(b); advance(); }} />}
+              {step === 1 && <ProjectStep claimMutation={claimMutation} releaseMutation={releaseMutation} onDone={(projectId) => { setCreatedProject(projectId); advance(); }} />}
               {step === 2 && (
                 <SourceStep
                   project={createdProject}
                   backendId={backend.id}
                   backendType={backend.type}
+                  claimMutation={claimMutation}
+                  releaseMutation={releaseMutation}
                   onDone={advance}
                 />
               )}
-              {step === 3 && <LaunchStep onDone={onComplete} initialProject={createdProject} />}
+              {step === 3 && <LaunchStep claimMutation={claimMutation} releaseMutation={releaseMutation} onDone={onComplete} initialProject={createdProject} />}
             </div>
             <div className="onboarding-actions" data-slot="footer">
               {skipError && <p className="form-error">{skipError}</p>}
@@ -99,7 +116,7 @@ export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
                 type="button"
                 className="btn-link"
                 onClick={handleSetUpLater}
-                disabled={putConfig.isPending}
+                disabled={stepPending || putConfig.isPending}
               >
                 {putConfig.isPending ? "Saving…" : "Set up later"}
               </button>

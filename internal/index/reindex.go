@@ -67,16 +67,13 @@ func reindexAgent(ix *Indexer, root, agentID string) error {
 	// only in the in-memory buffer and is silently dropped from sessions_fts.
 	var pendingFlush bool
 	err := transcript.NewReader(path).ForEach(transcript.ReadOptions{IncludeMeta: true}, func(ev runtime.Event) error {
-		if err := ix.OnEvent(agentID, ev); err != nil {
-			return fmt.Errorf("index: event %s seq %d: %w", agentID, ev.Seq, err)
-		}
 		if ev.Seq > lastSeq {
 			lastSeq = ev.Seq
 			updatedAt = ev.Ts
 		}
 		pendingFlush = true
 		if ev.Type == runtime.EvAnnotation {
-			if err := ix.FlushContent(agentID, ev.Seq, ev.Ts); err != nil {
+			if err := ix.OnEventAndFlushContent(agentID, ev, ev.Seq, ev.Ts); err != nil {
 				return fmt.Errorf("index: annotation flush %s seq %d: %w", agentID, ev.Seq, err)
 			}
 			pendingFlush = false
@@ -85,10 +82,14 @@ func reindexAgent(ix *Indexer, root, agentID string) error {
 			var d runtime.TurnEndData
 			_ = json.Unmarshal(ev.Data, &d)
 			lastContext = d.ContextPct
-			if err := ix.OnTurnEnd(agentID, runtime.TurnRollup{LastSeq: ev.Seq, LastContextPct: d.ContextPct, UpdatedAt: ev.Ts}); err != nil {
+			if err := ix.OnEventAndTurnEnd(agentID, ev, runtime.TurnRollup{LastSeq: ev.Seq, LastContextPct: d.ContextPct, UpdatedAt: ev.Ts}); err != nil {
 				return fmt.Errorf("index: turn_end %s seq %d: %w", agentID, ev.Seq, err)
 			}
 			pendingFlush = false
+		} else if ev.Type != runtime.EvAnnotation {
+			if err := ix.OnEvent(agentID, ev); err != nil {
+				return fmt.Errorf("index: event %s seq %d: %w", agentID, ev.Seq, err)
+			}
 		}
 		return nil
 	})
