@@ -7,7 +7,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** Dashboard state badges now visibly render their text labels; a broad selector had painted
+- **State:** Stopped Dashboard cards now expose the existing resume operation through their right-click
+  menu; running cards do not offer it, and a rejected resume surfaces an error toast. Dashboard state badges now visibly render their text labels; a broad selector had painted
   every nested span, including the label, as a solid state-coloured block. Component coverage and the
   browser visual matrix now exercise every state. Dashboard cards otherwise show configured project titles with a durable-id fallback, and every
   context meter visibly labels its percentage, including zero. Direct human inspection found both
@@ -75,6 +76,13 @@ are not promoted to findings without a repeatable failure.
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-26 — Added direct Dashboard Resume. **INV §10** found no new invariant boundary: the
+  existing resume operation already restores the frozen session snapshot, but was unnecessarily
+  reachable only through Archive. A stopped card's right-click menu now offers **Resume**, while a
+  running card omits it; failures use the established error toast. FS-02.R27–R28/A14 pin menu
+  visibility, the endpoint, and retryable failure behavior. Focused menu regressions, all 156 UI
+  tests, both Go test variants, specification checks, and the distribution build pass.
 
 - 2026-07-26 — Restored visible Dashboard state-badge labels. **INV §10** found a presentation
   selector that matched every `span` inside a badge, converting its label into a state-coloured

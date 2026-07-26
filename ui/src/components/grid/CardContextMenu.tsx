@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { launchAgent, renameAgent, stopAgent, switchRuntime, updateAgentIdentity } from "../../api/client";
+import { launchAgent, renameAgent, resumeAgent, stopAgent, switchRuntime, updateAgentIdentity } from "../../api/client";
 import { useAgentStore } from "../../store/agentStore";
 import { useUiStore } from "../../store/uiStore";
 
@@ -63,6 +63,20 @@ export function CardContextMenu() {
       >
         Stop
       </button>
+      {!agent.running && (
+        <button
+          type="button"
+          data-slot="item"
+          onClick={() => {
+            resumeAgent(agent.agent_id).catch((err) =>
+              pushError("Resume failed", err instanceof Error ? err.message : String(err)),
+            );
+            close();
+          }}
+        >
+          Resume
+        </button>
+      )}
       <hr />
       <button
         type="button"
