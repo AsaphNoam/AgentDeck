@@ -7,39 +7,22 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** a post-fix usability rerun at `c59dd2c` confirmed no new finding in every step that
-  completed. J1–J4 passed in the real release build: styled first paint with zero console errors;
-  missing/signed-out/ready onboarding including the `--no-color` fallback, Set up later, ordinary
-  first launch, and restart persistence; chat round-trip/replay; and distinct Approved, Denied,
-  Cancelled, and Timed out permission outcomes live and after reload. J5 density, collapse, pointer-
-  drag reorder, reload persistence, and the group-release API also passed. Its native confirm stalled
-  the in-app browser, and the execution account then reached its usage limit and refused further
-  loopback server starts, so J5 restart/delete and J6–J14 are explicitly blocked rather than called
-  passed. Supporting evidence is green: 139 UI tests, presentation checks/build, specification
-  checks, and focused tagged/untagged regressions for every recent fix. Full Go-suite listeners were
-  sandbox-blocked. The run report is
+- **State:** the continuous code review after `ccc2b50` through `cc9d498` found two Must-fix and
+  five Worth-fixing defects in the week's fix batch. A resumed or switch-resumed chat runtime loses
+  its launch generation, so an unsolicited exit is rejected as stale and skips registry,
+  registration, and pipeline recovery cleanup. A deep-linked agent route can also offer to discard
+  retained annotation drafts before initial agent hydration proves the source is missing. The five
+  smaller findings are stopped pipeline attempts and builders classified as live by identity
+  presence, an archived header choosing the oldest rather than current session metadata, mutable
+  offset pagination that can skip/duplicate Archive rows, and onboarding validation errors reduced
+  to `Error: HTTP 400`. Specification checks, both Go test variants, all 139 UI tests,
+  presentation/source/UI builds, and the distribution build pass; those green checks do not cover
+  the failing seams. The post-fix browser rerun still passed J1–J4 and the exercised J5 layout paths,
+  but J5 restart/delete and J6–J14 remain blocked by its recorded browser/execution limits. The
+  exact browser coverage remains in
   [`../archive/reviews/usability-review-run-2026-07-26-rerun.md`](../archive/reviews/usability-review-run-2026-07-26-rerun.md).
-  The preceding full browser review found six Must-fix and ten Worth-fixing items, all resolved.
-  Below is the earlier implementation state.
-  Configurable pipeline runs are complete and reviewed. FS-14 and TS-09 are Current;
-  the reusable template store, durable sequential manager, shared lifecycle execution, scoped
-  result/proposal tools, REST/SSE/CLI controls, notification/association paths, and Pipelines UI are
-  shipped. All seven review findings are fixed: ordinary stage-agent stops pause runs with recovery,
-  assignment protocol survives maximum-size values, attempt transcripts route by liveness,
-  notifications carry the display name and final outcome, stale builder sessions expire at the live
-  agent boundary, onboarding completion is serialized with every mounted-step mutation, and index
-  boundaries consume and flush one sequence-bounded operation. Specification checks, both Go test
-  variants, 126 UI tests, source/UI builds, focused race tests, and the distribution build succeed.
-  Credentialed provider acceptance remains a separate manual release gate; native prompt/confirm
-  actions also need replay in a browser that supports those dialogs. J2 onboarding has now been
-  replayed in a real browser: Set up later, missing/signed-out/ready Check again transitions, the
-  ordinary project/config/launch path, and restart persistence pass. Its provider-version blocker is
-  fixed: common diagnostics that reject optional `--no-color` now retry the fixed bare Claude status
-  command without treating unrelated failures as compatibility errors.
-  The 2026-07-26 usability fix pass resolves all sixteen recorded findings. Final specification
-  checks, both Go test variants, 139 UI tests, source/UI and presentation builds, and the
-  distribution build succeed.
-- **Last reviewed code:** `ccc2b50` (2026-07-26), the continuous range after `eb63dd5`.
+  Credentialed provider and terminal compatibility remain separate manual release gates.
+- **Last reviewed code:** `cc9d498` (2026-07-26), the continuous range after `ccc2b50`.
 - **Branch:** `main`.
 
 ## Active change
@@ -70,28 +53,80 @@ and creates disposable local configuration homes. On 2026-07-15 this machine has
 the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installed; the new
 `claude-agent-acp`, OpenCode, and OpenHands are not installed globally.
 
-The post-fix usability-review state is committed locally on `main`; pushing that commit to the shared
-`origin/main` branch needs explicit human authorization.
+The post-fix usability-review and current code-review state are committed locally on `main`; pushing
+those commits to the shared `origin/main` branch needs explicit human authorization.
 
 ## Review findings
 
-The 2026-07-26 post-fix rerun confirmed no new finding in the completed J1–J5 steps. J5's remaining
-variants and J6–J14 were blocked by the browser/execution environment; the exact coverage is in
-[`../archive/reviews/usability-review-run-2026-07-26-rerun.md`](../archive/reviews/usability-review-run-2026-07-26-rerun.md).
+- **Must fix** — **INV §1 / INV §2 / INV §4** — `internal/runtime/chat.go:504` constructs a
+  resumed chat `agentState` without copying `spec.Generation`, unlike chat Start and both terminal
+  paths. When a resumed or switch-resumed peer exits unexpectedly, `internal/runtime/registry.go:85`
+  rejects the empty callback generation as stale: the runtime deletes its running row, but registry
+  ownership and hook/MCP/settings registration remain, a later Resume returns `ErrAlreadyStarted`,
+  and a resumed pipeline stage never receives its crash pause. This violates FS-01.R17/R28,
+  TS-01.R6/R9, and TS-09.R12/R13. Copy the generation on Resume and add a non-empty-generation
+  resume→crash regression that asserts ownership/registration teardown, successful re-resume, and
+  pipeline `agent_crash` recovery.
+- **Must fix** — **INV §1** — `ui/src/components/chat/ChatPanel.tsx:70` treats an absent agent as
+  permanently missing before the first SSE hydration completes. On a hard reload or deep link with
+  retained annotation drafts, it immediately says the source no longer exists and enables
+  **Discard pending annotations** even though `agentStore.hydrated` is still false; a normal click
+  can permanently delete valid drafts before the live source arrives. This violates FS-13.R16/A8.
+  Gate the missing-source recovery on completed hydration and test pre-hydration, present-after-
+  hydration, and genuinely-absent-after-hydration cases.
+- **Worth fixing** — **INV §10** — `ui/src/features/pipelines/RunBrowser.tsx:129` passes
+  `Boolean(liveAgents[item.agent_id])` to its transcript router. Hydration retains stopped agent
+  identities with `running:false`, so every completed attempt is still classified live and opens
+  `/agent/{id}`, which shows Agent not found, instead of its Archive transcript. This violates
+  FS-14.R8/R11. Route on `agent.running === true` and render-test both live and stopped attempts.
+- **Worth fixing** — **INV §1** — `ui/src/features/pipelines/AgentDeckerBuilder.tsx:90` likewise
+  treats hydrated identity presence as liveness. A stopped builder remains in the agent store, so
+  its persisted browser id is never expired and Pipelines keeps a stale **Open AgentDecker chat**
+  link to the dead live route. Classify by `running`, clear the key only after hydration, and
+  component-test stopped and running builder states.
+- **Worth fixing** — **INV §1** — `ui/src/features/archive/ArchiveAgentPage.tsx:16` selects the
+  first `session_meta` event. Resume and runtime switch append newer metadata, so a switched,
+  stopped session displays its original backend/model beside **Resume** instead of the current
+  recorded identity that Resume will use, contrary to FS-05.R31/A15. Select the latest metadata
+  boundary and test a transcript containing original and switched session metadata.
+- **Worth fixing** — **INV §10** — `ui/src/features/archive/ArchivePage.tsx:75` appends
+  `offset=results.length` pages from an Archive ordered by mutable `updated_at`. With more than 50
+  matches, if a later-page session is resumed or receives an event between page requests, it moves
+  ahead of the offset; the next page can duplicate a boundary row and omit the moved session, then
+  hide **Load more** because the rendered count equals `total`. This breaks FS-05.R28/A12 complete
+  reachability. Use a stable paging boundary or reconcile/refetch changed pages, with a 51+-session
+  regression that mutates ordering between requests and asserts unique complete reachability.
+- **Worth fixing** — **INV §8** — `ui/src/features/onboarding/steps/BackendStep.tsx:122` and
+  `ProjectStep.tsx:48` call `String(e)` even though the shared config client preserves field-level
+  validation details and `configErrorMessage` extracts them. A repairable 400 such as a project
+  title over 120 characters therefore renders only `Error: HTTP 400`, hiding FS-04.R26's field and
+  reason. Route both through the shared parser and inject backend/project validation envelopes in
+  UI regressions.
 
-The preceding findings were recorded by the 2026-07-26 week usability review; repro steps and evidence paths are in
-[`../archive/reviews/usability-review-run-2026-07-26-week.md`](../archive/reviews/usability-review-run-2026-07-26-week.md).
-
-All sixteen findings are resolved: six Must fix and ten Worth fixing.
-
-Three items were deliberately **not** promoted to findings and are carried for the next code review
-in the run report's "Unconfirmed" and "Static sweeps" sections: a one-off archive-search 500 that did
-not reproduce, the untimed `tmux` driver calls, and the two onboarding steps that render
-"Error: HTTP 400" instead of the server's reason.
+The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
+and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
+are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-26 — Reviewed the continuous range after `ccc2b50` through `cc9d498` in both
+  specification directions and against every invariant class. Two Must-fix and five Worth-fixing
+  findings are recorded above. **INV §1/§2/§4** caught the missing generation on chat Resume and the
+  pre-hydration destructive annotation recovery; **INV §1/§10** caught identity presence being used
+  as liveness in two pipeline links, stale archived session metadata, and mutable offset paging;
+  **INV §8** promoted the two carried onboarding `HTTP 400` leads after confirming the shared parser
+  is bypassed. Clean on the remaining changed surfaces: §3 seeded forms remain merge-preserving; §5
+  onboarding/index/pipeline claims are serialized; §6 added no new runtime or driver and its changed
+  lifecycle contract is covered by the Resume finding; §7 readers check their real error signals;
+  §9 FTS downgrade and cancellation cause handling are bounded; §11 collections and client schemas
+  stay non-null/in lockstep; §12 the Claude optional-flag retry is fixed-command and fail-closed;
+  §13 new selectors and presentation states resolve; §14 adds no route and existing routes remain
+  under `localOnly`; §15 annotation/index/notification side effects follow their durable writes.
+  The one-off Archive 500 and untimed tmux calls remain unconfirmed, not findings. Specification
+  checks, both Go variants, 139 UI tests, source/UI/presentation builds, the distribution build, and
+  whitespace checks pass. No product code or specifications were changed.
 
 - 2026-07-26 — Confirmed the `/fix` queue is empty. **No invariant class** applied: every
   recorded Must-fix and Worth-fixing item is already resolved, no active change is selected, and
