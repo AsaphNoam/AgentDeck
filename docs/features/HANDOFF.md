@@ -71,6 +71,15 @@ are not promoted to findings without a repeatable failure.
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
+- 2026-07-26 — Retried the blocked browser validation without changing product code or specifications.
+  **No invariant class** applied because no completed browser path produced a finding. Native confirmation
+  completed, unlike the earlier stalled run, but that listener belonged to an older review home and was
+  excluded as evidence. A new isolated J7 listener rendered the stopped-agent dashboard, transcript,
+  and Archive list, after which the in-app browser repeatedly lost its tab after page transitions.
+  J5 restart/delete and J6–J14 remain unconfirmed, not passed. `make check-specs` and whitespace
+  checks pass; the full result is
+  [`../archive/reviews/usability-review-run-2026-07-26-browser-retry.md`](../archive/reviews/usability-review-run-2026-07-26-browser-retry.md).
+
 - 2026-07-26 — Fixed all seven open review findings. **INV §4** now copies the launch generation
   onto a resumed chat runtime, so a resumed or switch-resumed crash drops registry ownership, tears
   down hook/MCP/settings registration, allows an immediate re-resume, and pauses its pipeline stage
