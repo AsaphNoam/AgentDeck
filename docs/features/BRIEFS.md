@@ -4,6 +4,26 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-26 — Usability review: onboarding wizard
+
+I replayed onboarding in a real browser from two fresh homes. Set up later works with an ordinary
+pointer click, opens the dashboard without launching anything or changing the seeded provider
+catalog, and stays complete after reload. Check again correctly moves through missing, signed-out,
+and ready provider states. Once ready, the full project, optional configuration, first-agent launch,
+and restart path also completed without browser errors.
+
+I found one blocker: a valid signed-in Claude adapter can still be rejected when an older or
+different version describes the unsupported `--no-color` option as “unknown flag” instead of the
+one exact phrase AgentDeck recognizes. The wizard then reports a credential failure and cannot
+advance, even though the same provider check succeeds without that optional flag. The complete run
+and reproduction are in [the J2 usability report](../archive/reviews/usability-review-run-2026-07-26-j2.md).
+
+**Needs attention:** Fix the provider-status fallback so normal wording differences cannot falsely
+block onboarding.
+
+**Next:** Run `/fix` to repair the recorded onboarding finding and add the missing provider-version
+regression.
+
 ### 2026-07-26 — Fix: pipeline recovery, onboarding races, and transcript boundaries
 
 All seven open review findings are fixed. Stopping a pipeline stage from its ordinary agent card now
