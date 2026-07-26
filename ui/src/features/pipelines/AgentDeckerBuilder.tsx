@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getTranscript, launchAgent, sendPrompt } from "../../api/client";
-import { useBackends, useConfig, useRoles } from "../../api/config";
+import { useBackends, useConfig, useProjects, useRoles } from "../../api/config";
 import type { TranscriptEvent } from "../../api/types";
 import { pipelineProposalSchema, type PipelineProposal } from "../../schemas/pipeline";
 import { useTranscriptStore } from "../../store/transcriptStore";
@@ -59,7 +59,9 @@ export function AgentDeckerBuilder({
   const roles = useRoles();
   const backends = useBackends();
   const config = useConfig();
+  const projects = useProjects();
   const [open, setOpen] = useState(false);
+  const [project, setProject] = useState("");
   const [backendID, setBackendID] = useState("");
   const [modelID, setModelID] = useState("");
   const [description, setDescription] = useState("");
@@ -79,6 +81,16 @@ export function AgentDeckerBuilder({
 
   const backendEntries = Object.entries(backends.data?.backends ?? {});
   const defaultBackend = backendEntries.find(([, backend]) => backend.default)?.[0] ?? backendEntries[0]?.[0] ?? "";
+
+  // Seed the default project only when it still resolves to a configured project,
+  // exactly as RunStartForm does (INV §2). The builder previously launched into
+  // `default_project` unconditionally with no picker, so a seeded-but-absent default
+  // (the shipped `my-app`, whose cwd is missing on a fresh box) could only be
+  // discovered as a rejected launch, with nothing on this page able to change it.
+  useEffect(() => {
+    if (project || !config.data?.default_project) return;
+    if (projects.data?.[config.data.default_project]) setProject(config.data.default_project);
+  }, [config.data?.default_project, project, projects.data]);
 
   useEffect(() => {
     if (!backendID && defaultBackend) setBackendID(defaultBackend);
@@ -104,13 +116,13 @@ export function AgentDeckerBuilder({
   }, [agentsHydrated, agentsHydrating, builderID, builderRunning]);
 
   const launchBuilder = async () => {
-    if (!description.trim()) return;
+    if (!description.trim() || !project) return;
     setLaunching(true);
     setError(null);
     try {
       const response = await launchAgent({
         role: "agentdecker",
-        project: config.data?.default_project ?? "",
+        project,
         backend: backendID,
         model: modelID,
         interface: "chat",
@@ -134,7 +146,11 @@ export function AgentDeckerBuilder({
   };
 
   const selectedBackend = backends.data?.backends[backendID];
-  const builderReady = Boolean(roles.data?.agentdecker && config.data?.default_project && backendID && modelID && description.trim());
+  const projectEntries = Object.entries(projects.data ?? {});
+  // Readiness follows the selected project, not merely a configured default: a
+  // default naming a project that no longer exists must hold the launch closed
+  // rather than enabling a button whose only outcome is a rejected launch.
+  const builderReady = Boolean(roles.data?.agentdecker && project && backendID && modelID && description.trim());
 
   return <section className="pipeline-panel pipeline-builder">
     <div className="pipeline-panel-header">
@@ -142,10 +158,14 @@ export function AgentDeckerBuilder({
       <button type="button" onClick={() => setOpen((value) => !value)}>{open ? "Close builder setup" : "Create with AgentDecker"}</button>
     </div>
     {open && <div className="pipeline-builder-form">
-      <p>Choose the chat runtime for the ordinary AgentDecker session. This choice is not stored in the model-neutral template.</p>
+      <p>Choose the project and chat runtime for the ordinary AgentDecker session. This choice is not stored in the model-neutral template.</p>
       {!roles.data?.agentdecker && <p className="form-error">The configured <code>agentdecker</code> role is required.</p>}
-      {!config.data?.default_project && <p className="form-error">Configure a default project before launching the builder.</p>}
+      {projectEntries.length === 0 && <p className="form-error">Configure a project before launching the builder.</p>}
       <div className="pipeline-form-grid">
+        <label className="form-field"><span>Project</span><select value={project} onChange={(event) => setProject(event.target.value)}>
+          <option value="">Select project</option>
+          {projectEntries.map(([projectID, item]) => <option key={projectID} value={projectID}>{item.title} ({projectID})</option>)}
+        </select></label>
         <label className="form-field"><span>Configured backend</span><select value={backendID} onChange={(event) => setBackendID(event.target.value)}>
           <option value="">Select backend</option>
           {backendEntries.map(([id, backend]) => <option key={id} value={id}>{backend.name} ({id})</option>)}
