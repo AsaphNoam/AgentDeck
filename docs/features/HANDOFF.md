@@ -8,7 +8,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 - **Active change:** None.
 - **State:** the week's work has now been driven end to end in a real browser. All six Must-fix
-  findings are resolved; nine Worth-fixing findings remain. Everything else driven passed: the whole pipeline lifecycle, the
+  findings are resolved; eight Worth-fixing findings remain. Everything else driven passed: the whole pipeline lifecycle, the
   annotation tray and its three delivery routes, archive search on both build variants, first paint
   on an empty home, chat round-trip and delta coalescing, all four permission outcomes, crash and
   disconnect recovery, and restart durability. Below is the state as of the preceding review.
@@ -63,10 +63,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 Recorded by the 2026-07-26 week usability review; repro steps and evidence paths are in
 [`../archive/reviews/usability-review-run-2026-07-26-week.md`](../archive/reviews/usability-review-run-2026-07-26-week.md).
 
-- **Worth fixing** — J13 line numbers carry no affordance (no invariant class): computed cursor is
-  `auto`, with no tooltip, aria-label, or helper copy, so even once the blocker above is fixed the
-  selection handle is undiscoverable.
-
 - **Worth fixing** — J13 the pending tray's Send button falls below the fold (no invariant class):
   at three drafts the tray is 450px tall over 1165px of content with no sticky footer or scroll
   hint, and the overlay occludes the right half of the transcript being annotated.
@@ -108,6 +104,11 @@ not reproduce, the untimed `tmux` driver calls, and the two onboarding steps tha
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-26 — Made diff-line selection discoverable. **No invariant class** applied;
+  FS-13.R17/A9 now require a visible instruction and pointer cursor on selectable line numbers.
+  `DiffBlock` explains that line-number clicks select a range, the renderer theme supplies the
+  pointer affordance, and the existing library-shaped selection regression now checks the helper.
 
 - 2026-07-26 — Made Archive search capability honest. **INV §8** now reports
   `search_mode` on every Archive response from one shared SQLite capability detector; the metadata-

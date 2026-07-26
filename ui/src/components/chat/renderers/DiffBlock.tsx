@@ -24,7 +24,7 @@ export function DiffBlock({ event, onAnnotate }: { event: TranscriptEvent; onAnn
   };
   return (
     <article className="diff-block" data-ui="transcript" data-variant="diff">
-      <div className="diff-heading"><strong>{String(event.path ?? "diff")}</strong>{selection && <button type="button" className="annotation-event-trigger" onClick={addSelection}>Annotate lines {Math.min(selection.start, selection.end)}–{Math.max(selection.start, selection.end)}</button>}</div>
+      <div className="diff-heading"><strong>{String(event.path ?? "diff")}</strong><small>Click line numbers to select a range.</small>{selection && <button type="button" className="annotation-event-trigger" onClick={addSelection}>Annotate lines {Math.min(selection.start, selection.end)}–{Math.max(selection.start, selection.end)}</button>}</div>
       <ReactDiffViewer oldValue={String(event.old_text ?? event.old ?? "")} newValue={String(event.new_text ?? event.new ?? "")} splitView={false} styles={diffTheme} onLineNumberClick={chooseLine} />
     </article>
   );
