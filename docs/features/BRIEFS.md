@@ -4,6 +4,15 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-26 — Fix: review-finding queue
+
+There were no open review findings to repair. All previously recorded issues remain resolved, and
+the project’s specification checks pass without a product or specification change.
+
+**Needs attention:** None.
+
+**Next:** Share a new review finding or choose a ready change when you want further work.
+
 ### 2026-07-26 — Usability review: post-fix rerun
 
 The rerun found no new problem in the paths it completed. Fresh first paint, onboarding, the
