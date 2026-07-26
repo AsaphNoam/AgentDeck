@@ -7,7 +7,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** all seven findings from the review of `ccc2b50`→`cc9d498` are fixed and the queue is
+- **State:** Dashboard cards now show configured project titles with a durable-id fallback, and every
+  context meter visibly labels its percentage, including zero. Direct human inspection found both
+  prior presentations ambiguous; focused regressions, the visual matrix, and J5 now cover the
+  observations. The prior seven findings from the review of `ccc2b50`→`cc9d498` are fixed and the queue is
   empty. Chat Resume now carries its launch generation, so a resumed crash tears down ownership,
   registration, and pauses its pipeline stage; the missing-agent annotation recovery waits for
   hydration; pipeline attempt and builder links classify by `running`; the archived header reads the
@@ -70,6 +73,15 @@ are not promoted to findings without a repeatable failure.
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-26 — Clarified Dashboard card identity and context. **INV §10** found no additional
+  invariant breach: the problem was an explicit but misleading presentation rule. FS-02.R25 now
+  resolves the subtitle's durable project id through the current project configuration and falls
+  back safely if that definition is absent; FS-02.R26 replaces the blank zero-context track with a
+  visible `0% context used` label. Card/grid/context regressions cover title, fallback, and zero;
+  the visual matrix renders the zero state and human-readable project label; and J5 now requires
+  those observations. Specification checks, both Go test variants, all 152 UI tests, source/UI and
+  distribution builds, and a real-browser visual-matrix check pass.
 
 - 2026-07-26 — Retried the blocked browser validation without changing product code or specifications.
   **No invariant class** applied because no completed browser path produced a finding. Native confirmation

@@ -30,6 +30,7 @@ describe("AgentCard", () => {
                       running: true,
                       context_pct: 0,
                     }}
+                    projectTitle="AgentDeck demo"
                   />
                 )}
               />
@@ -40,9 +41,29 @@ describe("AgentCard", () => {
       </MemoryRouter>,
     );
 
+    expect(screen.getByText("implementer · AgentDeck demo")).toBeInTheDocument();
+
     fireEvent.click(screen.getByText("Atlas"));
 
     expect(screen.getByText("Chat view")).toBeInTheDocument();
+  });
+
+  it("falls back to the project id when its title is unavailable", () => {
+    render(
+      <MemoryRouter>
+        <DndContext>
+          <SortableContext items={["a_1"]} strategy={rectSortingStrategy}>
+            <AgentCard agent={{
+              agent_id: "a_1", name: "Atlas", role: "implementer", project: "agentdeck-v0-1-2-demo-20260726t230903z",
+              backend: "claude", model: "sonnet", interface: "chat", state: "idle",
+              detail: "ready", running: true, context_pct: 0,
+            }} />
+          </SortableContext>
+        </DndContext>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("implementer · agentdeck-v0-1-2-demo-20260726t230903z")).toBeInTheDocument();
   });
 
   it("links an associated stage agent back to its pipeline run", () => {

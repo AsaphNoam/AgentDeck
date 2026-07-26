@@ -28,9 +28,9 @@ animated pulsing dot), `idle` (slate), `waiting_input` (blue, "Waiting"), `done`
 (red), and `unknown` (gray — no status row reported yet). `waiting_input` and `error` are the
 actionable states and additionally draw a highlighted card treatment.
 
-**R4.** The context-usage meter renders `context_pct` (0..1) as a proportional bar with a rounded
-percentage label, color-ramped green (`< 0.6`) → amber (`0.6–0.85`) → red (`> 0.85`). A missing or
-zero value renders an empty bar with no label.
+**R4 — retired 2026-07-26:** The context-usage meter rendered missing or zero values as an empty bar
+with no label. This made an ordinary zero-value meter resemble an unloaded placeholder; superseded
+by R26.
 
 **R5.** The output-preview line is `status.detail` when present; otherwise the latest `assistant_text`
 delta observed for that agent (client-tracked fallback); if both are empty the line is omitted. The
@@ -133,6 +133,15 @@ Notification is raised instead of the toast (deduped per agent via the notificat
 notification. Desktop notifications can be disabled wholesale, and desktop permission is requested
 from the Notifications settings editor.
 
+**R25.** A card's project subtitle displays the current configured project title, not its durable
+project id. If the corresponding project definition is unavailable (for example, it was force-deleted
+after the agent launched), the card falls back to that id so the agent remains identifiable.
+
+**R26.** The context-usage meter renders `context_pct` (0..1) as a proportional bar with a rounded,
+visible percentage label, color-ramped green (`< 0.6`) → amber (`0.6–0.85`) → red (`> 0.85`). Zero
+and absent values normalize to and visibly label `0% context used`; the track alone is never the only
+indication of its meaning.
+
 ## 5. Acceptance criteria
 
 **A1.** Launching an agent adds its card within ~1s with no manual refresh; a status change flips the
@@ -173,6 +182,12 @@ granted permission uses a Web Notification. — `sse.test.ts` "drops muted notif
 
 **A12.** Toast auto-dismiss timers are per-toast; a new toast does not restart older timers. —
 `NotificationCenter.test.tsx` "dismisses each toast independently".
+
+**A13.** A dashboard card with a configured project renders its title rather than its id, falls back
+to the id if the definition is absent, and visibly labels a zero-value context meter. —
+`CardGrid.test.tsx` "uses the configured project title on agent cards"; `AgentCard.test.tsx`
+"falls back to the project id when its title is unavailable"; `ContextBar.test.tsx` "labels zero
+context usage"; J5.
 
 ## 6. Deviations & open decisions
 

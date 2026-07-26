@@ -4,6 +4,24 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-26 — Fix: clearer Dashboard agent cards
+
+Dashboard cards now show the configured project name rather than its internal id, while retaining
+the id as a fallback if a project definition is no longer available. Empty context bars now visibly
+say `0% context used`, so an active agent no longer looks as if part of its card failed to load.
+
+This slipped through because the old written rule explicitly required a blank zero-value meter, and
+the visual fixture and component tests mirrored that rule. The card test also bypassed project
+configuration entirely, while the layout usability journey only checked layout mechanics. The
+specification, regression tests, visual matrix, and J5 browser checklist now cover the missing
+observations. The full test and release-build checks pass, and the rendered card states were checked
+in a browser.
+
+**Needs attention:** Restart a currently running local dashboard to load the rebuilt application.
+
+**Next:** Inspect an active agent card after restart; its project subtitle should use the project name
+and a zero-value meter should read `0% context used`.
+
 ### 2026-07-26 — Usability review: browser retry
 
 Browser confirmation of the seven repaired findings is still incomplete. The earlier native-confirm
