@@ -5,7 +5,7 @@ export function ContextBar({ value }: { value: number }) {
   return (
     <div className={`context-bar ${tone}`} data-ui="context-meter" data-slot="track" data-variant={tone} aria-label={`${label}% context used`}>
       <span data-slot="fill" style={{ width: `${label}%` }} />
-      {label > 0 && <em data-slot="label">{label}%</em>}
+      <em data-slot="label">{label}% context used</em>
     </div>
   );
 }

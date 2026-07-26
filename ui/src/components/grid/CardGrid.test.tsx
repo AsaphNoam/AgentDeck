@@ -53,6 +53,16 @@ function renderWithQuery(ui: React.ReactElement) {
 }
 
 describe("CardGrid", () => {
+  // FS-02.A13: agent state keeps the durable project id, but Dashboard metadata
+  // must use the project's human-readable title whenever configuration resolves it.
+  it("uses the configured project title on agent cards", async () => {
+    act(() => useAgentStore.setState({ agents: { a_1: agent("a_1") }, order: ["a_1"] }));
+    renderWithQuery(<CardGrid />);
+
+    expect(await screen.findByText("implementer · My App")).toBeInTheDocument();
+    expect(screen.queryByText("implementer · my-app")).not.toBeInTheDocument();
+  });
+
   // J3b regression: the New-Agent modal must not remount when the first agent
   // appears (0→1). If it lived inside the empty/populated branches it would
   // unmount mid-launch and its onSuccess→onClose would never fire, leaving the

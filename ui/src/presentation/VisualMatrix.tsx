@@ -78,7 +78,7 @@ export function VisualMatrix() {
                 <strong data-slot="identity">{state === "waiting_input" ? "Needs a decision" : `${state} agent`}</strong>
                 <StateBadge state={state} />
               </div>
-              <p className="agent-subtitle" data-slot="metadata">builder · agentdeck</p>
+              <p className="agent-subtitle" data-slot="metadata">builder · AgentDeck demo</p>
               <span className="model-pill">codex · gpt-fixture-{index + 1}</span>
               <div className="message-indicators" data-slot="indicators">
                 {index === 2 && <span className="mail-badge">Mail 3</span>}
@@ -94,7 +94,7 @@ export function VisualMatrix() {
               <strong data-slot="identity">Stopped agent</strong>
               <StateBadge state="done" />
             </div>
-            <p className="agent-subtitle" data-slot="metadata">reviewer · agentdeck</p>
+            <p className="agent-subtitle" data-slot="metadata">reviewer · AgentDeck demo</p>
             <span className="terminal-pill">terminal · xterm</span>
             <small className="stopped-label">stopped</small>
           </article>

@@ -113,6 +113,7 @@ export function CardGrid() {
                           agent={agent}
                           lastLine={lastAssistantLine(transcripts[agent.agent_id])}
                           projectColor={projects.data?.[agent.project]?.color}
+                          projectTitle={projects.data?.[agent.project]?.title}
                         />
                       ))}
                     </div>
