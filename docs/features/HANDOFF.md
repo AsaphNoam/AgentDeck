@@ -7,12 +7,20 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** the week's work has now been driven end to end in a real browser. All six Must-fix
-  and ten Worth-fixing findings are resolved. Everything else driven passed: the
-  whole pipeline lifecycle, the
-  annotation tray and its three delivery routes, archive search on both build variants, first paint
-  on an empty home, chat round-trip and delta coalescing, all four permission outcomes, crash and
-  disconnect recovery, and restart durability. Below is the state as of the preceding review.
+- **State:** a post-fix usability rerun at `c59dd2c` confirmed no new finding in every step that
+  completed. J1–J4 passed in the real release build: styled first paint with zero console errors;
+  missing/signed-out/ready onboarding including the `--no-color` fallback, Set up later, ordinary
+  first launch, and restart persistence; chat round-trip/replay; and distinct Approved, Denied,
+  Cancelled, and Timed out permission outcomes live and after reload. J5 density, collapse, pointer-
+  drag reorder, reload persistence, and the group-release API also passed. Its native confirm stalled
+  the in-app browser, and the execution account then reached its usage limit and refused further
+  loopback server starts, so J5 restart/delete and J6–J14 are explicitly blocked rather than called
+  passed. Supporting evidence is green: 139 UI tests, presentation checks/build, specification
+  checks, and focused tagged/untagged regressions for every recent fix. Full Go-suite listeners were
+  sandbox-blocked. The run report is
+  [`../archive/reviews/usability-review-run-2026-07-26-rerun.md`](../archive/reviews/usability-review-run-2026-07-26-rerun.md).
+  The preceding full browser review found six Must-fix and ten Worth-fixing items, all resolved.
+  Below is the earlier implementation state.
   Configurable pipeline runs are complete and reviewed. FS-14 and TS-09 are Current;
   the reusable template store, durable sequential manager, shared lifecycle execution, scoped
   result/proposal tools, REST/SSE/CLI controls, notification/association paths, and Pipelines UI are
@@ -62,9 +70,16 @@ and creates disposable local configuration homes. On 2026-07-15 this machine has
 the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installed; the new
 `claude-agent-acp`, OpenCode, and OpenHands are not installed globally.
 
+The post-fix usability-review state is committed locally on `main`; pushing that commit to the shared
+`origin/main` branch needs explicit human authorization.
+
 ## Review findings
 
-Recorded by the 2026-07-26 week usability review; repro steps and evidence paths are in
+The 2026-07-26 post-fix rerun confirmed no new finding in the completed J1–J5 steps. J5's remaining
+variants and J6–J14 were blocked by the browser/execution environment; the exact coverage is in
+[`../archive/reviews/usability-review-run-2026-07-26-rerun.md`](../archive/reviews/usability-review-run-2026-07-26-rerun.md).
+
+The preceding findings were recorded by the 2026-07-26 week usability review; repro steps and evidence paths are in
 [`../archive/reviews/usability-review-run-2026-07-26-week.md`](../archive/reviews/usability-review-run-2026-07-26-week.md).
 
 All sixteen findings are resolved: six Must fix and ten Worth fixing.
@@ -77,6 +92,17 @@ not reproduce, the untimed `tmux` driver calls, and the two onboarding steps tha
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-26 — Re-ran the post-fix usability matrix at `c59dd2c`. **No invariant class** applied
+  because the completed browser paths produced no finding. J1–J4 and the exercised J5 layout paths
+  passed in the release build with new isolated homes and zero unexpected console errors; the
+  onboarding/provider fallback and all four permission labels were confirmed live and after reload.
+  The in-app browser stalled on J5's native confirm, then the execution account refused further
+  loopback servers after reaching its usage limit. J5 restart/delete and J6–J14 are recorded blocked,
+  not passed. Static serialization/CSS/null sweeps were clean; external-CLI and mutation-error hits
+  remain source leads only. All 139 UI tests, presentation checks/build, specification checks, and
+  focused tagged/untagged recent-fix regressions pass. Full report:
+  [`../archive/reviews/usability-review-run-2026-07-26-rerun.md`](../archive/reviews/usability-review-run-2026-07-26-rerun.md).
 
 - 2026-07-26 — Distinguished permission outcomes. **No invariant class** applied; FS-03.R4/R17/A6
   now retain the runtime's approved, denied, cancelled, and timed-out outcomes through both live and
