@@ -1,7 +1,7 @@
 # FS-01 — Agent Lifecycle
 
 **Status:** Current
-**Code:** `internal/server/{launch,resume,switch,sessions,groups}.go`, `internal/runtime/`, `internal/cli/launch.go` · **Journeys:** J3, J7, J11
+**Code:** `internal/server/{launch,resume,switch,sessions,groups}.go`, `internal/runtime/`, `internal/index/`, `internal/cli/launch.go` · **Journeys:** J3, J7, J11
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
 Covers the full life of an agent: launch, prompt-turn control (stop, cancel), rename, clone, resume,
@@ -146,6 +146,10 @@ transitions:
   returns `404`.
 - **R28** — Launch/resume/switch never leak a spoofable messaging identity: if identity write or
   runtime Start fails, the server rolls back the identity row and every registration artifact.
+- **R29** — Launch and resume remain available when an FTS5-created home is opened by a build whose
+  SQLite driver cannot load FTS5. The authoritative session row and lifecycle state still commit,
+  derived search-document writes are skipped until an FTS5-capable build returns, and no raw SQLite
+  module error reaches the launch/resume response.
 
 ## 5. Acceptance criteria
 
@@ -180,6 +184,8 @@ transitions:
   `TestReconcileStale`.
 - **A12** — A terminal agent's process disappearing marks it `done`, not `error`. *Verify:* manual
   gate (terminal `startWatcher` path) / journey **J6**.
+- **A13** — Simulated missing-FTS5 write capability preserves session metadata and turn rollups
+  while skipping derived documents without error: `internal/index/indexer_test.go::TestIndexerDegradesWhenFTS5WritesAreUnavailable`.
 
 ## 6. Deviations & open decisions
 
@@ -218,5 +224,7 @@ transitions:
 - Crash/reconcile/done-vs-error: `internal/runtime/chat.go` (`onTransportClosed`),
   `internal/runtime/terminal/terminal.go` (`startWatcher`, `setDone`), `internal/runtime/reconcile.go`
   (`ReconcileStale`).
+- Missing-FTS5 write degradation: `internal/index/indexer.go` (`ftsWritesAvailable`, metadata and
+  turn-document write boundaries).
 - Bug classes guarded: INV §2 (identity across resume/switch), §4 (orphan reaping / liveness), §6
   (LaunchSpec contract + capability honesty).

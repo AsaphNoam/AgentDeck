@@ -7,9 +7,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** the week's work has now been driven end to end in a real browser. Twelve usability
-  findings are open above, two of them Must fix: a home opened by the
-  FTS5 build cannot launch agents under the untagged build, and a search spanning two turns answers
+- **State:** the week's work has now been driven end to end in a real browser. Eleven usability
+  findings are open above, one of them Must fix: a search spanning two turns answers
   "No results" with no signal. Everything else driven passed: the whole pipeline lifecycle, the
   annotation tray and its three delivery routes, archive search on both build variants, first paint
   on an empty home, chat round-trip and delta coalescing, all four permission outcomes, crash and
@@ -64,16 +63,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 Recorded by the 2026-07-26 week usability review; repro steps and evidence paths are in
 [`../archive/reviews/usability-review-run-2026-07-26-week.md`](../archive/reviews/usability-review-run-2026-07-26-week.md).
-
-- **Must fix** — J8 a home opened by the FTS5 build cannot launch agents under the untagged build
-  (**INV §8**). Launch and resume return 502 with the raw internal message "runtime: index session
-  meta: index: delete metadata document: no such module: fts5", printed inside the launch modal, so
-  no agent can start on that home. Normal-use trigger: running the default `make build` binary once
-  and then an untagged build against the same home. Reachability is narrow — the release binary is
-  FTS5 (`TAGS := sqlite_fts5`) and a machine that only ever runs untagged is fine — which is why
-  this is MAJOR rather than BLOCKER, but the search path already falls back for exactly this case
-  and the index write path does not. Fix: degrade the index write the way search degrades, and keep
-  the raw SQLite module error out of the user-facing surface.
 
 - **Must fix** — J8 a search whose terms span two turns answers "No results" with no signal
   (**INV §8**). Searching an agent name plus a word from that same agent's transcript
@@ -132,6 +121,13 @@ not reproduce, the untimed `tmux` driver calls, and the two onboarding steps tha
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-26 — Kept lifecycle usable across an FTS5 capability downgrade. **INV §8**
+  now probes an existing virtual search table before each derived-document boundary; when the
+  SQLite driver reports the module unavailable, AgentDeck skips only the FTS document and still
+  commits authoritative session metadata, counters, and turn rollups. FS-01.R29/A13 and TS-02.R10
+  now pin that degradation and its bounded error surface. Focused tests simulate the unavailable
+  writer in both SQLite build variants.
 
 - 2026-07-26 — Added Archive paging. **INV §10** now exposes **Load more** whenever
   the reported match total exceeds the rendered rows, requests the next offset, appends the page,
