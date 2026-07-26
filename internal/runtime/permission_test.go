@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -351,6 +352,11 @@ func TestCancelEscalatesToSIGINT(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Start: %v", err)
 	}
+	ch, unsub, err := c.Subscribe(h.AgentID)
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+	defer unsub()
 	if err := c.SendPrompt(context.Background(), h.AgentID, "go"); err != nil {
 		t.Fatalf("SendPrompt: %v", err)
 	}
@@ -372,13 +378,36 @@ func TestCancelEscalatesToSIGINT(t *testing.T) {
 	if _, err := c.Cancel(context.Background(), h.AgentID); err != nil {
 		t.Fatalf("Cancel: %v", err)
 	}
+	reaped := false
 	for deadline := time.Now().Add(3 * time.Second); time.Now().Before(deadline); {
 		if _, err := c.store.ReadRunning(h.AgentID); err != nil {
-			return // hung peer reaped by the SIGINT escalation
+			reaped = true
+			break
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	t.Fatal("agent still running after cancel; SIGINT escalation did not reach the hung peer")
+	if !reaped {
+		t.Fatal("agent still running after cancel; SIGINT escalation did not reach the hung peer")
+	}
+	if status, _ := c.store.ReadStatus(h.AgentID); status.State != "error" || status.Detail != "cancelled — process exited" {
+		t.Fatalf("status after escalation = %+v, want error tied to cancellation", status)
+	}
+	errorEvent := waitForEvent(t, ch, EvError)
+	var errorData ErrorData
+	if err := json.Unmarshal(errorEvent.Data, &errorData); err != nil {
+		t.Fatalf("decode error event: %v", err)
+	}
+	if !errorData.Fatal || !strings.Contains(errorData.Message, "after ignoring cancellation") {
+		t.Fatalf("error event = %+v, want fatal cancellation-caused exit", errorData)
+	}
+	turnEnd := waitForEvent(t, ch, EvTurnEnd)
+	var turnEndData TurnEndData
+	if err := json.Unmarshal(turnEnd.Data, &turnEndData); err != nil {
+		t.Fatalf("decode turn end: %v", err)
+	}
+	if turnEndData.StopReason != "cancelled" {
+		t.Fatalf("stop reason = %q, want cancelled", turnEndData.StopReason)
+	}
 }
 
 func TestReconcileStale(t *testing.T) {

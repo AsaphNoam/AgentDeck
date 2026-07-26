@@ -51,7 +51,9 @@ orphaned processes.
   returns success, not an error.
 - **R7** — **Cancel turn** (`POST /api/sessions/{id}/cancel`) interrupts the agent's in-flight turn.
   The already-streamed events stay persisted. Cancelling an idle agent is a no-op that reports
-  `cancelled:false` rather than an error.
+  `cancelled:false` rather than an error. If the peer ignores cooperative cancellation and the
+  fallback interrupt ends its process, the resulting dead/error state identifies Cancel as the
+  cause rather than presenting a generic process exit (FS-03.R9).
 - **R8** — **Rename** (`POST /api/sessions/{id}/rename`) changes the display name
   only; the `agent_id` and all other identity fields are unchanged. Invalid names are rejected under
   R4. The UI drives rename through a browser prompt.
