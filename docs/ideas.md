@@ -14,11 +14,25 @@ Example:
 - **Pinned agents.** Let people keep frequently used agents at the top of the dashboard.
 ```
 
-- **General agent effort selection.** Add an optional per-launch effort choice to AgentDeck's normal
-  backend/model selection, backed by honest per-model capability metadata and provider-specific
-  launch mapping. Today effort is only visible through Claude/Codex configuration federation and is
-  not a general launch field or an OpenCode capability; define that cross-backend contract before
-  exposing effort in New Agent, AgentDecker-assisted creation, or pipeline runs.
+- **Fix card drag-and-drop usability.** Dashboard card reorder (FS-02.R12) technically works but
+  reads as broken: the drag listener is bound only to the tiny 28×28px `::` handle
+  (`AgentCard.tsx`), not the card itself, so dragging the card body does nothing — and because the
+  card's `onClick` navigates to the agent, a failed drag attempt looks like an accidental page
+  change. Dropping a card onto another group's section also doesn't move it between groups (`order`
+  is one flat array independent of `group`), so it silently snaps back. Needs whole-card drag (with
+  an activation distance so a plain click still opens the agent) and either real cross-group drop
+  support or a clear affordance that drag only reorders within a group.
+- **Real dialogs instead of browser prompts.** Move to group — and its siblings Rename and Switch
+  runtime — collect their arguments through `window.prompt`, so naming a group is an unstyled modal
+  dialog with no existing-group list, no validation feedback, and no cancel/confirm affordance. FS-02
+  §6 and FS-01.R8/R13 record this as a deliberate shipped limitation, so nothing half-built exists to
+  plug in; reversing it needs dedicated form modals (group picker with autocomplete over current
+  group labels, field-level validation) plus a feature-spec update.
+- **Per-chat model picker.** The agent chat header shows `backend · model` as static text; the only
+  way to change either is the dashboard context menu's Switch runtime, which asks for interface,
+  backend, and model through three consecutive browser prompts. Offer a picker in the chat header
+  itself, populated from the backend catalog, that drives the existing switch-runtime path (FS-01.R13
+  — running agents only, history preserved by native resume or primer).
 - **Claude backend model autosync.** The Codex half shipped (FS-09.R28: opt-in `autosync_models`
   reads `~/.codex/models_cache.json` on startup and add-only merges the catalog). Claude has no
   equivalent on-disk catalog to sync from — `~/.claude/settings.json` holds only the *selected*
@@ -32,6 +46,11 @@ Example:
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
 
+- **General agent effort selection.** Add an optional per-launch effort choice to AgentDeck's normal
+  backend/model selection, backed by honest per-model capability metadata and provider-specific
+  launch mapping. Today effort is only visible through Claude/Codex configuration federation and is
+  not a general launch field or an OpenCode capability; define that cross-backend contract before
+  exposing effort in New Agent, AgentDecker-assisted creation, or pipeline runs.
 - **Real-provider acceptance.** Run the credentialed OpenCode/OpenHands and Claude/Codex federation
   checks, then reconcile any observed provider incompatibility before making release claims.
 - **AgentDeck product knowledge MCP.** Define a versioned, non-secret `agentdeck_docs` topic service
