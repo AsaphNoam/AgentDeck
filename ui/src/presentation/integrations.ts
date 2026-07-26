@@ -56,6 +56,7 @@ export const diffTheme = {
     },
   },
   line: { fontFamily: "var(--ad-font-mono)" },
+  lineNumber: { cursor: "pointer" },
   contentText: { fontFamily: "var(--ad-font-mono)" },
 };
 

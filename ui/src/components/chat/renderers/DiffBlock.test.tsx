@@ -19,6 +19,7 @@ describe("DiffBlock", () => {
       />,
     );
 
+    expect(screen.getByText("Click line numbers to select a range.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Old line 2" }));
     fireEvent.click(screen.getByRole("button", { name: "Annotate lines 2–2" }));
 

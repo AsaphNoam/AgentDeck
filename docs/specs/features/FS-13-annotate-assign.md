@@ -106,6 +106,9 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   most-recently-edited sources are retained; both are applied when the browser reloads the stored
   trays. This keeps a session's own tray across reloads (R3) — including an archived session's,
   which is not in the live agent list — while bounding what accumulates in browser storage.
+- **R17.** A selectable diff block labels its line numbers as the selection control and presents
+  them with a pointer cursor. Clicking one line starts a selection; clicking another line on the
+  same side extends the contiguous range before **Annotate** captures it (R1–R2).
 
 ## 5. Acceptance criteria
 
@@ -132,6 +135,9 @@ Each acceptance item names its delivered verification.
   `internal/server/annotations_test.go::TestAnnotationAppendFailureDeliversNoMailAndRetrySendsOnce`.
 - **A8** (R16) — Deleting an agent drops its pending tray, and stored trays are capped and
   expired on rehydration: `ui/src/store/annotationStore.test.ts`.
+- **A9** (R1–R2, R17) — A diff block visibly explains line-number selection and applies the pointer
+  affordance while the library-shaped id regression captures the selected range:
+  `ui/src/components/chat/renderers/DiffBlock.test.tsx`.
 
 ## 6. Deviations & open decisions
 
