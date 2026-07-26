@@ -153,6 +153,22 @@ func TestValidateProject(t *testing.T) {
 			t.Errorf("expected required, got %v", ve.Errors)
 		}
 	})
+	t.Run("whitespace-only required fields", func(t *testing.T) {
+		p := Project{Title: " \t ", Cwd: "  \n "}
+		ve, _ := ValidateProject("my-app", p, true)
+		if ve == nil {
+			t.Fatal("expected validation errors")
+		}
+		fields := map[string]bool{}
+		for _, fieldErr := range ve.Errors {
+			if fieldErr.Code == "required" {
+				fields[fieldErr.Field] = true
+			}
+		}
+		if !fields["title"] || !fields["cwd"] {
+			t.Fatalf("required fields = %v, want title and cwd: %v", fields, ve.Errors)
+		}
+	})
 	t.Run("bad color", func(t *testing.T) {
 		p := Project{Title: "X", Cwd: "/tmp", Color: [3]int{0, 300, 0}}
 		ve, _ := ValidateProject("my-app", p, true)

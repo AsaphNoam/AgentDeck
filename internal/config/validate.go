@@ -116,12 +116,12 @@ func ValidateProject(slug string, p Project, checkSlug bool) (errs *ValidationEr
 			})
 		}
 	}
-	if p.Title == "" {
+	if strings.TrimSpace(p.Title) == "" {
 		errList = append(errList, FieldError{Field: "title", Code: "required", Message: "title is required"})
 	} else if len(p.Title) > 120 {
 		errList = append(errList, FieldError{Field: "title", Code: "too_long", Message: "title must be ≤ 120 characters"})
 	}
-	if p.Cwd == "" {
+	if strings.TrimSpace(p.Cwd) == "" {
 		errList = append(errList, FieldError{Field: "cwd", Code: "required", Message: "cwd is required"})
 	}
 	for i, c := range p.Color {
