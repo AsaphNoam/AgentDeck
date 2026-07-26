@@ -119,6 +119,25 @@ func startPipeline(t *testing.T, manager *Manager, requestID string) RunDetail {
 	return detail
 }
 
+// FS-14.A1 / INV §2: run assignments use configured catalog ids rather than
+// the role/project filename slug rule. The seeded Codex id contains dots.
+func TestStartAcceptsSeededCodexModelID(t *testing.T) {
+	manager, lifecycle, _ := pipelineManagerFixture(t)
+	detail, replay, err := manager.Start(context.Background(), StartRequest{
+		RequestID: "request-dotted-codex-model", TemplateID: "quality", DisplayName: "Ship", Project: "app", Goal: "Implement the spec",
+		Inputs: map[string]string{"spec": "Requirements"},
+		Assignments: map[string]RuntimeAssignment{
+			"work": {Backend: "codex", Model: "gpt-5.6-sol"}, "review": {Backend: "claude", Model: "sonnet"},
+		},
+	})
+	if err != nil || replay {
+		t.Fatalf("Start = %+v replay=%v err=%v", detail, replay, err)
+	}
+	if len(lifecycle.launches) != 1 || lifecycle.launches[0].Model != "gpt-5.6-sol" {
+		t.Fatalf("launches = %+v", lifecycle.launches)
+	}
+}
+
 func TestRunProposalDerivesAStableRequestIDFromExactPayload(t *testing.T) {
 	manager, _, _ := pipelineManagerFixture(t)
 	proposal, err := manager.ProposeRun(context.Background(), StartRequest{

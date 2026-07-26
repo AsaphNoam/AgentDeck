@@ -191,7 +191,7 @@ func (m *Manager) validateStart(ctx context.Context, request *StartRequest) (Tem
 	for _, stage := range record.Template.Stages {
 		stages[stage.ID] = stage
 		assignment, ok := request.Assignments[stage.ID]
-		if !ok || !config.ValidSlug(assignment.Backend) || !config.ValidSlug(assignment.Model) {
+		if !ok || assignment.Backend == "" || assignment.Model == "" {
 			add("assignments."+stage.ID, "required", "every stage requires a configured backend and model")
 			continue
 		}

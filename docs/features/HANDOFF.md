@@ -7,9 +7,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** the week's work has now been driven end to end in a real browser. Fifteen usability
-  findings are open above, five of them Must fix: no Codex model can be assigned to a pipeline
-  stage, the Start-run form drops the server's field
+- **State:** the week's work has now been driven end to end in a real browser. Fourteen usability
+  findings are open above, four of them Must fix: the Start-run form drops the server's field
   diagnostics, the archive shows only the first 50 sessions with no pager, a home opened by the
   FTS5 build cannot launch agents under the untagged build, and a search spanning two turns answers
   "No results" with no signal. Everything else driven passed: the whole pipeline lifecycle, the
@@ -66,17 +65,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 Recorded by the 2026-07-26 week usability review; repro steps and evidence paths are in
 [`../archive/reviews/usability-review-run-2026-07-26-week.md`](../archive/reviews/usability-review-run-2026-07-26-week.md).
-
-- **Must fix** — J14 no Codex model can be assigned to a pipeline stage (**INV §2**).
-  `internal/pipeline/manager.go:194` validates the run-time assignment with
-  `config.ValidSlug(assignment.Model)`, which is the role/project *filename* rule
-  (`internal/config/validate.go:15`) and forbids dots. FS-09.R33 seeds Codex's models as
-  `gpt-5.6-sol` and `gpt-5.5`, so every seeded Codex model is rejected. Normal-use trigger: choose
-  Codex for any stage in the Start-run form — the app offers the models and then refuses the run.
-  This contradicts FS-14.R2's own example ("Codex for implementation and Claude for review") and
-  blocks FS-14.A1/A7. Every existing pipeline test uses the slug-clean model id `"gpt"`, which is
-  why the suite is green. Fix: validate the model against the configured catalog, which the run
-  already resolves, and add a regression test that assigns a dotted seeded model id.
 
 - **Must fix** — J14 the Start-run form discards the server's field diagnostics (**INV §8**).
   `ui/src/features/pipelines/RunStartForm.tsx:116-120` sets the error from `reason.message` alone, so
@@ -161,6 +149,12 @@ not reproduce, the untimed `tmux` driver calls, and the two onboarding steps tha
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-26 — Fixed Codex pipeline assignments. **INV §2** no longer applies the
+  role/project filename slug rule to backend and model catalog keys before the shared lifecycle
+  validator checks the configured catalog, so seeded `gpt-5.6-sol` assignments now start and reach
+  the ordinary launch path. A manager regression starts a run with that exact model id. No FS/TS
+  delta was needed because the fix restores FS-14.R2/A1 and FS-09.R33.
 
 - 2026-07-26 — Fixed diff-line annotation selection. **INV §10** now parses the
   `react-diff-viewer-continued` line-id contract (`L-<line>` / `R-<line>`) instead of a format the
