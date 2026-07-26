@@ -8,7 +8,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 - **Active change:** None.
 - **State:** the week's work has now been driven end to end in a real browser. All six Must-fix
-  findings are resolved; seven Worth-fixing findings remain. Everything else driven passed: the
+  findings are resolved; six Worth-fixing findings remain. Everything else driven passed: the
   whole pipeline lifecycle, the
   annotation tray and its three delivery routes, archive search on both build variants, first paint
   on an empty home, chat round-trip and delta coalescing, all four permission outcomes, crash and
@@ -64,11 +64,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 Recorded by the 2026-07-26 week usability review; repro steps and evidence paths are in
 [`../archive/reviews/usability-review-run-2026-07-26-week.md`](../archive/reviews/usability-review-run-2026-07-26-week.md).
 
-- **Worth fixing** — J13 a tray whose source agent no longer exists cannot be discarded (**INV §1**):
-  it keeps one of the twenty retained-source slots for thirty days, and navigating to that agent
-  raises an uncaught `no such agent` page error. FS-13.R16's discard-on-delete only fires from
-  retention pruning because the product exposes no delete-agent affordance.
-
 - **Worth fixing** — J4 the live view rewrites earlier permission chips that share a tool-call id
   (**INV §2**): `markResolved` maps over every matching request while the transcript fold correctly
   stops at the newest, so the live states read `["denied","denied"]` where a reload shows
@@ -101,6 +96,12 @@ not reproduce, the untimed `tmux` driver calls, and the two onboarding steps tha
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-26 — Added stale annotation-tray recovery. **INV §1** now gives a missing-agent route a
+  direct discard action with its retained draft count, and SSE reconnect contains the corresponding
+  missing-transcript rejection instead of surfacing an uncaught error. FS-13.R16/A8 pin the
+  recovery boundary; route and reconnect regressions cover it without treating archived sources
+  as deleted.
 
 - 2026-07-26 — Kept annotation delivery controls visible. **No invariant class** applied;
   FS-13.R18/A10 now split the bounded pending tray into an independently scrolling draft body and

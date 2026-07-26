@@ -40,7 +40,9 @@ class SseClient {
       useAgentStore.getState().hydrateBegin();
       this.hydrationIds = [];
       this.lastAgentSeq = {};
-      this.refetchOpenTranscript();
+      // The open route can outlive its agent. Missing transcripts are represented
+      // by ChatPanel's recovery view, not an unhandled reconnect rejection.
+      void this.refetchOpenTranscript().catch(() => undefined);
       queryClient.invalidateQueries({ queryKey: ["pipelines", "runs"] });
     };
     this.es.onerror = () => useUiStore.getState().setConnection("reconnecting");

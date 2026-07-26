@@ -4,6 +4,7 @@ import * as Tabs from "@radix-ui/react-tabs";
 import { getTranscript } from "../../api/client";
 import { sseClient } from "../../api/sse";
 import { useAgentStore } from "../../store/agentStore";
+import { useAnnotationStore } from "../../store/annotationStore";
 import { useTranscriptStore } from "../../store/transcriptStore";
 import { ContextBar } from "../grid/ContextBar";
 import { Composer } from "./Composer";
@@ -28,6 +29,8 @@ export function ChatPanel() {
   const { id = "" } = useParams();
   const [params] = useSearchParams();
   const agent = useAgentStore((state) => state.agents[id]);
+  const pendingAnnotations = useAnnotationStore((state) => state.bySource[id]?.length ?? 0);
+  const discardAnnotations = useAnnotationStore((state) => state.discard);
   const events = useTranscriptStore((state) => state.byAgent[id] ?? []);
   const setTranscript = useTranscriptStore((state) => state.setTranscript);
   const [tab, setTab] = useState(() => initialTab(params.get("tab"), agent?.interface));
@@ -68,6 +71,12 @@ export function ChatPanel() {
     return (
       <section className="placeholder-view">
         <h1>Agent not found</h1>
+        {pendingAnnotations > 0 && (
+          <div>
+            <p>{pendingAnnotations} pending annotation{pendingAnnotations === 1 ? "" : "s"} cannot be sent because the source agent no longer exists.</p>
+            <button type="button" onClick={() => discardAnnotations(id)}>Discard pending annotations</button>
+          </div>
+        )}
         <Link to="/">Back</Link>
       </section>
     );

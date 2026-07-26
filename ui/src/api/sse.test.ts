@@ -99,6 +99,17 @@ describe("SseClient watchdog reconnect", () => {
     expect(client.getTranscript).toHaveBeenCalledTimes(1);
   });
 
+  it("contains a missing open transcript during reconnect hydration", async () => {
+    const { sseClient } = await import("./sse");
+    const client = await import("./client");
+    (client.getTranscript as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("no such agent"));
+    sseClient.setOpenAgent("a_gone");
+    sseClient.connect();
+
+    FakeEventSource.instances[0].onopen?.();
+    await vi.waitFor(() => expect(client.getTranscript).toHaveBeenCalledWith("a_gone"));
+  });
+
   // Regression (review fix, BLOCKING): a drop mid-hydration triggers the
   // browser's automatic EventSource reconnect, which fires onopen again on the
   // SAME object. Each onopen must reset the hydration generation; otherwise the
