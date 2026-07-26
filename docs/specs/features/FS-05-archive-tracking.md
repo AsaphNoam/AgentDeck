@@ -141,6 +141,10 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   while the server's `total` exceeds the number rendered. Each activation requests the next page
   with `offset` equal to the rendered count and appends it; changing the query resets to the first
   page. A later-page failure keeps the already-rendered results visible and surfaces the error.
+  Because results are ordered by the mutable `updated_at`, a session touched between page requests
+  moves ahead of that offset. The UI therefore never renders a session twice, and a repeated row —
+  the evidence that the ordering shifted — makes it refetch the first page and add whatever moved
+  into it, so every matching session stays reachable.
 - **R29.** The Archive search affordance states that all query terms must match within one session
   metadata record, transcript turn, or annotation and are not combined across turns. The search
   input is programmatically associated with that scope note, so an empty result does not imply that
@@ -197,7 +201,8 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   and `TestArchiveSearchCollapsesMatchingDocuments` under both SQLite build variants where applicable.
 - **A12** (R10, R28) — An Archive result set larger than one UI page exposes **Load more**, requests
   the next `offset`, appends those sessions, and removes the control when all matching rows are
-  rendered: `ui/src/features/archive/ArchivePage.test.tsx`.
+  rendered; a 51-session set reordered between page requests still renders every session exactly
+  once: `ui/src/features/archive/ArchivePage.test.tsx`.
 - **A13** (R25–R27, R29) — The Archive search input exposes the one-document/one-turn scope before
   and after an empty cross-turn query: `ui/src/features/archive/ArchivePage.test.tsx`.
 - **A14** (R6, R23, R30) — Tagged and untagged Archive responses report their effective search

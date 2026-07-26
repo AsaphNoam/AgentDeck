@@ -150,6 +150,45 @@ describe("ArchivePage", () => {
     expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
   });
 
+  // FS-05.R28/A12: the Archive is ordered by the mutable updated_at, so a
+  // session touched between page requests moves ahead of the next offset. That
+  // page repeats a boundary row, and offset paging alone would lose the moved
+  // session while the rendered count reached total and hid Load more.
+  it("reaches every session when a later page is reordered between requests", async () => {
+    const sessions = Array.from({ length: 51 }, (_, index) => ({
+      ...mockInactive,
+      agent_id: `a_seq_${index + 1}`,
+      name: `Session ${index + 1}`,
+      updated_at: new Date(Date.UTC(2026, 5, 1, 0, 51 - index)).toISOString(),
+    }));
+    let order = [...sessions];
+    let requests = 0;
+    server.use(http.get("/api/archive", ({ request }) => {
+      const url = new URL(request.url);
+      const offset = Number(url.searchParams.get("offset") ?? "0");
+      const limit = Number(url.searchParams.get("limit") ?? "50");
+      const page = order.slice(offset, offset + limit);
+      requests += 1;
+      // After the first page is rendered, the last session is resumed: it moves
+      // to the front and shifts every rendered row one position later.
+      if (requests === 1) order = [order[50], ...order.slice(0, 50)];
+      return HttpResponse.json({ query: "", search_mode: "full_text", total: order.length, limit, offset, results: page });
+    }));
+
+    renderArchive();
+    await screen.findByText("Session 1");
+    expect(screen.queryByText("Session 51")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+
+    await waitFor(() => expect(screen.getByText("Session 51")).toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument());
+    const rendered = Array.from(document.querySelectorAll(".archive-name")).map((node) => node.textContent);
+    expect(new Set(rendered).size).toBe(rendered.length);
+    expect(rendered).toHaveLength(51);
+    for (const session of sessions) expect(rendered).toContain(session.name);
+  });
+
   it("does not advertise transcript search in metadata-only mode", async () => {
     server.use(http.get("/api/archive", () => HttpResponse.json({
       query: "", search_mode: "metadata", total: 0, limit: 50, offset: 0, results: [],

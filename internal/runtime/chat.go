@@ -502,7 +502,12 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 
 	actx, acancel := context.WithCancel(context.Background())
 	as := &agentState{
-		agentID:    spec.Agent.AgentID,
+		agentID: spec.Agent.AgentID,
+		// A resumed agent carries its launch generation exactly like Start and both
+		// terminal paths (INV §4): the crash callback is matched against the
+		// registry's generation, so an empty value is rejected as stale and the
+		// unsolicited exit would skip ownership and registration teardown.
+		generation: spec.Generation,
 		cmd:        cmd,
 		pgid:       pgid,
 		hub:        NewHub(),

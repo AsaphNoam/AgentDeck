@@ -328,3 +328,35 @@ func TestManagerRejectsMissingDestinationValueAtomically(t *testing.T) {
 		t.Fatalf("rejected report mutated state: %+v values=%+v", after.Run, after.Values)
 	}
 }
+
+// TS-09.R12/R13: crash recovery is generation-scoped, so a stage agent that
+// exits without carrying its concrete launch generation (the resume path once
+// dropped it) is silently ignored and the run never receives its agent_crash
+// pause. The recorded generation must pause the run with Retry available.
+func TestManagerCrashRecoveryRequiresTheConcreteGeneration(t *testing.T) {
+	manager, _, _ := pipelineManagerFixture(t)
+	detail := startPipeline(t, manager, "request-crash")
+	attempt := detail.Attempts[0]
+
+	if err := manager.OnExit(attempt.AgentID, "", "process_exit"); err != nil {
+		t.Fatal(err)
+	}
+	unchanged, _ := manager.Detail(detail.Run.RunID)
+	if unchanged.Run.State != "running" || unchanged.Run.AttentionReason != "" {
+		t.Fatalf("empty-generation exit changed the run: %+v", unchanged.Run)
+	}
+
+	if err := manager.OnExit(attempt.AgentID, attempt.AgentGeneration, "process_exit"); err != nil {
+		t.Fatal(err)
+	}
+	crashed, _ := manager.Detail(detail.Run.RunID)
+	if crashed.Run.State != "paused" || crashed.Run.AttentionReason != "agent_crash" {
+		t.Fatalf("crashed run = %+v, want paused/agent_crash", crashed.Run)
+	}
+	if crashed.Attempts[0].State != "crashed" {
+		t.Fatalf("crashed attempt = %+v", crashed.Attempts[0])
+	}
+	if _, err := manager.Retry(context.Background(), crashed.Run.RunID, crashed.Run.Revision); err != nil {
+		t.Fatalf("Retry after crash: %v", err)
+	}
+}

@@ -220,4 +220,26 @@ describe("BackendStep", () => {
     expect(screen.getByText("Validate & Continue")).toBeDisabled();
     expect(lastPutBody).toBeNull();
   });
+
+  // FS-04.R26 / INV §8: a repairable 400 must name its field and reason. The
+  // shared config client preserves the validation envelope; the step once
+  // stringified the raw Error and rendered only "Error: HTTP 400".
+  it("surfaces field-level validation details from a rejected save", async () => {
+    server.use(
+      http.put("/api/backends", () =>
+        HttpResponse.json({
+          error: "validation_failed",
+          errors: [{ field: "backends.claude.name", code: "too_long", message: "name must be at most 120 characters" }],
+        }, { status: 400 }),
+      ),
+    );
+    renderWithQuery(<BackendStep onDone={vi.fn()} />);
+    await waitForLoaded();
+
+    fireEvent.click(screen.getByText("Validate & Continue"));
+
+    expect(await screen.findByText(/name must be at most 120 characters/)).toBeInTheDocument();
+    expect(screen.getByText(/backends\.claude\.name/)).toBeInTheDocument();
+    expect(screen.queryByText(/HTTP 400/)).toBeNull();
+  });
 });

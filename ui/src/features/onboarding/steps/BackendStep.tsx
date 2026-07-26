@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useBackends, usePutBackends } from "../../../api/config";
+import { configErrorMessage, useBackends, usePutBackends } from "../../../api/config";
 import type { BackendsConfig, BackendType } from "../../../schemas/backends";
 import { BACKEND_TYPE_LABELS, BACKEND_TYPE_OPTIONS } from "../../../lib/backendTypes";
 
@@ -119,7 +119,7 @@ export function BackendStep({ onDone, claimMutation, releaseMutation }: BackendS
         setCredDetail(cred?.detail ?? null);
         if (status === "ok") onDone({ id: backendId, type });
       },
-      onError: (e) => setError(String(e)),
+      onError: (e) => setError(configErrorMessage(e)),
       onSettled: releaseMutation,
     });
   };

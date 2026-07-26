@@ -29,6 +29,7 @@ export function ChatPanel() {
   const { id = "" } = useParams();
   const [params] = useSearchParams();
   const agent = useAgentStore((state) => state.agents[id]);
+  const agentsHydrated = useAgentStore((state) => state.hydrated);
   const pendingAnnotations = useAnnotationStore((state) => state.bySource[id]?.length ?? 0);
   const discardAnnotations = useAnnotationStore((state) => state.discard);
   const events = useTranscriptStore((state) => state.byAgent[id] ?? []);
@@ -66,6 +67,19 @@ export function ChatPanel() {
       }),
     );
   };
+
+  // A deep link or hard reload renders before the first agent hydration lands, so
+  // an absent agent is not yet evidence the source is gone (FS-13.R16). Claiming
+  // it early would offer a destructive discard for drafts whose live source is
+  // still arriving, so the missing-source recovery waits for hydration.
+  if (!agent && !agentsHydrated) {
+    return (
+      <section className="placeholder-view">
+        <h1>Loading agent…</h1>
+        <Link to="/">Back</Link>
+      </section>
+    );
+  }
 
   if (!agent) {
     return (

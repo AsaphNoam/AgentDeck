@@ -30,6 +30,34 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
+// FS-05.R31/A15: a switched or resumed session appends newer metadata, and the
+// read-only header must show the identity Resume will actually restore.
+describe("ArchiveAgentPage switched session identity", () => {
+  it("shows the newest recorded backend/model, not the original", async () => {
+    server.use(http.get("/api/sessions/a_switched/transcript", () => HttpResponse.json({
+      agent_id: "a_switched",
+      events: [
+        { seq: 1, type: "session_meta", ts: "t1", data: { name: "Atlas", project: "agentdeck", backend: "codex", model: "gpt-5.6-sol", interface: "chat", created_at: "2026-07-24T12:30:00Z" } },
+        { seq: 2, type: "assistant_text", ts: "t2", data: { delta: "working" } },
+        { seq: 3, type: "session_meta", ts: "t3", data: { name: "Atlas", project: "agentdeck", backend: "claude", model: "sonnet", interface: "chat", created_at: "2026-07-24T12:30:00Z", resumed_at: "2026-07-25T09:00:00Z" } },
+      ],
+    })));
+
+    render(
+      <MemoryRouter initialEntries={["/archive/a_switched"]}>
+        <Routes>
+          <Route path="/archive/:id" element={<ArchiveAgentPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("agentdeck · claude · sonnet")).toBeInTheDocument();
+    expect(screen.queryByText("agentdeck · codex · gpt-5.6-sol")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Atlas" })).toBeInTheDocument();
+    expect(document.querySelector("time")?.getAttribute("datetime")).toBe("2026-07-24T12:30:00Z");
+  });
+});
+
 describe("ArchiveAgentPage", () => {
   it("renders a stored assistant stream as one message", async () => {
     render(

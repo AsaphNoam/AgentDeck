@@ -4,6 +4,32 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-26 — Fix: the seven recorded review findings
+
+All seven problems from the last review are repaired, each with a test that was first confirmed to
+fail against the old code. The two serious ones are closed: a resumed or runtime-switched agent that
+crashes is now fully released — the server drops its ownership and per-agent credentials, another
+resume works immediately, and a pipeline waiting on that agent moves into crash recovery instead of
+stalling; and an agent page reached by a direct link or reload now waits until it actually knows
+whether the source session exists before offering to discard retained annotation drafts, so a normal
+click can no longer delete valid work.
+
+The five smaller fixes: completed pipeline stages now link to their archived transcript instead of a
+dead live page; a stopped AgentDecker builder is recognised as finished and its stale session link
+disappears; an archived session that switched backend or model shows the identity Resume will
+actually restore; Archive paging shows every matching session exactly once even when sessions are
+touched while you page through them; and onboarding now explains which field a rejected backend or
+project was wrong in, instead of showing “Error: HTTP 400.” Two of these needed the written product
+rules to be extended — how far Archive paging must go to stay complete, and when an agent may be
+declared missing; the rest simply restored behaviour that was already specified.
+
+**Needs attention:** None of these fixes has been exercised in a real browser yet — the last
+usability run could not get past its recorded browser and account limits, so browser confirmation of
+the Archive, pipeline, and onboarding surfaces is still outstanding.
+
+**Next:** Run a usability review over the Archive paging, pipeline transcript links, and onboarding
+error paths once a browser session is available.
+
 ### 2026-07-26 — Review: the week’s feature and fix batch
 
 The re-review found seven real problems: two need fixing before the recent work is dependable, and

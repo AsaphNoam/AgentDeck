@@ -49,6 +49,9 @@ function RunDetail({ selectedID, onDeleted }: { selectedID: string | null; onDel
   const retryRun = usePipelineControl("retry");
   const stopRun = usePipelineControl("stop");
   const deleteRun = useDeletePipelineRun();
+  // Hydration retains a stopped agent's identity row with running:false, so mere
+  // presence in the store is not liveness — a completed attempt must reach its
+  // Archive transcript, not the live agent route (FS-14.R8/R11).
   const liveAgents = useAgentStore((state) => state.agents);
   const [continuation, setContinuation] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -126,7 +129,7 @@ function RunDetail({ selectedID, onDeleted }: { selectedID: string | null; onDel
           {item.report_summary && <p>{item.report_summary}</p>}
           {item.report_details && <details><summary>Details</summary><pre>{item.report_details}</pre></details>}
           {item.report_checks && <details><summary>Checks</summary><pre>{item.report_checks}</pre></details>}
-          {item.agent_id && <Link to={attemptTranscriptPath(item.agent_id, Boolean(liveAgents[item.agent_id]))}>Open transcript</Link>}
+          {item.agent_id && <Link to={attemptTranscriptPath(item.agent_id, liveAgents[item.agent_id]?.running === true)}>Open transcript</Link>}
         </li>)}
       </ol>
     </div>

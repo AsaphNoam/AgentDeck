@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useCreateProject } from "../../../api/config";
+import { configErrorMessage, useCreateProject } from "../../../api/config";
 
 interface ProjectStepProps {
   /** Receives the slug of the project just created, so the launch step can
@@ -45,7 +45,7 @@ export function ProjectStep({ onDone, claimMutation, releaseMutation }: ProjectS
           }
           onDone(resp.project);
         },
-        onError: (e) => setError(String(e)),
+        onError: (e) => setError(configErrorMessage(e)),
         onSettled: releaseMutation,
       },
     );
