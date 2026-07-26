@@ -4,6 +4,27 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-26 — Review: the week’s feature and fix batch
+
+The re-review found seven real problems: two need fixing before the recent work is dependable, and
+five are smaller but user-visible. Most seriously, a resumed or runtime-switched chat agent that
+crashes can be left falsely owned by the server, blocking another resume and preventing a pipeline
+from entering recovery. Also, a deep-linked agent page can offer to discard retained annotation
+drafts before the initial server state has even established whether their source still exists.
+
+The smaller defects are broken transcript links for completed pipeline stages, a stopped
+AgentDecker builder retained as if it were live, stale backend/model identity in an archived header
+after a runtime switch, Archive paging that can skip or duplicate sessions when ordering changes
+between pages, and onboarding validation failures reduced to “Error: HTTP 400.” The full automated
+test and build matrix still passes, which confirms these are coverage gaps at real state boundaries
+rather than broad regressions.
+
+**Needs attention:** Fix the resumed-agent cleanup and premature annotation-discard paths first;
+the other five findings should follow in the same repair pass.
+
+**Next:** Run `/fix` to repair the seven recorded findings and add regressions at their real call
+sites.
+
 ### 2026-07-26 — Fix: review-finding queue
 
 There were no open review findings to repair. All previously recorded issues remain resolved, and
