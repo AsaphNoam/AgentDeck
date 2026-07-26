@@ -26,7 +26,7 @@ func (claudeProber) Check(ctx context.Context, _ config.Backend, _ config.Model,
 	// bundled Claude builds may not support `--no-color`, so retry once without
 	// it before surfacing a failure (INV §12).
 	outcome, out, err := probeNativeLogin(ctx, p, mergedEnv, "--no-color")
-	if err != nil && strings.Contains(strings.ToLower(string(out)), "unknown option '--no-color'") {
+	if err != nil && rejectsNoColorFlag(out) {
 		outcome, out, err = probeNativeLogin(ctx, p, mergedEnv)
 	}
 
@@ -45,4 +45,31 @@ func (claudeProber) Check(ctx context.Context, _ config.Backend, _ config.Model,
 		return CredResult{Status: "failed", Detail: "status_check_failed"}
 	}
 	return CredResult{Status: "ok"}
+}
+
+// rejectsNoColorFlag recognizes common CLI-parser diagnostics while requiring
+// both the optional flag and unsupported-argument vocabulary. That keeps an
+// unrelated auth/status failure from triggering the compatibility retry.
+func rejectsNoColorFlag(out []byte) bool {
+	text := strings.ToLower(string(out))
+	if !strings.Contains(text, "-no-color") {
+		return false
+	}
+	for _, marker := range []string{
+		"unknown option",
+		"unknown flag",
+		"unrecognized option",
+		"unrecognized flag",
+		"unsupported option",
+		"unsupported flag",
+		"invalid option",
+		"invalid flag",
+		"flag provided but not defined",
+		"unexpected argument",
+	} {
+		if strings.Contains(text, marker) {
+			return true
+		}
+	}
+	return false
 }

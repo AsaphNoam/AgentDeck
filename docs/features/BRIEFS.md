@@ -4,6 +4,19 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-26 — Fix: Claude onboarding compatibility
+
+Claude’s readiness check now handles the common ways different command-line versions reject the
+optional `--no-color` flag. When the diagnostic explicitly identifies that flag as unsupported,
+AgentDeck retries the same fixed status check without it; unrelated authentication or status
+failures still remain failures. This prevents a signed-in Claude user from being falsely blocked in
+onboarding. The new regressions and the full verification suite pass.
+
+**Needs attention:** None.
+
+**Next:** Run the credentialed provider acceptance gates when you are ready to authorize real
+provider sessions.
+
 ### 2026-07-26 — Usability review: onboarding wizard
 
 I replayed onboarding in a real browser from two fresh homes. Set up later works with an ordinary
