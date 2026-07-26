@@ -50,6 +50,42 @@ function renderMenu() {
 }
 
 describe("CardContextMenu error surfacing", () => {
+  it("resumes a stopped agent from its card", async () => {
+    useAgentStore.setState({ agents: { a_1: { ...agent, running: false } }, order: ["a_1"], hydrating: false });
+    let calls = 0;
+    server.use(
+      http.post("/api/sessions/:id/resume", () => {
+        calls += 1;
+        return HttpResponse.json({ resumed: true });
+      }),
+    );
+
+    renderMenu();
+    fireEvent.click(screen.getByRole("button", { name: /^Resume$/i }));
+
+    await waitFor(() => expect(calls).toBe(1));
+  });
+
+  it("omits Resume for a running agent", () => {
+    renderMenu();
+    expect(screen.queryByRole("button", { name: /^Resume$/i })).not.toBeInTheDocument();
+  });
+
+  it("shows an error toast when resume fails", async () => {
+    useAgentStore.setState({ agents: { a_1: { ...agent, running: false } }, order: ["a_1"], hydrating: false });
+    server.use(
+      http.post("/api/sessions/:id/resume", () =>
+        HttpResponse.json({ error: { code: "resume_failed", message: "session is unavailable" } }, { status: 422 }),
+      ),
+    );
+
+    renderMenu();
+    fireEvent.click(screen.getByRole("button", { name: /^Resume$/i }));
+    await waitFor(() =>
+      expect(useUiStore.getState().toasts.some((toast) => toast.type === "error" && toast.title === "Resume failed" && toast.body === "session is unavailable")).toBe(true),
+    );
+  });
+
   it("shows an error toast with the server message when switch-runtime fails", async () => {
     vi.spyOn(window, "prompt").mockReturnValue("terminal");
     server.use(

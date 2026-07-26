@@ -133,6 +133,14 @@ Notification is raised instead of the toast (deduped per agent via the notificat
 notification. Desktop notifications can be disabled wholesale, and desktop permission is requested
 from the Notifications settings editor.
 
+**R27.** A stopped agent's card context menu additionally offers **Resume**. It is absent from a
+running agent's menu, because a resume while a running row exists is rejected (FS-01.R25). The
+Dashboard Resume action reuses the session's frozen configuration and history as specified by
+FS-01.R10.
+
+**R28.** The Dashboard **Resume** action calls `POST /api/sessions/{id}/resume`. A rejected request
+shows the server's message in an error toast and leaves the card available for another attempt.
+
 **R25.** A card's project subtitle displays the current configured project title, not its durable
 project id. If the corresponding project definition is unavailable (for example, it was force-deleted
 after the agent launched), the card falls back to that id so the agent remains identifiable.
@@ -188,6 +196,11 @@ to the id if the definition is absent, and visibly labels a zero-value context m
 `CardGrid.test.tsx` "uses the configured project title on agent cards"; `AgentCard.test.tsx`
 "falls back to the project id when its title is unavailable"; `ContextBar.test.tsx` "labels zero
 context usage"; J5.
+
+**A14.** A stopped card's context menu shows **Resume** and resumes through the existing endpoint;
+the same menu on a running card omits it, and a rejected resume surfaces a toast. —
+`CardContextMenu.test.tsx` "resumes a stopped agent from its card" and "shows an error toast when
+resume fails"; J5.
 
 ## 6. Deviations & open decisions
 
