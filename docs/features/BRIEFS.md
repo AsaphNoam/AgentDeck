@@ -4,6 +4,24 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-26 — Fix: usability review findings, awaiting one decision
+
+Fifteen of the sixteen review findings are fixed and committed. Diff annotation, Codex pipeline
+assignments, run-start diagnostics, archive paging and search guidance, fallback-build launches,
+annotation-tray usability, live permission replay, agent/project validation, cancellation
+escalation, and archived-session identity now have regression coverage.
+
+All specification checks, both Go test variants, all 134 UI tests, and source/UI builds pass after
+the last fix. I have not run the final distribution build because one product decision remains.
+
+**Needs attention:** Choose the permission-chip vocabulary. I recommend distinct chips:
+**Approved**, **Denied**, **Cancelled**, and **Timed out**. The alternative is to preserve the
+current two-state wording, where every non-approval reads **Denied**; choosing that closes the
+finding without code.
+
+**Next:** Reply `distinct` or `keep Denied`. I’ll update the specification and UI if needed, run
+final distribution verification, and close the fix pass.
+
 ### 2026-07-26 — Usability review: the week's new features in a real browser
 
 I drove everything shipped in the last week through the actual app in a browser — pipelines,

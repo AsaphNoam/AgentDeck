@@ -60,6 +60,11 @@ and creates disposable local configuration homes. On 2026-07-15 this machine has
 the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installed; the new
 `claude-agent-acp`, OpenCode, and OpenHands are not installed globally.
 
+The review fix pass is waiting on one product decision: choose distinct permission chips
+**Approved**, **Denied**, **Cancelled**, and **Timed out** (recommended), or retain the specified
+two-state vocabulary where every non-approval reads **Denied**. The remaining review finding stays
+open until that choice is recorded.
+
 ## Review findings
 
 Recorded by the 2026-07-26 week usability review; repro steps and evidence paths are in
