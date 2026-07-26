@@ -266,7 +266,6 @@
 
 .state-badge {
   align-items: center;
-  color: var(--ad-text-muted);
   display: inline-flex;
   font-family: var(--ad-font-mono);
   font-size: 0.63rem;
@@ -281,12 +280,12 @@
   width: 8px;
 }
 
-.state-badge.busy span { background: var(--ad-state-busy); }
-.state-badge.idle span { background: var(--ad-state-idle); }
-.state-badge.waiting_input span { background: var(--ad-state-waiting); }
-.state-badge.done span { background: var(--ad-state-done); }
-.state-badge.error span { background: var(--ad-state-error); }
-.state-badge.unknown span { background: var(--ad-state-unknown); }
+.state-badge.busy .ad-badge-indicator { background: var(--ad-state-busy); }
+.state-badge.idle .ad-badge-indicator { background: var(--ad-state-idle); }
+.state-badge.waiting_input .ad-badge-indicator { background: var(--ad-state-waiting); }
+.state-badge.done .ad-badge-indicator { background: var(--ad-state-done); }
+.state-badge.error .ad-badge-indicator { background: var(--ad-state-error); }
+.state-badge.unknown .ad-badge-indicator { background: var(--ad-state-unknown); }
 
 .context-bar {
   background: var(--ad-surface-subtle);

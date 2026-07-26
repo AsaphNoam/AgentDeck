@@ -7,7 +7,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** Dashboard cards now show configured project titles with a durable-id fallback, and every
+- **State:** Dashboard state badges now visibly render their text labels; a broad selector had painted
+  every nested span, including the label, as a solid state-coloured block. Component coverage and the
+  browser visual matrix now exercise every state. Dashboard cards otherwise show configured project titles with a durable-id fallback, and every
   context meter visibly labels its percentage, including zero. Direct human inspection found both
   prior presentations ambiguous; focused regressions, the visual matrix, and J5 now cover the
   observations. The prior seven findings from the review of `ccc2b50`→`cc9d498` are fixed and the queue is
@@ -73,6 +75,13 @@ are not promoted to findings without a repeatable failure.
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-26 — Restored visible Dashboard state-badge labels. **INV §10** found a presentation
+  selector that matched every `span` inside a badge, converting its label into a state-coloured
+  rectangle. The selector now targets only `.ad-badge-indicator`, while the base badge variant
+  supplies its state-coloured text. FS-02.R3's existing vocabulary is restored; all six labels,
+  the visual matrix, the full 153-test UI suite, both Go test variants, and the release build pass.
+  A browser check confirms Busy, Idle, Waiting, Done, Error, and Unknown render as readable labels.
 
 - 2026-07-26 — Clarified Dashboard card identity and context. **INV §10** found no additional
   invariant breach: the problem was an explicit but misleading presentation rule. FS-02.R25 now

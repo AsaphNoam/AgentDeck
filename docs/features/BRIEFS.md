@@ -4,6 +4,21 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-26 — Fix: visible Dashboard state labels
+
+The top-right state badge is now readable. It was meant to show the agent state, but a CSS rule
+painted the label itself as a solid block; it now styles only the status dot. The browser check
+confirms readable Busy, Idle, Waiting, Done, Error, and Unknown labels, and the full test and
+release-build checks pass.
+
+To start a stopped agent today, open **Archive**, select that session, and choose **Resume**. The
+Dashboard card itself does not yet offer Resume, so this path is more indirect than it should be.
+
+**Needs attention:** Decide whether stopped Dashboard cards should gain a direct Resume action.
+
+**Next:** Restart a currently running local dashboard to load the rebuilt application, then use
+Archive → Resume to restart a stopped agent.
+
 ### 2026-07-26 — Fix: clearer Dashboard agent cards
 
 Dashboard cards now show the configured project name rather than its internal id, while retaining
