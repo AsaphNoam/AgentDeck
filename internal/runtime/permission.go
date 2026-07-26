@@ -179,10 +179,12 @@ func (c *ChatRuntime) escalateCancel(as *agentState, armedTurn int64) {
 		stillBusy := as.turnActive && !as.stopped && as.turnSeq == armedTurn
 		pgid := as.pgid
 		hasProc := as.cmd != nil && as.cmd.Process != nil
-		as.mu.Unlock()
 		if stillBusy && hasProc && pgid > 0 {
-			_ = syscall.Kill(-pgid, syscall.SIGINT)
+			if err := syscall.Kill(-pgid, syscall.SIGINT); err == nil {
+				as.cancelEscalated = true
+			}
 		}
+		as.mu.Unlock()
 	}()
 }
 

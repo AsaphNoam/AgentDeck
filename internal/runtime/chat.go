@@ -176,6 +176,9 @@ type agentState struct {
 	transcript []Event
 	writer     TranscriptWriter
 	stopped    bool
+	// cancelEscalated is set only when the current turn ignored cooperative
+	// cancellation and the fallback SIGINT was delivered successfully.
+	cancelEscalated bool
 }
 
 // pendingPerm is a withheld session/request_permission awaiting a decision.
@@ -309,6 +312,7 @@ func (c *ChatRuntime) SendPrompt(ctx context.Context, agentID, text string) erro
 		return ErrTurnInFlight
 	}
 	as.turnActive = true
+	as.cancelEscalated = false
 	as.resolved = map[string]struct{}{}
 	turnID := as.nextTurnIDLocked()
 	as.mu.Unlock()
@@ -347,6 +351,9 @@ func (c *ChatRuntime) SendPrompt(ctx context.Context, agentID, text string) erro
 			if errors.Is(err, errTransportClosed) || as.isStopped() {
 				return
 			}
+			as.mu.Lock()
+			as.cancelEscalated = false
+			as.mu.Unlock()
 			c.emit(as, EvError, ErrorData{Scope: "protocol", Message: err.Error(), Fatal: false})
 			td := TurnEndData{StopReason: "error", ContextPct: as.lastPct()}
 			c.applyTurnEndStatus(as, td)
@@ -356,6 +363,7 @@ func (c *ChatRuntime) SendPrompt(ctx context.Context, agentID, text string) erro
 		td, hasPct := mapPromptResult(res)
 		as.mu.Lock()
 		as.turnActive = false
+		as.cancelEscalated = false
 		if hasPct {
 			as.contextPct = td.ContextPct
 		} else {
@@ -619,6 +627,7 @@ func (c *ChatRuntime) CheckMessages(ctx context.Context, pid int) error {
 		return nil
 	}
 	as.turnActive = true
+	as.cancelEscalated = false
 	turnID := as.nextTurnIDLocked()
 	as.mu.Unlock()
 	if err := c.store.ResetTurnBudget(as.agentID, turnID); err != nil {
@@ -648,6 +657,9 @@ func (c *ChatRuntime) CheckMessages(ctx context.Context, pid int) error {
 			if errors.Is(err, errTransportClosed) || as.isStopped() {
 				return
 			}
+			as.mu.Lock()
+			as.cancelEscalated = false
+			as.mu.Unlock()
 			c.emit(as, EvError, ErrorData{Scope: "protocol", Message: err.Error(), Fatal: false})
 			td := TurnEndData{StopReason: "error", ContextPct: as.lastPct()}
 			c.applyTurnEndStatus(as, td)
@@ -657,6 +669,7 @@ func (c *ChatRuntime) CheckMessages(ctx context.Context, pid int) error {
 		td, hasPct := mapPromptResult(res)
 		as.mu.Lock()
 		as.turnActive = false
+		as.cancelEscalated = false
 		if hasPct {
 			as.contextPct = td.ContextPct
 		} else {
@@ -718,6 +731,7 @@ func (c *ChatRuntime) onTransportClosed(as *agentState) {
 		as.closePersistence()
 		return
 	}
+	cancelEscalated := as.cancelEscalated
 	as.stopped = true
 	as.turnActive = false
 	pend := as.pending
@@ -734,11 +748,24 @@ func (c *ChatRuntime) onTransportClosed(as *agentState) {
 	_ = as.cmd.Wait() // reap the exited process
 
 	tail := as.stderr.Tail()
-	c.emit(as, EvError, ErrorData{Scope: "process", Message: strutil.FirstNonEmpty(tail, "process exited"), Fatal: true})
+	errorMessage := strutil.FirstNonEmpty(tail, "process exited")
+	statusDetail := clip(tail, 120)
+	lastTrace := "Error"
+	stopReason := "error"
+	if cancelEscalated {
+		errorMessage = "Cancelled — agent process exited after ignoring cancellation."
+		if tail != "" {
+			errorMessage += " " + tail
+		}
+		statusDetail = "cancelled — process exited"
+		lastTrace = "Cancelled"
+		stopReason = "cancelled"
+	}
+	c.emit(as, EvError, ErrorData{Scope: "process", Message: errorMessage, Fatal: true})
 
 	// Settle state.db before emitting turn_end so a client reacting to turn_end
 	// never observes a stale running row or busy status.
-	c.updateStatus(as, "error", clip(tail, 120), "Error", clearBusySince)
+	c.updateStatus(as, "error", statusDetail, lastTrace, clearBusySince)
 	_ = c.store.DeleteRunning(as.agentID)
 	c.touchState(as.agentID)
 	c.removeAgent(as.agentID)
@@ -750,7 +777,7 @@ func (c *ChatRuntime) onTransportClosed(as *agentState) {
 		c.onExit(as.agentID, as.generation)
 	}
 
-	c.emit(as, EvTurnEnd, TurnEndData{StopReason: "error", ContextPct: as.lastPct()})
+	c.emit(as, EvTurnEnd, TurnEndData{StopReason: stopReason, ContextPct: as.lastPct()})
 	as.closePersistence()
 	as.cancel()
 	as.hub.Close()

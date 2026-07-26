@@ -55,9 +55,12 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   pending permission, and `202 {cancelled:false}` when the agent is already idle. Cancellation
   resolves a pending permission without executing its tool and terminates the turn with reason
   `cancelled`; if the cooperative ACP cancel does not finish, the runtime escalates to process
-  interrupt. Resolving that permission records a `permission_resolved` (decision `cancelled`) on the
-  live stream and in the durable transcript, so the prompt renders a resolved chip on both the live
-  view and after reload instead of staying actionable.
+  interrupt. If that escalation ends the process, the runtime removes its running row, marks the
+  agent `error`, and emits a fatal process error that explicitly says the agent exited after ignoring
+  cancellation; it does not report the outcome as an unrelated generic process exit. Resolving a
+  pending permission records a `permission_resolved` (decision `cancelled`) on the live stream and
+  in the durable transcript, so the prompt renders a resolved chip on both the live view and after
+  reload instead of staying actionable.
 
 ### 2.3 Streaming and recovery
 
@@ -139,8 +142,10 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `internal/server/integration_test.go::TestPermissionDenyReturnsIdleAfterTurnEnd`; server mapping in
   `internal/server/server_test.go::TestPermissionErrorAlreadyResolved`.
 - **A5** (R9) — Cancel claims a pending permission, prevents tool execution, records a
-  `permission_resolved` (decision `cancelled`) and a cancelled turn, and becomes a no-op once idle:
-  `internal/runtime/permission_test.go::TestCancelDuringPendingPermission`.
+  `permission_resolved` (decision `cancelled`) and a cancelled turn, becomes a no-op once idle, and
+  identifies a peer killed by escalation as a cancellation-caused process exit:
+  `internal/runtime/permission_test.go::TestCancelDuringPendingPermission` and
+  `TestCancelEscalatesToSIGINT`.
 - **A6** (R4, R10–R12) — Nested wire events normalize, assistant deltas fold on live append and
   replay, and permission resolutions fold on both paths: `ui/src/store/transcriptStore.test.ts`.
 - **A7** (R7, R13) — Accepted user prompts and delivered partial output remain in both the transcript
