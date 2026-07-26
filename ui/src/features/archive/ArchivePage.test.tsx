@@ -44,21 +44,21 @@ const server = setupServer(
     const url = new URL(request.url);
     const q = url.searchParams.get("q") ?? "";
     if (q === "noresult") {
-      return HttpResponse.json({ query: q, total: 0, limit: 50, offset: 0, results: [] });
+      return HttpResponse.json({ query: q, search_mode: "full_text", total: 0, limit: 50, offset: 0, results: [] });
     }
     if (q === "atlas") {
       return HttpResponse.json({
-        query: q, total: 1, limit: 50, offset: 0,
+        query: q, search_mode: "full_text", total: 1, limit: 50, offset: 0,
         results: [{ ...mockActive, matched_in: ["metadata"], snippet: "" }],
       });
     }
     if (q === "snippet test") {
       return HttpResponse.json({
-        query: q, total: 1, limit: 50, offset: 0,
+        query: q, search_mode: "full_text", total: 1, limit: 50, offset: 0,
         results: [{ ...mockActive, matched_in: ["transcript"], snippet: "a snippet here" }],
       });
     }
-    return HttpResponse.json({ query: "", total: 2, limit: 50, offset: 0, results: [mockActive, mockInactive] });
+    return HttpResponse.json({ query: "", search_mode: "full_text", total: 2, limit: 50, offset: 0, results: [mockActive, mockInactive] });
   }),
 );
 
@@ -136,7 +136,7 @@ describe("ArchivePage", () => {
         const result = offset === "0"
           ? { ...mockActive, agent_id: "a_page_1", name: "Page one" }
           : { ...mockInactive, agent_id: "a_page_2", name: "Page two" };
-        return HttpResponse.json({ query: "", total: 2, limit: 1, offset: Number(offset), results: [result] });
+        return HttpResponse.json({ query: "", search_mode: "full_text", total: 2, limit: 1, offset: Number(offset), results: [result] });
       }),
     );
 
@@ -148,5 +148,16 @@ describe("ArchivePage", () => {
     expect(screen.getByText("Page one")).toBeInTheDocument();
     expect(offsets).toEqual(["0", "1"]);
     expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+  });
+
+  it("does not advertise transcript search in metadata-only mode", async () => {
+    server.use(http.get("/api/archive", () => HttpResponse.json({
+      query: "", search_mode: "metadata", total: 0, limit: 50, offset: 0, results: [],
+    })));
+
+    renderArchive();
+    const input = await screen.findByPlaceholderText("Search agents, roles, projects, backends…");
+    expect(input).not.toHaveAttribute("placeholder", expect.stringContaining("transcript"));
+    expect(screen.getByText(/searches session metadata only/)).toBeInTheDocument();
   });
 });

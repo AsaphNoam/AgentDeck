@@ -107,8 +107,9 @@ VALUES ('a_archive','Atlas','implementer','my-app','claude','sonnet','chat','/tm
 		t.Fatalf("archive status = %d: %s", rec.Code, rec.Body.String())
 	}
 	var body struct {
-		Total   int `json:"total"`
-		Results []struct {
+		Total      int    `json:"total"`
+		SearchMode string `json:"search_mode"`
+		Results    []struct {
 			AgentID string `json:"agent_id"`
 			Active  bool   `json:"active"`
 		} `json:"results"`
@@ -116,7 +117,7 @@ VALUES ('a_archive','Atlas','implementer','my-app','claude','sonnet','chat','/tm
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("archive body: %v", err)
 	}
-	if body.Total != 1 || len(body.Results) != 1 || body.Results[0].AgentID != "a_archive" || body.Results[0].Active {
+	if body.Total != 1 || body.SearchMode == "" || len(body.Results) != 1 || body.Results[0].AgentID != "a_archive" || body.Results[0].Active {
 		t.Fatalf("archive body = %+v", body)
 	}
 }

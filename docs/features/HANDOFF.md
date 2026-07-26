@@ -8,7 +8,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 - **Active change:** None.
 - **State:** the week's work has now been driven end to end in a real browser. All six Must-fix
-  findings are resolved; ten Worth-fixing findings remain. Everything else driven passed: the whole pipeline lifecycle, the
+  findings are resolved; nine Worth-fixing findings remain. Everything else driven passed: the whole pipeline lifecycle, the
   annotation tray and its three delivery routes, archive search on both build variants, first paint
   on an empty home, chat round-trip and delta coalescing, all four permission outcomes, crash and
   disconnect recovery, and restart durability. Below is the state as of the preceding review.
@@ -63,10 +63,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 Recorded by the 2026-07-26 week usability review; repro steps and evidence paths are in
 [`../archive/reviews/usability-review-run-2026-07-26-week.md`](../archive/reviews/usability-review-run-2026-07-26-week.md).
 
-- **Worth fixing** — J8 the untagged build still advertises transcript search it cannot perform
-  (**INV §8**): the placeholder reads "Search agents, roles, projects, transcript…" while every
-  transcript-only term returns nothing and no snippet is ever produced.
-
 - **Worth fixing** — J13 line numbers carry no affordance (no invariant class): computed cursor is
   `auto`, with no tooltip, aria-label, or helper copy, so even once the blocker above is fixed the
   selection handle is undiscoverable.
@@ -112,6 +108,12 @@ not reproduce, the untimed `tmux` driver calls, and the two onboarding steps tha
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-26 — Made Archive search capability honest. **INV §8** now reports
+  `search_mode` on every Archive response from one shared SQLite capability detector; the metadata-
+  only path removes transcript from the placeholder and explains that transcript text/snippets are
+  unavailable, while full-text mode retains the one-turn guidance. FS-05.R30/A14, TS-02.R10, and
+  TS-03.R18 pin the API/UI contract. Tagged, untagged, server, and UI regressions cover both modes.
 
 - 2026-07-26 — Explained Archive search document boundaries. **INV §8** now gives
   the search input an accessible scope note stating that all terms must match one metadata record,

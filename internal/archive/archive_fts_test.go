@@ -104,6 +104,9 @@ func TestArchiveSearchFTSMetadataTranscriptAndPagination(t *testing.T) {
 	if resp.Total != 1 || resp.Results[0].AgentID != "a_active" {
 		t.Fatalf("transcript search results = %+v", resp.Results)
 	}
+	if resp.SearchMode != "full_text" {
+		t.Fatalf("search_mode = %q, want full_text", resp.SearchMode)
+	}
 	if got := resp.Results[0].MatchedIn; len(got) != 1 || got[0] != "transcript" {
 		t.Fatalf("matched_in = %+v, want transcript", got)
 	}

@@ -58,6 +58,7 @@ export function ArchivePage() {
   const debouncedQ = useDebounce(q, 250);
   const [results, setResults] = useState<ArchiveResult[]>([]);
   const [total, setTotal] = useState(0);
+  const [searchMode, setSearchMode] = useState<"full_text" | "metadata" | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -73,6 +74,7 @@ export function ArchivePage() {
       if (!ac.signal.aborted) {
         setResults((current) => append ? [...current, ...(resp.results ?? [])] : (resp.results ?? []));
         setTotal(resp.total);
+        setSearchMode(resp.search_mode === "full_text" ? "full_text" : "metadata");
       }
     } catch (err: unknown) {
       if (!ac.signal.aborted) {
@@ -95,6 +97,12 @@ export function ArchivePage() {
     }
   };
 
+  const searchPlaceholder = searchMode === "full_text"
+    ? "Search agents, roles, projects, transcript…"
+    : searchMode === "metadata"
+      ? "Search agents, roles, projects, backends…"
+      : "Search archive…";
+
   return (
     <section className="archive-page" data-ui="archive" data-state={error ? "error" : loading ? "loading" : results.length === 0 ? "empty" : undefined}>
       <div className="archive-header" data-slot="header">
@@ -104,7 +112,7 @@ export function ArchivePage() {
       <div className="archive-search" data-slot="search">
         <input
           type="search"
-          placeholder="Search agents, roles, projects, transcript…"
+          placeholder={searchPlaceholder}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           aria-label="Search archive"
@@ -112,7 +120,13 @@ export function ArchivePage() {
         />
         {total > 0 && <span className="archive-count">{total} result{total !== 1 ? "s" : ""}</span>}
       </div>
-      <p className="form-info" id="archive-search-scope">All terms must match within one metadata record, transcript turn, or annotation; search does not combine text across turns.</p>
+      <p className="form-info" id="archive-search-scope">
+        {searchMode === "full_text"
+          ? "All terms must match within one metadata record, transcript turn, or annotation; search does not combine text across turns."
+          : searchMode === "metadata"
+            ? "This build searches session metadata only; transcript text and snippets are unavailable."
+            : "Loading search capabilities…"}
+      </p>
       {error && <p className="archive-error">{error}</p>}
       {loading && results.length === 0 && <p className="archive-loading">Loading…</p>}
       {!loading && !error && results.length === 0 && (

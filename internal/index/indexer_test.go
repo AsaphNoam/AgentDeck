@@ -3,7 +3,6 @@ package index
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -663,12 +662,5 @@ func TestIndexerDegradesWhenFTS5WritesAreUnavailable(t *testing.T) {
 	}
 	if documents != 0 {
 		t.Fatalf("derived documents = %d, want 0", documents)
-	}
-}
-
-func TestClassifyFTSWritabilityTreatsMissingModuleAsDegraded(t *testing.T) {
-	writable, err := classifyFTSWritability("CREATE VIRTUAL TABLE sessions_fts USING fts5(content)", errors.New("no such module: fts5"))
-	if err != nil || writable {
-		t.Fatalf("writable = %v err = %v", writable, err)
 	}
 }

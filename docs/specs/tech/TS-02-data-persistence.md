@@ -59,7 +59,9 @@ untagged test/build path must degrade to metadata `LIKE` search without surfacin
 error. When that build opens an existing FTS5 virtual table it cannot load, index write boundaries
 skip only the derived FTS metadata/transcript document while still committing authoritative session
 metadata, event counters, and turn rollups. A missing FTS5 module never blocks agent lifecycle.
-Behavior differences are explicitly specified by FS-01.R29 and FS-05.
+One state-owned capability detector classifies the current `sessions_fts` object as full-text,
+plain fallback, or unavailable so index writes and Archive presentation cannot disagree. Behavior
+differences are explicitly specified by FS-01.R29 and FS-05.
 
 **R11 — Message persistence is transactional.** Messages, read state, expiry, and per-turn budget
 state live in SQLite. A send either stores the message and updates its budget atomically or stores

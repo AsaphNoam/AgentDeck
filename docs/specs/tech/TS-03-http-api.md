@@ -107,6 +107,11 @@ revisions and refetch run detail for attempts/results/values. Existing `notifica
 pipeline needs-attention/completed categories through the ordinary mute path. Reconnect hydrates
 pipeline lists through REST rather than replaying an unbounded event log.
 
+**R18 — Archive responses expose effective search capability.** Every `GET /api/archive` response
+includes `search_mode:"full_text"|"metadata"`, derived from the current SQLite connection rather
+than the build command or a UI assumption. This field is present for listing, successful search,
+and empty pages so the Archive UI can keep its search promise honest (FS-05.R30).
+
 ## 3. Interfaces & data shapes
 
 Feature-owned request/response fields are specified in the owning FS, including FS-14 for pipeline
