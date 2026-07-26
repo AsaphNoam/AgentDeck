@@ -30,8 +30,9 @@ export function putLayout(layout: Layout) {
   });
 }
 
-export function getTranscript(agentId: string) {
-  return json<{ agent_id: string; events: TranscriptEvent[] }>(`/api/sessions/${agentId}/transcript`);
+export function getTranscript(agentId: string, includeMeta = false) {
+  const suffix = includeMeta ? "?include_meta=true" : "";
+  return json<{ agent_id: string; events: TranscriptEvent[] }>(`/api/sessions/${agentId}/transcript${suffix}`);
 }
 
 // launchAgent POSTs a new session (techspec §7.1). Used by Clone to spin up a new

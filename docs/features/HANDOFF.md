@@ -8,7 +8,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 - **Active change:** None.
 - **State:** the week's work has now been driven end to end in a real browser. All six Must-fix
-  findings are resolved; two Worth-fixing findings remain. Everything else driven passed: the
+  findings are resolved; one Worth-fixing finding remains and requires a product decision.
+  Everything else driven passed: the
   whole pipeline lifecycle, the
   annotation tray and its three delivery routes, archive search on both build variants, first paint
   on an empty home, chat round-trip and delta coalescing, all four permission outcomes, crash and
@@ -68,10 +69,6 @@ Recorded by the 2026-07-26 week usability review; repro steps and evidence paths
   invariant class). This matches the two-state chip FS-03 specifies, so the fix is a spec decision
   about whether those outcomes deserve their own vocabulary.
 
-- **Worth fixing** — J8 an opened archived transcript does not identify itself (no invariant class):
-  the header shows only "Archived session · read-only · Resume" with no name, project, model, or
-  date, while Resume sits one click away.
-
 Three items were deliberately **not** promoted to findings and are carried for the next code review
 in the run report's "Unconfirmed" and "Static sweeps" sections: a one-off archive-search 500 that did
 not reproduce, the untimed `tmux` driver calls, and the two onboarding steps that render
@@ -80,6 +77,12 @@ not reproduce, the untimed `tmux` driver calls, and the two onboarding steps tha
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-26 — Identified archived transcripts before Resume. **No invariant class** applied;
+  FS-05.R31/A15 now require the read-only header to show recorded name, project, backend/model, and
+  creation date. The view requests the transcript's existing session metadata instead of relying on
+  live-agent state, retains a loading fallback, and renders the identity alongside its archived
+  state. A UI regression verifies the metadata query and every header field.
 
 - 2026-07-26 — Identified cancellation-escalation exits. **INV §8** now marks the exact turn when a
   peer ignores cooperative cancellation and receives fallback SIGINT; if that signal ends the

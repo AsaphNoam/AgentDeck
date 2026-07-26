@@ -150,6 +150,10 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   transcript search and the one-turn scope only in `full_text` mode; in `metadata` mode its
   placeholder and scope note state that only agent/session metadata is searchable and transcript
   snippets are unavailable. Before capability hydration, the placeholder makes no transcript claim.
+- **R31.** An opened archived transcript identifies the session before **Resume**: its header shows
+  the recorded agent name, project, backend/model, and creation date alongside its archived,
+  read-only state. The view obtains this identity from the transcript's existing
+  `include_meta=true` session metadata rather than relying on live-agent state.
 
 ## 5. Acceptance criteria
 
@@ -199,6 +203,9 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 - **A14** (R6, R23, R30) — Tagged and untagged Archive responses report their effective search
   mode, and the UI changes its placeholder and scope note without advertising unavailable
   transcript search: archive build-variant tests and `ui/src/features/archive/ArchivePage.test.tsx`.
+- **A15** (R14, R31) — The archived transcript requests session metadata and renders name, project,
+  backend/model, creation date, and read-only state before Resume:
+  `ui/src/features/archive/ArchiveAgentPage.test.tsx`.
 
 ## 6. Deviations & open decisions
 
