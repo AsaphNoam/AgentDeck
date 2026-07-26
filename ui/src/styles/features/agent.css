@@ -341,11 +341,26 @@
 .annotation-tray {
   bottom: var(--ad-space-4);
   box-shadow: var(--ad-shadow-keyline);
+  display: flex;
+  flex-direction: column;
   max-height: min(72%, 640px);
-  overflow: auto;
+  overflow: hidden;
   position: absolute;
   right: var(--ad-space-4);
   width: min(420px, calc(100% - var(--ad-space-8)));
+}
+
+.annotation-tray-body {
+  min-height: 0;
+  overflow: auto;
+}
+
+.annotation-tray-footer {
+  background: var(--ad-surface-panel);
+  border-top: var(--ad-border-thin) solid var(--ad-border-default);
+  flex: none;
+  margin-top: var(--ad-space-3);
+  padding-top: var(--ad-space-3);
 }
 
 .annotation-link {
@@ -391,7 +406,6 @@
 
 .annotation-targets {
   flex-wrap: wrap;
-  margin-top: var(--ad-space-3);
 }
 
 .annotation-targets label {

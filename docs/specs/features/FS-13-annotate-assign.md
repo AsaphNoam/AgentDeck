@@ -109,6 +109,10 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 - **R17.** A selectable diff block labels its line numbers as the selection control and presents
   them with a pointer cursor. Clicking one line starts a selection; clicking another line on the
   same side extends the contiguous range before **Annotate** captures it (R1–R2).
+- **R18.** The pending tray keeps its header and delivery controls visible within its bounded
+  overlay while the draft list and overall instruction scroll independently. Multiple detailed
+  drafts therefore cannot push target selection, errors, or **Send annotations** below the tray's
+  visible edge.
 
 ## 5. Acceptance criteria
 
@@ -138,6 +142,8 @@ Each acceptance item names its delivered verification.
 - **A9** (R1–R2, R17) — A diff block visibly explains line-number selection and applies the pointer
   affordance while the library-shaped id regression captures the selected range:
   `ui/src/components/chat/renderers/DiffBlock.test.tsx`.
+- **A10** (R3–R4, R18) — A tray with three drafts renders them in the scrollable body and keeps its
+  target and Send action in a separate fixed footer: `ui/src/components/chat/AnnotationTray.test.tsx`.
 
 ## 6. Deviations & open decisions
 
