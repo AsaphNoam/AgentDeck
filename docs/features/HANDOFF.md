@@ -7,7 +7,16 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** configurable pipeline runs are complete and now reviewed. FS-14 and TS-09 are Current;
+- **State:** the week's work has now been driven end to end in a real browser. Sixteen usability
+  findings are open above, six of them Must fix: diff-line annotation never registers a selection,
+  no Codex model can be assigned to a pipeline stage, the Start-run form drops the server's field
+  diagnostics, the archive shows only the first 50 sessions with no pager, a home opened by the
+  FTS5 build cannot launch agents under the untagged build, and a search spanning two turns answers
+  "No results" with no signal. Everything else driven passed: the whole pipeline lifecycle, the
+  annotation tray and its three delivery routes, archive search on both build variants, first paint
+  on an empty home, chat round-trip and delta coalescing, all four permission outcomes, crash and
+  disconnect recovery, and restart durability. Below is the state as of the preceding review.
+  Configurable pipeline runs are complete and reviewed. FS-14 and TS-09 are Current;
   the reusable template store, durable sequential manager, shared lifecycle execution, scoped
   result/proposal tools, REST/SSE/CLI controls, notification/association paths, and Pipelines UI are
   shipped. All seven review findings are fixed: ordinary stage-agent stops pause runs with recovery,
@@ -55,11 +64,136 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-None.
+Recorded by the 2026-07-26 week usability review; repro steps and evidence paths are in
+[`../archive/reviews/usability-review-run-2026-07-26-week.md`](../archive/reviews/usability-review-run-2026-07-26-week.md).
+
+- **Must fix** — J13 diff-line annotation never registers a selection (**INV §10**).
+  `ui/src/components/chat/renderers/DiffBlock.tsx:11` matches `/^([LR])(\d+)$/`, but
+  `react-diff-viewer-continued` passes `` `${prefix}-${lineNumber}` `` (`L-1`, `R-5`), so `chooseLine`
+  returns before calling `setSelection` and no gutter click ever selects anything. Normal-use
+  trigger: clicking line numbers on any diff in a live or archived transcript. FS-13.R1/R2 make
+  diff-line anchoring the feature's headline capability, so it is specified but unreachable; whole-
+  event annotation still works. Nothing in `ui/src` tests `DiffBlock` or the `onLineNumberClick`
+  contract. Fix: accept the library's real id format and add a `DiffBlock` regression test built
+  from a library-shaped id rather than a hand-written one.
+
+- **Must fix** — J14 no Codex model can be assigned to a pipeline stage (**INV §2**).
+  `internal/pipeline/manager.go:194` validates the run-time assignment with
+  `config.ValidSlug(assignment.Model)`, which is the role/project *filename* rule
+  (`internal/config/validate.go:15`) and forbids dots. FS-09.R33 seeds Codex's models as
+  `gpt-5.6-sol` and `gpt-5.5`, so every seeded Codex model is rejected. Normal-use trigger: choose
+  Codex for any stage in the Start-run form — the app offers the models and then refuses the run.
+  This contradicts FS-14.R2's own example ("Codex for implementation and Claude for review") and
+  blocks FS-14.A1/A7. Every existing pipeline test uses the slug-clean model id `"gpt"`, which is
+  why the suite is green. Fix: validate the model against the configured catalog, which the run
+  already resolves, and add a regression test that assigns a dotted seeded model id.
+
+- **Must fix** — J14 the Start-run form discards the server's field diagnostics (**INV §8**).
+  `ui/src/features/pipelines/RunStartForm.tsx:116-120` sets the error from `reason.message` alone, so
+  every run-start rejection renders as the bare words "run cannot start". Normal-use trigger: any
+  invalid run start — an unavailable backend, an undeclared or over-long input, or the Codex case
+  above. `pipelineDiagnostics()` already exists at `ui/src/api/pipelines.ts:209` and
+  `TemplateEditor.tsx:279-281` already renders the same shape, so the run form simply never calls
+  it. TS-09 requires bounded field diagnostics precisely so an invalid configuration stays
+  repairable. Fix: call `pipelineDiagnostics` in the run form's `onError` and render the list.
+
+- **Must fix** — J8 the archive shows only the first 50 sessions and offers no pager (**INV §10**).
+  `ui/src/features/archive/ArchivePage.tsx:72` always calls `searchArchive(query, 50, 0)`; the
+  offset parameter FS-05 specifies is never used. Normal-use trigger: any install that accumulates
+  more than 50 archived sessions — with 55 the header truthfully reads "55 results" while five rows
+  are unreachable. Fix: wire paging (or load-more) to the existing offset, and add a UI test with
+  more than one page of results.
+
+- **Must fix** — J8 a home opened by the FTS5 build cannot launch agents under the untagged build
+  (**INV §8**). Launch and resume return 502 with the raw internal message "runtime: index session
+  meta: index: delete metadata document: no such module: fts5", printed inside the launch modal, so
+  no agent can start on that home. Normal-use trigger: running the default `make build` binary once
+  and then an untagged build against the same home. Reachability is narrow — the release binary is
+  FTS5 (`TAGS := sqlite_fts5`) and a machine that only ever runs untagged is fine — which is why
+  this is MAJOR rather than BLOCKER, but the search path already falls back for exactly this case
+  and the index write path does not. Fix: degrade the index write the way search degrades, and keep
+  the raw SQLite module error out of the user-facing surface.
+
+- **Must fix** — J8 a search whose terms span two turns answers "No results" with no signal
+  (**INV §8**). Searching an agent name plus a word from that same agent's transcript
+  ("Marlin barnacle") returns nothing, though either term alone returns the session. The per-turn
+  document behaviour itself is the accepted boundary recorded with FS-05's turn indexing, and the
+  cross-turn alternative stays in `docs/ideas.md`; the defect is that the UI gives an affirmatively
+  wrong answer with no vocabulary for why. Fix: signal the one-turn scope in the search affordance
+  or the empty state — a copy and affordance change, not an index redesign.
+
+- **Worth fixing** — J8 the untagged build still advertises transcript search it cannot perform
+  (**INV §8**): the placeholder reads "Search agents, roles, projects, transcript…" while every
+  transcript-only term returns nothing and no snippet is ever produced.
+
+- **Worth fixing** — J13 line numbers carry no affordance (no invariant class): computed cursor is
+  `auto`, with no tooltip, aria-label, or helper copy, so even once the blocker above is fixed the
+  selection handle is undiscoverable.
+
+- **Worth fixing** — J13 the pending tray's Send button falls below the fold (no invariant class):
+  at three drafts the tray is 450px tall over 1165px of content with no sticky footer or scroll
+  hint, and the overlay occludes the right half of the transcript being annotated.
+
+- **Worth fixing** — J13 a tray whose source agent no longer exists cannot be discarded (**INV §1**):
+  it keeps one of the twenty retained-source slots for thirty days, and navigating to that agent
+  raises an uncaught `no such agent` page error. FS-13.R16's discard-on-delete only fires from
+  retention pruning because the product exposes no delete-agent affordance.
+
+- **Worth fixing** — J4 the live view rewrites earlier permission chips that share a tool-call id
+  (**INV §2**): `markResolved` maps over every matching request while the transcript fold correctly
+  stops at the newest, so the live states read `["denied","denied"]` where a reload shows
+  `["approved","denied"]`. Live and replay projection must agree.
+
+- **Worth fixing** — J11 a whitespace-only agent name is accepted at launch (**INV §8**) and renders
+  a card with no title, while Rename rejects the identical value with "name is required";
+  5000-character and NUL-containing names are also accepted unvalidated.
+
+- **Worth fixing** — J11 a project saves silently with a whitespace-only title and cwd (**INV §8**)
+  and then appears as a selectable target in New Agent.
+
+- **Worth fixing** — J3/J11 cancelling against a peer that ignores cancellation reports only
+  "process exited" (**INV §8**): escalation works and the UI unblocks in about three seconds, but
+  nothing ties the outcome to the user's Cancel or says the agent is now dead.
+
+- **Worth fixing** — J4 a cancelled and a timed-out permission both render the chip "DENIED" (no
+  invariant class). This matches the two-state chip FS-03 specifies, so the fix is a spec decision
+  about whether those outcomes deserve their own vocabulary.
+
+- **Worth fixing** — J8 an opened archived transcript does not identify itself (no invariant class):
+  the header shows only "Archived session · read-only · Resume" with no name, project, model, or
+  date, while Resume sits one click away.
+
+Three items were deliberately **not** promoted to findings and are carried for the next code review
+in the run report's "Unconfirmed" and "Static sweeps" sections: a one-off archive-search 500 that did
+not reproduce, the untimed `tmux` driver calls, and the two onboarding steps that render
+"Error: HTTP 400" instead of the server's reason.
 
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-26 — Drove the week's shipped work through the real rendered UI: J14 pipelines, J13
+  annotations, J8 archive/search on both build variants, J1/J3/J4/J11 core regressions, and J12
+  restart durability, against isolated homes and the fake ACP peer. Stage results were reported
+  through the local MCP endpoint with each stage agent's own minted token while its turn was held
+  open, so runs advanced through genuine turn quiescence. Sixteen findings are recorded above, six
+  Must fix. The two that matter most are unreachable shipped capabilities rather than regressions:
+  **INV §10** — `DiffBlock` parses a line id format the diff library does not emit, so FS-13's
+  diff-line annotation has never worked in a browser and no test covers that third-party seam;
+  **INV §2** — pipeline stage assignment validates model ids with the role/project filename slug
+  rule, which forbids dots, so both seeded Codex models are rejected and FS-14.R2's own
+  Codex-plus-Claude example is impossible. **INV §10** also caught the archive rendering only its
+  first 50 sessions while reporting the true total, and **INV §8** caught three dead ends: dropped
+  run-start diagnostics, a raw `no such module: fts5` blocking every launch on a downgraded home,
+  and cross-turn searches answering "No results" with no signal. Clean on the rest: the full
+  pipeline lifecycle including approval gates, repair loops, revision compare-and-swap, stop/
+  blocked/retry recovery, shared-workspace confirmation, restart recovery and run deletion; the
+  annotation tray, its three delivery routes and archive searchability; both archive build variants;
+  a styled empty home with zero console errors; delta coalescing; all four permission outcomes
+  including cancel-while-pending; and restart durability across agents, layout, archive and paused
+  runs. Static sweeps were clean on serialization, CSS wiring and null hostility. The full report is
+  [`../archive/reviews/usability-review-run-2026-07-26-week.md`](../archive/reviews/usability-review-run-2026-07-26-week.md).
+  No product code or specifications were changed; credentialed providers remain gated.
 
 - 2026-07-26 — Fixed the J2 Claude readiness blocker. **INV §12** now recognizes common
   `unknown`/`unrecognized`/`unsupported`/`invalid` option or flag diagnostics, Go's undefined-flag
