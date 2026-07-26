@@ -39,6 +39,49 @@ func TestComposeLaunchRejectsMissingCwd(t *testing.T) {
 	}
 }
 
+func TestNormalizeAgentName(t *testing.T) {
+	tests := []struct {
+		name     string
+		raw      string
+		optional bool
+		want     string
+		wantCode string
+	}{
+		{name: "omitted launch name", raw: "", optional: true, want: ""},
+		{name: "trimmed", raw: "  Atlas  ", want: "Atlas"},
+		{name: "whitespace", raw: " \t ", optional: true, wantCode: runtime.CodeEmptyName},
+		{name: "nul", raw: "At\x00las", optional: true, wantCode: runtime.CodeValidation},
+		{name: "unicode limit", raw: strings.Repeat("界", maxAgentNameRunes), want: strings.Repeat("界", maxAgentNameRunes)},
+		{name: "too long", raw: strings.Repeat("a", maxAgentNameRunes+1), wantCode: runtime.CodeValidation},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ae := normalizeAgentName(tt.raw, tt.optional)
+			if tt.wantCode != "" {
+				if ae == nil || ae.Code != tt.wantCode {
+					t.Fatalf("error = %#v, want code %q", ae, tt.wantCode)
+				}
+				return
+			}
+			if ae != nil || got != tt.want {
+				t.Fatalf("normalizeAgentName() = %q, %#v; want %q, nil", got, ae, tt.want)
+			}
+		})
+	}
+}
+
+func TestComposeLaunchRejectsInvalidName(t *testing.T) {
+	srv := testServer(t, true)
+	for _, name := range []string{"   ", "At\x00las", strings.Repeat("a", maxAgentNameRunes+1)} {
+		_, _, ae := srv.composeLaunch(t.Context(), launchRequest{
+			Role: "implementer", Project: "my-app", Name: name,
+		})
+		if ae == nil {
+			t.Fatalf("composeLaunch accepted invalid name %q", name)
+		}
+	}
+}
+
 func TestHookEnvInjected(t *testing.T) {
 	srv := testServer(t, true)
 	agent := state.Agent{AgentID: "a_h1", Interface: "terminal"}

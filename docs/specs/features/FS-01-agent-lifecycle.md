@@ -37,7 +37,9 @@ orphaned processes.
   composed config, which is frozen into the session snapshot. Ordinary resume and switch preserve
   it; only the explicit federation refresh in R12 re-resolves that source-owned portion.
 - **R4** — When no name is supplied, the server assigns the first unused name from a curated wordlist
-  (Atlas, Nova, Echo, …), appending a numeric suffix once the list is exhausted.
+  (Atlas, Nova, Echo, …), appending a numeric suffix once the list is exhausted. A supplied display
+  name is trimmed, must contain non-whitespace text, must not contain NUL, and is limited to 256
+  Unicode characters. The same display-name contract applies to rename and identity updates.
 - **R5** — Optional launch parameters default: `backend` → the backend marked default (else `claude`,
   else any); `model` → that backend's `default_model`; `interface` → `chat`.
 
@@ -51,8 +53,8 @@ orphaned processes.
   The already-streamed events stay persisted. Cancelling an idle agent is a no-op that reports
   `cancelled:false` rather than an error.
 - **R8** — **Rename** (`POST /api/sessions/{id}/rename`) changes the display name
-  only; the `agent_id` and all other identity fields are unchanged. An empty name is rejected. The
-  UI drives rename through a browser prompt.
+  only; the `agent_id` and all other identity fields are unchanged. Invalid names are rejected under
+  R4. The UI drives rename through a browser prompt.
 - **R9** — **Clone** launches a **new** agent (new `agent_id`) carrying the source agent's role,
   project, backend, model, interface, and group. Clone launches **immediately, with no confirmation
   dialog**; the source agent is untouched.
@@ -124,9 +126,9 @@ transitions:
 ## 4. Edge cases & errors
 
 - **R22** — Launch validation returns `400`/`422` naming the offending field for: missing role or
-  project, unknown role/project/backend/model, or an invalid interface. A project whose resolved
-  `cwd` does not exist is rejected up front with a message naming the directory and project — not a
-  deep fork/exec error that blames the adapter binary.
+  project, an invalid supplied name, unknown role/project/backend/model, or an invalid interface. A
+  project whose resolved `cwd` does not exist is rejected up front with a message naming the
+  directory and project — not a deep fork/exec error that blames the adapter binary.
 - **R23** — A terminal launch/resume/switch onto an unsupported backend returns `422
   terminal_unavailable` with a reason (R15). This gate lives in one helper shared by the launch,
   resume, and switch composers so the three paths cannot drift.
@@ -153,8 +155,10 @@ transitions:
 
 ## 5. Acceptance criteria
 
-- **A1** — Modal and CLI launch produce an identical running agent. *Verify:* CLI parse
-  `TestParseLaunch`, `TestParseLaunchNewAndResumeFlags`, `TestParseLaunchErrors`; journey **J3**.
+- **A1** — Modal and CLI launch produce an identical running agent, and every lifecycle entry point
+  applies the bounded display-name contract. *Verify:* CLI parse `TestParseLaunch`,
+  `TestParseLaunchNewAndResumeFlags`, `TestParseLaunchErrors`; server
+  `TestNormalizeAgentName`, `TestComposeLaunchRejectsInvalidName`; journey **J3**.
 - **A2** — Config composition is observable and correct (system prompt order, env layering, skip
   resolution) and frozen against later edits. *Verify:* `TestJoinSystemPrompt`,
   `TestComposeEnvLayering`, `TestResolveSkip`, `TestResumeAndSwitchUseFrozenSkipAndAddDirs`; journey
@@ -165,7 +169,8 @@ transitions:
   `TestStopReapsOrphanRuntimeAfterRestart`, `TestChatStopKillsOrphanedLiveProcess`.
 - **A5** — Cancel interrupts an in-flight turn and is a no-op when idle. *Verify:* `TestRealCLICancel`,
   `TestCancelDuringPendingPermission`, `TestCancelEscalatesToSIGINT`.
-- **A6** — Rename changes the name and nothing else. *Verify:* `TestRenameSession`.
+- **A6** — Rename changes the name and nothing else while sharing launch's validation. *Verify:*
+  `TestRenameSession`, `TestNormalizeAgentName`.
 - **A7** — Resume restores identity, model, system prompt, and add_dirs, observed from UI and process.
   *Verify:* `TestResumeAndSwitchCarryRoleAndProjectFields`, `TestResumeTerminalAgent`,
   `TestResumeFailureRemovesHookSettings`; journey **J7**.

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode/utf8"
 
 	"github.com/agentdeck/agentdeck/internal/backend"
 	"github.com/agentdeck/agentdeck/internal/config"
@@ -60,6 +61,28 @@ func (s *Server) handleLaunch(w http.ResponseWriter, r *http.Request) {
 type launchOptions struct {
 	AgentID    string
 	Generation string
+}
+
+const maxAgentNameRunes = 256
+
+// normalizeAgentName is the single display-name boundary for launch, rename,
+// and identity updates. An exactly omitted/empty launch name may request the
+// curated suggestion; explicit whitespace is invalid rather than a blank card.
+func normalizeAgentName(raw string, optional bool) (string, *runtime.APIError) {
+	if optional && raw == "" {
+		return "", nil
+	}
+	name := strings.TrimSpace(raw)
+	if name == "" {
+		return "", apiError(runtime.CodeEmptyName, "name is required")
+	}
+	if strings.ContainsRune(name, '\x00') {
+		return "", apiError(runtime.CodeValidation, "name must not contain NUL")
+	}
+	if utf8.RuneCountInString(name) > maxAgentNameRunes {
+		return "", apiError(runtime.CodeValidation, fmt.Sprintf("name must be at most %d characters", maxAgentNameRunes))
+	}
+	return name, nil
 }
 
 // launchAgent is the shared lifecycle service used by manual HTTP and pipeline
@@ -131,6 +154,10 @@ func (s *Server) composeLaunch(ctx context.Context, req launchRequest) (runtime.
 func (s *Server) composeLaunchWithOptions(ctx context.Context, req launchRequest, options launchOptions) (runtime.LaunchSpec, state.Agent, *runtime.APIError) {
 	if req.Role == "" || req.Project == "" {
 		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeValidation, "role and project are required")
+	}
+	normalizedName, ae := normalizeAgentName(req.Name, true)
+	if ae != nil {
+		return runtime.LaunchSpec{}, state.Agent{}, ae
 	}
 
 	role, err := s.configStore.ReadRole(req.Role)
@@ -249,7 +276,7 @@ func (s *Server) composeLaunchWithOptions(ctx context.Context, req launchRequest
 			return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeInternal, "mint agent id: "+err.Error())
 		}
 	}
-	name := req.Name
+	name := normalizedName
 	if name == "" {
 		name = s.suggestName()
 	}
