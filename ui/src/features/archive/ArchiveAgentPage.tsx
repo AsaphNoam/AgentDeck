@@ -13,9 +13,15 @@ export function ArchiveAgentPage() {
   const agent = useAgentStore((state) => state.agents[id]);
   const [resuming, setResuming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const metadata = events.find((event) => (event.kind ?? event.type) === "session_meta");
+  const archivedName = textField(metadata?.name) || "Archived session";
+  const project = textField(metadata?.project);
+  const backend = textField(metadata?.backend);
+  const model = textField(metadata?.model);
+  const createdAt = textField(metadata?.created_at);
 
   useEffect(() => {
-    void getTranscript(id).then((r) => setTranscript(r.agent_id, r.events)).catch(() => {});
+    void getTranscript(id, true).then((r) => setTranscript(r.agent_id, r.events)).catch(() => {});
   }, [id, setTranscript]);
 
   const doResume = async () => {
@@ -35,8 +41,12 @@ export function ArchiveAgentPage() {
       <header className="chat-header" data-slot="header">
         <Link to="/archive">Back to Archive</Link>
         <div data-slot="identity">
-          <h1>Archived session</h1>
-          <span className="archive-readonly-label">read-only</span>
+          <h1>{archivedName}</h1>
+          {(project || backend || model) && <span>{[project, [backend, model].filter(Boolean).join(" · ")].filter(Boolean).join(" · ")}</span>}
+          {(project || backend || model) && <br />}
+          <span className="archive-readonly-label">
+            Archived · read-only{createdAt && <> · <time dateTime={createdAt}>{formatTimestamp(createdAt)}</time></>}
+          </span>
         </div>
         <button
           type="button"
@@ -53,4 +63,13 @@ export function ArchiveAgentPage() {
       <div />
     </section>
   );
+}
+
+function textField(value: unknown) {
+  return typeof value === "string" ? value : "";
+}
+
+function formatTimestamp(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
