@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+
+	"github.com/agentdeck/agentdeck/internal/state"
 )
 
 type Archive struct {
@@ -18,11 +20,12 @@ type Query struct {
 }
 
 type Response struct {
-	Query   string   `json:"query,omitempty"`
-	Total   int      `json:"total"`
-	Limit   int      `json:"limit"`
-	Offset  int      `json:"offset"`
-	Results []Result `json:"results"`
+	Query      string   `json:"query,omitempty"`
+	SearchMode string   `json:"search_mode"`
+	Total      int      `json:"total"`
+	Limit      int      `json:"limit"`
+	Offset     int      `json:"offset"`
+	Results    []Result `json:"results"`
 }
 
 type Result struct {
@@ -74,7 +77,11 @@ func (a *Archive) Search(q Query) (Response, error) {
 	if err != nil {
 		return Response{}, err
 	}
-	return Response{Query: term, Total: total, Limit: q.Limit, Offset: q.Offset, Results: results}, nil
+	searchMode := "metadata"
+	if mode, detectErr := state.DetectSessionsFTS(a.db); detectErr == nil && mode == state.SessionsFTSFullText {
+		searchMode = "full_text"
+	}
+	return Response{Query: term, SearchMode: searchMode, Total: total, Limit: q.Limit, Offset: q.Offset, Results: results}, nil
 }
 
 func (a *Archive) list(q Query) (int, []Result, error) {

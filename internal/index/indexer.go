@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/agentdeck/agentdeck/internal/state"
 	"github.com/agentdeck/agentdeck/internal/strutil"
 )
 
@@ -298,26 +299,8 @@ VALUES (?, ?, '', '', '', '', '', '', ?)`, agentID, documentID, content); err !=
 }
 
 func ftsWritesAvailable(tx *sql.Tx) (bool, error) {
-	var createSQL string
-	if err := tx.QueryRow(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'sessions_fts'`).Scan(&createSQL); err != nil {
-		return false, fmt.Errorf("index: inspect sessions_fts: %w", err)
-	}
-	if !strings.Contains(strings.ToUpper(createSQL), "VIRTUAL") {
-		return true, nil
-	}
-	var count int
-	err := tx.QueryRow(`SELECT COUNT(*) FROM sessions_fts WHERE 0`).Scan(&count)
-	return classifyFTSWritability(createSQL, err)
-}
-
-func classifyFTSWritability(createSQL string, probeErr error) (bool, error) {
-	if !strings.Contains(strings.ToUpper(createSQL), "VIRTUAL") || probeErr == nil {
-		return true, nil
-	}
-	if strings.Contains(strings.ToLower(probeErr.Error()), "no such module") {
-		return false, nil
-	}
-	return false, fmt.Errorf("index: probe sessions_fts: %w", probeErr)
+	mode, err := state.DetectSessionsFTS(tx)
+	return mode != state.SessionsFTSUnavailable, err
 }
 
 func searchableText(ev runtime.Event) (string, error) {

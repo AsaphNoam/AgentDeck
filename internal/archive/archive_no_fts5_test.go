@@ -46,6 +46,9 @@ VALUES ('a2', 'Beta Agent', 'implementer', 'project-beta', 'claude', 'sonnet', '
 	if len(resp.Results) != 1 {
 		t.Fatalf("expected 1 result for 'reviewer', got %d", len(resp.Results))
 	}
+	if resp.SearchMode != "metadata" {
+		t.Fatalf("search_mode = %q, want metadata", resp.SearchMode)
+	}
 	if resp.Results[0].AgentID != "a1" {
 		t.Fatalf("expected agent_id='a1', got '%s'", resp.Results[0].AgentID)
 	}

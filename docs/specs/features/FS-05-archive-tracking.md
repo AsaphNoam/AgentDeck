@@ -145,6 +145,11 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   metadata record, transcript turn, or annotation and are not combined across turns. The search
   input is programmatically associated with that scope note, so an empty result does not imply that
   the terms are absent everywhere in the session.
+- **R30.** Every Archive response reports `search_mode` as `"full_text"` when the current SQLite
+  connection can use the FTS5 virtual table and `"metadata"` otherwise. The UI advertises
+  transcript search and the one-turn scope only in `full_text` mode; in `metadata` mode its
+  placeholder and scope note state that only agent/session metadata is searchable and transcript
+  snippets are unavailable. Before capability hydration, the placeholder makes no transcript claim.
 
 ## 5. Acceptance criteria
 
@@ -191,6 +196,9 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   rendered: `ui/src/features/archive/ArchivePage.test.tsx`.
 - **A13** (R25–R27, R29) — The Archive search input exposes the one-document/one-turn scope before
   and after an empty cross-turn query: `ui/src/features/archive/ArchivePage.test.tsx`.
+- **A14** (R6, R23, R30) — Tagged and untagged Archive responses report their effective search
+  mode, and the UI changes its placeholder and scope note without advertising unavailable
+  transcript search: archive build-variant tests and `ui/src/features/archive/ArchivePage.test.tsx`.
 
 ## 6. Deviations & open decisions
 

@@ -122,7 +122,7 @@ export function sendAnnotations(agentId: string, batch: AnnotationBatch) {
 export function searchArchive(q: string, limit = 50, offset = 0, signal?: AbortSignal) {
   const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
   if (q) params.set("q", q);
-  return json<{ query: string; total: number; limit: number; offset: number; results: ArchiveResult[] }>(
+  return json<{ query: string; search_mode: "full_text" | "metadata"; total: number; limit: number; offset: number; results: ArchiveResult[] }>(
     `/api/archive?${params}`,
     { signal },
   );
