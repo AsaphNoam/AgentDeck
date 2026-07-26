@@ -7,9 +7,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** the week's work has now been driven end to end in a real browser. Sixteen usability
-  findings are open above, six of them Must fix: diff-line annotation never registers a selection,
-  no Codex model can be assigned to a pipeline stage, the Start-run form drops the server's field
+- **State:** the week's work has now been driven end to end in a real browser. Fifteen usability
+  findings are open above, five of them Must fix: no Codex model can be assigned to a pipeline
+  stage, the Start-run form drops the server's field
   diagnostics, the archive shows only the first 50 sessions with no pager, a home opened by the
   FTS5 build cannot launch agents under the untagged build, and a search spanning two turns answers
   "No results" with no signal. Everything else driven passed: the whole pipeline lifecycle, the
@@ -66,16 +66,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 Recorded by the 2026-07-26 week usability review; repro steps and evidence paths are in
 [`../archive/reviews/usability-review-run-2026-07-26-week.md`](../archive/reviews/usability-review-run-2026-07-26-week.md).
-
-- **Must fix** — J13 diff-line annotation never registers a selection (**INV §10**).
-  `ui/src/components/chat/renderers/DiffBlock.tsx:11` matches `/^([LR])(\d+)$/`, but
-  `react-diff-viewer-continued` passes `` `${prefix}-${lineNumber}` `` (`L-1`, `R-5`), so `chooseLine`
-  returns before calling `setSelection` and no gutter click ever selects anything. Normal-use
-  trigger: clicking line numbers on any diff in a live or archived transcript. FS-13.R1/R2 make
-  diff-line anchoring the feature's headline capability, so it is specified but unreachable; whole-
-  event annotation still works. Nothing in `ui/src` tests `DiffBlock` or the `onLineNumberClick`
-  contract. Fix: accept the library's real id format and add a `DiffBlock` regression test built
-  from a library-shaped id rather than a hand-written one.
 
 - **Must fix** — J14 no Codex model can be assigned to a pipeline stage (**INV §2**).
   `internal/pipeline/manager.go:194` validates the run-time assignment with
@@ -171,6 +161,12 @@ not reproduce, the untimed `tmux` driver calls, and the two onboarding steps tha
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-26 — Fixed diff-line annotation selection. **INV §10** now parses the
+  `react-diff-viewer-continued` line-id contract (`L-<line>` / `R-<line>`) instead of a format the
+  dependency never emits, restoring FS-13.R1/R2 in live and archived transcripts. A component
+  regression drives a library-shaped `L-2` id through selection and verifies the captured anchor
+  and excerpt. No FS/TS delta was needed because the fix restores existing requirements.
 
 - 2026-07-26 — Drove the week's shipped work through the real rendered UI: J14 pipelines, J13
   annotations, J8 archive/search on both build variants, J1/J3/J4/J11 core regressions, and J12
