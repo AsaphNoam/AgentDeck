@@ -62,16 +62,16 @@ export function ArchivePage() {
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const load = useCallback(async (query: string) => {
+  const load = useCallback(async (query: string, offset: number, append: boolean) => {
     if (abortRef.current) abortRef.current.abort();
     const ac = new AbortController();
     abortRef.current = ac;
     setLoading(true);
     setError(null);
     try {
-      const resp = await searchArchive(query, 50, 0, ac.signal);
+      const resp = await searchArchive(query, 50, offset, ac.signal);
       if (!ac.signal.aborted) {
-        setResults(resp.results ?? []);
+        setResults((current) => append ? [...current, ...(resp.results ?? [])] : (resp.results ?? []));
         setTotal(resp.total);
       }
     } catch (err: unknown) {
@@ -84,7 +84,7 @@ export function ArchivePage() {
   }, []);
 
   useEffect(() => {
-    void load(debouncedQ);
+    void load(debouncedQ, 0, false);
   }, [debouncedQ, load]);
 
   const handleClick = (result: ArchiveResult) => {
@@ -121,6 +121,13 @@ export function ArchivePage() {
           <ArchiveRow key={r.agent_id} result={r} onClick={() => handleClick(r)} />
         ))}
       </ul>
+      {results.length < total && (
+        <div className="form-actions">
+          <button type="button" disabled={loading} onClick={() => void load(debouncedQ, results.length, true)}>
+            {loading ? "Loading…" : "Load more"}
+          </button>
+        </div>
+      )}
     </section>
   );
 }

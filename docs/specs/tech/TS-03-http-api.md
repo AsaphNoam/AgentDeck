@@ -146,7 +146,6 @@ integers instead of silently applying defaults.
 
 - Error envelopes remain mixed as described by R3–R4. Standardization is a compatibility change,
   not cleanup that may be done opportunistically.
-- Archive UI pagination is incomplete even though the API supports `limit`/`offset` (FS-05).
 - JSON handlers do not yet apply a shared maximum request-body size. Field-level limits protect
   several operations, but uniform pre-decode bounding is a security/API backlog item.
 
