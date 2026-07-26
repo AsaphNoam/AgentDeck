@@ -108,9 +108,11 @@ export function ArchivePage() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           aria-label="Search archive"
+          aria-describedby="archive-search-scope"
         />
         {total > 0 && <span className="archive-count">{total} result{total !== 1 ? "s" : ""}</span>}
       </div>
+      <p className="form-info" id="archive-search-scope">All terms must match within one metadata record, transcript turn, or annotation; search does not combine text across turns.</p>
       {error && <p className="archive-error">{error}</p>}
       {loading && results.length === 0 && <p className="archive-loading">Loading…</p>}
       {!loading && !error && results.length === 0 && (
