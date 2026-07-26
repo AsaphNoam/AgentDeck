@@ -8,7 +8,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 - **Active change:** None.
 - **State:** the week's work has now been driven end to end in a real browser. All six Must-fix
-  findings are resolved; four Worth-fixing findings remain. Everything else driven passed: the
+  findings are resolved; three Worth-fixing findings remain. Everything else driven passed: the
   whole pipeline lifecycle, the
   annotation tray and its three delivery routes, archive search on both build variants, first paint
   on an empty home, chat round-trip and delta coalescing, all four permission outcomes, crash and
@@ -64,9 +64,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 Recorded by the 2026-07-26 week usability review; repro steps and evidence paths are in
 [`../archive/reviews/usability-review-run-2026-07-26-week.md`](../archive/reviews/usability-review-run-2026-07-26-week.md).
 
-- **Worth fixing** — J11 a project saves silently with a whitespace-only title and cwd (**INV §8**)
-  and then appears as a selectable target in New Agent.
-
 - **Worth fixing** — J3/J11 cancelling against a peer that ignores cancellation reports only
   "process exited" (**INV §8**): escalation works and the UI unblocks in about three seconds, but
   nothing ties the outcome to the user's Cancel or says the agent is now dead.
@@ -87,6 +84,11 @@ not reproduce, the untimed `tmux` driver calls, and the two onboarding steps tha
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-26 — Rejected blank project identity fields. **INV §8** now treats whitespace-only title
+  and cwd values as missing in the shared project validator used by both create and update, so such
+  a project cannot enter the New Agent target list. A field-specific config regression requires
+  both diagnostics. No FS/TS delta was needed because the fix restores FS-04.R7.
 
 - 2026-07-26 — Unified agent display-name validation. **INV §8** now routes launch, rename, and
   identity updates through one trim/nonblank/NUL-free/256-character boundary; omitted launch names
