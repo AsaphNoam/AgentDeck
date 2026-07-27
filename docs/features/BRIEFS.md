@@ -4,6 +4,18 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-27 — Review: the past twelve hours of changes
+
+The reviewed changes are largely in good shape: their shipped behavior is covered by the current specifications and regression tests, while the new effort-selection work is correctly marked as planned rather than shipped. The full automated suite and release build pass.
+
+One defect needs a fix: if a project is removed after you selected it in the AgentDecker builder, the builder can still try to launch into that removed project instead of requiring a current choice. The launch button should stay disabled until the selected project is still present in the project list.
+
+The review also found a process gap. Three new user-facing changes were committed without the normal ready-change and active-plan trail, so it is not possible to verify from history that their specifications were completed before implementation. Their specifications now match the code; use the normal planning record before the next behavior change.
+
+**Needs attention:** Fix the stale builder-project selection before relying on that picker after project configuration changes.
+
+**Next:** Run `/fix` to repair the builder selector and add its regression test.
+
 ### 2026-07-27 — Build: annotate by highlighting and right-clicking
 
 The permanent **Annotate** button above every chat message is gone. Instead you highlight the part

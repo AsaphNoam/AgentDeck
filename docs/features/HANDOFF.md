@@ -41,7 +41,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   [`../archive/reviews/usability-review-run-2026-07-26-rerun.md`](../archive/reviews/usability-review-run-2026-07-26-rerun.md)
   and [`../archive/reviews/usability-review-run-2026-07-26-browser-retry.md`](../archive/reviews/usability-review-run-2026-07-26-browser-retry.md).
   Credentialed provider and terminal compatibility remain separate manual release gates.
-- **Last reviewed code:** `cc9d498` (2026-07-26), the continuous range after `ccc2b50`.
+- **Last reviewed code:** `a574076` (2026-07-27), the continuous range after `cc9d498`.
 - **Branch:** `main`.
 
 ## Active change
@@ -77,7 +77,19 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 ## Review findings
 
-None open.
+- **Must fix** — `ui/src/features/pipelines/AgentDeckerBuilder.tsx:149` (INV §10): The builder treats any
+  non-empty `project` state as ready, even when a refreshed project catalog no longer contains that
+  id. Select a project, remove it from Settings or another tab, then return to the open builder: the
+  controlled select can display an available option while the launch request still posts the removed
+  id and is rejected. This violates FS-14.R26's requirement that launch is limited to a listed
+  project. Derive readiness from `projects.data?.[project]`, clear a removed selection, and add the
+  catalog-refresh regression.
+- **Worth fixing** — SDD traceability for `0b6e793`, `ceef7ee`, and `9f0dbde`: These commits ship
+  new Dashboard Resume, builder-project selection, and transcript right-click behavior, but the
+  repository has no corresponding ready-change/active-change plan. Their specifications and tests
+  are now in sync, but the required spec-first and planned implementation trail cannot be audited
+  from history. Use a ready change and active handoff plan before the next behavior change; do not
+  create a retroactive waiting change for work that is already shipped.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
@@ -86,6 +98,18 @@ are not promoted to findings without a repeatable failure.
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-27 — Reviewed the continuous 12-hour range from `cc9d498` through `a574076`, including
+  all committed UI/runtime/test/specification changes and the clean working tree. Code and
+  specifications agree on the repaired review batch, Dashboard presentation/Resume, builder picker,
+  annotation context menu, and the planned effort-selection change; every invariant class was
+  swept. One Must-fix remains: a selected project that disappears after the builder opens can still
+  be launched because readiness checks only for a non-empty id rather than a current catalog member
+  (FS-14.R26). One Worth-fixing process finding remains: the three new behavior changes were shipped
+  without the required ready-change/active-plan trail, so spec-first sequencing is not auditable.
+  `make check-specs`, both Go test variants, the full 162-test UI suite, the source build, the
+  release build, and whitespace checks pass. No product code or specifications changed during this
+  review.
 
 - 2026-07-27 — Designed launch-time effort selection with the human; no product code changed.
   Verified both pinned adapters rather than assuming: `codex-acp` 1.1.2 encodes effort **inside** the
