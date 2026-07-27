@@ -4,6 +4,72 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-27 — Build: annotate by highlighting and right-clicking
+
+The permanent **Annotate** button above every chat message is gone. Instead you highlight the part
+of a message, tool call, or result you care about, right-click it, and pick **Annotate selection** —
+and only the text you highlighted becomes the excerpt, rather than the whole event. Right-clicking
+an event without highlighting anything still offers **Annotate whole event**, so nothing you could
+do before is lost. The menu closes on Escape, on a click elsewhere, or once you pick the action, and
+events that were never annotatable keep the browser's own menu.
+
+Diffs are unchanged: you still click line numbers to pick a range, because that selection is about
+lines rather than text and the button there only appears once you've chosen a range.
+
+**Needs attention:** I verified this with component tests, the specification checks, both Go test
+variants, and the full UI suite and builds, but not in a live browser against a real agent
+transcript. Right-click behaviour is worth one minute of your own hands-on check. Also note that
+the effort-design session's notes were still sitting uncommitted in these same two tracking files,
+so they went into this commit alongside mine; nothing else from your uncommitted work was touched.
+
+**Next:** Try it in a real chat and tell me if the selection-only excerpt reads better than the old
+whole-event capture; if it does, the whole-event fallback could go too.
+
+### 2026-07-27 — Design: choose an agent's effort level at launch
+
+I designed this one but wrote no product code — it's specified and queued, ready for a build session.
+
+You doubted Claude had an effort setting, so I checked instead of guessing. It does: the Claude Code
+on this machine takes `--effort` with `low, medium, high, xhigh, max`. That reversed my earlier
+answer, and it was worth reversing.
+
+Checking Codex turned up something more useful. Codex doesn't take effort as a separate setting at
+all — it hides the level inside the model name, as `gpt-5.6-sol[high]`. So AgentDeck needs no new
+plumbing for Codex; it already sends a model name. Better still, Codex publishes each model's
+available levels in a file AgentDeck **already reads** for its model auto-sync, so for Codex the
+levels can fill themselves in. Claude works the opposite way: it takes effort as a separate setting,
+and only *after* a session has started. Three providers, three genuinely different mechanisms — which
+is why this needed designing rather than just building.
+
+What you'll get: an effort picker beside the model in New Agent, an `--effort` flag on the command
+line, effort on a running agent through Switch runtime, and a per-stage effort when you start a
+pipeline run. A model only offers the levels it actually supports, so models without effort show no
+control at all rather than a setting that quietly does nothing.
+
+Three things I decided deliberately, and would change if you disagree:
+
+**Nothing is guessed.** Ask for a level a model doesn't have and the launch is refused with a clear
+message, rather than quietly running at some other level. That's the choice you made, and I carried
+it through to the awkward case too: if the provider itself rejects a level, AgentDeck stops rather
+than retrying without it.
+
+**Your config file doesn't break.** The new settings are optional additions, so an older AgentDeck
+can still read a newer file — it just ignores effort. No migration, nothing to convert.
+
+**I found a bug while designing this.** AgentDeck has always let you set an effort override on a
+linked Claude or Codex configuration, and has always *displayed* it — but nothing ever sent it to the
+agent. That override has been decorative since it shipped. I recorded it honestly rather than quietly
+patching it; this change makes it real.
+
+**Needs attention:** two things. Six specification documents that previously read as fully shipped are
+now marked partial, because they hold planned work — they flip back when this is built.
+
+And I did not commit. Work from an earlier session was already sitting uncommitted in the same
+documents I edited, so my changes and theirs are now mixed together in the same files and I can't
+separate them into an honest commit of my own. Nothing is lost and nothing is overwritten, but
+someone needs to look at the pending changes and decide what belongs in which commit before this
+gets saved to history.
+
 ### 2026-07-27 — Fix: choose the project when building a pipeline with AgentDecker
 
 You hit a real gap, and the error message was telling the truth. **Create with AgentDecker** always
@@ -33,6 +99,51 @@ Also restart your running dashboard to pick up the rebuilt interface.
 **Next:** Restart the dashboard, open **Pipelines → Create with AgentDecker**, and pick your project
 from the new dropdown.
 
+### 2026-07-26 — Fix: Resume stopped agents from the Dashboard
+
+Right-clicking a stopped agent card now offers **Resume**. It uses the same durable session resume
+as Archive, restores the frozen configuration and history, and shows a clear error if it cannot
+start. The action is absent from running cards, where it would be invalid.
+
+The menu's visibility, request, and failure feedback are covered by regression tests. All 156 UI
+tests, both Go test variants, specification checks, and the release build pass.
+
+**Needs attention:** Restart a currently running local dashboard to load the rebuilt application.
+
+**Next:** Right-click a stopped agent card and choose **Resume**.
+
+### 2026-07-26 — Acceptance: live Claude and Codex providers
+
+I ran the credentialed provider checks you authorized, against your real logged-in Claude and Codex
+installations with a throwaway AgentDeck home and project. Neither provider's own configuration was
+modified. Most of it works for real: Claude chat streaming, permission approve and deny, stop, and
+resume; Codex launch, streaming, prompt delivery, and stop; cross-provider messaging, where a Codex
+agent messaged a Claude agent and the Claude agent woke and read it; and the Claude terminal, whose
+flags and hooks the real CLI accepted, with a live typed prompt answered inside AgentDeck's terminal
+view. Configuration federation also holds up: it reads your real setup, records where each value came
+from, keeps secrets out of the mirror, notices an outside edit on its own, and refuses to launch when
+your setup would collide with AgentDeck's own messaging tool.
+
+Three things do not work against the real providers. Cancel kills a Claude agent instead of
+interrupting it, because that adapter ignores the cooperative cancel and the fallback signal ends the
+process — so cancelling costs you the agent. Resuming a Codex agent silently starts a fresh
+conversation: AgentDeck still shows the old transcript, but the agent has no memory of it. And the
+model you pick per agent has no effect on either provider — both run whatever their own CLI config
+says — so AgentDeck's model choice is currently cosmetic for real sessions. Full evidence, including
+how to reproduce each one, is in the run report under the archived reviews.
+
+OpenCode and OpenHands still could not be checked: neither is installed, and both would need you to
+enter credentials.
+
+**Needs attention:** Two other things came out of the session. Another AgentDeck session was
+committing to this repository while I worked, and one of its commits swept up a temporary probe file
+I had created (`internal/runtime/zz_cancelprobe_acceptance_test.go`); its removal is waiting in the
+working tree, uncommitted. Because that session is still editing shared files, I did not touch the
+handoff or the specifications — the gate results and the three findings still need to be recorded
+there once the tree is yours again.
+
+**Next:** Decide what Cancel should do when a provider ignores it, then let me record the results in
+the handoff and fix the Codex resume defect, which is a small, well-understood change.
 
 ### 2026-07-26 — Fix: visible Dashboard state labels
 

@@ -7,7 +7,11 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** The AgentDecker pipeline builder now picks its own project. It launched into
+- **State:** Chat and archived transcripts no longer carry a standing per-event **Annotate**
+  button; annotating is now a right-click action on the event, capturing the highlighted text when
+  a highlight sits inside that event and the whole event otherwise (FS-13.R1/R19/A11). The diff
+  block's line-number range selection is unchanged. No live-browser pass was run for this change;
+  component coverage stands in for it. The AgentDecker pipeline builder now picks its own project. It launched into
   `default_project` with no picker, so the seeded `my-app` (whose `~/Projects/my-app` cwd is absent
   on a fresh box) could only be discovered as a rejected launch, with nothing on the Pipelines page
   able to change it; its readiness check also only asked whether a default was configured, not
@@ -82,6 +86,29 @@ are not promoted to findings without a repeatable failure.
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-27 — Designed launch-time effort selection with the human; no product code changed.
+  Verified both pinned adapters rather than assuming: `codex-acp` 1.1.2 encodes effort **inside** the
+  ACP model id as `model[effort]` (so no new protocol field is needed), and its per-model levels are
+  already published in the `models_cache.json` that FS-09.R28 autosync reads; `claude-agent-acp`
+  0.62.0 accepts effort only as a post-`session/new` configuration option seeded from the native
+  settings chain AgentDeck must not write; and Claude Code 2.1.202 takes `--effort` for terminal
+  launches. FS-09.R35–R42/A14–A16 now specify optional per-model `efforts`/`default_effort`,
+  rejection of bracketed provider model strings, add-only autosync of levels, the claude/codex-only
+  capability boundary, the Claude post-session teardown, precedence, and undeclared-level rejection.
+  FS-01.R30/A14 add the launch field, `--effort`, and effort's place in runtime identity; FS-14.R31/A11
+  add per-stage run assignment; FS-08.R31/A8 make the long-inert effort override real. TS-01.R12 pins
+  one `resolveEffort` on the shared composition seam, TS-02.R18 keeps `backends.json` at version 2 and
+  adds a forward-only `sessions.effort` column, TS-03.R19 adds optional fields to existing routes only,
+  TS-04.R18–R19 pin the three adapter-declared delivery mechanisms and fail-closed rejection, TS-07.R14
+  feeds the federation override into the resolver, and TS-09.R24 snapshots per-stage effort.
+  **INV §2** is load-bearing (the Codex suffix must be composed once for both `sessionNewParams` and
+  `sessionLoadParams`), with **INV §4** on the pre-registration teardown, **INV §1** on re-applying
+  effort at resume, and **INV §12** deliberately departed from (fail closed, never retry bare).
+  Recorded FS-08's pre-existing spec/code mismatch as a deviation rather than silently fixing it.
+  FS-01, FS-14, TS-02, TS-03, and TS-09 move to Partial while their planned items are unshipped. The
+  source idea was promoted to the waiting `agent-effort-selection.md` change; specification,
+  twin-skill, and whitespace checks pass.
 
 - 2026-07-27 — Gave the AgentDecker builder its own project selector. **INV §10** found the
   shipped wiring incomplete: the builder launches an ordinary chat agent, which needs a real project

@@ -20,6 +20,11 @@
     "reason": "Coordinates are live pointer position data"
   },
   {
+    "file": "src/components/chat/AnnotationContextMenu.tsx",
+    "rule": "inline-style",
+    "reason": "Coordinates are live pointer position data"
+  },
+  {
     "file": "src/features/settings/ProjectForm.tsx",
     "rule": "inline-style",
     "reason": "Background is the project RGB value being edited"

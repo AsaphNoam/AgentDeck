@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import type { AnnotationDraft, TranscriptEvent } from "../../api/types";
 import { clipAnnotationExcerpt } from "../../lib/annotations";
 import { ErrorBoundary } from "../ErrorBoundary";
@@ -10,13 +10,30 @@ import { ToolResult } from "./renderers/ToolResult";
 import { TurnError } from "./renderers/TurnError";
 import { AnnotationCard } from "./renderers/AnnotationCard";
 import { AnnotationTray } from "./AnnotationTray";
+import { AnnotationContextMenu, type AnnotationMenuState } from "./AnnotationContextMenu";
 import { useAnnotationStore } from "../../store/annotationStore";
 
 export function TranscriptView({ agentId, events, sourceActive = false, annotationsEnabled = true }: { agentId: string; events: TranscriptEvent[]; sourceActive?: boolean; annotationsEnabled?: boolean }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
   const [atBottom, setAtBottom] = useState(true);
+  const [menu, setMenu] = useState<AnnotationMenuState | null>(null);
   const addAnnotation = useAnnotationStore((state) => state.add);
+
+  // Annotating is a right-click action on the event under the pointer: it captures the
+  // highlighted text when there is a selection inside that event, otherwise the whole event.
+  const openMenu = (mouse: MouseEvent<HTMLDivElement>, event: TranscriptEvent) => {
+    if (!annotationsEnabled || !canAnnotate(event)) return;
+    const selected = selectionWithin(mouse.currentTarget);
+    mouse.preventDefault();
+    const draft = selected ? { seq: Number(event.seq), excerpt: clipAnnotationExcerpt(selected), instruction: "" } : eventDraft(event);
+    setMenu({
+      x: mouse.clientX,
+      y: mouse.clientY,
+      label: selected ? "Annotate selection" : "Annotate whole event",
+      annotate: () => addAnnotation(agentId, draft),
+    });
+  };
 
   const onScroll = () => {
     const el = scrollRef.current;
@@ -42,12 +59,19 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
         {events.map((event, index) => (
           // data-seq lets the Files tab's "Diff" action scroll to this event
           // (present only when the event carries a runtime seq).
-          <div key={keyOf(event, index)} className="transcript-item" data-slot="event" data-variant={variantOf(event)} data-seq={event.seq ?? undefined}>
+          <div
+            key={keyOf(event, index)}
+            className="transcript-item"
+            data-slot="event"
+            data-variant={variantOf(event)}
+            data-seq={event.seq ?? undefined}
+            onContextMenu={(mouse) => openMenu(mouse, event)}
+          >
             <ErrorBoundary
               label="message"
               fallback={<pre className="tool-block tool-result-error">Failed to render this event.</pre>}
             >
-              <TranscriptItem agentId={agentId} event={event} annotationsEnabled={annotationsEnabled} onAnnotate={(draft) => addAnnotation(agentId, draft)} />
+              <TranscriptItem agentId={agentId} event={event} onAnnotate={(draft) => addAnnotation(agentId, draft)} />
             </ErrorBoundary>
           </div>
         ))}
@@ -58,6 +82,7 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
         </button>
       )}
       {annotationsEnabled && <AnnotationTray sourceId={agentId} sourceActive={sourceActive} />}
+      <AnnotationContextMenu menu={menu} onClose={() => setMenu(null)} />
     </div>
   );
 }
@@ -86,17 +111,16 @@ function keyOf(event: TranscriptEvent, index: number) {
   return `i${index}`;
 }
 
-function TranscriptItem({ agentId, event, annotationsEnabled, onAnnotate }: { agentId: string; event: TranscriptEvent; annotationsEnabled: boolean; onAnnotate: (draft: AnnotationDraft) => void }) {
+function TranscriptItem({ agentId, event, onAnnotate }: { agentId: string; event: TranscriptEvent; onAnnotate: (draft: AnnotationDraft) => void }) {
   const kind = String(event.kind ?? event.type ?? "");
-  const action = annotationsEnabled && canAnnotate(event) ? <button type="button" className="annotation-event-trigger" onClick={() => onAnnotate(eventDraft(event))}>Annotate</button> : null;
-  if (kind === "assistant_text") return <>{action}<AssistantText event={event} /></>;
+  if (kind === "assistant_text") return <AssistantText event={event} />;
   if (kind === "user_text")
-    return <>{action}<article className="message user-message" data-ui="transcript" data-variant="user">{String(event.text ?? "")}</article></>;
-  if (kind === "permission_request") return <>{action}<PermissionPrompt agentId={agentId} event={event} /></>;
+    return <article className="message user-message" data-ui="transcript" data-variant="user">{String(event.text ?? "")}</article>;
+  if (kind === "permission_request") return <PermissionPrompt agentId={agentId} event={event} />;
   if (kind === "diff") return <DiffBlock event={event} onAnnotate={onAnnotate} />;
-  if (kind === "tool_call") return <>{action}<ToolCall event={event} /></>;
-  if (kind === "tool_result") return <>{action}<ToolResult event={event} /></>;
-  if (kind === "error") return <>{action}<TurnError event={event} /></>;
+  if (kind === "tool_call") return <ToolCall event={event} />;
+  if (kind === "tool_result") return <ToolResult event={event} />;
+  if (kind === "error") return <TurnError event={event} />;
   if (kind === "annotation") return <AnnotationCard event={event} />;
   if (kind === "turn_end") return <hr className="turn-end" />;
   if (kind === "backend_switch") {
@@ -112,6 +136,14 @@ function TranscriptItem({ agentId, event, annotationsEnabled, onAnnotate }: { ag
 function canAnnotate(event: TranscriptEvent) {
   const kind = String(event.kind ?? event.type ?? "");
   return event.seq != null && !["session_meta", "permission_resolved", "turn_end", "annotation"].includes(kind);
+}
+
+// The highlighted text, but only when the highlight lives inside the right-clicked event.
+function selectionWithin(host: HTMLElement): string | null {
+  const selection = typeof window.getSelection === "function" ? window.getSelection() : null;
+  if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null;
+  if (!host.contains(selection.getRangeAt(0).commonAncestorContainer)) return null;
+  return selection.toString().trim() || null;
 }
 
 function eventDraft(event: TranscriptEvent): AnnotationDraft {
