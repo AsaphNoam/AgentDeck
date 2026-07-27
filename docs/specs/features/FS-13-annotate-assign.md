@@ -21,9 +21,10 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 ### 2.1 Selecting and capturing
 
 - **R1.** In a live chat transcript and in the archived read-only transcript view, a user
-  can select a contiguous line range inside a rendered diff block, or select one whole transcript
-  event (for example a message, tool call, tool result, or error), and choose **Annotate** on the
-  selection.
+  can select a contiguous line range inside a rendered diff block, or highlight text inside one
+  transcript event (for example a message, tool call, tool result, or error) — or take the whole
+  event — and choose **Annotate** on the selection. The transcript carries no standing per-event
+  **Annotate** control; the action is reached by right-clicking the event (R19).
 - **R2.** Annotating captures a structured record: the source `agent_id`, the anchored
   transcript event `seq`, the diff's file path, side, and 1-based line range when the selection is
   diff lines, the selected excerpt text verbatim (clipped at 2,000 characters with a visible
@@ -118,6 +119,13 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   overlay while the draft list and overall instruction scroll independently. Multiple detailed
   drafts therefore cannot push target selection, errors, or **Send annotations** below the tray's
   visible edge.
+- **R19.** Right-clicking an annotatable transcript event opens a context menu holding the
+  **Annotate** action instead of the browser's own menu. When the right-click follows a text
+  highlight inside that same event, the menu captures the highlighted text as the excerpt; with no
+  highlight in that event, it captures the whole event as before. The menu closes on **Escape**, on
+  a click outside it, and after the action is taken. Events that cannot be annotated (R13 terminal
+  surfaces, and the session, permission-resolution, turn-end, and annotation events) keep the
+  browser's own menu.
 
 ## 5. Acceptance criteria
 
@@ -152,6 +160,10 @@ Each acceptance item names its delivered verification.
   `ui/src/components/chat/renderers/DiffBlock.test.tsx`.
 - **A10** (R3–R4, R18) — A tray with three drafts renders them in the scrollable body and keeps its
   target and Send action in a separate fixed footer: `ui/src/components/chat/AnnotationTray.test.tsx`.
+- **A11** (R1, R19) — No standing **Annotate** control renders on transcript events; a right-click
+  after highlighting captures the highlighted text, a right-click with no highlight captures the
+  whole event, and a non-annotatable transcript keeps the browser menu:
+  `ui/src/components/chat/TranscriptView.test.tsx`.
 
 ## 6. Deviations & open decisions
 
