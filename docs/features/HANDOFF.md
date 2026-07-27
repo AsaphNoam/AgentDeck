@@ -77,13 +77,6 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 ## Review findings
 
-- **Must fix** — `ui/src/features/pipelines/AgentDeckerBuilder.tsx:149` (INV §10): The builder treats any
-  non-empty `project` state as ready, even when a refreshed project catalog no longer contains that
-  id. Select a project, remove it from Settings or another tab, then return to the open builder: the
-  controlled select can display an available option while the launch request still posts the removed
-  id and is rejected. This violates FS-14.R26's requirement that launch is limited to a listed
-  project. Derive readiness from `projects.data?.[project]`, clear a removed selection, and add the
-  catalog-refresh regression.
 - **Worth fixing** — SDD traceability for `0b6e793`, `ceef7ee`, and `9f0dbde`: These commits ship
   new Dashboard Resume, builder-project selection, and transcript right-click behavior, but the
   repository has no corresponding ready-change/active-change plan. Their specifications and tests
@@ -98,6 +91,17 @@ are not promoted to findings without a repeatable failure.
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-27 — Fixed the AgentDecker builder's stale-project launch. **INV §10** found the wiring
+  incomplete: readiness treated any non-empty `project` state as launchable, so a project deleted
+  from Settings or another tab after the builder opened left the controlled select showing no
+  selection while the launch still posted the removed id and was rejected. Readiness now requires the
+  selection to be a current catalog member (`projects.data?.[project]`), and a selection that leaves
+  the catalog is cleared so the seed effect and launch gate re-evaluate against the live catalog.
+  This restores FS-14.R26's "launch limited to a listed project" boundary, so no specification change
+  was needed. The catalog-refresh regression was verified to fail against the old code; specification
+  checks, both Go test variants, all 163 UI tests, the UI/distribution builds, and whitespace checks
+  pass.
 
 - 2026-07-27 — Reviewed the continuous 12-hour range from `cc9d498` through `a574076`, including
   all committed UI/runtime/test/specification changes and the clean working tree. Code and

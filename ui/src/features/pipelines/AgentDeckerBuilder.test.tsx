@@ -128,6 +128,33 @@ describe("AgentDeckerBuilder project selection", () => {
     expect(launches[0].project).toBe("other");
   });
 
+  it("clears a selection that leaves the catalog and holds the launch closed", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter><AgentDeckerBuilder onTemplateProposal={() => {}} onRunProposal={() => {}} /></MemoryRouter>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Create with AgentDecker" }));
+    const select = await screen.findByLabelText("Project");
+    await waitFor(() => expect((select as HTMLSelectElement).value).toBe("app"));
+
+    fireEvent.change(select, { target: { value: "other" } });
+    fireEvent.change(screen.getByLabelText("Describe the pipeline"), { target: { value: "Build then review." } });
+    expect(screen.getByRole("button", { name: "Launch AgentDecker builder" })).toBeEnabled();
+
+    // Another tab deletes the selected "other" and the seeded default "app"; the
+    // refreshed catalog no longer contains the selection, so the stale id must be
+    // cleared and the launch held closed rather than posting a rejected launch.
+    server.use(http.get("/api/projects", () => HttpResponse.json({
+      keep: { title: "Keep", cwd: "~/Projects/keep", color: [0, 0, 0], add_dirs: [], context_prompt: "", resource_dir: "" },
+    })));
+    await client.invalidateQueries({ queryKey: ["projects"] });
+
+    await waitFor(() => expect((select as HTMLSelectElement).value).toBe(""));
+    expect(screen.getByRole("button", { name: "Launch AgentDecker builder" })).toBeDisabled();
+  });
+
   it("holds the launch closed when the default project no longer exists", async () => {
     server.use(http.get("/api/projects", () => HttpResponse.json({
       other: { title: "Other", cwd: "~/Projects/other", color: [0, 0, 0], add_dirs: [], context_prompt: "", resource_dir: "" },
