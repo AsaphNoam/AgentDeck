@@ -68,6 +68,15 @@ AgentDeck-owned copy only for fields/assets with a verified injection path. Unti
 must prove discovery, precedence, native model inheritance, refresh, launch, and resume before the
 release claims complete federation compatibility.
 
+**R14 `(planned)` — The stored effort override becomes resolver input.** The binding's effort
+override, already resolved and redacted into the effective view, is handed to TS-01.R12's single
+`resolveEffort` as the tier below an explicit launch effort and above the model's `default_effort`
+— the same position the model override already occupies. Federation gains no second resolution
+order and no new persisted field: `config-sources.json` and the frozen launch object keep their
+current shapes, and the value they already carry simply stops being inert. A bound launch whose
+override names a level the selected model does not declare fails under FS-09.R42 like any other
+undeclared level; the source is never rewritten to repair it (R4).
+
 ## 3. Interfaces & data shapes
 
 `config-sources.json` version 1 stores one binding per backend: provider/root/profile/mode, claims,

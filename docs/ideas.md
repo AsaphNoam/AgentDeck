@@ -46,11 +46,6 @@ Example:
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
 
-- **General agent effort selection.** Add an optional per-launch effort choice to AgentDeck's normal
-  backend/model selection, backed by honest per-model capability metadata and provider-specific
-  launch mapping. Today effort is only visible through Claude/Codex configuration federation and is
-  not a general launch field or an OpenCode capability; define that cross-backend contract before
-  exposing effort in New Agent, AgentDecker-assisted creation, or pipeline runs.
 - **Real-provider acceptance.** Run the credentialed OpenCode/OpenHands and Claude/Codex federation
   checks, then reconcile any observed provider incompatibility before making release claims.
 - **AgentDeck product knowledge MCP.** Define a versioned, non-secret `agentdeck_docs` topic service

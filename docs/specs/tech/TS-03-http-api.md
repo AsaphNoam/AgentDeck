@@ -1,6 +1,6 @@
 # TS-03 — HTTP, SSE & WebSocket API
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/server`, `ui/src/api`
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) API sections and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -111,6 +111,19 @@ pipeline lists through REST rather than replaying an unbounded event log.
 includes `search_mode:"full_text"|"metadata"`, derived from the current SQLite connection rather
 than the build command or a UI assumption. This field is present for listing, successful search,
 and empty pages so the Archive UI can keep its search promise honest (FS-05.R30).
+
+**R19 `(planned)` — Effort is an optional field on existing routes, never a new one.**
+`POST /api/sessions` and `POST /api/sessions/{id}/switch-runtime` accept an optional `effort`
+alongside `backend`/`model`; omitting it preserves today's request and response bytes exactly, so no
+existing client changes. `GET /api/backends` and `PUT /api/backends` carry each model's `efforts` and
+`default_effort`; `efforts` marshals as `[]` and never `null` for a model that declares none, and the
+UI defends with `?? []` at first touch (INV §11 — the exact shape that twice broke this surface).
+Session and agent responses report the resolved `effort` as a plain string, empty when none resolved.
+Validation failures use the existing shared field-error envelope: an undeclared level, a
+`default_effort` outside `efforts`, a declared level on a backend type with no effort mechanism, and a
+bracketed provider model string each name their field and reason rather than returning a bare 400
+(INV §8 — the class the onboarding `HTTP 400` findings came from). No new route is added, so every
+path continues to inherit the `localOnly` guard unchanged (INV §14).
 
 ## 3. Interfaces & data shapes
 

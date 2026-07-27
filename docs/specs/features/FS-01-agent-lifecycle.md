@@ -1,6 +1,6 @@
 # FS-01 — Agent Lifecycle
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/server/{launch,resume,switch,sessions,groups}.go`, `internal/runtime/`, `internal/index/`, `internal/cli/launch.go` · **Journeys:** J3, J7, J11
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -42,6 +42,14 @@ orphaned processes.
   Unicode characters. The same display-name contract applies to rename and identity updates.
 - **R5** — Optional launch parameters default: `backend` → the backend marked default (else `claude`,
   else any); `model` → that backend's `default_model`; `interface` → `chat`.
+- **R30** `(planned)` — Launch accepts an optional **effort** alongside backend and model, from the
+  New Agent modal, the `POST /api/sessions` body, and the CLI flag `--effort` (which requires a
+  value like the other launch flags in R2). Its allowed values, resolution order, and rejection
+  rules belong to the selected model's declared capability (FS-09.R35/R41/R42). The resolved effort
+  joins backend and model as part of the agent's runtime identity: it is reported on the session
+  response and agent record, shown beside backend and model on the chat and archive headers,
+  restored by resume (R11), carried by clone (R9), and changeable on a running agent through switch
+  runtime (R13) under the same native-resume versus primer rules a model swap follows.
 
 ### Stop, cancel, rename, clone
 
@@ -193,6 +201,13 @@ transitions:
   gate (terminal `startWatcher` path) / journey **J6**.
 - **A13** — Simulated missing-FTS5 write capability preserves session metadata and turn rollups
   while skipping derived documents without error: `internal/index/indexer_test.go::TestIndexerDegradesWhenFTS5WritesAreUnavailable`.
+
+- **A14** `(planned)` (R30) — A modal launch, an API launch, and a CLI `--effort` launch of the same
+  role/project/backend/model produce an identical agent carrying the same resolved effort; `--effort`
+  with no operand is a usage error; the resolved effort appears on the session response, the chat
+  header, and the archive header; resume and clone carry it; and switch runtime changes it on a
+  running agent with history preserved. *Verify by* launch/CLI parity tests, switch-runtime tests,
+  `NewAgentModal.test.tsx`, and the chat/archive header UI tests.
 
 ## 6. Deviations & open decisions
 
