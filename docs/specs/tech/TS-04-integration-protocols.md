@@ -91,6 +91,42 @@ call the canonical pipeline validator, and return data/digests only: they cannot
 approve. Tool registration, token generation, teardown, transport, and redaction remain the existing
 R6–R7 authority rather than a second MCP server.
 
+**R18 `(planned)` — Effort delivery is adapter-declared and fail-closed.** The three shipped
+providers accept effort through three structurally different mechanisms, so the adapter declares
+*which* mechanism it uses and the runtime performs it; the runtime never branches on backend type
+inline (the rule `internal/backend/adapter.go` already states for argv, env, and resume):
+
+- **Model-suffix** (`codex-acp` chat) — the adapter encodes effort into the ACP model identifier as
+  `model[effort]`, the shape its pinned adapter parses. Because the model id is built in two places,
+  the suffix is composed by one `LaunchSpec` accessor consumed by **both** `sessionNewParams` and
+  `sessionLoadParams`; INV §2 names this exact pair as having twice drifted on `model`, so effort
+  must not become the third occurrence. An omitted effort yields the bare model id unchanged, so a
+  catalog that declares no levels produces byte-identical parameters to today.
+- **Post-session config** (`claude-acp` chat) — the adapter accepts effort only as a session
+  configuration option after `session/new`/`session/load` returns, and AgentDeck will not write the
+  user's native Claude settings files to seed it earlier (TS-07.R4). The runtime therefore issues the
+  option call as part of its own launch sequence, **before** the runtime is registered or announced,
+  and returns an error on failure so the caller's existing generation-scoped
+  `teardownAgentRegistration` is the single cleanup path (INV §4). No prompt is sent in that window.
+- **Argv flag** (`claude-acp` terminal) — the interactive Claude executable takes the level as a
+  launch flag, composed with the existing hook-settings args.
+- **None** (`opencode-acp`, `openhands-acp`) — no mechanism exists, so these adapters declare no
+  effort delivery and FS-09.R39 rejects a declared level at save time rather than at launch.
+
+Resume and switch re-apply effort through the same mechanism as launch. For the post-session
+mechanism this is mandatory rather than incidental: the adapter re-reads its own settings default
+when a session is loaded, so an unapplied effort silently reverts a resumed agent to a level nobody
+chose — INV §1's "state derived from the old side must be explicitly republished" at a lifecycle
+boundary.
+
+**R19 `(planned)` — A provider-rejected effort fails the launch; it is never retried bare.**
+A pinned CLI may reject a level AgentDeck's catalog declares (hand-declared Claude levels, an older
+CLI, a provider that withdrew a level). INV §12's usual detect-and-retry-without-the-optional-flag
+pattern is deliberately **not** applied here: retrying without effort would start an agent at a
+different level than the person chose, which FS-09.R42 forbids. The rejection instead surfaces as a
+bounded, backend-specific launch error naming the effort field, and the process group is terminated.
+Raw provider output stays behind the bounded vocabulary per R12.
+
 ## 3. Interfaces & data shapes
 
 - ACP: JSON-RPC messages over newline-delimited child stdin/stdout; adapter determines exact
@@ -102,6 +138,11 @@ R6–R7 authority rather than a second MCP server.
   product-safe text/structured content. Pipeline tools use the same transport/token and add
   no agent-callable start operation.
 - Terminal WebSocket: binary/text terminal bytes plus JSON resize control frames.
+- Effort delivery: no new ACP method. The model-suffix mechanism reuses the existing `model` key in
+  `session/new`/`session/load`; the post-session mechanism uses the adapter's documented session
+  configuration-option request with the option id it publishes for effort; the argv mechanism adds
+  one flag to the existing terminal command. `internal/backend` stays free of process/runtime
+  imports: the adapter contributes a delivery mode plus its identifier/flag, never an RPC call.
 - Native-auth readiness: no new HTTP shape; `PUT /api/backends` continues to return the existing
   per-backend `{status:"ok"|"failed"|"skipped", detail?}` result after provider-specific probing.
 

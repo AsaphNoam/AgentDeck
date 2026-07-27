@@ -1,6 +1,6 @@
 # TS-02 — Data & persistence
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/config`, `internal/state`, `internal/transcript`, `internal/index`, `internal/archive`, `internal/configsource`
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -107,6 +107,17 @@ forward-only SQLite tables written only through `internal/state`. Pipeline-table
 cascade within a deleted run but must not cascade into `agents`, `sessions`, transcripts, or archive
 projections. The migration uses non-null JSON defaults/collection decoding, indexes for active-run
 and agent-attempt lookup, and a schema-version guard test. TS-09 owns the logical shapes.
+
+**R18 `(planned)` — Effort is an additive catalog field and a frozen session column.**
+`backends.json` stays **version 2**: `efforts` and `default_effort` are optional per-model keys and
+the decoder ignores unknown keys, so a catalog written by a newer build still loads in an older one,
+which simply resolves no effort — FS-09.R41's documented fallback rather than a corrupt read. No
+migration touches the file, and seeding continues never to rewrite an existing catalog.
+The resolved effort is frozen in a new forward-only `sessions.effort TEXT NOT NULL DEFAULT ''`
+column beside the existing `model`, so resume and switch read it exactly as they read the model and
+an unbound backend needs no federation object. Empty means "none resolved"; existing rows adopt that
+value without interpretation. The federation `launch_config_json` object (v8) keeps its own
+requested-versus-resolved effort record for provenance and is not the authority for what ran.
 
 ## 3. Interfaces & data shapes
 

@@ -66,6 +66,17 @@ reconciler with the other server loops. Manual HTTP and pipeline launches/resume
 server-owned lifecycle services; the pipeline manager does not call local HTTP or construct a
 partial `LaunchSpec`. TS-09 owns its state machine and data contracts.
 
+**R12 `(planned)` — Effort resolution is one helper on the shared composition seam.** A single
+`resolveEffort` joins `resolveSkip`/`expandAddDirs`/`composeEnv` in `internal/server/launch.go` and
+is the only place that applies FS-09.R41's precedence (explicit → bound-source override → the
+model's `default_effort` → empty, meaning "send nothing"). `composeLaunch`, `composeResumeSpec`,
+`composeSwitchSpec`, and the pipeline stage launcher all obtain effort from it; none re-derives the
+order. The resolved value travels as one `Effort` field on `LaunchSpec`, so a path that forgets it
+loses effort entirely rather than resolving it differently — the R9 rule applied to a new field.
+Catalog-level capability (which levels a model declares, and whether a level is valid for it) stays
+in `internal/config` beside the existing backend/model validator, so the pipeline manager and the
+HTTP handlers share one authority rather than each checking the catalog themselves.
+
 ## 3. Interfaces & data shapes
 
 **Runtime interface** (`internal/runtime/runtime.go`, minimum surface):

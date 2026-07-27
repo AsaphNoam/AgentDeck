@@ -31,7 +31,14 @@ func switchTestServer(t *testing.T) (*Server, *httptest.Server) {
 
 	srv := testServer(t, true)
 	srv.registry.Chat().SetCommand(fake)
-	srv.terminal.SetCommand("cat") // harmless PTY process
+	// Harmless PTY process that must OUTLIVE the request under test: launchArgv
+	// appends spec.ExtraArgs (claude's `--settings <path>`) to the fixture command,
+	// and a bare `cat` given a readable file argument prints it and exits within
+	// milliseconds — the exit watcher then deletes the running row, so assertions
+	// on that row raced the watcher and failed on loaded CI runners. `sh -c 'exec
+	// cat'` swallows the extra args as positional parameters and leaves cat reading
+	// the PTY, so the agent stays live for the whole test.
+	srv.terminal.SetCommand("/bin/sh", "-c", "exec cat")
 	srv.terminal.SetInitialIdleDelay(10 * time.Millisecond)
 	if err := srv.configStore.WriteProject("tmpproj", config.Project{Title: "Tmp", Cwd: t.TempDir()}); err != nil {
 		t.Fatalf("WriteProject: %v", err)

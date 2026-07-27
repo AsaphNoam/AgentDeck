@@ -1,6 +1,6 @@
 # FS-14 — Configurable pipeline runs
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/pipeline`, `internal/config`, `internal/state`, `internal/server`, `internal/messaging`, `internal/cli`, `ui/src/features/pipelines` · **Journeys:** J14
 **Absorbed:** —
 
@@ -33,6 +33,13 @@ Every requirement in this specification is shipped and reflects the product boun
   same unchanged template may use Codex for implementation and Claude for review on one run and the
   reverse on another. Pipeline stages use the chat interface; terminal stages are rejected because
   terminal agents cannot use the structured coordination tools required to report a stage result.
+- **R31.** `(planned)` Run setup also assigns an optional effort to each stage, alongside that
+  stage's backend and model and under the same rules (FS-09.R35/R41/R42): the control appears only
+  for a stage whose assigned model declares effort levels, and a level that model does not declare
+  prevents the run from starting rather than substituting another. Effort stays out of the template
+  for the same reason backend and model do — it is a run-time assignment, not stage semantics — and
+  each stage's resolved effort is frozen into the run snapshot and shown in run supervision beside
+  its effective backend and model.
 - **R3.** Before starting a template, the user may set a run display name and must set a
   project, run goal, every required named run input, and the per-stage backend/model assignments.
   Those run values and runtime assignments are the complete run-specific editing surface: stage
@@ -241,6 +248,13 @@ Every requirement in this specification is shipped and reflects the product boun
   payload for separate one-time approval; denial
   has no effect, payload edits invalidate approval, and an approved request executes once. *Verify:*
   fake-runtime server test and J14.
+
+- **A11** `(planned)` (R31) — Run setup offers effort only for a stage whose assigned model declares
+  levels, a run started with per-stage efforts launches each stage agent at its assigned level, an
+  undeclared level prevents the whole run from starting with a named field error and no process, and
+  run supervision plus the frozen run snapshot report each stage's effective effort. *Verify by*
+  pipeline run-start validation tests, a manager test starting a run with per-stage efforts, and the
+  Pipelines run-setup/supervision UI tests.
 
 ## 6. Deviations & open decisions
 
