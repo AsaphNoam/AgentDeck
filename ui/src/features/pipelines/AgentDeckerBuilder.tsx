@@ -92,6 +92,14 @@ export function AgentDeckerBuilder({
     if (projects.data?.[config.data.default_project]) setProject(config.data.default_project);
   }, [config.data?.default_project, project, projects.data]);
 
+  // A project removed from the catalog after selection (deleted in Settings or
+  // another tab, then the query refetches) must not stay launchable: clear the
+  // stale id so readiness and the seed effect re-evaluate against the current
+  // catalog rather than posting an id the launch would reject (FS-14.R26).
+  useEffect(() => {
+    if (project && projects.data && !projects.data[project]) setProject("");
+  }, [project, projects.data]);
+
   useEffect(() => {
     if (!backendID && defaultBackend) setBackendID(defaultBackend);
   }, [backendID, defaultBackend]);
@@ -147,10 +155,11 @@ export function AgentDeckerBuilder({
 
   const selectedBackend = backends.data?.backends[backendID];
   const projectEntries = Object.entries(projects.data ?? {});
-  // Readiness follows the selected project, not merely a configured default: a
-  // default naming a project that no longer exists must hold the launch closed
+  // Readiness follows a project that is still a current catalog member, not merely
+  // a non-empty selection: a selection that has since left the catalog (or a
+  // default naming a project that no longer exists) must hold the launch closed
   // rather than enabling a button whose only outcome is a rejected launch.
-  const builderReady = Boolean(roles.data?.agentdecker && project && backendID && modelID && description.trim());
+  const builderReady = Boolean(roles.data?.agentdecker && project && projects.data?.[project] && backendID && modelID && description.trim());
 
   return <section className="pipeline-panel pipeline-builder">
     <div className="pipeline-panel-header">

@@ -4,6 +4,16 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-27 — Fix: stale project selection in the AgentDecker builder
+
+The AgentDecker pipeline builder no longer lets you launch into a project that was removed after you selected it. Before, if a project was deleted in Settings or another tab while the builder was open, the selector quietly showed nothing selected but the launch still tried to start in the removed project and was rejected. Now the launch button stays disabled unless the chosen project is still in the current project list, and a selection that disappears is cleared so you pick again from what actually exists.
+
+The full automated suite — specification checks, both Go test variants, all 163 UI tests, and the UI and release builds — passes, and the new test confirms the old behavior would have failed.
+
+**Needs attention:** None.
+
+**Next:** No action needed. One lower-priority process note remains open: three recent user-facing changes shipped without the usual planning record; adopt the normal ready-change trail before the next behavior change.
+
 ### 2026-07-27 — Review: the past twelve hours of changes
 
 The reviewed changes are largely in good shape: their shipped behavior is covered by the current specifications and regression tests, while the new effort-selection work is correctly marked as planned rather than shipped. The full automated suite and release build pass.
