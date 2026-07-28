@@ -130,6 +130,21 @@ unrecognized runtime entries. The personal `CODEX_HOME` is never a writable dest
 source symlink is created. The setup mirror is refreshed before each child start, not watched
 continuously; a failed refresh retains the previous published profile and manifest.
 
+**R20 — (planned).** Archive state is durable at its owning boundary. A project JSON gains
+`archived: false` by default; an absent key in an existing hand-edited file decodes as false. A
+forward-only SQLite migration adds `agents.archived INTEGER NOT NULL DEFAULT 0` plus the project/
+archive lookup index; an agent's archive flag is authoritative for its inclusion in Archive and is
+not copied into its immutable session snapshot or derived search projection. The server alone changes
+that flag through `internal/state`, and an archived flag is never committed while a `running` row
+exists. Under TS-01.R13's exclusive project claim, project archive stops relevant pipeline runs and
+processes, writes all agent archive flags in one SQLite transaction, then atomically writes the
+project JSON; no process-start path can register a running row anywhere in that stop-to-commit window.
+A failed final config write compensates the flag transaction before releasing the claim and returning
+an error; processes already stopped remain stopped. Restore reverses only the requested project or
+agent flag/config state. Existing `layout.json` and a `default_project` that names the project are
+unchanged: the default becomes a dormant preference under FS-04.R36, while project cards and scoped
+dashboards add no new persisted layout or migration.
+
 ## 3. Interfaces & data shapes
 
 The durable layout is:
@@ -154,7 +169,7 @@ $AGENTDECK_HOME/
 The binding schemas for roles, projects, backends, and global config are defined by FS-04 and
 FS-09. Federation binding/effective-view shapes are defined by TS-07. SQLite table definitions and
 migration order live in `internal/state/schema.go` and execute through `migrate.go`; that executable schema is subordinate to
-R1–R19 and must be reflected here when its contract changes.
+R1–R20 and must be reflected here when its contract changes.
 
 ## 4. Invariants
 

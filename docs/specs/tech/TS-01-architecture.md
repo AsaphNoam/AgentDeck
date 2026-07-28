@@ -77,6 +77,19 @@ Catalog-level capability (which levels a model declares, and whether a level is 
 in `internal/config` beside the existing backend/model validator, so the pipeline manager and the
 HTTP handlers share one authority rather than each checking the catalog themselves.
 
+**R13 — (planned).** Archive/restore is one server-owned lifecycle service, not an HTTP handler
+calling another handler or a UI-side sequence of Stop and config writes. One server-owned transition
+gate serializes archive/restore per project and per agent. Every path that can start a process —
+launch, clone, resume, switch-runtime, pipeline start/Continue/Retry/recovery, and builder launch —
+acquires a shared project start lease and holds it through running-row registration or rollback.
+Project archive acquires the exclusive `archiving` claim before stopping anything, waits for existing
+start leases, blocks new ones, and holds the claim through the agent-flag/project-config commit or its
+compensation; individual agent archive takes the corresponding exclusive agent claim against Resume.
+The service invokes ordinary runtime/pipeline stop paths; delegates durable agent flags only to
+`internal/state`; delegates project JSON reads/writes only to `internal/config`; and publishes the
+resulting full agent state through the existing bus. This is the atomic-claim boundary required by
+INV §5, not a check of `project.archived` followed later by process registration.
+
 ## 3. Interfaces & data shapes
 
 **Runtime interface** (`internal/runtime/runtime.go`, minimum surface):

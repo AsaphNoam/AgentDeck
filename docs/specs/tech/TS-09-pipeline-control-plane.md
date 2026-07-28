@@ -182,6 +182,16 @@ launches read effort from the frozen snapshot through the shared lifecycle servi
 edited mid-run cannot change an in-flight run's levels, and a retried or looped attempt reuses the
 snapshot's value rather than re-resolving it.
 
+**R25 — (planned).** After acquiring TS-01.R13's exclusive project-archiving claim, project archive
+calls the pipeline manager before changing durable archive state. The manager atomically blocks future
+transition claims and stops every active run in that project through its ordinary stop path, then
+returns control to the archive service to stop/archive the stage agent. Run start, Continue, Retry,
+recovery, and builder launch acquire the shared project start lease before claiming a transition and
+hold it through process registration, so none can enter the stop-to-commit window; they reject an
+archived project or an archive operation already in progress before a process starts. Restoring a
+project does not alter stopped-run state or create a new claim; the person must explicitly start a
+new run.
+
 ## 3. Interfaces & data shapes
 
 **Template JSON (logical version-1 shape):**

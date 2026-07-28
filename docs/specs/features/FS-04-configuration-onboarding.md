@@ -1,6 +1,6 @@
 # FS-04 — Configuration & Onboarding
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/config/`, `internal/server/config_handlers.go`, `ui/src/features/settings/`, `ui/src/features/onboarding/` · **Journeys:** J2, J9
 **Absorbed:** [`phase-3-config-onboarding.md`](../../archive/phases/phase-3-config-onboarding.md)
 
@@ -50,6 +50,24 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
 - **R7.** `title` is required (≤ 120), `cwd` is required, and each color channel must be 0–255. A
   `cwd` that does not exist on disk is a **non-blocking warning** (`cwd_not_found`), returned
   alongside a successful save — not a validation error.
+- **R35 — (planned).** A project additionally has an `archived` boolean, defaulting to `false` when
+  absent from a newly created or existing hand-edited project file. Setting it to `true` preserves
+  the project's immutable id, workspace configuration, resources, and every agent/session record;
+  it moves the project and all of its agents together between the active and archived dashboard
+  collections (FS-02.R29/R33). An active project can also have individually archived agents, in
+  which case it remains in the active dashboard and appears in Archive as their parent.
+  An archived project cannot host a running or newly launched agent; it must be reactivated before
+  any of its agents can be restored or resumed.
+  The project CRUD response and Settings surface expose the field, and either state can be changed
+  without re-creating the project.
+- **R36 — (planned).** An archived project is ineligible wherever a project is selected for a new
+  process. A stored `default_project` may continue to name an archived project as a dormant
+  preference, but the New Agent modal, onboarding Launch step, pipeline run setup, and AgentDecker
+  builder list only configured active projects and preselect the default only when it is active.
+  Direct JSON edits that archive the default therefore do not create a launch trap; restoring that
+  project makes the preference eligible again without rewriting `config.json`. `project.done` in
+  R21 requires at least one configured active project. An explicit API/CLI submission naming an
+  archived project is rejected under TS-03.R20.
 
 ### 2.3 Backends & models editing surface
 
@@ -209,6 +227,12 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   report unready/unavailable/failed/ready states; Codex can instead validate an API key. The Backend
   step contains neither an editable model id nor provider model string. *Verified:* `BackendStep.test.tsx`,
   credential-check tests, and journey J2 with a fake provider.
+- **A15 — (planned).** Project archive state round-trips through the project config API and survives
+  restart; an older project file without the field is active by default. — config/server/UI regressions.
+- **A16 — (planned).** When `default_project` names an archived project, launch selectors show only
+  active projects with no archived default preselected, onboarding reports no project ready when no
+  active project exists, and restoring the default makes it eligible again without changing
+  `config.json`. — config/readiness and launch-selector regressions; J2, J5, J14.
 
 ## 6. Deviations & open decisions
 
@@ -223,6 +247,9 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
 - The onboarding role/project steps are effectively always pre-satisfied on a fresh install because
   roles and a project seed unconditionally (R15); the operative gate is the backend credential check.
   This is intended, not a mismatch.
+- **Confirmed archived-project boundary.** R35–R36 preserve project data and a dormant archived
+  default while excluding archived projects from launch selectors. Launch, resume, restore, and
+  pipeline rejection use TS-03.R20; storage and transition ordering use TS-02.R20.
 
 ## 7. Traceability
 
