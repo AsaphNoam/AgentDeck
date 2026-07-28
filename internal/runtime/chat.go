@@ -119,22 +119,26 @@ func (c *ChatRuntime) spawnCmd(ad backend.BackendAdapter, spec LaunchSpec) (*exe
 		if err != nil {
 			return nil, err
 		}
-		// Codex session isolation: refresh the dedicated CODEX_HOME profile from
-		// the user's personal Codex setup before spawn, failing the start if any
-		// selected asset is unsafe or uncopyable (FS-09.R43/R44, TS-04.R20/R21).
-		// The child CODEX_HOME the server composed as the final env layer is the
-		// single source of truth for the refresh target (INV §2). It is absent
-		// only in unit specs that never route through composeEnv, which skip
-		// isolation.
-		if home := envValue(env, "CODEX_HOME"); home != "" {
-			if err := config.RefreshCodexProfile(home); err != nil {
-				return nil, fmt.Errorf("runtime: refresh codex profile: %w", err)
-			}
-		}
 	}
 	cmd.Env = env
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	return cmd, nil
+}
+
+// startCmd starts a child after refreshing its Codex profile when applicable.
+// The Codex refresh lock remains held through cmd.Start, so another launch
+// cannot publish a different setup generation in the interval between this
+// launch's refresh and its process creation (INV §5/§15).
+func (c *ChatRuntime) startCmd(cmd *exec.Cmd, spec LaunchSpec) error {
+	if spec.BackendType == "codex-acp" {
+		if home := envValue(cmd.Env, "CODEX_HOME"); home != "" {
+			if err := config.WithRefreshedCodexProfile(home, cmd.Start); err != nil {
+				return fmt.Errorf("runtime: refresh/start codex profile: %w", err)
+			}
+			return nil
+		}
+	}
+	return cmd.Start()
 }
 
 // SetEventSink mirrors normalized runtime events into the Phase 2 bus.
@@ -223,9 +227,14 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
+		_ = stdin.Close()
+		_ = stdout.Close()
 		return nil, fmt.Errorf("runtime: stderr pipe: %w", err)
 	}
-	if err := cmd.Start(); err != nil {
+	if err := c.startCmd(cmd, spec); err != nil {
+		_ = stdin.Close()
+		_ = stdout.Close()
+		_ = stderr.Close()
 		return nil, fmt.Errorf("runtime: start %s: %w", c.command, err)
 	}
 	pgid := cmd.Process.Pid // the child is the group leader (Setpgid)
@@ -506,9 +515,14 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
+		_ = stdin.Close()
+		_ = stdout.Close()
 		return nil, fmt.Errorf("runtime: stderr pipe: %w", err)
 	}
-	if err := cmd.Start(); err != nil {
+	if err := c.startCmd(cmd, spec); err != nil {
+		_ = stdin.Close()
+		_ = stdout.Close()
+		_ = stderr.Close()
 		return nil, fmt.Errorf("runtime: start %s: %w", c.command, err)
 	}
 	pgid := cmd.Process.Pid

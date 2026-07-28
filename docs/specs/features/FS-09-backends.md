@@ -117,8 +117,10 @@ Configuration-source federation for Claude/Codex is FS-08.
   home from the user's effective Codex home (`${CODEX_HOME:-~/.codex}`): configuration,
   authentication, skills, agents, rules, plugins, and MCP setup are copied into the private profile,
   while Codex session/history data is never copied. The refresh is one-way: the personal home remains
-  authoritative; additions, edits, and removals appear in the private profile on the next launch,
-  resume, or switch, and AgentDeck never writes through to the personal home. AgentDeck's own
+  authoritative; additions, edits, and removals appear in the private profile at the next process
+  start, and AgentDeck never writes through to the personal home. A rejected refresh leaves the prior
+  private setup intact; a switch detects that rejection before stopping its working Codex runtime.
+  AgentDeck's own
   configuration-federation discovery (FS-08) and Codex model autosync (R28) keep reading the user's
   real Codex home, so a bound source or an `autosync_models` backend behaves exactly as before.
 

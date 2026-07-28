@@ -11,7 +11,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   (`<agentdeck-home>/codex`, `0700`), composed as the final, reserved child-env layer in
   launch/resume/switch via `codexHomeEnv`/`composeEnv`, so their rollouts and native session index
   never enter the user's personal `codex` resume picker or app history. Before every codex-acp child
-  starts, `spawnCmd` calls a serialized `config.RefreshCodexProfile` that one-way mirrors the user's
+  starts, a serialized `config.WithRefreshedCodexProfile` critical section one-way mirrors the user's
   effective `${CODEX_HOME:-~/.codex}` setup (top-level config/auth/setup entries, session and
   history entries excluded) into owner-only copies, tracked by a `cache/codex-profile.json`
   managed-path manifest that prunes copies of removed personal setup while never touching the
@@ -92,58 +92,6 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 ## Review findings
 
-- **Must fix** — **INV §12** — `internal/config/codexprofile.go:32-49,142-165,196-209` copies
-  every personal Codex top-level entry except a short fixed denylist. Current supported Codex homes
-  store runtime/history state under unlisted names such as `state_5.sqlite*`, `logs_2.sqlite*`,
-  `.tmp`, and `shell_snapshots`, so an ordinary child start copies personal state into the isolated
-  profile, can copy an inconsistent live SQLite/WAL set, and replaces same-named private state on
-  every later start. This breaks FS-08.R32/A9, FS-09.R43/R44/A17, TS-02.R19, and TS-04.R20/R21 and
-  can break native resume while doing hundreds of megabytes of serialized I/O. Mirror an explicit
-  provider-setup allowlist instead, and test current database/WAL/log/snapshot names plus preservation
-  of same-named child state across refresh.
-
-- **Must fix** — **INV §10/§14** — `internal/config/codexprofile.go:234-254` recreates every
-  regular setup file as `0600`, including executable skill/plugin scripts and binaries. The private
-  profile then contains those assets but cannot execute them, contradicting FS-08.R32/A9,
-  FS-09.R44/A17, and TS-04.R21's setup-availability promise. Preserve the source owner-executable
-  bit while stripping group/world permissions, with an executable setup-asset regression.
-
-- **Must fix** — **INV §5/§15** — refresh is serialized only while
-  `RefreshCodexProfile` runs (`internal/config/codexprofile.go:82-116`), not through the process
-  consuming it (`internal/runtime/chat.go:129-133,228,511`), and each entry is removed and recopied
-  in place. Concurrent start A can launch while start B exposes a partial generation; a late copy or
-  manifest failure also leaves earlier replacements/orphaned managed assets visible to running
-  children even though the start fails. This violates FS-08.R32, FS-09.R44/A17, TS-02.R19, and
-  TS-04.R21. Stage and publish one complete generation with the manifest, retain the prior generation
-  on failure, and add barrier-controlled concurrent-start and late-failure rollback tests.
-
-- **Must fix** — **INV §14** — `internal/config/codexprofile.go:82-89,107-113,137-140` follows
-  an existing `$AGENTDECK_HOME/codex` destination symlink and chmods/copies/prunes through it before
-  checking whether it aliases the personal Codex home. A pre-existing alias can therefore modify or
-  delete personal/out-of-tree setup and defeats isolation, violating FS-09.R43/R44, TS-02.R19, and
-  TS-04.R20/R21. Reject a symlink/non-directory destination before mutation, require canonical
-  source/destination non-overlap beneath the AgentDeck home, validate prune basenames, and test an
-  alias with a prior manifest without changing the target.
-
-- **Must fix** — **INV §4/§15** — a Codex switch does not validate/prepare the refreshed
-  profile until after stopping the working runtime, so one newly unsafe/unreadable personal asset
-  makes both the target start and the rollback start fail. `internal/server/switch.go:231-238` then
-  calls `failSwitch` without tearing down the rollback's fresh hook/MCP/settings registration,
-  leaving the agent stopped with spoofable artifacts. Prepare a transactional generation before
-  Stop and reuse it through target/rollback, call `teardownAgentRegistration` on rollback failure,
-  and add a Codex switch refresh-failure regression that preserves the old runtime and leaves no
-  registration residue.
-
-- **Worth fixing** — **INV §2** — FS-09.A17 promises launch/resume/switch environment-composition
-  evidence, but `internal/server/launch_test.go:183-204` tests only `codexHomeEnv` with a synthetic
-  `composeEnv`, and `internal/runtime/chat_test.go:368-402` calls only `spawnCmd`. Removing the final
-  layer from resume, switch, or rollback would leave the claimed acceptance green. Table-test every
-  real composer/rollback with ambient, backend, and model collisions and a non-Codex control.
-
-- **Worth fixing** — **INV §10** — `docs/specs/features/FS-08-federation.md:104-107` still calls
-  the isolated Codex child "planned" while R32 and the linked FS/TS requirements mark it shipped.
-  Remove the stale qualifier so the specification does not contradict itself.
-
 - **Worth fixing** — (no invariant class) — SDD traceability for `0b6e793`, `ceef7ee`, `9f0dbde`,
   and `547ca43`: these commits ship Dashboard Resume, builder-project selection, transcript
   right-click behavior, and Codex profile isolation without a committed ready-change/active-change
@@ -160,6 +108,18 @@ are not promoted to findings without a repeatable failure.
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-28 — Fixed the five Codex-isolation findings and both scoped follow-ups. The private
+  setup mirror now selects an explicit setup allowlist, preserves executable setup assets as
+  owner-only, rejects unsafe profile destinations/source overlap before mutation, and stages a full
+  generation with its manifest before transactional publication; manifest failure restores the old
+  profile. Refresh stays locked through child process creation, and unsafe Codex switches are
+  rejected before stopping a live agent while failed rollback registrations are torn down. The
+  environment-composition matrix now covers the shared launch/resume/switch/rollback composer and
+  the stale federation qualifier is removed. Regression coverage includes runtime-state exclusion,
+  executable mode, source/destination safety, manifest rollback, concurrent-start barrier, and
+  unsafe-switch preservation. `make check-specs`, both Go test variants, `make build`, `make dist`,
+  and whitespace checks pass.
 
 - 2026-07-28 — Reviewed the continuous range after `a574076` through `547ca43`, including the
   previously reviewed AgentDecker catalog-membership fix and the new Codex session-isolation feature.

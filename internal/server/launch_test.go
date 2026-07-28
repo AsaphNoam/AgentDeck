@@ -203,6 +203,65 @@ func TestCodexHomeEnvLayer(t *testing.T) {
 	t.Fatalf("composed env did not override CODEX_HOME to %q: %v", want, got)
 }
 
+// TestComposeChildEnvCodexHomeOverride exercises the shared composer used by
+// launch, resume, switch, and rollback: for codex-acp the reserved CODEX_HOME
+// layer is applied last and beats ambient, backend, and per-model collisions,
+// while a non-codex backend leaves the ambient value untouched (INV §2,
+// FS-09.A17, TS-04.R20).
+func TestComposeChildEnvCodexHomeOverride(t *testing.T) {
+	t.Setenv("CODEX_HOME", "/ambient/.codex")
+	home := "/home/x/.agentdeck"
+	profile := config.CodexProfileDir(home)
+
+	codexValue := func(kv []string) string {
+		v := ""
+		for _, e := range kv {
+			if strings.HasPrefix(e, "CODEX_HOME=") {
+				v = e[len("CODEX_HOME="):]
+			}
+		}
+		return v
+	}
+
+	cases := []struct {
+		name        string
+		backendType string
+		backendEnv  map[string]string
+		modelEnv    map[string]string
+		want        string
+	}{
+		{"codex overrides ambient", "codex-acp", nil, nil, profile},
+		{"codex overrides backend", "codex-acp", map[string]string{"CODEX_HOME": "/backend"}, nil, profile},
+		{"codex overrides model", "codex-acp", map[string]string{"CODEX_HOME": "/backend"}, map[string]string{"CODEX_HOME": "/model"}, profile},
+		{"non-codex keeps ambient", "claude-acp", nil, nil, "/ambient/.codex"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := composeChildEnv(c.backendType, home, c.backendEnv, c.modelEnv, nil, nil)
+			if v := codexValue(got); v != c.want {
+				t.Errorf("CODEX_HOME = %q, want %q", v, c.want)
+			}
+		})
+	}
+
+	// Non-CODEX_HOME layer keys still contribute and later layers win their own keys.
+	got := composeChildEnv("codex-acp", home,
+		map[string]string{"B_ONLY": "1", "SHARED": "backend"},
+		map[string]string{"M_ONLY": "2", "SHARED": "model"}, nil, nil)
+	m := map[string]string{}
+	for _, kv := range got {
+		if i := strings.IndexByte(kv, '='); i >= 0 {
+			m[kv[:i]] = kv[i+1:]
+		}
+	}
+	if m["B_ONLY"] != "1" || m["M_ONLY"] != "2" || m["SHARED"] != "model" {
+		t.Errorf("layer composition lost keys: %v", m)
+	}
+	if m["CODEX_HOME"] != profile {
+		t.Errorf("codex layer not final: CODEX_HOME = %q, want %q", m["CODEX_HOME"], profile)
+	}
+}
+
 func TestJoinSystemPrompt(t *testing.T) {
 	cases := []struct {
 		ctx, sys, want string

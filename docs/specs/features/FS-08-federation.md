@@ -103,7 +103,7 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
   Source changes never hot-mutate an already running agent.
 - **R20** — AgentDeck passes the real project working directory and native user home through to the
   CLI, allowing provider-native project instructions and setup to remain discoverable without
-  AgentDeck copying them. The planned isolated Codex child is the exception in R32: it receives a
+  AgentDeck copying them. The isolated Codex child is the exception in R32: it receives a
   refreshed private profile rather than the personal `CODEX_HOME`.
 - **R21** — A native declaration named `agentdeck-messaging` conflicts with AgentDeck's reserved
   per-session messaging MCP id. Launch fails `409 source_conflict`; neither declaration is silently
@@ -113,7 +113,8 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
   one-way, owner-only managed mirror of the effective personal Codex setup in that profile: native
   configuration, authentication, skills, agents, rules, plugins, and MCP setup are available to the
   child, while session/history data remains private to AgentDeck. Source changes and removals take
-  effect at the next child start; running children are not hot-mutated. The mirror never creates a
+  effect at the next child start; a rejected refresh keeps the previous private setup and does not
+  stop a working runtime; running children are not hot-mutated. The mirror never creates a
   source symlink or writes to the source tree. This is internal execution setup, not the user-facing
   detached-import mode in R9, and does not change source authority, preview, consent, or provenance.
 

@@ -17,35 +17,41 @@ import (
 // session index stay there and AgentDeck-created Codex conversations never enter
 // the user's personal `codex` resume picker or app history. The child still needs
 // the user's real Codex setup, so before every child start this file makes a
-// one-way managed mirror of the personal Codex home's setup into the profile:
-// configuration, authentication, and any setup assets are copied, while
-// session/history data is never copied, no source symlink is ever created or
-// followed outside the personal root, and the personal home is never written to.
+// one-way managed mirror of the personal Codex home's SETUP into the profile:
+// configuration, authentication, and the recognized setup assets are copied,
+// while session/history/runtime state is never copied, no source symlink is ever
+// created or followed outside the personal root, and the personal home is never
+// written to. The mirror is built as one complete generation in a staging area
+// and then published entry-by-entry, so a concurrently running child never sees a
+// half-written generation and a copy failure leaves the prior generation intact.
 
 const (
 	dirCodexProfile          = "codex"
 	dirCache                 = "cache"
 	fileCodexProfileManifest = "codex-profile.json"
 	codexProfileManifestVer  = 1
+	dirCodexStaging          = "codex-profile.staging"
 )
 
-// codexSessionEntries are the top-level personal-CODEX_HOME names that hold
-// session/history/volatile state rather than setup. They are never mirrored, so
-// AgentDeck-created Codex conversations stay private to the isolated profile and
-// the user's own history is never duplicated (FS-09.R44, TS-04.R21).
-var codexSessionEntries = map[string]struct{}{
-	"sessions":            {},
-	"session_index.jsonl": {},
-	"history.jsonl":       {},
-	"history":             {},
-	"rollouts":            {},
-	"archived_sessions":   {},
-	"logs":                {},
-	"log":                 {},
-	"cache":               {},
-	".cache":              {},
-	"tmp":                 {},
-	".git":                {},
+// codexSetupEntries is the explicit ALLOWLIST of top-level personal-CODEX_HOME
+// names that hold provider-recognized setup (FS-09.R44, TS-04.R21). Only these
+// are mirrored into the isolated profile. An allowlist is deliberate: Codex adds
+// new session/history/runtime files across versions (state_5.sqlite*,
+// logs_2.sqlite*, shell_snapshots, .tmp, caches, session rollouts, ...), and a
+// denylist would silently mirror every new one into the profile — copying
+// personal runtime state, risking an inconsistent live SQLite/WAL set, and
+// replacing the child's own same-named private state on each start (INV §12,
+// TS-02.R19).
+var codexSetupEntries = map[string]struct{}{
+	"config.toml":     {}, // configuration, incl. [mcp_servers] MCP setup
+	"auth.json":       {}, // authentication
+	"AGENTS.md":       {}, // global agent instructions
+	"instructions.md": {}, // legacy global instructions
+	"prompts":         {}, // custom prompts
+	"skills":          {}, // skills
+	"agents":          {}, // agents
+	"rules":           {}, // rules
+	"plugins":         {}, // plugins
 }
 
 // codexProfileManifest records only the top-level destination names AgentDeck
@@ -61,6 +67,12 @@ type codexProfileManifest struct {
 // not race the mirror and manifest for the shared profile (TS-04.R21).
 var codexProfileMu sync.Mutex
 
+// writeCodexProfileManifest is a seam for the transaction regression test. A
+// manifest-write failure must restore the prior profile just like a copy failure
+// does; otherwise a start reports failure after exposing a new partial
+// generation (INV §5/§15).
+var writeCodexProfileManifest = writeJSONAtomic
+
 // CodexProfileDir returns the AgentDeck-owned CODEX_HOME for codex-acp children
 // under the given AgentDeck home. It is the single source of truth for both the
 // composed child-env value and the refresh target (INV §2).
@@ -74,71 +86,143 @@ func CodexProfileDir(home string) string {
 // since removed. profileDir is the composed child CODEX_HOME (CodexProfileDir).
 // The refresh is idempotent and safe to call before every child start; a missing
 // personal home or asset is a non-fatal skip, while an unsafe (root-escaping) or
-// uncopyable selected asset fails so the caller can abort before spawn.
+// uncopyable selected asset fails so the caller can abort before spawn — and,
+// because the whole generation is staged before anything is published, such a
+// failure leaves the previously published profile untouched (INV §5/§15).
 func RefreshCodexProfile(profileDir string) error {
 	codexProfileMu.Lock()
 	defer codexProfileMu.Unlock()
+	return refreshCodexProfile(profileDir)
+}
 
-	if err := os.MkdirAll(profileDir, 0o700); err != nil {
-		return fmt.Errorf("config: create codex profile %q: %w", profileDir, err)
+// WithRefreshedCodexProfile runs start while the refreshed profile lock is held.
+// This closes the refresh-to-exec window: a second Codex child cannot publish a
+// generation while the first child is being created to consume the one it just
+// prepared (INV §5/§15). The callback must only perform the process start, not
+// wait for the process, so concurrent Codex agents remain independently live.
+func WithRefreshedCodexProfile(profileDir string, start func() error) error {
+	codexProfileMu.Lock()
+	defer codexProfileMu.Unlock()
+	if err := refreshCodexProfile(profileDir); err != nil {
+		return err
 	}
-	// MkdirAll never re-modes an existing dir; tighten a profile made by an
-	// older build so its auth/config copies stay owner-only.
-	if err := os.Chmod(profileDir, 0o700); err != nil {
-		return fmt.Errorf("config: chmod codex profile %q: %w", profileDir, err)
-	}
+	return start()
+}
 
-	home := filepath.Dir(profileDir)
-	manifestPath := filepath.Join(home, dirCache, fileCodexProfileManifest)
-	prior := readCodexManifest(manifestPath)
-
-	managed, err := mirrorCodexSetup(profileDir)
+func refreshCodexProfile(profileDir string) error {
+	// Resolve and reject source/profile overlap before creating or chmodding the
+	// destination. In particular, CODEX_HOME=<agentdeck-home> must not cause us
+	// to create the profile inside the personal source before rejecting it.
+	root, err := resolveCodexSource(profileDir)
 	if err != nil {
 		return err
 	}
 
-	// Prune private copies of setup that has left the personal home. Only names
-	// AgentDeck itself mirrored are eligible, so Codex-owned session/history data
-	// in the profile is never removed.
-	managedSet := make(map[string]struct{}, len(managed))
-	for _, name := range managed {
-		managedSet[name] = struct{}{}
-	}
-	for _, name := range prior.Managed {
-		if _, ok := managedSet[name]; ok {
-			continue
-		}
-		if err := os.RemoveAll(filepath.Join(profileDir, name)); err != nil {
-			return fmt.Errorf("config: prune stale codex setup %q: %w", name, err)
-		}
+	// The destination must be a real directory we own — never a symlink or
+	// non-directory that could alias (and let us mutate/delete through) the
+	// personal home or any out-of-tree path (INV §14).
+	if err := ensureCodexProfileDir(profileDir); err != nil {
+		return err
 	}
 
-	return writeJSONAtomic(manifestPath, codexProfileManifest{Version: codexProfileManifestVer, Managed: managed})
+	home := filepath.Dir(profileDir)
+	manifestPath := filepath.Join(home, dirCache, fileCodexProfileManifest)
+
+	stagingDir := filepath.Join(home, dirCache, dirCodexStaging)
+	if err := os.RemoveAll(stagingDir); err != nil {
+		return fmt.Errorf("config: clear codex staging %q: %w", stagingDir, err)
+	}
+	if err := os.MkdirAll(stagingDir, 0o700); err != nil {
+		return fmt.Errorf("config: create codex staging %q: %w", stagingDir, err)
+	}
+	defer os.RemoveAll(stagingDir)
+
+	// 1. Build a COMPLETE generation of the setup mirror in staging. Every risky
+	//    step (reading/copying/validating personal assets) happens here, so a
+	//    failure returns with the live profile untouched (INV §5/§15).
+	managed, err := stageCodexSetup(root, stagingDir)
+	if err != nil {
+		return err
+	}
+
+	// 2. Publish the staged generation into the live profile and prune stale
+	//    managed copies. Each managed entry is swapped atomically so a running
+	//    child never observes a half-written or missing setup asset.
+	prior := readCodexManifest(manifestPath)
+	if err := publishCodexGeneration(stagingDir, profileDir, manifestPath, managed, prior.Managed); err != nil {
+		return err
+	}
+	return nil
 }
 
-// mirrorCodexSetup copies every top-level setup entry from the personal Codex
-// home into profileDir and returns the sorted managed destination names. Each
-// managed entry is removed and re-copied so inner edits and deletions in the
-// personal source are reflected exactly. Session/history entries are skipped.
-func mirrorCodexSetup(profileDir string) ([]string, error) {
+// ensureCodexProfileDir provisions the profile as an owner-only directory,
+// rejecting a pre-existing symlink or non-directory before any mutation so the
+// refresh cannot chmod/copy/prune through an alias of the personal home (INV §14).
+func ensureCodexProfileDir(profileDir string) error {
+	if fi, err := os.Lstat(profileDir); err == nil {
+		if fi.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("config: codex profile %q is a symlink; refusing to mutate through it", profileDir)
+		}
+		if !fi.IsDir() {
+			return fmt.Errorf("config: codex profile %q exists and is not a directory", profileDir)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("config: stat codex profile %q: %w", profileDir, err)
+	}
+	if err := os.MkdirAll(profileDir, 0o700); err != nil {
+		return fmt.Errorf("config: create codex profile %q: %w", profileDir, err)
+	}
+	// MkdirAll never re-modes an existing dir; tighten a profile made by an older
+	// build so its auth/config copies stay owner-only.
+	if err := os.Chmod(profileDir, 0o700); err != nil {
+		return fmt.Errorf("config: chmod codex profile %q: %w", profileDir, err)
+	}
+	return nil
+}
+
+// resolveCodexSource resolves the personal Codex home to a canonical root and
+// returns a canonical root. A missing personal home is a safe empty source: the
+// caller stages nothing and still prunes stale managed copies. An overlap
+// between the canonical source and profile (either contains the other) is
+// rejected before mutation, so a profile aliasing the personal home cannot
+// delete it (INV §14).
+func resolveCodexSource(profileDir string) (root string, err error) {
 	source, err := personalCodexHome()
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	// A missing personal home is a non-fatal skip: there is simply nothing to
-	// mirror, but any prior managed copy is still pruned by the caller.
-	root, err := filepath.EvalSymlinks(source)
+	root, err = filepath.EvalSymlinks(source)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return []string{}, nil
+			return "", nil // missing personal home: nothing to mirror, prune runs
 		}
-		return nil, fmt.Errorf("config: resolve personal codex home %q: %w", source, err)
+		return "", fmt.Errorf("config: resolve personal codex home %q: %w", source, err)
 	}
-	// Refuse to mirror the profile into itself (e.g. a misconfigured home).
-	if canonProfile, err := filepath.EvalSymlinks(profileDir); err == nil && canonProfile == root {
+	canonProfile, err := filepath.EvalSymlinks(profileDir)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return "", fmt.Errorf("config: resolve codex profile %q: %w", profileDir, err)
+		}
+		parent, parentErr := filepath.EvalSymlinks(filepath.Dir(profileDir))
+		if parentErr != nil {
+			return "", fmt.Errorf("config: resolve codex profile parent %q: %w", filepath.Dir(profileDir), parentErr)
+		}
+		canonProfile = filepath.Join(parent, filepath.Base(profileDir))
+	}
+	if withinRoot(canonProfile, root) || withinRoot(root, canonProfile) {
+		return "", fmt.Errorf("config: personal codex home %q overlaps profile %q; refusing to mutate", root, canonProfile)
+	}
+	return root, nil
+}
+
+// stageCodexSetup copies every allowlisted top-level setup entry from the
+// personal root into a fresh stagingDir and returns the sorted managed names.
+// Session/history/runtime entries are excluded by the allowlist. root == ""
+// means there is no personal home, so nothing is staged.
+func stageCodexSetup(root, stagingDir string) ([]string, error) {
+	if root == "" {
 		return []string{}, nil
 	}
-
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -146,15 +230,14 @@ func mirrorCodexSetup(profileDir string) ([]string, error) {
 		}
 		return nil, fmt.Errorf("config: read personal codex home %q: %w", root, err)
 	}
-
 	managed := make([]string, 0, len(entries))
 	for _, entry := range entries {
 		name := entry.Name()
-		if _, skip := codexSessionEntries[name]; skip {
+		if _, ok := codexSetupEntries[name]; !ok {
 			continue
 		}
 		src := filepath.Join(root, name)
-		dst := filepath.Join(profileDir, name)
+		dst := filepath.Join(stagingDir, name)
 		copied, err := copyCodexEntry(src, dst, root)
 		if err != nil {
 			return nil, err
@@ -167,10 +250,101 @@ func mirrorCodexSetup(profileDir string) ([]string, error) {
 	return managed, nil
 }
 
+// publishCodexGeneration swaps each staged managed entry into profileDir and
+// prunes managed copies of setup that has left the personal home. Only names a
+// prior refresh mirrored are eligible for pruning, and each must be a safe single
+// path element so a corrupt manifest cannot delete outside the profile (INV §14).
+func publishCodexGeneration(stagingDir, profileDir, manifestPath string, managed, prior []string) error {
+	for _, name := range managed {
+		if !isSafeCodexName(name) {
+			return fmt.Errorf("config: unsafe staged codex setup name %q", name)
+		}
+	}
+	managedSet := make(map[string]struct{}, len(managed))
+	for _, name := range managed {
+		managedSet[name] = struct{}{}
+	}
+	backupDir := filepath.Join(stagingDir, ".previous")
+	if err := os.MkdirAll(backupDir, 0o700); err != nil {
+		return fmt.Errorf("config: create codex generation backup %q: %w", backupDir, err)
+	}
+	type replacement struct {
+		name   string
+		hadOld bool
+	}
+	replaced := make([]replacement, 0, len(managed))
+	pruned := make([]string, 0, len(prior))
+	rollback := func() {
+		for i := len(replaced) - 1; i >= 0; i-- {
+			name := replaced[i].name
+			dst := filepath.Join(profileDir, name)
+			_ = os.RemoveAll(dst)
+			if replaced[i].hadOld {
+				_ = os.Rename(filepath.Join(backupDir, name), dst)
+			}
+		}
+		for i := len(pruned) - 1; i >= 0; i-- {
+			name := pruned[i]
+			_ = os.Rename(filepath.Join(backupDir, name), filepath.Join(profileDir, name))
+		}
+	}
+	for _, name := range managed {
+		dst := filepath.Join(profileDir, name)
+		backup := filepath.Join(backupDir, name)
+		hadOld := false
+		if _, err := os.Lstat(dst); err == nil {
+			if err := os.Rename(dst, backup); err != nil {
+				rollback()
+				return fmt.Errorf("config: back up codex setup %q: %w", dst, err)
+			}
+			hadOld = true
+		} else if !os.IsNotExist(err) {
+			rollback()
+			return fmt.Errorf("config: stat codex setup %q: %w", dst, err)
+		}
+		if err := os.Rename(filepath.Join(stagingDir, name), dst); err != nil {
+			if hadOld {
+				_ = os.Rename(backup, dst)
+			}
+			rollback()
+			return fmt.Errorf("config: publish codex setup %q: %w", dst, err)
+		}
+		replaced = append(replaced, replacement{name: name, hadOld: hadOld})
+	}
+	for _, name := range prior {
+		if _, ok := managedSet[name]; ok {
+			continue
+		}
+		if !isSafeCodexName(name) {
+			continue
+		}
+		dst := filepath.Join(profileDir, name)
+		if _, err := os.Lstat(dst); os.IsNotExist(err) {
+			continue
+		} else if err != nil {
+			rollback()
+			return fmt.Errorf("config: stat stale codex setup %q: %w", dst, err)
+		}
+		if err := os.Rename(dst, filepath.Join(backupDir, name)); err != nil {
+			rollback()
+			return fmt.Errorf("config: stage stale codex setup %q: %w", dst, err)
+		}
+		pruned = append(pruned, name)
+	}
+	if err := writeCodexProfileManifest(manifestPath, codexProfileManifest{Version: codexProfileManifestVer, Managed: managed}); err != nil {
+		rollback()
+		return fmt.Errorf("config: publish codex profile manifest: %w", err)
+	}
+	// The manifest and all new entries are now durable. The old generation is no
+	// longer reachable from the live profile, so cleanup cannot expose a partial
+	// setup to a child; a future refresh also clears any leftover staging data.
+	_ = os.RemoveAll(backupDir)
+	return nil
+}
+
 // copyCodexEntry mirrors a single source entry into dst, dereferencing symlinks
-// that stay inside the personal root and failing on any that escape it. It first
-// removes dst so a stale copy cannot survive a source deletion. Irregular files
-// (sockets, devices, fifos) are a non-fatal skip; anything selected but
+// that stay inside the personal root and failing on any that escape it. Irregular
+// files (sockets, devices, fifos) are a non-fatal skip; anything selected but
 // uncopyable is an error so the caller aborts before spawn (TS-04.R21).
 func copyCodexEntry(src, dst, root string) (bool, error) {
 	info, err := os.Lstat(src)
@@ -193,9 +367,6 @@ func copyCodexEntry(src, dst, root string) (bool, error) {
 		}
 		src = resolved
 	}
-	if err := os.RemoveAll(dst); err != nil {
-		return false, fmt.Errorf("config: clear codex setup %q: %w", dst, err)
-	}
 	switch {
 	case info.IsDir():
 		if err := copyCodexTree(src, dst, root); err != nil {
@@ -203,7 +374,7 @@ func copyCodexEntry(src, dst, root string) (bool, error) {
 		}
 		return true, nil
 	case info.Mode().IsRegular():
-		if err := copyCodexFile(src, dst); err != nil {
+		if err := copyCodexFile(src, dst, info.Mode()); err != nil {
 			return false, err
 		}
 		return true, nil
@@ -231,16 +402,21 @@ func copyCodexTree(dir, dst, root string) error {
 	return nil
 }
 
-// copyCodexFile copies a regular file to dst as an owner-only (0600) private
-// copy — Codex auth/config carry secrets, so the mirror is never group/world
-// readable.
-func copyCodexFile(src, dst string) error {
+// copyCodexFile copies a regular file to dst as an owner-only private copy. The
+// source owner-execute bit is preserved so executable setup assets (plugin/skill
+// scripts and binaries) stay runnable in the profile, but group/world bits are
+// always stripped since these copies can carry secrets (INV §10/§14).
+func copyCodexFile(src, dst string, mode os.FileMode) error {
+	perm := os.FileMode(0o600)
+	if mode&0o100 != 0 {
+		perm |= 0o100
+	}
 	in, err := os.Open(src)
 	if err != nil {
 		return fmt.Errorf("config: open codex setup %q: %w", src, err)
 	}
 	defer in.Close()
-	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
 	if err != nil {
 		return fmt.Errorf("config: create codex setup copy %q: %w", dst, err)
 	}
@@ -251,6 +427,11 @@ func copyCodexFile(src, dst string) error {
 	if err := out.Close(); err != nil {
 		return fmt.Errorf("config: finalize codex setup copy %q: %w", dst, err)
 	}
+	// OpenFile perm is umask-masked; chmod so the executable bit and owner-only
+	// restriction are exact regardless of the process umask.
+	if err := os.Chmod(dst, perm); err != nil {
+		return fmt.Errorf("config: chmod codex setup copy %q: %w", dst, err)
+	}
 	return nil
 }
 
@@ -260,6 +441,16 @@ func withinRoot(p, root string) bool {
 	p = filepath.Clean(p)
 	root = filepath.Clean(root)
 	return p == root || strings.HasPrefix(p, root+string(os.PathSeparator))
+}
+
+// isSafeCodexName reports whether name is a single, non-traversing path element,
+// so a corrupt manifest cannot cause a prune to touch anything outside the
+// profile directory (INV §14).
+func isSafeCodexName(name string) bool {
+	if name == "" || name == "." || name == ".." {
+		return false
+	}
+	return !strings.ContainsRune(name, os.PathSeparator) && filepath.Base(name) == name
 }
 
 // personalCodexHome resolves the user's effective personal Codex home from the

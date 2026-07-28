@@ -316,7 +316,7 @@ func (s *Server) composeLaunchWithOptions(ctx context.Context, req launchRequest
 		BackendType:  backend.Type,
 		ModelID:      acpModelID,
 		Driver:       driver,
-		Env:          composeEnv(os.Environ(), backend.Env, model.Env, hookEnv, projectResourcesEnv(resourceDir), codexHomeEnv(backend.Type, s.configStore.Home())),
+		Env:          composeChildEnv(backend.Type, s.configStore.Home(), backend.Env, model.Env, hookEnv, projectResourcesEnv(resourceDir)),
 		SkipPerms:    resolveSkip(s.cfg.SkipPermissions, role.SkipPermissions),
 		HookToken:    token,
 		MCPServers:   []runtime.MCPServerSpec{mcpSpec},
@@ -475,6 +475,17 @@ func codexHomeEnv(backendType, home string) map[string]string {
 		return nil
 	}
 	return map[string]string{"CODEX_HOME": config.CodexProfileDir(home)}
+}
+
+// composeChildEnv builds a child process environment for a launch, resume,
+// switch, or rollback. The reserved codex CODEX_HOME layer is always applied
+// LAST, so all four paths compose the isolated Codex store identically and no
+// ambient, backend, or per-model CODEX_HOME can win (INV §2, FS-09.R43/A17,
+// TS-04.R20). backendEnv, modelEnv, hookEnv, and resourceEnv are the ordered
+// per-call layers applied over the process environment before the codex layer;
+// a non-codex backend gets no codex layer, leaving its env untouched.
+func composeChildEnv(backendType, home string, backendEnv, modelEnv, hookEnv, resourceEnv map[string]string) []string {
+	return composeEnv(os.Environ(), backendEnv, modelEnv, hookEnv, resourceEnv, codexHomeEnv(backendType, home))
 }
 
 // composeEnv layers env: process env, then backend env, then per-model env (later

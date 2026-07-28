@@ -363,8 +363,9 @@ func TestCodexDeveloperInstructionsEnv(t *testing.T) {
 	assertPrompt(resume)
 }
 
-// FS-09.R43/R44, TS-04.R20/R21: a codex-acp spawn refreshes its dedicated
-// CODEX_HOME profile from the personal Codex setup before the process starts.
+// FS-09.R43/R44, TS-04.R20/R21: a codex-acp start refreshes its dedicated
+// CODEX_HOME profile from the personal Codex setup immediately before its
+// process starts.
 func TestCodexSpawnRefreshesProfile(t *testing.T) {
 	st, err := state.Open(t.TempDir())
 	if err != nil {
@@ -372,6 +373,8 @@ func TestCodexSpawnRefreshesProfile(t *testing.T) {
 	}
 	t.Cleanup(func() { st.Close() })
 	c := NewChatRuntime(st)
+	c.command = "/bin/sh"
+	c.cmdArgs = []string{"-c", "exit 0"}
 	ad, _ := backend.For("codex-acp")
 
 	personal := filepath.Join(t.TempDir(), "codex")
@@ -396,8 +399,14 @@ func TestCodexSpawnRefreshesProfile(t *testing.T) {
 	if got := envValue(cmd.Env, "CODEX_HOME"); got != profile {
 		t.Fatalf("child CODEX_HOME = %q, want %q", got, profile)
 	}
+	if err := c.startCmd(cmd, spec); err != nil {
+		t.Fatalf("startCmd: %v", err)
+	}
+	if err := cmd.Wait(); err != nil {
+		t.Fatalf("wait: %v", err)
+	}
 	if _, err := os.Stat(filepath.Join(profile, "config.toml")); err != nil {
-		t.Fatalf("profile setup not refreshed before spawn: %v", err)
+		t.Fatalf("profile setup not refreshed before process start: %v", err)
 	}
 }
 

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/agentdeck/agentdeck/internal/backend"
@@ -132,6 +131,20 @@ func (s *Server) handleSwitchRuntime(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A codex switch resumes into the isolated CODEX_HOME profile, whose refresh
+	// (spawnCmd → RefreshCodexProfile) fails closed on a newly unsafe/unreadable
+	// personal asset. Prepare that generation BEFORE stopping the working runtime:
+	// otherwise the same broken asset fails both the target resume and the
+	// rollback resume, leaving the agent dead with spoofable registration
+	// artifacts (INV §4/§15). Preparing here keeps the old runtime live on failure;
+	// the target/rollback resumes re-run the now-succeeding, idempotent refresh.
+	if s.backendType(agent.Backend) == "codex-acp" || s.backendType(target.Backend) == "codex-acp" {
+		if err := config.RefreshCodexProfile(config.CodexProfileDir(s.configStore.Home())); err != nil {
+			writeAPIError(w, apiError(runtime.CodeInternal, "prepare codex profile: "+err.Error()))
+			return
+		}
+	}
+
 	// 1. Cancel any in-flight turn and let it settle (streamed events already
 	//    persisted), then stop the old runtime (removes running row, status done).
 	s.cancelAndWait(r.Context(), id, switchCancelTimeout)
@@ -230,10 +243,15 @@ func (s *Server) rollbackSwitch(ctx context.Context, w http.ResponseWriter, prev
 	}
 	spec, ae := s.composeSwitchSpec(prevAgent, prevSessionID)
 	if ae != nil {
+		// composeSwitchSpec mints a fresh hook token + MCP registration before it
+		// can fail; tear those down so a failed rollback leaves no spoofable
+		// registration residue for the stopped agent (INV §4/§15).
+		s.teardownAgentRegistration(prevAgent.AgentID)
 		s.failSwitch(w, prevAgent.AgentID, "recompose previous: "+ae.Message)
 		return
 	}
 	if _, err := s.registry.Resume(ctx, spec); err != nil {
+		s.teardownAgentRegistration(prevAgent.AgentID)
 		s.failSwitch(w, prevAgent.AgentID, err.Error())
 		return
 	}
@@ -352,7 +370,7 @@ func (s *Server) composeSwitchSpec(target state.Agent, resumeID string) (runtime
 		SystemPrompt:   snap.SystemPrompt,
 		BackendType:    be.Type,
 		ModelID:        model.Model,
-		Env:            composeEnv(os.Environ(), be.Env, model.Env, s.hookEnv(target, token), projectResourcesEnv(resourceDir), codexHomeEnv(be.Type, s.configStore.Home())),
+		Env:            composeChildEnv(be.Type, s.configStore.Home(), be.Env, model.Env, s.hookEnv(target, token), projectResourcesEnv(resourceDir)),
 		SkipPerms:      snap.SkipPermissions,
 		HookToken:      token,
 		MCPServers:     []runtime.MCPServerSpec{mcpSpec},
