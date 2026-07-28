@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/agentdeck/agentdeck/internal/backend"
+	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/state"
 	"github.com/agentdeck/agentdeck/internal/strutil"
 )
@@ -117,6 +118,18 @@ func (c *ChatRuntime) spawnCmd(ad backend.BackendAdapter, spec LaunchSpec) (*exe
 		env, err = withCodexDeveloperInstructions(env, spec.StartSystemPrompt())
 		if err != nil {
 			return nil, err
+		}
+		// Codex session isolation: refresh the dedicated CODEX_HOME profile from
+		// the user's personal Codex setup before spawn, failing the start if any
+		// selected asset is unsafe or uncopyable (FS-09.R43/R44, TS-04.R20/R21).
+		// The child CODEX_HOME the server composed as the final env layer is the
+		// single source of truth for the refresh target (INV §2). It is absent
+		// only in unit specs that never route through composeEnv, which skip
+		// isolation.
+		if home := envValue(env, "CODEX_HOME"); home != "" {
+			if err := config.RefreshCodexProfile(home); err != nil {
+				return nil, fmt.Errorf("runtime: refresh codex profile: %w", err)
+			}
 		}
 	}
 	cmd.Env = env
@@ -1082,6 +1095,19 @@ func stripEnv(env []string, key string) []string {
 		out = append(out, kv)
 	}
 	return out
+}
+
+// envValue returns the value of the last "key=value" entry for key, or "" if
+// absent. Later entries win, matching how a process resolves duplicate env keys.
+func envValue(env []string, key string) string {
+	prefix := key + "="
+	value := ""
+	for _, kv := range env {
+		if strings.HasPrefix(kv, prefix) {
+			value = kv[len(prefix):]
+		}
+	}
+	return value
 }
 
 // withCodexDeveloperInstructions adds the composed AgentDeck launch prompt to

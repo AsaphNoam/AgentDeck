@@ -33,11 +33,6 @@ Example:
   backend, and model through three consecutive browser prompts. Offer a picker in the chat header
   itself, populated from the backend catalog, that drives the existing switch-runtime path (FS-01.R13
   — running agents only, history preserved by native resume or primer).
-- **Keep AgentDeck sessions out of ordinary Codex history.** AgentDeck-created Codex conversations
-  currently appear alongside personal Codex app/CLI history, making that history noisy during normal
-  use. Find a provider-supported way to archive, hide, or otherwise segregate AgentDeck sessions
-  while preserving AgentDeck's own transcript and resume behavior; do not assume it is safe to
-  delete or rewrite native Codex history.
 - **Claude backend model autosync.** The Codex half shipped (FS-09.R28: opt-in `autosync_models`
   reads `~/.codex/models_cache.json` on startup and add-only merges the catalog). Claude has no
   equivalent on-disk catalog to sync from — `~/.claude/settings.json` holds only the *selected*

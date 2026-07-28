@@ -127,6 +127,32 @@ different level than the person chose, which FS-09.R42 forbids. The rejection in
 bounded, backend-specific launch error naming the effort field, and the process group is terminated.
 Raw provider output stays behind the bounded vocabulary per R12.
 
+**R20 — Codex gets an isolated runtime profile.** AgentDeck launches the `codex-acp`
+child with `CODEX_HOME` set to `<agentdeck-home>/codex`, a `0700` directory under the owner-only
+AgentDeck home, so Codex writes its rollouts and native session index there instead of the user's
+personal store (FS-09.R43). The value is composed once as a reserved, final child-environment layer:
+it overrides ambient, backend, and model `CODEX_HOME` values in launch, resume, switch, and rollback.
+INV §2 already names these paths as "the same thing built in parallel," and a resume that opened a
+different home would abandon the session. AgentDeck's own process `CODEX_HOME` is left untouched, so
+the federation resolver (`config_sources.go`) and model autosync (`codexmodels.go`) keep reading the
+user's real home (FS-09.R44). Model and prompt still flow through ACP and the `CODEX_CONFIG` overlay
+(R14); only the Codex child receives the isolated profile.
+
+**R21 — The isolated profile is refreshed, never symlinked; honoring is credential-gated.**
+Before each `codex-acp` child starts, one shared, serialized helper provisions its dedicated home and
+one-way refreshes the provider-recognized personal setup from `${CODEX_HOME:-~/.codex}`: regular
+configuration/authentication files and the skills, agents, rules, plugins, and MCP setup assets are
+copied into the private profile. The helper tracks its managed destination paths so a source removal
+removes only the corresponding private copy; it never deletes Codex-owned private state. It never
+creates a symlink to the source, follows a source link outside the canonical personal root, or writes
+into/mutates the user's real home. Session/history data, including its indexes, is excluded from the
+refresh and belongs solely to the private profile. A missing source setup asset is a non-fatal skip;
+an unsafe or uncopyable selected asset fails the process start before spawn. The assumptions that the
+packaged `codex-acp` honors `CODEX_HOME` for its rollout store, recognizes the refreshed setup, and
+resumes against a non-default home are external-CLI compatibility gates (INV §12) confirmed by
+credentialed acceptance before a release claims isolation, extending R11. Fake-ACP tests assert the
+composed environment and profile-refresh contract only.
+
 ## 3. Interfaces & data shapes
 
 - ACP: JSON-RPC messages over newline-delimited child stdin/stdout; adapter determines exact
@@ -148,10 +174,15 @@ Raw provider output stays behind the bounded vocabulary per R12.
 
 ## 4. Invariants
 
+- **INV §2:** the codex `CODEX_HOME` is composed once and shared by launch, resume, and switch, never
+  re-derived per path, so a resumed session never opens a different store (R20).
 - **INV §4:** registration and teardown are symmetric, generation-scoped, and old-before-new.
 - **INV §6:** a new runtime/backend joins persistence, LaunchSpec, status, messaging, teardown, and
   capability contracts before it is advertised.
 - **INV §9:** process/cancel/readiness operations have real deadlines and terminate their resources.
+- **INV §12:** the packaged `codex-acp` honoring of a non-default `CODEX_HOME`, refreshed setup
+  assets, and resume against that home are version-variant external-CLI behaviors gated by
+  credentialed acceptance (R21).
 - **R12 — Boundary redaction.** Raw provider errors, stderr, tool inputs, and hook/MCP payloads are
   sanitized before logging or returning over HTTP; diagnostic value must not expose secrets.
 - **R16 — Auth probes cannot become command execution.** Provider id and argv are selected
@@ -166,6 +197,10 @@ Raw provider output stays behind the bounded vocabulary per R12.
 - Terminal agents are intentionally non-messageable until an interactive-CLI MCP path is verified.
 - OpenCode/OpenHands executable overrides are honored by credential checks but not consistently by
   launch; missing/old CLI diagnostics are also incomplete. These are tracked product gaps.
+- Codex session isolation (R20/R21) does not migrate `codex-acp` sessions already written into the
+  user's personal home before the change ships; they stay there, may no longer native-resume through
+  AgentDeck, and the user may archive them with the native `codex archive` command. Whether the
+  packaged CLI honors the isolated profile is confirmed only by the credentialed A7 gate.
 
 ## 6. Traceability
 
@@ -173,6 +208,10 @@ Raw provider output stays behind the bounded vocabulary per R12.
 - Adapters: `internal/backend/adapter.go`; credential checks in `internal/backend/credcheck`;
   official Claude session metadata and Codex `CODEX_CONFIG` prompt delivery are pinned by runtime
   parameter/environment tests.
+- Codex isolated profile (R20/R21): final `CODEX_HOME` composition in
+  `internal/server/{launch,resume,switch}.go` via `composeEnv`, one-way profile refresh under
+  `internal/config`, applied in `internal/runtime/chat.go` spawn; AgentDeck's own home read stays in
+  `internal/server/config_sources.go` and `internal/config/codexmodels.go`.
 - Hooks: `internal/hooks`, `internal/server/hook.go`, registration in `launch.go`.
 - MCP: `internal/messaging/messaging.go`, `tools.go`, `internal/server/messaging_registration.go`.
 - Terminal: `internal/runtime/terminal`, `internal/server/terminal.go`.

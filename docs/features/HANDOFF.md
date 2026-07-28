@@ -7,7 +7,22 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** Chat and archived transcripts no longer carry a standing per-event **Annotate**
+- **State:** AgentDeck-launched Codex agents now run in a private `CODEX_HOME`
+  (`<agentdeck-home>/codex`, `0700`), composed as the final, reserved child-env layer in
+  launch/resume/switch via `codexHomeEnv`/`composeEnv`, so their rollouts and native session index
+  never enter the user's personal `codex` resume picker or app history. Before every codex-acp child
+  starts, `spawnCmd` calls a serialized `config.RefreshCodexProfile` that one-way mirrors the user's
+  effective `${CODEX_HOME:-~/.codex}` setup (top-level config/auth/setup entries, session and
+  history entries excluded) into owner-only copies, tracked by a `cache/codex-profile.json`
+  managed-path manifest that prunes copies of removed personal setup while never touching the
+  child's own session data, creating a source symlink, or following one out of the personal root; an
+  unsafe or uncopyable selected asset fails the start before spawn. AgentDeck's own process
+  `CODEX_HOME` is untouched, so federation discovery and Codex model autosync still read the real
+  home. FS-08.R32/A9, FS-09.R43/R44/A17, TS-02.R19, and TS-04.R20/R21 are shipped and no longer
+  `(planned)`. The packaged `codex-acp` actually honoring a non-default `CODEX_HOME`, recognizing
+  the refreshed setup, and native-resuming a new isolated session remains a credentialed live-CLI
+  gate (FS-09.A7 / TS-04.R21). Pre-existing AgentDeck Codex sessions in the personal home are not
+  migrated and may no longer native-resume, as accepted by the human. Chat and archived transcripts no longer carry a standing per-event **Annotate**
   button; annotating is now a right-click action on the event, capturing the highlighted text when
   a highlight sits inside that event and the whole event otherwise (FS-13.R1/R19/A11). The diff
   block's line-number range selection is unchanged. No live-browser pass was run for this change;
@@ -91,6 +106,35 @@ are not promoted to findings without a repeatable failure.
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-28 — Shipped Codex session isolation (FS-08.R32/A9, FS-09.R43/R44/A17, TS-02.R19,
+  TS-04.R20/R21). **INV §2** is load-bearing: one `codexHomeEnv` layer, appended last to the shared
+  `composeEnv` in launch/resume/switch, points every codex-acp child at `<home>/codex` and overrides
+  any ambient/backend/model `CODEX_HOME`; `spawnCmd` reads that composed value back as the single
+  source of truth and refreshes the profile before spawn, so a resumed session never opens a
+  different store. The new `internal/config/codexprofile.go` provisions the `0700` profile and, under
+  a package mutex, one-way mirrors the personal `${CODEX_HOME:-~/.codex}` top-level setup into
+  owner-only files while excluding session/history entries, dereferencing in-root symlinks, failing
+  on a root-escaping one, and pruning managed copies of removed personal setup via
+  `cache/codex-profile.json` without touching the child's own session data. **INV §12** shapes the
+  gate: the packaged `codex-acp` honoring a non-default `CODEX_HOME` and the refreshed setup stays a
+  credentialed live-CLI acceptance, and fake-ACP tests assert only the composed env and refresh
+  contract. Config profile-refresh, env-composition, and a codex spawn-refresh test were added; both
+  Go test variants, `make build`, `make check-specs`, focused `-race` on the config/runtime refresh,
+  and whitespace checks pass. No UI changed. AgentDeck's own process `CODEX_HOME` is untouched, so
+  federation discovery and model autosync still read the real home. This change is unreviewed.
+
+- 2026-07-28 — Refined the planned Codex session isolation with the human; no product code changed.
+  `CODEX_HOME=<agentdeck-home>/codex` remains the always-on, new-launch-only boundary, but the
+  private profile now refreshes personal Codex setup before every launch/resume/switch rather than
+  symlinking only auth/config: auth, configuration, skills, agents, rules, plugins, and MCP setup
+  are copied one way; session/history data is excluded; source additions/edits/removals apply at the
+  next child start; and AgentDeck never writes to the personal home. This keeps AgentDeck Codex
+  capable with the user's normal setup while its sessions stay private. Pre-existing AgentDeck Codex
+  sessions may no longer native-resume, as accepted by the human. FS-08 gained R32/A9; FS-09 R43/R44
+  and A17, TS-02 R19, TS-04 R20/R21, and the ready change now define the profile-refresh boundary,
+  final `CODEX_HOME` precedence, managed-path cleanup, source-link safety, and the exact packaged
+  live-CLI gate. `make check-specs` and whitespace checks pass; no product code or tests changed.
 
 - 2026-07-27 — Fixed the AgentDecker builder's stale-project launch. **INV §10** found the wiring
   incomplete: readiness treated any non-empty `project` state as launchable, so a project deleted

@@ -4,6 +4,29 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-28 — Build: keep AgentDeck's Codex sessions out of your personal history
+
+AgentDeck now runs every Codex agent in its own private Codex home, so the conversations it starts no
+longer show up in your personal `codex` resume list or the Codex app history. Right before each Codex
+agent launches, resumes, or switches, AgentDeck copies your current Codex setup — configuration,
+sign-in, and any setup files — into that private home, one way only: your session history is never
+copied, changes and removals in your own setup are picked up on the next launch, and AgentDeck never
+writes back into your personal Codex home or follows a shortcut that points outside it. Your normal
+Codex home is left alone, so the rest of AgentDeck that reads it (federation and model sync) is
+unaffected. Codex sessions AgentDeck created before this change stay where they were and may no
+longer resume from inside AgentDeck, as we agreed.
+
+The automated checks pass: both Go test builds, the source build, the specification checks, and
+targeted concurrency and whitespace checks, including new tests for the private-home refresh, the
+environment wiring, and the pre-launch refresh. No visible UI changed.
+
+**Needs attention:** One real-Codex check still needs your machine and sign-in — confirming the
+packaged Codex CLI actually uses the private home, sees your refreshed setup, and can resume a new
+isolated session. That is the existing credentialed provider gate, not a blocker for the code.
+
+**Next:** When you want it verified end to end, run a credentialed Codex session through AgentDeck and
+confirm it does not appear in your personal `codex` history.
+
 ### 2026-07-27 — Fix: stale project selection in the AgentDecker builder
 
 The AgentDecker pipeline builder no longer lets you launch into a project that was removed after you selected it. Before, if a project was deleted in Settings or another tab while the builder was open, the selector quietly showed nothing selected but the launch still tried to start in the removed project and was rejected. Now the launch button stays disabled unless the chosen project is still in the current project list, and a selection that disappears is cleared so you pick again from what actually exists.
@@ -46,6 +69,22 @@ so they went into this commit alongside mine; nothing else from your uncommitted
 
 **Next:** Try it in a real chat and tell me if the selection-only excerpt reads better than the old
 whole-event capture; if it does, the whole-event fallback could go too.
+
+### 2026-07-28 — Design: keep AgentDeck's Codex sessions out of your personal history
+
+The planned design now gives AgentDeck Codex a private home for its sessions while refreshing your
+current Codex setup into it before every launch, resume, or switch. Your auth, configuration, skills,
+agents, rules, plugins, and MCP setup are copied one way; your personal session history is not.
+Changes or removals in your personal setup appear on the next AgentDeck Codex process, and AgentDeck
+never writes to your personal Codex home. Existing AgentDeck Codex sessions may no longer resume
+natively, as agreed.
+
+The relevant feature, federation, persistence, and integration specifications plus the ready change
+now describe this boundary. No product code changed.
+
+**Needs attention:** None.
+
+**Next:** Run `/work` on `isolate-codex-sessions-dedicated-home.md` when you want it built; the live provider check rides along on the credentialed provider gate.
 
 ### 2026-07-27 — Design: choose an agent's effort level at launch
 
