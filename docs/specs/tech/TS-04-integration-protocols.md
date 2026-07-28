@@ -146,8 +146,14 @@ copied into the private profile. The helper tracks its managed destination paths
 removes only the corresponding private copy; it never deletes Codex-owned private state. It never
 creates a symlink to the source, follows a source link outside the canonical personal root, or writes
 into/mutates the user's real home. Session/history data, including its indexes, is excluded from the
-refresh and belongs solely to the private profile. A missing source setup asset is a non-fatal skip;
-an unsafe or uncopyable selected asset fails the process start before spawn. The assumptions that the
+refresh and belongs solely to the private profile; the selected top-level setup names are an explicit
+allowlist, so new or unknown runtime-state files are not copied. A missing source setup asset is a
+non-fatal skip; an unsafe or uncopyable selected asset fails the process start before spawn. The
+profile destination must be a real directory and a canonical source/destination overlap is rejected
+before mutation. Regular setup copies are owner-only while retaining a source owner-execute bit for
+executable setup assets. The helper stages all selected entries and its managed-path manifest as one
+generation, publishes it transactionally, and holds its serial guard through child process creation;
+an error at any stage retains the previous profile and manifest. The assumptions that the
 packaged `codex-acp` honors `CODEX_HOME` for its rollout store, recognizes the refreshed setup, and
 resumes against a non-default home are external-CLI compatibility gates (INV §12) confirmed by
 credentialed acceptance before a release claims isolation, extending R11. Fake-ACP tests assert the

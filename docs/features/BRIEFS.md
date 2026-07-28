@@ -4,6 +4,23 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-28 — Fix: make Codex session isolation safe to rely on
+
+AgentDeck’s private Codex profile now copies only recognised setup, never personal runtime databases,
+logs, snapshots, or session state. Setup tools keep their executable permission while remaining
+private. Refreshes are staged and transactional: a failed update keeps the prior profile intact, and
+new Codex processes cannot start against another process’s half-updated setup. Unsafe profile paths
+and source aliases are rejected before anything is changed. A Codex runtime switch now validates the
+profile before stopping the working agent, so a bad personal setup leaves that agent and its
+registrations running.
+
+The full automated suite, specification checks, source build, and distribution build pass.
+
+**Needs attention:** The existing signed-in Codex acceptance check is still required to prove the
+packaged CLI honours the private profile and native-resumes from it.
+
+**Next:** Run that credentialed Codex launch and resume check when you want to clear the release gate.
+
 ### 2026-07-28 — Review: Codex session isolation
 
 The isolation layer is not safe to rely on yet. It copies current Codex state databases because it
@@ -21,6 +38,48 @@ running the credentialed release gate.
 
 **Next:** An implementation agent should run `/fix`, close the must-fix findings with regressions,
 then rerun the pinned live Codex launch and native-resume check.
+
+### 2026-07-28 — Design: project-grouped archives
+
+The main dashboard will show active projects, whose right-click menu can rename, recolor, or archive
+them. Stopped agents remain visible and resumable inside their active project. An archived agent is
+always listed beneath its project in Archive; a still-active project therefore appears both on the
+main dashboard and in Archive, clearly marked active and showing its archived-agent count. Archiving
+a project warns that running agents will be stopped, then archives the project and every agent. An
+individual agent Archive action stops and archives immediately with no confirmation. Project and
+agent restoration are independent, but an archived project must be reactivated before any of its
+agents can restore, resume, or launch.
+
+**Needs attention:** Confirm this complete behavior and whether project dashboards should initially
+share the current saved card layout or have independent layouts.
+
+**Next:** After confirmation, define the storage, API, routes, and migration behavior for the
+combined dashboard and archive redesign.
+
+### 2026-07-28 — Design: archive projects from the dashboard
+
+Projects can now be defined as active or archived in the design. Archived projects move from the
+main dashboard to their own restoreable project view while keeping their configuration, agents, and
+session history; this remains separate from the existing session Archive.
+
+**Needs attention:** Confirm whether archived projects should be blocked from new launches and
+resumes until restored. The recommendation is yes, and to prevent archiving while agents are running.
+
+**Next:** After confirmation, define the storage, API, and route details and prepare the change for
+implementation.
+
+### 2026-07-28 — Design: project-first dashboard
+
+The proposed redesign makes the main dashboard a live grid of project cards, including empty
+projects. Opening a project shows the familiar agent dashboard filtered to that project, so agent
+cards show their role without repeating the project name. Agents whose project was later deleted
+remain reachable under an unavailable-project card instead of disappearing.
+
+**Needs attention:** Confirm this behavior and whether each project should have its own saved card
+layout, or initially share the current layout preferences.
+
+**Next:** After confirmation, define the route, layout-storage, and component architecture and
+prepare the change for implementation.
 
 ### 2026-07-28 — Build: keep AgentDeck's Codex sessions out of your personal history
 

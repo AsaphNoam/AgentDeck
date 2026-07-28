@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"os"
 
 	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/runtime"
@@ -229,7 +228,7 @@ func (s *Server) composeResumeSpecWithGeneration(agent state.Agent, snap state.S
 		SystemPrompt:   snap.SystemPrompt,
 		BackendType:    be.Type,
 		ModelID:        model.Model,
-		Env:            composeEnv(os.Environ(), be.Env, model.Env, s.hookEnv(agent, token), projectResourcesEnv(resourceDir), codexHomeEnv(be.Type, s.configStore.Home())),
+		Env:            composeChildEnv(be.Type, s.configStore.Home(), be.Env, model.Env, s.hookEnv(agent, token), projectResourcesEnv(resourceDir)),
 		SkipPerms:      snap.SkipPermissions,
 		HookToken:      token,
 		MCPServers:     []runtime.MCPServerSpec{mcpSpec},

@@ -124,8 +124,11 @@ requested-versus-resolved effort record for provenance and is not the authority 
 It contains the child's own session/history store plus a one-way managed mirror of personal Codex
 setup. A private owner-only manifest records only the destination paths AgentDeck refreshed, so a
 later source removal removes that private copy without deleting session/history data or any
-unmanaged Codex state. The personal `CODEX_HOME` is never a writable destination and no source
-symlink is created. The setup mirror is refreshed before each child start, not watched continuously.
+unmanaged Codex state. An explicit setup allowlist, rather than a runtime-state denylist, excludes
+personal session indexes, databases and WAL sidecars, logs, snapshots, temp files, and future
+unrecognized runtime entries. The personal `CODEX_HOME` is never a writable destination and no
+source symlink is created. The setup mirror is refreshed before each child start, not watched
+continuously; a failed refresh retains the previous published profile and manifest.
 
 ## 3. Interfaces & data shapes
 

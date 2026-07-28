@@ -779,6 +779,70 @@ func TestSwitchRuntimeRollbackOnResumeFailure(t *testing.T) {
 	}
 }
 
+// INV §4/§15, FS-09.R44: a newly unsafe personal Codex setup is detected
+// before a switch tears down an already working Codex runtime. The live agent
+// and its registrations therefore remain usable rather than relying on a
+// rollback that would hit the same rejected profile refresh.
+func TestSwitchCodexProfileFailurePreservesWorkingRuntime(t *testing.T) {
+	personal := filepath.Join(t.TempDir(), "personal-codex")
+	if err := os.MkdirAll(personal, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(personal, "config.toml"), []byte("model = \"gpt\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CODEX_HOME", personal)
+	srv, ts := switchTestServer(t)
+	resp, body := post(t, ts.URL+"/api/sessions", map[string]string{
+		"role": "impl", "project": "tmpproj", "backend": "codex", "model": "gpt-5.5",
+	})
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("codex launch status = %d: %s", resp.StatusCode, body)
+	}
+	var launched sessionResponse
+	if err := json.Unmarshal(body, &launched); err != nil {
+		t.Fatal(err)
+	}
+	id := launched.Agent.AgentID
+	before, err := srv.stateStore.ReadRunning(id)
+	if err != nil {
+		t.Fatalf("read running before rejected switch: %v", err)
+	}
+	settingsPath := filepath.Join(hooks.Dir(srv.configStore.Home()), "agents", id+".json")
+	if _, err := os.Stat(settingsPath); err != nil {
+		t.Fatalf("working Codex hook settings missing before switch: %v", err)
+	}
+
+	outside := filepath.Join(t.TempDir(), "outside")
+	if err := os.WriteFile(outside, []byte("outside"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(personal, "skills"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(personal, "skills", "unsafe")); err != nil {
+		t.Fatal(err)
+	}
+
+	resp, body = post(t, ts.URL+"/api/sessions/"+id+"/switch-runtime", map[string]string{"backend": "claude", "model": "sonnet"})
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("unsafe Codex switch status = %d, want 500: %s", resp.StatusCode, body)
+	}
+	after, err := srv.stateStore.ReadRunning(id)
+	if err != nil {
+		t.Fatalf("working Codex runtime was stopped after rejected switch: %v", err)
+	}
+	if after.SessionID != before.SessionID {
+		t.Fatalf("running Codex runtime changed after rejected switch: before=%+v after=%+v", before, after)
+	}
+	if agent, err := srv.stateStore.ReadAgent(id); err != nil || agent.Backend != "codex" {
+		t.Fatalf("agent identity changed after rejected switch: agent=%+v err=%v", agent, err)
+	}
+	if _, err := os.Stat(settingsPath); err != nil {
+		t.Fatalf("working Codex registration was removed after rejected switch: %v", err)
+	}
+}
+
 // Regression (review fix, ADVISORY): a failed resume must tear down ALL
 // registration artifacts — including the hook-settings file that composeResumeSpec
 // writes — not just the token + MCP session. Otherwise a resume that fails after
