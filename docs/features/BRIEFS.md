@@ -4,6 +4,40 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-28 — Fix review: project dashboard and grouped Archive design
+
+All nine review findings were valid, and the waiting design is corrected. The specifications now
+record the confirmed decisions, define project-group and per-project agent pagination, preserve
+full-text search across every recorded session, require Restore before Resume for archived agents,
+and treat an archived default project as a dormant preference that launch selectors ignore until it
+is restored. Project archival now takes an exclusive transition claim before stopping anything, so
+no interactive or pipeline launch can enter the stop-to-commit window. Missing-project cards disappear
+with their last non-archived agent and expose no invalid project actions; missing and archived project
+routes have explicit non-empty states. The pipeline specification's shipped-only preamble is fixed.
+
+The current flat Archive requirements remain binding until implementation ships; the ready change now
+explicitly retires the superseded flat listing, paging, and acceptance rules at that point while
+retaining the valid non-null list guarantee. Specification and whitespace checks pass.
+
+**Needs attention:** None.
+
+**Next:** Run `/work project-dashboard-and-project-grouped-archive.md` when you want it built.
+
+### 2026-07-28 — Design: project dashboard and project-grouped archive
+
+The redesign is now ready to build. The main dashboard will show active project cards, project
+dashboards will show only their non-archived agents, and the Archive will group archived agents under
+their project — including an active-project marker and archive count when a project appears in both
+places. Project cards can be renamed, recolored, and archived; archiving a project warns, stops its
+agents and pipeline runs, then archives them. An individual agent archive stops it immediately;
+project and agent restoration are independent, while an archived project must be restored before an
+agent can return to work. Existing layout preferences remain shared, with no migration or per-project
+layout state.
+
+**Needs attention:** None.
+
+**Next:** Run `/work project-dashboard-and-project-grouped-archive.md` when you want it built.
+
 ### 2026-07-28 — Fix: make Codex session isolation safe to rely on
 
 AgentDeck’s private Codex profile now copies only recognised setup, never personal runtime databases,

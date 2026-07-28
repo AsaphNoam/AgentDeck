@@ -35,9 +35,9 @@ delta; clients must not assume every existing endpoint already uses R3.
 | Family | Routes |
 |---|---|
 | Health/live state | `GET /api/health`, `GET /api/sessions`, `GET /api/sessions/{id}`, `GET /api/events`, `GET /api/capabilities` |
-| Lifecycle/chat | `POST /api/sessions`, `prompt`, `cancel`, `stop`, `rename`, `identity`, `permission`, `resume`, `switch-runtime`, `annotations`; transcript read |
-| Config | role/project CRUD; `GET/PUT /api/backends`, `/api/config`, `/api/layout` |
-| Archive/tracking | `GET /api/archive`, session files/commands/messages |
+| Lifecycle/chat | `POST /api/sessions`, `prompt`, `cancel`, `stop`, `archive`, `restore`, `rename`, `identity`, `permission`, `resume`, `switch-runtime`, `annotations`; transcript read |
+| Config | role/project CRUD and project `archive`/`restore`; `GET/PUT /api/backends`, `/api/config`, `/api/layout` |
+| Archive/tracking | `GET /api/archive`, `GET /api/archive/projects/{project}`, session files/commands/messages |
 | Coordination | `POST /api/groups/{group}/release`, `/mcp` GET/POST/DELETE |
 | Federation | config-source list, preview, bind, refresh, delete |
 | Producers/terminal | `POST /api/hook`, terminal WebSocket |
@@ -107,10 +107,11 @@ revisions and refetch run detail for attempts/results/values. Existing `notifica
 pipeline needs-attention/completed categories through the ordinary mute path. Reconnect hydrates
 pipeline lists through REST rather than replaying an unbounded event log.
 
-**R18 — Archive responses expose effective search capability.** Every `GET /api/archive` response
-includes `search_mode:"full_text"|"metadata"`, derived from the current SQLite connection rather
-than the build command or a UI assumption. This field is present for listing, successful search,
-and empty pages so the Archive UI can keep its search promise honest (FS-05.R30).
+**R18 — Archive responses expose effective search capability.** Every `GET /api/archive` and
+`GET /api/archive/projects/{project}` response includes
+`search_mode:"full_text"|"metadata"`, derived from the current SQLite connection rather than the
+build command or a UI assumption. This field is present for listing, successful search, and empty
+pages so the Archive UI can keep its search promise honest (FS-05.R30/R36).
 
 **R19 `(planned)` — Effort is an optional field on existing routes, never a new one.**
 `POST /api/sessions` and `POST /api/sessions/{id}/switch-runtime` accept an optional `effort`
@@ -124,6 +125,26 @@ Validation failures use the existing shared field-error envelope: an undeclared 
 bracketed provider model string each name their field and reason rather than returning a bare 400
 (INV §8 — the class the onboarding `HTTP 400` findings came from). No new route is added, so every
 path continues to inherit the `localOnly` guard unchanged (INV §14).
+
+**R20 — (planned).** Project and agent archive use explicit action routes rather than overloading
+ordinary project replacement or Stop: `POST /api/projects/{project}/archive`, `POST
+/api/projects/{project}/restore`, `POST /api/sessions/{id}/archive`, and `POST
+/api/sessions/{id}/restore`. Project archive returns the updated project plus stopped/archived agent
+ids only after its warning-confirmed stop/archive work completes; individual agent archive stops a
+running agent and archives it without a confirmation field. All actions return R3 errors: unknown
+ids are `404`; Resume of an archived agent under an active project is `409 agent_archived`; a launch,
+resume, agent restore, pipeline start/control, or builder launch targeting an archived project is
+`409 project_archived`; a process-start request arriving while project archival holds its exclusive
+claim is retryable `409 project_archiving`; and an invalid competing agent transition is `409
+agent_archiving` or the existing `409 conflict` where no more specific code applies. `GET
+/api/projects` and project create/update responses add `archived`; agent/session responses and every
+`state_update` include `archived`. `GET /api/archive` changes from a flat list to paginated project
+groups, and `GET /api/archive/projects/{project}` pages that group's agent rows. FS-05.R36 owns the
+group-versus-agent totals, ordering, `q`/`active` corpus, and pagination semantics. A group contains
+its durable project id, current title/color when configured, `project_status` (`active`, `archived`,
+or `missing`), and `archived_agent_count`; its agent rows retain the existing archive metadata/search
+fields plus `archived`. No new SSE type is added: committed agent archive changes publish ordinary
+full `state_update` payloads, and project mutations invalidate/refetch the existing project catalog.
 
 ## 3. Interfaces & data shapes
 

@@ -1,6 +1,6 @@
 # FS-02 — Dashboard (card grid home view)
 
-**Status:** Current
+**Status:** Partial
 **Code:** `ui/src/components/grid/`, `ui/src/store/`, `ui/src/components/shell/NotificationCenter.tsx`, `ui/src/features/settings/NotificationsEditor.tsx`, `ui/src/api/sse.ts` · `internal/bus/`, `internal/state/`, `internal/server/handlers.go` (layout, reconcile) · **Journeys:** J5 (grid & layout), J11 (failure & recovery), J12 (restart durability)
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) F1/F2/F11 and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -150,6 +150,61 @@ visible percentage label, color-ramped green (`< 0.6`) → amber (`0.6–0.85`) 
 and absent values normalize to and visibly label `0% context used`; the track alone is never the only
 indication of its meaning.
 
+**R29 — (planned).** The home route (`/`) replaces the agent-card grid in R1 with a live project-card
+grid. It contains every configured project, including projects with no agents, plus one unavailable
+project card for each durable project id still referenced by at least one non-archived agent after
+its configuration was force-deleted. This preserves access to stopped agent cards rather than hiding
+them when their configuration disappears. The unavailable card disappears when its last
+non-archived agent is archived; those archived agents remain reachable under the missing-project
+group in Archive. Archived projects (FS-04.R35) are excluded from this active grid. R1 remains the
+shipped behavior until R29 is implemented.
+
+**R30 — (planned).** A project card displays the configured project title and color, or its durable id
+when configuration is unavailable; it also displays its dashboard-visible agent count and live
+per-state summary. Individually archived agents and agents under an archived project (FS-05.R32) are
+not counted. It updates from the same project catalog query and `state_update` stream that drive the
+existing dashboard, with no manual refresh.
+
+**R31 — (planned).** Selecting a project card navigates to `/project/:project-id`. That route renders
+the dashboard card grid for precisely the non-archived agents whose immutable `project` id matches
+the route and whose project is active or whose project configuration is unavailable;
+grouping, state, context, previews, context-menu lifecycle actions, and live updates retain their
+existing FS-02 behavior. An agent card on this scoped route displays its role but not its project,
+because the route heading identifies the common project.
+
+**R32 — (planned).** The scoped-dashboard header identifies the selected project using its current
+title (with durable-id fallback) and includes a route back to the project-card home. An unknown
+project route shows an unavailable-project state with the same return path, rather than an empty grid
+that implies a valid project with no agents. A known archived-project route instead shows an
+archived-project state with the same return path and a route to that project in Archive; a bookmark,
+Back navigation, or stale tab never renders an empty scoped grid for an archived project.
+
+**R33 — (planned).** The Archive workspace is project-based. It lists a project for every archived
+agent it contains and every archived project, then nests that project's archived agents beneath it
+with access to their retained transcripts and tracking data. Each project row displays its archived-
+agent count and whether the project itself remains active on the main dashboard. Thus a project with
+both active and archived agents appears in both collections. Project archival neither deletes project
+configuration nor any agent history.
+
+**R34 — (planned).** Right-clicking a configured active project card offers **Rename**, **Change
+color**, and **Archive**. Rename and Change color use the existing project configuration fields and
+update the card immediately. Archive presents a warning confirmation stating that every running agent
+will be stopped and every agent in the project will be archived; on confirmation it performs exactly
+that and moves the project to the Archive workspace. A failed action surfaces an error toast and
+leaves the project card unchanged. An unavailable-project card has no project-configuration actions;
+its visible agent cards retain the Archive action in R35.
+
+**R35 — (planned).** Every dashboard-visible agent card offers **Archive** in its context menu.
+Archive requires no confirmation: it stops a running agent, waits for that stop to complete, then
+archives the agent; a stopped agent is archived immediately. The action removes only that agent from
+the active project dashboard and nests it under its project in the Archive workspace; it does not
+archive the project or other agents. A project remains visible on both the active dashboard and
+Archive while it has agents in both collections.
+
+**R36 — (planned).** Project dashboards introduce no project-specific layout persistence. The
+existing shared agent-card layout preferences continue to order, group, and size any scoped agent
+grid; project cards use their normal responsive presentation and have no persisted reorder state.
+
 ## 5. Acceptance criteria
 
 **A1.** Launching an agent adds its card within ~1s with no manual refresh; a status change flips the
@@ -202,6 +257,35 @@ the same menu on a running card omits it, and a rejected resume surfaces a toast
 `CardContextMenu.test.tsx` "resumes a stopped agent from its card" and "shows an error toast when
 resume fails"; J5.
 
+**A15 — (planned).** The home grid shows configured empty projects and state/count summaries; an
+agent whose project definition was removed remains reachable through an unavailable-project card and
+updates live, and that card disappears when its last non-archived agent is archived. — project-
+dashboard component/store regressions; J5.
+
+**A16 — (planned).** Selecting a project filters the dashboard to exactly its agents, omits project
+text from their cards, preserves their existing lifecycle actions, lets an unavailable-project card
+open its remaining non-archived agents, and supports browser Back to the project grid. — route/
+component regressions; J5.
+
+**A17 — (planned).** An archived project is absent from the active home grid, remains reachable in
+the Archive with its agents, and reappears on the active grid after Restore without losing its
+configuration. Agents remain archived until individually restored. Direct `/project/:project-id`
+navigation while the project is archived shows an archived-project state linking to Archive rather
+than an empty dashboard. — project-dashboard/config regressions; J5.
+
+**A18 — (planned).** A stopped agent remains on its active project's dashboard with Resume available.
+Right-clicking that project's card can rename, recolor, or archive it; confirmed project archival
+stops running agents and archives every agent, while a rejected action keeps it visible. — project
+context-menu/dashboard regressions; J5, J7.
+
+**A19 — (planned).** Archiving one agent stops it when necessary without a confirmation, removes only
+that agent from the active dashboard, and groups it beneath its project in Archive; that group shows
+its count and marks the project active when it still appears on the main dashboard. — agent/archive
+dashboard regressions; J5, J7, J8.
+
+**A20 — (planned).** Switching between project dashboards does not create or migrate layout state;
+each scoped agent grid applies the existing shared layout preferences. — layout/route regressions; J5.
+
 ## 6. Deviations & open decisions
 
 - **Immediate / prompt-based UI.** Runtime-switch and
@@ -219,6 +303,11 @@ resume fails"; J5.
 - ⚠ unverified: the "~1s" freshness bound (R9, A1) is an interactive/manual observation (J3/J5) —
   no automated timing assertion pins it; it is gated behind the credential-limited live E2E journeys
   (credential-gated acceptance).
+- **Confirmed project-first boundary.** R29–R36 retain configured projects at the home level,
+  surface non-archived agents under an unavailable-project card, and keep the current shared card-
+  layout preferences. Independent per-project order, density, and collapsed-group preferences are
+  excluded from this change. Archive is project-based; project archival is warning-confirmed, while
+  individual agent archive stops and archives immediately without confirmation.
 
 ## 7. Traceability
 

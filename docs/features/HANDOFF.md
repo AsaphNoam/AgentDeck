@@ -109,6 +109,17 @@ are not promoted to findings without a repeatable failure.
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
+- 2026-07-28 — Validated and fixed all nine specification-review findings in the waiting project-
+  dashboard/grouped-Archive design; no product code changed. Stale confirmation deviations now record
+  the chosen boundaries. FS-05.R36/A19 define independent project-group and agent pagination, retain
+  `active` compatibility and all-session full-text search, and schedule the conflicting flat-list
+  requirements/acceptance criteria for retirement only when the replacement ships while retaining
+  R4/A2's non-null guarantee. Archived agents restore before Resume; archived defaults remain dormant
+  and are excluded from process selectors; TS-01.R13 adds an exclusive project/agent transition claim
+  held through archive commit/compensation; unavailable cards/routes and archived routes have complete
+  presentation rules; and FS-14's preamble now acknowledges planned requirements. `make check-specs`
+  and whitespace checks pass. The ready change remains waiting to start with no unresolved decision.
+
 - 2026-07-28 — Fixed the five Codex-isolation findings and both scoped follow-ups. The private
   setup mirror now selects an explicit setup allowlist, preserves executable setup assets as
   owner-only, rejects unsafe profile destinations/source overlap before mutation, and stages a full
