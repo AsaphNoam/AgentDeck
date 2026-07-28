@@ -4,6 +4,24 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-28 — Review: Codex session isolation
+
+The isolation layer is not safe to rely on yet. It copies current Codex state databases because it
+treats unknown files as setup, strips execute permission from setup tools, can expose a
+half-refreshed profile to concurrent or already-running agents, follows an existing private-profile
+symlink outside the AgentDeck home, and can stop a working agent while leaving registrations behind
+when switch rollback hits the same refresh failure. The shared private-home override itself is
+correctly wired across launch, resume, and switch, and the automated verification passes.
+
+The review also found a stale planned label, missing lifecycle-path acceptance coverage, and no
+committed spec-first change trail for this feature.
+
+**Needs attention:** Fix the five must-fix isolation findings before relying on this boundary or
+running the credentialed release gate.
+
+**Next:** An implementation agent should run `/fix`, close the must-fix findings with regressions,
+then rerun the pinned live Codex launch and native-resume check.
+
 ### 2026-07-28 — Build: keep AgentDeck's Codex sessions out of your personal history
 
 AgentDeck now runs every Codex agent in its own private Codex home, so the conversations it starts no
