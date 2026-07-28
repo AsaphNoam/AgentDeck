@@ -119,6 +119,14 @@ an unbound backend needs no federation object. Empty means "none resolved"; exis
 value without interpretation. The federation `launch_config_json` object (v8) keeps its own
 requested-versus-resolved effort record for provenance and is not the authority for what ran.
 
+**R19 — Codex's isolated runtime profile is private, managed filesystem state.**
+`$AGENTDECK_HOME/codex/` is an owner-only Codex profile for `codex-acp` children (TS-04.R20/R21).
+It contains the child's own session/history store plus a one-way managed mirror of personal Codex
+setup. A private owner-only manifest records only the destination paths AgentDeck refreshed, so a
+later source removal removes that private copy without deleting session/history data or any
+unmanaged Codex state. The personal `CODEX_HOME` is never a writable destination and no source
+symlink is created. The setup mirror is refreshed before each child start, not watched continuously.
+
 ## 3. Interfaces & data shapes
 
 The durable layout is:
@@ -133,6 +141,8 @@ $AGENTDECK_HOME/
   projects/{id}.json
   pipelines/{id}.json         reusable pipeline templates
   project-resources/{id}/     opaque agent/person shared material; never indexed or scanned
+  codex/                      private Codex runtime profile; sessions/history remain here
+  cache/codex-profile.json    managed setup-mirror manifest; never contains credentials
   state.db
   sessions/{agent_id}/transcript.ndjson
   cache/config-sources/**
@@ -141,7 +151,7 @@ $AGENTDECK_HOME/
 The binding schemas for roles, projects, backends, and global config are defined by FS-04 and
 FS-09. Federation binding/effective-view shapes are defined by TS-07. SQLite table definitions and
 migration order live in `internal/state/schema.go` and execute through `migrate.go`; that executable schema is subordinate to
-R1–R17 and must be reflected here when its contract changes.
+R1–R19 and must be reflected here when its contract changes.
 
 ## 4. Invariants
 
@@ -171,6 +181,8 @@ R1–R17 and must be reflected here when its contract changes.
 - Config: `internal/config/atomic.go`, `seed.go`, `validate.go`, `types.go`.
 - Project resources: `internal/config` path/layout helpers; project CRUD and lifecycle
   composers in `internal/server`.
+- Codex isolated profile: `internal/config` profile-refresh helper; child-env composition in
+  `internal/server/{launch,resume,switch}.go`; process spawn in `internal/runtime/chat.go`.
 - Schema/migrations: `internal/state/migrate.go`, `schema.go`, `state.go`, `running.go`, `session.go`.
 - Transcript: `internal/transcript/writer.go`, `reader.go`; runtime append in
   `internal/runtime/chat.go`.

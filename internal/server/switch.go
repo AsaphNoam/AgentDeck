@@ -352,7 +352,7 @@ func (s *Server) composeSwitchSpec(target state.Agent, resumeID string) (runtime
 		SystemPrompt:   snap.SystemPrompt,
 		BackendType:    be.Type,
 		ModelID:        model.Model,
-		Env:            composeEnv(os.Environ(), be.Env, model.Env, s.hookEnv(target, token), projectResourcesEnv(resourceDir)),
+		Env:            composeEnv(os.Environ(), be.Env, model.Env, s.hookEnv(target, token), projectResourcesEnv(resourceDir), codexHomeEnv(be.Type, s.configStore.Home())),
 		SkipPerms:      snap.SkipPermissions,
 		HookToken:      token,
 		MCPServers:     []runtime.MCPServerSpec{mcpSpec},

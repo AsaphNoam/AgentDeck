@@ -104,6 +104,23 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **R15** — Every chat launch receives AgentDeck's scoped HTTP messaging MCP entry through the ACP
   `mcpServers` session parameter. Whether each real CLI/version accepts that registration is an
   external compatibility gate, not inferred from fake-ACP success.
+- **R43** — AgentDeck launches every `codex-acp` process (launch, resume, and switch)
+  with `CODEX_HOME` pointed at an AgentDeck-owned directory instead of the user's personal Codex
+  home, so Codex writes its rollouts and native session index there and AgentDeck-created Codex
+  conversations never appear in the user's native `codex` resume picker or Codex app history.
+  AgentDeck's own transcript, archive, search, and every session created after this behavior ships
+  resume from that same dedicated home. Isolation is always on for `codex-acp`; there is no per-agent
+  or per-backend toggle. Sessions already written into the personal home are not moved and may no
+  longer native-resume through AgentDeck after the change; the user may archive those natively.
+  Claude, OpenCode, and OpenHands are unaffected.
+- **R44** — Before every `codex-acp` process starts, AgentDeck refreshes its dedicated
+  home from the user's effective Codex home (`${CODEX_HOME:-~/.codex}`): configuration,
+  authentication, skills, agents, rules, plugins, and MCP setup are copied into the private profile,
+  while Codex session/history data is never copied. The refresh is one-way: the personal home remains
+  authoritative; additions, edits, and removals appear in the private profile on the next launch,
+  resume, or switch, and AgentDeck never writes through to the personal home. AgentDeck's own
+  configuration-federation discovery (FS-08) and Codex model autosync (R28) keep reading the user's
+  real Codex home, so a bound source or an `autosync_models` backend behaves exactly as before.
 
 - **R39** `(planned)` — Effort capability is offered only for `claude-acp` (chat and terminal) and
   `codex-acp` (chat). `opencode-acp` and `openhands-acp` expose no effort mechanism, so a model
@@ -278,6 +295,18 @@ Configuration-source federation for Claude/Codex is FS-08.
   Claude chat, and Claude terminal, and that an undeclared level surfaces as AgentDeck's rejection
   rather than a provider-side failure. Until recorded, effort mapping is fixture-tested against the
   pinned adapters but live provider honoring is not claimed.
+- **A17** (R43, R44) — A `codex-acp` launch, resume, and switch set the child
+  `CODEX_HOME` to the AgentDeck-owned directory, overriding ambient/backend/model values, so the
+  rollout and native session index are written there and nothing is added to the user's personal
+  Codex `session_index.jsonl`. Before each child starts, its private profile refreshes copied
+  authentication, configuration, skills, agents, rules, plugins, and MCP setup from the personal
+  home; source additions, edits, and removals arrive on the next process start, no source path is
+  symlinked or written, and session/history data is excluded. A new isolated session resumes by
+  loading its native id from that same private store; federation resolution and autosync still read
+  the user's real Codex home. *Verify by* launch/resume/switch env-composition, profile-refresh,
+  and home-provisioning tests. Real `codex-acp` honoring of `CODEX_HOME`, profile setup visibility,
+  native resume, and the native CLI/app history boundary are external compatibility gates recorded
+  under A7 (cf. TS-04.R21).
 
 ## 6. Deviations & open decisions
 
@@ -335,6 +364,10 @@ Configuration-source federation for Claude/Codex is FS-08.
   `internal/runtime/chat.go` (adapter consumption, Codex config-overlay composition, and shared ACP
   permission gate).
 - **Capability/composition:** `internal/server/terminal.go`, `launch.go`, `resume.go`, `switch.go`.
+- **Codex isolated profile (R43/R44):** final `CODEX_HOME` child override composed in
+  `internal/server/{launch,resume,switch}.go`, one-way profile refresh under `internal/config`, spawn
+  application in `internal/runtime/chat.go`; AgentDeck's own-home reads stay in
+  `internal/server/config_sources.go` and `internal/config/codexmodels.go` (see TS-04.R20/R21).
 - **UI:** `ui/src/schemas/backends.ts`, `ui/src/lib/backendTypes.ts`,
   `ui/src/features/settings/BackendsEditor.tsx`,
   `ui/src/features/onboarding/steps/BackendStep.tsx`,

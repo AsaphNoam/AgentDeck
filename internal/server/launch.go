@@ -316,7 +316,7 @@ func (s *Server) composeLaunchWithOptions(ctx context.Context, req launchRequest
 		BackendType:  backend.Type,
 		ModelID:      acpModelID,
 		Driver:       driver,
-		Env:          composeEnv(os.Environ(), backend.Env, model.Env, hookEnv, projectResourcesEnv(resourceDir)),
+		Env:          composeEnv(os.Environ(), backend.Env, model.Env, hookEnv, projectResourcesEnv(resourceDir), codexHomeEnv(backend.Type, s.configStore.Home())),
 		SkipPerms:    resolveSkip(s.cfg.SkipPermissions, role.SkipPermissions),
 		HookToken:    token,
 		MCPServers:   []runtime.MCPServerSpec{mcpSpec},
@@ -463,6 +463,18 @@ func expandAddDirs(raw []string) []string {
 		}
 	}
 	return dirs
+}
+
+// codexHomeEnv returns the reserved, final env layer that points a codex-acp
+// child at its dedicated AgentDeck-owned CODEX_HOME (FS-09.R43, TS-04.R20). Passed
+// as the last composeEnv layer, it overrides any ambient, backend, or per-model
+// CODEX_HOME so launch, resume, and switch all open the same isolated Codex store
+// (INV §2). Non-codex backends get no layer, leaving their env untouched.
+func codexHomeEnv(backendType, home string) map[string]string {
+	if backendType != "codex-acp" {
+		return nil
+	}
+	return map[string]string{"CODEX_HOME": config.CodexProfileDir(home)}
 }
 
 // composeEnv layers env: process env, then backend env, then per-model env (later

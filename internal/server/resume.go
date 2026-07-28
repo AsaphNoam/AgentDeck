@@ -229,7 +229,7 @@ func (s *Server) composeResumeSpecWithGeneration(agent state.Agent, snap state.S
 		SystemPrompt:   snap.SystemPrompt,
 		BackendType:    be.Type,
 		ModelID:        model.Model,
-		Env:            composeEnv(os.Environ(), be.Env, model.Env, s.hookEnv(agent, token), projectResourcesEnv(resourceDir)),
+		Env:            composeEnv(os.Environ(), be.Env, model.Env, s.hookEnv(agent, token), projectResourcesEnv(resourceDir), codexHomeEnv(be.Type, s.configStore.Home())),
 		SkipPerms:      snap.SkipPermissions,
 		HookToken:      token,
 		MCPServers:     []runtime.MCPServerSpec{mcpSpec},

@@ -180,6 +180,29 @@ func TestComposeEnvLayering(t *testing.T) {
 	}
 }
 
+func TestCodexHomeEnvLayer(t *testing.T) {
+	// Non-codex backends get no CODEX_HOME layer.
+	if layer := codexHomeEnv("claude-acp", "/home/x/.agentdeck"); layer != nil {
+		t.Errorf("claude-acp got a CODEX_HOME layer: %v", layer)
+	}
+	// codex-acp gets the dedicated home, and it overrides any ambient/backend
+	// CODEX_HOME because it is the last composeEnv layer (FS-09.R43, TS-04.R20).
+	home := "/home/x/.agentdeck"
+	layer := codexHomeEnv("codex-acp", home)
+	if got := layer["CODEX_HOME"]; got != config.CodexProfileDir(home) {
+		t.Fatalf("CODEX_HOME = %q, want %q", got, config.CodexProfileDir(home))
+	}
+	base := []string{"CODEX_HOME=/personal/.codex", "PATH=/bin"}
+	got := composeEnv(base, map[string]string{"CODEX_HOME": "/backend"}, layer)
+	want := config.CodexProfileDir(home)
+	for _, kv := range got {
+		if kv == "CODEX_HOME="+want {
+			return
+		}
+	}
+	t.Fatalf("composed env did not override CODEX_HOME to %q: %v", want, got)
+}
+
 func TestJoinSystemPrompt(t *testing.T) {
 	cases := []struct {
 		ctx, sys, want string

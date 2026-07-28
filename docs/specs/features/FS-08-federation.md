@@ -7,10 +7,11 @@
 ## 1. Purpose
 
 Configuration federation lets an AgentDeck Claude or Codex backend use the user's existing native
-CLI setup without creating a second writable copy. Native files remain authoritative; AgentDeck
-stores an explicit binding, optional model/effort overrides, approved roots, and redacted
-provenance. The feature covers discovery, preview and consent, linked/mirrored operation,
-freshness, launch/resume semantics, and the Settings/onboarding experience.
+CLI setup without AgentDeck writing to that native source. Native files remain authoritative;
+AgentDeck stores an explicit binding, optional model/effort overrides, approved roots, and redacted
+provenance. Codex session isolation additionally creates a private runtime profile from that source
+for the Codex child only (R32). The feature covers discovery, preview and consent, linked/mirrored
+operation, freshness, launch/resume semantics, and the Settings/onboarding experience.
 
 Federation is optional. An unbound backend continues to use `backends.json` exactly as described by
 FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
@@ -69,7 +70,9 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
   Untrusted project configuration is reported as skipped rather than applied.
 - **R13** — Setup assets are inventory/reference metadata only (`path`, scope, kind, fingerprint,
   status, detachability). AgentDeck does not translate Claude setup into Codex setup, copy it, or
-  claim that a configured model is enabled for the user's account.
+  claim that a configured model is enabled for the user's account. The private Codex runtime-profile
+  refresh in R32 is the narrow exception: it reproduces the user's Codex setup for an isolated
+  `codex-acp` child without writing back to the source.
 - **R14** — Unknown native keys remain owned by the CLI and are reported as `native_passthrough`;
   unsupported content is never rewritten or presented as successfully imported.
 
@@ -100,10 +103,19 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
   Source changes never hot-mutate an already running agent.
 - **R20** — AgentDeck passes the real project working directory and native user home through to the
   CLI, allowing provider-native project instructions and setup to remain discoverable without
-  AgentDeck copying them.
+  AgentDeck copying them. The planned isolated Codex child is the exception in R32: it receives a
+  refreshed private profile rather than the personal `CODEX_HOME`.
 - **R21** — A native declaration named `agentdeck-messaging` conflicts with AgentDeck's reserved
   per-session messaging MCP id. Launch fails `409 source_conflict`; neither declaration is silently
   overwritten.
+- **R32** — Codex session isolation (FS-09.R43/R44) gives each `codex-acp` child one
+  AgentDeck-owned `CODEX_HOME`. Immediately before each launch, resume, or switch, AgentDeck makes a
+  one-way, owner-only managed mirror of the effective personal Codex setup in that profile: native
+  configuration, authentication, skills, agents, rules, plugins, and MCP setup are available to the
+  child, while session/history data remains private to AgentDeck. Source changes and removals take
+  effect at the next child start; running children are not hot-mutated. The mirror never creates a
+  source symlink or writes to the source tree. This is internal execution setup, not the user-facing
+  detached-import mode in R9, and does not change source authority, preview, consent, or provenance.
 
 ### User experience
 
@@ -181,6 +193,12 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
   declared default and then to an omitted effort; and an override the selected model does not
   declare is rejected before any process starts. *Verify by* launch-composition tests alongside
   `TestComposeLaunchExplicitModelOverridesSource` and the FS-09.A15 rejection tests.
+- **A9** (R32) — A fixture personal Codex setup appears in the isolated child profile on
+  launch, an edit/addition/removal appears at its next process start, and no personal session/index
+  data or writable symlink enters that profile. The normal resolver still reads the personal source,
+  while a pinned credentialed Codex child confirms skills, agents, plugins, rules, and MCP setup are
+  visible from the isolated profile. *Verify by* profile-refresh tests and FS-09.A17's gated live
+  check.
 
 ## 6. Deviations & open decisions
 
