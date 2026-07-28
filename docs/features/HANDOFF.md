@@ -56,7 +56,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   [`../archive/reviews/usability-review-run-2026-07-26-rerun.md`](../archive/reviews/usability-review-run-2026-07-26-rerun.md)
   and [`../archive/reviews/usability-review-run-2026-07-26-browser-retry.md`](../archive/reviews/usability-review-run-2026-07-26-browser-retry.md).
   Credentialed provider and terminal compatibility remain separate manual release gates.
-- **Last reviewed code:** `a574076` (2026-07-27), the continuous range after `cc9d498`.
+- **Last reviewed code:** `547ca43` (2026-07-28), the continuous range after `a574076`.
 - **Branch:** `main`.
 
 ## Active change
@@ -92,12 +92,66 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 ## Review findings
 
-- **Worth fixing** — SDD traceability for `0b6e793`, `ceef7ee`, and `9f0dbde`: These commits ship
-  new Dashboard Resume, builder-project selection, and transcript right-click behavior, but the
-  repository has no corresponding ready-change/active-change plan. Their specifications and tests
-  are now in sync, but the required spec-first and planned implementation trail cannot be audited
-  from history. Use a ready change and active handoff plan before the next behavior change; do not
-  create a retroactive waiting change for work that is already shipped.
+- **Must fix** — **INV §12** — `internal/config/codexprofile.go:32-49,142-165,196-209` copies
+  every personal Codex top-level entry except a short fixed denylist. Current supported Codex homes
+  store runtime/history state under unlisted names such as `state_5.sqlite*`, `logs_2.sqlite*`,
+  `.tmp`, and `shell_snapshots`, so an ordinary child start copies personal state into the isolated
+  profile, can copy an inconsistent live SQLite/WAL set, and replaces same-named private state on
+  every later start. This breaks FS-08.R32/A9, FS-09.R43/R44/A17, TS-02.R19, and TS-04.R20/R21 and
+  can break native resume while doing hundreds of megabytes of serialized I/O. Mirror an explicit
+  provider-setup allowlist instead, and test current database/WAL/log/snapshot names plus preservation
+  of same-named child state across refresh.
+
+- **Must fix** — **INV §10/§14** — `internal/config/codexprofile.go:234-254` recreates every
+  regular setup file as `0600`, including executable skill/plugin scripts and binaries. The private
+  profile then contains those assets but cannot execute them, contradicting FS-08.R32/A9,
+  FS-09.R44/A17, and TS-04.R21's setup-availability promise. Preserve the source owner-executable
+  bit while stripping group/world permissions, with an executable setup-asset regression.
+
+- **Must fix** — **INV §5/§15** — refresh is serialized only while
+  `RefreshCodexProfile` runs (`internal/config/codexprofile.go:82-116`), not through the process
+  consuming it (`internal/runtime/chat.go:129-133,228,511`), and each entry is removed and recopied
+  in place. Concurrent start A can launch while start B exposes a partial generation; a late copy or
+  manifest failure also leaves earlier replacements/orphaned managed assets visible to running
+  children even though the start fails. This violates FS-08.R32, FS-09.R44/A17, TS-02.R19, and
+  TS-04.R21. Stage and publish one complete generation with the manifest, retain the prior generation
+  on failure, and add barrier-controlled concurrent-start and late-failure rollback tests.
+
+- **Must fix** — **INV §14** — `internal/config/codexprofile.go:82-89,107-113,137-140` follows
+  an existing `$AGENTDECK_HOME/codex` destination symlink and chmods/copies/prunes through it before
+  checking whether it aliases the personal Codex home. A pre-existing alias can therefore modify or
+  delete personal/out-of-tree setup and defeats isolation, violating FS-09.R43/R44, TS-02.R19, and
+  TS-04.R20/R21. Reject a symlink/non-directory destination before mutation, require canonical
+  source/destination non-overlap beneath the AgentDeck home, validate prune basenames, and test an
+  alias with a prior manifest without changing the target.
+
+- **Must fix** — **INV §4/§15** — a Codex switch does not validate/prepare the refreshed
+  profile until after stopping the working runtime, so one newly unsafe/unreadable personal asset
+  makes both the target start and the rollback start fail. `internal/server/switch.go:231-238` then
+  calls `failSwitch` without tearing down the rollback's fresh hook/MCP/settings registration,
+  leaving the agent stopped with spoofable artifacts. Prepare a transactional generation before
+  Stop and reuse it through target/rollback, call `teardownAgentRegistration` on rollback failure,
+  and add a Codex switch refresh-failure regression that preserves the old runtime and leaves no
+  registration residue.
+
+- **Worth fixing** — **INV §2** — FS-09.A17 promises launch/resume/switch environment-composition
+  evidence, but `internal/server/launch_test.go:183-204` tests only `codexHomeEnv` with a synthetic
+  `composeEnv`, and `internal/runtime/chat_test.go:368-402` calls only `spawnCmd`. Removing the final
+  layer from resume, switch, or rollback would leave the claimed acceptance green. Table-test every
+  real composer/rollback with ambient, backend, and model collisions and a non-Codex control.
+
+- **Worth fixing** — **INV §10** — `docs/specs/features/FS-08-federation.md:104-107` still calls
+  the isolated Codex child "planned" while R32 and the linked FS/TS requirements mark it shipped.
+  Remove the stale qualifier so the specification does not contradict itself.
+
+- **Worth fixing** — (no invariant class) — SDD traceability for `0b6e793`, `ceef7ee`, `9f0dbde`,
+  and `547ca43`: these commits ship Dashboard Resume, builder-project selection, transcript
+  right-click behavior, and Codex profile isolation without a committed ready-change/active-change
+  plan. For `547ca43`, the ideas-only parent is followed by one commit that adds and immediately
+  ships all requirements and code while both handoffs say `Active change: None`; its brief names a
+  ready change that never exists in the tree. The required spec-first planned trail cannot be
+  audited. Use a committed ready change and active handoff plan before the next behavior change; do
+  not create a retroactive waiting change for work already shipped.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
@@ -106,6 +160,24 @@ are not promoted to findings without a repeatable failure.
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-28 — Reviewed the continuous range after `a574076` through `547ca43`, including the
+  previously reviewed AgentDecker catalog-membership fix and the new Codex session-isolation feature.
+  Five Must-fix and three Worth-fixing findings are recorded above. **INV §12/§10** caught the
+  open-ended setup mirror copying the pinned/current provider's real state and stripping executable
+  setup modes; **INV §5/§15** caught the partial-generation refresh/start window; **INV §14**
+  caught the destination-symlink escape; and **INV §4/§15** caught the failed-switch rollback
+  leak. **INV §2** confirmed one final child-env helper is correctly shared by launch, resume, and
+  switch but found the promised path matrix unpinned; **INV §10** also found one stale "planned"
+  spec qualifier. Clean/not applicable on the remaining classes: §1 is covered by the refresh
+  boundary finding; §3 adds no persisted form/one-shot field; §6 adds no runtime/interface; §7
+  surfaces changed read failures; §8 uses existing bounded start errors; §9 adds no PID/protocol/
+  SQLite migration and its durability concern is covered by the staged-generation finding; §11
+  adds no API collection and writes a non-null manifest list; §13 adds no Codex UI/CSS selector;
+  the remaining §14/§15 surfaces are owner-only and pre-spawn. Specification checks, both Go test
+  variants, focused config/runtime/server race tests, all 163 UI tests, presentation/source/UI
+  builds, the distribution build, and whitespace checks pass. The credentialed packaged-Codex gate
+  remains unrun and correctly gated. No product code or specifications changed during review.
 
 - 2026-07-28 — Shipped Codex session isolation (FS-08.R32/A9, FS-09.R43/R44/A17, TS-02.R19,
   TS-04.R20/R21). **INV §2** is load-bearing: one `codexHomeEnv` layer, appended last to the shared
@@ -122,7 +194,7 @@ _(Newest first; durable product truth is in FS/TS and history is in git.)_
   contract. Config profile-refresh, env-composition, and a codex spawn-refresh test were added; both
   Go test variants, `make build`, `make check-specs`, focused `-race` on the config/runtime refresh,
   and whitespace checks pass. No UI changed. AgentDeck's own process `CODEX_HOME` is untouched, so
-  federation discovery and model autosync still read the real home. This change is unreviewed.
+  federation discovery and model autosync still read the real home.
 
 - 2026-07-28 — Refined the planned Codex session isolation with the human; no product code changed.
   `CODEX_HOME=<agentdeck-home>/codex` remains the always-on, new-launch-only boundary, but the
