@@ -119,9 +119,9 @@ func TestArchiveProjectRespondsWithActionLists(t *testing.T) {
 	}
 }
 
-// FS-05.A19 / INV §7: the grouped projection must reach durable sessions
-// beyond the archive package's 200-row page cap, and the per-project endpoint
-// must independently page that same full corpus.
+// FS-05.A19 / INV §7/§8/§10: the top-level group page stays bounded regardless
+// of agent count, while the project endpoint applies its requested offset at
+// the durable query boundary and reaches the final row.
 func TestGroupedArchivePagesPastTwoHundredSessions(t *testing.T) {
 	srv := testServer(t, true)
 	stmt, err := srv.stateStore.DB().Prepare(`
@@ -151,8 +151,14 @@ VALUES (?, ?, 'implementer', 'my-app', 'claude', 'sonnet', 'chat', '/tmp', 'prom
 	if err := json.Unmarshal(rec.Body.Bytes(), &groups); err != nil {
 		t.Fatal(err)
 	}
-	if groups.Total != 1 || len(groups.Results) != 1 || len(groups.Results[0].Results) != 201 {
-		t.Fatalf("grouped archive = total %d groups %d rows %d, want 1/1/201", groups.Total, len(groups.Results), len(groups.Results[0].Results))
+	if groups.Total != 1 || len(groups.Results) != 1 {
+		t.Fatalf("grouped archive = total %d groups %d, want 1/1", groups.Total, len(groups.Results))
+	}
+	if groups.Results[0].Results == nil || len(groups.Results[0].Results) != 0 {
+		t.Fatalf("grouped archive rows = %#v, want []", groups.Results[0].Results)
+	}
+	if rec.Body.Len() > 2_000 {
+		t.Fatalf("group response serialized %d bytes for 201 agents, want a bounded project summary", rec.Body.Len())
 	}
 
 	rec = doGET(t, srv.routes(), "/api/archive/projects/my-app?limit=1&offset=200")

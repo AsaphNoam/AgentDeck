@@ -13,7 +13,6 @@ import (
 
 type archiveAgentResult struct {
 	persistarchive.Result
-	Archived bool `json:"archived"`
 }
 
 type archiveProjectGroup struct {
@@ -58,46 +57,25 @@ func parseArchiveQuery(r *http.Request) (persistarchive.Query, *runtime.APIError
 	return q, nil
 }
 
-func (s *Server) archiveRows(q persistarchive.Query, project string) ([]archiveAgentResult, string, error) {
-	// Grouping is a server projection. Search remains authoritative for the
-	// all-session corpus; archive state only controls the ordinary no-filter view.
-	fetch := q
-	fetch.Limit, fetch.Offset, fetch.Project = 200, 0, project
-	flatResults := make([]persistarchive.Result, 0)
-	mode := "metadata"
-	for {
-		flat, err := persistarchive.New(s.stateStore.DB()).Search(fetch)
-		if err != nil {
-			return nil, "", err
-		}
-		mode = flat.SearchMode
-		flatResults = append(flatResults, flat.Results...)
-		if len(flatResults) >= flat.Total || len(flat.Results) == 0 {
-			break
-		}
-		fetch.Offset += len(flat.Results)
-	}
-	agents, err := s.stateStore.ListAgents()
+func (s *Server) archiveRows(q persistarchive.Query, project string) ([]archiveAgentResult, int, string, error) {
+	q.Project = project
+	q.ArchivedOnly = strings.TrimSpace(q.Q) == "" && q.Active == nil
+	flat, err := persistarchive.New(s.stateStore.DB()).Search(q)
 	if err != nil {
-		return nil, "", err
+		return nil, 0, "", err
 	}
-	archived := make(map[string]bool, len(agents))
-	for _, agent := range agents {
-		archived[agent.AgentID] = agent.Archived
+	rows := make([]archiveAgentResult, 0, len(flat.Results))
+	for _, result := range flat.Results {
+		rows = append(rows, archiveAgentResult{Result: result})
 	}
-	rows := make([]archiveAgentResult, 0, len(flatResults))
-	for _, result := range flatResults {
-		row := archiveAgentResult{Result: result, Archived: archived[result.AgentID]}
-		if strings.TrimSpace(q.Q) == "" && q.Active == nil && !row.Archived {
-			continue
-		}
-		rows = append(rows, row)
-	}
-	return rows, mode, nil
+	return rows, flat.Total, flat.SearchMode, nil
 }
 
 func (s *Server) archiveGroups(q persistarchive.Query) (archiveGroupsResponse, error) {
-	rows, mode, err := s.archiveRows(q, "")
+	archive := persistarchive.New(s.stateStore.DB())
+	projectQuery := q
+	projectQuery.ArchivedOnly = strings.TrimSpace(q.Q) == "" && q.Active == nil
+	matchingProjects, mode, err := archive.Projects(projectQuery)
 	if err != nil {
 		return archiveGroupsResponse{}, err
 	}
@@ -105,15 +83,9 @@ func (s *Server) archiveGroups(q persistarchive.Query) (archiveGroupsResponse, e
 	if err != nil {
 		return archiveGroupsResponse{}, err
 	}
-	agents, err := s.stateStore.ListAgents()
+	counts, err := s.stateStore.ArchivedAgentCounts()
 	if err != nil {
 		return archiveGroupsResponse{}, err
-	}
-	counts := map[string]int{}
-	for _, agent := range agents {
-		if agent.Archived {
-			counts[agent.Project]++
-		}
 	}
 	groups := map[string]*archiveProjectGroup{}
 	ensure := func(id string) *archiveProjectGroup {
@@ -133,14 +105,18 @@ func (s *Server) archiveGroups(q persistarchive.Query) (archiveGroupsResponse, e
 		groups[id] = group
 		return group
 	}
-	for _, row := range rows {
-		ensure(row.Project).Results = append(ensure(row.Project).Results, row)
-	}
 	if strings.TrimSpace(q.Q) == "" && q.Active == nil {
 		for id, project := range projects {
 			if project.Archived || counts[id] > 0 {
 				ensure(id)
 			}
+		}
+		for id := range counts {
+			ensure(id)
+		}
+	} else {
+		for _, id := range matchingProjects {
+			ensure(id)
 		}
 	}
 	ordered := make([]archiveProjectGroup, 0, len(groups))
@@ -191,31 +167,12 @@ func (s *Server) handleArchiveProject(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, ae)
 		return
 	}
-	rows, mode, err := s.archiveRows(q, projectID)
+	rows, total, mode, err := s.archiveRows(q, projectID)
 	if err != nil {
 		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
 		return
 	}
-	filtered := make([]archiveAgentResult, 0)
-	filtered = append(filtered, rows...)
-	if strings.TrimSpace(q.Q) == "" && q.Active == nil {
-		filtered = filtered[:0]
-		for _, row := range rows {
-			if row.Archived {
-				filtered = append(filtered, row)
-			}
-		}
-	}
-	total := len(filtered)
-	start := q.Offset
-	if start > total {
-		start = total
-	}
-	end := start + q.Limit
-	if end > total {
-		end = total
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"query": strings.TrimSpace(q.Q), "search_mode": mode, "total": total, "limit": q.Limit, "offset": q.Offset, "results": append([]archiveAgentResult{}, filtered[start:end]...)})
+	writeJSON(w, http.StatusOK, map[string]any{"query": strings.TrimSpace(q.Q), "search_mode": mode, "total": total, "limit": q.Limit, "offset": q.Offset, "results": append([]archiveAgentResult{}, rows...)})
 }
 
 func parseIntQuery(r *http.Request, key string, def int) (int, error) {

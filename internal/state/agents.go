@@ -112,6 +112,35 @@ ORDER BY created_at, agent_id`)
 	return out, nil
 }
 
+// ArchivedAgentCounts returns one aggregate row per project. Archive group
+// listing uses this bounded projection instead of loading every durable agent
+// identity merely to count archived members.
+func (s *Store) ArchivedAgentCounts() (map[string]int, error) {
+	rows, err := s.db.Query(`
+SELECT project, COUNT(*)
+FROM agents
+WHERE archived = 1
+GROUP BY project`)
+	if err != nil {
+		return nil, fmt.Errorf("state: count archived agents by project: %w", err)
+	}
+	defer rows.Close()
+
+	counts := make(map[string]int)
+	for rows.Next() {
+		var project string
+		var count int
+		if err := rows.Scan(&project, &count); err != nil {
+			return nil, fmt.Errorf("state: scan archived project count: %w", err)
+		}
+		counts[project] = count
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("state: iterate archived project counts: %w", err)
+	}
+	return counts, nil
+}
+
 // SetAgentsArchived updates every requested durable identity in one transaction.
 // Callers stop all running agents before marking them archived.
 func (s *Store) SetAgentsArchived(ids []string, archived bool) error {

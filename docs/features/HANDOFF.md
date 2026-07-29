@@ -9,7 +9,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 - **Active change:** None; the native-dialog replacement change is finished.
 - **State:** The project-first dashboard, project/agent archive lifecycle, grouped Archive pagination,
   project archive containment, and native-dialog replacement are implemented and independently
-  reviewed. Five Must-fix and four Worth-fixing findings are open below; fixing them is the next
+  reviewed. Four Must-fix and four Worth-fixing findings are open below; fixing them is the current
   quality gate. The 2026-07-29
   usability pass found no new problem in its completed real-browser paths: project/scoped dashboards,
   stopped-agent Resume, individual archive/restore, and grouped Archive rendered and behaved as
@@ -79,14 +79,11 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Active change
 
-**State:** finished
+**State:** review findings are being fixed
 
-The native-dialog replacement is complete. Every first-party browser `prompt`/`confirm` flow now
-uses core dialogs, while preserving the existing requests, routes, SSE, and persistence. The source
-guard and focused components cover validation, cancellation, runtime selection, group suggestions,
-project actions, archive actions, and in-use force delete. The in-app browser cannot reach the
-workspace's healthy loopback test server, so this change's real-browser pass remains unconfirmed due
-to that automation boundary; UI and distribution checks pass.
+The native-dialog replacement remains complete. The current fix run is clearing the five Must-fix
+and four Worth-fixing findings from its independent review, one verified finding per commit. Grouped
+Archive pagination is fixed; the next open finding is the per-project search request race.
 
 ## Decisions needing your input
 
@@ -116,16 +113,6 @@ The post-fix usability-review and current code-review state are committed locall
 those commits to the shared `origin/main` branch needs explicit human authorization.
 
 ## Review findings
-
-- **Must fix** — INV §7/§8/§10 — Group paging still serializes the entire agent corpus.
-  `internal/server/archive.go` `archiveRows` materializes every matching session in 200-row loops,
-  `archiveGroups` embeds every matching agent row in each group, and only then applies the requested
-  group page. `GET /api/archive?limit=50` is therefore unbounded by agent count, while
-  `GET /api/archive/projects/{project}` also scans/materializes the full project before slicing its
-  page. `TestGroupedArchivePagesPastTwoHundredSessions` currently requires 201 embedded rows and pins
-  the defect. A project with a long session history produces O(corpus) work and an unbounded response,
-  defeating FS-05.R36/A19's independent agent pagination. Page/count at the durable query boundary,
-  keep the top-level group response bounded, and regress both response size and project-offset work.
 
 - **Must fix** — INV §1/§8 — Per-project Archive searches can render results from the previous
   query. `ui/src/features/archive/ArchivePage.tsx` protects the top-level group request with an
@@ -326,6 +313,12 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-07-29 — Fixed grouped Archive pagination (INV §7/§8/§10): top-level pages now serialize
+  project summaries with non-null empty agent lists, archived counts use a grouped durable query, and
+  per-project archive filtering/count/limit/offset execute in one durable search instead of loading
+  the full agent corpus. The 201-session regression now bounds group response size and still reaches
+  the final project row at offset 200; focused archive/server tests pass.
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
 
