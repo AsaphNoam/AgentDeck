@@ -112,6 +112,13 @@ orphaned processes.
   (or launch, or resume) that would land the terminal interface on `codex-acp` or any additional
   backend is rejected with `422 terminal_unavailable` rather than producing a statusless agent.
   Chat is supported on every backend. Cross-backend and cross-model switches within chat are allowed.
+- **R32** — The UI drives **Rename** (R8) and **Switch runtime** (R13) through core
+  application dialogs rather than browser prompts (FS-12.R26). Rename opens a single-field form
+  validated by R4. Switch runtime opens one form whose `interface`, `backend`, and `model` selects
+  are populated from the backend catalog (terminal gated by capability per R15), requires at least
+  one field to differ from the current identity before it can submit, and performs no switch when
+  cancelled. Both submit the same requests as today; the R8/R13 "browser prompt" notes are retired
+  on ship.
 
 ### Identity
 
@@ -220,6 +227,9 @@ transitions:
 - **A15.** Stopping an agent leaves it visible and resumable on its project dashboard;
   its final status and stable identity survive restart. — lifecycle/dashboard regressions; J5, J7,
   J12.
+- **A16** (R32) — The rename and switch-runtime dialogs open from the card menu, validate input,
+  reject a no-op switch, submit the same requests as before, and leave the agent unchanged on Cancel.
+  *Verify:* `CardContextMenu` component tests and the FS-12.A8 source guard.
 
 ## 6. Deviations & open decisions
 
@@ -235,7 +245,8 @@ transitions:
   switch on a stopped identity returns `409 agent_not_running`. These are user/API-visible
   interoperability choices.
 - **Immediate/prompt-based UI.** Clone launches immediately
-  with no confirmation (R9); runtime/group changes use browser prompts (R8, R13); a disappeared
+  with no confirmation (R9); rename and switch runtime use browser prompts today (R8, R13), with the
+  application-dialog replacement specified by R32/FS-12.R26; a disappeared
   terminal process becomes `done` not `error` (R18); and an invalid seeded project is explained after
   launch fails (R22, mitigated by the up-front cwd check).
 - **Agent env inheritance by design.** Child agents inherit

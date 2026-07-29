@@ -97,6 +97,15 @@ overflow cannot clip it.
 **R17.** A failed menu action surfaces an error toast carrying the server message; it does not fail
 silently.
 
+**R37.** Dashboard confirmations and inputs use core application dialogs rather than
+browser `prompt`/`confirm` (FS-12.R26). **Stop** (R16) and **Release group** open consequence-aware
+confirmation dialogs that state the effect and default focus to Cancel. **Move to group** (R16)
+opens a combobox that suggests the current group labels, where a blank value clears the group. A
+configured active project card's **Rename**, **Change color**, and **Archive** (R34) open,
+respectively, a name form validated as the project title, the R,G,B color control (FS-04.R5), and a
+consequence-aware confirmation. Cancel performs no action; each confirmed action issues the same
+request as today.
+
 ### Task groups
 
 **R18.** Agents carrying a non-empty `group` label are rendered under a collapsible group section;
@@ -288,13 +297,16 @@ dashboard regressions; J5, J7, J8.
 each scoped agent grid applies the existing shared layout preferences. — `CardGrid.test.tsx` "merges
 a scoped reorder back into the shared layout"; J5.
 
+**A21.** (R37) Each dashboard dialog opens from its menu, validates or suggests as specified, issues
+the same request on confirm, and performs no action on Cancel; the move-to-group combobox lists
+existing group labels. — `CardContextMenu`, `CardGrid`, and `ProjectDashboard` component tests plus
+the FS-12.A8 guard.
+
 ## 6. Deviations & open decisions
 
-- **Immediate / prompt-based UI.** Runtime-switch and
-  move-to-group collect their arguments through browser `window.prompt`/`confirm` dialogs rather than
-  dedicated form modals; Clone launches immediately with no confirmation; and a disappeared process
-  is surfaced as `done` rather than `error` (R11, R16, A11). Reversing any part requires an explicit
-  feature-spec update plus dedicated dialogs/confirmations or changed process-exit semantics.
+- **Immediate clone UI.** Clone launches immediately with no confirmation, and a disappeared process
+  is surfaced as `done` rather than `error` (R11, R16, A11); reversing either requires an explicit
+  feature-spec update plus a confirmation or changed process-exit semantics.
 - **Context-menu items are all wired.** The Phase-2 tech spec specced Switch runtime / Clone / Move
   to group as visible-but-disabled stubs (tooltips "Available in Phase 3/6"). Phase 6 shipped, so
   current truth is that every menu item is functional; the stubbing described in the tech spec is

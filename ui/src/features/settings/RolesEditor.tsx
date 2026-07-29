@@ -3,7 +3,10 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { useRoles, useCreateRole, useUpdateRole, useDeleteRole, configErrorMessage } from "../../api/config";
 import { useUiStore } from "../../store/uiStore";
 import type { RoleResponse } from "../../schemas/role";
+import { ConfirmDialog } from "../../components/ui";
 import { RoleForm } from "./RoleForm";
+
+type DeleteDialog = { id: string; force?: boolean; agents?: string[]; error?: string };
 
 export function RolesEditor() {
   const { data: roles, isLoading } = useRoles();
@@ -15,6 +18,7 @@ export function RolesEditor() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<RoleResponse | null>(null);
   const [formError, setFormError] = useState("");
+  const [deleting, setDeleting] = useState<DeleteDialog | null>(null);
 
   function openCreate() {
     setEditing(null);
@@ -48,25 +52,22 @@ export function RolesEditor() {
     }
   }
 
-  function handleDelete(id: string) {
-    if (!confirm(`Delete role "${id}"?`)) return;
+  function confirmDelete() {
+    if (!deleting) return;
     deleteRole.mutate(
-      { id },
+      { id: deleting.id, force: deleting.force },
       {
+        onSuccess: () => setDeleting(null),
         onError: (err) => {
           const e = err as { status?: number; body?: { agents?: string[] } };
-          if (e?.status === 409) {
+          if (e?.status === 409 && !deleting.force) {
             const agents = e?.body?.agents ?? [];
-            const msg =
-              agents.length > 0
-                ? `Role "${id}" is used by ${agents.length} running agent(s):\n${agents.join(", ")}\n\nDelete the role definition anyway? Running agents are unaffected.`
-                : `Role "${id}" is in use. Delete the definition anyway?`;
-            if (confirm(msg)) deleteRole.mutate({ id, force: true });
+            setDeleting({ id: deleting.id, force: true, agents });
             return;
           }
-          // Any other failure (500/offline) previously vanished silently, so a
-          // failed delete looked like it worked. Surface it.
-          pushError("Delete role failed", configErrorMessage(err));
+          const message = configErrorMessage(err);
+          setDeleting((current) => current ? { ...current, error: message } : current);
+          pushError("Delete role failed", message);
         },
       },
     );
@@ -103,7 +104,7 @@ export function RolesEditor() {
             </div>
             <div className="config-list-item-actions" data-slot="actions">
               <button onClick={() => openEdit(id, role)}>Edit</button>
-              <button onClick={() => handleDelete(id)} className="btn-danger">
+              <button onClick={() => setDeleting({ id })} className="btn-danger">
                 Delete
               </button>
             </div>
@@ -126,6 +127,25 @@ export function RolesEditor() {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
+      {deleting && (
+        <ConfirmDialog
+          open
+          title={deleting.force ? `Delete role "${deleting.id}" anyway?` : `Delete role "${deleting.id}"?`}
+          confirmLabel={deleting.force ? "Delete anyway" : "Delete role"}
+          destructive
+          pending={deleteRole.isPending}
+          onCancel={() => setDeleting(null)}
+          onConfirm={confirmDelete}
+        >
+          {deleting.force ? (
+            <>
+              <p>Running agents keep their already-composed role configuration.</p>
+              {deleting.agents && deleting.agents.length > 0 && <p>In use by: {deleting.agents.join(", ")}</p>}
+            </>
+          ) : <p>This removes the role definition.</p>}
+          {deleting.error && <p className="form-error">{deleting.error}</p>}
+        </ConfirmDialog>
+      )}
     </div>
   );
 }

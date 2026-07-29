@@ -1,6 +1,6 @@
 import React from "react";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { fireEvent, render, screen, cleanup } from "@testing-library/react";
+import { fireEvent, render, screen, cleanup, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { setupServer } from "msw/node";
@@ -61,5 +61,37 @@ describe("ProjectDashboard", () => {
     expect(screen.getByRole("button", { name: "Rename" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Change color" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
+  });
+
+  it("renames through a dialog and leaves the request untouched on cancel", async () => {
+    let saved: Record<string, unknown> | null = null;
+    server.use(http.put("/api/projects/app", async ({ request }) => {
+      saved = await request.json() as Record<string, unknown>;
+      return HttpResponse.json({ project: "app", ...saved });
+    }));
+    renderDashboard();
+    const card = (await screen.findByText("App")).closest("article")!;
+    fireEvent.contextMenu(card);
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    fireEvent.change(await screen.findByLabelText("Name"), { target: { value: "Renamed app" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(saved).toMatchObject({ title: "Renamed app" }));
+
+    fireEvent.contextMenu(card);
+    fireEvent.click(screen.getByRole("button", { name: "Change color" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(saved).toMatchObject({ title: "Renamed app" });
+  });
+
+  it("shows archive consequences and cancels without archiving", async () => {
+    let archives = 0;
+    server.use(http.post("/api/projects/app/archive", () => { archives += 1; return HttpResponse.json({}); }));
+    renderDashboard();
+    const card = (await screen.findByText("App")).closest("article")!;
+    fireEvent.contextMenu(card);
+    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+    expect(await screen.findByText(/Running agents will be stopped/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(archives).toBe(0);
   });
 });

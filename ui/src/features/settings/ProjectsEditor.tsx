@@ -12,7 +12,10 @@ import { QUERY_KEYS } from "../../api/config";
 import { archiveProject, restoreProject } from "../../api/client";
 import { useUiStore } from "../../store/uiStore";
 import type { ProjectResponse, FieldWarning } from "../../schemas/project";
+import { ConfirmDialog } from "../../components/ui";
 import { ProjectForm } from "./ProjectForm";
+
+type DeleteDialog = { id: string; resourceDir?: string; force?: boolean; agents?: string[]; error?: string };
 
 export function ProjectsEditor() {
   const { data: projects, isLoading } = useProjects();
@@ -24,7 +27,7 @@ export function ProjectsEditor() {
   const archive = useMutation({
     mutationFn: archiveProject,
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.projects }),
-    onError: (err) => pushError("Archive project failed", configErrorMessage(err)),
+    onError: (err) => { const message = configErrorMessage(err); setArchiveError(message); pushError("Archive project failed", message); },
   });
   const restore = useMutation({
     mutationFn: restoreProject,
@@ -36,6 +39,9 @@ export function ProjectsEditor() {
   const [editing, setEditing] = useState<ProjectResponse | null>(null);
   const [formError, setFormError] = useState("");
   const [warnings, setWarnings] = useState<FieldWarning[]>([]);
+  const [deleting, setDeleting] = useState<DeleteDialog | null>(null);
+  const [archiveID, setArchiveID] = useState<string | null>(null);
+  const [archiveError, setArchiveError] = useState("");
 
   function openCreate() {
     setEditing(null);
@@ -78,28 +84,22 @@ export function ProjectsEditor() {
     }
   }
 
-  function handleDelete(id: string, resourceDir?: string) {
-    // The shared-resources directory is intentionally retained on delete (FS-11.R5);
-    // say so up front using the server-computed path so removing it stays deliberate.
-    const retained = resourceDir
-      ? `\n\nIts shared resources directory is kept:\n${resourceDir}`
-      : "";
-    if (!confirm(`Delete project "${id}"?${retained}`)) return;
+  function confirmDelete() {
+    if (!deleting) return;
     deleteProject.mutate(
-      { id },
+      { id: deleting.id, force: deleting.force },
       {
+        onSuccess: () => setDeleting(null),
         onError: (err) => {
           const e = err as { status?: number; body?: { agents?: string[] } };
-          if (e?.status === 409) {
+          if (e?.status === 409 && !deleting.force) {
             const agents = e?.body?.agents ?? [];
-            const msg =
-              agents.length > 0
-                ? `Project "${id}" is used by ${agents.length} running agent(s):\n${agents.join(", ")}\n\nDelete the project definition anyway? Running agents are unaffected.`
-                : `Project "${id}" is in use. Delete the definition anyway?`;
-            if (confirm(msg)) deleteProject.mutate({ id, force: true });
+            setDeleting({ ...deleting, force: true, agents });
             return;
           }
-          pushError("Delete project failed", configErrorMessage(err));
+          const message = configErrorMessage(err);
+          setDeleting((current) => current ? { ...current, error: message } : current);
+          pushError("Delete project failed", message);
         },
       },
     );
@@ -142,10 +142,11 @@ export function ProjectsEditor() {
                 <button onClick={() => restore.mutate(id)} disabled={restore.isPending}>Restore</button>
               ) : (
                 <button onClick={() => {
-                  if (confirm(`Archive project "${proj.title}"? Running agents will be stopped and all project agents archived.`)) archive.mutate(id);
+                  setArchiveError("");
+                  setArchiveID(id);
                 }} disabled={archive.isPending}>Archive</button>
               )}
-              <button onClick={() => handleDelete(id, proj.resource_dir)} className="btn-danger">
+              <button onClick={() => setDeleting({ id, resourceDir: proj.resource_dir })} className="btn-danger">
                 Delete
               </button>
             </div>
@@ -169,6 +170,44 @@ export function ProjectsEditor() {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
+      {archiveID && projects?.[archiveID] && (
+        <ConfirmDialog
+          open
+          title={`Archive project "${projects[archiveID].title}"?`}
+          confirmLabel="Archive project"
+          destructive
+          pending={archive.isPending}
+          onCancel={() => { setArchiveError(""); setArchiveID(null); }}
+          onConfirm={() => archive.mutate(archiveID, { onSuccess: () => setArchiveID(null) })}
+        >
+          <p>Running agents will be stopped and every agent in this project will be archived.</p>
+          {archiveError && <p className="form-error">{archiveError}</p>}
+        </ConfirmDialog>
+      )}
+      {deleting && (
+        <ConfirmDialog
+          open
+          title={deleting.force ? `Delete project "${deleting.id}" anyway?` : `Delete project "${deleting.id}"?`}
+          confirmLabel={deleting.force ? "Delete anyway" : "Delete project"}
+          destructive
+          pending={deleteProject.isPending}
+          onCancel={() => setDeleting(null)}
+          onConfirm={confirmDelete}
+        >
+          {deleting.force ? (
+            <>
+              <p>Running agents keep their already-composed project configuration.</p>
+              {deleting.agents && deleting.agents.length > 0 && <p>In use by: {deleting.agents.join(", ")}</p>}
+            </>
+          ) : (
+            <>
+              <p>This removes the project definition.</p>
+              {deleting.resourceDir && <p>Its shared resources directory is kept: {deleting.resourceDir}</p>}
+            </>
+          )}
+          {deleting.error && <p className="form-error">{deleting.error}</p>}
+        </ConfirmDialog>
+      )}
     </div>
   );
 }

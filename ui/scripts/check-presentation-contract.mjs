@@ -7,7 +7,7 @@ import valueParser from "postcss-value-parser";
 import ts from "typescript";
 
 const LAYERS = ["ad-reset", "ad-tokens", "ad-base", "ad-components", "ad-features", "ad-integrations", "ad-skins"];
-const EXCEPTION_RULES = new Set(["inline-style", "raw-color", "raw-font", "raw-shadow", "raw-radius", "raw-spacing"]);
+const EXCEPTION_RULES = new Set(["inline-style", "raw-color", "raw-font", "raw-shadow", "raw-radius", "raw-spacing", "native-dialog"]);
 const DATA_ATTRIBUTES = ["data-ui", "data-slot", "data-state", "data-variant"];
 
 function walk(dir, suffixes) {
@@ -105,6 +105,18 @@ function jsxAttribute(opening, name) {
 
 function jsxTagName(opening) {
   return opening.tagName.getText();
+}
+
+function nativeDialogCall(node) {
+  if (!ts.isCallExpression(node)) return null;
+  const expression = node.expression;
+  if (ts.isPropertyAccessExpression(expression) && ts.isIdentifier(expression.expression) && expression.expression.text === "window" && ["prompt", "confirm"].includes(expression.name.text)) return expression.name.text;
+  if (ts.isIdentifier(expression) && ["prompt", "confirm"].includes(expression.text)) return expression.text;
+  return null;
+}
+
+function nativeDialogExempt(file) {
+  return /\.test\.[jt]sx?$/.test(file) || file === "src/presentation/VisualMatrix.tsx";
 }
 
 function classValues(attribute, checker) {
@@ -291,6 +303,8 @@ export function auditPresentation(root) {
     const sourceFile = program.getSourceFile(absolute) ?? ts.createSourceFile(absolute, fs.readFileSync(absolute, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 
     const visit = (node, owners = []) => {
+      const nativeDialog = nativeDialogCall(node);
+      if (nativeDialog && !nativeDialogExempt(file)) addRaw(file, "native-dialog", `browser-native ${nativeDialog}() is prohibited`);
       if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
         const imported = node.moduleSpecifier.text;
         if (imported.endsWith(".css")) importedStyles.push({ file, imported });

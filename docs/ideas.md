@@ -22,12 +22,6 @@ Example:
   is one flat array independent of `group`), so it silently snaps back. Needs whole-card drag (with
   an activation distance so a plain click still opens the agent) and either real cross-group drop
   support or a clear affordance that drag only reorders within a group.
-- **Real dialogs instead of browser prompts.** Move to group — and its siblings Rename and Switch
-  runtime — collect their arguments through `window.prompt`, so naming a group is an unstyled modal
-  dialog with no existing-group list, no validation feedback, and no cancel/confirm affordance. FS-02
-  §6 and FS-01.R8/R13 record this as a deliberate shipped limitation, so nothing half-built exists to
-  plug in; reversing it needs dedicated form modals (group picker with autocomplete over current
-  group labels, field-level validation) plus a feature-spec update.
 - **Per-chat model picker.** The agent chat header shows `backend · model` as static text; the only
   way to change either is the dashboard context menu's Switch runtime, which asks for interface,
   backend, and model through three consecutive browser prompts. Offer a picker in the chat header

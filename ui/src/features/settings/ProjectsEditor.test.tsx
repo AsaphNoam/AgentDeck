@@ -1,5 +1,5 @@
 import React from "react";
-import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { setupServer } from "msw/node";
@@ -116,16 +116,15 @@ describe("ProjectsEditor", () => {
     expect(screen.getByText(/outside the repository/i)).toBeInTheDocument();
   });
 
-  it("delete confirmation states the resources directory is retained (FS-11.R5)", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
-    try {
-      renderWithQuery(<ProjectsEditor />);
-      await screen.findByText("My App");
-      fireEvent.click(screen.getByText("Delete"));
-      expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining(RESOURCE_DIR));
-    } finally {
-      confirmSpy.mockRestore();
-    }
+  it("delete dialog states the resources directory is retained and cancels without deleting (FS-11.R5)", async () => {
+    let deletes = 0;
+    server.use(http.delete("/api/projects/:id", () => { deletes += 1; return new HttpResponse(null, { status: 204 }); }));
+    renderWithQuery(<ProjectsEditor />);
+    await screen.findByText("My App");
+    fireEvent.click(screen.getByText("Delete"));
+    expect(await screen.findByText(new RegExp(RESOURCE_DIR.replaceAll("/", "\\/")))).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(deletes).toBe(0);
   });
 
   it("closes dialog on success even when cwd_not_found warnings are present", async () => {

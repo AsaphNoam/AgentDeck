@@ -6,7 +6,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
-- **Active change:** None; the project-dashboard and project-grouped Archive change is finished.
+- **Active change:** None; the native-dialog replacement change is finished.
 - **State:** The project-first dashboard, project/agent archive lifecycle, grouped Archive pagination,
   and project archive containment are complete. The resolved review findings have focused regression
   coverage; an independent review of the completed commit is the next quality gate. The 2026-07-29
@@ -81,8 +81,12 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 **State:** finished
 
-The project-first dashboard and project-grouped Archive change is complete; no implementation work
-is currently active.
+The native-dialog replacement is complete. Every first-party browser `prompt`/`confirm` flow now
+uses core dialogs, while preserving the existing requests, routes, SSE, and persistence. The source
+guard and focused components cover validation, cancellation, runtime selection, group suggestions,
+project actions, archive actions, and in-use force delete. The in-app browser cannot reach the
+workspace's healthy loopback test server, so this change's real-browser pass remains unconfirmed due
+to that automation boundary; UI and distribution checks pass.
 
 ## Decisions needing your input
 
@@ -256,6 +260,27 @@ are not promoted to findings without a repeatable failure.
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-29 — Completed the native-dialog replacement. Agent rename, runtime switch, move to group,
+  stop/release-group, project rename/color/archive, role/project delete, and in-use force-delete now
+  use application dialogs. The static presentation contract rejects first-party native
+  `prompt`/`confirm`; dialog regressions cover submission, cancellation, field errors, catalog-driven
+  runtime selection, resource-retention copy, and force deletion. FS-01.R32/A16, FS-02.R37/A21,
+  FS-04.R37/A17, FS-12.R26/A8, and TS-08.R29 are shipped. Specification checks, the full Go test
+  matrix, all 170 UI tests, the UI build, distribution build, and whitespace checks pass. The
+  in-app browser could not reach an isolated loopback server that passed a local HTTP health check,
+  so the required browser smoke pass is recorded as an automation limitation rather than a product pass.
+
+- 2026-07-29 — Designed the native-prompt/confirm replacement with the human; no product code changed.
+  The seven `window.prompt` inputs and eight `confirm()` dialogs across the dashboard, project cards,
+  and Settings become styled application dialogs that validate, state consequences, and cancel
+  cleanly, issuing today's requests with no API/storage/route change. FS-12.R26/A8 own the umbrella
+  (superseding R19's carve-out); FS-01.R32/A16 the rename and cancellable catalog-driven switch;
+  FS-02.R37/A21 the move-to-group combobox, stop/release-group, and project card actions; FS-04.R37/A17
+  the delete/force-delete-in-use/archive confirmations; and TS-08.R29 the presentation-contract guard
+  that forbids native prompt/confirm in `ui/src`. FS-02/FS-04/FS-12/TS-08 move to Partial while those
+  items are unshipped. The idea was promoted to the waiting `replace-native-dialogs.md` change;
+  `make check-specs`, the twin-skill comparison, and whitespace checks pass.
 
 - 2026-07-29 — Fixed every project-dashboard/grouped-Archive review finding and completed the
   active change. **INV §2/§4/§5/§15** now protect archive/restore claims, live-orphan reaping,

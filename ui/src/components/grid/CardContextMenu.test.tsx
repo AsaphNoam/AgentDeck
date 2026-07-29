@@ -2,6 +2,7 @@ import React from "react";
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
 import { CardContextMenu } from "./CardContextMenu";
@@ -42,10 +43,13 @@ afterEach(() => {
 });
 
 function renderMenu() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
   return render(
-    <MemoryRouter>
-      <CardContextMenu />
-    </MemoryRouter>,
+    <QueryClientProvider client={client}>
+      <MemoryRouter>
+        <CardContextMenu />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
@@ -87,8 +91,9 @@ describe("CardContextMenu error surfacing", () => {
   });
 
   it("shows an error toast with the server message when switch-runtime fails", async () => {
-    vi.spyOn(window, "prompt").mockReturnValue("terminal");
     server.use(
+      http.get("/api/backends", () => HttpResponse.json({ version: 2, backends: { claude: { name: "Claude", type: "claude-acp", default_model: "sonnet", models: { sonnet: { name: "Sonnet", model: "sonnet" } } } } })),
+      http.get("/api/capabilities", () => HttpResponse.json({ terminal: { available: true } })),
       http.post("/api/sessions/:id/switch-runtime", () =>
         HttpResponse.json({ error: { code: "no_change", message: "no runtime change requested" } }, { status: 400 }),
       ),
@@ -96,6 +101,9 @@ describe("CardContextMenu error surfacing", () => {
 
     renderMenu();
     fireEvent.click(screen.getByRole("button", { name: /Switch runtime/i }));
+    const interfaceSelect = await screen.findByLabelText("Interface");
+    fireEvent.change(interfaceSelect, { target: { value: "terminal" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Switch runtime$/i }));
 
     await waitFor(() =>
       expect(useUiStore.getState().toasts.some((t) => t.type === "error" && t.body === "no runtime change requested")).toBe(true),
@@ -103,7 +111,6 @@ describe("CardContextMenu error surfacing", () => {
   });
 
   it("shows an error toast when rename fails", async () => {
-    vi.spyOn(window, "prompt").mockReturnValue("beta");
     server.use(
       http.post("/api/sessions/:id/rename", () =>
         HttpResponse.json({ error: { code: "validation", message: "bad name" } }, { status: 422 }),
@@ -112,6 +119,8 @@ describe("CardContextMenu error surfacing", () => {
 
     renderMenu();
     fireEvent.click(screen.getByRole("button", { name: /Rename/i }));
+    fireEvent.change(await screen.findByLabelText("Name"), { target: { value: "beta" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Rename$/i }));
 
     await waitFor(() =>
       expect(useUiStore.getState().toasts.some((t) => t.type === "error" && t.title === "Rename failed")).toBe(true),
@@ -119,7 +128,6 @@ describe("CardContextMenu error surfacing", () => {
   });
 
   it("shows an error toast when stop fails", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     server.use(
       http.post("/api/sessions/:id/stop", () =>
         HttpResponse.json({ error: { code: "internal", message: "boom" } }, { status: 500 }),
@@ -128,6 +136,7 @@ describe("CardContextMenu error surfacing", () => {
 
     renderMenu();
     fireEvent.click(screen.getByRole("button", { name: /^Stop$/i }));
+    fireEvent.click(await screen.findByRole("button", { name: "Stop agent" }));
 
     await waitFor(() =>
       expect(useUiStore.getState().toasts.some((t) => t.type === "error" && t.title === "Stop failed")).toBe(true),
@@ -174,7 +183,6 @@ describe("CardContextMenu error surfacing", () => {
   });
 
   it("shows an error toast when move-to-group fails", async () => {
-    vi.spyOn(window, "prompt").mockReturnValue("squad");
     server.use(
       http.post("/api/sessions/:id/identity", () =>
         HttpResponse.json({ error: { code: "validation", message: "bad group" } }, { status: 422 }),
@@ -183,9 +191,22 @@ describe("CardContextMenu error surfacing", () => {
 
     renderMenu();
     fireEvent.click(screen.getByRole("button", { name: /Move to group/i }));
+    fireEvent.change(await screen.findByLabelText("Group"), { target: { value: "squad" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Move$/i }));
 
     await waitFor(() =>
       expect(useUiStore.getState().toasts.some((t) => t.type === "error" && t.title === "Move to group failed")).toBe(true),
     );
+  });
+
+  it("cancels rename without sending a request", async () => {
+    let calls = 0;
+    server.use(http.post("/api/sessions/:id/rename", () => { calls += 1; return HttpResponse.json({}); }));
+
+    renderMenu();
+    fireEvent.click(screen.getByRole("button", { name: /Rename/i }));
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+
+    expect(calls).toBe(0);
   });
 });

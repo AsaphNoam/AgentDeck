@@ -124,6 +124,14 @@ only React primitive seam; the rejected alternatives are recorded in §5.
   `global.css`, no unexplained raw visual values, no literal class without a selector, no unreferenced
   public hook/token, no third-party default palette, and no production skin state, attribute,
   stylesheet, or asset.
+- **R29** — First-party UI does not call `window.prompt`/`confirm`; those input and
+  confirmation flows use the core Radix Dialog convention that FS-12.R26 mandates.
+  `ui/scripts/check-presentation-contract.mjs` (R19) gains a rule that fails on any
+  `window.prompt`/`confirm` or bare `prompt(`/`confirm(` call under `ui/src`, exempting only the
+  development visual-matrix and test files; the presentation-exception manifest (R20) is the sole
+  escape hatch. The dialogs reuse existing feature-owned Radix behavior, form validation, and the
+  backend-catalog, project-color, and client-derived group-label sources (R1); they add no API, SSE,
+  persistence, or route change (R15), so no new server endpoint or migration is introduced.
 
 ## 3. Interfaces & data shapes
 

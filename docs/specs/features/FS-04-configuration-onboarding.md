@@ -165,6 +165,11 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   confirm dialog listing the agents; on confirm it re-issues the delete with `force=true`. `force`
   deletes only the definition — running agents keep their already-composed config and are unaffected.
   Any non-409 delete failure (offline/500) is surfaced as an error toast, never a silent no-op.
+- **R37.** Settings destructive actions use core application dialogs rather than browser
+  `confirm()` (FS-12.R26). Deleting a role or project, archiving a project, and the in-use (409)
+  force follow-up (R28) each open a consequence-aware confirmation dialog. The in-use dialog lists
+  the offending running agent ids and, on confirm, re-issues the delete with `force=true`. Cancel
+  performs no action; each confirmed action issues the same request as today.
 - **R29.** In the Launch step, if the agent launches but the follow-up `onboarding_complete` write
   fails, the wizard stays visible, keeps the launched agent, and surfaces the write error (it does
   not silently claim completion).
@@ -233,14 +238,14 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   active projects with no archived default preselected, onboarding reports no project ready when no
   active project exists, and restoring the default makes it eligible again without changing
   `config.json`. — config/readiness and launch-selector regressions; J2, J5, J14.
+- **A17.** (R37) The role/project delete, force-delete-in-use, and project-archive dialogs render
+  their consequence and agent list, issue the same requests on confirm, and no-op on Cancel. —
+  `RolesEditor`/`ProjectsEditor` component tests and the FS-12.A8 guard.
 
 ## 6. Deviations & open decisions
 
-- **Prompt-based confirmation UI.** The delete-in-use flow
-  and other mutating confirmations use the browser's native `confirm()`/`prompt()` rather than
-  dedicated dialogs, and an invalid seeded-project `cwd` is explained only after a launch fails
-  rather than by preflight. This is the recorded "Immediate/prompt-based UI" product choice; reverse
-  by adding dedicated dialogs and stricter preflight.
+- **Invalid seeded-project `cwd`.** An invalid seeded-project `cwd` is still explained only after a
+  launch fails rather than by preflight; reverse that part by adding a stricter preflight.
 - **Federation Config step scope.** The wizard's Config step and Settings' config-source panel are
   the entry points to Claude/Codex federation, which has its own gated/deferred behavior (e.g.
   detached import returns `501`). Those specifics are owned by **FS-08**, not this spec.
