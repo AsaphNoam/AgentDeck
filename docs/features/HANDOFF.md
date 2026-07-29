@@ -113,6 +113,14 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 The post-fix usability-review and current code-review state are committed locally on `main`; pushing
 those commits to the shared `origin/main` branch needs explicit human authorization.
 
+- **Corrupt project lifecycle policy:** the last Must-fix cannot close until the human chooses how
+  an unreadable/corrupt project definition behaves on Resume, Switch runtime, agent Restore, and
+  pipeline start/control. Recommended: fail closed with an explicit internal error until the file is
+  repaired, because its unreadable JSON may contain `archived: true`. Alternative: treat corruption
+  like a missing/unavailable project, matching catalog omission but risking lifecycle work against a
+  project whose archived state is unknown. Unexpected non-corruption read failures will surface
+  either way; agent Archive remains available for cleanup.
+
 ## Review findings
 
 - **Must fix** — INV §7 (also §5/§8) — Unexpected project-read errors fail open on process and

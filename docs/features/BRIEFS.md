@@ -4,6 +4,21 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-29 — Fix: archive correctness findings
+
+Four high-risk Archive defects are fixed and committed: large project histories no longer inflate
+group pages, an older search cannot overwrite newer results, overlapping Archive and Restore actions
+cannot report false success, and a failed rollback now preserves and reports a coherent durable
+state. The remaining high-risk finding needs one product choice before implementation can continue.
+
+**Needs attention:** Choose how a corrupt project file behaves. Recommended: fail closed and return
+an explicit error for Resume, runtime switch, agent restore, and pipeline work until the file is
+repaired. Alternative: treat it like a missing project, which matches its absence from the project
+list but may allow work when the unreadable file actually marks the project archived.
+
+**Next:** Reply with “fail closed” or “treat as missing”; the fix run will then finish the remaining
+finding and the four lower-risk repairs.
+
 ### 2026-07-29 — Review: project archive and application dialogs
 
 The independent review found five defects that need correction before the project archive work is considered complete: large Archive pages still load and return every matching agent, older per-project searches can overwrite newer results, overlapping Archive and Restore actions can report the wrong final state, a failed rollback can leave project and agent archive flags inconsistent, and project-read failures can allow work to start while archive state is unknown. Four lower-risk repairs are also recorded for project-rename validation feedback, contradictory dialog documentation, bypasses in the native-dialog source guard, and the missing committed design handoff. The full automated test suite passes, but it does not exercise these failures.
