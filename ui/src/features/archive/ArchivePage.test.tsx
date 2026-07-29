@@ -112,6 +112,55 @@ describe("ArchivePage", () => {
     expect(screen.getByText("Atlas")).toBeInTheDocument();
   });
 
+  // FS-05.R36 / INV §1: a delayed project page from the previous search must
+  // not overwrite the rows loaded for the current search.
+  it("keeps project rows from the newest search request", async () => {
+    let markOldStarted!: () => void;
+    const oldStarted = new Promise<void>((resolve) => { markOldStarted = resolve; });
+    let releaseOld!: () => void;
+    const oldRelease = new Promise<void>((resolve) => { releaseOld = resolve; });
+    let markOldFinished!: () => void;
+    const oldFinished = new Promise<void>((resolve) => { markOldFinished = resolve; });
+    const group = {
+      project: "my-app", title: "My app", color: [1, 2, 3], project_status: "active",
+      archived_agent_count: 0, results: [],
+    };
+    server.use(
+      http.get("/api/archive", ({ request }) => {
+        const query = new URL(request.url).searchParams.get("q") ?? "";
+        return HttpResponse.json({ query, search_mode: "full_text", total: 1, limit: 50, offset: 0, results: [group] });
+      }),
+      http.get("/api/archive/projects/my-app", async ({ request }) => {
+        const query = new URL(request.url).searchParams.get("q") ?? "";
+        if (query === "old") {
+          markOldStarted();
+          await oldRelease;
+          markOldFinished();
+          return HttpResponse.json({
+            search_mode: "full_text", total: 1, limit: 50, offset: 0,
+            results: [{ ...mockActive, agent_id: "a_old", name: "Old result" }],
+          });
+        }
+        return HttpResponse.json({
+          search_mode: "full_text", total: 1, limit: 50, offset: 0,
+          results: [{ ...mockActive, agent_id: "a_new", name: query === "new" ? "New result" : "Initial result" }],
+        });
+      }),
+    );
+
+    renderArchive();
+    const input = screen.getByRole("searchbox");
+    fireEvent.change(input, { target: { value: "old" } });
+    await oldStarted;
+    fireEvent.change(input, { target: { value: "new" } });
+
+    expect(await screen.findByText("New result")).toBeInTheDocument();
+    releaseOld();
+    await oldFinished;
+    await waitFor(() => expect(screen.queryByText("Old result")).not.toBeInTheDocument());
+    expect(screen.getByText("New result")).toBeInTheDocument();
+  });
+
   it("shows no-results message when query has no matches", async () => {
     renderArchive();
     const input = screen.getByRole("searchbox");

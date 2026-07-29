@@ -9,7 +9,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 - **Active change:** None; the native-dialog replacement change is finished.
 - **State:** The project-first dashboard, project/agent archive lifecycle, grouped Archive pagination,
   project archive containment, and native-dialog replacement are implemented and independently
-  reviewed. Four Must-fix and four Worth-fixing findings are open below; fixing them is the current
+  reviewed. Three Must-fix and four Worth-fixing findings are open below; fixing them is the current
   quality gate. The 2026-07-29
   usability pass found no new problem in its completed real-browser paths: project/scoped dashboards,
   stopped-agent Resume, individual archive/restore, and grouped Archive rendered and behaved as
@@ -83,7 +83,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 The native-dialog replacement remains complete. The current fix run is clearing the five Must-fix
 and four Worth-fixing findings from its independent review, one verified finding per commit. Grouped
-Archive pagination is fixed; the next open finding is the per-project search request race.
+Archive pagination and stale per-project searches are fixed; the next open finding is the
+idempotent Archive transition race.
 
 ## Decisions needing your input
 
@@ -113,14 +114,6 @@ The post-fix usability-review and current code-review state are committed locall
 those commits to the shared `origin/main` branch needs explicit human authorization.
 
 ## Review findings
-
-- **Must fix** — INV §1/§8 — Per-project Archive searches can render results from the previous
-  query. `ui/src/features/archive/ArchivePage.tsx` protects the top-level group request with an
-  `AbortController`, but `ArchiveProjectRows.load` has neither cancellation nor a request generation.
-  A slow request for query A can complete after the faster query B request and overwrite B's agent
-  rows. The inline `onError` callback also changes `load` identity on parent renders and causes extra
-  old-query requests while typing. Add cancellation or a generation check and a delayed-old/fast-new
-  regression (FS-05.R36).
 
 - **Must fix** — INV §5/§15 — Idempotent Archive bypasses the archive/restore transition claim.
   `handleArchiveAgentAction` returns immediately when its initial read says `archived`, and
@@ -313,6 +306,11 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-07-29 — Fixed per-project Archive search races (INV §1/§8): each project pager now aborts
+  and generation-checks superseded requests, cleanup cancels work across query/project boundaries,
+  and the parent supplies a stable error callback. A delayed-old/fast-new regression proves the
+  newest query remains rendered; the focused Archive UI suite passes.
 
 - 2026-07-29 — Fixed grouped Archive pagination (INV §7/§8/§10): top-level pages now serialize
   project summaries with non-null empty agent lists, archived counts use a grouped durable query, and
