@@ -99,17 +99,70 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 ## Review findings
 
-- **Must fix** — INV §7 (also §10) — Grouped Archive truncates the corpus at 200 sessions.
-  `internal/server/archive.go` `archiveRows` always fetches `Limit=200, Offset=0` from
-  `persistarchive.Search`, then derives project groups, per-project agent rows, and every
-  `total`/`offset` from that fixed slice. With more than 200 recorded (or archived) sessions the
-  per-project agent lists and `q`/`active` search silently drop everything past the 200 boundary,
-  while a project's `archived_agent_count` (computed from the full agent table) still reports the
-  true number — so the count disagrees with the rows the UI can page to, and older archived agents
-  and transcript-only search hits become unreachable. Breaks FS-05.R36 ("filters the complete
-  recorded-session corpus", independent group/agent pagination) and A19. Fix: page the durable
-  query itself at both levels instead of grouping a capped in-memory slice; add a regression with
-  >200 sessions that reaches a beyond-page agent row.
+- **Must fix** — INV §7 (also §10) — Grouped Archive truncates the corpus at 200 sessions and the UI
+  has no independent agent paging. `internal/server/archive.go` `archiveRows` always fetches
+  `Limit=200, Offset=0` from `persistarchive.Search`, then derives project groups, per-project rows,
+  and every `total`/`offset` from that fixed slice. With more than 200 sessions, older archived rows
+  and search hits disappear while `archived_agent_count` still reports the full count. Separately,
+  `ui/src/api/client.ts` defines `searchArchiveProject`, but `ArchivePage.tsx` never calls it and
+  pages only the top-level groups, so fixing the cap alone still would not provide FS-05.R36/A19's
+  independent per-project agent pagination. Page the durable query at both levels and add grouped
+  API/UI regressions that reach an agent beyond the first 200 rows.
+
+- **Must fix** — INV §2/§4 (also §5) — Archive can mark a live orphan process archived.
+  `internal/server/archive_actions.go` `stopForArchive` treats `runtime.ErrNoHandle` as a successful
+  stop but does not call the shared `reapOrphanRuntime` path used by ordinary Stop and pipeline Stop.
+  After a server restart, a still-live process/running row not owned by the in-memory registry can
+  survive while agent or project archive commits `archived=true`, violating FS-05.R32 and
+  TS-02.R20. Reuse the shared stop/reap seam and add a restart-orphan regression that proves the
+  process and running row are gone before the archive bit commits.
+
+- **Must fix** — INV §5/§15 — Agent archive/restore has no transition claim. The handlers in
+  `internal/server/archive_actions.go` neither acquire the planned agent-exclusive claim nor join the
+  project claim, while Resume takes only a project start lease later in `resume.go`. Archive can
+  therefore read `archived=false`, race a Resume that registers a new process, and commit
+  `archived=true` beside that running row; agent Restore can also race project Archive and clear one
+  flag after the bulk archive update. This breaks TS-01.R13/TS-02.R20 and cannot produce the planned
+  `agent_archiving` conflict. Add deterministic Archive-vs-Resume and Restore-vs-project-Archive
+  barrier regressions.
+
+- **Must fix** — INV §15 — Failed project publication erases pre-existing individual archive state.
+  `internal/server/archive_actions.go` sets every project agent archived, then compensates a failed
+  `WriteProject` by setting every id to `false`. An agent that was individually archived before the
+  operation is silently restored after the failure. TS-02.R20 requires compensation back to the
+  prior state; snapshot or update only the flags changed by the operation and inject a config-write
+  failure with mixed initial flags.
+
+- **Must fix** — INV §5/§8 (also §10/§15) — Pipeline start/control claims the project too late and
+  loses the required archive conflict. `pipeline.Manager.Start`, Continue, and Retry mutate durable
+  run state before `LaunchStage`/`ContinueStage` reaches the lease in `pipeline_lifecycle.go`.
+  Project Archive can finish `StopProject`'s snapshot, then a concurrent Start creates a run whose
+  launch is rejected and left `paused/launch_failed` instead of stopped. Already-archived projects
+  fare no better: validation becomes a generic 400, and later lifecycle errors become a paused
+  success or generic 500 rather than TS-03.R20's `409 project_archived/project_archiving`. Hold the
+  lease across the manager transition and process registration, preserving the API error code; add
+  Start/Continue/Retry barrier and response regressions (TS-09.R25, FS-14.R32/A12).
+
+- **Must fix** — INV §1/§8/§10 — Successful project Archive/Restore leaves the UI stale.
+  `ProjectDashboard.tsx` and `ArchivePage.tsx` call raw helpers with only a rejection handler; they do
+  not update or invalidate the React Query project catalog or the Archive's local group. Every
+  successful Archive therefore leaves its project card/scoped route active, and every Restore leaves
+  the group marked archived and the project absent until an incidental refetch or reload. Route the
+  actions through catalog-aware mutations and update/refetch the Archive result (FS-02.R34/A17–A18).
+
+- **Must fix** — INV §3 (also §10) — Scoped drag-and-drop destroys the rest of the shared layout.
+  `ui/src/components/grid/CardGrid.tsx` filters `ids` to the selected project, then persists
+  `setOrder(arrayMove(ids,...))`; the replacement contains no ids from other projects. A normal drag
+  on one project dashboard therefore loses every other project's shared ordering, contrary to
+  FS-02.R36/A20. Merge the scoped reorder back into the global order and cover switching/reordering
+  across at least two projects.
+
+- **Worth fixing** — INV §5 — Project Archive does not reserve its claim while waiting for starts.
+  `internal/server/archive_gate.go` `beginProjectArchive` returns false whenever any start lease
+  exists, without first setting `projectArchiving` and waiting as TS-01.R13 requires. It reports
+  "archival is in progress" when the competitor is actually a launch, and repeated starts can keep
+  leapfrogging the requested archive. Reserve the exclusive claim, wait for existing leases, then
+  enter the stop-to-commit window.
 
 - **Worth fixing** — INV §10 — Archive **Load more** is hidden once groups exceed one page.
   `ui/src/features/archive/ArchivePage.tsx` gates the control with
@@ -125,6 +178,41 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
   on each card, and FS-02.R34 requires the active-card menu to offer **Rename** and **Change color**
   alongside **Archive**. As shipped, the (planned) R30/R34 behavior is unmet; implement it or record
   a deviation before flipping those tags.
+
+- **Worth fixing** — INV §10 — Settings does not expose project archive state. The server response
+  and TypeScript schema carry `archived`, but `ProjectsEditor.tsx` and `ProjectForm.tsx` neither show
+  that state nor offer Archive/Restore. This leaves FS-04.R35's Settings surface unshipped and gives
+  a person no indication why a configured project is absent from launch selectors.
+
+- **Worth fixing** — INV §1/§10 — Archived-project eligibility is only partially wired.
+  `computeOnboarding` in `config_handlers.go` counts every configured project, so a setup with only
+  archived projects reports the project step complete even though Launch has no eligible project.
+  `RunStartForm` and `NewAgentModal` filter their option lists but retain a non-empty selected or
+  prefilled project after it becomes archived, leaving a blank-looking, submit-enabled value that
+  the server rejects. AgentDeckerBuilder already has the needed catalog/archive clearing pattern.
+  Fix all selectors and readiness together (FS-04.R36/A16).
+
+- **Worth fixing** — INV §7/§8 — Project query failures are misreported as missing configuration.
+  `ProjectDashboard` and `ScopedProjectDashboard` ignore `useProjects` loading/error state and treat
+  absent query data as an empty catalog, so a failed read silently relabels every durable project
+  "unavailable" rather than surfacing the error. Preserve the loading/error boundary; reserve the
+  unavailable state for a successfully loaded catalog that lacks that id (FS-02.R29/R32).
+
+- **Worth fixing** — INV §10 — Resume returns the wrong conflict when both agent and project are
+  archived. `internal/server/resume.go` checks `agent.Archived` before reading the project, returning
+  `agent_archived`; FS-05.R34 explicitly requires `project_archived` until the containing project is
+  restored. Reverse or combine the checks and add the two-level archive response matrix.
+
+- **Worth fixing** — INV §10/§11 — Project Archive omits its specified result lists.
+  `handleArchiveProjectAction` returns only `projectResponse`, while TS-03.R20 requires the updated
+  project plus the stopped and archived agent ids. Return the documented non-null lists and update
+  the TypeScript contract/mocks in lockstep.
+
+- **Worth fixing** — INV §1/§10 — A stopped, non-archived search hit opens a page that calls it
+  archived. `ArchivePage.tsx` routes by `active` rather than the new authoritative `archived` bit, so
+  a stopped search result opens `ArchiveAgentPage`, whose header says **Archived · read-only** even
+  though its button offers Resume. Route non-archived hits to the ordinary stopped-agent workspace
+  and keep Restore only for genuinely archived agents (FS-05.R34–R36).
 
 - **Worth fixing** — INV §15 (also §5) — Codex profile publish is not the atomic swap it claims.
   `internal/config/codexprofile.go` (~L291–313, `e021ce3`) publishes each managed setup entry by
@@ -151,6 +239,28 @@ are not promoted to findings without a repeatable failure.
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-29 — Independently re-reviewed the uncommitted project-dashboard/grouped-Archive
+  implementation after the first pass, from the planned FS/TS requirements through every changed
+  backend/UI seam and every invariant class. Seven Must-fix and nine Worth-fixing dashboard findings
+  are recorded above; the prior Codex/traceability findings remain unchanged. **INV §2/§4/§5/§15**
+  caught Archive bypassing the shared orphan reaper, the missing agent transition claim, destructive
+  config-write compensation, a non-waiting project claim, and pipeline transitions taking their lease
+  only after durable mutation. Those gaps can leave a live archived agent, erase an earlier individual
+  archive, or create a paused run after project archival. **INV §1/§3/§8/§10** caught successful
+  project actions leaving the catalog stale and scoped drag replacing the global layout. **INV
+  §7/§10** reconfirmed the 200-session truncation and found that the UI never uses the per-project
+  agent endpoint, so independent paging is absent at both layers. The remaining spec gaps cover the
+  group Load-more gate, card and Settings surfaces, archived-project readiness/selectors, project-read
+  errors, Resume precedence, project-action response shape, and stopped-search routing. Clean/not
+  applicable: §6 adds no runtime/interface; §9's migration is forward-only with a non-null default
+  and version guard; §11's new server collections are non-null (although the Archive UI tests still
+  mock the retired flat response); §12 adds no external CLI; §13 all new literal classes resolve; and
+  §14 every new route inherits `localOnly` and project paths are slug-validated. `make check-specs`,
+  both Go test variants, all 163 UI tests, presentation/source/UI builds, `make build`, and `make dist`
+  pass. The new project dashboard, archive actions, transition barriers, grouped response, rollback,
+  and per-project paging have essentially no focused coverage, so the green suite does not exercise
+  the defects. No product code or specifications changed during review.
 
 - 2026-07-29 — Reviewed the range after `547ca43` through `dc04dbd` plus the uncommitted project-
   dashboard/grouped-archive working tree, in both specification directions and against every
