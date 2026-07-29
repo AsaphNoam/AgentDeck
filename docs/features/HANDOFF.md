@@ -8,8 +8,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 - **Active change:** None; the native-dialog replacement change is finished.
 - **State:** The project-first dashboard, project/agent archive lifecycle, grouped Archive pagination,
-  and project archive containment are complete. The resolved review findings have focused regression
-  coverage; an independent review of the completed commit is the next quality gate. The 2026-07-29
+  project archive containment, and native-dialog replacement are implemented and independently
+  reviewed. Five Must-fix and four Worth-fixing findings are open below; fixing them is the next
+  quality gate. The 2026-07-29
   usability pass found no new problem in its completed real-browser paths: project/scoped dashboards,
   stopped-agent Resume, individual archive/restore, and grouped Archive rendered and behaved as
   specified. Native browser confirmation input then stalled and blocked the remaining browser-only
@@ -72,9 +73,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   [`../archive/reviews/usability-review-run-2026-07-26-rerun.md`](../archive/reviews/usability-review-run-2026-07-26-rerun.md)
   and [`../archive/reviews/usability-review-run-2026-07-26-browser-retry.md`](../archive/reviews/usability-review-run-2026-07-26-browser-retry.md).
   Credentialed provider and terminal compatibility remain separate manual release gates.
-- **Last reviewed code:** `dc04dbd` (2026-07-29), the continuous range after `547ca43` (the Codex
-  isolation fix `e021ce3` and the project-dashboard spec finalization). The finished project-dashboard
-  change awaits an independent review.
+- **Last reviewed code:** `70afbe8` (2026-07-29), the continuous range after `dc04dbd`, including
+  the finished project-dashboard/archive lifecycle and native-dialog replacement.
 - **Branch:** `main`.
 
 ## Active change
@@ -115,7 +115,75 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 The post-fix usability-review and current code-review state are committed locally on `main`; pushing
 those commits to the shared `origin/main` branch needs explicit human authorization.
 
-## Resolved review findings
+## Review findings
+
+- **Must fix** — INV §7/§8/§10 — Group paging still serializes the entire agent corpus.
+  `internal/server/archive.go` `archiveRows` materializes every matching session in 200-row loops,
+  `archiveGroups` embeds every matching agent row in each group, and only then applies the requested
+  group page. `GET /api/archive?limit=50` is therefore unbounded by agent count, while
+  `GET /api/archive/projects/{project}` also scans/materializes the full project before slicing its
+  page. `TestGroupedArchivePagesPastTwoHundredSessions` currently requires 201 embedded rows and pins
+  the defect. A project with a long session history produces O(corpus) work and an unbounded response,
+  defeating FS-05.R36/A19's independent agent pagination. Page/count at the durable query boundary,
+  keep the top-level group response bounded, and regress both response size and project-offset work.
+
+- **Must fix** — INV §1/§8 — Per-project Archive searches can render results from the previous
+  query. `ui/src/features/archive/ArchivePage.tsx` protects the top-level group request with an
+  `AbortController`, but `ArchiveProjectRows.load` has neither cancellation nor a request generation.
+  A slow request for query A can complete after the faster query B request and overwrite B's agent
+  rows. The inline `onError` callback also changes `load` identity on parent renders and causes extra
+  old-query requests while typing. Add cancellation or a generation check and a delayed-old/fast-new
+  regression (FS-05.R36).
+
+- **Must fix** — INV §5/§15 — Idempotent Archive bypasses the archive/restore transition claim.
+  `handleArchiveAgentAction` returns immediately when its initial read says `archived`, and
+  `handleArchiveProjectAction` does the same for an archived project, before either acquires the
+  TS-01.R13 claim. A concurrent Restore can therefore hold the claim, clear the state, and let
+  Archive report success without archiving it. Put the no-op decision under the claim, re-read the
+  state there, and add Restore-vs-idempotent-Archive barrier tests.
+
+- **Must fix** — INV §15 (also §5) — Failed project-archive compensation is discarded.
+  `handleArchiveProjectAction` ignores the error from `RestoreAgentArchiveStates` after project JSON
+  publication fails. If both writes fail, the exclusive claim is released with an active project
+  whose agents remain archived, contradicting TS-02.R20's compensation-before-release guarantee, and
+  the response reports only the config error. Preserve/report a coherent durable outcome and add a
+  dual-failure regression.
+
+- **Must fix** — INV §7 (also §5/§8) — Unexpected project-read errors fail open on process and
+  restore paths. `resume.go`, `switch.go`, `AcquirePipelineStart`, and agent Restore check only
+  `err == nil && project.Archived`; an I/O/permission error is treated like an active project.
+  Resume/Switch or pipeline Continue/Retry can then start/control work, and Restore can clear an
+  agent archive flag, while project archive state is unknown (FS-05.R34, TS-03.R20). Preserve the
+  specified unavailable-project behavior for `config.ErrNotFound` and agent Archive, but surface
+  unexpected read errors and cover all four paths. `config.ErrCorrupt` needs an explicit
+  specification choice because current project listing treats corrupt definitions as unavailable.
+
+- **Worth fixing** — INV §8/§10 — Project-card Rename loses field-level validation errors.
+  `ProjectEditDialog` checks only a blank title and `ProjectDashboard` renders `err.message` from
+  `useUpdateProject`; a title longer than the server limit therefore returns a structured field
+  error that the new dialog reduces to `HTTP 400`. Use `configErrorMessage` or enforce the same bound
+  client-side, and regress an overlong title so FS-12.R26/FS-02.R37's field-level repair message is
+  visible.
+
+- **Worth fixing** — INV §10 — FS-01 contradicts the shipped dialog behavior. R8 and R13 still say
+  Rename and Switch runtime use browser prompts, and §6 repeats that as current behavior, while R32
+  says those notes retire on ship and the implementation uses application dialogs. Remove the stale
+  present-tense prompt claims so the Current specification has one source of truth.
+
+- **Worth fixing** — INV §10 — The native-dialog presentation guard has executable bypasses.
+  `nativeDialogCall` recognizes only bare calls and `window.prompt`/`window.confirm` dot access;
+  `window["confirm"]()`, `globalThis.confirm()`, and aliases of either native function pass the guard
+  while still opening a native dialog. Extend the AST check and fixtures to cover equivalent
+  computed/global/aliased calls required by FS-12.A8/TS-08.R29.
+
+- **Worth fixing** — (no invariant class) — The native-dialog change has no committed ready-change
+  trail. The completion commit adds a brief claiming `docs/ready-changes/replace-native-dialogs.md`
+  was waiting, but that file exists in neither parent, the commit, nor repository history; the same
+  commit adds the alleged design update and shipped specs/code. The required spec-first planned
+  state cannot be independently audited. Commit the ready change and planned specification state
+  before the next behavior implementation; do not create a retroactive waiting file for shipped work.
+
+### Resolved findings from the reviewed implementation
 
 All findings below are resolved by the finished project-dashboard and project-grouped Archive change;
 they remain here only as the review record until the next handoff cleanup.
@@ -260,6 +328,22 @@ are not promoted to findings without a repeatable failure.
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-29 — Independently reviewed the continuous range after `dc04dbd` through `70afbe8`,
+  covering the completed project-dashboard/archive lifecycle, its review/usability records, and the
+  native-dialog replacement in both specification directions and against every invariant class.
+  Five Must-fix findings remain: grouped Archive pages still materialize and embed the unbounded
+  agent corpus (**INV §7/§8/§10**); per-project search requests can race stale rows into the current
+  query (**INV §1/§8**); idempotent Archive bypasses transition claims (**INV §5/§15**); failed
+  project-archive compensation is discarded (**INV §15**); and unexpected project-read errors fail
+  open on Resume, Switch, pipeline control, and agent Restore (**INV §7/§5/§8**). Four Worth-fixing
+  findings cover lost project-title field errors (**INV §8/§10**), contradictory FS-01 prompt text
+  and bypassable native-dialog guard checks (**INV §10**), and the missing committed ready-change
+  trail. Clean/not applicable: §2 shared construction, §3 persisted/form merging, §4 teardown, §6
+  runtime/interface adoption, §9 durability primitives/migration, §11 collection nullability, §12
+  external CLIs, §13 CSS selectors, and §14 loopback security. Specification checks, both Go test
+  variants, all 170 UI tests, presentation checks, and focused backend/UI suites pass; the green
+  tests do not cover the recorded failures. No product code or specifications changed during review.
 
 - 2026-07-29 — Completed the native-dialog replacement. Agent rename, runtime switch, move to group,
   stop/release-group, project rename/color/archive, role/project delete, and in-use force-delete now
