@@ -69,6 +69,9 @@ export function ArchivePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const handleProjectError = useCallback((message: string) => {
+    pushError("Load project archive failed", message);
+  }, [pushError]);
 
   const load = useCallback(async (query: string, offset: number, append: boolean, rendered: ArchiveProjectGroup[] = []) => {
     if (abortRef.current) abortRef.current.abort();
@@ -169,7 +172,7 @@ export function ArchivePage() {
             group={group}
             query={debouncedQ}
             onClick={handleClick}
-            onError={(err) => pushError("Load project archive failed", err)}
+            onError={handleProjectError}
             onRestore={() => restore.mutate(group.project)}
             restoring={restore.isPending && restore.variables === group.project}
           />
@@ -196,38 +199,53 @@ function ArchiveProjectRows({
   onRestore: () => void;
   restoring: boolean;
 }) {
-  const [results, setResults] = useState<ArchiveResult[]>(group.results ?? []);
-  const [total, setTotal] = useState(group.results?.length ?? 0);
+  const [results, setResults] = useState<ArchiveResult[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const resultsRef = useRef(results);
+  const abortRef = useRef<AbortController | null>(null);
+  const requestGeneration = useRef(0);
 
   useEffect(() => {
     resultsRef.current = results;
   }, [results]);
 
   const load = useCallback(async (offset: number, append: boolean) => {
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+    const generation = ++requestGeneration.current;
+    const isCurrent = () => generation === requestGeneration.current && !ac.signal.aborted;
     setLoading(true);
     try {
-      const page = await searchArchiveProject(group.project, query, 50, offset);
+      const page = await searchArchiveProject(group.project, query, 50, offset, ac.signal);
       let incoming = page.results ?? [];
       if (append && incoming.some((result) => resultsRef.current.some((current) => current.agent_id === result.agent_id))) {
-        const head = await searchArchiveProject(group.project, query, 50, 0);
+        const head = await searchArchiveProject(group.project, query, 50, 0, ac.signal);
         incoming = mergeAgentRows(head.results ?? [], incoming);
       }
-      setResults((current) => append ? mergeAgentRows(current, incoming) : incoming);
-      setTotal(page.total);
+      if (isCurrent()) {
+        setResults((current) => append ? mergeAgentRows(current, incoming) : incoming);
+        setTotal(page.total);
+      }
     } catch (err: unknown) {
-      onError(err instanceof Error ? err.message : "Failed to load project archive");
+      if (isCurrent()) {
+        onError(err instanceof Error ? err.message : "Failed to load project archive");
+      }
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, [group.project, onError, query]);
 
   useEffect(() => {
-    setResults(group.results ?? []);
-    setTotal(group.results?.length ?? 0);
+    setResults([]);
+    setTotal(0);
     void load(0, false);
-  }, [group.project, group.results, load, query]);
+    return () => {
+      requestGeneration.current += 1;
+      abortRef.current?.abort();
+    };
+  }, [group.project, load, query]);
 
   return (
     <li className="archive-project-group">
