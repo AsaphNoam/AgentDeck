@@ -12,7 +12,7 @@ import { DensityControl } from "./DensityControl";
 import { EmptyState } from "./EmptyState";
 import { NewAgentModal } from "../../features/launch/NewAgentModal";
 import { useProjects } from "../../api/config";
-import { Button, PageHeader } from "../ui";
+import { Button, ConfirmDialog, PageHeader } from "../ui";
 
 export function CardGrid({ projectID, projectTitle }: { projectID?: string; projectTitle?: string } = {}) {
   const agents = useAgentStore((state) => state.agents);
@@ -26,6 +26,8 @@ export function CardGrid({ projectID, projectTitle }: { projectID?: string; proj
   const transcripts = useTranscriptStore((state) => state.byAgent);
   const pushError = useUiStore((state) => state.pushError);
   const [showNewAgent, setShowNewAgent] = useState(false);
+  const [releaseGroupLabel, setReleaseGroupLabel] = useState<string | null>(null);
+  const [releaseGroupError, setReleaseGroupError] = useState("");
   const projects = useProjects();
 
   const loaded = useRef(false);
@@ -105,12 +107,7 @@ export function CardGrid({ projectID, projectTitle }: { projectID?: string; proj
                       <button
                         type="button"
                         className="group-release"
-                        onClick={() => {
-                          if (window.confirm(`Release group ${group.label}?`))
-                            releaseGroup(group.key).catch((err: unknown) =>
-                              pushError("Release group failed", err instanceof Error ? err.message : String(err)),
-                            );
-                        }}
+                        onClick={() => { setReleaseGroupError(""); setReleaseGroupLabel(group.key); }}
                       >
                         Release group
                       </button>
@@ -149,6 +146,19 @@ export function CardGrid({ projectID, projectTitle }: { projectID?: string; proj
     <>
       {body}
       <NewAgentModal open={showNewAgent} onClose={() => setShowNewAgent(false)} />
+      {releaseGroupLabel && (
+        <ConfirmDialog
+          open
+          title={`Release group ${releaseGroupLabel}?`}
+          confirmLabel="Release group"
+          destructive
+          onCancel={() => { setReleaseGroupError(""); setReleaseGroupLabel(null); }}
+          onConfirm={() => releaseGroup(releaseGroupLabel).then(() => setReleaseGroupLabel(null)).catch((err: unknown) => { const message = err instanceof Error ? err.message : String(err); setReleaseGroupError(message); pushError("Release group failed", message); })}
+        >
+          <p>This stops every agent in the group. Their sessions remain available to resume later.</p>
+          {releaseGroupError && <p className="form-error">{releaseGroupError}</p>}
+        </ConfirmDialog>
+      )}
     </>
   );
 }

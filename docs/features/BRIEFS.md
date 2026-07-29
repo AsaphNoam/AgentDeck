@@ -4,6 +4,22 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-29 — Implementation: replace native browser dialogs
+
+AgentDeck now uses its own dialogs for all agent, project, group, and Settings inputs and destructive confirmations. Rename, runtime switching, group moves, project actions, archive, and delete flows validate before sending the same requests as before and make cancellation harmless; Settings force-delete dialogs identify the affected running agents. A source guard prevents browser prompts or confirmations from returning.
+
+**Needs attention:** The in-app browser cannot reach this workspace’s healthy loopback test server, so the requested browser pass is unconfirmed; automated checks cover the dialog flows.
+
+**Next:** Independent review of the completed change.
+
+### 2026-07-29 — Design: replace native prompts and confirmations with dialogs
+
+The idea to replace AgentDeck's browser-native prompts and confirmations with styled dialogs is now specified and ready to build. The seven `window.prompt` inputs (agent rename, runtime switch, move to group, project rename, project color) and the eight `confirm()` dialogs (stop, release group, project archive on the card and in Settings, and role/project delete including the in-use "delete anyway" step) will each become an application dialog that validates input, states the consequence of a destructive action, and cancels without side effects — issuing the same server requests as today, with no API, storage, or route change. Runtime switch becomes one cancellable form with catalog-driven dropdowns instead of three chained prompts that cannot abort, which also unblocks the browser journey native automation could not run; move to group gains a combobox over existing group names. The behavior and acceptance criteria are written as planned requirements in FS-12, FS-01, FS-02, FS-04, and TS-08, enforced by a source guard that forbids any native prompt/confirm in the UI, and the ready change `replace-native-dialogs.md` is waiting to start.
+
+**Needs attention:** None; the three product decisions (whole native-dialog surface in one change, move-to-group combobox, styled consequence confirmations rather than type-to-confirm) are resolved.
+
+**Next:** Implement `replace-native-dialogs.md` when the work is picked up; it is not active in the handoff and no product code was written.
+
 ### 2026-07-29 — Usability review: remaining project-archive journeys
 
 The remaining project-archive browser checks passed: with no active projects, onboarding directs the user to create a first project; Archive loads the 51st project group after the first 50; and archiving a project with a live pipeline stops the run and removes that project from new-run choices. No new user-facing issue was found. Runtime switch is still unconfirmed because this in-app browser rejects `prompt()` before showing its inputs; that is an automation limitation, not a product finding. The full record is in [the usability review report](../archive/reviews/usability-review-run-2026-07-29-project-archive.md).

@@ -126,4 +126,22 @@ describe("RolesEditor", () => {
     expect(err?.status).toBe(409);
     expect(err?.body?.agents).toEqual(["a_1", "a_2"]);
   });
+
+  it("shows the in-use agents and retries delete only after confirmation", async () => {
+    let calls = 0;
+    server.use(http.delete("/api/roles/:id", ({ request }) => {
+      calls += 1;
+      if (!request.url.includes("force=true")) return HttpResponse.json({ agents: ["a_1", "a_2"] }, { status: 409 });
+      return new HttpResponse(null, { status: 204 });
+    }));
+
+    renderWithQuery(<RolesEditor />);
+    await screen.findByText("Implementer");
+    fireEvent.click(screen.getByText("Delete"));
+    fireEvent.click(screen.getByRole("button", { name: "Delete role" }));
+    expect(await screen.findByText(/In use by: a_1, a_2/)).toBeInTheDocument();
+    expect(calls).toBe(1);
+    fireEvent.click(screen.getByRole("button", { name: "Delete anyway" }));
+    await waitFor(() => expect(calls).toBe(2));
+  });
 });

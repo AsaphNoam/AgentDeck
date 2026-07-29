@@ -50,6 +50,18 @@ test("rejects literal classes without selectors", () => {
   expectFailure(fixture({ component: '<div className="missing" data-ui="surface" />' }), 'literal class "missing"');
 });
 
+test("rejects browser-native prompt and confirm calls in first-party UI", () => {
+  expectFailure(fixture({ component: 'window.prompt("name"); export function Component() { return <div className="known" data-ui="surface" />; }' }), "native-dialog");
+  expectFailure(fixture({ component: 'confirm("delete"); export function Component() { return <div className="known" data-ui="surface" />; }' }), "native-dialog");
+});
+
+test("permits a documented native-dialog exception", () => {
+  assert.deepEqual(auditPresentation(fixture({
+    component: 'window.prompt("fixture only"); export function Component() { return <div className="known" data-ui="surface" />; }',
+    exceptions: [{ file: "src/Component.tsx", rule: "native-dialog", reason: "This fixture deliberately verifies the source guard." }],
+  })), []);
+});
+
 test("rejects undocumented presentation hooks", () => {
   expectFailure(fixture({ component: '<div className="known" data-ui="mystery" />' }), "undocumented data-ui mystery");
 });

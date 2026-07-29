@@ -16,9 +16,12 @@ remains Archive, and Settings remains Settings. It does not wrap those concepts 
 narrative, gaming, or real-world metaphor. Future skins may deliberately reinterpret the product;
 this change only gives them a modular visual foundation beneath the core design.
 
-The change is limited to presentation. It does not add or alter feature behavior, data, routes,
-actions, interaction flows, responsive support, keyboard behavior, zoom behavior, accessibility
-policy, loading/recovery behavior, or browser-native prompt/confirmation flows.
+The original core-design change was limited to presentation. It did not add or alter feature
+behavior, data, routes, actions, interaction flows, responsive support, keyboard behavior, zoom
+behavior, accessibility policy, or loading/recovery behavior, and it explicitly left browser-native
+prompt/confirmation flows unchanged. The later §2.7 requirement (R26) reverses only that
+last exclusion, moving those flows into the core Dialog system without changing any request they
+issue.
 
 ## 2. Behavior
 
@@ -105,9 +108,9 @@ Requirements are user-observable.
   progress treatment, content hierarchy, and controls receive the core design without reframing the
   flow as a journey, mission, game, or story.
 - **R19** — The New Agent modal, existing application dialogs, context menu,
-  notifications, permission prompts, and error boundary use the same core design. Browser-native
-  `prompt()` and `confirm()` flows remain outside this visual change and continue to behave as
-  specified by their owning features.
+  notifications, permission prompts, and error boundary use the same core design. The initial
+  core-design delivery excluded browser-native `prompt()` and `confirm()` flows; R26 supersedes that
+  exclusion with their application-dialog replacement.
 
 ### 2.6 Boundary for future skins
 
@@ -121,6 +124,19 @@ Requirements are user-observable.
 - **R22** — Future skins may introduce strong concepts or themed interpretations. The
   core design does not pre-empt that layer by embedding its own fictional terminology, themed copy,
   narrative illustrations, or concept-specific component names into product structure.
+
+### 2.7 Application dialogs (native-prompt replacement)
+
+- **R26** — Every first-party input and confirmation flow uses the core application
+  Dialog system instead of a browser-native `window.prompt()` or `confirm()`, and no first-party
+  module invokes `window.prompt`/`confirm`. Each dialog renders as a core overlay (focus trap,
+  `Escape`/overlay dismissal, exactly one confirm control and one Cancel control), surfaces the
+  owning feature's existing validation as field-level messages, and treats Cancel or dismissal as
+  performing no action. This supersedes R19's exclusion of browser-native prompt/confirm flows and
+  the "prompt-based UI" deviations recorded by FS-01 §6, FS-02 §6, and FS-04 §6. The individual
+  input and confirmation dialogs and their validation are owned by FS-01.R32 (rename, switch
+  runtime), FS-02.R37 (move to group, project rename/color, stop, release group, archive project),
+  and FS-04.R37 (delete role/project, delete-in-use, archive project).
 
 ## 3. States & transitions
 
@@ -168,8 +184,8 @@ Requirements are user-observable.
   tests, visual fixtures, and J3, J4, J6, J7, and J8.
 - **A5** (R16–R19) — Archive, every Settings editor, all four onboarding steps, New
   Agent, existing application overlays, notifications, and error boundary retain their existing
-  behavior and use the shared core design. Browser-native prompt/confirm behavior is unchanged and
-  explicitly excluded. *Verify:* existing feature tests, visual fixtures, J2, J8, and J9.
+  behavior and use the shared core design. *Verify:* existing feature tests, visual fixtures, J2,
+  J8, and J9.
 - **A6** (R20–R22) — The application renders the complete core design without an active
   skin or user-visible skin control. A test-only visual override can change approved presentation
   values without changing product copy, routes, actions, state meaning, or component structure.
@@ -177,6 +193,11 @@ Requirements are user-observable.
 - **A7** (R1, R4, R19) — Every literal `className` used by redesigned components
   resolves to a defined selector, and obsolete core-design selectors are removed. *Verify:* the
   stylesheet/class audit required by INV §13 plus the real-browser visual review.
+- **A8** (R26) — No first-party module under `ui/src` calls `window.prompt`/`confirm`, and each
+  replaced flow opens a core dialog that validates, confirms, and performs no side effect on Cancel.
+  *Verify:* a static source guard test asserting the absence of `prompt`/`confirm` calls in
+  first-party UI, the per-dialog component tests named by FS-01.A16, FS-02.A21, and FS-04.A17, and a
+  real-browser pass of the rename, switch-runtime, move-to-group, and destructive-confirm flows.
 
 ## 6. Deviations & open decisions
 
@@ -184,8 +205,9 @@ Requirements are user-observable.
   skin. This revision defines a product-native core interface and removes the proposed expedition,
   dispatch, dossier, field-log, catalog, workshop, and journey metaphors.
 - Responsive targets, phone behavior, keyboard-flow improvements, focus management, zoom support,
-  reduced-motion policy, new loading/recovery states, dedicated replacements for browser-native
-  prompt/confirm flows, and other quality-of-life changes are explicitly outside this visual change.
+  reduced-motion policy, new loading/recovery states, and other quality-of-life changes are
+  explicitly outside the original core-design change. Dedicated replacements for browser-native
+  prompt/confirm flows are no longer deferred: they are specified by R26 in §2.7.
 - The confirmed core direction is the product-native light-canvas system described above. Its
   behavior-preserving token, component, integration, and future-skin boundaries are defined by
   TS-08.

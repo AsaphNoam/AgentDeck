@@ -1,5 +1,6 @@
 export { Badge } from "./Badge";
 export { Button, IconButton } from "./Button";
+export { ConfirmDialog } from "./ConfirmDialog";
 export { FieldFrame } from "./FieldFrame";
 export { PageHeader } from "./PageHeader";
 export { Surface } from "./Surface";
