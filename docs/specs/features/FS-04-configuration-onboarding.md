@@ -1,6 +1,6 @@
 # FS-04 — Configuration & Onboarding
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/config/`, `internal/server/config_handlers.go`, `ui/src/features/settings/`, `ui/src/features/onboarding/` · **Journeys:** J2, J9
 **Absorbed:** [`phase-3-config-onboarding.md`](../../archive/phases/phase-3-config-onboarding.md)
 
@@ -50,7 +50,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
 - **R7.** `title` is required (≤ 120), `cwd` is required, and each color channel must be 0–255. A
   `cwd` that does not exist on disk is a **non-blocking warning** (`cwd_not_found`), returned
   alongside a successful save — not a validation error.
-- **R35 — (planned).** A project additionally has an `archived` boolean, defaulting to `false` when
+- **R35.** A project additionally has an `archived` boolean, defaulting to `false` when
   absent from a newly created or existing hand-edited project file. Setting it to `true` preserves
   the project's immutable id, workspace configuration, resources, and every agent/session record;
   it moves the project and all of its agents together between the active and archived dashboard
@@ -60,7 +60,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   any of its agents can be restored or resumed.
   The project CRUD response and Settings surface expose the field, and either state can be changed
   without re-creating the project.
-- **R36 — (planned).** An archived project is ineligible wherever a project is selected for a new
+- **R36.** An archived project is ineligible wherever a project is selected for a new
   process. A stored `default_project` may continue to name an archived project as a dormant
   preference, but the New Agent modal, onboarding Launch step, pipeline run setup, and AgentDecker
   builder list only configured active projects and preselect the default only when it is active.
@@ -227,9 +227,9 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   report unready/unavailable/failed/ready states; Codex can instead validate an API key. The Backend
   step contains neither an editable model id nor provider model string. *Verified:* `BackendStep.test.tsx`,
   credential-check tests, and journey J2 with a fake provider.
-- **A15 — (planned).** Project archive state round-trips through the project config API and survives
+- **A15.** Project archive state round-trips through the project config API and survives
   restart; an older project file without the field is active by default. — config/server/UI regressions.
-- **A16 — (planned).** When `default_project` names an archived project, launch selectors show only
+- **A16.** When `default_project` names an archived project, launch selectors show only
   active projects with no archived default preselected, onboarding reports no project ready when no
   active project exists, and restoring the default makes it eligible again without changing
   `config.json`. — config/readiness and launch-selector regressions; J2, J5, J14.
@@ -264,10 +264,14 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
 - **UI:** `ui/src/features/settings/` (`SettingsPage`, `RolesEditor`, `RoleForm`, `ProjectsEditor`,
   `ProjectForm`, `BackendsEditor`), `ui/src/features/onboarding/` (`OnboardingGate`,
   `OnboardingWizard`, `steps/`).
+- **Archive eligibility:** `internal/server/config_handlers.go` (`computeOnboarding`),
+  `ui/src/features/settings/ProjectsEditor.tsx`, `NewAgentModal.tsx`, `LaunchStep.tsx`, and
+  `RunStartForm.tsx`.
 - **Set up later & provider guidance:** `OnboardingWizard` owns the completion escape hatch (R32);
   `steps/BackendStep.tsx` holds the provider sign-in guidance and Check again (R33, R34), naming the
   `agentdeck auth` selectors that `internal/backend/providerauth` owns.
 - **Key regression tests:** `internal/server/config_handlers_test.go`,
   `internal/server/config_endpoint_test.go`, `internal/config/config_test.go`
   (`TestSeedIfAbsentNoClobber`), `ui/src/features/onboarding/OnboardingGate.test.tsx` (A12, A13),
-  `ui/src/features/onboarding/steps/BackendStep.test.tsx` (A14).
+  `ui/src/features/onboarding/steps/BackendStep.test.tsx` (A14), and
+  `ProjectsEditor.test.tsx` "shows archived state and restores the project from Settings".

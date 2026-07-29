@@ -21,7 +21,7 @@ export function LaunchStep({ onDone, initialProject, claimMutation, releaseMutat
   const pushError = useUiStore((state) => state.pushError);
 
   const roleEntries = Object.entries(rolesData ?? {});
-  const projectEntries = Object.entries(projectsData ?? {});
+  const projectEntries = Object.entries(projectsData ?? {}).filter(([, project]) => !project.archived);
 
   const defaultBackendId =
     Object.entries(backendsData?.backends ?? {}).find(([, b]) => b.default)?.[0] ??
@@ -29,7 +29,9 @@ export function LaunchStep({ onDone, initialProject, claimMutation, releaseMutat
     "";
 
   const defaultRole = roleEntries.find(([id]) => id === "implementer")?.[0] ?? roleEntries[0]?.[0] ?? "";
-  const defaultProject = initialProject ?? projectEntries[0]?.[0] ?? "";
+  const defaultProject = (initialProject && projectsData?.[initialProject] && !projectsData[initialProject].archived)
+    ? initialProject
+    : projectEntries[0]?.[0] ?? "";
 
   const [role, setRole] = useState(defaultRole);
   const [project, setProject] = useState(defaultProject);
@@ -48,6 +50,10 @@ export function LaunchStep({ onDone, initialProject, claimMutation, releaseMutat
     if (initialProject) setProject(initialProject);
     else if (projectEntries.length > 0) setProject(projectEntries[0][0]);
   }, [projectEntries.length, initialProject]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (project && projectsData && (!projectsData[project] || projectsData[project].archived)) setProject("");
+  }, [project, projectsData]);
 
   const handleLaunch = () => {
     if (claimMutation && !claimMutation()) return;

@@ -151,9 +151,11 @@ allowlist, so new or unknown runtime-state files are not copied. A missing sourc
 non-fatal skip; an unsafe or uncopyable selected asset fails the process start before spawn. The
 profile destination must be a real directory and a canonical source/destination overlap is rejected
 before mutation. Regular setup copies are owner-only while retaining a source owner-execute bit for
-executable setup assets. The helper stages all selected entries and its managed-path manifest as one
-generation, publishes it transactionally, and holds its serial guard through child process creation;
-an error at any stage retains the previous profile and manifest. The assumptions that the
+executable setup assets. The helper stages all selected entries and its managed-path manifest before
+publication, and holds its serial guard through child process creation so every new child receives a
+completed refresh. Existing children share this profile and may observe a selected setup entry being
+replaced during a later refresh; publication does not promise a snapshot-atomic view to those running
+children. An error at any stage retains the previous profile and manifest. The assumptions that the
 packaged `codex-acp` honors `CODEX_HOME` for its rollout store, recognizes the refreshed setup, and
 resumes against a non-default home are external-CLI compatibility gates (INV §12) confirmed by
 credentialed acceptance before a release claims isolation, extending R11. Fake-ACP tests assert the

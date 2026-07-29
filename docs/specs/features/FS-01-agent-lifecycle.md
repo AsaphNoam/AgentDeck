@@ -51,7 +51,7 @@ orphaned processes.
   restored by resume (R11), carried by clone (R9), and changeable on a running agent through switch
   runtime (R13) under the same native-resume versus primer rules a model swap follows.
 
-- **R31 — (planned).** A **stopped** agent is an inactive, non-archived agent whose project is
+- **R31.** A **stopped** agent is an inactive, non-archived agent whose project is
   active: it remains visible on that project dashboard, retains its final live-status outcome, and
   can Resume under R10. Stopping never hides an agent from dashboard supervision. Individual agent
   archival removes only that agent; project archival archives every agent in the project (FS-05.R32–
@@ -217,7 +217,7 @@ transitions:
   running agent with history preserved. *Verify by* launch/CLI parity tests, switch-runtime tests,
   `NewAgentModal.test.tsx`, and the chat/archive header UI tests.
 
-- **A15 — (planned).** Stopping an agent leaves it visible and resumable on its project dashboard;
+- **A15.** Stopping an agent leaves it visible and resumable on its project dashboard;
   its final status and stable identity survive restart. — lifecycle/dashboard regressions; J5, J7,
   J12.
 
@@ -250,6 +250,7 @@ transitions:
 - Launch compose + rollback: `internal/server/launch.go` (`composeLaunch`, `handleLaunch`,
   `teardownAgentRegistration`, `reapOrphanRuntime`).
 - Resume: `internal/server/resume.go` (`handleResume`, `composeResumeSpec`).
+- Archive transition coordination: `internal/server/archive_gate.go`; `TestAgentArchiveClaimBlocksConcurrentResume`.
 - Switch + rollback + matrix: `internal/server/switch.go` (`handleSwitchRuntime`, `rollbackSwitch`,
   `validateSwitchTarget`), `internal/server/terminal.go` (`terminalSupported`).
 - Stop/cancel/rename/clone + orphan reap: `internal/server/sessions.go`, `internal/server/groups.go`,

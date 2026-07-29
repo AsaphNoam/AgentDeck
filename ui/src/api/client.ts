@@ -1,4 +1,5 @@
-import type { AnnotationBatch, ArchiveResult, Capabilities, Layout, TrackedCommand, TrackedFile, TranscriptEvent } from "./types";
+import type { AnnotationBatch, ArchiveProjectGroup, ArchiveResult, Capabilities, Layout, TrackedCommand, TrackedFile, TranscriptEvent } from "./types";
+import type { ProjectResponse } from "../schemas/project";
 
 async function json<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init);
@@ -123,11 +124,24 @@ export function sendAnnotations(agentId: string, batch: AnnotationBatch) {
 export function searchArchive(q: string, limit = 50, offset = 0, signal?: AbortSignal) {
   const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
   if (q) params.set("q", q);
-  return json<{ query: string; search_mode: "full_text" | "metadata"; total: number; limit: number; offset: number; results: ArchiveResult[] }>(
+  return json<{ query: string; search_mode: "full_text" | "metadata"; total: number; limit: number; offset: number; results: ArchiveProjectGroup[] }>(
     `/api/archive?${params}`,
     { signal },
   );
 }
+
+export function searchArchiveProject(project: string, q: string, limit = 50, offset = 0, signal?: AbortSignal) {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (q) params.set("q", q);
+  return json<{ search_mode: "full_text" | "metadata"; total: number; limit: number; offset: number; results: ArchiveResult[] }>(`/api/archive/projects/${encodeURIComponent(project)}?${params}`, { signal });
+}
+
+export function archiveAgent(agentId: string) { return json<unknown>(`/api/sessions/${agentId}/archive`, { method: "POST" }); }
+export function restoreAgent(agentId: string) { return json<unknown>(`/api/sessions/${agentId}/restore`, { method: "POST" }); }
+export function archiveProject(project: string) {
+  return json<{ project: ProjectResponse; stopped_agent_ids: string[]; archived_agent_ids: string[] }>(`/api/projects/${encodeURIComponent(project)}/archive`, { method: "POST" });
+}
+export function restoreProject(project: string) { return json<ProjectResponse>(`/api/projects/${encodeURIComponent(project)}/restore`, { method: "POST" }); }
 
 export function resumeAgent(agentId: string) {
   return json<{ agent: unknown; running: unknown; status: unknown; resumed: boolean }>(

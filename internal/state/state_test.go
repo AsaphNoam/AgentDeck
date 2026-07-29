@@ -120,8 +120,8 @@ func TestOpenMigratesAndConfiguresSQLite(t *testing.T) {
 	if err := st.DB().QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil {
 		t.Fatalf("schema_migrations version: %v", err)
 	}
-	if version != 10 {
-		t.Fatalf("migration version = %d, want 10", version)
+	if version != 11 {
+		t.Fatalf("migration version = %d, want 11", version)
 	}
 }
 
@@ -152,8 +152,8 @@ func TestOpenIsIdempotentAndPreservesRows(t *testing.T) {
 	if err := reopened.DB().QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatalf("count migration: %v", err)
 	}
-	if count != 10 {
-		t.Fatalf("migration version rows = %d, want 10", count)
+	if count != 11 {
+		t.Fatalf("migration version rows = %d, want 11", count)
 	}
 }
 

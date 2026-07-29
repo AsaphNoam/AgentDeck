@@ -130,7 +130,7 @@ unrecognized runtime entries. The personal `CODEX_HOME` is never a writable dest
 source symlink is created. The setup mirror is refreshed before each child start, not watched
 continuously; a failed refresh retains the previous published profile and manifest.
 
-**R20 — (planned).** Archive state is durable at its owning boundary. A project JSON gains
+**R20.** Archive state is durable at its owning boundary. A project JSON gains
 `archived: false` by default; an absent key in an existing hand-edited file decodes as false. A
 forward-only SQLite migration adds `agents.archived INTEGER NOT NULL DEFAULT 0` plus the project/
 archive lookup index; an agent's archive flag is authoritative for its inclusion in Archive and is
@@ -202,6 +202,8 @@ R1–R20 and must be reflected here when its contract changes.
 - Codex isolated profile: `internal/config` profile-refresh helper; child-env composition in
   `internal/server/{launch,resume,switch}.go`; process spawn in `internal/runtime/chat.go`.
 - Schema/migrations: `internal/state/migrate.go`, `schema.go`, `state.go`, `running.go`, `session.go`.
+- Archive persistence and compensation: `internal/state/agents.go`
+  (`SetAgentsArchived`, `RestoreAgentArchiveStates`), `internal/server/archive_actions.go`.
 - Transcript: `internal/transcript/writer.go`, `reader.go`; runtime append in
   `internal/runtime/chat.go`.
 - Index/archive: `internal/index/indexer.go`, `reindex.go`, `internal/archive/archive.go`.

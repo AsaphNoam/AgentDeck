@@ -242,7 +242,10 @@ func writePipelineValidation(w http.ResponseWriter, diagnostics []pipeline.Diagn
 
 func writePipelineError(w http.ResponseWriter, err error) {
 	var controlled *pipeline.ControlError
+	var gate *pipeline.ProjectGateError
 	switch {
+	case errors.As(err, &gate):
+		writeAPIError(w, apiError(gate.Code, gate.Message))
 	case errors.As(err, &controlled):
 		code := runtime.CodeValidation
 		if controlled.Code == "revision_conflict" || controlled.Code == "request_conflict" || controlled.Code == "stale_assignment" || controlled.Code == "invalid_state" {

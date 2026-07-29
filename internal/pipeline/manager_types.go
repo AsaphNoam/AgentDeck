@@ -49,12 +49,22 @@ type StageExecution struct {
 //   - capabilities: ValidateStage rejects non-chat/unknown selections;
 //   - teardown: StopStage uses generation-scoped ordinary cleanup.
 type Lifecycle interface {
+	AcquirePipelineStart(context.Context, string) (func(), error)
 	ValidateStage(context.Context, StageExecution) error
 	LaunchStage(context.Context, StageExecution) error
 	ContinueStage(context.Context, StageExecution) error
 	StopStage(context.Context, string) error
 	IsRunning(string) bool
 }
+
+// ProjectGateError preserves the lifecycle gate's public conflict vocabulary
+// without teaching the durable pipeline package about HTTP or server internals.
+type ProjectGateError struct {
+	Code    string
+	Message string
+}
+
+func (e *ProjectGateError) Error() string { return e.Code + ": " + e.Message }
 
 type Publisher interface {
 	PublishPipelineUpdate(PipelineUpdate)

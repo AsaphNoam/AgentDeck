@@ -7,7 +7,7 @@ import { ContextBar } from "./ContextBar";
 import { StateBadge } from "./StateBadge";
 import { useUiStore } from "../../store/uiStore";
 
-export function AgentCard({ agent, lastLine, projectColor, projectTitle }: { agent: AgentState; lastLine?: string; projectColor?: [number, number, number]; projectTitle?: string }) {
+export function AgentCard({ agent, lastLine, projectColor, projectTitle, showProject = true }: { agent: AgentState; lastLine?: string; projectColor?: [number, number, number]; projectTitle?: string; showProject?: boolean }) {
   const navigate = useNavigate();
   const openContextMenu = useUiStore((state) => state.openContextMenu);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: agent.agent_id });
@@ -48,9 +48,7 @@ export function AgentCard({ agent, lastLine, projectColor, projectTitle }: { age
         <strong data-slot="identity">{agent.name}</strong>
         <StateBadge state={agent.state} />
       </div>
-      <p className="agent-subtitle" data-slot="metadata">
-        {agent.role} · {projectLabel}
-      </p>
+      <p className="agent-subtitle" data-slot="metadata">{showProject ? `${agent.role} · ${projectLabel}` : agent.role}</p>
       <span className="model-pill">
         {agent.backend} · {agent.model}
       </span>

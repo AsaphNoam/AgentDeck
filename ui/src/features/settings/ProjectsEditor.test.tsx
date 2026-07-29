@@ -46,6 +46,31 @@ describe("ProjectsEditor", () => {
   it("renders existing projects from GET /api/projects", async () => {
     renderWithQuery(<ProjectsEditor />);
     expect(await screen.findByText("My App")).toBeInTheDocument();
+    expect(screen.getByText("Active")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
+  });
+
+  it("shows archived state and restores the project from Settings", async () => {
+    let restoreCalls = 0;
+    server.use(
+      http.get("/api/projects", () => HttpResponse.json({
+        "my-app": {
+          title: "My App", color: [100, 180, 255], cwd: "/tmp/my-app", add_dirs: [], context_prompt: "",
+          archived: true,
+        },
+      })),
+      http.post("/api/projects/my-app/restore", () => {
+        restoreCalls += 1;
+        return HttpResponse.json({
+          project: "my-app", title: "My App", color: [100, 180, 255], cwd: "/tmp/my-app", add_dirs: [], context_prompt: "", archived: false,
+        });
+      }),
+    );
+
+    renderWithQuery(<ProjectsEditor />);
+    expect(await screen.findByText("Archived")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+    await waitFor(() => expect(restoreCalls).toBe(1));
   });
 
   it("create project invalidates query so new project appears", async () => {

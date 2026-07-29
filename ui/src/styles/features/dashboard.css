@@ -369,4 +369,11 @@
 .context-menu hr {
   margin: var(--ad-space-1) 0;
 }
+.project-dashboard { display: grid; gap: var(--ad-space-4); }
+.project-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: var(--ad-space-4); }
+.project-card { position: relative; display: grid; gap: var(--ad-space-2); padding: var(--ad-space-4); border: var(--ad-border-thin) solid var(--ad-border-strong); border-radius: var(--ad-radius-large); cursor: pointer; }
+.project-card-color { inline-size: var(--ad-space-4); block-size: var(--ad-space-4); border-radius: var(--ad-radius-round); border: var(--ad-border-thin) solid var(--ad-border-strong); }
+.project-card-actions { display: flex; flex-wrap: wrap; gap: var(--ad-space-2); }
+.project-card.unavailable { opacity: .75; }
+.project-route-state { display: grid; gap: var(--ad-space-4); }
 }

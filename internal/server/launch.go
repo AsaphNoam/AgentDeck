@@ -88,6 +88,10 @@ func normalizeAgentName(raw string, optional bool) (string, *runtime.APIError) {
 // launchAgent is the shared lifecycle service used by manual HTTP and pipeline
 // stages. It owns identity persistence, registry launch, and full rollback.
 func (s *Server) launchAgent(ctx context.Context, req launchRequest, options launchOptions) (sessionResponse, *runtime.APIError) {
+	if ae := s.acquireProjectStart(req.Project); ae != nil {
+		return sessionResponse{}, ae
+	}
+	defer s.releaseProjectStart(req.Project)
 	// Resolve config + defaults; validate (§6.1 step 1, §6.5).
 	spec, agent, ae := s.composeLaunchWithOptions(ctx, req, options)
 	if ae != nil {
@@ -167,6 +171,9 @@ func (s *Server) composeLaunchWithOptions(ctx context.Context, req launchRequest
 	project, err := s.configStore.ReadProject(req.Project)
 	if err != nil {
 		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeValidation, "unknown project: "+req.Project)
+	}
+	if project.Archived {
+		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeProjectArchived, "project is archived; restore it before launching an agent")
 	}
 
 	backends, err := s.configStore.ReadBackends()

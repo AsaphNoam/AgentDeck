@@ -58,6 +58,19 @@ func (s *Server) handleSwitchRuntime(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError(runtime.CodeNotFound, "no such agent: "+id))
 		return
 	}
+	if agent.Archived {
+		writeAPIError(w, apiError(runtime.CodeAgentArchived, "agent is archived"))
+		return
+	}
+	if project, err := s.configStore.ReadProject(agent.Project); err == nil && project.Archived {
+		writeAPIError(w, apiError(runtime.CodeProjectArchived, "project is archived"))
+		return
+	}
+	if ae := s.acquireAgentStart(agent.Project, id); ae != nil {
+		writeAPIError(w, ae)
+		return
+	}
+	defer s.releaseAgentStart(agent.Project, id)
 
 	// Compute the target identity (merge requested fields over current).
 	target := agent

@@ -44,6 +44,20 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError(runtime.CodeNotFound, "no such agent: "+id))
 		return
 	}
+	project, err := s.configStore.ReadProject(agent.Project)
+	if err == nil && project.Archived {
+		writeAPIError(w, apiError(runtime.CodeProjectArchived, "project is archived; restore it before resuming"))
+		return
+	}
+	if agent.Archived {
+		writeAPIError(w, apiError(runtime.CodeAgentArchived, "agent is archived; restore it before resuming"))
+		return
+	}
+	if ae := s.acquireAgentStart(agent.Project, id); ae != nil {
+		writeAPIError(w, ae)
+		return
+	}
+	defer s.releaseAgentStart(agent.Project, id)
 
 	// 2. Running row present → 409 conflict (resume is for inactive sessions).
 	// A non-ErrNotFound error means the DB read itself failed; do NOT fall through

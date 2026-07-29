@@ -41,7 +41,7 @@ product boundaries in §6.
   for the same reason backend and model do — it is a run-time assignment, not stage semantics — and
   each stage's resolved effort is frozen into the run snapshot and shown in run supervision beside
   its effective backend and model.
-- **R32 — (planned).** Archiving a project stops every active pipeline run for that project before
+- **R32.** Archiving a project stops every active pipeline run for that project before
   its agents are archived. The stopped run remains durable but cannot Continue, Retry, or launch a
   replacement stage agent while the project is archived; restoring the project does not restart a
   run automatically.
@@ -262,7 +262,7 @@ product boundaries in §6.
   pipeline run-start validation tests, a manager test starting a run with per-stage efforts, and the
   Pipelines run-setup/supervision UI tests.
 
-- **A12 — (planned).** Archiving a project with an active pipeline stops the run before archiving its
+- **A12.** Archiving a project with an active pipeline stops the run before archiving its
   stage agent; no later pipeline recovery or control starts an agent while the project is archived. —
   pipeline/project-archive integration regressions; J14.
 
@@ -312,3 +312,5 @@ a separate cross-backend launch capability.
 - Primary regression anchors: `internal/pipeline/{templates,manager}_test.go`,
   `internal/state/pipelines_test.go`, `internal/messaging/pipeline_tools_test.go`,
   `internal/server/pipeline_handlers_test.go`, and `ui/src/api/{pipelines,sse}.test.ts`.
+- Archive containment: `internal/pipeline/manager_test.go`
+  `TestStartRejectsProjectArchiveClaimBeforeDurableMutation`; `internal/server/archive_gate_test.go`.

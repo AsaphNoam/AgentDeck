@@ -146,8 +146,9 @@ func refreshCodexProfile(profileDir string) error {
 	}
 
 	// 2. Publish the staged generation into the live profile and prune stale
-	//    managed copies. Each managed entry is swapped atomically so a running
-	//    child never observes a half-written or missing setup asset.
+	//    managed copies. Publication is serialized with child creation, so each
+	//    new child receives a completed refresh. Existing children must tolerate
+	//    a setup entry changing while a later child refreshes this shared profile.
 	prior := readCodexManifest(manifestPath)
 	if err := publishCodexGeneration(stagingDir, profileDir, manifestPath, managed, prior.Managed); err != nil {
 		return err

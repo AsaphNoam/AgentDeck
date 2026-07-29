@@ -77,7 +77,7 @@ Catalog-level capability (which levels a model declares, and whether a level is 
 in `internal/config` beside the existing backend/model validator, so the pipeline manager and the
 HTTP handlers share one authority rather than each checking the catalog themselves.
 
-**R13 — (planned).** Archive/restore is one server-owned lifecycle service, not an HTTP handler
+**R13.** Archive/restore is one server-owned lifecycle service, not an HTTP handler
 calling another handler or a UI-side sequence of Stop and config writes. One server-owned transition
 gate serializes archive/restore per project and per agent. Every path that can start a process —
 launch, clone, resume, switch-runtime, pipeline start/Continue/Retry/recovery, and builder launch —
@@ -150,4 +150,6 @@ type Runtime interface {
 - Sole-writer state: `internal/state/*`, token validation in `internal/state/manager.go`, reconcile
   fallback `internal/server/reconcile.go`.
 - Event flow: `internal/server/hook.go`, `internal/server/sse.go`, `internal/bus/bus.go` (`SubscribeWithSnapshot`).
+- Archive transition gate: `internal/server/archive_gate.go`, `archive_actions.go`, and
+  `archive_gate_test.go` (project reservation and agent/project transition barriers).
 - Regression anchors: `TestSwitchRuntimeKeepsTargetRegistration`, `TestCrashTearsDownAgentRegistration`, `TestSessionParamsOmitModelWhenInherited`.

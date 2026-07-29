@@ -156,4 +156,6 @@
   border-color: var(--ad-action-secondary);
   color: var(--ad-action-secondary);
 }
+.archive-project-group { display: grid; gap: var(--ad-space-2); }
+.archive-project-group > h2 { display: flex; justify-content: space-between; gap: var(--ad-space-2); font-size: 1rem; }
 }

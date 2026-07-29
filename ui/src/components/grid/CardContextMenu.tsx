@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { launchAgent, renameAgent, resumeAgent, stopAgent, switchRuntime, updateAgentIdentity } from "../../api/client";
+import { archiveAgent, launchAgent, renameAgent, resumeAgent, stopAgent, switchRuntime, updateAgentIdentity } from "../../api/client";
 import { useAgentStore } from "../../store/agentStore";
 import { useUiStore } from "../../store/uiStore";
 
@@ -128,6 +128,9 @@ export function CardContextMenu() {
         }}
       >
         Move to group
+      </button>
+      <button type="button" data-slot="item" onClick={() => { archiveAgent(agent.agent_id).catch((err) => pushError("Archive failed", err instanceof Error ? err.message : String(err))); close(); }}>
+        Archive
       </button>
       {agent.interface === "terminal" && (
         <button type="button" data-slot="item" onClick={() => { navigate(`/agent/${agent.agent_id}?tab=terminal`); close(); }}>

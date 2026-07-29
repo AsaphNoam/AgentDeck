@@ -10,6 +10,18 @@ import (
 )
 
 func (m *Manager) Reconcile(ctx context.Context, runID string) error {
+	// Recovery can call Reconcile without a user control method. Claim the
+	// project before a pending launch/resume transition is advanced so a project
+	// archive cannot observe and stop an incomplete snapshot.
+	if run, err := m.store.ReadPipelineRun(runID); err != nil {
+		return err
+	} else if startsProcess(run.PendingAction) {
+		release, err := m.acquireProjectStart(ctx, run.Project)
+		if err != nil {
+			return err
+		}
+		defer release()
+	}
 	lock := m.runLock(runID)
 	lock.Lock()
 	defer lock.Unlock()
@@ -114,6 +126,15 @@ func (m *Manager) Reconcile(ctx context.Context, runID string) error {
 		}
 	}
 	return fmt.Errorf("pipeline: reconcile step limit reached for %s", runID)
+}
+
+func startsProcess(action string) bool {
+	switch action {
+	case "launch_stage", "launching_stage", "resume_blocked", "resuming_blocked", "retry_stop_agent", "retry_stopping_agent":
+		return true
+	default:
+		return false
+	}
 }
 
 func (m *Manager) reconcileLaunch(ctx context.Context, run state.PipelineRunRecord) error {

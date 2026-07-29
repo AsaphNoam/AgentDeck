@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { getTranscript, resumeAgent } from "../../api/client";
+import { getTranscript, restoreAgent, resumeAgent } from "../../api/client";
 import { useTranscriptStore } from "../../store/transcriptStore";
 import { useAgentStore } from "../../store/agentStore";
 import { TranscriptView } from "../../components/chat/TranscriptView";
@@ -39,6 +39,18 @@ export function ArchiveAgentPage() {
     }
   };
 
+  const doRestore = async () => {
+    setResuming(true);
+    setError(null);
+    try {
+      await restoreAgent(id);
+      navigate(`/project/${agent?.project ?? project}`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Restore failed");
+      setResuming(false);
+    }
+  };
+
   return (
     <section className="chat-panel" data-ui="agent-workspace" data-state="archived" data-variant="chat">
       <header className="chat-header" data-slot="header">
@@ -55,9 +67,9 @@ export function ArchiveAgentPage() {
           type="button"
           className="resume-btn"
           disabled={resuming}
-          onClick={() => void doResume()}
+          onClick={() => void (agent?.archived ? doRestore() : doResume())}
         >
-          {resuming ? "Resuming…" : "Resume"}
+          {resuming ? (agent?.archived ? "Restoring…" : "Resuming…") : agent?.archived ? "Restore" : "Resume"}
         </button>
       </header>
       {error && <p className="archive-error">{error}</p>}

@@ -126,7 +126,7 @@ bracketed provider model string each name their field and reason rather than ret
 (INV §8 — the class the onboarding `HTTP 400` findings came from). No new route is added, so every
 path continues to inherit the `localOnly` guard unchanged (INV §14).
 
-**R20 — (planned).** Project and agent archive use explicit action routes rather than overloading
+**R20.** Project and agent archive use explicit action routes rather than overloading
 ordinary project replacement or Stop: `POST /api/projects/{project}/archive`, `POST
 /api/projects/{project}/restore`, `POST /api/sessions/{id}/archive`, and `POST
 /api/sessions/{id}/restore`. Project archive returns the updated project plus stopped/archived agent
@@ -194,6 +194,8 @@ integers instead of silently applying defaults.
 - Errors/middleware: `internal/server/apierror.go`, `middleware.go`, `security.go`.
 - SSE/bus: `internal/server/sse.go`, `internal/bus/bus.go`, `ui/src/api/sse.ts`.
 - Terminal upgrade: `internal/server/terminal.go`.
+- Archive action and grouped query routes: `internal/server/{archive,archive_actions}.go`,
+  `ui/src/api/client.ts`; `TestArchiveProjectRespondsWithActionLists`.
 - Regression anchors: `TestUnknownAPIPath404`, `TestStartShutsDownWithOpenSSEClient`,
   `TestDNSRebindingHostRejected`, `TestCrossOriginRequestRejected`, SSE reconnect tests in
   `ui/src/api/sse.test.ts`.

@@ -24,6 +24,7 @@ type Project struct {
 	Cwd           string   `json:"cwd"`      // "~/Projects/my-app"
 	AddDirs       []string `json:"add_dirs"` // extra accessible directories
 	ContextPrompt string   `json:"context_prompt"`
+	Archived      bool     `json:"archived"`
 }
 
 // ---- Backend config: backends.json (PRD §3.4), version 2 ----

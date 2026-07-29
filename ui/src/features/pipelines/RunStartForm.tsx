@@ -71,8 +71,12 @@ export function RunStartForm({
 
   useEffect(() => {
     if (project || !config.data?.default_project) return;
-    if (projects.data?.[config.data.default_project]) setProject(config.data.default_project);
+    if (projects.data?.[config.data.default_project] && !projects.data[config.data.default_project].archived) setProject(config.data.default_project);
   }, [config.data?.default_project, project, projects.data]);
+
+  useEffect(() => {
+    if (project && projects.data && (!projects.data[project] || projects.data[project].archived)) setProject("");
+  }, [project, projects.data]);
 
   useEffect(() => {
     if (!template || proposal) return;
@@ -132,7 +136,8 @@ export function RunStartForm({
 
   const requiredMissing = template?.inputs.some((input) => input.required && !inputs[input.name]?.trim()) ?? true;
   const assignmentsMissing = template?.stages.some((stage) => !assignments[stage.id]?.backend || !assignments[stage.id]?.model) ?? true;
-  const cannotStart = !template || !project || !goal.trim() || requiredMissing || assignmentsMissing || start.isPending;
+  const projectAvailable = Boolean(project && projects.data?.[project] && !projects.data[project].archived);
+  const cannotStart = !template || !projectAvailable || !goal.trim() || requiredMissing || assignmentsMissing || start.isPending;
 
   return (
     <section className="pipeline-panel pipeline-run-start">
@@ -150,7 +155,7 @@ export function RunStartForm({
         <label className="form-field"><span>Run display name</span><input value={displayName} placeholder={template?.title || "Delivery run"} onChange={(event) => { edit(); setDisplayName(event.target.value); }} /></label>
         <label className="form-field"><span>Project</span><select value={project} onChange={(event) => { edit(); setProject(event.target.value); }}>
           <option value="">Select project</option>
-          {Object.entries(projects.data ?? {}).map(([projectID, item]) => <option key={projectID} value={projectID}>{item.title} ({projectID})</option>)}
+          {Object.entries(projects.data ?? {}).filter(([, item]) => !item.archived).map(([projectID, item]) => <option key={projectID} value={projectID}>{item.title} ({projectID})</option>)}
         </select></label>
       </div>
       <label className="form-field"><span>Run goal</span><textarea rows={3} value={goal} onChange={(event) => { edit(); setGoal(event.target.value); }} /></label>

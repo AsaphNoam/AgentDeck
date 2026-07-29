@@ -4,6 +4,17 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-29 — Fix: project dashboard and grouped Archive
+
+The project-first dashboard and grouped Archive are complete. Archive and restore now safely handle
+concurrent starts, restarted processes, rollback, pipeline work, and large result sets; project
+cards, Settings, and launch choices now stay in sync with archive state. The old flat Archive rules
+were retired so the documentation matches the shipped experience.
+
+**Needs attention:** None.
+
+**Next:** An independent review can assess the completed change before future work begins.
+
 ### 2026-07-29 — Re-review: project dashboard and grouped Archive
 
 The second pass found that the first review materially understated the risk. Seven dashboard issues

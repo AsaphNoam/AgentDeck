@@ -1,6 +1,6 @@
 # FS-05 — Session archive, search, resume & tracking
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/archive/`, `internal/index/`, `internal/state/` (sessions, tracked_files, tracked_commands), `internal/server/` (`archive.go`, `resume.go`, `files_commands.go`, `sessions.go`), `ui/src/features/archive/`, `ui/src/components/chat/{FilesTab,CommandsTab}.tsx` · **Journeys:** J7, J8
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -20,17 +20,11 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 
 ### 2.1 Archive listing
 
-- **R1.** `GET /api/archive` returns every session AgentDeck has recorded — both currently-running
-  and stopped — as a `results` array with `total`, `limit`, and `offset`. Each result carries
-  `agent_id`, `name`, `role`, `project`, `backend`, `model`, `interface`, optional `group`,
-  `created_at`, `updated_at`, `turn_count`, `files_touched`, `commands_run`, and `active` (true iff
-  the agent currently has a running row).
-- **R2.** With no `q`, results are ordered by `updated_at` descending, then `agent_id` — most
-  recently active first. `total` is the full count of matching sessions, independent of the returned
-  page.
-- **R3.** The `active` query parameter filters the listing: `active=true` returns only running
-  sessions, `active=false` only stopped ones, absent returns both. Any other value is rejected
-  `422 validation`.
+- **R1 — retired 2026-07-29:** The flat all-session response is superseded by R36's project-grouped
+  response and its per-project agent rows.
+- **R2 — retired 2026-07-29:** Flat-row ordering is superseded by R36's group and agent-row ordering.
+- **R3 — retired 2026-07-29:** Flat-list active filtering is superseded by R36's all-session corpus
+  filtering before project grouping.
 - **R4.** `results` is always a JSON array, never `null`, including for an empty archive (an empty
   archive returns `{"total":0,...,"results":[]}`).
 
@@ -51,14 +45,12 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 
 ### 2.3 Result limits & pagination
 
-- **R10.** `GET /api/archive` accepts `limit` (default 50, valid range 1–200; out-of-range →
-  `422 validation`) and `offset` (default 0, must be ≥ 0; negative → `422 validation`). The archive
-  layer additionally clamps any limit above 200 down to 200. `total` always reports the full match
-  count so a client can page through with `offset`.
+- **R10 — retired 2026-07-29:** Flat-list paging is superseded by R36's independent group and
+  per-project agent paging; its limit validation remains part of the replacement contract.
 
 ### 2.4 Resume from archive
 
-- **R11.** `POST /api/sessions/{id}/resume` on an inactive session re-attaches a runtime under the
+- **R11.** `POST /api/sessions/{id}/resume` on an inactive, non-archived session re-attaches a runtime under the
   same stable `agent_id`, restoring the session from its frozen snapshot: `cwd`, `system_prompt`,
   `skip_permissions`, `add_dirs`, the last upstream session id (so the agent CLI continues the same
   logical conversation), and the frozen launch/federation config. Backend, model, and interface are
@@ -72,7 +64,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 
 ### 2.5 Archived transcript viewing
 
-- **R14.** An inactive session opens in a **read-only** archived view that renders its recorded
+- **R14.** An archived session opens in a **read-only** archived view that renders its recorded
   transcript (user prompts, assistant text, tool calls, tool results, file diffs, permission requests) via
   `GET /api/sessions/{id}/transcript`, with no composer and no ability to send a prompt. The view
   exposes a Resume control (R11). An `active` session instead opens the live chat panel (FS-03).
@@ -138,14 +130,8 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 - **R27.** Search accepts double-quoted phrases in `q` as single terms; unquoted
   whitespace separates terms. A phrase must occur inside one indexed document and therefore does not
   span completed turns or a separately flushed annotation boundary.
-- **R28.** The Archive UI initially requests at most 50 matching sessions and offers **Load more**
-  while the server's `total` exceeds the number rendered. Each activation requests the next page
-  with `offset` equal to the rendered count and appends it; changing the query resets to the first
-  page. A later-page failure keeps the already-rendered results visible and surfaces the error.
-  Because results are ordered by the mutable `updated_at`, a session touched between page requests
-  moves ahead of that offset. The UI therefore never renders a session twice, and a repeated row —
-  the evidence that the ordering shifted — makes it refetch the first page and add whatever moved
-  into it, so every matching session stays reachable.
+- **R28 — retired 2026-07-29:** The flat UI pager is superseded by R36's independent group and
+  per-project agent pagers, including their reordered-boundary recovery.
 - **R29.** The Archive search affordance states that all query terms must match within one session
   metadata record, transcript turn, or annotation and are not combined across turns. The search
   input is programmatically associated with that scope note, so an empty result does not imply that
@@ -160,7 +146,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   read-only state. The view obtains this identity from the transcript's existing
   `include_meta=true` session metadata rather than relying on live-agent state.
 
-- **R32 — (planned).** Agent archival is an explicit, reversible lifecycle action distinct from Stop.
+- **R32.** Agent archival is an explicit, reversible lifecycle action distinct from Stop.
   It requires no confirmation: a running agent is stopped first, then archived; a stopped agent is
   archived immediately. It removes only that agent from its active project dashboard, without
   changing its immutable identity, frozen session configuration, normalized transcript, search index,
@@ -168,14 +154,13 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   it stops every running agent in the project, archives every agent, and moves the project out of the
   active dashboard collection with the same preservation guarantees.
 
-- **R33 — (planned).** The Archive workspace is grouped by project, not a global flat agent list. It
+- **R33.** The Archive workspace is grouped by project, not a global flat agent list. It
   includes a project whenever the project is archived or it has at least one archived agent; beneath
   each project are its archived agents. Each project row reports its archived-agent count and whether
-  that project remains active on the main dashboard. The current `GET /api/archive` behavior in R1–R4
-  continues until this requirement ships; then an ordinary unfiltered Archive lists only archived
-  projects/agents, while R36 preserves all-session search and explicit active filtering.
+  that project remains active on the main dashboard. An ordinary unfiltered Archive lists only
+  archived projects/agents, while R36 preserves all-session search and explicit active filtering.
 
-- **R34 — (planned).** Restore is independent per agent and per project. Restoring an archived agent
+- **R34.** Restore is independent per agent and per project. Restoring an archived agent
   returns only that agent to its active project's dashboard in stopped state, after which it can
   Resume under FS-01.R10. An agent under an archived project cannot be restored or resumed; the
   project must be reactivated first. Restoring an archived project returns only the project to the
@@ -186,21 +171,21 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   archived, project restoration is required first and the request returns `409 project_archived`.
   After agent restoration, the ordinary stopped-agent dashboard/transcript exposes Resume under R14.
 
-- **R35 — (planned).** The Archive workspace's empty state explains that it contains archived agents
+- **R35.** The Archive workspace's empty state explains that it contains archived agents
   under their projects, while stopped agents remain on an active project's dashboard until archived.
   Project and agent search results are visibly grouped by their project, and an archived project with
   no individually restored agents remains distinguishable from an active project with archived agents.
 
-- **R36 — (planned).** Grouping replaces, rather than silently reinterprets, the flat collection
-  contract. On shipment, R1–R3, R10, and R28 are retired and superseded by this requirement; R4's
-  non-null `results` guarantee and R22's `active` validation remain binding.
+- **R36.** Grouping replaces, rather than silently reinterprets, the flat collection contract. R1–R3,
+R10, and R28 are retired and superseded by this requirement; R4's non-null `results` guarantee and
+R22's `active` validation remain binding.
 
   `GET /api/archive` returns `{results,total,limit,offset,search_mode}`, where `results` contains
   project groups, `total` counts matching groups, and `limit`/`offset` page groups with the same
   defaults, bounds, and validation currently stated by R10/R22. Groups order by current display
   title (case-insensitive), then durable project id. With neither `q` nor `active`, it returns every
   archived project plus every project with an archived agent. With a non-empty `q` or an explicit
-  `active`, it filters the complete recorded-session corpus under R3, R6, and R25–R27 before grouping;
+  `active`, it filters the complete recorded-session corpus under R6 and R25–R27 before grouping;
   this keeps active and ordinary stopped transcripts searchable even when their agents are not
   archived. A group may therefore exist only because a non-archived session matched.
 
@@ -211,20 +196,17 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   reports `active` and `archived`, every group reports `project_status` and the unfiltered
   `archived_agent_count`, and both endpoints always report `search_mode`. The UI pages project groups
   and each expanded project's agents independently, resets both levels when the query/filter changes,
-  labels non-archived hits by running/stopped state, and preserves R28's retry-visible error behavior.
+  labels non-archived hits by running/stopped state, and preserves retry-visible error behavior.
 
 ## 5. Acceptance criteria
 
-- **A1** (R1–R3) — Archive lists active and inactive sessions with metadata and honors the `active`
-  filter: `internal/archive/archive_test.go::TestArchiveListAndActiveFilter`,
-  `internal/server/server_test.go::TestArchiveListHandler`.
+- **A1 — retired 2026-07-29:** Flat archive listing acceptance is superseded by A19.
 - **A2** (R4, R21) — Empty archive/lists marshal as `[]`:
   `internal/archive/archive_no_fts5_test.go::TestEmptyArchiveMarshalsResultsArray`,
   `internal/server/files_commands_test.go::TestFilesEndpointEmptyList` and
   `TestCommandsEndpointEmptyList`.
-- **A3** (R8, R10, R25, R26) — FTS5 search matches metadata and transcript documents, sets
-  `matched_in`, and
-  paginates: `internal/archive/archive_fts_test.go::TestArchiveSearchFTSMetadataTranscriptAndPagination`.
+- **A3 — retired 2026-07-29:** Flat archive pagination acceptance is superseded by A19; FTS5
+  document matching remains covered by A11 and A19.
 - **A4** (R25, R27) — Multi-term AND search semantics within one document, including no match when
   terms are split across turns:
   `internal/archive/archive_fts_test.go::TestArchiveSearchANDSemantics` and
@@ -245,18 +227,13 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `TestHookCommandCapture`, `TestHookCommandCaptureMultiple`.
 - **A9** (R19) — Unknown-agent tracking requests 404:
   `internal/server/files_commands_test.go::TestFilesEndpointUnknownAgent`, `TestCommandsEndpointUnknownAgent`.
-- **A10** (R1, R11, R20, R25) — End-to-end archive + search + resume + tracking through the running UI
-  on both the FTS5 and untagged builds: journey **J8** (archive & search), **J7** (stop/resume/switch)
-  in `docs/features/USABILITY-REVIEW.md`.
+- **A10 — retired 2026-07-29:** The flat Archive journey acceptance is superseded by A19 and J8.
 - **A11** (R25–R27) — Indexing a later turn inserts a new transcript document without changing the
   earlier document, metadata replacement touches only the metadata document, annotations flush as
   independent documents, and archive pagination counts distinct sessions: focused regressions
   `TestTurnsAppendWithoutRewritingEarlierDocuments`, `TestReindexPreservesAnnotationFlushBoundary`,
   and `TestArchiveSearchCollapsesMatchingDocuments` under both SQLite build variants where applicable.
-- **A12** (R10, R28) — An Archive result set larger than one UI page exposes **Load more**, requests
-  the next `offset`, appends those sessions, and removes the control when all matching rows are
-  rendered; a 51-session set reordered between page requests still renders every session exactly
-  once: `ui/src/features/archive/ArchivePage.test.tsx`.
+- **A12 — retired 2026-07-29:** Flat Archive paging acceptance is superseded by A19.
 - **A13** (R25–R27, R29) — The Archive search input exposes the one-document/one-turn scope before
   and after an empty cross-turn query: `ui/src/features/archive/ArchivePage.test.tsx`.
 - **A14** (R6, R23, R30) — Tagged and untagged Archive responses report their effective search
@@ -266,30 +243,35 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   backend/model, creation date, and read-only state before Resume:
   `ui/src/features/archive/ArchiveAgentPage.test.tsx`.
 
-- **A16 — (planned).** Warning-confirmed project archival stops every running agent, removes the
+- **A16.** Warning-confirmed project archival stops every running agent, removes the
   project and every agent from the active dashboard, and preserves their configuration, transcript,
   search results, and tracking data across restart. A barrier regression pauses archival after its
   stop phase and proves a concurrent launch cannot register a new running row before commit. —
-  lifecycle/archive/dashboard regressions; J5, J7, J8, J12.
+  `TestArchiveAgentReapsLiveOrphanBeforeCommit`, `TestArchiveProjectConfigFailureRestoresMixedAgentFlags`,
+  `TestProjectArchiveReservesClaimBeforeWaitingForStart`; J5, J7, J8, J12.
 
-- **A17 — (planned).** Restoring an archived project returns only that project to the active dashboard;
+- **A17.** Restoring an archived project returns only that project to the active dashboard;
   restoring an archived agent returns only that agent as stopped, with the same identity and history.
   Before restore, its transcript shows Restore instead of Resume and a direct Resume returns
   `agent_archived`; after restore it can Resume. An agent under an archived project cannot restore or
-  resume until the project is reactivated and receives `project_archived`. — lifecycle/archive route
-  regressions; J7, J8.
+  resume until the project is reactivated and receives `project_archived`. —
+  `TestAgentArchiveClaimBlocksConcurrentResume`, `TestProjectArchiveWaitsForAgentRestoreTransition`,
+  lifecycle/archive route regressions; J7, J8.
 
-- **A18 — (planned).** The Archive workspace distinguishes an empty project archive from an active
+- **A18.** The Archive workspace distinguishes an empty project archive from an active
   dashboard containing stopped agents, lists archived agents beneath their project rather than in a
-  separate global collection, counts them, and marks a project that is still active. — archive/project-
-  dashboard UI regressions; J8.
+  separate global collection, counts them, and marks a project that is still active. —
+  `ArchivePage.test.tsx`, `ProjectDashboard.test.tsx`; J8.
 
-- **A19 — (planned).** The grouped API pages project groups and per-project agent rows independently,
+- **A19.** The grouped API pages project groups and per-project agent rows independently,
   keeps every list non-null, and reports group-versus-agent totals unambiguously. A full-text query
   finds a transcript-only hit from a stopped, non-archived agent and renders it under a project group
   that exists only because of that match; `active` filters the same all-session corpus and both
-  endpoints report `search_mode`. On shipment this supersedes A1, A3, A10, and A12; A2 remains the
-  non-null acceptance criterion. — archive API/index/UI regressions under both SQLite variants; J8.
+  endpoints report `search_mode`. It supersedes A1, A3, A10, and A12; A2 remains the non-null
+  acceptance criterion. — `TestGroupedArchivePagesPastTwoHundredSessions`,
+  `TestArchiveProjectRespondsWithActionLists`,
+  `ArchivePage.test.tsx` "reaches every agent when a per-project page is reordered" and
+  "loads the next result page using the rendered count as offset"; J8.
 
 ## 6. Deviations & open decisions
 

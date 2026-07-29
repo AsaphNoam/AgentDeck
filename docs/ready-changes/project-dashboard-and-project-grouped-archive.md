@@ -1,6 +1,6 @@
 # Project dashboard and project-grouped archive
 
-**State:** Waiting to start
+**State:** Finished
 **Why:** the human requested a project-first dashboard with project-grouped agent archive
 **Relevant requirements:** FS-01.R31/A15, FS-02.R29–R36/A15–A20, FS-04.R35–R36/A15–A16,
 FS-05.R32–R36/A16–A19, FS-14.R32/A12, TS-01.R13, TS-02.R20, TS-03.R18/R20, TS-09.R25,

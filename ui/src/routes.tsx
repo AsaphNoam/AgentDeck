@@ -1,12 +1,12 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import App from "./App";
-import { CardGrid } from "./components/grid/CardGrid";
 import { ChatPanel } from "./components/chat/ChatPanel";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { OnboardingGate } from "./features/onboarding/OnboardingGate";
 import { ArchivePage } from "./features/archive/ArchivePage";
 import { ArchiveAgentPage } from "./features/archive/ArchiveAgentPage";
 import { PipelinesPage } from "./features/pipelines/PipelinesPage";
+import { ProjectDashboard, ScopedProjectDashboard } from "./features/dashboard/ProjectDashboard";
 
 const developmentRoutes = import.meta.env.DEV
   ? [
@@ -25,7 +25,8 @@ export const router = createBrowserRouter([
     path: "/",
     element: <App />,
     children: [
-      { index: true, element: <OnboardingGate><CardGrid /></OnboardingGate> },
+      { index: true, element: <OnboardingGate><ProjectDashboard /></OnboardingGate> },
+	  { path: "project/:project", element: <ScopedProjectDashboard /> },
       { path: "agent/:id", element: <ChatPanel /> },
       { path: "archive", element: <ArchivePage /> },
       { path: "archive/:id", element: <ArchiveAgentPage /> },

@@ -246,6 +246,7 @@ type projectCreateBody struct {
 	Cwd           string   `json:"cwd"`
 	AddDirs       []string `json:"add_dirs"`
 	ContextPrompt string   `json:"context_prompt"`
+	Archived      bool     `json:"archived"`
 }
 
 func (b projectCreateBody) toProject() config.Project {
@@ -262,6 +263,7 @@ func (b projectCreateBody) toProject() config.Project {
 		Cwd:           b.Cwd,
 		AddDirs:       addDirs,
 		ContextPrompt: b.ContextPrompt,
+		Archived:      b.Archived,
 	}
 }
 
@@ -272,6 +274,7 @@ type projectPutBody struct {
 	Cwd           string   `json:"cwd"`
 	AddDirs       []string `json:"add_dirs"`
 	ContextPrompt string   `json:"context_prompt"`
+	Archived      bool     `json:"archived"`
 }
 
 func (b projectPutBody) toProject() config.Project {
@@ -285,6 +288,7 @@ func (b projectPutBody) toProject() config.Project {
 		Cwd:           b.Cwd,
 		AddDirs:       addDirs,
 		ContextPrompt: b.ContextPrompt,
+		Archived:      b.Archived,
 	}
 }
 
@@ -300,6 +304,7 @@ type projectResponse struct {
 	// immutable id, never stored in projects/{id}.json, and ignores any client value.
 	ResourceDir string              `json:"resource_dir"`
 	Warnings    []config.FieldError `json:"warnings,omitempty"`
+	Archived    bool                `json:"archived"`
 }
 
 func (s *Server) toProjectResponse(id string, p config.Project, warnings []config.FieldError) projectResponse {
@@ -316,6 +321,7 @@ func (s *Server) toProjectResponse(id string, p config.Project, warnings []confi
 		ContextPrompt: p.ContextPrompt,
 		ResourceDir:   s.projectResourceDir(id),
 		Warnings:      warnings,
+		Archived:      p.Archived,
 	}
 }
 
@@ -400,7 +406,8 @@ func (s *Server) handlePutProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// 404 if absent.
-	if _, err := s.configStore.ReadProject(id); err != nil {
+	existing, err := s.configStore.ReadProject(id)
+	if err != nil {
 		if errors.Is(err, config.ErrNotFound) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "not_found"})
 			return
@@ -409,6 +416,9 @@ func (s *Server) handlePutProject(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
+	// Archive/restore is a lifecycle transition with stop/compensation semantics;
+	// ordinary project edits must not bypass it.
+	proj.Archived = existing.Archived
 	if err := s.configStore.WriteProject(id, proj); err != nil {
 		s.log.Error("projects: write", "err", err)
 		writeAPIError(w, apiError("internal", "internal error"))
@@ -553,12 +563,19 @@ func (s *Server) computeOnboarding(ctx context.Context) onboardingBlock {
 		ob.Steps.Role = onboardingStep{Done: false, Detail: "no roles defined"}
 	}
 
-	// Project step: ≥1 project exists.
+	// Project step: ≥1 active project exists. Archived projects remain durable
+	// preferences, but cannot satisfy a setup that has no eligible launch target.
 	projects, err := s.configStore.ListProjects()
-	if err == nil && len(projects) > 0 {
-		ob.Steps.Project = onboardingStep{Done: true, Detail: fmt.Sprintf("%d projects", len(projects))}
+	activeProjects := 0
+	for _, project := range projects {
+		if !project.Archived {
+			activeProjects++
+		}
+	}
+	if err == nil && activeProjects > 0 {
+		ob.Steps.Project = onboardingStep{Done: true, Detail: fmt.Sprintf("%d active projects", activeProjects)}
 	} else {
-		ob.Steps.Project = onboardingStep{Done: false, Detail: "no projects defined"}
+		ob.Steps.Project = onboardingStep{Done: false, Detail: "no active projects defined"}
 	}
 
 	// Backend step: backends.json parses, version==2, default backend + model with ok creds.
@@ -714,9 +731,16 @@ func (s *Server) handlePutConfig(w http.ResponseWriter, r *http.Request) {
 	// Validate that referenced defaults exist (a dangling default would surface as
 	// a broken pre-selection in the launch modal / onboarding).
 	if body.DefaultProject != nil && *body.DefaultProject != "" {
-		if _, err := s.configStore.ReadProject(*body.DefaultProject); err != nil {
+		project, err := s.configStore.ReadProject(*body.DefaultProject)
+		if err != nil {
 			writeValidationError(w, &config.ValidationErrors{Errors: []config.FieldError{
 				{Field: "default_project", Code: "not_found", Message: "no such project: " + *body.DefaultProject},
+			}})
+			return
+		}
+		if project.Archived {
+			writeValidationError(w, &config.ValidationErrors{Errors: []config.FieldError{
+				{Field: "default_project", Code: "project_archived", Message: "default project is archived"},
 			}})
 			return
 		}
