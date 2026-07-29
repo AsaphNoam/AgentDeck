@@ -6,7 +6,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
-- **Active change:** None.
+- **Active change:** [`project-dashboard-and-project-grouped-archive.md`](../ready-changes/project-dashboard-and-project-grouped-archive.md).
 - **State:** AgentDeck-launched Codex agents now run in a private `CODEX_HOME`
   (`<agentdeck-home>/codex`, `0700`), composed as the final, reserved child-env layer in
   launch/resume/switch via `codexHomeEnv`/`composeEnv`, so their rollouts and native session index
@@ -56,12 +56,19 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   [`../archive/reviews/usability-review-run-2026-07-26-rerun.md`](../archive/reviews/usability-review-run-2026-07-26-rerun.md)
   and [`../archive/reviews/usability-review-run-2026-07-26-browser-retry.md`](../archive/reviews/usability-review-run-2026-07-26-browser-retry.md).
   Credentialed provider and terminal compatibility remain separate manual release gates.
-- **Last reviewed code:** `547ca43` (2026-07-28), the continuous range after `a574076`.
+- **Last reviewed code:** `dc04dbd` (2026-07-29), the continuous range after `547ca43` (the Codex
+  isolation fix `e021ce3` and the project-dashboard spec finalization), plus the uncommitted
+  project-dashboard/grouped-archive working tree implementing the active change.
 - **Branch:** `main`.
 
 ## Active change
 
-None. Agents do not choose future work for themselves.
+**State:** in progress
+
+Implement the project-first dashboard and project-grouped archive change. First map the existing
+project, archive, lifecycle, pipeline, API, persistence, and UI seams against the planned FS/TS
+requirements; then ship the shared archive transition, API/persistence, UI, focused regressions,
+and normal verification as complete pieces.
 
 ## Decisions needing your input
 
@@ -92,6 +99,42 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 ## Review findings
 
+- **Must fix** — INV §7 (also §10) — Grouped Archive truncates the corpus at 200 sessions.
+  `internal/server/archive.go` `archiveRows` always fetches `Limit=200, Offset=0` from
+  `persistarchive.Search`, then derives project groups, per-project agent rows, and every
+  `total`/`offset` from that fixed slice. With more than 200 recorded (or archived) sessions the
+  per-project agent lists and `q`/`active` search silently drop everything past the 200 boundary,
+  while a project's `archived_agent_count` (computed from the full agent table) still reports the
+  true number — so the count disagrees with the rows the UI can page to, and older archived agents
+  and transcript-only search hits become unreachable. Breaks FS-05.R36 ("filters the complete
+  recorded-session corpus", independent group/agent pagination) and A19. Fix: page the durable
+  query itself at both levels instead of grouping a capped in-memory slice; add a regression with
+  >200 sessions that reaches a beyond-page agent row.
+
+- **Worth fixing** — INV §10 — Archive **Load more** is hidden once groups exceed one page.
+  `ui/src/features/archive/ArchivePage.tsx` gates the control with
+  `Math.max(results.length, renderedAgentIDs(results).length) < total`, but the grouped `total`
+  counts project groups while `renderedAgentIDs` counts agent rows; once there are more than 50
+  groups and any group holds multiple agents, the agent-row count exceeds the group total and the
+  button never renders, stranding later group pages (FS-05.R36/A19). Fix: compare rendered group
+  count to the group `total` (`results.length < total`); add a >50-group paging test.
+
+- **Worth fixing** — INV §10 — Project cards omit spec'd surfaces.
+  `ui/src/features/dashboard/ProjectDashboard.tsx` renders only the title, an agent count, and a
+  bare Archive-on-right-click, but FS-02.R30 requires the project color and a live per-state summary
+  on each card, and FS-02.R34 requires the active-card menu to offer **Rename** and **Change color**
+  alongside **Archive**. As shipped, the (planned) R30/R34 behavior is unmet; implement it or record
+  a deviation before flipping those tags.
+
+- **Worth fixing** — INV §15 (also §5) — Codex profile publish is not the atomic swap it claims.
+  `internal/config/codexprofile.go` (~L291–313, `e021ce3`) publishes each managed setup entry by
+  `rename(dst→backup)` then `rename(staging→dst)`, so `dst` is briefly absent between the two
+  renames — contradicting the code's own comment that each entry is "swapped atomically so a running
+  child never observes a half-written or missing setup asset." A codex child already running under
+  the shared private `CODEX_HOME` that re-reads `config.toml`/`auth.json` during a subsequent child's
+  refresh could observe it missing. Low impact (newly started children run under the completed
+  publish); fix by renaming staged-over-existing in one step or softening the claim.
+
 - **Worth fixing** — (no invariant class) — SDD traceability for `0b6e793`, `ceef7ee`, `9f0dbde`,
   and `547ca43`: these commits ship Dashboard Resume, builder-project selection, transcript
   right-click behavior, and Codex profile isolation without a committed ready-change/active-change
@@ -108,6 +151,28 @@ are not promoted to findings without a repeatable failure.
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-29 — Reviewed the range after `547ca43` through `dc04dbd` plus the uncommitted project-
+  dashboard/grouped-archive working tree, in both specification directions and against every
+  invariant class. One Must-fix and four Worth-fixing findings are recorded above. **INV §7/§10**
+  caught the grouped Archive fetching a fixed 200-session slice and paginating the projection, so a
+  corpus over 200 sessions truncates per-project rows and search while the archived-agent count
+  still reports the true number (FS-05.R36/A19). **INV §10** caught the Archive **Load more** gate
+  comparing agent-row count to the group total (hidden past 50 groups) and the project cards missing
+  R30 color/per-state summary and R34 Rename/Change color actions. **INV §15/§5** caught the Codex
+  profile publish (`e021ce3`) claiming an atomic per-entry swap it does not perform. Clean/not
+  applicable elsewhere: §2 launch/resume/switch/pipeline all route project-start gating and archived
+  checks through the shared `launchAgent`/`composeChildEnv` seams and `codexHomeEnv` stays the final
+  env layer; §1 the scoped dashboard and archive lists derive from the live agent/project queries;
+  §3 the project archive bit is preserved across ordinary `PUT /api/projects` edits; §4/§5 the
+  project-start lease and `beginProjectArchive` form one atomic claim under `archiveMu` spanning
+  registry registration, and switch rollback tears down registration; §8 archive/restore actions
+  surface errors through the envelope and toasts; §11 every grouped/agent collection marshals
+  non-null; §13 all new dashboard/archive classNames resolve; §14 new routes inherit `localOnly`
+  and slug-validate the project path. The subagent-assisted `e021ce3` correctness pass found the
+  transaction/rollback, symlink safety, owner-only modes, prune scoping, switch ordering, and env
+  composition otherwise correct. `go build ./...`, the server/state/pipeline Go tests, and
+  `make check-specs` pass. No product code or specifications changed during review.
 
 - 2026-07-28 — Validated and fixed all nine specification-review findings in the waiting project-
   dashboard/grouped-Archive design; no product code changed. Stale confirmation deviations now record
