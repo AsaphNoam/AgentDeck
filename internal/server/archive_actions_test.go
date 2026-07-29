@@ -7,10 +7,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
@@ -116,6 +118,110 @@ func TestArchiveProjectRespondsWithActionLists(t *testing.T) {
 	second := archive()
 	if second.StoppedAgentIDs == nil || second.ArchivedAgentIDs == nil || len(second.StoppedAgentIDs) != 0 || len(second.ArchivedAgentIDs) != 0 {
 		t.Fatalf("repeated archive response lists = stopped %#v archived %#v", second.StoppedAgentIDs, second.ArchivedAgentIDs)
+	}
+}
+
+// TS-01.R13 / INV §5/§15: even an apparently idempotent agent Archive
+// participates in the transition claim. A concurrent Restore must finish
+// before Archive can re-read and decide whether it is a no-op.
+func TestIdempotentAgentArchiveDoesNotBypassRestoreClaim(t *testing.T) {
+	srv := testServer(t, true)
+	agent := state.Agent{
+		AgentID: "a_restore_race", Name: "Restore race", Role: "implementer",
+		Project: "my-app", Backend: "claude", Model: "sonnet", Interface: "chat",
+		CreatedAt: time.Now().UTC(), Archived: true,
+	}
+	if err := srv.stateStore.WriteAgent(agent); err != nil {
+		t.Fatal(err)
+	}
+
+	restoreEntered := make(chan struct{})
+	releaseRestore := make(chan struct{})
+	srv.setAgentsArchived = func(ids []string, archived bool) error {
+		if !archived {
+			close(restoreEntered)
+			<-releaseRestore
+		}
+		return srv.stateStore.SetAgentsArchived(ids, archived)
+	}
+	restoreDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		rec := httptest.NewRecorder()
+		srv.routes().ServeHTTP(rec, newLocalRequest(http.MethodPost, "/api/sessions/"+agent.AgentID+"/restore", nil))
+		restoreDone <- rec
+	}()
+	<-restoreEntered
+
+	rec := httptest.NewRecorder()
+	srv.routes().ServeHTTP(rec, newLocalRequest(http.MethodPost, "/api/sessions/"+agent.AgentID+"/archive", nil))
+	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), runtime.CodeAgentArchiving) {
+		t.Fatalf("competing archive = %d %s, want 409 %s", rec.Code, rec.Body.String(), runtime.CodeAgentArchiving)
+	}
+	close(releaseRestore)
+	if restored := <-restoreDone; restored.Code != http.StatusOK {
+		t.Fatalf("restore = %d %s", restored.Code, restored.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	srv.routes().ServeHTTP(rec, newLocalRequest(http.MethodPost, "/api/sessions/"+agent.AgentID+"/archive", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("archive retry = %d %s", rec.Code, rec.Body.String())
+	}
+	got, err := srv.stateStore.ReadAgent(agent.AgentID)
+	if err != nil || !got.Archived {
+		t.Fatalf("agent after archive retry = %+v err=%v", got, err)
+	}
+}
+
+// TS-01.R13 / INV §5/§15: an archived-project no-op is decided under the
+// project claim, so it cannot report success while Restore is clearing the
+// project flag.
+func TestIdempotentProjectArchiveDoesNotBypassRestoreClaim(t *testing.T) {
+	srv := testServer(t, true)
+	project, err := srv.configStore.ReadProject("my-app")
+	if err != nil {
+		t.Fatal(err)
+	}
+	project.Archived = true
+	if err := srv.configStore.WriteProject("my-app", project); err != nil {
+		t.Fatal(err)
+	}
+
+	restoreEntered := make(chan struct{})
+	releaseRestore := make(chan struct{})
+	srv.writeProject = func(id string, next config.Project) error {
+		if !next.Archived {
+			close(restoreEntered)
+			<-releaseRestore
+		}
+		return srv.configStore.WriteProject(id, next)
+	}
+	restoreDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		rec := httptest.NewRecorder()
+		srv.routes().ServeHTTP(rec, newLocalRequest(http.MethodPost, "/api/projects/my-app/restore", nil))
+		restoreDone <- rec
+	}()
+	<-restoreEntered
+
+	rec := httptest.NewRecorder()
+	srv.routes().ServeHTTP(rec, newLocalRequest(http.MethodPost, "/api/projects/my-app/archive", nil))
+	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), runtime.CodeProjectArchiving) {
+		t.Fatalf("competing archive = %d %s, want 409 %s", rec.Code, rec.Body.String(), runtime.CodeProjectArchiving)
+	}
+	close(releaseRestore)
+	if restored := <-restoreDone; restored.Code != http.StatusOK {
+		t.Fatalf("restore = %d %s", restored.Code, restored.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	srv.routes().ServeHTTP(rec, newLocalRequest(http.MethodPost, "/api/projects/my-app/archive", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("archive retry = %d %s", rec.Code, rec.Body.String())
+	}
+	got, err := srv.configStore.ReadProject("my-app")
+	if err != nil || !got.Archived {
+		t.Fatalf("project after archive retry = %+v err=%v", got, err)
 	}
 }
 

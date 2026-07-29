@@ -79,6 +79,9 @@ type Server struct {
 	// writeProject is the final project-config publication seam. Archive tests
 	// inject a failure here to verify exact SQLite compensation.
 	writeProject func(string, config.Project) error
+	// setAgentsArchived is the durable archive-flag seam. Transition tests block
+	// it to prove competing idempotent actions still join the exclusive claim.
+	setAgentsArchived func([]string, bool) error
 
 	// primerSummarizer is the one-shot target-backend summary seam for backend
 	// switches. The default implementation is gated until live CLI invocation is
@@ -174,6 +177,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		archiveChanged:     make(chan struct{}),
 		credCheck:          credcheck.Check,
 		writeProject:       cfgStore.WriteProject,
+		setAgentsArchived:  stateStore.SetAgentsArchived,
 		primerSummarizer:   defaultPrimerSummarizer,
 	}
 	s.pipelineTemplates = pipeline.NewTemplateStore(cfgStore)
