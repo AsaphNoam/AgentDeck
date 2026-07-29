@@ -17,9 +17,12 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   focused regressions passed but are not browser passes. Full record:
   [`../archive/reviews/usability-review-run-2026-07-29-project-archive.md`](../archive/reviews/usability-review-run-2026-07-29-project-archive.md).
   The same-day retry recovered native-confirmation interaction and passed browser project archive,
-  project/agent restore, a 55-agent per-project Archive page, archived-default launch exclusion, and
-  post-restart rendering. Only no-active-project onboarding, runtime switch, >50 project-group
-  paging, and active-pipeline archive remain unexercised in a browser.
+  project/agent restore, a 55-agent per-project Archive page, archived-default launch exclusion,
+  and post-restart rendering. A final retry passed no-active-project onboarding, 51-project
+  Archive paging, and archiving a project with a live pipeline (the run becomes stopped and the
+  archived project is unavailable to new runs). Runtime switch remains the only unexercised browser
+  journey: the current in-app browser rejects `window.prompt()` before it can render the three
+  inputs, so this is an automation limitation rather than a product finding.
 - **Previous transition context:** AgentDeck-launched Codex agents now run in a private `CODEX_HOME`
   (`<agentdeck-home>/codex`, `0700`), composed as the final, reserved child-env layer in
   launch/resume/switch via `codexHomeEnv`/`composeEnv`, so their rollouts and native session index

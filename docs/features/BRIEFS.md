@@ -4,6 +4,14 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-29 — Usability review: remaining project-archive journeys
+
+The remaining project-archive browser checks passed: with no active projects, onboarding directs the user to create a first project; Archive loads the 51st project group after the first 50; and archiving a project with a live pipeline stops the run and removes that project from new-run choices. No new user-facing issue was found. Runtime switch is still unconfirmed because this in-app browser rejects `prompt()` before showing its inputs; that is an automation limitation, not a product finding. The full record is in [the usability review report](../archive/reviews/usability-review-run-2026-07-29-project-archive.md).
+
+**Needs attention:** Re-run only the runtime-switch browser journey in a prompt-capable browser.
+
+**Next:** Treat the project-archive browser matrix as complete once that environment-specific check passes.
+
 ### 2026-07-29 — Usability review retry: project archive
 
 The browser retry completed the project-archive path: its warning is accepted, the project leaves the dashboard, Archive shows the project and its agents, and project then individual restore return the expected stopped agent. Archive also loaded the final rows of a 55-agent project, archived default projects disappeared from new-agent choices, and the checked state rendered unchanged after a restart. No new user-facing problem was found. The full record is in [the usability review report](../archive/reviews/usability-review-run-2026-07-29-project-archive.md).
