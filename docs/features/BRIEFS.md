@@ -4,6 +4,14 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-29 — Review: project archive and application dialogs
+
+The independent review found five defects that need correction before the project archive work is considered complete: large Archive pages still load and return every matching agent, older per-project searches can overwrite newer results, overlapping Archive and Restore actions can report the wrong final state, a failed rollback can leave project and agent archive flags inconsistent, and project-read failures can allow work to start while archive state is unknown. Four lower-risk repairs are also recorded for project-rename validation feedback, contradictory dialog documentation, bypasses in the native-dialog source guard, and the missing committed design handoff. The full automated test suite passes, but it does not exercise these failures.
+
+**Needs attention:** The archive lifecycle has correctness and scaling risks under concurrency, read/storage failures, and long histories.
+
+**Next:** Run `/fix` to validate and repair the five must-fix findings one at a time, then address the four lower-risk findings.
+
 ### 2026-07-29 — Implementation: replace native browser dialogs
 
 AgentDeck now uses its own dialogs for all agent, project, group, and Settings inputs and destructive confirmations. Rename, runtime switching, group moves, project actions, archive, and delete flows validate before sending the same requests as before and make cancellation harmless; Settings force-delete dialogs identify the affected running agents. A source guard prevents browser prompts or confirmations from returning.
