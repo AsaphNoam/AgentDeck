@@ -33,15 +33,24 @@ func (s *Server) handleArchiveAgentAction(w http.ResponseWriter, r *http.Request
 		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
 		return
 	}
-	if agent.Archived {
-		writeJSON(w, http.StatusOK, s.readSession(id))
-		return
-	}
 	if ae := s.beginAgentArchive(r.Context(), agent.Project, id); ae != nil {
 		writeAPIError(w, ae)
 		return
 	}
 	defer s.endAgentArchive(agent.Project, id)
+	agent, err = s.stateStore.ReadAgent(id)
+	if errors.Is(err, state.ErrNotFound) {
+		writeAPIError(w, apiError(runtime.CodeNotFound, "no such agent: "+id))
+		return
+	}
+	if err != nil {
+		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
+		return
+	}
+	if agent.Archived {
+		writeJSON(w, http.StatusOK, s.readSession(id))
+		return
+	}
 	project, err := s.configStore.ReadProject(agent.Project)
 	if err == nil && project.Archived {
 		writeAPIError(w, apiError(runtime.CodeProjectArchived, "project is archived"))
@@ -51,7 +60,7 @@ func (s *Server) handleArchiveAgentAction(w http.ResponseWriter, r *http.Request
 		writeAPIError(w, ae)
 		return
 	}
-	if err := s.stateStore.SetAgentsArchived([]string{id}, true); err != nil {
+	if err := s.setAgentsArchived([]string{id}, true); err != nil {
 		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
 		return
 	}
@@ -80,7 +89,7 @@ func (s *Server) handleRestoreAgentAction(w http.ResponseWriter, r *http.Request
 		writeAPIError(w, apiError(runtime.CodeProjectArchived, "project is archived; restore it first"))
 		return
 	}
-	if err := s.stateStore.SetAgentsArchived([]string{id}, false); err != nil {
+	if err := s.setAgentsArchived([]string{id}, false); err != nil {
 		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
 		return
 	}
@@ -94,6 +103,11 @@ func (s *Server) handleArchiveProjectAction(w http.ResponseWriter, r *http.Reque
 		writeAPIError(w, apiError(runtime.CodeValidation, "invalid project"))
 		return
 	}
+	if ae := s.beginProjectArchive(r.Context(), id); ae != nil {
+		writeAPIError(w, ae)
+		return
+	}
+	defer s.endProjectArchive(id)
 	project, err := s.configStore.ReadProject(id)
 	if errors.Is(err, config.ErrNotFound) {
 		writeAPIError(w, apiError(runtime.CodeNotFound, "no such project: "+id))
@@ -111,11 +125,6 @@ func (s *Server) handleArchiveProjectAction(w http.ResponseWriter, r *http.Reque
 		})
 		return
 	}
-	if ae := s.beginProjectArchive(r.Context(), id); ae != nil {
-		writeAPIError(w, ae)
-		return
-	}
-	defer s.endProjectArchive(id)
 	if s.pipelineMgr != nil {
 		if err := s.pipelineMgr.StopProject(r.Context(), id); err != nil {
 			writeAPIError(w, apiError(runtime.CodeInternal, "stop project pipelines: "+err.Error()))
@@ -141,7 +150,7 @@ func (s *Server) handleArchiveProjectAction(w http.ResponseWriter, r *http.Reque
 			return
 		}
 	}
-	if err := s.stateStore.SetAgentsArchived(ids, true); err != nil {
+	if err := s.setAgentsArchived(ids, true); err != nil {
 		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
 		return
 	}

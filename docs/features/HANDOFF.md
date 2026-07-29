@@ -9,7 +9,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 - **Active change:** None; the native-dialog replacement change is finished.
 - **State:** The project-first dashboard, project/agent archive lifecycle, grouped Archive pagination,
   project archive containment, and native-dialog replacement are implemented and independently
-  reviewed. Three Must-fix and four Worth-fixing findings are open below; fixing them is the current
+  reviewed. Two Must-fix and four Worth-fixing findings are open below; fixing them is the current
   quality gate. The 2026-07-29
   usability pass found no new problem in its completed real-browser paths: project/scoped dashboards,
   stopped-agent Resume, individual archive/restore, and grouped Archive rendered and behaved as
@@ -84,7 +84,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 The native-dialog replacement remains complete. The current fix run is clearing the five Must-fix
 and four Worth-fixing findings from its independent review, one verified finding per commit. Grouped
 Archive pagination and stale per-project searches are fixed; the next open finding is the
-idempotent Archive transition race.
+failed project-archive compensation.
 
 ## Decisions needing your input
 
@@ -114,13 +114,6 @@ The post-fix usability-review and current code-review state are committed locall
 those commits to the shared `origin/main` branch needs explicit human authorization.
 
 ## Review findings
-
-- **Must fix** — INV §5/§15 — Idempotent Archive bypasses the archive/restore transition claim.
-  `handleArchiveAgentAction` returns immediately when its initial read says `archived`, and
-  `handleArchiveProjectAction` does the same for an archived project, before either acquires the
-  TS-01.R13 claim. A concurrent Restore can therefore hold the claim, clear the state, and let
-  Archive report success without archiving it. Put the no-op decision under the claim, re-read the
-  state there, and add Restore-vs-idempotent-Archive barrier tests.
 
 - **Must fix** — INV §15 (also §5) — Failed project-archive compensation is discarded.
   `handleArchiveProjectAction` ignores the error from `RestoreAgentArchiveStates` after project JSON
@@ -306,6 +299,11 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-07-29 — Fixed idempotent Archive transition races (INV §5/§15): agent and project Archive
+  now acquire their exclusive transition claim before the authoritative archived-state read and
+  no-op decision. Restore barrier regressions prove competing Archive requests receive the specific
+  retryable conflict, then succeed after Restore releases its claim; focused server tests pass.
 
 - 2026-07-29 — Fixed per-project Archive search races (INV §1/§8): each project pager now aborts
   and generation-checks superseded requests, cleanup cancels work across query/project boundaries,
