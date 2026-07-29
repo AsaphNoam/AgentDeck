@@ -4,6 +4,14 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-29 — Usability review: project dashboard and grouped Archive
+
+The new dashboard flows work in the real app: projects open their own dashboards, stopped agents resume, individual archive and restore work safely, and the Archive groups archived agents beneath their still-active project. The checked state also survived a server restart. No new user-facing problem was found. The full record is in [the usability review report](../archive/reviews/usability-review-run-2026-07-29-project-archive.md).
+
+**Needs attention:** Browser automation could not accept the project-archive confirmation dialog, so the remaining browser-only archive, paging, restart-render, and pipeline checks are still unconfirmed.
+
+**Next:** Re-run those remaining browser paths with a browser session that can handle native confirmation dialogs.
+
 ### 2026-07-29 — Fix: project dashboard and grouped Archive
 
 The project-first dashboard and grouped Archive are complete. Archive and restore now safely handle
