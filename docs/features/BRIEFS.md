@@ -4,6 +4,31 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-29 — Re-review: project dashboard and grouped Archive
+
+The second pass found that the first review materially understated the risk. Seven dashboard issues
+should be fixed before shipment: archive can leave a restarted orphan process alive while marking it
+archived; archive and restore can race Resume or each other because the promised transition claim is
+missing; a failed project-archive write can silently restore agents that were already archived;
+pipeline starts and controls claim the project too late and return the wrong result; successful
+project Archive/Restore leaves the interface stale; dragging within one project discards the saved
+ordering for other projects; and Archive still truncates or strands agents because neither the
+server nor the interface implements the specified two-level paging correctly.
+
+I also found nine smaller dashboard contract gaps, including the early-disappearing Load more button,
+missing project-card and Settings controls, archived projects being treated as onboarding-ready or
+remaining invisibly selected, misleading project-read errors, incomplete archive responses, and a
+stopped search result being labelled archived. All automated tests and builds pass, but the new
+dashboard, archive actions, rollback, race barriers, grouped response, and per-project paging have
+almost no focused coverage; the green suite does not exercise these failures. No product code or
+specifications were changed.
+
+**Needs attention:** Do not mark the dashboard change shipped until the seven must-fix findings are
+resolved and covered by deterministic regressions.
+
+**Next:** The build agent should fix the archive lifecycle/transaction boundaries first, then repair
+the two-level paging and project UI state before closing the remaining contract gaps.
+
 ### 2026-07-29 — Review: project dashboard, grouped Archive, and Codex isolation fix
 
 I reviewed the project-first dashboard, project-grouped Archive, and the recent Codex profile-isolation
