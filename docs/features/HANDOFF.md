@@ -9,7 +9,13 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 - **Active change:** None; the project-dashboard and project-grouped Archive change is finished.
 - **State:** The project-first dashboard, project/agent archive lifecycle, grouped Archive pagination,
   and project archive containment are complete. The resolved review findings have focused regression
-  coverage; an independent review of the completed commit is the next quality gate.
+  coverage; an independent review of the completed commit is the next quality gate. The 2026-07-29
+  usability pass found no new problem in its completed real-browser paths: project/scoped dashboards,
+  stopped-agent Resume, individual archive/restore, and grouped Archive rendered and behaved as
+  specified. Native browser confirmation input then stalled and blocked the remaining browser-only
+  project-archive, paging, post-restart-render, and pipeline paths; their backing API state and
+  focused regressions passed but are not browser passes. Full record:
+  [`../archive/reviews/usability-review-run-2026-07-29-project-archive.md`](../archive/reviews/usability-review-run-2026-07-29-project-archive.md).
 - **Previous transition context:** AgentDeck-launched Codex agents now run in a private `CODEX_HOME`
   (`<agentdeck-home>/codex`, `0700`), composed as the final, reserved child-env layer in
   launch/resume/switch via `codexHomeEnv`/`composeEnv`, so their rollouts and native session index
