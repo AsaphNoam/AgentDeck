@@ -113,3 +113,21 @@ was still in flight; neither product code nor specifications changed.
 No confirmed Must-fix or Worth-fixing finding was produced by the retry. The unexercised browser
 coverage is now narrower: onboarding readiness when no active project exists, J7 runtime switch,
 top-level Archive paging across more than 50 project groups, and J14 active-pipeline project archive.
+
+## Retry — 2026-07-29 remaining browser journeys
+
+**Scope:** exercised the four remaining paths against fresh isolated homes and real loopback
+dashboards. The fixtures used the repository fake ACP peer; the active-pipeline fixture deliberately
+held its stage in flight until project archive stopped it. No product code or specifications changed.
+
+| Journey | Result | Evidence |
+|---|---|---|
+| J2 no-active-project onboarding | **PASS** — after archiving every project while the configured default remained archived, the root route opened the Project onboarding step, “Create your first project.” It did not silently select or launch the archived default. | browser DOM |
+| J7 runtime switch | **BLOCKED(browser capability)** — Resume completed and made Layout A idle; Switch runtime then failed before its first prompt because the current in-app browser reports `prompt() is not supported.` No product result is inferred. | browser console error and DOM |
+| J8 top-level project-group paging | **PASS** — 51 archived projects rendered Page 01 through Page 50 and one **Load more** button; clicking it revealed Page 51 and removed the control. | browser DOM; zero console errors |
+| J14 archive active pipeline project | **PASS** — the Pipelines page first showed “Active archive run” as running. Confirming the Review App dashboard archive removed that project from the dashboard, rendered the run as stopped, omitted the archived project from the new-run selector, and showed no continuation/retry control for the stopped run. | browser DOM; zero console errors |
+
+No confirmed Must-fix or Worth-fixing usability finding was produced. The only remaining browser
+gap for this change is J7 runtime switching, which needs a prompt-capable browser session. The
+`prompt()` error is a limitation of the review browser, not evidence that the shipped application
+fails in a normal browser.
