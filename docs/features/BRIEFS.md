@@ -4,6 +4,39 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-29 — Review: project dashboard, grouped Archive, and Codex isolation fix
+
+I reviewed the project-first dashboard, project-grouped Archive, and the recent Codex profile-isolation
+fix. The archive/restore actions, the lease that stops a project archive from racing a new agent
+launch, and the hardened Codex private-profile handling all hold up. I found one issue that should be
+fixed before this ships and four smaller ones.
+
+The important one: the grouped Archive only ever loads the newest 200 sessions and then splits that
+fixed batch into project groups. Once someone has archived more than 200 agents over time, the older
+ones simply stop appearing and can no longer be searched or reached — even though each project still
+shows its true archived count, so the number on screen won't match what you can actually open. This
+needs to page the database directly instead of slicing a capped batch.
+
+The smaller ones: the Archive "Load more" button disappears too early once there are many projects, so
+later projects can't be reached; the new project cards don't yet show the project color or a live
+per-status breakdown, and their right-click menu is missing Rename and Change color; and the Codex
+setup copy briefly removes a file mid-swap despite a comment promising it never does, which a
+still-running Codex agent could trip over in rare timing. Build and the backend tests pass.
+
+**Needs attention:** Fix the 200-session Archive cap before marking the dashboard change shipped; the
+other four are worth doing but not blockers.
+
+**Next:** The build agent should page the grouped Archive at both levels (add a >200-session test),
+then close the four smaller findings.
+
+### 2026-07-28 — Implementation in progress: project dashboard and grouped Archive
+
+The working tree now has durable project and agent archive state, archive and restore actions, project-first navigation, grouped Archive results, and launch safeguards that keep archived projects from starting new work. Project archive also stops active pipeline runs before archiving their agents. Focused backend and frontend regression suites, the full UI suite, source build, embedded frontend build, and specification checks pass.
+
+**Needs attention:** Finish the remaining acceptance coverage and retire the superseded flat-Archive requirements before this change can be marked shipped.
+
+**Next:** Continue the active project dashboard and grouped Archive change.
+
 ### 2026-07-28 — Fix review: project dashboard and grouped Archive design
 
 All nine review findings were valid, and the waiting design is corrected. The specifications now
