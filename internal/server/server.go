@@ -82,6 +82,10 @@ type Server struct {
 	// setAgentsArchived is the durable archive-flag seam. Transition tests block
 	// it to prove competing idempotent actions still join the exclusive claim.
 	setAgentsArchived func([]string, bool) error
+	// restoreAgentArchiveStates is the cross-store compensation seam. Tests
+	// inject a second failure to verify the durable fallback is published and
+	// both causes are reported.
+	restoreAgentArchiveStates func(map[string]bool) error
 
 	// primerSummarizer is the one-shot target-backend summary seam for backend
 	// switches. The default implementation is gated until live CLI invocation is
@@ -154,31 +158,32 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	msg.SetBudgetExceededSink(eventBus.PublishBudgetExceeded)
 	sourceMgr := newConfigSourceManager(cfgStore, eventBus)
 	s := &Server{
-		configStore:        cfgStore,
-		stateStore:         stateStore,
-		stateMgr:           stateMgr,
-		eventBus:           eventBus,
-		registry:           registry,
-		terminal:           term,
-		indexer:            ix,
-		messaging:          msg,
-		sourceMgr:          sourceMgr,
-		nudgeCh:            nudgeCh,
-		cfg:                cfg,
-		log:                log,
-		hookTokens:         map[string]string{},
-		mcpCleanups:        map[string]func(){},
-		switching:          map[string]bool{},
-		projectArchiving:   map[string]bool{},
-		projectStartLeases: map[string]int{},
-		agentArchiving:     map[string]bool{},
-		agentStartLeases:   map[string]int{},
-		projectTransitions: map[string]int{},
-		archiveChanged:     make(chan struct{}),
-		credCheck:          credcheck.Check,
-		writeProject:       cfgStore.WriteProject,
-		setAgentsArchived:  stateStore.SetAgentsArchived,
-		primerSummarizer:   defaultPrimerSummarizer,
+		configStore:               cfgStore,
+		stateStore:                stateStore,
+		stateMgr:                  stateMgr,
+		eventBus:                  eventBus,
+		registry:                  registry,
+		terminal:                  term,
+		indexer:                   ix,
+		messaging:                 msg,
+		sourceMgr:                 sourceMgr,
+		nudgeCh:                   nudgeCh,
+		cfg:                       cfg,
+		log:                       log,
+		hookTokens:                map[string]string{},
+		mcpCleanups:               map[string]func(){},
+		switching:                 map[string]bool{},
+		projectArchiving:          map[string]bool{},
+		projectStartLeases:        map[string]int{},
+		agentArchiving:            map[string]bool{},
+		agentStartLeases:          map[string]int{},
+		projectTransitions:        map[string]int{},
+		archiveChanged:            make(chan struct{}),
+		credCheck:                 credcheck.Check,
+		writeProject:              cfgStore.WriteProject,
+		setAgentsArchived:         stateStore.SetAgentsArchived,
+		restoreAgentArchiveStates: stateStore.RestoreAgentArchiveStates,
+		primerSummarizer:          defaultPrimerSummarizer,
 	}
 	s.pipelineTemplates = pipeline.NewTemplateStore(cfgStore)
 	s.pipelineMgr = pipeline.NewManager(stateStore, s.pipelineTemplates, s, s)

@@ -140,10 +140,14 @@ exists. Under TS-01.R13's exclusive project claim, project archive stops relevan
 processes, writes all agent archive flags in one SQLite transaction, then atomically writes the
 project JSON; no process-start path can register a running row anywhere in that stop-to-commit window.
 A failed final config write compensates the flag transaction before releasing the claim and returning
-an error; processes already stopped remain stopped. Restore reverses only the requested project or
-agent flag/config state. Existing `layout.json` and a `default_project` that names the project are
-unchanged: the default becomes a dormant preference under FS-04.R36, while project cards and scoped
-dashboards add no new persisted layout or migration.
+an error; processes already stopped remain stopped. If that atomic compensation also fails, the
+project remains active, the server re-reads and publishes the resulting durable agent
+flags before releasing the claim, and the error reports both the project-publication and compensation
+failures; any agents that remain archived are coherent independent agent archives rather than hidden
+partial state. Restore reverses only the requested project or agent flag/config state. Existing
+`layout.json` and a `default_project` that names the project are unchanged: the default becomes a
+dormant preference under FS-04.R36, while project cards and scoped dashboards add no new persisted
+layout or migration.
 
 ## 3. Interfaces & data shapes
 
@@ -209,4 +213,5 @@ R1–R20 and must be reflected here when its contract changes.
 - Index/archive: `internal/index/indexer.go`, `reindex.go`, `internal/archive/archive.go`.
 - Regression anchors: `TestHomeTreeIsOwnerOnly`, `TestStateDBIsOwnerOnly`,
   `TestTranscriptIsOwnerOnly`, `TestReindexPreservesFinalPartialTurn`,
-  `TestEmptyArchiveMarshalsResultsArray`, `TestSearchFallbackFiltersMetadata`.
+  `TestEmptyArchiveMarshalsResultsArray`, `TestSearchFallbackFiltersMetadata`,
+  `TestArchiveProjectReportsCompensationFailureAndPublishesDurableFallback`.

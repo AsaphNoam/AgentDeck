@@ -156,7 +156,14 @@ func (s *Server) handleArchiveProjectAction(w http.ResponseWriter, r *http.Reque
 	}
 	project.Archived = true
 	if err := s.writeProject(id, project); err != nil {
-		_ = s.stateStore.RestoreAgentArchiveStates(priorArchived)
+		if restoreErr := s.restoreAgentArchiveStates(priorArchived); restoreErr != nil {
+			for _, agentID := range ids {
+				_, _ = s.stateMgr.Touch(agentID)
+			}
+			writeAPIError(w, apiError(runtime.CodeInternal,
+				"write project archive state: "+err.Error()+"; restore agent archive states: "+restoreErr.Error()))
+			return
+		}
 		writeAPIError(w, apiError(runtime.CodeInternal, "write project archive state: "+err.Error()))
 		return
 	}
