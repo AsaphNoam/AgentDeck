@@ -13,10 +13,11 @@ type Archive struct {
 }
 
 type Query struct {
-	Q      string
-	Limit  int
-	Offset int
-	Active *bool
+	Q            string
+	Limit        int
+	Offset       int
+	Active       *bool
+	ArchivedOnly bool
 	// Project narrows a durable archive query before pagination. Grouped Archive
 	// uses it for independent per-project agent pages instead of slicing an
 	// already-truncated cross-project projection.
@@ -47,6 +48,7 @@ type Result struct {
 	FilesTouched int      `json:"files_touched"`
 	CommandsRun  int      `json:"commands_run"`
 	Active       bool     `json:"active"`
+	Archived     bool     `json:"archived"`
 	MatchedIn    []string `json:"matched_in,omitempty"`
 	Snippet      string   `json:"snippet,omitempty"`
 
@@ -88,18 +90,129 @@ func (a *Archive) Search(q Query) (Response, error) {
 	return Response{Query: term, SearchMode: searchMode, Total: total, Limit: q.Limit, Offset: q.Offset, Results: results}, nil
 }
 
+// Projects returns the durable project keys matching the same all-session
+// query as Search without materializing an agent row for every match. The
+// server joins these keys to current project config before applying the
+// title-ordered group page.
+func (a *Archive) Projects(q Query) ([]string, string, error) {
+	term := strings.TrimSpace(q.Q)
+	var (
+		projects []string
+		err      error
+	)
+	if term == "" {
+		projects, err = a.listProjects(q)
+	} else {
+		projects, err = a.searchProjects(q, ftsQuery(term), term)
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	return projects, a.searchMode(), nil
+}
+
+func (a *Archive) listProjects(q Query) ([]string, error) {
+	where, args := archiveWhere(q, "WHERE")
+	rows, err := a.db.Query(`
+SELECT DISTINCT s.project
+FROM sessions s
+LEFT JOIN agents a ON a.agent_id = s.agent_id
+LEFT JOIN running r ON r.agent_id = s.agent_id`+where+`
+ORDER BY s.project`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("archive: list projects: %w", err)
+	}
+	return scanProjects(rows)
+}
+
+func (a *Archive) searchProjects(q Query, match, raw string) ([]string, error) {
+	where, args := archiveWhere(q, "AND")
+	queryArgs := append([]any{match}, args...)
+	rows, err := a.db.Query(`
+SELECT DISTINCT s.project
+FROM sessions_fts
+JOIN sessions s ON s.agent_id = sessions_fts.agent_id
+LEFT JOIN agents a ON a.agent_id = s.agent_id
+LEFT JOIN running r ON r.agent_id = s.agent_id
+WHERE sessions_fts MATCH ?`+where+`
+ORDER BY s.project`, queryArgs...)
+	if err != nil {
+		if isFTS5Missing(err) {
+			return a.searchProjectsFallback(q, raw)
+		}
+		return nil, fmt.Errorf("archive: search projects: %w", err)
+	}
+	return scanProjects(rows)
+}
+
+func (a *Archive) searchProjectsFallback(q Query, raw string) ([]string, error) {
+	terms := splitTerms(raw)
+	if len(terms) == 0 {
+		return a.listProjects(q)
+	}
+	where, args := archiveWhere(q, "WHERE")
+	placeholders := make([]string, 0, len(terms))
+	for range terms {
+		placeholders = append(placeholders, `(s.name LIKE ? OR s.role LIKE ? OR s.project LIKE ? OR s.backend LIKE ?)`)
+	}
+	textFilter := "(" + strings.Join(placeholders, " AND ") + ")"
+	if where == "" {
+		where = " WHERE " + textFilter
+	} else {
+		where += " AND " + textFilter
+	}
+	for _, term := range terms {
+		likePattern := "%" + strings.ReplaceAll(term, "%", "\\%") + "%"
+		args = append(args, likePattern, likePattern, likePattern, likePattern)
+	}
+	rows, err := a.db.Query(`
+SELECT DISTINCT s.project
+FROM sessions s
+LEFT JOIN agents a ON a.agent_id = s.agent_id
+LEFT JOIN running r ON r.agent_id = s.agent_id`+where+`
+ORDER BY s.project`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("archive: fallback search projects: %w", err)
+	}
+	return scanProjects(rows)
+}
+
+func scanProjects(rows *sql.Rows) ([]string, error) {
+	defer rows.Close()
+	projects := make([]string, 0)
+	for rows.Next() {
+		var project string
+		if err := rows.Scan(&project); err != nil {
+			return nil, fmt.Errorf("archive: scan project: %w", err)
+		}
+		projects = append(projects, project)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("archive: iterate projects: %w", err)
+	}
+	return projects, nil
+}
+
+func (a *Archive) searchMode() string {
+	if mode, err := state.DetectSessionsFTS(a.db); err == nil && mode == state.SessionsFTSFullText {
+		return "full_text"
+	}
+	return "metadata"
+}
+
 func (a *Archive) list(q Query) (int, []Result, error) {
 	where, args := archiveWhere(q, "WHERE")
 	var total int
-	if err := a.db.QueryRow(`SELECT COUNT(*) FROM sessions s LEFT JOIN running r ON r.agent_id = s.agent_id`+where, args...).Scan(&total); err != nil {
+	if err := a.db.QueryRow(`SELECT COUNT(*) FROM sessions s LEFT JOIN agents a ON a.agent_id = s.agent_id LEFT JOIN running r ON r.agent_id = s.agent_id`+where, args...).Scan(&total); err != nil {
 		return 0, nil, fmt.Errorf("archive: count list: %w", err)
 	}
 	args = append(args, q.Limit, q.Offset)
 	rows, err := a.db.Query(`
 SELECT s.agent_id, s.name, s.role, s.project, s.backend, s.model, s.interface, s.grp,
        s.created_at, s.updated_at, s.turn_count, s.files_touched, s.commands_run,
-       (r.agent_id IS NOT NULL) AS active, '' AS snippet, '' AS content
+       (r.agent_id IS NOT NULL) AS active, COALESCE(a.archived, 0), '' AS snippet, '' AS content
 FROM sessions s
+LEFT JOIN agents a ON a.agent_id = s.agent_id
 LEFT JOIN running r ON r.agent_id = s.agent_id`+where+`
 ORDER BY s.updated_at DESC, s.agent_id
 LIMIT ? OFFSET ?`, args...)
@@ -119,6 +232,7 @@ func (a *Archive) search(q Query, match, raw string) (int, []Result, error) {
 SELECT COUNT(DISTINCT sessions_fts.agent_id)
 FROM sessions_fts
 JOIN sessions s ON s.agent_id = sessions_fts.agent_id
+LEFT JOIN agents a ON a.agent_id = s.agent_id
 LEFT JOIN running r ON r.agent_id = s.agent_id
 WHERE sessions_fts MATCH ?`+where, countArgs...).Scan(&total); err != nil {
 		if isFTS5Missing(err) {
@@ -161,12 +275,14 @@ transcript_snippets AS (
 SELECT s.agent_id, s.name, s.role, s.project, s.backend, s.model, s.interface, s.grp,
        s.created_at, s.updated_at, s.turn_count, s.files_touched, s.commands_run,
        (r.agent_id IS NOT NULL) AS active,
+       COALESCE(a.archived, 0),
        COALESCE(ts.snippet, '') AS snippet,
        ms.metadata_match,
        ms.transcript_match
 FROM ranked_documents rd
 JOIN match_summary ms ON ms.agent_id = rd.agent_id
 JOIN sessions s ON s.agent_id = rd.agent_id
+LEFT JOIN agents a ON a.agent_id = s.agent_id
 LEFT JOIN running r ON r.agent_id = s.agent_id
 LEFT JOIN transcript_snippets ts ON ts.agent_id = rd.agent_id AND ts.snippet_rank = 1
 WHERE rd.document_rank = 1`+where+`
@@ -214,7 +330,7 @@ func (a *Archive) searchFallback(q Query, raw string) (int, []Result, error) {
 		countArgs = append(countArgs, likePattern, likePattern, likePattern, likePattern)
 	}
 
-	if err := a.db.QueryRow(`SELECT COUNT(*) FROM sessions s LEFT JOIN running r ON r.agent_id = s.agent_id`+whereClause, countArgs...).Scan(&total); err != nil {
+	if err := a.db.QueryRow(`SELECT COUNT(*) FROM sessions s LEFT JOIN agents a ON a.agent_id = s.agent_id LEFT JOIN running r ON r.agent_id = s.agent_id`+whereClause, countArgs...).Scan(&total); err != nil {
 		return 0, nil, fmt.Errorf("archive: fallback count: %w", err)
 	}
 
@@ -228,8 +344,9 @@ func (a *Archive) searchFallback(q Query, raw string) (int, []Result, error) {
 	rows, err := a.db.Query(`
 SELECT s.agent_id, s.name, s.role, s.project, s.backend, s.model, s.interface, s.grp,
        s.created_at, s.updated_at, s.turn_count, s.files_touched, s.commands_run,
-       (r.agent_id IS NOT NULL) AS active, '' AS snippet, '' AS content
+       (r.agent_id IS NOT NULL) AS active, COALESCE(a.archived, 0), '' AS snippet, '' AS content
 FROM sessions s
+LEFT JOIN agents a ON a.agent_id = s.agent_id
 LEFT JOIN running r ON r.agent_id = s.agent_id`+whereClause+`
 ORDER BY s.updated_at DESC, s.agent_id
 LIMIT ? OFFSET ?`, queryArgs...)
@@ -265,26 +382,39 @@ func activeWhere(active *bool, prefix string) (string, []any) {
 }
 
 func archiveWhere(q Query, prefix string) (string, []any) {
-	where, args := activeWhere(q.Active, prefix)
-	if q.Project == "" {
-		return where, args
+	clauses := make([]string, 0, 3)
+	args := make([]any, 0, 1)
+	if q.Active != nil {
+		if *q.Active {
+			clauses = append(clauses, "r.agent_id IS NOT NULL")
+		} else {
+			clauses = append(clauses, "r.agent_id IS NULL")
+		}
 	}
-	if where == "" {
-		return " " + prefix + " s.project = ?", []any{q.Project}
+	if q.Project != "" {
+		clauses = append(clauses, "s.project = ?")
+		args = append(args, q.Project)
 	}
-	return where + " AND s.project = ?", append(args, q.Project)
+	if q.ArchivedOnly {
+		clauses = append(clauses, "a.archived = 1")
+	}
+	if len(clauses) == 0 {
+		return "", nil
+	}
+	return " " + prefix + " " + strings.Join(clauses, " AND "), args
 }
 
 func scanResults(rows *sql.Rows) ([]Result, error) {
 	out := make([]Result, 0)
 	for rows.Next() {
 		var r Result
-		var active int
+		var active, archived int
 		if err := rows.Scan(&r.AgentID, &r.Name, &r.Role, &r.Project, &r.Backend, &r.Model, &r.Interface, &r.Group,
-			&r.CreatedAt, &r.UpdatedAt, &r.TurnCount, &r.FilesTouched, &r.CommandsRun, &active, &r.Snippet, &r.content); err != nil {
+			&r.CreatedAt, &r.UpdatedAt, &r.TurnCount, &r.FilesTouched, &r.CommandsRun, &active, &archived, &r.Snippet, &r.content); err != nil {
 			return nil, fmt.Errorf("archive: scan result: %w", err)
 		}
 		r.Active = active != 0
+		r.Archived = archived != 0
 		out = append(out, r)
 	}
 	if err := rows.Err(); err != nil {
@@ -297,13 +427,14 @@ func scanSearchResults(rows *sql.Rows) ([]Result, error) {
 	out := make([]Result, 0)
 	for rows.Next() {
 		var r Result
-		var active, metadataMatch, transcriptMatch int
+		var active, archived, metadataMatch, transcriptMatch int
 		if err := rows.Scan(&r.AgentID, &r.Name, &r.Role, &r.Project, &r.Backend, &r.Model, &r.Interface, &r.Group,
-			&r.CreatedAt, &r.UpdatedAt, &r.TurnCount, &r.FilesTouched, &r.CommandsRun, &active, &r.Snippet,
+			&r.CreatedAt, &r.UpdatedAt, &r.TurnCount, &r.FilesTouched, &r.CommandsRun, &active, &archived, &r.Snippet,
 			&metadataMatch, &transcriptMatch); err != nil {
 			return nil, fmt.Errorf("archive: scan search result: %w", err)
 		}
 		r.Active = active != 0
+		r.Archived = archived != 0
 		if metadataMatch != 0 {
 			r.MatchedIn = append(r.MatchedIn, "metadata")
 		}

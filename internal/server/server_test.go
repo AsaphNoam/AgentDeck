@@ -123,7 +123,7 @@ VALUES ('a_archive','Atlas','implementer','my-app','claude','sonnet','chat','/tm
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("archive body: %v", err)
 	}
-	if body.Total != 1 || body.SearchMode == "" || len(body.Results) != 1 || body.Results[0].Project != "my-app" || len(body.Results[0].Results) != 1 || body.Results[0].Results[0].AgentID != "a_archive" || body.Results[0].Results[0].Active {
+	if body.Total != 1 || body.SearchMode == "" || len(body.Results) != 1 || body.Results[0].Project != "my-app" || body.Results[0].Results == nil || len(body.Results[0].Results) != 0 {
 		t.Fatalf("archive body = %+v", body)
 	}
 }
