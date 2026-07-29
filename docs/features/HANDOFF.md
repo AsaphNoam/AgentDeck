@@ -9,7 +9,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 - **Active change:** None; the native-dialog replacement change is finished.
 - **State:** The project-first dashboard, project/agent archive lifecycle, grouped Archive pagination,
   project archive containment, and native-dialog replacement are implemented and independently
-  reviewed. Two Must-fix and four Worth-fixing findings are open below; fixing them is the current
+  reviewed. One Must-fix and four Worth-fixing findings are open below; fixing them is the current
   quality gate. The 2026-07-29
   usability pass found no new problem in its completed real-browser paths: project/scoped dashboards,
   stopped-agent Resume, individual archive/restore, and grouped Archive rendered and behaved as
@@ -84,7 +84,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 The native-dialog replacement remains complete. The current fix run is clearing the five Must-fix
 and four Worth-fixing findings from its independent review, one verified finding per commit. Grouped
 Archive pagination and stale per-project searches are fixed; the next open finding is the
-failed project-archive compensation.
+unexpected project-read error handling.
 
 ## Decisions needing your input
 
@@ -114,13 +114,6 @@ The post-fix usability-review and current code-review state are committed locall
 those commits to the shared `origin/main` branch needs explicit human authorization.
 
 ## Review findings
-
-- **Must fix** — INV §15 (also §5) — Failed project-archive compensation is discarded.
-  `handleArchiveProjectAction` ignores the error from `RestoreAgentArchiveStates` after project JSON
-  publication fails. If both writes fail, the exclusive claim is released with an active project
-  whose agents remain archived, contradicting TS-02.R20's compensation-before-release guarantee, and
-  the response reports only the config error. Preserve/report a coherent durable outcome and add a
-  dual-failure regression.
 
 - **Must fix** — INV §7 (also §5/§8) — Unexpected project-read errors fail open on process and
   restore paths. `resume.go`, `switch.go`, `AcquirePipelineStart`, and agent Restore check only
@@ -299,6 +292,11 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-07-29 — Fixed failed project-archive compensation reporting (INV §15, also §5): if project
+  publication and exact flag rollback both fail, the project remains active, the server publishes
+  the durable agent flags that remain, and the response reports both causes. TS-02 now records this
+  coherent independent-agent-archive fallback, and the injected dual-failure regression passes.
 
 - 2026-07-29 — Fixed idempotent Archive transition races (INV §5/§15): agent and project Archive
   now acquire their exclusive transition claim before the authoritative archived-state read and

@@ -90,6 +90,45 @@ func TestArchiveProjectConfigFailureRestoresMixedAgentFlags(t *testing.T) {
 	}
 }
 
+// TS-02.R20 / INV §15: if project publication and its atomic compensation both
+// fail, the active project plus still-archived agents is a coherent durable
+// fallback, and the response reports both causes instead of discarding one.
+func TestArchiveProjectReportsCompensationFailureAndPublishesDurableFallback(t *testing.T) {
+	srv := testServer(t, true)
+	for _, agent := range []state.Agent{
+		{AgentID: "a_dual_prearchived", Name: "Archived", Role: "implementer", Project: "my-app", Backend: "claude", Model: "sonnet", Interface: "chat", CreatedAt: time.Now().UTC(), Archived: true},
+		{AgentID: "a_dual_active", Name: "Active", Role: "reviewer", Project: "my-app", Backend: "claude", Model: "sonnet", Interface: "chat", CreatedAt: time.Now().UTC()},
+	} {
+		if err := srv.stateStore.WriteAgent(agent); err != nil {
+			t.Fatal(err)
+		}
+	}
+	srv.writeProject = func(string, config.Project) error {
+		return errors.New("injected project publication failure")
+	}
+	srv.restoreAgentArchiveStates = func(map[string]bool) error {
+		return errors.New("injected archive compensation failure")
+	}
+
+	rec := httptest.NewRecorder()
+	srv.routes().ServeHTTP(rec, newLocalRequest(http.MethodPost, "/api/projects/my-app/archive", nil))
+	if rec.Code != http.StatusInternalServerError ||
+		!strings.Contains(rec.Body.String(), "injected project publication failure") ||
+		!strings.Contains(rec.Body.String(), "injected archive compensation failure") {
+		t.Fatalf("dual-failure response = %d %s", rec.Code, rec.Body.String())
+	}
+	project, err := srv.configStore.ReadProject("my-app")
+	if err != nil || project.Archived {
+		t.Fatalf("project after dual failure = %+v err=%v, want active", project, err)
+	}
+	for _, id := range []string{"a_dual_prearchived", "a_dual_active"} {
+		agent, err := srv.stateStore.ReadAgent(id)
+		if err != nil || !agent.Archived {
+			t.Fatalf("agent %s after dual failure = %+v err=%v, want durable archived fallback", id, agent, err)
+		}
+	}
+}
+
 // TS-03.R20 / INV §11: project archive always returns its documented, non-null
 // action lists, including a harmless repeated archive request.
 func TestArchiveProjectRespondsWithActionLists(t *testing.T) {
