@@ -4,6 +4,14 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-29 — Usability review retry: project archive
+
+The browser retry completed the project-archive path: its warning is accepted, the project leaves the dashboard, Archive shows the project and its agents, and project then individual restore return the expected stopped agent. Archive also loaded the final rows of a 55-agent project, archived default projects disappeared from new-agent choices, and the checked state rendered unchanged after a restart. No new user-facing problem was found. The full record is in [the usability review report](../archive/reviews/usability-review-run-2026-07-29-project-archive.md).
+
+**Needs attention:** Browser coverage still does not include the no-active-project onboarding state, runtime switch, more than 50 project groups in Archive, or archiving an active pipeline.
+
+**Next:** Run those remaining browser journeys before treating the review matrix as complete.
+
 ### 2026-07-29 — Usability review: project dashboard and grouped Archive
 
 The new dashboard flows work in the real app: projects open their own dashboards, stopped agents resume, individual archive and restore work safely, and the Archive groups archived agents beneath their still-active project. The checked state also survived a server restart. No new user-facing problem was found. The full record is in [the usability review report](../archive/reviews/usability-review-run-2026-07-29-project-archive.md).

@@ -95,3 +95,21 @@ Run the remaining browser paths with a browser capable of accepting native confi
 J2 archived-default eligibility, J5 confirmed project archive and page reload, J7 switch, J8
 two-level paging, J12 post-restart render, and J14 active-pipeline project archive. Credentialed
 provider and terminal gates remain separate and were not attempted.
+
+## Retry — 2026-07-29 native-dialog recovery
+
+**Scope:** reran the browser-only paths that were blocked above against fresh copied homes and fresh
+loopback servers. The native confirmation was handled by opening it and accepting it while its click
+was still in flight; neither product code nor specifications changed.
+
+| Journey | Result | Evidence |
+|---|---|---|
+| J5 project archive | **PASS** — the warning confirmation completed, the archived project immediately disappeared from the home dashboard, and its direct scoped route rendered an explicit archived state with Archive navigation. | browser DOM; zero console errors |
+| J8 project/agent restoration | **PASS** — Archive showed the archived project with all three agents; project Restore kept those agents archived, and individual Restore returned just that agent stopped to its project dashboard. | browser DOM |
+| J8 per-project paging | **PASS** — a 55-agent archived project rendered its count and **Load more agents**; one click exposed the remaining Narwhal row and removed the control. | browser DOM; zero console errors |
+| J12 restart durability | **PASS** — after a server restart and browser reload, the restored stopped agent, archived siblings, scoped heading, layout controls, and zero-context label all rendered unchanged. | browser DOM; zero console errors |
+| J2 archived-default launch selector | **PARTIAL PASS** — after archiving the configured default project, New Agent listed only the active My App project; Review App was absent. | `.review/usability-20260729-project-archive-retry/evidence/J2-archived-default-launch.png` |
+
+No confirmed Must-fix or Worth-fixing finding was produced by the retry. The unexercised browser
+coverage is now narrower: onboarding readiness when no active project exists, J7 runtime switch,
+top-level Archive paging across more than 50 project groups, and J14 active-pipeline project archive.
