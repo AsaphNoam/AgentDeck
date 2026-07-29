@@ -10,6 +10,7 @@ export const projectSchema = z.object({
   cwd: z.string().min(1, "cwd is required"),
   add_dirs: z.array(z.string()).default([]),
   context_prompt: z.string().default(""),
+  archived: z.boolean().optional(),
 });
 
 export type ProjectInput = z.infer<typeof projectSchema>;
@@ -31,6 +32,7 @@ export const projectResponseSchema = z.object({
   // shared-resources directory (TS-03.R12). Never sent back on create/update.
   resource_dir: z.string().default(""),
   warnings: z.array(fieldWarningSchema).optional(),
+  archived: z.boolean().optional(),
 });
 
 export type ProjectResponse = z.infer<typeof projectResponseSchema>;

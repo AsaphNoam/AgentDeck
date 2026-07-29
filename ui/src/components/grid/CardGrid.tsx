@@ -14,7 +14,7 @@ import { NewAgentModal } from "../../features/launch/NewAgentModal";
 import { useProjects } from "../../api/config";
 import { Button, PageHeader } from "../ui";
 
-export function CardGrid() {
+export function CardGrid({ projectID, projectTitle }: { projectID?: string; projectTitle?: string } = {}) {
   const agents = useAgentStore((state) => state.agents);
   const order = useAgentStore((state) => state.order);
   const setOrder = useAgentStore((state) => state.setOrder);
@@ -49,11 +49,17 @@ export function CardGrid() {
     return () => window.clearTimeout(handle);
   }, [density, groupLayout, order]);
 
-  const ids = useMemo(() => {
+  const globalIds = useMemo(() => {
     const safeOrder = order ?? [];
     const known = new Set(Object.keys(agents));
-    return [...safeOrder.filter((id) => known.has(id)), ...Object.keys(agents).filter((id) => !safeOrder.includes(id))];
+    return [...safeOrder.filter((id) => known.has(id)), ...Object.keys(agents).filter((id) => !safeOrder.includes(id))]
+      .filter((id) => !agents[id].archived);
   }, [agents, order]);
+
+  const ids = useMemo(
+    () => globalIds.filter((id) => !projectID || agents[id].project === projectID),
+    [agents, globalIds, projectID],
+  );
 
   const grouped = useMemo(() => groupAgents(ids.map((id) => agents[id]).filter(Boolean)), [agents, ids]);
 
@@ -61,7 +67,12 @@ export function CardGrid() {
     if (!event.over || event.active.id === event.over.id) return;
     const oldIndex = ids.indexOf(String(event.active.id));
     const newIndex = ids.indexOf(String(event.over.id));
-    setOrder(arrayMove(ids, oldIndex, newIndex));
+    const reordered = arrayMove(ids, oldIndex, newIndex);
+    if (!projectID) {
+      setOrder(reordered);
+      return;
+    }
+    setOrder(mergeScopedOrder(globalIds, ids, reordered));
   };
 
   const body =
@@ -72,7 +83,7 @@ export function CardGrid() {
       <PageHeader
         className="grid-toolbar"
         eyebrow="Live operations"
-        title="Agents"
+        title={projectTitle ?? "Agents"}
         actions={<><Button variant="primary" type="button" onClick={() => setShowNewAgent(true)}>New agent</Button><DensityControl /></>}
         data-slot="header"
       />
@@ -114,6 +125,7 @@ export function CardGrid() {
                           lastLine={lastAssistantLine(transcripts[agent.agent_id])}
                           projectColor={projects.data?.[agent.project]?.color}
                           projectTitle={projects.data?.[agent.project]?.title}
+                          showProject={!projectID}
                         />
                       ))}
                     </div>
@@ -139,6 +151,12 @@ export function CardGrid() {
       <NewAgentModal open={showNewAgent} onClose={() => setShowNewAgent(false)} />
     </>
   );
+}
+
+export function mergeScopedOrder(globalIDs: string[], scopedIDs: string[], reorderedScopedIDs: string[]) {
+  const scoped = new Set(scopedIDs);
+  let nextScopedID = 0;
+  return globalIDs.map((id) => (scoped.has(id) ? reorderedScopedIDs[nextScopedID++] : id));
 }
 
 function groupAgents(items: AgentState[]) {

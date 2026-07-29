@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/re
 import { MemoryRouter } from "react-router-dom";
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ArchivePage } from "./ArchivePage";
 import type { ArchiveResult } from "../../api/types";
 
@@ -21,6 +22,7 @@ const mockActive: ArchiveResult = {
   files_touched: 3,
   commands_run: 2,
   active: true,
+	archived: false,
 };
 
 const mockInactive: ArchiveResult = {
@@ -37,6 +39,7 @@ const mockInactive: ArchiveResult = {
   files_touched: 0,
   commands_run: 0,
   active: false,
+	archived: true,
 };
 
 const server = setupServer(
@@ -60,6 +63,13 @@ const server = setupServer(
     }
     return HttpResponse.json({ query: "", search_mode: "full_text", total: 2, limit: 50, offset: 0, results: [mockActive, mockInactive] });
   }),
+  http.get("/api/archive/projects/:project", ({ params, request }) => {
+    const query = new URL(request.url).searchParams.get("q");
+    if (query === "atlas") return HttpResponse.json({ search_mode: "full_text", total: 1, limit: 50, offset: 0, results: [{ ...mockActive, matched_in: ["metadata"] }] });
+    if (query === "snippet test") return HttpResponse.json({ search_mode: "full_text", total: 1, limit: 50, offset: 0, results: [{ ...mockActive, matched_in: ["transcript"], snippet: "a snippet here" }] });
+    const result = params.project === "my-app" ? mockActive : mockInactive;
+    return HttpResponse.json({ search_mode: "full_text", total: 1, limit: 50, offset: 0, results: [result] });
+  }),
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
@@ -67,10 +77,13 @@ afterEach(() => { cleanup(); server.resetHandlers(); });
 afterAll(() => server.close());
 
 function renderArchive() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter initialEntries={["/archive"]}>
-      <ArchivePage />
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={["/archive"]}>
+        <ArchivePage />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
@@ -129,14 +142,19 @@ describe("ArchivePage", () => {
 
   it("loads the next result page using the rendered count as offset", async () => {
     const offsets: string[] = [];
+    const pages = [
+      { project: "page-one", title: "Project one", color: [1, 2, 3] as [number, number, number], project_status: "active" as const, archived_agent_count: 1, results: [{ ...mockActive, agent_id: "a_page_1", name: "Page one" }] },
+      { project: "page-two", title: "Project two", color: [1, 2, 3] as [number, number, number], project_status: "active" as const, archived_agent_count: 1, results: [{ ...mockInactive, agent_id: "a_page_2", name: "Page two" }] },
+    ];
     server.use(
       http.get("/api/archive", ({ request }) => {
         const offset = new URL(request.url).searchParams.get("offset") ?? "0";
         offsets.push(offset);
-        const result = offset === "0"
-          ? { ...mockActive, agent_id: "a_page_1", name: "Page one" }
-          : { ...mockInactive, agent_id: "a_page_2", name: "Page two" };
-        return HttpResponse.json({ query: "", search_mode: "full_text", total: 2, limit: 1, offset: Number(offset), results: [result] });
+        return HttpResponse.json({ query: "", search_mode: "full_text", total: 2, limit: 1, offset: Number(offset), results: [pages[Number(offset)]] });
+      }),
+      http.get("/api/archive/projects/:project", ({ params }) => {
+        const page = pages.find((entry) => entry.project === params.project);
+        return HttpResponse.json({ search_mode: "full_text", total: 1, limit: 50, offset: 0, results: page?.results ?? [] });
       }),
     );
 
@@ -150,11 +168,10 @@ describe("ArchivePage", () => {
     expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
   });
 
-  // FS-05.R28/A12: the Archive is ordered by the mutable updated_at, so a
-  // session touched between page requests moves ahead of the next offset. That
-  // page repeats a boundary row, and offset paging alone would lose the moved
-  // session while the rendered count reached total and hid Load more.
-  it("reaches every session when a later page is reordered between requests", async () => {
+  // FS-05.A19: project groups and their agent rows page independently. A
+  // mutable updated_at can repeat a boundary row, so the per-project pager
+  // refetches its head and merges it before deciding the corpus is complete.
+  it("reaches every agent when a per-project page is reordered", async () => {
     const sessions = Array.from({ length: 51 }, (_, index) => ({
       ...mockInactive,
       agent_id: `a_seq_${index + 1}`,
@@ -163,7 +180,10 @@ describe("ArchivePage", () => {
     }));
     let order = [...sessions];
     let requests = 0;
-    server.use(http.get("/api/archive", ({ request }) => {
+    server.use(http.get("/api/archive", () => HttpResponse.json({
+      query: "", search_mode: "full_text", total: 1, limit: 50, offset: 0,
+      results: [{ project: "auth-lib", title: "Auth lib", color: [1, 2, 3], project_status: "active", archived_agent_count: 0, results: sessions.slice(0, 50) }],
+    })), http.get("/api/archive/projects/auth-lib", ({ request }) => {
       const url = new URL(request.url);
       const offset = Number(url.searchParams.get("offset") ?? "0");
       const limit = Number(url.searchParams.get("limit") ?? "50");
@@ -172,17 +192,17 @@ describe("ArchivePage", () => {
       // After the first page is rendered, the last session is resumed: it moves
       // to the front and shifts every rendered row one position later.
       if (requests === 1) order = [order[50], ...order.slice(0, 50)];
-      return HttpResponse.json({ query: "", search_mode: "full_text", total: order.length, limit, offset, results: page });
+      return HttpResponse.json({ search_mode: "full_text", total: order.length, limit, offset, results: page });
     }));
 
     renderArchive();
     await screen.findByText("Session 1");
     expect(screen.queryByText("Session 51")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    fireEvent.click(screen.getByRole("button", { name: "Load more agents" }));
 
     await waitFor(() => expect(screen.getByText("Session 51")).toBeInTheDocument());
-    await waitFor(() => expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Load more agents" })).not.toBeInTheDocument());
     const rendered = Array.from(document.querySelectorAll(".archive-name")).map((node) => node.textContent);
     expect(new Set(rendered).size).toBe(rendered.length);
     expect(rendered).toHaveLength(51);

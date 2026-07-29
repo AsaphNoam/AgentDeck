@@ -19,8 +19,15 @@ type fakeLifecycle struct {
 	continuations  []StageExecution
 	stops          []string
 	failNextLaunch bool
+	startErr       error
 }
 
+func (f *fakeLifecycle) AcquirePipelineStart(context.Context, string) (func(), error) {
+	if f.startErr != nil {
+		return nil, f.startErr
+	}
+	return func() {}, nil
+}
 func (f *fakeLifecycle) ValidateStage(context.Context, StageExecution) error { return nil }
 func (f *fakeLifecycle) LaunchStage(_ context.Context, execution StageExecution) error {
 	f.mu.Lock()
@@ -135,6 +142,27 @@ func TestStartAcceptsSeededCodexModelID(t *testing.T) {
 	}
 	if len(lifecycle.launches) != 1 || lifecycle.launches[0].Model != "gpt-5.6-sol" {
 		t.Fatalf("launches = %+v", lifecycle.launches)
+	}
+}
+
+func TestStartRejectsProjectArchiveClaimBeforeDurableMutation(t *testing.T) {
+	manager, lifecycle, _ := pipelineManagerFixture(t)
+	lifecycle.startErr = &ProjectGateError{Code: "project_archiving", Message: "project archive is in progress"}
+
+	_, _, err := manager.Start(context.Background(), StartRequest{
+		RequestID: "request-project-archiving", TemplateID: "quality", DisplayName: "Ship", Project: "app", Goal: "Implement the spec",
+		Inputs: map[string]string{"spec": "Requirements"},
+		Assignments: map[string]RuntimeAssignment{
+			"work": {Backend: "codex", Model: "gpt"}, "review": {Backend: "claude", Model: "sonnet"},
+		},
+	})
+	var gateErr *ProjectGateError
+	if !errors.As(err, &gateErr) || gateErr.Code != "project_archiving" {
+		t.Fatalf("Start error = %#v", err)
+	}
+	runs, err := manager.store.ListPipelineRuns(10, 0)
+	if err != nil || len(runs) != 0 {
+		t.Fatalf("runs = %+v err=%v", runs, err)
 	}
 }
 

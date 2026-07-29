@@ -65,9 +65,20 @@ type Server struct {
 	switchMu  sync.Mutex
 	switching map[string]bool
 
+	archiveMu          sync.Mutex
+	projectArchiving   map[string]bool
+	projectStartLeases map[string]int
+	agentArchiving     map[string]bool
+	agentStartLeases   map[string]int
+	projectTransitions map[string]int
+	archiveChanged     chan struct{}
+
 	// credCheck is the credential probe function; defaults to credcheck.Check.
 	// Tests inject a stub so real network/CLI calls are avoided.
 	credCheck func(ctx context.Context, bk config.Backend, model config.Model, mergedEnv map[string]string) credcheck.CredResult
+	// writeProject is the final project-config publication seam. Archive tests
+	// inject a failure here to verify exact SQLite compensation.
+	writeProject func(string, config.Project) error
 
 	// primerSummarizer is the one-shot target-backend summary seam for backend
 	// switches. The default implementation is gated until live CLI invocation is
@@ -140,23 +151,30 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	msg.SetBudgetExceededSink(eventBus.PublishBudgetExceeded)
 	sourceMgr := newConfigSourceManager(cfgStore, eventBus)
 	s := &Server{
-		configStore:      cfgStore,
-		stateStore:       stateStore,
-		stateMgr:         stateMgr,
-		eventBus:         eventBus,
-		registry:         registry,
-		terminal:         term,
-		indexer:          ix,
-		messaging:        msg,
-		sourceMgr:        sourceMgr,
-		nudgeCh:          nudgeCh,
-		cfg:              cfg,
-		log:              log,
-		hookTokens:       map[string]string{},
-		mcpCleanups:      map[string]func(){},
-		switching:        map[string]bool{},
-		credCheck:        credcheck.Check,
-		primerSummarizer: defaultPrimerSummarizer,
+		configStore:        cfgStore,
+		stateStore:         stateStore,
+		stateMgr:           stateMgr,
+		eventBus:           eventBus,
+		registry:           registry,
+		terminal:           term,
+		indexer:            ix,
+		messaging:          msg,
+		sourceMgr:          sourceMgr,
+		nudgeCh:            nudgeCh,
+		cfg:                cfg,
+		log:                log,
+		hookTokens:         map[string]string{},
+		mcpCleanups:        map[string]func(){},
+		switching:          map[string]bool{},
+		projectArchiving:   map[string]bool{},
+		projectStartLeases: map[string]int{},
+		agentArchiving:     map[string]bool{},
+		agentStartLeases:   map[string]int{},
+		projectTransitions: map[string]int{},
+		archiveChanged:     make(chan struct{}),
+		credCheck:          credcheck.Check,
+		writeProject:       cfgStore.WriteProject,
+		primerSummarizer:   defaultPrimerSummarizer,
 	}
 	s.pipelineTemplates = pipeline.NewTemplateStore(cfgStore)
 	s.pipelineMgr = pipeline.NewManager(stateStore, s.pipelineTemplates, s, s)

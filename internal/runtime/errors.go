@@ -59,6 +59,10 @@ const (
 	CodeSourceConflict   = "source_conflict"   // 409
 	CodeApprovalRequired = "approval_required" // 409
 	CodeSourceInvalid    = "source_invalid"    // 422
+	CodeAgentArchived    = "agent_archived"    // 409
+	CodeAgentArchiving   = "agent_archiving"   // 409
+	CodeProjectArchived  = "project_archived"  // 409
+	CodeProjectArchiving = "project_archiving" // 409
 )
 
 // APIError is the normalized error payload. It serializes to the §7.7 envelope:
@@ -90,7 +94,8 @@ func statusForCode(code string) int {
 	case CodeNotFound, CodeGroupNotFound, CodeSourceNotFound:
 		return http.StatusNotFound // 404
 	case CodeConflict, CodeAgentNotRunning, CodeSwitchInProgress,
-		CodeSourceChanged, CodeSourceConflict, CodeApprovalRequired:
+		CodeSourceChanged, CodeSourceConflict, CodeApprovalRequired,
+		CodeAgentArchived, CodeAgentArchiving, CodeProjectArchived, CodeProjectArchiving:
 		return http.StatusConflict // 409
 	case CodeNotImplemented:
 		return http.StatusNotImplemented // 501

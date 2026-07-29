@@ -436,7 +436,7 @@ func (m *Manager) recompute(agentID string) (AgentStateUpdate, error) {
 	now := timeNow().UnixMilli()
 	row := m.store.db.QueryRow(`
 SELECT
-    a.agent_id, a.name, a.role, a.project, a.backend, a.model, a.interface, a.grp, a.created_at,
+    a.agent_id, a.name, a.role, a.project, a.backend, a.model, a.interface, a.grp, a.created_at, a.archived,
     r.pid, r.session_id, r.tty, r.driver, r.started_at,
     st.state, st.detail, st.last_trace, st.busy_since, st.context_pct
 FROM agents a
@@ -451,7 +451,7 @@ WHERE a.agent_id = ?`, agentID)
 	var contextPct sql.NullFloat64
 	err := row.Scan(
 		&out.AgentID, &out.Name, &out.Role, &out.Project, &out.Backend, &out.Model,
-		&out.Interface, &out.Group, &out.CreatedAt,
+		&out.Interface, &out.Group, &out.CreatedAt, &out.Archived,
 		&pid, &sessionID, &tty, &driver, &startedAt,
 		&state, &detail, &lastTrace, &busySince, &contextPct,
 	)

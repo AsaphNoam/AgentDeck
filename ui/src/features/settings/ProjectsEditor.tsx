@@ -1,5 +1,6 @@
 import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   useProjects,
   useCreateProject,
@@ -7,6 +8,8 @@ import {
   useDeleteProject,
   configErrorMessage,
 } from "../../api/config";
+import { QUERY_KEYS } from "../../api/config";
+import { archiveProject, restoreProject } from "../../api/client";
 import { useUiStore } from "../../store/uiStore";
 import type { ProjectResponse, FieldWarning } from "../../schemas/project";
 import { ProjectForm } from "./ProjectForm";
@@ -17,6 +20,17 @@ export function ProjectsEditor() {
   const updateProject = useUpdateProject();
   const deleteProject = useDeleteProject();
   const pushError = useUiStore((state) => state.pushError);
+  const queryClient = useQueryClient();
+  const archive = useMutation({
+    mutationFn: archiveProject,
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.projects }),
+    onError: (err) => pushError("Archive project failed", configErrorMessage(err)),
+  });
+  const restore = useMutation({
+    mutationFn: restoreProject,
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.projects }),
+    onError: (err) => pushError("Restore project failed", configErrorMessage(err)),
+  });
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ProjectResponse | null>(null);
@@ -119,10 +133,18 @@ export function ProjectsEditor() {
               />
               <strong>{proj.title}</strong>
               <code className="config-slug">{id}</code>
+              <span>{proj.archived ? "Archived" : "Active"}</span>
               <span className="config-cwd">{proj.cwd}</span>
             </div>
             <div className="config-list-item-actions" data-slot="actions">
               <button onClick={() => openEdit(id, proj)}>Edit</button>
+              {proj.archived ? (
+                <button onClick={() => restore.mutate(id)} disabled={restore.isPending}>Restore</button>
+              ) : (
+                <button onClick={() => {
+                  if (confirm(`Archive project "${proj.title}"? Running agents will be stopped and all project agents archived.`)) archive.mutate(id);
+                }} disabled={archive.isPending}>Archive</button>
+              )}
               <button onClick={() => handleDelete(id, proj.resource_dir)} className="btn-danger">
                 Delete
               </button>

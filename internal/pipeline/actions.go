@@ -22,6 +22,12 @@ func (m *Manager) Continue(ctx context.Context, runID string, expectedRevision i
 		lock.Unlock()
 		return RunDetail{}, controlError("revision_conflict", "run changed; refresh before continuing")
 	}
+	release, err := m.acquireProjectStart(ctx, run.Project)
+	if err != nil {
+		lock.Unlock()
+		return RunDetail{}, err
+	}
+	defer release()
 	detail, err := m.Detail(runID)
 	if err != nil {
 		lock.Unlock()
@@ -87,6 +93,12 @@ func (m *Manager) Retry(ctx context.Context, runID string, expectedRevision int6
 		lock.Unlock()
 		return RunDetail{}, controlError("revision_conflict", "run changed; refresh before retrying")
 	}
+	release, err := m.acquireProjectStart(ctx, run.Project)
+	if err != nil {
+		lock.Unlock()
+		return RunDetail{}, err
+	}
+	defer release()
 	if run.State != "paused" || run.PendingAction == "await_approval" || run.AttentionReason == "loop_limit_reached" {
 		lock.Unlock()
 		return RunDetail{}, controlError("invalid_state", "retry is not valid for the current run state")
@@ -139,6 +151,24 @@ func (m *Manager) Stop(ctx context.Context, runID string, expectedRevision int64
 		return RunDetail{}, err
 	}
 	return m.Detail(runID)
+}
+
+// StopProject uses the ordinary durable stop path for every non-terminal run
+// owned by a project. Project archival calls it before archiving stage agents.
+func (m *Manager) StopProject(ctx context.Context, project string) error {
+	runs, err := m.store.ListActivePipelineRuns()
+	if err != nil {
+		return err
+	}
+	for _, run := range runs {
+		if run.Project != project {
+			continue
+		}
+		if _, err := m.Stop(ctx, run.RunID, run.Revision); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (m *Manager) Delete(runID string) error {

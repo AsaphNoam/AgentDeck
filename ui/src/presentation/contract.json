@@ -77,6 +77,11 @@
       "states": [],
       "variants": []
     },
+    "project-dashboard": {
+      "slots": [],
+      "states": [],
+      "variants": []
+    },
     "agent-group": {
       "slots": ["header", "summary", "grid"],
       "states": ["expanded", "collapsed"],

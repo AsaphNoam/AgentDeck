@@ -33,5 +33,10 @@
     "file": "src/features/settings/ProjectsEditor.tsx",
     "rule": "inline-style",
     "reason": "Background is the persisted project RGB accent"
+  },
+  {
+    "file": "src/features/dashboard/ProjectDashboard.tsx",
+    "rule": "inline-style",
+    "reason": "Background is the persisted project RGB accent"
   }
 ]

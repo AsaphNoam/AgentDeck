@@ -16,6 +16,7 @@ type Agent struct {
 	Interface string    `json:"interface"`
 	CreatedAt time.Time `json:"created_at"`
 	Group     string    `json:"group,omitempty"`
+	Archived  bool      `json:"archived"`
 }
 
 // RunningEntry records an active session for an agent.
@@ -75,6 +76,7 @@ type AgentState struct {
 	UnreadMessages int                  `json:"unread_messages,omitempty"`
 	LastSentAt     string               `json:"last_sent_at,omitempty"`
 	UpdatedAt      int64                `json:"updated_at"`
+	Archived       bool                 `json:"archived"`
 	Pipeline       *PipelineAssociation `json:"pipeline,omitempty"`
 }
 

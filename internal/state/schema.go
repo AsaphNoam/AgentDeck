@@ -280,4 +280,13 @@ CREATE TABLE pipeline_requests (
 CREATE UNIQUE INDEX idx_pipeline_requests_run ON pipeline_requests(run_id);
 `,
 	},
+	{
+		// Project-first dashboard and grouped Archive. The archive bit belongs to
+		// the durable agent identity, not a session snapshot or search projection.
+		version: 11,
+		sql: `
+ALTER TABLE agents ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX idx_agents_project_archived ON agents(project, archived);
+`,
+	},
 }

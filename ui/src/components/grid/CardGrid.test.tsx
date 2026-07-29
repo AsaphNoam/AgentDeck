@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
-import { CardGrid } from "./CardGrid";
+import { CardGrid, mergeScopedOrder } from "./CardGrid";
 import { useAgentStore } from "../../store/agentStore";
 import type { AgentState } from "../../api/types";
 
@@ -53,6 +53,15 @@ function renderWithQuery(ui: React.ReactElement) {
 }
 
 describe("CardGrid", () => {
+
+  it("merges a scoped reorder back into the shared layout", () => {
+    expect(mergeScopedOrder(
+      ["a-one", "b-one", "a-two", "b-two"],
+      ["a-one", "a-two"],
+      ["a-two", "a-one"],
+    )).toEqual(["a-two", "b-one", "a-one", "b-two"]);
+  });
+
   // FS-02.A13: agent state keeps the durable project id, but Dashboard metadata
   // must use the project's human-readable title whenever configuration resolves it.
   it("uses the configured project title on agent cards", async () => {

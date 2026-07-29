@@ -24,6 +24,7 @@ export interface AgentState {
   unread_messages?: number;
   last_sent_at?: string;
   updated_at: number;
+	archived: boolean;
   removed?: boolean;
   hydrated?: boolean;
   pipeline?: {
@@ -138,8 +139,18 @@ export interface ArchiveResult {
   files_touched: number;
   commands_run: number;
   active: boolean;
+	archived: boolean;
   matched_in?: string[];
   snippet?: string;
+}
+
+export interface ArchiveProjectGroup {
+  project: string;
+  title: string;
+  color: [number, number, number];
+  project_status: "active" | "archived" | "missing";
+  archived_agent_count: number;
+  results: ArchiveResult[];
 }
 
 export interface DiffRef {

@@ -11,6 +11,21 @@ import (
 	"github.com/agentdeck/agentdeck/internal/runtime"
 )
 
+// AcquirePipelineStart is the control-plane's shared project start lease. The
+// manager obtains it before advancing durable run state, preserving the public
+// archive conflict code rather than converting it to a later paused failure.
+func (s *Server) AcquirePipelineStart(_ context.Context, projectID string) (func(), error) {
+	if ae := s.acquireProjectStart(projectID); ae != nil {
+		return nil, &pipeline.ProjectGateError{Code: ae.Code, Message: ae.Message}
+	}
+	project, err := s.configStore.ReadProject(projectID)
+	if err == nil && project.Archived {
+		s.releaseProjectStart(projectID)
+		return nil, &pipeline.ProjectGateError{Code: runtime.CodeProjectArchived, Message: "project is archived"}
+	}
+	return func() { s.releaseProjectStart(projectID) }, nil
+}
+
 // ValidateStage checks the same chat role/project/backend/model boundary before
 // a run snapshot is committed, without registering or starting a process.
 func (s *Server) ValidateStage(_ context.Context, execution pipeline.StageExecution) error {
@@ -20,6 +35,9 @@ func (s *Server) ValidateStage(_ context.Context, execution pipeline.StageExecut
 	project, err := s.configStore.ReadProject(execution.Project)
 	if err != nil {
 		return fmt.Errorf("unknown project %q", execution.Project)
+	}
+	if project.Archived {
+		return fmt.Errorf("project is archived")
 	}
 	cwd, err := config.ExpandTilde(project.Cwd)
 	if err != nil {
@@ -74,6 +92,13 @@ func (s *Server) LaunchStage(ctx context.Context, execution pipeline.StageExecut
 // ContinueStage reuses a live blocked agent or resumes its ordinary persisted
 // session after restart, then submits the durable continuation assignment.
 func (s *Server) ContinueStage(ctx context.Context, execution pipeline.StageExecution) error {
+	if ae := s.acquireAgentStart(execution.Project, execution.AgentID); ae != nil {
+		return errors.New(ae.Message)
+	}
+	defer s.releaseAgentStart(execution.Project, execution.AgentID)
+	if project, err := s.configStore.ReadProject(execution.Project); err != nil || project.Archived {
+		return errors.New("project is archived")
+	}
 	if s.IsRunning(execution.AgentID) {
 		return s.registry.SendPrompt(ctx, execution.AgentID, execution.Assignment)
 	}

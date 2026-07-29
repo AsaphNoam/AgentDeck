@@ -17,6 +17,10 @@ type Query struct {
 	Limit  int
 	Offset int
 	Active *bool
+	// Project narrows a durable archive query before pagination. Grouped Archive
+	// uses it for independent per-project agent pages instead of slicing an
+	// already-truncated cross-project projection.
+	Project string
 }
 
 type Response struct {
@@ -85,7 +89,7 @@ func (a *Archive) Search(q Query) (Response, error) {
 }
 
 func (a *Archive) list(q Query) (int, []Result, error) {
-	where, args := activeWhere(q.Active, "WHERE")
+	where, args := archiveWhere(q, "WHERE")
 	var total int
 	if err := a.db.QueryRow(`SELECT COUNT(*) FROM sessions s LEFT JOIN running r ON r.agent_id = s.agent_id`+where, args...).Scan(&total); err != nil {
 		return 0, nil, fmt.Errorf("archive: count list: %w", err)
@@ -108,7 +112,7 @@ LIMIT ? OFFSET ?`, args...)
 }
 
 func (a *Archive) search(q Query, match, raw string) (int, []Result, error) {
-	where, args := activeWhere(q.Active, "AND")
+	where, args := archiveWhere(q, "AND")
 	countArgs := append([]any{match}, args...)
 	var total int
 	if err := a.db.QueryRow(`
@@ -188,7 +192,7 @@ func (a *Archive) searchFallback(q Query, raw string) (int, []Result, error) {
 		return a.list(q)
 	}
 
-	where, args := activeWhere(q.Active, "WHERE")
+	where, args := archiveWhere(q, "WHERE")
 	var total int
 
 	placeholders := make([]string, 0, len(terms))
@@ -258,6 +262,17 @@ func activeWhere(active *bool, prefix string) (string, []any) {
 		return " " + prefix + " r.agent_id IS NOT NULL", nil
 	}
 	return " " + prefix + " r.agent_id IS NULL", nil
+}
+
+func archiveWhere(q Query, prefix string) (string, []any) {
+	where, args := activeWhere(q.Active, prefix)
+	if q.Project == "" {
+		return where, args
+	}
+	if where == "" {
+		return " " + prefix + " s.project = ?", []any{q.Project}
+	}
+	return where + " AND s.project = ?", append(args, q.Project)
 }
 
 func scanResults(rows *sql.Rows) ([]Result, error) {

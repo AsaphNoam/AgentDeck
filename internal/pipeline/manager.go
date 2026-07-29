@@ -38,6 +38,11 @@ func (m *Manager) Start(ctx context.Context, request StartRequest) (RunDetail, b
 	if detail, found, err := m.LookupStart(request); err != nil || found {
 		return detail, found, err
 	}
+	release, err := m.acquireProjectStart(ctx, request.Project)
+	if err != nil {
+		return RunDetail{}, false, err
+	}
+	defer release()
 	record, startErr := m.validateStart(ctx, &request)
 	if startErr != nil {
 		return RunDetail{}, false, startErr
@@ -122,6 +127,13 @@ func (m *Manager) LookupStart(request StartRequest) (RunDetail, bool, error) {
 	}
 	detail, err := m.Detail(runID)
 	return detail, true, err
+}
+
+func (m *Manager) acquireProjectStart(ctx context.Context, project string) (func(), error) {
+	if m.lifecycle == nil {
+		return func() {}, nil
+	}
+	return m.lifecycle.AcquirePipelineStart(ctx, project)
 }
 
 func (m *Manager) validateStart(ctx context.Context, request *StartRequest) (TemplateRecord, error) {

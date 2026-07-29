@@ -182,7 +182,7 @@ launches read effort from the frozen snapshot through the shared lifecycle servi
 edited mid-run cannot change an in-flight run's levels, and a retried or looped attempt reuses the
 snapshot's value rather than re-resolving it.
 
-**R25 — (planned).** After acquiring TS-01.R13's exclusive project-archiving claim, project archive
+**R25.** After acquiring TS-01.R13's exclusive project-archiving claim, project archive
 calls the pipeline manager before changing durable archive state. The manager atomically blocks future
 transition claims and stops every active run in that project through its ordinary stop path, then
 returns control to the archive service to stop/archive the stage agent. Run start, Continue, Retry,
@@ -274,7 +274,7 @@ new durable run revision or a structured validation/conflict result.
 
 ## 6. Traceability
 
-- Product behavior and acceptance: FS-14.R1–R30 and FS-14.A1–A10.
+- Product behavior and acceptance: FS-14.R1–R32 and FS-14.A1–A12.
 - Existing lifecycle/composition: TS-01.R4–R9; FS-01.
 - Persistence and migrations: TS-02.R1–R8, R12, R17.
 - HTTP/SSE and UI/API lockstep: TS-03.R1–R11, R16–R17.
@@ -283,3 +283,5 @@ new durable run revision or a structured validation/conflict result.
 - Regression anchors: `internal/pipeline`, `internal/state/pipelines_test.go`,
   `internal/messaging/pipeline_tools_test.go`, `internal/server/pipeline_handlers_test.go`, and
   `ui/src/{api,features/pipelines,schemas/pipeline.ts}`.
+- Archive containment: `Manager.Start`, `Continue`, `Retry`, and `Reconcile`;
+  `TestStartRejectsProjectArchiveClaimBeforeDurableMutation`.

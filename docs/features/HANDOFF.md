@@ -6,8 +6,11 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
-- **Active change:** [`project-dashboard-and-project-grouped-archive.md`](../ready-changes/project-dashboard-and-project-grouped-archive.md).
-- **State:** AgentDeck-launched Codex agents now run in a private `CODEX_HOME`
+- **Active change:** None; the project-dashboard and project-grouped Archive change is finished.
+- **State:** The project-first dashboard, project/agent archive lifecycle, grouped Archive pagination,
+  and project archive containment are complete. The resolved review findings have focused regression
+  coverage; an independent review of the completed commit is the next quality gate.
+- **Previous transition context:** AgentDeck-launched Codex agents now run in a private `CODEX_HOME`
   (`<agentdeck-home>/codex`, `0700`), composed as the final, reserved child-env layer in
   launch/resume/switch via `codexHomeEnv`/`composeEnv`, so their rollouts and native session index
   never enter the user's personal `codex` resume picker or app history. Before every codex-acp child
@@ -57,18 +60,16 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   and [`../archive/reviews/usability-review-run-2026-07-26-browser-retry.md`](../archive/reviews/usability-review-run-2026-07-26-browser-retry.md).
   Credentialed provider and terminal compatibility remain separate manual release gates.
 - **Last reviewed code:** `dc04dbd` (2026-07-29), the continuous range after `547ca43` (the Codex
-  isolation fix `e021ce3` and the project-dashboard spec finalization), plus the uncommitted
-  project-dashboard/grouped-archive working tree implementing the active change.
+  isolation fix `e021ce3` and the project-dashboard spec finalization). The finished project-dashboard
+  change awaits an independent review.
 - **Branch:** `main`.
 
 ## Active change
 
-**State:** in progress
+**State:** finished
 
-Implement the project-first dashboard and project-grouped archive change. First map the existing
-project, archive, lifecycle, pipeline, API, persistence, and UI seams against the planned FS/TS
-requirements; then ship the shared archive transition, API/persistence, UI, focused regressions,
-and normal verification as complete pieces.
+The project-first dashboard and project-grouped Archive change is complete; no implementation work
+is currently active.
 
 ## Decisions needing your input
 
@@ -97,7 +98,10 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 The post-fix usability-review and current code-review state are committed locally on `main`; pushing
 those commits to the shared `origin/main` branch needs explicit human authorization.
 
-## Review findings
+## Resolved review findings
+
+All findings below are resolved by the finished project-dashboard and project-grouped Archive change;
+they remain here only as the review record until the next handoff cleanup.
 
 - **Must fix** — INV §7 (also §10) — Grouped Archive truncates the corpus at 200 sessions and the UI
   has no independent agent paging. `internal/server/archive.go` `archiveRows` always fetches
@@ -239,6 +243,15 @@ are not promoted to findings without a repeatable failure.
 ## Recent changelog
 
 _(Newest first; durable product truth is in FS/TS and history is in git.)_
+
+- 2026-07-29 — Fixed every project-dashboard/grouped-Archive review finding and completed the
+  active change. **INV §2/§4/§5/§15** now protect archive/restore claims, live-orphan reaping,
+  compensation, and pipeline starts; **INV §1/§3/§8/§10** keep project/Archive state and shared
+  layout coherent; **INV §7/§10/§11** cover the complete grouped-search corpus, independent paging,
+  documented action responses, and Settings/selector boundaries. The Codex profile statement now
+  accurately describes the visibility guarantee for new versus already-running children. Focused
+  Go/UI regressions, specification checks, and the normal build/test/distribution verification are
+  recorded with this change.
 
 - 2026-07-29 — Independently re-reviewed the uncommitted project-dashboard/grouped-Archive
   implementation after the first pass, from the planned FS/TS requirements through every changed

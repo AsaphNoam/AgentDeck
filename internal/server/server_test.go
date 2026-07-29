@@ -97,6 +97,9 @@ func TestSessionsEmptyIsArray(t *testing.T) {
 
 func TestArchiveListHandler(t *testing.T) {
 	srv := testServer(t, true)
+	if err := srv.stateStore.WriteAgent(state.Agent{AgentID: "a_archive", Name: "Atlas", Role: "implementer", Project: "my-app", Backend: "claude", Model: "sonnet", Interface: "chat", CreatedAt: time.Date(2026, 6, 28, 10, 0, 0, 0, time.UTC), Archived: true}); err != nil {
+		t.Fatalf("write archived agent: %v", err)
+	}
 	if _, err := srv.stateStore.DB().Exec(`
 INSERT INTO sessions(agent_id, name, role, project, backend, model, interface, cwd, system_prompt, created_at, updated_at)
 VALUES ('a_archive','Atlas','implementer','my-app','claude','sonnet','chat','/tmp','prompt','2026-06-28T10:00:00Z','2026-06-28T10:01:00Z')`); err != nil {
@@ -110,14 +113,17 @@ VALUES ('a_archive','Atlas','implementer','my-app','claude','sonnet','chat','/tm
 		Total      int    `json:"total"`
 		SearchMode string `json:"search_mode"`
 		Results    []struct {
-			AgentID string `json:"agent_id"`
-			Active  bool   `json:"active"`
+			Project string `json:"project"`
+			Results []struct {
+				AgentID string `json:"agent_id"`
+				Active  bool   `json:"active"`
+			} `json:"results"`
 		} `json:"results"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("archive body: %v", err)
 	}
-	if body.Total != 1 || body.SearchMode == "" || len(body.Results) != 1 || body.Results[0].AgentID != "a_archive" || body.Results[0].Active {
+	if body.Total != 1 || body.SearchMode == "" || len(body.Results) != 1 || body.Results[0].Project != "my-app" || len(body.Results[0].Results) != 1 || body.Results[0].Results[0].AgentID != "a_archive" || body.Results[0].Results[0].Active {
 		t.Fatalf("archive body = %+v", body)
 	}
 }

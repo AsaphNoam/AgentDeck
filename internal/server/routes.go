@@ -34,6 +34,9 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/hook", s.handleHook)
 	api("GET /api/events", s.handleEvents)
 	api("GET /api/archive", s.handleArchive)
+	api("GET /api/archive/projects/{project}", s.handleArchiveProject)
+	api("POST /api/projects/{project}/archive", s.handleArchiveProjectAction)
+	api("POST /api/projects/{project}/restore", s.handleRestoreProjectAction)
 
 	// Native sequential pipeline templates and durable runs (FS-14 / TS-09).
 	api("GET /api/pipelines", s.handlePipelineTemplates)
@@ -63,6 +66,8 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/sessions/{id}/identity", s.handleIdentity)
 	api("POST /api/sessions/{id}/permission", s.handlePermission)
 	api("POST /api/sessions/{id}/resume", s.handleResume)
+	api("POST /api/sessions/{id}/archive", s.handleArchiveAgentAction)
+	api("POST /api/sessions/{id}/restore", s.handleRestoreAgentAction)
 	api("POST /api/sessions/{id}/switch-runtime", s.handleSwitchRuntime)
 	api("GET /api/sessions/{id}/files", s.handleFiles)
 	api("GET /api/sessions/{id}/commands", s.handleCommands)

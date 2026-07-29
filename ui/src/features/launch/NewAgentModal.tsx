@@ -29,7 +29,7 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, onLa
   const launch = useLaunchAgent();
 
   const roleEntries = Object.entries(rolesData ?? {});
-  const projectEntries = Object.entries(projectsData ?? {});
+  const projectEntries = Object.entries(projectsData ?? {}).filter(([, project]) => !project.archived);
 
   const defaultBackendId =
     Object.entries(backendsData?.backends ?? {}).find(([, b]) => b.default)?.[0] ??
@@ -68,6 +68,10 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, onLa
       setProject(projectEntries[0][0]);
     }
   }, [projectEntries.length, configData?.default_project]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (project && projectsData && (!projectsData[project] || projectsData[project].archived)) setProject("");
+  }, [project, projectsData]);
 
   useEffect(() => {
     if (!backendId && defaultBackendId) setBackendId(defaultBackendId);

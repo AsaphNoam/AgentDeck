@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { searchArchive } from "../../api/client";
-import type { ArchiveResult } from "../../api/types";
+import { restoreProject, searchArchive, searchArchiveProject } from "../../api/client";
+import { useUiStore } from "../../store/uiStore";
+import type { ArchiveProjectGroup, ArchiveResult } from "../../api/types";
 import { Badge } from "../../components/ui";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { QUERY_KEYS } from "../../api/config";
+import type { ProjectResponse } from "../../schemas/project";
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -30,6 +34,7 @@ function ArchiveRow({ result, onClick }: { result: ArchiveResult; onClick: () =>
       </div>
       <div className="archive-row-sub" data-slot="metadata">
         <span>{result.role} · {result.project}</span>
+        <span>{result.archived ? "archived" : result.active ? "running" : "stopped"}</span>
         <span>{result.backend} · {result.model}</span>
       </div>
       {result.snippet && (
@@ -54,16 +59,18 @@ function ArchiveRow({ result, onClick }: { result: ArchiveResult; onClick: () =>
 
 export function ArchivePage() {
   const navigate = useNavigate();
+  const pushError = useUiStore((state) => state.pushError);
+  const queryClient = useQueryClient();
   const [q, setQ] = useState("");
   const debouncedQ = useDebounce(q, 250);
-  const [results, setResults] = useState<ArchiveResult[]>([]);
+  const [results, setResults] = useState<ArchiveProjectGroup[]>([]);
   const [total, setTotal] = useState(0);
   const [searchMode, setSearchMode] = useState<"full_text" | "metadata" | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const load = useCallback(async (query: string, offset: number, append: boolean, rendered: ArchiveResult[] = []) => {
+  const load = useCallback(async (query: string, offset: number, append: boolean, rendered: ArchiveProjectGroup[] = []) => {
     if (abortRef.current) abortRef.current.abort();
     const ac = new AbortController();
     abortRef.current = ac;
@@ -71,25 +78,20 @@ export function ArchivePage() {
     setError(null);
     try {
       const resp = await searchArchive(query, 50, offset, ac.signal);
-      let page = resp.results ?? [];
-      let recovered: ArchiveResult[] = [];
+      const raw = resp.results ?? [];
+      // Retain a defensive compatibility projection for an older server during
+      // a rolling upgrade; the grouped API is authoritative for new responses.
+      let page = normalizeGroups(raw);
       if (append) {
-        // The Archive is ordered by the mutable updated_at, so a session resumed
-        // or touched between page requests moves ahead of this offset: the page
-        // repeats a boundary row and the moved session is never reached. A
-        // repeat is the proof that the prefix shifted, so refetch the first page
-        // and recover whatever moved into it (FS-05.R28).
-        const seen = new Set(rendered.map((result) => result.agent_id));
-        const shifted = page.some((result) => seen.has(result.agent_id));
-        page = page.filter((result) => !seen.has(result.agent_id));
-        if (shifted) {
+        const seen = new Set(rendered.map((group) => group.project));
+        const duplicate = page.some((group) => seen.has(group.project));
+        if (duplicate) {
           const head = await searchArchive(query, 50, 0, ac.signal);
-          const pageIDs = new Set(page.map((result) => result.agent_id));
-          recovered = (head.results ?? []).filter((result) => !seen.has(result.agent_id) && !pageIDs.has(result.agent_id));
+          page = mergeGroups(normalizeGroups(head.results ?? []), page);
         }
       }
       if (!ac.signal.aborted) {
-        setResults((current) => append ? [...recovered, ...current, ...page] : page);
+        setResults((current) => append ? mergeGroups(current, page) : page);
         setTotal(resp.total);
         setSearchMode(resp.search_mode === "full_text" ? "full_text" : "metadata");
       }
@@ -106,12 +108,23 @@ export function ArchivePage() {
     void load(debouncedQ, 0, false);
   }, [debouncedQ, load]);
 
+  const restore = useMutation({
+    mutationFn: restoreProject,
+    onSuccess: (project) => {
+      queryClient.setQueryData<Record<string, Omit<ProjectResponse, "project">>>(QUERY_KEYS.projects, (current) => (
+        current ? { ...current, [project.project]: { ...current[project.project], ...project, archived: false } } : current
+      ));
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.projects });
+      setResults((current) => current.map((group) => (
+        group.project === project.project ? { ...group, project_status: "active" } : group
+      )));
+      void load(debouncedQ, 0, false);
+    },
+    onError: (err) => pushError("Restore project failed", err instanceof Error ? err.message : String(err)),
+  });
+
   const handleClick = (result: ArchiveResult) => {
-    if (result.active) {
-      navigate(`/agent/${result.agent_id}`);
-    } else {
-      navigate(`/archive/${result.agent_id}`);
-    }
+    navigate(result.archived ? `/archive/${result.agent_id}` : `/agent/${result.agent_id}`);
   };
 
   const searchPlaceholder = searchMode === "full_text"
@@ -147,11 +160,19 @@ export function ArchivePage() {
       {error && <p className="archive-error">{error}</p>}
       {loading && results.length === 0 && <p className="archive-loading">Loading…</p>}
       {!loading && !error && results.length === 0 && (
-        <p className="archive-empty">{q ? `No results for "${q}"` : "No sessions yet."}</p>
+        <p className="archive-empty">{q ? `No results for "${q}"` : "No archived agents yet. Stopped agents remain on their project dashboard."}</p>
       )}
       <ul className="archive-list" data-slot="results">
-        {results.map((r) => (
-          <ArchiveRow key={r.agent_id} result={r} onClick={() => handleClick(r)} />
+        {results.map((group) => (
+          <ArchiveProjectRows
+            key={group.project}
+            group={group}
+            query={debouncedQ}
+            onClick={handleClick}
+            onError={(err) => pushError("Load project archive failed", err)}
+            onRestore={() => restore.mutate(group.project)}
+            restoring={restore.isPending && restore.variables === group.project}
+          />
         ))}
       </ul>
       {results.length < total && (
@@ -163,4 +184,90 @@ export function ArchivePage() {
       )}
     </section>
   );
+}
+
+function ArchiveProjectRows({
+  group, query, onClick, onError, onRestore, restoring,
+}: {
+  group: ArchiveProjectGroup;
+  query: string;
+  onClick: (result: ArchiveResult) => void;
+  onError: (message: string) => void;
+  onRestore: () => void;
+  restoring: boolean;
+}) {
+  const [results, setResults] = useState<ArchiveResult[]>(group.results ?? []);
+  const [total, setTotal] = useState(group.results?.length ?? 0);
+  const [loading, setLoading] = useState(false);
+  const resultsRef = useRef(results);
+
+  useEffect(() => {
+    resultsRef.current = results;
+  }, [results]);
+
+  const load = useCallback(async (offset: number, append: boolean) => {
+    setLoading(true);
+    try {
+      const page = await searchArchiveProject(group.project, query, 50, offset);
+      let incoming = page.results ?? [];
+      if (append && incoming.some((result) => resultsRef.current.some((current) => current.agent_id === result.agent_id))) {
+        const head = await searchArchiveProject(group.project, query, 50, 0);
+        incoming = mergeAgentRows(head.results ?? [], incoming);
+      }
+      setResults((current) => append ? mergeAgentRows(current, incoming) : incoming);
+      setTotal(page.total);
+    } catch (err: unknown) {
+      onError(err instanceof Error ? err.message : "Failed to load project archive");
+    } finally {
+      setLoading(false);
+    }
+  }, [group.project, onError, query]);
+
+  useEffect(() => {
+    setResults(group.results ?? []);
+    setTotal(group.results?.length ?? 0);
+    void load(0, false);
+  }, [group.project, group.results, load, query]);
+
+  return (
+    <li className="archive-project-group">
+      <h2>
+        {group.title} <small>{group.project_status} · {group.archived_agent_count} archived</small>
+        {group.project_status === "archived" && <button type="button" disabled={restoring} onClick={onRestore}>{restoring ? "Restoring…" : "Restore project"}</button>}
+      </h2>
+      <ul>{results.map((result) => <ArchiveRow key={result.agent_id} result={result} onClick={() => onClick(result)} />)}</ul>
+      {results.length < total && (
+        <div className="form-actions">
+          <button type="button" disabled={loading} onClick={() => void load(results.length, true)}>{loading ? "Loading…" : "Load more agents"}</button>
+        </div>
+      )}
+    </li>
+  );
+}
+
+function normalizeGroups(raw: ArchiveProjectGroup[]): ArchiveProjectGroup[] {
+  if (raw.length === 0 || Array.isArray(raw[0]?.results)) return raw.map((group) => ({ ...group, results: group.results ?? [] }));
+  const groups = new Map<string, ArchiveProjectGroup>();
+  for (const result of raw as unknown as ArchiveResult[]) {
+    const group = groups.get(result.project) ?? { project: result.project, title: result.project, color: [128, 128, 128], project_status: "active" as const, archived_agent_count: 0, results: [] };
+    group.results.push(result);
+    groups.set(result.project, group);
+  }
+  return [...groups.values()];
+}
+
+function mergeGroups(current: ArchiveProjectGroup[], page: ArchiveProjectGroup[]): ArchiveProjectGroup[] {
+  const merged = new Map(current.map((group) => [group.project, { ...group, results: [...group.results] }]));
+  for (const incoming of page) {
+    const group = merged.get(incoming.project) ?? { ...incoming, results: [] };
+    const ids = new Set(group.results.map((result) => result.agent_id));
+    group.results.push(...incoming.results.filter((result) => !ids.has(result.agent_id)));
+    merged.set(incoming.project, group);
+  }
+  return [...merged.values()];
+}
+
+function mergeAgentRows(current: ArchiveResult[], page: ArchiveResult[]) {
+  const known = new Set(current.map((result) => result.agent_id));
+  return [...current, ...page.filter((result) => !known.has(result.agent_id))];
 }

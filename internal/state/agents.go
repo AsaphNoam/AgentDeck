@@ -36,11 +36,11 @@ func (s *Store) ReadAgent(id string) (Agent, error) {
 	var a Agent
 	var createdAt string
 	err := s.db.QueryRow(`
-SELECT agent_id, name, role, project, backend, model, interface, created_at, grp
+SELECT agent_id, name, role, project, backend, model, interface, created_at, grp, archived
 FROM agents
 WHERE agent_id = ?`, id).Scan(
 		&a.AgentID, &a.Name, &a.Role, &a.Project, &a.Backend, &a.Model,
-		&a.Interface, &createdAt, &a.Group,
+		&a.Interface, &createdAt, &a.Group, &a.Archived,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Agent{}, ErrNotFound
@@ -58,8 +58,8 @@ WHERE agent_id = ?`, id).Scan(
 // WriteAgent inserts or updates an agent.
 func (s *Store) WriteAgent(a Agent) error {
 	_, err := s.db.Exec(`
-INSERT INTO agents(agent_id, name, role, project, backend, model, interface, created_at, grp)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO agents(agent_id, name, role, project, backend, model, interface, created_at, grp, archived)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(agent_id) DO UPDATE SET
     name = excluded.name,
     role = excluded.role,
@@ -68,9 +68,10 @@ ON CONFLICT(agent_id) DO UPDATE SET
     model = excluded.model,
     interface = excluded.interface,
     created_at = excluded.created_at,
-    grp = excluded.grp`,
+    grp = excluded.grp,
+    archived = excluded.archived`,
 		a.AgentID, a.Name, a.Role, a.Project, a.Backend, a.Model, a.Interface,
-		formatTime(a.CreatedAt), a.Group,
+		formatTime(a.CreatedAt), a.Group, a.Archived,
 	)
 	if err != nil {
 		return fmt.Errorf("state: write agent: %w", err)
@@ -81,7 +82,7 @@ ON CONFLICT(agent_id) DO UPDATE SET
 // ListAgents returns agents ordered by created_at.
 func (s *Store) ListAgents() ([]Agent, error) {
 	rows, err := s.db.Query(`
-SELECT agent_id, name, role, project, backend, model, interface, created_at, grp
+SELECT agent_id, name, role, project, backend, model, interface, created_at, grp, archived
 FROM agents
 ORDER BY created_at, agent_id`)
 	if err != nil {
@@ -95,7 +96,7 @@ ORDER BY created_at, agent_id`)
 		var createdAt string
 		if err := rows.Scan(
 			&a.AgentID, &a.Name, &a.Role, &a.Project, &a.Backend, &a.Model,
-			&a.Interface, &createdAt, &a.Group,
+			&a.Interface, &createdAt, &a.Group, &a.Archived,
 		); err != nil {
 			return nil, fmt.Errorf("state: scan agent: %w", err)
 		}
@@ -109,6 +110,51 @@ ORDER BY created_at, agent_id`)
 		return nil, fmt.Errorf("state: iterate agents: %w", err)
 	}
 	return out, nil
+}
+
+// SetAgentsArchived updates every requested durable identity in one transaction.
+// Callers stop all running agents before marking them archived.
+func (s *Store) SetAgentsArchived(ids []string, archived bool) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("state: begin archive update: %w", err)
+	}
+	defer tx.Rollback()
+	for _, id := range ids {
+		if _, err := tx.Exec(`UPDATE agents SET archived = ? WHERE agent_id = ?`, archived, id); err != nil {
+			return fmt.Errorf("state: update agent archive: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("state: commit archive update: %w", err)
+	}
+	return nil
+}
+
+// RestoreAgentArchiveStates compensates a failed cross-store project archive
+// with each agent's exact pre-transition flag, rather than assuming every
+// project member was active before the attempt.
+func (s *Store) RestoreAgentArchiveStates(states map[string]bool) error {
+	if len(states) == 0 {
+		return nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("state: begin archive compensation: %w", err)
+	}
+	defer tx.Rollback()
+	for id, archived := range states {
+		if _, err := tx.Exec(`UPDATE agents SET archived = ? WHERE agent_id = ?`, archived, id); err != nil {
+			return fmt.Errorf("state: restore agent archive state: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("state: commit archive compensation: %w", err)
+	}
+	return nil
 }
 
 // DeleteAgent deletes an agent and cascades dependent state rows.
