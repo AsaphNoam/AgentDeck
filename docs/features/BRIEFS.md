@@ -4,6 +4,28 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-30 — Review: Sky & Grove appearance and the archive/dialog fixes
+
+I reviewed the unreviewed work — the Sky & Grove appearance plus the recent archive-retry,
+project-rename error, native-dialog guard, and dialog-spec fixes — against the specifications and our
+recurring bug-class checklist. The code and the specifications agree, and the appearance behaves as
+promised: it applies immediately, saves as a global preference, falls back to the plain Core look on
+any missing, unknown, or unreadable configuration, and undoes an optimistic choice if the save fails.
+
+I found one minor issue worth fixing when convenient: if someone hand-edits the config file to an
+appearance name that doesn't exist, the app correctly shows Core and warns that the saved choice is
+unavailable, but the Core option in Settings already appears selected, so clicking it does nothing —
+the person has to pick Sky & Grove first and then switch back to fully clear the bad value. It only
+happens after a manual file edit or a persistent config read error, so it is low risk.
+
+Verification I ran passed: the specification and presentation-contract checks, the Go configuration
+and server tests, and the appearance, terminal, and visual-matrix UI tests. I changed no product code
+or specifications.
+
+**Needs attention:** None.
+
+**Next:** Fix the Appearance "repair to Core" gap when the team wants it; no blocker to shipping.
+
 ### 2026-07-30 — Implement: Sky & Grove appearance
 
 Sky & Grove is implemented and committed on `main`.
