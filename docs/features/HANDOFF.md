@@ -84,8 +84,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 The native-dialog replacement remains complete. The current fix run is clearing the review findings,
 one verified finding per commit. All five Must-fix findings are now fixed (grouped Archive
 pagination, stale per-project searches, idempotent archive claims, compensation reporting, and
-unexpected project-read errors failing closed); the next lower-risk finding is native-dialog guard
-coverage.
+unexpected project-read errors failing closed); the remaining lower-risk finding records the missing
+historical ready-change trail.
 
 ## Decisions needing your input
 
@@ -115,12 +115,6 @@ The post-fix usability-review and current code-review state are committed locall
 those commits to the shared `origin/main` branch needs explicit human authorization.
 
 ## Review findings
-
-- **Worth fixing** — INV §10 — The native-dialog presentation guard has executable bypasses.
-  `nativeDialogCall` recognizes only bare calls and `window.prompt`/`window.confirm` dot access;
-  `window["confirm"]()`, `globalThis.confirm()`, and aliases of either native function pass the guard
-  while still opening a native dialog. Extend the AST check and fixtures to cover equivalent
-  computed/global/aliased calls required by FS-12.A8/TS-08.R29.
 
 - **Worth fixing** — (no invariant class) — The native-dialog change has no committed ready-change
   trail. The completion commit adds a brief claiming `docs/ready-changes/replace-native-dialogs.md`
@@ -272,6 +266,10 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-07-30 — Closed native-dialog guard bypasses (INV §10): the presentation check now rejects
+  `globalThis`, computed-property, and static-alias calls as well as the original bare/window forms;
+  its fixtures exercise every equivalent call shape.
 
 - 2026-07-30 — Corrected the shipped lifecycle dialog specification (INV §10): Rename and runtime
   switching now consistently name their core application dialogs, with no stale browser-prompt
