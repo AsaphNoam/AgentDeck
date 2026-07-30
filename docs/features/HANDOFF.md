@@ -84,8 +84,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 The native-dialog replacement remains complete. The current fix run is clearing the review findings,
 one verified finding per commit. All five Must-fix findings are now fixed (grouped Archive
 pagination, stale per-project searches, idempotent archive claims, compensation reporting, and
-unexpected project-read errors failing closed); the next lower-risk finding is stale native-dialog
-wording in FS-01.
+unexpected project-read errors failing closed); the next lower-risk finding is native-dialog guard
+coverage.
 
 ## Decisions needing your input
 
@@ -115,11 +115,6 @@ The post-fix usability-review and current code-review state are committed locall
 those commits to the shared `origin/main` branch needs explicit human authorization.
 
 ## Review findings
-
-- **Worth fixing** — INV §10 — FS-01 contradicts the shipped dialog behavior. R8 and R13 still say
-  Rename and Switch runtime use browser prompts, and §6 repeats that as current behavior, while R32
-  says those notes retire on ship and the implementation uses application dialogs. Remove the stale
-  present-tense prompt claims so the Current specification has one source of truth.
 
 - **Worth fixing** — INV §10 — The native-dialog presentation guard has executable bypasses.
   `nativeDialogCall` recognizes only bare calls and `window.prompt`/`window.confirm` dot access;
@@ -277,6 +272,10 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-07-30 — Corrected the shipped lifecycle dialog specification (INV §10): Rename and runtime
+  switching now consistently name their core application dialogs, with no stale browser-prompt
+  wording left in FS-01.
 
 - 2026-07-30 — Fixed project Rename validation feedback (INV §8/§10): the dialog now preserves the
   server's structured field-level message instead of showing only `HTTP 400`; the overlong-title

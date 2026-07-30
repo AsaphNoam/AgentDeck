@@ -72,7 +72,7 @@ orphaned processes.
   cause rather than presenting a generic process exit (FS-03.R9).
 - **R8** — **Rename** (`POST /api/sessions/{id}/rename`) changes the display name
   only; the `agent_id` and all other identity fields are unchanged. Invalid names are rejected under
-  R4. The UI drives rename through a browser prompt.
+  R4. The UI drives rename through the core application dialog described by R32.
 - **R9** — **Clone** launches a **new** agent (new `agent_id`) carrying the source agent's role,
   project, backend, model, interface, and group. Clone launches **immediately, with no confirmation
   dialog**; the source agent is untouched.
@@ -99,7 +99,8 @@ orphaned processes.
   `interface` (chat ↔ terminal), `backend`, and `model` on a **running** agent, preserving
   conversation history. At least one field must differ from the current identity. The server cancels
   any in-flight turn (bounded wait), stops the current runtime, persists the new identity under the
-  **unchanged** `agent_id`, and resumes. The UI drives switch through browser prompts.
+  **unchanged** `agent_id`, and resumes. The UI drives switch through the core application dialog
+  described by R32.
 - **R14** — History is preserved one of two ways, reported in the response `history_handoff`:
   - **`native_resume`** — a **same-backend** switch (e.g. interface-only, or a model swap the backend
     supports on resume) keeps the CLI's own native session; only the changed argument differs.
@@ -117,8 +118,7 @@ orphaned processes.
   validated by R4. Switch runtime opens one form whose `interface`, `backend`, and `model` selects
   are populated from the backend catalog (terminal gated by capability per R15), requires at least
   one field to differ from the current identity before it can submit, and performs no switch when
-  cancelled. Both submit the same requests as today; the R8/R13 "browser prompt" notes are retired
-  on ship.
+  cancelled. Both submit the same requests as today.
 
 ### Identity
 
@@ -244,9 +244,9 @@ transitions:
   hardcoded ~5 seconds before stopping; the live identity updates before the archived snapshot; and a
   switch on a stopped identity returns `409 agent_not_running`. These are user/API-visible
   interoperability choices.
-- **Immediate/prompt-based UI.** Clone launches immediately
-  with no confirmation (R9); rename and switch runtime use browser prompts today (R8, R13), with the
-  application-dialog replacement specified by R32/FS-12.R26; a disappeared
+- **Immediate/dialog-based UI.** Clone launches immediately
+  with no confirmation (R9); rename and switch runtime use the application dialogs specified by
+  R32/FS-12.R26; a disappeared
   terminal process becomes `done` not `error` (R18); and an invalid seeded project is explained after
   launch fails (R22, mitigated by the up-front cwd check).
 - **Agent env inheritance by design.** Child agents inherit
