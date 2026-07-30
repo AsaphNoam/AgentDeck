@@ -1,7 +1,7 @@
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { QUERY_KEYS, useProjects, useUpdateProject } from "../../api/config";
+import { configErrorMessage, QUERY_KEYS, useProjects, useUpdateProject } from "../../api/config";
 import { useAgentStore } from "../../store/agentStore";
 import { CardGrid } from "../../components/grid/CardGrid";
 import { archiveProject } from "../../api/client";
@@ -60,7 +60,7 @@ export function ProjectDashboard() {
         })}
         {unavailable.map((id) => <article className="project-card unavailable" key={id} onClick={() => navigate(`/project/${id}`)}><strong>{id}</strong><span>Project unavailable</span></article>)}
       </div>
-      {edit && <ProjectEditDialog key={`${edit.id}-${edit.field}`} edit={edit} onCancel={() => setEdit(null)} onSave={(data, setError) => updateProject.mutate({ id: edit.id, data }, { onSuccess: () => setEdit(null), onError: (err) => { const message = err instanceof Error ? err.message : String(err); setError(message); pushError(edit.field === "title" ? "Rename project failed" : "Change color failed", message); } })} />}
+      {edit && <ProjectEditDialog key={`${edit.id}-${edit.field}`} edit={edit} onCancel={() => setEdit(null)} onSave={(data, setError) => updateProject.mutate({ id: edit.id, data }, { onSuccess: () => setEdit(null), onError: (err) => { const message = configErrorMessage(err); setError(message); pushError(edit.field === "title" ? "Rename project failed" : "Change color failed", message); } })} />}
       {archiveProjectEntry && (
         <ConfirmDialog open title={`Archive ${archiveProjectEntry.title}?`} confirmLabel="Archive project" destructive onCancel={() => { setArchiveError(""); setArchiveID(null); }} onConfirm={() => archive.mutate(archiveID!)} pending={archive.isPending}>
           <p>Running agents will be stopped and every agent in this project will be archived.</p>
