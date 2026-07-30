@@ -84,8 +84,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 The native-dialog replacement remains complete. The current fix run is clearing the review findings,
 one verified finding per commit. All five Must-fix findings are now fixed (grouped Archive
 pagination, stale per-project searches, idempotent archive claims, compensation reporting, and
-unexpected project-read errors failing closed); the next lower-risk finding is project Rename's
-missing field-level error.
+unexpected project-read errors failing closed); the next lower-risk finding is stale native-dialog
+wording in FS-01.
 
 ## Decisions needing your input
 
@@ -115,13 +115,6 @@ The post-fix usability-review and current code-review state are committed locall
 those commits to the shared `origin/main` branch needs explicit human authorization.
 
 ## Review findings
-
-- **Worth fixing** — INV §8/§10 — Project-card Rename loses field-level validation errors.
-  `ProjectEditDialog` checks only a blank title and `ProjectDashboard` renders `err.message` from
-  `useUpdateProject`; a title longer than the server limit therefore returns a structured field
-  error that the new dialog reduces to `HTTP 400`. Use `configErrorMessage` or enforce the same bound
-  client-side, and regress an overlong title so FS-12.R26/FS-02.R37's field-level repair message is
-  visible.
 
 - **Worth fixing** — INV §10 — FS-01 contradicts the shipped dialog behavior. R8 and R13 still say
   Rename and Switch runtime use browser prompts, and §6 repeats that as current behavior, while R32
@@ -284,6 +277,10 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-07-30 — Fixed project Rename validation feedback (INV §8/§10): the dialog now preserves the
+  server's structured field-level message instead of showing only `HTTP 400`; the overlong-title
+  component regression passes.
 
 - 2026-07-30 — Fixed per-project Archive retry visibility (INV §8/§10): a failed independent agent
   page now remains visibly failed beneath its project and offers Retry, while successful rows stay

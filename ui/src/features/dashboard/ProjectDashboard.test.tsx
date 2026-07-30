@@ -83,6 +83,21 @@ describe("ProjectDashboard", () => {
     expect(saved).toMatchObject({ title: "Renamed app" });
   });
 
+  // FS-02.R37 / FS-12.R26 / INV §8: project Rename retains the server's
+  // field-level validation detail rather than reducing it to HTTP 400.
+  it("shows the field-level validation error when a project title is too long", async () => {
+    server.use(http.put("/api/projects/app", () => HttpResponse.json({
+      errors: [{ field: "title", message: "must be at most 120 characters" }],
+    }, { status: 400 })));
+    renderDashboard();
+    const card = (await screen.findByText("App")).closest("article")!;
+    fireEvent.contextMenu(card);
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    fireEvent.change(await screen.findByLabelText("Name"), { target: { value: "x".repeat(121) } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("title: must be at most 120 characters")).toBeInTheDocument();
+  });
+
   it("shows archive consequences and cancels without archiving", async () => {
     let archives = 0;
     server.use(http.post("/api/projects/app/archive", () => { archives += 1; return HttpResponse.json({}); }));
