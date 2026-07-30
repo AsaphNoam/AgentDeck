@@ -36,10 +36,10 @@ func (s *Store) ReadAgent(id string) (Agent, error) {
 	var a Agent
 	var createdAt string
 	err := s.db.QueryRow(`
-SELECT agent_id, name, role, project, backend, model, interface, created_at, grp, archived
+SELECT agent_id, name, role, project, backend, model, effort, interface, created_at, grp, archived
 FROM agents
 WHERE agent_id = ?`, id).Scan(
-		&a.AgentID, &a.Name, &a.Role, &a.Project, &a.Backend, &a.Model,
+		&a.AgentID, &a.Name, &a.Role, &a.Project, &a.Backend, &a.Model, &a.Effort,
 		&a.Interface, &createdAt, &a.Group, &a.Archived,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -58,19 +58,20 @@ WHERE agent_id = ?`, id).Scan(
 // WriteAgent inserts or updates an agent.
 func (s *Store) WriteAgent(a Agent) error {
 	_, err := s.db.Exec(`
-INSERT INTO agents(agent_id, name, role, project, backend, model, interface, created_at, grp, archived)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO agents(agent_id, name, role, project, backend, model, effort, interface, created_at, grp, archived)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(agent_id) DO UPDATE SET
     name = excluded.name,
     role = excluded.role,
     project = excluded.project,
     backend = excluded.backend,
     model = excluded.model,
+	 effort = excluded.effort,
     interface = excluded.interface,
     created_at = excluded.created_at,
     grp = excluded.grp,
     archived = excluded.archived`,
-		a.AgentID, a.Name, a.Role, a.Project, a.Backend, a.Model, a.Interface,
+		a.AgentID, a.Name, a.Role, a.Project, a.Backend, a.Model, a.Effort, a.Interface,
 		formatTime(a.CreatedAt), a.Group, a.Archived,
 	)
 	if err != nil {
@@ -82,7 +83,7 @@ ON CONFLICT(agent_id) DO UPDATE SET
 // ListAgents returns agents ordered by created_at.
 func (s *Store) ListAgents() ([]Agent, error) {
 	rows, err := s.db.Query(`
-SELECT agent_id, name, role, project, backend, model, interface, created_at, grp, archived
+SELECT agent_id, name, role, project, backend, model, effort, interface, created_at, grp, archived
 FROM agents
 ORDER BY created_at, agent_id`)
 	if err != nil {
@@ -95,7 +96,7 @@ ORDER BY created_at, agent_id`)
 		var a Agent
 		var createdAt string
 		if err := rows.Scan(
-			&a.AgentID, &a.Name, &a.Role, &a.Project, &a.Backend, &a.Model,
+			&a.AgentID, &a.Name, &a.Role, &a.Project, &a.Backend, &a.Model, &a.Effort,
 			&a.Interface, &createdAt, &a.Group, &a.Archived,
 		); err != nil {
 			return nil, fmt.Errorf("state: scan agent: %w", err)

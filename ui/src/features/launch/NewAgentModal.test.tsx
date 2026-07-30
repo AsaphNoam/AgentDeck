@@ -29,8 +29,10 @@ const server = setupServer(
           default: true,
           default_model: "sonnet",
           models: {
-            sonnet: { name: "Sonnet 4.6", model: "claude-sonnet-4-6" },
-            haiku: { name: "Haiku 4.5", model: "claude-haiku-4-5" },
+            // sonnet (the default) declares no efforts so the effort control is
+            // hidden by default and the fixed combobox indices below stay stable.
+            sonnet: { name: "Sonnet 4.6", model: "claude-sonnet-4-6", efforts: [] },
+            haiku: { name: "Haiku 4.5", model: "claude-haiku-4-5", efforts: ["low", "medium", "high"], default_effort: "medium" },
           },
         },
         codex: {
@@ -39,7 +41,7 @@ const server = setupServer(
           default: false,
           default_model: "gpt-4o",
           models: {
-            "gpt-4o": { name: "GPT-4o", model: "gpt-4o" },
+            "gpt-4o": { name: "GPT-4o", model: "gpt-4o", efforts: ["low", "high"], default_effort: "high" },
           },
         },
       },
@@ -114,6 +116,47 @@ describe("NewAgentModal", () => {
 
     expect(await screen.findByText(/GPT-4o/)).toBeInTheDocument();
     expect(screen.queryByText(/Sonnet 4.6/)).toBeNull();
+  });
+
+  // FS-09.R37/A14 — the effort control is offered only for models that declare
+  // efforts, preselects default_effort, and follows the selected model.
+  it("shows an effort control preselecting the model's default_effort", async () => {
+    renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
+    await screen.findByText(/Sonnet 4.6/);
+
+    // sonnet declares no efforts → no control until a model with efforts is picked.
+    expect(screen.queryByText("Effort")).toBeNull();
+    const modelSelect = screen.getAllByRole("combobox")[3];
+    fireEvent.change(modelSelect, { target: { value: "haiku" } });
+
+    const effortSelect = (await screen.findByText("Effort")).parentElement!.querySelector("select") as HTMLSelectElement;
+    await waitFor(() => expect(effortSelect.value).toBe("medium"));
+    expect(effortSelect).toHaveTextContent("low");
+    expect(effortSelect).toHaveTextContent("high");
+  });
+
+  it("hides the effort control for a model that declares no efforts", async () => {
+    renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
+    await screen.findByText(/Sonnet 4.6/);
+
+    // Reveal it on haiku, then switch back to effort-less sonnet: it disappears.
+    const modelSelect = screen.getAllByRole("combobox")[3];
+    fireEvent.change(modelSelect, { target: { value: "haiku" } });
+    await screen.findByText("Effort");
+    fireEvent.change(modelSelect, { target: { value: "sonnet" } });
+    await waitFor(() => expect(screen.queryByText("Effort")).toBeNull());
+  });
+
+  it("resets effort to the new model's default when the model changes", async () => {
+    renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
+    await screen.findByText(/Sonnet 4.6/);
+
+    // Switch backend to codex → gpt-4o defaults its effort to "high".
+    const backendSelect = screen.getAllByRole("combobox")[2];
+    fireEvent.change(backendSelect, { target: { value: "codex" } });
+    await screen.findByText(/GPT-4o/);
+    const effortSelect = (await screen.findByText("Effort")).parentElement!.querySelector("select") as HTMLSelectElement;
+    await waitFor(() => expect(effortSelect.value).toBe("high"));
   });
 
   it("terminal interface option is enabled when capabilities allow it", async () => {

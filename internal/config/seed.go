@@ -63,8 +63,8 @@ func DefaultBackends() BackendsConfig {
 				Default:      true,
 				DefaultModel: "sonnet",
 				Models: map[string]Model{
-					"sonnet": {Name: "Claude Sonnet", Model: "sonnet"},
-					"opus":   {Name: "Claude Opus", Model: "opus"},
+					"sonnet": {Name: "Claude Sonnet", Model: "sonnet", Efforts: []string{"low", "medium", "high", "max"}, DefaultEffort: "medium"},
+					"opus":   {Name: "Claude Opus", Model: "opus", Efforts: []string{"low", "medium", "high", "max"}, DefaultEffort: "medium"},
 				},
 			},
 			"codex": {
@@ -72,8 +72,8 @@ func DefaultBackends() BackendsConfig {
 				Type:         "codex-acp",
 				DefaultModel: "gpt-5.6-sol",
 				Models: map[string]Model{
-					"gpt-5.6-sol": {Name: "GPT-5.6-Sol", Model: "gpt-5.6-sol"},
-					"gpt-5.5":     {Name: "GPT-5.5", Model: "gpt-5.5"},
+					"gpt-5.6-sol": {Name: "GPT-5.6-Sol", Model: "gpt-5.6-sol", Efforts: []string{"low", "medium", "high", "xhigh"}, DefaultEffort: "medium"},
+					"gpt-5.5":     {Name: "GPT-5.5", Model: "gpt-5.5", Efforts: []string{"low", "medium", "high", "xhigh"}, DefaultEffort: "medium"},
 				},
 			},
 			"opencode": {
@@ -82,8 +82,10 @@ func DefaultBackends() BackendsConfig {
 				DefaultModel: "sonnet-4-5",
 				// OpenCode model ids are provider-qualified (provider/model);
 				// auth is CLI-side (`opencode auth login`), so no env keys seeded.
+				// Efforts is [] not nil so the seed matches the read-time
+				// normalization and never persists "efforts":null (INV §11).
 				Models: map[string]Model{
-					"sonnet-4-5": {Name: "Claude Sonnet 4.5", Model: "anthropic/claude-sonnet-4-5"},
+					"sonnet-4-5": {Name: "Claude Sonnet 4.5", Model: "anthropic/claude-sonnet-4-5", Efforts: []string{}},
 				},
 			},
 			"openhands": {
@@ -95,7 +97,7 @@ func DefaultBackends() BackendsConfig {
 				// so Settings shows the fields without shipping a real secret.
 				Env: map[string]string{"LLM_API_KEY": "", "LLM_BASE_URL": ""},
 				Models: map[string]Model{
-					"sonnet-4-5": {Name: "Claude Sonnet 4.5", Model: "anthropic/claude-sonnet-4-5"},
+					"sonnet-4-5": {Name: "Claude Sonnet 4.5", Model: "anthropic/claude-sonnet-4-5", Efforts: []string{}},
 				},
 			},
 		},

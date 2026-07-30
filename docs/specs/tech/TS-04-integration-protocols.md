@@ -91,7 +91,7 @@ call the canonical pipeline validator, and return data/digests only: they cannot
 approve. Tool registration, token generation, teardown, transport, and redaction remain the existing
 R6–R7 authority rather than a second MCP server.
 
-**R18 `(planned)` — Effort delivery is adapter-declared and fail-closed.** The three shipped
+**R18 — Effort delivery is adapter-declared and fail-closed.** The three shipped
 providers accept effort through three structurally different mechanisms, so the adapter declares
 *which* mechanism it uses and the runtime performs it; the runtime never branches on backend type
 inline (the rule `internal/backend/adapter.go` already states for argv, env, and resume):
@@ -119,7 +119,7 @@ when a session is loaded, so an unapplied effort silently reverts a resumed agen
 chose — INV §1's "state derived from the old side must be explicitly republished" at a lifecycle
 boundary.
 
-**R19 `(planned)` — A provider-rejected effort fails the launch; it is never retried bare.**
+**R19 — A provider-rejected effort fails the launch; it is never retried bare.**
 A pinned CLI may reject a level AgentDeck's catalog declares (hand-declared Claude levels, an older
 CLI, a provider that withdrew a level). INV §12's usual detect-and-retry-without-the-optional-flag
 pattern is deliberately **not** applied here: retrying without effort would start an agent at a

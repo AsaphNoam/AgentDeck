@@ -1,6 +1,6 @@
 # TS-03 — HTTP, SSE & WebSocket API
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/server`, `ui/src/api`
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) API sections and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -113,7 +113,7 @@ pipeline lists through REST rather than replaying an unbounded event log.
 build command or a UI assumption. This field is present for listing, successful search, and empty
 pages so the Archive UI can keep its search promise honest (FS-05.R30/R36).
 
-**R19 `(planned)` — Effort is an optional field on existing routes, never a new one.**
+**R19 — Effort is an optional field on existing routes, never a new one.**
 `POST /api/sessions` and `POST /api/sessions/{id}/switch-runtime` accept an optional `effort`
 alongside `backend`/`model`; omitting it preserves today's request and response bytes exactly, so no
 existing client changes. `GET /api/backends` and `PUT /api/backends` carry each model's `efforts` and

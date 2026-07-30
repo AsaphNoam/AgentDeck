@@ -10,6 +10,7 @@ import (
 type RuntimeAssignment struct {
 	Backend string `json:"backend"`
 	Model   string `json:"model"`
+	Effort  string `json:"effort"`
 }
 
 type StartRequest struct {
@@ -32,6 +33,7 @@ type StageExecution struct {
 	Project    string
 	Backend    string
 	Model      string
+	Effort     string
 	AgentID    string
 	Generation string
 	AgentName  string

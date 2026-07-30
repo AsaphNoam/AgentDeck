@@ -13,6 +13,7 @@ type Agent struct {
 	Project   string    `json:"project"`
 	Backend   string    `json:"backend"`
 	Model     string    `json:"model"`
+	Effort    string    `json:"effort"`
 	Interface string    `json:"interface"`
 	CreatedAt time.Time `json:"created_at"`
 	Group     string    `json:"group,omitempty"`
@@ -56,6 +57,7 @@ type AgentState struct {
 	Project   string `json:"project"`
 	Backend   string `json:"backend"`
 	Model     string `json:"model"`
+	Effort    string `json:"effort"`
 	Interface string `json:"interface"`
 	Group     string `json:"group,omitempty"`
 	CreatedAt string `json:"created_at"`

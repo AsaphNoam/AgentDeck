@@ -64,6 +64,7 @@ function RunDetail({ selectedID, onDeleted }: { selectedID: string | null; onDel
   const run = data.run;
   const stage = data.template.stages.find((item) => item.id === run.current_stage_id);
   const attempt = data.attempts.find((item) => item.attempt_id === run.current_attempt_id);
+  const effortFor = (stageID: string) => data.assignments[stageID]?.effort;
   const paused = run.state === "paused";
   const blocked = paused && run.attention_reason === "blocked" && attempt?.report_outcome === "blocked";
   const approval = paused && run.pending_action === "await_approval";
@@ -94,7 +95,7 @@ function RunDetail({ selectedID, onDeleted }: { selectedID: string | null; onDel
       <div><dt>Project</dt><dd>{run.project}</dd></div>
       <div><dt>Current stage</dt><dd>{stage?.title ?? (run.current_stage_id || "—")}</dd></div>
       <div><dt>Agent</dt><dd>{run.current_agent_id || "—"}</dd></div>
-      <div><dt>Runtime</dt><dd>{attempt ? `${attempt.backend} · ${attempt.model}` : "—"}</dd></div>
+      <div><dt>Runtime</dt><dd>{attempt ? [attempt.backend, attempt.model, effortFor(attempt.stage_id)].filter(Boolean).join(" · ") : "—"}</dd></div>
       <div><dt>Attempt / visit</dt><dd>{attempt ? `${attempt.attempt_no} / ${attempt.visit_no}` : "—"}</dd></div>
       <div><dt>Revision</dt><dd>{run.revision}</dd></div>
     </dl>
@@ -123,7 +124,7 @@ function RunDetail({ selectedID, onDeleted }: { selectedID: string | null; onDel
         {data.attempts.map((item) => <li key={item.attempt_id}>
           <div className="pipeline-attempt-heading">
             <span className="pipeline-stage-number">{item.attempt_no}</span>
-            <div><strong>{data.template.stages.find((candidate) => candidate.id === item.stage_id)?.title ?? item.stage_id}</strong><small>visit {item.visit_no} · {item.backend} · {item.model}</small></div>
+            <div><strong>{data.template.stages.find((candidate) => candidate.id === item.stage_id)?.title ?? item.stage_id}</strong><small>{["visit " + item.visit_no, item.backend, item.model, effortFor(item.stage_id)].filter(Boolean).join(" · ")}</small></div>
             <span className="pipeline-state">{item.report_outcome || item.state}</span>
           </div>
           {item.report_summary && <p>{item.report_summary}</p>}

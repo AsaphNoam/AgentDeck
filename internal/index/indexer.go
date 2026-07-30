@@ -72,14 +72,15 @@ func (ix *Indexer) UpsertSessionMeta(agentID string, meta runtime.SessionMetaDat
 	}
 	defer tx.Rollback()
 	_, err = tx.Exec(`
-INSERT INTO sessions(agent_id, name, role, project, backend, model, interface, grp, cwd, system_prompt, env_keys, skip_permissions, add_dirs, launch_config_json, last_session_id, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO sessions(agent_id, name, role, project, backend, model, effort, interface, grp, cwd, system_prompt, env_keys, skip_permissions, add_dirs, launch_config_json, last_session_id, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(agent_id) DO UPDATE SET
   name=excluded.name,
   role=excluded.role,
   project=excluded.project,
   backend=excluded.backend,
   model=excluded.model,
+	 effort=excluded.effort,
   interface=excluded.interface,
   grp=excluded.grp,
   cwd=excluded.cwd,
@@ -90,7 +91,7 @@ ON CONFLICT(agent_id) DO UPDATE SET
   launch_config_json=excluded.launch_config_json,
   last_session_id=excluded.last_session_id,
   updated_at=MAX(excluded.updated_at, sessions.updated_at)`,
-		agentID, meta.Name, meta.Role, meta.Project, meta.Backend, meta.Model, meta.Interface,
+		agentID, meta.Name, meta.Role, meta.Project, meta.Backend, meta.Model, meta.Effort, meta.Interface,
 		meta.Group, meta.Cwd, meta.SystemPrompt, string(envKeys), meta.SkipPermissions, string(addDirs), launchConfig, meta.SessionID, now, now)
 	if err != nil {
 		return fmt.Errorf("index: upsert session meta: %w", err)

@@ -50,7 +50,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   non-fatal skip that never blocks startup or mutates the catalog. Backends without the flag, and
   every non-`codex-acp` type, are untouched. Claude has no equivalent on-disk catalog (its list is
   compiled into the CLI binary) and is intentionally out of scope.
-- **R35** `(planned)` — A model entry may declare optional **effort capability**: `efforts`, a
+- **R35** — A model entry may declare optional **effort capability**: `efforts`, a
   non-empty array of distinct non-empty provider effort-level strings, and `default_effort`, which
   must be one of them. Both are optional. A model that declares no `efforts` has no effort
   capability and AgentDeck offers no effort choice for it anywhere. AgentDeck defines no effort
@@ -59,17 +59,17 @@ Configuration-source federation for Claude/Codex is FS-08.
   rejects a blank or duplicated level, a `default_effort` outside `efforts`, and a `default_effort`
   on a model declaring no `efforts`, using the shared field-error envelope and without partially
   persisting the document.
-- **R36** `(planned)` — A model's provider `model` string must not carry a bracketed effort suffix
+- **R36** — A model's provider `model` string must not carry a bracketed effort suffix
   (`slug[level]`). `PUT /api/backends` rejects one with a field-level error naming `efforts` as the
   supported way to express a level, so a model's effort has exactly one source. This rejects a
   previously undocumented Codex-only encoding; a person holding such a catalog moves the level into
   `efforts` on their next save.
-- **R37** `(planned)` — `GET /api/backends` reports each model's `efforts` and `default_effort`. New
+- **R37** — `GET /api/backends` reports each model's `efforts` and `default_effort`. New
   Agent shows an effort control only for a model that declares `efforts`, offers exactly those
   levels, preselects `default_effort` when present, and resets the selection when the backend or
   model changes — the same rule R7 applies to the model itself. Settings can add, remove, and
   reorder a model's levels and choose its default effort.
-- **R38** `(planned)` — A `codex-acp` backend with `autosync_models` (R28) also fills a synced
+- **R38** — A `codex-acp` backend with `autosync_models` (R28) also fills a synced
   model's `efforts` and `default_effort` from the local cache's `supported_reasoning_levels[].effort`
   and `default_reasoning_level`. This stays add-only under R28's rules: it never edits an existing
   model entry, including one that already declares effort fields, and a cache without reasoning
@@ -124,12 +124,12 @@ Configuration-source federation for Claude/Codex is FS-08.
   configuration-federation discovery (FS-08) and Codex model autosync (R28) keep reading the user's
   real Codex home, so a bound source or an `autosync_models` backend behaves exactly as before.
 
-- **R39** `(planned)` — Effort capability is offered only for `claude-acp` (chat and terminal) and
+- **R39** — Effort capability is offered only for `claude-acp` (chat and terminal) and
   `codex-acp` (chat). `opencode-acp` and `openhands-acp` expose no effort mechanism, so a model
   under one of those backends that declares `efforts` is rejected by `PUT /api/backends` with a
   field-level error rather than accepted and silently ignored at launch — capabilities remain
   explicit per backend as R26 requires.
-- **R40** `(planned)` — For `claude-acp` chat, the chosen effort is applied immediately after the
+- **R40** — For `claude-acp` chat, the chosen effort is applied immediately after the
   native session is created rather than as part of creating it, because the adapter accepts effort
   only as a post-creation session setting and AgentDeck will not write a person's native Claude
   settings files to seed it (FS-08.R7). If that application fails, AgentDeck stops the just-started
@@ -159,7 +159,7 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **R21** — Launch selects a backend id and model id, resolves the provider model string and merged
   environment, strips adapter-forbidden inherited variables, adds adapter-owned values, and starts
   the adapter argv. Stop and crash cleanup remain common runtime behavior.
-- **R41** `(planned)` — Launch resolves effort in one precedence order: an explicitly requested
+- **R41** — Launch resolves effort in one precedence order: an explicitly requested
   effort; else a bound configuration source's stored effort override (FS-08.R10); else the selected
   model's `default_effort`; else nothing is sent and the CLI selects its own level. This mirrors the
   model-inheritance rule in FS-08.R17 rather than inventing a level. The resolved effort is frozen
@@ -185,7 +185,7 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **R27** `(planned)` — `OPENCODE_PATH` and `OPENHANDS_PATH` select the executable consistently for
   both credential probing and launch, and a missing/rejected CLI fails with backend-specific
   installation or incompatible-flag guidance instead of a raw transport-closed error.
-- **R42** `(planned)` — A requested effort the selected model does not declare fails launch, switch
+- **R42** — A requested effort the selected model does not declare fails launch, switch
   runtime, and pipeline run start with a field-level error naming the effort field and the levels
   that model does declare, before any process starts — exactly as an unknown model does under R7.
   AgentDeck never substitutes a different level and never silently drops the request. A model whose
@@ -274,7 +274,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   without AgentDeck starting a login process or receiving credential bytes; Codex API-key readiness
   remains supported. *Verified by* credential-check tests and FS-04.A14's UI test.
 
-- **A14** `(planned)` (R35–R38) — A catalog declaring per-model effort levels validates and round
+- **A14** (R35–R38) — A catalog declaring per-model effort levels validates and round
   trips; a blank/duplicate level, an out-of-range `default_effort`, a `default_effort` without
   `efforts`, and a bracketed provider model string each fail with a named field and nothing is
   persisted; `GET /api/backends` reports the levels; New Agent offers exactly the selected model's
@@ -283,7 +283,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   entry's hand-declared levels and the catalog default untouched. *Verify by* backend validation and
   config-handler tests, Codex model-cache sync tests, `BackendsEditor.test.tsx`, and
   `NewAgentModal.test.tsx`.
-- **A15** `(planned)` (R39–R42) — A Codex chat launch at a declared level reaches the adapter
+- **A15** (R39–R42) — A Codex chat launch at a declared level reaches the adapter
   carrying that level; a Claude chat launch applies it after session creation, and an injected
   failure of that application leaves no running agent and returns a bounded error; a Claude terminal
   launch carries the level in its argv; an `opencode-acp`/`openhands-acp` model declaring `efforts`

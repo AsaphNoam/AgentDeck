@@ -292,6 +292,10 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 		return nil, fmt.Errorf("runtime: session/new returned no sessionId")
 	}
 	as.sessionID = sess.SessionID
+	if err := applyPostSessionEffort(ctx, as.transport, ad, spec, sess.SessionID); err != nil {
+		as.shutdown()
+		return nil, err
+	}
 	if err := c.openPersistence(as, spec, sess.SessionID); err != nil {
 		as.shutdown()
 		return nil, err
@@ -605,6 +609,10 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 		newSessionID = sess.SessionID
 	}
 	as.sessionID = newSessionID
+	if err := applyPostSessionEffort(ctx, as.transport, ad, spec, newSessionID); err != nil {
+		as.shutdown()
+		return nil, err
+	}
 
 	// Re-open the existing transcript in append mode (Open skips seq:0 meta for existing files).
 	if err := c.openPersistence(as, spec, newSessionID); err != nil {
@@ -1002,6 +1010,7 @@ func runtimeMeta(spec LaunchSpec, sessionID string) SessionMetaData {
 		Project:         spec.Agent.Project,
 		Backend:         spec.Agent.Backend,
 		Model:           spec.Agent.Model,
+		Effort:          spec.Effort,
 		Interface:       spec.Agent.Interface,
 		Group:           spec.Agent.Group,
 		Cwd:             spec.Cwd,
@@ -1299,8 +1308,8 @@ func sessionNewParams(spec LaunchSpec) map[string]any {
 	if spec.BackendType != "codex-acp" {
 		params["systemPrompt"] = spec.StartSystemPrompt()
 	}
-	if spec.ModelID != "" {
-		params["model"] = spec.ModelID
+	if model := deliveredModelID(spec); model != "" {
+		params["model"] = model
 	}
 	return params
 }
@@ -1340,10 +1349,44 @@ func sessionLoadParams(spec LaunchSpec, sessionID string) map[string]any {
 	if spec.BackendType != "codex-acp" {
 		params["systemPrompt"] = spec.StartSystemPrompt()
 	}
-	if spec.ModelID != "" {
-		params["model"] = spec.ModelID
+	if model := deliveredModelID(spec); model != "" {
+		params["model"] = model
 	}
 	return params
+}
+
+func deliveredModelID(spec LaunchSpec) string {
+	model := spec.ModelID
+	if model == "" || spec.Effort == "" {
+		return model
+	}
+	if ad, ok := backend.For(spec.BackendType); ok {
+		if mode, _ := ad.EffortDelivery(spec.Agent.Interface); mode == backend.EffortModelSuffix {
+			return model + "[" + spec.Effort + "]"
+		}
+	}
+	return model
+}
+
+// applyPostSessionEffort configures Claude after the native session exists. A
+// failed request is a launch failure: callers shut down before registering a
+// running agent, keeping the generation-scoped teardown path authoritative.
+func applyPostSessionEffort(ctx context.Context, transport *Transport, ad backend.BackendAdapter, spec LaunchSpec, sessionID string) error {
+	if spec.Effort == "" {
+		return nil
+	}
+	mode, optionID := ad.EffortDelivery(spec.Agent.Interface)
+	if mode != backend.EffortPostSession {
+		return nil
+	}
+	if _, err := transport.Call(ctx, "session/set_config_option", map[string]any{
+		"sessionId": sessionID,
+		"configId":  optionID,
+		"value":     spec.Effort,
+	}); err != nil {
+		return fmt.Errorf("runtime: apply effort: %w", err)
+	}
+	return nil
 }
 
 func mcpServerParam(m MCPServerSpec) map[string]any {

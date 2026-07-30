@@ -28,6 +28,7 @@ type launchRequest struct {
 	Project   string `json:"project"`
 	Backend   string `json:"backend"`
 	Model     string `json:"model"`
+	Effort    string `json:"effort"`
 	Interface string `json:"interface"`
 	Driver    string `json:"driver"` // terminal driver: ""/"xterm" | "tmux" | "iterm2" (§3.5)
 	Name      string `json:"name"`
@@ -275,6 +276,13 @@ func (s *Server) composeLaunchWithOptions(ctx context.Context, req launchRequest
 			acpModelID = ""
 		}
 	}
+	resolvedEffort, ae := resolveEffort(req.Effort, model, fedModel)
+	if ae != nil {
+		return runtime.LaunchSpec{}, state.Agent{}, ae
+	}
+	if err := config.ValidateModelEffort(backend, model, resolvedEffort); err != nil {
+		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeInvalidField, err.Error())
+	}
 
 	agentID := options.AgentID
 	if agentID == "" {
@@ -290,7 +298,7 @@ func (s *Server) composeLaunchWithOptions(ctx context.Context, req launchRequest
 
 	agent := state.Agent{
 		AgentID: agentID, Name: name, Role: req.Role, Project: req.Project,
-		Backend: backendID, Model: modelID, Interface: iface,
+		Backend: backendID, Model: modelID, Effort: resolvedEffort, Interface: iface,
 		CreatedAt: time.Now().UTC(), Group: req.Group,
 	}
 
@@ -322,6 +330,7 @@ func (s *Server) composeLaunchWithOptions(ctx context.Context, req launchRequest
 		SystemPrompt: joinSystemPrompt(project.ContextPrompt, role.SystemPrompt, projectResourcesInstruction(resourceDir)),
 		BackendType:  backend.Type,
 		ModelID:      acpModelID,
+		Effort:       resolvedEffort,
 		Driver:       driver,
 		Env:          composeChildEnv(backend.Type, s.configStore.Home(), backend.Env, model.Env, hookEnv, projectResourcesEnv(resourceDir)),
 		SkipPerms:    resolveSkip(s.cfg.SkipPermissions, role.SkipPermissions),
@@ -331,6 +340,19 @@ func (s *Server) composeLaunchWithOptions(ctx context.Context, req launchRequest
 		LaunchConfig: launchConfig,
 	}
 	return spec, agent, nil
+}
+
+// resolveEffort is the single launch-composition precedence seam: an explicit
+// request wins over a bound-source override, then the catalog default, then an
+// empty value that deliberately sends nothing to the provider.
+func resolveEffort(explicit string, model config.Model, fed *federationModel) (string, *runtime.APIError) {
+	if explicit != "" {
+		return explicit, nil
+	}
+	if fed != nil && fed.effortOverride != nil {
+		return *fed.effortOverride, nil
+	}
+	return model.DefaultEffort, nil
 }
 
 // hookEnv builds the per-launch AGENTDECK_* env the hook scripts read (§2.3,

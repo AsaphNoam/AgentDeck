@@ -124,57 +124,31 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 ### Open findings
 
-The prior project-dashboard / project-grouped Archive findings are all resolved and confirmed fixed
-across the reviewed range; they are removed from live state and remain in git history and the
-changelog. Three new findings from the uncommitted agent-effort-selection review, followed by the
-carried Sky & Grove finding:
-
-- **Must fix** — INV §11 (also TS-02.R18, workflow §2) — `make test` is red: the new `Efforts`
-  field breaks `internal/config/config_test.go::TestRoundTripConfigObjects`. `ReadBackends`
-  normalizes each model's nil `Efforts` to `[]string{}` (`internal/config/validate.go` invariant-6
-  loop), but `WriteBackends` and the `DefaultBackends` seed leave OpenCode/OpenHands `Efforts` nil,
-  and `Model.Efforts` carries `json:"efforts"` with no `omitempty` (`internal/config/types.go`). A
-  default catalog therefore round-trips nil → `null` → `[]`, so the DeepEqual fails and, worse,
-  `backends.json` is persisted on disk with `"efforts":null` — the exact null-marshal shape the
-  read-time normalization exists to prevent. Trigger: any `make test`, or a fresh install writing
-  default backends. The implementer's own brief admits full `make test` was not rerun. Fix:
-  normalize symmetrically (seed `Efforts: []string{}` and/or normalize on the write path), then make
-  the round-trip green. Do not hand the change off with a failing required check.
-
-- **Worth fixing** — FS-09.A15/R40, INV §4 — the Claude chat post-session effort path
-  (`applyPostSessionEffort`, `internal/runtime/chat.go`) and its required failure-teardown have no
-  test, even though `internal/runtime/testdata/fakeacp/main.go` gained `FAKEACP_EFFORT_DUMP` /
-  `FAKEACP_EFFORT_FAIL` hooks precisely for it. Only the Codex model suffix and Claude terminal argv
-  are proven; A15's "an injected failure of that application leaves no running agent and returns a
-  bounded error" is unverified. Suggested fix: a chat-runtime test that dumps the
-  `session/set_config_option` params on success and asserts a rejected option fails the launch with
-  nothing registered.
-
-- **Worth fixing** — FS-09.A14/R37/R38, INV §10 — the specs' "Verify by" lists cite
-  `NewAgentModal.test.tsx`, `BackendsEditor.test.tsx`, and Codex model-cache sync tests for effort,
-  but none contain any effort assertion: `ReadCodexModelCatalog`'s new
-  `supported_reasoning_levels`→`efforts` import (`internal/config/codexmodels.go`), the New Agent
-  effort control, and the Settings effort editor are all untested. A spec that names coverage which
-  does not exist is drift; add the cited tests or correct the acceptance criteria.
-
-- **Worth fixing** — INV §10 (also FS-12.R32/A11) — Appearance Settings cannot repair a stored
-  unsupported skin id back to Core. `ui/src/features/settings/AppearanceEditor.tsx` renders the
-  choice as radios with `checked={active === appearance.id}`, where `active =
-  effectiveAppearance(stored)` maps any unknown/unsupported id to `core`. When `config.json` is
-  hand-edited to an unknown skin (e.g. `midnight`), GET returns
-  `appearance_skin_warning:"unsupported"`, the Core radio already renders checked, and clicking it
-  fires no `onChange`, so the durable unsupported value and its warning persist. The person can
-  still recover by selecting Sky & Grove (a valid save), so R32's “choose and save a valid
-  appearance” is met, but restoring Core specifically needs a Sky & Grove detour. Normal-use
-  likelihood is low (requires a hand edit or a persistent config-read error). Suggested fix: drive
-  the save from the durable stored value (or let Core's control save `""` even when Core is only the
-  effective fallback) and add a regression that repairs an unsupported stored id straight to Core.
+All four findings from the uncommitted agent-effort-selection review (one Must fix, three Worth
+fixing) are fixed in the working tree; they are removed from live state and recorded in the changelog
+below. The fixes are **not yet committed** — the fix run was scoped to leave committing to the human.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-07-30 — Fixed all four agent-effort-selection review findings (not committed; committing is
+  left to the human). **INV §11** — the `DefaultBackends` seed now declares `Efforts: []string{}`
+  for the OpenCode/OpenHands models, so the seed matches the read-time normalization, the
+  `TestRoundTripConfigObjects` round-trip is green, and a fresh install writes `"efforts":[]` rather
+  than the `"efforts":null` the read normalization exists to prevent. **INV §4** (FS-09.A15/R40) —
+  new chat-runtime tests dump the Claude post-session `session/set_config_option` params on success
+  and prove a rejected option fails the launch with no running agent registered. **INV §10**
+  (FS-09.R37/R38/A14) — the specs' cited effort coverage now exists: the Codex catalog `efforts`
+  import (`ReadCodexModelCatalog`), the New Agent effort control, and the Settings model effort
+  editor all gained assertions. **INV §10** (FS-12.R32/A11) — Appearance Settings no longer
+  pre-checks Core when a warning is present, so clicking Core saves `""` and repairs a hand-edited
+  unsupported skin id straight to Core; a regression covers the repair. No specification change was
+  needed: the seed and Core-repair fixes restore already-specified behavior, and the effort tests
+  fill the coverage the "Verify by" lists already promised. `make test`, `make build`,
+  `make check-specs`, all 185 UI tests, the UI build, and whitespace checks pass.
 
 - 2026-07-30 — Reviewed the uncommitted agent-effort-selection change (FS-01.R30/A14, FS-08.R31/A8,
   FS-09.R35–R42/A14–A15, FS-14.R31/A11, TS-01.R12, TS-02.R18, TS-03.R19, TS-04.R18–R19, TS-07.R14,

@@ -653,6 +653,61 @@ func TestResumeSessionLoadAppliesMCP(t *testing.T) {
 	}
 }
 
+// TestChatEffortPostSessionApplied guards FS-09.A15/R40: for a claude-acp chat
+// agent the resolved effort is delivered by a post-session
+// `session/set_config_option` call carrying the adapter's option id and value.
+func TestChatEffortPostSessionApplied(t *testing.T) {
+	c, spec := newChatTest(t, "stream_text")
+	ctx := context.Background()
+
+	dump := filepath.Join(t.TempDir(), "effort_params.json")
+	spec.Effort = "high"
+	spec.Env = append(spec.Env, "FAKEACP_EFFORT_DUMP="+dump)
+
+	h, err := c.Start(ctx, spec)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { c.Stop(ctx, h.AgentID) })
+
+	raw, err := os.ReadFile(dump)
+	if err != nil {
+		t.Fatalf("read effort dump (set_config_option not invoked?): %v", err)
+	}
+	var params struct {
+		SessionID string `json:"sessionId"`
+		ConfigID  string `json:"configId"`
+		Value     string `json:"value"`
+	}
+	if err := json.Unmarshal(raw, &params); err != nil {
+		t.Fatalf("unmarshal effort params: %v\n%s", err, raw)
+	}
+	if params.SessionID != h.SessionID {
+		t.Fatalf("effort sessionId = %q, want %q", params.SessionID, h.SessionID)
+	}
+	if params.ConfigID != "effort" || params.Value != "high" {
+		t.Fatalf("effort params = %+v, want configId=effort value=high", params)
+	}
+}
+
+// TestChatEffortPostSessionFailureLeavesNoAgent guards FS-09.A15's teardown
+// clause: a rejected post-session effort option fails the launch and registers
+// no running agent (the option precedes WriteRunning, so nothing survives).
+func TestChatEffortPostSessionFailureLeavesNoAgent(t *testing.T) {
+	c, spec := newChatTest(t, "stream_text")
+	ctx := context.Background()
+
+	spec.Effort = "high"
+	spec.Env = append(spec.Env, "FAKEACP_EFFORT_FAIL=1")
+
+	if _, err := c.Start(ctx, spec); err == nil {
+		t.Fatal("Start should fail when the effort option is rejected")
+	}
+	if _, err := c.store.ReadRunning(spec.Agent.AgentID); !errors.Is(err, state.ErrNotFound) {
+		t.Fatalf("running row after failed effort = %v, want ErrNotFound (no agent registered)", err)
+	}
+}
+
 func TestCheckMessagesInjectsNudgeTurn(t *testing.T) {
 	c, spec := newChatTest(t, "stream_text")
 	dump := filepath.Join(t.TempDir(), "prompt.json")

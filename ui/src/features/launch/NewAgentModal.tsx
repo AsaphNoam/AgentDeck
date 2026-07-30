@@ -40,6 +40,7 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, onLa
   const [project, setProject] = useState(initialProject ?? "");
   const [backendId, setBackendId] = useState(defaultBackendId);
   const [modelId, setModelId] = useState("");
+  const [effort, setEffort] = useState("");
   const [agentInterface, setAgentInterface] = useState<"chat" | "terminal">("chat");
   const [terminalAvailable, setTerminalAvailable] = useState(true);
   const [launchError, setLaunchError] = useState<string | null>(null);
@@ -81,6 +82,8 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, onLa
   useEffect(() => {
     const backend = backendsData?.backends[backendId];
     setModelId(backend?.default_model ?? Object.keys(backend?.models ?? {})[0] ?? "");
+    const model = backend?.models[backend?.default_model ?? ""];
+    setEffort(model?.default_effort ?? "");
   }, [backendId, backendsData]);
 
   useEffect(() => {
@@ -90,6 +93,12 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, onLa
 
   const selectedBackend = backendsData?.backends[backendId];
   const modelEntries = Object.entries(selectedBackend?.models ?? {});
+  const selectedModel = selectedBackend?.models[modelId];
+  const effortLevels = selectedModel?.efforts ?? [];
+
+  useEffect(() => {
+    setEffort(selectedModel?.default_effort ?? "");
+  }, [backendId, modelId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Federation preflight: if the chosen backend has a linked configuration source
   // that is stale or broken, launch will be blocked server-side (422/409). Warn the
@@ -116,7 +125,7 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, onLa
     e.preventDefault();
     setLaunchError(null);
     launch.mutate(
-      { name: name || undefined, role, project, backend: backendId || undefined, model: modelId || undefined, interface: agentInterface },
+      { name: name || undefined, role, project, backend: backendId || undefined, model: modelId || undefined, effort: effort || undefined, interface: agentInterface },
       {
         onSuccess: (result) => {
           onLaunched?.(result.agent.agent_id);
@@ -147,6 +156,15 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, onLa
                 placeholder="e.g. Atlas"
               />
             </div>
+
+            {effortLevels.length > 0 && (
+              <div className="form-field">
+                <label>Effort</label>
+                <select value={effort} onChange={(e) => setEffort(e.target.value)}>
+                  {effortLevels.map((level) => <option key={level} value={level}>{level}</option>)}
+                </select>
+              </div>
+            )}
 
             <div className="form-field">
               <label>Role</label>

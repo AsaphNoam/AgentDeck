@@ -42,4 +42,4 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-- [Choose an agent's effort level at launch](agent-effort-selection.md)
+None.

@@ -190,6 +190,49 @@ func TestValidateBackendsConfig_EmptyModelField(t *testing.T) {
 	}
 }
 
+func TestValidateBackendsConfig_Efforts(t *testing.T) {
+	b := baseBackends()
+	bk := b.Backends["claude"]
+	m := bk.Models["default"]
+	m.Efforts = []string{"low", "high"}
+	m.DefaultEffort = "high"
+	bk.Models["default"] = m
+	b.Backends["claude"] = bk
+	if got := ValidateBackendsConfig(&b); got != nil {
+		t.Fatalf("valid effort capability rejected: %v", got.Errors)
+	}
+	if err := ValidateModelEffort(bk, m, "low"); err != nil {
+		t.Fatalf("declared effort rejected: %v", err)
+	}
+	if err := ValidateModelEffort(bk, m, "max"); err == nil {
+		t.Fatal("undeclared effort was accepted")
+	}
+}
+
+func TestValidateBackendsConfig_RejectsInvalidEffortDeclarations(t *testing.T) {
+	tests := []struct {
+		name  string
+		model Model
+	}{
+		{"blank", Model{Model: "claude", Efforts: []string{""}}},
+		{"duplicate", Model{Model: "claude", Efforts: []string{"low", "low"}}},
+		{"bad default", Model{Model: "claude", Efforts: []string{"low"}, DefaultEffort: "high"}},
+		{"default without levels", Model{Model: "claude", DefaultEffort: "high"}},
+		{"suffix", Model{Model: "claude[high]"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := baseBackends()
+			bk := b.Backends["claude"]
+			bk.Models["default"] = tt.model
+			b.Backends["claude"] = bk
+			if got := ValidateBackendsConfig(&b); got == nil {
+				t.Fatal("invalid effort declaration was accepted")
+			}
+		})
+	}
+}
+
 func backendsHasCode(ve *ValidationErrors, code string) bool {
 	for _, e := range ve.Errors {
 		if e.Code == code {

@@ -61,6 +61,7 @@ export const pipelineTemplateRecordSchema = z.object({
 export const pipelineRuntimeAssignmentSchema = z.object({
   backend: z.string(),
   model: z.string(),
+  effort: z.string().optional().default(""),
 });
 
 export const pipelineStartRequestSchema = z.object({

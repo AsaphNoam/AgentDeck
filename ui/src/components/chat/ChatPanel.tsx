@@ -102,7 +102,7 @@ export function ChatPanel() {
         <Link to="/">Back</Link>
         <div data-slot="identity">
           <h1>{agent.name}</h1>
-          <span>{agent.backend} · {agent.model}</span>
+          <span>{[agent.backend, agent.model, agent.effort].filter(Boolean).join(" · ")}</span>
         </div>
         <div data-slot="context"><ContextBar value={agent.context_pct} /></div>
       </header>

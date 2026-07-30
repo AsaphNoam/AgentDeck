@@ -40,6 +40,7 @@ type Result struct {
 	Project      string   `json:"project"`
 	Backend      string   `json:"backend"`
 	Model        string   `json:"model"`
+	Effort       string   `json:"effort"`
 	Interface    string   `json:"interface"`
 	Group        string   `json:"group,omitempty"`
 	CreatedAt    string   `json:"created_at"`
@@ -208,7 +209,7 @@ func (a *Archive) list(q Query) (int, []Result, error) {
 	}
 	args = append(args, q.Limit, q.Offset)
 	rows, err := a.db.Query(`
-SELECT s.agent_id, s.name, s.role, s.project, s.backend, s.model, s.interface, s.grp,
+SELECT s.agent_id, s.name, s.role, s.project, s.backend, s.model, s.effort, s.interface, s.grp,
        s.created_at, s.updated_at, s.turn_count, s.files_touched, s.commands_run,
        (r.agent_id IS NOT NULL) AS active, COALESCE(a.archived, 0), '' AS snippet, '' AS content
 FROM sessions s
@@ -272,7 +273,7 @@ transcript_snippets AS (
   FROM matching_documents
   WHERE document_id <> 'metadata'
 )
-SELECT s.agent_id, s.name, s.role, s.project, s.backend, s.model, s.interface, s.grp,
+SELECT s.agent_id, s.name, s.role, s.project, s.backend, s.model, s.effort, s.interface, s.grp,
        s.created_at, s.updated_at, s.turn_count, s.files_touched, s.commands_run,
        (r.agent_id IS NOT NULL) AS active,
        COALESCE(a.archived, 0),
@@ -342,7 +343,7 @@ func (a *Archive) searchFallback(q Query, raw string) (int, []Result, error) {
 	queryArgs = append(queryArgs, q.Limit, q.Offset)
 
 	rows, err := a.db.Query(`
-SELECT s.agent_id, s.name, s.role, s.project, s.backend, s.model, s.interface, s.grp,
+SELECT s.agent_id, s.name, s.role, s.project, s.backend, s.model, s.effort, s.interface, s.grp,
        s.created_at, s.updated_at, s.turn_count, s.files_touched, s.commands_run,
        (r.agent_id IS NOT NULL) AS active, COALESCE(a.archived, 0), '' AS snippet, '' AS content
 FROM sessions s
@@ -409,7 +410,7 @@ func scanResults(rows *sql.Rows) ([]Result, error) {
 	for rows.Next() {
 		var r Result
 		var active, archived int
-		if err := rows.Scan(&r.AgentID, &r.Name, &r.Role, &r.Project, &r.Backend, &r.Model, &r.Interface, &r.Group,
+		if err := rows.Scan(&r.AgentID, &r.Name, &r.Role, &r.Project, &r.Backend, &r.Model, &r.Effort, &r.Interface, &r.Group,
 			&r.CreatedAt, &r.UpdatedAt, &r.TurnCount, &r.FilesTouched, &r.CommandsRun, &active, &archived, &r.Snippet, &r.content); err != nil {
 			return nil, fmt.Errorf("archive: scan result: %w", err)
 		}
@@ -428,7 +429,7 @@ func scanSearchResults(rows *sql.Rows) ([]Result, error) {
 	for rows.Next() {
 		var r Result
 		var active, archived, metadataMatch, transcriptMatch int
-		if err := rows.Scan(&r.AgentID, &r.Name, &r.Role, &r.Project, &r.Backend, &r.Model, &r.Interface, &r.Group,
+		if err := rows.Scan(&r.AgentID, &r.Name, &r.Role, &r.Project, &r.Backend, &r.Model, &r.Effort, &r.Interface, &r.Group,
 			&r.CreatedAt, &r.UpdatedAt, &r.TurnCount, &r.FilesTouched, &r.CommandsRun, &active, &archived, &r.Snippet,
 			&metadataMatch, &transcriptMatch); err != nil {
 			return nil, fmt.Errorf("archive: scan search result: %w", err)

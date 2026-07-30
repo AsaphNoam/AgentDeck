@@ -4,6 +4,27 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-30 — Fix: agent effort selection review findings
+
+I fixed all four findings from the effort-selection review. The blocker is cleared: the new "effort
+levels" field is now seeded the same way it is read back, so the test suite is green again and a
+fresh install saves an empty list instead of the null value that broke the round-trip. The three
+smaller gaps are closed too — the Claude path that applies effort after a chat starts now has tests
+proving it works and that a rejected level cleanly fails the launch with no leftover agent, and the
+effort controls in New Agent and Settings, plus the Codex model import, all gained the tests the
+specs had promised but never had. One usability nicety: if someone hand-edits the config to an
+unknown appearance, they can now click "Core" to repair it directly instead of having to detour
+through the other skin first.
+
+Everything passes: both Go test modes, the build, the spec checks, all 185 UI tests, the UI build,
+and the whitespace check. As you asked, I did not commit anything — the fixes sit in the working
+tree ready for you to review and commit.
+
+**Needs attention:** None.
+
+**Next:** Commit the effort-selection change together with these fixes when you're ready; live
+Claude/Codex provider honoring still needs a credentialed run before it can be claimed.
+
 ### 2026-07-30 — Review: agent effort selection
 
 I reviewed the agent effort selection work against the specifications and our recurring bug-class
