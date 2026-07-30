@@ -22,11 +22,6 @@ Example:
   is one flat array independent of `group`), so it silently snaps back. Needs whole-card drag (with
   an activation distance so a plain click still opens the agent) and either real cross-group drop
   support or a clear affordance that drag only reorders within a group.
-- **Per-chat model picker.** The agent chat header shows `backend · model` as static text; the only
-  way to change either is the dashboard context menu's Switch runtime, which asks for interface,
-  backend, and model through three consecutive browser prompts. Offer a picker in the chat header
-  itself, populated from the backend catalog, that drives the existing switch-runtime path (FS-01.R13
-  — running agents only, history preserved by native resume or primer).
 - **Claude backend model autosync.** The Codex half shipped (FS-09.R28: opt-in `autosync_models`
   reads `~/.codex/models_cache.json` on startup and add-only merges the catalog). Claude has no
   equivalent on-disk catalog to sync from — `~/.claude/settings.json` holds only the *selected*

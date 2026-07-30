@@ -4,6 +4,28 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-30 — Design: per-chat runtime picker
+
+I designed the per-chat runtime picker with you and wrote it up as a ready-to-build change. In the
+chat view, the header line that today just displays "backend · model · effort" as text will become
+three dropdowns for a running agent, so you can change the model (or backend or effort) right there
+and apply it with one explicit "Switch" click — no more going back to the dashboard and using the
+card's right-click menu. History is preserved exactly as the existing switch does it. Switching
+between chat and terminal stays in the dashboard dialog, and a stopped agent just shows plain text.
+
+Two things worth noting: the old "three browser prompts" complaint in the idea was already out of
+date (that flow was replaced with a proper dialog a while back), so the real value here is
+convenience and discoverability, not removing prompts. And this needs no backend or API work at all —
+the switch machinery already handles model/effort changes — so it's a small, UI-only change.
+
+No product code changed; only the specification and the ready-change note. Spec and whitespace checks
+pass.
+
+**Needs attention:** None.
+
+**Next:** Run `/work` when you want it built (it's the only item now waiting in the ready queue), or
+tell me to start it.
+
 ### 2026-07-30 — Fix: agent effort selection review findings
 
 I fixed all four findings from the effort-selection review. The blocker is cleared: the new "effort

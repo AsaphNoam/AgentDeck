@@ -134,6 +134,15 @@ are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
 
+- 2026-07-30 — Designed the per-chat runtime picker feature; no product code changed. The chat
+  header's static `backend · model · effort` becomes inline backend/model/effort selects for a
+  running chat agent, applied through an explicit **Switch** action that reuses the existing
+  switch-runtime path (FS-01.R13/R30 — native resume or primer). Interface stays in the dashboard
+  dialog; a stopped agent shows static text. FS-03 gained R23/R24/A9 (planned) and moved to Partial;
+  R1 now names effort in the runtime identity. No technical-spec change is needed — switch-runtime
+  already accepts backend/model/effort over existing architecture. The idea moved to the waiting
+  `per-chat-runtime-picker.md` change; `make check-specs` and whitespace checks pass.
+
 - 2026-07-30 — Fixed all four agent-effort-selection review findings (not committed; committing is
   left to the human). **INV §11** — the `DefaultBackends` seed now declares `Efforts: []string{}`
   for the OpenCode/OpenHands models, so the seed matches the read-time normalization, the
