@@ -126,10 +126,11 @@ only React primitive seam; the rejected alternatives are recorded in §5.
   stylesheet, or asset.
 - **R29** — First-party UI does not call `window.prompt`/`confirm`; those input and
   confirmation flows use the core Radix Dialog convention that FS-12.R26 mandates.
-  `ui/scripts/check-presentation-contract.mjs` (R19) gains a rule that fails on any
-  `window.prompt`/`confirm` or bare `prompt(`/`confirm(` call under `ui/src`, exempting only the
-  development visual-matrix and test files; the presentation-exception manifest (R20) is the sole
-  escape hatch. The dialogs reuse existing feature-owned Radix behavior, form validation, and the
+  `ui/scripts/check-presentation-contract.mjs` (R19) gains a rule that fails on any browser-native
+  prompt/confirm call under `ui/src`, including bare, `window`/`globalThis`, computed-property, and
+  statically aliased references; it exempts only the development visual-matrix and test files, and
+  the presentation-exception manifest (R20) is the sole escape hatch. The dialogs reuse existing
+  feature-owned Radix behavior, form validation, and the
   backend-catalog, project-color, and client-derived group-label sources (R1); they add no API, SSE,
   persistence, or route change (R15), so no new server endpoint or migration is introduced.
 

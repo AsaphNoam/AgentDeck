@@ -107,12 +107,47 @@ function jsxTagName(opening) {
   return opening.tagName.getText();
 }
 
-function nativeDialogCall(node) {
-  if (!ts.isCallExpression(node)) return null;
-  const expression = node.expression;
-  if (ts.isPropertyAccessExpression(expression) && ts.isIdentifier(expression.expression) && expression.expression.text === "window" && ["prompt", "confirm"].includes(expression.name.text)) return expression.name.text;
-  if (ts.isIdentifier(expression) && ["prompt", "confirm"].includes(expression.text)) return expression.text;
+function nativeDialogReference(expression, aliases = new Map()) {
+  if (!expression) return null;
+  if (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression) || ts.isSatisfiesExpression(expression) || ts.isNonNullExpression(expression)) {
+    return nativeDialogReference(expression.expression, aliases);
+  }
+  if (ts.isIdentifier(expression)) {
+    if (["prompt", "confirm"].includes(expression.text)) return expression.text;
+    return aliases.get(expression.text) ?? null;
+  }
+  const global = (node) => ts.isIdentifier(node) && ["window", "globalThis"].includes(node.text);
+  if (ts.isPropertyAccessExpression(expression) && global(expression.expression) && ["prompt", "confirm"].includes(expression.name.text)) return expression.name.text;
+  if (ts.isElementAccessExpression(expression) && global(expression.expression) && ts.isStringLiteralLike(expression.argumentExpression) && ["prompt", "confirm"].includes(expression.argumentExpression.text)) return expression.argumentExpression.text;
   return null;
+}
+
+function nativeDialogAliases(sourceFile) {
+  const aliases = new Map();
+  const global = (node) => ts.isIdentifier(node) && ["window", "globalThis"].includes(node.text);
+  const visit = (node) => {
+    if (ts.isVariableDeclaration(node) && node.initializer) {
+      const nativeDialog = nativeDialogReference(node.initializer, aliases);
+      if (nativeDialog && ts.isIdentifier(node.name)) aliases.set(node.name.text, nativeDialog);
+      if (ts.isObjectBindingPattern(node.name) && global(node.initializer)) {
+        for (const element of node.name.elements) {
+          const property = element.propertyName ?? element.name;
+          if (ts.isIdentifier(property) && ts.isIdentifier(element.name) && ["prompt", "confirm"].includes(property.text)) aliases.set(element.name.text, property.text);
+        }
+      }
+    }
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken && ts.isIdentifier(node.left)) {
+      const nativeDialog = nativeDialogReference(node.right, aliases);
+      if (nativeDialog) aliases.set(node.left.text, nativeDialog);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return aliases;
+}
+
+function nativeDialogCall(node, aliases) {
+  return ts.isCallExpression(node) ? nativeDialogReference(node.expression, aliases) : null;
 }
 
 function nativeDialogExempt(file) {
@@ -301,9 +336,10 @@ export function auditPresentation(root) {
   for (const absolute of codeFiles) {
     const file = relative(root, absolute);
     const sourceFile = program.getSourceFile(absolute) ?? ts.createSourceFile(absolute, fs.readFileSync(absolute, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const nativeDialogAliasMap = nativeDialogAliases(sourceFile);
 
     const visit = (node, owners = []) => {
-      const nativeDialog = nativeDialogCall(node);
+      const nativeDialog = nativeDialogCall(node, nativeDialogAliasMap);
       if (nativeDialog && !nativeDialogExempt(file)) addRaw(file, "native-dialog", `browser-native ${nativeDialog}() is prohibited`);
       if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
         const imported = node.moduleSpecifier.text;

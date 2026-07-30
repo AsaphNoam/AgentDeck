@@ -53,6 +53,10 @@ test("rejects literal classes without selectors", () => {
 test("rejects browser-native prompt and confirm calls in first-party UI", () => {
   expectFailure(fixture({ component: 'window.prompt("name"); export function Component() { return <div className="known" data-ui="surface" />; }' }), "native-dialog");
   expectFailure(fixture({ component: 'confirm("delete"); export function Component() { return <div className="known" data-ui="surface" />; }' }), "native-dialog");
+  expectFailure(fixture({ component: 'window["confirm"]("delete"); export function Component() { return <div className="known" data-ui="surface" />; }' }), "native-dialog");
+  expectFailure(fixture({ component: 'globalThis.confirm("delete"); export function Component() { return <div className="known" data-ui="surface" />; }' }), "native-dialog");
+  expectFailure(fixture({ component: 'const ask = window.prompt; ask("name"); export function Component() { return <div className="known" data-ui="surface" />; }' }), "native-dialog");
+  expectFailure(fixture({ component: 'const { confirm: ask } = globalThis; ask("delete"); export function Component() { return <div className="known" data-ui="surface" />; }' }), "native-dialog");
 });
 
 test("permits a documented native-dialog exception", () => {
