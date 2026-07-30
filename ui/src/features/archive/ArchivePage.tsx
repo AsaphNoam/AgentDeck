@@ -202,6 +202,7 @@ function ArchiveProjectRows({
   const [results, setResults] = useState<ArchiveResult[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const resultsRef = useRef(results);
   const abortRef = useRef<AbortController | null>(null);
   const requestGeneration = useRef(0);
@@ -217,6 +218,7 @@ function ArchiveProjectRows({
     const generation = ++requestGeneration.current;
     const isCurrent = () => generation === requestGeneration.current && !ac.signal.aborted;
     setLoading(true);
+    setError(null);
     try {
       const page = await searchArchiveProject(group.project, query, 50, offset, ac.signal);
       let incoming = page.results ?? [];
@@ -230,7 +232,9 @@ function ArchiveProjectRows({
       }
     } catch (err: unknown) {
       if (isCurrent()) {
-        onError(err instanceof Error ? err.message : "Failed to load project archive");
+        const message = err instanceof Error ? err.message : "Failed to load project archive";
+        setError(message);
+        onError(message);
       }
     } finally {
       if (isCurrent()) setLoading(false);
@@ -240,6 +244,7 @@ function ArchiveProjectRows({
   useEffect(() => {
     setResults([]);
     setTotal(0);
+    setError(null);
     void load(0, false);
     return () => {
       requestGeneration.current += 1;
@@ -254,6 +259,14 @@ function ArchiveProjectRows({
         {group.project_status === "archived" && <button type="button" disabled={restoring} onClick={onRestore}>{restoring ? "Restoring…" : "Restore project"}</button>}
       </h2>
       <ul>{results.map((result) => <ArchiveRow key={result.agent_id} result={result} onClick={() => onClick(result)} />)}</ul>
+      {error && (
+        <div className="form-error" role="alert">
+          <p>Could not load this project's archived agents.</p>
+          <button type="button" disabled={loading} onClick={() => void load(results.length, results.length > 0)}>
+            {loading ? "Retrying…" : "Retry"}
+          </button>
+        </div>
+      )}
       {results.length < total && (
         <div className="form-actions">
           <button type="button" disabled={loading} onClick={() => void load(results.length, true)}>{loading ? "Loading…" : "Load more agents"}</button>

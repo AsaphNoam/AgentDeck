@@ -84,8 +84,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 The native-dialog replacement remains complete. The current fix run is clearing the review findings,
 one verified finding per commit. All five Must-fix findings are now fixed (grouped Archive
 pagination, stale per-project searches, idempotent archive claims, compensation reporting, and
-unexpected project-read errors failing closed); the lower-risk queue now also includes the
-independently reviewed per-project Archive error/retry gap.
+unexpected project-read errors failing closed); the next lower-risk finding is project Rename's
+missing field-level error.
 
 ## Decisions needing your input
 
@@ -115,14 +115,6 @@ The post-fix usability-review and current code-review state are committed locall
 those commits to the shared `origin/main` branch needs explicit human authorization.
 
 ## Review findings
-
-- **Worth fixing** — INV §8/§10; FS-05.R36 — A failed per-project Archive page disappears without
-  a retry-visible state. `ArchiveProjectRows` now begins with no rows and fetches every group through
-  `GET /api/archive/projects/{project}`; if that request fails, it emits only a toast, leaves the
-  group body empty, and records neither an inline error nor a retry action. A transient normal
-  request failure therefore makes a group whose header says it has archived agents look empty until
-  the person changes the search or reloads the page. Retain the last successful rows when present,
-  otherwise render the group error with a retry control, and add a failed-project-page regression.
 
 - **Worth fixing** — INV §8/§10 — Project-card Rename loses field-level validation errors.
   `ProjectEditDialog` checks only a blank title and `ProjectDashboard` renders `err.message` from
@@ -292,6 +284,11 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-07-30 — Fixed per-project Archive retry visibility (INV §8/§10): a failed independent agent
+  page now remains visibly failed beneath its project and offers Retry, while successful rows stay
+  rendered for later-page failures. The focused Archive UI regression proves recovery without a
+  search change or reload.
 
 - 2026-07-30 — Fixed unexpected project-read errors failing open (INV §7, also §5/§8): Resume,
   Switch runtime, agent Restore, and pipeline start now route their archived-project check through a

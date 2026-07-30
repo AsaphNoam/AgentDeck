@@ -112,6 +112,33 @@ describe("ArchivePage", () => {
     expect(screen.getByText("Atlas")).toBeInTheDocument();
   });
 
+  // FS-05.R36 / INV §8/§10: a group whose independent page fails keeps a
+  // visible recovery path instead of presenting an empty archive as success.
+  it("shows a retry control when a project archive page fails", async () => {
+    let attempts = 0;
+    const group = {
+      project: "my-app", title: "My app", color: [1, 2, 3], project_status: "active",
+      archived_agent_count: 1, results: [],
+    };
+    server.use(
+      http.get("/api/archive", () => HttpResponse.json({
+        query: "", search_mode: "full_text", total: 1, limit: 50, offset: 0, results: [group],
+      })),
+      http.get("/api/archive/projects/my-app", () => {
+        attempts += 1;
+        if (attempts === 1) return HttpResponse.error();
+        return HttpResponse.json({ search_mode: "full_text", total: 1, limit: 50, offset: 0, results: [mockInactive] });
+      }),
+    );
+
+    renderArchive();
+    expect(await screen.findByText("Could not load this project's archived agents.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("Morpheus")).toBeInTheDocument();
+    expect(screen.queryByText("Could not load this project's archived agents.")).not.toBeInTheDocument();
+    expect(attempts).toBe(2);
+  });
+
   // FS-05.R36 / INV §1: a delayed project page from the previous search must
   // not overwrite the rows loaded for the current search.
   it("keeps project rows from the newest search request", async () => {
