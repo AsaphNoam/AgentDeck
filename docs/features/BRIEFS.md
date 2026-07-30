@@ -4,6 +4,48 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-30 — Implement: Sky & Grove appearance
+
+Sky & Grove is implemented and committed on `main`.
+
+- Settings → Appearance switches the mounted app immediately between AgentDeck Core and the
+  sky-blue/nature-green Sky & Grove design.
+- The existing global config API persists the choice; absent, unknown, corrupt, or failed config
+  reads safely use Core, while failed saves report the error and restore the durable selection.
+- The skin is statically bundled, guarded by the finite presentation contract, covered by paired
+  Core/Sky fixtures, and updates live terminal colors without reconnecting.
+
+Verification passed: `make check-specs`, `make build`, `make test` (both Go modes), UI checks (180
+tests), `npm run build`, `make dist`, and a real-browser switch/reload/onboarding pass with no console
+errors.
+
+**Needs attention:** `npm ci` reports 13 dependency vulnerabilities (6 moderate, 6 high, 1
+critical); they were not changed in this feature.
+
+**Next:** Independent review of the Sky & Grove implementation.
+
+### 2026-07-30 — Design: Sky & Grove ready to build
+
+Sky & Grove is fully specified and waiting to start. No product code was changed.
+
+The implementation will keep AgentDeck Core as the unskinned, no-preference default. Choosing Sky &
+Grove writes one global appearance preference through the existing configuration API; switching
+back to Core removes that preference. The interface applies the choice immediately from the same
+configuration cache, rolls back visibly if saving fails, and safely uses Core for missing, unknown,
+corrupt, or temporarily unreadable configuration.
+
+The skin itself will be statically bundled in the reserved presentation layer—no theme provider,
+browser-storage copy, dynamic download, or external code. Its exact sky-blue, evergreen, state, and
+technical palettes are defined with distinct action and success colors; approved component hooks add
+the softer geometry and restrained natural linework. The presentation contract and checker will
+recognize only the bundled skin, every required surface will have paired Core/Sky & Grove visual
+evidence, and a live terminal will recolor in place without reconnecting or losing content.
+
+**Needs attention:** None.
+
+**Next:** Start the **Add the Sky & Grove appearance** waiting change when you want it implemented;
+name it explicitly because another change is also waiting.
+
 ### 2026-07-30 — Fix: archive and dialog review findings
 
 The Archive and dialog review queue is complete. Large archives stay bounded, Archive and Restore
@@ -15,6 +57,37 @@ missing historical planning record is documented without inventing a retroactive
 **Needs attention:** None.
 
 **Next:** Independent review of the completed fixes before future behavior work.
+
+### 2026-07-30 — Design: Sky & Grove theme
+
+The original interface design did intentionally reserve optional skins around the unskinned
+AgentDeck core. The proposed first skin is now defined at the product-behavior level; no product code
+has changed.
+
+The proposed behavior is:
+
+- Settings gains an Appearance destination with compact previews for AgentDeck Core and **Sky &
+  Grove**. Selection applies immediately across every route, dialog, code view, diff, and terminal,
+  without changing product words, actions, state, or structure.
+- The choice is stored as `appearance_skin` in AgentDeck's global `config.json` and exposed through
+  the existing config API. It applies to every project and agent, survives restarts and browser
+  sessions, and is unrelated to agent/session retention.
+- Core remains the first-install default and safe fallback. A missing, unknown, or unreadable skin
+  choice still renders Core; a failed save reports the error and returns to the last saved choice.
+- Sky & Grove uses an airy sky-blue canvas, layered pale-blue surfaces, deep nature-green structure
+  and primary actions, softer organic geometry, and restrained botanical/topographic decoration.
+  Status, warning, destructive, permission, context, connection, and project colors remain visibly
+  distinct.
+- This change includes only the two bundled choices. It excludes operating-system dark/light
+  following, per-project themes, schedules, custom CSS or code, downloads, imports, a marketplace,
+  network-loaded assets, and theme-specific product terminology.
+
+**Needs attention:** Confirm or revise these five choices: the **Sky & Grove** name, Core as the
+default, one global server-stored preference, Settings-only selection, and a purely visual nature
+interpretation with unchanged product vocabulary.
+
+**Next:** After confirmation, I’ll define the loading, persistence, compatibility, and presentation
+architecture, then create the ready-to-build change.
 
 ### 2026-07-30 — Review: Archive fix run
 

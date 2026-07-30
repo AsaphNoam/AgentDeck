@@ -30,8 +30,32 @@ function expectedLayers(file) {
   if (file === "src/styles/base.css") return new Set(["ad-base"]);
   if (file.startsWith("src/styles/components/")) return new Set(["ad-components"]);
   if (file.startsWith("src/styles/features/")) return new Set(["ad-features"]);
+  if (file.startsWith("src/styles/skins/")) return new Set(["ad-skins"]);
   if (file === "src/styles/integrations.css") return new Set(["ad-integrations"]);
   return new Set();
+}
+
+function skinForFile(file) {
+  return /^src\/styles\/skins\/([a-z][a-z0-9-]*)\.css$/.exec(file)?.[1] ?? null;
+}
+
+function unwrappedExpression(expression) {
+  let current = expression;
+  while (current && (ts.isParenthesizedExpression(current) || ts.isAsExpression(current) || ts.isSatisfiesExpression(current) || ts.isNonNullExpression(current))) {
+    current = current.expression;
+  }
+  return current;
+}
+
+function literalArray(expression) {
+  const array = unwrappedExpression(expression);
+  if (!array || !ts.isArrayLiteralExpression(array)) return null;
+  const values = [];
+  for (const element of array.elements) {
+    if (!ts.isStringLiteralLike(element)) return null;
+    values.push(element.text);
+  }
+  return values;
 }
 
 function layerOf(node) {
@@ -238,14 +262,22 @@ export function auditPresentation(root) {
   const tokenDefinitions = new Map();
   const tokenReferences = new Map();
   const publicTokens = new Set(contract.tokens);
+  const declaredSkins = new Set(contract.skins ?? []);
   const allSlots = new Set(Object.values(contract.components).flatMap((item) => item.slots));
   const decorative = new Set(contract.decorative_slots);
+  const activeSkinSelectors = new Set();
+  const previewSkinSelectors = new Set();
+  const cssImports = [];
 
   const add = (file, rule, message) => diagnostics.push({ file, rule, message });
   const addRaw = (file, rule, message) => rawDiagnostics.push({ file, rule, message });
 
-  if (contract.version !== 1) add("src/presentation/contract.json", "manifest", "version must be 1");
-  if (!Array.isArray(contract.tokens) || !contract.components || !Array.isArray(contract.decorative_slots)) add("src/presentation/contract.json", "manifest", "invalid contract shape");
+  if (contract.version !== 2) add("src/presentation/contract.json", "manifest", "version must be 2");
+  if (!Array.isArray(contract.skins) || !Array.isArray(contract.tokens) || !contract.components || !Array.isArray(contract.decorative_slots)) add("src/presentation/contract.json", "manifest", "invalid contract shape");
+  if (new Set(contract.skins ?? []).size !== (contract.skins ?? []).length) add("src/presentation/contract.json", "manifest", "duplicate built-in skin id");
+  for (const skin of contract.skins ?? []) {
+    if (!/^[a-z][a-z0-9-]*$/.test(skin) || skin === "core") add("src/presentation/contract.json", "manifest", `invalid built-in skin id ${skin}`);
+  }
   if (new Set(contract.tokens).size !== contract.tokens.length) add("src/presentation/contract.json", "manifest", "duplicate public token");
   for (const [name, item] of Object.entries(contract.components)) {
     if (!/^[a-z][a-z0-9-]*$/.test(name)) add("src/presentation/contract.json", "manifest", `invalid data-ui name ${name}`);
@@ -253,9 +285,13 @@ export function auditPresentation(root) {
       if (!Array.isArray(item[key]) || new Set(item[key]).size !== item[key].length) add("src/presentation/contract.json", "manifest", `${name}.${key} must be a unique array`);
     }
   }
+  if (declaredSkins.size && !contract.components["config-editor"]?.variants?.includes("appearance")) {
+    add("src/presentation/contract.json", "manifest", "built-in skins require the config-editor appearance variant");
+  }
 
   for (const absolute of cssFiles) {
     const file = relative(root, absolute);
+    const fileSkin = skinForFile(file);
     const source = fs.readFileSync(absolute, "utf8");
     let cssRoot;
     try {
@@ -267,20 +303,54 @@ export function auditPresentation(root) {
     cssRoot.walkComments((comment) => {
       if (/stylelint-disable/.test(comment.text)) add(file, "inline-disable", "inline Stylelint disables are prohibited");
     });
+    cssRoot.walkAtRules("import", (atRule) => {
+      const imported = atRule.params.trim().replace(/^url\(\s*|\s*\)$/g, "").replace(/^['\"]|['\"]$/g, "");
+      cssImports.push({ file, imported });
+      if (/^(?:https?:)?\/\//i.test(imported)) add(file, "network-asset", `network stylesheet import ${imported} is prohibited`);
+    });
+    if (fileSkin && !declaredSkins.has(fileSkin)) add(file, "skin-file", `skin stylesheet ${fileSkin} is not declared by the manifest`);
     cssRoot.walkRules((rule) => {
       const layer = layerOf(rule);
       const expected = expectedLayers(file);
       if (file !== "src/styles/index.css" && (!layer || !expected.has(layer))) add(file, "cascade-layer", `selector ${rule.selector} is outside its declared layer`);
-      if (layer === "ad-skins" && file !== "src/presentation/contract-fixture.css") add(file, "production-skin", "production ad-skins layer must be empty");
+      if (layer === "ad-skins" && file !== "src/presentation/contract-fixture.css" && !fileSkin) add(file, "skin-file", "production ad-skins rules belong only in a declared skin stylesheet");
       try {
         selectorParser((selectors) => {
           selectors.each((selector) => {
             const hooks = { "data-ui": [], "data-slot": [], "data-state": [], "data-variant": [] };
+            const skinValues = [];
+            const previewValues = [];
             selector.walkClasses((node) => selectorClasses.add(node.value));
             selector.walkAttributes((node) => {
-              if (node.attribute === "data-skin") add(file, "skin-state", "core CSS must not depend on data-skin");
+              const value = node.operator === "=" && node.value ? node.value.replace(/^['"]|['"]$/g, "") : null;
+              if (node.attribute === "data-skin") skinValues.push(value);
+              if (node.attribute === "data-preview-skin") previewValues.push(value);
               if (DATA_ATTRIBUTES.includes(node.attribute) && node.operator === "=" && node.value) hooks[node.attribute].push(node.value.replace(/^['"]|['"]$/g, ""));
             });
+            if (fileSkin) {
+              const selectorText = selector.toString().trim();
+              if (skinValues.length) {
+                const startsAtRoot = selector.nodes[0]?.type === "pseudo" && selector.nodes[0].value === ":root";
+                if (!startsAtRoot || skinValues.some((value) => value !== fileSkin)) {
+                  add(file, "skin-scope", `selector ${selectorText} must use :root[data-skin="${fileSkin}"]`);
+                } else {
+                  activeSkinSelectors.add(fileSkin);
+                }
+              } else if (previewValues.length) {
+                const appearancePreview = previewValues.every((value) => value === fileSkin)
+                  && hooks["data-ui"].includes("config-editor")
+                  && hooks["data-variant"].includes("appearance");
+                if (!appearancePreview) add(file, "skin-scope", `selector ${selectorText} must be scoped to the ${fileSkin} Settings appearance preview`);
+                else previewSkinSelectors.add(fileSkin);
+              } else if (selectorText !== ":root") {
+                add(file, "skin-scope", `selector ${selectorText} is not scoped to ${fileSkin}`);
+              }
+            } else if (file !== "src/presentation/contract-fixture.css") {
+              if (skinValues.length) add(file, "skin-state", "Core CSS must not depend on data-skin");
+              for (const value of previewValues) {
+                if (value !== "core") add(file, "skin-scope", `preview skin ${value ?? "<dynamic>"} belongs only in its declared skin stylesheet`);
+              }
+            }
             const owners = hooks["data-ui"];
             for (const name of owners) {
               if (!contract.components[name]) add(file, "hook", `undocumented data-ui ${name}`);
@@ -306,19 +376,40 @@ export function auditPresentation(root) {
     });
     cssRoot.walkDecls((declaration) => {
       const layer = layerOf(declaration);
+      const privatePrefix = fileSkin ? `--ad-${fileSkin}-` : null;
+      const parentSelector = declaration.parent?.type === "rule" ? declaration.parent.selector.trim() : "";
+      if (fileSkin && parentSelector === ":root" && !declaration.prop.startsWith(privatePrefix)) {
+        add(file, "skin-token", `bare :root may declare only private ${privatePrefix}* palette tokens`);
+      }
       if (declaration.prop.startsWith("--ad-")) {
         const list = tokenDefinitions.get(declaration.prop) ?? [];
-        list.push({ file, layer });
+        list.push({ file, layer, selector: parentSelector });
         tokenDefinitions.set(declaration.prop, list);
-        if (publicTokens.has(declaration.prop) && file !== "src/styles/tokens.css" && layer !== "ad-skins") add(file, "skin-layer", `${declaration.prop} override is outside ad-skins`);
+        if (publicTokens.has(declaration.prop) && !["src/styles/tokens.css", "src/presentation/contract-fixture.css"].includes(file) && !(fileSkin && layer === "ad-skins")) add(file, "skin-layer", `${declaration.prop} override is outside a declared ad-skins stylesheet`);
+        if (fileSkin && !publicTokens.has(declaration.prop) && !declaration.prop.startsWith(privatePrefix)) add(file, "skin-token", `${declaration.prop} is neither public nor private to ${fileSkin}`);
+        if (fileSkin && declaration.prop.startsWith(privatePrefix) && parentSelector !== ":root") add(file, "skin-token", `${declaration.prop} must be declared once on :root`);
+        for (const skin of declaredSkins) {
+          if (declaration.prop.startsWith(`--ad-${skin}-`) && fileSkin !== skin) add(file, "skin-token", `${declaration.prop} may be declared only in ${skin}.css`);
+        }
       }
       const parsed = valueParser(declaration.value);
       parsed.walk((node) => {
         if (node.type === "function" && node.value === "var" && node.nodes[0]?.value?.startsWith("--ad-")) {
-          tokenReferences.set(node.nodes[0].value, (tokenReferences.get(node.nodes[0].value) ?? 0) + 1);
+          const token = node.nodes[0].value;
+          const references = tokenReferences.get(token) ?? [];
+          references.push({ file });
+          tokenReferences.set(token, references);
+          for (const skin of declaredSkins) {
+            if (token.startsWith(`--ad-${skin}-`) && fileSkin !== skin) add(file, "skin-token", `${token} may be used only in ${skin}.css`);
+          }
+        }
+        if (node.type === "function" && node.value.toLowerCase() === "url") {
+          const target = valueParser.stringify(node.nodes).trim().replace(/^['"]|['"]$/g, "");
+          if (/^(?:https?:)?\/\//i.test(target)) add(file, "network-asset", `network asset ${target} is prohibited`);
         }
       });
-      const rawAllowed = ["src/styles/tokens.css", "src/styles/foundation.css", "src/presentation/contract-fixture.css"].includes(file);
+      const rawAllowed = ["src/styles/tokens.css", "src/styles/foundation.css", "src/presentation/contract-fixture.css"].includes(file)
+        || Boolean(fileSkin && declaration.prop.startsWith(privatePrefix));
       if (rawAllowed) return;
       if (/(?:#[0-9a-f]{3,8}\b|\b(?:rgb|hsl)a?\()/i.test(declaration.value)) addRaw(file, "raw-color", `${declaration.prop} uses a raw color`);
       if (declaration.prop === "font-family" && !/^var\(/.test(declaration.value)) addRaw(file, "raw-font", "font-family must use a token");
@@ -331,6 +422,8 @@ export function auditPresentation(root) {
   const program = programFor(root, codeFiles);
   const checker = program.getTypeChecker();
   const importedStyles = [];
+  const frontendSkinAllowlists = [];
+  let appearanceVariantImplementation = false;
   let visualMatrixStaticImport = false;
 
   for (const absolute of codeFiles) {
@@ -341,6 +434,11 @@ export function auditPresentation(root) {
     const visit = (node, owners = []) => {
       const nativeDialog = nativeDialogCall(node, nativeDialogAliasMap);
       if (nativeDialog && !nativeDialogExempt(file)) addRaw(file, "native-dialog", `browser-native ${nativeDialog}() is prohibited`);
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === "BUILT_IN_SKINS") {
+        const values = literalArray(node.initializer);
+        if (values == null) add(file, "skin-allowlist", "BUILT_IN_SKINS must be a string-literal array");
+        else frontendSkinAllowlists.push({ file, values });
+      }
       if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
         const imported = node.moduleSpecifier.text;
         if (imported.endsWith(".css")) importedStyles.push({ file, imported });
@@ -403,6 +501,21 @@ export function auditPresentation(root) {
             if (!item?.[key].includes(value)) add(sourceName, "hook", `${owner} does not declare ${kind} ${value}`);
           }
           markUsage(usage, inferred, kind, value);
+          if (kind === "data-variant" && value === "appearance" && owners.includes("config-editor")) appearanceVariantImplementation = true;
+        }
+      }
+
+      for (const kind of ["data-skin", "data-preview-skin"]) {
+        const attribute = jsxAttribute(opening, kind);
+        if (!attribute) continue;
+        const values = attributeValues(attribute, checker);
+        if (values == null) {
+          add(sourceName, "skin-state", `${kind} must resolve to a finite string-literal union`);
+          continue;
+        }
+        for (const value of values) {
+          const allowed = kind === "data-preview-skin" ? value === "core" || declaredSkins.has(value) : declaredSkins.has(value);
+          if (!allowed) add(sourceName, "skin-state", `undocumented ${kind} ${value || "<empty>"}`);
         }
       }
 
@@ -417,14 +530,31 @@ export function auditPresentation(root) {
     visit(sourceFile, []);
   }
 
-  for (const [token, count] of tokenReferences) {
+  for (const [token, references] of tokenReferences) {
     if (!tokenDefinitions.has(token)) add("src/styles", "token", `undefined token ${token}`);
-    void count;
+    void references;
   }
   for (const token of contract.tokens) {
-    const definitions = (tokenDefinitions.get(token) ?? []).filter(({ file }) => file !== "src/presentation/contract-fixture.css");
-    if (definitions.length !== 1) add("src/styles/tokens.css", "token", `${token} must have exactly one core definition (found ${definitions.length})`);
-    if (!tokenReferences.has(token)) add("src/styles/tokens.css", "token", `${token} is public but unused by core CSS`);
+    const coreDefinitions = (tokenDefinitions.get(token) ?? []).filter(({ file, layer }) => file === "src/styles/tokens.css" && layer === "ad-tokens");
+    const coreReferences = (tokenReferences.get(token) ?? []).filter(({ file }) => !skinForFile(file) && file !== "src/presentation/contract-fixture.css");
+    if (coreDefinitions.length !== 1) add("src/styles/tokens.css", "token", `${token} must have exactly one Core definition (found ${coreDefinitions.length})`);
+    if (!coreReferences.length) add("src/styles/tokens.css", "token", `${token} is public but unused by Core CSS`);
+  }
+  for (const skin of declaredSkins) {
+    const prefix = `--ad-${skin}-`;
+    for (const [token, definitions] of tokenDefinitions) {
+      if (!token.startsWith(prefix)) continue;
+      if (definitions.length !== 1) add(`src/styles/skins/${skin}.css`, "skin-token", `${token} must have exactly one private definition (found ${definitions.length})`);
+      if (!tokenReferences.has(token)) add(`src/styles/skins/${skin}.css`, "skin-token", `${token} is private but unused`);
+    }
+  }
+
+  if (declaredSkins.size) {
+    if (!appearanceVariantImplementation) add("src/features/settings", "skin-hook", "config-editor appearance variant has no TSX implementation");
+    if (frontendSkinAllowlists.length !== 1) add("src/features/appearance", "skin-allowlist", `expected exactly one BUILT_IN_SKINS declaration (found ${frontendSkinAllowlists.length})`);
+    for (const { file, values } of frontendSkinAllowlists) {
+      if (values.length !== declaredSkins.size || values.some((value) => !declaredSkins.has(value))) add(file, "skin-allowlist", "BUILT_IN_SKINS must exactly match contract.json skins");
+    }
   }
 
   for (const [name, item] of Object.entries(contract.components)) {
@@ -439,10 +569,25 @@ export function auditPresentation(root) {
   const indexPath = path.join(src, "styles", "index.css");
   const index = fs.readFileSync(indexPath, "utf8");
   if (!index.includes(`@layer ${LAYERS.join(", ")};`)) add("src/styles/index.css", "cascade", "missing fixed cascade declaration");
-  if (!index.includes("@layer ad-skins {}")) add("src/styles/index.css", "skin-layer", "production ad-skins layer must be explicitly empty");
   if (/contract-fixture\.css/.test(index)) add("src/styles/index.css", "fixture-production", "development fixture is imported by production CSS");
+  const indexImports = cssImports.filter(({ file }) => file === "src/styles/index.css").map(({ imported }) => imported);
+  for (const skin of declaredSkins) {
+    const stylesheet = `src/styles/skins/${skin}.css`;
+    const imported = `./skins/${skin}.css`;
+    if (!fs.existsSync(path.join(root, stylesheet))) add(stylesheet, "skin-file", `manifest skin ${skin} has no production stylesheet`);
+    if (indexImports.filter((value) => value === imported).length !== 1) add("src/styles/index.css", "skin-import", `${imported} must be statically imported exactly once`);
+    if (!activeSkinSelectors.has(skin)) add(stylesheet, "skin-scope", `${skin} has no active :root[data-skin] mapping`);
+    if (!previewSkinSelectors.has(skin)) add(stylesheet, "skin-scope", `${skin} has no Settings appearance preview selector`);
+  }
+  for (const imported of indexImports) {
+    const match = /^\.\/skins\/([a-z][a-z0-9-]*)\.css$/.exec(imported);
+    if (match && !declaredSkins.has(match[1])) add("src/styles/index.css", "skin-import", `undeclared skin import ${imported}`);
+  }
   const permittedImports = new Set(["./styles/index.css", "@xterm/xterm/css/xterm.css", "./contract-fixture.css"]);
   for (const { file, imported } of importedStyles) if (!permittedImports.has(imported)) add(file, "css-import", `unsupported stylesheet import ${imported}`);
+  for (const { file, imported } of importedStyles) {
+    if (imported === "./contract-fixture.css" && file !== "src/presentation/VisualMatrix.tsx") add(file, "fixture-production", "contract fixture may be imported only by VisualMatrix");
+  }
   if (visualMatrixStaticImport) add("src/routes.tsx", "fixture-production", "VisualMatrix must be dynamically imported behind the development gate");
   const routes = fs.readFileSync(path.join(src, "routes.tsx"), "utf8");
   if (!routes.includes("import.meta.env.DEV") || !routes.includes('import("./presentation/VisualMatrix")')) add("src/routes.tsx", "fixture-gate", "visual matrix must remain development-only");

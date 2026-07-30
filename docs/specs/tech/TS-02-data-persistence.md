@@ -149,6 +149,17 @@ partial state. Restore reverses only the requested project or agent flag/config 
 dormant preference under FS-04.R36, while project cards and scoped dashboards add no new persisted
 layout or migration.
 
+**R21 — Appearance is an additive version-1 config preference.**
+`config.json` gains optional string `appearance_skin`; an absent or empty value means Core, while
+the first supported skin id is `sky-grove`. The Settings path writes `sky-grove` for that skin and
+clears/omits the field for Core through the existing config store, so R3's owner-only atomic rewrite
+and ordinary hand editing apply. No SQLite row, migration, cache file, project/session field, seed
+rewrite, or config-version bump is
+introduced. `internal/config` owns the finite write-time validation set; a syntactically valid but
+unknown value from a hand edit remains readable so the UI can fall back and explain it rather than
+classifying the whole version-1 document as corrupt. Older files decode to Core without rewrite;
+Core is never inserted into the manifest as if it were a skin id.
+
 ## 3. Interfaces & data shapes
 
 The durable layout is:
@@ -173,7 +184,7 @@ $AGENTDECK_HOME/
 The binding schemas for roles, projects, backends, and global config are defined by FS-04 and
 FS-09. Federation binding/effective-view shapes are defined by TS-07. SQLite table definitions and
 migration order live in `internal/state/schema.go` and execute through `migrate.go`; that executable schema is subordinate to
-R1–R20 and must be reflected here when its contract changes.
+R1–R21 and must be reflected here when its contract changes.
 
 ## 4. Invariants
 
@@ -200,7 +211,8 @@ R1–R20 and must be reflected here when its contract changes.
 
 ## 6. Traceability
 
-- Config: `internal/config/atomic.go`, `seed.go`, `validate.go`, `types.go`.
+- Config: `internal/config/atomic.go`, `appconfig.go`, `appconfig_test.go`, `seed.go`, `validate.go`,
+  `types.go`.
 - Project resources: `internal/config` path/layout helpers; project CRUD and lifecycle
   composers in `internal/server`.
 - Codex isolated profile: `internal/config` profile-refresh helper; child-env composition in

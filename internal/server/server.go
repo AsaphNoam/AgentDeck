@@ -79,6 +79,10 @@ type Server struct {
 	// writeProject is the final project-config publication seam. Archive tests
 	// inject a failure here to verify exact SQLite compensation.
 	writeProject func(string, config.Project) error
+	// writeConfig is the global-config publication seam. Config endpoint tests
+	// inject a failure here to verify an optimistic appearance choice is not
+	// published durably when the atomic rewrite fails.
+	writeConfig func(config.Config) error
 	// setAgentsArchived is the durable archive-flag seam. Transition tests block
 	// it to prove competing idempotent actions still join the exclusive claim.
 	setAgentsArchived func([]string, bool) error
@@ -181,6 +185,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		archiveChanged:            make(chan struct{}),
 		credCheck:                 credcheck.Check,
 		writeProject:              cfgStore.WriteProject,
+		writeConfig:               cfgStore.WriteConfig,
 		setAgentsArchived:         stateStore.SetAgentsArchived,
 		restoreAgentArchiveStates: stateStore.RestoreAgentArchiveStates,
 		primerSummarizer:          defaultPrimerSummarizer,

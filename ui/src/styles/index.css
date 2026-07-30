@@ -12,5 +12,4 @@
 @import "./features/settings.css";
 @import "./features/onboarding.css";
 @import "./integrations.css";
-
-@layer ad-skins {}
+@import "./skins/sky-grove.css";

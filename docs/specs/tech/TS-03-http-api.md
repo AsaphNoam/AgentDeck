@@ -151,6 +151,20 @@ or `missing`), and `archived_agent_count`; its agent rows retain the existing ar
 fields plus `archived`. No new SSE type is added: committed agent archive changes publish ordinary
 full `state_update` payloads, and project mutations invalidate/refetch the existing project catalog.
 
+**R21 — Appearance extends the existing config route only.** `GET /api/config`
+adds optional string `appearance_skin` and optional `appearance_skin_warning`; `PUT /api/config`
+accepts `appearance_skin` in its existing partial-merge body. Omission preserves the stored choice;
+empty string selects Core and `sky-grove` selects the built-in skin, while another submitted id
+returns the existing field-validation envelope naming `appearance_skin` and writes nothing. The
+Core write omits the optional field from the rewritten document. `GET` returns the raw stored id and
+omits `appearance_skin_warning` for empty/known values; an unknown hand-edited id is returned with
+`appearance_skin_warning:"unsupported"`, and the existing corrupt-config fallback returns Core with
+`appearance_skin_warning:"config_unreadable"`. An ordinary read failure remains the existing API
+error and the client renders Core while Settings surfaces that query error. No appearance route,
+SSE event, cache-control rule, or skin-content response is added. The TypeScript schema accepts
+unknown read strings long enough to fall back safely, recognizes only the two warning codes, and the
+Go/frontend/manifest supported-id sets have a lockstep regression (R11).
+
 ## 3. Interfaces & data shapes
 
 Feature-owned request/response fields are specified in the owning FS, including FS-14 for pipeline
@@ -201,6 +215,8 @@ integers instead of silently applying defaults.
 - Terminal upgrade: `internal/server/terminal.go`.
 - Archive action and grouped query routes: `internal/server/{archive,archive_actions}.go`,
   `ui/src/api/client.ts`; `TestArchiveProjectRespondsWithActionLists`.
+- Appearance config projection: `internal/server/config_handlers.go`,
+  `internal/server/config_endpoint_test.go`, `ui/src/{api/config.ts,schemas/config.ts}`.
 - Regression anchors: `TestUnknownAPIPath404`, `TestStartShutsDownWithOpenSSEClient`,
   `TestDNSRebindingHostRejected`, `TestCrossOriginRequestRejected`, SSE reconnect tests in
   `ui/src/api/sse.test.ts`.

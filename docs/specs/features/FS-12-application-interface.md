@@ -138,6 +138,41 @@ Requirements are user-observable.
   runtime), FS-02.R37 (move to group, project rename/color, stop, release group, archive project),
   and FS-04.R37 (delete role/project, delete-in-use, archive project).
 
+### 2.8 First optional skin
+
+- **R27** — AgentDeck offers one optional built-in skin named **Sky & Grove**
+  alongside **AgentDeck Core**. Core remains the initial selection for an install with no stored
+  preference and remains the safe fallback; adding the skin does not reinterpret Core as a skin or
+  make optional skin code necessary for the application to render.
+- **R28** — Sky & Grove is an airy sky-blue and nature-green design, not a
+  simple accent-color swap. It uses a clear blue canvas and layered pale-blue surfaces, deep
+  evergreen structure and primary-action accents, softer organic geometry, and restrained
+  botanical or topographic decoration. It keeps technical content crisp and gives warning, error,
+  destructive, connection, permission, agent-state, context-pressure, and project colors enough
+  separation that green or blue never changes their product meaning.
+- **R29** — Settings gains an **Appearance** destination with an explicit
+  choice between AgentDeck Core and Sky & Grove, including a compact visual sample of each. Choosing
+  an option applies it across the currently open application immediately, without a reload or
+  server restart, and the control always identifies the active choice by text rather than color
+  alone.
+- **R30** — The appearance choice is one durable, AgentDeck-wide preference,
+  not a browser-only or project-specific value. It applies to every route, project, and agent and is
+  reused by later browser sessions after configuration loads. An absent preference selects Core.
+- **R31** — Sky & Grove covers every first-party surface in R1–R19 and the
+  syntax, diff, and terminal integrations. Switching appearance changes presentation only: product
+  copy, routes, actions, component state, feature data, focus behavior, and content structure remain
+  unchanged, and the application dialogs in R26 adopt the selected appearance without changing
+  their validation or consequences.
+- **R32** — A missing, unknown, or unreadable stored skin id cannot prevent
+  first paint or replace the application with an error boundary. AgentDeck renders Core, identifies
+  the unavailable preference in Settings, and lets the person choose and save a valid appearance.
+  If saving a new choice fails, the UI reports the failure and returns to the last durably selected
+  appearance rather than presenting an unsaved selection as permanent.
+- **R33** — This first skin adds no operating-system light/dark following,
+  per-project choice, schedules, user-authored CSS, arbitrary skin code, downloads, imports,
+  marketplace, third-party package discovery, or theme-specific product vocabulary. All skin CSS,
+  fonts, and decorative assets ship locally and work without network access.
+
 ## 3. States & transitions
 
 - **Route change:** the persistent shell remains visually stable while the current-route
@@ -149,6 +184,9 @@ Requirements are user-observable.
   owning feature's behavior.
 - **Overlay:** existing modals, menus, permission prompts, and toasts appear above the
   shell with a consistent depth and surface treatment; their open/close behavior is unchanged.
+- **Appearance selection:** choosing Core or Sky & Grove applies the complete selected
+  presentation to the mounted application and saves the global preference; a later session restores
+  it after configuration loads.
 
 ## 4. Edge cases & errors
 
@@ -198,6 +236,21 @@ Requirements are user-observable.
   *Verify:* a static source guard test asserting the absence of `prompt`/`confirm` calls in
   first-party UI, the per-dialog component tests named by FS-01.A16, FS-02.A21, and FS-04.A17, and a
   real-browser pass of the rename, switch-runtime, move-to-group, and destructive-confirm flows.
+- **A9** (R27, R29–R30) — A person can select Sky & Grove in Settings, see the
+  mounted application change without reload, navigate through every route with the choice intact,
+  and open a second browser session or reload to recover the same stored choice; clearing the
+  preference restores Core. *Verify:* Settings/component tests, configuration round-trip tests, and
+  a real-browser appearance-switch journey.
+- **A10** (R28, R31, R33) — A deterministic visual matrix renders the core and
+  Sky & Grove versions of the shell, Dashboard extremes, agent screen and transcript variants,
+  Pipelines, Archive, Settings, onboarding, overlays, syntax, diffs, and terminal. Review confirms
+  the approved blue/green direction, distinct semantic states and project colors, unchanged
+  content/actions/structure, and no network-loaded asset. *Verify:* paired visual fixtures,
+  presentation-contract tests, and real-browser screenshots at the existing desktop floor.
+- **A11** (R32) — Missing/unknown/unreadable appearance configuration and an
+  injected save failure each leave a usable Core application; Settings explains the unavailable or
+  unsaved choice and can recover by saving a valid option. *Verify:* configuration/API and Settings
+  regressions plus a first-paint browser smoke test.
 
 ## 6. Deviations & open decisions
 
@@ -211,6 +264,10 @@ Requirements are user-observable.
 - The confirmed core direction is the product-native light-canvas system described above. Its
   behavior-preserving token, component, integration, and future-skin boundaries are defined by
   TS-08.
+- R27–R33 and A9–A11 are the confirmed first use of that future-skin boundary. The human confirmed
+  the Sky & Grove name, Core default/fallback, global server-stored preference, Settings-only
+  selection, unchanged product vocabulary, and explicit exclusions on 2026-07-30. TS-02.R21,
+  TS-03.R21, and TS-08.R30–R36 define the matching technical boundary.
 
 ## 7. Traceability
 
@@ -219,8 +276,13 @@ Requirements are user-observable.
 - Core visual source and shared construction: `ui/src/styles/`, `ui/src/components/ui/`.
 - Product surfaces: `ui/src/components/{grid,chat}/`,
   `ui/src/features/{archive,launch,onboarding,settings}/`.
+- Appearance activation and bundled skin: `ui/src/features/appearance/`,
+  `ui/src/features/settings/AppearanceEditor.tsx`, `ui/src/styles/skins/sky-grove.css`.
 - Deterministic browser evidence: `ui/src/presentation/VisualMatrix.tsx`,
   `ui/src/presentation/contract-fixture.css`, `ui/src/presentation/VisualMatrix.test.tsx`.
+- Appearance behavior regressions: `ui/src/features/appearance/AppearanceRoot.test.tsx`,
+  `ui/src/features/settings/AppearanceEditor.test.tsx`,
+  `ui/src/components/chat/TerminalTab.test.tsx`.
 - Presentation completeness and visual-value enforcement:
   `ui/scripts/check-presentation-contract.mjs`, `ui/scripts/check-presentation-contract.test.mjs`,
   `ui/stylelint.config.mjs`, `ui/scripts/stylelint-config.test.mjs`.

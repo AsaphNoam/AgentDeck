@@ -3,6 +3,7 @@ import { RolesEditor } from "./RolesEditor";
 import { ProjectsEditor } from "./ProjectsEditor";
 import { BackendsEditor } from "./BackendsEditor";
 import { NotificationsEditor } from "./NotificationsEditor";
+import { AppearanceEditor } from "./AppearanceEditor";
 
 export function SettingsPage() {
   return (
@@ -14,6 +15,7 @@ export function SettingsPage() {
           <Tabs.Trigger value="projects">Projects</Tabs.Trigger>
           <Tabs.Trigger value="backends">Backends</Tabs.Trigger>
           <Tabs.Trigger value="notifications">Notifications</Tabs.Trigger>
+          <Tabs.Trigger value="appearance">Appearance</Tabs.Trigger>
         </Tabs.List>
         <Tabs.Content value="roles" className="settings-tab-content" data-slot="content">
           <RolesEditor />
@@ -26,6 +28,9 @@ export function SettingsPage() {
         </Tabs.Content>
         <Tabs.Content value="notifications" className="settings-tab-content" data-slot="content">
           <NotificationsEditor />
+        </Tabs.Content>
+        <Tabs.Content value="appearance" className="settings-tab-content" data-slot="content">
+          <AppearanceEditor />
         </Tabs.Content>
       </Tabs.Root>
     </div>

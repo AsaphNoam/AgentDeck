@@ -19,6 +19,8 @@ export const configSchema = z.object({
   port: z.number(),
   default_project: z.string(),
   default_role: z.string(),
+  appearance_skin: z.string().optional(),
+  appearance_skin_warning: z.enum(["unsupported", "config_unreadable"]).optional(),
   skip_permissions: z.boolean(),
   onboarding_complete: z.boolean(),
   notifications: z.object({

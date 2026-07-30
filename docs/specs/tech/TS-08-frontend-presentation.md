@@ -11,10 +11,11 @@ React/Vite frontend and how that core remains distinct from future optional skin
 tokens, cascade order, stylesheet/component boundaries, local visual assets, third-party renderer
 styling, stable skin hooks, automated maintenance safeguards, and presentation verification.
 
-It does not own feature state, API/SSE data, routes, persistence, user-selectable skins, skin
-discovery/loading, or interaction behavior. Those boundaries remain with TS-01 and the owning
-feature specifications. The selected architecture is layered plain CSS with a small presentation-
-only React primitive seam; the rejected alternatives are recorded in §5.
+It does not own feature state, API/SSE data, routes, persistence, or interaction behavior. R30–R36
+own the presentation-side activation of the first bundled selectable skin; FS-04,
+TS-02, and TS-03 own its preference and wire shape. External skin discovery/loading remains out of
+scope. The selected architecture is layered plain CSS with a small presentation-only React
+primitive seam; the rejected alternatives are recorded in §5.
 
 ## 2. Design & constraints
 
@@ -134,6 +135,73 @@ only React primitive seam; the rejected alternatives are recorded in §5.
   backend-catalog, project-color, and client-derived group-label sources (R1); they add no API, SSE,
   persistence, or route change (R15), so no new server endpoint or migration is introduced.
 
+### 2.2 Built-in skin selection
+
+- **R30** — Built-in appearance selection uses no React theme provider,
+  runtime CSS-in-JS engine, dynamic stylesheet loader, or browser-storage shadow preference. One
+  application-level `AppearanceRoot` reads the existing React Query configuration projection and
+  sets `data-skin="sky-grove"` on `document.documentElement`; Core removes the attribute. Core is
+  the first paint while configuration is loading or failed, and a later config result or poll may
+  change the marker without remounting routes. This is the narrow exception that supersedes
+  R2's prohibition on production skin state while keeping Core structurally unskinned.
+- **R31** — `styles/skins/sky-grove.css` is statically imported by
+  `styles/index.css`, declares every rule inside `ad-skins`, and scopes every semantic-token or hook
+  override to the documented `sky-grove` id. The CSS ships in the ordinary Vite bundle and makes no
+  network request. Private `--ad-sky-grove-*` raw palette values may be declared once at `:root`
+  inside that file so the inactive Settings preview can reuse them; they affect the application only
+  when the documented root selector maps them to public semantic tokens.
+  `presentation/contract.json` advances to version 2 and adds the finite built-in skin-id list;
+  Core is represented by the absence of a skin marker, not by a parallel Core skin.
+  This supersedes only R3/R9/R25's empty-production-layer statements; the cascade order, one CSS
+  entry, complete Core fallback, approved-token/hook boundary, and stale-authority rules remain.
+- **R32** — The config query cache is the sole browser projection of the
+  durable preference. `AppearanceRoot` derives an effective id through a finite frontend allowlist
+  that the contract checker verifies against the manifest and never makes its own request. The
+  Settings mutation optimistically updates that same cache so
+  selection is immediate, rolls the cache and root marker back on failure, surfaces the existing
+  mutation error, and invalidates/refetches on success. Missing, empty, unknown, malformed, or
+  failed configuration produces Core; Settings shows the server warning, unknown raw id, or query
+  error instead of crashing the shell. No appearance value enters Zustand, component props, routes,
+  project/session data, or launch composition.
+- **R33** — Sky & Grove defines its raw palette once in its skin stylesheet
+  and maps it to the existing public semantic tokens. Its starting visual contract is:
+
+  | Role | Value |
+  |---|---|
+  | Canvas / panel / raised | `#e9f5fb` / `#f4fbf8` / `#ffffff` |
+  | Primary / secondary / muted text | `#12382f` / `#315e53` / `#648078` |
+  | Default / strong border | `#a8cec2` / `#27604f` |
+  | Primary action / secondary action / highlight | `#1f6f4d` / `#2f80b7` / `#b8df72` |
+  | Busy / idle / waiting / done / error / unknown | `#bd7418` / `#66847b` / `#2f80b7` / `#2f8a62` / `#bd3d45` / `#80938e` |
+  | Technical background / surface / text / muted | `#102e2a` / `#183d37` / `#effbf7` / `#a8c8be` |
+
+  The skin retains the bundled Core fonts, increases the public small/medium/large radii to
+  `6px`/`12px`/`20px`, and uses token-derived sky/green depth plus CSS-only botanical/topographic
+  line decoration on approved hooks. It introduces no glass, glow, decorative text, semantic-color
+  alias, or asset that carries product meaning. Compact Core/Sky & Grove previews reuse the Core raw
+  values and Sky & Grove raw values respectively rather than duplicating palette literals.
+- **R34** — The presentation checker accepts a production `data-skin` selector
+  only inside `ad-skins`, rejects undocumented ids, rejects a skin rule outside the declared skin
+  stylesheet/layer, and still rejects Core CSS that depends on a skin marker. It proves each manifest
+  skin has production CSS, each skin public-token override is approved, Core retains exactly one
+  definition of every public token, the Settings appearance variant has matching hooks/selectors,
+  and the production bundle never imports the development fixture or a network URL. Private skin
+  palette tokens are allowed only in the matching declared skin file and must be used by its active
+  mapping or preview. The local UI agent guide is updated from its old absolute prohibition to this
+  finite built-in-skin rule. This supersedes the
+  production-skin bans in R19/R21/R23 only as explicitly described.
+- **R35** — Syntax and diff renderers continue to consume live CSS custom
+  properties and therefore follow the root marker without special state. The canvas-backed xterm
+  adapter observes changes to the root `data-skin` attribute through one shared presentation helper,
+  re-resolves computed colors, and assigns the existing terminal instance's theme without closing
+  its WebSocket, recreating the terminal, changing dimensions, or losing content. The observer is
+  disconnected during the existing terminal cleanup.
+- **R36** — The development visual matrix can render paired Core and Sky &
+  Grove fixtures from the same deterministic feature data, including the Appearance control and all
+  FS-12.A10 surfaces. Its tests assert that selection changes only the root marker/presentation,
+  behavior tests cover optimistic success/failure and polling changes, and real-browser review
+  compares both appearances at the existing desktop floor. No stored pixel-baseline system is added.
+
 ## 3. Interfaces & data shapes
 
 ### 3.1 Cascade and file contract
@@ -160,6 +228,7 @@ ui/src/
     base.css                    shell-independent document/content rules
     components/*.css            shared presentation primitives
     features/*.css              surface composition
+    skins/*.css                 declared built-in skin palette/hook overrides
     integrations.css            third-party DOM adapters
   scripts/check-presentation-contract.mjs
 ui/presentation-exceptions.json
@@ -214,14 +283,15 @@ bundled fonts/assets
 raw core values → semantic values → shared component construction → feature composition
                                                               ↘ third-party renderer adapters
 
-future skin (not shipped): approved semantic overrides + scoped hook rules + decorative assets
+built-in skin: approved semantic overrides + scoped hook rules + decorative assets
 ```
 
 ### 3.4 Contract/exception manifest shapes
 
 ```jsonc
 {
-  "version": 1,
+  "version": 2,
+  "skins": ["sky-grove"],
   "tokens": ["--ad-surface-canvas", "--ad-text-primary"],
   "components": {
     "agent-card": {
@@ -244,6 +314,41 @@ future skin (not shipped): approved semantic overrides + scoped hook rules + dec
 ```
 
 Manifests are declarative build/test inputs only; production does not fetch or interpret them.
+
+### 3.5 Appearance state and CSS shape
+
+```text
+GET /api/config → React Query config cache → effective built-in id → <html data-skin="sky-grove">
+                                            ↘ Core: remove data-skin
+
+Settings mutation → optimistic cache/root marker → PUT /api/config
+                  ↘ failure: restore prior cache/root marker + visible error
+```
+
+```css
+/* styles/skins/sky-grove.css */
+@layer ad-skins {
+  :root {
+    /* private --ad-sky-grove-* palette values; inert until mapped or previewed */
+  }
+
+  :root[data-skin="sky-grove"] {
+    /* one raw Sky & Grove palette mapped onto approved --ad-* semantic tokens */
+  }
+
+  :root[data-skin="sky-grove"] [data-ui="agent-card"] {
+    /* optional hook-scoped construction/decorative override */
+  }
+
+  [data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="sky-grove"] {
+    /* compact inactive preview reads the same private palette */
+  }
+}
+```
+
+The Go config validator, frontend effective-id allowlist, manifest, and checker fixtures carry the
+same finite ids and are guarded in lockstep. This duplication is the explicit cross-language API
+boundary; the manifest remains the visual contract and arbitrary ids never become CSS selectors.
 
 ## 4. Invariants
 
@@ -276,9 +381,10 @@ Manifests are declarative build/test inputs only; production does not fetch or i
   resemble a default theme. Runtime CSS-in-JS was rejected because it adds dependency/runtime cost
   and a broad rewrite without current runtime skin behavior. Reversing this choice is a TS-08
   architecture change.
-- Skin selection, persistence, discovery, packaging, compatibility/version negotiation, third-party
-  skin trust, and arbitrary skin code are future features. The version-1 manifest is an internal
-  compatibility seam, not a promise that external skins can be loaded today.
+- R30–R36 define selection and persistence only for the bundled Sky & Grove skin. Discovery, external
+  packaging, compatibility negotiation beyond the in-repository manifest, third-party skin trust,
+  and arbitrary skin code remain future features. The version-2 manifest stays an internal
+  compatibility seam, not a promise that external skins can be loaded.
 - Browser pixel-diff infrastructure is not added by this change. Deterministic visual fixtures,
   browser screenshots, the contract fixture, style lint, and existing behavior tests provide the
   acceptance evidence; adopting stored pixel baselines can be designed separately if manual visual
@@ -290,6 +396,8 @@ Manifests are declarative build/test inputs only; production does not fetch or i
   `ui/src/styles/index.css`, TS-06.R3–R5.
 - Core visual source: `ui/src/styles/{foundation,tokens,base,integrations}.css`,
   `ui/src/styles/components/`, `ui/src/styles/features/`.
+- Appearance bridge and finite built-in allowlist: `ui/src/features/appearance/`; bundled skin:
+  `ui/src/styles/skins/sky-grove.css`.
 - Shared construction, public hooks, and local assets: `ui/src/components/ui/`,
   `ui/src/presentation/contract.json`, `ui/src/assets/`.
 - Third-party renderers: `AssistantText.tsx` (`react-syntax-highlighter`), `DiffBlock.tsx`
@@ -303,3 +411,5 @@ Manifests are declarative build/test inputs only; production does not fetch or i
 - Deterministic visual evidence: `ui/src/presentation/VisualMatrix.tsx`,
   `ui/src/presentation/contract-fixture.css`, `ui/src/presentation/VisualMatrix.test.tsx`; the route
   is development-gated in `ui/src/routes.tsx` and absent from production bundles.
+- Selection and live-renderer regressions: `ui/src/features/settings/AppearanceEditor.test.tsx`,
+  `ui/src/features/appearance/AppearanceRoot.test.tsx`, `ui/src/components/chat/TerminalTab.test.tsx`.

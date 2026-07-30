@@ -19,3 +19,17 @@ export function resolvePresentationColors(element: Element = document.documentEl
     Object.entries(presentationColorTokens).map(([name, token]) => [name, style.getPropertyValue(token).trim()]),
   ) as PresentationColors;
 }
+
+export function observePresentationColors(
+  element: Element,
+  onChange: (colors: PresentationColors) => void,
+): () => void {
+  const observer = new MutationObserver(() => {
+    onChange(resolvePresentationColors(element));
+  });
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-skin"],
+  });
+  return () => observer.disconnect();
+}

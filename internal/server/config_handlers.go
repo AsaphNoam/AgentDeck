@@ -547,7 +547,8 @@ type onboardingBlock struct {
 // configResponse is the GET /api/config body (config fields + onboarding block).
 type configResponse struct {
 	config.Config
-	Onboarding onboardingBlock `json:"onboarding"`
+	Onboarding            onboardingBlock `json:"onboarding"`
+	AppearanceSkinWarning string          `json:"appearance_skin_warning,omitempty"`
 }
 
 // computeOnboarding computes the min-viable-config onboarding status.
@@ -653,14 +654,21 @@ func (s *Server) cachedCredCheck(ctx context.Context, bk config.Backend, model c
 // handleGetConfig implements GET /api/config (§5.4).
 func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	cfg, err := s.configStore.ReadConfig()
+	var appearanceWarning string
 	if err != nil {
 		if errors.Is(err, config.ErrNotFound) || errors.Is(err, config.ErrCorrupt) {
 			cfg = config.DefaultConfig()
+			if errors.Is(err, config.ErrCorrupt) {
+				appearanceWarning = "config_unreadable"
+			}
 		} else {
 			s.log.Error("config: read", "err", err)
 			writeAPIError(w, apiError("internal", "internal error"))
 			return
 		}
+	}
+	if cfg.AppearanceSkin != "" && !config.ValidAppearanceSkin(cfg.AppearanceSkin) {
+		appearanceWarning = "unsupported"
 	}
 
 	ob := s.computeOnboarding(r.Context())
@@ -670,7 +678,11 @@ func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	normalizeNotifications(&cfg)
 
-	writeJSON(w, http.StatusOK, configResponse{Config: cfg, Onboarding: ob})
+	writeJSON(w, http.StatusOK, configResponse{
+		Config:                cfg,
+		Onboarding:            ob,
+		AppearanceSkinWarning: appearanceWarning,
+	})
 }
 
 func normalizeNotifications(cfg *config.Config) {
@@ -694,6 +706,7 @@ type configPutBody struct {
 	OnboardingComplete *bool                       `json:"onboarding_complete"`
 	DefaultProject     *string                     `json:"default_project"`
 	DefaultRole        *string                     `json:"default_role"`
+	AppearanceSkin     *string                     `json:"appearance_skin"`
 	Notifications      *config.NotificationsConfig `json:"notifications"`
 	// Sentinel fields: reject if present.
 	Version *int `json:"version"`
@@ -713,6 +726,12 @@ func (s *Server) handlePutConfig(w http.ResponseWriter, r *http.Request) {
 	if body.Version != nil || body.Port != nil {
 		writeValidationError(w, &config.ValidationErrors{Errors: []config.FieldError{
 			{Field: "version/port", Code: "immutable", Message: "version and port are not user-editable via PUT /api/config"},
+		}})
+		return
+	}
+	if body.AppearanceSkin != nil && !config.ValidAppearanceSkin(*body.AppearanceSkin) {
+		writeValidationError(w, &config.ValidationErrors{Errors: []config.FieldError{
+			{Field: "appearance_skin", Code: "unsupported", Message: "unsupported appearance skin: " + *body.AppearanceSkin},
 		}})
 		return
 	}
@@ -768,12 +787,15 @@ func (s *Server) handlePutConfig(w http.ResponseWriter, r *http.Request) {
 	if body.DefaultRole != nil {
 		cfg.DefaultRole = *body.DefaultRole
 	}
+	if body.AppearanceSkin != nil {
+		cfg.AppearanceSkin = *body.AppearanceSkin
+	}
 	if body.Notifications != nil {
 		cfg.Notifications = *body.Notifications
 		normalizeNotifications(&cfg)
 	}
 
-	if err := s.configStore.WriteConfig(cfg); err != nil {
+	if err := s.writeConfig(cfg); err != nil {
 		s.log.Error("config: write", "err", err)
 		writeAPIError(w, apiError("internal", "internal error"))
 		return

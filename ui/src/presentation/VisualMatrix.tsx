@@ -1,15 +1,31 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Badge, Button, PageHeader, Surface } from "../components/ui";
 import { ContextBar } from "../components/grid/ContextBar";
 import { StateBadge } from "../components/grid/StateBadge";
+import { EmptyState } from "../components/grid/EmptyState";
+import { AssistantText } from "../components/chat/renderers/AssistantText";
+import { DiffBlock } from "../components/chat/renderers/DiffBlock";
 import type { AgentStatus } from "../api/types";
+import { applyAppearance } from "../features/appearance/appearance";
 import "./contract-fixture.css";
 
 const agentStates: AgentStatus[] = ["busy", "idle", "waiting_input", "done", "error", "unknown"];
 
 export function VisualMatrix() {
   const [highVariance, setHighVariance] = useState(false);
+  const [appearance, setAppearance] = useState<"core" | "sky-grove">("core");
+  const initialSkin = useRef(document.documentElement.getAttribute("data-skin"));
+
+  useEffect(() => {
+    applyAppearance(appearance === "sky-grove" ? "sky-grove" : "");
+  }, [appearance]);
+
+  useEffect(() => () => {
+    const previous = initialSkin.current;
+    if (previous) document.documentElement.dataset.skin = previous;
+    else document.documentElement.removeAttribute("data-skin");
+  }, []);
 
   return (
     <div className={`visual-matrix ${highVariance ? "visual-matrix-high-variance" : ""}`}>
@@ -18,14 +34,27 @@ export function VisualMatrix() {
         title="Presentation matrix"
         description="Deterministic AgentDeck core surfaces for visual contract review."
         actions={(
-          <label className="visual-matrix-toggle">
-            <input
-              type="checkbox"
-              checked={highVariance}
-              onChange={(event) => setHighVariance(event.target.checked)}
-            />
-            High-variance contract
-          </label>
+          <div className="visual-matrix-controls">
+            <label className="visual-matrix-toggle">
+              Appearance
+              <select
+                aria-label="Fixture appearance"
+                value={appearance}
+                onChange={(event) => setAppearance(event.target.value as "core" | "sky-grove")}
+              >
+                <option value="core">AgentDeck Core</option>
+                <option value="sky-grove">Sky & Grove</option>
+              </select>
+            </label>
+            <label className="visual-matrix-toggle">
+              <input
+                type="checkbox"
+                checked={highVariance}
+                onChange={(event) => setHighVariance(event.target.checked)}
+              />
+              High-variance contract
+            </label>
+          </div>
         )}
       />
 
@@ -99,6 +128,7 @@ export function VisualMatrix() {
             <small className="stopped-label">stopped</small>
           </article>
         </div>
+        <EmptyState onNewAgent={() => undefined} />
       </section>
 
       <section className="visual-matrix-section">
@@ -112,6 +142,11 @@ export function VisualMatrix() {
             <p>Readable Markdown uses a deliberate measure and technical detail stays distinct.</p>
             <code>inline_code()</code>
           </article>
+          <AssistantText event={{ seq: 17, kind: "assistant_text", text: "```ts\nconst appearance = 'sky-grove';\n```" }} />
+          <DiffBlock
+            event={{ seq: 18, kind: "diff", path: "ui/src/styles/skins/sky-grove.css", old_text: "--surface: core;", new_text: "--surface: sky;" }}
+            onAnnotate={() => undefined}
+          />
           <article className="tool-block tool-call" data-ui="tool-call" data-state="expanded">
             <button className="tool-toggle" data-slot="trigger" type="button">▾ Tool call: inspect_workspace</button>
             <pre className="tool-args" data-slot="content">{`{"path":"ui/src"}`}</pre>
@@ -126,6 +161,29 @@ export function VisualMatrix() {
           </article>
           <div className="terminal-panel" data-ui="terminal">
             <pre className="visual-matrix-terminal" data-slot="viewport">$ make test{"\n"}all checks passed</pre>
+          </div>
+        </div>
+      </section>
+
+      <section className="visual-matrix-section visual-matrix-columns">
+        <div className="pipeline-panel pipeline-runs">
+          <div className="pipeline-panel-header">
+            <div><span className="pipeline-eyebrow">Pipelines</span><h2>Release verification</h2></div>
+            <Badge variant="warning">needs attention</Badge>
+          </div>
+          <div className="pipeline-stage-card">
+            <div className="pipeline-stage-heading"><span className="pipeline-stage-number">02</span><strong>Visual review</strong></div>
+            <p>Compare Core and Sky & Grove against the same deterministic fixture.</p>
+          </div>
+        </div>
+        <div className="dialog-content onboarding-wizard" data-ui="dialog" data-slot="content" data-variant="onboarding">
+          <div className="onboarding-flow" data-ui="onboarding" data-state="current">
+            <div className="wizard-progress" data-slot="progress">Step 2 of 4</div>
+            <div className="onboarding-step" data-slot="content">
+              <h2>Choose a project</h2>
+              <p>Onboarding keeps its existing structure and behavior in both appearances.</p>
+            </div>
+            <div className="onboarding-actions" data-slot="actions"><Button>Back</Button><Button variant="primary">Continue</Button></div>
           </div>
         </div>
       </section>

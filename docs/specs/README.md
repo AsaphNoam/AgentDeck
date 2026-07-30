@@ -30,7 +30,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-01 | [features/FS-01-agent-lifecycle.md](features/FS-01-agent-lifecycle.md) | Partial | Launch, stop, cancel, resume, clone, rename, switch runtime, crash handling, identity |
 | FS-02 | [features/FS-02-dashboard.md](features/FS-02-dashboard.md) | Current | Card grid, live status, layout/density, task groups, notifications |
 | FS-03 | [features/FS-03-chat.md](features/FS-03-chat.md) | Current | Streaming chat panel, tool calls/diffs, permission prompts, transcript view |
-| FS-04 | [features/FS-04-configuration-onboarding.md](features/FS-04-configuration-onboarding.md) | Current | Roles/projects/backends CRUD, settings UI, onboarding wizard |
+| FS-04 | [features/FS-04-configuration-onboarding.md](features/FS-04-configuration-onboarding.md) | Current | Roles/projects/backends CRUD, settings UI, onboarding wizard, appearance preference |
 | FS-05 | [features/FS-05-archive-tracking.md](features/FS-05-archive-tracking.md) | Current | Session archive, full-text search, resume from archive, file/command tracking |
 | FS-06 | [features/FS-06-coordination.md](features/FS-06-coordination.md) | Current | Agent-to-agent messaging, nudger, budgets, unread indicators |
 | FS-07 | [features/FS-07-terminal.md](features/FS-07-terminal.md) | Partial | Terminal interface, drivers (xterm/tmux/iTerm2), terminal-agent boundaries |
@@ -38,7 +38,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-09 | [features/FS-09-backends.md](features/FS-09-backends.md) | Partial | Backend/model catalog, credential checks, per-backend capability matrix |
 | FS-10 | [features/FS-10-macos-installation.md](features/FS-10-macos-installation.md) | Current | macOS release installation, guided provider setup, explicit updates and rollback |
 | FS-11 | [features/FS-11-project-resources.md](features/FS-11-project-resources.md) | Current | AgentDeck-owned, project-scoped shared resources outside repositories |
-| FS-12 | [features/FS-12-application-interface.md](features/FS-12-application-interface.md) | Current | Product-native core interface design and future-skin boundary |
+| FS-12 | [features/FS-12-application-interface.md](features/FS-12-application-interface.md) | Current | Product-native core interface design, future-skin boundary, and Sky & Grove skin |
 | FS-13 | [features/FS-13-annotate-assign.md](features/FS-13-annotate-assign.md) | Current | Annotate and assign: select diff lines/transcript events, instruct, route to an agent or new task |
 | FS-14 | [features/FS-14-configurable-pipelines.md](features/FS-14-configurable-pipelines.md) | Partial | Model-neutral multi-stage pipelines with run-time model assignment, text artifacts, routing, and recovery |
 
@@ -53,7 +53,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | TS-05 | [tech/TS-05-security.md](tech/TS-05-security.md) | Current | Loopback boundary, tokens, file modes, permission model, release-install trust notes |
 | TS-06 | [tech/TS-06-build-test.md](tech/TS-06-build-test.md) | Current | Build tags, embed pipeline, release runtime, install, test strategy & conventions |
 | TS-07 | [tech/TS-07-federation.md](tech/TS-07-federation.md) | Partial | Native configuration authority, resolvers, consent, freshness, redaction, launch freezing |
-| TS-08 | [tech/TS-08-frontend-presentation.md](tech/TS-08-frontend-presentation.md) | Current | Core visual architecture, presentation contracts, maintenance safeguards, local assets, third-party renderer styling, future-skin seam |
+| TS-08 | [tech/TS-08-frontend-presentation.md](tech/TS-08-frontend-presentation.md) | Current | Core visual architecture, presentation contracts, maintenance safeguards, local assets, renderer styling, and built-in skin selection |
 | TS-09 | [tech/TS-09-pipeline-control-plane.md](tech/TS-09-pipeline-control-plane.md) | Partial | Native sequential pipeline templates, durable run state machine, stage-result tools, recovery, and AgentDecker proposals |
 | INV | [../features/INVARIANTS.md](../features/INVARIANTS.md) | Current | Bug-class constraint catalog (path kept stable for hooks/history) |
 

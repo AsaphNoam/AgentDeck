@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
-import { resolvePresentationColors } from "../../presentation/resolveColors";
+import { observePresentationColors, resolvePresentationColors } from "../../presentation/resolveColors";
 import { xtermTheme } from "../../presentation/integrations";
 
 // TerminalTab renders a real xterm.js emulator bridged to the agent's PTY over a
@@ -28,6 +28,9 @@ export function TerminalTab({ agentId }: { agentId: string }) {
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(container);
+    const stopObservingPresentation = observePresentationColors(container, (colors) => {
+      term.options.theme = xtermTheme(colors);
+    });
     const safeFit = () => {
       try {
         fit.fit();
@@ -69,6 +72,7 @@ export function TerminalTab({ agentId }: { agentId: string }) {
     window.addEventListener("resize", onWindowResize);
 
     return () => {
+      stopObservingPresentation();
       window.removeEventListener("resize", onWindowResize);
       dataSub.dispose();
       resizeSub.dispose();
