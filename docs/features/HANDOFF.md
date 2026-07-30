@@ -73,8 +73,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   [`../archive/reviews/usability-review-run-2026-07-26-rerun.md`](../archive/reviews/usability-review-run-2026-07-26-rerun.md)
   and [`../archive/reviews/usability-review-run-2026-07-26-browser-retry.md`](../archive/reviews/usability-review-run-2026-07-26-browser-retry.md).
   Credentialed provider and terminal compatibility remain separate manual release gates.
-- **Last reviewed code:** `70afbe8` (2026-07-29), the continuous range after `dc04dbd`, including
-  the finished project-dashboard/archive lifecycle and native-dialog replacement.
+- **Last reviewed code:** `0f52f89` (2026-07-30), the continuous range after `70afbe8`, including
+  the archive paging, transition-claim, compensation-reporting, and fail-closed project-read fixes.
 - **Branch:** `main`.
 
 ## Active change
@@ -84,8 +84,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 The native-dialog replacement remains complete. The current fix run is clearing the review findings,
 one verified finding per commit. All five Must-fix findings are now fixed (grouped Archive
 pagination, stale per-project searches, idempotent archive claims, compensation reporting, and
-unexpected project-read errors failing closed); the next open finding is the project-card Rename
-losing field-level validation errors.
+unexpected project-read errors failing closed); the lower-risk queue now also includes the
+independently reviewed per-project Archive error/retry gap.
 
 ## Decisions needing your input
 
@@ -115,6 +115,14 @@ The post-fix usability-review and current code-review state are committed locall
 those commits to the shared `origin/main` branch needs explicit human authorization.
 
 ## Review findings
+
+- **Worth fixing** — INV §8/§10; FS-05.R36 — A failed per-project Archive page disappears without
+  a retry-visible state. `ArchiveProjectRows` now begins with no rows and fetches every group through
+  `GET /api/archive/projects/{project}`; if that request fails, it emits only a toast, leaves the
+  group body empty, and records neither an inline error nor a retry action. A transient normal
+  request failure therefore makes a group whose header says it has archived agents look empty until
+  the person changes the search or reloads the page. Retain the last successful rows when present,
+  otherwise render the group error with a retry control, and add a failed-project-page regression.
 
 - **Worth fixing** — INV §8/§10 — Project-card Rename loses field-level validation errors.
   `ProjectEditDialog` checks only a blank title and `ProjectDashboard` renders `err.message` from
