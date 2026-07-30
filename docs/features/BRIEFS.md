@@ -4,6 +4,20 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-30 — Review: Archive fix run
+
+The recent Archive fixes correctly page long histories, prevent overlapping archive actions from
+reporting a false result, preserve a coherent state when rollback fails, and stop work when a
+project definition cannot be read safely. One issue remains: if loading an individual project's
+Archive rows temporarily fails, that project appears empty even when its header says archived agents
+exist, and there is no retry control.
+
+**Needs attention:** A transient per-project Archive request failure can hide archived agents until
+the person changes the search or reloads the page.
+
+**Next:** Add an inline per-project error and retry action with a regression test, then continue the
+remaining lower-priority repairs.
+
 ### 2026-07-30 — Fix: unreadable project files no longer allow work
 
 The last high-risk finding is fixed. Resume, runtime switch, agent restore, and pipeline work now
