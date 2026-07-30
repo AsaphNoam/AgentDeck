@@ -4,6 +4,18 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-30 — Fix: archive and dialog review findings
+
+The Archive and dialog review queue is complete. Large archives stay bounded, Archive and Restore
+remain safe under overlap and failure, unreadable projects block work until repaired, and Archive
+pages keep a visible retry path. Project Rename now explains field errors, lifecycle documentation
+matches the shipped dialogs, and the dialog guard catches equivalent native-browser call forms. The
+missing historical planning record is documented without inventing a retroactive file.
+
+**Needs attention:** None.
+
+**Next:** Independent review of the completed fixes before future behavior work.
+
 ### 2026-07-30 — Review: Archive fix run
 
 The recent Archive fixes correctly page long histories, prevent overlapping archive actions from
