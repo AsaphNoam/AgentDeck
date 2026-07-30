@@ -43,6 +43,7 @@ export function launchAgent(body: {
   project: string;
   backend?: string;
   model?: string;
+  effort?: string;
   interface?: string;
   name?: string;
   group?: string;
@@ -77,7 +78,7 @@ export function releaseGroup(group: string) {
   );
 }
 
-export function switchRuntime(agentId: string, body: { interface?: string; backend?: string; model?: string }) {
+export function switchRuntime(agentId: string, body: { interface?: string; backend?: string; model?: string; effort?: string }) {
   return json<{ history_handoff: "native_resume" | "primer" }>(`/api/sessions/${agentId}/switch-runtime`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

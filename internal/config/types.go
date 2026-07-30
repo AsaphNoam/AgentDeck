@@ -51,9 +51,25 @@ type Backend struct {
 
 // Model is one model under a backend. Per-model Env overrides backend-level Env.
 type Model struct {
-	Name  string            `json:"name"`
-	Model string            `json:"model"`         // provider model string ("claude-sonnet-4-6")
-	Env   map[string]string `json:"env,omitempty"` // per-model env; overrides backend env
+	Name          string            `json:"name"`
+	Model         string            `json:"model"`                    // provider model string ("claude-sonnet-4-6")
+	Env           map[string]string `json:"env,omitempty"`            // per-model env; overrides backend env
+	Efforts       []string          `json:"efforts"`                  // provider-declared reasoning levels
+	DefaultEffort string            `json:"default_effort,omitempty"` // one of Efforts
+}
+
+// SupportsEffort reports whether effort is one of the model's declared provider
+// levels. Empty means that no effort is requested/resolved.
+func (m Model) SupportsEffort(effort string) bool {
+	if effort == "" {
+		return true
+	}
+	for _, level := range m.Efforts {
+		if level == effort {
+			return true
+		}
+	}
+	return false
 }
 
 // ---- Layout: layout.json (PRD §3.5) ----

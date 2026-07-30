@@ -187,6 +187,7 @@ type SessionMetaData struct {
 	Project         string   `json:"project"`
 	Backend         string   `json:"backend"`
 	Model           string   `json:"model"`
+	Effort          string   `json:"effort"`
 	Interface       string   `json:"interface"`
 	Group           string   `json:"group,omitempty"`
 	Cwd             string   `json:"cwd"`

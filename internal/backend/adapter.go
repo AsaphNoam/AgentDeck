@@ -56,7 +56,19 @@ type BackendAdapter interface {
 	// settings JSON via `--settings <path>`. Returns nil when the backend has no
 	// settings-file mechanism (or it is not yet confirmed for that backend).
 	HookLaunchArgs(settingsPath string) []string
+
+	// EffortDelivery declares how an effort level reaches this adapter for the
+	// given AgentDeck interface. The identifier is a session option id or argv
+	// flag as appropriate; an empty mode means the backend has no mechanism.
+	EffortDelivery(agentInterface string) (mode, identifier string)
 }
+
+const (
+	EffortNone        = ""
+	EffortModelSuffix = "model_suffix"
+	EffortPostSession = "post_session"
+	EffortArgv        = "argv"
+)
 
 // ExtraEnvProvider is an optional interface a BackendAdapter may implement to
 // contribute launch-derived environment variables ("K=V"), given the resolved
@@ -134,6 +146,13 @@ func (claudeACP) HookLaunchArgs(settingsPath string) []string {
 	return []string{"--settings", settingsPath}
 }
 
+func (claudeACP) EffortDelivery(agentInterface string) (string, string) {
+	if agentInterface == "terminal" {
+		return EffortArgv, "--effort"
+	}
+	return EffortPostSession, "effort"
+}
+
 // codexACP is the adapter for the codex-acp backend. It speaks ACP over stdio
 // like claude-acp, so it reuses the chat runtime transport; only the binary,
 // env, resume mechanism and hook map differ (techspec §2.4, §6).
@@ -182,6 +201,8 @@ func (codexACP) HookLaunchArgs(settingsPath string) []string {
 	return nil
 }
 
+func (codexACP) EffortDelivery(string) (string, string) { return EffortModelSuffix, "" }
+
 // opencodeACP is the adapter for the OpenCode CLI (`opencode acp`). It speaks
 // ACP over stdio like the other backends, so the chat runtime is unchanged; the
 // binary/argv, env hygiene, and yolo-via-env differ (techspec §2.1, §2.3).
@@ -212,9 +233,10 @@ func (opencodeACP) CanSwitchModelOnResume() bool { return true }
 
 // OpenCode has no AgentDeck hook surface; chat status derives from the ACP
 // stream like every chat agent.
-func (opencodeACP) HookMap() map[string]string      { return nil }
-func (opencodeACP) UnsupportedHookEvents() []string { return unsupported(nil) }
-func (opencodeACP) HookLaunchArgs(string) []string  { return nil }
+func (opencodeACP) HookMap() map[string]string             { return nil }
+func (opencodeACP) UnsupportedHookEvents() []string        { return unsupported(nil) }
+func (opencodeACP) HookLaunchArgs(string) []string         { return nil }
+func (opencodeACP) EffortDelivery(string) (string, string) { return EffortNone, "" }
 
 // ExtraEnv injects the yolo permission config for skip=true (techspec §2.3):
 // OPENCODE_CONFIG_CONTENT carries a full config JSON so the CLI auto-allows
@@ -254,9 +276,10 @@ func (openhandsACP) ResolveResumeID(prevSessionID string, sameBackend bool) stri
 
 func (openhandsACP) CanSwitchModelOnResume() bool { return true }
 
-func (openhandsACP) HookMap() map[string]string      { return nil }
-func (openhandsACP) UnsupportedHookEvents() []string { return unsupported(nil) }
-func (openhandsACP) HookLaunchArgs(string) []string  { return nil }
+func (openhandsACP) HookMap() map[string]string             { return nil }
+func (openhandsACP) UnsupportedHookEvents() []string        { return unsupported(nil) }
+func (openhandsACP) HookLaunchArgs(string) []string         { return nil }
+func (openhandsACP) EffortDelivery(string) (string, string) { return EffortNone, "" }
 
 // ExtraEnv sets LLM_MODEL from the resolved model id (OpenHands selects the
 // model via env, not the ACP session param — techspec §2.2).

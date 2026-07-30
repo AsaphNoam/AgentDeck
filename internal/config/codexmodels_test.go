@@ -51,6 +51,37 @@ func TestReadCodexModelCatalog(t *testing.T) {
 	}
 }
 
+// TestReadCodexModelCatalogImportsEfforts guards FS-09.R38/A14: a synced model's
+// effort levels and default come from the cache's supported_reasoning_levels /
+// default_reasoning_level, an entry without levels contributes none, and a
+// default outside the declared levels is dropped rather than imported invalid.
+func TestReadCodexModelCatalogImportsEfforts(t *testing.T) {
+	const fixture = `{
+	  "models": [
+	    {"slug": "gpt-eff", "display_name": "GPT Eff", "visibility": "list",
+	     "supported_reasoning_levels": [{"effort": "low"}, {"effort": "high"}],
+	     "default_reasoning_level": "high"},
+	    {"slug": "gpt-none", "display_name": "GPT None", "visibility": "list"},
+	    {"slug": "gpt-baddefault", "display_name": "GPT Bad", "visibility": "list",
+	     "supported_reasoning_levels": [{"effort": "low"}],
+	     "default_reasoning_level": "extreme"}
+	  ]
+	}`
+	cat, err := ReadCodexModelCatalog(writeCache(t, fixture))
+	if err != nil {
+		t.Fatalf("read catalog: %v", err)
+	}
+	if got := cat["gpt-eff"]; len(got.Efforts) != 2 || got.Efforts[0] != "low" || got.Efforts[1] != "high" || got.DefaultEffort != "high" {
+		t.Fatalf("gpt-eff efforts = %+v, want [low high] default high", got)
+	}
+	if got := cat["gpt-none"]; len(got.Efforts) != 0 || got.DefaultEffort != "" {
+		t.Fatalf("gpt-none efforts = %+v, want none", got)
+	}
+	if got := cat["gpt-baddefault"]; got.DefaultEffort != "" {
+		t.Fatalf("gpt-baddefault default_effort = %q, want dropped (not in levels)", got.DefaultEffort)
+	}
+}
+
 func TestSyncCodexModelsAddsVisibleModels(t *testing.T) {
 	bc := BackendsConfig{Version: 2, Backends: map[string]Backend{
 		"codex": {

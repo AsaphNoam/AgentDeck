@@ -35,7 +35,7 @@ function ArchiveRow({ result, onClick }: { result: ArchiveResult; onClick: () =>
       <div className="archive-row-sub" data-slot="metadata">
         <span>{result.role} · {result.project}</span>
         <span>{result.archived ? "archived" : result.active ? "running" : "stopped"}</span>
-        <span>{result.backend} · {result.model}</span>
+        <span>{[result.backend, result.model, result.effort].filter(Boolean).join(" · ")}</span>
       </div>
       {result.snippet && (
         <p className="archive-snippet" data-slot="snippet">…{result.snippet}…</p>

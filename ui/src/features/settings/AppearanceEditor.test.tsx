@@ -97,7 +97,25 @@ describe("AppearanceEditor", () => {
     renderAppearance();
 
     expect(await screen.findByText(/forest-from-the-future/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/AgentDeck Core/)).toBeChecked();
+    // With an active warning, no radio is pre-checked so that clicking Core is
+    // not inert — otherwise the unsupported value could never be repaired to Core.
+    expect(screen.getByLabelText(/AgentDeck Core/)).not.toBeChecked();
     expect(document.documentElement).not.toHaveAttribute("data-skin");
+  });
+
+  it("repairs an unsupported stored appearance straight to Core", async () => {
+    currentConfig = {
+      ...configDoc,
+      appearance_skin: "forest-from-the-future",
+      appearance_skin_warning: "unsupported",
+    };
+    renderAppearance();
+    // Wait for the warning (GET resolved → fieldset enabled) before clicking.
+    await screen.findByText(/forest-from-the-future/);
+
+    fireEvent.click(screen.getByLabelText(/AgentDeck Core/));
+
+    await waitFor(() => expect(lastPut).toEqual({ appearance_skin: "" }));
+    await waitFor(() => expect(screen.queryByText(/forest-from-the-future/)).toBeNull());
   });
 });

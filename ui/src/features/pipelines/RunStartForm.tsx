@@ -85,7 +85,7 @@ export function RunStartForm({
       const backendID = current[stage.id]?.backend || defaultBackend;
       const backend = backends.data?.backends[backendID];
       const model = current[stage.id]?.model || backend?.default_model || Object.keys(backend?.models ?? {})[0] || "";
-      return [stage.id, { backend: backendID, model }];
+      return [stage.id, { backend: backendID, model, effort: current[stage.id]?.effort || backend?.models[model]?.default_effort || "" }];
     })));
   }, [backends.data, defaultBackend, proposal, template]);
 
@@ -175,7 +175,7 @@ export function RunStartForm({
         <h3>Stage runtimes</h3>
         <div className="pipeline-runtime-list">
           {template.stages.map((stage, index) => {
-            const assignment = assignments[stage.id] ?? { backend: "", model: "" };
+            const assignment = assignments[stage.id] ?? { backend: "", model: "", effort: "" };
             const backend = backends.data?.backends[assignment.backend];
             return <div className="pipeline-runtime-row" key={stage.id}>
               <span className="pipeline-stage-number">{index + 1}</span>
@@ -184,15 +184,19 @@ export function RunStartForm({
                 edit();
                 const backendID = event.target.value;
                 const selected = backends.data?.backends[backendID];
-                setAssignments((current) => ({ ...current, [stage.id]: { backend: backendID, model: selected?.default_model || Object.keys(selected?.models ?? {})[0] || "" } }));
+                const model = selected?.default_model || Object.keys(selected?.models ?? {})[0] || "";
+                setAssignments((current) => ({ ...current, [stage.id]: { backend: backendID, model, effort: selected?.models[model]?.default_effort || "" } }));
               }}>
                 <option value="">Select configured backend</option>
                 {backendEntries.map(([backendID, item]) => <option key={backendID} value={backendID}>{item.name} ({backendID})</option>)}
               </select></label>
-              <label className="form-field"><span>Model</span><select value={assignment.model} onChange={(event) => { edit(); setAssignments((current) => ({ ...current, [stage.id]: { ...assignment, model: event.target.value } })); }}>
+              <label className="form-field"><span>Model</span><select value={assignment.model} onChange={(event) => { edit(); const model = backend?.models[event.target.value]; setAssignments((current) => ({ ...current, [stage.id]: { ...assignment, model: event.target.value, effort: model?.default_effort || "" } })); }}>
                 <option value="">Select configured model</option>
                 {Object.entries(backend?.models ?? {}).map(([modelID, model]) => <option key={modelID} value={modelID}>{model.name} ({modelID})</option>)}
               </select></label>
+              {(backend?.models[assignment.model]?.efforts ?? []).length > 0 && <label className="form-field"><span>Effort</span><select value={assignment.effort} onChange={(event) => { edit(); setAssignments((current) => ({ ...current, [stage.id]: { ...assignment, effort: event.target.value } })); }}>
+                {(backend?.models[assignment.model]?.efforts ?? []).map((effort) => <option key={effort} value={effort}>{effort}</option>)}
+              </select></label>}
             </div>;
           })}
         </div>

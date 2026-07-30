@@ -207,6 +207,7 @@ export interface LaunchParams {
   project: string;
   backend?: string;
   model?: string;
+  effort?: string;
   interface: "chat" | "terminal";
 }
 

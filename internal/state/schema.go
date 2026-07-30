@@ -287,6 +287,15 @@ CREATE UNIQUE INDEX idx_pipeline_requests_run ON pipeline_requests(run_id);
 		sql: `
 ALTER TABLE agents ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;
 CREATE INDEX idx_agents_project_archived ON agents(project, archived);
+		`,
+	},
+	{
+		// Effort is frozen at the lifecycle boundary. The agent identity reflects a
+		// later switch, while sessions preserve the archived/resume choice.
+		version: 12,
+		sql: `
+ALTER TABLE agents ADD COLUMN effort TEXT NOT NULL DEFAULT '';
+ALTER TABLE sessions ADD COLUMN effort TEXT NOT NULL DEFAULT '';
 `,
 	},
 }

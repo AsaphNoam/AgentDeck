@@ -84,6 +84,28 @@ describe("BackendsEditor", () => {
     expect(await screen.findByText("failed")).toBeInTheDocument();
   });
 
+  // FS-09.R37/A14 — the model editor lets a person declare/reorder effort levels
+  // and choose the default from among them.
+  it("edits a model's effort levels and default in the expanded editor", async () => {
+    renderWithQuery(<BackendsEditor />);
+    await screen.findByDisplayValue("Claude");
+
+    // Expand the sonnet model row's env/effort editor (the ▾ toggle button).
+    fireEvent.click(screen.getByRole("button", { name: /▾ env/ }));
+
+    const levels = screen.getByPlaceholderText("low, medium, high") as HTMLInputElement;
+    fireEvent.change(levels, { target: { value: "low, medium, high" } });
+    await waitFor(() => expect(levels.value).toBe("low, medium, high"));
+
+    // The default-effort select now appears and seeds to the first level.
+    const defaultSelect = screen.getByText("Default effort").parentElement!.querySelector("select") as HTMLSelectElement;
+    expect(Array.from(defaultSelect.options).map((o) => o.value)).toEqual(["low", "medium", "high"]);
+    await waitFor(() => expect(defaultSelect.value).toBe("low"));
+
+    fireEvent.change(defaultSelect, { target: { value: "medium" } });
+    await waitFor(() => expect(defaultSelect.value).toBe("medium"));
+  });
+
   it("offers all four backend types in the type dropdown", async () => {
     renderWithQuery(<BackendsEditor />);
     await screen.findByDisplayValue("Claude");

@@ -375,8 +375,9 @@ type launchConfigResolved struct {
 //     when the user chose no explicit model.
 //   - neither: an explicit launch model was chosen and wins over the source.
 type federationModel struct {
-	inherit  bool
-	override *string
+	inherit        bool
+	override       *string
+	effortOverride *string
 }
 
 // composeFederation resolves a backend's active source binding fresh at launch and
@@ -431,6 +432,9 @@ func (s *Server) composeFederation(ctx context.Context, backendID string, req la
 	fed := &federationModel{inherit: inherited}
 	if req.Model == "" && binding.Overrides.Model != nil {
 		fed.override = binding.Overrides.Model
+	}
+	if req.Effort == "" && binding.Overrides.Effort != nil {
+		fed.effortOverride = binding.Overrides.Effort
 	}
 	return data, fed, nil
 }

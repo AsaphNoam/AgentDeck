@@ -384,9 +384,11 @@ func currentAttempt(detail RunDetail) (state.PipelineAttemptRecord, bool) {
 }
 
 func stageExecution(detail RunDetail, attempt state.PipelineAttemptRecord, stage Stage) StageExecution {
+	assignment := detail.Assignments[stage.ID]
 	return StageExecution{RunID: detail.Run.RunID, RunName: detail.Run.DisplayName, AttemptID: attempt.AttemptID,
 		StageID: stage.ID, StageTitle: stage.Title, Role: stage.Role, Project: detail.Run.Project,
 		Backend: attempt.Backend, Model: attempt.Model, AgentID: attempt.AgentID,
+		Effort:     assignment.Effort,
 		Generation: attempt.AgentGeneration, AgentName: stage.Title + " — " + detail.Run.DisplayName,
 		Assignment: attempt.AssignmentText}
 }

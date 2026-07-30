@@ -70,6 +70,28 @@ func TestNormalizeAgentName(t *testing.T) {
 	}
 }
 
+func TestResolveEffortPrecedence(t *testing.T) {
+	model := config.Model{Efforts: []string{"low", "medium", "high"}, DefaultEffort: "medium"}
+	source := "low"
+	for _, tt := range []struct {
+		name     string
+		explicit string
+		fed      *federationModel
+		want     string
+	}{
+		{name: "explicit", explicit: "high", fed: &federationModel{effortOverride: &source}, want: "high"},
+		{name: "source override", fed: &federationModel{effortOverride: &source}, want: "low"},
+		{name: "model default", want: "medium"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ae := resolveEffort(tt.explicit, model, tt.fed)
+			if ae != nil || got != tt.want {
+				t.Fatalf("resolveEffort() = %q, %#v; want %q, nil", got, ae, tt.want)
+			}
+		})
+	}
+}
+
 func TestComposeLaunchRejectsInvalidName(t *testing.T) {
 	srv := testServer(t, true)
 	for _, name := range []string{"   ", "At\x00las", strings.Repeat("a", maxAgentNameRunes+1)} {

@@ -50,7 +50,7 @@ export function AgentCard({ agent, lastLine, projectColor, projectTitle, showPro
       </div>
       <p className="agent-subtitle" data-slot="metadata">{showProject ? `${agent.role} · ${projectLabel}` : agent.role}</p>
       <span className="model-pill">
-        {agent.backend} · {agent.model}
+        {[agent.backend, agent.model, agent.effort].filter(Boolean).join(" · ")}
       </span>
       {agent.pipeline && (
         <Link

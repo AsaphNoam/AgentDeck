@@ -86,14 +86,14 @@ func TestIsLaunchArg(t *testing.T) {
 }
 
 func TestParseLaunch(t *testing.T) {
-	la, err := parseLaunch([]string{"implementer@my-app", "--backend", "claude", "--model", "sonnet-4-6", "--name", "Atlas", "--group", "auth"})
+	la, err := parseLaunch([]string{"implementer@my-app", "--backend", "claude", "--model", "sonnet-4-6", "--effort", "high", "--name", "Atlas", "--group", "auth"})
 	if err != nil {
 		t.Fatalf("parseLaunch: %v", err)
 	}
 	if la.Role != "implementer" || la.Project != "my-app" {
 		t.Fatalf("role/project = %q/%q", la.Role, la.Project)
 	}
-	if la.Backend != "claude" || la.Model != "sonnet-4-6" || la.Name != "Atlas" || la.Group != "auth" {
+	if la.Backend != "claude" || la.Model != "sonnet-4-6" || la.Effort != "high" || la.Name != "Atlas" || la.Group != "auth" {
 		t.Fatalf("flags parsed wrong: %+v", la)
 	}
 	if la.Interface != "chat" {

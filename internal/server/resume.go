@@ -26,6 +26,7 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 		Interface string `json:"interface"`
 		Backend   string `json:"backend"`
 		Model     string `json:"model"`
+		Effort    string `json:"effort"`
 		// ConfigRefresh selects "Resume with latest setup" (Phase 7 §2.5): re-resolve
 		// the source fresh and freeze the new high-level object instead of the frozen
 		// snapshot. Absent/false preserves the snapshot's frozen federation config.
@@ -89,12 +90,16 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 	// Optional override fields win (Phase 4 exercises only the no-override path).
 	backendID := agent.Backend
 	modelKey := agent.Model
+	effort := agent.Effort
 	iface := agent.Interface
 	if override.Backend != "" {
 		backendID = override.Backend
 	}
 	if override.Model != "" {
 		modelKey = override.Model
+	}
+	if override.Effort != "" {
+		effort = override.Effort
 	}
 	if override.Interface != "" {
 		iface = override.Interface
@@ -124,7 +129,6 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError(runtime.CodeValidation, "unknown model: "+modelKey))
 		return
 	}
-
 	// 5b. "Resume with latest setup" (§2.5): re-resolve the source fresh and freeze
 	// the new object. Done before composeResumeSpec so a source error blocks the
 	// resume with nothing registered to unwind. Absent/false keeps the frozen
@@ -136,13 +140,22 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, apiError(runtime.CodeValidation, "unknown project: "+agent.Project))
 			return
 		}
-		lc, _, ae := s.composeFederation(r.Context(), backendID,
-			launchRequest{Project: agent.Project, Model: override.Model}, backend, project, modelKey)
+		lc, fed, ae := s.composeFederation(r.Context(), backendID,
+			launchRequest{Project: agent.Project, Model: override.Model, Effort: override.Effort}, backend, project, modelKey)
 		if ae != nil {
 			writeAPIError(w, ae)
 			return
 		}
 		refreshedConfig = lc
+		effort, ae = resolveEffort(override.Effort, model, fed)
+		if ae != nil {
+			writeAPIError(w, ae)
+			return
+		}
+	}
+	if err := config.ValidateModelEffort(backend, model, effort); err != nil {
+		writeAPIError(w, apiError(runtime.CodeInvalidField, err.Error()))
+		return
 	}
 
 	// 6. Build the resume LaunchSpec entirely from the frozen snapshot — including
@@ -156,6 +169,7 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 		Project:   agent.Project,
 		Backend:   backendID,
 		Model:     modelKey,
+		Effort:    effort,
 		Interface: iface,
 		CreatedAt: agent.CreatedAt,
 		Group:     agent.Group,
@@ -241,6 +255,7 @@ func (s *Server) composeResumeSpecWithGeneration(agent state.Agent, snap state.S
 		SystemPrompt:   snap.SystemPrompt,
 		BackendType:    be.Type,
 		ModelID:        model.Model,
+		Effort:         agent.Effort,
 		Env:            composeChildEnv(be.Type, s.configStore.Home(), be.Env, model.Env, s.hookEnv(agent, token), projectResourcesEnv(resourceDir)),
 		SkipPerms:      snap.SkipPermissions,
 		HookToken:      token,

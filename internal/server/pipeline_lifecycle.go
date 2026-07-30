@@ -57,8 +57,12 @@ func (s *Server) ValidateStage(_ context.Context, execution pipeline.StageExecut
 	if !ok {
 		return fmt.Errorf("unknown backend %q", execution.Backend)
 	}
-	if _, ok := backend.Models[execution.Model]; !ok {
+	model, ok := backend.Models[execution.Model]
+	if !ok {
 		return fmt.Errorf("unknown model %q", execution.Model)
+	}
+	if err := config.ValidateModelEffort(backend, model, execution.Effort); err != nil {
+		return err
 	}
 	return nil
 }
@@ -76,7 +80,7 @@ func (s *Server) LaunchStage(ctx context.Context, execution pipeline.StageExecut
 	}
 	_, ae := s.launchAgent(ctx, launchRequest{
 		Role: execution.Role, Project: execution.Project, Backend: execution.Backend,
-		Model: execution.Model, Interface: "chat", Name: execution.AgentName,
+		Model: execution.Model, Effort: execution.Effort, Interface: "chat", Name: execution.AgentName,
 	}, launchOptions{AgentID: execution.AgentID, Generation: execution.Generation})
 	if ae != nil {
 		return errors.New(ae.Message)
@@ -133,6 +137,7 @@ func (s *Server) ContinueStage(ctx context.Context, execution pipeline.StageExec
 	}
 	agent.Backend = execution.Backend
 	agent.Model = execution.Model
+	agent.Effort = execution.Effort
 	agent.Interface = "chat"
 	spec, ae := s.composeResumeSpecWithGeneration(agent, snapshot, backend, model, execution.Generation)
 	if ae != nil {

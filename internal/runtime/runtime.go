@@ -32,6 +32,7 @@ type LaunchSpec struct {
 	RuntimeSystemPrompt string
 	BackendType         string // "claude-acp" | "codex-acp"
 	ModelID             string // provider model id, e.g. "claude-sonnet-4-6"
+	Effort              string // resolved provider level; empty means omit
 	// Driver selects the terminal TerminalDriver ("" | "xterm" | "tmux" | "iterm2");
 	// ignored by the chat runtime. Empty defaults to the cross-platform xterm/PTY
 	// driver. The server validates availability against the capability probe before

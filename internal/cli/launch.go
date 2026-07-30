@@ -18,6 +18,7 @@ type launchArgs struct {
 	Project   string
 	Backend   string
 	Model     string
+	Effort    string
 	Interface string
 	Name      string
 	Group     string
@@ -32,6 +33,7 @@ type launchBody struct {
 	Project   string `json:"project"`
 	Backend   string `json:"backend,omitempty"`
 	Model     string `json:"model,omitempty"`
+	Effort    string `json:"effort,omitempty"`
 	Interface string `json:"interface,omitempty"`
 	Name      string `json:"name,omitempty"`
 	Group     string `json:"group,omitempty"`
@@ -39,7 +41,7 @@ type launchBody struct {
 
 func (a launchArgs) body() launchBody {
 	return launchBody{
-		Role: a.Role, Project: a.Project, Backend: a.Backend, Model: a.Model,
+		Role: a.Role, Project: a.Project, Backend: a.Backend, Model: a.Model, Effort: a.Effort,
 		Interface: a.Interface, Name: a.Name, Group: a.Group,
 	}
 }
@@ -78,6 +80,8 @@ func parseLaunch(args []string) (launchArgs, error) {
 			out.Backend, err = val()
 		case "--model":
 			out.Model, err = val()
+		case "--effort":
+			out.Effort, err = val()
 		case "--interface":
 			out.Interface, err = val()
 		case "--name":

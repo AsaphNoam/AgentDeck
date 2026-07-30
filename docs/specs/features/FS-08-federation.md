@@ -89,7 +89,7 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
   explicit model exists, a source override is used. If neither exists, AgentDeck omits the model
   from the ACP request so the native CLI selects its own default rather than receiving a guessed
   AgentDeck model.
-- **R31** `(planned)` — The stored effort override in R10 becomes launch input rather than display
+- **R31** — The stored effort override in R10 becomes launch input rather than display
   state only: for a bound launch, an explicit launch effort wins over the stored source override,
   which in turn wins over the model's declared default, and if none exists AgentDeck omits effort so
   the native CLI selects its own. This is the same precedence R17 already applies to the model, and
@@ -189,7 +189,7 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
   behavior, read-only operation, and redaction. Until recorded, fixture-backed resolver and launch
   behavior is shipped but live native-pass-through compatibility is not claimed.
 
-- **A8** `(planned)` (R31) — A bound backend whose source or override supplies an effort launches at
+- **A8** (R31) — A bound backend whose source or override supplies an effort launches at
   that level; an explicit launch effort overrides it; neither present falls through to the model's
   declared default and then to an omitted effort; and an override the selected model does not
   declare is rejected before any process starts. *Verify by* launch-composition tests alongside
@@ -203,10 +203,9 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
 
 ## 6. Deviations & open decisions
 
-- **Federation effort was inert before R31.** R10 has always accepted and displayed an effort
-  override and R18 froze it into the session snapshot, but no launch path ever read it, so the
-  override changed nothing about how an agent ran. R31 closes that gap; until it ships, an effort
-  override remains provenance display only.
+- **Federation effort is an explicit AgentDeck override.** R31 deliberately uses only the binding's
+  stored override in launch precedence; a provider-native effective effort remains provenance and
+  is not silently imported as a launch choice.
 - **Detached import is planned, not shipped (R9).** Every discovered setup asset is currently
   `reference_only`; no verified provider-specific launch-injection path can honor an independent
   copy. Implementing detach requires a new specification update defining exactly which values/assets become

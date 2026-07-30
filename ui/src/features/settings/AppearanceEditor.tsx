@@ -78,7 +78,12 @@ export function AppearanceEditor() {
         {appearances.map((appearance) => (
           <label className="appearance-option" data-slot="item" key={appearance.id}>
             <input
-              checked={active === appearance.id}
+              // When a warning is present the durable selection is not a clean
+              // valid appearance (unsupported/unreadable/read error), so leave
+              // every radio unchecked — clicking Core then saves "" to repair it
+              // rather than being inert because Core is only the effective
+              // fallback (FS-12.R32/A11).
+              checked={!warning && active === appearance.id}
               name="appearance"
               onChange={() => save(appearance.value)}
               type="radio"

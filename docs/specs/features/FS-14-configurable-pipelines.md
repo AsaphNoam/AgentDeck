@@ -34,7 +34,7 @@ product boundaries in §6.
   same unchanged template may use Codex for implementation and Claude for review on one run and the
   reverse on another. Pipeline stages use the chat interface; terminal stages are rejected because
   terminal agents cannot use the structured coordination tools required to report a stage result.
-- **R31.** `(planned)` Run setup also assigns an optional effort to each stage, alongside that
+- **R31.** Run setup also assigns an optional effort to each stage, alongside that
   stage's backend and model and under the same rules (FS-09.R35/R41/R42): the control appears only
   for a stage whose assigned model declares effort levels, and a level that model does not declare
   prevents the run from starting rather than substituting another. Effort stays out of the template
@@ -190,8 +190,8 @@ product boundaries in §6.
   configured active project and defaults to the configured default project only when that project
   still exists and is active; the builder cannot be launched until a listed project is selected, so
   a stale, removed, or archived default is visible before launch rather than only as a rejected
-  launch. The picker shows configured readiness honestly; effort is absent until AgentDeck gains the
-  separate general effort-selection capability. This creator choice is not written into the
+  launch. The picker shows configured readiness honestly; effort remains a per-run stage assignment
+  rather than a template or builder setting. This creator choice is not written into the
   resulting model-neutral template.
 - **R27.** The AgentDecker builder accepts a natural-language pipeline description, asks
   clarifying questions in chat, and submits a structured draft containing stages, roles,
@@ -255,7 +255,7 @@ product boundaries in §6.
   has no effect, payload edits invalidate approval, and an approved request executes once. *Verify:*
   fake-runtime server test and J14.
 
-- **A11** `(planned)` (R31) — Run setup offers effort only for a stage whose assigned model declares
+- **A11** (R31) — Run setup offers effort only for a stage whose assigned model declares
   levels, a run started with per-stage efforts launches each stage agent at its assigned level, an
   undeclared level prevents the whole run from starting with a named field error and no process, and
   run supervision plus the frozen run snapshot report each stage's effective effort. *Verify by*

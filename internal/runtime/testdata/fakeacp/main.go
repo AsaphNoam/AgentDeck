@@ -101,6 +101,15 @@ func handle(msg *rpcMessage) {
 		}
 		// Simulate successful load by returning a distinct resumed session ID.
 		respond(*msg.ID, map[string]any{"sessionId": "fake-sess-loaded"})
+	case "session/set_config_option":
+		if dump := os.Getenv("FAKEACP_EFFORT_DUMP"); dump != "" {
+			_ = os.WriteFile(dump, msg.Params, 0o600)
+		}
+		if os.Getenv("FAKEACP_EFFORT_FAIL") != "" {
+			respondErr(*msg.ID, -32000, "effort rejected")
+			return
+		}
+		respond(*msg.ID, map[string]any{})
 	case "session/prompt":
 		id := *msg.ID
 		if dump := os.Getenv("FAKEACP_PROMPT_DUMP"); dump != "" {

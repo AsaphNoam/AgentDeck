@@ -601,6 +601,9 @@ func (r *Runtime) launchArgv(spec rt.LaunchSpec, resume bool, sessionID string) 
 		if spec.ModelID != "" {
 			argv = append(argv, "--model", spec.ModelID)
 		}
+		if spec.Effort != "" {
+			argv = append(argv, "--effort", spec.Effort)
+		}
 		for _, d := range spec.AddDirs {
 			argv = append(argv, "--add-dir", d)
 		}

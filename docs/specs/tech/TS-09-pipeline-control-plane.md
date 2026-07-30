@@ -1,6 +1,6 @@
 # TS-09 — Pipeline control plane
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/pipeline`, `internal/config`, `internal/state`, `internal/server`, `internal/messaging`, `internal/cli`, `ui/src/features/pipelines`
 **Absorbed:** —
 
@@ -170,7 +170,7 @@ Unsaved editor form state is local to the page; only template CRUD or an approve
 template, and only the run-start endpoint creates a run. CSS selectors, mocks, errors, confirmation
 pending state, and navigation ship with the page (INV §8, §10, §11, §13).
 
-**R24 `(planned)` — Per-stage effort is run-snapshot data validated at start.** A run's frozen
+**R24 — Per-stage effort is run-snapshot data validated at start.** A run's frozen
 assignment record gains an optional effort per stage beside its backend and model, written by the
 same forward-only migration style and non-null decoding as the rest of the run state (TS-02.R17).
 Templates are untouched: effort is a run-time assignment, so the version-1 template schema, its

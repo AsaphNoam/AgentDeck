@@ -237,6 +237,12 @@ func ValidateBackendsConfig(b *BackendsConfig) *ValidationErrors {
 		}
 		// Invariant 6: each model's model field must be non-empty.
 		for mID, m := range bk.Models {
+			// Keep the API collection contract stable: a model without effort
+			// capability is represented as [] rather than omitted or null.
+			if m.Efforts == nil {
+				m.Efforts = []string{}
+				bk.Models[mID] = m
+			}
 			if m.Model == "" {
 				errs = append(errs, FieldError{
 					Field:   fmt.Sprintf("backends.%s.models.%s.model", id, mID),
@@ -244,11 +250,58 @@ func ValidateBackendsConfig(b *BackendsConfig) *ValidationErrors {
 					Message: fmt.Sprintf("model %q in backend %q must have a non-empty model field", mID, id),
 				})
 			}
+			if strings.Contains(m.Model, "[") || strings.Contains(m.Model, "]") {
+				errs = append(errs, FieldError{
+					Field:   fmt.Sprintf("backends.%s.models.%s.model", id, mID),
+					Code:    "effort_suffix_unsupported",
+					Message: "provider model strings must not include [effort]; declare efforts instead",
+				})
+			}
+			if (bk.Type == "opencode-acp" || bk.Type == "openhands-acp") && len(m.Efforts) > 0 {
+				errs = append(errs, FieldError{
+					Field:   fmt.Sprintf("backends.%s.models.%s.efforts", id, mID),
+					Code:    "unsupported",
+					Message: fmt.Sprintf("backend type %q does not support effort selection", bk.Type),
+				})
+			}
+			seenEfforts := map[string]bool{}
+			for index, effort := range m.Efforts {
+				field := fmt.Sprintf("backends.%s.models.%s.efforts.%d", id, mID, index)
+				if strings.TrimSpace(effort) == "" {
+					errs = append(errs, FieldError{Field: field, Code: "required", Message: "effort level must not be blank"})
+					continue
+				}
+				if seenEfforts[effort] {
+					errs = append(errs, FieldError{Field: field, Code: "duplicate", Message: "effort levels must be distinct"})
+				}
+				seenEfforts[effort] = true
+			}
+			if m.DefaultEffort != "" && len(m.Efforts) == 0 {
+				errs = append(errs, FieldError{Field: fmt.Sprintf("backends.%s.models.%s.default_effort", id, mID), Code: "unsupported", Message: "default_effort requires declared efforts"})
+			} else if m.DefaultEffort != "" && !m.SupportsEffort(m.DefaultEffort) {
+				errs = append(errs, FieldError{Field: fmt.Sprintf("backends.%s.models.%s.default_effort", id, mID), Code: "invalid", Message: "default_effort must be one of efforts"})
+			}
 		}
 	}
 
 	if len(errs) > 0 {
 		return &ValidationErrors{Errors: errs}
+	}
+	return nil
+}
+
+// ValidateModelEffort applies the catalog capability check used by launch,
+// switch, and pipeline start. The caller supplies the selected model rather
+// than reimplementing catalog lookup at each lifecycle boundary.
+func ValidateModelEffort(backend Backend, model Model, effort string) error {
+	if effort == "" {
+		return nil
+	}
+	if backend.Type != "claude-acp" && backend.Type != "codex-acp" {
+		return fmt.Errorf("backend type %q does not support effort selection", backend.Type)
+	}
+	if !model.SupportsEffort(effort) {
+		return fmt.Errorf("effort %q is not declared by this model (available: %s)", effort, strings.Join(model.Efforts, ", "))
 	}
 	return nil
 }

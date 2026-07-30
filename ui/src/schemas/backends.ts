@@ -4,6 +4,8 @@ export const modelSchema = z.object({
   name: z.string(),
   model: z.string().min(1, "model is required"),
   env: z.record(z.string()).optional(),
+  efforts: z.array(z.string()).optional(),
+  default_effort: z.string().optional(),
 });
 
 // backendTypeSchema is the single source of the backend type union; every other

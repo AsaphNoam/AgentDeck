@@ -1,6 +1,6 @@
 # TS-02 — Data & persistence
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/config`, `internal/state`, `internal/transcript`, `internal/index`, `internal/archive`, `internal/configsource`
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -108,7 +108,7 @@ cascade within a deleted run but must not cascade into `agents`, `sessions`, tra
 projections. The migration uses non-null JSON defaults/collection decoding, indexes for active-run
 and agent-attempt lookup, and a schema-version guard test. TS-09 owns the logical shapes.
 
-**R18 `(planned)` — Effort is an additive catalog field and a frozen session column.**
+**R18 — Effort is an additive catalog field and a frozen session column.**
 `backends.json` stays **version 2**: `efforts` and `default_effort` are optional per-model keys and
 the decoder ignores unknown keys, so a catalog written by a newer build still loads in an older one,
 which simply resolves no effort — FS-09.R41's documented fallback rather than a corrupt read. No

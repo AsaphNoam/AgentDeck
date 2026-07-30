@@ -54,6 +54,7 @@ func TestLaunchArgvHonorsComposedSpec(t *testing.T) {
 		Agent:               state.Agent{Backend: "claude", Interface: "terminal"},
 		BackendType:         "claude-acp",
 		ModelID:             "claude-sonnet-4-6",
+		Effort:              "high",
 		AddDirs:             []string{"/work/extra-a", "/work/extra-b"},
 		SystemPrompt:        "be a careful engineer",
 		RuntimeSystemPrompt: "PRIMER: prior context summary",
@@ -64,6 +65,7 @@ func TestLaunchArgvHonorsComposedSpec(t *testing.T) {
 
 	wantPairs := [][2]string{
 		{"--model", "claude-sonnet-4-6"},
+		{"--effort", "high"},
 		{"--add-dir", "/work/extra-a"},
 		{"--add-dir", "/work/extra-b"},
 		// StartSystemPrompt prefers the one-shot RuntimeSystemPrompt (the primer).

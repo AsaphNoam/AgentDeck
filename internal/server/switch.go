@@ -24,6 +24,7 @@ type switchRuntimeRequest struct {
 	Interface string `json:"interface"`
 	Backend   string `json:"backend"`
 	Model     string `json:"model"`
+	Effort    string `json:"effort"`
 	Driver    string `json:"driver"` // target terminal driver: ""/"xterm" | "tmux" | "iterm2" (§3.5)
 }
 
@@ -33,6 +34,7 @@ type switchRuntimeResponse struct {
 	Interface      string              `json:"interface"`
 	Backend        string              `json:"backend"`
 	Model          string              `json:"model"`
+	Effort         string              `json:"effort"`
 	Running        *state.RunningEntry `json:"running,omitempty"`
 	HistoryHandoff string              `json:"history_handoff"` // "native_resume" | "primer"
 }
@@ -83,7 +85,18 @@ func (s *Server) handleSwitchRuntime(w http.ResponseWriter, r *http.Request) {
 	if req.Model != "" {
 		target.Model = req.Model
 	}
-	if target.Interface == agent.Interface && target.Backend == agent.Backend && target.Model == agent.Model {
+	if req.Effort != "" {
+		target.Effort = req.Effort
+	} else if target.Backend != agent.Backend || target.Model != agent.Model {
+		if backends, err := s.readBackendsOrDefault(); err == nil {
+			if be, ok := backends.Backends[target.Backend]; ok {
+				if model, ok := be.Models[target.Model]; ok {
+					target.Effort, _ = resolveEffort("", model, nil)
+				}
+			}
+		}
+	}
+	if target.Interface == agent.Interface && target.Backend == agent.Backend && target.Model == agent.Model && target.Effort == agent.Effort {
 		writeAPIError(w, apiError(runtime.CodeNoChange, "switch request equals current state"))
 		return
 	}
@@ -239,7 +252,7 @@ func (s *Server) handleSwitchRuntime(w http.ResponseWriter, r *http.Request) {
 	// state_update via the runtime's state-touch, so the card re-renders.
 	running, _ := s.stateStore.ReadRunning(id)
 	writeJSON(w, http.StatusOK, switchRuntimeResponse{
-		AgentID: id, Interface: target.Interface, Backend: target.Backend, Model: target.Model,
+		AgentID: id, Interface: target.Interface, Backend: target.Backend, Model: target.Model, Effort: target.Effort,
 		Running: ptrRunning(running), HistoryHandoff: handoff,
 	})
 }
@@ -313,6 +326,9 @@ func (s *Server) validateSwitchTarget(target state.Agent) *runtime.APIError {
 	if _, ok := be.Models[target.Model]; !ok {
 		return apiError(runtime.CodeInvalidField, "unknown model: "+target.Model)
 	}
+	if err := config.ValidateModelEffort(be, be.Models[target.Model], target.Effort); err != nil {
+		return apiError(runtime.CodeInvalidField, err.Error())
+	}
 	// Only claude-acp supports the terminal interface; reject a terminal switch to
 	// any other backend rather than land a statusless agent that drops the composed
 	// spec (mirrors the launch guard, §6 capability honesty).
@@ -383,6 +399,7 @@ func (s *Server) composeSwitchSpec(target state.Agent, resumeID string) (runtime
 		SystemPrompt:   snap.SystemPrompt,
 		BackendType:    be.Type,
 		ModelID:        model.Model,
+		Effort:         target.Effort,
 		Env:            composeChildEnv(be.Type, s.configStore.Home(), be.Env, model.Env, s.hookEnv(target, token), projectResourcesEnv(resourceDir)),
 		SkipPerms:      snap.SkipPermissions,
 		HookToken:      token,

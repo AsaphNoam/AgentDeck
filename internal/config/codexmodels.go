@@ -18,9 +18,13 @@ type codexModelsCache struct {
 }
 
 type codexModelEntry struct {
-	Slug        string `json:"slug"`
-	DisplayName string `json:"display_name"`
-	Visibility  string `json:"visibility"` // "list" = user-selectable; "hide" = internal
+	Slug                     string `json:"slug"`
+	DisplayName              string `json:"display_name"`
+	Visibility               string `json:"visibility"` // "list" = user-selectable; "hide" = internal
+	SupportedReasoningLevels []struct {
+		Effort string `json:"effort"`
+	} `json:"supported_reasoning_levels"`
+	DefaultReasoningLevel string `json:"default_reasoning_level"`
 }
 
 // CodexModelCatalogPath returns the Codex CLI model cache path, honoring
@@ -60,7 +64,17 @@ func ReadCodexModelCatalog(path string) (map[string]Model, error) {
 		if name == "" {
 			name = m.Slug
 		}
-		out[m.Slug] = Model{Name: name, Model: m.Slug}
+		efforts := make([]string, 0, len(m.SupportedReasoningLevels))
+		for _, level := range m.SupportedReasoningLevels {
+			if level.Effort != "" {
+				efforts = append(efforts, level.Effort)
+			}
+		}
+		defaultEffort := m.DefaultReasoningLevel
+		if !(Model{Efforts: efforts}).SupportsEffort(defaultEffort) {
+			defaultEffort = ""
+		}
+		out[m.Slug] = Model{Name: name, Model: m.Slug, Efforts: efforts, DefaultEffort: defaultEffort}
 	}
 	return out, nil
 }

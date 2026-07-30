@@ -208,7 +208,7 @@ func (m *Manager) validateStart(ctx context.Context, request *StartRequest) (Tem
 			continue
 		}
 		if m.lifecycle != nil {
-			if err := m.lifecycle.ValidateStage(ctx, StageExecution{StageID: stage.ID, StageTitle: stage.Title, Role: stage.Role, Project: request.Project, Backend: assignment.Backend, Model: assignment.Model}); err != nil {
+			if err := m.lifecycle.ValidateStage(ctx, StageExecution{StageID: stage.ID, StageTitle: stage.Title, Role: stage.Role, Project: request.Project, Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort}); err != nil {
 				add("assignments."+stage.ID, "unavailable", err.Error())
 			}
 		}

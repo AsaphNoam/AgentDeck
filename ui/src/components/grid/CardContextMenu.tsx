@@ -24,7 +24,7 @@ export function CardContextMenu() {
   const [dialog, setDialog] = useState<ActiveDialog | null>(null);
   const [name, setName] = useState("");
   const [group, setGroup] = useState("");
-  const [runtime, setRuntime] = useState({ interface: "chat", backend: "", model: "" });
+  const [runtime, setRuntime] = useState({ interface: "chat", backend: "", model: "", effort: "" });
   const [dialogError, setDialogError] = useState("");
   const [terminalAvailable, setTerminalAvailable] = useState(true);
 
@@ -54,7 +54,7 @@ export function CardContextMenu() {
     setDialogError("");
     setName(dialog.agent.name);
     setGroup(dialog.agent.group ?? "");
-    setRuntime({ interface: dialog.agent.interface, backend: dialog.agent.backend, model: dialog.agent.model });
+    setRuntime({ interface: dialog.agent.interface, backend: dialog.agent.backend, model: dialog.agent.model, effort: dialog.agent.effort ?? "" });
   }, [dialog]);
 
   const groupLabels = useMemo(
@@ -97,8 +97,8 @@ export function CardContextMenu() {
   };
   const submitSwitch = () => {
     if (!dialog) return;
-    if (runtime.interface === dialog.agent.interface && runtime.backend === dialog.agent.backend && runtime.model === dialog.agent.model) {
-      setDialogError("Choose an interface, backend, or model that differs from the current runtime.");
+    if (runtime.interface === dialog.agent.interface && runtime.backend === dialog.agent.backend && runtime.model === dialog.agent.model && runtime.effort === (dialog.agent.effort ?? "")) {
+		setDialogError("Choose an interface, backend, model, or effort that differs from the current runtime.");
       return;
     }
     switchRuntime(dialog.agent.agent_id, runtime).then(closeDialog).catch((err) => reportError("Switch runtime failed", err));
@@ -124,7 +124,7 @@ export function CardContextMenu() {
         Switch runtime
       </button>
       <button type="button" data-slot="item" title="Launch a new agent with this one's role, project, backend, and model" onClick={() => {
-        launchAgent({ role: agent.role, project: agent.project, backend: agent.backend, model: agent.model, interface: agent.interface, group: agent.group }).catch((err) => pushError("Clone failed", err instanceof Error ? err.message : String(err)));
+        launchAgent({ role: agent.role, project: agent.project, backend: agent.backend, model: agent.model, effort: agent.effort, interface: agent.interface, group: agent.group }).catch((err) => pushError("Clone failed", err instanceof Error ? err.message : String(err)));
         close();
       }}>
         Clone
@@ -186,8 +186,9 @@ export function CardContextMenu() {
               {dialog.kind === "switch" && (
                 <form className="config-form" onSubmit={(event) => { event.preventDefault(); submitSwitch(); }}>
                   <div className="form-field"><label htmlFor="runtime-interface">Interface</label><select id="runtime-interface" value={runtime.interface} onChange={(event) => setRuntime((current) => ({ ...current, interface: event.target.value }))}><option value="chat">Chat</option><option value="terminal" disabled={!terminalOK}>Terminal</option></select></div>
-                  <div className="form-field"><label htmlFor="runtime-backend">Backend</label><select id="runtime-backend" value={runtime.backend} onChange={(event) => { const backend = event.target.value; const next = backends?.backends[backend]; setRuntime((current) => ({ ...current, backend, model: next?.default_model ?? Object.keys(next?.models ?? {})[0] ?? "" })); }}>{Object.entries(backends?.backends ?? {}).map(([id, backend]) => <option key={id} value={id}>{backend.name} ({id})</option>)}</select></div>
-                  <div className="form-field"><label htmlFor="runtime-model">Model</label><select id="runtime-model" value={runtime.model} onChange={(event) => setRuntime((current) => ({ ...current, model: event.target.value }))}>{modelEntries.map(([id, model]) => <option key={id} value={id}>{model.name} ({id})</option>)}</select></div>
+                  <div className="form-field"><label htmlFor="runtime-backend">Backend</label><select id="runtime-backend" value={runtime.backend} onChange={(event) => { const backend = event.target.value; const next = backends?.backends[backend]; const model = next?.models[next?.default_model ?? ""]; setRuntime((current) => ({ ...current, backend, model: next?.default_model ?? Object.keys(next?.models ?? {})[0] ?? "", effort: model?.default_effort ?? "" })); }}>{Object.entries(backends?.backends ?? {}).map(([id, backend]) => <option key={id} value={id}>{backend.name} ({id})</option>)}</select></div>
+                  <div className="form-field"><label htmlFor="runtime-model">Model</label><select id="runtime-model" value={runtime.model} onChange={(event) => { const model = selectedBackend?.models[event.target.value]; setRuntime((current) => ({ ...current, model: event.target.value, effort: model?.default_effort ?? "" })); }}>{modelEntries.map(([id, model]) => <option key={id} value={id}>{model.name} ({id})</option>)}</select></div>
+                  {(selectedBackend?.models[runtime.model]?.efforts ?? []).length > 0 && <div className="form-field"><label htmlFor="runtime-effort">Effort</label><select id="runtime-effort" value={runtime.effort} onChange={(event) => setRuntime((current) => ({ ...current, effort: event.target.value }))}>{(selectedBackend?.models[runtime.model]?.efforts ?? []).map((level) => <option key={level} value={level}>{level}</option>)}</select></div>}
                   {dialogError && <p className="form-error">{dialogError}</p>}
                   <div className="form-actions" data-slot="actions"><button type="button" onClick={closeDialog}>Cancel</button><button type="submit" disabled={!runtime.backend || !runtime.model}>Switch runtime</button></div>
                 </form>

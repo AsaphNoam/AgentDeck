@@ -68,7 +68,7 @@ AgentDeck-owned copy only for fields/assets with a verified injection path. Unti
 must prove discovery, precedence, native model inheritance, refresh, launch, and resume before the
 release claims complete federation compatibility.
 
-**R14 `(planned)` — The stored effort override becomes resolver input.** The binding's effort
+**R14 — The stored effort override becomes resolver input.** The binding's effort
 override, already resolved and redacted into the effective view, is handed to TS-01.R12's single
 `resolveEffort` as the tier below an explicit launch effort and above the model's `default_effort`
 — the same position the model override already occupies. Federation gains no second resolution

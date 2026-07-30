@@ -54,6 +54,10 @@ export function ModelRow({ modelId, model, isDefault, radioGroup, onSetDefault, 
   const pairs = toPairs(model.env);
 
   const updateEnv = (next: Pair[]) => onChange({ ...model, env: fromPairs(next) });
+  const updateEfforts = (raw: string) => {
+    const efforts = raw.split(",").map((level) => level.trim()).filter(Boolean);
+    onChange({ ...model, efforts, default_effort: efforts.includes(model.default_effort ?? "") ? model.default_effort : efforts[0] });
+  };
 
   return (
     <div className="model-row">
@@ -87,6 +91,18 @@ export function ModelRow({ modelId, model, isDefault, radioGroup, onSetDefault, 
       </div>
       {expanded && (
         <div className="model-env-editor">
+          <label className="form-field">
+            <span>Effort levels (comma separated)</span>
+            <input value={(model.efforts ?? []).join(", ")} placeholder="low, medium, high" onChange={(e) => updateEfforts(e.target.value)} />
+          </label>
+          {(model.efforts ?? []).length > 0 && (
+            <label className="form-field">
+              <span>Default effort</span>
+              <select value={model.default_effort ?? ""} onChange={(e) => onChange({ ...model, default_effort: e.target.value })}>
+                {(model.efforts ?? []).map((level) => <option key={level} value={level}>{level}</option>)}
+              </select>
+            </label>
+          )}
           {pairs.map((pair, i) => (
             <div key={i} className="env-row">
               <input
