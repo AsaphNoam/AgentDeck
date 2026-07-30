@@ -1,6 +1,6 @@
 # FS-03 — Live chat & permission flow
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/runtime/` (`chat.go`, `permission.go`, `event.go`), `internal/server/sessions.go`, `internal/transcript/`, `ui/src/components/chat/`, `ui/src/store/transcriptStore.ts`, `ui/src/api/sse.ts` · **Journeys:** J3, J4, J7
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -19,8 +19,10 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 
 ### 2.1 Opening and reading a chat
 
-- **R1.** Opening a chat-interface agent shows its name, backend, model, context usage, and a
-  Transcript tab. The same surface also exposes the session's Files and Commands tabs (FS-05).
+- **R1.** Opening a chat-interface agent shows its name, its runtime identity (backend, model, and
+  resolved effort — FS-01.R30), context usage, and a Transcript tab. For a running agent the runtime
+  identity is an inline picker that can switch it (R23). The same surface also exposes the session's
+  Files and Commands tabs (FS-05).
 - **R2.** The Transcript renders normalized events in sequence: user prompts; assistant text as sanitized
   GitHub-flavored Markdown with syntax-highlighted fenced code; tool calls with expandable JSON
   arguments; tool results with error styling and expandable content after the first 600 characters;
@@ -101,6 +103,26 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   as auto-approved, the agent never enters `waiting_input`, and the tool proceeds without a user
   click. Resume and switch retain that frozen policy under FS-01.
 
+### 2.5 Switching runtime from the chat header
+
+- **R23. (planned)** For a running chat-interface agent, the header presents backend, model, and
+  effort as inline selects populated from the backend catalog (FS-09), rather than static text. This
+  is an additional entry point to the switch-runtime operation (FS-01.R13), complementing the
+  dashboard Switch dialog (FS-01.R32); it does not change the interface (chat↔terminal), which stays
+  in that dialog (FS-01.R15/R32). Choosing a backend resets model to that backend's default model and
+  effort to that model's default effort; the effort select appears only for a model that declares
+  efforts (FS-09.R37). A selection that differs from the agent's current runtime reveals an explicit
+  **Switch** control; nothing is applied until it is activated. Activating it calls switch runtime
+  with the chosen `{backend, model, effort}`, which preserves the conversation through native resume
+  or a primer (FS-01.R13). A `no_change` (equal to current), rejected, or rolled-back switch
+  (FS-01.R26) surfaces an actionable error and returns the picker to the agent's current runtime
+  rather than presenting the unselected change as applied.
+- **R24. (planned)** When the agent is not running — a stopped or archived session viewed under
+  FS-05 — the header shows the runtime identity as static text with no editable picker or Switch
+  control, matching switch runtime's running-only rule (FS-01.R13/R26). If the agent's current
+  backend or model is absent from the live catalog, the picker still shows the current identity and
+  does not break; the **Switch** control stays gated on choosing a listed backend and model.
+
 ## 3. States & transitions
 
 - **Open/reload:** panel fetches durable events → normalizes/folds them → subscribes to live SSE
@@ -158,6 +180,12 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 - **A8** (R1–R18) — A user launches a fake-ACP chat agent, sends a prompt, observes streaming and
   status transitions, and completes approve/deny/timeout without a stuck prompt: journeys **J3**
   and **J4** in `docs/features/USABILITY-REVIEW.md`.
+- **A9. (planned)** (R23, R24) — For a running chat agent the header renders backend/model/effort
+  selects; choosing a backend resets the model and effort to that backend/model's defaults; the
+  effort select appears only for an effort-capable model; a differing selection reveals **Switch**
+  and calls `POST /api/sessions/{id}/switch-runtime` with the chosen runtime; and a stopped agent
+  renders the static identity with no picker. *Verify by* a new chat-header component test under
+  `ui/src/components/chat/`.
 
 ## 6. Deviations & open decisions
 
@@ -177,7 +205,9 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 - **HTTP/persistence:** `internal/server/sessions.go` (`handlePrompt`, `handleTranscript`,
   `handleCancel`, `handlePermission`), `internal/transcript/writer.go`, `reader.go`.
 - **UI:** `ui/src/components/chat/ChatPanel.tsx`, `Composer.tsx`, `TranscriptView.tsx`,
-  `renderers/`, `ui/src/store/transcriptStore.ts`, `ui/src/api/sse.ts`.
+  `renderers/`, `ui/src/store/transcriptStore.ts`, `ui/src/api/sse.ts`. The header runtime picker
+  (R23/R24) reuses `switchRuntime` (`ui/src/api/client.ts`) and the same backend/model/effort reset
+  logic as the dashboard Switch dialog (`ui/src/components/grid/CardContextMenu.tsx`).
 - **Key regression tests:** `TestChatStreamText`, `TestChatToolFlow`,
   `TestLaunchPromptPermissionFlow`, `TestPermissionApprove`, `TestPermissionTimeout`,
   `TestCancelDuringPendingPermission`, `TestCrashMidTurnPersistsDeliveredTranscript`, and
