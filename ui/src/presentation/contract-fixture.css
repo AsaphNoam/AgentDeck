@@ -40,6 +40,13 @@
     gap: var(--ad-space-2);
   }
 
+  .visual-matrix-controls {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--ad-space-3);
+  }
+
   .visual-matrix-surface {
     display: grid;
     gap: var(--ad-space-3);

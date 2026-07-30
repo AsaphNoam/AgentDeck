@@ -1,5 +1,6 @@
 {
-  "version": 1,
+  "version": 2,
+  "skins": ["sky-grove"],
   "tokens": [
     "--ad-surface-canvas",
     "--ad-surface-panel",
@@ -155,7 +156,7 @@
     "config-editor": {
       "slots": ["header", "list", "item", "form", "actions"],
       "states": ["empty", "loading", "error"],
-      "variants": ["roles", "projects", "backends", "notifications"]
+      "variants": ["roles", "projects", "backends", "notifications", "appearance"]
     },
     "config-source": {
       "slots": ["status", "root", "warning", "overrides", "effective", "inventory", "actions"],

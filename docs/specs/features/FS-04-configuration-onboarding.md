@@ -92,6 +92,11 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   this keeps the New Agent modal and onboarding from pre-selecting a dangling default.
 - **R12.** `layout.json` (card order, density, group collapse) is owned by FS-02; this spec only
   notes it is one of the seeded config files (R14) governed by the same JSON-file model.
+- **R38** — The user-editable global configuration adds an optional
+  `appearance_skin` preference owned by FS-12. The Settings → Appearance control reads and writes it
+  through the existing configuration surface. Supported values are the unskinned Core and installed
+  built-in skin ids; absence means Core. The preference affects presentation only and does not alter
+  launch snapshots, projects, agents, pipelines, or onboarding readiness.
 
 ### 2.5 Composition timing
 
@@ -241,6 +246,10 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
 - **A17.** (R37) The role/project delete, force-delete-in-use, and project-archive dialogs render
   their consequence and agent list, issue the same requests on confirm, and no-op on Cancel. —
   `RolesEditor`/`ProjectsEditor` component tests and the FS-12.A8 guard.
+- **A18** — (R38) The appearance preference round-trips through the global
+  configuration surface, survives restart, defaults to Core when absent, and rejects or safely
+  recovers from unsupported values as required by FS-12.R32. — configuration/API regressions and
+  FS-12.A9–A11.
 
 ## 6. Deviations & open decisions
 
@@ -267,7 +276,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   `computeOnboarding`, `computeBackendStep`, `cachedCredCheck`), `onboardingCacheTTL` in
   `internal/server/server.go`.
 - **UI:** `ui/src/features/settings/` (`SettingsPage`, `RolesEditor`, `RoleForm`, `ProjectsEditor`,
-  `ProjectForm`, `BackendsEditor`), `ui/src/features/onboarding/` (`OnboardingGate`,
+  `ProjectForm`, `BackendsEditor`, `AppearanceEditor`), `ui/src/features/onboarding/` (`OnboardingGate`,
   `OnboardingWizard`, `steps/`).
 - **Archive eligibility:** `internal/server/config_handlers.go` (`computeOnboarding`),
   `ui/src/features/settings/ProjectsEditor.tsx`, `NewAgentModal.tsx`, `LaunchStep.tsx`, and
@@ -279,4 +288,5 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   `internal/server/config_endpoint_test.go`, `internal/config/config_test.go`
   (`TestSeedIfAbsentNoClobber`), `ui/src/features/onboarding/OnboardingGate.test.tsx` (A12, A13),
   `ui/src/features/onboarding/steps/BackendStep.test.tsx` (A14), and
-  `ProjectsEditor.test.tsx` "shows archived state and restores the project from Settings".
+  `ProjectsEditor.test.tsx` "shows archived state and restores the project from Settings",
+  `internal/config/appconfig_test.go`, and `AppearanceEditor.test.tsx` (A18).

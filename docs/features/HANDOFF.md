@@ -6,8 +6,15 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
-- **Active change:** None; the native-dialog replacement change is finished.
-- **State:** The project-first dashboard, project/agent archive lifecycle, grouped Archive pagination,
+- **Active change:** None.
+- **State:** Sky & Grove is implemented as AgentDeck's first optional built-in appearance. Settings
+  switches the mounted application immediately between unskinned Core and the statically bundled
+  sky-blue/nature-green skin; the existing global config API persists the choice, invalid or
+  unreadable values fall back to Core with an explanation, and failed saves restore the durable
+  selection. The presentation contract now guards the finite skin set and CSS boundary, and live
+  xterm instances recolor without reconnecting. Specification checks, both Go test modes, all 180
+  UI tests, UI/build/style checks, the distribution build, and an isolated real-browser
+  switch/reload/onboarding pass succeed. The project-first dashboard, project/agent archive lifecycle, grouped Archive pagination,
   project archive containment, and native-dialog replacement are implemented and independently
   reviewed. All five Must-fix findings are fixed and the five Worth-fixing findings are fixed or
   correctly closed; final verification passed. The 2026-07-29
@@ -79,21 +86,14 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Active change
 
-**State:** finished
+**State:** none
 
-The native-dialog replacement remains complete. The current fix run has cleared every repairable
-finding: grouped Archive pagination, stale searches, idempotent archive claims, compensation
-reporting, fail-closed project reads, retry-visible project pages, Rename feedback, lifecycle
-documentation, and native-dialog guard coverage. The native-dialog ready-change trail is a confirmed
-historical audit gap; it cannot be truthfully recreated after shipment, and future behavior changes
-must follow the existing spec-first/ready-change workflow. Specification checks, both Go test
-variants, source/UI builds, the full UI suite, distribution build, and whitespace checks pass.
+The Sky & Grove change is complete. Do not select another waiting change without the human naming it.
 
 ## Decisions needing your input
 
-These are shipped boundaries documented in the specifications, not blockers. A future reversal needs
-an explicit specification update; remove an item when the human accepts the current rule or queues
-that update.
+These are product decisions needed for a future change or shipped boundaries whose reversal needs
+an explicit specification update. Remove an item when the human resolves it or queues that update.
 
 - **API/model compatibility:** TS-03.R3–R4 preserve mixed legacy error envelopes; TS-04.R3 records
   provider model-ID ownership. Standardizing either is a compatibility change.
@@ -262,9 +262,28 @@ are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
 
+- 2026-07-30 — Implemented the confirmed Sky & Grove built-in appearance. Core remains the
+  no-marker default/fallback; Settings writes the global preference through the existing config
+  route with optimistic rollback; unknown/corrupt/read-failure paths remain usable; the statically
+  bundled skin, finite presentation contract, paired visual matrix, and in-place xterm recoloring
+  ship together. All required checks and isolated real-browser switch/reload/onboarding evidence
+  pass; FS-04.R38/A18, FS-12.R27–R33/A9–A11, TS-02.R21, TS-03.R21, and TS-08.R30–R36 are current.
+- 2026-07-30 — Completed the confirmed Sky & Grove feature design; no product code changed. The
+  technical plan uses the existing config route and atomic version-1 `config.json` store, an
+  optimistic React Query projection, one root `data-skin` marker, a statically bundled `ad-skins`
+  stylesheet, version-2 presentation manifest/checker rules, live xterm recoloring, paired visual
+  fixtures, and Core fallback on missing/unknown/failed configuration. The source idea moved to the
+  waiting `add-sky-grove-skin.md` change; specification and whitespace checks pass.
+
 - 2026-07-30 — Completed the archive/native-dialog review-fix run: all five Must-fix findings and
   five Worth-fixing findings are fixed or correctly closed. Specification checks, both Go test
   variants, UI tests/build, source build, distribution build, and whitespace checks pass.
+
+- 2026-07-30 — Began the requested Sky & Grove theme design; no product code changed. FS-12 and
+  FS-04 now carry planned behavior for the first optional built-in skin, a Settings appearance
+  selector, a durable global preference, complete surface/integration coverage, safe Core fallback,
+  locally bundled assets, and explicit exclusions. Technical design waits for human confirmation of
+  the proposed behavior, so the idea remains under definition and no ready change exists yet.
 
 - 2026-07-30 — Closed the native-dialog ready-change audit finding: history confirms that the
   claimed waiting file never existed, and a retroactive file would be misleading. The gap remains a

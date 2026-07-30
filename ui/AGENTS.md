@@ -10,8 +10,11 @@ drag behavior, and terminal lifecycle. CSS, visual primitives, and decorative as
 those values; they must not fetch, persist, derive product meaning, or alter event behavior.
 
 Use the cascade in `src/styles/index.css`: reset → tokens → base → components → features →
-integrations → skins. Production leaves the skins layer empty. Do not add a skin provider,
-`data-skin`, preference, loader, picker, or production skin asset.
+integrations → skins. Core remains complete without a skin marker. The only production skin is a
+statically imported file declared by `src/presentation/contract.json`; its rules stay inside
+`ad-skins` and are scoped to the matching root `data-skin` id or the Settings appearance preview.
+Do not add another id, skin file, provider, browser-storage preference, dynamic loader, external
+asset, or arbitrary skin code without first updating FS-12, TS-08, and the versioned contract.
 
 ## Choosing a value
 
@@ -31,6 +34,11 @@ meaning never come from CSS.
 Dynamic feature values may use inline styles only when an exact, justified entry exists in
 `presentation-exceptions.json`. The checker rejects both new unlisted styles and stale exceptions.
 Do not add inline disable comments or broad file/rule suppressions.
+
+Skin raw palette tokens use the private `--ad-<skin-id>-*` namespace and may be defined and used
+only in that skin's declared stylesheet. Active skin rules may override only public semantic tokens
+from the contract or approved public hooks. Core token definitions stay in `styles/tokens.css`;
+never move them into a skin or make Core depend on `[data-skin]`.
 
 ## Required checks
 

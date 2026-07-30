@@ -79,10 +79,11 @@ type GroupLayout struct {
 
 // Config is the top-level config.json. Version is the schema version (== 1).
 type Config struct {
-	Version            int                 `json:"version"`             // == 1
-	Port               int                 `json:"port"`                // 4317
-	DefaultProject     string              `json:"default_project"`     // "my-app"
-	DefaultRole        string              `json:"default_role"`        // "implementer"
+	Version            int                 `json:"version"`         // == 1
+	Port               int                 `json:"port"`            // 4317
+	DefaultProject     string              `json:"default_project"` // "my-app"
+	DefaultRole        string              `json:"default_role"`    // "implementer"
+	AppearanceSkin     string              `json:"appearance_skin,omitempty"`
 	SkipPermissions    bool                `json:"skip_permissions"`    // false
 	OnboardingComplete bool                `json:"onboarding_complete"` // set after first launch
 	Notifications      NotificationsConfig `json:"notifications"`

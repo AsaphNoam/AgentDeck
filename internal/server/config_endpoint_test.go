@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -64,6 +65,9 @@ func TestGetConfigEmptyStoreNotSatisfied(t *testing.T) {
 	// Roles may be seeded — but we used testServer(false) so store is empty.
 	if resp.Onboarding.Steps.Role.Done {
 		t.Error("empty store: role step should not be done")
+	}
+	if resp.AppearanceSkin != "" || resp.AppearanceSkinWarning != "" {
+		t.Fatalf("empty store appearance = skin %q warning %q, want Core without warning", resp.AppearanceSkin, resp.AppearanceSkinWarning)
 	}
 }
 
@@ -243,5 +247,165 @@ func TestPutConfigPersistsNotificationSettings(t *testing.T) {
 	}
 	if cfg.Notifications.DesktopEnabled || !cfg.Notifications.Muted["done"] || !cfg.Notifications.Muted["budget_exceeded"] {
 		t.Fatalf("notifications = %+v", cfg.Notifications)
+	}
+}
+
+func TestConfigAppearanceSkinRoundTripAndCoreOmission(t *testing.T) {
+	srv := testServer(t, true)
+	h := srv.routes()
+
+	rec := doRequest(t, h, http.MethodPut, "/api/config", map[string]any{
+		"appearance_skin": config.AppearanceSkinSkyGrove,
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT Sky & Grove status = %d body=%s, want 200", rec.Code, rec.Body)
+	}
+	rec = doGET(t, h, "/api/config")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET Sky & Grove status = %d body=%s, want 200", rec.Code, rec.Body)
+	}
+	var got configResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.AppearanceSkin != config.AppearanceSkinSkyGrove || got.AppearanceSkinWarning != "" {
+		t.Fatalf("GET Sky & Grove = skin %q warning %q", got.AppearanceSkin, got.AppearanceSkinWarning)
+	}
+	// Omitting the optional field from a later partial update preserves it.
+	rec = doRequest(t, h, http.MethodPut, "/api/config", map[string]any{"onboarding_complete": true})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT omitting appearance status = %d body=%s, want 200", rec.Code, rec.Body)
+	}
+	preserved, err := srv.configStore.ReadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if preserved.AppearanceSkin != config.AppearanceSkinSkyGrove {
+		t.Fatalf("appearance after omitted partial update = %q, want %q", preserved.AppearanceSkin, config.AppearanceSkinSkyGrove)
+	}
+
+	rec = doRequest(t, h, http.MethodPut, "/api/config", map[string]any{"appearance_skin": ""})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT Core status = %d body=%s, want 200", rec.Code, rec.Body)
+	}
+	raw, err := os.ReadFile(filepath.Join(srv.configStore.Home(), "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := doc["appearance_skin"]; ok {
+		t.Fatalf("Core PUT retained appearance_skin: %s", raw)
+	}
+}
+
+func TestPutConfigRejectsUnsupportedAppearanceWithoutWriting(t *testing.T) {
+	srv := testServer(t, true)
+	path := filepath.Join(srv.configStore.Home(), "config.json")
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rec := doRequest(t, srv.routes(), http.MethodPut, "/api/config", map[string]any{
+		"appearance_skin":     "forest-night",
+		"onboarding_complete": true,
+	})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("PUT unsupported skin status = %d body=%s, want 400", rec.Code, rec.Body)
+	}
+	var body validationFailedBody
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if len(body.Errors) != 1 || body.Errors[0].Field != "appearance_skin" {
+		t.Fatalf("unsupported skin errors = %+v", body.Errors)
+	}
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) != string(before) {
+		t.Fatalf("invalid PUT changed config.json:\nbefore=%s\nafter=%s", before, after)
+	}
+}
+
+func TestGetConfigAppearanceSkinWarnings(t *testing.T) {
+	t.Run("unknown hand edit", func(t *testing.T) {
+		srv := testServer(t, true)
+		cfg, err := srv.configStore.ReadConfig()
+		if err != nil {
+			t.Fatal(err)
+		}
+		cfg.AppearanceSkin = "forest-night"
+		if err := srv.configStore.WriteConfig(cfg); err != nil {
+			t.Fatal(err)
+		}
+
+		rec := doGET(t, srv.routes(), "/api/config")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("GET status = %d body=%s, want 200", rec.Code, rec.Body)
+		}
+		var got configResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+			t.Fatal(err)
+		}
+		if got.AppearanceSkin != "forest-night" || got.AppearanceSkinWarning != "unsupported" {
+			t.Fatalf("unknown hand edit = skin %q warning %q", got.AppearanceSkin, got.AppearanceSkinWarning)
+		}
+	})
+
+	t.Run("corrupt config", func(t *testing.T) {
+		srv := testServer(t, true)
+		path := filepath.Join(srv.configStore.Home(), "config.json")
+		if err := os.WriteFile(path, []byte("{"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+
+		rec := doGET(t, srv.routes(), "/api/config")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("GET status = %d body=%s, want 200", rec.Code, rec.Body)
+		}
+		var got configResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+			t.Fatal(err)
+		}
+		if got.AppearanceSkin != "" || got.AppearanceSkinWarning != "config_unreadable" {
+			t.Fatalf("corrupt config = skin %q warning %q", got.AppearanceSkin, got.AppearanceSkinWarning)
+		}
+		var doc map[string]json.RawMessage
+		if err := json.Unmarshal(rec.Body.Bytes(), &doc); err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := doc["appearance_skin"]; ok {
+			t.Fatalf("corrupt fallback returned a persisted skin: %s", rec.Body.Bytes())
+		}
+	})
+}
+
+func TestPutConfigWriteFailurePreservesAppearanceChoice(t *testing.T) {
+	srv := testServer(t, true)
+	cfg, err := srv.configStore.ReadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.AppearanceSkin = config.AppearanceSkinSkyGrove
+	if err := srv.configStore.WriteConfig(cfg); err != nil {
+		t.Fatal(err)
+	}
+	srv.writeConfig = func(config.Config) error { return errors.New("injected write failure") }
+
+	rec := doRequest(t, srv.routes(), http.MethodPut, "/api/config", map[string]any{"appearance_skin": ""})
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("PUT with failed write status = %d body=%s, want 500", rec.Code, rec.Body)
+	}
+	got, err := srv.configStore.ReadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.AppearanceSkin != config.AppearanceSkinSkyGrove {
+		t.Fatalf("appearance after failed Core write = %q, want %q", got.AppearanceSkin, config.AppearanceSkinSkyGrove)
 	}
 }
