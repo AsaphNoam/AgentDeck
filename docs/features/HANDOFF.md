@@ -80,8 +80,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   [`../archive/reviews/usability-review-run-2026-07-26-rerun.md`](../archive/reviews/usability-review-run-2026-07-26-rerun.md)
   and [`../archive/reviews/usability-review-run-2026-07-26-browser-retry.md`](../archive/reviews/usability-review-run-2026-07-26-browser-retry.md).
   Credentialed provider and terminal compatibility remain separate manual release gates.
-- **Last reviewed code:** `0f52f89` (2026-07-30), the continuous range after `70afbe8`, including
-  the archive paging, transition-claim, compensation-reporting, and fail-closed project-read fixes.
+- **Last reviewed code:** `7fc5158` (2026-07-30), the continuous range after `0f52f89`, including
+  the Sky & Grove appearance and the archive-retry, project-rename field-error, native-dialog guard,
+  and lifecycle-dialog specification fixes.
 - **Branch:** `main`.
 
 ## Active change
@@ -118,149 +119,51 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 ## Review findings
 
-### Resolved findings from the reviewed implementation
+### Open findings
 
-All findings below are resolved by the finished project-dashboard and project-grouped Archive change;
-they remain here only as the review record until the next handoff cleanup.
+The prior project-dashboard / project-grouped Archive findings are all resolved and confirmed fixed
+across the reviewed range; they are removed from live state and remain in git history and the
+changelog. One new finding from the `0f52f89`→`7fc5158` review:
 
-- **Must fix** — INV §7 (also §10) — Grouped Archive truncates the corpus at 200 sessions and the UI
-  has no independent agent paging. `internal/server/archive.go` `archiveRows` always fetches
-  `Limit=200, Offset=0` from `persistarchive.Search`, then derives project groups, per-project rows,
-  and every `total`/`offset` from that fixed slice. With more than 200 sessions, older archived rows
-  and search hits disappear while `archived_agent_count` still reports the full count. Separately,
-  `ui/src/api/client.ts` defines `searchArchiveProject`, but `ArchivePage.tsx` never calls it and
-  pages only the top-level groups, so fixing the cap alone still would not provide FS-05.R36/A19's
-  independent per-project agent pagination. Page the durable query at both levels and add grouped
-  API/UI regressions that reach an agent beyond the first 200 rows.
-
-- **Must fix** — INV §2/§4 (also §5) — Archive can mark a live orphan process archived.
-  `internal/server/archive_actions.go` `stopForArchive` treats `runtime.ErrNoHandle` as a successful
-  stop but does not call the shared `reapOrphanRuntime` path used by ordinary Stop and pipeline Stop.
-  After a server restart, a still-live process/running row not owned by the in-memory registry can
-  survive while agent or project archive commits `archived=true`, violating FS-05.R32 and
-  TS-02.R20. Reuse the shared stop/reap seam and add a restart-orphan regression that proves the
-  process and running row are gone before the archive bit commits.
-
-- **Must fix** — INV §5/§15 — Agent archive/restore has no transition claim. The handlers in
-  `internal/server/archive_actions.go` neither acquire the planned agent-exclusive claim nor join the
-  project claim, while Resume takes only a project start lease later in `resume.go`. Archive can
-  therefore read `archived=false`, race a Resume that registers a new process, and commit
-  `archived=true` beside that running row; agent Restore can also race project Archive and clear one
-  flag after the bulk archive update. This breaks TS-01.R13/TS-02.R20 and cannot produce the planned
-  `agent_archiving` conflict. Add deterministic Archive-vs-Resume and Restore-vs-project-Archive
-  barrier regressions.
-
-- **Must fix** — INV §15 — Failed project publication erases pre-existing individual archive state.
-  `internal/server/archive_actions.go` sets every project agent archived, then compensates a failed
-  `WriteProject` by setting every id to `false`. An agent that was individually archived before the
-  operation is silently restored after the failure. TS-02.R20 requires compensation back to the
-  prior state; snapshot or update only the flags changed by the operation and inject a config-write
-  failure with mixed initial flags.
-
-- **Must fix** — INV §5/§8 (also §10/§15) — Pipeline start/control claims the project too late and
-  loses the required archive conflict. `pipeline.Manager.Start`, Continue, and Retry mutate durable
-  run state before `LaunchStage`/`ContinueStage` reaches the lease in `pipeline_lifecycle.go`.
-  Project Archive can finish `StopProject`'s snapshot, then a concurrent Start creates a run whose
-  launch is rejected and left `paused/launch_failed` instead of stopped. Already-archived projects
-  fare no better: validation becomes a generic 400, and later lifecycle errors become a paused
-  success or generic 500 rather than TS-03.R20's `409 project_archived/project_archiving`. Hold the
-  lease across the manager transition and process registration, preserving the API error code; add
-  Start/Continue/Retry barrier and response regressions (TS-09.R25, FS-14.R32/A12).
-
-- **Must fix** — INV §1/§8/§10 — Successful project Archive/Restore leaves the UI stale.
-  `ProjectDashboard.tsx` and `ArchivePage.tsx` call raw helpers with only a rejection handler; they do
-  not update or invalidate the React Query project catalog or the Archive's local group. Every
-  successful Archive therefore leaves its project card/scoped route active, and every Restore leaves
-  the group marked archived and the project absent until an incidental refetch or reload. Route the
-  actions through catalog-aware mutations and update/refetch the Archive result (FS-02.R34/A17–A18).
-
-- **Must fix** — INV §3 (also §10) — Scoped drag-and-drop destroys the rest of the shared layout.
-  `ui/src/components/grid/CardGrid.tsx` filters `ids` to the selected project, then persists
-  `setOrder(arrayMove(ids,...))`; the replacement contains no ids from other projects. A normal drag
-  on one project dashboard therefore loses every other project's shared ordering, contrary to
-  FS-02.R36/A20. Merge the scoped reorder back into the global order and cover switching/reordering
-  across at least two projects.
-
-- **Worth fixing** — INV §5 — Project Archive does not reserve its claim while waiting for starts.
-  `internal/server/archive_gate.go` `beginProjectArchive` returns false whenever any start lease
-  exists, without first setting `projectArchiving` and waiting as TS-01.R13 requires. It reports
-  "archival is in progress" when the competitor is actually a launch, and repeated starts can keep
-  leapfrogging the requested archive. Reserve the exclusive claim, wait for existing leases, then
-  enter the stop-to-commit window.
-
-- **Worth fixing** — INV §10 — Archive **Load more** is hidden once groups exceed one page.
-  `ui/src/features/archive/ArchivePage.tsx` gates the control with
-  `Math.max(results.length, renderedAgentIDs(results).length) < total`, but the grouped `total`
-  counts project groups while `renderedAgentIDs` counts agent rows; once there are more than 50
-  groups and any group holds multiple agents, the agent-row count exceeds the group total and the
-  button never renders, stranding later group pages (FS-05.R36/A19). Fix: compare rendered group
-  count to the group `total` (`results.length < total`); add a >50-group paging test.
-
-- **Worth fixing** — INV §10 — Project cards omit spec'd surfaces.
-  `ui/src/features/dashboard/ProjectDashboard.tsx` renders only the title, an agent count, and a
-  bare Archive-on-right-click, but FS-02.R30 requires the project color and a live per-state summary
-  on each card, and FS-02.R34 requires the active-card menu to offer **Rename** and **Change color**
-  alongside **Archive**. As shipped, the (planned) R30/R34 behavior is unmet; implement it or record
-  a deviation before flipping those tags.
-
-- **Worth fixing** — INV §10 — Settings does not expose project archive state. The server response
-  and TypeScript schema carry `archived`, but `ProjectsEditor.tsx` and `ProjectForm.tsx` neither show
-  that state nor offer Archive/Restore. This leaves FS-04.R35's Settings surface unshipped and gives
-  a person no indication why a configured project is absent from launch selectors.
-
-- **Worth fixing** — INV §1/§10 — Archived-project eligibility is only partially wired.
-  `computeOnboarding` in `config_handlers.go` counts every configured project, so a setup with only
-  archived projects reports the project step complete even though Launch has no eligible project.
-  `RunStartForm` and `NewAgentModal` filter their option lists but retain a non-empty selected or
-  prefilled project after it becomes archived, leaving a blank-looking, submit-enabled value that
-  the server rejects. AgentDeckerBuilder already has the needed catalog/archive clearing pattern.
-  Fix all selectors and readiness together (FS-04.R36/A16).
-
-- **Worth fixing** — INV §7/§8 — Project query failures are misreported as missing configuration.
-  `ProjectDashboard` and `ScopedProjectDashboard` ignore `useProjects` loading/error state and treat
-  absent query data as an empty catalog, so a failed read silently relabels every durable project
-  "unavailable" rather than surfacing the error. Preserve the loading/error boundary; reserve the
-  unavailable state for a successfully loaded catalog that lacks that id (FS-02.R29/R32).
-
-- **Worth fixing** — INV §10 — Resume returns the wrong conflict when both agent and project are
-  archived. `internal/server/resume.go` checks `agent.Archived` before reading the project, returning
-  `agent_archived`; FS-05.R34 explicitly requires `project_archived` until the containing project is
-  restored. Reverse or combine the checks and add the two-level archive response matrix.
-
-- **Worth fixing** — INV §10/§11 — Project Archive omits its specified result lists.
-  `handleArchiveProjectAction` returns only `projectResponse`, while TS-03.R20 requires the updated
-  project plus the stopped and archived agent ids. Return the documented non-null lists and update
-  the TypeScript contract/mocks in lockstep.
-
-- **Worth fixing** — INV §1/§10 — A stopped, non-archived search hit opens a page that calls it
-  archived. `ArchivePage.tsx` routes by `active` rather than the new authoritative `archived` bit, so
-  a stopped search result opens `ArchiveAgentPage`, whose header says **Archived · read-only** even
-  though its button offers Resume. Route non-archived hits to the ordinary stopped-agent workspace
-  and keep Restore only for genuinely archived agents (FS-05.R34–R36).
-
-- **Worth fixing** — INV §15 (also §5) — Codex profile publish is not the atomic swap it claims.
-  `internal/config/codexprofile.go` (~L291–313, `e021ce3`) publishes each managed setup entry by
-  `rename(dst→backup)` then `rename(staging→dst)`, so `dst` is briefly absent between the two
-  renames — contradicting the code's own comment that each entry is "swapped atomically so a running
-  child never observes a half-written or missing setup asset." A codex child already running under
-  the shared private `CODEX_HOME` that re-reads `config.toml`/`auth.json` during a subsequent child's
-  refresh could observe it missing. Low impact (newly started children run under the completed
-  publish); fix by renaming staged-over-existing in one step or softening the claim.
-
-- **Worth fixing** — (no invariant class) — SDD traceability for `0b6e793`, `ceef7ee`, `9f0dbde`,
-  and `547ca43`: these commits ship Dashboard Resume, builder-project selection, transcript
-  right-click behavior, and Codex profile isolation without a committed ready-change/active-change
-  plan. For `547ca43`, the ideas-only parent is followed by one commit that adds and immediately
-  ships all requirements and code while both handoffs say `Active change: None`; its brief names a
-  ready change that never exists in the tree. The required spec-first planned trail cannot be
-  audited. Use a committed ready change and active handoff plan before the next behavior change; do
-  not create a retroactive waiting change for work already shipped.
+- **Worth fixing** — INV §10 (also FS-12.R32/A11) — Appearance Settings cannot repair a stored
+  unsupported skin id back to Core. `ui/src/features/settings/AppearanceEditor.tsx` renders the
+  choice as radios with `checked={active === appearance.id}`, where `active =
+  effectiveAppearance(stored)` maps any unknown/unsupported id to `core`. When `config.json` is
+  hand-edited to an unknown skin (e.g. `midnight`), GET returns
+  `appearance_skin_warning:"unsupported"`, the Core radio already renders checked, and clicking it
+  fires no `onChange`, so the durable unsupported value and its warning persist. The person can
+  still recover by selecting Sky & Grove (a valid save), so R32's “choose and save a valid
+  appearance” is met, but restoring Core specifically needs a Sky & Grove detour. Normal-use
+  likelihood is low (requires a hand edit or a persistent config-read error). Suggested fix: drive
+  the save from the durable stored value (or let Core's control save `""` even when Core is only the
+  effective fallback) and add a regression that repairs an unsupported stored id straight to Core.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-07-30 — Reviewed the continuous range after `0f52f89` through `7fc5158` in both specification
+  directions and against every invariant class: the Sky & Grove appearance and the archive-retry,
+  project-rename field-error, native-dialog guard-bypass, and lifecycle-dialog specification fixes.
+  Code and specs agree; FS-04.R38/A18, FS-12.R27–R33/A9–A11, TS-02.R21, TS-03.R21, and TS-08.R30–R36
+  match the shipped appearance preference, Core fallback, checker skin rules, and live xterm
+  recoloring. One **Worth fixing** finding: the Appearance radio control cannot save Core to repair a
+  hand-edited unsupported skin id because Core already renders checked as the effective fallback
+  (**INV §10**, FS-12.R32/A11). Clean/not applicable elsewhere: §1 AppearanceRoot/xterm republish on
+  the `data-skin` boundary and disconnect the observer on cleanup; §2 one `BUILT_IN_SKINS` allowlist
+  and one `resolvePresentationColors` helper, checker-enforced; §3 PUT `/api/config` stays a partial
+  merge; §4 terminal teardown disposes observer/subs/ws/term; §5/§6 add no concurrency or runtime;
+  §7 `handleGetConfig` falls back on `ErrNotFound`/`ErrCorrupt` and 500s only on unexpected reads;
+  §8 the save error rolls back the optimistic cache and toasts, and rename now keeps field-level
+  detail; §9 the field is an additive version-1 preference with no migration and `omitempty` Core
+  omission; §11 the new fields are scalars with a lockstep Go/TS/manifest id set; §12 no external
+  CLI; §13 the presentation checker passes with every new class resolved; §14 the config route keeps
+  `localOnly`; §15 the server writes durably before responding and the injected `writeConfig` failure
+  preserves the prior choice. Specification checks, the presentation contract check, the Go config and
+  server suites, and the appearance/terminal/visual-matrix UI tests pass; the green suite does not
+  exercise the recorded finding. No product code or specifications changed during review.
 
 - 2026-07-30 — Implemented the confirmed Sky & Grove built-in appearance. Core remains the
   no-marker default/fallback; Settings writes the global preference through the existing config
