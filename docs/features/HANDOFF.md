@@ -9,8 +9,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 - **Active change:** None; the native-dialog replacement change is finished.
 - **State:** The project-first dashboard, project/agent archive lifecycle, grouped Archive pagination,
   project archive containment, and native-dialog replacement are implemented and independently
-  reviewed. All five Must-fix findings are fixed; four Worth-fixing findings remain open below and
-  fixing them is the current quality gate. The 2026-07-29
+  reviewed. All five Must-fix findings are fixed and the five Worth-fixing findings are fixed or
+  correctly closed; final verification is the current quality gate. The 2026-07-29
   usability pass found no new problem in its completed real-browser paths: project/scoped dashboards,
   stopped-agent Resume, individual archive/restore, and grouped Archive rendered and behaved as
   specified. Native browser confirmation input then stalled and blocked the remaining browser-only
@@ -79,13 +79,15 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Active change
 
-**State:** review findings are being fixed
+**State:** final verification
 
-The native-dialog replacement remains complete. The current fix run is clearing the review findings,
-one verified finding per commit. All five Must-fix findings are now fixed (grouped Archive
-pagination, stale per-project searches, idempotent archive claims, compensation reporting, and
-unexpected project-read errors failing closed); the remaining lower-risk finding records the missing
-historical ready-change trail.
+The native-dialog replacement remains complete. The current fix run has cleared every repairable
+finding: grouped Archive pagination, stale searches, idempotent archive claims, compensation
+reporting, fail-closed project reads, retry-visible project pages, Rename feedback, lifecycle
+documentation, and native-dialog guard coverage. The native-dialog ready-change trail is a confirmed
+historical audit gap; it cannot be truthfully recreated after shipment, and future behavior changes
+must follow the existing spec-first/ready-change workflow. Run final verification, then complete the
+handoff and brief.
 
 ## Decisions needing your input
 
@@ -115,13 +117,6 @@ The post-fix usability-review and current code-review state are committed locall
 those commits to the shared `origin/main` branch needs explicit human authorization.
 
 ## Review findings
-
-- **Worth fixing** — (no invariant class) — The native-dialog change has no committed ready-change
-  trail. The completion commit adds a brief claiming `docs/ready-changes/replace-native-dialogs.md`
-  was waiting, but that file exists in neither parent, the commit, nor repository history; the same
-  commit adds the alleged design update and shipped specs/code. The required spec-first planned
-  state cannot be independently audited. Commit the ready change and planned specification state
-  before the next behavior implementation; do not create a retroactive waiting file for shipped work.
 
 ### Resolved findings from the reviewed implementation
 
@@ -266,6 +261,11 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-07-30 — Closed the native-dialog ready-change audit finding: history confirms that the
+  claimed waiting file never existed, and a retroactive file would be misleading. The gap remains a
+  historical record; future behavior changes must use the existing spec-first planned-state and
+  ready-change workflow before implementation.
 
 - 2026-07-30 — Closed native-dialog guard bypasses (INV §10): the presentation check now rejects
   `globalThis`, computed-property, and static-alias calls as well as the original bare/window forms;
