@@ -4,6 +4,22 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-30 — Fix: unreadable project files no longer allow work
+
+The last high-risk finding is fixed. Resume, runtime switch, agent restore, and pipeline work now
+read the project's saved definition to check whether it is archived; if that file is corrupt or
+otherwise unreadable, the action stops with an error instead of quietly proceeding — because an
+unreadable file might itself say the project is archived. A project whose file is simply missing
+still behaves as before (available but not archived), and archiving an agent for cleanup keeps
+working regardless. This is the fail-closed choice you selected. A test confirms the old code let a
+restore silently succeed and clear the archive flag; the new code refuses it. All five high-risk
+findings are now cleared.
+
+**Needs attention:** None.
+
+**Next:** Continue with the four lower-risk repairs, starting with project-rename validation
+feedback.
+
 ### 2026-07-29 — Fix: archive correctness findings
 
 Four high-risk Archive defects are fixed and committed: large project histories no longer inflate

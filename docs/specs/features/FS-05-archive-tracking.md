@@ -170,6 +170,11 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   **Restore**, not **Resume**; direct Resume returns `409 agent_archived`. If its project is also
   archived, project restoration is required first and the request returns `409 project_archived`.
   After agent restoration, the ordinary stopped-agent dashboard/transcript exposes Resume under R14.
+  When a project definition cannot be read at all — corrupt or otherwise unreadable, as opposed to
+  simply absent — Resume, Switch runtime, agent Restore, and pipeline start/control fail closed with
+  an internal error rather than proceeding, because the unreadable definition may itself record the
+  project archived. A missing definition remains treated as an unavailable-but-active project so its
+  agents can still be worked, and agent Archive stays available for cleanup regardless.
 
 - **R35.** The Archive workspace's empty state explains that it contains archived agents
   under their projects, while stopped agents remain on an active project's dashboard until archived.

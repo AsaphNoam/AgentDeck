@@ -136,7 +136,12 @@ ids are `404`; Resume of an archived agent under an active project is `409 agent
 resume, agent restore, pipeline start/control, or builder launch targeting an archived project is
 `409 project_archived`; a process-start request arriving while project archival holds its exclusive
 claim is retryable `409 project_archiving`; and an invalid competing agent transition is `409
-agent_archiving` or the existing `409 conflict` where no more specific code applies. `GET
+agent_archiving` or the existing `409 conflict` where no more specific code applies. Resume, Switch
+runtime, agent restore, and pipeline start/control read the project definition to detect the archived
+state; a read failure other than `ErrNotFound` (a corrupt file or an I/O/permission error) fails
+closed with `500 internal` rather than proceeding as active, because the unreadable definition may
+record the project archived, while `ErrNotFound` is treated as an unavailable-but-active project and
+agent archive proceeds regardless. `GET
 /api/projects` and project create/update responses add `archived`; agent/session responses and every
 `state_update` include `archived`. `GET /api/archive` changes from a flat list to paginated project
 groups, and `GET /api/archive/projects/{project}` pages that group's agent rows. FS-05.R36 owns the

@@ -84,9 +84,8 @@ func (s *Server) handleRestoreAgentAction(w http.ResponseWriter, r *http.Request
 		return
 	}
 	defer s.endAgentArchive(agent.Project, id)
-	project, err := s.configStore.ReadProject(agent.Project)
-	if err == nil && project.Archived {
-		writeAPIError(w, apiError(runtime.CodeProjectArchived, "project is archived; restore it first"))
+	if ae := s.projectArchiveGate(agent.Project, "project is archived; restore it first"); ae != nil {
+		writeAPIError(w, ae)
 		return
 	}
 	if err := s.setAgentsArchived([]string{id}, false); err != nil {

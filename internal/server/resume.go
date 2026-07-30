@@ -44,9 +44,8 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError(runtime.CodeNotFound, "no such agent: "+id))
 		return
 	}
-	project, err := s.configStore.ReadProject(agent.Project)
-	if err == nil && project.Archived {
-		writeAPIError(w, apiError(runtime.CodeProjectArchived, "project is archived; restore it before resuming"))
+	if ae := s.projectArchiveGate(agent.Project, "project is archived; restore it before resuming"); ae != nil {
+		writeAPIError(w, ae)
 		return
 	}
 	if agent.Archived {

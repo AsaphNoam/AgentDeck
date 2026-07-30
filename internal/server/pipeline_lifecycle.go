@@ -18,10 +18,9 @@ func (s *Server) AcquirePipelineStart(_ context.Context, projectID string) (func
 	if ae := s.acquireProjectStart(projectID); ae != nil {
 		return nil, &pipeline.ProjectGateError{Code: ae.Code, Message: ae.Message}
 	}
-	project, err := s.configStore.ReadProject(projectID)
-	if err == nil && project.Archived {
+	if ae := s.projectArchiveGate(projectID, "project is archived"); ae != nil {
 		s.releaseProjectStart(projectID)
-		return nil, &pipeline.ProjectGateError{Code: runtime.CodeProjectArchived, Message: "project is archived"}
+		return nil, &pipeline.ProjectGateError{Code: ae.Code, Message: ae.Message}
 	}
 	return func() { s.releaseProjectStart(projectID) }, nil
 }

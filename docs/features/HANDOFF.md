@@ -9,8 +9,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 - **Active change:** None; the native-dialog replacement change is finished.
 - **State:** The project-first dashboard, project/agent archive lifecycle, grouped Archive pagination,
   project archive containment, and native-dialog replacement are implemented and independently
-  reviewed. One Must-fix and four Worth-fixing findings are open below; fixing them is the current
-  quality gate. The 2026-07-29
+  reviewed. All five Must-fix findings are fixed; four Worth-fixing findings remain open below and
+  fixing them is the current quality gate. The 2026-07-29
   usability pass found no new problem in its completed real-browser paths: project/scoped dashboards,
   stopped-agent Resume, individual archive/restore, and grouped Archive rendered and behaved as
   specified. Native browser confirmation input then stalled and blocked the remaining browser-only
@@ -81,10 +81,11 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 **State:** review findings are being fixed
 
-The native-dialog replacement remains complete. The current fix run is clearing the five Must-fix
-and four Worth-fixing findings from its independent review, one verified finding per commit. Grouped
-Archive pagination and stale per-project searches are fixed; the next open finding is the
-unexpected project-read error handling.
+The native-dialog replacement remains complete. The current fix run is clearing the review findings,
+one verified finding per commit. All five Must-fix findings are now fixed (grouped Archive
+pagination, stale per-project searches, idempotent archive claims, compensation reporting, and
+unexpected project-read errors failing closed); the next open finding is the project-card Rename
+losing field-level validation errors.
 
 ## Decisions needing your input
 
@@ -113,24 +114,7 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 The post-fix usability-review and current code-review state are committed locally on `main`; pushing
 those commits to the shared `origin/main` branch needs explicit human authorization.
 
-- **Corrupt project lifecycle policy:** the last Must-fix cannot close until the human chooses how
-  an unreadable/corrupt project definition behaves on Resume, Switch runtime, agent Restore, and
-  pipeline start/control. Recommended: fail closed with an explicit internal error until the file is
-  repaired, because its unreadable JSON may contain `archived: true`. Alternative: treat corruption
-  like a missing/unavailable project, matching catalog omission but risking lifecycle work against a
-  project whose archived state is unknown. Unexpected non-corruption read failures will surface
-  either way; agent Archive remains available for cleanup.
-
 ## Review findings
-
-- **Must fix** — INV §7 (also §5/§8) — Unexpected project-read errors fail open on process and
-  restore paths. `resume.go`, `switch.go`, `AcquirePipelineStart`, and agent Restore check only
-  `err == nil && project.Archived`; an I/O/permission error is treated like an active project.
-  Resume/Switch or pipeline Continue/Retry can then start/control work, and Restore can clear an
-  agent archive flag, while project archive state is unknown (FS-05.R34, TS-03.R20). Preserve the
-  specified unavailable-project behavior for `config.ErrNotFound` and agent Archive, but surface
-  unexpected read errors and cover all four paths. `config.ErrCorrupt` needs an explicit
-  specification choice because current project listing treats corrupt definitions as unavailable.
 
 - **Worth fixing** — INV §8/§10 — Project-card Rename loses field-level validation errors.
   `ProjectEditDialog` checks only a blank title and `ProjectDashboard` renders `err.message` from
@@ -300,6 +284,15 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-07-30 — Fixed unexpected project-read errors failing open (INV §7, also §5/§8): Resume,
+  Switch runtime, agent Restore, and pipeline start now route their archived-project check through a
+  shared `projectArchiveGate` that fails closed with an internal error when the definition is corrupt
+  or otherwise unreadable, while a missing definition still proceeds as unavailable-but-active and
+  agent Archive stays available for cleanup. The human chose the fail-closed corrupt-project policy;
+  FS-05.R34 and TS-03.R20 now record it. The four-path regression was verified to fail against the
+  old code (restore even fail-opened to 200, clearing the archive flag); both Go test variants,
+  `make build`, focused `-race`, and whitespace checks pass.
 
 - 2026-07-29 — Fixed failed project-archive compensation reporting (INV §15, also §5): if project
   publication and exact flag rollback both fail, the project remains active, the server publishes

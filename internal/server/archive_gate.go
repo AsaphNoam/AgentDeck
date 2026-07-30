@@ -2,9 +2,33 @@ package server
 
 import (
 	"context"
+	"errors"
 
+	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/runtime"
 )
+
+// projectArchiveGate reports whether the named project blocks a lifecycle action.
+// It returns CodeProjectArchived (using the supplied message) when the project is
+// archived, and CodeInternal when its definition is unreadable for any reason
+// other than absence — corrupt or I/O/permission failures fail closed because the
+// archived state is unknown and the file may itself record archived: true. A
+// missing definition (ErrNotFound) passes, matching catalog omission
+// (FS-05.R34, TS-03.R20).
+func (s *Server) projectArchiveGate(projectID, archivedMsg string) *runtime.APIError {
+	project, err := s.configStore.ReadProject(projectID)
+	switch {
+	case err == nil:
+		if project.Archived {
+			return apiError(runtime.CodeProjectArchived, archivedMsg)
+		}
+		return nil
+	case errors.Is(err, config.ErrNotFound):
+		return nil
+	default:
+		return apiError(runtime.CodeInternal, err.Error())
+	}
+}
 
 // acquireProjectStart is the shared launch boundary. It deliberately spans the
 // final registry registration so a project archive cannot stop a snapshot of
