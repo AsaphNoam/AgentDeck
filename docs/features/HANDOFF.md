@@ -10,7 +10,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 - **State:** The project-first dashboard, project/agent archive lifecycle, grouped Archive pagination,
   project archive containment, and native-dialog replacement are implemented and independently
   reviewed. All five Must-fix findings are fixed and the five Worth-fixing findings are fixed or
-  correctly closed; final verification is the current quality gate. The 2026-07-29
+  correctly closed; final verification passed. The 2026-07-29
   usability pass found no new problem in its completed real-browser paths: project/scoped dashboards,
   stopped-agent Resume, individual archive/restore, and grouped Archive rendered and behaved as
   specified. Native browser confirmation input then stalled and blocked the remaining browser-only
@@ -79,15 +79,15 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Active change
 
-**State:** final verification
+**State:** finished
 
 The native-dialog replacement remains complete. The current fix run has cleared every repairable
 finding: grouped Archive pagination, stale searches, idempotent archive claims, compensation
 reporting, fail-closed project reads, retry-visible project pages, Rename feedback, lifecycle
 documentation, and native-dialog guard coverage. The native-dialog ready-change trail is a confirmed
 historical audit gap; it cannot be truthfully recreated after shipment, and future behavior changes
-must follow the existing spec-first/ready-change workflow. Run final verification, then complete the
-handoff and brief.
+must follow the existing spec-first/ready-change workflow. Specification checks, both Go test
+variants, source/UI builds, the full UI suite, distribution build, and whitespace checks pass.
 
 ## Decisions needing your input
 
@@ -261,6 +261,10 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-07-30 — Completed the archive/native-dialog review-fix run: all five Must-fix findings and
+  five Worth-fixing findings are fixed or correctly closed. Specification checks, both Go test
+  variants, UI tests/build, source build, distribution build, and whitespace checks pass.
 
 - 2026-07-30 — Closed the native-dialog ready-change audit finding: history confirms that the
   claimed waiting file never existed, and a retroactive file would be misleading. The gap remains a
