@@ -7,7 +7,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** Sky & Grove is implemented as AgentDeck's first optional built-in appearance. Settings
+- **State:** Agent effort selection is implemented: models can declare provider-native levels and a
+  default, launch/CLI/switch/resume/pipeline flows preserve the resolved level, and Claude/Codex
+  delivery is adapter-specific. Live-provider honoring remains a credentialed acceptance gate.
+  Sky & Grove is implemented as AgentDeck's first optional built-in appearance. Settings
   switches the mounted application immediately between unskinned Core and the statically bundled
   sky-blue/nature-green skin; the existing global config API persists the choice, invalid or
   unreadable values fall back to Core with an explanation, and failed saves restore the durable
@@ -89,7 +92,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 **State:** none
 
-The Sky & Grove change is complete. Do not select another waiting change without the human naming it.
+No implementation change is active. Do not select a waiting change without the human naming it.
 
 ## Decisions needing your input
 
@@ -123,7 +126,36 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 The prior project-dashboard / project-grouped Archive findings are all resolved and confirmed fixed
 across the reviewed range; they are removed from live state and remain in git history and the
-changelog. One new finding from the `0f52f89`→`7fc5158` review:
+changelog. Three new findings from the uncommitted agent-effort-selection review, followed by the
+carried Sky & Grove finding:
+
+- **Must fix** — INV §11 (also TS-02.R18, workflow §2) — `make test` is red: the new `Efforts`
+  field breaks `internal/config/config_test.go::TestRoundTripConfigObjects`. `ReadBackends`
+  normalizes each model's nil `Efforts` to `[]string{}` (`internal/config/validate.go` invariant-6
+  loop), but `WriteBackends` and the `DefaultBackends` seed leave OpenCode/OpenHands `Efforts` nil,
+  and `Model.Efforts` carries `json:"efforts"` with no `omitempty` (`internal/config/types.go`). A
+  default catalog therefore round-trips nil → `null` → `[]`, so the DeepEqual fails and, worse,
+  `backends.json` is persisted on disk with `"efforts":null` — the exact null-marshal shape the
+  read-time normalization exists to prevent. Trigger: any `make test`, or a fresh install writing
+  default backends. The implementer's own brief admits full `make test` was not rerun. Fix:
+  normalize symmetrically (seed `Efforts: []string{}` and/or normalize on the write path), then make
+  the round-trip green. Do not hand the change off with a failing required check.
+
+- **Worth fixing** — FS-09.A15/R40, INV §4 — the Claude chat post-session effort path
+  (`applyPostSessionEffort`, `internal/runtime/chat.go`) and its required failure-teardown have no
+  test, even though `internal/runtime/testdata/fakeacp/main.go` gained `FAKEACP_EFFORT_DUMP` /
+  `FAKEACP_EFFORT_FAIL` hooks precisely for it. Only the Codex model suffix and Claude terminal argv
+  are proven; A15's "an injected failure of that application leaves no running agent and returns a
+  bounded error" is unverified. Suggested fix: a chat-runtime test that dumps the
+  `session/set_config_option` params on success and asserts a rejected option fails the launch with
+  nothing registered.
+
+- **Worth fixing** — FS-09.A14/R37/R38, INV §10 — the specs' "Verify by" lists cite
+  `NewAgentModal.test.tsx`, `BackendsEditor.test.tsx`, and Codex model-cache sync tests for effort,
+  but none contain any effort assertion: `ReadCodexModelCatalog`'s new
+  `supported_reasoning_levels`→`efforts` import (`internal/config/codexmodels.go`), the New Agent
+  effort control, and the Settings effort editor are all untested. A spec that names coverage which
+  does not exist is drift; add the cited tests or correct the acceptance criteria.
 
 - **Worth fixing** — INV §10 (also FS-12.R32/A11) — Appearance Settings cannot repair a stored
   unsupported skin id back to Core. `ui/src/features/settings/AppearanceEditor.tsx` renders the
@@ -143,6 +175,34 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-07-30 — Reviewed the uncommitted agent-effort-selection change (FS-01.R30/A14, FS-08.R31/A8,
+  FS-09.R35–R42/A14–A15, FS-14.R31/A11, TS-01.R12, TS-02.R18, TS-03.R19, TS-04.R18–R19, TS-07.R14,
+  TS-09.R24) in both specification directions and against every invariant class. One **Must fix**
+  and two **Worth fixing** findings are recorded above. **INV §11** caught the `Efforts`
+  nil-vs-`[]` read/write asymmetry that fails `TestRoundTripConfigObjects`, reddening `make test`
+  and persisting `"efforts":null`. **INV §4/§10** caught the untested Claude post-session delivery
+  and its failure-teardown, and spec "Verify by" lists citing effort tests that do not exist. Clean
+  or not applicable elsewhere: **§1** effort is re-applied at resume/switch and the Codex suffix is
+  composed once by `deliveredModelID` for both `sessionNewParams`/`sessionLoadParams`; **§2** the
+  load-bearing shared seams (`resolveEffort`, `deliveredModelID`, `ValidateModelEffort`) are single
+  authorities used by launch/switch/pipeline; **§3** the ModelRow editor merge-preserves the model;
+  **§5** adds no concurrency; **§6** joins no new runtime, only an `EffortDelivery` adapter method;
+  **§7** the archive/session scans extend existing checked loops; **§8** effort renders in-vocabulary
+  and validation errors surface as field errors; **§9** migration v12 is forward-only `NOT NULL
+  DEFAULT ''` with the version-guard test updated; **§12** a provider-rejected level fails closed and
+  is deliberately not retried bare; **§13** the new controls reuse `.form-field`/`.form-error`;
+  **§14** effort rides existing `localOnly` routes; **§15** the post-session step precedes agent
+  registration. `make check-specs` and all 180 UI tests pass; the config Go suite fails on the
+  recorded round-trip regression. No product code or specifications were changed during review.
+
+- 2026-07-30 — Implemented agent effort selection. Backends now declare provider-native effort
+  levels/defaults; Codex autosync imports cache levels; the shared resolver freezes the resolved
+  value through launch, resume, switch, archive, CLI, federation, and per-stage pipeline runs.
+  Claude chat applies its setting post-session with failure cleanup, Codex chat uses the model
+  suffix, and Claude terminal uses argv. FS-01.R30/A14, FS-08.R31/A8, FS-09.R35–R42/A14–A15,
+  FS-14.R31/A11, TS-01.R12, TS-02.R18, TS-03.R19, TS-04.R18–R19, TS-07.R14, and TS-09.R24 are
+  current; real provider honoring remains gated in FS-09.A16 and TS-07.R12.
 
 - 2026-07-30 — Reviewed the continuous range after `0f52f89` through `7fc5158` in both specification
   directions and against every invariant class: the Sky & Grove appearance and the archive-retry,

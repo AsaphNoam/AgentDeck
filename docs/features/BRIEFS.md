@@ -4,6 +4,53 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-30 — Review: agent effort selection
+
+I reviewed the agent effort selection work against the specifications and our recurring bug-class
+checklist. The feature is well built where it counts: one shared resolver decides the level
+(your choice, then a linked source's override, then the model's default, then nothing), the level is
+saved and re-applied on resume and switch, and each provider gets it the right way. But it is not
+ready to ship as-is.
+
+The blocker: the full test suite is red. A new "effort levels" field is written to disk one way and
+read back another, so the default backend catalog fails its round-trip test and, worse, gets saved
+with a null value. The person who implemented it noted they could not rerun the full test run; it
+does fail. This must be fixed before the change is committed.
+
+Two smaller gaps are worth fixing at the same time: the Claude path that applies effort after a chat
+session starts — including the "if it fails, don't leave a half-started agent" rule — has no test,
+even though the test harness was wired up for exactly that; and several specifications claim specific
+tests prove the effort controls and the Codex level import, but those tests contain no effort checks.
+
+**Needs attention:** The change fails `make test` and should not be committed until the effort field
+is stored and read consistently.
+
+**Next:** Hand these findings to a fix session to repair the round-trip and add the missing tests,
+then rerun the full suite before committing on `main`.
+
+### 2026-07-30 — Implement: agent effort selection
+
+Agent effort selection is implemented; the working tree is ready to commit on `main`.
+
+- Settings, New Agent, runtime switch, CLI launch, headers/archive, and pipeline stage assignments
+  now use each model's declared provider-native effort levels.
+- The resolved level follows explicit request → bound source override → model default → omission;
+  it is persisted for resume/switch and delivered as Codex ACP model suffix, Claude chat session
+  configuration, or Claude terminal argv.
+- Catalog validation rejects invalid, duplicated, bracketed, or unsupported effort declarations;
+  OpenCode/OpenHands remain unsupported.
+
+Focused Go package tests and all 180 UI tests/build passed, as did `make check-specs` and whitespace
+checks. Full `make test`/distribution verification was not rerun after the final regression-test
+additions because compiler-cache escalation became unavailable; the required Git write was also
+denied after the sandbox blocked `.git/index.lock`. Live Claude/Codex honoring remains the existing
+credentialed gate.
+
+**Needs attention:** None.
+
+**Next:** Approve the Git write so this completed change can be committed, then run the credentialed
+Claude and Codex effort acceptance matrix before claiming live-provider honoring.
+
 ### 2026-07-30 — Review: Sky & Grove appearance and the archive/dialog fixes
 
 I reviewed the unreviewed work — the Sky & Grove appearance plus the recent archive-retry,
