@@ -170,17 +170,18 @@ Unsaved editor form state is local to the page; only template CRUD or an approve
 template, and only the run-start endpoint creates a run. CSS selectors, mocks, errors, confirmation
 pending state, and navigation ship with the page (INV §8, §10, §11, §13).
 
-**R24 — Per-stage effort is run-snapshot data validated at start.** A run's frozen
-assignment record gains an optional effort per stage beside its backend and model, written by the
-same forward-only migration style and non-null decoding as the rest of the run state (TS-02.R17).
+**R24 — Per-stage effort is frozen execution data validated at start.** A run's frozen
+assignment record gains an optional effort per stage beside its backend and model. Each created
+attempt copies that level beside its own backend/model through the same forward-only migration style
+and non-null decoding as the rest of the run state (TS-02.R17).
 Templates are untouched: effort is a run-time assignment, so the version-1 template schema, its
 canonical validator, and every stored template stay byte-identical. Start-time validation calls the
 same `internal/config` effort-capability check the manual launch path uses (TS-01.R12) inside the
 existing all-or-nothing start validation, so one undeclared level prevents the entire run from
 starting and no stage process begins — the rule already applied to an unknown backend or model. Stage
-launches read effort from the frozen snapshot through the shared lifecycle services, so a catalog
-edited mid-run cannot change an in-flight run's levels, and a retried or looped attempt reuses the
-snapshot's value rather than re-resolving it.
+launches, continuation, and recovery read effort from the frozen attempt through the shared lifecycle
+services, so a catalog or future assignment edit cannot change an in-flight attempt's level, and a
+retried or looped attempt reuses the snapshot's value rather than re-resolving it.
 
 **R25.** After acquiring TS-01.R13's exclusive project-archiving claim, project archive
 calls the pipeline manager before changing durable archive state. The manager atomically blocks future

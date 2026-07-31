@@ -4,6 +4,17 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-31 — Fix: effort lifecycle review findings
+
+Stopped agents now resume with the reasoning-effort level they were started with even if a later
+Settings edit removes that level. Effort capability is derived directly from each provider adapter,
+and every pipeline attempt now preserves its own level so continued stages cannot pick up a changed
+assignment by accident.
+
+**Needs attention:** None.
+
+**Next:** Run the existing credentialed provider checks before claiming live-provider effort support.
+
 ### 2026-07-31 — Review: agent effort selection
 
 I reviewed the newly committed agent effort-selection feature — the one that lets a model run at a

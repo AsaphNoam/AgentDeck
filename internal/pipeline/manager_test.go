@@ -117,7 +117,7 @@ func startPipeline(t *testing.T, manager *Manager, requestID string) RunDetail {
 		RequestID: requestID, TemplateID: "quality", DisplayName: "Ship", Project: "app", Goal: "Implement the spec",
 		Inputs: map[string]string{"spec": "Requirements"},
 		Assignments: map[string]RuntimeAssignment{
-			"work": {Backend: "codex", Model: "gpt"}, "review": {Backend: "claude", Model: "sonnet"},
+			"work": {Backend: "codex", Model: "gpt", Effort: "high"}, "review": {Backend: "claude", Model: "sonnet"},
 		},
 	})
 	if err != nil || replay {
@@ -312,8 +312,22 @@ func TestManagerSequentialRoutingBlockedContinuationAndIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	continued := detail.Attempts[len(detail.Attempts)-1]
-	if continued.AgentID != repair.AgentID || continued.AttemptID == repair.AttemptID || len(lifecycle.continuations) != 1 {
+	if continued.AgentID != repair.AgentID || continued.AttemptID == repair.AttemptID || continued.Effort != "high" || len(lifecycle.continuations) != 1 || lifecycle.continuations[0].Effort != "high" {
 		t.Fatalf("continued attempt = %+v continuations=%d", continued, len(lifecycle.continuations))
+	}
+}
+
+// TS-09.R24: a resumed stage executes the effort recorded with that attempt,
+// never a value re-read from the run's assignment document.
+func TestStageExecutionUsesAttemptEffort(t *testing.T) {
+	detail := RunDetail{Run: state.PipelineRunRecord{RunID: "pr_1", DisplayName: "Run", Project: "app"}, Assignments: map[string]RuntimeAssignment{
+		"work": {Backend: "codex", Model: "gpt", Effort: "low"},
+	}}
+	execution := stageExecution(detail, state.PipelineAttemptRecord{
+		AttemptID: "pa_1", StageID: "work", Backend: "codex", Model: "gpt", Effort: "high",
+	}, Stage{ID: "work", Title: "Work", Role: "implementer"})
+	if execution.Effort != "high" {
+		t.Fatalf("stage execution effort = %q, want frozen attempt effort high", execution.Effort)
 	}
 }
 

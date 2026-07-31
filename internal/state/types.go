@@ -185,6 +185,7 @@ type PipelineAttemptRecord struct {
 	AgentGeneration   string          `json:"agent_generation,omitempty"`
 	Backend           string          `json:"backend"`
 	Model             string          `json:"model"`
+	Effort            string          `json:"effort"`
 	State             string          `json:"state"`
 	AssignmentText    string          `json:"assignment_text"`
 	AssignmentHash    string          `json:"assignment_hash"`

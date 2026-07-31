@@ -153,9 +153,14 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err := config.ValidateModelEffort(backend, model, effort); err != nil {
-		writeAPIError(w, apiError(runtime.CodeInvalidField, err.Error()))
-		return
+	// An ordinary resume re-applies the effort frozen with the agent. Only a
+	// caller selecting a new effort or fresh configuration asks the current
+	// catalog to validate a newly resolved value.
+	if override.Effort != "" || override.ConfigRefresh {
+		if err := config.ValidateModelEffort(backend, model, effort); err != nil {
+			writeAPIError(w, apiError(runtime.CodeInvalidField, err.Error()))
+			return
+		}
 	}
 
 	// 6. Build the resume LaunchSpec entirely from the frozen snapshot — including

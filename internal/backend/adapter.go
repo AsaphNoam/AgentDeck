@@ -104,6 +104,22 @@ func For(backendType string) (BackendAdapter, bool) {
 	}
 }
 
+// SupportsEffort derives catalog capability from the adapter delivery contract
+// rather than maintaining a second backend-type allowlist in config validation.
+func SupportsEffort(backendType string) bool {
+	adapter, ok := For(backendType)
+	if !ok {
+		return false
+	}
+	for _, agentInterface := range []string{"chat", "terminal"} {
+		mode, _ := adapter.EffortDelivery(agentInterface)
+		if mode != EffortNone {
+			return true
+		}
+	}
+	return false
+}
+
 // claudeACP is the adapter for the official claude-agent-acp package.
 type claudeACP struct{}
 

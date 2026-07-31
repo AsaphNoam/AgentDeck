@@ -324,7 +324,7 @@ func (m *Manager) createStageAttempt(run state.PipelineRunRecord, stageID string
 	attempt := state.PipelineAttemptRecord{
 		AttemptID: attemptID, RunID: run.RunID, StageID: stageID, AttemptNo: attemptNo, VisitNo: visitNo,
 		ParentAttemptID: parent, AgentID: agentID, AgentGeneration: generation,
-		Backend: assignment.Backend, Model: assignment.Model, State: "queued", AssignmentText: text,
+		Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort, State: "queued", AssignmentText: text,
 		AssignmentHash: hash, AssignmentVersion: assignmentVersion, CreatedAt: now, UpdatedAt: now,
 	}
 	pending := "launch_stage"
@@ -384,11 +384,10 @@ func currentAttempt(detail RunDetail) (state.PipelineAttemptRecord, bool) {
 }
 
 func stageExecution(detail RunDetail, attempt state.PipelineAttemptRecord, stage Stage) StageExecution {
-	assignment := detail.Assignments[stage.ID]
 	return StageExecution{RunID: detail.Run.RunID, RunName: detail.Run.DisplayName, AttemptID: attempt.AttemptID,
 		StageID: stage.ID, StageTitle: stage.Title, Role: stage.Role, Project: detail.Run.Project,
 		Backend: attempt.Backend, Model: attempt.Model, AgentID: attempt.AgentID,
-		Effort:     assignment.Effort,
+		Effort:     attempt.Effort,
 		Generation: attempt.AgentGeneration, AgentName: stage.Title + " — " + detail.Run.DisplayName,
 		Assignment: attempt.AssignmentText}
 }

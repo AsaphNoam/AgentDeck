@@ -79,7 +79,7 @@ func (m *Manager) Start(ctx context.Context, request StartRequest) (RunDetail, b
 	assignment := request.Assignments[first.ID]
 	attempt := &state.PipelineAttemptRecord{
 		AttemptID: attemptID, RunID: runID, StageID: first.ID, AttemptNo: 1, VisitNo: 1,
-		AgentID: agentID, AgentGeneration: attemptID, Backend: assignment.Backend, Model: assignment.Model,
+		AgentID: agentID, AgentGeneration: attemptID, Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort,
 		State: "queued", AssignmentText: assignmentText, AssignmentHash: assignmentHash,
 		AssignmentVersion: assignmentVersion, ReportOutputs: json.RawMessage(`{}`), CreatedAt: now, UpdatedAt: now,
 	}

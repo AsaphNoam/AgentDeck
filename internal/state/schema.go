@@ -298,4 +298,12 @@ ALTER TABLE agents ADD COLUMN effort TEXT NOT NULL DEFAULT '';
 ALTER TABLE sessions ADD COLUMN effort TEXT NOT NULL DEFAULT '';
 `,
 	},
+	{
+		// Each attempt owns its execution identity, so continuation never recovers
+		// effort from a run assignment that could later gain reassignment support.
+		version: 13,
+		sql: `
+ALTER TABLE pipeline_attempts ADD COLUMN effort TEXT NOT NULL DEFAULT '';
+`,
+	},
 }
