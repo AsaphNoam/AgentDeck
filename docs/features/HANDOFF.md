@@ -83,13 +83,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   [`../archive/reviews/usability-review-run-2026-07-26-rerun.md`](../archive/reviews/usability-review-run-2026-07-26-rerun.md)
   and [`../archive/reviews/usability-review-run-2026-07-26-browser-retry.md`](../archive/reviews/usability-review-run-2026-07-26-browser-retry.md).
   Credentialed provider and terminal compatibility remain separate manual release gates.
-- **Last reviewed code:** `7fc5158` (2026-07-30), the continuous range after `0f52f89`, including
-  the Sky & Grove appearance and the archive-retry, project-rename field-error, native-dialog guard,
-  and lifecycle-dialog specification fixes. Committed since, unreviewed as committed: `de8634f`
-  landed the agent-effort-selection implementation together with its four review fixes — the review
-  (`aafd240`) covered the pre-fix working tree, so those committed fixes have had no confirming pass —
-  and `d182853` is a design-only per-chat-runtime-picker change with no product code. A code review
-  should start after `7fc5158`.
+- **Last reviewed code:** `b8e31fb` (2026-07-31), the continuous range after `7fc5158`. The only
+  product code in it is `de8634f` (the agent-effort-selection implementation and its four bundled
+  review fixes); the surrounding commits are docs/design only. The review recorded one **Must fix**
+  and two **Worth fixing** findings below (all open — this was a review, not a fix run).
 - **Branch:** `main`.
 
 ## Active change
@@ -128,15 +125,60 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 ### Open findings
 
-None. The four agent-effort-selection review findings (one Must fix, three Worth fixing) are fixed
-and committed in `de8634f` and recorded in the changelog below. The committed fixes have not had a
-confirming review pass — see **Last reviewed code** above.
+**Must fix** (FS-09.R42/R4; INV §10 spec/behavior drift) — `internal/server/resume.go` (the
+unconditional `config.ValidateModelEffort` after the identity lookup, ~L154) re-validates the
+*frozen* `agent.Effort` against the *current* catalog on every resume, including the plain
+no-override/no-refresh path. Trigger: launch a `claude-acp` (or `codex-acp`) agent at a declared
+effort, later remove that level from the model in Settings, stop the agent, then Resume with an empty
+body → `422 invalid_field` "effort … is not declared by this model", refusing an unchanged,
+previously-working session. This contradicts R4 ("a running or frozen archived session is not
+hot-mutated") and R42, whose reject-points are explicitly launch, switch runtime, and pipeline run
+start — resume is omitted, and pipeline `ContinueStage` correspondingly never re-validates. Switch's
+re-validation is spec-sanctioned (R42 lists it); only resume is wrong. Fix: gate the resume
+`ValidateModelEffort` on the effort actually changing (`override.Effort != "" || override.ConfigRefresh`),
+mirroring the `resolveEffort` re-resolution just above it, and add a resume-after-effort-removal
+regression (`resume_test.go` has no effort case).
+
+**Worth fixing** (INV §2) — `ValidateModelEffort` (`internal/config/validate.go`) hardcodes the
+`claude-acp`/`codex-acp` allowlist, a second capability authority parallel to each adapter's
+`EffortDelivery` (`internal/backend/adapter.go`). They agree today (opencode/openhands return
+`EffortNone`) but can silently desync; derive the check from `EffortDelivery` so effort capability has
+one source, as the commit message's "single authority" framing intends.
+
+**Worth fixing** (INV §2/§10) — `PipelineAttemptRecord` (`internal/state/types.go`) stores backend
+and model but not effort, so `stageExecution()` (`internal/pipeline/reconcile.go`) sources a continued
+stage's effort from the live `detail.Assignments` map rather than the frozen attempt. Harmless today
+(no API mutates run assignments after creation), but a latent asymmetry: add per-stage reassignment
+later and reconcile would apply a new effort while still freezing backend/model.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-07-31 — Reviewed the committed range after `7fc5158` (the agent-effort-selection
+  implementation and its four bundled review fixes in `de8634f`; the surrounding commits are
+  docs/design only) in both specification directions and against every invariant class. One
+  **Must fix** and two **Worth fixing** findings are recorded above. **INV §10 / FS-09.R42/R4** —
+  plain resume re-validates the frozen effort against the current catalog, so removing a model's
+  effort level in Settings blocks resume of an unchanged frozen session, which R4 forbids and R42's
+  reject-points (launch/switch/pipeline start, not resume) exclude; pipeline `ContinueStage`
+  correctly does not re-validate. **INV §2** — `ValidateModelEffort`'s hardcoded backend allowlist
+  duplicates each adapter's `EffortDelivery`, and `PipelineAttemptRecord` omits effort so reconcile
+  reads a continued stage's level from live assignments. Clean/not applicable elsewhere: §1 effort is
+  re-applied at resume/switch and republished; §2 `resolveEffort`/`deliveredModelID` are single seams
+  and the Codex suffix is composed once for new/load; §3 the ModelRow editor spreads `...model` and
+  Settings saves the whole document; §4 `applyPostSessionEffort` shuts down before registration on
+  failure; §5 adds no concurrency; §6 joins no new runtime, only the `EffortDelivery` adapter method;
+  §7 the archive/session scans extend existing checked loops; §8 effort renders in-vocabulary and
+  validation errors surface as field errors; §9 migration v12 is forward-only `NOT NULL DEFAULT ''`
+  with the version guard bumped and every read site updated in lockstep; §11 the seed `[]string{}`
+  and read normalization agree so the round-trip is stable and `"efforts":[]` is served; §12 external
+  CLIs are unchanged; §13 the switch effort control reuses `.form-field`/`.form-error`; §14 the
+  effort fields ride existing `localOnly` routes; §15 the post-session step precedes registration.
+  A Sonnet subagent ran a parallel correctness pass and independently reached the same Must fix.
+  `make check-specs` passes; no product code or specifications changed during review.
 
 - 2026-07-30 — Designed the per-chat runtime picker feature; no product code changed. The chat
   header's static `backend · model · effort` becomes inline backend/model/effort selects for a
