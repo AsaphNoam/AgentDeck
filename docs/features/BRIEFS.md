@@ -4,6 +4,27 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-31 — Review: agent effort selection
+
+I reviewed the newly committed agent effort-selection feature — the one that lets a model run at a
+provider's chosen reasoning-effort level — against its requirements and the project's invariant
+checklist. The feature is well built: the chosen level is resolved once, frozen with the session, and
+correctly restored and delivered for each backend, and it flows through history, archive, the command
+line, and pipelines. A separate model checked the code in parallel and reached the same conclusion.
+
+One real problem. When you resume a stopped agent, the app re-checks its frozen effort level against
+the current model settings. So if someone removes that level from a model in Settings after an agent
+was started at it, resuming that untouched agent is refused — even though the design says a later
+settings edit must not disturb an already-frozen session. Two minor cleanups were also noted and are
+not urgent: a capability check written in two places that could drift apart, and pipeline attempt
+records not storing their own effort level.
+
+**Needs attention:** One must-fix — resume wrongly rejects a still-valid frozen session after an
+unrelated model edit.
+
+**Next:** Fix the resume check so it trusts the frozen level, then re-verify; the two minor items can
+follow or wait.
+
 ### 2026-07-30 — Design: per-chat runtime picker
 
 I designed the per-chat runtime picker with you and wrote it up as a ready-to-build change. In the
