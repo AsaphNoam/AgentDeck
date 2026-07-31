@@ -85,7 +85,11 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   Credentialed provider and terminal compatibility remain separate manual release gates.
 - **Last reviewed code:** `7fc5158` (2026-07-30), the continuous range after `0f52f89`, including
   the Sky & Grove appearance and the archive-retry, project-rename field-error, native-dialog guard,
-  and lifecycle-dialog specification fixes.
+  and lifecycle-dialog specification fixes. Committed since, unreviewed as committed: `de8634f`
+  landed the agent-effort-selection implementation together with its four review fixes — the review
+  (`aafd240`) covered the pre-fix working tree, so those committed fixes have had no confirming pass —
+  and `d182853` is a design-only per-chat-runtime-picker change with no product code. A code review
+  should start after `7fc5158`.
 - **Branch:** `main`.
 
 ## Active change
@@ -124,9 +128,9 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 ### Open findings
 
-All four findings from the uncommitted agent-effort-selection review (one Must fix, three Worth
-fixing) are fixed in the working tree; they are removed from live state and recorded in the changelog
-below. The fixes are **not yet committed** — the fix run was scoped to leave committing to the human.
+None. The four agent-effort-selection review findings (one Must fix, three Worth fixing) are fixed
+and committed in `de8634f` and recorded in the changelog below. The committed fixes have not had a
+confirming review pass — see **Last reviewed code** above.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
@@ -143,8 +147,8 @@ are not promoted to findings without a repeatable failure.
   already accepts backend/model/effort over existing architecture. The idea moved to the waiting
   `per-chat-runtime-picker.md` change; `make check-specs` and whitespace checks pass.
 
-- 2026-07-30 — Fixed all four agent-effort-selection review findings (not committed; committing is
-  left to the human). **INV §11** — the `DefaultBackends` seed now declares `Efforts: []string{}`
+- 2026-07-30 — Fixed all four agent-effort-selection review findings (committed in `de8634f`
+  alongside the implementation). **INV §11** — the `DefaultBackends` seed now declares `Efforts: []string{}`
   for the OpenCode/OpenHands models, so the seed matches the read-time normalization, the
   `TestRoundTripConfigObjects` round-trip is green, and a fresh install writes `"efforts":[]` rather
   than the `"efforts":null` the read normalization exists to prevent. **INV §4** (FS-09.A15/R40) —
