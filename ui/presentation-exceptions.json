@@ -25,9 +25,9 @@
     "reason": "Coordinates are live pointer position data"
   },
   {
-    "file": "src/features/settings/ProjectForm.tsx",
+    "file": "src/components/ui/ProjectColorPicker.tsx",
     "rule": "inline-style",
-    "reason": "Background is the project RGB value being edited"
+    "reason": "Swatch background is the fixed declared project-accent palette"
   },
   {
     "file": "src/features/settings/ProjectsEditor.tsx",
@@ -37,6 +37,11 @@
   {
     "file": "src/features/dashboard/ProjectDashboard.tsx",
     "rule": "inline-style",
-    "reason": "Background is the persisted project RGB accent"
+    "reason": "Project RGB accent and live pointer coordinates drive the portal menu"
+  },
+  {
+    "file": "src/presentation/VisualMatrix.tsx",
+    "rule": "inline-style",
+    "reason": "Fixture cards render the fixed declared project-accent palette"
   }
 ]

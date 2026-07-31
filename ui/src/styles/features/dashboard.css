@@ -95,8 +95,8 @@
 
 .agent-card {
   --ad-project-accent: var(--ad-project-fallback);
-  background: var(--ad-surface-panel);
-  border: var(--ad-border-thin) solid var(--ad-border-strong);
+  background: color-mix(in srgb, var(--ad-project-accent) 9%, var(--ad-surface-panel));
+  border: var(--ad-border-thin) solid color-mix(in srgb, var(--ad-project-accent) 50%, var(--ad-border-strong));
   border-radius: var(--ad-radius-large) var(--ad-radius-large) var(--ad-radius-small) var(--ad-radius-large);
   box-shadow: var(--ad-shadow-project-edge);
   cursor: pointer;
@@ -133,7 +133,7 @@
 }
 
 .agent-card[data-state="waiting_input"] {
-  background: var(--ad-surface-emphasis);
+  background: color-mix(in srgb, var(--ad-project-accent) 9%, var(--ad-surface-emphasis));
 }
 
 .agent-card[data-state="waiting_input"]::after {
@@ -371,9 +371,10 @@
 }
 .project-dashboard { display: grid; gap: var(--ad-space-4); }
 .project-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: var(--ad-space-4); }
-.project-card { position: relative; display: grid; gap: var(--ad-space-2); padding: var(--ad-space-4); border: var(--ad-border-thin) solid var(--ad-border-strong); border-radius: var(--ad-radius-large); cursor: pointer; }
+.project-card { --ad-project-accent: var(--ad-project-fallback); background: color-mix(in srgb, var(--ad-project-accent) 9%, var(--ad-surface-panel)); border: var(--ad-border-thin) solid color-mix(in srgb, var(--ad-project-accent) 50%, var(--ad-border-strong)); border-radius: var(--ad-radius-large); box-shadow: var(--ad-shadow-project-edge); cursor: pointer; display: grid; gap: var(--ad-space-2); padding: var(--ad-space-4) var(--ad-space-4) var(--ad-space-4) var(--ad-space-6); position: relative; }
 .project-card-color { inline-size: var(--ad-space-4); block-size: var(--ad-space-4); border-radius: var(--ad-radius-round); border: var(--ad-border-thin) solid var(--ad-border-strong); }
-.project-card-actions { display: flex; flex-wrap: wrap; gap: var(--ad-space-2); }
+.context-menu-color { display: grid; gap: var(--ad-space-2); padding: var(--ad-space-2); }
+.context-menu-color > span { color: var(--ad-text-muted); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
 .project-card.unavailable { opacity: .75; }
 .project-route-state { display: grid; gap: var(--ad-space-4); }
 }

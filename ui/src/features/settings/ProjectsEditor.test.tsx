@@ -75,6 +75,7 @@ describe("ProjectsEditor", () => {
 
   it("create project invalidates query so new project appears", async () => {
     let calls = 0;
+    let created: Record<string, unknown> | null = null;
     server.use(
       http.get("/api/projects", () => {
         calls++;
@@ -86,6 +87,10 @@ describe("ProjectsEditor", () => {
                 billing: { title: "Billing", color: [200, 100, 50], cwd: "/tmp/billing", add_dirs: [], context_prompt: "" },
               };
         return HttpResponse.json(projects);
+      }),
+      http.post("/api/projects", async ({ request }) => {
+        created = await request.json() as Record<string, unknown>;
+        return HttpResponse.json({ project: "billing", ...created }, { status: 201 });
       }),
     );
 
@@ -100,10 +105,15 @@ describe("ProjectsEditor", () => {
     fireEvent.change(titleInput, { target: { value: "Billing" } });
     fireEvent.change(cwdInput, { target: { value: "/tmp/billing" } });
 
+    expect(screen.getAllByRole("button", { name: /project color$/ })).toHaveLength(6);
+    expect(screen.getByRole("button", { name: "Slate project color" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Violet project color" }));
+
     fireEvent.click(screen.getByText("Create"));
 
     await waitFor(() => expect(calls).toBeGreaterThan(1));
     expect(await screen.findByText("Billing")).toBeInTheDocument();
+    expect(created).toMatchObject({ color: [139, 92, 246] });
   });
 
   it("shows the read-only shared-resources path when editing (FS-11.R4)", async () => {

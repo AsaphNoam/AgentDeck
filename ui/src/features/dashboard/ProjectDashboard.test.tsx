@@ -11,7 +11,7 @@ import type { AgentState } from "../../api/types";
 
 const server = setupServer(
   http.get("/api/projects", () => HttpResponse.json({
-    app: { title: "App", color: [10, 20, 30], cwd: "/tmp/app", add_dirs: [], context_prompt: "", archived: false },
+    app: { title: "App", color: [100, 116, 139], cwd: "/tmp/app", add_dirs: [], context_prompt: "", archived: false },
   })),
 );
 
@@ -55,12 +55,16 @@ describe("ProjectDashboard", () => {
     expect(await screen.findByText("App")).toBeInTheDocument();
     expect(screen.getByText("2 agents")).toBeInTheDocument();
     expect(screen.getByText("1 busy · 1 done")).toBeInTheDocument();
-    expect(screen.getByLabelText("Project color")).toHaveStyle({ background: "rgb(10, 20, 30)" });
+    expect(screen.getByLabelText("Project color")).toHaveStyle({ background: "rgb(100, 116, 139)" });
 
-    fireEvent.contextMenu(screen.getByText("App").closest("article")!);
+    const card = screen.getByText("App").closest("article")!;
+    fireEvent.contextMenu(card, { clientX: 40, clientY: 50 });
     expect(screen.getByRole("button", { name: "Rename" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Change color" })).toBeInTheDocument();
+    expect(screen.getByText("Change color")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /project color$/ })).toHaveLength(6);
+    expect(screen.getByRole("button", { name: "Slate project color" })).toHaveAttribute("aria-pressed", "true");
+    expect(card.querySelector(".context-menu")).toBeNull();
   });
 
   it("renames through a dialog and leaves the request untouched on cancel", async () => {
@@ -77,10 +81,29 @@ describe("ProjectDashboard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(saved).toMatchObject({ title: "Renamed app" }));
 
-    fireEvent.contextMenu(card);
-    fireEvent.click(screen.getByRole("button", { name: "Change color" }));
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(saved).toMatchObject({ title: "Renamed app" });
+  });
+
+  // FS-02.A22 / FS-04.A19: color selection is an immediate API update from the
+  // portal menu and carries the preset's RGB triple unchanged.
+  it("updates the project to the chosen preset from the portal menu", async () => {
+    let saved: Record<string, unknown> | null = null;
+    let color = [100, 116, 139];
+    server.use(
+      http.get("/api/projects", () => HttpResponse.json({
+        app: { title: "App", color, cwd: "/tmp/app", add_dirs: [], context_prompt: "", archived: false },
+      })),
+      http.put("/api/projects/app", async ({ request }) => {
+        saved = await request.json() as Record<string, unknown>;
+        color = saved.color as number[];
+        return HttpResponse.json({ project: "app", ...saved });
+      }),
+    );
+    renderDashboard();
+    const card = (await screen.findByText("App")).closest("article")!;
+    fireEvent.contextMenu(card);
+    fireEvent.click(screen.getByRole("button", { name: "Blue project color" }));
+    await waitFor(() => expect(saved).toMatchObject({ color: [59, 130, 246] }));
   });
 
   // FS-02.R37 / FS-12.R26 / INV §8: project Rename retains the server's

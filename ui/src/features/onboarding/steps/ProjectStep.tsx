@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { configErrorMessage, useCreateProject } from "../../../api/config";
+import { ProjectColorPicker } from "../../../components/ui";
+import { DEFAULT_PROJECT_COLOR, type ProjectColor } from "../../../lib/projectColors";
 
 interface ProjectStepProps {
   /** Receives the slug of the project just created, so the launch step can
@@ -14,6 +16,7 @@ export function ProjectStep({ onDone, claimMutation, releaseMutation }: ProjectS
   const [title, setTitle] = useState("");
   const [cwd, setCwd] = useState("");
   const [context, setContext] = useState("");
+  const [color, setColor] = useState<ProjectColor>(DEFAULT_PROJECT_COLOR);
   const [warning, setWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,7 +33,7 @@ export function ProjectStep({ onDone, claimMutation, releaseMutation }: ProjectS
         // Empty id: the server derives the project id from the title (R31).
         project: "",
         title: title.trim(),
-        color: [128, 128, 128],
+        color: [...color] as [number, number, number],
         cwd: cwd.trim(),
         add_dirs: [],
         context_prompt: context.trim(),
@@ -74,6 +77,11 @@ export function ProjectStep({ onDone, claimMutation, releaseMutation }: ProjectS
           onChange={(e) => setCwd(e.target.value)}
           placeholder="~/Projects/my-app"
         />
+      </div>
+
+      <div className="form-field">
+        <label>Color</label>
+        <ProjectColorPicker value={color} onChange={setColor} disabled={createProject.isPending} />
       </div>
 
       <div className="form-field">

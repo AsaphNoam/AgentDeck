@@ -133,6 +133,30 @@ are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
 
+- 2026-07-31 — Implemented project context menus and preset colors. Active project cards now open a
+  cursor-positioned portal menu with Rename, Archive, and an immediate six-swatch color picker;
+  unavailable-project cards still offer no menu. Slate, Blue, Green, Amber, Rose, and Violet live in
+  one frontend palette and replace all R/G/B input fields in Settings and onboarding, with Slate the
+  new-project default. The existing RGB API/storage contract remains unchanged, including support for
+  historical and non-UI colors. Agent and home project cards now use their project accent for a soft
+  surface wash and border while preserving the left edge and agent-state top bar. Focused component
+  and visual-matrix regressions, `make check-specs`, the full tests, source build, distribution build,
+  and whitespace checks pass. FS-02.R38–R40/A22–A23, FS-04.R39/A19, and TS-08.R37 are current.
+
+- 2026-07-31 — Designed the project context-menu and preset-color feature; no product code changed.
+  The active-project card's inline right-click expand becomes a cursor-positioned portal menu that
+  reuses the agent menu's presentation, and project color is chosen from a fixed six-accent palette
+  (Slate default, Blue, Green, Amber, Rose, Violet) shown as inline swatches in that menu and in the
+  Settings/onboarding project forms, replacing the free-form R/G/B inputs everywhere. The accent also
+  gains visual weight: each card in a project reads as gently mono-colored via a `color-mix` background
+  wash (~9% into `--ad-surface-panel`) and tinted border (~50% into `--ad-border-strong`), keeping the
+  7px left stripe and the agent-state top bar, bounded for contrast across presets and skins.
+  Storage/API stay the existing RGB triple: no schema change, no migration, no server-side enum
+  enforcement, and old colors stay valid. FS-02 gained R38/R39/R40/A22/A23, FS-04 gained R39/A19, and
+  TS-08 gained R37 (all planned); the three specs moved Current→Partial and the index tracks it. Items
+  #1 (create from the projects page) and #3 (visual rework) stayed raw ideas; #2/#4 moved to the
+  waiting `project-context-menu-and-preset-colors.md` change. `make check-specs` passes.
+
 - 2026-07-31 — Fixed all three effort-lifecycle review findings. **INV §10 /
   FS-09.R4/R42** — ordinary resume now trusts and re-applies the effort frozen with the agent;
   only an explicit effort override or `config_refresh` validates a newly resolved value against

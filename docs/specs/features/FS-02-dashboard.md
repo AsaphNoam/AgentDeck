@@ -102,7 +102,8 @@ browser `prompt`/`confirm` (FS-12.R26). **Stop** (R16) and **Release group** ope
 confirmation dialogs that state the effect and default focus to Cancel. **Move to group** (R16)
 opens a combobox that suggests the current group labels, where a blank value clears the group. A
 configured active project card's **Rename**, **Change color**, and **Archive** (R34) open,
-respectively, a name form validated as the project title, the R,G,B color control (FS-04.R5), and a
+respectively, a name form validated as the project title, the R,G,B color control (FS-04.R5)
+(superseded by the inline preset picker in R39), and a
 consequence-aware confirmation. Cancel performs no action; each confirmed action issues the same
 request as today.
 
@@ -195,7 +196,8 @@ both active and archived agents appears in both collections. Project archival ne
 configuration nor any agent history.
 
 **R34.** Right-clicking a configured active project card offers **Rename**, **Change
-color**, and **Archive**. Rename and Change color use the existing project configuration fields and
+color**, and **Archive** (menu presentation and the color control refined by R38–R39).
+Rename and Change color use the existing project configuration fields and
 update the card immediately. Archive presents a warning confirmation stating that every running agent
 will be stopped and every agent in the project will be archived; on confirmation it performs exactly
 that and moves the project to the Archive workspace. A failed action surfaces an error toast and
@@ -212,6 +214,25 @@ Archive while it has agents in both collections.
 **R36.** Project dashboards introduce no project-specific layout persistence. The
 existing shared agent-card layout preferences continue to order, group, and size any scoped agent
 grid; project cards use their normal responsive presentation and have no persisted reorder state.
+
+**R38.** The project card context menu (R34) renders as a cursor-positioned portal at the
+pointer, reusing the same `context-menu` presentation hook, click-outside/Escape dismissal, and
+overflow-proof portaling as the agent card menu (R15), rather than expanding inline within the card
+body. Its offered actions and their targets are otherwise unchanged from R34.
+
+**R39.** Within that menu, **Change color** is presented as an inline row of the six
+preset accent swatches defined in FS-04.R39; selecting one applies immediately through the existing
+project update and recolors the card, and the card's current color is indicated when it equals a
+preset. No color dialog opens. This supersedes the Change-color dialog clause of R37; **Rename** and
+**Archive** continue to open their dialogs (R37).
+
+**R40.** A project's accent color (FS-04.R5) visibly tints every card belonging to that
+project — each agent card on a scoped grid and the project card on the home grid — as a soft full-card
+background wash and a tinted card border, so an otherwise empty card still reads as that project's
+hue. This is in addition to the existing inset left-edge accent, which is retained. The top state bar
+keeps showing the agent's live state color (R8/state), not the project color. The wash and border are
+bounded so body text keeps its contrast under Core and every built-in skin, and the treatment derives
+from the single project-accent value without any per-card presentational literal (TS-08.R37).
 
 ## 5. Acceptance criteria
 
@@ -301,6 +322,17 @@ a scoped reorder back into the shared layout"; J5.
 the same request on confirm, and performs no action on Cancel; the move-to-group combobox lists
 existing group labels. — `CardContextMenu`, `CardGrid`, and `ProjectDashboard` component tests plus
 the FS-12.A8 guard.
+
+**A22.** (R38, R39) Right-clicking an active project card opens a cursor-positioned portal
+menu — not an inline card expansion — offering Rename, an inline six-swatch color picker, and
+Archive; picking a swatch immediately recolors the card and marks the active preset, while Rename and
+Archive still open their dialogs. The unavailable-project card offers no such menu. — `ProjectDashboard`
+component tests; J5.
+
+**A23.** (R40) Agent cards and the home project card render a project-accent background
+wash and a tinted border alongside the retained left-edge accent, while the top bar still reflects
+agent state; the visual-matrix fixtures show the tint across the six presets in Core and Sky & Grove
+at readable contrast. — `AgentCard`/`ProjectDashboard` component tests and the FS-12 visual matrix; J5.
 
 ## 6. Deviations & open decisions
 
