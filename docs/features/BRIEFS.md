@@ -4,6 +4,47 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-07-31 — Implementation: project context menu and preset colors
+
+Project cards now open a floating right-click menu with Rename, Archive, and a six-color picker.
+Slate, Blue, Green, Amber, Rose, and Violet replace the manual RGB fields in Settings and onboarding;
+new projects start with Slate. Cards also use the chosen accent as a subtle background wash and border
+while keeping the existing state bar and accent edge. Existing saved colors and API clients continue
+to use ordinary RGB values unchanged.
+
+**Needs attention:** None.
+
+**Next:** Use the new project menu and color picker in normal project setup and dashboard work.
+
+### 2026-07-31 — Design: project context menu and preset colors
+
+I designed two fixes to the redesigned Projects page: the right-click menu and the color picker. No
+product code changed — this is specification and a ready-to-build change file.
+
+Right-clicking an active project card will open a floating menu at the pointer, the same kind agents
+already use, instead of expanding buttons inside the card. Project color becomes a choice of six
+preset accents — Slate (the new default), Blue, Green, Amber, Rose, and Violet — shown as clickable
+swatches directly in that menu; clicking one recolors the card immediately, with no dialog. The same
+six swatches replace the free-form red/green/blue number inputs in the Settings and onboarding project
+forms, so color is picked the same way everywhere. Rename and Archive keep their existing dialogs.
+Colors are still stored and sent as ordinary RGB values, so nothing migrates, the API keeps working
+for any caller, and existing project colors stay valid.
+
+The color also carries more weight on the cards themselves. Today a project's color shows only as a
+thin left stripe; now each card in the project reads as gently mono-colored in that hue — a soft
+full-card background wash and a tinted border, so even an empty card is clearly "that project." It is
+tuned to be distinct without being loud: the top status bar still shows the agent's live state color,
+and the tint is bounded so text stays readable in both the plain and Sky & Grove looks.
+
+Two of the four "Projects page problems" ideas are covered here (the context menu and the six colors).
+Creating a project from the page and the broader visual rework stay as raw ideas for later. The specs
+(FS-02, FS-04, TS-08) gained planned requirements and moved to Partial, and the work is written up in
+`docs/ready-changes/project-context-menu-and-preset-colors.md`, ready to implement.
+
+**Needs attention:** None.
+
+**Next:** Build the change with `/work` when you want it; the specs and acceptance checks are complete.
+
 ### 2026-07-31 — Fix: effort lifecycle review findings
 
 Stopped agents now resume with the reasoning-effort level they were started with even if a later

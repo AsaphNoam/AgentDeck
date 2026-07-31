@@ -8,6 +8,7 @@ import { AssistantText } from "../components/chat/renderers/AssistantText";
 import { DiffBlock } from "../components/chat/renderers/DiffBlock";
 import type { AgentStatus } from "../api/types";
 import { applyAppearance } from "../features/appearance/appearance";
+import { PROJECT_COLOR_PRESETS } from "../lib/projectColors";
 import "./contract-fixture.css";
 
 const agentStates: AgentStatus[] = ["busy", "idle", "waiting_input", "done", "error", "unknown"];
@@ -101,6 +102,7 @@ export function VisualMatrix() {
               data-state={state}
               data-variant="default"
               key={state}
+              style={{ "--ad-project-accent": `rgb(${PROJECT_COLOR_PRESETS[index].color.join(",")})` } as React.CSSProperties}
             >
               <div className="agent-card-top" data-slot="header">
                 <button className="drag-handle" aria-label={`Reorder ${state}`} type="button">::</button>
@@ -117,7 +119,7 @@ export function VisualMatrix() {
               <p className="agent-preview" data-slot="preview">Long operational detail remains bounded inside the card surface.</p>
             </article>
           ))}
-          <article className="agent-card stopped" data-ui="agent-card" data-state="stopped" data-variant="default">
+          <article className="agent-card stopped" data-ui="agent-card" data-state="stopped" data-variant="default" style={{ "--ad-project-accent": `rgb(${PROJECT_COLOR_PRESETS[0].color.join(",")})` } as React.CSSProperties}>
             <div className="agent-card-top" data-slot="header">
               <button className="drag-handle" aria-label="Reorder stopped" type="button">::</button>
               <strong data-slot="identity">Stopped agent</strong>

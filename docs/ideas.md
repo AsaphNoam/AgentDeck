@@ -14,6 +14,11 @@ Example:
 - **Pinned agents.** Let people keep frequently used agents at the top of the dashboard.
 ```
 
+- **Projects page problems (new design).** Remaining redesigned-projects-page issues (the context
+  menu and six-preset colors were promoted to
+  `docs/ready-changes/project-context-menu-and-preset-colors.md`):
+  1. No way to create a new project from the projects page.
+  2. The new design looks bad and needs rework.
 - **Fix card drag-and-drop usability.** Dashboard card reorder (FS-02.R12) technically works but
   reads as broken: the drag listener is bound only to the tiny 28×28px `::` handle
   (`AgentCard.tsx`), not the card itself, so dragging the card body does nothing — and because the

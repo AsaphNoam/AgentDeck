@@ -32,7 +32,8 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
 ### 2.2 Projects
 
 - **R5.** A project is `{title, color, cwd, add_dirs, context_prompt}`. `color` is an RGB triple of
-  integers 0–255 (display accent); `cwd` is the working directory (a leading `~` is expanded at
+  integers 0–255 (display accent; first-party selection is constrained to the six presets in R39);
+  `cwd` is the working directory (a leading `~` is expanded at
   launch); `add_dirs` is a list of extra accessible directories; `context_prompt` is injected into
   every agent launched in the project.
 - **R6.** `GET/POST /api/projects`, `PUT /api/projects/{project}`, `DELETE /api/projects/{project}`
@@ -68,6 +69,15 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   project makes the preference eligible again without rewriting `config.json`. `project.done` in
   R21 requires at least one configured active project. An explicit API/CLI submission naming an
   archived project is rejected under TS-03.R20.
+- **R39** — First-party project color selection is constrained to a fixed palette of six
+  predetermined accents (the canonical set and values are defined once in TS-08.R37). Each preset is
+  stored and transported as its RGB triple exactly as R5/R7 define, so the persisted shape,
+  `/api/projects` payloads, and channel validation (R7) are unchanged and any historically stored
+  triple stays valid. Every first-party color entry point — the Settings → Projects form, the
+  onboarding project step, and the dashboard project context menu (FS-02.R39) — offers only these six
+  presets as selectable swatches rather than free-form channel inputs, and a newly created project
+  defaults to the palette's first accent. The API continues to accept any in-range triple from
+  non-UI callers; no server-side enum enforcement is added, preserving compatibility.
 
 ### 2.3 Backends & models editing surface
 
@@ -250,6 +260,10 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   configuration surface, survives restart, defaults to Core when absent, and rejects or safely
   recovers from unsupported values as required by FS-12.R32. — configuration/API regressions and
   FS-12.A9–A11.
+- **A19** — (R39) The Settings/onboarding project forms and the dashboard project menu
+  present the six-preset swatch picker with no free-form channel inputs; selecting a preset persists
+  its RGB triple through the existing project API and round-trips unchanged, and a newly created
+  project defaults to the first preset. — `ProjectForm` and `ProjectDashboard` component tests; J2, J5.
 
 ## 6. Deviations & open decisions
 

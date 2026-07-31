@@ -429,28 +429,36 @@
 }
 
 .string-list li,
-.string-list-add,
-.color-picker {
+.string-list-add {
   align-items: center;
   display: flex;
   gap: var(--ad-space-2);
 }
 
-.color-swatch {
-  background: var(--ad-project-fallback);
-  border: var(--ad-border-thick) solid var(--ad-border-strong);
-  border-radius: var(--ad-radius-small);
-  flex-shrink: 0;
-  height: 36px;
-  width: 36px;
+.project-color-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-2);
 }
 
-.color-channel {
-  color: var(--ad-text-muted);
-  display: grid;
-  font-family: var(--ad-font-mono);
-  font-size: 0.65rem;
-  gap: var(--ad-space-1);
+.project-color-preset {
+  border: var(--ad-border-thick) solid var(--ad-border-strong);
+  border-radius: var(--ad-radius-round);
+  box-shadow: none;
+  height: 28px;
+  min-height: 0;
+  padding: 0;
+  width: 28px;
+}
+
+.project-color-preset:hover:not(:disabled) {
+  box-shadow: var(--ad-shadow-keyline);
+  transform: translate(-1px, -1px);
+}
+
+.project-color-preset[aria-pressed="true"] {
+  outline: 3px solid var(--ad-text-primary);
+  outline-offset: 2px;
 }
 
 .notifications-editor {

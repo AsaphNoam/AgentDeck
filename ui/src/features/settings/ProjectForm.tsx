@@ -2,17 +2,14 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { ProjectColorPicker } from "../../components/ui";
+import { DEFAULT_PROJECT_COLOR, type ProjectColor } from "../../lib/projectColors";
 import type { ProjectResponse, FieldWarning } from "../../schemas/project";
-
-const colorChannel = z.number().int().min(0).max(255);
 
 const schema = z.object({
   // Project id is server-derived from the title (FS-04.R31); the create form no
   // longer collects it. Edit mode shows the existing id read-only.
   title: z.string().min(1, "title is required").max(120),
-  colorR: colorChannel,
-  colorG: colorChannel,
-  colorB: colorChannel,
   cwd: z.string().min(1, "cwd is required"),
   context_prompt: z.string(),
 });
@@ -37,8 +34,8 @@ export function ProjectForm({
   warnings,
 }: ProjectFormProps) {
   const isEdit = !!initial;
-  const [color, setColor] = useState<[number, number, number]>(
-    initial?.color ?? [128, 128, 128],
+  const [color, setColor] = useState<ProjectColor>(
+    initial?.color ?? DEFAULT_PROJECT_COLOR,
   );
   const [addDirs, setAddDirs] = useState<string[]>(initial?.add_dirs ?? []);
   const [addDirsInput, setAddDirsInput] = useState("");
@@ -46,33 +43,21 @@ export function ProjectForm({
     register,
     handleSubmit,
     formState: { errors },
-    setValue,
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       title: initial?.title ?? "",
-      colorR: initial?.color[0] ?? 128,
-      colorG: initial?.color[1] ?? 128,
-      colorB: initial?.color[2] ?? 128,
       cwd: initial?.cwd ?? "",
       context_prompt: initial?.context_prompt ?? "",
     },
   });
-
-  function updateColor(ch: 0 | 1 | 2, value: number) {
-    const next = [...color] as [number, number, number];
-    next[ch] = value;
-    setColor(next);
-    const keys = ["colorR", "colorG", "colorB"] as const;
-    setValue(keys[ch], value);
-  }
 
   const submit = (vals: FormValues) => {
     onSubmit({
       // Empty id on create tells the server to derive it from the title (R31).
       project: isEdit ? initial!.project : "",
       title: vals.title,
-      color: [vals.colorR, vals.colorG, vals.colorB],
+      color: [...color] as [number, number, number],
       cwd: vals.cwd,
       add_dirs: addDirs,
       context_prompt: vals.context_prompt,
@@ -98,28 +83,8 @@ export function ProjectForm({
         {errors.title && <span className="form-error">{errors.title.message}</span>}
       </div>
       <div className="form-field">
-        <label>Color (RGB)</label>
-        <div className="color-picker">
-          <div
-            className="color-swatch"
-            style={{ background: `rgb(${color[0]},${color[1]},${color[2]})` }}
-          />
-          {(["R", "G", "B"] as const).map((ch, i) => (
-            <div key={ch} className="color-channel">
-              <label>{ch}</label>
-              <input
-                type="number"
-                min={0}
-                max={255}
-                value={color[i]}
-                onChange={(e) => updateColor(i as 0 | 1 | 2, Number(e.target.value))}
-              />
-            </div>
-          ))}
-        </div>
-        {(errors.colorR || errors.colorG || errors.colorB) && (
-          <span className="form-error">Each channel must be 0–255</span>
-        )}
+        <label>Color</label>
+        <ProjectColorPicker value={color} onChange={setColor} disabled={submitting} />
       </div>
       <div className="form-field">
         <label>Working directory (cwd)</label>

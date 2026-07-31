@@ -1,17 +1,19 @@
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { createPortal } from "react-dom";
 import { configErrorMessage, QUERY_KEYS, useProjects, useUpdateProject } from "../../api/config";
 import { useAgentStore } from "../../store/agentStore";
 import { CardGrid } from "../../components/grid/CardGrid";
 import { archiveProject } from "../../api/client";
 import { useUiStore } from "../../store/uiStore";
-import { ConfirmDialog } from "../../components/ui";
+import { ConfirmDialog, ProjectColorPicker } from "../../components/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ProjectResponse } from "../../schemas/project";
 import type { MouseEvent } from "react";
 
-type ProjectEdit = { id: string; project: Omit<ProjectResponse, "project">; field: "title" | "color" };
+type ProjectEdit = { id: string; project: Omit<ProjectResponse, "project"> };
+type ProjectMenu = { id: string; x: number; y: number };
 
 export function ProjectDashboard() {
   const navigate = useNavigate();
@@ -20,7 +22,7 @@ export function ProjectDashboard() {
   const pushError = useUiStore((state) => state.pushError);
   const queryClient = useQueryClient();
   const updateProject = useUpdateProject();
-  const [contextProject, setContextProject] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<ProjectMenu | null>(null);
   const [edit, setEdit] = useState<ProjectEdit | null>(null);
   const [archiveID, setArchiveID] = useState<string | null>(null);
   const [archiveError, setArchiveError] = useState("");
@@ -37,6 +39,29 @@ export function ProjectDashboard() {
   });
   const active = useMemo(() => Object.entries(projects.data ?? {}).filter(([, project]) => !project.archived), [projects.data]);
   const unavailable = useMemo(() => [...new Set(Object.values(agents).filter((agent) => !agent.archived && !projects.data?.[agent.project]).map((agent) => agent.project))], [agents, projects.data]);
+  useEffect(() => {
+    if (!contextMenu) return;
+    const dismiss = (event: globalThis.MouseEvent) => {
+      if (!(event.target as HTMLElement).closest(".context-menu")) setContextMenu(null);
+    };
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") setContextMenu(null); };
+    window.addEventListener("mousedown", dismiss);
+    window.addEventListener("keydown", escape);
+    return () => {
+      window.removeEventListener("mousedown", dismiss);
+      window.removeEventListener("keydown", escape);
+    };
+  }, [contextMenu]);
+
+  const updateColor = (id: string, project: Omit<ProjectResponse, "project">, color: readonly number[]) => {
+    queryClient.setQueryData<Record<string, Omit<ProjectResponse, "project">>>(QUERY_KEYS.projects, (current) => (
+      current ? { ...current, [id]: { ...current[id], color: [...color] as [number, number, number] } } : current
+    ));
+    updateProject.mutate(
+      { id, data: { ...project, color: [...color] as [number, number, number] } },
+      { onError: (err) => { void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.projects }); pushError("Change project color failed", configErrorMessage(err)); } },
+    );
+  };
   if (projects.isLoading) return <section className="project-dashboard" data-ui="project-dashboard"><p>Loading projects…</p></section>;
   if (projects.isError) return <section className="project-dashboard" data-ui="project-dashboard"><p className="form-error">Could not load projects. Please retry.</p></section>;
 
@@ -48,19 +73,25 @@ export function ProjectDashboard() {
         {active.map(([id, project]) => {
           const projectAgents = Object.values(agents).filter((agent) => agent.project === id && !agent.archived);
           const stateSummary = Object.entries(projectAgents.reduce<Record<string, number>>((counts, agent) => ({ ...counts, [agent.state]: (counts[agent.state] ?? 0) + 1 }), {})).map(([state, count]) => `${count} ${state}`).join(" · ") || "No agents";
-          return <article className="project-card" key={id} onClick={() => navigate(`/project/${id}`)} onContextMenu={(event: MouseEvent) => { event.preventDefault(); setContextProject(id); }}>
+          return <article className="project-card" key={id} style={{ "--ad-project-accent": `rgb(${project.color.join(",")})` } as React.CSSProperties} onClick={() => navigate(`/project/${id}`)} onContextMenu={(event: MouseEvent) => { event.preventDefault(); setContextMenu({ id, x: event.clientX, y: event.clientY }); }}>
             <span className="project-card-color" style={{ background: `rgb(${project.color[0]}, ${project.color[1]}, ${project.color[2]})` }} aria-label="Project color" />
             <strong>{project.title}</strong><span>{projectAgents.length} agents</span><small>{stateSummary}</small>
-            {contextProject === id && <div className="project-card-actions" onClick={(event) => event.stopPropagation()}>
-              <button type="button" onClick={() => { setEdit({ id, project, field: "title" }); setContextProject(null); }}>Rename</button>
-              <button type="button" onClick={() => { setEdit({ id, project, field: "color" }); setContextProject(null); }}>Change color</button>
-              <button type="button" onClick={() => { setArchiveError(""); setArchiveID(id); setContextProject(null); }}>Archive</button>
-            </div>}
           </article>;
         })}
         {unavailable.map((id) => <article className="project-card unavailable" key={id} onClick={() => navigate(`/project/${id}`)}><strong>{id}</strong><span>Project unavailable</span></article>)}
       </div>
-      {edit && <ProjectEditDialog key={`${edit.id}-${edit.field}`} edit={edit} onCancel={() => setEdit(null)} onSave={(data, setError) => updateProject.mutate({ id: edit.id, data }, { onSuccess: () => setEdit(null), onError: (err) => { const message = configErrorMessage(err); setError(message); pushError(edit.field === "title" ? "Rename project failed" : "Change color failed", message); } })} />}
+      {contextMenu && projects.data?.[contextMenu.id] && createPortal(
+        <div className="context-menu" data-ui="context-menu" role="menu" style={{ left: contextMenu.x, top: contextMenu.y }}>
+          <button type="button" data-slot="item" onClick={() => { setEdit({ id: contextMenu.id, project: projects.data![contextMenu.id] }); setContextMenu(null); }}>Rename</button>
+          <div className="context-menu-color" role="menuitem">
+            <span>Change color</span>
+            <ProjectColorPicker value={projects.data[contextMenu.id].color} onChange={(color) => updateColor(contextMenu.id, projects.data![contextMenu.id], color)} />
+          </div>
+          <button type="button" data-slot="item" onClick={() => { setArchiveError(""); setArchiveID(contextMenu.id); setContextMenu(null); }}>Archive</button>
+        </div>,
+        document.body,
+      )}
+      {edit && <ProjectEditDialog key={edit.id} edit={edit} onCancel={() => setEdit(null)} onSave={(data, setError) => updateProject.mutate({ id: edit.id, data }, { onSuccess: () => setEdit(null), onError: (err) => { const message = configErrorMessage(err); setError(message); pushError("Rename project failed", message); } })} />}
       {archiveProjectEntry && (
         <ConfirmDialog open title={`Archive ${archiveProjectEntry.title}?`} confirmLabel="Archive project" destructive onCancel={() => { setArchiveError(""); setArchiveID(null); }} onConfirm={() => archive.mutate(archiveID!)} pending={archive.isPending}>
           <p>Running agents will be stopped and every agent in this project will be archived.</p>
@@ -73,33 +104,20 @@ export function ProjectDashboard() {
 
 function ProjectEditDialog({ edit, onCancel, onSave }: { edit: ProjectEdit; onCancel: () => void; onSave: (data: Omit<ProjectResponse, "project">, setError: (message: string) => void) => void }) {
   const [title, setTitle] = useState(edit.project.title);
-  const [color, setColor] = useState<[number, number, number]>(edit.project.color);
   const [error, setError] = useState("");
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (edit.field === "title") {
-      if (!title.trim()) { setError("Project name is required."); return; }
-      onSave({ ...edit.project, title: title.trim() }, setError);
-      return;
-    }
-    if (color.some((channel) => !Number.isInteger(channel) || channel < 0 || channel > 255)) {
-      setError("Each channel must be a whole number from 0 to 255.");
-      return;
-    }
-    onSave({ ...edit.project, color }, setError);
+    if (!title.trim()) { setError("Project name is required."); return; }
+    onSave({ ...edit.project, title: title.trim() }, setError);
   };
   return (
     <Dialog.Root open onOpenChange={(open) => { if (!open) onCancel(); }}>
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" data-ui="dialog" data-slot="overlay" />
         <Dialog.Content className="dialog-content" data-ui="dialog" data-slot="content" data-variant="default">
-          <Dialog.Title data-slot="title">{edit.field === "title" ? "Rename project" : "Change project color"}</Dialog.Title>
+          <Dialog.Title data-slot="title">Rename project</Dialog.Title>
           <form className="config-form" onSubmit={submit}>
-            {edit.field === "title" ? (
-              <div className="form-field"><label htmlFor="project-title">Name</label><input id="project-title" value={title} onChange={(event) => setTitle(event.target.value)} /></div>
-            ) : (
-              <div className="form-field"><label>Color (RGB)</label>{(["R", "G", "B"] as const).map((channel, index) => <label key={channel}>{channel}<input aria-label={`${channel} channel`} type="number" min={0} max={255} value={color[index]} onChange={(event) => setColor((current) => current.map((value, item) => item === index ? Number(event.target.value) : value) as [number, number, number])} /></label>)}</div>
-            )}
+            <div className="form-field"><label htmlFor="project-title">Name</label><input id="project-title" value={title} onChange={(event) => setTitle(event.target.value)} /></div>
             {error && <p className="form-error">{error}</p>}
             <div className="form-actions" data-slot="actions"><button type="button" onClick={onCancel}>Cancel</button><button type="submit">Save</button></div>
           </form>

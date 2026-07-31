@@ -201,6 +201,22 @@ primitive seam; the rejected alternatives are recorded in §5.
   FS-12.A10 surfaces. Its tests assert that selection changes only the root marker/presentation,
   behavior tests cover optimistic success/failure and polling changes, and real-browser review
   compares both appearances at the existing desktop floor. No stored pixel-baseline system is added.
+- **R37** — The six preset project accents (FS-04.R39) are defined once as a single
+  frontend source-of-truth constant — the canonical palette `Slate [100,116,139]` (default),
+  `Blue [59,130,246]`, `Green [34,197,94]`, `Amber [245,158,11]`, `Rose [244,63,94]`,
+  `Violet [139,92,246]`. No accent id becomes a CSS selector or a `contract.json`/skin entry: the
+  swatches and the resulting card accent render through the existing inline project-accent data
+  exception (R14), and the palette is not skin-overridable. The project card context menu is a
+  cursor-positioned portal that reuses the agent menu's `context-menu` hook, portaling, and dismissal
+  (FS-02.R38) and the Radix dialog convention (R29) for its Rename/Archive dialogs; the inline swatch
+  picker adds no `window.prompt`/`confirm` call. Server-side color validation and the `/api/projects`
+  shape are unchanged. Beyond the existing inset left-edge accent (retained), the accent is composited
+  into each card's surface and border with `color-mix`, mirroring the existing
+  `--ad-surface-subtle`/`--ad-surface-emphasis` derivations: a background wash of ~9% accent into
+  `--ad-surface-panel` and a border of ~50% accent into `--ad-border-strong`, both derived from the
+  single `--ad-project-accent` value so no new per-card inline literal is added (R14). The agent-state
+  top bar is unaffected, and the mix proportions are bounded to preserve body-text contrast in Core
+  and every skin (FS-02.R40).
 
 ## 3. Interfaces & data shapes
 
