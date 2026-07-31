@@ -77,13 +77,13 @@ func TestPipelineAttemptLineageCASAndDeletionKeepsAgent(t *testing.T) {
 	attemptID, _ := store.NewPipelineAttemptID()
 	if err := store.InsertPipelineAttempt(PipelineAttemptRecord{
 		AttemptID: attemptID, RunID: runID, StageID: "work", AttemptNo: 1, VisitNo: 1,
-		AgentID: agent.AgentID, Backend: "codex", Model: "gpt", State: "queued", ReportOutputs: nil,
+		AgentID: agent.AgentID, Backend: "codex", Model: "gpt", Effort: "high", State: "queued", ReportOutputs: nil,
 		CreatedAt: now, UpdatedAt: now,
 	}); err != nil {
 		t.Fatal(err)
 	}
 	attempts, err := store.ListPipelineAttempts(runID)
-	if err != nil || len(attempts) != 1 || string(attempts[0].ReportOutputs) != "{}" {
+	if err != nil || len(attempts) != 1 || attempts[0].Effort != "high" || string(attempts[0].ReportOutputs) != "{}" {
 		t.Fatalf("attempts = %+v err=%v", attempts, err)
 	}
 	updated, err := store.UpdatePipelineRunCAS(runID, 1, PipelineRunUpdate{

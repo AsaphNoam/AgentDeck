@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	adapter "github.com/agentdeck/agentdeck/internal/backend"
 )
 
 // ValidSlug reports whether s is a valid role/project id. The id must begin
@@ -257,7 +259,7 @@ func ValidateBackendsConfig(b *BackendsConfig) *ValidationErrors {
 					Message: "provider model strings must not include [effort]; declare efforts instead",
 				})
 			}
-			if (bk.Type == "opencode-acp" || bk.Type == "openhands-acp") && len(m.Efforts) > 0 {
+			if _, known := adapter.For(bk.Type); known && !adapter.SupportsEffort(bk.Type) && len(m.Efforts) > 0 {
 				errs = append(errs, FieldError{
 					Field:   fmt.Sprintf("backends.%s.models.%s.efforts", id, mID),
 					Code:    "unsupported",
@@ -297,7 +299,7 @@ func ValidateModelEffort(backend Backend, model Model, effort string) error {
 	if effort == "" {
 		return nil
 	}
-	if backend.Type != "claude-acp" && backend.Type != "codex-acp" {
+	if !adapter.SupportsEffort(backend.Type) {
 		return fmt.Errorf("backend type %q does not support effort selection", backend.Type)
 	}
 	if !model.SupportsEffort(effort) {

@@ -209,6 +209,25 @@ func TestValidateBackendsConfig_Efforts(t *testing.T) {
 	}
 }
 
+func TestValidateModelEffortUsesAdapterDelivery(t *testing.T) {
+	for _, tt := range []struct {
+		backendType string
+		allowed     bool
+	}{
+		{backendType: "claude-acp", allowed: true},
+		{backendType: "codex-acp", allowed: true},
+		{backendType: "opencode-acp", allowed: false},
+		{backendType: "openhands-acp", allowed: false},
+	} {
+		t.Run(tt.backendType, func(t *testing.T) {
+			err := ValidateModelEffort(Backend{Type: tt.backendType}, Model{Efforts: []string{"high"}}, "high")
+			if (err == nil) != tt.allowed {
+				t.Fatalf("ValidateModelEffort(%q) error = %v, allowed = %v", tt.backendType, err, tt.allowed)
+			}
+		})
+	}
+}
+
 func TestValidateBackendsConfig_RejectsInvalidEffortDeclarations(t *testing.T) {
 	tests := []struct {
 		name  string

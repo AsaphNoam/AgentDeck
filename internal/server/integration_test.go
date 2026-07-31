@@ -610,6 +610,59 @@ func TestResumeHappyPath(t *testing.T) {
 	}
 }
 
+// FS-09.R4/R42: an unchanged resume reuses the effort frozen with the session;
+// later catalog edits only affect future launches.
+func TestResumeKeepsFrozenEffortAfterCatalogEdit(t *testing.T) {
+	fake := buildFakeACP(t)
+	t.Setenv("FAKEACP_SCENARIO", "stream_text")
+
+	srv := testServer(t, true)
+	srv.registry.Chat().SetCommand(fake)
+	if err := srv.configStore.WriteProject("tmpproj", config.Project{Title: "Tmp", Cwd: t.TempDir()}); err != nil {
+		t.Fatalf("WriteProject: %v", err)
+	}
+	if err := srv.configStore.WriteRole("impl", config.Role{Title: "Impl", SystemPrompt: "be helpful"}); err != nil {
+		t.Fatalf("WriteRole: %v", err)
+	}
+
+	ts := httptest.NewServer(srv.routes())
+	defer ts.Close()
+	t.Cleanup(func() { srv.registry.Shutdown(context.Background()) })
+
+	resp, body := post(t, ts.URL+"/api/sessions", map[string]string{
+		"role": "impl", "project": "tmpproj", "effort": "high",
+	})
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("launch status = %d: %s", resp.StatusCode, body)
+	}
+	var launched sessionResponse
+	if err := json.Unmarshal(body, &launched); err != nil {
+		t.Fatalf("decode launch: %v", err)
+	}
+	if resp, body = post(t, ts.URL+"/api/sessions/"+launched.Agent.AgentID+"/stop", nil); resp.StatusCode != http.StatusOK {
+		t.Fatalf("stop status = %d: %s", resp.StatusCode, body)
+	}
+
+	backends, err := srv.configStore.ReadBackends()
+	if err != nil {
+		t.Fatalf("ReadBackends: %v", err)
+	}
+	claude := backends.Backends["claude"]
+	sonnet := claude.Models["sonnet"]
+	sonnet.Efforts = []string{"low"}
+	sonnet.DefaultEffort = "low"
+	claude.Models["sonnet"] = sonnet
+	backends.Backends["claude"] = claude
+	if err := srv.configStore.WriteBackends(backends); err != nil {
+		t.Fatalf("WriteBackends: %v", err)
+	}
+
+	resp, body = post(t, ts.URL+"/api/sessions/"+launched.Agent.AgentID+"/resume", nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("resume status = %d, want 200: %s", resp.StatusCode, body)
+	}
+}
+
 // TestResumeAlreadyRunning returns 409 when the agent is still active.
 func TestResumeAlreadyRunning(t *testing.T) {
 	fake := buildFakeACP(t)

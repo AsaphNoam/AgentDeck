@@ -75,8 +75,10 @@ value rather than resolving the catalog again. The resolved value travels as one
 `LaunchSpec`, so a path that forgets it loses effort entirely rather than resolving it differently —
 the R9 rule applied to a new field.
 Catalog-level capability (which levels a model declares, and whether a level is valid for it) stays
-in `internal/config` beside the existing backend/model validator, so the pipeline manager and the
-HTTP handlers share one authority rather than each checking the catalog themselves.
+in `internal/config` beside the existing backend/model validator. Its backend capability check
+derives from the selected adapter's `EffortDelivery` contract rather than a second type allowlist,
+so the pipeline manager and HTTP handlers share one authority rather than each checking the catalog
+themselves.
 
 **R13.** Archive/restore is one server-owned lifecycle service, not an HTTP handler
 calling another handler or a UI-side sequence of Stop and config writes. One server-owned transition

@@ -85,8 +85,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   Credentialed provider and terminal compatibility remain separate manual release gates.
 - **Last reviewed code:** `b8e31fb` (2026-07-31), the continuous range after `7fc5158`. The only
   product code in it is `de8634f` (the agent-effort-selection implementation and its four bundled
-  review fixes); the surrounding commits are docs/design only. The review recorded one **Must fix**
-  and two **Worth fixing** findings below (all open — this was a review, not a fix run).
+  review fixes); the surrounding commits are docs/design only. Its one **Must fix** and two
+  **Worth fixing** findings are fixed in the following fix session.
 - **Branch:** `main`.
 
 ## Active change
@@ -125,37 +125,25 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 ### Open findings
 
-**Must fix** (FS-09.R42/R4; INV §10 spec/behavior drift) — `internal/server/resume.go` (the
-unconditional `config.ValidateModelEffort` after the identity lookup, ~L154) re-validates the
-*frozen* `agent.Effort` against the *current* catalog on every resume, including the plain
-no-override/no-refresh path. Trigger: launch a `claude-acp` (or `codex-acp`) agent at a declared
-effort, later remove that level from the model in Settings, stop the agent, then Resume with an empty
-body → `422 invalid_field` "effort … is not declared by this model", refusing an unchanged,
-previously-working session. This contradicts R4 ("a running or frozen archived session is not
-hot-mutated") and R42, whose reject-points are explicitly launch, switch runtime, and pipeline run
-start — resume is omitted, and pipeline `ContinueStage` correspondingly never re-validates. Switch's
-re-validation is spec-sanctioned (R42 lists it); only resume is wrong. Fix: gate the resume
-`ValidateModelEffort` on the effort actually changing (`override.Effort != "" || override.ConfigRefresh`),
-mirroring the `resolveEffort` re-resolution just above it, and add a resume-after-effort-removal
-regression (`resume_test.go` has no effort case).
-
-**Worth fixing** (INV §2) — `ValidateModelEffort` (`internal/config/validate.go`) hardcodes the
-`claude-acp`/`codex-acp` allowlist, a second capability authority parallel to each adapter's
-`EffortDelivery` (`internal/backend/adapter.go`). They agree today (opencode/openhands return
-`EffortNone`) but can silently desync; derive the check from `EffortDelivery` so effort capability has
-one source, as the commit message's "single authority" framing intends.
-
-**Worth fixing** (INV §2/§10) — `PipelineAttemptRecord` (`internal/state/types.go`) stores backend
-and model but not effort, so `stageExecution()` (`internal/pipeline/reconcile.go`) sources a continued
-stage's effort from the live `detail.Assignments` map rather than the frozen attempt. Harmless today
-(no API mutates run assignments after creation), but a latent asymmetry: add per-stage reassignment
-later and reconcile would apply a new effort while still freezing backend/model.
+None.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-07-31 — Fixed all three effort-lifecycle review findings. **INV §10 /
+  FS-09.R4/R42** — ordinary resume now trusts and re-applies the effort frozen with the agent;
+  only an explicit effort override or `config_refresh` validates a newly resolved value against
+  the current catalog, with a fake-ACP launch → settings edit → stop → resume regression. **INV
+  §2** — backend effort capability now derives from each adapter's `EffortDelivery` contract in
+  the config validator rather than a duplicate type allowlist. **INV §2/§10** — migration v13
+  adds `pipeline_attempts.effort`; every attempt stores its execution level and stage launch,
+  continuation, and recovery read that frozen field instead of live run assignments. TS-01.R12,
+  TS-02.R18, and TS-09.R24 now state the delivery and persistence boundaries. `make check-specs`,
+  both Go test modes, `make build`, `make dist`, and whitespace checks pass; the first distribution
+  attempt encountered npm's `ENOTEMPTY` cleanup race and the immediate retry passed.
 
 - 2026-07-31 — Reviewed the committed range after `7fc5158` (the agent-effort-selection
   implementation and its four bundled review fixes in `de8634f`; the surrounding commits are

@@ -108,7 +108,7 @@ cascade within a deleted run but must not cascade into `agents`, `sessions`, tra
 projections. The migration uses non-null JSON defaults/collection decoding, indexes for active-run
 and agent-attempt lookup, and a schema-version guard test. TS-09 owns the logical shapes.
 
-**R18 — Effort is an additive catalog field and a frozen session column.**
+**R18 — Effort is an additive catalog field and frozen execution data.**
 `backends.json` stays **version 2**: `efforts` and `default_effort` are optional per-model keys and
 the decoder ignores unknown keys, so a catalog written by a newer build still loads in an older one,
 which simply resolves no effort — FS-09.R41's documented fallback rather than a corrupt read. No
@@ -118,6 +118,9 @@ column beside the existing `model`, so resume and switch read it exactly as they
 an unbound backend needs no federation object. Empty means "none resolved"; existing rows adopt that
 value without interpretation. The federation `launch_config_json` object (v8) keeps its own
 requested-versus-resolved effort record for provenance and is not the authority for what ran.
+Every pipeline attempt likewise stores `effort TEXT NOT NULL DEFAULT ''` beside its backend/model;
+continuation and recovery execute that attempt's frozen identity rather than re-reading a run
+assignment. Empty retains the same "none resolved" meaning for existing attempts.
 
 **R19 — Codex's isolated runtime profile is private, managed filesystem state.**
 `$AGENTDECK_HOME/codex/` is an owner-only Codex profile for `codex-acp` children (TS-04.R20/R21).
