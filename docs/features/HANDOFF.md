@@ -83,11 +83,11 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   [`../archive/reviews/usability-review-run-2026-07-26-rerun.md`](../archive/reviews/usability-review-run-2026-07-26-rerun.md)
   and [`../archive/reviews/usability-review-run-2026-07-26-browser-retry.md`](../archive/reviews/usability-review-run-2026-07-26-browser-retry.md).
   Credentialed provider and terminal compatibility remain separate manual release gates.
-- **Last reviewed code:** `9c6a637` (2026-08-01), the continuous range after `b8e31fb`. Its product
-  code is `bd5ba71` (the effort-lifecycle fix for the three findings recorded against `de8634f`) and
-  `9c6a637` (the project context menu and preset-color feature); `8b95f90` is a prior review-state
-  commit (docs only). The effort fix correctly resolves all three predecessor findings. One
-  **Worth fixing** finding is recorded below.
+- **Last reviewed code:** `ca100e0` (2026-08-01), the continuous range after `9c6a637`. Its product
+  code is `ca100e0` (the per-chat runtime picker); `b28a96c` is a prior review-state commit (docs
+  only). Code and specification agree in both directions and the diff is clean against every invariant
+  class; no new finding. One pre-existing **Worth fixing** finding (the project menu preset-swatch CSS)
+  remains recorded below.
 - **Branch:** `main`.
 
 ## Active change
@@ -143,6 +143,24 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-01 — Reviewed the continuous range after `9c6a637` through `ca100e0` (the per-chat runtime
+  picker; `b28a96c` is a prior review-state commit) in both specification directions and against every
+  invariant class. Code and specs agree: FS-03.R23/R24/A9 and the R1 update describe the shipped
+  running-chat header picker, its explicit Switch, and the stopped/archived static identity, and no
+  uncovered behavior shipped. **INV §2** is load-bearing and correct — the change extracts
+  `resetRuntimeForBackend`/`resetRuntimeForModel` into one `runtimeSelection.ts` and routes the chat
+  header, New Agent modal, and dashboard Switch dialog through it, replacing three drifting inline
+  copies behavior-equivalently (and more correctly for an absent `default_model`). Clean/not applicable
+  elsewhere: §1 the re-seed effect republishes the picker from the authoritative agent record on
+  switch/hydration; §8 a rejected/`no_change` switch surfaces its server message via `role="alert"` and
+  resets to the live identity; §10 the ready-change file is removed, the index and FS-03 Traceability
+  updated, no drift; §13 `.chat-runtime-picker`/`.chat-runtime-switch` and the reused
+  `.form-field`/`.form-error` all resolve; §5 the `switching` guard plus the server per-agent switch
+  lock prevent double-submit and the chat-only payload omits `interface`, which the server preserves as
+  the current value; §3/§4/§6/§7/§9/§11/§12/§14/§15 have no applicable surface. No new finding. `make
+  check-specs` passes and the 35 affected chat/switch/launch UI tests pass. No product code or
+  specifications changed during review.
 
 - 2026-08-01 — Implemented the per-chat runtime picker. A running chat header now offers catalog
   backend/model/effort selects and an explicit Switch action that calls the existing runtime-switch

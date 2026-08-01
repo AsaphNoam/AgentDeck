@@ -4,6 +4,18 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-01 — Review: per-chat runtime picker
+
+I reviewed the new chat-header runtime picker that lets you change a running agent's backend, model, and effort without leaving the chat.
+
+It works as intended and matches its written requirements. A running chat agent shows the picker; a stopped or archived one shows the plain read-only label. Changes stay pending until you press Switch, a failed or no-op switch is explained and the picker snaps back to the agent's real runtime, and an agent whose current backend or model is no longer in the catalog still shows its identity and won't let you switch until you pick a listed one. The change also pulls the shared "reset model and effort when the backend changes" logic into one place so the chat header, the New Agent screen, and the dashboard Switch dialog can't drift apart — a genuine cleanup, done correctly.
+
+I found no new problems. The one open item is unchanged and unrelated: the small cosmetic issue with the project color swatches inside the right-click menu, already recorded from the previous review.
+
+**Needs attention:** None.
+
+**Next:** No action needed; the picker is ready to use.
+
 ### 2026-08-01 — Implementation: per-chat runtime picker
 
 The chat header now lets you change a running agent’s backend, model, and effort without returning to the dashboard. Changes stay pending until you choose Switch, preserve the existing transcript, and reset cleanly with an explanation if the switch fails. Stopped and archived sessions keep the simple read-only runtime label.
