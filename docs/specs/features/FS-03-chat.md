@@ -153,6 +153,13 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   visible completed tool outcome, but renders as a compact labelled status rather than a blank
   transcript panel. Non-empty and failed results retain R2's inspection and error behavior in both
   live and archived transcripts.
+- **R26.** The transcript locally groups each uninterrupted run of normalized
+  `tool_call` and `tool_result` events into a collapsed **Ran _n_ tools** row, where _n_ is the
+  number of calls. Activating that row reveals the original calls and every non-empty or failed
+  result for inspection; any non-tool event ends the run. A successful result with no displayable
+  payload is omitted whether it is in a run or arrives alone. This supersedes R25. Grouping changes
+  neither durable events, sequence order, live/replay behavior, nor the individual event's
+  right-click annotation target.
 
 ## 5. Acceptance criteria
 
@@ -192,10 +199,12 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `ui/src/components/chat/ChatPanel.test.tsx`; the browser acceptance pass changes a live fake
   agent's model and verifies that stopping it restores static identity.
 
-- **A10** (R25) — A completed tool result with no displayable payload renders **Completed** rather
-  than an empty result panel; an empty `content` field does not hide a meaningful error, and a
-  long result remains expandable. *Verify:* `ui/src/components/chat/renderers/ToolResult.test.tsx`
-  and the tool-activity states in `ui/src/presentation/VisualMatrix.tsx`.
+- **A10** (R25) — Superseded by R26/A11.
+
+- **A11** (R26) — Two uninterrupted calls and their results initially render one
+  **Ran 2 tools** control. Opening it reveals the calls and non-empty/failed results but no
+  successful no-payload outcome; intervening assistant text starts a new run. *Verify:*
+  `ui/src/components/chat/TranscriptView.test.tsx`.
 
 ## 6. Deviations & open decisions
 

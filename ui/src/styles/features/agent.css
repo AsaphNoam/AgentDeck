@@ -202,6 +202,26 @@
   padding: var(--ad-space-2) var(--ad-space-3);
 }
 
+.tool-run {
+  background: var(--ad-surface-subtle);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-radius: var(--ad-radius-medium);
+  color: var(--ad-text-muted);
+  font-family: var(--ad-font-mono);
+  font-size: 0.76rem;
+  padding: var(--ad-space-2) var(--ad-space-3);
+}
+
+.tool-run-content {
+  display: grid;
+  gap: var(--ad-space-2);
+  margin-top: var(--ad-space-2);
+}
+
+.tool-run-event {
+  margin: 0;
+}
+
 .diff-block {
   background: var(--ad-technical-background);
   border: var(--ad-border-thin) solid var(--ad-technical-muted);
@@ -253,10 +273,6 @@
   overflow: auto;
   padding: var(--ad-space-2) var(--ad-space-3);
   white-space: pre-wrap;
-}
-
-.tool-result-status {
-  color: var(--ad-text-muted);
 }
 
 .tool-result-error {

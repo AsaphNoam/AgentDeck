@@ -157,10 +157,18 @@ export function VisualMatrix() {
             event={{ seq: 18, kind: "diff", path: "ui/src/styles/skins/sky-grove.css", old_text: "--surface: core;", new_text: "--surface: sky;" }}
             onAnnotate={() => undefined}
           />
-          <ToolCall event={{ kind: "tool_call", name: "inspect_workspace", args: { path: "ui/src" } }} />
-          <ToolResult event={{ kind: "tool_result", status: "completed", content: "Representative tool output" }} />
-          <ToolResult event={{ kind: "tool_result", status: "completed", content: null }} />
-          <ToolResult event={{ kind: "tool_result", status: "failed", error: "Representative tool error output" }} />
+          <article className="tool-run" data-ui="tool-run" data-state="collapsed">
+            <button className="tool-toggle" data-slot="trigger" type="button">▸ Ran 2 tools</button>
+          </article>
+          <article className="tool-run" data-ui="tool-run" data-state="expanded">
+            <button className="tool-toggle" data-slot="trigger" type="button">▾ Ran 2 tools</button>
+            <div className="tool-run-content" data-slot="content">
+              <ToolCall event={{ kind: "tool_call", name: "inspect_workspace", args: { path: "ui/src" } }} />
+              <ToolCall event={{ kind: "tool_call", name: "search_files" }} />
+              <ToolResult event={{ kind: "tool_result", status: "completed", content: "Representative tool output" }} />
+              <ToolResult event={{ kind: "tool_result", status: "failed", error: "Representative tool error output" }} />
+            </div>
+          </article>
           <article className="permission-prompt" data-ui="permission-prompt" data-state="pending">
             <strong data-slot="title">Permission required</strong>
             <p data-slot="reason">Run a bounded local verification command.</p>

@@ -177,6 +177,10 @@ Requirements are user-observable.
   remain expandable for inspection; diffs, fenced code, commands, and the Terminal retain their
   technical treatment. An outcome with no displayable payload carries a short status label instead
   of blank geometry. This supersedes R14 only for tool calls and tool results.
+- **R35** — An uninterrupted tool run is a single subdued **Ran _n_ tools** row by
+  default, inviting disclosure without competing with the conversation. Opening the row reveals
+  the existing compact tool-call and non-empty/failed result rows; a successful no-payload result
+  adds no visual row. This supersedes R34's no-payload status label.
 
 ## 3. States & transitions
 
