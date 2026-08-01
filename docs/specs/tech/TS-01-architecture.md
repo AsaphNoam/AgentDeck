@@ -93,6 +93,22 @@ The service invokes ordinary runtime/pipeline stop paths; delegates durable agen
 resulting full agent state through the existing bus. This is the atomic-claim boundary required by
 INV §5, not a check of `project.archived` followed later by process registration.
 
+**R14 `(planned)` — Native model autosync is one bounded startup import into the AgentDeck
+catalog.** After seeding and before the server starts, `internal/config` reads the validated
+`backends.json` snapshot once, detects which provider types opted in, invokes only those providers'
+pure local catalog readers, merges every successful candidate set in memory through one shared
+add-only helper, and publishes all additions through at most one ordinary atomic `backends.json`
+rewrite. A provider reader never writes its native source, starts a provider process, reads
+credentials or private account caches, or uses the network; one missing, malformed, or incompatible
+source contributes no candidates without suppressing another provider's valid additions. The Claude
+reader decodes only `model`, `availableModels`, and the array-or-legacy-string `fallbackModel` from
+the fixed user-level settings path, rejects a wrong shape before returning any candidate, and never
+logs or returns unrelated source content. Candidate validation reuses the same provider-model-string
+rule as backend PUT validation. Existing model entries and defaults win; imported entries become
+ordinary user-owned AgentDeck configuration and are not retracted when the native source changes.
+This path does not use federation bindings, project precedence, previews, watches, provenance, or
+effective generations. It adds no API, config version, cache, sidecar, SQLite state, or migration.
+
 ## 3. Interfaces & data shapes
 
 **Runtime interface** (`internal/runtime/runtime.go`, minimum surface):
@@ -155,4 +171,6 @@ type Runtime interface {
 - Event flow: `internal/server/hook.go`, `internal/server/sse.go`, `internal/bus/bus.go` (`SubscribeWithSnapshot`).
 - Archive transition gate: `internal/server/archive_gate.go`, `archive_actions.go`, and
   `archive_gate_test.go` (project reservation and agent/project transition barriers).
+- Model catalog autosync: `internal/config/{codexmodels,modelautosync}.go` and the planned
+  `claudemodels.go`, invoked after seeding by `internal/cli/dashboard.go` (R14).
 - Regression anchors: `TestSwitchRuntimeKeepsTargetRegistration`, `TestCrashTearsDownAgentRegistration`, `TestSessionParamsOmitModelWhenInherited`.

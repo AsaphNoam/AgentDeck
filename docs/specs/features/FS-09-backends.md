@@ -48,8 +48,8 @@ Configuration-source federation for Claude/Codex is FS-08.
   **add-only**: it never edits or removes an existing model entry, never changes `default_model`, and
   writes nothing when it finds nothing new. A missing, unreadable, or unparseable cache is a
   non-fatal skip that never blocks startup or mutates the catalog. Backends without the flag, and
-  every non-`codex-acp` type, are untouched. Claude has no equivalent on-disk catalog (its list is
-  compiled into the CLI binary) and is intentionally out of scope.
+  every non-`codex-acp` type, are untouched. This requirement remains Codex-specific; planned
+  configured-model discovery for Claude is R45.
 - **R35** — A model entry may declare optional **effort capability**: `efforts`, a
   non-empty array of distinct non-empty provider effort-level strings, and `default_effort`, which
   must be one of them. Both are optional. A model that declares no `efforts` has no effort
@@ -73,8 +73,30 @@ Configuration-source federation for Claude/Codex is FS-08.
   model's `efforts` and `default_effort` from the local cache's `supported_reasoning_levels[].effort`
   and `default_reasoning_level`. This stays add-only under R28's rules: it never edits an existing
   model entry, including one that already declares effort fields, and a cache without reasoning
-  levels simply contributes none. Claude has no on-disk catalog, so Claude effort levels are always
-  hand-declared.
+  levels simply contributes none. Claude's planned configured-model sync in R45 does not discover
+  effort capability, so Claude effort levels remain hand-declared.
+- **R45** `(planned)` — A `claude-acp` backend may also set `autosync_models: true`. On dashboard
+  startup after seeding, AgentDeck reads only the user-level `~/.claude/settings.json` and collects
+  model selectors from `model`, every string entry in `availableModels`, and every string entry in
+  the `fallbackModel` array (also tolerating the older singular string shape). Each distinct,
+  non-empty selector that passes the existing model-string validation and is not already represented
+  by either a model-map key or an existing entry's provider `model` string is added to that backend's
+  global `models` map, keyed by and carrying the exact selector. The four family aliases use the
+  labels **Claude Fable**, **Claude Opus**, **Claude Sonnet**, and **Claude Haiku**; any other selector
+  uses itself as its label because the settings file carries no display metadata. Sync is add-only:
+  it never edits or removes an existing entry, changes `default_model`, or writes when it finds
+  nothing new. A missing, unreadable, malformed, or shape-invalid settings file is a non-fatal skip
+  that never blocks startup or partially mutates the catalog. A disabled flag and every backend type
+  other than `claude-acp` are untouched by this Claude source. Settings offers the same flag for
+  Claude and explains that it imports configured user-level models at the next dashboard start.
+- **R46** `(planned)` — A fresh home seeds the Claude backend with the portable provider aliases
+  `fable`, `opus`, `sonnet`, and `haiku`, keyed by those same values and labelled **Claude Fable**,
+  **Claude Opus**, **Claude Sonnet**, and **Claude Haiku**. `sonnet` remains the Claude default.
+  These aliases intentionally resolve through the installed Claude/provider and may point to
+  different concrete versions over time; the catalog does not claim a fixed version or account
+  entitlement. This planned behavior supersedes only the Claude portion of R33 when shipped. As in
+  R33, seeding never rewrites a pre-existing `backends.json`, adds missing aliases to an existing
+  catalog, or changes an existing default.
 
 ### Adapter and capability matrix
 
@@ -309,9 +331,30 @@ Configuration-source federation for Claude/Codex is FS-08.
   and home-provisioning tests. Real `codex-acp` honoring of `CODEX_HOME`, profile setup visibility,
   native resume, and the native CLI/app history boundary are external compatibility gates recorded
   under A7 (cf. TS-04.R21).
+- **A18** `(planned)` (R45) — An opted-in `claude-acp` backend gains valid, previously
+  unrepresented selectors from the user-level `model`, `availableModels`, and array or legacy-string
+  `fallbackModel` settings at dashboard startup; alias labels are friendly and other labels preserve
+  the selector. Existing entries are unchanged even when their map key differs from their provider
+  string, the default is unchanged, removed source values remain in the catalog, and source values
+  never gain inferred effort levels. A disabled flag, non-Claude backend, missing/malformed/wrong-shape
+  file, invalid selector, duplicate selector, project/local/managed setting, private Claude cache,
+  and environment-only model setting add nothing. *Verify by* focused config sync/persistence tests
+  and `BackendsEditor` tests for the Claude-specific opt-in copy and restart timing.
+- **A19** `(planned)` (R46) — A fresh backend catalog contains exactly the four Claude family
+  aliases with generic family labels and `sonnet` as its default, while a pre-existing catalog
+  remains byte-for-byte unchanged by seeding. The launch picker exposes all four without claiming
+  their resolved versions or entitlements. *Verify by* seed/config tests and the onboarding/New
+  Agent catalog fixtures.
 
 ## 6. Deviations & open decisions
 
+- **Claude configured-model sync is deliberately not full discovery (planned R45).** Claude exposes
+  no stable local full-catalog contract equivalent to Codex's cache. The planned sync therefore
+  reads only explicit user-level settings, does not scan the executable or private account caches,
+  does not inspect environment values, and does not issue a network, credential, adapter, or session
+  probe. Imported selectors can still be unavailable for the installed version, provider, or
+  account; launch remains the authoritative compatibility check. Project, local, and managed values
+  stay project/policy-scoped instead of leaking into the global backend catalog.
 - **Effort levels are declared, not discovered, for Claude.** Codex publishes its per-model levels
   in the cache `autosync_models` already reads, so R38 can fill them. Claude reports its levels only
   through the running adapter's session config options, so a Claude model's levels are hand-declared

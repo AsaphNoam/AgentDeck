@@ -27,14 +27,6 @@ Example:
   is one flat array independent of `group`), so it silently snaps back. Needs whole-card drag (with
   an activation distance so a plain click still opens the agent) and either real cross-group drop
   support or a clear affordance that drag only reorders within a group.
-- **Claude backend model autosync.** The Codex half shipped (FS-09.R28: opt-in `autosync_models`
-  reads `~/.codex/models_cache.json` on startup and add-only merges the catalog). Claude has no
-  equivalent on-disk catalog to sync from — `~/.claude/settings.json` holds only the *selected*
-  model, and the full available list is compiled into the CLI binary — so a Claude version needs a
-  different source: parse the model strings out of the `claude` binary, ship/maintain a bundled list
-  updated per release, or sync only the single selected/default model. Same guardrails as the Codex
-  one: opt-in per backend, never overwrite hand-edited entries, never change the default silently.
-
 ## Ideas being defined
 
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
