@@ -234,6 +234,26 @@ keeps showing the agent's live state color (R8/state), not the project color. Th
 bounded so body text keeps its contrast under Core and every built-in skin, and the treatment derives
 from the single project-accent value without any per-card presentational literal (TS-08.R37).
 
+### Project creation
+
+**R41.** The projects home (`/`, R29) offers a **New project** action from a persistent
+header button and from a cursor-positioned context menu opened by right-clicking the projects-home
+background — any point in the projects view that is not a project card. Right-clicking a project card
+continues to open that card's menu (R34/R38) and does not also open the background menu. The
+background menu reuses the same `context-menu` portal presentation, click-outside/Escape dismissal,
+and overflow-proof portaling as the card menus (R15/R38), and offers the single **New project** item.
+This action exists only on the projects home, not on the scoped `/project/:id` route.
+
+**R42.** Both entry points (R41) open one modal containing the project creation form reused
+from the Settings project form (FS-04.R5/R7/R39): **Title**, **Color** (six-preset swatches),
+**Working directory (cwd)**, **Additional directories**, and **Context prompt**, validated as
+FS-04.R7 requires (title and cwd required). Submitting issues `POST /api/projects` with no id so the
+server derives it (FS-04.R31). On success the modal closes and the new project's card appears in the
+live project grid with no manual refresh (it derives from the same project catalog query as R30). On
+a validation or API failure the modal stays open and surfaces the server's field/error message;
+Cancel or Escape closes it with no change. A non-existent `cwd` is a non-blocking warning, not a
+failure (FS-04.R7). The action creates a project only; it does not launch an agent or navigate away.
+
 ## 5. Acceptance criteria
 
 **A1.** Launching an agent adds its card within ~1s with no manual refresh; a status change flips the
@@ -334,6 +354,12 @@ wash and a tinted border alongside the retained left-edge accent, while the top 
 agent state; the visual-matrix fixtures show the tint across the six presets in Core and Sky & Grove
 at readable contrast. — `AgentCard`/`ProjectDashboard` component tests and the FS-12 visual matrix; J5.
 
+**A24.** On the projects home, a persistent **New project** button and a background
+right-click menu each open the create modal, while right-clicking a project card opens the card menu
+rather than the create menu. Submitting a valid project creates it through `POST /api/projects` and
+its card appears on the grid without a reload; an invalid submission keeps the modal open showing the
+error, and Cancel closes it with no change. — `ProjectDashboard` component test; J5.
+
 ## 6. Deviations & open decisions
 
 - **Immediate clone UI.** Clone launches immediately with no confirmation, and a disappeared process
@@ -359,8 +385,10 @@ at readable contrast. — `AgentCard`/`ProjectDashboard` component tests and the
 
 - **Grid & cards:** `ui/src/components/grid/CardGrid.tsx`, `AgentCard.tsx`, `StateBadge.tsx`,
   `ContextBar.tsx`, `CardContextMenu.tsx`, `DensityControl.tsx`, `EmptyState.tsx`.
-- **Project cards and scoped routes:** `ui/src/features/dashboard/ProjectDashboard.tsx`; archive
-  catalog updates in `ui/src/features/archive/ArchivePage.tsx`.
+- **Project cards and scoped routes:** `ui/src/features/dashboard/ProjectDashboard.tsx` (project
+  cards, context menus, and the New project button/background-menu create modal reusing
+  `ui/src/features/settings/ProjectForm.tsx` and `useCreateProject`); archive catalog updates in
+  `ui/src/features/archive/ArchivePage.tsx`.
 - **Stores:** `ui/src/store/agentStore.ts` (upsert/hydrate/remove/order), `uiStore.ts` (density,
   groupLayout, toasts, context menu), `transcriptStore.ts` (last-line fallback source).
 - **SSE + notifications dispatch:** `ui/src/api/sse.ts` (`onStateUpdate`, `onNotification`),
@@ -372,4 +400,5 @@ at readable contrast. — `AgentCard`/`ProjectDashboard` component tests and the
   `TestPublishDropsOldestForSlowSubscriber`, `TestManagerRecomputeRunningFalseAndRemovalTombstone`,
   `TestPruneStaleRunning`, `TestReleaseGroupStopsMembers`, `TestPutLayoutValidatesAndPersists`;
   UI: `agentStore.test.ts`, `sse.test.ts`, `CardContextMenu.test.tsx`, `NotificationsEditor.test.tsx`,
-  `NotificationCenter.test.tsx`.
+  `NotificationCenter.test.tsx`, `ProjectDashboard.test.tsx` (project cards, context menus, and the
+  New project create modal — A22/A24).

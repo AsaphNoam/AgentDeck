@@ -121,6 +121,72 @@ describe("ProjectDashboard", () => {
     expect(await screen.findByText("title: must be at most 120 characters")).toBeInTheDocument();
   });
 
+  // FS-02.A24: the header button and the background right-click both open the
+  // create modal; a card right-click opens the card menu, not the create menu.
+  it("opens the create modal from the header button and the background menu, not from a card", async () => {
+    renderDashboard();
+    const card = (await screen.findByText("App")).closest("article")!;
+
+    fireEvent.click(screen.getByRole("button", { name: "New project" }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "New project" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    fireEvent.contextMenu(screen.getByRole("heading", { name: "Projects" }));
+    const menuItem = (await screen.findAllByRole("button", { name: "New project" })).find((b) => b.getAttribute("data-slot") === "item")!;
+    fireEvent.click(menuItem);
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    fireEvent.contextMenu(card);
+    expect(await screen.findByRole("button", { name: "Rename" })).toBeInTheDocument();
+    // Only the persistent header button remains; the create menu never opened.
+    expect(screen.getAllByRole("button", { name: "New project" })).toHaveLength(1);
+  });
+
+  // FS-02.A24: a valid submission creates the project through POST /api/projects
+  // and its card appears from the refreshed catalog with no manual reload.
+  it("creates a project and shows its card without a reload", async () => {
+    const projectsData: Record<string, unknown> = {
+      app: { title: "App", color: [100, 116, 139], cwd: "/tmp/app", add_dirs: [], context_prompt: "", archived: false },
+    };
+    let created: Record<string, unknown> | null = null;
+    server.use(
+      http.get("/api/projects", () => HttpResponse.json(projectsData)),
+      http.post("/api/projects", async ({ request }) => {
+        created = await request.json() as Record<string, unknown>;
+        projectsData["new-app"] = { ...created, project: undefined, archived: false };
+        return HttpResponse.json({ project: "new-app", ...created });
+      }),
+    );
+    renderDashboard();
+    await screen.findByText("App");
+    fireEvent.click(screen.getByRole("button", { name: "New project" }));
+    fireEvent.change(await screen.findByPlaceholderText("e.g. My App"), { target: { value: "New App" } });
+    fireEvent.change(screen.getByPlaceholderText("~/Projects/my-app"), { target: { value: "/tmp/new-app" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+    expect(await screen.findByText("New App")).toBeInTheDocument();
+    expect(created).toMatchObject({ project: "", title: "New App", cwd: "/tmp/new-app" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  // FS-02.A24: an API failure keeps the modal open and surfaces the server message.
+  it("keeps the create modal open with the server error on failure", async () => {
+    server.use(http.post("/api/projects", () => HttpResponse.json({
+      errors: [{ field: "title", message: "already exists" }],
+    }, { status: 400 })));
+    renderDashboard();
+    await screen.findByText("App");
+    fireEvent.click(screen.getByRole("button", { name: "New project" }));
+    fireEvent.change(await screen.findByPlaceholderText("e.g. My App"), { target: { value: "App" } });
+    fireEvent.change(screen.getByPlaceholderText("~/Projects/my-app"), { target: { value: "/tmp/app" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+    expect(await screen.findByText("title: already exists")).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
   it("shows archive consequences and cancels without archiving", async () => {
     let archives = 0;
     server.use(http.post("/api/projects/app/archive", () => { archives += 1; return HttpResponse.json({}); }));

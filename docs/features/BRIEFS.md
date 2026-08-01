@@ -4,6 +4,49 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-01 — Implementation: Create a project from the projects page
+
+You can now create a project straight from the projects home, without opening Settings or onboarding.
+A persistent **New project** button sits next to the "Projects" heading, and right-clicking anywhere on
+the projects background (but not on a project card) opens a small **New project** menu. Both open the
+same modal with the full project form — Title, the six-preset Color, working directory, additional
+directories, and context prompt. Submitting a valid project creates it and its card appears on the grid
+immediately, no reload. A bad working directory is a non-blocking warning; a validation or server error
+keeps the modal open with the message; Cancel or Escape closes it with no change. The create action
+exists only on the projects home, not on a single project's page, and right-clicking a project card
+still opens that card's own menu.
+
+This reuses the existing project form and create API unchanged — no new storage, id, color, or
+validation rules. The dashboard's create flow is covered by a new automated test (both entry points,
+the card-menu exclusion, a live create, the error case, and cancel). All required checks pass: the full
+UI test suite, both Go test modes, the source and packaged builds, and the presentation/style/whitespace
+checks. FS-02 is now fully current.
+
+**Needs attention:** None. One real-browser walkthrough of the new create flow (grid journey J5) is
+still worth doing in a usability review; the automated coverage stands in for it for now.
+
+**Next:** Optionally run a usability review to exercise the create flow in a real browser; otherwise
+this change is complete.
+
+### 2026-08-01 — Feature design: Create a project from the projects page
+
+The projects home will get a way to create a project directly, so people no longer have to open
+Settings or onboarding. A persistent **New project** button and a right-click **New project** menu on
+the projects background both open one modal with the full project form — Title, the six-preset Color,
+working directory, additional directories, and context prompt. Submitting creates the project through
+the existing create API and its card appears on the grid immediately; a bad `cwd` is a non-blocking
+warning, and a validation error keeps the modal open. The create action lives only on the projects
+home, not on a single project's page, and right-clicking a project card still opens that card's menu.
+
+FS-02 gained R41, R42, and A24 (all planned) and moved to Partial. No technical-spec change is
+needed: the create route, React Query hooks, project form, and context-menu/dialog presentation
+already exist and are reused unchanged. The idea moved out of `docs/ideas.md` into the waiting
+`docs/ready-changes/create-project-from-projects-page.md` change. `make check-specs` passes.
+
+**Needs attention:** None.
+
+**Next:** Build the change from `create-project-from-projects-page.md` when you want it implemented.
+
 ### 2026-08-01 — Implementation: Sky & Grove visual rework
 
 Sky & Grove now uses a calmer sky-blue canvas, crisp blue-white surfaces, evergreen controls,
