@@ -1,22 +1,40 @@
 import React from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { afterEach, describe, it, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { useAgentStore } from "../../store/agentStore";
 import { useAnnotationStore } from "../../store/annotationStore";
 import { ChatPanel, initialTab } from "./ChatPanel";
 
-vi.mock("../../api/client", () => ({
+const mocks = vi.hoisted(() => ({
   getTranscript: vi.fn(async (id: string) => ({ agent_id: id, events: [] })),
+  switchRuntime: vi.fn(),
+  useBackends: vi.fn(),
+}));
+
+vi.mock("../../api/client", () => ({
+  getTranscript: mocks.getTranscript,
+  switchRuntime: mocks.switchRuntime,
+}));
+
+vi.mock("../../api/config", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../../api/config")>(),
+  useBackends: mocks.useBackends,
 }));
 
 vi.mock("../../api/sse", () => ({
   sseClient: { setOpenAgent: vi.fn() },
 }));
 
+beforeEach(() => {
+  mocks.useBackends.mockReturnValue({ data: undefined });
+});
+
 afterEach(() => {
   cleanup();
+  mocks.switchRuntime.mockReset();
+  mocks.useBackends.mockReset();
   useAgentStore.setState({ agents: {}, order: [], hydrated: false, hydrating: false });
   useAnnotationStore.setState({ bySource: {}, overallBySource: {}, editedAt: {} });
 });
@@ -59,6 +77,20 @@ function liveAgent(id: string) {
   } as never;
 }
 
+const backends = {
+  version: 2 as const,
+  backends: {
+    claude: {
+      name: "Claude", type: "claude-acp" as const, default_model: "sonnet",
+      models: { sonnet: { name: "Sonnet", model: "sonnet" } },
+    },
+    codex: {
+      name: "Codex", type: "codex-acp" as const, default_model: "gpt-5",
+      models: { "gpt-5": { name: "GPT-5", model: "gpt-5", efforts: ["low", "high"], default_effort: "high" } },
+    },
+  },
+};
+
 // FS-13.R16/A8: the missing-source recovery is destructive, so it may only claim
 // a source is gone once agent hydration has actually looked for it.
 describe("ChatPanel missing-agent recovery", () => {
@@ -94,5 +126,68 @@ describe("ChatPanel missing-agent recovery", () => {
     expect(screen.getByRole("heading", { name: "Nova" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Discard pending annotations" })).not.toBeInTheDocument();
     expect(useAnnotationStore.getState().bySource.a_live).toHaveLength(1);
+  });
+});
+
+// FS-03.A9 — the chat header is a second, explicit entry point to the existing
+// runtime switch. It shares backend/model/effort reset behavior with launch and
+// the dashboard switch dialog.
+describe("ChatPanel runtime picker", () => {
+  it("resets the model and effort, then switches a running chat agent", async () => {
+    mocks.useBackends.mockReturnValue({ data: backends });
+    mocks.switchRuntime.mockResolvedValue({ history_handoff: "native_resume" });
+    useAgentStore.setState({ agents: { a_live: liveAgent("a_live") }, order: ["a_live"], hydrated: true, hydrating: false });
+
+    renderPanel("a_live");
+
+    const backend = await screen.findByLabelText("Backend");
+    expect((screen.getByLabelText("Model") as HTMLSelectElement).value).toBe("sonnet");
+    expect(screen.queryByLabelText("Effort")).not.toBeInTheDocument();
+    fireEvent.change(backend, { target: { value: "codex" } });
+
+    expect((screen.getByLabelText("Model") as HTMLSelectElement).value).toBe("gpt-5");
+    expect((screen.getByLabelText("Effort") as HTMLSelectElement).value).toBe("high");
+    fireEvent.click(screen.getByRole("button", { name: "Switch" }));
+
+    await waitFor(() => expect(mocks.switchRuntime).toHaveBeenCalledWith("a_live", { backend: "codex", model: "gpt-5", effort: "high" }));
+  });
+
+  it("restores the current runtime and explains a rejected switch", async () => {
+    mocks.useBackends.mockReturnValue({ data: backends });
+    mocks.switchRuntime.mockRejectedValue(new Error("no runtime change requested"));
+    useAgentStore.setState({ agents: { a_live: liveAgent("a_live") }, order: ["a_live"], hydrated: true, hydrating: false });
+
+    renderPanel("a_live");
+
+    fireEvent.change(await screen.findByLabelText("Backend"), { target: { value: "codex" } });
+    fireEvent.click(screen.getByRole("button", { name: "Switch" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("no runtime change requested");
+    expect((screen.getByLabelText("Backend") as HTMLSelectElement).value).toBe("claude");
+    expect(screen.queryByRole("button", { name: "Switch" })).not.toBeInTheDocument();
+  });
+
+  it("keeps stopped agents' runtime identity static", () => {
+    mocks.useBackends.mockReturnValue({ data: backends });
+    useAgentStore.setState({ agents: { a_stopped: { ...liveAgent("a_stopped"), running: false } }, order: ["a_stopped"], hydrated: true, hydrating: false });
+
+    renderPanel("a_stopped");
+
+    expect(screen.getByText("claude · sonnet")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Backend")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Switch" })).not.toBeInTheDocument();
+  });
+
+  it("keeps an unavailable current runtime visible until a listed target is chosen", async () => {
+    mocks.useBackends.mockReturnValue({ data: { version: 2, backends: { codex: backends.backends.codex } } });
+    useAgentStore.setState({ agents: { a_live: liveAgent("a_live") }, order: ["a_live"], hydrated: true, hydrating: false });
+
+    renderPanel("a_live");
+
+    expect((await screen.findByLabelText("Backend") as HTMLSelectElement).value).toBe("claude");
+    expect((screen.getByLabelText("Model") as HTMLSelectElement).value).toBe("sonnet");
+    expect(screen.queryByRole("button", { name: "Switch" })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Backend"), { target: { value: "codex" } });
+    expect(screen.getByRole("button", { name: "Switch" })).toBeEnabled();
   });
 });

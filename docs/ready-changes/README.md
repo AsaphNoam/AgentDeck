@@ -42,5 +42,4 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-- [per-chat-runtime-picker.md](per-chat-runtime-picker.md) — inline runtime picker in the chat header
-  (FS-03.R23/R24).
+None.

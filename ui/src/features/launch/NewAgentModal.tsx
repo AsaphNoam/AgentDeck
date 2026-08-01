@@ -8,6 +8,7 @@ import { useConfig } from "../../api/config";
 import { useLaunchAgent } from "../../api/config";
 import { useConfigSources } from "../../api/configSources";
 import { terminalSupported } from "../../lib/backendTypes";
+import { resetRuntimeForBackend, resetRuntimeForModel } from "../../lib/runtimeSelection";
 import { useSuggestedName } from "./useSuggestedName";
 
 interface NewAgentModalProps {
@@ -80,10 +81,9 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, onLa
 
   // When backend changes, reset model to that backend's default_model.
   useEffect(() => {
-    const backend = backendsData?.backends[backendId];
-    setModelId(backend?.default_model ?? Object.keys(backend?.models ?? {})[0] ?? "");
-    const model = backend?.models[backend?.default_model ?? ""];
-    setEffort(model?.default_effort ?? "");
+    const runtime = resetRuntimeForBackend(backendsData, backendId);
+    setModelId(runtime.model);
+    setEffort(runtime.effort);
   }, [backendId, backendsData]);
 
   useEffect(() => {
@@ -97,7 +97,7 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, onLa
   const effortLevels = selectedModel?.efforts ?? [];
 
   useEffect(() => {
-    setEffort(selectedModel?.default_effort ?? "");
+    setEffort(resetRuntimeForModel(backendsData, backendId, modelId).effort);
   }, [backendId, modelId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Federation preflight: if the chosen backend has a linked configuration source
@@ -199,7 +199,11 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, onLa
               <label>Model</label>
               <select
                 value={modelId}
-                onChange={(e) => setModelId(e.target.value)}
+                onChange={(e) => {
+                  const runtime = resetRuntimeForModel(backendsData, backendId, e.target.value);
+                  setModelId(runtime.model);
+                  setEffort(runtime.effort);
+                }}
               >
                 {modelEntries.map(([id, m]) => (
                   <option key={id} value={id}>{m.name} ({id})</option>

@@ -4,6 +4,14 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-01 — Implementation: per-chat runtime picker
+
+The chat header now lets you change a running agent’s backend, model, and effort without returning to the dashboard. Changes stay pending until you choose Switch, preserve the existing transcript, and reset cleanly with an explanation if the switch fails. Stopped and archived sessions keep the simple read-only runtime label.
+
+**Needs attention:** None.
+
+**Next:** Use the header picker to change a running chat agent’s runtime when needed.
+
 ### 2026-08-01 — Review: effort-lifecycle fix and project context menu/colors
 
 I reviewed the two batches of work since the last review: the fix that keeps each agent's chosen

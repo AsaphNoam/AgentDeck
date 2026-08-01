@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import * as Tabs from "@radix-ui/react-tabs";
-import { getTranscript } from "../../api/client";
+import { getTranscript, switchRuntime } from "../../api/client";
+import { useBackends } from "../../api/config";
+import type { AgentState } from "../../api/types";
 import { sseClient } from "../../api/sse";
 import { useAgentStore } from "../../store/agentStore";
 import { useAnnotationStore } from "../../store/annotationStore";
@@ -12,6 +14,15 @@ import { TranscriptView } from "./TranscriptView";
 import { FilesTab } from "./FilesTab";
 import { CommandsTab } from "./CommandsTab";
 import { TerminalTab } from "./TerminalTab";
+import { resetRuntimeForBackend, resetRuntimeForModel, type RuntimeSelection } from "../../lib/runtimeSelection";
+
+function runtimeSelection(agent: AgentState): RuntimeSelection {
+  return { backend: agent.backend, model: agent.model, effort: agent.effort ?? "" };
+}
+
+function runtimeErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 // initialTab picks the tab a chat panel opens on. An explicit ?tab= wins; then a
 // terminal-interface agent defaults to its Terminal tab so a WS attaches right
@@ -34,7 +45,11 @@ export function ChatPanel() {
   const discardAnnotations = useAnnotationStore((state) => state.discard);
   const events = useTranscriptStore((state) => state.byAgent[id] ?? []);
   const setTranscript = useTranscriptStore((state) => state.setTranscript);
+  const { data: backends } = useBackends();
   const [tab, setTab] = useState(() => initialTab(params.get("tab"), agent?.interface));
+  const [runtime, setRuntime] = useState<RuntimeSelection>(() => agent ? runtimeSelection(agent) : { backend: "", model: "", effort: "" });
+  const [switchError, setSwitchError] = useState<string | null>(null);
+  const [switching, setSwitching] = useState(false);
 
   // The agent often isn't in the store yet at mount (it hydrates over SSE), so
   // the useState initializer above can't see its interface. Once it loads, apply
@@ -48,6 +63,14 @@ export function ChatPanel() {
       setTab("terminal");
     }
   }, [agent?.interface, params]);
+
+  // A successful switch is published as an updated agent record. Re-seed from
+  // that authoritative identity instead of keeping the former pending choice.
+  useEffect(() => {
+    if (!agent) return;
+    setRuntime(runtimeSelection(agent));
+    setSwitchError(null);
+  }, [agent?.backend, agent?.model, agent?.effort]);
 
   useEffect(() => {
     sseClient.setOpenAgent(id);
@@ -96,13 +119,63 @@ export function ChatPanel() {
     );
   }
 
+  const selectedBackend = backends?.backends[runtime.backend];
+  const selectedModel = selectedBackend?.models[runtime.model];
+  const currentRuntime = runtimeSelection(agent);
+  const runtimeChanged = runtime.backend !== currentRuntime.backend || runtime.model !== currentRuntime.model || runtime.effort !== currentRuntime.effort;
+  const runtimeListed = !!selectedBackend && !!selectedModel;
+  const editableRuntime = agent.running && agent.interface === "chat";
+
+  const submitRuntimeSwitch = async () => {
+    if (!runtimeChanged || !runtimeListed || switching) return;
+    setSwitching(true);
+    setSwitchError(null);
+    try {
+      await switchRuntime(agent.agent_id, runtime);
+    } catch (error) {
+      setRuntime(currentRuntime);
+      setSwitchError(runtimeErrorMessage(error));
+    } finally {
+      setSwitching(false);
+    }
+  };
+
   return (
     <section className="chat-panel" data-ui="agent-workspace" data-state="active" data-variant={agent.interface === "terminal" ? "terminal" : "chat"}>
       <header className="chat-header" data-slot="header">
         <Link to="/">Back</Link>
         <div data-slot="identity">
           <h1>{agent.name}</h1>
-          <span>{[agent.backend, agent.model, agent.effort].filter(Boolean).join(" · ")}</span>
+          {editableRuntime ? (
+            <div className="chat-runtime-picker">
+              <div className="form-field">
+                <label htmlFor="chat-runtime-backend">Backend</label>
+                <select id="chat-runtime-backend" value={runtime.backend} disabled={!backends || switching} onChange={(event) => setRuntime(resetRuntimeForBackend(backends, event.target.value))}>
+                  {!backends?.backends[runtime.backend] && runtime.backend && <option value={runtime.backend}>{runtime.backend}</option>}
+                  {Object.entries(backends?.backends ?? {}).map(([id, backend]) => <option key={id} value={id}>{backend.name} ({id})</option>)}
+                </select>
+              </div>
+              <div className="form-field">
+                <label htmlFor="chat-runtime-model">Model</label>
+                <select id="chat-runtime-model" value={runtime.model} disabled={!selectedBackend || switching} onChange={(event) => setRuntime(resetRuntimeForModel(backends, runtime.backend, event.target.value))}>
+                  {!selectedModel && runtime.model && <option value={runtime.model}>{runtime.model}</option>}
+                  {Object.entries(selectedBackend?.models ?? {}).map(([id, model]) => <option key={id} value={id}>{model.name} ({id})</option>)}
+                </select>
+              </div>
+              {(selectedModel?.efforts ?? []).length > 0 && (
+                <div className="form-field">
+                  <label htmlFor="chat-runtime-effort">Effort</label>
+                  <select id="chat-runtime-effort" value={runtime.effort} disabled={switching} onChange={(event) => setRuntime((current) => ({ ...current, effort: event.target.value }))}>
+                    {selectedModel!.efforts!.map((effort) => <option key={effort} value={effort}>{effort}</option>)}
+                  </select>
+                </div>
+              )}
+              {runtimeChanged && <button className="chat-runtime-switch" type="button" disabled={!runtimeListed || switching} onClick={() => void submitRuntimeSwitch()}>{switching ? "Switching…" : "Switch"}</button>}
+              {switchError && <p className="form-error" role="alert">{switchError}</p>}
+            </div>
+          ) : (
+            <span>{[agent.backend, agent.model, agent.effort].filter(Boolean).join(" · ")}</span>
+          )}
         </div>
         <div data-slot="context"><ContextBar value={agent.context_pct} /></div>
       </header>
