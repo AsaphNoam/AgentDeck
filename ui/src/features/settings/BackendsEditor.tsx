@@ -248,6 +248,17 @@ export function BackendsEditor() {
             </label>
           )}
 
+          {backend.type === "claude-acp" && (
+            <label className="backend-autosync-label" title="At the next dashboard start, add the models named in your user-level Claude settings (~/.claude/settings.json). Existing entries and the default are never changed.">
+              <input
+                type="checkbox"
+                checked={backend.autosync_models ?? false}
+                onChange={(e) => updateBackend(id, { autosync_models: e.target.checked })}
+              />
+              Import configured models from Claude on startup
+            </label>
+          )}
+
           {(backend.type === "claude-acp" || backend.type === "codex-acp") && (
             <ConfigSourcePanel backendId={id} backendType={backend.type} persisted={savedBackendIds.has(id)} />
           )}

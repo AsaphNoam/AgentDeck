@@ -63,10 +63,11 @@ func resolveConfig(log *slog.Logger) (*config.Store, config.Config, error) {
 	if err := cfgStore.SeedIfAbsent(); err != nil {
 		return nil, config.Config{}, err
 	}
-	// Refresh opted-in codex-acp backends from the Codex CLI model cache
-	// (FS-09.R28). Best-effort: a sync/persist hiccup must not block startup.
+	// Import configured provider models into opted-in backends: the Codex CLI
+	// model cache (FS-09.R28) and user-level Claude settings (FS-09.R45).
+	// Best-effort: a sync/persist hiccup must not block startup.
 	if err := cfgStore.AutoSyncBackends(); err != nil {
-		log.Warn("codex model autosync", "err", err)
+		log.Warn("model autosync", "err", err)
 	}
 	// (Re)install the hook scripts so they always match this binary (techspec §4.1).
 	if err := hooks.Install(cfgStore.Home()); err != nil {

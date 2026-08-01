@@ -62,9 +62,15 @@ func DefaultBackends() BackendsConfig {
 				Type:         "claude-acp",
 				Default:      true,
 				DefaultModel: "sonnet",
+				// The four portable Claude family aliases (FS-09.R46). Like the
+				// Codex/Claude moving aliases above, they name the current family
+				// generation rather than a dated pin and carry no version/account
+				// claim; a person pins an exact generation in Settings → Backends.
 				Models: map[string]Model{
-					"sonnet": {Name: "Claude Sonnet", Model: "sonnet", Efforts: []string{"low", "medium", "high", "max"}, DefaultEffort: "medium"},
+					"fable":  {Name: "Claude Fable", Model: "fable", Efforts: []string{"low", "medium", "high", "max"}, DefaultEffort: "medium"},
 					"opus":   {Name: "Claude Opus", Model: "opus", Efforts: []string{"low", "medium", "high", "max"}, DefaultEffort: "medium"},
+					"sonnet": {Name: "Claude Sonnet", Model: "sonnet", Efforts: []string{"low", "medium", "high", "max"}, DefaultEffort: "medium"},
+					"haiku":  {Name: "Claude Haiku", Model: "haiku", Efforts: []string{"low", "medium", "high", "max"}, DefaultEffort: "medium"},
 				},
 			},
 			"codex": {

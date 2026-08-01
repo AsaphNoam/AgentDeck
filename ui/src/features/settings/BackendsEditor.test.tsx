@@ -106,6 +106,18 @@ describe("BackendsEditor", () => {
     await waitFor(() => expect(defaultSelect.value).toBe("medium"));
   });
 
+  // FS-09.R45/A18 — a claude-acp backend offers the configured-model import
+  // opt-in with Claude-specific copy, and the toggle updates its state.
+  it("offers the Claude configured-model import toggle on a claude-acp backend", async () => {
+    renderWithQuery(<BackendsEditor />);
+    await screen.findByDisplayValue("Claude");
+
+    const toggle = screen.getByLabelText(/Import configured models from Claude on startup/) as HTMLInputElement;
+    expect(toggle.checked).toBe(false);
+    fireEvent.click(toggle);
+    await waitFor(() => expect(toggle.checked).toBe(true));
+  });
+
   it("offers all four backend types in the type dropdown", async () => {
     renderWithQuery(<BackendsEditor />);
     await screen.findByDisplayValue("Claude");
