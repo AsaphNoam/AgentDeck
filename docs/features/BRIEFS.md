@@ -4,6 +4,18 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-01 — Usability review: per-chat runtime picker
+
+I drove the new chat-header runtime picker in a real browser, from a freshly built copy of the app and an isolated test setup, using a stand-in agent so nothing touched your real providers.
+
+Everything worked. On a running chat agent the header shows backend, model, and effort as dropdowns; picking a different model or effort reveals a Switch button, and pressing it actually changes the live agent and snaps the dropdowns to its new identity. Changing the backend correctly resets the model and effort to that backend's defaults, and a cross-backend switch went through cleanly. Stopping the agent turns the header back into a plain read-only label. No errors appeared at any point.
+
+This was the one browser journey the project had never been able to run before — the old version relied on a pop-up prompt the automated browser refused to show. The shipped picker uses inline dropdowns instead, so it can now be exercised, and it passed.
+
+**Needs attention:** None.
+
+**Next:** No action needed. Credentialed checks against the real Claude/Codex CLIs remain a separate release gate, unchanged by this run.
+
 ### 2026-08-01 — Review: per-chat runtime picker
 
 I reviewed the new chat-header runtime picker that lets you change a running agent's backend, model, and effort without leaving the chat.

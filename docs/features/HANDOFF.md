@@ -31,9 +31,14 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   project/agent restore, a 55-agent per-project Archive page, archived-default launch exclusion,
   and post-restart rendering. A final retry passed no-active-project onboarding, 51-project
   Archive paging, and archiving a project with a live pipeline (the run becomes stopped and the
-  archived project is unavailable to new runs). Runtime switch remains the only unexercised browser
-  journey: the current in-app browser rejects `window.prompt()` before it can render the three
-  inputs, so this is an automation limitation rather than a product finding.
+  archived project is unavailable to new runs). The 2026-08-01 usability pass then cleared the
+  last unexercised browser journey — the per-chat runtime switch (FS-03.R23/R24/A9): a real
+  headless-Chrome pass drove the running chat header's backend/model/effort picker through a model
+  switch, an effort switch, a cross-backend switch (with the model/effort reset), and a stop, all
+  applied by the switch-runtime path with zero console errors, and a stopped agent rendered the
+  read-only static identity. The shipped picker uses inline selects, so the prior `window.prompt()`
+  automation block no longer applies. Full record:
+  [`../archive/reviews/usability-review-run-2026-08-01-runtime-picker.md`](../archive/reviews/usability-review-run-2026-08-01-runtime-picker.md).
 - **Previous transition context:** AgentDeck-launched Codex agents now run in a private `CODEX_HOME`
   (`<agentdeck-home>/codex`, `0700`), composed as the final, reserved child-env layer in
   launch/resume/switch via `codexHomeEnv`/`composeEnv`, so their rollouts and native session index
@@ -143,6 +148,16 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-01 — Usability review of the per-chat runtime picker (FS-03.R23/R24/A9): PASS, no findings.
+  Built the real binary, seeded an isolated home, and drove the running chat header in headless
+  Chrome via `fakeacp` (reached through `claude-agent-acp`/`codex-acp` PATH shims). Confirmed the
+  running agent renders backend/model/effort selects; a differing selection reveals Switch; applying
+  re-seeds the picker from the authoritative record; a backend change resets model and effort to the
+  new defaults; a cross-backend switch applies via the switch-runtime path (server record verified);
+  and a stopped agent shows read-only static identity with no picker. Zero console/page errors
+  throughout. This clears the previously blocked runtime-switch browser journey. Run record:
+  [`../archive/reviews/usability-review-run-2026-08-01-runtime-picker.md`](../archive/reviews/usability-review-run-2026-08-01-runtime-picker.md).
 
 - 2026-08-01 — Reviewed the continuous range after `9c6a637` through `ca100e0` (the per-chat runtime
   picker; `b28a96c` is a prior review-state commit) in both specification directions and against every
