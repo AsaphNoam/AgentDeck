@@ -1,38 +1,37 @@
 @layer ad-skins {
 :root {
-  --ad-sky-grove-canvas: #e9f5fb;
-  --ad-sky-grove-panel: #f4fbf8;
+  --ad-sky-grove-canvas: #e8f4f8;
+  --ad-sky-grove-panel: #f4fafb;
   --ad-sky-grove-raised: #ffffff;
-  --ad-sky-grove-ink: #12382f;
-  --ad-sky-grove-text: #315e53;
-  --ad-sky-grove-muted: #648078;
-  --ad-sky-grove-line: #a8cec2;
-  --ad-sky-grove-line-strong: #27604f;
-  --ad-sky-grove-primary: #1f6f4d;
-  --ad-sky-grove-secondary: #2f80b7;
-  --ad-sky-grove-highlight: #b8df72;
-  --ad-sky-grove-busy: #bd7418;
-  --ad-sky-grove-idle: #66847b;
-  --ad-sky-grove-waiting: #2f80b7;
-  --ad-sky-grove-done: #2f8a62;
-  --ad-sky-grove-error: #bd3d45;
-  --ad-sky-grove-unknown: #80938e;
-  --ad-sky-grove-tech-background: #102e2a;
-  --ad-sky-grove-tech-surface: #183d37;
-  --ad-sky-grove-tech-text: #effbf7;
-  --ad-sky-grove-tech-muted: #a8c8be;
-  --ad-sky-grove-radius-small: 6px;
-  --ad-sky-grove-radius-medium: 12px;
-  --ad-sky-grove-radius-large: 20px;
-  --ad-sky-grove-leaf-radius: 55% 8% 55% 8%;
+  --ad-sky-grove-ink: #17332f;
+  --ad-sky-grove-text: #34524e;
+  --ad-sky-grove-muted: #697e7b;
+  --ad-sky-grove-line: #bed5d9;
+  --ad-sky-grove-line-strong: #3a675f;
+  --ad-sky-grove-primary: #2f7058;
+  --ad-sky-grove-secondary: #287a9b;
+  --ad-sky-grove-highlight: #d5e9c6;
+  --ad-sky-grove-busy: #b46b1e;
+  --ad-sky-grove-idle: #687d7a;
+  --ad-sky-grove-waiting: #287a9b;
+  --ad-sky-grove-done: #2f7d5c;
+  --ad-sky-grove-error: #b8454d;
+  --ad-sky-grove-unknown: #829491;
+  --ad-sky-grove-tech-background: #102927;
+  --ad-sky-grove-tech-surface: #183734;
+  --ad-sky-grove-tech-text: #eff8f6;
+  --ad-sky-grove-tech-muted: #abc5c0;
+  --ad-sky-grove-radius-small: 4px;
+  --ad-sky-grove-radius-medium: 9px;
+  --ad-sky-grove-radius-large: 14px;
 }
 
 :root[data-skin="sky-grove"] {
   --ad-surface-canvas: var(--ad-sky-grove-canvas);
   --ad-surface-panel: var(--ad-sky-grove-panel);
   --ad-surface-raised: var(--ad-sky-grove-raised);
-  --ad-surface-subtle: color-mix(in srgb, var(--ad-sky-grove-secondary) 10%, var(--ad-sky-grove-panel));
-  --ad-surface-emphasis: color-mix(in srgb, var(--ad-sky-grove-highlight) 34%, var(--ad-sky-grove-panel));
+  --ad-surface-subtle: color-mix(in srgb, var(--ad-sky-grove-secondary) 8%, var(--ad-sky-grove-panel));
+  --ad-surface-emphasis: color-mix(in srgb, var(--ad-sky-grove-highlight) 30%, var(--ad-sky-grove-panel));
   --ad-text-primary: var(--ad-sky-grove-ink);
   --ad-text-secondary: var(--ad-sky-grove-text);
   --ad-text-muted: var(--ad-sky-grove-muted);
@@ -56,39 +55,26 @@
   --ad-radius-small: var(--ad-sky-grove-radius-small);
   --ad-radius-medium: var(--ad-sky-grove-radius-medium);
   --ad-radius-large: var(--ad-sky-grove-radius-large);
-  --ad-shadow-keyline: 0 2px 0 color-mix(in srgb, var(--ad-sky-grove-line-strong) 44%, transparent);
-  --ad-shadow-offset: 0 10px 24px color-mix(in srgb, var(--ad-sky-grove-line-strong) 18%, transparent);
+  --ad-shadow-keyline: 0 1px 2px color-mix(in srgb, var(--ad-sky-grove-line-strong) 18%, transparent);
+  --ad-shadow-offset: 0 14px 34px color-mix(in srgb, var(--ad-sky-grove-line-strong) 14%, transparent);
 }
 
 :root[data-skin="sky-grove"] body::before {
   background-image:
-    radial-gradient(ellipse at 18% 18%, transparent 0 26%, color-mix(in srgb, var(--ad-action-secondary) 18%, transparent) 26.5% 27%, transparent 27.5%),
-    radial-gradient(ellipse at 82% 72%, transparent 0 30%, color-mix(in srgb, var(--ad-action-primary) 16%, transparent) 30.5% 31%, transparent 31.5%),
-    linear-gradient(145deg, color-mix(in srgb, var(--ad-surface-raised) 70%, transparent), transparent 58%);
-  background-size: 420px 280px, 520px 360px, 100% 100%;
-  opacity: 0.72;
+    radial-gradient(circle at 10% -12%, color-mix(in srgb, var(--ad-action-secondary) 14%, transparent), transparent 34rem),
+    radial-gradient(circle at 92% 12%, color-mix(in srgb, var(--ad-action-primary) 8%, transparent), transparent 30rem),
+    repeating-radial-gradient(ellipse at 96% 112%, transparent 0 74px, color-mix(in srgb, var(--ad-border-strong) 9%, transparent) 75px 76px, transparent 77px 104px);
+  background-size: 100% 100%;
+  opacity: 0.64;
 }
 
 :root[data-skin="sky-grove"] [data-ui="app-shell"] {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--ad-surface-raised) 30%, transparent), transparent 35%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ad-surface-raised) 42%, transparent), transparent 30rem);
 }
 
 :root[data-skin="sky-grove"] [data-ui="agent-card"] {
-  border-radius: var(--ad-radius-small) var(--ad-radius-large) var(--ad-radius-large) var(--ad-radius-small);
+  border-radius: var(--ad-radius-large);
   overflow: hidden;
-}
-
-:root[data-skin="sky-grove"] [data-ui="agent-card"]::after {
-  border: var(--ad-border-thin) solid color-mix(in srgb, var(--ad-action-primary) 34%, transparent);
-  border-radius: var(--ad-sky-grove-leaf-radius);
-  content: "";
-  height: 46px;
-  pointer-events: none;
-  position: absolute;
-  right: -18px;
-  top: -20px;
-  transform: rotate(24deg);
-  width: 72px;
 }
 
 :root[data-skin="sky-grove"] [data-ui="surface"],
@@ -102,7 +88,7 @@
 }
 
 :root[data-skin="sky-grove"] [data-ui="transcript"] [data-variant="user"] {
-  background: color-mix(in srgb, var(--ad-action-secondary) 12%, var(--ad-surface-raised));
+  background: color-mix(in srgb, var(--ad-action-secondary) 8%, var(--ad-surface-raised));
 }
 
 [data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="sky-grove"] {
@@ -119,12 +105,12 @@
 [data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="sky-grove"] .appearance-preview-surface {
   background: var(--ad-sky-grove-panel);
   border-color: var(--ad-sky-grove-line);
-  border-radius: var(--ad-sky-grove-radius-small) var(--ad-sky-grove-radius-medium) var(--ad-sky-grove-radius-medium) var(--ad-sky-grove-radius-small);
+  border-radius: var(--ad-sky-grove-radius-medium);
 }
 
 [data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="sky-grove"] .appearance-preview-action {
   background: var(--ad-sky-grove-primary);
-  border-radius: var(--ad-sky-grove-radius-small) var(--ad-sky-grove-radius-medium) var(--ad-sky-grove-radius-medium) var(--ad-sky-grove-radius-small);
+  border-radius: var(--ad-sky-grove-radius-medium);
 }
 
 [data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="sky-grove"] .appearance-preview-signal {

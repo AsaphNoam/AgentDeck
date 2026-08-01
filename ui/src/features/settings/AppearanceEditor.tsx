@@ -15,7 +15,7 @@ const appearances = [
     id: SKY_GROVE_SKIN,
     value: SKY_GROVE_SKIN,
     name: "Sky & Grove",
-    description: "Airy sky surfaces, evergreen structure, and restrained natural linework.",
+    description: "Calm sky-blue layers, evergreen structure, and quiet contour linework.",
   },
 ];
 

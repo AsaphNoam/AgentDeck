@@ -163,23 +163,9 @@ primitive seam; the rejected alternatives are recorded in §5.
   failed configuration produces Core; Settings shows the server warning, unknown raw id, or query
   error instead of crashing the shell. No appearance value enters Zustand, component props, routes,
   project/session data, or launch composition.
-- **R33** — Sky & Grove defines its raw palette once in its skin stylesheet
-  and maps it to the existing public semantic tokens. Its starting visual contract is:
-
-  | Role | Value |
-  |---|---|
-  | Canvas / panel / raised | `#e9f5fb` / `#f4fbf8` / `#ffffff` |
-  | Primary / secondary / muted text | `#12382f` / `#315e53` / `#648078` |
-  | Default / strong border | `#a8cec2` / `#27604f` |
-  | Primary action / secondary action / highlight | `#1f6f4d` / `#2f80b7` / `#b8df72` |
-  | Busy / idle / waiting / done / error / unknown | `#bd7418` / `#66847b` / `#2f80b7` / `#2f8a62` / `#bd3d45` / `#80938e` |
-  | Technical background / surface / text / muted | `#102e2a` / `#183d37` / `#effbf7` / `#a8c8be` |
-
-  The skin retains the bundled Core fonts, increases the public small/medium/large radii to
-  `6px`/`12px`/`20px`, and uses token-derived sky/green depth plus CSS-only botanical/topographic
-  line decoration on approved hooks. It introduces no glass, glow, decorative text, semantic-color
-  alias, or asset that carries product meaning. Compact Core/Sky & Grove previews reuse the Core raw
-  values and Sky & Grove raw values respectively rather than duplicating palette literals.
+- **R33 — retired 2026-08-01:** The initial Sky & Grove palette, diffuse depth, `6px`/`12px`/`20px`
+  geometry, and card-leaf ornament are superseded by R38 after visual review found that combination
+  washed out hierarchy and displaced a semantic agent-state cue.
 - **R34** — The presentation checker accepts a production `data-skin` selector
   only inside `ad-skins`, rejects undocumented ids, rejects a skin rule outside the declared skin
   stylesheet/layer, and still rejects Core CSS that depends on a skin marker. It proves each manifest
@@ -217,6 +203,25 @@ primitive seam; the rejected alternatives are recorded in §5.
   single `--ad-project-accent` value so no new per-card inline literal is added (R14). The agent-state
   top bar is unaffected, and the mix proportions are bounded to preserve body-text contrast in Core
   and every skin (FS-02.R40).
+- **R38** — Sky & Grove defines its raw palette once in its skin stylesheet and maps it to
+  the existing public semantic tokens. Its reworked visual contract is:
+
+  | Role | Value |
+  |---|---|
+  | Canvas / panel / raised | `#e8f4f8` / `#f4fafb` / `#ffffff` |
+  | Primary / secondary / muted text | `#17332f` / `#34524e` / `#697e7b` |
+  | Default / strong border | `#bed5d9` / `#3a675f` |
+  | Primary action / secondary action / highlight | `#2f7058` / `#287a9b` / `#d5e9c6` |
+  | Busy / idle / waiting / done / error / unknown | `#b46b1e` / `#687d7a` / `#287a9b` / `#2f7d5c` / `#b8454d` / `#829491` |
+  | Technical background / surface / text / muted | `#102927` / `#183734` / `#eff8f6` / `#abc5c0` |
+
+  The skin retains the bundled Core fonts and uses `4px`/`9px`/`14px` public
+  small/medium/large radii, controlled one- and two-stage shadows, blue-white surface layering,
+  evergreen structure, and low-contrast CSS-only contour/canopy linework on approved hooks. Skin
+  decoration never replaces an agent state strip or another semantic-state cue. The skin introduces
+  no glass, glow, decorative text, semantic-color alias, or asset that carries product meaning.
+  Compact Core/Sky & Grove previews reuse the Core raw values and Sky & Grove raw values respectively
+  rather than duplicating palette literals.
 
 ## 3. Interfaces & data shapes
 
