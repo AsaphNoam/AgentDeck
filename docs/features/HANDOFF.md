@@ -131,23 +131,31 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 ### Open findings
 
-- **Worth fixing** (INV §13/§10) — In the project context menu, the preset color swatches
-  (`.project-color-preset`, specificity 0,1,0) are out-specified by the shared `.context-menu button`
-  rules (specificity 0,1,1) in `ui/src/styles/features/dashboard.css`, so a swatch rendered inside the
-  menu loses its round shape (`border-radius` falls to `--ad-radius-small`), its border
-  (`border-color: transparent`), and its hover lift. The inline fill color and the `aria-pressed`
-  selected outline (0,2,0) still win, so the picker stays usable and selectable — this is cosmetic.
-  Normal-use trigger: right-click any active project card and look at the six swatches; they are
-  squarish and borderless versus the round bordered swatches in the Settings/onboarding forms. No test
-  catches it (jsdom is blind to CSS and the visual matrix renders only agent cards, not the menu).
-  Suggested fix: scope the swatch rules to beat `.context-menu button` (e.g. `.context-menu .project-color-preset`)
-  or exclude the picker from that selector; extend the visual matrix to render the menu picker.
-
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-01 — Fixed the AgentDecker builder findings (FS-14.R27/A10; **INV §1/§13/§10**): proposal
+  discovery now validates every self-identifying terminal tool result instead of trusting the
+  ACP display title/category; the builder stays on Pipelines where its approval controls live; and a
+  stopped builder refetches and retains a transcript that contains a pending proposal, while stale
+  proposal-free sessions still expire. Focused UI regressions cover generic ACP labels and the
+  stopped-builder recovery. The project-menu swatches regain their round border/hover treatment and
+  the visual matrix now renders that menu picker. `make check-specs`, the focused UI tests/build, and
+  the full required verification suite pass. The real credentialed adapter round-trip remains a
+  release gate, not a claim from this fixture coverage.
+
+- 2026-08-01 — Targeted usability review of the Create-with-AgentDecker pipeline flow (J14, FS-14
+  §4.2): 2 Must-fix, 1 Worth-fixing, queued above. The live round-trip could not be run — `fakeacp`
+  cannot issue a real `propose_pipeline_template` MCP call, so no fixture exercises a real
+  MCP-tool-named transcript event. Leading cause: proposal detection matches on the ACP-derived
+  tool-call `name`/`title`, which never carries the tool name (`name` = ACP kind `"other"`), so the
+  proposal panel likely never renders with the real adapter (needs a live-adapter check). Secondary:
+  launch navigates to the chat while the only approval surface is on Pipelines, stranding the user.
+  Run record:
+  [`../archive/reviews/usability-review-run-2026-08-01-agentdecker-builder.md`](../archive/reviews/usability-review-run-2026-08-01-agentdecker-builder.md).
 
 - 2026-08-01 — Usability review of the per-chat runtime picker (FS-03.R23/R24/A9): PASS, no findings.
   Built the real binary, seeded an isolated home, and drove the running chat header in headless

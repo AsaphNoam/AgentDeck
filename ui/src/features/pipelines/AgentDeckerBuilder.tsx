@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { getTranscript, launchAgent, sendPrompt } from "../../api/client";
 import { useBackends, useConfig, useProjects, useRoles } from "../../api/config";
 import type { TranscriptEvent } from "../../api/types";
@@ -10,22 +10,15 @@ import { useAgentStore } from "../../store/agentStore";
 const BUILDER_KEY = "agentdeck.pipeline-builder-agent";
 const EMPTY_EVENTS: TranscriptEvent[] = [];
 
-export function shouldDropBuilderSession(builderID: string | null, live: boolean, hydrated: boolean, hydrating: boolean, justLaunched: boolean) {
-  return Boolean(builderID && hydrated && !hydrating && !live && !justLaunched);
+export function shouldDropBuilderSession(builderID: string | null, live: boolean, transcriptLoaded: boolean, hasProposal: boolean, hydrated: boolean, hydrating: boolean, justLaunched: boolean) {
+  return Boolean(builderID && transcriptLoaded && hydrated && !hydrating && !live && !hasProposal && !justLaunched);
 }
 
 export function extractPipelineProposals(events: TranscriptEvent[]): PipelineProposal[] {
-  const toolNames = new Map<string, string>();
   const proposals = new Map<string, PipelineProposal>();
   for (const event of events) {
     const kind = String(event.kind ?? event.type ?? "");
-    const callID = String(event.tool_call_id ?? "");
-    if (kind === "tool_call" && callID) {
-      const name = String(event.name ?? "");
-      const title = String(event.title ?? "");
-      toolNames.set(callID, [name, title].find((value) => ["propose_pipeline_template", "propose_pipeline_run"].includes(value)) ?? name);
-    }
-    if (kind !== "tool_result" || !callID || !["propose_pipeline_template", "propose_pipeline_run"].includes(toolNames.get(callID) ?? "")) continue;
+    if (kind !== "tool_result") continue;
     for (const candidate of jsonCandidates(event.content ?? event.result)) {
       try {
         const parsed = JSON.parse(candidate) as { ok?: boolean; proposal?: unknown };
@@ -55,7 +48,6 @@ export function AgentDeckerBuilder({
   onTemplateProposal: (proposal: Extract<PipelineProposal, { kind: "save_template" }>) => void;
   onRunProposal: (proposal: Extract<PipelineProposal, { kind: "start_run" }>) => void;
 }) {
-  const navigate = useNavigate();
   const roles = useRoles();
   const backends = useBackends();
   const config = useConfig();
@@ -66,6 +58,7 @@ export function AgentDeckerBuilder({
   const [modelID, setModelID] = useState("");
   const [description, setDescription] = useState("");
   const [builderID, setBuilderID] = useState<string | null>(() => localStorage.getItem(BUILDER_KEY));
+  const [builderTranscriptLoaded, setBuilderTranscriptLoaded] = useState(false);
   const justLaunchedBuilder = useRef<string | null>(null);
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,18 +103,20 @@ export function AgentDeckerBuilder({
   }, [backendID, backends.data]);
 
   useEffect(() => {
-    if (!builderID || !agentsHydrated || agentsHydrating || !builderRunning) return;
-    if (justLaunchedBuilder.current === builderID) justLaunchedBuilder.current = null;
+    if (!builderID || !agentsHydrated || agentsHydrating) return;
     void getTranscript(builderID)
       .then((transcript) => setTranscript(transcript.agent_id, transcript.events))
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => setBuilderTranscriptLoaded(true));
   }, [agentsHydrated, agentsHydrating, builderID, builderRunning, setTranscript]);
 
   useEffect(() => {
-    if (!shouldDropBuilderSession(builderID, builderRunning, agentsHydrated, agentsHydrating, justLaunchedBuilder.current === builderID)) return;
+    if (builderRunning && justLaunchedBuilder.current === builderID) justLaunchedBuilder.current = null;
+    if (!shouldDropBuilderSession(builderID, builderRunning, builderTranscriptLoaded, proposals.length > 0, agentsHydrated, agentsHydrating, justLaunchedBuilder.current === builderID)) return;
     localStorage.removeItem(BUILDER_KEY);
     setBuilderID(null);
-  }, [agentsHydrated, agentsHydrating, builderID, builderRunning]);
+    setBuilderTranscriptLoaded(false);
+  }, [agentsHydrated, agentsHydrating, builderID, builderRunning, builderTranscriptLoaded, proposals.length]);
 
   const launchBuilder = async () => {
     if (!description.trim() || !project) return;
@@ -140,12 +135,12 @@ export function AgentDeckerBuilder({
       justLaunchedBuilder.current = agentID;
       localStorage.setItem(BUILDER_KEY, agentID);
       setBuilderID(agentID);
+      setBuilderTranscriptLoaded(false);
       await sendPrompt(agentID, [
         "Help me design this AgentDeck pipeline:",
         description.trim(),
         "Ask any clarifying questions in chat. When the design is ready, call propose_pipeline_template with the exact model-neutral draft. Do not save or start anything yourself.",
       ].join("\n\n"));
-      navigate(`/agent/${agentID}`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
@@ -190,8 +185,8 @@ export function AgentDeckerBuilder({
     </div>}
 
     {builderID && <div className="pipeline-builder-session">
-      <p>Builder session: <code>{builderID}</code></p>
-      <Link to={`/agent/${builderID}`}>Open AgentDecker chat</Link>
+      <p>{!agentsHydrated ? "Loading builder session…" : builderRunning ? <>Builder session: <code>{builderID}</code></> : "The builder session has stopped. Its pending proposals remain available below."}</p>
+      {builderRunning && <Link to={`/agent/${builderID}`}>Open AgentDecker chat</Link>}
     </div>}
     {proposals.length > 0 && <div className="pipeline-proposal-list">
       <h3>Pending exact proposals</h3>

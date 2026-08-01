@@ -366,6 +366,16 @@
   transform: none;
 }
 
+.context-menu .project-color-preset {
+  border: var(--ad-border-thick) solid var(--ad-border-strong);
+  border-radius: var(--ad-radius-round);
+}
+
+.context-menu .project-color-preset:hover:not(:disabled) {
+  box-shadow: var(--ad-shadow-keyline);
+  transform: translate(-1px, -1px);
+}
+
 .context-menu hr {
   margin: var(--ad-space-1) 0;
 }
