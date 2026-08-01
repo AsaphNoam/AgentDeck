@@ -143,7 +143,7 @@ export function ChatPanel() {
   return (
     <section className="chat-panel" data-ui="agent-workspace" data-state="active" data-variant={agent.interface === "terminal" ? "terminal" : "chat"}>
       <header className="chat-header" data-slot="header">
-        <Link to="/">Back</Link>
+        <Link to={agent.project ? `/project/${agent.project}` : "/"}>Back</Link>
         <div data-slot="identity">
           <h1>{agent.name}</h1>
           {editableRuntime ? (
