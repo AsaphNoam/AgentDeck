@@ -147,6 +147,32 @@ func TestConfigSourcePreviewBindRefreshDelete(t *testing.T) {
 	}
 }
 
+func TestConfigSourceBindUnknownBackendDoesNotSpendPreview(t *testing.T) {
+	srv, _, _ := federationServer(t)
+	h := srv.routes()
+	rec := doJSON(t, h, http.MethodPost, "/api/config-sources/preview",
+		`{"provider":"claude-code","root":"auto","mode":"linked","claims":["launch_defaults"],"project":"fed"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("preview status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	var pv previewResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &pv); err != nil {
+		t.Fatalf("preview body: %v", err)
+	}
+
+	rec = doJSON(t, h, http.MethodPut, "/api/config-sources/not-saved",
+		`{"preview_token":"`+pv.PreviewToken+`","overrides":{}}`)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("unknown backend bind status = %d body=%s, want 404", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodPut, "/api/config-sources/claude",
+		`{"preview_token":"`+pv.PreviewToken+`","overrides":{}}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("bind after unknown backend status = %d body=%s, want 200", rec.Code, rec.Body.String())
+	}
+}
+
 func TestConfigSourceBindRejectsBadToken(t *testing.T) {
 	srv, _, _ := federationServer(t)
 	h := srv.routes()

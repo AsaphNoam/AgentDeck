@@ -690,6 +690,50 @@ func TestPutBackendsFailedCredCheckStillPersists(t *testing.T) {
 	}
 }
 
+func TestPutBackendsPrunesRemovedOrRetargetedSourceBindings(t *testing.T) {
+	srv := testServerWithCredCheck(t, credcheck.CredResult{Status: "ok"})
+	sources, err := srv.readConfigSources()
+	if err != nil {
+		t.Fatalf("readConfigSources: %v", err)
+	}
+	sources.Sources["claude"] = config.SourceBinding{Provider: "claude-code"}
+	sources.Sources["codex"] = config.SourceBinding{Provider: "codex"}
+	if err := srv.configStore.WriteConfigSources(sources); err != nil {
+		t.Fatalf("WriteConfigSources: %v", err)
+	}
+
+	h := srv.routes()
+	rec := doRequest(t, h, http.MethodPut, "/api/backends", validBackendsBody())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT /api/backends status = %d body=%s", rec.Code, rec.Body)
+	}
+
+	sources, err = srv.readConfigSources()
+	if err != nil {
+		t.Fatalf("readConfigSources after save: %v", err)
+	}
+	if _, ok := sources.Sources["claude"]; !ok {
+		t.Fatal("matching Claude source binding was removed")
+	}
+	if _, ok := sources.Sources["codex"]; ok {
+		t.Fatal("binding for removed backend was retained")
+	}
+
+	body := validBackendsBody()
+	body["backends"].(map[string]any)["claude"].(map[string]any)["type"] = "codex-acp"
+	rec = doRequest(t, h, http.MethodPut, "/api/backends", body)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT retargeted backend status = %d body=%s", rec.Code, rec.Body)
+	}
+	sources, err = srv.readConfigSources()
+	if err != nil {
+		t.Fatalf("readConfigSources after retarget: %v", err)
+	}
+	if _, ok := sources.Sources["claude"]; ok {
+		t.Fatal("binding for retargeted backend was retained")
+	}
+}
+
 // ---- Helpers ----
 
 // seedRunningAgentWithRole creates agent+running entries in the state store

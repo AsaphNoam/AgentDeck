@@ -116,6 +116,7 @@ export function BackendsEditor() {
 
   const [entries, setEntries] = useState<BackendEntry[]>([]);
   const [defaultId, setDefaultId] = useState<string>("");
+  const [savedBackendIds, setSavedBackendIds] = useState<Set<string>>(new Set());
   const [credentials, setCredentials] = useState<Record<string, CredResult>>({});
   const [error, setError] = useState<string | null>(null);
 
@@ -124,6 +125,7 @@ export function BackendsEditor() {
     if (!data) return;
     const es = backendEntries(data);
     setEntries(es);
+    setSavedBackendIds(new Set(Object.keys(data.backends ?? {})));
     const def = es.find((e) => e.backend.default)?.id ?? es[0]?.id ?? "";
     setDefaultId(def);
   }, [data]);
@@ -171,6 +173,7 @@ export function BackendsEditor() {
         // Re-sync draft from normalized response.
         const es = backendEntries(resp);
         setEntries(es);
+        setSavedBackendIds(new Set(Object.keys(resp.backends ?? {})));
         const def = es.find((e) => e.backend.default)?.id ?? es[0]?.id ?? "";
         setDefaultId(def);
       },
@@ -246,7 +249,7 @@ export function BackendsEditor() {
           )}
 
           {(backend.type === "claude-acp" || backend.type === "codex-acp") && (
-            <ConfigSourcePanel backendId={id} backendType={backend.type} />
+            <ConfigSourcePanel backendId={id} backendType={backend.type} persisted={savedBackendIds.has(id)} />
           )}
 
           <div className="backend-models-section">

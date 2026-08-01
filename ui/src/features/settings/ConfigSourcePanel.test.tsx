@@ -43,6 +43,13 @@ describe("ConfigSourcePanel", () => {
     expect(container.firstChild).toBeNull();
   });
 
+  it("requires a Settings backend to be saved before it can be linked", async () => {
+    renderWithQuery(<ConfigSourcePanel backendId="backend-draft" backendType="codex-acp" persisted={false} />);
+
+    expect(await screen.findByText("Save this backend before linking a configuration source.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Discover native config" })).not.toBeInTheDocument();
+  });
+
   it("discovers then links a native source", async () => {
     let bound = false;
     server.use(

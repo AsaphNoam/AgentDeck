@@ -4,6 +4,16 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-01 — Implementation: configuration-source backend linking
+
+New backends now require a successful Settings save before configuration-source linking is offered. A premature API request no longer consumes its preview token, and saving the backend catalog removes bindings for deleted or provider-retargeted backends, so an invisible stale binding cannot block later links.
+
+The focused regressions, both Go test modes, all 207 UI tests, specification checks, and generated distribution build pass.
+
+**Needs attention:** None.
+
+**Next:** Restart AgentDeck to use the rebuilt application.
+
 ### 2026-08-01 — Review: today's ad-hoc changes
 
 I reviewed everything committed today after the per-chat runtime picker: the AgentDecker proposal

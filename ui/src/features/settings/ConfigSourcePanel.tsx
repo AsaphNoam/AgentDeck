@@ -120,6 +120,7 @@ function EffectiveView({ effective }: { effective: Effective }) {
 export function ConfigSourcePanel({
   backendId,
   backendType,
+  persisted = true,
   initialProjectId,
   defaultOpen,
   claimMutation,
@@ -127,6 +128,9 @@ export function ConfigSourcePanel({
 }: {
   backendId: string;
   backendType: BackendType;
+  // A Settings draft has a client-only id until the enclosing backend catalog
+  // is saved. Binding against it would fail with "unknown backend".
+  persisted?: boolean;
   initialProjectId?: string;
   defaultOpen?: boolean;
   claimMutation?: () => boolean;
@@ -179,6 +183,17 @@ export function ConfigSourcePanel({
 
   // Federation applies to Claude/Codex only.
   if (!provider) return null;
+
+  if (!persisted) {
+    return (
+      <details className="backend-source-section" data-ui="config-source" data-state="unbound" open={defaultOpen}>
+        <summary>Configuration source ({providerLabel(provider)})</summary>
+        <div className="source-panel">
+          <p className="source-hint">Save this backend before linking a configuration source.</p>
+        </div>
+      </details>
+    );
+  }
 
   const claims = ["launch_defaults", "model_catalog", "setup"];
 
