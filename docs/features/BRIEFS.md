@@ -4,6 +4,16 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-01 — Implementation: Plain chat tool activity
+
+Chat tool activity now renders as regular, subdued text. Group summaries, calls, output, and failures have no tinted backgrounds or enclosing boxes; the expand/collapse control and error-text cue remain.
+
+The visual fixture and full test/build suite passed.
+
+**Needs attention:** None.
+
+**Next:** No action needed.
+
 ### 2026-08-01 — Implementation: Collapsed chat tool runs
 
 Consecutive tool activity now appears as one closed **Ran _n_ tools** row. Clicking it reveals the individual calls, their meaningful output, and any failures; regular assistant text, diffs, permissions, and other events begin a new row.

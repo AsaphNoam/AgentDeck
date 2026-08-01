@@ -181,6 +181,9 @@ Requirements are user-observable.
   default, inviting disclosure without competing with the conversation. Opening the row reveals
   the existing compact tool-call and non-empty/failed result rows; a successful no-payload result
   adds no visual row. This supersedes R34's no-payload status label.
+- **R36** — Tool-run summaries, tool calls, and tool results render as regular subdued text rather
+  than coloured or enclosed surfaces. Disclosure, indentation, and semantic error text remain
+  available without adding a tinted background or box. This refines R35.
 
 ## 3. States & transitions
 
@@ -260,6 +263,9 @@ Requirements are user-observable.
   injected save failure each leave a usable Core application; Settings explains the unavailable or
   unsaved choice and can recover by saving a valid option. *Verify:* configuration/API and Settings
   regressions plus a first-paint browser smoke test.
+- **A12** (R36) — Tool-run summary, call, result, and failure fixtures remain visible as plain
+  text without a coloured or boxed surface. *Verify:* the tool-activity states in
+  `ui/src/presentation/VisualMatrix.tsx`.
 
 ## 6. Deviations & open decisions
 
