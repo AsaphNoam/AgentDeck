@@ -149,6 +149,10 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   error instead of optimistically resolving the prompt.
 - **R22.** A terminal-interface agent does not use this composer or ACP permission relay. Its panel
   opens on Terminal and directs input/permission handling to the live terminal (FS-07).
+- **R25.** A terminal tool result with no displayable `content`, `error`, or `result` remains a
+  visible completed tool outcome, but renders as a compact labelled status rather than a blank
+  transcript panel. Non-empty and failed results retain R2's inspection and error behavior in both
+  live and archived transcripts.
 
 ## 5. Acceptance criteria
 
@@ -188,6 +192,11 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `ui/src/components/chat/ChatPanel.test.tsx`; the browser acceptance pass changes a live fake
   agent's model and verifies that stopping it restores static identity.
 
+- **A10** (R25) — A completed tool result with no displayable payload renders **Completed** rather
+  than an empty result panel; an empty `content` field does not hide a meaningful error, and a
+  long result remains expandable. *Verify:* `ui/src/components/chat/renderers/ToolResult.test.tsx`
+  and the tool-activity states in `ui/src/presentation/VisualMatrix.tsx`.
+
 ## 6. Deviations & open decisions
 
 - **Concurrent transcript refetches have no ordering token.** Open, reconnect, and gap-repair
@@ -213,4 +222,5 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `TestLaunchPromptPermissionFlow`, `TestPermissionApprove`, `TestPermissionTimeout`,
   `TestCancelDuringPendingPermission`, `TestCrashMidTurnPersistsDeliveredTranscript`,
   `ui/src/store/transcriptStore.test.ts`, and
-  `ui/src/components/chat/ChatPanel.test.tsx` (R23/R24).
+  `ui/src/components/chat/ChatPanel.test.tsx` (R23/R24), and
+  `ui/src/components/chat/renderers/ToolResult.test.tsx` (R25).

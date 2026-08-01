@@ -144,6 +144,15 @@ are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
 
+- 2026-08-01 — Implemented compact chat tool activity (FS-03.R25/A10; FS-12.R34;
+  TS-08.R1/R5/R7; **INV §8/§13**). A terminal tool result whose completed payload is empty is
+  now a compact, labelled **Completed** outcome rather than a blank block; an empty `content`
+  field no longer hides a meaningful error. Tool calls/results use subdued neutral rows, while
+  diffs, fenced code, commands, and Terminal retain their technical surfaces. The visual matrix
+  covers call, non-empty result, empty completion, and failure. Specification/style/presentation
+  checks, both Go test modes, all 203 UI tests, source and distribution builds, whitespace, and a
+  real-browser visual fixture pass with no browser errors.
+
 - 2026-08-01 — Designed Claude configured-model autosync; no product code changed. An opted-in
   `claude-acp` backend will add valid selectors from the user-level Claude `model`,
   `availableModels`, and `fallbackModel` settings at dashboard startup. Sync is add-only, keeps
