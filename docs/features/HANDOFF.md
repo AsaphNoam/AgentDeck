@@ -144,6 +144,8 @@ are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
 
+- 2026-08-01 — Fixed scoped New Agent launches (FS-02.R43/A25; **INV §1/§8/§10**). A New agent action on `/project/:id` now fixes the launch target to that route project and omits the project picker, while the general modal and other prefilled launch surfaces retain their existing chooser behavior. The fixed project is reapplied if the scoped route changes before submission, preventing a mounted modal from carrying the prior project. Focused regressions cover the hidden picker and submitted project from both the modal and scoped grid. `make check-specs`, both Go test modes, all 200 UI tests, source and distribution builds, presentation/style checks, and whitespace checks pass. No real-browser pass was run; component coverage stands in for J5.
+
 - 2026-08-01 — Implemented "create a project from the projects page" (FS-02.R41/R42/A24; **INV
   §1/§8/§10/§13**). The projects home now shows a persistent **New project** header button and a
   background right-click **New project** menu (a right-click on a project card still opens that card's

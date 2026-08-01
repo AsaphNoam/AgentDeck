@@ -88,6 +88,54 @@ describe("NewAgentModal", () => {
     expect(projectSelect).not.toHaveTextContent("My App (my-app)");
   });
 
+  it("locks a scoped launch to its fixed project without rendering a picker", async () => {
+    let capturedBody: unknown;
+    server.use(
+      http.post("/api/sessions", async ({ request }) => {
+        capturedBody = await request.json();
+        return HttpResponse.json({ agent: { agent_id: "a1", name: "Atlas" } }, { status: 201 });
+      }),
+    );
+
+    renderWithQuery(<NewAgentModal open={true} onClose={() => {}} fixedProject="billing" />);
+    await screen.findByText(/Implementer/);
+
+    expect(screen.queryByText("Project")).toBeNull();
+    fireEvent.click(screen.getByText("Launch"));
+
+    await waitFor(() => expect(capturedBody).toBeDefined());
+    expect((capturedBody as Record<string, unknown>).project).toBe("billing");
+  });
+
+  it("updates the fixed project when a scoped route changes", async () => {
+    let capturedBody: unknown;
+    server.use(
+      http.post("/api/sessions", async ({ request }) => {
+        capturedBody = await request.json();
+        return HttpResponse.json({ agent: { agent_id: "a1", name: "Atlas" } }, { status: 201 });
+      }),
+    );
+
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    const onClose = () => {};
+    const view = render(
+      <QueryClientProvider client={qc}>
+        <NewAgentModal open={true} onClose={onClose} fixedProject="my-app" />
+      </QueryClientProvider>,
+    );
+    await screen.findByText(/Implementer/);
+
+    view.rerender(
+      <QueryClientProvider client={qc}>
+        <NewAgentModal open={true} onClose={onClose} fixedProject="billing" />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByText("Launch"));
+
+    await waitFor(() => expect(capturedBody).toBeDefined());
+    expect((capturedBody as Record<string, unknown>).project).toBe("billing");
+  });
+
   it("auto-suggests name from the role", async () => {
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
     // The suggested name is just the (capitalized) role once the role default loads.
