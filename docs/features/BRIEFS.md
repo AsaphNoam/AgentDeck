@@ -4,6 +4,29 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-01 — Review: simple backend creation and global source linking
+
+The design is not ready to implement. Four decisions are still underspecified or internally
+inconsistent: the specification describes the unshipped global flow as if it were already current;
+the Add-backend dialog does not say exactly when the backend becomes durable, what happens to
+unsaved edits elsewhere in the whole-catalog form, or whether a saved backend remains after linking
+fails; Mirrored is offered as recovery even though it currently follows the same discovery and
+resolution path as Linked and only adds a cache after success; and the two-file source/catalog update
+has no restart recovery if the process stops between writes.
+
+Two smaller corrections should land with that revision: describe Claude/Codex imports as configured
+or locally visible models rather than "supported models," and make the verification plan explicitly
+cover target-only import, zero-project use, concurrent saves, rollback/restart, retry, and both source
+and backend invalidation.
+
+**Needs attention:** Choose the modal ownership rule and the future of Mirrored recovery. I recommend
+persisting the valid backend inside the dialog before connection, keeping it as an unbound backend if
+connection fails, preserving or explicitly resolving any pre-existing unsaved edits, and removing
+Mirrored from error recovery unless a concrete failure it can repair is defined.
+
+**Next:** Revise the planned requirements and ready-change file around those choices, then review the
+package once more before implementation.
+
 ### 2026-08-01 — Design: simple backend creation and global configuration linking
 
 Backend setup is ready to simplify. **Add backend** will open a provider-first dialog that suggests
