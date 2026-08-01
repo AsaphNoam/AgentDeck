@@ -43,10 +43,11 @@ describe("extractPipelineProposals", () => {
 });
 
 describe("builder session lifecycle", () => {
-  it("drops a persisted builder id only after hydration proves the agent is gone", () => {
-    expect(shouldDropBuilderSession("a_stale", false, false, false, false)).toBe(false);
-    expect(shouldDropBuilderSession("a_stale", false, true, true, false)).toBe(false);
-    expect(shouldDropBuilderSession("a_stale", false, true, false, false)).toBe(true);
-    expect(shouldDropBuilderSession("a_live", true, true, false, false)).toBe(false);
+  it("drops a stopped builder only after a proposal-free transcript loads", () => {
+    expect(shouldDropBuilderSession("a_stale", false, false, false, true, false, false)).toBe(false);
+    expect(shouldDropBuilderSession("a_stale", false, true, false, true, true, false)).toBe(false);
+    expect(shouldDropBuilderSession("a_stale", false, true, true, true, false, false)).toBe(false);
+    expect(shouldDropBuilderSession("a_stale", false, true, false, true, false, false)).toBe(true);
+    expect(shouldDropBuilderSession("a_live", true, true, false, true, false, false)).toBe(false);
   });
 });

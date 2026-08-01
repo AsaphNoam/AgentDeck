@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Badge, Button, PageHeader, Surface } from "../components/ui";
+import { Badge, Button, PageHeader, ProjectColorPicker, Surface } from "../components/ui";
 import { ContextBar } from "../components/grid/ContextBar";
 import { StateBadge } from "../components/grid/StateBadge";
 import { EmptyState } from "../components/grid/EmptyState";
@@ -131,6 +131,12 @@ export function VisualMatrix() {
           </article>
         </div>
         <EmptyState onNewAgent={() => undefined} />
+        <div className="context-menu" data-ui="context-menu" role="menu">
+          <div className="context-menu-color" role="menuitem">
+            <span>Project color picker</span>
+            <ProjectColorPicker value={PROJECT_COLOR_PRESETS[0].color} onChange={() => undefined} />
+          </div>
+        </div>
       </section>
 
       <section className="visual-matrix-section">

@@ -4,6 +4,28 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-01 — Fix: AgentDecker pipeline proposals
+
+AgentDecker now recognizes a valid proposal from its returned data instead of relying on an adapter’s display label, stays on Pipelines after launch so its approval controls remain in view, and keeps a proposal available if the builder stops immediately afterward. The project color dots in the right-click menu are round, bordered, and interactive again.
+
+**Needs attention:** The real Claude/Codex adapter round-trip remains a credentialed release check.
+
+**Next:** Run that credentialed pipeline-builder check before a release that claims live-provider support.
+
+### 2026-08-01 — Usability review: Create-with-AgentDecker pipeline flow
+
+I did a targeted review of the "Create with AgentDecker" pipeline-builder flow you reported as broken. I could not drive it end-to-end in the app: the stand-in test agent can't make the real tool call that produces a proposal, so no test setup ever exercises the actual approval surface — which is exactly why the tests stay green while the real flow fails. I traced the whole path in the code instead. Three problems, two of them serious.
+
+The likely cause of "broken": the page only recognizes a pipeline proposal when the agent's tool call is labeled with the exact name `propose_pipeline_template`, but the way AgentDeck records tool calls stores a generic category ("other") in that slot, not the tool name. So with the real Claude/Codex adapter the proposal almost certainly never shows up, and there is nothing to approve. This one needs a quick check against the real adapter to confirm the label it actually uses before fixing.
+
+Second, even when a proposal is produced, the flow sends you into the agent chat right after launch — but the only place to review and approve the proposal is back on the Pipelines page. Nothing in the chat tells you a proposal is waiting or how to get back to it, so the guided flow dead-ends. Third and minor: a proposal made just before the builder stops is dropped with no record.
+
+All three are written up with exact file locations and fix directions in the handoff for the next agent, and the full run record is saved under `docs/archive/reviews/usability-review-run-2026-08-01-agentdecker-builder.md`. I changed no product code.
+
+**Needs attention:** HUMAN — before the fix, confirm what tool-call title the real claude-agent-acp / codex-acp adapter emits for an MCP tool, since that determines the right fix for finding 1.
+
+**Next:** hand to the fix agent; the two Must-fix findings are queued in the handoff.
+
 ### 2026-08-01 — Usability review: per-chat runtime picker
 
 I drove the new chat-header runtime picker in a real browser, from a freshly built copy of the app and an isolated test setup, using a stand-in agent so nothing touched your real providers.

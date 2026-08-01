@@ -44,6 +44,12 @@ describe("VisualMatrix", () => {
     ]);
   });
 
+  it("renders the project color picker inside its context menu fixture", () => {
+    render(<MemoryRouter><VisualMatrix /></MemoryRouter>);
+    const menu = document.querySelector('[data-ui="context-menu"]')!;
+    expect(menu.querySelectorAll(".project-color-preset")).toHaveLength(6);
+  });
+
   it("switches between Core and Sky & Grove without changing product structure", () => {
     const { container, unmount } = render(<MemoryRouter><VisualMatrix /></MemoryRouter>);
     const root = container.querySelector(".visual-matrix")!;

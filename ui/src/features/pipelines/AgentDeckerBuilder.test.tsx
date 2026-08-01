@@ -8,7 +8,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { AgentState } from "../../api/types";
 import { useAgentStore } from "../../store/agentStore";
 import { useTranscriptStore } from "../../store/transcriptStore";
-import { AgentDeckerBuilder } from "./AgentDeckerBuilder";
+import { AgentDeckerBuilder, extractPipelineProposals } from "./AgentDeckerBuilder";
 
 const BUILDER_KEY = "agentdeck.pipeline-builder-agent";
 
@@ -58,9 +58,15 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
-// INV §1: a stopped builder keeps its identity row in the agent store, so the
-// persisted browser id must be classified by `running` — presence alone left a
-// dead "Open AgentDecker chat" link pointing at the live route forever.
+const templateProposal = {
+  proposal_id: "pp_123",
+  kind: "save_template",
+  digest: "digest-123",
+  payload: { id: "review", template: { version: 1, title: "Review", inputs: [], stages: [] } },
+};
+
+// INV §1: a stopped builder cannot keep a dead chat link, but a durable
+// transcript proposal must remain reachable for the required human approval.
 describe("AgentDeckerBuilder persisted session", () => {
   it("expires a persisted builder id once hydration shows it stopped", async () => {
     localStorage.setItem(BUILDER_KEY, "a_builder");
@@ -93,8 +99,39 @@ describe("AgentDeckerBuilder persisted session", () => {
 
     renderBuilder();
 
-    await screen.findByRole("link", { name: "Open AgentDecker chat" });
+    expect(screen.getByText("Loading builder session…")).toBeInTheDocument();
     expect(localStorage.getItem(BUILDER_KEY)).toBe("a_builder");
+  });
+
+  // FS-14.R27/A10: a proposal can be the final tool result before AgentDecker
+  // exits. Refetch that transcript and retain the review surface, rather than
+  // clearing the only reference to its one-time confirmation.
+  it("keeps a stopped builder's pending proposal available for review", async () => {
+    localStorage.setItem(BUILDER_KEY, "a_builder");
+    useAgentStore.setState({
+      agents: { a_builder: agent("a_builder", false) }, order: ["a_builder"], hydrated: true, hydrating: false,
+    });
+    server.use(http.get("/api/sessions/:id/transcript", ({ params }) => HttpResponse.json({
+      agent_id: params.id,
+      events: [{ kind: "tool_result", tool_call_id: "call_1", content: JSON.stringify({ ok: true, proposal: templateProposal }) }],
+    })));
+
+    renderBuilder();
+
+    await screen.findByRole("button", { name: "Review exact Save proposal" });
+    expect(localStorage.getItem(BUILDER_KEY)).toBe("a_builder");
+    expect(screen.queryByRole("link", { name: "Open AgentDecker chat" })).not.toBeInTheDocument();
+  });
+});
+
+describe("extractPipelineProposals", () => {
+  // FS-14.R27/A10: ACP gives the UI a tool category/title for display, not a
+  // machine-readable MCP tool name. The self-identifying result is authoritative.
+  it("accepts a self-identifying proposal when the ACP tool title is generic", () => {
+    expect(extractPipelineProposals([
+      { kind: "tool_call", tool_call_id: "call_1", name: "other", title: "Use pipeline tool" },
+      { kind: "tool_result", tool_call_id: "call_1", content: JSON.stringify({ ok: true, proposal: templateProposal }) },
+    ])).toEqual([templateProposal]);
   });
 });
 
