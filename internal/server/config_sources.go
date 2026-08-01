@@ -180,12 +180,6 @@ func (s *Server) handleBindConfigSource(w http.ResponseWriter, r *http.Request) 
 		writeAPIError(w, apiError(runtime.CodeInvalidField, "invalid JSON body"))
 		return
 	}
-	binding, projectID, project, err := s.sourceMgr.ConsumeBind(r.Context(), req.PreviewToken, req.Overrides)
-	if err != nil {
-		writeAPIError(w, sourceAPIError(err))
-		return
-	}
-
 	backends, err := s.readBackendsOrDefault()
 	if err != nil {
 		writeAPIError(w, apiError(runtime.CodeInternal, "read backends: "+err.Error()))
@@ -194,6 +188,11 @@ func (s *Server) handleBindConfigSource(w http.ResponseWriter, r *http.Request) 
 	backend, ok := backends.Backends[backendID]
 	if !ok {
 		writeAPIError(w, apiError(runtime.CodeSourceNotFound, "unknown backend: "+backendID))
+		return
+	}
+	binding, projectID, project, err := s.sourceMgr.ConsumeBind(r.Context(), req.PreviewToken, req.Overrides)
+	if err != nil {
+		writeAPIError(w, sourceAPIError(err))
 		return
 	}
 	if provider, supported := config.ProviderForBackendType(backend.Type); !supported || provider != binding.Provider {
@@ -312,6 +311,38 @@ func (s *Server) readConfigSources() (config.ConfigSources, error) {
 		sources.Sources = map[string]config.SourceBinding{}
 	}
 	return sources, nil
+}
+
+// pruneIncompatibleConfigSources removes bindings whose backend was deleted or
+// retargeted to another provider. A binding has no valid meaning without the
+// backend it names; keeping it would block later binds when the manifest is
+// validated as a whole.
+func (s *Server) pruneIncompatibleConfigSources(backends config.BackendsConfig) error {
+	sources, err := s.readConfigSources()
+	if err != nil {
+		return err
+	}
+
+	removed := make([]string, 0)
+	for backendID, binding := range sources.Sources {
+		backend, exists := backends.Backends[backendID]
+		provider, supported := config.ProviderForBackendType(backend.Type)
+		if exists && supported && binding.Provider == provider {
+			continue
+		}
+		delete(sources.Sources, backendID)
+		removed = append(removed, backendID)
+	}
+	if len(removed) == 0 {
+		return nil
+	}
+	if err := s.configStore.WriteConfigSources(sources); err != nil {
+		return err
+	}
+	for _, backendID := range removed {
+		s.sourceMgr.ForgetBackend(backendID)
+	}
+	return nil
 }
 
 func (s *Server) readBackendsOrDefault() (config.BackendsConfig, error) {

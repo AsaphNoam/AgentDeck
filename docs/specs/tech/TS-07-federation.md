@@ -77,6 +77,12 @@ current shapes, and the value they already carry simply stops being inert. A bou
 override names a level the selected model does not declare fails under FS-09.R42 like any other
 undeclared level; the source is never rewritten to repair it (R4).
 
+**R15 — Backend-catalog replacement reconciles source ownership.** After a successful complete
+`backends.json` save, the server removes persisted bindings whose backend key is absent or whose
+provider no longer matches the backend type, then drops their manager generations. A Settings-only
+draft is not a backend identity and cannot enter the bind route; that rejection precedes preview
+token consumption. Compatible bindings are retained.
+
 ## 3. Interfaces & data shapes
 
 `config-sources.json` version 1 stores one binding per backend: provider/root/profile/mode, claims,

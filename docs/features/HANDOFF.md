@@ -191,6 +191,13 @@ are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
 
+- 2026-08-01 — Fixed configuration-source linking for newly added or retargeted backends
+  (FS-08.R5/R33/A10; TS-07.R15). Settings holds source-link actions until a new backend has been
+  saved, an unknown backend leaves its preview token usable, and backend-catalog saves prune
+  deleted or provider-incompatible bindings while retaining compatible ones. Focused server/UI
+  regressions, both Go test modes, all 207 UI tests, spec checks, and the generated distribution
+  build pass.
+
 - 2026-08-01 — Reviewed the continuous range after `ca100e0` through `05dff38` in both
   specification directions and against every invariant class: the AgentDecker proposal-review fix
   (`249da5b`), the Sky & Grove visual rework (`a8d103f`), projects-home project creation (`f360216`),

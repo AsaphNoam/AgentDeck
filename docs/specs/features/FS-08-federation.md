@@ -40,7 +40,8 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
 - **R5** — `PUT /api/config-sources/{backend_id}` accepts only a one-use preview token plus optional
   model/effort overrides. The server reconstructs the provider, mode, paths, profile, claims, and
   approved roots from the token rather than trusting new client paths. It rejects an unknown,
-  spent, or expired token and rejects a source whose digest changed after preview.
+  spent, or expired token and rejects a source whose digest changed after preview. It validates the
+  named backend before consuming the token, so an invalid or unsaved backend does not spend consent.
 - **R6** — Every source read is constrained to a canonical root the user approved during preview,
   plus the currently selected project's canonical root. A symlink that resolves outside those
   roots produces `approval_required`; AgentDeck never silently expands the approved boundary.
@@ -117,6 +118,12 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
   stop a working runtime; running children are not hot-mutated. The mirror never creates a
   source symlink or writes to the source tree. This is internal execution setup, not the user-facing
   detached-import mode in R9, and does not change source authority, preview, consent, or provenance.
+
+- **R33** — Saving the complete backend catalog removes any configuration-source binding whose
+  backend was removed or no longer supports that binding's provider, and drops its derived
+  generations. Settings does not offer discovery or linking for a newly added backend until the
+  backend catalog save makes its id durable. These rules prevent a draft id or orphaned binding
+  from blocking later source links.
 
 ### User experience
 
@@ -200,6 +207,10 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
   while a pinned credentialed Codex child confirms skills, agents, plugins, rules, and MCP setup are
   visible from the isolated profile. *Verify by* profile-refresh tests and FS-09.A17's gated live
   check.
+- **A10** (R33) — Settings requires a new backend to be saved before it exposes source-link
+  actions; a catalog save removes bindings for deleted or provider-retargeted backends while
+  preserving compatible bindings. *Verify by* `ConfigSourcePanel.test.tsx` and
+  `TestPutBackendsPrunesRemovedOrRetargetedSourceBindings`.
 
 ## 6. Deviations & open decisions
 

@@ -502,6 +502,14 @@ func (s *Server) handlePutBackends(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
+	// A whole-catalog save can remove a backend or change its provider type.
+	// Drop any now-meaningless source binding before it can poison a future
+	// bind through whole-manifest validation.
+	if err := s.pruneIncompatibleConfigSources(body); err != nil {
+		s.log.Error("backends: prune incompatible config sources", "err", err)
+		writeAPIError(w, apiError("internal", "internal error"))
+		return
+	}
 
 	// Invalidate the onboarding cred-check cache: env/model contents may have changed.
 	s.onboardingCacheMu.Lock()
