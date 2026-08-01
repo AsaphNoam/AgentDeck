@@ -130,14 +130,16 @@ func (s *Server) handlePreviewConfigSource(w http.ResponseWriter, r *http.Reques
 		writeAPIError(w, apiError(runtime.CodeInvalidField, "mode must be linked or mirrored"))
 		return
 	}
-	if req.Project == "" {
-		writeAPIError(w, apiError(runtime.CodeInvalidField, "project is required"))
-		return
-	}
-	project, err := s.configStore.ReadProject(req.Project)
-	if err != nil {
-		writeAPIError(w, apiError(runtime.CodeInvalidField, "unknown project: "+req.Project))
-		return
+	// An omitted project previews the provider's user-level source only
+	// (TS-03.R22). The persisted binding is backend-global either way: a later
+	// launch still resolves against its own actual project.
+	var project config.Project
+	if req.Project != "" {
+		var perr error
+		if project, perr = s.configStore.ReadProject(req.Project); perr != nil {
+			writeAPIError(w, apiError(runtime.CodeInvalidField, "unknown project: "+req.Project))
+			return
+		}
 	}
 
 	root := req.Root
@@ -167,6 +169,18 @@ func (s *Server) handlePreviewConfigSource(w http.ResponseWriter, r *http.Reques
 type bindRequest struct {
 	PreviewToken string                 `json:"preview_token"`
 	Overrides    config.SourceOverrides `json:"overrides"`
+	// EnableModelSync opts the bind into FS-09.R47's target-only model import.
+	// Existing preview/override/compatibility callers omit it and keep the
+	// source-only path byte-for-byte.
+	EnableModelSync bool `json:"enable_model_sync"`
+}
+
+// bindResponse is the bind body: the redacted binding, plus the non-secret
+// model-sync outcome when the caller enabled it (TS-03.R22).
+type bindResponse struct {
+	configSourceBindingView
+	ModelSyncEnabled bool `json:"model_sync_enabled,omitempty"`
+	ModelsAdded      int  `json:"models_added,omitempty"`
 }
 
 // handleBindConfigSource implements PUT /api/config-sources/{backend_id}. It
@@ -180,51 +194,132 @@ func (s *Server) handleBindConfigSource(w http.ResponseWriter, r *http.Request) 
 		writeAPIError(w, apiError(runtime.CodeInvalidField, "invalid JSON body"))
 		return
 	}
+	view, added, aerr := s.bindConfigSource(r.Context(), backendID, req)
+	if aerr != nil {
+		writeAPIError(w, aerr)
+		return
+	}
+	writeJSON(w, http.StatusOK, bindResponse{
+		configSourceBindingView: view,
+		ModelSyncEnabled:        req.EnableModelSync,
+		ModelsAdded:             added,
+	})
+}
+
+// bindConfigSource consumes a preview token and persists its binding, returning
+// the redacted binding view and how many models an enabled bind imported. It is
+// the one bind seam: the PUT route and the item-scoped create's orchestrated
+// connection (TS-03.R23) both go through it, so consent, TOCTOU re-checking, and
+// persistence ordering cannot drift between them.
+//
+// Persistence order for an enabled bind is deliberate (TS-07.R17): the merged
+// catalog is written first and the source manifest second, so an interruption
+// can only leave an *unbound* backend carrying add-only models — never a binding
+// that claims a connection the catalog does not reflect. The generation and its
+// SSE are installed only after both writes succeed.
+func (s *Server) bindConfigSource(ctx context.Context, backendID string, req bindRequest) (configSourceBindingView, int, *runtime.APIError) {
 	backends, err := s.readBackendsOrDefault()
 	if err != nil {
-		writeAPIError(w, apiError(runtime.CodeInternal, "read backends: "+err.Error()))
-		return
+		return configSourceBindingView{}, 0, apiError(runtime.CodeInternal, "read backends: "+err.Error())
 	}
 	backend, ok := backends.Backends[backendID]
 	if !ok {
-		writeAPIError(w, apiError(runtime.CodeSourceNotFound, "unknown backend: "+backendID))
-		return
+		return configSourceBindingView{}, 0, apiError(runtime.CodeSourceNotFound, "unknown backend: "+backendID)
 	}
-	binding, projectID, project, err := s.sourceMgr.ConsumeBind(r.Context(), req.PreviewToken, req.Overrides)
+	// Validate the named backend before spending consent (FS-08.R5).
+	provider, supported := config.ProviderForBackendType(backend.Type)
+	if !supported {
+		return configSourceBindingView{}, 0, apiError(runtime.CodeInvalidField, "backend does not support configuration sources")
+	}
+	binding, projectID, project, err := s.sourceMgr.ConsumeBind(ctx, req.PreviewToken, req.Overrides)
 	if err != nil {
-		writeAPIError(w, sourceAPIError(err))
-		return
+		return configSourceBindingView{}, 0, sourceAPIError(err)
 	}
-	if provider, supported := config.ProviderForBackendType(backend.Type); !supported || provider != binding.Provider {
-		writeAPIError(w, apiError(runtime.CodeInvalidField, "backend does not support this provider"))
-		return
+	if provider != binding.Provider {
+		return configSourceBindingView{}, 0, apiError(runtime.CodeInvalidField, "backend does not support this provider")
 	}
 
-	sources, err := s.readConfigSources()
-	if err != nil {
-		writeAPIError(w, apiError(runtime.CodeInternal, "read config sources: "+err.Error()))
-		return
-	}
-	sources.Sources[backendID] = binding
-	if verr := config.ValidateConfigSources(&sources, backends); verr != nil {
-		writeValidationError(w, verr)
-		return
-	}
-	if werr := s.configStore.WriteConfigSources(sources); werr != nil {
-		writeAPIError(w, apiError(runtime.CodeInternal, "write config sources: "+werr.Error()))
-		return
+	added, aerr := s.persistBinding(backendID, binding, req.EnableModelSync)
+	if aerr != nil {
+		return configSourceBindingView{}, 0, aerr
 	}
 
 	// Populate the generation + emit SSE. A resolve failure here does not undo the
 	// persisted binding; it surfaces as stale/invalid health the UI can repair.
-	_, _, _, _ = s.sourceMgr.ResolveFresh(r.Context(), backendID, projectID, project)
+	_, _, _, _ = s.sourceMgr.ResolveFresh(ctx, backendID, projectID, project)
 	health, stale, gen, _ := s.sourceMgr.Status(backendID, projectID)
-	writeJSON(w, http.StatusOK, configSourceBindingView{
+	return configSourceBindingView{
 		BackendID: backendID, Provider: binding.Provider, Mode: binding.Mode,
 		Root: binding.Root, Profile: binding.Profile, Claims: binding.Claims,
 		Overrides: binding.Overrides, Approved: binding.Approved,
 		Health: health, Stale: stale, Generation: gen,
-	})
+	}, added, nil
+}
+
+// persistBinding writes the (optionally model-merged) catalog and the source
+// manifest under the shared catalog lock, restoring the catalog preimage when
+// the manifest write returns an error. It returns the number of models imported.
+func (s *Server) persistBinding(backendID string, binding config.SourceBinding, enableModelSync bool) (int, *runtime.APIError) {
+	s.catalogMu.Lock()
+	defer s.catalogMu.Unlock()
+
+	added := 0
+	var preimage config.BackendsConfig
+	backends, aerr := s.readBackendsForWrite()
+	if aerr != nil {
+		return 0, aerr
+	}
+	if enableModelSync {
+		// Re-read under the lock: the catalog may have changed since the
+		// pre-consent check, and the preimage must be an independent document
+		// (the merge mutates the target's model map in place).
+		preimage, aerr = s.readBackendsForWrite()
+		if aerr != nil {
+			return 0, aerr
+		}
+		if _, still := backends.Backends[backendID]; !still {
+			return 0, apiError(runtime.CodeSourceNotFound, "unknown backend: "+backendID)
+		}
+		added = config.ImportConfiguredModels(&backends, backendID)
+		if verr := config.ValidateBackendsConfig(&backends); verr != nil {
+			return 0, apiError(runtime.CodeSourceInvalid, "imported models are not a valid catalog")
+		}
+		if werr := s.configStore.WriteBackends(backends); werr != nil {
+			return 0, apiError(runtime.CodeInternal, "write backends: "+werr.Error())
+		}
+		s.invalidateOnboardingCache()
+	}
+
+	sources, serr := s.readConfigSources()
+	if serr != nil {
+		return 0, s.restoreCatalog(preimage, enableModelSync,
+			apiError(runtime.CodeInternal, "read config sources: "+serr.Error()))
+	}
+	sources.Sources[backendID] = binding
+	if verr := config.ValidateConfigSources(&sources, backends); verr != nil {
+		return 0, s.restoreCatalog(preimage, enableModelSync,
+			apiError(runtime.CodeSourceInvalid, "binding is not valid for this backend"))
+	}
+	if werr := s.configStore.WriteConfigSources(sources); werr != nil {
+		return 0, s.restoreCatalog(preimage, enableModelSync,
+			apiError(runtime.CodeInternal, "write config sources: "+werr.Error()))
+	}
+	return added, nil
+}
+
+// restoreCatalog attempts to undo an enabled bind's catalog write after the
+// source manifest failed, so a failed connection does not silently keep the
+// autosync flag it turned on. A failed restoration is the accepted add-only
+// unbound residue of TS-07.R17, not a second reported failure: the backend stays
+// valid, no entry was overwritten, and the stable id makes retry converge.
+func (s *Server) restoreCatalog(preimage config.BackendsConfig, attempted bool, cause *runtime.APIError) *runtime.APIError {
+	if attempted {
+		if err := s.configStore.WriteBackends(preimage); err != nil {
+			s.log.Error("config source: catalog restoration failed", "err", err)
+		}
+		s.invalidateOnboardingCache()
+	}
+	return cause
 }
 
 // handleRefreshConfigSource implements POST /api/config-sources/{backend_id}/refresh.
@@ -233,14 +328,15 @@ func (s *Server) handleBindConfigSource(w http.ResponseWriter, r *http.Request) 
 func (s *Server) handleRefreshConfigSource(w http.ResponseWriter, r *http.Request) {
 	backendID := r.PathValue("backend_id")
 	projectID := r.URL.Query().Get("project")
-	if projectID == "" {
-		writeAPIError(w, apiError(runtime.CodeInvalidField, "project is required"))
-		return
-	}
-	project, err := s.configStore.ReadProject(projectID)
-	if err != nil {
-		writeAPIError(w, apiError(runtime.CodeInvalidField, "unknown project: "+projectID))
-		return
+	// An omitted project refreshes the user-level view of a backend-global
+	// binding (TS-03.R22); an explicit one keeps the project-aware behavior.
+	var project config.Project
+	if projectID != "" {
+		var perr error
+		if project, perr = s.configStore.ReadProject(projectID); perr != nil {
+			writeAPIError(w, apiError(runtime.CodeInvalidField, "unknown project: "+projectID))
+			return
+		}
 	}
 	effective, _, binding, rerr := s.sourceMgr.ResolveFresh(r.Context(), backendID, projectID, project)
 	if rerr != nil {
@@ -343,6 +439,30 @@ func (s *Server) pruneIncompatibleConfigSources(backends config.BackendsConfig) 
 		s.sourceMgr.ForgetBackend(backendID)
 	}
 	return nil
+}
+
+// readBackendsForWrite reads the catalog for a read-modify-write. Unlike
+// readBackendsOrDefault it never substitutes the seeded catalog for an
+// unreadable one: an item create or a model merge that fell back to the default
+// document would overwrite a hand-broken backends.json with four invented
+// backends (INV §7). A missing document is an empty catalog, which is the state
+// a first create legitimately amends.
+func (s *Server) readBackendsForWrite() (config.BackendsConfig, *runtime.APIError) {
+	backends, err := s.configStore.ReadBackends()
+	switch {
+	case err == nil:
+		if backends.Backends == nil {
+			backends.Backends = map[string]config.Backend{}
+		}
+		return backends, nil
+	case errors.Is(err, config.ErrNotFound):
+		return config.BackendsConfig{Version: 2, Backends: map[string]config.Backend{}}, nil
+	case errors.Is(err, config.ErrCorrupt):
+		return config.BackendsConfig{}, apiError(runtime.CodeInternal,
+			"the backend catalog is unreadable; repair backends.json before changing it")
+	default:
+		return config.BackendsConfig{}, apiError(runtime.CodeInternal, "read backends: "+err.Error())
+	}
 }
 
 func (s *Server) readBackendsOrDefault() (config.BackendsConfig, error) {

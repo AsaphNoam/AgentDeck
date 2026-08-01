@@ -99,6 +99,12 @@ type Server struct {
 	// onboardingCacheMu guards onboardingCache.
 	onboardingCacheMu sync.Mutex
 	onboardingCache   *onboardingCacheEntry
+
+	// catalogMu serializes every read-modify-write of backends.json: the
+	// whole-document PUT, the item-scoped POST create, and an enabled source
+	// bind's target-scoped model merge (TS-07.R17/R18). Without it a create and
+	// a full save can each write a catalog that erases the other's entry.
+	catalogMu sync.Mutex
 }
 
 // New constructs a Server. The config supplies the port; the stores back the data
