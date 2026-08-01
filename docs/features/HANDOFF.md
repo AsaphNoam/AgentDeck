@@ -42,6 +42,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   read-only static identity. The shipped picker uses inline selects, so the prior `window.prompt()`
   automation block no longer applies. Full record:
   [`../archive/reviews/usability-review-run-2026-08-01-runtime-picker.md`](../archive/reviews/usability-review-run-2026-08-01-runtime-picker.md).
+  The projects home can now create a project without Settings: a persistent **New project** button and
+  a background right-click menu both open the reused project form and create through the existing
+  `POST /api/projects` path, with the card appearing live on success. FS-02 is now Current. Component
+  coverage exercises the flow; a real-browser J5 pass is still pending in usability review.
 - **Previous transition context:** AgentDeck-launched Codex agents now run in a private `CODEX_HOME`
   (`<agentdeck-home>/codex`, `0700`), composed as the final, reserved child-env layer in
   launch/resume/switch via `codexHomeEnv`/`composeEnv`, so their rollouts and native session index
@@ -139,6 +143,30 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-01 — Implemented "create a project from the projects page" (FS-02.R41/R42/A24; **INV
+  §1/§8/§10/§13**). The projects home now shows a persistent **New project** header button and a
+  background right-click **New project** menu (a right-click on a project card still opens that card's
+  menu, never the background one), both opening one modal that reuses the Settings `ProjectForm` and
+  the existing `POST /api/projects` create path (server-derived id, six-preset color, non-blocking
+  `cwd` warning). A valid submission closes the modal and the card appears from the shared project
+  query with no reload; an API/validation failure keeps the modal open with the server message; Cancel
+  or Escape closes with no change. No new API, storage, id-derivation, or color rule; no create surface
+  on the scoped `/project/:id` route. FS-02.R41/R42/A24 shipped and FS-02 moved Partial→Current. A new
+  `ProjectDashboard` regression covers A24 (both entry points, card-menu exclusion, live create,
+  error, cancel). `make check-specs`, all 197 UI tests, both Go test modes, source and distribution
+  builds, presentation/style checks, and whitespace checks pass. A real-browser J5 pass remains for
+  usability review; component coverage stands in for it here.
+
+- 2026-08-01 — Designed "create a project from the projects page"; no product code changed. The
+  projects home gains a persistent **New project** button and a background right-click **New project**
+  menu, both opening one modal that reuses the Settings project form and the existing
+  `POST /api/projects` create path (server-derived id, six-preset color, non-blocking `cwd` warning);
+  a valid submission adds the card live. FS-02 gained R41/R42/A24 (all planned) and moved to Partial;
+  the create surface is projects-home-only and the background menu never fires on a project card. No
+  technical-spec change is needed — the route, hooks, form, and `.context-menu`/dialog presentation
+  already exist. The idea moved from `docs/ideas.md` to the waiting
+  `create-project-from-projects-page.md` change; `make check-specs` passes.
 
 - 2026-08-01 — Reworked Sky & Grove's visual contract and bundled CSS (FS-12.R28/R31/A10;
   TS-08.R33 retired, R38 shipped; **INV §10/§13**). The palette now separates an atmospheric blue
