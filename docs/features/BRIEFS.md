@@ -4,6 +4,18 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-01 — Implementation: Compact chat tool activity
+
+The empty black rectangles were successful tool-result events with no payload to show — commonly an edit whose actual change is already rendered as a diff. The renderer was still creating a padded result panel for them. They now show a compact **Completed** outcome instead.
+
+Tool calls and results now use quiet, light-gray activity rows closer to the Codex experience. Expanded arguments and output remain inspectable; errors keep their clear treatment; diffs, code, commands, and terminal output stay on dark technical surfaces.
+
+The full test and build suite passed, and the browser fixture confirmed the call, output, empty-completion, and error states with no browser errors.
+
+**Needs attention:** None.
+
+**Next:** No action needed.
+
 ### 2026-08-01 — Feature design: Claude backend model autosync
 
 Claude backend model sync is fully designed and ready to implement. An opted-in Claude backend will

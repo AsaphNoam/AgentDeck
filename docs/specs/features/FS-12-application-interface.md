@@ -172,6 +172,11 @@ Requirements are user-observable.
   per-project choice, schedules, user-authored CSS, arbitrary skin code, downloads, imports,
   marketplace, third-party package discovery, or theme-specific product vocabulary. All skin CSS,
   fonts, and decorative assets ship locally and work without network access.
+- **R34** — Tool calls and tool outcomes use compact, muted transcript rows that read as
+  secondary activity rather than dark code or terminal panels. Arguments and non-empty results
+  remain expandable for inspection; diffs, fenced code, commands, and the Terminal retain their
+  technical treatment. An outcome with no displayable payload carries a short status label instead
+  of blank geometry. This supersedes R14 only for tool calls and tool results.
 
 ## 3. States & transitions
 

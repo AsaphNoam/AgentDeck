@@ -6,6 +6,8 @@ import { StateBadge } from "../components/grid/StateBadge";
 import { EmptyState } from "../components/grid/EmptyState";
 import { AssistantText } from "../components/chat/renderers/AssistantText";
 import { DiffBlock } from "../components/chat/renderers/DiffBlock";
+import { ToolCall } from "../components/chat/renderers/ToolCall";
+import { ToolResult } from "../components/chat/renderers/ToolResult";
 import type { AgentStatus } from "../api/types";
 import { applyAppearance } from "../features/appearance/appearance";
 import { PROJECT_COLOR_PRESETS } from "../lib/projectColors";
@@ -155,13 +157,10 @@ export function VisualMatrix() {
             event={{ seq: 18, kind: "diff", path: "ui/src/styles/skins/sky-grove.css", old_text: "--surface: core;", new_text: "--surface: sky;" }}
             onAnnotate={() => undefined}
           />
-          <article className="tool-block tool-call" data-ui="tool-call" data-state="expanded">
-            <button className="tool-toggle" data-slot="trigger" type="button">▾ Tool call: inspect_workspace</button>
-            <pre className="tool-args" data-slot="content">{`{"path":"ui/src"}`}</pre>
-          </article>
-          <article className="tool-block tool-result tool-result-error" data-ui="tool-result" data-state="error">
-            <pre data-slot="content">Representative tool error output</pre>
-          </article>
+          <ToolCall event={{ kind: "tool_call", name: "inspect_workspace", args: { path: "ui/src" } }} />
+          <ToolResult event={{ kind: "tool_result", status: "completed", content: "Representative tool output" }} />
+          <ToolResult event={{ kind: "tool_result", status: "completed", content: null }} />
+          <ToolResult event={{ kind: "tool_result", status: "failed", error: "Representative tool error output" }} />
           <article className="permission-prompt" data-ui="permission-prompt" data-state="pending">
             <strong data-slot="title">Permission required</strong>
             <p data-slot="reason">Run a bounded local verification command.</p>
