@@ -10,14 +10,17 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 - **State:** Agent effort selection is implemented: models can declare provider-native levels and a
   default, launch/CLI/switch/resume/pipeline flows preserve the resolved level, and Claude/Codex
   delivery is adapter-specific. Live-provider honoring remains a credentialed acceptance gate.
-  Sky & Grove is implemented as AgentDeck's first optional built-in appearance. Settings
-  switches the mounted application immediately between unskinned Core and the statically bundled
-  sky-blue/nature-green skin; the existing global config API persists the choice, invalid or
-  unreadable values fall back to Core with an explanation, and failed saves restore the durable
-  selection. The presentation contract now guards the finite skin set and CSS boundary, and live
-  xterm instances recolor without reconnecting. Specification checks, both Go test modes, all 180
-  UI tests, UI/build/style checks, the distribution build, and an isolated real-browser
-  switch/reload/onboarding pass succeed. The project-first dashboard, project/agent archive lifecycle, grouped Archive pagination,
+  Sky & Grove is implemented as AgentDeck's first optional built-in appearance and its visual
+  design has been reworked around a clearer sky canvas, blue-white surfaces, controlled evergreen
+  structure, restrained contour linework, and tighter geometry/depth. The change also restores the
+  agent-card state strip that the former leaf ornament displaced. Settings still switches the
+  mounted application immediately between unskinned Core and the statically bundled skin; the
+  existing global config API persists the choice, invalid or unreadable values fall back to Core
+  with an explanation, and failed saves restore the durable selection. The presentation contract
+  guards the finite skin set and CSS boundary, and live xterm instances recolor without reconnecting.
+  Specification/style/presentation checks, both Go test modes, all 194 UI tests, source and
+  distribution builds, and a paired real-browser visual-matrix review succeed with no browser
+  errors. The project-first dashboard, project/agent archive lifecycle, grouped Archive pagination,
   project archive containment, and native-dialog replacement are implemented and independently
   reviewed. All five Must-fix findings are fixed and the five Worth-fixing findings are fixed or
   correctly closed; final verification passed. The 2026-07-29
@@ -136,6 +139,15 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-01 — Reworked Sky & Grove's visual contract and bundled CSS (FS-12.R28/R31/A10;
+  TS-08.R33 retired, R38 shipped; **INV §10/§13**). The palette now separates an atmospheric blue
+  canvas, blue-white surface hierarchy, and evergreen action/structure colors; smaller radii and
+  controlled shadows recover Core's discipline; low-contrast off-canvas contour linework replaces
+  the oversized rings; and removing the card-leaf override restores the semantic state strip.
+  Settings preview copy and the xterm palette fixture follow the single palette authority. Core's
+  marker-free token values remain unchanged. The presentation/style contract, all 194 UI tests,
+  both Go modes, source/distribution builds, paired browser matrix, and browser console check pass.
 
 - 2026-08-01 — Fixed the AgentDecker builder findings (FS-14.R27/A10; **INV §1/§13/§10**): proposal
   discovery now validates every self-identifying terminal tool result instead of trusting the

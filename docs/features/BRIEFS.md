@@ -4,6 +4,21 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-01 — Implementation: Sky & Grove visual rework
+
+Sky & Grove now uses a calmer sky-blue canvas, crisp blue-white surfaces, evergreen controls,
+restrained contour linework, tighter radii, and more controlled shadows. The oversized ring and leaf
+decoration is gone, so the original interface's hierarchy remains intact and agent-state bars stay
+visible instead of becoming decoration. AgentDeck Core is unchanged.
+
+The complete test, build, and distribution suite passes: all 194 UI tests, both Go test modes,
+style and presentation checks, and the paired browser visual matrix with no browser errors.
+
+**Needs attention:** None.
+
+**Next:** Use Sky & Grove in normal work and flag any specific surface that still feels too
+decorative or low-contrast.
+
 ### 2026-08-01 — Fix: AgentDecker pipeline proposals
 
 AgentDecker now recognizes a valid proposal from its returned data instead of relying on an adapter’s display label, stays on Pipelines after launch so its approval controls remain in view, and keeps a proposal available if the builder stops immediately afterward. The project color dots in the right-click menu are round, bordered, and interactive again.

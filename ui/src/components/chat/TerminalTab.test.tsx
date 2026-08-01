@@ -135,15 +135,15 @@ describe("TerminalTab", () => {
     };
     const skyGrove = {
       ...core,
-      "--ad-technical-background": "#102e2a",
-      "--ad-technical-surface": "#183d37",
-      "--ad-technical-text": "#effbf7",
-      "--ad-technical-muted": "#a8c8be",
-      "--ad-action-primary": "#1f6f4d",
-      "--ad-action-secondary": "#2f80b7",
-      "--ad-state-done": "#2f8a62",
-      "--ad-state-error": "#bd3d45",
-      "--ad-border-default": "#a8cec2",
+      "--ad-technical-background": "#102927",
+      "--ad-technical-surface": "#183734",
+      "--ad-technical-text": "#eff8f6",
+      "--ad-technical-muted": "#abc5c0",
+      "--ad-action-primary": "#2f7058",
+      "--ad-action-secondary": "#287a9b",
+      "--ad-state-done": "#2f7d5c",
+      "--ad-state-error": "#b8454d",
+      "--ad-border-default": "#bed5d9",
     };
     vi.stubGlobal("getComputedStyle", ((element: Element) => ({
       getPropertyValue: (token: keyof typeof core) => {
