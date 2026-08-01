@@ -35,6 +35,31 @@
   font-size: 0.68rem;
 }
 
+.chat-runtime-picker {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-2);
+  margin-top: var(--ad-space-2);
+}
+
+.chat-runtime-picker .form-field {
+  min-width: 8rem;
+}
+
+.chat-runtime-picker select {
+  min-height: 2rem;
+}
+
+.chat-runtime-switch {
+  min-height: 2rem;
+}
+
+.chat-runtime-picker .form-error {
+  flex-basis: 100%;
+  margin: 0;
+}
+
 .chat-tabs {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);

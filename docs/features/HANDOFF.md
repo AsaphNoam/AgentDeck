@@ -144,6 +144,15 @@ are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
 
+- 2026-08-01 — Implemented the per-chat runtime picker. A running chat header now offers catalog
+  backend/model/effort selects and an explicit Switch action that calls the existing runtime-switch
+  path; a shared reset helper keeps the header, New Agent modal, and dashboard Switch dialog aligned.
+  Rejected switches surface their server message and reset to the live agent identity, catalog-missing
+  identities remain visible but cannot submit until a listed target is selected, and stopped/archived
+  views retain static identity. FS-03.R23/R24/A9 are shipped and FS-03 is Current. Focused coverage,
+  all 191 UI tests, both Go test modes, specification/presentation/source/distribution builds, and an
+  isolated browser launch→model-switch→stop pass succeed.
+
 - 2026-08-01 — Reviewed the continuous range after `b8e31fb` through `9c6a637` in both specification
   directions and against every invariant class: the effort-lifecycle fix (`bd5ba71`) and the project
   context-menu/preset-color feature (`9c6a637`); `8b95f90` is a prior review-state commit. The effort
