@@ -4,6 +4,29 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-01 — Review: effort-lifecycle fix and project context menu/colors
+
+I reviewed the two batches of work since the last review: the fix that keeps each agent's chosen
+effort level attached through resume and pipeline runs, and the new project right-click menu with
+preset colors.
+
+The effort fix is correct. Resuming an agent now reuses the level it was launched with instead of
+re-checking it against the current catalog, so removing a level from a model in Settings no longer
+blocks resuming an older agent. Pipeline stages now carry their own frozen level, so retries and
+recovery run at the level the stage started with. All three problems flagged in the previous review
+are properly resolved.
+
+The project menu and colors work well, with one cosmetic issue: the six color swatches shown inside
+the right-click menu are restyled by the menu's shared button styling, so they appear as slightly
+squared, borderless dots rather than the round bordered swatches used in the Settings and onboarding
+forms. They still show the right colors and mark the selected one, so the picker is fully usable —
+this is a visual-only polish item. The same swatches in the Settings and onboarding forms look
+correct. No automated test can catch this because the test tools do not evaluate styling.
+
+**Needs attention:** None. One worth-fixing cosmetic finding is recorded for a future fix pass.
+
+**Next:** Fix the in-menu swatch styling when convenient; no blocker for using the feature now.
+
 ### 2026-07-31 — Implementation: project context menu and preset colors
 
 Project cards now open a floating right-click menu with Rename, Archive, and a six-color picker.
