@@ -81,58 +81,9 @@ func ReadCodexModelCatalog(path string) (map[string]Model, error) {
 
 // syncCodexModels merges catalog into every codex-acp backend that opted in via
 // AutoSyncModels. Add-only: an existing model id is left exactly as the user had
-// it, and default_model is never touched. Returns true if any backend gained at
-// least one model (so the caller knows whether to persist).
+// it, and default_model is never touched. Codex keys models by the slug (which is
+// also its provider string), so only the map key gates duplicates. Returns true
+// if any backend gained at least one model.
 func syncCodexModels(bc *BackendsConfig, catalog map[string]Model) bool {
-	changed := false
-	for id, bk := range bc.Backends {
-		if bk.Type != "codex-acp" || !bk.AutoSyncModels {
-			continue
-		}
-		if bk.Models == nil {
-			bk.Models = map[string]Model{}
-		}
-		added := false
-		for slug, model := range catalog {
-			if _, exists := bk.Models[slug]; exists {
-				continue // never overwrite a user-owned entry
-			}
-			bk.Models[slug] = model
-			added = true
-		}
-		if added {
-			bc.Backends[id] = bk
-			changed = true
-		}
-	}
-	return changed
-}
-
-// AutoSyncBackends refreshes opted-in codex-acp backends from the Codex CLI model
-// cache (FS-09.R28) and persists backends.json only when a model was added. It is
-// best-effort: a missing/unreadable/unparseable cache, or no opted-in backend, is
-// a silent no-op that never blocks startup.
-func (s *Store) AutoSyncBackends() error {
-	bc, err := s.ReadBackends()
-	if err != nil {
-		return nil // corrupt/absent catalog is handled by seeding/fallback elsewhere
-	}
-	optedIn := false
-	for _, bk := range bc.Backends {
-		if bk.Type == "codex-acp" && bk.AutoSyncModels {
-			optedIn = true
-			break
-		}
-	}
-	if !optedIn {
-		return nil
-	}
-	catalog, err := ReadCodexModelCatalog(CodexModelCatalogPath())
-	if err != nil {
-		return nil // best-effort: no cache to sync from
-	}
-	if syncCodexModels(&bc, catalog) {
-		return s.WriteBackends(bc)
-	}
-	return nil
+	return syncModels(bc, "codex-acp", catalog, false)
 }

@@ -4,6 +4,18 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-01 — Implementation: import configured Claude models at startup
+
+The Claude backend can now pull in the models you have configured. Turn on "Import configured models from Claude on startup" for the Claude backend in Settings, and at the next dashboard start AgentDeck reads the models named in your personal Claude settings file (`~/.claude/settings.json`) and adds any it doesn't already list to the launch picker. It only adds — it never edits, removes, or reorders your existing models, never changes your default, and never touches anything on a backend where the option is off. A missing or unusual settings file is simply skipped. This mirrors the existing Codex auto-sync, and both providers now share one import step.
+
+Fresh installs also start with the four portable Claude family choices — Fable, Opus, Sonnet, and Haiku — with Sonnet as the default, so a new machine offers all four without any setup. Existing setups are left exactly as they are.
+
+Specification checks, both Go test modes, all 208 interface tests, and the packaged application build all pass. I verified the read/merge/save and seeding behavior with focused tests against real files; whether a given imported model actually runs still depends on your installed Claude version and account, which the launch step checks as usual.
+
+**Needs attention:** None.
+
+**Next:** Restart AgentDeck to pick up the change, then (optionally) enable the Claude import toggle in Settings → Backends.
+
 ### 2026-08-01 — Implementation: configuration-source backend linking
 
 New backends now require a successful Settings save before configuration-source linking is offered. A premature API request no longer consumes its preview token, and saving the backend catalog removes bindings for deleted or provider-retargeted backends, so an invisible stale binding cannot block later links.

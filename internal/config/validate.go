@@ -18,6 +18,14 @@ var slugRE = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 
 func ValidSlug(s string) bool { return slugRE.MatchString(s) }
 
+// validModelString reports whether s is an acceptable provider model selector:
+// non-empty and free of the reserved [effort] bracket suffix (FS-09.R36). Model
+// autosync reuses this rule so imported selectors satisfy the same contract that
+// PUT /api/backends enforces on hand-edited entries.
+func validModelString(s string) bool {
+	return s != "" && !strings.ContainsAny(s, "[]")
+}
+
 // projectIDTimestamp is the length of the "-YYYYMMDDThhmmssz" suffix that
 // GenerateProjectID appends (hyphen + 8 date + "t" + 6 time + "z" = 17).
 const projectIDTimestamp = len("-20060102t150405z")

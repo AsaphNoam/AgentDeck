@@ -48,7 +48,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   **add-only**: it never edits or removes an existing model entry, never changes `default_model`, and
   writes nothing when it finds nothing new. A missing, unreadable, or unparseable cache is a
   non-fatal skip that never blocks startup or mutates the catalog. Backends without the flag, and
-  every non-`codex-acp` type, are untouched. This requirement remains Codex-specific; planned
+  every non-`codex-acp` type, are untouched. This requirement remains Codex-specific;
   configured-model discovery for Claude is R45.
 - **R35** — A model entry may declare optional **effort capability**: `efforts`, a
   non-empty array of distinct non-empty provider effort-level strings, and `default_effort`, which
@@ -73,9 +73,9 @@ Configuration-source federation for Claude/Codex is FS-08.
   model's `efforts` and `default_effort` from the local cache's `supported_reasoning_levels[].effort`
   and `default_reasoning_level`. This stays add-only under R28's rules: it never edits an existing
   model entry, including one that already declares effort fields, and a cache without reasoning
-  levels simply contributes none. Claude's planned configured-model sync in R45 does not discover
+  levels simply contributes none. Claude's configured-model sync in R45 does not discover
   effort capability, so Claude effort levels remain hand-declared.
-- **R45** `(planned)` — A `claude-acp` backend may also set `autosync_models: true`. On dashboard
+- **R45** — A `claude-acp` backend may also set `autosync_models: true`. On dashboard
   startup after seeding, AgentDeck reads only the user-level `~/.claude/settings.json` and collects
   model selectors from `model`, every string entry in `availableModels`, and every string entry in
   the `fallbackModel` array (also tolerating the older singular string shape). Each distinct,
@@ -89,7 +89,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   that never blocks startup or partially mutates the catalog. A disabled flag and every backend type
   other than `claude-acp` are untouched by this Claude source. Settings offers the same flag for
   Claude and explains that it imports configured user-level models at the next dashboard start.
-- **R46** `(planned)` — A fresh home seeds the Claude backend with the portable provider aliases
+- **R46** — A fresh home seeds the Claude backend with the portable provider aliases
   `fable`, `opus`, `sonnet`, and `haiku`, keyed by those same values and labelled **Claude Fable**,
   **Claude Opus**, **Claude Sonnet**, and **Claude Haiku**. `sonnet` remains the Claude default.
   These aliases intentionally resolve through the installed Claude/provider and may point to
@@ -331,7 +331,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   and home-provisioning tests. Real `codex-acp` honoring of `CODEX_HOME`, profile setup visibility,
   native resume, and the native CLI/app history boundary are external compatibility gates recorded
   under A7 (cf. TS-04.R21).
-- **A18** `(planned)` (R45) — An opted-in `claude-acp` backend gains valid, previously
+- **A18** (R45) — An opted-in `claude-acp` backend gains valid, previously
   unrepresented selectors from the user-level `model`, `availableModels`, and array or legacy-string
   `fallbackModel` settings at dashboard startup; alias labels are friendly and other labels preserve
   the selector. Existing entries are unchanged even when their map key differs from their provider
@@ -340,7 +340,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   file, invalid selector, duplicate selector, project/local/managed setting, private Claude cache,
   and environment-only model setting add nothing. *Verify by* focused config sync/persistence tests
   and `BackendsEditor` tests for the Claude-specific opt-in copy and restart timing.
-- **A19** `(planned)` (R46) — A fresh backend catalog contains exactly the four Claude family
+- **A19** (R46) — A fresh backend catalog contains exactly the four Claude family
   aliases with generic family labels and `sonnet` as its default, while a pre-existing catalog
   remains byte-for-byte unchanged by seeding. The launch picker exposes all four without claiming
   their resolved versions or entitlements. *Verify by* seed/config tests and the onboarding/New
@@ -348,7 +348,7 @@ Configuration-source federation for Claude/Codex is FS-08.
 
 ## 6. Deviations & open decisions
 
-- **Claude configured-model sync is deliberately not full discovery (planned R45).** Claude exposes
+- **Claude configured-model sync is deliberately not full discovery (R45).** Claude exposes
   no stable local full-catalog contract equivalent to Codex's cache. The planned sync therefore
   reads only explicit user-level settings, does not scan the executable or private account caches,
   does not inspect environment values, and does not issue a network, credential, adapter, or session
@@ -394,9 +394,11 @@ Configuration-source federation for Claude/Codex is FS-08.
 
 - **Catalog/validation/seeds:** `internal/config/types.go`, `internal/config/validate.go`,
   `internal/config/seed.go`, `internal/server/config_handlers.go`.
-- **Codex model autosync (R28):** `internal/config/codexmodels.go` (`ReadCodexModelCatalog`,
-  `syncCodexModels`, `Store.AutoSyncBackends`); invoked from `resolveConfig` in
-  `internal/cli/dashboard.go`.
+- **Model autosync (R28/R45):** `internal/config/codexmodels.go` (`ReadCodexModelCatalog`,
+  `syncCodexModels`), `internal/config/claudemodels.go` (`ReadClaudeConfiguredModels`,
+  `syncClaudeModels`, `ClaudeSettingsPath`), and `internal/config/modelautosync.go` (the shared
+  add-only `syncModels` merge and combined `Store.AutoSyncBackends`); invoked from `resolveConfig`
+  in `internal/cli/dashboard.go`. Fresh Claude family aliases seed in `internal/config/seed.go` (R46).
 - **Adapters/credentials:** `internal/backend/adapter.go`, `internal/backend/credcheck/`;
   the official Claude executable and delegated auth probe are pinned by
   `TestClaudeAdapterUsesOfficialBinary` and `TestClaudeProberRetriesWithoutNoColor`;

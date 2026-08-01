@@ -42,5 +42,4 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-- [`claude-configured-model-autosync.md`](claude-configured-model-autosync.md) — import configured
-  user-level Claude models at startup and seed the four portable Claude family aliases on fresh homes.
+_None._

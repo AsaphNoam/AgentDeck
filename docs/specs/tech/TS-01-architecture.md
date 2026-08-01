@@ -93,7 +93,7 @@ The service invokes ordinary runtime/pipeline stop paths; delegates durable agen
 resulting full agent state through the existing bus. This is the atomic-claim boundary required by
 INV §5, not a check of `project.archived` followed later by process registration.
 
-**R14 `(planned)` — Native model autosync is one bounded startup import into the AgentDeck
+**R14 — Native model autosync is one bounded startup import into the AgentDeck
 catalog.** After seeding and before the server starts, `internal/config` reads the validated
 `backends.json` snapshot once, detects which provider types opted in, invokes only those providers'
 pure local catalog readers, merges every successful candidate set in memory through one shared
@@ -171,6 +171,6 @@ type Runtime interface {
 - Event flow: `internal/server/hook.go`, `internal/server/sse.go`, `internal/bus/bus.go` (`SubscribeWithSnapshot`).
 - Archive transition gate: `internal/server/archive_gate.go`, `archive_actions.go`, and
   `archive_gate_test.go` (project reservation and agent/project transition barriers).
-- Model catalog autosync: `internal/config/{codexmodels,modelautosync}.go` and the planned
-  `claudemodels.go`, invoked after seeding by `internal/cli/dashboard.go` (R14).
+- Model catalog autosync: `internal/config/{codexmodels,claudemodels,modelautosync}.go`,
+  invoked after seeding by `internal/cli/dashboard.go` (R14).
 - Regression anchors: `TestSwitchRuntimeKeepsTargetRegistration`, `TestCrashTearsDownAgentRegistration`, `TestSessionParamsOmitModelWhenInherited`.

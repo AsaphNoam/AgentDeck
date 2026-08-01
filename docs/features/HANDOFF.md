@@ -46,6 +46,12 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   a background right-click menu both open the reused project form and create through the existing
   `POST /api/projects` path, with the card appearing live on success. FS-02 is now Current. Component
   coverage exercises the flow; a real-browser J5 pass is still pending in usability review.
+  Claude configured-model autosync (FS-09.R45/R46) is now implemented: an opted-in `claude-acp`
+  backend imports the selectors named in the user-level `~/.claude/settings.json` at startup through
+  the shared add-only merge that Codex already used, fresh homes seed the four portable Claude family
+  aliases with `sonnet` as default, and Settings offers the Claude opt-in. Real live-CLI honoring of
+  imported selectors remains the standing provider acceptance gate; this change was verified by
+  focused Go tests against real file I/O, not a live Claude session.
 - **Previous transition context:** AgentDeck-launched Codex agents now run in a private `CODEX_HOME`
   (`<agentdeck-home>/codex`, `0700`), composed as the final, reserved child-env layer in
   launch/resume/switch via `codexHomeEnv`/`composeEnv`, so their rollouts and native session index
@@ -190,6 +196,20 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-01 — Implemented Claude configured-model autosync (FS-09.R45/R46/A18/A19; TS-01.R14;
+  **INV §2/§11**). An opted-in `claude-acp` backend now imports the selectors named in the
+  user-level `~/.claude/settings.json` (`model`, `availableModels`, array-or-legacy-string
+  `fallbackModel`) at dashboard startup, keyed by and carrying the exact selector, with friendly
+  labels for the `fable`/`opus`/`sonnet`/`haiku` aliases and self-labels otherwise. The import is
+  add-only and skips a selector already used as a map key or an existing entry's provider string;
+  a missing/malformed/wrong-shape file is a non-fatal skip. Codex and Claude now merge through one
+  shared `syncModels` add-only helper and a single `AutoSyncBackends` rewrite (`modelautosync.go`),
+  with the Claude reader in `claudemodels.go`. Fresh homes seed exactly the four Claude family
+  aliases with generic labels and `sonnet` as default; existing catalogs are never touched. Settings
+  offers the same opt-in for Claude with restart-timing copy. `make check-specs`, both Go test modes,
+  all 208 UI tests, source build, and distribution build pass. The reader/merge/persist paths and the
+  seed are exercised by focused Go tests against real file I/O; no live Claude CLI was involved.
 
 - 2026-08-01 — Fixed configuration-source linking for newly added or retargeted backends
   (FS-08.R5/R33/A10; TS-07.R15). Settings holds source-link actions until a new backend has been

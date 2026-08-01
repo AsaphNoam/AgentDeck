@@ -26,7 +26,8 @@ export const backendSchema = z.object({
   default_model: z.string(),
   models: z.record(modelSchema),
   env: z.record(z.string()).optional(),
-  // Opt-in Codex model-catalog autosync on startup (FS-09.R28); codex-acp only.
+  // Opt-in startup model import (FS-09.R28/R45): codex-acp syncs the Codex CLI
+  // model cache; claude-acp imports configured user-level Claude settings.
   autosync_models: z.boolean().optional(),
 });
 
