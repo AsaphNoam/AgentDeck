@@ -18,31 +18,68 @@ func syncModels(bc *BackendsConfig, backendType string, catalog map[string]Model
 		if bk.Type != backendType || !bk.AutoSyncModels {
 			continue
 		}
-		if bk.Models == nil {
-			bk.Models = map[string]Model{}
-		}
-		represented := make(map[string]bool, len(bk.Models))
-		for key, m := range bk.Models {
-			represented[key] = true
-			if matchProvider && m.Model != "" {
-				represented[m.Model] = true
-			}
-		}
-		added := false
-		for key, model := range catalog {
-			if represented[key] {
-				continue // never overwrite a user-owned entry
-			}
-			bk.Models[key] = model
-			represented[key] = true
-			added = true
-		}
-		if added {
+		if addModels(&bk, catalog, matchProvider) > 0 {
 			bc.Backends[id] = bk
 			changed = true
 		}
 	}
 	return changed
+}
+
+// addModels merges a catalog into one backend add-only and returns how many
+// entries it actually added. It is the single merge rule shared by whole-catalog
+// startup sync and the target-scoped import an enabled source bind performs.
+func addModels(bk *Backend, catalog map[string]Model, matchProvider bool) int {
+	if bk.Models == nil {
+		bk.Models = map[string]Model{}
+	}
+	represented := make(map[string]bool, len(bk.Models))
+	for key, m := range bk.Models {
+		represented[key] = true
+		if matchProvider && m.Model != "" {
+			represented[m.Model] = true
+		}
+	}
+	added := 0
+	for key, model := range catalog {
+		if represented[key] {
+			continue // never overwrite a user-owned entry
+		}
+		bk.Models[key] = model
+		represented[key] = true
+		added++
+	}
+	return added
+}
+
+// ImportConfiguredModels enables autosync on exactly one backend and immediately
+// performs that provider's add-only import into it (FS-09.R47, TS-07.R17). It
+// reuses the same local readers and merge rules as startup sync rather than
+// parsing native files a second way, changes no other backend, no default, and
+// no existing entry, and reports a missing/unreadable/invalid local catalog as a
+// zero-model success. It returns how many models were added.
+func ImportConfiguredModels(bc *BackendsConfig, backendID string) int {
+	backend, ok := bc.Backends[backendID]
+	if !ok {
+		return 0
+	}
+	var catalog map[string]Model
+	matchProvider := false
+	switch backend.Type {
+	case "codex-acp":
+		catalog, _ = ReadCodexModelCatalog(CodexModelCatalogPath())
+	case "claude-acp":
+		// Claude keys by selector, so a selector already used as an existing
+		// entry's provider string is already represented (FS-09.R45).
+		catalog, _ = ReadClaudeConfiguredModels(ClaudeSettingsPath())
+		matchProvider = true
+	default:
+		return 0
+	}
+	backend.AutoSyncModels = true
+	added := addModels(&backend, catalog, matchProvider)
+	bc.Backends[backendID] = backend
+	return added
 }
 
 // AutoSyncBackends imports configured provider models into opted-in backends on

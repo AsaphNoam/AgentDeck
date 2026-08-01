@@ -71,8 +71,11 @@ func (r *ClaudeResolver) resolve(ctx context.Context, binding Binding, project c
 	// selected project's canonical root: a binding is per backend and reused across
 	// projects, so it must resolve on whatever project the user launches/refreshes
 	// against. Without this, an A→B project change was rejected with approval_required.
+	// A project-free resolution (TS-07.R16) reads only the user layer. Joining an
+	// empty project root would resolve ".claude/settings.json" against — and
+	// approve — the server process's own working directory.
 	binding.Approved = append([]string{}, binding.Approved...)
-	for _, path := range []string{binding.Root, projectRoot} {
+	for _, path := range append([]string{binding.Root}, projectDirs(projectRoot)...) {
 		if canonical, err := canonicalExisting(path); err == nil && !containsString(binding.Approved, canonical) {
 			binding.Approved = append(binding.Approved, canonical)
 		}
@@ -81,8 +84,12 @@ func (r *ClaudeResolver) resolve(ctx context.Context, binding Binding, project c
 	sort.Strings(report.ApprovedRoots)
 	layers := []claudeLayer{
 		{filepath.Join(binding.Root, "settings.json"), "user", false},
-		{filepath.Join(projectRoot, ".claude", "settings.json"), "project", false},
-		{filepath.Join(projectRoot, ".claude", "settings.local.json"), "local", false},
+	}
+	for _, dir := range projectDirs(projectRoot) {
+		layers = append(layers,
+			claudeLayer{filepath.Join(dir, ".claude", "settings.json"), "project", false},
+			claudeLayer{filepath.Join(dir, ".claude", "settings.local.json"), "local", false},
+		)
 	}
 	known := map[string]struct{}{
 		"model": {}, "fallbackModel": {}, "effortLevel": {}, "availableModels": {}, "env": {},
@@ -131,18 +138,19 @@ func (r *ClaudeResolver) resolve(ctx context.Context, binding Binding, project c
 	}
 	if hasClaim(binding, "setup") {
 		visited := make(map[string]bool)
-		for _, instruction := range []struct{ path, scope string }{
-			{filepath.Join(binding.Root, "CLAUDE.md"), "user"},
-			{filepath.Join(projectRoot, "CLAUDE.md"), "project"},
-		} {
+		instructions := []struct{ path, scope string }{{filepath.Join(binding.Root, "CLAUDE.md"), "user"}}
+		bases := []struct{ path, scope string }{{binding.Root, "user"}}
+		for _, dir := range projectDirs(projectRoot) {
+			instructions = append(instructions, struct{ path, scope string }{filepath.Join(dir, "CLAUDE.md"), "project"})
+			bases = append(bases, struct{ path, scope string }{filepath.Join(dir, ".claude"), "project"})
+		}
+		for _, instruction := range instructions {
 			if err := inventoryClaudeInstruction(ctx, instruction.path, instruction.scope, binding.Approved, &effective, &report, visited, false); err != nil && !errors.Is(err, os.ErrNotExist) {
 				finalizeClaude(&effective, &report)
 				return effective, report, err
 			}
 		}
-		for _, base := range []struct{ path, scope string }{
-			{binding.Root, "user"}, {filepath.Join(projectRoot, ".claude"), "project"},
-		} {
+		for _, base := range bases {
 			for _, dir := range []struct{ name, kind string }{{"rules", "rule"}, {"skills", "skill"}, {"agents", "agent"}} {
 				if err := inventoryClaudeDir(ctx, filepath.Join(base.path, dir.name), base.scope, dir.kind, binding.Approved, &effective, &report); err != nil && !errors.Is(err, os.ErrNotExist) {
 					finalizeClaude(&effective, &report)
