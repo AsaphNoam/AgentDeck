@@ -4,12 +4,10 @@ import { describe, expect, it } from "vitest";
 import { ToolResult } from "./ToolResult";
 
 describe("ToolResult", () => {
-  it("labels a successful no-payload outcome instead of rendering an empty panel", () => {
+  it("omits a successful no-payload outcome", () => {
     const { container } = render(<ToolResult event={{ kind: "tool_result", status: "completed", content: null }} />);
 
-    expect(screen.getByText("Completed")).toBeInTheDocument();
-    expect(container.querySelector('[data-ui="tool-result"]')).toHaveAttribute("data-state", "empty");
-    expect(container.querySelector("pre")).not.toBeInTheDocument();
+    expect(container.firstChild).toBeNull();
   });
 
   it("uses a meaningful error when an empty content field accompanies it", () => {

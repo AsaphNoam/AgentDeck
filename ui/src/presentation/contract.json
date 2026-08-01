@@ -125,7 +125,12 @@
     },
     "tool-result": {
       "slots": ["content", "actions"],
-      "states": ["collapsed", "expanded", "error", "empty"],
+      "states": ["collapsed", "expanded", "error"],
+      "variants": []
+    },
+    "tool-run": {
+      "slots": ["trigger", "content"],
+      "states": ["collapsed", "expanded"],
       "variants": []
     },
     "permission-prompt": {

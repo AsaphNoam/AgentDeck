@@ -144,6 +144,17 @@ are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
 
+- 2026-08-01 — Collapsed uninterrupted chat tool activity (FS-03.R26/A11;
+  FS-12.R35; TS-08.R39; **INV §1/§8/§13**). Consecutive `tool_call`/`tool_result`
+  records now render as one closed **Ran _n_ tools** row; opening it restores the individual calls,
+  non-empty results, and failures. A non-tool event starts a new run. Successful no-payload results
+  now render nowhere, including orphaned legacy records; the former **Completed** presentation is
+  retired. Grouping occurs only in `TranscriptView`, so persistence, live/replay input, and expanded
+  per-event annotation anchors are unchanged. Focused regressions cover expansion, empty-result
+  omission, boundaries, and per-event annotation; specification/style/presentation checks, both Go test modes, all 206 UI
+  tests, source and distribution builds, whitespace, and a real-browser visual fixture pass with no
+  browser errors.
+
 - 2026-08-01 — Implemented compact chat tool activity (FS-03.R25/A10; FS-12.R34;
   TS-08.R1/R5/R7; **INV §8/§13**). A terminal tool result whose completed payload is empty is
   now a compact, labelled **Completed** outcome rather than a blank block; an empty `content`

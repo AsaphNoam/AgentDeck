@@ -222,6 +222,11 @@ primitive seam; the rejected alternatives are recorded in §5.
   no glass, glow, decorative text, semantic-color alias, or asset that carries product meaning.
   Compact Core/Sky & Grove previews reuse the Core raw values and Sky & Grove raw values respectively
   rather than duplicating palette literals.
+- **R39** — The transcript's presentation-only tool-run projection has one documented
+  `tool-run` hook with `trigger` and `content` slots and collapsed/expanded states. It groups only
+  normalized events already supplied by the feature owner, retains the original event nodes when
+  expanded for their existing annotation behavior, and neither fetches, persists, folds, nor
+  changes transcript data.
 
 ## 3. Interfaces & data shapes
 

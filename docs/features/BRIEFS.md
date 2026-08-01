@@ -4,6 +4,18 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-01 — Implementation: Collapsed chat tool runs
+
+Consecutive tool activity now appears as one closed **Ran _n_ tools** row. Clicking it reveals the individual calls, their meaningful output, and any failures; regular assistant text, diffs, permissions, and other events begin a new row.
+
+Successful no-output results are no longer displayed at all, so the **Completed** line is gone. The stored transcript and the individual right-click annotation targets are unchanged.
+
+The full test and build suite passed, and the browser fixture confirmed both collapsed and expanded states with no browser errors.
+
+**Needs attention:** None.
+
+**Next:** No action needed.
+
 ### 2026-08-01 — Implementation: Compact chat tool activity
 
 The empty black rectangles were successful tool-result events with no payload to show — commonly an edit whose actual change is already rendered as a diff. The renderer was still creating a padded result panel for them. They now show a compact **Completed** outcome instead.
