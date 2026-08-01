@@ -18,11 +18,13 @@ interface NewAgentModalProps {
   initialRole?: string;
   /** Pre-select project (e.g. from onboarding wizard). */
   initialProject?: string;
+  /** Fix the launch to a project and omit the project chooser. */
+  fixedProject?: string;
   /** Called after a successful launch, before this modal closes. */
   onLaunched?: (agentId: string) => void;
 }
 
-export function NewAgentModal({ open, onClose, initialRole, initialProject, onLaunched }: NewAgentModalProps) {
+export function NewAgentModal({ open, onClose, initialRole, initialProject, fixedProject, onLaunched }: NewAgentModalProps) {
   const { data: rolesData } = useRoles();
   const { data: projectsData } = useProjects();
   const { data: backendsData } = useBackends();
@@ -38,7 +40,7 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, onLa
     "";
 
   const [role, setRole] = useState(initialRole ?? "");
-  const [project, setProject] = useState(initialProject ?? "");
+  const [project, setProject] = useState(fixedProject ?? initialProject ?? "");
   const [backendId, setBackendId] = useState(defaultBackendId);
   const [modelId, setModelId] = useState("");
   const [effort, setEffort] = useState("");
@@ -72,8 +74,12 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, onLa
   }, [projectEntries.length, configData?.default_project]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (project && projectsData && (!projectsData[project] || projectsData[project].archived)) setProject("");
-  }, [project, projectsData]);
+    if (fixedProject) setProject(fixedProject);
+  }, [fixedProject]);
+
+  useEffect(() => {
+    if (!fixedProject && project && projectsData && (!projectsData[project] || projectsData[project].archived)) setProject("");
+  }, [fixedProject, project, projectsData]);
 
   useEffect(() => {
     if (!backendId && defaultBackendId) setBackendId(defaultBackendId);
@@ -176,15 +182,17 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, onLa
               </select>
             </div>
 
-            <div className="form-field">
-              <label>Project</label>
-              <select value={project} onChange={(e) => setProject(e.target.value)}>
-                {projectEntries.length === 0 && <option value="">No projects</option>}
-                {projectEntries.map(([id, p]) => (
-                  <option key={id} value={id}>{p.title}</option>
-                ))}
-              </select>
-            </div>
+            {!fixedProject && (
+              <div className="form-field">
+                <label>Project</label>
+                <select value={project} onChange={(e) => setProject(e.target.value)}>
+                  {projectEntries.length === 0 && <option value="">No projects</option>}
+                  {projectEntries.map(([id, p]) => (
+                    <option key={id} value={id}>{p.title}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="form-field">
               <label>Backend</label>

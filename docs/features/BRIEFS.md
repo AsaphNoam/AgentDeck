@@ -4,6 +4,16 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-01 — Fix: Keep new agents in their current project
+
+Creating an agent from a project page now always creates it in that project. The project chooser is
+removed from that modal, so it is no longer possible to accidentally launch into a different project.
+The normal New Agent screen still lets you choose a project. Automated checks and builds pass.
+
+**Needs attention:** None.
+
+**Next:** No action needed.
+
 ### 2026-08-01 — Implementation: Create a project from the projects page
 
 You can now create a project straight from the projects home, without opening Settings or onboarding.

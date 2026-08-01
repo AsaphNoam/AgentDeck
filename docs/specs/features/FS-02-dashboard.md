@@ -254,6 +254,12 @@ a validation or API failure the modal stays open and surfaces the server's field
 Cancel or Escape closes it with no change. A non-existent `cwd` is a non-blocking warning, not a
 failure (FS-04.R7). The action creates a project only; it does not launch an agent or navigate away.
 
+**R43.** On an active scoped project dashboard, each **New agent** action opens the
+existing New Agent modal with that route's project fixed as the launch target. The modal does not
+render a project picker, and its submission always sends that project id. The unscoped New Agent
+modal and prefilled launches outside a scoped dashboard retain their existing project selection
+behavior.
+
 ## 5. Acceptance criteria
 
 **A1.** Launching an agent adds its card within ~1s with no manual refresh; a status change flips the
@@ -359,6 +365,10 @@ right-click menu each open the create modal, while right-clicking a project card
 rather than the create menu. Submitting a valid project creates it through `POST /api/projects` and
 its card appears on the grid without a reload; an invalid submission keeps the modal open showing the
 error, and Cancel closes it with no change. — `ProjectDashboard` component test; J5.
+
+**A25.** (R43) Opening **New agent** from a scoped project dashboard omits the project
+picker and launches with the route project's id; the general modal continues to offer its picker. —
+`CardGrid.test.tsx`, `NewAgentModal.test.tsx`; J5.
 
 ## 6. Deviations & open decisions
 

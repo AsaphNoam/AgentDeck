@@ -145,7 +145,7 @@ export function CardGrid({ projectID, projectTitle }: { projectID?: string; proj
   return (
     <>
       {body}
-      <NewAgentModal open={showNewAgent} onClose={() => setShowNewAgent(false)} />
+      <NewAgentModal open={showNewAgent} onClose={() => setShowNewAgent(false)} fixedProject={projectID} />
       {releaseGroupLabel && (
         <ConfirmDialog
           open

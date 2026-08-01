@@ -54,6 +54,28 @@ function renderWithQuery(ui: React.ReactElement) {
 
 describe("CardGrid", () => {
 
+  // FS-02.A25: New Agent opened from a project dashboard is bound to that
+  // route's project, so a person cannot accidentally launch it elsewhere.
+  it("locks a scoped New Agent launch to the current project", async () => {
+    let capturedBody: unknown;
+    server.use(
+      http.post("/api/sessions", async ({ request }) => {
+        capturedBody = await request.json();
+        return HttpResponse.json({ agent: { agent_id: "a_2", name: "Atlas" } }, { status: 201 });
+      }),
+    );
+
+    renderWithQuery(<CardGrid projectID="my-app" projectTitle="My App" />);
+    fireEvent.click(await screen.findByText("New Agent"));
+    await screen.findByText("New agent");
+
+    expect(screen.queryByText("Project")).toBeNull();
+    fireEvent.click(screen.getByText("Launch"));
+
+    await waitFor(() => expect(capturedBody).toBeDefined());
+    expect((capturedBody as Record<string, unknown>).project).toBe("my-app");
+  });
+
   it("merges a scoped reorder back into the shared layout", () => {
     expect(mergeScopedOrder(
       ["a-one", "b-one", "a-two", "b-two"],
