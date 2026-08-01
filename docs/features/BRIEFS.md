@@ -4,6 +4,33 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-01 — Review: today's ad-hoc changes
+
+I reviewed everything committed today after the per-chat runtime picker: the AgentDecker proposal
+fix, the Sky & Grove visual rework, creating a project from the projects home, the chat Back-link
+change, locking scoped New Agent launches, the Claude model-sync design, and the three chat
+tool-activity presentation commits. All the required checks pass. Most of it is sound, and the two
+larger features — project creation and the collapsed tool runs — are correctly described in the
+specifications and covered by tests.
+
+One thing is broken. Locking New Agent to the current project also applies on a project page whose
+project no longer exists (you get there from an "Project unavailable" card when a project was
+deleted while its agents were still live). There the project chooser is hidden and every launch is
+rejected by the server, so New Agent cannot work at all and there is no control to fix it. That
+needs the lock limited to real, active projects.
+
+Three smaller things are worth fixing. The AgentDecker builder treats a failed transcript fetch as
+an empty one, so a single server hiccup can permanently discard a stopped builder's pending
+proposal — the exact loss today's fix was written to prevent. And three user-visible changes shipped
+with nothing written down: the chat **Back** link now returns to the project page instead of the
+home dashboard (with no note, test, or handling for a deleted project), the builder no longer jumps
+to its chat after launch, and the builder panel now hides its chat link while stopped.
+
+**Needs attention:** The New Agent lock on an unavailable-project page is a real dead end; the other
+three are lower priority.
+
+**Next:** Run `/fix` to work through the four findings, starting with the New Agent one.
+
 ### 2026-08-01 — Implementation: Plain chat tool activity
 
 Chat tool activity now renders as regular, subdued text. Group summaries, calls, output, and failures have no tinted backgrounds or enclosing boxes; the expand/collapse control and error-text cue remain.

@@ -95,11 +95,12 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   [`../archive/reviews/usability-review-run-2026-07-26-rerun.md`](../archive/reviews/usability-review-run-2026-07-26-rerun.md)
   and [`../archive/reviews/usability-review-run-2026-07-26-browser-retry.md`](../archive/reviews/usability-review-run-2026-07-26-browser-retry.md).
   Credentialed provider and terminal compatibility remain separate manual release gates.
-- **Last reviewed code:** `ca100e0` (2026-08-01), the continuous range after `9c6a637`. Its product
-  code is `ca100e0` (the per-chat runtime picker); `b28a96c` is a prior review-state commit (docs
-  only). Code and specification agree in both directions and the diff is clean against every invariant
-  class; no new finding. One pre-existing **Worth fixing** finding (the project menu preset-swatch CSS)
-  remains recorded below.
+- **Last reviewed code:** `05dff38` (2026-08-01), the continuous range after `ca100e0`: the
+  AgentDecker proposal-review fix, the Sky & Grove visual rework, projects-home project creation, the
+  chat Back-link change, the scoped New Agent project lock, the Claude configured-model design, and
+  the three chat tool-activity presentation commits. One **Must fix** and three **Worth fixing**
+  findings are recorded below. The previously recorded project-menu preset-swatch item is confirmed
+  fixed in `249da5b` and is not carried forward.
 - **Branch:** `main`.
 
 ## Active change
@@ -138,11 +139,92 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 ### Open findings
 
+- **Must fix** — `ui/src/features/dashboard/ProjectDashboard.tsx:188` renders
+  `<CardGrid projectID={id}>` for an *unavailable* scoped project (the `!project && hasAgents`
+  branch), and `ui/src/components/grid/CardGrid.tsx:148` now passes that id as `fixedProject`. On
+  that route the New Agent modal therefore hides the project picker
+  (`ui/src/features/launch/NewAgentModal.tsx:185`) and always submits a project the server rejects
+  with `unknown project` (`internal/server/launch.go:174`), so New Agent can never succeed and the
+  person has no control that would let it. Normal-use trigger: delete or hand-remove a project that
+  still has live agents, open `/project/<id>` from the "Project unavailable" card, and press New
+  agent. FS-02.R43/A25 scope the lock to an "active scoped project dashboard", so this also violates
+  the requirement as written (**INV §10**). Fix: only pass `fixedProject` when the route project is a
+  current, non-archived catalog member — thread that from `ScopedProjectDashboard` — and fall back to
+  the ordinary picker otherwise. Test: render the scoped dashboard for an id with a live agent and no
+  project entry and assert the Project picker renders.
+
+- **Worth fixing** — `ui/src/features/pipelines/AgentDeckerBuilder.tsx:105-110` sets
+  `builderTranscriptLoaded` inside `.finally()` after `.catch(() => undefined)`, so a failed
+  `getTranscript` is indistinguishable from a successfully loaded empty transcript. For a stopped
+  builder this makes `shouldDropBuilderSession` true with `hasProposal` false, and the effect then
+  calls `localStorage.removeItem(BUILDER_KEY)` — irreversibly discarding the only pointer to a
+  pending proposal awaiting its one-time human approval, which is exactly the loss `249da5b` was
+  written to prevent (FS-14.R27/A10). Normal-use trigger: reload the Pipelines page while the server
+  is restarting, or any 500 from `/api/sessions/:id/transcript`, with a stopped builder that
+  proposed a template. This is **INV §7** (a read failure amplified into a destructive write) and
+  **INV §1**. Fix: set the flag only in `.then()` so a failed read leaves the session undecided.
+  Test: MSW 500 on the transcript for a stopped, hydrated builder → `BUILDER_KEY` retained.
+
+- **Worth fixing** — `0fddb5a` ("fix back nav") shipped a user-visible navigation change with no
+  specification, acceptance item, test, brief, or changelog entry: the chat header **Back** link in
+  `ui/src/components/chat/ChatPanel.tsx:146` now targets `/project/<agent.project>` instead of `/`.
+  FS-03 does not describe the chat Back target at all, so nothing records the shipped behavior
+  (**INV §10**; workflow §2.1 requires the specification first for user-visible change). The new
+  target is also unguarded against a project the agent names but the catalog no longer has: Back then
+  lands on the "Project unavailable" / "is archived" route rather than the dashboard. Fix: add the
+  FS-03 requirement and acceptance item plus a `ChatPanel` regression, and fall back to `/` when the
+  agent's project is not an active catalog member.
+
+- **Worth fixing** — `249da5b` changed two further user-visible AgentDecker behaviors with no
+  specification text (**INV §10**): launching the builder no longer navigates to its chat (the
+  `useNavigate` call was removed from `AgentDeckerBuilder.tsx`, so the person stays on Pipelines where
+  the approval controls live), and the builder session panel now renders a hydrating/stopped status
+  line and withholds the "Open AgentDecker chat" link while the builder is stopped
+  (`AgentDeckerBuilder.tsx:188`). FS-14.R26/R27 and A10 say nothing about post-launch navigation or
+  the session panel's hydrating/stopped presentation. Fix: extend FS-14.R27/A10 to state that the
+  builder flow stays on the Pipelines approval surface and what the session panel shows in each
+  state; the component tests added in `249da5b` already cover the behavior.
+
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-01 — Reviewed the continuous range after `ca100e0` through `05dff38` in both
+  specification directions and against every invariant class: the AgentDecker proposal-review fix
+  (`249da5b`), the Sky & Grove visual rework (`a8d103f`), projects-home project creation (`f360216`),
+  the chat Back-link change (`0fddb5a`), the scoped New Agent project lock (`24630d9`), the Claude
+  configured-model design (`33806e1`, docs only), and the three chat tool-activity presentation
+  commits (`f7f5262`, `a1d9446`, `05dff38`). One **Must fix** and three **Worth fixing** findings are
+  recorded above. **INV §10** caught the scoped New Agent lock reaching the *unavailable*-project
+  route, where the picker is hidden and every launch is rejected as `unknown project`, contradicting
+  FS-02.R43's "active scoped project dashboard"; it also caught three unspecified user-visible
+  behaviors — the chat Back target (no FS-03 text at all, and no test/brief/changelog for `0fddb5a`),
+  the builder no longer navigating to its chat, and the builder session panel's hydrating/stopped
+  presentation. **INV §7** caught the builder marking its transcript "loaded" in `.finally()` after
+  swallowing the fetch error, so one failed read destroys the persisted pointer to a pending
+  proposal. Clean/not applicable elsewhere: **§1** `NewAgentModal` re-applies `fixedProject` when the
+  scoped route changes, `ToolRun`'s open state is keyed to its first event so a growing run keeps it,
+  and the builder refetches its transcript on the running→stopped boundary; the Files tab's "Diff"
+  reveal still resolves because `diff_refs` seqs come from `EvDiff` events, which grouping never
+  collapses, and `CommandsTab` has no seq reveal. **§2** `shouldRenderToolResult` is the single
+  omit predicate shared by `ToolResult` and the `TranscriptView` grouping, and the create modal
+  reuses `ProjectForm` + `useCreateProject` rather than a second form or POST path. **§3** the create
+  form submits the whole document with a server-derived empty id. **§8** create/color/archive
+  mutations surface their server messages, and widening proposal discovery to every `tool_result` is
+  safe because a candidate must still satisfy `ok === true`, `pipelineProposalSchema`, and a digest,
+  and remains behind FS-14.R27/R30's one-time human approval. **§13** `.tool-run`,
+  `.tool-run-content`, `.tool-run-event`, `.project-dashboard-header`, and the
+  `.context-menu .project-color-preset` rules all resolve, `tool-run` is documented in
+  `contract.json` with its `trigger`/`content` slots and collapsed/expanded states, and the shipped
+  Sky & Grove palette matches TS-08.R38 value for value. **§4/§5/§6/§9/§11/§12/§14/§15** have no
+  applicable surface: the range adds no teardown, concurrency, runtime/interface, durability or
+  migration, server collection, external CLI, route, or external side-effect ordering. `make
+  check-specs`, `make test`, all 206 UI tests, `npm run check:styles`, the UI build, and
+  `git diff --check` pass; the green suite does not exercise any recorded finding. A concurrent
+  session committed `05dff38` mid-review; its diff was reviewed in full and is included in the range.
+  No product code or specifications changed during review.
 
 - 2026-08-01 — Removed coloured/enclosing surfaces from chat tool activity (FS-12.R36/A12;
   **INV §13**). The collapsed summary and the calls, results, and failures disclosed from it now
