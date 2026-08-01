@@ -83,10 +83,11 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   [`../archive/reviews/usability-review-run-2026-07-26-rerun.md`](../archive/reviews/usability-review-run-2026-07-26-rerun.md)
   and [`../archive/reviews/usability-review-run-2026-07-26-browser-retry.md`](../archive/reviews/usability-review-run-2026-07-26-browser-retry.md).
   Credentialed provider and terminal compatibility remain separate manual release gates.
-- **Last reviewed code:** `b8e31fb` (2026-07-31), the continuous range after `7fc5158`. The only
-  product code in it is `de8634f` (the agent-effort-selection implementation and its four bundled
-  review fixes); the surrounding commits are docs/design only. Its one **Must fix** and two
-  **Worth fixing** findings are fixed in the following fix session.
+- **Last reviewed code:** `9c6a637` (2026-08-01), the continuous range after `b8e31fb`. Its product
+  code is `bd5ba71` (the effort-lifecycle fix for the three findings recorded against `de8634f`) and
+  `9c6a637` (the project context menu and preset-color feature); `8b95f90` is a prior review-state
+  commit (docs only). The effort fix correctly resolves all three predecessor findings. One
+  **Worth fixing** finding is recorded below.
 - **Branch:** `main`.
 
 ## Active change
@@ -125,13 +126,44 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 ### Open findings
 
-None.
+- **Worth fixing** (INV §13/§10) — In the project context menu, the preset color swatches
+  (`.project-color-preset`, specificity 0,1,0) are out-specified by the shared `.context-menu button`
+  rules (specificity 0,1,1) in `ui/src/styles/features/dashboard.css`, so a swatch rendered inside the
+  menu loses its round shape (`border-radius` falls to `--ad-radius-small`), its border
+  (`border-color: transparent`), and its hover lift. The inline fill color and the `aria-pressed`
+  selected outline (0,2,0) still win, so the picker stays usable and selectable — this is cosmetic.
+  Normal-use trigger: right-click any active project card and look at the six swatches; they are
+  squarish and borderless versus the round bordered swatches in the Settings/onboarding forms. No test
+  catches it (jsdom is blind to CSS and the visual matrix renders only agent cards, not the menu).
+  Suggested fix: scope the swatch rules to beat `.context-menu button` (e.g. `.context-menu .project-color-preset`)
+  or exclude the picker from that selector; extend the visual matrix to render the menu picker.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-01 — Reviewed the continuous range after `b8e31fb` through `9c6a637` in both specification
+  directions and against every invariant class: the effort-lifecycle fix (`bd5ba71`) and the project
+  context-menu/preset-color feature (`9c6a637`); `8b95f90` is a prior review-state commit. The effort
+  fix correctly resolves its three predecessor findings — **INV §10/FS-09.R4/R42** ordinary resume now
+  skips catalog re-validation and reuses the frozen effort (verified the resume path keeps the snapshot
+  value untouched); **INV §2** `SupportsEffort` derives backend capability from each adapter's
+  `EffortDelivery` (behaviour-equivalent to the removed allowlist); **INV §2/§9** migration v13 adds
+  `pipeline_attempts.effort` with the version guard bumped, insert/select/scan updated in lockstep
+  (placeholder count verified), and `stageExecution` reads the frozen attempt effort. One
+  **Worth fixing** finding: the shared `.context-menu button` CSS out-specifies the preset swatches, so
+  swatches inside the project menu render squarish and borderless (fill and selected outline survive) —
+  cosmetic, INV §13/§10. Clean/not applicable elsewhere: §1 the color update republishes optimistically
+  and rolls back on error, the portal menu carries no cross-boundary derived state; §2 one
+  `ProjectColorPicker` and one `projectColors` palette feed Settings/onboarding/menu, the portal menu
+  matches `CardContextMenu` exactly; §3 `ProjectForm` merges the seeded color via local state; §4/§5/§6
+  add no teardown, concurrency, or runtime; §7 no new read loops; §8 the color mutation surfaces its
+  error and invalidates; §10 R38/R39/R40 wiring reaches every surface and `AgentCard` already sets
+  `--ad-project-accent`; §11 no server serialization change; §14 no new route. `make check-specs`, the
+  config/state/pipeline/backend Go tests, the frozen-effort resume integration test, and the four
+  changed UI test files pass. No product code or specifications changed during review.
 
 - 2026-07-31 — Implemented project context menus and preset colors. Active project cards now open a
   cursor-positioned portal menu with Rename, Archive, and an immediate six-swatch color picker;
