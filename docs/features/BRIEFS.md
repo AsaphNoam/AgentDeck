@@ -4,6 +4,30 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-01 — Design update: global backend creation and configuration linking
+
+The design is ready to implement again. Backend creation now uses a focused one-backend operation,
+so **Create and use my configuration** can save the correct provider starter and connect Claude or
+Codex in one visible action without saving or discarding unrelated Settings edits. If connection
+fails, the valid backend remains visible, unbound, and retryable. Existing backends use the same
+project-free global connection; their agents still resolve project-specific configuration only when
+they launch.
+
+The normal flow is Linked only. Existing Mirrored bindings and explicit API use remain compatible,
+but Mirrored is no longer presented as recovery for a failure it cannot repair. Immediate model
+import is limited to the connected backend and accurately means Codex's locally visible cache entries
+or Claude's explicitly configured selectors—not guaranteed support or entitlement.
+
+Persistence is intentionally best effort: catalog changes are written before the binding, returned
+failures attempt restoration, and an interruption can leave only harmless add-only models or autosync
+on an unbound backend. The binding alone means “connected,” and retrying with the stable backend id
+converges safely. The planned checks now cover dirty drafts, zero-project use, partial failures,
+concurrency, replay/retry, invalidation, and later project launch.
+
+**Needs attention:** None.
+
+**Next:** Start the waiting backend-creation/global-linking change when you want it implemented.
+
 ### 2026-08-01 — Review: simple backend creation and global source linking
 
 The design is not ready to implement. Four decisions are still underspecified or internally

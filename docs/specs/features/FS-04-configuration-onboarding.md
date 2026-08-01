@@ -94,12 +94,22 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   incomplete card into the Settings document. The person chooses the provider type first; AgentDeck
   supplies a matching editable display-name suggestion and a usable provider starter model, so a
   selected **Codex** type never begins with a confusing **Claude** identity or an invalid empty
-  model. The dialog creates a valid persisted backend and then closes with the new card visible.
-  Cancel or Escape leaves the catalog unchanged; a validation/save failure keeps the dialog open with
-  the actionable server error. Claude/Codex creation also offers the optional one-click
-  native-configuration connection specified by FS-08.R34. Existing backend editing remains in
-  Settings; this change does not make a separate backend-management screen or alter a running
-  agent's frozen runtime.
+  model. Submit uses TS-03.R23's item-scoped create operation: the server builds the starter from the
+  same provider template as fresh-home seeding and adds exactly that valid backend to the durable
+  catalog without submitting, saving, replacing, or discarding unrelated whole-catalog Settings
+  drafts. If the catalog was empty the new backend becomes its default; otherwise the existing
+  default is preserved.
+
+  Claude/Codex creation also offers **Create and use my configuration**. It durably creates the
+  backend, then performs FS-08.R34's normal project-free Linked connection as the same visible
+  action. Validation or the initial backend write failing leaves the catalog unchanged and keeps the
+  dialog open with an actionable error. If backend creation succeeds but native connection fails,
+  the valid backend remains saved and unbound, the dialog shows the specific retry action, and no
+  state claims it connected. Cancel or Escape before submission changes nothing; after a backend is
+  saved, closing the dialog never deletes it. The new card is merged into the editor while every
+  unrelated unsaved edit remains intact. Existing backend editing stays on the complete-document
+  Settings save; this change does not create a separate management screen or alter a running agent's
+  frozen runtime.
 
 ### 2.4 Layout & global config
 
@@ -274,10 +284,14 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   present the six-preset swatch picker with no free-form channel inputs; selecting a preset persists
   its RGB triple through the existing project API and round-trips unchanged, and a newly created
   project defaults to the first preset. — `ProjectForm` and `ProjectDashboard` component tests; J2, J5.
-- **A20** `(planned)` — (R40) Add backend opens a cancellable application dialog; choosing a type
-  produces only that provider's matching suggested name and valid starter model, and successful
-  submission adds one saved backend while cancel/error leave Settings unchanged or retryable. The
-  Claude/Codex dialog action delegates the one-click global connection journey to FS-08.A11.
+- **A20** `(planned)` — (R40) Add backend is cancellable before submission; choosing a type produces
+  only that provider's matching suggested name and canonical valid starter model; and item-scoped
+  create adds exactly one backend without persisting, replacing, or discarding an unrelated dirty
+  Settings draft. **Create and use my configuration** returns a connected Claude/Codex backend only
+  after FS-08.A11 succeeds. A connection failure instead leaves the new backend saved, unbound,
+  visible, and retryable; closing after that failure preserves it. *Verify by* dialog/editor tests
+  for dirty-draft preservation, validation/initial-write failure, cancel, create-only success,
+  create-and-connect success, create-and-connect failure/retry, and ordinary later edit/delete.
 
 ## 6. Deviations & open decisions
 

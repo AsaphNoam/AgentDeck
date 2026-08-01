@@ -191,82 +191,25 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
   builder flow stays on the Pipelines approval surface and what the session panel shows in each
   state; the component tests added in `249da5b` already cover the behavior.
 
-- **Must fix** — The waiting global-source design silently rewrites already-shipped requirements as
-  if the replacement behavior were current. `docs/specs/features/FS-08-federation.md:26-33` changes
-  R2/R3 from the shipped project-scoped list/required-project preview contract to a global list and
-  optional project, and lines 152-156 change R23 from the shipped project/discover/preview/mode UI to
-  the one-click project-free UI; none is tagged `(planned)`, while the current handler still rejects
-  a project-free preview at `internal/server/config_sources.go:133-140`. This makes the source of truth
-  falsely describe unshipped behavior and silently changes stable requirement meanings (**INV §10**;
-  specification constitution lines 94-111). Fix: restore the shipped meanings under R2/R3/R23 and
-  append distinct planned requirements for the global replacements (or explicitly retire and
-  supersede the old IDs), then point A11 and the ready change at those planned IDs.
-
-- **Must fix** — The Add-backend dialog does not define its durable save/link/cancel boundary.
-  `docs/ready-changes/simple-backend-creation-and-global-source-linking.md:4,17-24` says both that the
-  save-first gate is replaced and that linking occurs inside creation, while FS-08.R33 and TS-07.R15
-  require a real persisted backend before bind. The existing editor holds whole-catalog drafts in
-  local state (`ui/src/features/settings/BackendsEditor.tsx:117-131`) and the only backend mutation
-  replaces the complete document (`ui/src/api/config.ts:166-176`). Normal-use trigger: edit an
-  existing backend without saving, then create/link another; the implementation must either persist
-  the unrelated draft or refetch and overwrite it. A link failure after the backend save also leaves
-  Cancel ambiguous: keep the valid unbound backend or delete it. This is a material persistence and
-  data-loss choice (**INV §3/§10/§15**). Fix: specify the exact sequence and dirty-draft policy. The
-  recommended simple boundary is Create persists the valid backend first, retains it unbound on any
-  connection failure, and Cancel is catalog-neutral only before Create; existing unsaved edits must
-  be preserved or explicitly resolved before that whole-document save. Add UI regressions for dirty
-  existing edits and create-success/link-failure/retry/cancel.
-
-- **Must fix** — Mirrored mode cannot currently recover any failure that exposes it. FS-08.R34
-  (`docs/specs/features/FS-08-federation.md:129-145`) calls Mirrored a compatibility recovery after a
-  failed Linked attempt, but FS-08.R8 and TS-07.R9 say both modes use the same native authority and
-  resolution, with Mirrored adding only a disposable redacted cache. The implementation confirms the
-  only mode-specific branch is the post-success cache write at
-  `internal/configsource/manager.go:270-274`, and even that failure is reduced to a warning. A missing,
-  invalid, changed, or unapproved source therefore fails identically in both modes, while cache
-  failure cannot trigger the recovery UI. Offering Mirrored after any normal failure is a retry dead
-  end (**INV §8/§10**). Fix: either define and implement a distinct failure class Mirrored actually
-  repairs, with a regression that Linked fails and Mirrored succeeds, or remove the recovery promise
-  and keep Mirrored as an explicitly advanced mode rather than error handling.
-
-- **Must fix** — TS-07.R17's compensated two-file update is not crash-consistent. It writes
-  `config-sources.json` and `backends.json` separately and restores a preimage only when the second
-  write returns an error (`docs/specs/tech/TS-07-federation.md:95-107`). A process exit, power loss,
-  or rollback-write failure after the first atomic rename leaves a durable split: a binding without
-  enabled sync, or enabled sync/catalog additions without the binding. The proposed in-process lock
-  prevents concurrent handler races but cannot repair that state after restart, violating the
-  retryable multi-store rule in **INV §15**. Fix: define a durable transaction intent/startup
-  reconciliation (or another single-authority/idempotent design), including the authoritative
-  outcome for every partial state. Test injected first/second/rollback failures, restart between
-  writes, retry, and that no generation/SSE publishes before the committed outcome.
-
-- **Worth fixing** — The ready change overstates model discovery and leaves the easiest incorrect
-  implementation path open. Its Outcome says the connection imports "the provider's supported
-  models" (`docs/ready-changes/simple-backend-creation-and-global-source-linking.md:11-13`), but Codex
-  imports only locally list-visible cache models and Claude only user-configured selectors; neither
-  proves availability or entitlement (FS-09.R28/R45/R47). Also, the existing
-  `Store.AutoSyncBackends` rereads and may rewrite every opted-in backend
-  (`internal/config/modelautosync.go:53-90`), which would escape the locked enabled-bind snapshot and
-  make `models_added` ambiguous if reused directly (**INV §2/§10/§15**). Fix: say
-  provider-specific configured/visible
-  add-only import, retain the not-an-entitlement copy, and require a pure target-backend merge over
-  the locked catalog snapshot. Test that linking one provider cannot sync an unrelated opted-in
-  backend.
-
-- **Worth fixing** — The ready change's traceability omits the durable-identity rules it depends on
-  and does not name the failure matrix for the new boundary. Its Relevant requirements list
-  (`docs/ready-changes/simple-backend-creation-and-global-source-linking.md:6-7`) omits FS-08.R33/A10
-  and TS-07.R15, while its verification section names only generic focused regressions. Add those
-  requirements plus explicit cases for project-free Settings/onboarding with zero projects,
-  successful Claude and Codex connection, compatibility-control gating, target-scoped immediate
-  import, concurrent Settings Save/bind, both write failures, rollback/restart recovery, retry, and
-  both backend/source query plus SSE invalidation (**INV §10/§11/§13/§15**).
-
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-01 — Revised the simple-backend/global-source design after the human resolved every review
+  decision; no product code changed. The global project-free flow is included and the shipped
+  project-scoped FS-08.R2/R3/R23 text is restored until replacement ships. Add backend now uses a
+  planned item-scoped, idempotent `POST /api/backends`: it builds the canonical provider starter,
+  preserves unrelated whole-catalog drafts, and can create plus Linked-connect in one visible action.
+  A connection failure retains the valid backend as visibly unbound and retryable. Mirrored remains
+  compatible for existing bindings/explicit API callers but is not offered as recovery. Immediate
+  import is target-only and provider-honest. The human accepted catalog-first best-effort persistence:
+  a returned source-write error attempts restoration, while interruption may leave only safe add-only
+  autosync/model residue on an unbound backend; source binding alone means connected and stable-id
+  retry converges under INV §15. FS-04/FS-08/FS-09 and TS-03/TS-07 plus the ready change carry the
+  complete failure, concurrency, invalidation, zero-project, replay, and browser evidence. The six
+  design-review findings are resolved; documentation checks pass and the change remains waiting.
 
 - 2026-08-01 — Reviewed the waiting simple-backend/global-source design against the current
   FS/TS requirements, implementation seams, and cited invariants. Four Must-fix design defects keep
