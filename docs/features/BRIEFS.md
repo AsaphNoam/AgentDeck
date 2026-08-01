@@ -4,6 +4,30 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-01 — Feature design: Claude backend model autosync
+
+Claude backend model sync is fully designed and ready to implement. An opted-in Claude backend will
+read only the user-level Claude `model`, `availableModels`, and `fallbackModel` settings at dashboard
+startup and add valid, previously unrepresented selectors to AgentDeck's future-launch picker. The
+merge is add-only: it never overwrites or removes an entry, changes the default, infers effort, or
+mutates running and archived sessions. A bad or absent Claude source does not block startup or stop a
+valid Codex catalog update.
+
+Fresh homes will seed Claude Code's [portable aliases](https://code.claude.com/docs/en/model-config)
+`fable`, `opus`, `sonnet`, and `haiku` with generic family labels; Sonnet stays default. Existing
+catalogs remain untouched. Project, local, managed, environment-only, private-cache, binary, network,
+and live-session sources are excluded, so this is configured-model convenience rather than a full
+entitlement catalog.
+
+The implementation will keep `backends.json` as the sole authority, parse provider sources inside
+the configuration package, merge all provider additions into one validated snapshot, and perform at
+most one atomic rewrite. It adds no API, schema version, cache, sidecar, database migration, or
+federation binding. Documentation checks pass.
+
+**Needs attention:** None.
+
+**Next:** Run the waiting **Sync configured Claude models** change when you want it implemented.
+
 ### 2026-08-01 — Fix: Keep new agents in their current project
 
 Creating an agent from a project page now always creates it in that project. The project chooser is
