@@ -144,6 +144,13 @@ are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
 
+- 2026-08-01 — Removed coloured/enclosing surfaces from chat tool activity (FS-12.R36/A12;
+  **INV §13**). The collapsed summary and the calls, results, and failures disclosed from it now
+  render as plain subdued text: no tint, border, box padding, or raised output panel. Disclosure,
+  indentation, and semantic failure text remain. Specification/style/presentation checks, both Go
+  test modes, all 206 UI tests, source and distribution builds, whitespace, and browser inspection
+  of computed tool styles pass.
+
 - 2026-08-01 — Collapsed uninterrupted chat tool activity (FS-03.R26/A11;
   FS-12.R35; TS-08.R39; **INV §1/§8/§13**). Consecutive `tool_call`/`tool_result`
   records now render as one closed **Ran _n_ tools** row; opening it restores the individual calls,

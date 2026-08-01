@@ -192,24 +192,15 @@
 }
 
 .tool-block {
-  background: var(--ad-surface-subtle);
-  border: var(--ad-border-thin) solid var(--ad-border-default);
-  border-radius: var(--ad-radius-medium);
   color: var(--ad-text-secondary);
   font-family: var(--ad-font-mono);
   font-size: 0.76rem;
-  overflow: hidden;
-  padding: var(--ad-space-2) var(--ad-space-3);
 }
 
 .tool-run {
-  background: var(--ad-surface-subtle);
-  border: var(--ad-border-thin) solid var(--ad-border-default);
-  border-radius: var(--ad-radius-medium);
   color: var(--ad-text-muted);
   font-family: var(--ad-font-mono);
   font-size: 0.76rem;
-  padding: var(--ad-space-2) var(--ad-space-3);
 }
 
 .tool-run-content {
@@ -242,7 +233,7 @@
 }
 
 .tool-call {
-  background: color-mix(in srgb, var(--ad-surface-subtle) 76%, var(--ad-surface-raised));
+  color: var(--ad-text-muted);
 }
 
 .tool-toggle {
@@ -265,19 +256,16 @@
 
 .tool-args,
 .tool-result pre {
-  background: var(--ad-surface-raised);
-  border-top: var(--ad-border-thin) solid var(--ad-border-default);
   color: var(--ad-text-primary);
-  margin: var(--ad-space-2) calc(var(--ad-space-3) * -1) calc(var(--ad-space-2) * -1);
+  margin: var(--ad-space-2) 0 0;
   max-height: 420px;
   overflow: auto;
-  padding: var(--ad-space-2) var(--ad-space-3);
+  padding: 0;
   white-space: pre-wrap;
 }
 
 .tool-result-error {
-  background: color-mix(in srgb, var(--ad-state-error) 6%, var(--ad-surface-subtle));
-  border-color: var(--ad-state-error);
+  color: var(--ad-state-error);
 }
 
 .tool-result-error pre {
