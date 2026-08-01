@@ -197,6 +197,16 @@ are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
 
+- 2026-08-01 — Designed simple backend creation and global configuration linking; no product code
+  changed. Add backend will become a provider-first modal with a matching editable name and usable
+  starter model, never an incomplete inline card. Claude/Codex will offer one read-only **Use my
+  configuration** action during creation and on existing backends: it hides discovery/project/mode
+  choices, connects a global source, immediately imports provider-supported models, and enables
+  continuing add-only sync. Claude and Codex share the same flow, while their catalog metadata stays
+  provider-honest. Compatibility mode appears only after a normal link fails; detached import stays
+  unavailable. FS-04/FS-08/FS-09 and TS-03/TS-07 now carry the planned behavior; the ready change is
+  `simple-backend-creation-and-global-source-linking.md`. Specification and whitespace checks pass.
+
 - 2026-08-01 — Implemented Claude configured-model autosync (FS-09.R45/R46/A18/A19; TS-01.R14;
   **INV §2/§11**). An opted-in `claude-acp` backend now imports the selectors named in the
   user-level `~/.claude/settings.json` (`model`, `availableModels`, array-or-legacy-string

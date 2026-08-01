@@ -98,6 +98,15 @@ Configuration-source federation for Claude/Codex is FS-08.
   R33, seeding never rewrites a pre-existing `backends.json`, adds missing aliases to an existing
   catalog, or changes an existing default.
 
+- **R47** `(planned)` — Connecting a Claude/Codex native configuration through the normal
+  one-click federation action enables that backend's existing `autosync_models` capability and runs
+  its same provider-specific, add-only catalog import before the connection reports success. Codex
+  therefore imports visible cache models and their declared effort metadata under R28/R38; Claude
+  imports its configured selectors under R45, without inferring effort. A missing or malformed
+  provider catalog remains a non-blocking no-op exactly as R28/R45 define: the source is still
+  connected and its valid starter model still launches. The ordinary Settings control can later turn
+  automatic sync off; provider connection does not overwrite existing model entries or the default.
+
 ### Adapter and capability matrix
 
 - **R8** — All four backend types use the common ACP chat runtime and normalized transcript,
@@ -345,6 +354,11 @@ Configuration-source federation for Claude/Codex is FS-08.
   remains byte-for-byte unchanged by seeding. The launch picker exposes all four without claiming
   their resolved versions or entitlements. *Verify by* seed/config tests and the onboarding/New
   Agent catalog fixtures.
+- **A20** `(planned)` (R47) — A normal successful Claude/Codex source connection enables model
+  autosync and immediately performs the existing provider-specific add-only model import. Codex
+  preserves its declared effort metadata; Claude gains no inferred effort. Missing/invalid catalog
+  data does not undo a successful source connection, and existing models/defaults remain untouched.
+  *Verify by* focused source-bind, model-sync, and Settings connection regressions.
 
 ## 6. Deviations & open decisions
 

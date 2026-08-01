@@ -42,4 +42,4 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-_None._
+- [Simple backend creation and global configuration linking](simple-backend-creation-and-global-source-linking.md)
