@@ -68,6 +68,9 @@ const (
 	// with a different name or type (TS-03.R23). An exact replay is idempotent
 	// and never reaches this code.
 	CodeBackendExists = "backend_exists" // 409
+	// CodeBackendCatalogChanged rejects a whole-catalog replacement whose ETag
+	// predates a committed catalog mutation in another tab.
+	CodeBackendCatalogChanged = "backend_catalog_changed" // 409
 )
 
 // APIError is the normalized error payload. It serializes to the §7.7 envelope:
@@ -101,7 +104,7 @@ func statusForCode(code string) int {
 	case CodeConflict, CodeAgentNotRunning, CodeSwitchInProgress,
 		CodeSourceChanged, CodeSourceConflict, CodeApprovalRequired,
 		CodeAgentArchived, CodeAgentArchiving, CodeProjectArchived, CodeProjectArchiving,
-		CodeBackendExists:
+		CodeBackendExists, CodeBackendCatalogChanged:
 		return http.StatusConflict // 409
 	case CodeNotImplemented:
 		return http.StatusNotImplemented // 501

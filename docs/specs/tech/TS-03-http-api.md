@@ -203,9 +203,12 @@ the saved backend and
 `connection:{status:"unbound",error:{code,message,details?}}`; no binding, installed generation, or
 source-update event is claimed. The nested error uses R3's safe vocabulary and tells the client that
 the ordinary connection action is retryable. Create-only omits `connection`. Existing
-`PUT /api/backends` remains the complete-document editing operation. POST/PUT/source-bind mutations
-share TS-07.R17's catalog lock; schemas, mocks, backend/source query invalidation, and error display
-ship together under R11/R13.
+`GET /api/backends` returns the current document's strong `ETag`; `PUT /api/backends` remains the
+complete-document editing operation and requires that value in `If-Match`. A changed catalog returns
+R3's `409 backend_catalog_changed` response and preserves the submitted browser draft for reload or
+reconciliation. A successful POST/PUT response returns the resulting `ETag`. POST/PUT/source-bind
+mutations share TS-07.R17's catalog lock; schemas, mocks, backend/source query invalidation, and
+error display ship together under R11/R13.
 
 ## 3. Interfaces & data shapes
 

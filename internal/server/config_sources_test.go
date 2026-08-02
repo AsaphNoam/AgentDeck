@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/agentdeck/agentdeck/internal/config"
@@ -374,5 +375,138 @@ func TestComposeLaunchRejectsReservedMCPCollision(t *testing.T) {
 	_, _, ae := srv.composeLaunch(context.Background(), launchRequest{Role: "implementer", Project: "fed"})
 	if ae == nil || ae.Code != runtime.CodeSourceConflict {
 		t.Fatalf("ae = %+v, want source_conflict", ae)
+	}
+}
+
+// TS-07.R17 / INV §15 — a corrupt durable catalog must reject a bind before the
+// single-use preview token is consumed, rather than substituting seed defaults
+// and burning consent that strict persistence then refuses (FS-08.R5).
+func TestBindRejectsCorruptCatalogBeforeSpendingPreview(t *testing.T) {
+	srv, _, _ := federationServer(t)
+	h := srv.routes()
+
+	rec := doJSON(t, h, http.MethodPost, "/api/config-sources/preview",
+		`{"provider":"claude-code","root":"auto","mode":"linked","claims":["launch_defaults"],"project":"fed"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("preview status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	var pv previewResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &pv); err != nil {
+		t.Fatalf("preview body: %v", err)
+	}
+
+	// Corrupt the catalog after preview, then attempt to bind: the token must not
+	// be spent.
+	backendsPath := filepath.Join(srv.configStore.Home(), "backends.json")
+	if err := os.WriteFile(backendsPath, []byte("{not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	rec = doJSON(t, h, http.MethodPut, "/api/config-sources/claude",
+		`{"preview_token":"`+pv.PreviewToken+`","overrides":{}}`)
+	if rec.Code == http.StatusOK {
+		t.Fatalf("bind against a corrupt catalog unexpectedly succeeded: %s", rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), srv.configStore.Home()) {
+		t.Errorf("error leaked a filesystem path: %s", rec.Body.String())
+	}
+
+	// Repair the catalog and bind with the SAME token: it must still be valid.
+	if err := srv.configStore.WriteBackends(config.DefaultBackends()); err != nil {
+		t.Fatalf("repair: %v", err)
+	}
+	rec = doJSON(t, h, http.MethodPut, "/api/config-sources/claude",
+		`{"preview_token":"`+pv.PreviewToken+`","overrides":{}}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("bind after repair with the original token = %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+// TS-07.R15 / INV §15 — a whole-catalog PUT writes the new catalog before pruning
+// incompatible source bindings; a failed prune must restore the catalog preimage
+// so no returned-error state leaves a backend/source-provider mismatch.
+func TestPutBackendsRestoresCatalogWhenPruneFails(t *testing.T) {
+	srv, h := createServer(t)
+
+	preimage, _ := srv.configStore.ReadBackends()
+	preimage.Backends["claude"] = config.Backend{
+		Name: "My Claude", Type: "claude-acp", Default: true, DefaultModel: "sonnet",
+		Models: map[string]config.Model{"sonnet": {Name: "Sonnet", Model: "sonnet"}},
+	}
+	if err := srv.configStore.WriteBackends(preimage); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	// Corrupt the source manifest so the post-write prune fails.
+	manifest := filepath.Join(srv.configStore.Home(), "config-sources.json")
+	if err := os.WriteFile(manifest, []byte("{not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// A save that retypes the backend (claude-acp → codex-acp) is what a prune acts on.
+	body := `{"version":2,"backends":{"claude":{"name":"My Claude","type":"codex-acp","default":true,"default_model":"gpt","models":{"gpt":{"name":"GPT","model":"gpt"}}}}}`
+	var replacement any
+	if err := json.Unmarshal([]byte(body), &replacement); err != nil {
+		t.Fatal(err)
+	}
+	rec := doBackendsPut(t, h, replacement)
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	after, err := srv.configStore.ReadBackends()
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if got := after.Backends["claude"]; got.Type != "claude-acp" {
+		t.Fatalf("catalog not restored after a failed prune: %+v", got)
+	}
+}
+
+// TS-07.R17 / INV §15 — an unlink and a successful bind both mutate the source
+// manifest. Regardless of which acquires the shared lock first, unlinking A
+// cannot write an old snapshot that drops B's completed bind.
+func TestConcurrentUnlinkAndBindPreservesNewBinding(t *testing.T) {
+	srv := testServer(t, true)
+	sources, _ := srv.readConfigSources()
+	sources.Sources["claude"] = config.SourceBinding{
+		Provider: configsource.ProviderClaude, Mode: configsource.ModeLinked, Root: "/x", Approved: []string{"/x"},
+	}
+	if err := srv.configStore.WriteConfigSources(sources); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	// Hold both mutations at the same start line. The old unlocked unlink could
+	// read {claude}, let the bind write {claude,codex}, then overwrite it with {}.
+	srv.catalogMu.Lock()
+	var wg sync.WaitGroup
+	var unlinkErr, bindErr *runtime.APIError
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		unlinkErr = srv.unbindConfigSource("claude")
+	}()
+	go func() {
+		defer wg.Done()
+		_, bindErr = srv.persistBinding("codex", config.SourceBinding{
+			Provider: configsource.ProviderCodex, Mode: configsource.ModeLinked, Root: "/x", Approved: []string{"/x"},
+		}, false)
+	}()
+	srv.catalogMu.Unlock()
+	wg.Wait()
+	if unlinkErr != nil {
+		t.Fatalf("unlink: %v", unlinkErr)
+	}
+	if bindErr != nil {
+		t.Fatalf("bind: %v", bindErr)
+	}
+
+	after, err := srv.readConfigSources()
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if _, ok := after.Sources["claude"]; ok {
+		t.Errorf("unlink left binding A behind: %+v", after.Sources)
+	}
+	if _, ok := after.Sources["codex"]; !ok {
+		t.Errorf("concurrent unlink lost binding B: %+v", after.Sources)
 	}
 }

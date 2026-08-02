@@ -36,6 +36,26 @@ func doRequest(t *testing.T, h http.Handler, method, path string, body any) *htt
 	return rec
 }
 
+// doBackendsPut sends the strong catalog validator a Settings client obtains
+// from GET before replacing the whole document.
+func doBackendsPut(t *testing.T, h http.Handler, body any) *httptest.ResponseRecorder {
+	t.Helper()
+	get := doGET(t, h, "/api/backends")
+	if get.Code != http.StatusOK {
+		t.Fatalf("GET /api/backends status = %d body=%s", get.Code, get.Body.String())
+	}
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("marshal request body: %v", err)
+	}
+	req := newLocalRequest(http.MethodPut, "/api/backends", bytes.NewReader(encoded))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("If-Match", get.Header().Get("ETag"))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
 // ---- Roles CRUD tests ----
 
 // FS-04.A1: role CRUD round-trips every owned field.
@@ -580,7 +600,7 @@ func validBackendsBody() map[string]any {
 func TestPutBackendsValid(t *testing.T) {
 	srv := testServerWithCredCheck(t, credcheck.CredResult{Status: "ok"})
 	h := srv.routes()
-	rec := doRequest(t, h, http.MethodPut, "/api/backends", validBackendsBody())
+	rec := doBackendsPut(t, h, validBackendsBody())
 	if rec.Code != http.StatusOK {
 		t.Fatalf("PUT /api/backends status = %d body=%s, want 200", rec.Code, rec.Body)
 	}
@@ -622,7 +642,7 @@ func TestPutBackendsAutoPromoteDefault(t *testing.T) {
 			},
 		},
 	}
-	rec := doRequest(t, h, http.MethodPut, "/api/backends", body)
+	rec := doBackendsPut(t, h, body)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("PUT status = %d body=%s", rec.Code, rec.Body)
 	}
@@ -631,6 +651,48 @@ func TestPutBackendsAutoPromoteDefault(t *testing.T) {
 	// Auto-promoted: the returned doc must have Default=true.
 	if !resp.Backends["claude"].Default {
 		t.Error("claude not auto-promoted to default in response")
+	}
+}
+
+// TS-07.R18 / INV §15 — a Settings draft loaded before another tab creates a
+// backend must conflict rather than replace the current catalog and erase that
+// committed entry.
+func TestPutBackendsRejectsStaleCatalogAfterItemCreate(t *testing.T) {
+	srv := testServerWithCredCheck(t, credcheck.CredResult{Status: "ok"})
+	h := srv.routes()
+
+	snapshot := doGET(t, h, "/api/backends")
+	if snapshot.Code != http.StatusOK || snapshot.Header().Get("ETag") == "" {
+		t.Fatalf("GET /api/backends = %d etag=%q", snapshot.Code, snapshot.Header().Get("ETag"))
+	}
+	create := doRequest(t, h, http.MethodPost, "/api/backends", map[string]any{
+		"backend_id": "other-tab", "name": "Other tab", "type": "codex-acp",
+	})
+	if create.Code != http.StatusCreated {
+		t.Fatalf("POST /api/backends = %d body=%s", create.Code, create.Body.String())
+	}
+
+	body, err := json.Marshal(validBackendsBody())
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := newLocalRequest(http.MethodPut, "/api/backends", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("If-Match", snapshot.Header().Get("ETag"))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("stale PUT = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "backend_catalog_changed") {
+		t.Fatalf("stale PUT error = %s", rec.Body.String())
+	}
+	after, err := srv.configStore.ReadBackends()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := after.Backends["other-tab"]; !ok {
+		t.Fatal("stale PUT removed the backend created by the other tab")
 	}
 }
 
@@ -675,7 +737,7 @@ func TestPutBackendsFailedCredCheckStillPersists(t *testing.T) {
 	// A 200 with failed creds means the bytes are saved — the UI shouldn't lose user edits.
 	srv := testServerWithCredCheck(t, credcheck.CredResult{Status: "failed", Detail: "invalid_api_key"})
 	h := srv.routes()
-	rec := doRequest(t, h, http.MethodPut, "/api/backends", validBackendsBody())
+	rec := doBackendsPut(t, h, validBackendsBody())
 	if rec.Code != http.StatusOK {
 		t.Fatalf("failed-creds status = %d, want 200", rec.Code)
 	}
@@ -703,7 +765,7 @@ func TestPutBackendsPrunesRemovedOrRetargetedSourceBindings(t *testing.T) {
 	}
 
 	h := srv.routes()
-	rec := doRequest(t, h, http.MethodPut, "/api/backends", validBackendsBody())
+	rec := doBackendsPut(t, h, validBackendsBody())
 	if rec.Code != http.StatusOK {
 		t.Fatalf("PUT /api/backends status = %d body=%s", rec.Code, rec.Body)
 	}
@@ -721,7 +783,7 @@ func TestPutBackendsPrunesRemovedOrRetargetedSourceBindings(t *testing.T) {
 
 	body := validBackendsBody()
 	body["backends"].(map[string]any)["claude"].(map[string]any)["type"] = "codex-acp"
-	rec = doRequest(t, h, http.MethodPut, "/api/backends", body)
+	rec = doBackendsPut(t, h, body)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("PUT retargeted backend status = %d body=%s", rec.Code, rec.Body)
 	}

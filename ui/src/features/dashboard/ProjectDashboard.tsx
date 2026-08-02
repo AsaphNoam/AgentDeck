@@ -185,5 +185,9 @@ export function ScopedProjectDashboard() {
   if (projects.isError) return <section className="project-route-state"><p className="form-error">Could not load this project. Please retry.</p><Link to="/">Back to projects</Link></section>;
   if (project?.archived) return <section className="project-route-state"><h1>{project.title} is archived</h1><Link to="/">Back to projects</Link> · <Link to="/archive">Open Archive</Link></section>;
   if (!project && !hasAgents) return <section className="project-route-state"><h1>Project unavailable</h1><Link to="/">Back to projects</Link></section>;
-  return <section><Link to="/">Back to projects</Link><CardGrid projectID={id} projectTitle={project?.title ?? id} /></section>;
+  // fixedProject only when the route project is a current, non-archived catalog
+  // member. On the `!project && hasAgents` fall-through (a live agent naming a
+  // removed project) the New Agent picker must stay available so a launch can
+  // target a real project instead of the rejected route id (INV §10).
+  return <section><Link to="/">Back to projects</Link><CardGrid projectID={id} fixedProject={project ? id : undefined} projectTitle={project?.title ?? id} /></section>;
 }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import * as Tabs from "@radix-ui/react-tabs";
 import { getTranscript, switchRuntime } from "../../api/client";
-import { useBackends } from "../../api/config";
+import { useBackends, useProjects } from "../../api/config";
 import type { AgentState } from "../../api/types";
 import { sseClient } from "../../api/sse";
 import { useAgentStore } from "../../store/agentStore";
@@ -46,6 +46,7 @@ export function ChatPanel() {
   const events = useTranscriptStore((state) => state.byAgent[id] ?? []);
   const setTranscript = useTranscriptStore((state) => state.setTranscript);
   const { data: backends } = useBackends();
+  const { data: projects } = useProjects();
   const [tab, setTab] = useState(() => initialTab(params.get("tab"), agent?.interface));
   const [runtime, setRuntime] = useState<RuntimeSelection>(() => agent ? runtimeSelection(agent) : { backend: "", model: "", effort: "" });
   const [switchError, setSwitchError] = useState<string | null>(null);
@@ -119,6 +120,11 @@ export function ChatPanel() {
     );
   }
 
+  // Back targets the agent's project dashboard only when that project is a current,
+  // non-archived catalog member; otherwise it falls back to the projects home so a
+  // removed/archived project never strands the user on a dead-end route (FS-03.R27).
+  const projectActive = !!agent.project && !!projects?.[agent.project] && !projects[agent.project].archived;
+  const backTarget = projectActive ? `/project/${agent.project}` : "/";
   const selectedBackend = backends?.backends[runtime.backend];
   const selectedModel = selectedBackend?.models[runtime.model];
   const currentRuntime = runtimeSelection(agent);
@@ -143,7 +149,7 @@ export function ChatPanel() {
   return (
     <section className="chat-panel" data-ui="agent-workspace" data-state="active" data-variant={agent.interface === "terminal" ? "terminal" : "chat"}>
       <header className="chat-header" data-slot="header">
-        <Link to={agent.project ? `/project/${agent.project}` : "/"}>Back</Link>
+        <Link to={backTarget}>Back</Link>
         <div data-slot="identity">
           <h1>{agent.name}</h1>
           {editableRuntime ? (

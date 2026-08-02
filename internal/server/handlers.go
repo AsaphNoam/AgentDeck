@@ -122,13 +122,16 @@ func (s *Server) handleBackends(w http.ResponseWriter, _ *http.Request) {
 	if err != nil {
 		if errors.Is(err, config.ErrNotFound) || errors.Is(err, config.ErrCorrupt) {
 			s.log.Warn("backends: falling back to default", "err", err)
-			writeJSON(w, http.StatusOK, config.DefaultBackends())
+			b = config.DefaultBackends()
+			w.Header().Set("ETag", backendCatalogETag(b))
+			writeJSON(w, http.StatusOK, b)
 			return
 		}
 		s.log.Error("backends: read", "err", err)
 		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
+	w.Header().Set("ETag", backendCatalogETag(b))
 	writeJSON(w, http.StatusOK, b)
 }
 

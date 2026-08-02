@@ -218,9 +218,13 @@ func (s *Server) handleBindConfigSource(w http.ResponseWriter, r *http.Request) 
 // that claims a connection the catalog does not reflect. The generation and its
 // SSE are installed only after both writes succeed.
 func (s *Server) bindConfigSource(ctx context.Context, backendID string, req bindRequest) (configSourceBindingView, int, *runtime.APIError) {
-	backends, err := s.readBackendsOrDefault()
-	if err != nil {
-		return configSourceBindingView{}, 0, apiError(runtime.CodeInternal, "read backends: "+err.Error())
+	// Preflight with the strict catalog read: a corrupt durable catalog must reject
+	// the bind before the preview token is consumed, rather than substituting seed
+	// defaults and spending consent against a catalog strict persistence then
+	// refuses (FS-08.R5, TS-07.R17, INV §15).
+	backends, aerr := s.readBackendsForWrite()
+	if aerr != nil {
+		return configSourceBindingView{}, 0, aerr
 	}
 	backend, ok := backends.Backends[backendID]
 	if !ok {
@@ -285,7 +289,7 @@ func (s *Server) persistBinding(backendID string, binding config.SourceBinding, 
 			return 0, apiError(runtime.CodeSourceInvalid, "imported models are not a valid catalog")
 		}
 		if werr := s.configStore.WriteBackends(backends); werr != nil {
-			return 0, apiError(runtime.CodeInternal, "write backends: "+werr.Error())
+			return 0, s.internalSourceError("config source: write catalog for enabled bind", werr)
 		}
 		s.invalidateOnboardingCache()
 	}
@@ -293,7 +297,7 @@ func (s *Server) persistBinding(backendID string, binding config.SourceBinding, 
 	sources, serr := s.readConfigSources()
 	if serr != nil {
 		return 0, s.restoreCatalog(preimage, enableModelSync,
-			apiError(runtime.CodeInternal, "read config sources: "+serr.Error()))
+			s.internalSourceError("config source: read manifest for bind", serr))
 	}
 	sources.Sources[backendID] = binding
 	if verr := config.ValidateConfigSources(&sources, backends); verr != nil {
@@ -302,7 +306,7 @@ func (s *Server) persistBinding(backendID string, binding config.SourceBinding, 
 	}
 	if werr := s.configStore.WriteConfigSources(sources); werr != nil {
 		return 0, s.restoreCatalog(preimage, enableModelSync,
-			apiError(runtime.CodeInternal, "write config sources: "+werr.Error()))
+			s.internalSourceError("config source: write manifest for bind", werr))
 	}
 	return added, nil
 }
@@ -365,29 +369,40 @@ func (s *Server) handleRefreshConfigSource(w http.ResponseWriter, r *http.Reques
 // silently dropping the copy promise.
 func (s *Server) handleDeleteConfigSource(w http.ResponseWriter, r *http.Request) {
 	backendID := r.PathValue("backend_id")
-	detach := r.URL.Query().Get("detach") == "true"
-
-	sources, err := s.readConfigSources()
-	if err != nil {
-		writeAPIError(w, apiError(runtime.CodeInternal, "read config sources: "+err.Error()))
-		return
-	}
-	if _, ok := sources.Sources[backendID]; !ok {
-		writeAPIError(w, apiError(runtime.CodeSourceNotFound, "no configuration source bound to "+backendID))
-		return
-	}
-	if detach {
+	if r.URL.Query().Get("detach") == "true" {
 		writeAPIError(w, apiError(runtime.CodeNotImplemented,
 			"detached import is not yet available: no verified launch-injection path exists for Claude/Codex setup assets"))
 		return
 	}
-	delete(sources.Sources, backendID)
-	if werr := s.configStore.WriteConfigSources(sources); werr != nil {
-		writeAPIError(w, apiError(runtime.CodeInternal, "write config sources: "+werr.Error()))
+	if aerr := s.unbindConfigSource(backendID); aerr != nil {
+		writeAPIError(w, aerr)
 		return
 	}
-	s.sourceMgr.ForgetBackend(backendID)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// unbindConfigSource removes a single binding under the shared catalog lock. An
+// unlocked read-modify-write of config-sources.json could lose a concurrent
+// bind's committed entry: unlink A reads {A}, another tab binds B and writes
+// {A,B}, then unlink writes its stale {} snapshot and drops B (TS-07.R17,
+// INV §15). Every manifest mutation — bind, prune, and unlink — takes catalogMu.
+func (s *Server) unbindConfigSource(backendID string) *runtime.APIError {
+	s.catalogMu.Lock()
+	defer s.catalogMu.Unlock()
+
+	sources, err := s.readConfigSources()
+	if err != nil {
+		return s.internalSourceError("config source: read manifest for unlink", err)
+	}
+	if _, ok := sources.Sources[backendID]; !ok {
+		return apiError(runtime.CodeSourceNotFound, "no configuration source bound to "+backendID)
+	}
+	delete(sources.Sources, backendID)
+	if werr := s.configStore.WriteConfigSources(sources); werr != nil {
+		return s.internalSourceError("config source: write manifest for unlink", werr)
+	}
+	s.sourceMgr.ForgetBackend(backendID)
+	return nil
 }
 
 // readConfigSources reads config-sources.json, treating a missing document as an
@@ -604,6 +619,15 @@ func frozenModelInherited(launchConfig json.RawMessage) bool {
 		return false
 	}
 	return doc.NativeInherited
+}
+
+// internalSourceError logs the underlying storage cause and returns a fixed,
+// path-free message, so a permission or I/O failure in the item-create/bind/
+// unlink paths never leaks local filesystem paths or OS details to the API
+// client (INV §13, TS-03.R3).
+func (s *Server) internalSourceError(logMsg string, err error) *runtime.APIError {
+	s.log.Error(logMsg, "err", err)
+	return apiError(runtime.CodeInternal, "internal error")
 }
 
 // sourceAPIError maps a configsource error to the §2.7 API envelope. Resolver

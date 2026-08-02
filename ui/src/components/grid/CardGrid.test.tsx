@@ -55,8 +55,9 @@ function renderWithQuery(ui: React.ReactElement) {
 describe("CardGrid", () => {
 
   // FS-02.A25: New Agent opened from a project dashboard is bound to that
-  // route's project, so a person cannot accidentally launch it elsewhere.
-  it("locks a scoped New Agent launch to the current project", async () => {
+  // route's project (via fixedProject), so a person cannot accidentally launch it
+  // elsewhere.
+  it("locks a scoped New Agent launch to the fixed project", async () => {
     let capturedBody: unknown;
     server.use(
       http.post("/api/sessions", async ({ request }) => {
@@ -65,7 +66,7 @@ describe("CardGrid", () => {
       }),
     );
 
-    renderWithQuery(<CardGrid projectID="my-app" projectTitle="My App" />);
+    renderWithQuery(<CardGrid projectID="my-app" fixedProject="my-app" projectTitle="My App" />);
     fireEvent.click(await screen.findByText("New Agent"));
     await screen.findByText("New agent");
 
@@ -74,6 +75,21 @@ describe("CardGrid", () => {
 
     await waitFor(() => expect(capturedBody).toBeDefined());
     expect((capturedBody as Record<string, unknown>).project).toBe("my-app");
+  });
+
+  // INV §10 / FS-02.R43: a scoped grid for a project that is NOT a current catalog
+  // member (e.g. an unavailable project shown because it still has live agents)
+  // passes projectID for filtering but no fixedProject, so New Agent must keep the
+  // Project picker rather than hiding it and submitting a project the server
+  // rejects with `unknown project`.
+  it("keeps the Project picker when no fixedProject is supplied", async () => {
+    act(() => useAgentStore.setState({ agents: { a_1: agent("a_1") }, order: ["a_1"] }));
+    renderWithQuery(<CardGrid projectID="my-app" projectTitle="My App" />);
+    // The populated grid header uses "New agent"; the empty state uses "New Agent".
+    fireEvent.click(await screen.findByText("New agent"));
+
+    // The modal opened with no fixedProject, so the Project picker is present.
+    expect(await screen.findByText("Project")).toBeInTheDocument();
   });
 
   it("merges a scoped reorder back into the shared layout", () => {

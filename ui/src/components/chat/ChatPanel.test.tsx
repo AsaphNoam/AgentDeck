@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   getTranscript: vi.fn(async (id: string) => ({ agent_id: id, events: [] })),
   switchRuntime: vi.fn(),
   useBackends: vi.fn(),
+  useProjects: vi.fn(),
 }));
 
 vi.mock("../../api/client", () => ({
@@ -21,6 +22,7 @@ vi.mock("../../api/client", () => ({
 vi.mock("../../api/config", async (importOriginal) => ({
   ...await importOriginal<typeof import("../../api/config")>(),
   useBackends: mocks.useBackends,
+  useProjects: mocks.useProjects,
 }));
 
 vi.mock("../../api/sse", () => ({
@@ -29,12 +31,14 @@ vi.mock("../../api/sse", () => ({
 
 beforeEach(() => {
   mocks.useBackends.mockReturnValue({ data: undefined });
+  mocks.useProjects.mockReturnValue({ data: undefined });
 });
 
 afterEach(() => {
   cleanup();
   mocks.switchRuntime.mockReset();
   mocks.useBackends.mockReset();
+  mocks.useProjects.mockReset();
   useAgentStore.setState({ agents: {}, order: [], hydrated: false, hydrating: false });
   useAnnotationStore.setState({ bySource: {}, overallBySource: {}, editedAt: {} });
 });
@@ -126,6 +130,39 @@ describe("ChatPanel missing-agent recovery", () => {
     expect(screen.getByRole("heading", { name: "Nova" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Discard pending annotations" })).not.toBeInTheDocument();
     expect(useAnnotationStore.getState().bySource.a_live).toHaveLength(1);
+  });
+});
+
+// FS-03.A12 (R27) — the chat header Back link targets the agent's project
+// dashboard only when that project is a current, non-archived catalog member;
+// otherwise it falls back to the projects home so a removed/archived project
+// never strands the user on a dead-end route.
+describe("ChatPanel back target", () => {
+  it("targets the project dashboard for an active catalog project", () => {
+    useAgentStore.setState({ agents: { a_live: liveAgent("a_live") }, order: ["a_live"], hydrated: true, hydrating: false });
+    mocks.useProjects.mockReturnValue({ data: { app: { title: "App", archived: false } } });
+
+    renderPanel("a_live");
+
+    expect(screen.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/project/app");
+  });
+
+  it("falls back to the projects home when the project is absent from the catalog", () => {
+    useAgentStore.setState({ agents: { a_live: liveAgent("a_live") }, order: ["a_live"], hydrated: true, hydrating: false });
+    mocks.useProjects.mockReturnValue({ data: {} });
+
+    renderPanel("a_live");
+
+    expect(screen.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/");
+  });
+
+  it("falls back to the projects home when the project is archived", () => {
+    useAgentStore.setState({ agents: { a_live: liveAgent("a_live") }, order: ["a_live"], hydrated: true, hydrating: false });
+    mocks.useProjects.mockReturnValue({ data: { app: { title: "App", archived: true } } });
+
+    renderPanel("a_live");
+
+    expect(screen.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/");
   });
 });
 
