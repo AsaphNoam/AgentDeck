@@ -98,7 +98,9 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   same provider template as fresh-home seeding and adds exactly that valid backend to the durable
   catalog without submitting, saving, replacing, or discarding unrelated whole-catalog Settings
   drafts. If the catalog was empty the new backend becomes its default; otherwise the existing
-  default is preserved.
+  default is preserved. If another catalog mutation commits after the Settings draft loaded, its
+  later complete save is rejected and leaves that draft intact for reload/reconciliation rather than
+  silently deleting the newer backend.
 
   Claude/Codex creation also offers **Create and use my configuration**. It durably creates the
   backend, then performs FS-08.R34's normal project-free Linked connection as the same visible

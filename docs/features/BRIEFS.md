@@ -4,6 +4,18 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-02 — Fix: backend safety and review follow-ups
+
+Settings now refuses a stale save instead of deleting a backend created in another tab. Configuration
+linking and unlinking no longer lose concurrent connections, failed cleanup restores the prior
+catalog, and storage errors stay private. The connected-create screen now refreshes to its actual
+linked state; unavailable project dashboards keep a usable project picker; failed builder transcript
+reads retain pending proposal recovery; and Back avoids missing or archived project pages.
+
+**Needs attention:** None.
+
+**Next:** Review the completed fix set before publishing.
+
 ### 2026-08-02 — Usability review: backend creation and configuration linking
 
 The real browser flow for adding and linking backends worked in an isolated run. Cancel changed

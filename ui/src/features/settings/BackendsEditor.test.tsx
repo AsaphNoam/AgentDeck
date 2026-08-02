@@ -248,6 +248,49 @@ describe("BackendsEditor", () => {
     expect(screen.getByDisplayValue("Codex / OpenAI")).toBeInTheDocument();
   });
 
+  // FS-08.A11 / TS-03.R23 / INV §1: a create-and-connect binds the source
+  // server-side, so the already-mounted global config-source query is stale and
+  // must be refetched — otherwise a sibling backend's panel would still read
+  // bindings:[] and the new card would offer to connect an already-bound source.
+  it("refetches the config-source query after a connected create", async () => {
+    let sourceGets = 0;
+    server.use(
+      http.get("/api/config-sources", () => {
+        sourceGets += 1;
+        return HttpResponse.json({
+          bindings: sourceGets === 1
+            ? []
+            : [{ backend_id: "codex-openai", provider: "codex", mode: "linked", root: "/native/codex", health: "ok", stale: false }],
+          candidates: [],
+        });
+      }),
+      http.post("/api/backends", () =>
+        HttpResponse.json(
+          {
+            backend_id: "codex-openai",
+            backend: codexStarter,
+            connection: { status: "connected", model_sync_enabled: true, models_added: 1 },
+          },
+          { status: 201 },
+        ),
+      ),
+    );
+
+    renderWithQuery(<BackendsEditor />);
+    await screen.findByDisplayValue("Claude");
+    // The seeded claude-acp backend mounts the global config-source query once.
+    await waitFor(() => expect(sourceGets).toBeGreaterThanOrEqual(1));
+    const before = sourceGets;
+
+    fireEvent.click(screen.getByText("Add backend"));
+    fireEvent.change(await screen.findByLabelText("Provider"), { target: { value: "codex-acp" } });
+    fireEvent.click(screen.getByText("Create and use my configuration"));
+
+    await waitFor(() => expect(sourceGets).toBeGreaterThan(before));
+    expect(await screen.findByText("/native/codex")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Use my Codex configuration" })).not.toBeInTheDocument();
+  });
+
   it("only offers native configuration for federated providers", async () => {
     const providerSelect = (await openAddDialog()) as HTMLSelectElement;
     expect(screen.getByText("Create and use my configuration")).toBeInTheDocument();

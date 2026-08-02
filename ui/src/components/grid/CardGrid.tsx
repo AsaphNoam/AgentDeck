@@ -14,7 +14,13 @@ import { NewAgentModal } from "../../features/launch/NewAgentModal";
 import { useProjects } from "../../api/config";
 import { Button, ConfirmDialog, PageHeader } from "../ui";
 
-export function CardGrid({ projectID, projectTitle }: { projectID?: string; projectTitle?: string } = {}) {
+// projectID scopes which agents the grid shows; fixedProject locks New Agent to a
+// launch target and hides its project picker. They are separate because a scoped
+// route can show a project's live agents while that project is NOT a current
+// catalog member (deleted/hand-removed): fixing the launch to it would hide the
+// picker and every launch would be rejected as `unknown project` (FS-02.R43/A25,
+// INV §10). The caller passes fixedProject only for an active catalog member.
+export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?: string; projectTitle?: string; fixedProject?: string } = {}) {
   const agents = useAgentStore((state) => state.agents);
   const order = useAgentStore((state) => state.order);
   const setOrder = useAgentStore((state) => state.setOrder);
@@ -145,7 +151,7 @@ export function CardGrid({ projectID, projectTitle }: { projectID?: string; proj
   return (
     <>
       {body}
-      <NewAgentModal open={showNewAgent} onClose={() => setShowNewAgent(false)} fixedProject={projectID} />
+      <NewAgentModal open={showNewAgent} onClose={() => setShowNewAgent(false)} fixedProject={fixedProject} />
       {releaseGroupLabel && (
         <ConfirmDialog
           open

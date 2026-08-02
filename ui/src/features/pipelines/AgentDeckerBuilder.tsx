@@ -104,10 +104,18 @@ export function AgentDeckerBuilder({
 
   useEffect(() => {
     if (!builderID || !agentsHydrated || agentsHydrating) return;
+    // Mark the transcript loaded only on a real success. Setting it in .finally()
+    // makes a failed read (server restart, 500) indistinguishable from a loaded
+    // empty transcript, which flips shouldDropBuilderSession true for a stopped
+    // builder and destroys the localStorage pointer to a pending proposal awaiting
+    // its one-time approval — the exact loss this recovery prevents (FS-14.R27/A10,
+    // INV §7/§1). A failed read leaves the session undecided until a later retry.
     void getTranscript(builderID)
-      .then((transcript) => setTranscript(transcript.agent_id, transcript.events))
-      .catch(() => undefined)
-      .finally(() => setBuilderTranscriptLoaded(true));
+      .then((transcript) => {
+        setTranscript(transcript.agent_id, transcript.events);
+        setBuilderTranscriptLoaded(true);
+      })
+      .catch(() => undefined);
   }, [agentsHydrated, agentsHydrating, builderID, builderRunning, setTranscript]);
 
   useEffect(() => {

@@ -124,9 +124,13 @@ source-only path.
 **R18** — TS-03.R23's item-scoped create is the sole exception to R15's Settings-draft
 boundary. The server validates and persists exactly one backend before initiating its optional
 connection, without submitting, merging, or replacing the browser-local whole-catalog draft. The
-item-create orchestration and full-catalog replacement share R17's mutation lock, so neither can
-erase the other's committed entry. A source failure after creation returns the saved backend as
-unbound rather than compensating away the successful create.
+item-create orchestration and full-catalog replacement share R17's mutation lock. `GET /api/backends`
+returns a strong catalog `ETag`, and the Settings client sends that value in `If-Match` on a complete
+replacement; after taking the lock, the server rejects a non-matching replacement with `409
+backend_catalog_changed` rather than erasing an item committed since the draft was loaded. The
+successful item-create response supplies the validator for the resulting catalog so its own merged
+draft can still save. A source failure after creation returns the saved backend as unbound rather
+than compensating away the successful create.
 
 ## 3. Interfaces & data shapes
 

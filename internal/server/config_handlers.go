@@ -10,6 +10,7 @@ import (
 
 	"github.com/agentdeck/agentdeck/internal/backend/credcheck"
 	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
@@ -496,15 +497,46 @@ func (s *Server) handlePutBackends(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Serialize against the item-scoped create and enabled-bind merge so neither
-	// can erase the other's committed entry (TS-07.R18).
+	// Serialize against item creates and source-bind catalog merges. A complete
+	// replacement must also match the catalog snapshot the editor loaded: the
+	// ETag check rejects a stale draft instead of erasing an item another tab
+	// committed after that snapshot (TS-07.R18, INV §15).
 	s.catalogMu.Lock()
+	// Capture the durable catalog first: the new catalog is written before the
+	// source manifest is pruned, so a failed prune must be compensated to avoid
+	// returning an error while durable state holds the changed backend beside an
+	// incompatible binding (TS-07.R15, INV §15). A preimage is only meaningful
+	// when the current catalog was readable; an unreadable/absent one has no
+	// consistent state to restore.
+	preimage, preErr := s.configStore.ReadBackends()
+	current := preimage
+	if errors.Is(preErr, config.ErrNotFound) || errors.Is(preErr, config.ErrCorrupt) {
+		current = config.DefaultBackends()
+	} else if preErr != nil {
+		s.catalogMu.Unlock()
+		s.log.Error("backends: read before save", "err", preErr)
+		writeAPIError(w, apiError(runtime.CodeInternal, "internal error"))
+		return
+	}
+	if r.Header.Get("If-Match") != backendCatalogETag(current) {
+		s.catalogMu.Unlock()
+		writeAPIError(w, apiError(runtime.CodeBackendCatalogChanged,
+			"backend catalog changed; reload it before saving"))
+		return
+	}
 	err := s.configStore.WriteBackends(body)
 	if err == nil {
 		// A whole-catalog save can remove a backend or change its provider type.
 		// Drop any now-meaningless source binding before it can poison a future
 		// bind through whole-manifest validation.
-		err = s.pruneIncompatibleConfigSources(body)
+		if perr := s.pruneIncompatibleConfigSources(body); perr != nil {
+			err = perr
+			if preErr == nil {
+				if rerr := s.configStore.WriteBackends(preimage); rerr != nil {
+					s.log.Error("backends: catalog restoration after failed prune", "err", rerr)
+				}
+			}
+		}
 	}
 	s.catalogMu.Unlock()
 	if err != nil {
@@ -527,6 +559,7 @@ func (s *Server) handlePutBackends(w http.ResponseWriter, r *http.Request) {
 		credentials[id] = s.credCheck(context.Background(), bk, model, merged)
 	}
 
+	w.Header().Set("ETag", backendCatalogETag(body))
 	writeJSON(w, http.StatusOK, backendsResponse{
 		BackendsConfig: body,
 		Credentials:    credentials,

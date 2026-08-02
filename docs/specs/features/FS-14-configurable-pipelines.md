@@ -200,7 +200,12 @@ product boundaries in §6.
   exact validated draft or **Start** for an exact saved-template run configuration, but neither
   action occurs until the person approves its one-time confirmation in the Pipelines UI. Editing the
   proposed payload invalidates that approval, Save and Start require separate approvals, and chat
-  wording alone is not treated as approval.
+  wording alone is not treated as approval. Launching the builder keeps the person on the Pipelines
+  approval surface rather than navigating into the builder chat, because the Save/Start controls live
+  there. The builder session panel reflects the session's live state: while agent state is still
+  hydrating it shows a loading line; while the builder runs it shows the session id and an **Open
+  AgentDecker chat** link; and once the builder has stopped it withholds that link and states that the
+  session stopped while its pending proposals remain available for approval below.
 - **R28.** Runs can be started and controlled from the Pipelines page and local CLI/API.
   AgentDecker may invoke that local surface after a user's request, but v1 exposes no agent-facing
   start-run MCP tool and pipelines cannot start child pipelines.
@@ -250,10 +255,12 @@ product boundaries in §6.
 - **A10** — Create with AgentDecker offers configured project/backend/model choices for
   the creator, launches the session into the selected project rather than an assumed default, holds
   the launch closed while no listed project is selected, supports a clarifying conversation, and
-  places a valid model-neutral draft into the editor. Its Save and Start requests show the exact
-  payload for separate one-time approval; denial
+  places a valid model-neutral draft into the editor. Launching keeps the person on the Pipelines
+  approval surface, and the builder session panel shows the loading, running (with an **Open
+  AgentDecker chat** link), and stopped (link withheld, pending proposals still listed) states. Its
+  Save and Start requests show the exact payload for separate one-time approval; denial
   has no effect, payload edits invalidate approval, and an approved request executes once. *Verify:*
-  fake-runtime server test and J14.
+  fake-runtime server test, `ui/src/features/pipelines/AgentDeckerBuilder.test.tsx`, and J14.
 
 - **A11** (R31) — Run setup offers effort only for a stage whose assigned model declares
   levels, a run started with per-stage efforts launches each stage agent at its assigned level, an

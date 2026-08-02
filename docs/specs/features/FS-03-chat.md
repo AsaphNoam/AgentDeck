@@ -122,6 +122,10 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   control, matching switch runtime's running-only rule (FS-01.R13/R26). If the agent's current
   backend or model is absent from the live catalog, the picker still shows the current identity and
   does not break; the **Switch** control stays gated on choosing a listed backend and model.
+- **R27.** The chat header **Back** link targets the agent's project dashboard
+  (`/project/<project>`) when that project is a current, non-archived catalog member, and otherwise
+  the projects home (`/`). An agent naming a project the catalog no longer has (deleted or archived)
+  never sends Back to an unavailable/archived route; it returns to the projects home instead.
 
 ## 3. States & transitions
 
@@ -206,6 +210,10 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   successful no-payload outcome; intervening assistant text starts a new run. *Verify:*
   `ui/src/components/chat/TranscriptView.test.tsx`.
 
+- **A12** (R27) — The chat header **Back** link points at `/project/<project>` for an agent
+  whose project is a current, non-archived catalog member, and at `/` for an agent whose project is
+  absent from or archived in the catalog. *Verify:* `ui/src/components/chat/ChatPanel.test.tsx`.
+
 ## 6. Deviations & open decisions
 
 - **Concurrent transcript refetches have no ordering token.** Open, reconnect, and gap-repair
@@ -231,5 +239,5 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `TestLaunchPromptPermissionFlow`, `TestPermissionApprove`, `TestPermissionTimeout`,
   `TestCancelDuringPendingPermission`, `TestCrashMidTurnPersistsDeliveredTranscript`,
   `ui/src/store/transcriptStore.test.ts`, and
-  `ui/src/components/chat/ChatPanel.test.tsx` (R23/R24), and
+  `ui/src/components/chat/ChatPanel.test.tsx` (R23/R24/R27), and
   `ui/src/components/chat/renderers/ToolResult.test.tsx` (R25).

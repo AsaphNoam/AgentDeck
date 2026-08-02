@@ -103,11 +103,13 @@ func (s *Server) handleCreateBackend(w http.ResponseWriter, r *http.Request) {
 		// here leaves the valid backend saved and unbound rather than
 		// compensating away the successful create (TS-07.R18).
 		resp.Connection = s.connectNativeConfiguration(r.Context(), req.BackendID, provider)
-		if resp.Connection.Binding != nil {
-			if refreshed, err := s.configStore.ReadBackends(); err == nil {
-				resp.Backend = refreshed.Backends[req.BackendID]
-			}
-		}
+	}
+	// The editor merges this one backend into its local draft, so return the
+	// validator for the final catalog too. That draft can then save its own
+	// unrelated edits without being mistaken for a stale whole-catalog PUT.
+	if refreshed, err := s.configStore.ReadBackends(); err == nil {
+		resp.Backend = refreshed.Backends[req.BackendID]
+		w.Header().Set("ETag", backendCatalogETag(refreshed))
 	}
 	status := http.StatusOK
 	if created {
@@ -146,7 +148,7 @@ func (s *Server) createBackend(backendID, name string, starter config.Backend) (
 		return config.Backend{}, false, apiError(runtime.CodeValidation, "backend is not a valid catalog entry")
 	}
 	if werr := s.configStore.WriteBackends(backends); werr != nil {
-		return config.Backend{}, false, apiError(runtime.CodeInternal, "write backends: "+werr.Error())
+		return config.Backend{}, false, s.internalSourceError("backend create: write catalog", werr)
 	}
 	return backends.Backends[backendID], true, nil
 }

@@ -67,6 +67,19 @@ async function json<T>(input: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+// The backend catalog is whole-document editable, so its GET/POST/PUT responses
+// retain the server's strong ETag beside the JSON payload. It is an HTTP
+// validator, not a persisted catalog field.
+export type CatalogETagged<T> = T & { catalogEtag?: string };
+
+async function jsonWithCatalogETag<T>(input: string, init?: RequestInit): Promise<CatalogETagged<T>> {
+  const res = await fetch(input, init);
+  if (!res.ok) {
+    throw await httpError(res);
+  }
+  return { ...(await res.json() as T), catalogEtag: res.headers.get("ETag") ?? undefined };
+}
+
 // ---- Roles ----
 
 export function useRoles() {
@@ -164,7 +177,7 @@ export function useDeleteProject() {
 export function useBackends() {
   return useQuery({
     queryKey: QUERY_KEYS.backends,
-    queryFn: () => json<BackendsConfig>("/api/backends"),
+    queryFn: () => jsonWithCatalogETag<BackendsConfig>("/api/backends"),
   });
 }
 
@@ -180,23 +193,35 @@ export interface CreateBackendRequest {
 // Settings editor merges the created card into its draft, so an unrelated
 // unsaved edit is never discarded by a background refetch (FS-04.R40).
 export function useCreateBackend() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (req: CreateBackendRequest) =>
-      json<CreateBackendResponse>("/api/backends", {
+      jsonWithCatalogETag<CreateBackendResponse>("/api/backends", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(req),
       }),
+    // A create-and-connect binds the source server-side, so the already-mounted
+    // global config-source query (a sibling backend's panel) is now stale and
+    // would render the new backend as unbound with a "Use my … configuration"
+    // action (FS-08.A11, TS-03.R23, INV §1/§10). Invalidate that query — but not
+    // the backends query, whose refetch must not re-seed the draft. The literal
+    // key mirrors configSourcesKey() to avoid a config↔configSources import cycle.
+    onSuccess: (res) => {
+      if (res.connection?.status === "connected") {
+        void qc.invalidateQueries({ queryKey: ["config-sources"] });
+      }
+    },
   });
 }
 
 export function usePutBackends() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: BackendsConfig) =>
-      json<BackendsResponse>("/api/backends", {
+    mutationFn: ({ catalogEtag, ...data }: CatalogETagged<BackendsConfig>) =>
+      jsonWithCatalogETag<BackendsResponse>("/api/backends", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "If-Match": catalogEtag ?? "" },
         body: JSON.stringify(data),
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: QUERY_KEYS.backends }),

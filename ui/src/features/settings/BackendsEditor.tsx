@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useBackends, usePutBackends, configErrorMessage } from "../../api/config";
+import { useBackends, usePutBackends, configErrorMessage, type CatalogETagged } from "../../api/config";
 import type {
   BackendsConfig,
   Backend,
@@ -123,17 +123,19 @@ export function BackendsEditor() {
 
   const [entries, setEntries] = useState<BackendEntry[]>([]);
   const [defaultId, setDefaultId] = useState<string>("");
+  const [catalogEtag, setCatalogEtag] = useState<string | undefined>();
   const [savedBackendIds, setSavedBackendIds] = useState<Set<string>>(new Set());
   const [credentials, setCredentials] = useState<Record<string, CredResult>>({});
   const [error, setError] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const seedDraft = (cfg: BackendsConfig) => {
+  const seedDraft = (cfg: CatalogETagged<BackendsConfig>) => {
     const es = backendEntries(cfg);
     setEntries(es);
     setSavedBackendIds(new Set(Object.keys(cfg.backends ?? {})));
     setDefaultId(es.find((e) => e.backend.default)?.id ?? es[0]?.id ?? "");
+    setCatalogEtag(cfg.catalogEtag);
   };
 
   // Seed the draft from the server exactly once. Re-seeding on every query
@@ -172,13 +174,10 @@ export function BackendsEditor() {
     if (backend.default) setDefaultId(id);
   };
 
-  const handleCreated = (
-    id: string,
-    backend: Backend,
-    connection: CreateBackendResponse["connection"],
-  ) => {
+  const handleCreated = ({ backend_id: id, backend, connection, catalogEtag: nextCatalogEtag }: CatalogETagged<CreateBackendResponse>) => {
     setError(null);
     mergeBackend(id, backend);
+    setCatalogEtag(nextCatalogEtag);
     setAddOpen(false);
     if (!connection) {
       setNotice(null);
@@ -203,6 +202,7 @@ export function BackendsEditor() {
     const fresh = await refetch();
     const backend = fresh.data?.backends?.[id];
     if (backend) mergeBackend(id, backend);
+    setCatalogEtag(fresh.data?.catalogEtag);
   };
 
   const removeBackend = (id: string) => {
@@ -215,7 +215,7 @@ export function BackendsEditor() {
 
   const handleSave = () => {
     setError(null);
-    const config = entriesToConfig(entries, defaultId);
+    const config = { ...entriesToConfig(entries, defaultId), catalogEtag };
     putBackends.mutate(config, {
       onSuccess: (resp) => {
         setCredentials(resp.credentials ?? {});

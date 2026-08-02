@@ -126,9 +126,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   and [`../archive/reviews/usability-review-run-2026-07-26-browser-retry.md`](../archive/reviews/usability-review-run-2026-07-26-browser-retry.md).
   Credentialed provider and terminal compatibility remain separate manual release gates.
 - **Last reviewed code:** `b6654b5` (2026-08-02), the continuous range after `05dff38`: Claude
-  configured-model autosync, item-scoped backend creation, and global configuration linking. Four
-  **Must fix** and two **Worth fixing** findings are recorded below, alongside the earlier open
-  findings.
+  configured-model autosync, item-scoped backend creation, and global configuration linking. Its
+  review findings and the earlier dashboard/pipeline findings are fixed in the completed fix set.
 - **Branch:** `main`.
 
 ## Active change
@@ -167,110 +166,24 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 ### Open findings
 
-- **Must fix** — `internal/server/config_handlers.go:501-509` only serializes a stale whole-catalog
-  `PUT /api/backends`; it does not prevent that already-decoded document from replacing an
-  item-scoped backend created just before it acquires `catalogMu`. Normal-use trigger: leave Settings
-  open in one tab, add a backend in another tab, then save the first tab. The stale document removes
-  the just-created durable backend, despite TS-07.R18's promise that complete replacement and item
-  creation cannot erase each other's committed entry and FS-04.R40's durable-create/draft boundary
-  (**INV §15**). Fix: add a catalog revision/CAS conflict or defined merge semantics that preserves
-  committed item creates; a mutex alone is insufficient. Test: create, then submit an independently
-  captured stale whole catalog, and assert the created backend remains.
-
-- **Must fix** — `ui/src/api/config.ts:171-183` deliberately avoids invalidation after
-  create-and-connect, but does not invalidate the already-mounted global config-source query either.
-  `BackendsEditor.tsx:175-198` therefore displays its success message and renders the newly created
-  card while `ConfigSourcePanel.tsx:126` still reads the fresh cached `bindings:[]` result. Normal-use
-  trigger: a catalog already has a Claude/Codex card (and therefore the global query mounted), then
-  create-and-connect another such backend within the query stale window. The new card incorrectly
-  offers **Use my … configuration** instead of showing the connected status, and retrying can repeat
-  the connection. This violates FS-08.R34/A11 and TS-03.R23's backend/source-query invalidation
-  contract (**INV §1/§10**). Fix: merge/invalidate the global source query after a connected POST
-  without re-seeding the backend draft. Test the cached-unbound query followed by create-and-connect
-  and assert the card renders the returned bound status.
-
-- **Must fix** — `internal/server/config_sources.go:366-388` unlinks by an unlocked
-  read-modify-write of `config-sources.json`, while binds/prunes write that same manifest under
-  `catalogMu`. Normal-use trigger: an unlink of binding A reads `{A}`, another tab successfully binds
-  B and writes `{A,B}`, then the unlink writes its stale `{}` snapshot. B's successful connection is
-  lost and its in-memory generation is misleading. This violates FS-08.R27's single-binding unlink,
-  TS-07.R17, and **INV §15**. Fix: serialize every manifest mutation under the same lock (or a
-  dedicated manifest mutex) around its read/write/manager update. Test an interleaved unlink A and
-  bind B and assert B persists.
-
-- **Must fix** — `internal/server/config_handlers.go:501-509` writes the replacement catalog before
-  `pruneIncompatibleConfigSources`, but does not restore that catalog if the manifest prune fails.
-  Normal-use trigger: retarget or remove a bound backend when `config-sources.json` cannot be written.
-  The API returns `500`, but durable state now contains the changed backend and an incompatible old
-  binding, which can be used after restart. This violates FS-08.R33, TS-07.R15, and **INV §15**.
-  Fix: keep a catalog preimage and compensate on a failed prune (or use an equivalent safe ordering
-  with compensation). Test an injected manifest write failure and assert no returned-error state
-  leaves a backend/source-provider mismatch.
-
-- **Worth fixing** — `internal/server/config_sources.go:221-234` preflights a bind with
-  `readBackendsOrDefault`, so a corrupt durable catalog is substituted with seed defaults and a
-  matching token is consumed. Strict persistence then rejects that corrupt catalog at `:268`; after
-  repair, the person must preview and consent again. This violates FS-08.R5 and TS-07.R17's
-  durable-backend-before-consumption rule (**INV §15**). Fix: use the strict catalog read for preflight. Test a
-  corrupt catalog after preview, repair it, then bind with the original still-valid token.
-
-- **Worth fixing** — the new item-create/bind paths expose raw filesystem errors in API messages:
-  `internal/server/backend_create.go:149` and `internal/server/config_sources.go:288,296,305,317`.
-  A permission or I/O failure can reveal local paths/OS details to the API client, contrary to
-  TS-03.R3's safe structured-error boundary (**INV §13**). Fix: log the cause server-side and return
-  fixed safe messages. Test injected read/write failures for the response payload.
-
-- **Must fix** — `ui/src/features/dashboard/ProjectDashboard.tsx:188` renders
-  `<CardGrid projectID={id}>` for an *unavailable* scoped project (the `!project && hasAgents`
-  branch), and `ui/src/components/grid/CardGrid.tsx:148` now passes that id as `fixedProject`. On
-  that route the New Agent modal therefore hides the project picker
-  (`ui/src/features/launch/NewAgentModal.tsx:185`) and always submits a project the server rejects
-  with `unknown project` (`internal/server/launch.go:174`), so New Agent can never succeed and the
-  person has no control that would let it. Normal-use trigger: delete or hand-remove a project that
-  still has live agents, open `/project/<id>` from the "Project unavailable" card, and press New
-  agent. FS-02.R43/A25 scope the lock to an "active scoped project dashboard", so this also violates
-  the requirement as written (**INV §10**). Fix: only pass `fixedProject` when the route project is a
-  current, non-archived catalog member — thread that from `ScopedProjectDashboard` — and fall back to
-  the ordinary picker otherwise. Test: render the scoped dashboard for an id with a live agent and no
-  project entry and assert the Project picker renders.
-
-- **Worth fixing** — `ui/src/features/pipelines/AgentDeckerBuilder.tsx:105-110` sets
-  `builderTranscriptLoaded` inside `.finally()` after `.catch(() => undefined)`, so a failed
-  `getTranscript` is indistinguishable from a successfully loaded empty transcript. For a stopped
-  builder this makes `shouldDropBuilderSession` true with `hasProposal` false, and the effect then
-  calls `localStorage.removeItem(BUILDER_KEY)` — irreversibly discarding the only pointer to a
-  pending proposal awaiting its one-time human approval, which is exactly the loss `249da5b` was
-  written to prevent (FS-14.R27/A10). Normal-use trigger: reload the Pipelines page while the server
-  is restarting, or any 500 from `/api/sessions/:id/transcript`, with a stopped builder that
-  proposed a template. This is **INV §7** (a read failure amplified into a destructive write) and
-  **INV §1**. Fix: set the flag only in `.then()` so a failed read leaves the session undecided.
-  Test: MSW 500 on the transcript for a stopped, hydrated builder → `BUILDER_KEY` retained.
-
-- **Worth fixing** — `0fddb5a` ("fix back nav") shipped a user-visible navigation change with no
-  specification, acceptance item, test, brief, or changelog entry: the chat header **Back** link in
-  `ui/src/components/chat/ChatPanel.tsx:146` now targets `/project/<agent.project>` instead of `/`.
-  FS-03 does not describe the chat Back target at all, so nothing records the shipped behavior
-  (**INV §10**; workflow §2.1 requires the specification first for user-visible change). The new
-  target is also unguarded against a project the agent names but the catalog no longer has: Back then
-  lands on the "Project unavailable" / "is archived" route rather than the dashboard. Fix: add the
-  FS-03 requirement and acceptance item plus a `ChatPanel` regression, and fall back to `/` when the
-  agent's project is not an active catalog member.
-
-- **Worth fixing** — `249da5b` changed two further user-visible AgentDecker behaviors with no
-  specification text (**INV §10**): launching the builder no longer navigates to its chat (the
-  `useNavigate` call was removed from `AgentDeckerBuilder.tsx`, so the person stays on Pipelines where
-  the approval controls live), and the builder session panel now renders a hydrating/stopped status
-  line and withholds the "Open AgentDecker chat" link while the builder is stopped
-  (`AgentDeckerBuilder.tsx:188`). FS-14.R26/R27 and A10 say nothing about post-launch navigation or
-  the session panel's hydrating/stopped presentation. Fix: extend FS-14.R27/A10 to state that the
-  builder flow stays on the Pipelines approval surface and what the session panel shows in each
-  state; the component tests added in `249da5b` already cover the behavior.
+None.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-02 — Fixed every open review finding. Whole-catalog Settings saves now use a strong ETag
+  and reject a stale second-tab draft rather than deleting a newly created backend; creates and
+  successful catalog saves return the current validator. Source-manifest unlink now uses the shared
+  catalog lock, failed source pruning restores the catalog preimage, corrupted catalogs reject binds
+  before preview consent is consumed, and storage errors no longer expose local paths. The UI now
+  refetches the global source state after direct create-and-connect, keeps the project picker on an
+  unavailable scoped dashboard, and retains a stopped builder's saved proposal session when its
+  transcript read fails. Chat Back safely falls home for absent/archived projects, and the builder
+  and chat presentation behavior are specified. Focused and complete Go/UI suites, spec checks,
+  builds, and the generated distribution pass.
 
 - 2026-08-02 — Usability-reviewed backend creation and global configuration linking in a real
   browser against a fresh isolated home. Cancel, provider-specific Codex starter creation,

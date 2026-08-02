@@ -1,7 +1,7 @@
 import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { useCreateBackend, configErrorMessage } from "../../api/config";
-import type { Backend, BackendType, CreateBackendResponse } from "../../schemas/backends";
+import { useCreateBackend, configErrorMessage, type CatalogETagged } from "../../api/config";
+import type { BackendType, CreateBackendResponse } from "../../schemas/backends";
 import { BACKEND_TYPE_LABELS, BACKEND_TYPE_OPTIONS } from "../../lib/backendTypes";
 
 // Add backend is a dialog rather than an inline card insert (FS-04.R40): the
@@ -45,7 +45,7 @@ export function AddBackendDialog({
   open: boolean;
   existingIds: string[];
   onCancel: () => void;
-  onCreated: (id: string, backend: Backend, connection: CreateBackendResponse["connection"]) => void;
+  onCreated: (response: CatalogETagged<CreateBackendResponse>) => void;
 }) {
   const create = useCreateBackend();
   const [type, setType] = useState<BackendType>("claude-acp");
@@ -86,7 +86,7 @@ export function AddBackendDialog({
       },
       {
         onSuccess: (res) => {
-          onCreated(res.backend_id, res.backend, res.connection);
+          onCreated(res);
           reset();
         },
         onError: (e) => setError(configErrorMessage(e)),

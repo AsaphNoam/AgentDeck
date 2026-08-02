@@ -80,6 +80,25 @@ describe("AgentDeckerBuilder persisted session", () => {
     expect(screen.queryByRole("link", { name: "Open AgentDecker chat" })).not.toBeInTheDocument();
   });
 
+  // INV §7 / FS-14.R27/A10: a failed transcript read must not be mistaken for a
+  // loaded empty transcript. Doing so would drop the localStorage pointer to a
+  // possibly-pending proposal awaiting its one-time approval. A read failure
+  // leaves the session undecided until a later retry.
+  it("retains a stopped builder's session when the transcript read fails", async () => {
+    localStorage.setItem(BUILDER_KEY, "a_builder");
+    useAgentStore.setState({
+      agents: { a_builder: agent("a_builder", false) }, order: ["a_builder"], hydrated: true, hydrating: false,
+    });
+    server.use(http.get("/api/sessions/:id/transcript", () => new HttpResponse(null, { status: 500 })));
+
+    renderBuilder();
+
+    await screen.findByText(/The builder session has stopped/i);
+    // Let the rejected transcript promise settle; the drop effect must not fire.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(localStorage.getItem(BUILDER_KEY)).toBe("a_builder");
+  });
+
   it("keeps the session link while the builder is still running", async () => {
     localStorage.setItem(BUILDER_KEY, "a_builder");
     useAgentStore.setState({

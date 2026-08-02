@@ -111,7 +111,7 @@ export function BackendStep({ onDone, claimMutation, releaseMutation }: BackendS
       if (id !== backendId) config.backends[id] = { ...config.backends[id], default: false };
     }
 
-    putBackends.mutate(config, {
+    putBackends.mutate({ ...config, catalogEtag: existing?.catalogEtag }, {
       onSuccess: (resp) => {
         const cred = resp.credentials?.[backendId];
         const status = cred?.status ?? null;
