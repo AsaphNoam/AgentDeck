@@ -26,8 +26,11 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   FS-08.R34/A11, FS-09.R47/A20, TS-03.R22/R23, and TS-07.R16/R17/R18 shipped; FS-08.R23 is superseded
   and FS-04/TS-03 moved Partial→Current. `make check-specs`, both Go test modes, focused `-race` on the
   catalog lock, all 214 UI tests, presentation/style checks, source build, and the distribution build
-  pass. No real-browser pass was run for this change; component coverage stands in for it, so the
-  browser create/connect/retry/launch journey remains for usability review.
+  pass. The 2026-08-02 real-browser J9 pass confirmed cancel, provider-specific starter creation,
+  dirty-draft preservation, existing and direct create-and-connect linking, target-only import, and
+  unlink with zero browser errors; source-failure/retry and launch through the binding remain
+  unexercised. Full record:
+  [`../archive/reviews/usability-review-run-2026-08-02-backend-creation.md`](../archive/reviews/usability-review-run-2026-08-02-backend-creation.md).
 - **Previous state:** Agent effort selection is implemented: models can declare provider-native levels and a
   default, launch/CLI/switch/resume/pipeline flows preserve the resolved level, and Claude/Codex
   delivery is adapter-specific. Live-provider honoring remains a credentialed acceptance gate.
@@ -268,6 +271,14 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-02 — Usability-reviewed backend creation and global configuration linking in a real
+  browser against a fresh isolated home. Cancel, provider-specific Codex starter creation,
+  preservation of an unrelated dirty Settings draft, ordinary linking, direct create-and-connect,
+  target-only import, and unlink all passed with zero browser errors and no new user-impact finding.
+  The failure/retry branch needs a controlled unavailable-source fixture; launch through the new
+  binding remains the credentialed provider gate. Full record:
+  [`../archive/reviews/usability-review-run-2026-08-02-backend-creation.md`](../archive/reviews/usability-review-run-2026-08-02-backend-creation.md).
 
 - 2026-08-02 — Reviewed the continuous range `05dff38`→`b6654b5` (Claude configured-model autosync,
   item-scoped backend creation, and global configuration linking) against FS-04/FS-08/FS-09,

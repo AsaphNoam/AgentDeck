@@ -4,6 +4,22 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-02 — Usability review: backend creation and configuration linking
+
+The real browser flow for adding and linking backends worked in an isolated run. Cancel changed
+nothing; provider selection created the matching Codex starter; adding a backend kept an unrelated
+unsaved Settings edit intact; direct create-and-connect showed a global linked state and imported
+the configured models for that backend only; and unlink restored its retryable unbound state. The
+browser reported no warnings or errors. The detailed record is in
+[`usability-review-run-2026-08-02-backend-creation.md`](../archive/reviews/usability-review-run-2026-08-02-backend-creation.md).
+
+**Needs attention:** The earlier durability findings are still open. Connection failure/retry needs a
+controlled unavailable-source fixture, and launching through the binding remains a credentialed
+provider check.
+
+**Next:** Run `/fix` to resolve the recorded backend/catalog and configuration-source durability
+findings.
+
 ### 2026-08-02 — Review: backend creation and configuration linking
 
 The new backend and configuration-linking flow is not safe to ship yet. A stale Settings save can
