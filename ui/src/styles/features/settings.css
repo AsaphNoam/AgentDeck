@@ -84,6 +84,16 @@
   padding: var(--ad-space-6);
 }
 
+.config-notice {
+  background: var(--ad-surface-subtle);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-radius: var(--ad-radius-small);
+  color: var(--ad-text-muted);
+  font-size: 0.8rem;
+  margin: 0;
+  padding: var(--ad-space-3);
+}
+
 .config-list {
   border-top: var(--ad-border-thin) solid var(--ad-border-strong);
   display: grid;
@@ -331,7 +341,6 @@
   padding: var(--ad-space-3);
 }
 
-.source-project-select,
 .source-hint,
 .source-note,
 .source-mode,

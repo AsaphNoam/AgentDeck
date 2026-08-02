@@ -1,6 +1,6 @@
 # TS-03 — HTTP, SSE & WebSocket API
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/server`, `ui/src/api`
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) API sections and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -165,7 +165,7 @@ SSE event, cache-control rule, or skin-content response is added. The TypeScript
 unknown read strings long enough to fall back safely, recognizes only the two warning codes, and the
 Go/frontend/manifest supported-id sets have a lockstep regression (R11).
 
-**R22** `(planned)` — Configuration-source routes describe backend-global bindings. `GET
+**R22** — Configuration-source routes describe backend-global bindings. `GET
 /api/config-sources` has no required project query and returns candidates/bindings for the global
 surface; `project` becomes optional on preview/refresh/delete, where omission means user-level
 preview or refresh and an explicit project retains the existing resolver-compatible behavior. A
@@ -179,7 +179,7 @@ is the authoritative resulting catalog. The request/response schemas, mocks, que
 SSE invalidation change in lockstep under R11/R13. All routes remain under the existing `localOnly`
 guard; no new configuration-source endpoint or provider credential transport is introduced.
 
-**R23** `(planned)` — `POST /api/backends` is an item-scoped create operation and the only route
+**R23** — `POST /api/backends` is an item-scoped create operation and the only route
 added by this change. Its body is
 `{backend_id:<valid-id>,name:<display-name>,type:<backend-type>,connect_native_configuration?:boolean}`.
 The server builds the type's canonical starter backend/model from the same authority as fresh-home

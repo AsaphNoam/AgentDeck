@@ -300,7 +300,7 @@ describe("OnboardingGate", () => {
     release();
   });
 
-  it("disables Set up later while configuration-source discovery is pending", async () => {
+  it("disables Set up later while a configuration-source connection is pending", async () => {
     let release!: () => void;
     let completionWrites = 0;
     server.use(
@@ -313,9 +313,9 @@ describe("OnboardingGate", () => {
       http.put("/api/config", () => { completionWrites += 1; return HttpResponse.json({}); }),
     );
     renderWithQuery(<OnboardingWizard steps={wizardSteps} onComplete={() => {}} />);
-    const discover = await screen.findByText("Discover native config");
-    await waitFor(() => expect(discover).not.toBeDisabled());
-    fireEvent.click(discover);
+    const connect = await screen.findByText(/^Use my .* configuration$/);
+    await waitFor(() => expect(connect).not.toBeDisabled());
+    fireEvent.click(connect);
     expect(screen.getByText("Set up later")).toBeDisabled();
     fireEvent.click(screen.getByText("Set up later"));
     expect(completionWrites).toBe(0);

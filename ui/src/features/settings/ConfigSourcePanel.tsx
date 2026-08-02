@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { useConfig, useProjects, configErrorMessage } from "../../api/config";
+import { useEffect, useState } from "react";
+import { configErrorMessage } from "../../api/config";
 import {
   useBindConfigSource,
   useConfigSources,
@@ -121,52 +121,39 @@ export function ConfigSourcePanel({
   backendId,
   backendType,
   persisted = true,
-  initialProjectId,
   defaultOpen,
   claimMutation,
   releaseMutation,
+  onConnected,
 }: {
   backendId: string;
   backendType: BackendType;
   // A Settings draft has a client-only id until the enclosing backend catalog
   // is saved. Binding against it would fail with "unknown backend".
   persisted?: boolean;
-  initialProjectId?: string;
   defaultOpen?: boolean;
   claimMutation?: () => boolean;
   releaseMutation?: () => void;
+  // onConnected lets the enclosing editor refresh just this backend's card after
+  // a connection imported models into it.
+  onConnected?: () => void;
 }) {
   const provider = PROVIDER_FOR_TYPE[backendType];
-  const { data: projects } = useProjects();
-  const { data: config } = useConfig();
 
-  const projectIds = useMemo(() => Object.keys(projects ?? {}).sort(), [projects]);
-  const [projectId, setProjectId] = useState<string>(initialProjectId ?? "");
-  useEffect(() => {
-    if (projectId || projectIds.length === 0) return;
-    const preferred =
-      initialProjectId && projectIds.includes(initialProjectId)
-        ? initialProjectId
-        : config?.default_project && projectIds.includes(config.default_project)
-          ? config.default_project
-          : projectIds[0];
-    setProjectId(preferred);
-  }, [projectId, projectIds, config?.default_project, initialProjectId]);
-
-  const { data: sources } = useConfigSources(projectId || undefined);
+  // A binding is backend-global (FS-08.R34): the normal connection chooses no
+  // project, root, profile, claim set, or mode, and works with no project
+  // configured at all. The launched agent's actual project still resolves later.
+  const { data: sources } = useConfigSources();
   const preview = usePreviewConfigSource();
-  const bind = useBindConfigSource(projectId || undefined);
-  const refresh = useRefreshConfigSource(projectId || undefined);
-  const del = useDeleteConfigSource(projectId || undefined);
+  const bind = useBindConfigSource();
+  const refresh = useRefreshConfigSource();
+  const del = useDeleteConfigSource();
 
   // The effective view is loaded on demand (link preview or refresh), never
   // rendered from a cached secret — the server only ever sends redacted fields.
   const [effective, setEffective] = useState<Effective | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // The mode the current preview token was minted for. The server derives the bound
-  // mode SOLELY from the token, so binding must use a token minted for the requested
-  // mode — otherwise "Link (Mirrored)" silently persists Linked (no mirror cache).
-  const [previewMode, setPreviewMode] = useState<"linked" | "mirrored" | null>(null);
+  const [importNote, setImportNote] = useState<string | null>(null);
   // AgentDeck override inputs for a bound source (empty = inherit the native value).
   const [overrideModel, setOverrideModel] = useState("");
   const [overrideEffort, setOverrideEffort] = useState("");
@@ -197,59 +184,37 @@ export function ConfigSourcePanel({
 
   const claims = ["launch_defaults", "model_catalog", "setup"];
 
-  const runPreview = (mode: "linked" | "mirrored") => {
+  // runConnect is the one visible action of the normal flow (FS-08.R34): a
+  // standard auto-root, user-level, read-only Linked preview followed
+  // immediately by its matching bind with the model import enabled. Mirrored is
+  // never offered as recovery — it uses the same resolver and only adds a
+  // post-success cache — so a failure leaves the backend unbound and retryable.
+  const runConnect = () => {
     if (claimMutation && !claimMutation()) return;
     setError(null);
-    setEffective(null);
-    setPreviewMode(null);
+    setImportNote(null);
     preview.mutate(
-      { provider, root: "auto", mode, claims, project: projectId },
+      { provider, root: "auto", mode: "linked", claims },
       {
-        onSuccess: (res) => {
-          setEffective(res.effective);
-          setPreviewMode(mode);
-        },
-        onError: (e) => setError(configErrorMessage(e)),
-        onSettled: releaseMutation,
-      },
-    );
-  };
-
-  const bindWithToken = (token: string) => {
-    bind.mutate(
-      { backendId, previewToken: token, overrides: {} },
-      {
-        onSuccess: () => {
-          setEffective(null);
-          setPreviewMode(null);
-          preview.reset();
-        },
-        onError: (e) => setError(configErrorMessage(e)),
-        onSettled: releaseMutation,
-      },
-    );
-  };
-
-  const runBind = (mode: "linked" | "mirrored") => {
-    if (claimMutation && !claimMutation()) return;
-    setError(null);
-    const token = preview.data?.preview_token;
-    // Bind only with a token minted for THIS mode. If none exists yet (first click)
-    // or the discovery preview was minted for a different mode, re-preview for the
-    // requested mode and bind with that fresh token, so the persisted mode matches
-    // the button the user clicked.
-    if (token && previewMode === mode) {
-      bindWithToken(token);
-      return;
-    }
-    preview.mutate(
-      { provider, root: "auto", mode, claims, project: projectId },
-      {
-        onSuccess: (res) => {
-          setEffective(res.effective);
-          setPreviewMode(mode);
-          bindWithToken(res.preview_token);
-        },
+        onSuccess: (res) =>
+          bind.mutate(
+            { backendId, previewToken: res.preview_token, overrides: {}, enableModelSync: true },
+            {
+              onSuccess: (bound) => {
+                setEffective(null);
+                preview.reset();
+                const added = bound.models_added ?? 0;
+                setImportNote(
+                  added > 0
+                    ? `Imported ${added} configured model${added === 1 ? "" : "s"}. This lists what your configuration names; it does not check availability or entitlement.`
+                    : "No new configured models to import. Your existing models are unchanged.",
+                );
+                onConnected?.();
+              },
+              onError: (e) => setError(configErrorMessage(e)),
+              onSettled: releaseMutation,
+            },
+          ),
         onError: (e) => {
           setError(configErrorMessage(e));
           releaseMutation?.();
@@ -291,7 +256,6 @@ export function ConfigSourcePanel({
         profile: binding.profile,
         mode: binding.mode as "linked" | "mirrored",
         claims,
-        project: projectId,
       },
       {
         onSuccess: (res) =>
@@ -319,45 +283,18 @@ export function ConfigSourcePanel({
       <summary>Configuration source ({providerLabel(provider)})</summary>
 
       <div className="source-panel">
-        <label className="source-project-select">
-          Project&nbsp;
-          <select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
-            {projectIds.length === 0 && <option value="">No projects</option>}
-            {projectIds.map((id) => (
-              <option key={id} value={id}>
-                {id}
-              </option>
-            ))}
-          </select>
-        </label>
-
         {!binding && (
           <div className="source-unbound" data-slot="status">
             <p className="source-hint">
-              Link {providerLabel(provider)}'s native configuration so this backend reads its real model,
-              instructions and tooling. Nothing is copied or modified.
+              AgentDeck reads {providerLabel(provider)}'s existing setup — its model, instructions and
+              tooling — without copying or modifying it.
             </p>
-            {preview.data && effective && (
-              <div className="source-preview" data-slot="effective">
-                <p className="source-hint">Discovered at {preview.data.report.source_digest ? "the native root" : "—"}:</p>
-                <EffectiveView effective={effective} />
-              </div>
-            )}
             <div className="source-actions" data-slot="actions">
-              {!preview.data ? (
-                <button type="button" disabled={!projectId || preview.isPending} onClick={() => runPreview("linked")}>
-                  {preview.isPending ? "Discovering…" : "Discover native config"}
-                </button>
-              ) : (
-                <>
-                  <button type="button" disabled={bind.isPending} onClick={() => runBind("linked")}>
-                    Link (Linked — recommended)
-                  </button>
-                  <button type="button" className="btn-link" disabled={bind.isPending} onClick={() => runBind("mirrored")}>
-                    Link (Mirrored — compatibility)
-                  </button>
-                </>
-              )}
+              <button type="button" disabled={preview.isPending || bind.isPending} onClick={runConnect}>
+                {preview.isPending || bind.isPending
+                  ? "Connecting…"
+                  : `Use my ${providerLabel(provider)} configuration`}
+              </button>
               <button type="button" className="btn-link" disabled title="Detached import is not available yet">
                 Import detached copy (unavailable)
               </button>
@@ -442,6 +379,10 @@ export function ConfigSourcePanel({
           </div>
         )}
 
+        {/* The import result stands on its own: it stays readable while the
+            invalidated binding query refetches, and states plainly that it
+            lists what the configuration names rather than what is available. */}
+        {importNote && <p className="source-hint">{importNote}</p>}
         {error && <p className="form-error">{error}</p>}
       </div>
     </details>

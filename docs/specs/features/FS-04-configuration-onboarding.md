@@ -1,6 +1,6 @@
 # FS-04 — Configuration & Onboarding
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/config/`, `internal/server/config_handlers.go`, `ui/src/features/settings/`, `ui/src/features/onboarding/` · **Journeys:** J2, J9
 **Absorbed:** [`phase-3-config-onboarding.md`](../../archive/phases/phase-3-config-onboarding.md)
 
@@ -90,7 +90,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   returns per-backend credential results. The catalog shape, validation invariants, credential-check
   semantics, and per-backend capabilities are specified in **FS-09**; this spec only asserts that the
   Settings UI is the editing front-end to that surface.
-- **R40** `(planned)` — **Add backend** opens an application dialog rather than inserting an
+- **R40** — **Add backend** opens an application dialog rather than inserting an
   incomplete card into the Settings document. The person chooses the provider type first; AgentDeck
   supplies a matching editable display-name suggestion and a usable provider starter model, so a
   selected **Codex** type never begins with a confusing **Claude** identity or an invalid empty
@@ -284,7 +284,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   present the six-preset swatch picker with no free-form channel inputs; selecting a preset persists
   its RGB triple through the existing project API and round-trips unchanged, and a newly created
   project defaults to the first preset. — `ProjectForm` and `ProjectDashboard` component tests; J2, J5.
-- **A20** `(planned)` — (R40) Add backend is cancellable before submission; choosing a type produces
+- **A20** — (R40) Add backend is cancellable before submission; choosing a type produces
   only that provider's matching suggested name and canonical valid starter model; and item-scoped
   create adds exactly one backend without persisting, replacing, or discarding an unrelated dirty
   Settings draft. **Create and use my configuration** returns a connected Claude/Codex backend only
@@ -332,3 +332,9 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   `ui/src/features/onboarding/steps/BackendStep.test.tsx` (A14), and
   `ProjectsEditor.test.tsx` "shows archived state and restores the project from Settings",
   `internal/config/appconfig_test.go`, and `AppearanceEditor.test.tsx` (A18).
+- **Backend creation (R40/A20):** `internal/server/backend_create.go`,
+  `internal/config/seed.go` (`StarterBackend`),
+  `ui/src/features/settings/AddBackendDialog.tsx`, and the merge into
+  `ui/src/features/settings/BackendsEditor.tsx`; pinned by
+  `internal/server/backend_create_test.go`, `internal/config/backendcreate_test.go`, and
+  `BackendsEditor.test.tsx`.

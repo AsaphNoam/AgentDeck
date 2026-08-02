@@ -47,75 +47,94 @@ describe("ConfigSourcePanel", () => {
     renderWithQuery(<ConfigSourcePanel backendId="backend-draft" backendType="codex-acp" persisted={false} />);
 
     expect(await screen.findByText("Save this backend before linking a configuration source.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Discover native config" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Use my/ })).not.toBeInTheDocument();
   });
 
-  it("discovers then links a native source", async () => {
-    let bound = false;
-    server.use(
-      http.post("/api/config-sources/preview", () =>
-        HttpResponse.json({
-          preview_token: "tok123",
-          expires_at: new Date(Date.now() + 600000).toISOString(),
-          effective: { ...emptyEffective, model: "user-model", provenance: { model: { scope: "user", path: "/h/.claude/settings.json", key: "model" } } },
-          report: { source_digest: "abc", files_read: [], skipped: [], unknown_keys: [], warnings: [], fingerprints: [], approved_roots: [] },
-        }),
-      ),
-      http.put("/api/config-sources/:id", () => {
-        bound = true;
-        return HttpResponse.json({ backend_id: "claude", provider: "claude-code", mode: "linked", root: "/h/.claude", health: "ok", stale: false });
-      }),
-    );
-
-    renderWithQuery(<ConfigSourcePanel backendId="claude" backendType="claude-acp" />);
-
-    // The Discover button is disabled until the project id resolves from the
-    // async projects query; wait for it to enable before clicking.
-    const discover = (await screen.findByText("Discover native config")) as HTMLButtonElement;
-    await waitFor(() => expect(discover).not.toBeDisabled());
-    fireEvent.click(discover);
-
-    // The redacted effective model with its provenance label appears.
-    expect(await screen.findByText(/user-model — inherited from user/)).toBeInTheDocument();
-
-    // Link (Linked) binds with the preview token.
-    fireEvent.click(screen.getByText(/Link \(Linked/));
-    await waitFor(() => expect(bound).toBe(true));
-  });
-
-  // Regression (review fix): "Discover" previews Linked to show the effective view;
-  // clicking "Link (Mirrored)" must bind a token minted FOR mirrored (the server
-  // derives the bound mode from the token), not reuse the linked discovery token.
-  it("Link (Mirrored) binds a mirrored-minted token, not the linked discovery token", async () => {
-    const previewedModes: string[] = [];
-    let boundToken: string | null = null;
+  // FS-08.A11 (R34): one visible action performs a project-free, auto-root,
+  // Linked preview and its matching bind with the model import enabled. It
+  // exposes no project, root, profile, claim, or mode chooser.
+  it("connects a native source through one action with no project or mode chooser", async () => {
+    const previewBodies: Array<{ mode: string; root: string; project?: string }> = [];
+    let bindBody: { preview_token: string; enable_model_sync: boolean } | null = null;
     server.use(
       http.post("/api/config-sources/preview", async ({ request }) => {
-        const body = (await request.json()) as { mode: string };
-        previewedModes.push(body.mode);
+        previewBodies.push((await request.json()) as { mode: string; root: string; project?: string });
         return HttpResponse.json({
-          preview_token: `tok-${body.mode}`,
+          preview_token: "tok123",
           expires_at: new Date(Date.now() + 600000).toISOString(),
-          effective: { ...emptyEffective, model: "user-model", provenance: { model: { scope: "user", path: "/h/.claude/settings.json", key: "model" } } },
+          effective: { ...emptyEffective, model: "user-model" },
           report: { source_digest: "abc", files_read: [], skipped: [], unknown_keys: [], warnings: [], fingerprints: [], approved_roots: [] },
         });
       }),
       http.put("/api/config-sources/:id", async ({ request }) => {
-        const body = (await request.json()) as { preview_token: string };
-        boundToken = body.preview_token;
-        return HttpResponse.json({ backend_id: "claude", provider: "claude-code", mode: "mirrored", root: "/h/.claude", health: "ok", stale: false });
+        bindBody = (await request.json()) as { preview_token: string; enable_model_sync: boolean };
+        return HttpResponse.json({
+          backend_id: "claude", provider: "claude-code", mode: "linked", root: "/h/.claude",
+          health: "ok", stale: false, model_sync_enabled: true, models_added: 2,
+        });
       }),
     );
 
-    renderWithQuery(<ConfigSourcePanel backendId="claude" backendType="claude-acp" />);
-    const discover = (await screen.findByText("Discover native config")) as HTMLButtonElement;
-    await waitFor(() => expect(discover).not.toBeDisabled());
-    fireEvent.click(discover); // discovery previews Linked
-    expect(await screen.findByText(/user-model/)).toBeInTheDocument();
+    let connected = 0;
+    renderWithQuery(
+      <ConfigSourcePanel backendId="claude" backendType="claude-acp" onConnected={() => (connected += 1)} />,
+    );
 
-    fireEvent.click(screen.getByText(/Link \(Mirrored/));
-    await waitFor(() => expect(boundToken).toBe("tok-mirrored"));
-    expect(previewedModes).toContain("mirrored");
+    // No project select and no mirrored fallback control anywhere.
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Mirrored/)).not.toBeInTheDocument();
+
+    fireEvent.click(await screen.findByText("Use my Claude Code configuration"));
+
+    await waitFor(() => expect(bindBody).not.toBeNull());
+    expect(previewBodies).toEqual([
+      { provider: "claude-code", root: "auto", mode: "linked", claims: ["launch_defaults", "model_catalog", "setup"] },
+    ]);
+    expect(bindBody!).toMatchObject({ preview_token: "tok123", enable_model_sync: true });
+    // The import result is reported without any support/entitlement claim.
+    expect(await screen.findByText(/Imported 2 configured models\./)).toBeInTheDocument();
+    expect(screen.getByText(/does not check availability or entitlement/)).toBeInTheDocument();
+    expect(connected).toBe(1);
+  });
+
+  // FS-08.A11: a failed connection stays visible and retryable and creates no
+  // binding; the normal flow never offers Mirrored as the recovery.
+  it("keeps a failed connection retryable without offering mirrored", async () => {
+    let previews = 0;
+    server.use(
+      http.post("/api/config-sources/preview", () => {
+        previews += 1;
+        if (previews === 1) {
+          return HttpResponse.json(
+            { error: { code: "source_not_found", message: "no native configuration found for claude-code" } },
+            { status: 404 },
+          );
+        }
+        return HttpResponse.json({
+          preview_token: "tok-retry",
+          expires_at: new Date(Date.now() + 600000).toISOString(),
+          effective: { ...emptyEffective },
+          report: { source_digest: "abc", files_read: [], skipped: [], unknown_keys: [], warnings: [], fingerprints: [], approved_roots: [] },
+        });
+      }),
+      http.put("/api/config-sources/:id", () =>
+        HttpResponse.json({
+          backend_id: "claude", provider: "claude-code", mode: "linked", root: "/h/.claude",
+          health: "ok", stale: false, model_sync_enabled: true, models_added: 0,
+        }),
+      ),
+    );
+
+    renderWithQuery(<ConfigSourcePanel backendId="claude" backendType="claude-acp" />);
+    const connect = await screen.findByText("Use my Claude Code configuration");
+    fireEvent.click(connect);
+
+    expect(await screen.findByText(/no native configuration found/)).toBeInTheDocument();
+    expect(screen.queryByText(/Mirrored/)).not.toBeInTheDocument();
+
+    // The same action retries and succeeds.
+    fireEvent.click(screen.getByText("Use my Claude Code configuration"));
+    expect(await screen.findByText(/No new configured models to import/)).toBeInTheDocument();
   });
 
   // Regression (review fix): Codex emits plural asset kinds (instructions,

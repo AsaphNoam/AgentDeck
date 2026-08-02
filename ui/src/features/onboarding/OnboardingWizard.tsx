@@ -100,7 +100,6 @@ export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
               {step === 1 && <ProjectStep claimMutation={claimMutation} releaseMutation={releaseMutation} onDone={(projectId) => { setCreatedProject(projectId); advance(); }} />}
               {step === 2 && (
                 <SourceStep
-                  project={createdProject}
                   backendId={backend.id}
                   backendType={backend.type}
                   claimMutation={claimMutation}

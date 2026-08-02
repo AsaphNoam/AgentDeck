@@ -6,7 +6,12 @@ import {
 } from "@tanstack/react-query";
 import type { RoleResponse } from "../schemas/role";
 import type { ProjectResponse } from "../schemas/project";
-import type { BackendsResponse, BackendsConfig } from "../schemas/backends";
+import type {
+  BackendsResponse,
+  BackendsConfig,
+  BackendType,
+  CreateBackendResponse,
+} from "../schemas/backends";
 import type { Config } from "../schemas/config";
 
 // Query keys — used for cache invalidation.
@@ -160,6 +165,28 @@ export function useBackends() {
   return useQuery({
     queryKey: QUERY_KEYS.backends,
     queryFn: () => json<BackendsConfig>("/api/backends"),
+  });
+}
+
+export interface CreateBackendRequest {
+  backend_id: string;
+  name: string;
+  type: BackendType;
+  connect_native_configuration?: boolean;
+}
+
+// useCreateBackend adds exactly one backend through the item-scoped create
+// (TS-03.R23). It deliberately does NOT invalidate the backends query: the
+// Settings editor merges the created card into its draft, so an unrelated
+// unsaved edit is never discarded by a background refetch (FS-04.R40).
+export function useCreateBackend() {
+  return useMutation({
+    mutationFn: (req: CreateBackendRequest) =>
+      json<CreateBackendResponse>("/api/backends", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(req),
+      }),
   });
 }
 

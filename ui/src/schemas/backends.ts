@@ -52,3 +52,22 @@ export const backendsResponseSchema = backendsConfigSchema.extend({
 });
 
 export type BackendsResponse = z.infer<typeof backendsResponseSchema>;
+
+// Item-scoped create (TS-03.R23). `connection` is present only when the request
+// asked to connect native configuration; a failure reports "unbound" beside the
+// backend that was still created, never an overall error.
+export const backendConnectionSchema = z.object({
+  status: z.enum(["connected", "unbound"]),
+  model_sync_enabled: z.boolean().optional(),
+  models_added: z.number().optional(),
+  error: z.object({ code: z.string(), message: z.string() }).optional(),
+});
+
+export const createBackendResponseSchema = z.object({
+  backend_id: z.string(),
+  backend: backendSchema,
+  connection: backendConnectionSchema.optional(),
+});
+
+export type BackendConnection = z.infer<typeof backendConnectionSchema>;
+export type CreateBackendResponse = z.infer<typeof createBackendResponseSchema>;

@@ -4,6 +4,34 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-02 — Implementation: simple backend creation and global configuration linking
+
+Adding a backend is no longer an incomplete card you have to finish by hand. **Add backend** opens a
+dialog where you pick the provider first; AgentDeck fills in a matching name you can edit and creates
+the backend with that provider's standard starter model. It adds only that one backend — any other
+unsaved edits you had open in Settings stay exactly as you left them, neither saved nor thrown away.
+
+For Claude and Codex the dialog also offers **Create and use my configuration**, which creates the
+backend and connects it to your existing CLI setup in one step. Connecting no longer asks you to pick
+a project or choose between Linked and Mirrored: there is one **Use my … configuration** button, it
+works even when you have no projects set up yet, and each agent still picks up its own project's
+configuration when it launches. Connecting also turns on model import and immediately adds the models
+your configuration names — which is what your files say, not a check that those models are actually
+available to your account. If connecting fails, the backend is still created and saved, clearly shown
+as not connected, and the same button retries.
+
+Three problems were found and fixed while building this. Reading a configuration without a project
+was falling back to AgentDeck's own working directory, so it could read and approve an unrelated
+folder. A damaged `backends.json` could be silently replaced with the built-in default catalog
+instead of being reported. And the Settings backends screen quietly discarded your unsaved edits
+whenever it refreshed in the background.
+
+**Needs attention:** None.
+
+**Next:** A usability pass should drive the real browser journey — create a backend, connect Claude
+and Codex, retry a failed connection, and launch an agent through the new global binding from a
+project chosen later. Component tests cover this today, but no browser run does.
+
 ### 2026-08-01 — Design update: global backend creation and configuration linking
 
 The design is ready to implement again. Backend creation now uses a focused one-backend operation,

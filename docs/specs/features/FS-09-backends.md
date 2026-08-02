@@ -98,7 +98,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   R33, seeding never rewrites a pre-existing `backends.json`, adds missing aliases to an existing
   catalog, or changes an existing default.
 
-- **R47** `(planned)` — Connecting a Claude/Codex native configuration through the normal
+- **R47** — Connecting a Claude/Codex native configuration through the normal
   one-click federation action enables `autosync_models` only on that target backend and immediately
   runs its existing provider-specific, add-only import. Codex imports only locally cached
   user-visible (`visibility:"list"`) entries and their declared effort metadata under R28/R38; Claude
@@ -358,7 +358,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   remains byte-for-byte unchanged by seeding. The launch picker exposes all four without claiming
   their resolved versions or entitlements. *Verify by* seed/config tests and the onboarding/New
   Agent catalog fixtures.
-- **A20** `(planned)` (R47) — A normal successful Claude/Codex source connection enables model
+- **A20** (R47) — A normal successful Claude/Codex source connection enables model
   autosync and immediately imports only into its target backend: Codex adds local-cache
   `visibility:"list"` models plus declared effort metadata, while Claude adds only valid explicit
   user-level configured selectors and no inferred effort. Existing entries/defaults and every other
@@ -444,3 +444,7 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **Regression anchors:** `internal/backend/adapter_test.go`,
   `internal/backend/credcheck/credcheck_test.go`, `internal/runtime/chat_test.go`,
   `internal/server/switch_test.go`, backend config handler tests, and the UI tests above.
+- **Connected model import (R47/A20):** `internal/config/modelautosync.go`
+  (`ImportConfiguredModels`, shared `addModels`) driven from
+  `internal/server/config_sources.go` (`persistBinding`); pinned by
+  `internal/config/backendcreate_test.go` and `internal/server/backend_create_test.go`.
