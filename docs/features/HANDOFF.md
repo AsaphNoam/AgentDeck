@@ -122,12 +122,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   [`../archive/reviews/usability-review-run-2026-07-26-rerun.md`](../archive/reviews/usability-review-run-2026-07-26-rerun.md)
   and [`../archive/reviews/usability-review-run-2026-07-26-browser-retry.md`](../archive/reviews/usability-review-run-2026-07-26-browser-retry.md).
   Credentialed provider and terminal compatibility remain separate manual release gates.
-- **Last reviewed code:** `05dff38` (2026-08-01), the continuous range after `ca100e0`: the
-  AgentDecker proposal-review fix, the Sky & Grove visual rework, projects-home project creation, the
-  chat Back-link change, the scoped New Agent project lock, the Claude configured-model design, and
-  the three chat tool-activity presentation commits. One **Must fix** and three **Worth fixing**
-  findings are recorded below. The previously recorded project-menu preset-swatch item is confirmed
-  fixed in `249da5b` and is not carried forward.
+- **Last reviewed code:** `b6654b5` (2026-08-02), the continuous range after `05dff38`: Claude
+  configured-model autosync, item-scoped backend creation, and global configuration linking. Four
+  **Must fix** and two **Worth fixing** findings are recorded below, alongside the earlier open
+  findings.
 - **Branch:** `main`.
 
 ## Active change
@@ -165,6 +163,59 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 ## Review findings
 
 ### Open findings
+
+- **Must fix** — `internal/server/config_handlers.go:501-509` only serializes a stale whole-catalog
+  `PUT /api/backends`; it does not prevent that already-decoded document from replacing an
+  item-scoped backend created just before it acquires `catalogMu`. Normal-use trigger: leave Settings
+  open in one tab, add a backend in another tab, then save the first tab. The stale document removes
+  the just-created durable backend, despite TS-07.R18's promise that complete replacement and item
+  creation cannot erase each other's committed entry and FS-04.R40's durable-create/draft boundary
+  (**INV §15**). Fix: add a catalog revision/CAS conflict or defined merge semantics that preserves
+  committed item creates; a mutex alone is insufficient. Test: create, then submit an independently
+  captured stale whole catalog, and assert the created backend remains.
+
+- **Must fix** — `ui/src/api/config.ts:171-183` deliberately avoids invalidation after
+  create-and-connect, but does not invalidate the already-mounted global config-source query either.
+  `BackendsEditor.tsx:175-198` therefore displays its success message and renders the newly created
+  card while `ConfigSourcePanel.tsx:126` still reads the fresh cached `bindings:[]` result. Normal-use
+  trigger: a catalog already has a Claude/Codex card (and therefore the global query mounted), then
+  create-and-connect another such backend within the query stale window. The new card incorrectly
+  offers **Use my … configuration** instead of showing the connected status, and retrying can repeat
+  the connection. This violates FS-08.R34/A11 and TS-03.R23's backend/source-query invalidation
+  contract (**INV §1/§10**). Fix: merge/invalidate the global source query after a connected POST
+  without re-seeding the backend draft. Test the cached-unbound query followed by create-and-connect
+  and assert the card renders the returned bound status.
+
+- **Must fix** — `internal/server/config_sources.go:366-388` unlinks by an unlocked
+  read-modify-write of `config-sources.json`, while binds/prunes write that same manifest under
+  `catalogMu`. Normal-use trigger: an unlink of binding A reads `{A}`, another tab successfully binds
+  B and writes `{A,B}`, then the unlink writes its stale `{}` snapshot. B's successful connection is
+  lost and its in-memory generation is misleading. This violates FS-08.R27's single-binding unlink,
+  TS-07.R17, and **INV §15**. Fix: serialize every manifest mutation under the same lock (or a
+  dedicated manifest mutex) around its read/write/manager update. Test an interleaved unlink A and
+  bind B and assert B persists.
+
+- **Must fix** — `internal/server/config_handlers.go:501-509` writes the replacement catalog before
+  `pruneIncompatibleConfigSources`, but does not restore that catalog if the manifest prune fails.
+  Normal-use trigger: retarget or remove a bound backend when `config-sources.json` cannot be written.
+  The API returns `500`, but durable state now contains the changed backend and an incompatible old
+  binding, which can be used after restart. This violates FS-08.R33, TS-07.R15, and **INV §15**.
+  Fix: keep a catalog preimage and compensate on a failed prune (or use an equivalent safe ordering
+  with compensation). Test an injected manifest write failure and assert no returned-error state
+  leaves a backend/source-provider mismatch.
+
+- **Worth fixing** — `internal/server/config_sources.go:221-234` preflights a bind with
+  `readBackendsOrDefault`, so a corrupt durable catalog is substituted with seed defaults and a
+  matching token is consumed. Strict persistence then rejects that corrupt catalog at `:268`; after
+  repair, the person must preview and consent again. This violates FS-08.R5 and TS-07.R17's
+  durable-backend-before-consumption rule (**INV §15**). Fix: use the strict catalog read for preflight. Test a
+  corrupt catalog after preview, repair it, then bind with the original still-valid token.
+
+- **Worth fixing** — the new item-create/bind paths expose raw filesystem errors in API messages:
+  `internal/server/backend_create.go:149` and `internal/server/config_sources.go:288,296,305,317`.
+  A permission or I/O failure can reveal local paths/OS details to the API client, contrary to
+  TS-03.R3's safe structured-error boundary (**INV §13**). Fix: log the cause server-side and return
+  fixed safe messages. Test injected read/write failures for the response payload.
 
 - **Must fix** — `ui/src/features/dashboard/ProjectDashboard.tsx:188` renders
   `<CardGrid projectID={id}>` for an *unavailable* scoped project (the `!project && hasAgents`
@@ -217,6 +268,16 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-02 — Reviewed the continuous range `05dff38`→`b6654b5` (Claude configured-model autosync,
+  item-scoped backend creation, and global configuration linking) against FS-04/FS-08/FS-09,
+  TS-03/TS-07, and every invariant class. Four Must-fix findings: stale complete-catalog save can
+  erase a committed item create; create-and-connect leaves an already cached source panel falsely
+  unbound; concurrent unlink can erase another completed binding; and a failed binding-prune leaves
+  an incompatible catalog/manifest pair after returning 500. Two Worth-fixing findings: a corrupt
+  catalog consumes preview consent before strict persistence refuses it, and new API error paths
+  expose raw storage details. `make check-specs`, focused server/config tests, focused Settings tests,
+  and the UI build pass; the server suite also passes when allowed its loopback test listener.
 
 - 2026-08-02 — Implemented simple backend creation and global configuration linking
   (FS-04.R40/A20; FS-08.R2/R3/R23/R33/R34/A11; FS-09.R47/A20; TS-03.R22/R23; TS-07.R16/R17/R18;
