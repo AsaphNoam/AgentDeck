@@ -110,6 +110,21 @@ func DefaultBackends() BackendsConfig {
 	}
 }
 
+// StarterBackend returns the canonical starter backend for a backend type,
+// taken from the same authority a fresh home seeds (FS-04.R40, TS-03.R23), so
+// an item-scoped create can never invent a second, drifting template. The
+// returned entry is never the catalog default; the caller decides membership.
+func StarterBackend(backendType string) (Backend, bool) {
+	for _, backend := range DefaultBackends().Backends {
+		if backend.Type != backendType {
+			continue
+		}
+		backend.Default = false
+		return backend, true
+	}
+	return Backend{}, false
+}
+
 // agentDeckerPrompt is the system prompt for the seeded "agentdecker" role: a
 // persona that knows AgentDeck itself, so users have an out-of-the-box guide
 // for the product and a skillful orchestrator for multi-agent workflows. Keep

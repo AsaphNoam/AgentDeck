@@ -111,9 +111,15 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Active change
 
-**State:** none
+**State:** in progress — Simple backend creation and global configuration linking
+(`../ready-changes/simple-backend-creation-and-global-source-linking.md`).
 
-No implementation change is active. Do not select a waiting change without the human naming it.
+**Next step:** ship the config-package seams (canonical per-type starter backend, target-scoped
+add-only model import, project-free Codex resolution), then the server routes (item-scoped
+`POST /api/backends`, optional `project` on preview/refresh, `enable_model_sync` on bind with the
+catalog-first best-effort persistence and shared catalog lock), then the UI (Add backend dialog and
+the one-action **Use my … configuration** panel), flipping the `(planned)` tags on FS-04.R40/A20,
+FS-08.R34/A11, FS-09.R47/A20, TS-03.R22/R23, and TS-07.R16/R17/R18 as each ships.
 
 ## Decisions needing your input
 

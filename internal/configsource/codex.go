@@ -67,13 +67,19 @@ func (r *CodexResolver) resolve(ctx context.Context, binding Binding, project co
 	if err != nil {
 		return effective, report, classifyPathError(err)
 	}
-	projectPath := project.Cwd
-	if expanded, expandErr := config.ExpandTilde(projectPath); expandErr == nil {
-		projectPath = expanded
-	}
-	projectRoot, err := canonicalRoot(projectPath)
-	if err != nil {
-		return effective, report, classifyPathError(err)
+	// A project-free resolution (TS-07.R16) resolves only the user-level source.
+	// Leaving projectRoot empty matters: canonicalRoot("") resolves to the server
+	// process's own working directory, which would silently approve an unrelated
+	// tree as a read root.
+	projectRoot := ""
+	if projectPath := project.Cwd; projectPath != "" {
+		if expanded, expandErr := config.ExpandTilde(projectPath); expandErr == nil {
+			projectPath = expanded
+		}
+		projectRoot, err = canonicalRoot(projectPath)
+		if err != nil {
+			return effective, report, classifyPathError(err)
+		}
 	}
 	// Approved roots gate every read. The source root and the *currently selected*
 	// project's canonical root are always approved for this resolution — a binding is
@@ -82,7 +88,10 @@ func (r *CodexResolver) resolve(ctx context.Context, binding Binding, project co
 	// only the preview project's roots rejected a normal A→B project change with
 	// approval_required.) The skills tree is inventoried at preview only.
 	approved := append([]string{}, binding.Approved...)
-	approved = append(approved, root, projectRoot)
+	approved = append(approved, root)
+	if projectRoot != "" {
+		approved = append(approved, projectRoot)
+	}
 	if preview {
 		if r.userHome != "" {
 			if skills, skillsErr := canonicalRoot(filepath.Join(r.userHome, ".agents", "skills")); skillsErr == nil {
@@ -95,8 +104,10 @@ func (r *CodexResolver) resolve(ctx context.Context, binding Binding, project co
 	if _, err := approvedPath(root, approved); err != nil {
 		return effective, report, classifyPathError(err)
 	}
-	if _, err := approvedPath(projectRoot, approved); err != nil {
-		return effective, report, classifyPathError(err)
+	if projectRoot != "" {
+		if _, err := approvedPath(projectRoot, approved); err != nil {
+			return effective, report, classifyPathError(err)
+		}
 	}
 
 	user, found, err := readTOMLLayer(filepath.Join(root, "config.toml"), "user", approved, &report)
@@ -130,7 +141,7 @@ func (r *CodexResolver) resolve(ctx context.Context, binding Binding, project co
 	}
 
 	projectTrusted := codexProjectTrusted(user.data, projectRoot)
-	for _, dir := range []string{projectRoot} {
+	for _, dir := range projectDirs(projectRoot) {
 		configPath := filepath.Join(dir, ".codex", "config.toml")
 		if _, statErr := os.Stat(configPath); errors.Is(statErr, os.ErrNotExist) {
 			continue
@@ -319,7 +330,7 @@ func codexProjectTrusted(user map[string]any, projectRoot string) bool {
 }
 
 func (r *CodexResolver) inventory(ctx context.Context, effective *Effective, report *Report, projectRoot string, approved []string) error {
-	for _, dir := range []string{projectRoot} {
+	for _, dir := range projectDirs(projectRoot) {
 		agents := filepath.Join(dir, "AGENTS.md")
 		if _, err := os.Stat(agents); err == nil {
 			if err := addInventoryFile(effective, report, agents, "project", "instructions", "copyable", approved); err != nil {
@@ -336,6 +347,16 @@ func (r *CodexResolver) inventory(ctx context.Context, effective *Effective, rep
 		}
 	}
 	return nil
+}
+
+// projectDirs is the project layer's directory list: empty for a project-free
+// resolution, so user-level-only reads skip every project-scoped layer instead
+// of falling back to some unrelated directory.
+func projectDirs(projectRoot string) []string {
+	if projectRoot == "" {
+		return nil
+	}
+	return []string{projectRoot}
 }
 
 func uniqueCleanPaths(paths []string) []string {
