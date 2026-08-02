@@ -4,6 +4,24 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-02 — Review: backend creation and configuration linking
+
+The new backend and configuration-linking flow is not safe to ship yet. A stale Settings save can
+erase a backend created in another tab, unlinking one configuration can erase a different connection
+that completed at the same time, and a failed cleanup can leave a backend paired with the wrong
+configuration source. The create-and-connect screen can also say a backend is connected while its
+own card immediately shows it as unbound.
+
+Two smaller issues need cleanup with those fixes: a damaged backend catalog consumes a one-time
+connection approval even though no bind can succeed, and storage failures expose internal file-system
+details in API errors.
+
+**Needs attention:** Resolve the recorded review findings before relying on the new creation or
+configuration-linking flow.
+
+**Next:** Run `/fix` to address the backend/catalog and configuration-source durability findings,
+with regressions for the interleavings and failed writes.
+
 ### 2026-08-02 — Implementation: simple backend creation and global configuration linking
 
 Adding a backend is no longer an incomplete card you have to finish by hand. **Add backend** opens a
