@@ -23,13 +23,12 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
 - **R1** — Only a backend whose type is `claude-acp` or `codex-acp` can have a configuration-source
   binding. Their provider ids are respectively `claude-code` and `codex`; a provider/backend
   mismatch is rejected rather than coerced.
-- **R2** — `GET /api/config-sources` returns redacted discovery candidates and active bindings for
-  the backend-global source surface. Standard discovery examines `~/.claude/settings.json` for
+- **R2** — `GET /api/config-sources?project=<id>` returns redacted discovery candidates and active
+  bindings for the selected project. Standard discovery examines `~/.claude/settings.json` for
   Claude and `${CODEX_HOME:-~/.codex}/config.toml` for Codex. Discovery alone grants no read
   authority and persists nothing.
 - **R3** — `POST /api/config-sources/preview` accepts a provider, project, mode, optional claims, and either
-  `root:"auto"` or an explicit root. Its project is optional, so a global connection preview has no
-  project context. It resolves read-only and returns an effective view, a report,
+  `root:"auto"` or an explicit root. It resolves read-only and returns an effective view, a report,
   and an opaque preview token expiring after ten minutes. The supported claims are
   `launch_defaults`, `model_catalog`, and `setup`.
 - **R4** — A preview report contains paths/scopes/kinds read, skipped paths with reasons, unknown
@@ -126,32 +125,36 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
   backend catalog save makes its id durable. These rules prevent a draft id or orphaned binding
   from blocking later source links.
 
-- **R34** `(planned)` — Settings makes the normal native-configuration path a single explicit
-  action: **Use my Claude Code configuration** or **Use my Codex configuration**. For an existing
- compatible backend, that action performs standard auto-discovery, the read-only preview/consent
-  work, and a `linked` binding as one visible operation. A binding is global to its backend: the
-  connection UI has no project picker and never requires a default project. Per-project native
-  configuration remains a launch-time concern for the agent's actual project under R12/R16/R20, not
-  a prerequisite for connecting a backend. The action explains before activation that AgentDeck reads
-  the native setup and never copies or modifies it. Success immediately replaces the action with the
-  concise bound status and the existing effective view, provenance, overrides, refresh, and unlink
-  controls. Failure leaves the backend unbound and gives a specific repair/retry action. Claude and
-  Codex use this same flow and surface their provider-native configured-model import under FS-09.R28
-  and R45 without implying account entitlement; it enables continuing model sync and imports the
-  currently available add-only catalog immediately under FS-09.R47. People do not inspect a
-  preliminary report or choose
-  `linked` versus `mirrored` before the normal connection succeeds. The `mirrored` path remains
-  available only as a clearly labelled compatibility recovery action after a linked attempt fails;
-  detached import remains unavailable under R9.
+- **R34** `(planned)` — The normal Claude/Codex native-configuration path supersedes R23's
+  project-selected Settings interaction with one explicit **Use my Claude Code configuration** or
+  **Use my Codex configuration** action. For an existing compatible backend, the action performs
+  standard auto-discovery, read-only preview/consent, and a `linked` bind as one visible operation.
+  TS-03.R23's **Create and use my configuration** first makes its new backend durable under R33 and
+  then invokes this same operation. The connection has no project, root, profile, claim-set, or mode
+  chooser and works without any configured/default project. It resolves only the provider's
+  user-level source while connecting; the backend-global binding still resolves the launched agent's
+  actual project later under R12/R16/R20. R2/R3 remain the compatible explicit-project API form.
+
+  Before activation, the action explains that AgentDeck reads native setup without copying or
+  modifying it. Success replaces the action with concise global bound status and the existing
+  effective-view, provenance, overrides, refresh, and unlink controls, enables continuing model
+  sync, and runs FS-09.R47's immediate target-only provider import. A discovery, preview, consent,
+  validation, or bind failure leaves no new binding and gives a specific repair/retry action; when
+  this follows item-scoped creation, the valid backend remains saved and unbound. The normal flow is
+  Linked only: it never presents `mirrored` as recovery because that mode uses the same source
+  resolution and only adds a post-success cache. Existing mirrored bindings continue to render and
+  explicit mode-accepting API callers remain compatible under R8. Detached import remains unavailable
+  under R9. R34 supersedes R23's normal Settings interaction only when it ships; R23 continues to
+  describe the current UI until then.
 
 ### User experience
 
 - **R22** — First-run onboarding contains an optional, always-skippable source step after project
   creation. It reuses the Settings source panel for the backend selected earlier. OpenCode and
   OpenHands show an explanation and continue without federation controls.
-- **R23** — Settings exposes federation only for Claude/Codex backends. It presents the one-click
-  normal connection in R34 and a compatibility recovery only when needed; it has no project chooser.
-  A bound source shows mode, root, health/staleness, model/effort provenance,
+- **R23** — Settings exposes federation only for Claude/Codex backends. The user selects a project,
+  discovers and previews native setup, then binds Linked (recommended) or Mirrored
+  (compatibility). A bound source shows mode, root, health/staleness, model/effort provenance,
   configured models with a “not an entitlement check” note, setup inventory, override controls,
   refresh/load-effective-view, and unlink.
 - **R24** — The UI renders paths, field names, scope, status, and configured environment-key names,
@@ -230,15 +233,17 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
   actions; a catalog save removes bindings for deleted or provider-retargeted backends while
   preserving compatible bindings. *Verify by* `ConfigSourcePanel.test.tsx` and
   `TestPutBackendsPrunesRemovedOrRetargetedSourceBindings`.
-- **A11** `(planned)` (R34, FS-04.R40) — Adding a backend opens a cancellable dialog and neither
-  creates an unsaved Settings card nor leaves a partial catalog entry; successful creation exposes a
-  usable persisted backend. A Claude/Codex backend can be connected from that dialog or after
-  creation with one normal action that auto-discovers, previews, and links the native source. The
-  normal path needs no project or mode selection, clearly remains read-only, gives the same
-  provider-neutral connection experience to Claude and Codex, exposes bound status on success, and
-  leaves no binding on a discovery/preview/bind error; compatibility mode is offered only after that
-  failure. *Verify by* Settings and configuration-source component tests plus a server integration
-  test covering connection catalog/source compensation and failure cleanup.
+- **A11** `(planned)` (R34, FS-04.R40, FS-09.R47) — With no projects or default project configured,
+  a saved Claude or Codex backend connects through one read-only, project-free Linked action and a
+  new one can do the same through **Create and use my configuration**. Success exposes one global
+  binding, enables sync, immediately imports only into the target backend, and invalidates/refetches
+  both global source state and the authoritative backend catalog. Discovery/preview/consent/bind or
+  returned persistence failure is visible and retryable and creates no binding; after item-scoped
+  creation it leaves the valid backend saved and unbound. The normal UI never offers Mirrored as a
+  fallback, while an existing mirrored binding still renders and explicit API use remains compatible.
+  *Verify by* Settings/onboarding component tests and server integrations for zero-project connection,
+  create-only/create-and-connect, saved-unbound failure and retry, dirty-draft preservation,
+  provider-specific target-only import, global query/SSE invalidation, and mirrored compatibility.
 
 ## 6. Deviations & open decisions
 

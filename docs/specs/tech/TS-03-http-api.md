@@ -168,14 +168,44 @@ Go/frontend/manifest supported-id sets have a lockstep regression (R11).
 **R22** `(planned)` — Configuration-source routes describe backend-global bindings. `GET
 /api/config-sources` has no required project query and returns candidates/bindings for the global
 surface; `project` becomes optional on preview/refresh/delete, where omission means user-level
-preview or refresh. `PUT /api/config-sources/{backend_id}` adds optional
+preview or refresh and an explicit project retains the existing resolver-compatible behavior. A
+persisted binding is never project-scoped: a later launch still resolves with its actual project
+under TS-07.R2/R4. `PUT /api/config-sources/{backend_id}` adds optional
 `enable_model_sync:boolean`; the normal Settings connection sends `true`, while existing preview,
 override, and compatibility callers retain their current bytes and behavior when it is omitted.
 On a successful enabled bind, the response adds non-secret `model_sync_enabled:true` and
 `models_added:<non-negative integer>` alongside the binding view; the `GET /api/backends` refetch
 is the authoritative resulting catalog. The request/response schemas, mocks, query keys, and source
 SSE invalidation change in lockstep under R11/R13. All routes remain under the existing `localOnly`
-guard; no new endpoint or provider credential transport is introduced.
+guard; no new configuration-source endpoint or provider credential transport is introduced.
+
+**R23** `(planned)` — `POST /api/backends` is an item-scoped create operation and the only route
+added by this change. Its body is
+`{backend_id:<valid-id>,name:<display-name>,type:<backend-type>,connect_native_configuration?:boolean}`.
+The server builds the type's canonical starter backend/model from the same authority as fresh-home
+seeding, applies the submitted display name, validates the id and complete prospective catalog, and
+inserts only that entry into the current durable catalog. It never accepts or writes the browser's
+whole-catalog draft. An empty catalog makes the new entry default; otherwise the existing default is
+preserved. Invalid input, unsupported native connection for OpenCode/OpenHands, or the initial
+catalog write failing returns R3/field errors and creates nothing. Reusing an id with a different
+requested name or type is `409 backend_exists`; replaying the same id/name/type is idempotent even if
+an earlier connection attempt already added models or enabled autosync. It returns the same backend
+and may safely continue/return the requested connection result. The first create returns `201`; an
+exact replay may return `200`.
+
+For Claude/Codex with `connect_native_configuration:true`, the server first makes the backend
+durable, then orchestrates TS-07.R16's standard auto-root, user-level, Linked preview/token/bind with
+`enable_model_sync:true`; the request accepts no project, root, profile, claims, or mode. Success
+returns `{backend_id,backend,connection}` with `connection.status:"connected"`, the ordinary redacted
+binding, `model_sync_enabled:true`, and `models_added`. If creation succeeds but discovery, preview,
+consent, validation, catalog/source persistence, or bind fails, creation still returns success with
+the saved backend and
+`connection:{status:"unbound",error:{code,message,details?}}`; no binding, installed generation, or
+source-update event is claimed. The nested error uses R3's safe vocabulary and tells the client that
+the ordinary connection action is retryable. Create-only omits `connection`. Existing
+`PUT /api/backends` remains the complete-document editing operation. POST/PUT/source-bind mutations
+share TS-07.R17's catalog lock; schemas, mocks, backend/source query invalidation, and error display
+ship together under R11/R13.
 
 ## 3. Interfaces & data shapes
 

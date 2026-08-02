@@ -83,28 +83,50 @@ provider no longer matches the backend type, then drops their manager generation
 draft is not a backend identity and cannot enter the bind route; that rejection precedes preview
 token consumption. Compatible bindings are retained.
 
-**R16** `(planned)` — The ordinary source connection remains the existing preview-token/bind
-protocol, composed by the client as one action: a standard auto-root `linked` preview with no
-project followed immediately by its matching bind. An omitted project resolves only the provider's
-user-level source during connection; the persisted binding remains backend-global and later
-launches still pass their actual project to R2/R4's project-aware resolver. The regular UI never
-selects a root, profile, project, claim set, or binding mode. The server keeps preview-token expiry,
-one-use consumption, and fingerprint re-checking unchanged; a normal connection never weakens
-consent or path approval merely to remove an intermediate screen.
+**R16** `(planned)` — Ordinary source connection retains the existing preview-token/bind protocol,
+composed server-side for TS-03.R23 and client-side for an already persisted backend: a standard
+auto-root `linked` preview with no project followed immediately by its matching bind. An omitted
+project resolves only the provider's user-level source during connection; the persisted binding
+remains backend-global and later launches still pass their actual project to R2/R4's project-aware
+resolver. The regular UI and item-create request never select a root, profile, project, claim set, or
+binding mode. Preview-token expiry, one-use consumption, and fingerprint re-checking remain
+unchanged; simplifying the interaction never weakens consent or path approval. `mirrored` remains
+accepted by existing API callers and persisted bindings for compatibility, but the regular flow does
+not offer it or present it as recovery for failed `linked` discovery/resolution/bind because it uses
+the same resolver and only adds a post-success disposable cache.
 
-**R17** `(planned)` — An enabled bind (`enable_model_sync:true`) is the sole source-connection
-seam that turns on `Backend.AutoSyncModels` and performs its immediate provider-specific add-only
-import. It reuses the existing Codex/Claude local readers and merge rules rather than parsing native
-model files in the handler: Codex includes its declared reasoning metadata, Claude imports only
-configured selectors, and either reader's missing/invalid input is a reported zero-model success.
-Before writes, the handler validates the backend/provider/token and computes both the replacement
-source manifest and normalized backend catalog. Backend-catalog replacement, source bind, and this
-combined update share one server-side catalog mutation lock. The handler writes the source manifest
-and backend catalog as a compensated local transaction: if the second owner-only atomic write fails,
-it restores the first durable preimage, drops the attempted generation, and returns an error rather
-than reporting a connection whose model-sync state is split. Only after both writes succeed does it
-install/announce the new generation. Ordinary bind callers that omit the flag retain the existing
-source-only write path.
+**R17** `(planned)` — An enabled bind (`enable_model_sync:true`) is the sole source-connection seam
+that turns on the target backend's `AutoSyncModels` flag and performs its immediate provider-specific
+add-only import. It reuses the existing Codex/Claude local readers and merge rules rather than
+parsing native model files in the handler: Codex includes declared reasoning metadata, Claude
+imports only configured selectors, and either reader's missing/invalid input is a reported zero-model
+success.
+
+Before persistence, the handler validates backend/provider/token and computes a replacement source
+manifest plus a normalized target-scoped catalog merge. Backend-catalog replacement, item creation,
+source bind, and this merge share one catalog-mutation lock. Under it, enabled bind re-reads the
+current catalog, confirms the target is still compatible and durable, changes only that backend's
+autosync flag, and adds only previously unrepresented provider models. It never deletes or edits an
+existing model, changes a default, calls whole-catalog startup sync, or writes another backend.
+
+Enabled bind writes the merged catalog first and the source manifest second. If the source write
+returns an error, it attempts to restore the catalog preimage, drops the attempted generation, and
+returns an unbound connection failure. It installs a generation and publishes
+`config_source_update` only after both writes return success. If the process stops between writes or
+restoration itself fails, the explicitly accepted durable residue is only a compatible **unbound**
+backend with autosync enabled and/or add-only imported models; source binding alone determines
+connected status. The stable backend id plus target-scoped add-only merge makes retry idempotent and
+convergent under INV §15: it cannot duplicate, delete, or overwrite catalog entries. For
+TS-03.R23, the rollback preimage is taken after the new valid backend was created, so a returned bind
+failure never deletes that backend. Ordinary callers omitting the flag retain the existing
+source-only path.
+
+**R18** `(planned)` — TS-03.R23's item-scoped create is the sole exception to R15's Settings-draft
+boundary. The server validates and persists exactly one backend before initiating its optional
+connection, without submitting, merging, or replacing the browser-local whole-catalog draft. The
+item-create orchestration and full-catalog replacement share R17's mutation lock, so neither can
+erase the other's committed entry. A source failure after creation returns the saved backend as
+unbound rather than compensating away the successful create.
 
 ## 3. Interfaces & data shapes
 
@@ -113,8 +135,9 @@ approved roots, and explicit overrides. Fingerprints/effective data are held in 
 health is derived by resolution, and frozen effective data belongs to the session snapshot; mirror
 cache is regenerable. Preview tokens are in-memory, expiring, and single-use.
 
-REST/SSE routes are listed by TS-03. The `config_source_update` event identifies backend/project,
-generation, health, changed field names, and stale state; it never carries source content.
+REST/SSE routes are listed by TS-03. The `config_source_update` event identifies backend, optional
+project, generation, health, changed field names, and stale state; a backend-global connection event
+does not require project. It never carries source content.
 
 ## 4. Invariants
 
@@ -123,6 +146,8 @@ generation, health, changed field names, and stale state; it never carries sourc
 - **INV §10:** native source is authority; mirror/effective views are cache/projection with explicit
   refresh boundaries.
 - **INV §13:** every provider path/error/effective view crosses the redaction boundary.
+- **INV §15:** the catalog-first best-effort boundary exposes only retry-safe add-only unbound
+  residue; binding remains the connected-state authority and publication follows both durable writes.
 - **R13 — TOCTOU closure.** Bind verifies the preview-bound fingerprint/selection immediately before
   committing; a changed source requires a new preview rather than accepting stale consent.
 
@@ -133,12 +158,20 @@ generation, health, changed field names, and stale state; it never carries sourc
   them. Effective-view SSE invalidation and prompt watch registration have known usability gaps.
 - Real-provider acceptance in R12 is credential-gated. Fake/fixture coverage proves AgentDeck's
   resolver/manager behavior, not undocumented provider compatibility.
+- **Accepted enabled-bind residue (R17).** The backend catalog and source manifest remain separate
+  owner-only JSON authorities. A crash between their atomic writes or a failed compensation may
+  leave autosync/add-only target models on an unbound backend. This is intentionally preferred over a
+  false binding: connected status comes only from the manifest, no existing catalog value is
+  overwritten, and the stable backend id makes retry converge safely.
 
 ## 6. Traceability
 
 - Store/manager/watch: `internal/config/sources.go`, `internal/configsource/manager.go`, `watch.go`.
 - Resolvers/redaction: `internal/configsource/claude.go`, `codex.go`, `types.go`, `security.go`.
 - Server/composition: `internal/server/config_sources.go`, `launch.go`, `resume.go`, `switch.go`.
+- Planned item create/enabled-bind regression anchors: `internal/server/config_handlers_test.go` and
+  `config_sources_test.go` cover idempotent create, catalog/source failure and residue, target-only
+  merge, lock serialization, retry convergence, and post-commit-only generation/SSE.
 - UI: `ui/src/features/settings/ConfigSourcePanel.tsx`, onboarding `SourceStep.tsx`.
 - Regression anchors: `TestHydrateBindingsPopulatesGenerations`, provider resolver precedence/
   symlink/redaction tests, `TestComposeLaunchFreezesFederationConfig`, UI mirrored-token and override
