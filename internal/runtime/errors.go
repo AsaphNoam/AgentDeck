@@ -63,6 +63,11 @@ const (
 	CodeAgentArchiving   = "agent_archiving"   // 409
 	CodeProjectArchived  = "project_archived"  // 409
 	CodeProjectArchiving = "project_archiving" // 409
+
+	// CodeBackendExists rejects an item-scoped backend create that reuses an id
+	// with a different name or type (TS-03.R23). An exact replay is idempotent
+	// and never reaches this code.
+	CodeBackendExists = "backend_exists" // 409
 )
 
 // APIError is the normalized error payload. It serializes to the §7.7 envelope:
@@ -95,7 +100,8 @@ func statusForCode(code string) int {
 		return http.StatusNotFound // 404
 	case CodeConflict, CodeAgentNotRunning, CodeSwitchInProgress,
 		CodeSourceChanged, CodeSourceConflict, CodeApprovalRequired,
-		CodeAgentArchived, CodeAgentArchiving, CodeProjectArchived, CodeProjectArchiving:
+		CodeAgentArchived, CodeAgentArchiving, CodeProjectArchived, CodeProjectArchiving,
+		CodeBackendExists:
 		return http.StatusConflict // 409
 	case CodeNotImplemented:
 		return http.StatusNotImplemented // 501

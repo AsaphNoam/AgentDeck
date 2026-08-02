@@ -26,6 +26,7 @@ func (s *Server) routes() http.Handler {
 	api("PUT /api/projects/{project}", s.handlePutProject)
 	api("DELETE /api/projects/{project}", s.handleDeleteProject)
 	api("GET /api/backends", s.handleBackends)
+	api("POST /api/backends", s.handleCreateBackend)
 	api("PUT /api/backends", s.handlePutBackends)
 	api("GET /api/config", s.handleGetConfig)
 	api("PUT /api/config", s.handlePutConfig)

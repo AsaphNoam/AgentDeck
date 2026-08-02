@@ -496,25 +496,24 @@ func (s *Server) handlePutBackends(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Persist the normalized document (save regardless of cred-check outcome).
-	if err := s.configStore.WriteBackends(body); err != nil {
-		s.log.Error("backends: write", "err", err)
-		writeAPIError(w, apiError("internal", "internal error"))
-		return
+	// Serialize against the item-scoped create and enabled-bind merge so neither
+	// can erase the other's committed entry (TS-07.R18).
+	s.catalogMu.Lock()
+	err := s.configStore.WriteBackends(body)
+	if err == nil {
+		// A whole-catalog save can remove a backend or change its provider type.
+		// Drop any now-meaningless source binding before it can poison a future
+		// bind through whole-manifest validation.
+		err = s.pruneIncompatibleConfigSources(body)
 	}
-	// A whole-catalog save can remove a backend or change its provider type.
-	// Drop any now-meaningless source binding before it can poison a future
-	// bind through whole-manifest validation.
-	if err := s.pruneIncompatibleConfigSources(body); err != nil {
-		s.log.Error("backends: prune incompatible config sources", "err", err)
+	s.catalogMu.Unlock()
+	if err != nil {
+		s.log.Error("backends: save", "err", err)
 		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
 
-	// Invalidate the onboarding cred-check cache: env/model contents may have changed.
-	s.onboardingCacheMu.Lock()
-	s.onboardingCache = nil
-	s.onboardingCacheMu.Unlock()
+	s.invalidateOnboardingCache()
 
 	// Run cred checks for the default model of each backend (best-effort, bounded).
 	credentials := make(map[string]credcheck.CredResult, len(body.Backends))
