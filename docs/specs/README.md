@@ -30,7 +30,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-01 | [features/FS-01-agent-lifecycle.md](features/FS-01-agent-lifecycle.md) | Current | Launch, stop, cancel, resume, clone, rename, switch runtime, crash handling, identity |
 | FS-02 | [features/FS-02-dashboard.md](features/FS-02-dashboard.md) | Current | Card grid, live status, layout/density, task groups, notifications, project creation |
 | FS-03 | [features/FS-03-chat.md](features/FS-03-chat.md) | Current | Streaming chat panel, tool calls/diffs, permission prompts, transcript view, header runtime picker |
-| FS-04 | [features/FS-04-configuration-onboarding.md](features/FS-04-configuration-onboarding.md) | Current | Roles/projects/backends CRUD, settings UI, onboarding wizard, appearance preference |
+| FS-04 | [features/FS-04-configuration-onboarding.md](features/FS-04-configuration-onboarding.md) | Partial | Roles/projects/backends CRUD, settings UI, onboarding wizard, appearance preference |
 | FS-05 | [features/FS-05-archive-tracking.md](features/FS-05-archive-tracking.md) | Current | Session archive, full-text search, resume from archive, file/command tracking |
 | FS-06 | [features/FS-06-coordination.md](features/FS-06-coordination.md) | Current | Agent-to-agent messaging, nudger, budgets, unread indicators |
 | FS-07 | [features/FS-07-terminal.md](features/FS-07-terminal.md) | Partial | Terminal interface, drivers (xterm/tmux/iTerm2), terminal-agent boundaries |
@@ -48,7 +48,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 |----|------|--------|--------|
 | TS-01 | [tech/TS-01-architecture.md](tech/TS-01-architecture.md) | Partial | Process model, package boundaries, runtime abstraction, source-of-truth rules |
 | TS-02 | [tech/TS-02-data-persistence.md](tech/TS-02-data-persistence.md) | Current | SQLite schema & migrations, config files, transcripts, FTS index |
-| TS-03 | [tech/TS-03-http-api.md](tech/TS-03-http-api.md) | Current | REST surface, error envelope, SSE contract, status codes |
+| TS-03 | [tech/TS-03-http-api.md](tech/TS-03-http-api.md) | Partial | REST surface, error envelope, SSE contract, status codes |
 | TS-04 | [tech/TS-04-integration-protocols.md](tech/TS-04-integration-protocols.md) | Partial | ACP, hooks, MCP messaging, PTY/WebSocket, external-CLI tolerance |
 | TS-05 | [tech/TS-05-security.md](tech/TS-05-security.md) | Current | Loopback boundary, tokens, file modes, permission model, release-install trust notes |
 | TS-06 | [tech/TS-06-build-test.md](tech/TS-06-build-test.md) | Current | Build tags, embed pipeline, release runtime, install, test strategy & conventions |

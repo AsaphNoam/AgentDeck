@@ -4,6 +4,21 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-01 — Design: simple backend creation and global configuration linking
+
+Backend setup is ready to simplify. **Add backend** will open a provider-first dialog that suggests
+the matching name and creates a usable saved backend, rather than adding an incomplete Settings card.
+Claude and Codex will both offer one read-only **Use my configuration** action during creation and on
+an existing backend. It connects the backend globally with no project, discovery, or mode chooser,
+imports currently supported provider models immediately, and keeps that catalog add-only synced.
+Model/effort provenance, overrides, refresh, unlink, and a compatibility recovery remain available
+after connection; detached copying remains unavailable.
+
+**Needs attention:** None.
+
+**Next:** Start the ready change `simple-backend-creation-and-global-source-linking.md` when you want
+to implement it.
+
 ### 2026-08-01 — Implementation: import configured Claude models at startup
 
 The Claude backend can now pull in the models you have configured. Turn on "Import configured models from Claude on startup" for the Claude backend in Settings, and at the next dashboard start AgentDeck reads the models named in your personal Claude settings file (`~/.claude/settings.json`) and adds any it doesn't already list to the launch picker. It only adds — it never edits, removes, or reorders your existing models, never changes your default, and never touches anything on a backend where the option is off. A missing or unusual settings file is simply skipped. This mirrors the existing Codex auto-sync, and both providers now share one import step.

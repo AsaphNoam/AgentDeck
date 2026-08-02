@@ -83,6 +83,29 @@ provider no longer matches the backend type, then drops their manager generation
 draft is not a backend identity and cannot enter the bind route; that rejection precedes preview
 token consumption. Compatible bindings are retained.
 
+**R16** `(planned)` — The ordinary source connection remains the existing preview-token/bind
+protocol, composed by the client as one action: a standard auto-root `linked` preview with no
+project followed immediately by its matching bind. An omitted project resolves only the provider's
+user-level source during connection; the persisted binding remains backend-global and later
+launches still pass their actual project to R2/R4's project-aware resolver. The regular UI never
+selects a root, profile, project, claim set, or binding mode. The server keeps preview-token expiry,
+one-use consumption, and fingerprint re-checking unchanged; a normal connection never weakens
+consent or path approval merely to remove an intermediate screen.
+
+**R17** `(planned)` — An enabled bind (`enable_model_sync:true`) is the sole source-connection
+seam that turns on `Backend.AutoSyncModels` and performs its immediate provider-specific add-only
+import. It reuses the existing Codex/Claude local readers and merge rules rather than parsing native
+model files in the handler: Codex includes its declared reasoning metadata, Claude imports only
+configured selectors, and either reader's missing/invalid input is a reported zero-model success.
+Before writes, the handler validates the backend/provider/token and computes both the replacement
+source manifest and normalized backend catalog. Backend-catalog replacement, source bind, and this
+combined update share one server-side catalog mutation lock. The handler writes the source manifest
+and backend catalog as a compensated local transaction: if the second owner-only atomic write fails,
+it restores the first durable preimage, drops the attempted generation, and returns an error rather
+than reporting a connection whose model-sync state is split. Only after both writes succeed does it
+install/announce the new generation. Ordinary bind callers that omit the flag retain the existing
+source-only write path.
+
 ## 3. Interfaces & data shapes
 
 `config-sources.json` version 1 stores one binding per backend: provider/root/profile/mode, claims,

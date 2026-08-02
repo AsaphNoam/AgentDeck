@@ -1,6 +1,6 @@
 # TS-03 — HTTP, SSE & WebSocket API
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/server`, `ui/src/api`
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) API sections and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -164,6 +164,18 @@ error and the client renders Core while Settings surfaces that query error. No a
 SSE event, cache-control rule, or skin-content response is added. The TypeScript schema accepts
 unknown read strings long enough to fall back safely, recognizes only the two warning codes, and the
 Go/frontend/manifest supported-id sets have a lockstep regression (R11).
+
+**R22** `(planned)` — Configuration-source routes describe backend-global bindings. `GET
+/api/config-sources` has no required project query and returns candidates/bindings for the global
+surface; `project` becomes optional on preview/refresh/delete, where omission means user-level
+preview or refresh. `PUT /api/config-sources/{backend_id}` adds optional
+`enable_model_sync:boolean`; the normal Settings connection sends `true`, while existing preview,
+override, and compatibility callers retain their current bytes and behavior when it is omitted.
+On a successful enabled bind, the response adds non-secret `model_sync_enabled:true` and
+`models_added:<non-negative integer>` alongside the binding view; the `GET /api/backends` refetch
+is the authoritative resulting catalog. The request/response schemas, mocks, query keys, and source
+SSE invalidation change in lockstep under R11/R13. All routes remain under the existing `localOnly`
+guard; no new endpoint or provider credential transport is introduced.
 
 ## 3. Interfaces & data shapes
 
