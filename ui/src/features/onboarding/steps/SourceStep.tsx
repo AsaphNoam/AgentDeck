@@ -2,8 +2,6 @@ import { ConfigSourcePanel } from "../../settings/ConfigSourcePanel";
 import type { BackendType } from "../../../schemas/backends";
 
 interface SourceStepProps {
-  // The project just created in the previous step; federation is project-scoped.
-  project?: string;
   // The backend chosen in the Backend step, so this step links the RIGHT provider
   // (Claude vs Codex) instead of always assuming Claude.
   backendId: string;
@@ -21,7 +19,7 @@ const FEDERATED: Partial<Record<BackendType, true>> = { "claude-acp": true, "cod
 // Claude Code / Codex configuration up front, but linking can equally be done
 // later in Settings, so the step is always skippable. It reuses the same
 // ConfigSourcePanel as Settings so there is one federation UI, not two.
-export function SourceStep({ project, backendId, backendType, onDone, claimMutation, releaseMutation }: SourceStepProps) {
+export function SourceStep({ backendId, backendType, onDone, claimMutation, releaseMutation }: SourceStepProps) {
   const federated = !!FEDERATED[backendType];
   const handleContinue = () => {
     if (claimMutation && !claimMutation()) return;
@@ -41,7 +39,6 @@ export function SourceStep({ project, backendId, backendType, onDone, claimMutat
           <ConfigSourcePanel
             backendId={backendId}
             backendType={backendType}
-            initialProjectId={project}
             defaultOpen
             claimMutation={claimMutation}
             releaseMutation={releaseMutation}

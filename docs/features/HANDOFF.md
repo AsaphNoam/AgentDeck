@@ -7,7 +7,28 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** Agent effort selection is implemented: models can declare provider-native levels and a
+- **State:** Simple backend creation and global configuration linking is implemented. **Add backend**
+  is now a provider-first dialog: choosing a type supplies a matching editable name and the canonical
+  starter model, and submitting uses the new item-scoped `POST /api/backends`, which adds exactly one
+  backend to the durable catalog without submitting, replacing, or discarding the browser's unsaved
+  whole-catalog Settings draft. Claude/Codex creation also offers **Create and use my configuration**,
+  which makes the backend durable first and then performs the normal project-free Linked connection;
+  a failed connection leaves the valid backend saved, unbound, and retryable. The Settings/onboarding
+  source panel replaced its project selector, discover step, and Linked/Mirrored choice with one
+  **Use my … configuration** action; `project` is optional on the config-source GET/preview/refresh
+  routes, and an `enable_model_sync` bind turns on continuing sync and immediately runs that
+  provider's add-only import into the target backend only. Persistence is catalog-first then manifest
+  with preimage restoration, the generation and SSE publish only after both writes, and one shared
+  `catalogMu` serializes the full-document save, the item create, and the enabled-bind merge (the
+  concurrency regression loses seven of eight entries without it). Catalog read-modify-writes now
+  refuse an unreadable `backends.json` instead of overwriting it with the seed, and the Claude/Codex
+  resolvers no longer treat an absent project as the server process's working directory. FS-04.R40/A20,
+  FS-08.R34/A11, FS-09.R47/A20, TS-03.R22/R23, and TS-07.R16/R17/R18 shipped; FS-08.R23 is superseded
+  and FS-04/TS-03 moved Partial→Current. `make check-specs`, both Go test modes, focused `-race` on the
+  catalog lock, all 214 UI tests, presentation/style checks, source build, and the distribution build
+  pass. No real-browser pass was run for this change; component coverage stands in for it, so the
+  browser create/connect/retry/launch journey remains for usability review.
+- **Previous state:** Agent effort selection is implemented: models can declare provider-native levels and a
   default, launch/CLI/switch/resume/pipeline flows preserve the resolved level, and Claude/Codex
   delivery is adapter-specific. Live-provider honoring remains a credentialed acceptance gate.
   Sky & Grove is implemented as AgentDeck's first optional built-in appearance and its visual
@@ -111,15 +132,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Active change
 
-**State:** in progress — Simple backend creation and global configuration linking
-(`../ready-changes/simple-backend-creation-and-global-source-linking.md`).
+**State:** none
 
-**Next step:** ship the config-package seams (canonical per-type starter backend, target-scoped
-add-only model import, project-free Codex resolution), then the server routes (item-scoped
-`POST /api/backends`, optional `project` on preview/refresh, `enable_model_sync` on bind with the
-catalog-first best-effort persistence and shared catalog lock), then the UI (Add backend dialog and
-the one-action **Use my … configuration** panel), flipping the `(planned)` tags on FS-04.R40/A20,
-FS-08.R34/A11, FS-09.R47/A20, TS-03.R22/R23, and TS-07.R16/R17/R18 as each ships.
+No implementation change is active. Do not select a waiting change without the human naming it.
 
 ## Decisions needing your input
 
@@ -202,6 +217,26 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-02 — Implemented simple backend creation and global configuration linking
+  (FS-04.R40/A20; FS-08.R2/R3/R23/R33/R34/A11; FS-09.R47/A20; TS-03.R22/R23; TS-07.R16/R17/R18;
+  **INV §1/§2/§7/§8/§11/§13/§15**). Add backend became a provider-first dialog over a new
+  item-scoped `POST /api/backends` that builds the type's canonical starter from the same authority
+  as fresh-home seeding and never accepts the whole-catalog draft; an empty catalog makes the new
+  entry default, an id reused with a different name/type is `backend_exists`, and an exact replay is
+  idempotent even after an earlier connection added models. `connect_native_configuration:true` and
+  the panel's single **Use my … configuration** action share one server bind seam that does an
+  auto-root, user-level, Linked preview plus an `enable_model_sync` bind: it enables sync on the
+  target backend only, runs that provider's existing add-only reader, writes the merged catalog
+  before the manifest, restores the catalog preimage on a returned manifest error, and installs the
+  generation/SSE only after both writes. Three latent defects were fixed along the way: the Claude
+  and Codex resolvers canonicalized an absent project to the server's own working directory (reading
+  and approving an unrelated tree), catalog read-modify-writes fell back to the seeded document on a
+  corrupt `backends.json`, and the Settings editor re-seeded its draft on every background refetch.
+  The two resolver regressions and the eight-way concurrent-create regression were each verified to
+  fail against the previous code. FS-08.R23 is superseded by R34; FS-04 and TS-03 moved
+  Partial→Current. `make check-specs`, both Go test modes, focused `-race`, all 214 UI tests,
+  presentation/style checks, source build, and `make dist` pass. No real-browser pass was run.
 
 - 2026-08-01 — Revised the simple-backend/global-source design after the human resolved every review
   decision; no product code changed. The global project-free flow is included and the shipped

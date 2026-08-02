@@ -126,4 +126,146 @@ describe("BackendsEditor", () => {
     const values = Array.from(typeSelect.options).map((o) => o.value);
     expect(values).toEqual(["claude-acp", "codex-acp", "opencode-acp", "openhands-acp"]);
   });
+
+  // ---- Add backend dialog (FS-04.A20 / R40) ----
+
+  const codexStarter = {
+    name: "Codex / OpenAI",
+    type: "codex-acp",
+    default: false,
+    default_model: "gpt-5.6-sol",
+    models: { "gpt-5.6-sol": { name: "GPT-5.6-Sol", model: "gpt-5.6-sol" } },
+  };
+
+  async function openAddDialog() {
+    renderWithQuery(<BackendsEditor />);
+    await screen.findByDisplayValue("Claude");
+    fireEvent.click(screen.getByText("Add backend"));
+    return screen.findByLabelText("Provider");
+  }
+
+  it("suggests the chosen provider's name and creates only that backend", async () => {
+    let created: { backend_id: string; name: string; type: string; connect_native_configuration?: boolean } | null = null;
+    server.use(
+      http.post("/api/backends", async ({ request }) => {
+        created = (await request.json()) as typeof created;
+        return HttpResponse.json({ backend_id: "codex-openai", backend: codexStarter }, { status: 201 });
+      }),
+    );
+
+    const providerSelect = (await openAddDialog()) as HTMLSelectElement;
+    // A Claude default gives a Claude name; choosing Codex re-suggests Codex.
+    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("Claude");
+    fireEvent.change(providerSelect, { target: { value: "codex-acp" } });
+    await waitFor(() => expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("Codex / OpenAI"));
+
+    fireEvent.click(screen.getByText("Create backend"));
+    await waitFor(() => expect(created).not.toBeNull());
+    expect(created!).toMatchObject({ name: "Codex / OpenAI", type: "codex-acp", connect_native_configuration: false });
+
+    // The created card is merged in with its usable starter model, and the
+    // existing backend is still there.
+    expect(await screen.findByDisplayValue("Codex / OpenAI")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("gpt-5.6-sol")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Claude")).toBeInTheDocument();
+  });
+
+  // The whole-catalog draft is browser-local: creating one backend must not
+  // submit, save, or discard an unrelated unsaved edit.
+  it("preserves an unrelated dirty draft across a create", async () => {
+    server.use(
+      http.post("/api/backends", () =>
+        HttpResponse.json({ backend_id: "codex-openai", backend: codexStarter }, { status: 201 }),
+      ),
+    );
+    renderWithQuery(<BackendsEditor />);
+    const nameInput = (await screen.findByDisplayValue("Claude")) as HTMLInputElement;
+    fireEvent.change(nameInput, { target: { value: "Renamed but unsaved" } });
+
+    fireEvent.click(screen.getByText("Add backend"));
+    await screen.findByLabelText("Provider");
+    fireEvent.click(screen.getByText("Create backend"));
+
+    expect(await screen.findByDisplayValue("Codex / OpenAI")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Renamed but unsaved")).toBeInTheDocument();
+  });
+
+  it("keeps the dialog open with the server message when creation fails", async () => {
+    server.use(
+      http.post("/api/backends", () =>
+        HttpResponse.json({ errors: [{ field: "backend_id", message: "backend id must be a slug" }] }, { status: 400 }),
+      ),
+    );
+    await openAddDialog();
+    fireEvent.click(screen.getByText("Create backend"));
+
+    expect(await screen.findByText(/backend id must be a slug/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Provider")).toBeInTheDocument();
+  });
+
+  // FS-04.A20: create-and-connect returns a connected backend; a connection
+  // failure still leaves it saved, visible, and retryable.
+  it("reports a connected create and a saved-but-unbound failure", async () => {
+    server.use(
+      http.post("/api/backends", async ({ request }) => {
+        const body = (await request.json()) as { name: string };
+        return HttpResponse.json(
+          {
+            backend_id: "codex-openai",
+            backend: { ...codexStarter, name: body.name },
+            connection: { status: "connected", model_sync_enabled: true, models_added: 4 },
+          },
+          { status: 201 },
+        );
+      }),
+    );
+    const providerSelect = (await openAddDialog()) as HTMLSelectElement;
+    fireEvent.change(providerSelect, { target: { value: "codex-acp" } });
+    fireEvent.click(screen.getByText("Create and use my configuration"));
+
+    expect(await screen.findByText(/imported 4 configured models/)).toBeInTheDocument();
+    expect(screen.getByText(/not a check of availability or entitlement/)).toBeInTheDocument();
+
+    cleanup();
+    server.use(
+      http.post("/api/backends", () =>
+        HttpResponse.json(
+          {
+            backend_id: "codex-openai",
+            backend: codexStarter,
+            connection: { status: "unbound", error: { code: "source_not_found", message: "no native configuration found" } },
+          },
+          { status: 201 },
+        ),
+      ),
+    );
+    const retrySelect = (await openAddDialog()) as HTMLSelectElement;
+    fireEvent.change(retrySelect, { target: { value: "codex-acp" } });
+    fireEvent.click(screen.getByText("Create and use my configuration"));
+
+    expect(await screen.findByText(/is not connected: no native configuration found/)).toBeInTheDocument();
+    // The valid backend is still created and rendered so the person can retry.
+    expect(screen.getByDisplayValue("Codex / OpenAI")).toBeInTheDocument();
+  });
+
+  it("only offers native configuration for federated providers", async () => {
+    const providerSelect = (await openAddDialog()) as HTMLSelectElement;
+    expect(screen.getByText("Create and use my configuration")).toBeInTheDocument();
+
+    fireEvent.change(providerSelect, { target: { value: "opencode-acp" } });
+    await waitFor(() =>
+      expect(screen.queryByText("Create and use my configuration")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("changes nothing when the dialog is cancelled", async () => {
+    let posts = 0;
+    server.use(http.post("/api/backends", () => { posts += 1; return HttpResponse.json({}, { status: 201 }); }));
+    await openAddDialog();
+    fireEvent.click(screen.getByText("Cancel"));
+
+    await waitFor(() => expect(screen.queryByLabelText("Provider")).not.toBeInTheDocument());
+    expect(posts).toBe(0);
+    expect(screen.getByDisplayValue("Claude")).toBeInTheDocument();
+  });
 });

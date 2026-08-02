@@ -23,14 +23,16 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
 - **R1** — Only a backend whose type is `claude-acp` or `codex-acp` can have a configuration-source
   binding. Their provider ids are respectively `claude-code` and `codex`; a provider/backend
   mismatch is rejected rather than coerced.
-- **R2** — `GET /api/config-sources?project=<id>` returns redacted discovery candidates and active
-  bindings for the selected project. Standard discovery examines `~/.claude/settings.json` for
-  Claude and `${CODEX_HOME:-~/.codex}/config.toml` for Codex. Discovery alone grants no read
-  authority and persists nothing.
-- **R3** — `POST /api/config-sources/preview` accepts a provider, project, mode, optional claims, and either
-  `root:"auto"` or an explicit root. It resolves read-only and returns an effective view, a report,
-  and an opaque preview token expiring after ten minutes. The supported claims are
-  `launch_defaults`, `model_catalog`, and `setup`.
+- **R2** — `GET /api/config-sources` returns redacted discovery candidates and active bindings.
+  `project` is optional: omitted it describes the backend-global surface, and an explicit
+  `?project=<id>` retains the project-scoped view. Standard discovery examines
+  `~/.claude/settings.json` for Claude and `${CODEX_HOME:-~/.codex}/config.toml` for Codex.
+  Discovery alone grants no read authority and persists nothing.
+- **R3** — `POST /api/config-sources/preview` accepts a provider, mode, optional claims, an optional
+  project, and either `root:"auto"` or an explicit root. It resolves read-only and returns an
+  effective view, a report, and an opaque preview token expiring after ten minutes. An omitted
+  project resolves only the provider's user-level source; the resulting binding is backend-global
+  either way. The supported claims are `launch_defaults`, `model_catalog`, and `setup`.
 - **R4** — A preview report contains paths/scopes/kinds read, skipped paths with reasons, unknown
   key names classified as native pass-through, fingerprints, approved roots, warnings, and a
   source digest. The effective view may contain model, fallback model, effort, verbosity, provider,
@@ -121,11 +123,12 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
 
 - **R33** — Saving the complete backend catalog removes any configuration-source binding whose
   backend was removed or no longer supports that binding's provider, and drops its derived
-  generations. Settings does not offer discovery or linking for a newly added backend until the
-  backend catalog save makes its id durable. These rules prevent a draft id or orphaned binding
-  from blocking later source links.
+  generations. Settings does not offer source-link actions for a backend whose id is still a local
+  draft; a backend added through TS-03.R23's item-scoped create is durable on creation and therefore
+  offers them immediately. These rules prevent a draft id or orphaned binding from blocking later
+  source links.
 
-- **R34** `(planned)` — The normal Claude/Codex native-configuration path supersedes R23's
+- **R34** — The normal Claude/Codex native-configuration path supersedes R23's
   project-selected Settings interaction with one explicit **Use my Claude Code configuration** or
   **Use my Codex configuration** action. For an existing compatible backend, the action performs
   standard auto-discovery, read-only preview/consent, and a `linked` bind as one visible operation.
@@ -144,19 +147,19 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
   Linked only: it never presents `mirrored` as recovery because that mode uses the same source
   resolution and only adds a post-success cache. Existing mirrored bindings continue to render and
   explicit mode-accepting API callers remain compatible under R8. Detached import remains unavailable
-  under R9. R34 supersedes R23's normal Settings interaction only when it ships; R23 continues to
-  describe the current UI until then.
+  under R9. R34 has shipped and now supersedes R23's normal Settings interaction.
 
 ### User experience
 
 - **R22** — First-run onboarding contains an optional, always-skippable source step after project
   creation. It reuses the Settings source panel for the backend selected earlier. OpenCode and
   OpenHands show an explanation and continue without federation controls.
-- **R23** — Settings exposes federation only for Claude/Codex backends. The user selects a project,
-  discovers and previews native setup, then binds Linked (recommended) or Mirrored
-  (compatibility). A bound source shows mode, root, health/staleness, model/effort provenance,
-  configured models with a “not an entitlement check” note, setup inventory, override controls,
-  refresh/load-effective-view, and unlink.
+- **R23 — superseded 2026-08-02 by R34:** Settings previously exposed a project selector, an
+  explicit discover/preview step, and a Linked-or-Mirrored choice. R34's single connection action
+  replaces that interaction. The bound-source presentation this item describes is unchanged and
+  still current: mode, root, health/staleness, model/effort provenance, configured models with a
+  “not an entitlement check” note, setup inventory, override controls, refresh/load-effective-view,
+  and unlink. Federation remains exposed only for Claude/Codex backends.
 - **R24** — The UI renders paths, field names, scope, status, and configured environment-key names,
   but never renders source contents or secret values. A stale/invalid/approval-required source
   shows a repair message offering refresh after correction or unlink.
@@ -233,7 +236,7 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
   actions; a catalog save removes bindings for deleted or provider-retargeted backends while
   preserving compatible bindings. *Verify by* `ConfigSourcePanel.test.tsx` and
   `TestPutBackendsPrunesRemovedOrRetargetedSourceBindings`.
-- **A11** `(planned)` (R34, FS-04.R40, FS-09.R47) — With no projects or default project configured,
+- **A11** (R34, FS-04.R40, FS-09.R47) — With no projects or default project configured,
   a saved Claude or Codex backend connects through one read-only, project-free Linked action and a
   new one can do the same through **Create and use my configuration**. Success exposes one global
   binding, enables sync, immediately imports only into the target backend, and invalidates/refetches

@@ -1,9 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useBackends, usePutBackends, configErrorMessage } from "../../api/config";
-import type { BackendsConfig, Backend, Model, CredResult } from "../../schemas/backends";
+import type {
+  BackendsConfig,
+  Backend,
+  Model,
+  CredResult,
+  CreateBackendResponse,
+} from "../../schemas/backends";
 import { BACKEND_TYPE_LABELS, BACKEND_TYPE_OPTIONS } from "../../lib/backendTypes";
 import { ModelRow } from "./ModelRow";
 import { ConfigSourcePanel } from "./ConfigSourcePanel";
+import { AddBackendDialog } from "./AddBackendDialog";
 
 type Pair = { key: string; value: string };
 
@@ -111,7 +118,7 @@ function credChip(result: CredResult) {
 }
 
 export function BackendsEditor() {
-  const { data, isLoading } = useBackends();
+  const { data, isLoading, refetch } = useBackends();
   const putBackends = usePutBackends();
 
   const [entries, setEntries] = useState<BackendEntry[]>([]);
@@ -119,15 +126,25 @@ export function BackendsEditor() {
   const [savedBackendIds, setSavedBackendIds] = useState<Set<string>>(new Set());
   const [credentials, setCredentials] = useState<Record<string, CredResult>>({});
   const [error, setError] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  // Initialize draft from query data (once on load; also after successful save).
-  useEffect(() => {
-    if (!data) return;
-    const es = backendEntries(data);
+  const seedDraft = (cfg: BackendsConfig) => {
+    const es = backendEntries(cfg);
     setEntries(es);
-    setSavedBackendIds(new Set(Object.keys(data.backends ?? {})));
-    const def = es.find((e) => e.backend.default)?.id ?? es[0]?.id ?? "";
-    setDefaultId(def);
+    setSavedBackendIds(new Set(Object.keys(cfg.backends ?? {})));
+    setDefaultId(es.find((e) => e.backend.default)?.id ?? es[0]?.id ?? "");
+  };
+
+  // Seed the draft from the server exactly once. Re-seeding on every query
+  // change would let a background refetch — including the one an item create or
+  // a source connection triggers — silently discard unrelated unsaved edits
+  // (FS-04.R40). Save and create merge their own results explicitly.
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (!data || seeded.current) return;
+    seeded.current = true;
+    seedDraft(data);
   }, [data]);
 
   const updateEntry = (id: string, patch: Partial<BackendEntry>) => {
@@ -140,20 +157,52 @@ export function BackendsEditor() {
     );
   };
 
-  const addBackend = () => {
-    const id = `backend-${Date.now()}`;
-    const newBackend: Backend = {
-      name: "New backend",
-      type: "claude-acp",
-      default: entries.length === 0,
-      default_model: "default",
-      models: {
-        default: { name: "Default", model: "" },
-      },
-    };
-    const newEntry: BackendEntry = { id, backend: newBackend, envPairs: [] };
-    setEntries((prev) => [...prev, newEntry]);
-    if (entries.length === 0) setDefaultId(id);
+  // mergeBackend inserts or replaces exactly one entry, leaving every other
+  // unsaved edit in the draft untouched.
+  const mergeBackend = (id: string, backend: Backend) => {
+    setEntries((prev) => {
+      const entry: BackendEntry = { id, backend, envPairs: toPairs(backend.env) };
+      const at = prev.findIndex((e) => e.id === id);
+      if (at === -1) return [...prev, entry];
+      const next = [...prev];
+      next[at] = entry;
+      return next;
+    });
+    setSavedBackendIds((prev) => new Set(prev).add(id));
+    if (backend.default) setDefaultId(id);
+  };
+
+  const handleCreated = (
+    id: string,
+    backend: Backend,
+    connection: CreateBackendResponse["connection"],
+  ) => {
+    setError(null);
+    mergeBackend(id, backend);
+    setAddOpen(false);
+    if (!connection) {
+      setNotice(null);
+    } else if (connection.status === "connected") {
+      const added = connection.models_added ?? 0;
+      setNotice(
+        `Connected ${backend.name} to your native configuration` +
+          (added > 0 ? ` and imported ${added} configured model${added === 1 ? "" : "s"}.` : ".") +
+          " Imported models are what your configuration names, not a check of availability or entitlement.",
+      );
+    } else {
+      setNotice(
+        `${backend.name} was created but is not connected: ${connection.error?.message ?? "the connection failed"}.` +
+          " Use its Configuration source panel to try again.",
+      );
+    }
+  };
+
+  // syncBackendFromServer refreshes one card from the authoritative catalog after
+  // a connection imported models into it, without re-seeding the whole draft.
+  const syncBackendFromServer = async (id: string) => {
+    const fresh = await refetch();
+    const backend = fresh.data?.backends?.[id];
+    if (backend) mergeBackend(id, backend);
   };
 
   const removeBackend = (id: string) => {
@@ -170,12 +219,7 @@ export function BackendsEditor() {
     putBackends.mutate(config, {
       onSuccess: (resp) => {
         setCredentials(resp.credentials ?? {});
-        // Re-sync draft from normalized response.
-        const es = backendEntries(resp);
-        setEntries(es);
-        setSavedBackendIds(new Set(Object.keys(resp.backends ?? {})));
-        const def = es.find((e) => e.backend.default)?.id ?? es[0]?.id ?? "";
-        setDefaultId(def);
+        seedDraft(resp); // re-sync the draft from the normalized response
       },
       onError: (e) => setError(configErrorMessage(e)),
     });
@@ -187,8 +231,17 @@ export function BackendsEditor() {
     <div className="config-editor backends-editor" data-ui="config-editor" data-state={error ? "error" : entries.length === 0 ? "empty" : undefined} data-variant="backends">
       <div className="config-editor-header" data-slot="header">
         <h2>Backends</h2>
-        <button type="button" onClick={addBackend}>Add backend</button>
+        <button type="button" onClick={() => setAddOpen(true)}>Add backend</button>
       </div>
+
+      <AddBackendDialog
+        open={addOpen}
+        existingIds={entries.map((e) => e.id)}
+        onCancel={() => setAddOpen(false)}
+        onCreated={handleCreated}
+      />
+
+      {notice && <p className="config-notice" role="status">{notice}</p>}
 
       {entries.length === 0 && (
         <p className="config-empty">No backends configured. Add one to get started.</p>
@@ -260,7 +313,12 @@ export function BackendsEditor() {
           )}
 
           {(backend.type === "claude-acp" || backend.type === "codex-acp") && (
-            <ConfigSourcePanel backendId={id} backendType={backend.type} persisted={savedBackendIds.has(id)} />
+            <ConfigSourcePanel
+              backendId={id}
+              backendType={backend.type}
+              persisted={savedBackendIds.has(id)}
+              onConnected={() => void syncBackendFromServer(id)}
+            />
           )}
 
           <div className="backend-models-section">

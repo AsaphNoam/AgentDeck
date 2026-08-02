@@ -83,7 +83,7 @@ provider no longer matches the backend type, then drops their manager generation
 draft is not a backend identity and cannot enter the bind route; that rejection precedes preview
 token consumption. Compatible bindings are retained.
 
-**R16** `(planned)` — Ordinary source connection retains the existing preview-token/bind protocol,
+**R16** — Ordinary source connection retains the existing preview-token/bind protocol,
 composed server-side for TS-03.R23 and client-side for an already persisted backend: a standard
 auto-root `linked` preview with no project followed immediately by its matching bind. An omitted
 project resolves only the provider's user-level source during connection; the persisted binding
@@ -95,7 +95,7 @@ accepted by existing API callers and persisted bindings for compatibility, but t
 not offer it or present it as recovery for failed `linked` discovery/resolution/bind because it uses
 the same resolver and only adds a post-success disposable cache.
 
-**R17** `(planned)` — An enabled bind (`enable_model_sync:true`) is the sole source-connection seam
+**R17** — An enabled bind (`enable_model_sync:true`) is the sole source-connection seam
 that turns on the target backend's `AutoSyncModels` flag and performs its immediate provider-specific
 add-only import. It reuses the existing Codex/Claude local readers and merge rules rather than
 parsing native model files in the handler: Codex includes declared reasoning metadata, Claude
@@ -121,7 +121,7 @@ TS-03.R23, the rollback preimage is taken after the new valid backend was create
 failure never deletes that backend. Ordinary callers omitting the flag retain the existing
 source-only path.
 
-**R18** `(planned)` — TS-03.R23's item-scoped create is the sole exception to R15's Settings-draft
+**R18** — TS-03.R23's item-scoped create is the sole exception to R15's Settings-draft
 boundary. The server validates and persists exactly one backend before initiating its optional
 connection, without submitting, merging, or replacing the browser-local whole-catalog draft. The
 item-create orchestration and full-catalog replacement share R17's mutation lock, so neither can
@@ -169,9 +169,12 @@ does not require project. It never carries source content.
 - Store/manager/watch: `internal/config/sources.go`, `internal/configsource/manager.go`, `watch.go`.
 - Resolvers/redaction: `internal/configsource/claude.go`, `codex.go`, `types.go`, `security.go`.
 - Server/composition: `internal/server/config_sources.go`, `launch.go`, `resume.go`, `switch.go`.
-- Planned item create/enabled-bind regression anchors: `internal/server/config_handlers_test.go` and
-  `config_sources_test.go` cover idempotent create, catalog/source failure and residue, target-only
-  merge, lock serialization, retry convergence, and post-commit-only generation/SSE.
+- Item create/enabled bind: `internal/server/backend_create.go` (`createBackend`,
+  `connectNativeConfiguration`) and `config_sources.go` (`bindConfigSource`, `persistBinding`,
+  `restoreCatalog`, `readBackendsForWrite`); the shared catalog lock is `Server.catalogMu`.
+  `internal/server/backend_create_test.go` covers idempotent create, catalog/source failure and
+  residue, target-only merge, lock serialization, retry convergence, project-free connection, and
+  mirrored compatibility.
 - UI: `ui/src/features/settings/ConfigSourcePanel.tsx`, onboarding `SourceStep.tsx`.
 - Regression anchors: `TestHydrateBindingsPopulatesGenerations`, provider resolver precedence/
   symlink/redaction tests, `TestComposeLaunchFreezesFederationConfig`, UI mirrored-token and override

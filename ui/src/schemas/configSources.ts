@@ -102,6 +102,14 @@ export const bindingViewSchema = z.object({
 });
 export type BindingView = z.infer<typeof bindingViewSchema>;
 
+// Bind adds the non-secret model-sync outcome when the caller enabled it
+// (TS-03.R22); an ordinary compatibility bind omits both fields.
+export const bindResponseSchema = bindingViewSchema.extend({
+  model_sync_enabled: z.boolean().optional(),
+  models_added: z.number().optional(),
+});
+export type BindResponse = z.infer<typeof bindResponseSchema>;
+
 export const configSourcesResponseSchema = z.object({
   bindings: z.array(bindingViewSchema).nullable().default([]),
   candidates: z.array(candidateSchema).nullable().default([]),
