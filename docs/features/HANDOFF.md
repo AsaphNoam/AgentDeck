@@ -7,7 +7,16 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** Simple backend creation and global configuration linking is implemented. **Add backend**
+- **State:** Claude ACP startup hardening is implemented. The original 2026-08-10
+  `initialize: runtime: transport closed` cause cannot be recovered because startup stderr was
+  discarded, but the exact pinned 0.59.0 adapter now passes local ACP v1 initialize/session creation
+  and an authenticated one-word streamed turn on this machine. Every ACP initialize/load/new call is
+  capped at 30 seconds; early Claude exits map captured stderr to bounded resource, nested-launch,
+  authentication, or runtime guidance without returning raw output, and launch/resume share fake-ACP
+  exit/timeout regressions plus a focused race pass. FS-09.R48/A21 and TS-04.R22 shipped; TS-04.R10
+  was split so optional-integration probing remains planned as R23. Shared checks, both Go test modes,
+  source/UI builds, presentation checks, and the distribution build pass. Simple backend creation and
+  global configuration linking is implemented. **Add backend**
   is now a provider-first dialog: choosing a type supplies a matching editable name and the canonical
   starter model, and submitting uses the new item-scoped `POST /api/backends`, which adds exactly one
   backend to the durable catalog without submitting, replacing, or discarding the browser's unsaved
@@ -173,6 +182,15 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-14 — Fixed the reported opaque Claude ACP startup boundary (FS-09.R48/A21,
+  TS-04.R22/R23, INV §9/§12). Initialize, session load, and session new now have a shared 30-second
+  per-stage deadline on launch and resume. A pre-registration Claude exit is classified from the
+  captured stderr into a fixed safe recovery vocabulary, so raw stderr and the generic
+  `transport closed` sentinel no longer reach the API; timeout and exit both terminate without a
+  live handle. Fake-ACP exit/timeout regressions and a focused race pass succeed. The pinned
+  `claude-agent-acp` 0.59.0 completed local initialize/session creation and an authenticated streamed
+  one-word turn. `make check-specs`, both Go test modes, `make build`, and `make dist` pass.
 
 - 2026-08-11 — Implemented two chat usability items (FS-03.R28/R29/A13/A14). The transcript now shows
   a waiting indicator at its end while the open chat agent is `busy`, clearing on turn end, error, or

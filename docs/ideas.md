@@ -30,8 +30,6 @@ Example:
 
 ### From play session 2026-08-10
 
-- **Bug: can't use Claude.** Runtime error `initialize:runtime:transport closed` when starting a
-  Claude agent. Needs diagnosis of the ACP transport handshake.
 - **Crash protection for bad projects.** AgentDeck created invalid projects that broke the process.
   Add input validation on project creation and guard the process against malformed project state.
 - **Response spinner.** Show a spinner/indicator while waiting for an agent response, so it's clear

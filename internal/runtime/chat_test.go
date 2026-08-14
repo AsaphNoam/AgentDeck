@@ -603,6 +603,52 @@ func TestStartProtocolVersionMismatch(t *testing.T) {
 	}
 }
 
+func TestStartClaudeInitializeExitReturnsSafeGuidance(t *testing.T) {
+	c, spec := newChatTest(t, "stream_text")
+	spec.Env = append(spec.Env, "FAKEACP_INIT_STDERR=EMFILE: too many open files at /private/account/token-secret")
+
+	_, err := c.Start(context.Background(), spec)
+	if err == nil {
+		t.Fatal("Start should fail when the adapter exits during initialize")
+	}
+	message := err.Error()
+	for _, want := range []string{"Claude initialize failed", "could not open required files"} {
+		if !strings.Contains(message, want) {
+			t.Fatalf("error = %q, want %q", message, want)
+		}
+	}
+	for _, leaked := range []string{"transport closed", "token-secret", "/private/account"} {
+		if strings.Contains(message, leaked) {
+			t.Fatalf("error = %q, leaked %q", message, leaked)
+		}
+	}
+	if _, lookupErr := c.lookup(spec.Agent.AgentID); !errors.Is(lookupErr, ErrNoHandle) {
+		t.Fatalf("lookup after failed startup = %v, want ErrNoHandle", lookupErr)
+	}
+}
+
+func TestResumeClaudeInitializeTimeoutIsBounded(t *testing.T) {
+	c, spec := newChatTest(t, "stream_text")
+	c.startupCallTimeout = 50 * time.Millisecond
+	spec.Env = append(spec.Env, "FAKEACP_INIT_HANG=1")
+
+	started := time.Now()
+	_, err := c.Resume(context.Background(), spec, "prior-session-id")
+	if err == nil {
+		t.Fatal("Resume should fail when initialize never answers")
+	}
+	if elapsed := time.Since(started); elapsed > 2*time.Second {
+		t.Fatalf("Resume returned after %s, want bounded startup", elapsed)
+	}
+	message := err.Error()
+	if !strings.Contains(message, "Claude initialize timed out") {
+		t.Fatalf("error = %q, want Claude initialize timeout guidance", message)
+	}
+	if _, lookupErr := c.lookup(spec.Agent.AgentID); !errors.Is(lookupErr, ErrNoHandle) {
+		t.Fatalf("lookup after failed resume = %v, want ErrNoHandle", lookupErr)
+	}
+}
+
 // TestResumeSessionLoadAppliesMCP guards the BLOCKING finding that a successful
 // session/load resume must still carry the freshly-minted MCP registration that
 // Phase 5 messaging depends on — not only the session/new fallback path.

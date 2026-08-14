@@ -4,6 +4,21 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-14 — Fix: Claude ACP startup failures
+
+Claude works through AgentDeck's exact pinned adapter on this machine: startup completed and an
+authenticated one-word streamed turn passed. The original play-session failure cannot be recovered
+because AgentDeck discarded the adapter's startup diagnostics, so that blind spot is now fixed.
+Claude launch and resume have a 30-second limit for each startup stage, and an adapter exit reports
+safe guidance for resource exhaustion, nested launch, authentication, or runtime problems instead
+of the opaque `transport closed` message or raw provider output.
+
+**Needs attention:** The historical failure's exact cause remains unknown, and the broader live
+Claude resume, permissions, and messaging checks are still separate acceptance gates.
+
+**Next:** Launch a Claude agent normally. If the environment-specific problem returns, the new error
+will identify the failed stage and recovery path instead of hiding the cause.
+
 ### 2026-08-11 — Implementation: chat spinner and selectable messages
 
 Two of your play-session items are done. The chat now shows a small "Working…" spinner at the bottom

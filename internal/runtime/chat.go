@@ -27,6 +27,12 @@ const stopGrace = 5 * time.Second
 // before escalating to SIGINT on the process group (techspec §8.4).
 const defaultCancelGrace = 3 * time.Second
 
+// defaultStartupCallTimeout bounds each ACP handshake request independently.
+// The pinned Claude adapter has historically taken about 15 seconds to create a
+// session, so 30 seconds leaves headroom without letting a wedged child hold an
+// HTTP launch forever (TS-04.R22).
+const defaultStartupCallTimeout = 30 * time.Second
+
 // ChatRuntime drives ACP agents (claude-acp, codex-acp) over the stdio protocol.
 // It owns one agentState per live agent. ALL ACP wire decoding is isolated in
 // acpmap.go; per-backend differences (binary, env strip, resume) live in the
@@ -43,7 +49,8 @@ type ChatRuntime struct {
 	// when the runtime is constructed standalone (tests). See registry.go.
 	onExit func(agentID, generation string)
 
-	cancelGrace time.Duration // Cancel→SIGINT escalation window (§8.4)
+	cancelGrace        time.Duration // Cancel→SIGINT escalation window (§8.4)
+	startupCallTimeout time.Duration // initialize/session load/new deadline (TS-04.R22)
 
 	mu     sync.Mutex
 	agents map[string]*agentState
@@ -60,9 +67,10 @@ type ChatRuntime struct {
 // via SetCommand (or c.command) — e.g. tests pointing at the fake ACP CLI.
 func NewChatRuntime(s *state.Store) *ChatRuntime {
 	return &ChatRuntime{
-		store:       s,
-		agents:      map[string]*agentState{},
-		cancelGrace: defaultCancelGrace,
+		store:              s,
+		agents:             map[string]*agentState{},
+		cancelGrace:        defaultCancelGrace,
+		startupCallTimeout: defaultStartupCallTimeout,
 	}
 }
 
@@ -176,6 +184,7 @@ type agentState struct {
 	hub        *Hub
 	stdin      interface{ Close() error }
 	stderr     *ringBuffer
+	stderrDone chan struct{}
 
 	ctx    context.Context // turn-scoped base context, cancelled on Stop
 	cancel context.CancelFunc
@@ -248,6 +257,7 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 		hub:        NewHub(),
 		stdin:      stdin,
 		stderr:     newRingBuffer(16 * 1024),
+		stderrDone: make(chan struct{}),
 		ctx:        actx,
 		cancel:     acancel,
 		skipPerms:  spec.SkipPerms,
@@ -260,29 +270,30 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 		func(req *IncomingRequest) { c.onRequest(as, req) },
 	)
 
-	go as.stderr.copyFrom(stderr)
+	go func() {
+		as.stderr.copyFrom(stderr)
+		close(as.stderrDone)
+	}()
 	go func() {
 		_ = as.transport.Run(stdout)
 		c.onTransportClosed(as)
 	}()
 
 	// ACP handshake: initialize then session/new (techspec §4.1).
-	initRes, err := as.transport.Call(ctx, "initialize", map[string]any{
+	initRes, err := c.startupCall(ctx, as.transport, "initialize", map[string]any{
 		"protocolVersion":    1,
 		"clientCapabilities": map[string]any{},
 	})
 	if err != nil {
-		as.shutdown()
-		return nil, fmt.Errorf("runtime: initialize: %w", err)
+		return nil, c.startupFailure(as, spec.BackendType, "initialize", err)
 	}
 	if err := checkACPVersion(initRes); err != nil {
 		as.shutdown()
 		return nil, err
 	}
-	newRes, err := as.transport.Call(ctx, "session/new", sessionNewParams(spec))
+	newRes, err := c.startupCall(ctx, as.transport, "session/new", sessionNewParams(spec))
 	if err != nil {
-		as.shutdown()
-		return nil, fmt.Errorf("runtime: session/new: %w", err)
+		return nil, c.startupFailure(as, spec.BackendType, "session/new", err)
 	}
 	var sess struct {
 		SessionID string `json:"sessionId"`
@@ -544,6 +555,7 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 		hub:        NewHub(),
 		stdin:      stdin,
 		stderr:     newRingBuffer(16 * 1024),
+		stderrDone: make(chan struct{}),
 		ctx:        actx,
 		cancel:     acancel,
 		skipPerms:  spec.SkipPerms,
@@ -557,20 +569,22 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 		func(req *IncomingRequest) { c.onRequest(as, req) },
 	)
 
-	go as.stderr.copyFrom(stderr)
+	go func() {
+		as.stderr.copyFrom(stderr)
+		close(as.stderrDone)
+	}()
 	go func() {
 		_ = as.transport.Run(stdout)
 		c.onTransportClosed(as)
 	}()
 
 	// ACP handshake: initialize.
-	initRes, err := as.transport.Call(ctx, "initialize", map[string]any{
+	initRes, err := c.startupCall(ctx, as.transport, "initialize", map[string]any{
 		"protocolVersion":    1,
 		"clientCapabilities": map[string]any{},
 	})
 	if err != nil {
-		as.shutdown()
-		return nil, fmt.Errorf("runtime: initialize: %w", err)
+		return nil, c.startupFailure(as, spec.BackendType, "initialize", err)
 	}
 	if err := checkACPVersion(initRes); err != nil {
 		as.shutdown()
@@ -584,20 +598,21 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 	// messaging MCP server Phase 5 depends on.
 	newSessionID := ""
 	if sessionID != "" {
-		if loadRes, loadErr := as.transport.Call(ctx, "session/load", sessionLoadParams(spec, sessionID)); loadErr == nil {
+		if loadRes, loadErr := c.startupCall(ctx, as.transport, "session/load", sessionLoadParams(spec, sessionID)); loadErr == nil {
 			var loaded struct {
 				SessionID string `json:"sessionId"`
 			}
 			if json.Unmarshal(loadRes, &loaded) == nil && loaded.SessionID != "" {
 				newSessionID = loaded.SessionID
 			}
+		} else if errors.Is(loadErr, context.DeadlineExceeded) || errors.Is(loadErr, errTransportClosed) {
+			return nil, c.startupFailure(as, spec.BackendType, "session/load", loadErr)
 		}
 	}
 	if newSessionID == "" {
-		newRes, err := as.transport.Call(ctx, "session/new", sessionNewParams(spec))
+		newRes, err := c.startupCall(ctx, as.transport, "session/new", sessionNewParams(spec))
 		if err != nil {
-			as.shutdown()
-			return nil, fmt.Errorf("runtime: session/new: %w", err)
+			return nil, c.startupFailure(as, spec.BackendType, "session/new", err)
 		}
 		var sess struct {
 			SessionID string `json:"sessionId"`
@@ -1242,6 +1257,66 @@ func (as *agentState) shutdown() {
 	case <-time.After(stopGrace):
 		_ = syscall.Kill(-as.pgid, syscall.SIGKILL)
 		<-waited
+	}
+}
+
+// startupCall applies the shared per-stage ACP startup bound. A shorter caller
+// deadline still wins through context propagation.
+func (c *ChatRuntime) startupCall(ctx context.Context, transport *Transport, method string, params any) (json.RawMessage, error) {
+	timeout := c.startupCallTimeout
+	if timeout <= 0 {
+		timeout = defaultStartupCallTimeout
+	}
+	callCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	return transport.Call(callCtx, method, params)
+}
+
+// startupFailure terminates the not-yet-registered child and turns transport
+// EOF/timeout plus captured stderr into a bounded, non-secret recovery message.
+// Raw provider stderr must not cross the API boundary (TS-04.R12/R22).
+func (c *ChatRuntime) startupFailure(as *agentState, backendType, stage string, cause error) error {
+	as.shutdown()
+	select {
+	case <-as.stderrDone:
+	case <-time.After(250 * time.Millisecond):
+	}
+
+	provider := backendType
+	if backendType == "claude-acp" {
+		provider = "Claude"
+	}
+	if errors.Is(cause, context.DeadlineExceeded) {
+		return fmt.Errorf("runtime: %s %s timed out; verify the adapter installation and provider authentication, then retry", provider, stage)
+	}
+	if !errors.Is(cause, errTransportClosed) {
+		return fmt.Errorf("runtime: %s: %w", stage, cause)
+	}
+
+	guidance := "the adapter exited before responding; verify the adapter installation and provider authentication, then retry"
+	if backendType == "claude-acp" {
+		guidance = claudeStartupGuidance(as.stderr.Tail())
+	}
+	return fmt.Errorf("runtime: %s %s failed: %s", provider, stage, guidance)
+}
+
+// claudeStartupGuidance deliberately maps stderr to a fixed vocabulary instead
+// of returning any provider-controlled text, paths, account data, or secrets.
+func claudeStartupGuidance(stderr string) string {
+	lower := strings.ToLower(stderr)
+	switch {
+	case strings.Contains(lower, "emfile"), strings.Contains(lower, "too many open files"):
+		return "the adapter could not open required files; close unused agent processes and retry"
+	case strings.Contains(lower, "claudecode"), strings.Contains(lower, "nested session"):
+		return "Claude refused a nested launch; start AgentDeck outside an existing Claude session and retry"
+	case strings.Contains(lower, "not logged in"), strings.Contains(lower, "authentication"),
+		strings.Contains(lower, "unauthorized"), strings.Contains(lower, "auth login"):
+		return "Claude authentication is unavailable; run `agentdeck auth claude` and retry"
+	case strings.Contains(lower, "cannot find module"), strings.Contains(lower, "module not found"),
+		strings.Contains(lower, "unsupported node"), strings.Contains(lower, "syntaxerror"):
+		return "the pinned Claude adapter runtime is incompatible or incomplete; reinstall AgentDeck and retry"
+	default:
+		return "the adapter exited before responding; run `agentdeck auth claude`, verify the pinned adapter installation, and retry"
 	}
 }
 

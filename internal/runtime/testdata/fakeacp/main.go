@@ -84,6 +84,13 @@ func handle(msg *rpcMessage) {
 	}
 	switch msg.Method {
 	case "initialize":
+		if stderr := os.Getenv("FAKEACP_INIT_STDERR"); stderr != "" {
+			_, _ = os.Stderr.WriteString(stderr + "\n")
+			os.Exit(7)
+		}
+		if os.Getenv("FAKEACP_INIT_HANG") != "" {
+			time.Sleep(10 * time.Minute)
+		}
 		ver := 1
 		if v := os.Getenv("FAKEACP_PROTO_VERSION"); v != "" {
 			if n, err := strconv.Atoi(v); err == nil {
