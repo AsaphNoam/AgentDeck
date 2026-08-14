@@ -15,7 +15,12 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   authentication, or runtime guidance without returning raw output, and launch/resume share fake-ACP
   exit/timeout regressions plus a focused race pass. FS-09.R48/A21 and TS-04.R22 shipped; TS-04.R10
   was split so optional-integration probing remains planned as R23. Shared checks, both Go test modes,
-  source/UI builds, presentation checks, and the distribution build pass. Two chat usability items are
+  source/UI builds, presentation checks, and the distribution build pass. Dashboard application logs
+  now append to owner-only `$AGENTDECK_HOME/dashboard.log` for foreground and detached starts;
+  foreground mode also mirrors them to stderr, while detached mode retains one redirected sink.
+  The dashboard logger is the scoped process-wide `slog` default, so package-level diagnostics share
+  its JSON format and level. FS-04.R41/A21 and TS-01.R15 shipped with append, permission, unavailable-
+  path, and no-duplication regressions. Two chat usability items are
   also implemented: the transcript shows a **Working…** indicator at its end while the open chat agent
   is `busy` (clearing on turn end, error, or a permission pause to `waiting_input`), and transcript
   text is selectable/copyable with a distinct `.user-message::selection` colour so a highlight inside
@@ -187,6 +192,15 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-14 — Persisted dashboard application logs for every `dashboard start`, not only detached
+  runs (FS-04.R41/A21, TS-01.R15, TS-05.R7, INV §14). Foreground mode appends JSON records to
+  `$AGENTDECK_HOME/dashboard.log` and mirrors them to stderr; the detached child keeps its existing
+  redirected stderr as the single sink to avoid duplicate records. Existing logs append and are
+  tightened to `0600`; an unavailable log path fails startup rather than silently discarding
+  diagnostics. The dashboard logger is also the scoped process-wide `slog` default. README now gives
+  the exact `tail` command for collecting a shareable log file. Spec checks, focused tests/race,
+  both Go test variants, source build, presentation checks, UI build, and distribution build pass.
 
 - 2026-08-14 — Fixed a rare `TestNewAgentIDFormatUniquenessAndCollisionRetry` failure and completed
   the 2026-08-11 chat-usability record. The test drew 1000 real random agent ids and then stubbed

@@ -122,6 +122,15 @@ cache/config-sources/ redacted, regenerable federation mirror data
 
 `AGENTDECK_HOME` overrides `~/.agentdeck/` (used by tests/CI).
 `AGENTDECK_LOG_LEVEL` sets the slog level (`debug|info|warn|error`, default `info`).
+Every `dashboard start` appends structured application logs to
+`$AGENTDECK_HOME/dashboard.log`, including foreground starts; foreground logs are also shown in the
+terminal. To collect the latest records for debugging on another computer, run:
+
+```sh
+tail -n 500 "${AGENTDECK_HOME:-$HOME/.agentdeck}/dashboard.log" > agentdeck-dashboard.log
+```
+
+Review the resulting `agentdeck-dashboard.log`, then attach or send that file with the bug report.
 
 ### Seeded roles
 

@@ -3,9 +3,114 @@ package cli
 import (
 	"bytes"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// FS-04.A21: a foreground dashboard persists structured logs and keeps the
+// interactive terminal stream useful.
+func TestDashboardLoggerForegroundPersistsAndMirrors(t *testing.T) {
+	home := t.TempDir()
+	var terminal bytes.Buffer
+	log, closeLog, err := newDashboardLogger(home, false, &terminal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Info("foreground record", "component", "test")
+	if err := closeLog(); err != nil {
+		t.Fatal(err)
+	}
+
+	contents, err := os.ReadFile(filepath.Join(home, "dashboard.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, got := range map[string]string{"terminal": terminal.String(), "file": string(contents)} {
+		if !strings.Contains(got, `"msg":"foreground record"`) || !strings.Contains(got, `"component":"test"`) {
+			t.Fatalf("%s output = %q, want JSON log record", name, got)
+		}
+	}
+	if strings.Count(string(contents), `"msg":"foreground record"`) != 1 {
+		t.Fatalf("file output = %q, want one record", contents)
+	}
+}
+
+// FS-04.A21: repeated starts append and repair an existing overly broad mode.
+func TestDashboardLoggerAppendsAndTightensPermissions(t *testing.T) {
+	home := t.TempDir()
+	logPath := filepath.Join(home, "dashboard.log")
+	if err := os.WriteFile(logPath, []byte("prior record\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(logPath, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	log, closeLog, err := newDashboardLogger(home, false, &bytes.Buffer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Info("appended record")
+	if err := closeLog(); err != nil {
+		t.Fatal(err)
+	}
+
+	contents, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(contents), "prior record\n") || !strings.Contains(string(contents), `"msg":"appended record"`) {
+		t.Fatalf("log contents = %q, want preserved and appended records", contents)
+	}
+	info, err := os.Stat(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode().Perm(); got != 0o600 {
+		t.Fatalf("dashboard.log mode = %o, want 600", got)
+	}
+}
+
+// FS-04.A21: the detached child uses its redirected stderr as the sole sink.
+func TestDashboardLoggerDaemonUsesRedirectedStderr(t *testing.T) {
+	home := t.TempDir()
+	logPath := filepath.Join(home, "dashboard.log")
+	redirected, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log, closeLog, err := newDashboardLogger(home, true, redirected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Info("daemon record")
+	if err := closeLog(); err != nil {
+		t.Fatal(err)
+	}
+	if err := redirected.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	contents, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Count(string(contents), `"msg":"daemon record"`); got != 1 {
+		t.Fatalf("daemon record count = %d in %q, want 1", got, contents)
+	}
+}
+
+// FS-04.A21: startup fails instead of silently losing its promised diagnostics.
+func TestDashboardLoggerRejectsUnavailableLog(t *testing.T) {
+	home := t.TempDir()
+	if err := os.Mkdir(filepath.Join(home, "dashboard.log"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := newDashboardLogger(home, false, &bytes.Buffer{}); err == nil {
+		t.Fatal("newDashboardLogger succeeded with a directory at dashboard.log")
+	}
+}
 
 // Regression (review fix): reindex refuses to run against a live server. It gates
 // on serverRunning, which must report true only for an actually-alive pid (a stale

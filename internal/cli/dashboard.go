@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -36,8 +37,7 @@ func newDashboardCmd() *cobra.Command {
 	return cmd
 }
 
-// newLogger builds the slog JSON logger to stderr, honoring AGENTDECK_LOG_LEVEL.
-func newLogger() *slog.Logger {
+func configuredLogLevel() slog.Level {
 	level := slog.LevelInfo
 	switch os.Getenv("AGENTDECK_LOG_LEVEL") {
 	case "debug":
@@ -47,7 +47,36 @@ func newLogger() *slog.Logger {
 	case "error":
 		level = slog.LevelError
 	}
-	return slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
+	return level
+}
+
+func newJSONLogger(w io.Writer) *slog.Logger {
+	return slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{Level: configuredLogLevel()}))
+}
+
+// newLogger builds the slog JSON logger to stderr, honoring AGENTDECK_LOG_LEVEL.
+func newLogger() *slog.Logger {
+	return newJSONLogger(os.Stderr)
+}
+
+// newDashboardLogger configures the dashboard's persistent application log.
+// A detached child already has stderr redirected to dashboard.log by its parent,
+// so it must not open a second file sink or each record would be duplicated.
+func newDashboardLogger(home string, daemon bool, terminal io.Writer) (*slog.Logger, func() error, error) {
+	if daemon {
+		return newJSONLogger(terminal), func() error { return nil }, nil
+	}
+
+	logPath := filepath.Join(home, "dashboard.log")
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		return nil, nil, fmt.Errorf("open dashboard log %s: %w", logPath, err)
+	}
+	if err := logFile.Chmod(0o600); err != nil {
+		_ = logFile.Close()
+		return nil, nil, fmt.Errorf("secure dashboard log %s: %w", logPath, err)
+	}
+	return newJSONLogger(io.MultiWriter(terminal, logFile)), logFile.Close, nil
 }
 
 // resolveConfig opens the store, ensures the layout, seeds defaults, and returns
@@ -60,8 +89,15 @@ func resolveConfig(log *slog.Logger) (*config.Store, config.Config, error) {
 	if err := cfgStore.EnsureLayout(); err != nil {
 		return nil, config.Config{}, err
 	}
+	cfg, err := resolvePreparedConfig(cfgStore, log)
+	return cfgStore, cfg, err
+}
+
+// resolvePreparedConfig completes startup configuration after the caller has
+// created the AgentDeck home and established its dashboard log.
+func resolvePreparedConfig(cfgStore *config.Store, log *slog.Logger) (config.Config, error) {
 	if err := cfgStore.SeedIfAbsent(); err != nil {
-		return nil, config.Config{}, err
+		return config.Config{}, err
 	}
 	// Import configured provider models into opted-in backends: the Codex CLI
 	// model cache (FS-09.R28) and user-level Claude settings (FS-09.R45).
@@ -79,7 +115,7 @@ func resolveConfig(log *slog.Logger) (*config.Store, config.Config, error) {
 		log.Warn("config unreadable; using default", "err", err)
 		cfg = config.DefaultConfig()
 	}
-	return cfgStore, cfg, nil
+	return cfg, nil
 }
 
 func newDashboardStartCmd() *cobra.Command {
@@ -91,8 +127,24 @@ func newDashboardStartCmd() *cobra.Command {
 		Use:   "start",
 		Short: "Start the dashboard server",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			log := newLogger()
-			cfgStore, cfg, err := resolveConfig(log)
+			cfgStore, err := config.New()
+			if err != nil {
+				return err
+			}
+			if err := cfgStore.EnsureLayout(); err != nil {
+				return err
+			}
+			log, closeLog, err := newDashboardLogger(cfgStore.Home(), daemon, os.Stderr)
+			if err != nil {
+				return err
+			}
+			defer closeLog()
+
+			previousDefault := slog.Default()
+			slog.SetDefault(log)
+			defer slog.SetDefault(previousDefault)
+
+			cfg, err := resolvePreparedConfig(cfgStore, log)
 			if err != nil {
 				return err
 			}
