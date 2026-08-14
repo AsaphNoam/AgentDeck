@@ -109,6 +109,14 @@ ordinary user-owned AgentDeck configuration and are not retracted when the nativ
 This path does not use federation bindings, project precedence, previews, watches, provenance, or
 effective generations. It adds no API, config version, cache, sidecar, SQLite state, or migration.
 
+**R15 — Dashboard process logging has one durable sink.** After the AgentDeck home exists and before
+startup work that can emit diagnostics, `internal/cli` configures the dashboard's structured logger
+and the process-wide `slog` default to append to `$AGENTDECK_HOME/dashboard.log`. A foreground process
+uses a multi-writer to retain interactive stderr output; a detached child writes only to stderr
+because its parent redirects that stream to the same file. This preserves one copy of each record
+and brings package-level `slog` calls under the configured level and format. The file obeys TS-05.R7
+and INV §14; this requirement does not authorize persistence of raw provider or terminal output.
+
 ## 3. Interfaces & data shapes
 
 **Runtime interface** (`internal/runtime/runtime.go`, minimum surface):
@@ -173,4 +181,6 @@ type Runtime interface {
   `archive_gate_test.go` (project reservation and agent/project transition barriers).
 - Model catalog autosync: `internal/config/{codexmodels,claudemodels,modelautosync}.go`,
   invoked after seeding by `internal/cli/dashboard.go` (R14).
+- Dashboard process logging: `newDashboardLogger` and the scoped process-default logger in
+  `internal/cli/dashboard.go` (R15), with mode/append/sink regressions in `internal/cli/cli_test.go`.
 - Regression anchors: `TestSwitchRuntimeKeepsTargetRegistration`, `TestCrashTearsDownAgentRegistration`, `TestSessionParamsOmitModelWhenInherited`.

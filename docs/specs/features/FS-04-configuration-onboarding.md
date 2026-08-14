@@ -149,6 +149,11 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   (`cwd: ~/Projects/my-app`). Because roles and a project are seeded, the onboarding role and project
   steps are already satisfied on a fresh install; the backend credential check is the operative gate
   (§3).
+- **R41.** Every `dashboard start` writes the structured application log by appending to
+  `$AGENTDECK_HOME/dashboard.log` (normally `~/.agentdeck/dashboard.log`), whether it runs in the
+  foreground or with `--detach`. Foreground starts also mirror the same records to stderr. The log
+  file is owner-only (`0600`), an existing broader mode is tightened before startup continues, and
+  failure to establish the persistent log prevents the dashboard from starting.
 
 ### 2.7 Onboarding wizard
 
@@ -294,6 +299,11 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   visible, and retryable; closing after that failure preserves it. *Verify by* dialog/editor tests
   for dirty-draft preservation, validation/initial-write failure, cancel, create-only success,
   create-and-connect success, create-and-connect failure/retry, and ordinary later edit/delete.
+- **A21.** (R41) Foreground logging appends each JSON record to `dashboard.log` while mirroring it to
+  the terminal, repeated starts preserve prior records, and the file is created or tightened to
+  `0600`; detached-child logging uses its redirected stderr as the single file sink so records are
+  not duplicated. — `TestDashboardLoggerForegroundPersistsAndMirrors`,
+  `TestDashboardLoggerAppendsAndTightensPermissions`, `TestDashboardLoggerDaemonUsesRedirectedStderr`.
 
 ## 6. Deviations & open decisions
 
@@ -328,6 +338,9 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
 - **Set up later & provider guidance:** `OnboardingWizard` owns the completion escape hatch (R32);
   `steps/BackendStep.tsx` holds the provider sign-in guidance and Check again (R33, R34), naming the
   `agentdeck auth` selectors that `internal/backend/providerauth` owns.
+- **Dashboard logging (R41/A21):** `internal/cli/dashboard.go` establishes the shared persistent
+  logger; `internal/cli/cli_test.go` covers foreground mirroring, append/permission behavior,
+  unavailable paths, and the detached child's single redirected sink.
 - **Key regression tests:** `internal/server/config_handlers_test.go`,
   `internal/server/config_endpoint_test.go`, `internal/config/config_test.go`
   (`TestSeedIfAbsentNoClobber`), `ui/src/features/onboarding/OnboardingGate.test.tsx` (A12, A13),

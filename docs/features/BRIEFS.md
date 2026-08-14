@@ -4,6 +4,30 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-14 — Implementation: persistent dashboard logs in both modes
+
+Implemented. Every `agentdeck dashboard start` now appends structured application logs to
+`$AGENTDECK_HOME/dashboard.log`—normally `~/.agentdeck/dashboard.log`—whether started in the
+foreground or with `--detach`. Foreground mode still mirrors the same records to the terminal.
+:codex-annotation{index="1"}
+
+On the work computer, collect the latest 500 records with:
+
+```sh
+tail -n 500 "${AGENTDECK_HOME:-$HOME/.agentdeck}/dashboard.log" > agentdeck-dashboard.log
+```
+
+Review and attach `agentdeck-dashboard.log` to send it. The file is append-only and forced to owner-
+only `0600`; startup now fails clearly if the persistent log cannot be opened. Detached logging uses
+one sink, so records are not duplicated. Package-level `slog` diagnostics now use the same configured
+JSON logger and log level.
+
+Verified with spec checks, focused logger tests and race test, both Go test variants, `make build`,
+and `make dist`.
+
+**Needs attention:** `dashboard.log` still has no rotation or retention limit, so it can grow over
+time. That should be a separate diagnostics/log-lifecycle change.
+
 ### 2026-08-14 — Fix: random build failure and leftover chat paperwork
 
 The build failure you hit on push is a flaky test, not a real defect. The test that checks agent-id
