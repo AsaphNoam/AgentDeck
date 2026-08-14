@@ -4,6 +4,29 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-14 — Process: new /investigate-bug workflow
+
+Added. `/investigate-bug` is a new agent workflow for the bugs you meet at work, where live
+debugging is impossible and a report plus whatever was logged is all the evidence there is. You
+paste the symptom and any log excerpt; the agent records the report verbatim, finds what the
+specifications say should happen, and classifies it: a real code defect, a specification gap, or
+behavior that is actually working as specified.
+
+For a real defect it traces the failure path in code, tries to reproduce it locally, and records a
+finding that the existing `/fix` workflow picks up unchanged. Every conclusion carries an honest
+confidence label — confirmed, probable, or undetermined — so a plausible story is never dressed up
+as a proven root cause. When a reproduction test is achieved it is committed skipped, keeping the
+build green, and the fix session un-skips it as the regression test. When the investigation stalls
+because nothing was logged at the failure point, that missing diagnostic becomes its own finding, so
+every undiagnosable report at least makes the next one diagnosable.
+
+Documentation checks, the twin-skill comparison, and whitespace checks pass. Also suggested but not
+built: workflows for cutting releases, auditing overall spec drift, and quick idea capture.
+
+**Needs attention:** None.
+
+**Next:** Use `/investigate-bug <report or log path>` the next time a work bug comes home.
+
 ### 2026-08-14 — Fix: packaged Claude and Codex launchers
 
 Fixed. Release archives now keep `claude-agent-acp`, `codex-acp`, and `codex` rooted in their real

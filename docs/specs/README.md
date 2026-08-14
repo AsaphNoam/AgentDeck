@@ -204,6 +204,8 @@ Agents do not choose future work on their own.
   relevant spec in the same completed change.
 - **usability-review:** exercises journeys against feature-spec acceptance criteria; a mismatch
   between observed behavior and an A-item is a finding tagged with that ID.
+- **investigate-bug:** turns a field bug report into a diagnosed finding for fix, classified against
+  the governing FS/TS/INV items; edits no product code or specs beyond a skipped reproduction test.
 
 ## Lint
 
