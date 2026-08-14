@@ -15,7 +15,12 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   authentication, or runtime guidance without returning raw output, and launch/resume share fake-ACP
   exit/timeout regressions plus a focused race pass. FS-09.R48/A21 and TS-04.R22 shipped; TS-04.R10
   was split so optional-integration probing remains planned as R23. Shared checks, both Go test modes,
-  source/UI builds, presentation checks, and the distribution build pass. Simple backend creation and
+  source/UI builds, presentation checks, and the distribution build pass. Two chat usability items are
+  also implemented: the transcript shows a **Working…** indicator at its end while the open chat agent
+  is `busy` (clearing on turn end, error, or a permission pause to `waiting_input`), and transcript
+  text is selectable/copyable with a distinct `.user-message::selection` colour so a highlight inside
+  the user's own bubble stays visible. FS-03.R28/R29/A13/A14 shipped and FS-03 remains Current; the
+  selection colour was confirmed from the styles, not a live browser pass. Simple backend creation and
   global configuration linking is implemented. **Add backend**
   is now a provider-first dialog: choosing a type supplies a matching editable name and the canonical
   starter model, and submitting uses the new item-scoped `POST /api/backends`, which adds exactly one
@@ -183,6 +188,20 @@ are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
 
+- 2026-08-14 — Fixed a rare `TestNewAgentIDFormatUniquenessAndCollisionRetry` failure and completed
+  the 2026-08-11 chat-usability record. The test drew 1000 real random agent ids and then stubbed
+  `randRead` to retry into the fixed id `a_abcdef`; when the sweep happened to mint that id first
+  (about 1 in 16,800 runs, 1000/2^24), every one of `NewAgentID`'s ten tries collided and the run
+  failed with `could not mint unique agent_id after 10 tries`. The fixture now clears the retry
+  target between the sweep and the stub. `NewAgentID` itself is unchanged and correct: the failure
+  was in the fixture, not the generator, so no specification change is needed. The diagnosis was
+  confirmed by a temporary reproduction that seeded `a_abcdef` and produced the identical error, and
+  the fix was proven by forcing that seed against the corrected fixture. Documentation cleanup from
+  the same review: the two shipped ideas (response spinner, copy-pastable messages) are removed from
+  `docs/ideas.md`, the 2026-08-11 entry's idea count is corrected from eleven to nine (seven now
+  remain), the current-position state records the shipped chat behavior, and FS-03 §7 cites the
+  `TranscriptView` regression. `make check-specs`, both Go test modes, and whitespace checks pass.
+
 - 2026-08-14 — Fixed the reported opaque Claude ACP startup boundary (FS-09.R48/A21,
   TS-04.R22/R23, INV §9/§12). Initialize, session load, and session new now have a shared 30-second
   per-stage deadline on launch and resume. A pre-registration Claude exit is classified from the
@@ -197,8 +216,9 @@ are not promoted to findings without a repeatable failure.
   a permission pause to `waiting_input`. Transcript text is also selectable/copyable, with a distinct
   `.user-message::selection` colour so a highlight inside the user's own bubble (whose background is
   `--ad-highlight`, the same token the global `::selection` used) is visible rather than
-  invisible-on-invisible. A `TranscriptView` regression covers the busy-only indicator. Eleven
-  play-session ideas were also recorded in `docs/ideas.md`. `make check-specs`, both Go test modes,
+  invisible-on-invisible. A `TranscriptView` regression covers the busy-only indicator. Nine
+  play-session ideas were also recorded in `docs/ideas.md`; the two shipped here were left in that
+  list by mistake and are now removed, leaving seven. `make check-specs`, both Go test modes,
   `make build`, all 221 UI tests, presentation/style checks, the UI build, and `make dist` pass; the
   selection colour was confirmed by the styles, not a live browser pass.
 
