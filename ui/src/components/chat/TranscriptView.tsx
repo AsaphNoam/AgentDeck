@@ -13,7 +13,7 @@ import { AnnotationTray } from "./AnnotationTray";
 import { AnnotationContextMenu, type AnnotationMenuState } from "./AnnotationContextMenu";
 import { useAnnotationStore } from "../../store/annotationStore";
 
-export function TranscriptView({ agentId, events, sourceActive = false, annotationsEnabled = true }: { agentId: string; events: TranscriptEvent[]; sourceActive?: boolean; annotationsEnabled?: boolean }) {
+export function TranscriptView({ agentId, events, sourceActive = false, annotationsEnabled = true, busy = false }: { agentId: string; events: TranscriptEvent[]; sourceActive?: boolean; annotationsEnabled?: boolean; busy?: boolean }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
   const [atBottom, setAtBottom] = useState(true);
@@ -46,7 +46,7 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
   useEffect(() => {
     const el = scrollRef.current;
     if (el && atBottomRef.current) el.scrollTop = el.scrollHeight;
-  }, [events]);
+  }, [events, busy]);
 
   const jumpToLatest = () => {
     const el = scrollRef.current;
@@ -80,6 +80,12 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
             onContextMenu={openMenu}
           />
         ))}
+        {busy && (
+          <div className="transcript-pending" aria-live="polite">
+            <span className="spinner" aria-hidden="true" />
+            <span>Working…</span>
+          </div>
+        )}
       </div>
       {!atBottom && (
         <button type="button" className="jump-to-latest" onClick={jumpToLatest}>

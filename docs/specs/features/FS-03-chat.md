@@ -38,6 +38,10 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   auto-approval map to Approved; the other three runtime decisions retain their distinct outcome.
 - **R5.** One malformed or unrenderable event is isolated by an event-level error boundary; the
   remainder of the transcript stays usable and the failed item displays a fallback.
+- **R28.** Transcript text is selectable and copyable, and an active selection is visibly
+  highlighted — including inside the user's own prompt bubble, whose highlight colour must differ
+  from the bubble background so the selection remains visible there. This lets a reader copy any
+  message content out of the panel.
 
 ### 2.2 Prompting and turn state
 
@@ -64,6 +68,10 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   pending permission records a `permission_resolved` (decision `cancelled`) on the live stream and
   in the durable transcript, so the prompt renders a resolved chip on both the live view and after
   reload instead of staying actionable.
+- **R29.** While a chat agent is `busy`, the transcript shows a waiting indicator at its end so it is
+  visible that a response is in progress and the turn is not stuck. The indicator clears when the
+  agent leaves `busy` — on `turn_end`, on error, or when a permission request pauses it to
+  `waiting_input` (where the pending prompt and Cancel control already convey the wait).
 
 ### 2.3 Streaming and recovery
 
@@ -213,6 +221,14 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 - **A12** (R27) — The chat header **Back** link points at `/project/<project>` for an agent
   whose project is a current, non-archived catalog member, and at `/` for an agent whose project is
   absent from or archived in the catalog. *Verify:* `ui/src/components/chat/ChatPanel.test.tsx`.
+
+- **A13** (R29) — The transcript renders the waiting indicator when the open agent is `busy` and
+  omits it otherwise: `ui/src/components/chat/TranscriptView.test.tsx`.
+
+- **A14** (R28) — Transcript text is selectable and the user bubble's `::selection` colour differs
+  from its background. *Verify by* the presentation styles (`.transcript-view` selectable text and
+  the distinct `.user-message::selection` rule in `ui/src/styles/features/agent.css`) and a browser
+  check that highlighting a sent message shows a visible selection.
 
 ## 6. Deviations & open decisions
 

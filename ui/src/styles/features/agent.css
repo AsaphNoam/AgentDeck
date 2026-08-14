@@ -122,11 +122,52 @@
   overflow: auto;
   padding: var(--ad-space-6) max(var(--ad-space-6), 10vw);
   scroll-padding: var(--ad-space-6);
+  /* Keep transcript text selectable so people can mark, copy, and reuse it. */
+  user-select: text;
 }
 
 .transcript-item {
   margin-bottom: var(--ad-space-3);
   position: relative;
+}
+
+/* The global ::selection highlight uses --ad-highlight, which is also the user
+   message's background — selecting your own message would be invisible. Give the
+   user bubble a contrasting selection colour so the highlight actually shows. */
+.user-message::selection {
+  background: var(--ad-action-secondary);
+  color: var(--ad-surface-canvas);
+}
+
+.transcript-pending {
+  align-items: center;
+  color: var(--ad-text-muted);
+  display: flex;
+  font-size: 0.86rem;
+  gap: var(--ad-space-2);
+  padding: var(--ad-space-2) 0;
+}
+
+.spinner {
+  animation: ad-spin 0.7s linear infinite;
+  border: var(--ad-border-thick) solid var(--ad-border-default);
+  border-radius: var(--ad-radius-round);
+  border-top-color: var(--ad-action-secondary);
+  display: inline-block;
+  height: 0.9rem;
+  width: 0.9rem;
+}
+
+@keyframes ad-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2.4s;
+  }
 }
 
 .annotation-event-trigger {

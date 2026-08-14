@@ -174,6 +174,16 @@ are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
 
+- 2026-08-11 — Implemented two chat usability items (FS-03.R28/R29/A13/A14). The transcript now shows
+  a waiting indicator at its end while the open chat agent is `busy`, clearing on turn end, error, or
+  a permission pause to `waiting_input`. Transcript text is also selectable/copyable, with a distinct
+  `.user-message::selection` colour so a highlight inside the user's own bubble (whose background is
+  `--ad-highlight`, the same token the global `::selection` used) is visible rather than
+  invisible-on-invisible. A `TranscriptView` regression covers the busy-only indicator. Eleven
+  play-session ideas were also recorded in `docs/ideas.md`. `make check-specs`, both Go test modes,
+  `make build`, all 221 UI tests, presentation/style checks, the UI build, and `make dist` pass; the
+  selection colour was confirmed by the styles, not a live browser pass.
+
 - 2026-08-02 — Fixed every open review finding. Whole-catalog Settings saves now use a strong ETag
   and reject a stale second-tab draft rather than deleting a newly created backend; creates and
   successful catalog saves return the current validator. Source-manifest unlink now uses the shared
