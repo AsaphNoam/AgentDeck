@@ -50,9 +50,8 @@ text frame with `cols`/`rows` requests resize. Viewer disconnect never stops the
 initialize, unavailable credentials, and unsupported interface/backend combinations return bounded,
 backend-specific errors. AgentDeck does not claim a capability solely because a binary exists.
 
-**R10 `(planned)` — Readiness and version tolerance are bounded.** ACP initialization will have a
-documented timeout and optional-integration flag fallback/probe so an interactive or older CLI cannot
-leave launch pending forever. The current generic transport-close diagnostics are an explicit gap.
+**R10 — retired 2026-08-14:** Startup bounds and diagnostics shipped as R22; optional-integration
+flag fallback/probing remains planned as R23.
 
 **R11 `(planned)` — Real-provider compatibility gates are recorded.** Claude/Codex MCP registration,
 Codex chat resume, Claude terminal flags/hooks, and OpenCode/OpenHands launch flows require pinned,
@@ -160,6 +159,18 @@ packaged `codex-acp` honors `CODEX_HOME` for its rollout store, recognizes the r
 resumes against a non-default home are external-CLI compatibility gates (INV §12) confirmed by
 credentialed acceptance before a release claims isolation, extending R11. Fake-ACP tests assert the
 composed environment and profile-refresh contract only.
+
+**R22 — ACP startup is bounded and reports safe stage-specific failures.** Each `initialize`,
+`session/load`, and `session/new` call has a 30-second deadline bounded further by the caller's
+context. An adapter exit or timeout before registration terminates the process group and returns the
+backend plus failed stage. Claude maps recognized captured stderr to a small recovery vocabulary
+(resource exhaustion, nested launch, authentication, or runtime incompatibility); unrecognized
+stderr is never returned over the API and falls back to adapter/authentication verification
+guidance. Launch and resume share this boundary.
+
+**R23 `(planned)` — Optional-integration version tolerance is probed.** An adapter flag or metadata
+extension known to vary by pinned CLI version will use an explicit capability probe or a documented
+unsupported-option retry only when dropping it cannot change the user's requested runtime behavior.
 
 ## 3. Interfaces & data shapes
 

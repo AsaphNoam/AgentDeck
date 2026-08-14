@@ -212,6 +212,11 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **R24** — A missing executable fails launch rather than creating a running agent; a credential
   result of `skipped` is not proof that launch will work. Backend-specific recovery copy is a known
   deviation in §6.
+- **R48** — A Claude chat adapter that exits or stops answering during `initialize`,
+  `session/load`, or `session/new` fails launch/resume within 30 seconds for that stage. The error
+  names Claude and the failed stage, gives bounded recovery guidance for a recognized resource,
+  nested-launch, authentication, or runtime-compatibility failure, and never returns raw adapter
+  stderr. No failed startup is left registered as a running agent.
 - **R25** — Ambient adapter-specific environment that could override AgentDeck composition is
   removed according to R10–R12 and R29 before backend/model/hook values are applied. Other host environment
   variables remain inherited subject to the standing env-inheritance decision in FS-00/TS-05.
@@ -367,6 +372,11 @@ Configuration-source federation for Claude/Codex is FS-08.
   unbound best-effort residue remains add-only and converges without duplication on retry. *Verify by*
   focused source-connect/model-sync server tests and Settings tests for both providers, target-only
   behavior, add-only/default preservation, zero-model success, residue, and retry.
+- **A21** (R48) — A fake Claude adapter that writes a resource-exhaustion diagnostic and exits
+  during initialize returns Claude/initialize recovery guidance without its raw stderr or the
+  generic transport-close sentinel; a fake adapter that never answers initialize times out and is
+  terminated; both leave no running handle. *Verify by* focused chat-runtime startup tests shared by
+  launch and resume.
 
 ## 6. Deviations & open decisions
 
@@ -400,9 +410,9 @@ Configuration-source federation for Claude/Codex is FS-08.
   login from fixed default files or env, while Claude parses CLI text. Alternate platform paths,
   stale files, or changed/localized CLI output can yield a misleading result; launch remains the
   authoritative check.
-- **Missing/rejected CLI startup diagnostics are weak.** A missing executable or rejected optional
-  flags can currently collapse into a raw/generic transport error; backend-specific installation
-  and compatibility guidance is tracked usability work.
+- **OpenCode/OpenHands startup diagnostics remain weak.** Their missing executable or rejected
+  optional flags still lack provider-specific installation and compatibility guidance; R48 closes
+  the reported Claude startup boundary only.
 - **Official Claude adapter acceptance remains credential-gated.** Automated tests pin the ACP v1
   boundary and session metadata, but an authenticated streamed turn/resume/MCP run against the
   exact packaged version is still required before release compatibility is claimed.
