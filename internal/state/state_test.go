@@ -458,6 +458,13 @@ func TestNewAgentIDFormatUniquenessAndCollisionRetry(t *testing.T) {
 		}
 	}
 
+	// The sweep above draws real random ids, so it can itself mint a_abcdef —
+	// the id the stub below retries into. Clear the retry target first, or that
+	// run exhausts all 10 tries and the test fails for an unrelated reason.
+	if _, err := st.db.Exec(`DELETE FROM agents WHERE agent_id = ?`, "a_abcdef"); err != nil {
+		t.Fatalf("clear retry target: %v", err)
+	}
+
 	originalRandRead := randRead
 	defer func() { randRead = originalRandRead }()
 	calls := 0

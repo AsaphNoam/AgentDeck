@@ -255,5 +255,6 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `TestLaunchPromptPermissionFlow`, `TestPermissionApprove`, `TestPermissionTimeout`,
   `TestCancelDuringPendingPermission`, `TestCrashMidTurnPersistsDeliveredTranscript`,
   `ui/src/store/transcriptStore.test.ts`, and
-  `ui/src/components/chat/ChatPanel.test.tsx` (R23/R24/R27), and
-  `ui/src/components/chat/renderers/ToolResult.test.tsx` (R25).
+  `ui/src/components/chat/ChatPanel.test.tsx` (R23/R24/R27),
+  `ui/src/components/chat/renderers/ToolResult.test.tsx` (R25), and
+  `ui/src/components/chat/TranscriptView.test.tsx` (R29 waiting indicator).

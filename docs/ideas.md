@@ -27,15 +27,14 @@ Example:
   is one flat array independent of `group`), so it silently snaps back. Needs whole-card drag (with
   an activation distance so a plain click still opens the agent) and either real cross-group drop
   support or a clear affordance that drag only reorders within a group.
+- **Browse for working directories.** When a form asks for a working-directory path, add a
+  **Browse** button that opens a directory picker so users can choose the folder instead of typing
+  the path manually.
 
 ### From play session 2026-08-10
 
 - **Crash protection for bad projects.** AgentDeck created invalid projects that broke the process.
   Add input validation on project creation and guard the process against malformed project state.
-- **Response spinner.** Show a spinner/indicator while waiting for an agent response, so it's clear
-  an answer is coming and the process isn't stuck — like Claude and Codex.
-- **Copy-pastable messages.** CSS currently blocks text selection in the transcript. Remove it so
-  people can mark text, copy it, and send it out as tasks, etc.
 - **Adjustable chat window size.** Let the chat window be resized.
 - **Sending a message resumes the conversation.** Sending a message to an idle/exited agent should
   resume its conversation rather than requiring a separate resume action.

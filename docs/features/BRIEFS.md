@@ -4,6 +4,29 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-14 — Fix: random build failure and leftover chat paperwork
+
+The build failure you hit on push is a flaky test, not a real defect. The test that checks agent-id
+generation first creates a thousand agents with genuinely random ids, then forces a deliberate
+collision to prove the retry works — but the retry target is a fixed id, so roughly one run in
+sixteen thousand happens to have already used it, and the collision it was supposed to survive
+becomes unsurvivable. Id generation itself is correct and unchanged; only the test setup was wrong,
+and it now clears the target before forcing the collision. I confirmed the cause by reproducing the
+identical error on purpose, then proved the fix against the same forced condition.
+
+The chat spinner and copy-pastable messages were also left half-recorded. Both were still sitting in
+the ideas list as if unbuilt, so they are removed — seven of the play-session ideas remain. The note
+claiming eleven ideas were captured was wrong; nine were. The project's current-state summary now
+mentions the shipped chat behavior, which it had skipped entirely. Your uncommitted "browse for
+working directories" idea sat in the same file and rode along in this commit; nothing was changed
+about it.
+
+**Needs attention:** That change went straight from a raw idea to shipped code without a design step,
+so there is no record of what was agreed before it was built. Worth deciding whether small usability
+items should keep skipping that step or not.
+
+**Next:** Push the branch and confirm the build is green.
+
 ### 2026-08-14 — Fix: Claude ACP startup failures
 
 Claude works through AgentDeck's exact pinned adapter on this machine: startup completed and an
