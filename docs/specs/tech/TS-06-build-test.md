@@ -164,6 +164,8 @@ shared target guarantees.
   `install.sh`.
 - Release assembly/installer/update: `scripts/release/`, `internal/release/`, `internal/cli/`,
   `.github/workflows/release.yml`, `internal/cli/{installer,release,update,auth}_test.go` (FS-10).
+- Symlink-free npm command packaging preserves package-relative module resolution:
+  `TestCreateArchiveKeepsSymlinkedCommandTargetContext`.
 - Private Codex CLI pin (R22): `scripts/release/package.json` + lockfile declare `@openai/codex`
   directly, `scripts/release/assemble.sh` validates the executable before packaging, and
   `requiredLayout`/`verifyInternalManifest` in `internal/release/manifest.go` enforce it. Proven by

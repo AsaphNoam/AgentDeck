@@ -7,7 +7,14 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** Claude ACP startup hardening is implemented. The original 2026-08-10
+- **State:** Release archive packaging now preserves the package context of the three required npm
+  commands (`claude-agent-acp`, `codex-acp`, and `codex`) while keeping archives symlink-free: each
+  npm `.bin` symlink becomes a regular launcher that calls the private Node runtime on the original
+  in-tree module, so package-relative imports still resolve after extraction. The archive round-trip
+  regression fails against the old byte-flattening behavior and executes successfully now; FS-10.R3/A2
+  and TS-06.R15/R21 are restored. Existing installed release directories remain immutable and need a
+  newly published release plus explicit update/reinstall to receive the repair. Claude ACP startup
+  hardening is implemented. The original 2026-08-10
   `initialize: runtime: transport closed` cause cannot be recovered because startup stderr was
   discarded, but the exact pinned 0.59.0 adapter now passes local ACP v1 initialize/session creation
   and an authenticated one-word streamed turn on this machine. Every ACP initialize/load/new call is
@@ -192,6 +199,17 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-14 — Fixed the release archiver's npm-command flattening defect (FS-10.R3/A2,
+  TS-06.R15/R21, INV §9). `CreateArchive` still emits no symlink entries, but the required private
+  `claude-agent-acp`, `codex-acp`, and `codex` commands now become regular POSIX launchers that invoke
+  the bundled Node runtime on their original package modules. This preserves relative ESM imports;
+  the old archive copied `dist/index.js` into `.bin`, so Claude resolved `./acp-agent.js` from the
+  wrong directory and every archive produced by that code carried the same latent runtime defect.
+  A package/extract/execute regression was confirmed to fail against the old implementation. Focused
+  release and CLI tests, the release race test, spec checks, both Go test modes, source build,
+  presentation/UI build, distribution build, and whitespace checks pass. Existing installed releases
+  remain unchanged until a corrected release is published and explicitly installed or updated.
 
 - 2026-08-14 — Persisted dashboard application logs for every `dashboard start`, not only detached
   runs (FS-04.R41/A21, TS-01.R15, TS-05.R7, INV §14). Foreground mode appends JSON records to
