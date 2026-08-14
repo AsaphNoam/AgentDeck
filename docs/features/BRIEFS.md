@@ -4,6 +4,33 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-14 — Fix: packaged Claude and Codex launchers
+
+Fixed. Release archives now keep `claude-agent-acp`, `codex-acp`, and `codex` rooted in their real
+package directories while remaining symlink-free. The packaged commands are regular launchers that
+run the original module with AgentDeck's private Node runtime, so relative imports resolve correctly.
+
+The original `executable file not found in $PATH` happened because the running dashboard came from
+the cloned repository's `./bin/agentdeck`. Source builds intentionally use the caller's PATH and do
+not inherit the separately installed release runtime, so that process could not see
+`claude-agent-acp`.
+
+Installer users do not hit that exact PATH error: the installed wrapper adds its private runtime.
+They could hit a separate, universal packaging failure in any archive built by the defective code.
+The archiver copied the npm symlink target `dist/index.js` into `.bin`; JavaScript then looked for
+`./acp-agent.js` inside `.bin` and failed with `ERR_MODULE_NOT_FOUND`. The installed 0.1.2 runtime on
+this machine confirms that failure. Every copy of the same affected archive has the defect, although
+users who never launch the bundled provider command would not notice it.
+
+The regression was proven to fail before the fix and pass afterward. Specification checks, focused
+and race tests, both Go test variants, source and distribution builds, and the UI presentation build
+all pass.
+
+**Needs attention:** Existing installations are immutable and are not repaired in place. A corrected
+release must be published, then users must explicitly update or reinstall it.
+
+**Next:** Publish a corrected release, then update the affected installation before retrying Claude.
+
 ### 2026-08-14 — Implementation: persistent dashboard logs in both modes
 
 Implemented. Every `agentdeck dashboard start` now appends structured application logs to

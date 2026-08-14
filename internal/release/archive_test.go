@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -265,6 +266,80 @@ func TestCreateArchiveDereferencesSymlink(t *testing.T) {
 	}
 	if string(got) != "#!/usr/bin/env node\n" {
 		t.Fatalf("dereferenced content = %q, want the target's content", got)
+	}
+}
+
+// npm exposes package commands through node_modules/.bin symlinks. Packaging
+// must keep those commands rooted at the package target so relative imports
+// resolve after extraction (FS-10.A2, TS-06.R21).
+func TestCreateArchiveKeepsSymlinkedCommandTargetContext(t *testing.T) {
+	version := "1.2.3"
+	src := buildFakeVersion(t, t.TempDir(), version)
+	privateNode := filepath.Join(src, "runtime", "node", "bin", "node")
+	if err := os.WriteFile(privateNode, []byte("#!/bin/sh\nexec /bin/sh \"$@\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	packageDist := filepath.Join(src, "runtime", "node_modules", "@agentclientprotocol", "claude-agent-acp", "dist")
+	if err := os.MkdirAll(packageDist, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	entrypoint := filepath.Join(packageDist, "index.js")
+	entrypointBody := "#!/bin/sh\ncat \"$(dirname \"$0\")/acp-agent.js\"\n"
+	if err := os.WriteFile(entrypoint, []byte(entrypointBody), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(packageDist, "acp-agent.js"), []byte("adapter-ok\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	command := filepath.Join(src, "runtime", "node_modules", ".bin", "claude-agent-acp")
+	if err := os.Remove(command); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join("..", "@agentclientprotocol", "claude-agent-acp", "dist", "index.js"), command); err != nil {
+		t.Fatal(err)
+	}
+
+	archive, _ := releaseFrom(t, src, version)
+	dest := t.TempDir()
+	if _, err := ExtractArchive(archive, dest); err != nil {
+		t.Fatalf("ExtractArchive: %v", err)
+	}
+
+	extractedCommand := filepath.Join(dest, VersionDirName(version), "runtime", "node_modules", ".bin", "claude-agent-acp")
+	out, err := exec.Command(extractedCommand).CombinedOutput()
+	if err != nil {
+		t.Fatalf("packaged command: %v\n%s", err, out)
+	}
+	if got := string(out); got != "adapter-ok\n" {
+		t.Fatalf("packaged command output = %q, want %q", got, "adapter-ok\\n")
+	}
+}
+
+// Required private npm commands may only launch modules from the packaged
+// dependency closure; a staged symlink must not turn the regular launcher into
+// an escape from private node_modules (INV §9).
+func TestCreateArchiveRejectsRequiredNPMBinTargetOutsideNodeModules(t *testing.T) {
+	version := "1.2.3"
+	src := buildFakeVersion(t, t.TempDir(), version)
+	outside := filepath.Join(src, "outside.js")
+	if err := os.WriteFile(outside, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	command := filepath.Join(src, "runtime", "node_modules", ".bin", "claude-agent-acp")
+	if err := os.Remove(command); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join("..", "..", "..", "outside.js"), command); err != nil {
+		t.Fatal(err)
+	}
+
+	archive := filepath.Join(t.TempDir(), "release.tar.gz")
+	err := CreateArchive(src, archive)
+	if err == nil || !strings.Contains(err.Error(), "points outside private node_modules") {
+		t.Fatalf("CreateArchive error = %v, want private node_modules confinement failure", err)
 	}
 }
 

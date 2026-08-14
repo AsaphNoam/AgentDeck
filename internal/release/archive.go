@@ -80,16 +80,19 @@ func CreateArchive(srcDir, archivePath string) error {
 		if err != nil {
 			return err
 		}
-		// Dereference symlinks into their target file content. The private runtime
+		// Dereference symlinks into regular archive entries. The private runtime
 		// ships command entries as symlinks (Node's bin/npm, bin/npx, bin/corepack
-		// and each npm-installed node_modules/.bin/* adapter), but the release
-		// layout is deliberately plain files and directories so the archive stays
-		// symlink-free and extraction can keep rejecting symlinks as a traversal
-		// vector (INV §9). Assembly input is our own trusted runtime, so
-		// materializing the target is safe. Command entries must stay runnable, so
-		// the archived mode keeps the target's bits and adds owner/group/other
-		// execute (macOS reports a symlink's own mode as 0777).
+		// and npm-installed node_modules/.bin/* commands), but the release layout
+		// is deliberately symlink-free so extraction can keep rejecting symlinks
+		// as a traversal vector (INV §9).
+		//
+		// npm bin targets are JavaScript modules whose relative imports resolve
+		// from the target package directory. Copying their bytes into .bin changes
+		// that directory and breaks commands such as claude-agent-acp. Materialize
+		// the required private commands as launchers that invoke the packaged Node
+		// runtime on the original in-tree module instead (FS-10.A2, TS-06.R21).
 		mode := info.Mode()
+		var symlinkLauncher []byte
 		if mode&os.ModeSymlink != 0 {
 			resolved, err := filepath.EvalSymlinks(path)
 			if err != nil {
@@ -102,8 +105,31 @@ func CreateArchive(srcDir, archivePath string) error {
 			if target.IsDir() {
 				return fmt.Errorf("symlink %q points to a directory; unsupported in release layout", rel)
 			}
+			if isRequiredNPMBin(rel) {
+				modulesDir, err := filepath.EvalSymlinks(filepath.Join(srcDir, "runtime", "node_modules"))
+				if err != nil {
+					return fmt.Errorf("resolve private node_modules: %w", err)
+				}
+				targetFromModules, err := filepath.Rel(modulesDir, resolved)
+				if err != nil || targetFromModules == ".." || strings.HasPrefix(targetFromModules, ".."+string(os.PathSeparator)) {
+					return fmt.Errorf("required npm command %q points outside private node_modules", rel)
+				}
+				binDir, err := filepath.EvalSymlinks(filepath.Dir(path))
+				if err != nil {
+					return fmt.Errorf("resolve npm command directory %q: %w", rel, err)
+				}
+				targetFromBin, err := filepath.Rel(binDir, resolved)
+				if err != nil {
+					return fmt.Errorf("locate npm command target %q: %w", rel, err)
+				}
+				symlinkLauncher = []byte("#!/bin/sh\n" +
+					"here=\"$(cd \"$(dirname \"$0\")\" && pwd -P)\"\n" +
+					"exec \"$here/../../node/bin/node\" \"$here/\"" + shellSingleQuote(filepath.ToSlash(targetFromBin)) + " \"$@\"\n")
+			}
 			info = target
-			path = resolved
+			if symlinkLauncher == nil {
+				path = resolved
+			}
 		}
 		hdr, err := tar.FileInfoHeader(info, "")
 		if err != nil {
@@ -116,7 +142,16 @@ func CreateArchive(srcDir, archivePath string) error {
 		if mode&os.ModeSymlink != 0 {
 			hdr.Mode = int64(info.Mode().Perm() | 0o111)
 		}
+		if symlinkLauncher != nil {
+			hdr.Typeflag = tar.TypeReg
+			hdr.Linkname = ""
+			hdr.Size = int64(len(symlinkLauncher))
+		}
 		if err := tw.WriteHeader(hdr); err != nil {
+			return err
+		}
+		if symlinkLauncher != nil {
+			_, err := tw.Write(symlinkLauncher)
 			return err
 		}
 		if info.Mode().IsRegular() {
@@ -139,6 +174,21 @@ func CreateArchive(srcDir, archivePath string) error {
 		return err
 	}
 	return gz.Close()
+}
+
+func isRequiredNPMBin(rel string) bool {
+	switch filepath.ToSlash(rel) {
+	case "runtime/node_modules/.bin/claude-agent-acp",
+		"runtime/node_modules/.bin/codex-acp",
+		"runtime/node_modules/.bin/codex":
+		return true
+	default:
+		return false
+	}
+}
+
+func shellSingleQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 }
 
 // ExtractArchive unpacks a gzip tar into destDir. It rejects any entry whose
