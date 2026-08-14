@@ -13,11 +13,11 @@ afterEach(() => {
 
 const events = [{ kind: "assistant_text", seq: 7, text: "First line\nSecond line" }];
 
-function renderTranscript(annotationsEnabled = true, transcriptEvents = events) {
+function renderTranscript(annotationsEnabled = true, transcriptEvents = events, busy = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
   return render(
     <QueryClientProvider client={client}>
-      <TranscriptView agentId="a1" events={transcriptEvents} sourceActive annotationsEnabled={annotationsEnabled} />
+      <TranscriptView agentId="a1" events={transcriptEvents} sourceActive annotationsEnabled={annotationsEnabled} busy={busy} />
     </QueryClientProvider>,
   );
 }
@@ -104,6 +104,19 @@ describe("TranscriptView annotation entry point", () => {
 
     expect(screen.getAllByRole("button", { name: "Ran 1 tool" })).toHaveLength(2);
     expect(screen.getByText("I found the file.")).toBeInTheDocument();
+  });
+
+  it("shows a waiting indicator only while the agent is busy", () => {
+    const { rerender } = renderTranscript(false, events, false);
+    expect(screen.queryByText("Working…")).toBeNull();
+
+    rerender(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: 0 } } })}>
+        <TranscriptView agentId="a1" events={events} sourceActive annotationsEnabled={false} busy />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Working…")).toBeInTheDocument();
   });
 
   it("keeps expanded tool calls individually annotatable", () => {

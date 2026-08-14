@@ -4,6 +4,26 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-11 — Implementation: chat spinner and selectable messages
+
+Two of your play-session items are done. The chat now shows a small "Working…" spinner at the bottom
+of the conversation while an agent is preparing its reply, so it is clear the answer is coming and
+the session is not stuck; it disappears when the reply arrives or the agent pauses to ask for a
+permission. You can also now select and copy text anywhere in the conversation, including your own
+messages — selecting your own message used to highlight it in the same colour as its background, so
+it looked like the text could not be marked at all. That change is limited to the chat and does not
+touch the projects page.
+
+Your other nine ideas are written down and ordered by how easy they are to build, so you can pick the
+next one.
+
+**Needs attention:** The selection-colour fix was confirmed from the styles and tests, not by opening
+a live browser, so a quick look to confirm the highlight reads well in both light and the Sky & Grove
+theme is worth doing.
+
+**Next:** Choose the next idea — the strongest candidates are diagnosing the "can't use Claude" error
+or adding the @-file and #-skill autocomplete.
+
 ### 2026-08-02 — Fix: backend safety and review follow-ups
 
 Settings now refuses a stale save instead of deleting a backend created in another tab. Configuration
