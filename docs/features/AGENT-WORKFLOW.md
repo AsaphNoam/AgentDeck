@@ -98,7 +98,7 @@ Record each real finding in `## Review findings` in `HANDOFF.md` with its locati
 
 Handle one finding at a time, starting with **Must fix** items.
 
-1. Confirm the report is true by reading the code, the cited requirement, and the real path. Reproduce it with a failing test when practical.
+1. Confirm the report is true by reading the code, the cited requirement, and the real path. Reproduce it with a failing test when practical. A finding that cites a committed skipped reproduction test (§12) starts by un-skipping it and confirming it fails.
 2. If it is false or already fixed, remove the finding and record the short evidence in the changelog and human update; do not change code.
 3. If it is real, fix it, add or keep a regression test, run the required checks, and update the relevant specification if the correct fix changes behavior or fills missing coverage.
 4. When the work is verified, remove the finding, update the handoff, and commit.
@@ -143,3 +143,34 @@ specifications and planning documents, not product code.
 
 If a material decision remains unresolved, leave the idea under `Ideas being defined` and do not
 call it ready. Keep partial specifications honest and record what is needed from the user.
+
+## 12. Investigate a reported bug
+
+`/investigate-bug` turns a field bug report into a diagnosed finding that §8 can fix. Reports come
+from real use, often from a machine where live debugging is impossible, so the report and any
+captured logs may be the only evidence there will ever be. The investigation changes no product code
+and no specifications, with one exception: it may commit a reproduction test marked skipped.
+
+1. **Record the report.** Capture the report verbatim before interpreting it: the symptom, what the
+   person was doing, the AgentDeck version or commit when known, the environment, and the logs — or
+   the explicit fact that nothing was logged. If the request carries no report, ask for one.
+2. **Establish expected behavior first.** Find the FS/TS/INV items that govern the reported area
+   before reading code, and classify the report:
+   - a **code defect** — shipped behavior violates a requirement; keep investigating;
+   - a **spec gap** — the behavior is unspecified; record a coverage finding, and keep investigating
+     any defect that remains;
+   - **works as specified** — an expectation mismatch, not a bug. Say so plainly, route the wish to
+     `docs/ideas.md` or a user product question, and stop.
+3. **Investigate with evidence.** Map each log line — and each silence — to the exact code path, and
+   check history for when the behavior changed. Try to reproduce locally; a failing test is the
+   strongest evidence. When one is achieved, commit it marked skipped with a comment citing the
+   finding, so the repository stays green; the §8 fix session un-skips it as the regression test.
+4. **State confidence honestly.** Every conclusion is **confirmed** (reproduced, or proven from the
+   code path), **probable** (consistent with all evidence but not reproduced), or **undetermined**.
+   Never present a plausible story as a confirmed root cause.
+5. **Missing observability is a finding.** When the investigation stalls because the failure point
+   logged nothing, record what diagnostic should exist, where, and what question it would have
+   answered, as its own finding. An undiagnosable report must at least make the next one diagnosable.
+6. **Close.** Record findings in `## Review findings` in `HANDOFF.md` using the §7 format plus the
+   confidence label, so §8 consumes them unchanged. Commit only the state files and any skipped
+   reproduction test, then finish with the §6 human update.

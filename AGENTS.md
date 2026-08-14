@@ -29,6 +29,8 @@ rationale, history, or sequencing but do not override an FS/TS requirement.
   changes behavior or fills missing coverage.
 - **Usability review:** §9 plus `USABILITY-REVIEW.md`. Exercise FS acceptance criteria without
   changing product code or specs.
+- **Investigate bug:** §12. Turn a field bug report into a diagnosed, confidence-labelled finding
+  for fix; change no product code or specs beyond a skipped reproduction test.
 
 `docs/ideas.md` holds new ideas and known product improvements. `docs/ready-changes/` holds changes
 that are specified and ready to start. `HANDOFF.md` records only the change already in progress.

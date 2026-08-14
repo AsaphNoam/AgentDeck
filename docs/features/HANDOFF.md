@@ -200,6 +200,18 @@ are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
 
+- 2026-08-14 — Added the `/investigate-bug` role; no product code changed. Workflow §12 defines the
+  investigation process for field bug reports that cannot be live-debugged: verbatim report intake,
+  spec-first classification (code defect / spec gap / works as specified), evidence-mapped diagnosis
+  with **confirmed**/**probable**/**undetermined** confidence labels, and the rule that a failure
+  point that logged nothing becomes its own observability finding. Findings land in this file's
+  `## Review findings` in the §7 format so `/fix` consumes them unchanged; the role edits no product
+  code or specs except a reproduction test committed skipped, and §8 step 1 now says a fix session
+  un-skips such a test and confirms it fails before fixing. Twinned byte-identical launchers exist in
+  `.claude/skills/investigate-bug/` and `.agents/skills/investigate-bug/`; `AGENTS.md` and the spec
+  README's role list name the new role. `make check-specs`, the twin-skill comparison, and
+  `git diff --check` pass.
+
 - 2026-08-14 — Fixed the release archiver's npm-command flattening defect (FS-10.R3/A2,
   TS-06.R15/R21, INV §9). `CreateArchive` still emits no symlink entries, but the required private
   `claude-agent-acp`, `codex-acp`, and `codex` commands now become regular POSIX launchers that invoke
