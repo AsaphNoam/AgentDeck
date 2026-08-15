@@ -4,6 +4,38 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-15 — Design review: file and skill autocomplete
+
+The draft is not ready to implement. It is still an incomplete feature draft—there is no technical
+specification or ready change—and the review found two connected problems.
+
+Deferring skill/command autocomplete is not justified by ACP compatibility. The pinned Claude and
+Codex adapters both publish the standard, replaceable `available_commands_update` list when a
+session starts or loads, and Claude refreshes it when commands change. AgentDeck can cache the latest
+list for each live session, expose one read endpoint, and reuse the file picker's UI for `#`.
+[ACP's command contract](https://agentclientprotocol.com/protocol/v1/slash-commands) says advertised
+names are invoked as `/<name>` prompt text, including `/$skill-name` for Codex skills.
+
+File selection also needs an explicit semantic choice. The draft sends only literal `@path` text,
+but [ACP makes `resource_link` a baseline prompt block](https://agentclientprotocol.com/protocol/v1/initialization)
+and both pinned adapters translate it to their native file-reference form. If selecting a file is
+supposed to attach usable context, AgentDeck should send a server-validated resource link alongside
+the durable display text. If it is only text completion, the specification must call it that and
+accept provider-dependent resolution.
+
+I recommend one combined change: a reusable picker, `@` files sent as validated ACP resource links,
+and `#` commands/skills from a live per-session snapshot. This needs moderate runtime and API test
+coverage, but no new package, persistence, or provider-specific discovery; that is not enough
+complexity to justify silently dropping half of the requested feature.
+
+**Needs attention:** Decide whether `#` shows every ACP-advertised command or only skills. I
+recommend all advertised commands because Claude's standard payload does not identify which entries
+came from skills. Also confirm whether `@` is real file attachment (recommended) or text-only
+convenience.
+
+**Next:** Confirm those two product choices; the next design session should revise the feature
+specification, add the technical specification, and create the ready change.
+
 ### 2026-08-15 — Process: limitation checks generalized beyond packages
 
 Generalized. The rule no longer names packages and providers as the special case — it now covers
