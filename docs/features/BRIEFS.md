@@ -4,6 +4,17 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-15 — Implementation: no change available
+
+No implementation was started. The project has no active change and no specified change waiting to
+start, so there is nothing currently authorized for implementation.
+
+**Needs attention:** A change must be designed and placed in the ready queue before implementation
+can begin.
+
+**Next:** Choose the product change you want designed next, then start implementation after that
+design is ready.
+
 ### 2026-08-15 — Implementation: composer file and command autocomplete
 
 Chat now has the file and command autocomplete the play session asked for. In a running chat, typing
