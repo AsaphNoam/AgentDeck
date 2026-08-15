@@ -534,9 +534,73 @@
   padding: var(--ad-space-2);
 }
 
+.composer-input {
+  position: relative;
+}
+
 .composer textarea {
   border: 0;
   min-height: 74px;
+  width: 100%;
+}
+
+/* Autocomplete picker, anchored above the textarea (FS-03.R30–R34). */
+.composer-picker {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 0 0 var(--ad-space-1);
+  padding: var(--ad-space-1);
+  list-style: none;
+  max-height: 14rem;
+  overflow-y: auto;
+  background: var(--ad-surface-panel);
+  border: var(--ad-border-thin) solid var(--ad-border-strong);
+  border-radius: var(--ad-radius-small);
+  box-shadow: var(--ad-shadow-offset);
+}
+
+.composer-picker-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ad-space-2);
+  padding: var(--ad-space-1) var(--ad-space-2);
+  border-radius: var(--ad-radius-small);
+  cursor: pointer;
+}
+
+.composer-picker-item.is-active {
+  background: var(--ad-highlight);
+}
+
+.composer-picker-label {
+  font-family: var(--ad-font-mono);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.composer-picker-desc {
+  color: var(--ad-text-muted);
+  font-size: 0.72rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-picker-hint {
+  color: var(--ad-text-muted);
+  font-size: 0.7rem;
+  font-style: italic;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.composer-picker-empty {
+  padding: var(--ad-space-1) var(--ad-space-2);
+  color: var(--ad-text-muted);
+  font-size: 0.72rem;
 }
 
 .composer button {

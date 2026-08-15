@@ -266,6 +266,21 @@ func (r *Registry) AppendAnnotationAndSync(agentID string, data AnnotationData) 
 	return chat.AppendAnnotationAndSync(agentID, data)
 }
 
+// Commands returns the owning chat runtime's latest ACP available-commands
+// snapshot (TS-04.R24). A terminal (non-chat) owner yields ErrNotImplemented and
+// an unowned agent yields ErrNoHandle, which the API layer maps to a typed error.
+func (r *Registry) Commands(agentID string) ([]CommandItem, error) {
+	rt, err := r.ownerFor(agentID)
+	if err != nil {
+		return nil, err
+	}
+	chat, ok := rt.(*ChatRuntime)
+	if !ok {
+		return nil, ErrNotImplemented
+	}
+	return chat.Commands(agentID)
+}
+
 // Cancel routes a cancel to the owning runtime. The bool reports whether a turn
 // or pending permission was actually interrupted (false = idle no-op).
 func (r *Registry) Cancel(ctx context.Context, agentID string) (bool, error) {
