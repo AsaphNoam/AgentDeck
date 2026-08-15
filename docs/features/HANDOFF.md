@@ -19,8 +19,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   bounded snapshot (≤256 entries; name ≤256 and description/hint ≤2000 runes; nameless entries skipped)
   as live runtime state that dies with the agent, and two new session-scoped GET routes (`file-search`,
   `available-commands`) project it. Missing/unreadable directories return an empty list, unknown agents
-  404, and non-chat agents return a typed conflict; the stopped-chat file-search case is an open review
-  finding below. FS-03 and TS-03 moved Partial→Current; TS-04 stays Partial. `make check-specs`, both Go test
+  404, and both a stopped agent (via the running record) and a non-chat agent return the shared typed
+  runtime/conflict error. FS-03 and TS-03 moved Partial→Current; TS-04 stays Partial. `make check-specs`, both Go test
   modes, focused `-race` on the snapshot, `make build`, all 227 UI tests plus the new
   `Composer.test.tsx`, presentation/style checks, and `make dist` pass. No live-browser pass was run;
   component and fake-ACP integration coverage stands in.
@@ -76,7 +76,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   [`../archive/reviews/usability-review-run-2026-08-02-backend-creation.md`](../archive/reviews/usability-review-run-2026-08-02-backend-creation.md).
 - **Last reviewed code:** `2727ae8` (2026-08-15), the continuous range after `b6654b5`: catalog
   review fixes, ACP startup diagnostics, dashboard logging, release launcher packaging, and composer
-  file/command autocomplete. Two composer findings remain open below.
+  file/command autocomplete. Both composer findings from that review are now fixed.
 - **Branch:** `main`.
 
 ## Active change
@@ -115,23 +115,25 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 ### Open findings
 
-- **Must fix** — `ui/src/components/chat/Composer.tsx:130-143` (FS-03.R31/R33/A15/A17; INV §1):
-  Selecting a file or command inserts the required trailing space, but `submit` trims the entire draft
-  before both the optimistic event and `POST /prompt`. A normal select-then-send journey therefore
-  does not submit or record the text exactly as displayed. Preserve selected prompt text while retaining
-  whitespace-only rejection, and add regressions that accept both a file and a command then assert the
-  request body retains the inserted trailing space.
-- **Must fix** — `internal/server/files_commands.go:70-89` (TS-03.R24; INV §1): A stopped chat
-  agent keeps its durable session row, so `GET /api/sessions/{id}/file-search` returns `200` and lists
-  its former working directory instead of the specified typed conflict. Gate the read on the live/running
-  chat runtime (or its running record) and add a stopped-chat regression beside the available-commands
-  error test.
+None.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-15 — Fixed both composer autocomplete review findings (FS-03.R31/R33, TS-03.R24; INV §1);
+  both restore already-specified behavior, so no specification changed. **Composer submit** now sends
+  the draft exactly as displayed — rejecting only whitespace-only prompts — instead of trimming it, so
+  a selected `@path` or `/$skill` and its inserted trailing space reach the optimistic event and
+  `POST /prompt` verbatim. **File search** now gates on the durable running record (`ReadRunning`, the
+  same seam annotate-and-assign uses), so a stopped chat agent yields the shared typed
+  agent_not_running error (`409`) instead of a `200` listing of its former working directory. New
+  regressions: a `Composer.test.tsx` case accepting a file and a command then asserting the request
+  body keeps the trailing space, and `TestFileSearchStoppedAgent`; both were confirmed to fail against
+  the pre-fix code. `make test`, `make build`, all 228 UI tests, `npm run build`, presentation/style
+  checks, and `make dist` pass.
 
 - 2026-08-15 — Reviewed the continuous range after `b6654b5` through `2727ae8` in both specification
   directions and against every invariant class. Two Must-fix autocomplete findings are open. **INV §1 /

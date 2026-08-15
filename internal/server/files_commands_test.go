@@ -407,6 +407,14 @@ func seedChatSessionWithCwd(t *testing.T, srv *Server, agentID, cwd string) {
 	if err := ix.UpsertSessionMeta(agentID, meta); err != nil {
 		t.Fatalf("UpsertSessionMeta: %v", err)
 	}
+	// File search is gated on the running record (TS-03.R24), so a seeded chat
+	// session that expects a listing must also be running.
+	if err := srv.stateStore.WriteRunning(state.RunningEntry{
+		AgentID: agentID, PID: 42, SessionID: "sess-fs-" + agentID, Interface: "chat",
+		StartedAt: time.Date(2026, 6, 28, 10, 0, 0, 0, time.UTC),
+	}); err != nil {
+		t.Fatalf("WriteRunning: %v", err)
+	}
 }
 
 func writeFile(t *testing.T, path, content string) {
@@ -539,6 +547,26 @@ func TestFileSearchNonChatAgent(t *testing.T) {
 	rec := doGET(t, h, "/api/sessions/a_term/file-search?q=x")
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("status = %d body=%s, want 409", rec.Code, rec.Body.String())
+	}
+}
+
+// TestFileSearchStoppedAgent gates the read on the running record: a stopped chat
+// agent keeps its durable session row but must yield the shared typed runtime error
+// (agent_not_running, 409) rather than listing its former working directory
+// (TS-03.R24, INV §1).
+func TestFileSearchStoppedAgent(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "main.go"), "package main")
+	srv := testServer(t, false)
+	seedChatSessionWithCwd(t, srv, "a_fs_stopped", dir)
+	// Clear the running record to represent a stopped chat agent.
+	if err := srv.stateStore.DeleteRunning("a_fs_stopped"); err != nil {
+		t.Fatalf("DeleteRunning: %v", err)
+	}
+	h := srv.routes()
+	rec := doGET(t, h, "/api/sessions/a_fs_stopped/file-search?q=main")
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("stopped chat status = %d body=%s, want 409", rec.Code, rec.Body.String())
 	}
 }
 
