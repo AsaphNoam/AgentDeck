@@ -19,8 +19,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   bounded snapshot (≤256 entries; name ≤256 and description/hint ≤2000 runes; nameless entries skipped)
   as live runtime state that dies with the agent, and two new session-scoped GET routes (`file-search`,
   `available-commands`) project it. Missing/unreadable directories return an empty list, unknown agents
-  404, and stopped or non-chat agents return a typed conflict, so autocomplete never blocks or fails a
-  send. FS-03 and TS-03 moved Partial→Current; TS-04 stays Partial. `make check-specs`, both Go test
+  404, and non-chat agents return a typed conflict; the stopped-chat file-search case is an open review
+  finding below. FS-03 and TS-03 moved Partial→Current; TS-04 stays Partial. `make check-specs`, both Go test
   modes, focused `-race` on the snapshot, `make build`, all 227 UI tests plus the new
   `Composer.test.tsx`, presentation/style checks, and `make dist` pass. No live-browser pass was run;
   component and fake-ACP integration coverage stands in.
@@ -74,9 +74,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   unlink with zero browser errors; source-failure/retry and launch through the binding remain
   unexercised. Full record:
   [`../archive/reviews/usability-review-run-2026-08-02-backend-creation.md`](../archive/reviews/usability-review-run-2026-08-02-backend-creation.md).
-- **Last reviewed code:** `b6654b5` (2026-08-02), the continuous range after `05dff38`: Claude
-  configured-model autosync, item-scoped backend creation, and global configuration linking. Its
-  review findings and the earlier dashboard/pipeline findings are fixed in the completed fix set.
+- **Last reviewed code:** `2727ae8` (2026-08-15), the continuous range after `b6654b5`: catalog
+  review fixes, ACP startup diagnostics, dashboard logging, release launcher packaging, and composer
+  file/command autocomplete. Two composer findings remain open below.
 - **Branch:** `main`.
 
 ## Active change
@@ -115,13 +115,33 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 ### Open findings
 
-None.
+- **Must fix** — `ui/src/components/chat/Composer.tsx:130-143` (FS-03.R31/R33/A15/A17; INV §1):
+  Selecting a file or command inserts the required trailing space, but `submit` trims the entire draft
+  before both the optimistic event and `POST /prompt`. A normal select-then-send journey therefore
+  does not submit or record the text exactly as displayed. Preserve selected prompt text while retaining
+  whitespace-only rejection, and add regressions that accept both a file and a command then assert the
+  request body retains the inserted trailing space.
+- **Must fix** — `internal/server/files_commands.go:70-89` (TS-03.R24; INV §1): A stopped chat
+  agent keeps its durable session row, so `GET /api/sessions/{id}/file-search` returns `200` and lists
+  its former working directory instead of the specified typed conflict. Gate the read on the live/running
+  chat runtime (or its running record) and add a stopped-chat regression beside the available-commands
+  error test.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-15 — Reviewed the continuous range after `b6654b5` through `2727ae8` in both specification
+  directions and against every invariant class. Two Must-fix autocomplete findings are open. **INV §1 /
+  FS-03.R31/R33** — picker selection visibly inserts a trailing space, but Composer trims it before the
+  optimistic and durable prompt paths, so neither selected `@path` nor `/$skill` is submitted exactly
+  as displayed. **INV §1 / TS-03.R24** — a stopped chat agent retains its durable session snapshot and
+  can still receive a `200` file-search listing, despite the specified stopped-agent conflict. The
+  archive, dashboard logging, ACP startup, and command-snapshot work otherwise matches its governing
+  requirements. `make check-specs` and the focused runtime and server test suites pass. No product
+  code or specifications changed during review.
 
 - 2026-08-15 — Implemented composer file-and-command autocomplete (FS-03.R30–R34, TS-03.R24,
   TS-04.R24; INV §1/§2/§7/§8). `Composer.tsx` gained one reusable keyboard-operated picker: `@` at a

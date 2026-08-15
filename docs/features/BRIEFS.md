@@ -4,6 +4,17 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-15 — Code review: recent dashboard and composer work
+
+The review found two problems in the new chat autocomplete. Selecting a file or command visibly adds a
+trailing space, but sending trims it away, so the saved and delivered prompt differs from what was
+shown. Also, a stopped chat can still return files from its former working directory instead of safely
+reporting that autocomplete is unavailable.
+
+**Needs attention:** These two fixes are required before the autocomplete work can be considered fully correct.
+
+**Next:** Run `/fix` to preserve selected prompt text verbatim and reject file search for stopped chats.
+
 ### 2026-08-15 — Implementation: no change available
 
 No implementation was started. The project has no active change and no specified change waiting to
