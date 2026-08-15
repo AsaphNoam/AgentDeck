@@ -1,6 +1,6 @@
 # TS-03 — HTTP, SSE & WebSocket API
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/server`, `ui/src/api`
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) API sections and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -38,6 +38,7 @@ delta; clients must not assume every existing endpoint already uses R3.
 | Lifecycle/chat | `POST /api/sessions`, `prompt`, `cancel`, `stop`, `archive`, `restore`, `rename`, `identity`, `permission`, `resume`, `switch-runtime`, `annotations`; transcript read |
 | Config | role/project CRUD and project `archive`/`restore`; `GET/PUT /api/backends`, `/api/config`, `/api/layout` |
 | Archive/tracking | `GET /api/archive`, `GET /api/archive/projects/{project}`, session files/commands/messages |
+| Composer autocomplete *(planned)* | session-scoped file search and available-command snapshot reads |
 | Coordination | `POST /api/groups/{group}/release`, `/mcp` GET/POST/DELETE |
 | Federation | config-source list, preview, bind, refresh, delete |
 | Producers/terminal | `POST /api/hook`, terminal WebSocket |
@@ -210,6 +211,23 @@ reconciliation. A successful POST/PUT response returns the resulting `ETag`. POS
 mutations share TS-07.R17's catalog lock; schemas, mocks, backend/source query invalidation, and
 error display ship together under R11/R13.
 
+**R24 `(planned)` — Composer autocomplete uses two session-scoped reads.** `GET
+/api/sessions/{id}/file-search?q=<text>` resolves the known chat session's working directory on the
+server and returns `{agent_id,files:[<relative-path>]}`. The query is decoded as text, never joined
+as a caller-chosen path. Results are relative, slash-separated, deterministically ranked by simple
+case-insensitive basename/path matches, and capped at 50. The inventory uses Git's tracked,
+untracked, and effective-ignore view when the directory is in a Git worktree; otherwise a bounded
+filesystem walk is used. Neither path follows directory symlinks or traverses `.git`, and canonical
+containment is checked before a result is returned.
+
+`GET /api/sessions/{id}/available-commands` returns
+`{agent_id,commands:[{name,description,input_hint?}]}` from TS-04.R24's latest in-memory snapshot.
+It does not ask the adapter to refresh and creates no persisted row or transcript event. Both lists
+obey R6. An unknown agent is `404`; an existing stopped or non-chat agent uses the shared typed
+runtime/conflict error. Search, Git, traversal, or command-source unavailability returns the safe
+R3 error/empty shape required by FS-03.R32 and never affects the prompt route. The TypeScript client,
+mocks, and component consumers ship with both handlers under R11.
+
 ## 3. Interfaces & data shapes
 
 Feature-owned request/response fields are specified in the owning FS, including FS-14 for pipeline
@@ -260,6 +278,9 @@ integers instead of silently applying defaults.
 - Terminal upgrade: `internal/server/terminal.go`.
 - Archive action and grouped query routes: `internal/server/{archive,archive_actions}.go`,
   `ui/src/api/client.ts`; `TestArchiveProjectRespondsWithActionLists`.
+- Composer autocomplete (R24, planned): routes in `internal/server/routes.go`, handlers beside
+  `internal/server/files_commands.go`, runtime command snapshots from TS-04.R24, and client shapes in
+  `ui/src/api/{client,types}.ts`.
 - Appearance config projection: `internal/server/config_handlers.go`,
   `internal/server/config_endpoint_test.go`, `ui/src/{api/config.ts,schemas/config.ts}`.
 - Regression anchors: `TestUnknownAPIPath404`, `TestStartShutsDownWithOpenSSEClient`,

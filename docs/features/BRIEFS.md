@@ -4,6 +4,27 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-15 — Feature design: composer file and command autocomplete
+
+The design is ready to implement. Typing `@` will search the live chat's working directory and
+insert the selected relative path as ordinary prompt text. It deliberately does not create a
+structured ACP attachment or embed file contents.
+
+Typing `#` will open the same keyboard-operated picker with every command and skill most recently
+advertised by the live ACP session. Selecting one inserts its executable slash form—for example,
+`/review` or `/$skill-name`. Later provider updates replace the list; the list exists only for the
+running session and is never written to transcripts or other storage.
+
+The implementation extends the existing chat runtime and session API with two small reads: bounded,
+Git-aware file search and the current in-memory ACP command snapshot. It needs no new package,
+provider-specific discovery, persistence, or global live event. The pinned Claude and Codex adapters
+and current releases were checked against ACP's command contract, and the earlier design-review
+findings are resolved.
+
+**Needs attention:** None.
+
+**Next:** Run `/work composer-file-and-command-autocomplete` to implement the waiting change.
+
 ### 2026-08-15 — Design review: file and skill autocomplete
 
 The draft is not ready to implement. It is still an incomplete feature draft—there is no technical
