@@ -200,6 +200,18 @@ are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
 
+- 2026-08-15 — Extended the §13 research lens and the design-feature launcher to claimed
+  limitations; no product code changed. A design that works around something a package or protocol
+  "cannot do" must now show the limitation is real — verified against the pinned version's actual
+  surface, newer releases, and official or better-maintained alternative packages — with the
+  evidence in the change file; an unverified impossibility claim is a finding, and its workaround is
+  re-judged under the over-engineering lens once the claim falls. The twinned design-feature skill
+  gains the matching designer-side rule: never declare a capability impossible from memory, verify
+  before designing around it, and record the evidence. Motivated by repeated real cases where a
+  designing agent declared ACP capabilities unavailable that the pinned or newer Claude/Codex
+  packages fully supported, including staying on the unofficial codex ACP package when the official
+  one was better. `make check-specs`, the twin-skill comparison, and `git diff --check` pass.
+
 - 2026-08-15 — Added the `/review-design` role and simplicity rules; no product code changed.
   Workflow §13 reviews a `Waiting to start` ready change before implementation through three ordered
   lenses: over-engineering (every planned requirement must earn its place from the confirmed

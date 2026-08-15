@@ -4,6 +4,30 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-15 — Process: impossibility claims now require proof
+
+No, the research lens only covered one direction — it caught designs assuming a capability that
+doesn't exist, but not the failure you've hit repeatedly: an agent declaring something unavailable
+in the Claude or Codex ACP packages when it was fully supported, in the pinned version, a newer one,
+or a better alternative package. That false "cannot do" is worse than the false "can do," because
+the workaround it motivates is exactly the over-engineering the review exists to prevent.
+
+Both sides are now fixed. The design reviewer must give claimed limitations the same rigor as
+claimed capabilities: any design that works around something a package supposedly cannot do must
+show the limitation is real, verified against the pinned version's actual surface, newer releases,
+and official or better-maintained alternatives, with the evidence recorded in the change file. An
+unverified impossibility claim is itself a finding, and once it falls, the workaround it justified
+is re-judged as over-engineering. The designing agent gets the matching rule at the source: never
+declare a capability impossible from memory — verify first, record the evidence, and expect a false
+limitation to delete the workaround it motivated.
+
+Documentation checks, the twin-skill comparison, and whitespace checks pass.
+
+**Needs attention:** None.
+
+**Next:** When a design cites a provider or package limitation, expect to see its evidence in the
+change file; challenge any that arrives without it.
+
 ### 2026-08-15 — Process: new /review-design workflow and simplicity rules
 
 Added. `/review-design` reviews a designed-but-unbuilt change before any code is written — the gap
