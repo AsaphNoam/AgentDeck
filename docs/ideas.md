@@ -41,8 +41,6 @@ Example:
 - **Edit message (fork on older).** Like Codex: editing the most recent message edits it in place;
   editing any older message forks/copies the conversation from that point (this is the "split
   conversation" mechanism).
-- **File and skill autocomplete.** Like Codex/Claude/Cursor: typing `@` opens a project file searcher
-  autocomplete; typing `#` opens a skill-trigger autocomplete.
 - **'Approve for me' mode.** Like the agents already have — just expose the toggle, with the default
   persisting to whatever was last selected.
 

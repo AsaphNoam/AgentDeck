@@ -1,6 +1,6 @@
 # FS-03 — Live chat & permission flow
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/runtime/` (`chat.go`, `permission.go`, `event.go`), `internal/server/sessions.go`, `internal/transcript/`, `ui/src/components/chat/`, `ui/src/store/transcriptStore.ts`, `ui/src/api/sse.ts` · **Journeys:** J3, J4, J7
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -135,6 +135,37 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   the projects home (`/`). An agent naming a project the catalog no longer has (deleted or archived)
   never sends Back to an unavailable/archived route; it returns to the projects home instead.
 
+### 2.6 Composer file and ACP command autocomplete
+
+- **R30.** *(planned)* Typing `@` in the composer at a word boundary — the start of the input or
+  immediately after whitespace — opens a file picker anchored to the composer. The text typed after
+  `@` up to the next whitespace is the query; the picker lists matching files from the agent's
+  session working directory, ranked, and capped at a bounded result count. An empty query lists a
+  bounded initial list from that directory. `@` typed inside a word (`user@example.com`) does not open
+  the picker. Files are listed; directories are not offered as entries.
+- **R31.** *(planned)* While the picker is open, ↑/↓ move the highlighted entry, Enter or Tab accepts
+  it, and Escape dismisses it. Accepting replaces the typed `@query` with `@` followed by the file's
+  path relative to the session working directory, then a trailing space. The result is ordinary
+  composer text: it is submitted exactly as displayed, is recorded verbatim in the durable
+  `user_text` event, and requires no change to the prompt request contract (R6) — AgentDeck sends no
+  structured attachment and embeds no file contents. Enter accepts the highlighted entry only while
+  the picker is open; with the picker closed Enter submits per R6, and Shift+Enter always inserts a
+  newline.
+- **R32.** *(planned)* Autocomplete never blocks, delays, or fails a prompt. If the working directory
+  is absent or unreadable, file search fails, no ACP command list has arrived, or nothing matches,
+  the applicable picker shows an empty or unavailable state and dismisses on Escape or continued
+  typing, while the composer keeps accepting and submitting text exactly as it does without this
+  feature. An inserted file mention is plain text, so a file later moved or deleted neither
+  invalidates the draft nor blocks the send.
+- **R33.** *(planned)* Typing `#` at a word boundary opens a command picker anchored to the composer.
+  The text after `#` up to the next whitespace filters the complete command/skill list most recently
+  advertised by the running chat agent over ACP `available_commands_update`; entries show the
+  advertised name and description and, when present, the input hint. Each later ACP update replaces
+  the prior live-session list. Accepting replaces `#query` with `/` followed by the advertised name
+  and a trailing space: a Codex skill advertised as `$review` therefore inserts `/$review `. The
+  inserted command is ordinary composer text and is submitted and recorded exactly as displayed.
+  AgentDeck neither invents commands nor attempts to classify a provider's entries as skills.
+
 ## 3. States & transitions
 
 - **Open/reload:** panel fetches durable events → normalizes/folds them → subscribes to live SSE
@@ -172,6 +203,12 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   payload is omitted whether it is in a run or arrives alone. This supersedes R25. Grouping changes
   neither durable events, sequence order, live/replay behavior, nor the individual event's
   right-click annotation target.
+
+- **R34.** *(planned)* File search is confined to the agent's session working directory. No query,
+  however written, returns or reveals a path outside it; `.git` is always skipped; and, when the
+  directory is in a Git worktree, files excluded by Git's effective ignore rules are not listed.
+  Traversal and result count are bounded so a very large directory cannot hang the picker, and an
+  unknown or non-chat agent returns the applicable `404`/typed error rather than a directory listing.
 
 ## 5. Acceptance criteria
 
@@ -230,6 +267,24 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   the distinct `.user-message::selection` rule in `ui/src/styles/features/agent.css`) and a browser
   check that highlighting a sent message shows a visible selection.
 
+- **A15** *(planned)* (R30, R31) — `@` at a word boundary opens the picker and `@` inside a word does
+  not; typing filters it; ↑/↓ move and Escape dismisses; accepting inserts `@<relative path>` plus a
+  trailing space; Enter accepts while the picker is open and submits the unchanged prompt text once
+  it is closed. *Verify by* a new `ui/src/components/chat/Composer.test.tsx`.
+
+- **A16** *(planned)* (R32, R34) — The search endpoint lists a working directory's files, omits
+  `.git` and Git-ignored files when the directory is in a worktree, refuses to return any path
+  outside the working directory, bounds its result count, and returns `404` for an unknown agent;
+  an unreadable working directory leaves the composer able to send. *Verify by* a new server test beside
+  `internal/server/files_commands_test.go` and an unavailable-source case in
+  `ui/src/components/chat/Composer.test.tsx`.
+
+- **A17** *(planned)* (R32, R33) — A fake ACP session publishes a command list, `#` opens one picker
+  containing every advertised entry, later complete updates replace the list, and accepting an entry
+  inserts `/<advertised-name>` plus a trailing space (including `/$<skill>`). No update, an empty
+  replacement, and a stopped/non-chat session leave prompt entry and submission usable. *Verify by*
+  runtime mapping/snapshot tests, a server endpoint test, and `ui/src/components/chat/Composer.test.tsx`.
+
 ## 6. Deviations & open decisions
 
 - **Concurrent transcript refetches have no ordering token.** Open, reconnect, and gap-repair
@@ -247,6 +302,11 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   ACP update normalization), `internal/runtime/event.go`, `internal/runtime/permission.go`.
 - **HTTP/persistence:** `internal/server/sessions.go` (`handlePrompt`, `handleTranscript`,
   `handleCancel`, `handlePermission`), `internal/transcript/writer.go`, `reader.go`.
+- **Composer autocomplete (R30–R34, planned):** `ui/src/components/chat/Composer.tsx` owns one
+  reusable picker for `@` files and `#` ACP commands. Bounded working-directory search and the live
+  command-snapshot read are session-scoped server handlers beside `internal/server/files_commands.go`;
+  `internal/runtime/acpmap.go` decodes command updates into replace-only live runtime state. Inserted
+  files and commands are plain composer text, so `SendPrompt` and the prompt route are unchanged.
 - **UI:** `ui/src/components/chat/ChatPanel.tsx`, `Composer.tsx`, `TranscriptView.tsx`,
   `renderers/`, `ui/src/store/transcriptStore.ts`, `ui/src/api/sse.ts`. The header runtime picker
   (R23/R24) reuses `switchRuntime` (`ui/src/api/client.ts`) and the same backend/model/effort reset

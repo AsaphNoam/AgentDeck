@@ -172,6 +172,26 @@ guidance. Launch and resume share this boundary.
 extension known to vary by pinned CLI version will use an explicit capability probe or a documented
 unsupported-option retry only when dropping it cannot change the user's requested runtime behavior.
 
+**R24 `(planned)` — ACP available commands are replace-only live session state.** The ACP decode
+boundary recognizes `available_commands_update` and validates its standard `availableCommands`
+items (`name`, `description`, optional unstructured `input.hint`). Each valid notification atomically
+replaces, rather than merges into, the owning chat runtime's command snapshot; an empty update clears
+it. The snapshot retains at most 256 entries; names are capped at 256 runes and descriptions/input
+hints at 2,000 runes at decode/storage so provider output cannot create an unbounded user-facing
+payload (INV §8). Invalid entries are skipped without losing
+the other valid entries or disrupting the ACP stream (INV §7). This state is not a normalized
+transcript event: it receives no transcript sequence, durable append, index entry, or global SSE
+publication. A fresh launch/resume/switch owns a fresh snapshot, and stop/crash removes it with the
+live runtime state (INV §1/§4).
+
+The runtime/registry exposes a read-only snapshot method used only by TS-03.R24. The server and UI
+do not discover provider commands independently and do not infer a skill taxonomy. ACP advertises
+names without the invocation slash, so UI selection inserts `/<name>` as ordinary prompt text; a
+Codex skill name beginning `$` becomes `/$<skill>`. Pinned evidence: Claude adapter 0.59.0 sends the
+snapshot after new/load/resume and on `commands_changed`; Codex adapter 1.1.2 sends built-ins plus
+cwd/additional-directory-discovered `$` skills. The ACP v1 command contract and both pinned adapter
+implementations are the compatibility authority, not provider-specific parsing in AgentDeck.
+
 ## 3. Interfaces & data shapes
 
 - ACP: JSON-RPC messages over newline-delimited child stdin/stdout; adapter determines exact
@@ -190,6 +210,10 @@ unsupported-option retry only when dropping it cannot change the user's requeste
   imports: the adapter contributes a delivery mode plus its identifier/flag, never an RPC call.
 - Native-auth readiness: no new HTTP shape; `PUT /api/backends` continues to return the existing
   per-backend `{status:"ok"|"failed"|"skipped", detail?}` result after provider-specific probing.
+- Available commands (R24, planned): ACP `session/update` payload
+  `{sessionUpdate:"available_commands_update",availableCommands:[...]}` becomes a bounded live
+  runtime snapshot; TS-03.R24 is its only HTTP projection and invocation remains an ordinary text
+  `session/prompt` block.
 
 ## 4. Invariants
 
@@ -224,6 +248,8 @@ unsupported-option retry only when dropping it cannot change the user's requeste
 ## 6. Traceability
 
 - ACP/runtime: `internal/runtime/chat.go`, `transport.go`, `event.go`, `permission.go`.
+- Available commands (R24, planned): decode in `internal/runtime/acpmap.go`, replace-only snapshot on
+  the live `agentState`, registry read projection, and fake-ACP new/load/replacement regressions.
 - Adapters: `internal/backend/adapter.go`; credential checks in `internal/backend/credcheck`;
   official Claude session metadata and Codex `CODEX_CONFIG` prompt delivery are pinned by runtime
   parameter/environment tests.

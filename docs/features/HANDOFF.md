@@ -192,41 +192,26 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 ### Open findings
 
-- **Must fix** — The file picker is designed as unverified plain-text completion instead of ACP
-  attachment. `docs/specs/features/FS-03-chat.md` R31 says accepting a file sends only the literal
-  `@<relative path>` in the existing text prompt and explicitly rules out structured attachment.
-  Normal use can therefore show a selected file without establishing that the adapter treats it as
-  file context. ACP v1 makes `resource_link` a baseline `session/prompt` content block, and both
-  pinned adapters already translate it to their native file-reference form
-  (`scripts/release/node_modules/@agentclientprotocol/claude-agent-acp/dist/acp-agent.js`,
-  `promptToClaude`; `scripts/release/node_modules/@agentclientprotocol/codex-acp/dist/index.js`,
-  `buildPromptItems`), while AgentDeck currently hard-codes a text-only prompt in
-  `internal/runtime/chat.go::SendPrompt`. Revise FS-03.R31 and the future TS-04 item either to send a
-  server-validated resource link alongside the durable display text, with a fake-ACP prompt-shape
-  regression, or explicitly obtain the human's decision that this is cosmetic text completion and
-  not file attachment. Record the ACP/pinned-adapter evidence in the eventual ready change. (INV §2)
-- **Must fix** — Half of the requested autocomplete was deferred without a product decision or a real
-  ACP limitation. `docs/specs/features/FS-03-chat.md` R33/A17 postpones `#` command/skill
-  autocomplete to an unspecified companion change even though the source idea requests file and
-  skill autocomplete together. ACP v1 defines `available_commands_update` as a replaceable
-  per-session command snapshot and invokes each advertised name as `/<name>` prompt text. The pinned
-  Claude 0.59.0 and Codex 1.1.2 adapters both publish it; Claude also republishes after
-  `commands_changed`, and Codex includes cwd-discovered skills as `$<skill>` command names. The
-  current runtime merely drops that known update in `internal/runtime/acpmap.go::mapSessionUpdate`.
-  Follow-up design should resolve whether `#` lists every advertised command (recommended, because
-  Claude's standard payload does not identify command origin) or only a demonstrably classifiable
-  skill subset, then include the smallest coherent plumbing: replace the live agent state's command
-  snapshot on every update, expose it through one session-scoped read route, reuse the composer
-  picker, and insert `/<name>` (including `/$<skill>` for Codex). Cover start/load, replacement,
-  empty/unavailable, stopped-session, and invocation-shape cases. If the human instead chooses a
-  file-only scope, revise the source idea and planned requirements explicitly rather than calling
-  the combined request complete. (INV §10)
+None.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-15 — Completed the composer file-and-command autocomplete design after the human resolved
+  both review findings. File selection is intentionally a plain-text convenience: `@` searches the
+  live chat session's working directory and inserts a relative `@path`, with no ACP resource block or
+  embedded contents. `#` uses the same picker for every command/skill in the latest complete ACP
+  `available_commands_update`; selection inserts `/<name>` (including Codex `/$<skill>`), later
+  updates replace the in-memory list, and launch/resume/switch/stop boundaries reset it. Planned
+  FS-03.R30–R34/A15–A17, TS-03.R24, and TS-04.R24 define the user behavior, two session-scoped reads,
+  bounded Git-aware file enumeration with fallback walking, ACP decode/cache/read plumbing,
+  failure behavior, and focused acceptance evidence. Pinned Claude 0.59.0, Codex 1.1.2, ACP v1, and
+  current package releases were verified. The source idea was removed and
+  `composer-file-and-command-autocomplete.md` is waiting to start. Both review findings are closed;
+  no product code changed.
 
 - 2026-08-15 — Reviewed the incomplete file-and-skill autocomplete design under the `/review-design`
   research and simplicity lenses; no product code, specification, or ready-change file changed.
