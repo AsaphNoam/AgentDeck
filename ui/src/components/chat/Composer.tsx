@@ -128,19 +128,22 @@ export function Composer({ agentId, busy }: { agentId: string; busy: boolean }) 
   };
 
   const submit = async () => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
+    // Reject whitespace-only drafts (R19) but send the text exactly as displayed:
+    // a picker insertion's trailing space is part of the prompt and must reach both
+    // the optimistic event and POST /prompt verbatim (FS-03.R31/R33, INV §1).
+    const prompt = text;
+    if (!prompt.trim()) return;
     setError(null);
-    append(agentId, { kind: "user_text", text: trimmed, message_id: `local-${Date.now()}` });
+    append(agentId, { kind: "user_text", text: prompt, message_id: `local-${Date.now()}` });
     setText("");
     setTrigger(null);
     try {
-      await sendPrompt(agentId, trimmed);
+      await sendPrompt(agentId, prompt);
     } catch {
       // Surface the failure and restore the draft so the user can retry; the
       // optimistic bubble stays, but the error makes clear it was not delivered.
       setError("Failed to send — the agent may have stopped. Your message was restored.");
-      setText(trimmed);
+      setText(prompt);
     }
   };
 

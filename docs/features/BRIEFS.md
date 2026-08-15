@@ -4,6 +4,19 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-15 — Fix: composer autocomplete send and stopped-chat file search
+
+Both problems the review found in the new chat autocomplete are fixed. Sending now delivers and saves
+the prompt exactly as shown — including the trailing space a selected file or command adds — while
+still refusing an empty or whitespace-only message. And a stopped chat no longer returns files from its
+former working directory; it now safely reports that autocomplete is unavailable, matching how the
+command picker already behaves. Both fixes restore behavior the specifications already required, so no
+specification changed. New automated tests cover each fix and were confirmed to fail before the change.
+
+**Needs attention:** None. Pushing the local commits to the shared branch still needs your authorization.
+
+**Next:** No further action required; the autocomplete work is now complete and verified.
+
 ### 2026-08-15 — Code review: recent dashboard and composer work
 
 The review found two problems in the new chat autocomplete. Selecting a file or command visibly adds a

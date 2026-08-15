@@ -117,6 +117,29 @@ describe("Composer autocomplete", () => {
     await waitFor(() => expect(ta.value).toBe("/$plan "));
   });
 
+  it("submits selected file and command text exactly as displayed, keeping the trailing space", async () => {
+    render(<Composer agentId="a_1" busy={false} />);
+    const ta = screen.getByRole("textbox") as HTMLTextAreaElement;
+
+    // Accept a file: inserts `@src/app.ts ` (with trailing space).
+    type(ta, "@app");
+    await screen.findByText("src/app.ts");
+    fireEvent.keyDown(ta, { key: "Enter" });
+    await waitFor(() => expect(ta.value).toBe("@src/app.ts "));
+
+    // Continue and accept a command: inserts `/$plan ` (with trailing space).
+    type(ta, "@src/app.ts #plan");
+    await screen.findByText("/$plan");
+    fireEvent.keyDown(ta, { key: "Enter" });
+    await waitFor(() => expect(ta.value).toBe("@src/app.ts /$plan "));
+
+    // The picker is closed after accepting, so Enter submits. The request body must
+    // retain the inserted trailing space (FS-03.R31/R33, INV §1).
+    fireEvent.keyDown(ta, { key: "Enter" });
+    await waitFor(() => expect(promptBodies.length).toBe(1));
+    expect(JSON.parse(promptBodies[0]).text).toBe("@src/app.ts /$plan ");
+  });
+
   it("stays usable when the file source is unavailable", async () => {
     failFileSearch = true;
     render(<Composer agentId="a_1" busy={false} />);

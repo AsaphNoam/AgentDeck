@@ -78,6 +78,14 @@ func (s *Server) handleFileSearch(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError(runtime.CodeConflict, "file search is only available for chat agents"))
 		return
 	}
+	// A stopped chat agent keeps its durable session row, but the composer that
+	// consumes this read exists only for a running agent. Gate on the running
+	// record so a stopped agent yields the shared typed runtime error instead of
+	// listing its former working directory (TS-03.R24, INV §1).
+	if _, err := s.stateStore.ReadRunning(id); err != nil {
+		writeAPIError(w, apiError(runtime.CodeAgentNotRunning, "agent is not running"))
+		return
+	}
 	files := []string{}
 	if snap, serr := s.stateStore.ReadSession(id); serr == nil {
 		cwd := snap.Cwd
