@@ -206,11 +206,14 @@ matching invariant classes before judging. Then review through three lenses, in 
    helpers, and routes exist and behave as assumed; claimed package, CLI, or protocol capabilities
    are real for the pinned versions; named dependencies are actually available. An assumption the
    code or a pinned tool contradicts is a finding, recorded with the contradicting evidence.
-   Claimed limitations get the same rigor as claimed capabilities: a design that works around
-   something a package or protocol "cannot do" must show the limitation is real — checked against
-   the pinned version's actual surface, newer releases, and official or better-maintained
-   alternative packages — with the evidence in the change file. An unverified impossibility claim
-   is a finding, and the workaround it motivated is re-judged under lens 1 once the claim falls.
+   Claimed limitations get the same rigor as claimed capabilities, and an implied limitation is
+   still a claim: when a design says something cannot be done the straightforward way, silently
+   takes an indirect route whose only sensible motive is such a limitation, or reads as a strange
+   strategy for the stated goal, validate the limitation itself. Show it is real against the
+   actual code, the pinned tool's real surface, newer releases, and better alternatives — a direct
+   approach, an existing seam, an official package — with the evidence in the change file. An
+   unverified impossibility claim is a finding, and the workaround it motivated is re-judged under
+   lens 1 once the claim falls.
 
 Also check the design's own hygiene: planned items tagged `(planned)`; no contradiction with
 shipped requirements or invariant classes; failure, concurrency, and rollback paths owned;

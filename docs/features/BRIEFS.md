@@ -4,6 +4,27 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-15 — Process: limitation checks generalized beyond packages
+
+Generalized. The rule no longer names packages and providers as the special case — it now covers
+every way a design can smuggle in a false limitation. Three triggers force validation: the design
+explicitly says something cannot be done the straightforward way; the design silently takes an
+indirect route whose only sensible motive is such a limitation; or the strategy simply reads as
+strange for the stated goal. In each case the limitation itself must be shown real — against the
+actual code, the pinned tool's real surface, newer releases, and better alternatives, whether that
+is a direct approach, an existing seam, or an official package — with the evidence in the change
+file. A workaround built on a claim that falls is then re-judged as over-engineering.
+
+The designer-side rule is generalized the same way: nothing is declared impossible from memory, and
+an indirect strategy whose only motive is an unverified limitation is not ready to propose.
+
+Documentation checks, the twin-skill comparison, and whitespace checks pass.
+
+**Needs attention:** None.
+
+**Next:** Nothing pending; the next `/design-feature` and `/review-design` runs pick these rules up
+automatically.
+
 ### 2026-08-15 — Process: impossibility claims now require proof
 
 No, the research lens only covered one direction — it caught designs assuming a capability that

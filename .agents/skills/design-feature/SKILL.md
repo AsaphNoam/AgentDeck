@@ -59,10 +59,12 @@ Read the relevant TS files, matching `INVARIANTS.md` classes, code boundaries, d
 protocols, and applicable architectural rationale. Design the smallest coherent architecture that
 satisfies the confirmed feature specification.
 
-Never declare a provider, package, or protocol capability impossible from memory. Before designing
-around a limitation, verify it against the pinned version's actual surface, newer releases, and
-official or better-maintained alternative packages, and record the evidence in the change file; a
-real limitation is cited, a false one usually deletes the workaround it motivated.
+Never declare anything impossible from memory — a provider capability, a package or protocol
+feature, or a direct use of an existing seam. Before designing around a limitation, verify it
+against the actual code or the pinned tool's real surface, newer releases, and better alternatives,
+and record the evidence in the change file; a real limitation is cited, a false one usually deletes
+the workaround it motivated. An indirect strategy whose only motive is an unverified limitation is
+not ready to propose.
 
 Extend the best existing TS when possible; create the next TS only for a separate architectural
 area. Add planned, append-only requirements covering the required interfaces, persistence, security,
