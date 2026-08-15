@@ -5,6 +5,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -378,5 +383,177 @@ func TestHookTrackingValidationErrors(t *testing.T) {
 				t.Fatalf("%s: status = %d body=%s, want %d", tc.name, rec.Code, rec.Body.String(), tc.wantCode)
 			}
 		})
+	}
+}
+
+// seedChatSessionWithCwd creates a chat agent + sessions row whose frozen cwd is
+// the given directory, so /file-search resolves a real working directory.
+func seedChatSessionWithCwd(t *testing.T, srv *Server, agentID, cwd string) {
+	t.Helper()
+	agent := state.Agent{
+		AgentID: agentID, Name: "Atlas", Role: "implementer", Project: "my-app",
+		Backend: "claude", Model: "sonnet-4-6", Interface: "chat",
+		CreatedAt: time.Date(2026, 6, 28, 10, 0, 0, 0, time.UTC),
+	}
+	if err := srv.stateStore.WriteAgent(agent); err != nil {
+		t.Fatalf("WriteAgent: %v", err)
+	}
+	ix := index.New(srv.stateStore.DB())
+	meta := runtime.SessionMetaData{
+		Name: "Atlas", Role: "implementer", Project: "my-app",
+		Backend: "claude", Model: "sonnet-4-6", Interface: "chat",
+		Cwd: cwd, CreatedAt: "2026-06-28T10:00:00Z", SessionID: "sess-fs-" + agentID,
+	}
+	if err := ix.UpsertSessionMeta(agentID, meta); err != nil {
+		t.Fatalf("UpsertSessionMeta: %v", err)
+	}
+}
+
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write %s: %v", path, err)
+	}
+}
+
+func fileSearchResults(t *testing.T, h http.Handler, agentID, query string) []string {
+	t.Helper()
+	rec := doGET(t, h, "/api/sessions/"+agentID+"/file-search?q="+url.QueryEscape(query))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("file-search status = %d body=%s, want 200", rec.Code, rec.Body.String())
+	}
+	var resp struct {
+		Files []string `json:"files"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	return resp.Files
+}
+
+// TestFileSearchGitWorktree covers the Git-aware inventory, ignores, .git skip,
+// query filtering, and symlink containment (TS-03.R24 / FS-03.R34, A16).
+func TestFileSearchGitWorktree(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	dir := t.TempDir()
+	run := func(args ...string) {
+		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		if b, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, b)
+		}
+	}
+	run("init")
+	writeFile(t, filepath.Join(dir, "main.go"), "package main")
+	run("add", "main.go")
+	writeFile(t, filepath.Join(dir, ".gitignore"), "*.log\n")
+	writeFile(t, filepath.Join(dir, "notes.md"), "notes")
+	writeFile(t, filepath.Join(dir, "build.log"), "ignored")
+	// A symlink pointing outside the worktree must never be returned.
+	outside := filepath.Join(t.TempDir(), "secret.txt")
+	writeFile(t, outside, "secret")
+	_ = os.Symlink(outside, filepath.Join(dir, "link"))
+
+	srv := testServer(t, false)
+	seedChatSessionWithCwd(t, srv, "a_fs_git", dir)
+	h := srv.routes()
+
+	all := fileSearchResults(t, h, "a_fs_git", "")
+	has := func(list []string, want string) bool {
+		for _, f := range list {
+			if f == want {
+				return true
+			}
+		}
+		return false
+	}
+	if !has(all, "main.go") || !has(all, "notes.md") || !has(all, ".gitignore") {
+		t.Fatalf("empty query results missing tracked/untracked files: %v", all)
+	}
+	if has(all, "build.log") {
+		t.Fatalf("ignored build.log was listed: %v", all)
+	}
+	if has(all, "link") {
+		t.Fatalf("out-of-tree symlink was listed: %v", all)
+	}
+	for _, f := range all {
+		if strings.HasPrefix(f, ".git/") || f == ".git" {
+			t.Fatalf(".git content listed: %v", all)
+		}
+	}
+	if got := fileSearchResults(t, h, "a_fs_git", "main"); len(got) != 1 || got[0] != "main.go" {
+		t.Fatalf("query 'main' = %v, want [main.go]", got)
+	}
+}
+
+// TestFileSearchCap bounds the result count at 50 (TS-03.R24).
+func TestFileSearchCap(t *testing.T) {
+	dir := t.TempDir()
+	for i := 0; i < 60; i++ {
+		writeFile(t, filepath.Join(dir, "f"+strconv.Itoa(i)+".txt"), "x")
+	}
+	srv := testServer(t, false)
+	seedChatSessionWithCwd(t, srv, "a_fs_cap", dir)
+	h := srv.routes()
+	got := fileSearchResults(t, h, "a_fs_cap", "")
+	if len(got) > 50 {
+		t.Fatalf("results = %d, want <= 50", len(got))
+	}
+}
+
+// TestFileSearchUnreadableDir returns an empty list (not an error) so the composer
+// can still send (FS-03.R32).
+func TestFileSearchUnreadableDir(t *testing.T) {
+	srv := testServer(t, false)
+	seedChatSessionWithCwd(t, srv, "a_fs_gone", filepath.Join(t.TempDir(), "does-not-exist"))
+	h := srv.routes()
+	if got := fileSearchResults(t, h, "a_fs_gone", ""); len(got) != 0 {
+		t.Fatalf("unreadable dir results = %v, want empty", got)
+	}
+}
+
+// TestFileSearchUnknownAgent is 404 (TS-03.R24).
+func TestFileSearchUnknownAgent(t *testing.T) {
+	srv := testServer(t, false)
+	h := srv.routes()
+	rec := doGET(t, h, "/api/sessions/a_missing/file-search?q=x")
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", rec.Code)
+	}
+}
+
+// TestFileSearchNonChatAgent returns a typed conflict rather than a directory
+// listing (FS-03.R34).
+func TestFileSearchNonChatAgent(t *testing.T) {
+	srv := testServer(t, false)
+	agent := state.Agent{
+		AgentID: "a_term", Name: "T", Role: "r", Project: "my-app",
+		Backend: "claude", Model: "m", Interface: "terminal",
+		CreatedAt: time.Date(2026, 6, 28, 10, 0, 0, 0, time.UTC),
+	}
+	if err := srv.stateStore.WriteAgent(agent); err != nil {
+		t.Fatalf("WriteAgent: %v", err)
+	}
+	h := srv.routes()
+	rec := doGET(t, h, "/api/sessions/a_term/file-search?q=x")
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d body=%s, want 409", rec.Code, rec.Body.String())
+	}
+}
+
+// TestAvailableCommandsUnknownAgent is 404; a known but not-running agent is a
+// typed conflict (agent_not_running) so the composer treats it as "no commands".
+func TestAvailableCommandsEndpointErrors(t *testing.T) {
+	srv := testServer(t, false)
+	seedSessionForTracking(t, srv) // chat agent, but no live runtime handle
+	h := srv.routes()
+
+	if rec := doGET(t, h, "/api/sessions/a_missing/available-commands"); rec.Code != http.StatusNotFound {
+		t.Fatalf("unknown agent status = %d, want 404", rec.Code)
+	}
+	rec := doGET(t, h, "/api/sessions/a_fc_test/available-commands")
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("stopped agent status = %d body=%s, want 409", rec.Code, rec.Body.String())
 	}
 }

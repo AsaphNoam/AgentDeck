@@ -172,7 +172,7 @@ guidance. Launch and resume share this boundary.
 extension known to vary by pinned CLI version will use an explicit capability probe or a documented
 unsupported-option retry only when dropping it cannot change the user's requested runtime behavior.
 
-**R24 `(planned)` — ACP available commands are replace-only live session state.** The ACP decode
+**R24 — ACP available commands are replace-only live session state.** The ACP decode
 boundary recognizes `available_commands_update` and validates its standard `availableCommands`
 items (`name`, `description`, optional unstructured `input.hint`). Each valid notification atomically
 replaces, rather than merges into, the owning chat runtime's command snapshot; an empty update clears
@@ -210,7 +210,7 @@ implementations are the compatibility authority, not provider-specific parsing i
   imports: the adapter contributes a delivery mode plus its identifier/flag, never an RPC call.
 - Native-auth readiness: no new HTTP shape; `PUT /api/backends` continues to return the existing
   per-backend `{status:"ok"|"failed"|"skipped", detail?}` result after provider-specific probing.
-- Available commands (R24, planned): ACP `session/update` payload
+- Available commands (R24): ACP `session/update` payload
   `{sessionUpdate:"available_commands_update",availableCommands:[...]}` becomes a bounded live
   runtime snapshot; TS-03.R24 is its only HTTP projection and invocation remains an ordinary text
   `session/prompt` block.
@@ -248,7 +248,7 @@ implementations are the compatibility authority, not provider-specific parsing i
 ## 6. Traceability
 
 - ACP/runtime: `internal/runtime/chat.go`, `transport.go`, `event.go`, `permission.go`.
-- Available commands (R24, planned): decode in `internal/runtime/acpmap.go`, replace-only snapshot on
+- Available commands (R24): decode in `internal/runtime/acpmap.go`, replace-only snapshot on
   the live `agentState`, registry read projection, and fake-ACP new/load/replacement regressions.
 - Adapters: `internal/backend/adapter.go`; credential checks in `internal/backend/credcheck`;
   official Claude session metadata and Codex `CODEX_CONFIG` prompt delivery are pinned by runtime

@@ -4,6 +4,30 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-15 — Implementation: composer file and command autocomplete
+
+Chat now has the file and command autocomplete the play session asked for. In a running chat, typing
+`@` opens a keyboard-driven picker of files from that session's working directory and inserts the one
+you pick as a plain relative path; typing `#` opens the same picker filled with the commands and
+skills the live agent currently advertises and inserts the runnable slash form (for example `/review`
+or a Codex `/$skill`). Both are just text in your message — nothing is attached, embedded, or saved
+anywhere — so sending works exactly as before.
+
+The autocomplete never gets in the way: file search is confined to the working directory (it skips
+`.git` and Git-ignored files, follows no symlinks out of the tree, and is size-capped), the command
+list comes straight from the agent's latest update, and if a directory is missing or the agent is
+stopped the picker just shows an empty state and you can still send. This finished the two "Chat &
+composer" spec areas, which are now marked complete.
+
+I verified it with automated tests across the runtime, the two new endpoints (driven against a real
+temporary Git project and a fake agent that publishes a command list), and the composer UI, plus the
+full build and packaging. I did not run a live browser or a real Claude/Codex session for this change.
+
+**Needs attention:** None.
+
+**Next:** A quick real-browser pass in the usability review to confirm the picker feels right against
+a live agent; nothing blocks that.
+
 ### 2026-08-15 — Feature design: composer file and command autocomplete
 
 The design is ready to implement. Typing `@` will search the live chat's working directory and

@@ -72,6 +72,8 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/sessions/{id}/switch-runtime", s.handleSwitchRuntime)
 	api("GET /api/sessions/{id}/files", s.handleFiles)
 	api("GET /api/sessions/{id}/commands", s.handleCommands)
+	api("GET /api/sessions/{id}/file-search", s.handleFileSearch)
+	api("GET /api/sessions/{id}/available-commands", s.handleAvailableCommands)
 	api("GET /api/sessions/{id}/messages", s.handleMessages)
 
 	// Phase 6 terminal runtime: capability probe (§8.5) and the PTY↔WebSocket

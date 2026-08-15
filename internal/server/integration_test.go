@@ -829,3 +829,58 @@ func mustAgent() state.Agent {
 		CreatedAt: time.Now(),
 	}
 }
+
+// TestAvailableCommandsSnapshotEndpoint drives the composer `#` read path end to
+// end (TS-03.R24, TS-04.R24, FS-03.A17): a fake ACP session publishes a command
+// list on session/new; GET /available-commands returns that live snapshot with
+// the advertised names and the optional input hint, including a Codex-style
+// `$skill`. The empty replacement case is covered by the runtime unit test.
+func TestAvailableCommandsSnapshotEndpoint(t *testing.T) {
+	fake := buildFakeACP(t)
+	t.Setenv("FAKEACP_SCENARIO", "stream_text")
+	t.Setenv("FAKEACP_COMMANDS", `[{"name":"review","description":"Review code","input":{"hint":"branch"}},{"name":"$plan","description":"Plan work"}]`)
+
+	srv := testServer(t, true)
+	srv.registry.Chat().SetCommand(fake)
+	if err := srv.configStore.WriteProject("tmpproj", config.Project{Title: "Tmp", Cwd: t.TempDir()}); err != nil {
+		t.Fatalf("WriteProject: %v", err)
+	}
+	if err := srv.configStore.WriteRole("impl", config.Role{Title: "Impl", SystemPrompt: "be helpful"}); err != nil {
+		t.Fatalf("WriteRole: %v", err)
+	}
+
+	ts := httptest.NewServer(srv.routes())
+	defer ts.Close()
+	t.Cleanup(func() { srv.registry.Shutdown(context.Background()) })
+
+	agentID := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+
+	r, err := http.Get(ts.URL + "/api/sessions/" + agentID + "/available-commands")
+	if err != nil {
+		t.Fatalf("get available-commands: %v", err)
+	}
+	defer r.Body.Close()
+	if r.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", r.StatusCode)
+	}
+	var resp struct {
+		AgentID  string `json:"agent_id"`
+		Commands []struct {
+			Name        string `json:"name"`
+			Description string `json:"description"`
+			InputHint   string `json:"input_hint"`
+		} `json:"commands"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Commands) != 2 {
+		t.Fatalf("commands = %+v, want 2", resp.Commands)
+	}
+	if resp.Commands[0].Name != "review" || resp.Commands[0].InputHint != "branch" {
+		t.Fatalf("command[0] = %+v, want review/branch", resp.Commands[0])
+	}
+	if resp.Commands[1].Name != "$plan" {
+		t.Fatalf("command[1] = %+v, want $plan", resp.Commands[1])
+	}
+}

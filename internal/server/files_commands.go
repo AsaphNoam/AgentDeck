@@ -3,9 +3,11 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
+	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/runtime"
 )
 
@@ -57,6 +59,68 @@ func (s *Server) handleCommands(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"agent_id": id, "commands": cmds})
+}
+
+// handleFileSearch serves GET /api/sessions/{id}/file-search?q=<text> for the
+// composer `@` picker (TS-03.R24, FS-03.R30/R32/R34). It resolves the known chat
+// session's working directory on the server and returns bounded, ranked relative
+// paths; the query is decoded as text, never joined as a caller-chosen path. An
+// unknown agent is 404 and a non-chat agent is a typed conflict; a missing or
+// unreadable working directory returns an empty list so the composer can still send.
+func (s *Server) handleFileSearch(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	agent, err := s.stateStore.ReadAgent(id)
+	if err != nil {
+		writeAPIError(w, apiError(runtime.CodeNotFound, "no such agent: "+id))
+		return
+	}
+	if agent.Interface != "chat" {
+		writeAPIError(w, apiError(runtime.CodeConflict, "file search is only available for chat agents"))
+		return
+	}
+	files := []string{}
+	if snap, serr := s.stateStore.ReadSession(id); serr == nil {
+		cwd := snap.Cwd
+		if expanded, eerr := config.ExpandTilde(cwd); eerr == nil {
+			cwd = expanded
+		}
+		files = searchWorkspaceFiles(cwd, r.URL.Query().Get("q"), fileSearchResultCap)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"agent_id": id, "files": files})
+}
+
+// handleAvailableCommands serves GET /api/sessions/{id}/available-commands for the
+// composer `#` picker (TS-03.R24, FS-03.R33). It returns the owning chat runtime's
+// latest ACP command snapshot without asking the adapter to refresh and without
+// creating any persisted row or transcript event. An unknown agent is 404; a
+// stopped or non-chat agent yields the shared typed runtime/conflict error so the
+// composer treats it as "no commands" and stays usable (FS-03.R32).
+func (s *Server) handleAvailableCommands(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if _, err := s.stateStore.ReadAgent(id); err != nil {
+		writeAPIError(w, apiError(runtime.CodeNotFound, "no such agent: "+id))
+		return
+	}
+	cmds, err := s.registry.Commands(id)
+	if err != nil {
+		writeAPIError(w, commandsSnapshotError(err))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"agent_id": id, "commands": cmds})
+}
+
+// commandsSnapshotError maps a command-snapshot read error to the typed API error
+// (TS-03.R24): an agent with no live handle (never started, stopped, crashed) is
+// agent_not_running, and a non-chat owner is a conflict.
+func commandsSnapshotError(err error) *runtime.APIError {
+	switch {
+	case errors.Is(err, runtime.ErrNoHandle):
+		return apiError(runtime.CodeAgentNotRunning, "agent is not running")
+	case errors.Is(err, runtime.ErrNotImplemented):
+		return apiError(runtime.CodeConflict, "available commands are only provided by chat agents")
+	default:
+		return apiError(runtime.CodeInternal, err.Error())
+	}
 }
 
 func queryTrackedFiles(db *sql.DB, agentID string) ([]trackedFile, error) {

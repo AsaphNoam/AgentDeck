@@ -99,6 +99,10 @@ func handle(msg *rpcMessage) {
 		}
 		respond(*msg.ID, map[string]any{"protocolVersion": ver, "agentCapabilities": map[string]any{}})
 	case "session/new":
+		// The real adapters publish an available_commands_update right after a
+		// session is created. Emit it BEFORE the response so the runtime's ordered
+		// read loop has stored the snapshot by the time session/new returns.
+		emitAvailableCommands()
 		respond(*msg.ID, map[string]any{"sessionId": sessionID})
 	case "session/load":
 		// If asked, dump the raw load params so tests can assert that the
@@ -269,6 +273,23 @@ func routeResponse(id int64, msg rpcMessage) {
 func sendRequest(id int64, method string, params map[string]any) {
 	raw, _ := json.Marshal(params)
 	writeMessage(rpcMessage{JSONRPC: "2.0", ID: &id, Method: method, Params: raw})
+}
+
+// emitAvailableCommands publishes the FAKEACP_COMMANDS array (raw ACP command
+// items) as an available_commands_update, or nothing when the env var is unset.
+func emitAvailableCommands() {
+	raw := os.Getenv("FAKEACP_COMMANDS")
+	if raw == "" {
+		return
+	}
+	var cmds []any
+	if err := json.Unmarshal([]byte(raw), &cmds); err != nil {
+		return
+	}
+	emitUpdate(map[string]any{
+		"sessionUpdate":     "available_commands_update",
+		"availableCommands": cmds,
+	})
 }
 
 func emitChunk(text string) {

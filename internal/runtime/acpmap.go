@@ -6,6 +6,74 @@ import (
 	"github.com/agentdeck/agentdeck/internal/strutil"
 )
 
+// Bounds on the decoded available-commands snapshot so provider output cannot
+// create an unbounded user-facing payload (TS-04.R24, INV §8).
+const (
+	maxCommandEntries = 256
+	maxCommandName    = 256
+	maxCommandText    = 2000
+)
+
+// CommandItem is one entry of a chat runtime's advertised ACP command snapshot,
+// projected verbatim to the composer command picker (TS-03.R24). InputHint is the
+// unstructured `input.hint` when the adapter supplies one.
+type CommandItem struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	InputHint   string `json:"input_hint,omitempty"`
+}
+
+// acpCommandsParams decodes an `available_commands_update` session/update. The
+// standard item carries name, description, and an optional unstructured input hint.
+type acpCommandsParams struct {
+	Update struct {
+		SessionUpdate     string            `json:"sessionUpdate"`
+		AvailableCommands []acpCommandEntry `json:"availableCommands"`
+	} `json:"update"`
+}
+
+type acpCommandEntry struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Input       *struct {
+		Hint string `json:"hint"`
+	} `json:"input"`
+}
+
+// decodeAvailableCommands recognizes an `available_commands_update` notification
+// and returns its validated, bounded snapshot (TS-04.R24). ok is false for any
+// other update kind so the caller falls through to normalized-event mapping. A
+// valid update with no items returns an empty (non-nil) slice, which clears the
+// snapshot. Entries without a name are skipped without dropping the valid ones
+// (INV §7); names and text are rune-clamped at the decode boundary (INV §8).
+func decodeAvailableCommands(params json.RawMessage) ([]CommandItem, bool) {
+	var p acpCommandsParams
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, false
+	}
+	if p.Update.SessionUpdate != "available_commands_update" {
+		return nil, false
+	}
+	out := make([]CommandItem, 0, len(p.Update.AvailableCommands))
+	for _, c := range p.Update.AvailableCommands {
+		if len(out) >= maxCommandEntries {
+			break
+		}
+		if c.Name == "" {
+			continue
+		}
+		item := CommandItem{
+			Name:        strutil.ClipRunes(c.Name, maxCommandName),
+			Description: strutil.ClipRunes(c.Description, maxCommandText),
+		}
+		if c.Input != nil {
+			item.InputHint = strutil.ClipRunes(c.Input.Hint, maxCommandText)
+		}
+		out = append(out, item)
+	}
+	return out, true
+}
+
 // acpmap.go is the ONLY place ACP wire shapes are decoded (techspec §12.1
 // isolation rule). Everything else in the package sees normalized Events. This
 // keeps the blast radius of an ACP version bump — or a Codex backend — localized

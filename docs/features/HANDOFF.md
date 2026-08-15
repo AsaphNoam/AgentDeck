@@ -7,7 +7,24 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** Release archive packaging now preserves the package context of the three required npm
+- **State:** Composer file-and-command autocomplete is implemented (FS-03.R30–R34, TS-03.R24,
+  TS-04.R24). In a live chat composer, `@` at a word boundary opens a file picker over the chat
+  session's working directory — Git tracked/untracked/effective-ignore view when it is a worktree,
+  otherwise a bounded walk; `.git` is skipped, directory symlinks are not followed, canonical
+  containment is enforced, results are ranked and capped at 50 — and accepting inserts a relative
+  `@path` plus a trailing space. `#` opens a command picker over the running agent's latest ACP
+  `available_commands_update` snapshot and inserts `/<name>`, including a Codex `/$skill`. Both stay
+  ordinary durable prompt text: no structured attachment, embedded contents, or command persistence,
+  so the prompt route and `SendPrompt` are unchanged. The ACP decode boundary stores the replace-only,
+  bounded snapshot (≤256 entries; name ≤256 and description/hint ≤2000 runes; nameless entries skipped)
+  as live runtime state that dies with the agent, and two new session-scoped GET routes (`file-search`,
+  `available-commands`) project it. Missing/unreadable directories return an empty list, unknown agents
+  404, and stopped or non-chat agents return a typed conflict, so autocomplete never blocks or fails a
+  send. FS-03 and TS-03 moved Partial→Current; TS-04 stays Partial. `make check-specs`, both Go test
+  modes, focused `-race` on the snapshot, `make build`, all 227 UI tests plus the new
+  `Composer.test.tsx`, presentation/style checks, and `make dist` pass. No live-browser pass was run;
+  component and fake-ACP integration coverage stands in.
+- **Previous state:** Release archive packaging now preserves the package context of the three required npm
   commands (`claude-agent-acp`, `codex-acp`, and `codex`) while keeping archives symlink-free: each
   npm `.bin` symlink becomes a regular launcher that calls the private Node runtime on the original
   in-tree module, so package-relative imports still resolve after extraction. The archive round-trip
@@ -57,100 +74,6 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   unlink with zero browser errors; source-failure/retry and launch through the binding remain
   unexercised. Full record:
   [`../archive/reviews/usability-review-run-2026-08-02-backend-creation.md`](../archive/reviews/usability-review-run-2026-08-02-backend-creation.md).
-- **Previous state:** Agent effort selection is implemented: models can declare provider-native levels and a
-  default, launch/CLI/switch/resume/pipeline flows preserve the resolved level, and Claude/Codex
-  delivery is adapter-specific. Live-provider honoring remains a credentialed acceptance gate.
-  Sky & Grove is implemented as AgentDeck's first optional built-in appearance and its visual
-  design has been reworked around a clearer sky canvas, blue-white surfaces, controlled evergreen
-  structure, restrained contour linework, and tighter geometry/depth. The change also restores the
-  agent-card state strip that the former leaf ornament displaced. Settings still switches the
-  mounted application immediately between unskinned Core and the statically bundled skin; the
-  existing global config API persists the choice, invalid or unreadable values fall back to Core
-  with an explanation, and failed saves restore the durable selection. The presentation contract
-  guards the finite skin set and CSS boundary, and live xterm instances recolor without reconnecting.
-  Specification/style/presentation checks, both Go test modes, all 194 UI tests, source and
-  distribution builds, and a paired real-browser visual-matrix review succeed with no browser
-  errors. The project-first dashboard, project/agent archive lifecycle, grouped Archive pagination,
-  project archive containment, and native-dialog replacement are implemented and independently
-  reviewed. All five Must-fix findings are fixed and the five Worth-fixing findings are fixed or
-  correctly closed; final verification passed. The 2026-07-29
-  usability pass found no new problem in its completed real-browser paths: project/scoped dashboards,
-  stopped-agent Resume, individual archive/restore, and grouped Archive rendered and behaved as
-  specified. Native browser confirmation input then stalled and blocked the remaining browser-only
-  project-archive, paging, post-restart-render, and pipeline paths; their backing API state and
-  focused regressions passed but are not browser passes. Full record:
-  [`../archive/reviews/usability-review-run-2026-07-29-project-archive.md`](../archive/reviews/usability-review-run-2026-07-29-project-archive.md).
-  The same-day retry recovered native-confirmation interaction and passed browser project archive,
-  project/agent restore, a 55-agent per-project Archive page, archived-default launch exclusion,
-  and post-restart rendering. A final retry passed no-active-project onboarding, 51-project
-  Archive paging, and archiving a project with a live pipeline (the run becomes stopped and the
-  archived project is unavailable to new runs). The 2026-08-01 usability pass then cleared the
-  last unexercised browser journey — the per-chat runtime switch (FS-03.R23/R24/A9): a real
-  headless-Chrome pass drove the running chat header's backend/model/effort picker through a model
-  switch, an effort switch, a cross-backend switch (with the model/effort reset), and a stop, all
-  applied by the switch-runtime path with zero console errors, and a stopped agent rendered the
-  read-only static identity. The shipped picker uses inline selects, so the prior `window.prompt()`
-  automation block no longer applies. Full record:
-  [`../archive/reviews/usability-review-run-2026-08-01-runtime-picker.md`](../archive/reviews/usability-review-run-2026-08-01-runtime-picker.md).
-  The projects home can now create a project without Settings: a persistent **New project** button and
-  a background right-click menu both open the reused project form and create through the existing
-  `POST /api/projects` path, with the card appearing live on success. FS-02 is now Current. Component
-  coverage exercises the flow; a real-browser J5 pass is still pending in usability review.
-  Claude configured-model autosync (FS-09.R45/R46) is now implemented: an opted-in `claude-acp`
-  backend imports the selectors named in the user-level `~/.claude/settings.json` at startup through
-  the shared add-only merge that Codex already used, fresh homes seed the four portable Claude family
-  aliases with `sonnet` as default, and Settings offers the Claude opt-in. Real live-CLI honoring of
-  imported selectors remains the standing provider acceptance gate; this change was verified by
-  focused Go tests against real file I/O, not a live Claude session.
-- **Previous transition context:** AgentDeck-launched Codex agents now run in a private `CODEX_HOME`
-  (`<agentdeck-home>/codex`, `0700`), composed as the final, reserved child-env layer in
-  launch/resume/switch via `codexHomeEnv`/`composeEnv`, so their rollouts and native session index
-  never enter the user's personal `codex` resume picker or app history. Before every codex-acp child
-  starts, a serialized `config.WithRefreshedCodexProfile` critical section one-way mirrors the user's
-  effective `${CODEX_HOME:-~/.codex}` setup (top-level config/auth/setup entries, session and
-  history entries excluded) into owner-only copies, tracked by a `cache/codex-profile.json`
-  managed-path manifest that prunes copies of removed personal setup while never touching the
-  child's own session data, creating a source symlink, or following one out of the personal root; an
-  unsafe or uncopyable selected asset fails the start before spawn. AgentDeck's own process
-  `CODEX_HOME` is untouched, so federation discovery and Codex model autosync still read the real
-  home. FS-08.R32/A9, FS-09.R43/R44/A17, TS-02.R19, and TS-04.R20/R21 are shipped and no longer
-  `(planned)`. The packaged `codex-acp` actually honoring a non-default `CODEX_HOME`, recognizing
-  the refreshed setup, and native-resuming a new isolated session remains a credentialed live-CLI
-  gate (FS-09.A7 / TS-04.R21). Pre-existing AgentDeck Codex sessions in the personal home are not
-  migrated and may no longer native-resume, as accepted by the human. Chat and archived transcripts no longer carry a standing per-event **Annotate**
-  button; annotating is now a right-click action on the event, capturing the highlighted text when
-  a highlight sits inside that event and the whole event otherwise (FS-13.R1/R19/A11). The diff
-  block's line-number range selection is unchanged. No live-browser pass was run for this change;
-  component coverage stands in for it. The AgentDecker pipeline builder now picks its own project. It launched into
-  `default_project` with no picker, so the seeded `my-app` (whose `~/Projects/my-app` cwd is absent
-  on a fresh box) could only be discovered as a rejected launch, with nothing on the Pipelines page
-  able to change it; its readiness check also only asked whether a default was configured, not
-  whether that default still resolved. Both regressions were verified to fail against the old code,
-  and a real-browser check confirmed the picker renders and that a real project clears the
-  directory rejection while `my-app` still reports it. Stopped Dashboard cards now expose the existing resume operation through their right-click
-  menu; running cards do not offer it, and a rejected resume surfaces an error toast. Dashboard state badges now visibly render their text labels; a broad selector had painted
-  every nested span, including the label, as a solid state-coloured block. Component coverage and the
-  browser visual matrix now exercise every state. Dashboard cards otherwise show configured project titles with a durable-id fallback, and every
-  context meter visibly labels its percentage, including zero. Direct human inspection found both
-  prior presentations ambiguous; focused regressions, the visual matrix, and J5 now cover the
-  observations. The prior seven findings from the review of `ccc2b50`→`cc9d498` are fixed and the queue is
-  empty. Chat Resume now carries its launch generation, so a resumed crash tears down ownership,
-  registration, and pauses its pipeline stage; the missing-agent annotation recovery waits for
-  hydration; pipeline attempt and builder links classify by `running`; the archived header reads the
-  newest session metadata; Archive paging de-duplicates and recovers rows that move between page
-  requests; and both onboarding steps render field-level validation detail. Each fix landed with a
-  regression that was verified to fail against the old code. FS-05.R28/A12 and FS-13.R16/A8 gained
-  the new boundaries; the other five restore existing requirements. Specification checks, both Go
-  test variants, all 149 UI tests, presentation/source/UI builds, the distribution build, focused
-  `-race` on the resume crash path, and whitespace checks pass. The post-fix browser rerun passed
-  J1–J4 and the exercised J5 layout paths, but J5 restart/delete and J6–J14 remain unconfirmed, so
-  none of these fixes has been exercised end-to-end in a real browser. A follow-up retry showed
-  that native confirmation now completes, but prior tabs contaminated the reused J5 fixture and
-  the in-app browser then dropped its tab after each successful transition; J7's stopped-agent,
-  transcript, and Archive-list surfaces rendered before that new block. The exact coverage is in
-  [`../archive/reviews/usability-review-run-2026-07-26-rerun.md`](../archive/reviews/usability-review-run-2026-07-26-rerun.md)
-  and [`../archive/reviews/usability-review-run-2026-07-26-browser-retry.md`](../archive/reviews/usability-review-run-2026-07-26-browser-retry.md).
-  Credentialed provider and terminal compatibility remain separate manual release gates.
 - **Last reviewed code:** `b6654b5` (2026-08-02), the continuous range after `05dff38`: Claude
   configured-model autosync, item-scoped backend creation, and global configuration linking. Its
   review findings and the earlier dashboard/pipeline findings are fixed in the completed fix set.
@@ -199,6 +122,22 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-15 — Implemented composer file-and-command autocomplete (FS-03.R30–R34, TS-03.R24,
+  TS-04.R24; INV §1/§2/§7/§8). `Composer.tsx` gained one reusable keyboard-operated picker: `@` at a
+  word boundary searches the chat session's working directory and inserts a relative `@path`; `#`
+  searches the running agent's live ACP command snapshot and inserts `/<name>` (Codex `/$skill`
+  included). Both remain ordinary durable prompt text, so the prompt route is unchanged. Two new
+  session-scoped GET handlers (`file-search`, `available-commands`) sit beside
+  `internal/server/files_commands.go`; `filesearch.go` does the bounded, Git-aware, symlink-safe,
+  containment-checked, 50-capped listing; `acpmap.go` decodes `available_commands_update` into a
+  replace-only, bounded runtime snapshot exposed by `ChatRuntime.Commands`/`Registry.Commands`. Safe
+  empty/typed-error shapes keep the composer sendable for missing directories, unknown (404), and
+  stopped/non-chat (conflict) agents. FS-03 and TS-03 moved Partial→Current. New regressions:
+  `Composer.test.tsx`, `TestDecodeAvailableCommands`, `TestAvailableCommandsSnapshotReplaceOnly`,
+  `TestFileSearch*`, and `TestAvailableCommandsSnapshotEndpoint`. `make check-specs`, both Go test
+  modes, focused `-race`, `make build`, all 227 UI tests, presentation/style checks, and `make dist`
+  pass. No live-browser pass was run.
 
 - 2026-08-15 — Completed the composer file-and-command autocomplete design after the human resolved
   both review findings. File selection is intentionally a plain-text convenience: `@` searches the

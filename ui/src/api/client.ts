@@ -1,4 +1,4 @@
-import type { AnnotationBatch, ArchiveProjectGroup, ArchiveResult, Capabilities, Layout, TrackedCommand, TrackedFile, TranscriptEvent } from "./types";
+import type { AnnotationBatch, ArchiveProjectGroup, ArchiveResult, AvailableCommand, Capabilities, Layout, TrackedCommand, TrackedFile, TranscriptEvent } from "./types";
 import type { ProjectResponse } from "../schemas/project";
 
 async function json<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -157,4 +157,21 @@ export function getTrackedFiles(agentId: string) {
 
 export function getTrackedCommands(agentId: string) {
   return json<{ agent_id: string; commands: TrackedCommand[] }>(`/api/sessions/${agentId}/commands`);
+}
+
+// searchSessionFiles backs the composer `@` picker: bounded, ranked relative paths
+// from the chat session's working directory (TS-03.R24). The query is sent as text.
+export function searchSessionFiles(agentId: string, query: string) {
+  return json<{ agent_id: string; files: string[] }>(
+    `/api/sessions/${agentId}/file-search?q=${encodeURIComponent(query)}`,
+  );
+}
+
+// getAvailableCommands backs the composer `#` picker: the running chat agent's
+// latest ACP command/skill snapshot (TS-03.R24). A stopped/non-chat agent errors,
+// which the composer treats as "no commands".
+export function getAvailableCommands(agentId: string) {
+  return json<{ agent_id: string; commands: AvailableCommand[] }>(
+    `/api/sessions/${agentId}/available-commands`,
+  );
 }

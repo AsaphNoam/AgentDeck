@@ -179,3 +179,11 @@ export interface TrackedCommand {
   exit_status: string;
   exit_error: string;
 }
+
+// AvailableCommand is one entry of the composer `#` command picker: an ACP
+// command/skill advertised by the running chat agent (TS-03.R24 / FS-03.R33).
+export interface AvailableCommand {
+  name: string;
+  description: string;
+  input_hint?: string;
+}

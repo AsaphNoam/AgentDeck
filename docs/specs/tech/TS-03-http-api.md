@@ -1,6 +1,6 @@
 # TS-03 — HTTP, SSE & WebSocket API
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/server`, `ui/src/api`
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) API sections and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -38,7 +38,7 @@ delta; clients must not assume every existing endpoint already uses R3.
 | Lifecycle/chat | `POST /api/sessions`, `prompt`, `cancel`, `stop`, `archive`, `restore`, `rename`, `identity`, `permission`, `resume`, `switch-runtime`, `annotations`; transcript read |
 | Config | role/project CRUD and project `archive`/`restore`; `GET/PUT /api/backends`, `/api/config`, `/api/layout` |
 | Archive/tracking | `GET /api/archive`, `GET /api/archive/projects/{project}`, session files/commands/messages |
-| Composer autocomplete *(planned)* | session-scoped file search and available-command snapshot reads |
+| Composer autocomplete | session-scoped file search and available-command snapshot reads |
 | Coordination | `POST /api/groups/{group}/release`, `/mcp` GET/POST/DELETE |
 | Federation | config-source list, preview, bind, refresh, delete |
 | Producers/terminal | `POST /api/hook`, terminal WebSocket |
@@ -211,7 +211,7 @@ reconciliation. A successful POST/PUT response returns the resulting `ETag`. POS
 mutations share TS-07.R17's catalog lock; schemas, mocks, backend/source query invalidation, and
 error display ship together under R11/R13.
 
-**R24 `(planned)` — Composer autocomplete uses two session-scoped reads.** `GET
+**R24 — Composer autocomplete uses two session-scoped reads.** `GET
 /api/sessions/{id}/file-search?q=<text>` resolves the known chat session's working directory on the
 server and returns `{agent_id,files:[<relative-path>]}`. The query is decoded as text, never joined
 as a caller-chosen path. Results are relative, slash-separated, deterministically ranked by simple
@@ -278,7 +278,7 @@ integers instead of silently applying defaults.
 - Terminal upgrade: `internal/server/terminal.go`.
 - Archive action and grouped query routes: `internal/server/{archive,archive_actions}.go`,
   `ui/src/api/client.ts`; `TestArchiveProjectRespondsWithActionLists`.
-- Composer autocomplete (R24, planned): routes in `internal/server/routes.go`, handlers beside
+- Composer autocomplete (R24): routes in `internal/server/routes.go`, handlers beside
   `internal/server/files_commands.go`, runtime command snapshots from TS-04.R24, and client shapes in
   `ui/src/api/{client,types}.ts`.
 - Appearance config projection: `internal/server/config_handlers.go`,

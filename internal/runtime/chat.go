@@ -201,7 +201,11 @@ type agentState struct {
 	resolved   map[string]struct{}     // toolCallIDs already settled this turn
 	transcript []Event
 	writer     TranscriptWriter
-	stopped    bool
+	// commands is the latest ACP available-commands snapshot (TS-04.R24). It is
+	// replace-only live state, not a transcript event: each update overwrites it,
+	// an empty update clears it, and it dies with this agentState on stop/crash.
+	commands []CommandItem
+	stopped  bool
 	// cancelEscalated is set only when the current turn ignored cooperative
 	// cancellation and the fallback SIGINT was delivered successfully.
 	cancelEscalated bool
@@ -766,10 +770,32 @@ func (c *ChatRuntime) onNotification(as *agentState, method string, params json.
 	if method != "session/update" {
 		return
 	}
+	// available_commands_update is replace-only live state, not a normalized
+	// transcript event: it gets no seq, durable append, index entry, or SSE
+	// publication (TS-04.R24). Handle it before event mapping and return.
+	if cmds, ok := decodeAvailableCommands(params); ok {
+		as.mu.Lock()
+		as.commands = cmds
+		as.mu.Unlock()
+		return
+	}
 	for _, m := range mapSessionUpdate(params) {
 		c.emit(as, m.Type, m.Data)
 		c.applyEventStatus(as, m)
 	}
+}
+
+// Commands returns the owning chat runtime's latest ACP available-commands
+// snapshot (TS-04.R24). ErrNoHandle when no live handle exists for the agent
+// (never started, stopped, or crashed) — the read is purely from live state.
+func (c *ChatRuntime) Commands(agentID string) ([]CommandItem, error) {
+	as, err := c.lookup(agentID)
+	if err != nil {
+		return nil, err
+	}
+	as.mu.Lock()
+	defer as.mu.Unlock()
+	return append([]CommandItem{}, as.commands...), nil
 }
 
 // onTransportClosed handles the read loop ending (EOF or scanner error). If we
