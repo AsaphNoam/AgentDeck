@@ -200,6 +200,24 @@ are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
 
+- 2026-08-15 — Added the `/review-design` role and simplicity rules; no product code changed.
+  Workflow §13 reviews a `Waiting to start` ready change before implementation through three ordered
+  lenses: over-engineering (every planned requirement must earn its place from the confirmed
+  outcome, a real report, or a binding invariant; "in case" machinery is a finding), maintainability
+  and extension (prefer stretching an existing FS/TS area, seam, route, or pattern over minting a
+  parallel mechanism — the design-level twin of INV §2 — with genuinely new interfaces justifying
+  the §6 contract cost), and research (design assumptions verified against the tree and pinned tool
+  versions, contradictions recorded with evidence), plus design hygiene (planned tags, invariant
+  conflicts, failure/concurrency/rollback ownership, observable acceptance, silently pre-made
+  product decisions). Findings use the §7 format in this file; the change stays waiting while
+  Must-fix findings are open, and resolution is §11 design-feature work. The same gap was closed for
+  implementation: §2 now requires the smallest satisfying change, extending existing seams before
+  inventing parallel ones, and no unrequired abstraction/configurability/edge-case handling; §7 now
+  treats unrequired complexity as a finding while still ignoring demands for speculative handling.
+  Twinned byte-identical launchers exist in `.claude/skills/review-design/` and
+  `.agents/skills/review-design/`; `AGENTS.md` and the spec README role list name the role.
+  `make check-specs`, the twin-skill comparison, and `git diff --check` pass.
+
 - 2026-08-14 — Added the `/investigate-bug` role; no product code changed. Workflow §12 defines the
   investigation process for field bug reports that cannot be live-debugged: verbatim report intake,
   spec-first classification (code defect / spec gap / works as specified), evidence-mapped diagnosis

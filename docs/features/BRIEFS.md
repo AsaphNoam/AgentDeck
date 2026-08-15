@@ -4,6 +4,35 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-15 — Process: new /review-design workflow and simplicity rules
+
+Added. `/review-design` reviews a designed-but-unbuilt change before any code is written — the gap
+the August 1st backend-design review had to improvise through. It reads the waiting change and its
+planned requirements, then judges them through three ordered lenses. First, over-engineering: every
+planned requirement must justify itself from the confirmed user outcome, a real report, or a binding
+invariant, and machinery built "in case" of situations nobody has observed is a finding, not
+prudence. Second, maintainability: designs should stretch an existing area, seam, route, or pattern
+before minting a parallel mechanism or new interface, and anything genuinely new must say why
+extension was rejected. Third, research: the design's factual assumptions — that cited helpers
+behave as claimed, that packages and pinned tools can do what the design needs — are checked against
+the actual tree, with contradictions recorded as findings.
+
+Findings land in the same queue the code reviewer uses; the change stays waiting while any Must-fix
+finding is open, and fixing the design is a follow-up design session with you. The reviewer itself
+changes nothing.
+
+Your instinct about implementation was right: the build workflow had the same blind spot. It asked
+for small complete pieces but never for simple ones, and code reviewers were told to ignore
+speculative edge cases rather than flag their presence. Both are fixed: implementers must now make
+the smallest change that satisfies the requirement and extend existing seams before inventing
+parallel ones, and unrequired complexity is now an explicit code-review finding.
+
+Documentation checks, the twin-skill comparison, and whitespace checks pass.
+
+**Needs attention:** None.
+
+**Next:** Run `/review-design` on the next change `/design-feature` produces, before starting `/work`.
+
 ### 2026-08-14 — Process: new /investigate-bug workflow
 
 Added. `/investigate-bug` is a new agent workflow for the bugs you meet at work, where live
