@@ -192,13 +192,55 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 ### Open findings
 
-None.
+- **Must fix** — The file picker is designed as unverified plain-text completion instead of ACP
+  attachment. `docs/specs/features/FS-03-chat.md` R31 says accepting a file sends only the literal
+  `@<relative path>` in the existing text prompt and explicitly rules out structured attachment.
+  Normal use can therefore show a selected file without establishing that the adapter treats it as
+  file context. ACP v1 makes `resource_link` a baseline `session/prompt` content block, and both
+  pinned adapters already translate it to their native file-reference form
+  (`scripts/release/node_modules/@agentclientprotocol/claude-agent-acp/dist/acp-agent.js`,
+  `promptToClaude`; `scripts/release/node_modules/@agentclientprotocol/codex-acp/dist/index.js`,
+  `buildPromptItems`), while AgentDeck currently hard-codes a text-only prompt in
+  `internal/runtime/chat.go::SendPrompt`. Revise FS-03.R31 and the future TS-04 item either to send a
+  server-validated resource link alongside the durable display text, with a fake-ACP prompt-shape
+  regression, or explicitly obtain the human's decision that this is cosmetic text completion and
+  not file attachment. Record the ACP/pinned-adapter evidence in the eventual ready change. (INV §2)
+- **Must fix** — Half of the requested autocomplete was deferred without a product decision or a real
+  ACP limitation. `docs/specs/features/FS-03-chat.md` R33/A17 postpones `#` command/skill
+  autocomplete to an unspecified companion change even though the source idea requests file and
+  skill autocomplete together. ACP v1 defines `available_commands_update` as a replaceable
+  per-session command snapshot and invokes each advertised name as `/<name>` prompt text. The pinned
+  Claude 0.59.0 and Codex 1.1.2 adapters both publish it; Claude also republishes after
+  `commands_changed`, and Codex includes cwd-discovered skills as `$<skill>` command names. The
+  current runtime merely drops that known update in `internal/runtime/acpmap.go::mapSessionUpdate`.
+  Follow-up design should resolve whether `#` lists every advertised command (recommended, because
+  Claude's standard payload does not identify command origin) or only a demonstrably classifiable
+  skill subset, then include the smallest coherent plumbing: replace the live agent state's command
+  snapshot on every update, expose it through one session-scoped read route, reuse the composer
+  picker, and insert `/<name>` (including `/$<skill>` for Codex). Cover start/load, replacement,
+  empty/unavailable, stopped-session, and invocation-shape cases. If the human instead chooses a
+  file-only scope, revise the source idea and planned requirements explicitly rather than calling
+  the combined request complete. (INV §10)
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-15 — Reviewed the incomplete file-and-skill autocomplete design under the `/review-design`
+  research and simplicity lenses; no product code, specification, or ready-change file changed.
+  There is no waiting ready change yet: the interrupted design left the idea under **Ideas being
+  defined** and drafted only FS-03.R30–R34/A15–A17. Two Must-fix findings are open. The draft silently
+  chose plain `@path` text despite ACP v1 baseline `resource_link` support in both pinned adapters,
+  and deferred the requested command/skill half despite both adapters already publishing standard
+  dynamic `available_commands_update` snapshots. The recommended combined design adds no new
+  package or persistence: validate and send selected files as resource links, cache the latest live
+  command snapshot per session behind a read endpoint, reuse one composer picker, and invoke the
+  advertised name as `/<name>`. The human still needs to decide whether `#` shows all advertised ACP
+  commands (recommended) or only a provider-classifiable skill subset, and whether `@` is real file
+  attachment (recommended) or cosmetic text completion. Local pinned sources, ACP v1 documentation,
+  and current npm releases were checked; `make check-specs` and `git diff --check` pass.
 
 - 2026-08-15 — Extended the §13 research lens and the design-feature launcher to claimed and
   implied limitations; no product code changed (two commits: the provider/package rule, then its
