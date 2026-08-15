@@ -4,6 +4,24 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-15 — Usability review: newest chat and startup changes
+
+The newest chat autocomplete, progress, and startup changes passed a focused real-browser review with
+no user-impact findings. File and command pickers opened only at word boundaries, filtered correctly,
+accepted from the keyboard, and preserved their trailing spaces in the sent transcript. A stopped chat
+reported unavailable autocomplete without disabling the composer. The Working indicator appeared for
+a deliberately non-finishing turn and cleared after the turn failed. Controlled Claude startup failure
+showed safe recovery guidance without leaking raw diagnostics, and the persistent dashboard log stayed
+owner-only across restarts. The browser reported zero console errors.
+
+One visual-only step was blocked: the automation could inspect the live selectable-text and contrasting
+selection styles but could not create an actual pointer text selection, so that gesture is not claimed
+as passed. Full evidence is in the [review report](../archive/reviews/usability-review-run-2026-08-15-recent-chat-fixes.md).
+
+**Needs attention:** None; the blocked selection gesture is an evidence gap, not an observed product problem.
+
+**Next:** No fix is needed from this review; optionally drag-select a user message once during the next manual browser smoke.
+
 ### 2026-08-15 — Fix: composer autocomplete send and stopped-chat file search
 
 Both problems the review found in the new chat autocomplete are fixed. Sending now delivers and saves

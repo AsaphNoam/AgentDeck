@@ -22,8 +22,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   404, and both a stopped agent (via the running record) and a non-chat agent return the shared typed
   runtime/conflict error. FS-03 and TS-03 moved Partial→Current; TS-04 stays Partial. `make check-specs`, both Go test
   modes, focused `-race` on the snapshot, `make build`, all 227 UI tests plus the new
-  `Composer.test.tsx`, presentation/style checks, and `make dist` pass. No live-browser pass was run;
-  component and fake-ACP integration coverage stands in.
+  `Composer.test.tsx`, presentation/style checks, and `make dist` pass. A 2026-08-15 isolated
+  real-browser pass confirmed both pickers, boundary/filter/keyboard behavior, verbatim trailing-space
+  submission, stopped-session failure without composer loss, and zero console errors.
 - **Previous state:** Release archive packaging now preserves the package context of the three required npm
   commands (`claude-agent-acp`, `codex-acp`, and `codex`) while keeping archives symlink-free: each
   npm `.bin` symlink becomes a regular launcher that calls the private Node runtime on the original
@@ -48,8 +49,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   also implemented: the transcript shows a **Working…** indicator at its end while the open chat agent
   is `busy` (clearing on turn end, error, or a permission pause to `waiting_input`), and transcript
   text is selectable/copyable with a distinct `.user-message::selection` colour so a highlight inside
-  the user's own bubble stays visible. FS-03.R28/R29/A13/A14 shipped and FS-03 remains Current; the
-  selection colour was confirmed from the styles, not a live browser pass. Simple backend creation and
+  the user's own bubble stays visible. FS-03.R28/R29/A13/A14 shipped and FS-03 remains Current. The
+  2026-08-15 browser pass confirmed the Working indicator and its error clear, plus live computed
+  selection styles; browser automation could not establish an actual pointer text selection, so that
+  one visual gesture remains unclaimed. Simple backend creation and
   global configuration linking is implemented. **Add backend**
   is now a provider-first dialog: choosing a type supplies a matching editable name and the canonical
   starter model, and submitting uses the new item-scoped `POST /api/backends`, which adds exactly one
@@ -122,6 +125,18 @@ and the API-only `tmux` calls without explicit timeouts remain an unreproduced s
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-15 — Ran a focused real-browser usability review of the newest chat and startup work. In
+  one isolated seeded home with a deterministic ACP peer, composer `@`/`#` boundary, filtering,
+  keyboard acceptance, exact trailing-space submission, and stopped-session failure behavior all
+  passed; a non-finishing turn showed **Working…** and cleared it after cancellation failure; a
+  controlled Claude initialize resource exit surfaced bounded recovery guidance without raw stderr;
+  and the foreground dashboard log appended with `0600` mode. Browser console errors: zero. The live
+  browser reported selectable transcript text and contrasting computed `::selection` colours, but
+  automation could not establish the pointer selection itself, so that visual gesture is recorded
+  blocked rather than passed. No user-impact findings. Focused Go regressions and 15 composer/transcript
+  UI tests pass. Full record:
+  [`../archive/reviews/usability-review-run-2026-08-15-recent-chat-fixes.md`](../archive/reviews/usability-review-run-2026-08-15-recent-chat-fixes.md).
 
 - 2026-08-15 — Fixed both composer autocomplete review findings (FS-03.R31/R33, TS-03.R24; INV §1);
   both restore already-specified behavior, so no specification changed. **Composer submit** now sends
