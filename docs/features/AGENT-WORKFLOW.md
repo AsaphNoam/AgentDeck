@@ -41,6 +41,12 @@ Work in small, complete pieces. For each piece:
 5. Commit the completed work, its specification update when needed, and the handoff update together
    on `main`. Continue with the next piece until the request is complete or there is a real reason to stop.
 
+Implement the smallest change that satisfies the requirement. Extend an existing seam, pattern, or
+interface before inventing a parallel one (INV §2 and its canonical-helpers registry), and do not
+add abstraction, configurability, or edge-case handling that no requirement or real report demands.
+When a requirement itself seems to force disproportionate machinery, question it under §3 rather
+than building around it.
+
 Do not claim work is complete while required checks fail. Do not make tests pass by weakening useful coverage or by changing a requirement without recording that change in the relevant specification.
 
 ## 3. When to ask the user
@@ -90,7 +96,7 @@ Check both directions:
 - Does the code do what the relevant requirements say?
 - Did the change introduce user-visible behavior or an architectural rule that the specifications do not describe?
 
-Also look for normal-use bugs: missing error handling at boundaries, realistic races, unsafe writes, dead code, and incomplete wiring. Ignore style preferences, speculative edge cases, and micro-optimizations.
+Also look for normal-use bugs: missing error handling at boundaries, realistic races, unsafe writes, dead code, and incomplete wiring. Unrequired complexity is likewise a finding: a new parallel mechanism or abstraction where an existing seam could extend, or code serving a case no requirement names. Ignore style preferences, demands for speculative edge-case handling, and micro-optimizations.
 
 Record each real finding in `## Review findings` in `HANDOFF.md` with its location, normal-use trigger, why it matters, relevant requirement ID when one exists, and a suggested test or fix. Start the bullet with either **Must fix** (a likely normal-use failure, data-loss risk, or requirement violation) or **Worth fixing** (useful but not urgent). Update the last reviewed commit only across a continuous range actually reviewed. Commit only the review-state files.
 
@@ -174,3 +180,38 @@ and no specifications, with one exception: it may commit a reproduction test mar
 6. **Close.** Record findings in `## Review findings` in `HANDOFF.md` using the §7 format plus the
    confidence label, so §8 consumes them unchanged. Commit only the state files and any skipped
    reproduction test, then finish with the §6 human update.
+
+## 13. Review a design
+
+`/review-design` reviews a waiting change in `docs/ready-changes/` — its change file and the planned
+FS/TS/INV items it cites — before implementation starts. It is the §7 author/reviewer split applied
+to a design: record findings, change nothing. Resolving findings is follow-up design-feature work
+with the human (§11), which removes each finding as it revises.
+
+`$ARGUMENTS` names the change; with exactly one waiting change, use it; with several, ask. Read the
+change file, every planned requirement it cites, the shipped requirements around them, and the
+matching invariant classes before judging. Then review through three lenses, in this order:
+
+1. **Over-engineering.** Every planned requirement must earn its place from the confirmed user
+   outcome, a real report, or a binding invariant. Abstraction layers, configuration surfaces,
+   modes, and edge-case machinery that no journey or report demands are findings; a requirement
+   that exists "in case" of an unobserved situation is a finding, not prudence. This repository
+   stays understandable only while each feature ships at its smallest coherent size.
+2. **Maintainability and extension.** Prefer a design that extends an existing FS/TS area, seam,
+   route, storage shape, or presentation pattern over one that mints a parallel mechanism,
+   interface, or vocabulary an existing one could stretch to cover — the design-level twin of
+   INV §2. Anything genuinely new must be worth the full §6 interface-contract cost, and the
+   design should say why extension was rejected.
+3. **Research.** Verify the design's factual assumptions against the tree: the cited seams,
+   helpers, and routes exist and behave as assumed; claimed package, CLI, or protocol capabilities
+   are real for the pinned versions; named dependencies are actually available. An assumption the
+   code or a pinned tool contradicts is a finding, recorded with the contradicting evidence.
+
+Also check the design's own hygiene: planned items tagged `(planned)`; no contradiction with
+shipped requirements or invariant classes; failure, concurrency, and rollback paths owned;
+acceptance evidence observable; and no product decision silently pre-made.
+
+Record findings in `## Review findings` in `HANDOFF.md` using the §7 format. The change stays
+`Waiting to start` — implementation must not begin while a design has open Must-fix findings. With
+no findings, say so plainly and leave the change untouched. Commit only the state files and finish
+with the §6 human update.
