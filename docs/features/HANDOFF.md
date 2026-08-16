@@ -126,6 +126,12 @@ are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
 
+- 2026-08-16 — `/review-design` found no selectable waiting design. `docs/ready-changes/`
+  contains only its index and explicitly lists no changes waiting to start; the handoff likewise
+  names no active change. The existing uncommitted idea and specification edits were left untouched
+  and were not silently treated as an approved ready change. No findings were recorded because no
+  design was eligible for review.
+
 - 2026-08-16 — Confirmed the `/fix` queue is empty. **No invariant class** applied: the handoff
   lists no open findings or active change, and both previously reported Must-fix items are already
   fixed in `5743cd3`. The user-owned `docs/ideas.md` edit remains untouched. No product or
