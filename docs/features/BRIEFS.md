@@ -4,6 +4,23 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-16 — Bug investigation: context bar stuck at 0%
+
+The bug is confirmed. The context-usage bar on every real chat agent reads "0% context used" because
+AgentDeck looks for token usage in the wrong place and under the wrong names. The pinned Claude adapter
+reports how full the context is through a running "usage update" message carrying the tokens used and
+the window size — AgentDeck ignores that message entirely. It instead reads the end-of-turn result,
+where the adapter only reports raw token counts with no window, under field names ("used"/"window")
+that the adapter never sends. Both paths therefore leave the value at zero forever. It went unnoticed
+because the fake adapter used in tests emits the made-up shape AgentDeck expects, so the tests passed
+against an adapter that doesn't exist. The fix also needs to write down, in the integration spec, what
+the real adapters actually send, since the code currently points at a spec section that isn't there.
+
+**Needs attention:** This is a required fix; the meter has been silently meaningless for real agents.
+
+**Next:** Run `/fix` to read context usage from the adapter's real "usage update" message, pin the
+mapping in the integration spec, correct the test adapter, and un-skip the reproduction test.
+
 ### 2026-08-16 — Bug investigation: missing AgentDecker pipeline proposals
 
 The bug is confirmed. AgentDecker successfully validates a pipeline proposal, but AgentDeck keeps no

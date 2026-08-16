@@ -140,11 +140,52 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
   the originating local-storage key, and assert the exact pending proposal remains reviewable once
   and still requires explicit Save/Start confirmation.
 
+- **Must fix** — **Confirmed** — The dashboard context-usage meter is stuck at `0% context used` for
+  every real chat agent. Verbatim field report (2026-08-16): “The context bar is broken, just stuck at
+  0%”; current `main`, local macOS environment, no report-supplied version or logs. Root cause is a
+  two-sided ACP mapping mismatch against the pinned Claude adapter 0.59.0
+  (`~/.local/lib/node_modules/@agentclientprotocol/claude-agent-acp`, `dist/acp-agent.js`), proven from
+  the code path, not a live turn (live-provider runs are blocked on human authorization). (1) The
+  adapter's `session/prompt` result `usage` object is
+  `{inputTokens,outputTokens,cachedReadTokens,cachedWriteTokens,totalTokens}` (`sessionUsage`,
+  `dist/acp-agent.js:4081`) — it has **no** `used` and **no** `window`. `internal/runtime/acpmap.go:122-125`
+  decodes `acpUsage{Used json:"used"; Window json:"window"}`, so both fields decode to 0;
+  `mapPromptResult` (`acpmap.go:269-281`) then fails its `r.Usage.Window > 0` guard and returns
+  `context_pct = 0`, `hasPct = false` for every turn. (2) The adapter's real context channel is a
+  separate `session/update` notification `{sessionUpdate:"usage_update", used:<tokens>, size:<contextWindow>}`
+  (`dist/acp-agent.js:1447,1958`), which `mapSessionUpdate` (`acpmap.go:209-265`) drops via its `default`
+  case. So `agentState.contextPct` never leaves 0, `ContextBar`
+  (`ui/src/components/grid/ContextBar.tsx`) always renders `0% context used`, satisfying FS-02.R26's
+  literal wording while defeating its purpose. The reason this shipped green: the `fakeacp` double emits
+  the AgentDeck-invented `{"used":4200,"window":200000}` result shape
+  (`internal/runtime/testdata/fakeacp/main.go:135`), so `chat_test.go:506-519` and `event_test.go:42`
+  validate a shape the real adapter never sends (INV §11 — a mock that does not tell the truth). This is
+  both a code defect (wrong ACP→`context_pct` mapping under TS-04) and a spec gap: no current TS-04
+  requirement governs the usage→`context_pct` mapping, and `acpmap.go:121,268` cite a “techspec §4.3”
+  that does not exist in the current TS-04. Fix by reading context from the adapter's real channel —
+  map the `usage_update` notification `{used,size}` into `context_pct = used/size`, and/or read the
+  result usage's token fields against a known/declared context window — add a TS-04 requirement pinning
+  the mapping to the pinned adapters' true shapes, and correct `fakeacp` to emit those shapes.
+  Reproduction committed skipped: `internal/runtime/acpmap_test.go` `TestContextUsageFromRealClaudeAdapterShapes`
+  (confirmed to fail un-skipped: `context_pct=0 hasPct=false`); the `/fix` session un-skips it.
+
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-16 — Investigated the report “The context bar is broken, just stuck at 0%” against FS-02.R26,
+  TS-04, and every invariant class. Confirmed a two-sided ACP mapping mismatch against the pinned Claude
+  adapter 0.59.0: its `session/prompt` result `usage` carries token counts only
+  (`inputTokens/outputTokens/…`, no `used`/`window`), so AgentDeck's `acpUsage{used,window}` decode
+  yields 0 and `mapPromptResult` never sets a non-zero `context_pct`; and the adapter's actual context
+  channel — a `usage_update` `session/update` with `{used,size}` — is dropped by `mapSessionUpdate`'s
+  default case. The meter therefore reads `0% context used` for every real turn. It stayed green because
+  `fakeacp` emits the invented `{used,window}` result shape (INV §11). Also a spec gap: no current TS-04
+  requirement governs the usage→`context_pct` mapping and the code cites a non-existent “§4.3”. One
+  Must-fix finding plus a skipped reproduction (`TestContextUsageFromRealClaudeAdapterShapes`, confirmed
+  failing un-skipped). No product code or specification changed.
 
 - 2026-08-16 — Investigated the report “pipeline proposals made with AgentDecker don't show up
   anywhere” against FS-14, TS-09, TS-04, and every invariant class. The defect is confirmed: proposal
