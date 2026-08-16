@@ -118,13 +118,61 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 ### Open findings
 
-None.
+- **Must fix** — concurrent wake/resume can tear down the successful runtime's registrations
+  (high confidence; TS-01.R16, INV §4/§5). Normal trigger: a prompt, mail nudge, or explicit
+  Resume reaches the same stopped agent concurrently. `handleResume` calls
+  `composeResumeSpecWithGeneration` before `Registry.Resume` takes its nil-sentinel claim, so both
+  callers can replace the agent-keyed hook token, MCP cleanup, and generated files; the loser then
+  calls `teardownAgentRegistration(agentID)` and deletes/revokes the winner's artifacts.
+  `acquireAgentStart` is an archive lease, not an exclusive resume claim. Revise the design so one
+  generation-scoped claim occurs before registration side effects (or cleanup is generation-scoped)
+  and explicit Resume uses the same seam; regress simultaneous prompt, mail, and explicit wakes,
+  proving one process, a conflict loser, and intact winner registrations.
+- **Must fix** — the wake predicate silently includes pipeline-stage agents the pipeline deliberately
+  stopped (high confidence; FS-01.R33, FS-06.R22/R23). `stopThenAdvance` calls `StopStage` after an
+  accepted stage result, but that chat agent remains non-archived with a persisted snapshot and
+  therefore satisfies every planned wake gate. A later prompt or agent mail would revive completed
+  stage work outside the pipeline state machine, undercutting the design's rationale that pipeline
+  agents already release their memory. The durable association already exists through
+  `PipelineAssociationForAgent`; resolve whether pipeline-stage identities are excluded or which
+  pipeline states may wake, specify it, and test list/prompt/mail behavior for a completed stage.
+- **Must fix** — failed-wake suppression is contradictory and has no reliable newer-mail cursor
+  (high confidence; FS-06.R23/A11, TS-04.R26, INV §15). FS-06 promises no retry until new mail or
+  human action, while TS-04's process-local marker explicitly permits the same unread row to retry
+  after every dashboard restart. Within one process, `messages.created_at` is stored only to whole
+  seconds and message ids are random, so two same-second rows cannot establish which is newer.
+  Prefer extending the existing durable `delivered_via` state: mark the pending rows whose wake
+  failed and treat only later `pending` rows as a stopped wake candidate. Otherwise define an
+  equally reliable cursor and narrow the FS guarantee. Regress same-second mail and restart after a
+  failed wake.
+- **Must fix** — the additive `list_agents` wake marker has no wire shape (high confidence;
+  FS-06.R3/R22/A11, TS-04.R26). The design promises a stopped/wakeable marker but defines neither
+  its field name/type nor how it relates to the existing `state` vocabulary. Specify the exact
+  backward-compatible field while preserving the agent's last status, and assert stopped wakeable,
+  running, and non-wakeable entries in the MCP integration test.
+- **Worth fixing** — “active project” does not name the exact shipped Resume gate (high confidence;
+  FS-01.R33, FS-05.R34). Ordinary Resume deliberately treats a missing project definition as
+  unavailable-but-active, while the ready change's parenthetical can be implemented as “project
+  file must exist and be active.” Cite and reuse the exact existing not-archived gate, or separately
+  specify an intentional behavior change; cover a stopped agent whose project definition is absent.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-16 — Reviewed `wake-on-message-for-stopped-agents.md` against every cited planned item,
+  the surrounding shipped requirements, all invariant classes, and the actual resume, registration,
+  messaging, nudger, pipeline, and composer seams; no product code, specification, or ready-change
+  file changed. Four Must-fix findings are open: the registry claim occurs after agent-keyed
+  registration side effects, so a concurrent loser can tear down the winning wake; the broad
+  predicate revives automatically stopped pipeline-stage agents outside the pipeline state machine;
+  the process-local failed-wake marker contradicts the no-retry promise and cannot order
+  same-second mail; and the additive `list_agents` marker has no defined wire shape. One
+  Worth-fixing ambiguity asks the design to preserve FS-05.R34's missing-project Resume behavior.
+  `make check-specs` and `git diff --check` pass. The change remains Waiting to start and must not
+  begin until the Must-fix findings are resolved.
 
 - 2026-08-16 — `/review-design` found no selectable waiting design. `docs/ready-changes/`
   contains only its index and explicitly lists no changes waiting to start; the handoff likewise
