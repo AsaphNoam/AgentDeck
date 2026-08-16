@@ -4,6 +4,25 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-16 — Design review: wake stopped agents on message
+
+The wake-on-message design is not ready to implement. Four required corrections surfaced. Two
+messages can try to wake the same agent before the runtime claim is taken, and the losing attempt can
+remove the successful agent's messaging and hook registrations. The wake rule also includes pipeline
+stage agents that the pipeline deliberately stopped after accepting their work, so ordinary mail
+could revive completed stages outside pipeline control. The proposed failed-wake guard both retries
+after a dashboard restart despite promising not to and cannot reliably distinguish messages created
+in the same second; the existing durable delivery marker is a simpler place to record that failure.
+Finally, the agent-discovery response promises a wakeable marker without defining its field or type.
+There is also a smaller ambiguity around agents whose project definition has been removed.
+
+**Needs attention:** Decide whether completed pipeline-stage agents may ever wake from ordinary
+prompts or mail. The other required changes are technical corrections to make concurrency, retry,
+and protocol behavior precise.
+
+**Next:** Revise the design and planned requirements to close these findings, then run
+`/review-design` again before implementation.
+
 ### 2026-08-16 — Design review: no waiting change
 
 There is no waiting design to review. The ready-changes directory explicitly lists none, and the
