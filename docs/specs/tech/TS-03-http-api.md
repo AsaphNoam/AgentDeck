@@ -229,6 +229,16 @@ runtime/conflict error. Search, Git, traversal, or command-source unavailability
 R3 error/empty shape required by FS-03.R32 and never affects the prompt route. The TypeScript client,
 mocks, and component consumers ship with both handlers under R11.
 
+**R25 — The prompt route wakes a stopped wakeable chat agent synchronously.** When
+`POST /api/sessions/{id}/prompt` finds no live runtime handle for an existing chat agent that
+FS-01.R33 can wake, the handler invokes the shared wake helper (TS-01.R16) inside the same request
+— bounded by TS-04.R22's per-stage ACP deadlines — and then delivers the prompt to the woken
+session. The route inventory (R5), request/response shapes, and success status are unchanged; the
+request simply carries the resume latency. Failure mapping: an agent the wake gates exclude keeps
+today's `404`/typed errors; a failed wake returns the typed resume error the explicit resume route
+would return; losing TS-01.R16's shared exclusive wake claim returns the existing `409` conflict,
+which the client may retry.
+
 ## 3. Interfaces & data shapes
 
 Feature-owned request/response fields are specified in the owning FS, including FS-14 for pipeline

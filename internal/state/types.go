@@ -127,19 +127,29 @@ type Message struct {
 	InReplyTo    string     `json:"in_reply_to,omitempty"`
 }
 
-// LiveAgent is a currently-running agent (a row in the running registry) joined
-// with identity and latest status — the unit list_agents returns and
-// ResolveRecipient matches against (techspec §3.2, §3.3).
+// Availability values for LiveAgent: an agent that is running right now, or a
+// stopped chat agent a message wakes before delivery (FS-06.R22).
+const (
+	AvailabilityRunning         = "running"
+	AvailabilityStoppedWakeable = "stopped_wakeable"
+)
+
+// LiveAgent is an addressable agent — running, or stopped and wakeable — joined
+// with identity and latest status: the unit list_agents returns and
+// ResolveRecipient matches against (techspec §3.2, §3.3). State always carries
+// the agent's latest durable status, so a stopped agent still reports the state
+// it ended in; Availability is what tells a sender that delivery implies a wake.
 type LiveAgent struct {
-	AgentID    string  `json:"agent_id"`
-	Name       string  `json:"name"`
-	Role       string  `json:"role"`
-	Project    string  `json:"project"`
-	Interface  string  `json:"interface"` // "chat" | "terminal"
-	Address    string  `json:"address"`   // canonical "role@project"
-	State      string  `json:"state"`     // latest status state, or "unknown"
-	Detail     string  `json:"detail"`
-	ContextPct float64 `json:"context_pct"`
+	AgentID      string  `json:"agent_id"`
+	Name         string  `json:"name"`
+	Role         string  `json:"role"`
+	Project      string  `json:"project"`
+	Interface    string  `json:"interface"`    // "chat" | "terminal"
+	Address      string  `json:"address"`      // canonical "role@project"
+	State        string  `json:"state"`        // latest status state, or "unknown"
+	Availability string  `json:"availability"` // "running" | "stopped_wakeable"
+	Detail       string  `json:"detail"`
+	ContextPct   float64 `json:"context_pct"`
 }
 
 // AgentRef is a compact reference returned in ambiguous-recipient errors so the

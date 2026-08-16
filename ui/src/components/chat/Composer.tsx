@@ -138,11 +138,15 @@ export function Composer({ agentId, busy }: { agentId: string; busy: boolean }) 
     setText("");
     setTrigger(null);
     try {
+      // A stopped chat agent is woken by this same request (FS-03.R35), so the
+      // composer submits normally and only the reply takes longer to start.
       await sendPrompt(agentId, prompt);
-    } catch {
-      // Surface the failure and restore the draft so the user can retry; the
-      // optimistic bubble stays, but the error makes clear it was not delivered.
-      setError("Failed to send — the agent may have stopped. Your message was restored.");
+    } catch (err) {
+      // Surface the server's own typed error — a rejected wake included — and
+      // restore the draft so the user can retry; the optimistic bubble stays,
+      // but the error makes clear it was not delivered.
+      const reason = err instanceof Error && err.message ? err.message : "the agent may have stopped";
+      setError(`Failed to send — ${reason}. Your message was restored.`);
       setText(prompt);
     }
   };

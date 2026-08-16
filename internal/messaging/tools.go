@@ -61,7 +61,7 @@ func (s *Server) handleListAgents(_ context.Context, req *mcp.CallToolRequest, i
 	if !ok {
 		return sessionUnknown()
 	}
-	live, err := s.store.LiveAgents()
+	live, err := s.addressableAgents()
 	if err != nil {
 		return storeUnavailable(err)
 	}
@@ -101,7 +101,11 @@ func (s *Server) handleSendMessage(_ context.Context, req *mcp.CallToolRequest, 
 			"message": fmt.Sprintf("subject must be <=%d chars.", maxSubjectLen)})
 	}
 
-	toID, candidates, err := s.store.ResolveRecipient(in.To)
+	addressable, err := s.addressableAgents()
+	if err != nil {
+		return storeUnavailable(err)
+	}
+	toID, candidates, err := state.ResolveRecipient(addressable, in.To)
 	if err != nil {
 		var amb *state.AmbiguousError
 		switch {

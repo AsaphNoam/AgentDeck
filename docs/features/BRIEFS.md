@@ -4,6 +4,59 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-17 — Implementation: stopped chat agents wake when a message arrives
+
+Stopping a chat agent is now a lightweight sleep rather than an ending. Typing into the composer of
+a stopped conversation sends the message as usual: AgentDeck restarts that agent behind the scenes,
+using exactly the settings it was frozen with, and then delivers the message, so the only visible
+difference is that the reply takes a few seconds longer to start. Another agent can now find and
+message a sleeping agent the same way — it appears in the agent list marked as sleeping rather than
+running, its mail is saved before anything else happens, and the agent is woken and told to read it.
+This means a person can freely stop idle agents to reclaim the memory their provider processes hold,
+knowing any later message brings the conversation back.
+
+The three deliberate limits from the design all hold. Agents that a pipeline stopped after accepting
+their work are never revived by a message; only the pipeline itself or the explicit Resume action
+can restart them. Archived agents, agents in archived projects, agents with nothing saved to resume
+from, and terminal agents behave exactly as before. And if a wake fails — a broken provider, for
+example — the message is kept, the agent stays stopped, an error is shown with the draft preserved,
+and AgentDeck does not keep retrying that same mail, even after a dashboard restart; new mail arms
+it again. Because a prompt, incoming mail, and a manual Resume can all arrive at once, all three now
+go through one exclusive per-agent lock, so exactly one restart happens and the others are told the
+agent is already starting.
+
+One unrelated repair: a test guarding the database version had been failing on the main branch since
+an earlier change added a migration without updating it. It now derives its expectation from the
+migration list, so it cannot drift again.
+
+**Needs attention:** None. This was verified with automated tests against a stand-in provider, not
+in a real browser with a real Claude or Codex session; a usability pass would confirm the wake feels
+right in practice.
+
+**Next:** Optionally run a usability review of the stopped-agent composer and mail wake, or pick the
+next idea to design.
+
+### 2026-08-16 — Design fix: all five wake-on-message review findings resolved
+
+Every finding from the design review checked out against the real code, so the wake-on-message
+design was revised rather than defended. The four confirmed problems and their fixes: two
+simultaneous wakes of the same agent could have destroyed each other's registration — the design
+now takes one exclusive per-agent claim before any side effect, shared by prompt, mail, and the
+existing Resume button; finished pipeline stage agents would have been silently wakeable, reviving
+completed stage work — they are now fully excluded from wake, with the pipeline and explicit Resume
+as the only revival paths; the "don't retry a failed wake" promise relied on an in-memory marker
+and second-granularity timestamps that could not order same-second mail — it now uses a durable
+per-message delivery marker that survives restarts; and the promised "stopped but wakeable" label
+in the agent list had no concrete field — it is now an explicit `availability` value alongside the
+existing status. A wording fix also pins the project gate to the exact shipped Resume behavior. The
+change is still waiting to start, now with the review's concurrency, pipeline, restart, and
+same-second test scenarios in its acceptance evidence.
+
+**Needs attention:** None — all findings are closed.
+
+**Next:** Say the word and an implementation session can start the ready change
+(`wake-on-message-for-stopped-agents.md`).
+
 ### 2026-08-16 — Design review: wake stopped agents on message
 
 The wake-on-message design is not ready to implement. Four required corrections surfaced. Two
@@ -22,6 +75,24 @@ and protocol behavior precise.
 
 **Next:** Revise the design and planned requirements to close these findings, then run
 `/review-design` again before implementation.
+
+### 2026-08-16 — Feature design: wake stopped agents on message
+
+The idle-memory idea is now a ready-to-implement design, and it turned out smaller than expected.
+Investigation showed the memory an idle agent holds is its provider child process, and the only
+agents created by the system rather than a person — pipeline stage agents — are already stopped the
+moment they finish. Per your decisions, conversations you start are never put to sleep
+automatically, so no idle timer was designed at all. Instead, the design makes waking transparent:
+sending a chat message to a stopped conversation resumes it and delivers the message, and
+agent-to-agent mail can find a stopped agent, wake it, and prompt it to read. Stopping an agent
+therefore becomes the cheap, deliberate way to free its memory, since any message brings it back
+with its history, model, and permissions intact. A broken agent cannot be woken repeatedly into a
+process-spawn loop, and a failed wake keeps your typed message so nothing is lost.
+
+**Needs attention:** None — all product decisions were resolved in session.
+
+**Next:** Say the word and an implementation session can start the ready change
+(`wake-on-message-for-stopped-agents.md`).
 
 ### 2026-08-16 — Design review: no waiting change
 

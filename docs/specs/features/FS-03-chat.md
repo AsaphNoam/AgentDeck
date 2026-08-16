@@ -183,8 +183,14 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 ## 4. Edge cases & errors
 
 - **R19.** Empty or whitespace-only prompts are not sent. Invalid JSON or empty prompt bodies at
-  the API boundary return `422 validation`; an unknown/non-running agent returns the applicable
-  `404`/typed runtime error.
+  the API boundary return `422 validation`; an agent FS-01.R33 cannot wake — an unknown id, a
+  terminal agent, an archived agent, an agent without a resumable snapshot, or a
+  pipeline-associated agent — returns the applicable `404`/typed runtime error.
+- **R35** — The composer of a stopped chat agent remains an enabled **wake surface**:
+  submitting sends the prompt, which wakes the agent per FS-01.R33, and the transcript shows the
+  user message plus the ordinary busy progression while the runtime re-attaches (wake adds the
+  resume latency before the turn starts). A failed wake surfaces the server's typed error through
+  the existing chat error surface and preserves the composer draft.
 - **R20.** The UI sanitizes assistant Markdown before inserting it into the DOM; transcript content
   cannot inject arbitrary HTML or script through Markdown rendering.
 - **R21.** A permission decision must be exactly `approve` or `deny`; invalid JSON or any other
@@ -284,6 +290,11 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   inserts `/<advertised-name>` plus a trailing space (including `/$<skill>`). No update, an empty
   replacement, and a stopped/non-chat session leave prompt entry and submission usable. *Verify by*
   runtime mapping/snapshot tests, a server endpoint test, and `ui/src/components/chat/Composer.test.tsx`.
+- **A18** (R35) — With a stopped chat agent open, the composer accepts and submits a
+  prompt; the UI issues the ordinary prompt request and renders the user message and busy
+  progression from the resulting events, and a rejected wake shows the server error while keeping
+  the draft. *Verify:* `Composer`/chat component tests against a mocked prompt route for both
+  branches; the end-to-end wake itself is FS-01.A17's server test.
 
 ## 6. Deviations & open decisions
 

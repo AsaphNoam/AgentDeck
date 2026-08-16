@@ -120,8 +120,10 @@ func TestOpenMigratesAndConfiguresSQLite(t *testing.T) {
 	if err := st.DB().QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil {
 		t.Fatalf("schema_migrations version: %v", err)
 	}
-	if version != 13 {
-		t.Fatalf("migration version = %d, want 13", version)
+	// Derived from the migrations slice rather than a literal: a hand-maintained
+	// number silently drifts the moment a migration is appended (INV §9).
+	if want := migrations[len(migrations)-1].version; version != want {
+		t.Fatalf("migration version = %d, want %d", version, want)
 	}
 }
 
@@ -152,8 +154,8 @@ func TestOpenIsIdempotentAndPreservesRows(t *testing.T) {
 	if err := reopened.DB().QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatalf("count migration: %v", err)
 	}
-	if count != 13 {
-		t.Fatalf("migration version rows = %d, want 13", count)
+	if want := len(migrations); count != want {
+		t.Fatalf("migration version rows = %d, want %d", count, want)
 	}
 }
 
