@@ -126,6 +126,11 @@ are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
 
+- 2026-08-16 — Confirmed the `/fix` queue is empty. **No invariant class** applied: the handoff
+  lists no open findings or active change, and both previously reported Must-fix items are already
+  fixed in `5743cd3`. The user-owned `docs/ideas.md` edit remains untouched. No product or
+  specification change was needed.
+
 - 2026-08-16 — Fixed both confirmed findings. **Pipeline proposals** now commit one canonical,
   content-addressed proposal record to SQLite before MCP success, publish an invalidation event, and
   appear through the server-owned Pipelines query rather than an ACP tool-result transcript or
