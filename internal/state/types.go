@@ -210,6 +210,17 @@ type PipelineValueRecord struct {
 	UpdatedAt       time.Time `json:"updated_at"`
 }
 
+// PipelineProposalRecord is the durable, canonical result of an AgentDecker
+// proposal tool call. Its payload stays opaque here so state remains independent
+// of the pipeline package's template and run request types.
+type PipelineProposalRecord struct {
+	ProposalID string          `json:"proposal_id"`
+	Kind       string          `json:"kind"`
+	Digest     string          `json:"digest"`
+	Payload    json.RawMessage `json:"payload"`
+	CreatedAt  time.Time       `json:"created_at"`
+}
+
 type CreatePipelineRunParams struct {
 	Run            PipelineRunRecord
 	RequestID      string

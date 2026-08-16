@@ -779,6 +779,15 @@ func (c *ChatRuntime) onNotification(as *agentState, method string, params json.
 		as.mu.Unlock()
 		return
 	}
+	// usage_update is live runtime state rather than a transcript event. The
+	// prompt result only contains token accounting, so retain this provider
+	// notification until the turn-end status write republishes it (TS-04.R25).
+	if pct, ok := decodeContextUsage(params); ok {
+		as.mu.Lock()
+		as.contextPct = pct
+		as.mu.Unlock()
+		return
+	}
 	for _, m := range mapSessionUpdate(params) {
 		c.emit(as, m.Type, m.Data)
 		c.applyEventStatus(as, m)

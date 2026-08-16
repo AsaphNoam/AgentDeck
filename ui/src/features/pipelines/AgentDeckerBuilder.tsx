@@ -1,44 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { getTranscript, launchAgent, sendPrompt } from "../../api/client";
+import { launchAgent, sendPrompt } from "../../api/client";
 import { useBackends, useConfig, useProjects, useRoles } from "../../api/config";
-import type { TranscriptEvent } from "../../api/types";
-import { pipelineProposalSchema, type PipelineProposal } from "../../schemas/pipeline";
-import { useTranscriptStore } from "../../store/transcriptStore";
+import { usePipelineProposals } from "../../api/pipelines";
+import type { PipelineProposal } from "../../schemas/pipeline";
 import { useAgentStore } from "../../store/agentStore";
 
 const BUILDER_KEY = "agentdeck.pipeline-builder-agent";
-const EMPTY_EVENTS: TranscriptEvent[] = [];
 
-export function shouldDropBuilderSession(builderID: string | null, live: boolean, transcriptLoaded: boolean, hasProposal: boolean, hydrated: boolean, hydrating: boolean, justLaunched: boolean) {
-  return Boolean(builderID && transcriptLoaded && hydrated && !hydrating && !live && !hasProposal && !justLaunched);
-}
-
-export function extractPipelineProposals(events: TranscriptEvent[]): PipelineProposal[] {
-  const proposals = new Map<string, PipelineProposal>();
-  for (const event of events) {
-    const kind = String(event.kind ?? event.type ?? "");
-    if (kind !== "tool_result") continue;
-    for (const candidate of jsonCandidates(event.content ?? event.result)) {
-      try {
-        const parsed = JSON.parse(candidate) as { ok?: boolean; proposal?: unknown };
-        const result = pipelineProposalSchema.safeParse(parsed.proposal);
-        if (parsed.ok === true && result.success) proposals.set(result.data.digest, result.data);
-      } catch {
-        // Tool renderers accept arbitrary content; unrelated text is not a proposal.
-      }
-    }
-  }
-  return [...proposals.values()];
-}
-
-function jsonCandidates(value: unknown): string[] {
-  if (typeof value === "string") return [value];
-  if (Array.isArray(value)) return value.flatMap(jsonCandidates);
-  if (!value || typeof value !== "object") return [];
-  const object = value as Record<string, unknown>;
-  const direct = typeof object.text === "string" ? [object.text] : [];
-  return [...direct, ...Object.values(object).flatMap(jsonCandidates)];
+export function shouldDropBuilderSession(builderID: string | null, live: boolean, hydrated: boolean, hydrating: boolean, justLaunched: boolean) {
+  return Boolean(builderID && hydrated && !hydrating && !live && !justLaunched);
 }
 
 export function AgentDeckerBuilder({
@@ -58,19 +29,16 @@ export function AgentDeckerBuilder({
   const [modelID, setModelID] = useState("");
   const [description, setDescription] = useState("");
   const [builderID, setBuilderID] = useState<string | null>(() => localStorage.getItem(BUILDER_KEY));
-  const [builderTranscriptLoaded, setBuilderTranscriptLoaded] = useState(false);
   const justLaunchedBuilder = useRef<string | null>(null);
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const events = useTranscriptStore((state) => builderID ? state.byAgent[builderID] ?? EMPTY_EVENTS : EMPTY_EVENTS);
-  const setTranscript = useTranscriptStore((state) => state.setTranscript);
+  const proposals = usePipelineProposals();
   // A stopped builder keeps its identity row in the agent store, so presence is
   // not liveness: classifying by presence never expires the persisted id and
   // leaves a dead "Open AgentDecker chat" link behind (INV §1).
   const builderRunning = useAgentStore((state) => (builderID ? state.agents[builderID]?.running === true : false));
   const agentsHydrated = useAgentStore((state) => state.hydrated);
   const agentsHydrating = useAgentStore((state) => state.hydrating);
-  const proposals = useMemo(() => extractPipelineProposals(events), [events]);
 
   const backendEntries = Object.entries(backends.data?.backends ?? {});
   const defaultBackend = backendEntries.find(([, backend]) => backend.default)?.[0] ?? backendEntries[0]?.[0] ?? "";
@@ -103,28 +71,11 @@ export function AgentDeckerBuilder({
   }, [backendID, backends.data]);
 
   useEffect(() => {
-    if (!builderID || !agentsHydrated || agentsHydrating) return;
-    // Mark the transcript loaded only on a real success. Setting it in .finally()
-    // makes a failed read (server restart, 500) indistinguishable from a loaded
-    // empty transcript, which flips shouldDropBuilderSession true for a stopped
-    // builder and destroys the localStorage pointer to a pending proposal awaiting
-    // its one-time approval — the exact loss this recovery prevents (FS-14.R27/A10,
-    // INV §7/§1). A failed read leaves the session undecided until a later retry.
-    void getTranscript(builderID)
-      .then((transcript) => {
-        setTranscript(transcript.agent_id, transcript.events);
-        setBuilderTranscriptLoaded(true);
-      })
-      .catch(() => undefined);
-  }, [agentsHydrated, agentsHydrating, builderID, builderRunning, setTranscript]);
-
-  useEffect(() => {
     if (builderRunning && justLaunchedBuilder.current === builderID) justLaunchedBuilder.current = null;
-    if (!shouldDropBuilderSession(builderID, builderRunning, builderTranscriptLoaded, proposals.length > 0, agentsHydrated, agentsHydrating, justLaunchedBuilder.current === builderID)) return;
+    if (!shouldDropBuilderSession(builderID, builderRunning, agentsHydrated, agentsHydrating, justLaunchedBuilder.current === builderID)) return;
     localStorage.removeItem(BUILDER_KEY);
     setBuilderID(null);
-    setBuilderTranscriptLoaded(false);
-  }, [agentsHydrated, agentsHydrating, builderID, builderRunning, builderTranscriptLoaded, proposals.length]);
+  }, [agentsHydrated, agentsHydrating, builderID, builderRunning]);
 
   const launchBuilder = async () => {
     if (!description.trim() || !project) return;
@@ -143,7 +94,6 @@ export function AgentDeckerBuilder({
       justLaunchedBuilder.current = agentID;
       localStorage.setItem(BUILDER_KEY, agentID);
       setBuilderID(agentID);
-      setBuilderTranscriptLoaded(false);
       await sendPrompt(agentID, [
         "Help me design this AgentDeck pipeline:",
         description.trim(),
@@ -196,9 +146,9 @@ export function AgentDeckerBuilder({
       <p>{!agentsHydrated ? "Loading builder session…" : builderRunning ? <>Builder session: <code>{builderID}</code></> : "The builder session has stopped. Its pending proposals remain available below."}</p>
       {builderRunning && <Link to={`/agent/${builderID}`}>Open AgentDecker chat</Link>}
     </div>}
-    {proposals.length > 0 && <div className="pipeline-proposal-list">
+    {(proposals.data?.length ?? 0) > 0 && <div className="pipeline-proposal-list">
       <h3>Pending exact proposals</h3>
-      {proposals.map((proposal) => <article className="pipeline-proposal" key={proposal.digest}>
+      {proposals.data?.map((proposal) => <article className="pipeline-proposal" key={proposal.proposal_id}>
         <div><strong>{proposal.kind === "save_template" ? "Save template" : "Start run"}</strong><code>{proposal.proposal_id}</code></div>
         <pre className="pipeline-proposal-payload">{JSON.stringify(proposal.payload, null, 2)}</pre>
         {proposal.kind === "save_template"

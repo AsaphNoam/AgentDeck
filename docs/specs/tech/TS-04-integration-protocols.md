@@ -86,9 +86,10 @@ server adds `report_pipeline_stage_result`, `propose_pipeline_template`, and
 `propose_pipeline_run`; there is no `start_pipeline_run` tool. All derive caller identity from the
 per-launch token and return bounded structured results. Reporting delegates to TS-09's atomic
 current-attempt service. Proposal tools are limited to token-bound AgentDecker-role chat sessions,
-call the canonical pipeline validator, and return data/digests only: they cannot save, start, or
-approve. Tool registration, token generation, teardown, transport, and redaction remain the existing
-R6–R7 authority rather than a second MCP server.
+call the canonical pipeline validator, and commit their bounded canonical proposal record before
+returning data/digests: they cannot save, start, or approve. Tool registration, token generation,
+teardown, transport, and redaction remain the existing R6–R7 authority rather than a second MCP
+server.
 
 **R18 — Effort delivery is adapter-declared and fail-closed.** The three shipped
 providers accept effort through three structurally different mechanisms, so the adapter declares
@@ -192,6 +193,17 @@ snapshot after new/load/resume and on `commands_changed`; Codex adapter 1.1.2 se
 cwd/additional-directory-discovered `$` skills. The ACP v1 command contract and both pinned adapter
 implementations are the compatibility authority, not provider-specific parsing in AgentDeck.
 
+**R25 — ACP context usage follows the adapter's context channel.** The pinned Claude adapter's
+`session/prompt` result `usage` object is token accounting
+(`inputTokens`, `outputTokens`, `cachedReadTokens`, `cachedWriteTokens`, `totalTokens`) and does not
+declare a context window, so it does not set `context_pct`. Its `session/update`
+`{sessionUpdate:"usage_update",used,size}` notification is decoded at the ACP boundary and replaces
+the owning live chat runtime's context percentage with `used / size`; invalid negative usage or a
+non-positive size is ignored, and a value above one is capped at one. The current value is carried
+into the terminal turn status and rollup, preserving the existing dashboard and resume contracts.
+The fake ACP adapter emits these same shapes so protocol tests do not assert an invented wire
+contract (INV §11).
+
 ## 3. Interfaces & data shapes
 
 - ACP: JSON-RPC messages over newline-delimited child stdin/stdout; adapter determines exact
@@ -214,6 +226,9 @@ implementations are the compatibility authority, not provider-specific parsing i
   `{sessionUpdate:"available_commands_update",availableCommands:[...]}` becomes a bounded live
   runtime snapshot; TS-03.R24 is its only HTTP projection and invocation remains an ordinary text
   `session/prompt` block.
+- Context usage (R25): Claude's `usage_update` payload
+  `{sessionUpdate:"usage_update",used:<tokens>,size:<context-window>}` becomes the live
+  `context_pct`; prompt-result token accounting is not interpreted as a percentage.
 
 ## 4. Invariants
 
@@ -250,6 +265,8 @@ implementations are the compatibility authority, not provider-specific parsing i
 - ACP/runtime: `internal/runtime/chat.go`, `transport.go`, `event.go`, `permission.go`.
 - Available commands (R24): decode in `internal/runtime/acpmap.go`, replace-only snapshot on
   the live `agentState`, registry read projection, and fake-ACP new/load/replacement regressions.
+- Context usage (R25): `decodeContextUsage`, `ChatRuntime.onNotification`, and
+  `TestContextUsageFromRealClaudeAdapterShapes`.
 - Adapters: `internal/backend/adapter.go`; credential checks in `internal/backend/credcheck`;
   official Claude session metadata and Codex `CODEX_CONFIG` prompt delivery are pinned by runtime
   parameter/environment tests.

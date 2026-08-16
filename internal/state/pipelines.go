@@ -142,6 +142,57 @@ func (s *Store) ReadPipelineRequest(requestID string) (runID, requestHash string
 	return runID, requestHash, nil
 }
 
+// SavePipelineProposal publishes one canonical proposal durably before its MCP
+// caller receives success. proposal_id is content-derived, so a transport retry
+// leaves one reviewable record rather than duplicating the approval surface.
+func (s *Store) SavePipelineProposal(proposal PipelineProposalRecord) error {
+	if proposal.CreatedAt.IsZero() {
+		proposal.CreatedAt = timeNow()
+	}
+	proposal.Payload = nonEmptyJSON(proposal.Payload, `{}`)
+	_, err := s.db.Exec(`
+INSERT INTO pipeline_proposals(proposal_id, kind, digest, payload_json, created_at)
+VALUES (?, ?, ?, ?, ?)
+ON CONFLICT(proposal_id) DO NOTHING`,
+		proposal.ProposalID, proposal.Kind, proposal.Digest, string(proposal.Payload), formatTime(proposal.CreatedAt))
+	if err != nil {
+		return fmt.Errorf("state: save pipeline proposal: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) ListPipelineProposals(limit int) ([]PipelineProposalRecord, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	rows, err := s.db.Query(`
+SELECT proposal_id, kind, digest, payload_json, created_at
+FROM pipeline_proposals
+ORDER BY created_at DESC, proposal_id
+LIMIT ?`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("state: list pipeline proposals: %w", err)
+	}
+	defer rows.Close()
+	proposals := []PipelineProposalRecord{}
+	for rows.Next() {
+		var proposal PipelineProposalRecord
+		var payload, createdAt string
+		if err := rows.Scan(&proposal.ProposalID, &proposal.Kind, &proposal.Digest, &payload, &createdAt); err != nil {
+			return nil, fmt.Errorf("state: scan pipeline proposal: %w", err)
+		}
+		proposal.Payload = nonEmptyJSON([]byte(payload), `{}`)
+		if proposal.CreatedAt, err = parseTime(createdAt); err != nil {
+			return nil, wrapTimeErr("pipeline_proposal.created_at", err)
+		}
+		proposals = append(proposals, proposal)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("state: iterate pipeline proposals: %w", err)
+	}
+	return proposals, nil
+}
+
 func (s *Store) ReadPipelineRun(runID string) (PipelineRunRecord, error) {
 	return readPipelineRunQuery(s.db, runID)
 }

@@ -94,12 +94,13 @@ server-started sign-in process.
 
 **R16 — Pipelines add one conventional local REST family.** The route inventory gains
 template list/create/validate and item read/update/delete under `/api/pipelines`; run list/start and
-item read/delete under `/api/pipeline-runs`; and method-specific `continue`, `retry`, and `stop`
-actions on a run. Start accepts a caller-generated request id and returns the original run for an
-exact idempotent replay; reuse with different content is `409`. Invalid templates/run values are
-field-addressed R3 errors, stale run revisions are `409`, active-run deletion is `409`, creates are
-`201`, and successful deletes are `204`. Collection/detail payloads, TypeScript schemas, and mocks
-ship together under R6/R11; TS-09 owns their feature-specific fields.
+item read/delete under `/api/pipeline-runs`; a pending-proposal list at
+`GET /api/pipeline-proposals`; and method-specific `continue`, `retry`, and `stop` actions on a run.
+Start accepts a caller-generated request id and returns the original run for an exact idempotent
+replay; reuse with different content is `409`. Invalid templates/run values are field-addressed R3
+errors, stale run revisions are `409`, active-run deletion is `409`, creates are `201`, and successful
+deletes are `204`. Collection/detail payloads, TypeScript schemas, and mocks ship together under
+R6/R11; TS-09 owns their feature-specific fields.
 
 **R17 — Pipeline live state uses summary SSE plus refetch.** `pipeline_update` is added to
 the versioned SSE vocabulary after its authoritative SQLite commit. Its bounded payload contains run

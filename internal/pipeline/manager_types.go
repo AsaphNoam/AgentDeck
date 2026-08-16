@@ -71,6 +71,7 @@ func (e *ProjectGateError) Error() string { return e.Code + ": " + e.Message }
 type Publisher interface {
 	PublishPipelineUpdate(PipelineUpdate)
 	PublishPipelineNotification(PipelineUpdate, string)
+	PublishPipelineProposalUpdate()
 }
 
 type PipelineUpdate struct {

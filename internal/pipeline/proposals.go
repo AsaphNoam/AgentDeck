@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
+
+	"github.com/agentdeck/agentdeck/internal/state"
 )
 
 type Proposal struct {
@@ -29,7 +32,8 @@ func (m *Manager) ProposeTemplate(id string, template Template) (Proposal, error
 	if err != nil {
 		return Proposal{}, err
 	}
-	return Proposal{ProposalID: "pp_" + digest[:16], Kind: "save_template", Digest: digest, Payload: payload}, nil
+	proposal := Proposal{ProposalID: "pp_" + digest[:16], Kind: "save_template", Digest: digest, Payload: payload}
+	return m.saveProposal(proposal)
 }
 
 func (m *Manager) ProposeRun(ctx context.Context, request StartRequest) (Proposal, error) {
@@ -58,7 +62,42 @@ func (m *Manager) ProposeRun(ctx context.Context, request StartRequest) (Proposa
 	} else {
 		request.RequestID = requestedID
 	}
-	return Proposal{ProposalID: proposalID, Kind: "start_run", Digest: digest, Payload: request}, nil
+	return m.saveProposal(Proposal{ProposalID: proposalID, Kind: "start_run", Digest: digest, Payload: request})
+}
+
+// ListProposals is the Pipelines page's server-owned authority. It deliberately
+// does not reconstruct proposals from runtime transcript events, because an ACP
+// adapter may omit terminal tool-result content.
+func (m *Manager) ListProposals() ([]Proposal, error) {
+	records, err := m.store.ListPipelineProposals(MaxListPage)
+	if err != nil {
+		return nil, err
+	}
+	proposals := make([]Proposal, 0, len(records))
+	for _, record := range records {
+		var payload any
+		if err := json.Unmarshal(record.Payload, &payload); err != nil {
+			return nil, fmt.Errorf("pipeline: decode proposal %s: %w", record.ProposalID, err)
+		}
+		proposals = append(proposals, Proposal{ProposalID: record.ProposalID, Kind: record.Kind, Digest: record.Digest, Payload: payload})
+	}
+	return proposals, nil
+}
+
+func (m *Manager) saveProposal(proposal Proposal) (Proposal, error) {
+	payload, err := json.Marshal(proposal.Payload)
+	if err != nil {
+		return Proposal{}, err
+	}
+	if err := m.store.SavePipelineProposal(state.PipelineProposalRecord{
+		ProposalID: proposal.ProposalID, Kind: proposal.Kind, Digest: proposal.Digest, Payload: payload, CreatedAt: time.Now().UTC(),
+	}); err != nil {
+		return Proposal{}, err
+	}
+	if m.publisher != nil {
+		m.publisher.PublishPipelineProposalUpdate()
+	}
+	return proposal, nil
 }
 
 func validateProposalSize(payload any) error {

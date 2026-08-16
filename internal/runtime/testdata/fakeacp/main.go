@@ -130,9 +130,16 @@ func handle(msg *rpcMessage) {
 		// client's permission reply / cancel while the scenario blocks.
 		go func() {
 			stop := runScenario(os.Getenv("FAKEACP_SCENARIO"))
+			// Match the pinned Claude adapter: current context percentage comes
+			// from a usage_update notification, while the prompt result carries
+			// token accounting only.
+			emitUpdate(map[string]any{"sessionUpdate": "usage_update", "used": 44000, "size": 200000})
 			respond(id, map[string]any{
 				"stopReason": stop,
-				"usage":      map[string]any{"used": 4200, "window": 200000},
+				"usage": map[string]any{
+					"inputTokens": 42000, "outputTokens": 800,
+					"cachedReadTokens": 1200, "cachedWriteTokens": 0, "totalTokens": 44000,
+				},
 			})
 		}()
 	default:

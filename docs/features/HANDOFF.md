@@ -118,62 +118,24 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 ### Open findings
 
-- **Must fix** — **Confirmed** — AgentDecker pipeline proposals have no durable/discoverable product
-  record, so a successful proposal can appear nowhere. Verbatim field report (2026-08-16):
-  “pipeline proposals made with AgentDecker don't show up anywhere”; current `main`, local macOS
-  environment, with no report-supplied version or logs. The local historical real-adapter evidence
-  reproduces the symptom: `~/.agentdeck/sessions/a_ffdaff/transcript.ndjson` records the
-  `mcp.agentdeck-messaging.propose_pipeline_template` call at seq 372 and its completed terminal
-  `tool_result` at seq 375 with `content:null`, even though the following assistant text reports the
-  returned `pp_...` proposal id. `internal/messaging/pipeline_tools.go:45-88` returns the canonical
-  proposal only to the MCP caller, while `internal/pipeline/proposals.go:16-61` persists nothing.
-  `ui/src/features/pipelines/AgentDeckerBuilder.tsx:17-42,60,105-127,199-208` reconstructs pending
-  proposals solely from tool-result content in the one transcript named by browser-local storage;
-  that key is set only by this browser's dedicated builder launch. Therefore the observed adapter
-  shape loses even a dedicated-builder proposal, and a proposal from another valid token-bound
-  AgentDecker session/browser is undiscoverable by construction. This violates FS-14.R27/A10,
-  TS-09.R15/R23, TS-04.R17, and INV §1/§10/§15. Fix by publishing the validated canonical proposal
-  through a server-owned durable/discoverable seam before returning MCP success, then make the
-  Pipelines approval surface read that authority rather than adapter-rendered tool output or one
-  browser-local session pointer. Regression: exercise the MCP handler through a token-bound
-  AgentDecker, force a terminal ACP result with no forwarded content, reload/open Pipelines without
-  the originating local-storage key, and assert the exact pending proposal remains reviewable once
-  and still requires explicit Save/Start confirmation.
-
-- **Must fix** — **Confirmed** — The dashboard context-usage meter is stuck at `0% context used` for
-  every real chat agent. Verbatim field report (2026-08-16): “The context bar is broken, just stuck at
-  0%”; current `main`, local macOS environment, no report-supplied version or logs. Root cause is a
-  two-sided ACP mapping mismatch against the pinned Claude adapter 0.59.0
-  (`~/.local/lib/node_modules/@agentclientprotocol/claude-agent-acp`, `dist/acp-agent.js`), proven from
-  the code path, not a live turn (live-provider runs are blocked on human authorization). (1) The
-  adapter's `session/prompt` result `usage` object is
-  `{inputTokens,outputTokens,cachedReadTokens,cachedWriteTokens,totalTokens}` (`sessionUsage`,
-  `dist/acp-agent.js:4081`) — it has **no** `used` and **no** `window`. `internal/runtime/acpmap.go:122-125`
-  decodes `acpUsage{Used json:"used"; Window json:"window"}`, so both fields decode to 0;
-  `mapPromptResult` (`acpmap.go:269-281`) then fails its `r.Usage.Window > 0` guard and returns
-  `context_pct = 0`, `hasPct = false` for every turn. (2) The adapter's real context channel is a
-  separate `session/update` notification `{sessionUpdate:"usage_update", used:<tokens>, size:<contextWindow>}`
-  (`dist/acp-agent.js:1447,1958`), which `mapSessionUpdate` (`acpmap.go:209-265`) drops via its `default`
-  case. So `agentState.contextPct` never leaves 0, `ContextBar`
-  (`ui/src/components/grid/ContextBar.tsx`) always renders `0% context used`, satisfying FS-02.R26's
-  literal wording while defeating its purpose. The reason this shipped green: the `fakeacp` double emits
-  the AgentDeck-invented `{"used":4200,"window":200000}` result shape
-  (`internal/runtime/testdata/fakeacp/main.go:135`), so `chat_test.go:506-519` and `event_test.go:42`
-  validate a shape the real adapter never sends (INV §11 — a mock that does not tell the truth). This is
-  both a code defect (wrong ACP→`context_pct` mapping under TS-04) and a spec gap: no current TS-04
-  requirement governs the usage→`context_pct` mapping, and `acpmap.go:121,268` cite a “techspec §4.3”
-  that does not exist in the current TS-04. Fix by reading context from the adapter's real channel —
-  map the `usage_update` notification `{used,size}` into `context_pct = used/size`, and/or read the
-  result usage's token fields against a known/declared context window — add a TS-04 requirement pinning
-  the mapping to the pinned adapters' true shapes, and correct `fakeacp` to emit those shapes.
-  Reproduction committed skipped: `internal/runtime/acpmap_test.go` `TestContextUsageFromRealClaudeAdapterShapes`
-  (confirmed to fail un-skipped: `context_pct=0 hasPct=false`); the `/fix` session un-skips it.
+None.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-16 — Fixed both confirmed findings. **Pipeline proposals** now commit one canonical,
+  content-addressed proposal record to SQLite before MCP success, publish an invalidation event, and
+  appear through the server-owned Pipelines query rather than an ACP tool-result transcript or
+  browser-local builder pointer; the saved proposal remains an exact, explicitly confirmed Save/Start
+  request. Regression coverage exercises an AgentDecker MCP call, discards its caller-only result,
+  then verifies a fresh Pipelines surface finds one durable proposal. **Context usage** now follows
+  the pinned Claude adapter's `usage_update {used,size}` notification, carries that fraction to the
+  turn status/rollup, and no longer treats prompt-result token accounting as a context window; the
+  fake ACP now emits the real wire shapes. TS-03.R16, TS-04.R25, and TS-09.R15/R23 record the shipped
+  interfaces. `make test`, `make build`, and `make dist` pass. INV §1/§10/§11/§15.
 
 - 2026-08-16 — Investigated the report “The context bar is broken, just stuck at 0%” against FS-02.R26,
   TS-04, and every invariant class. Confirmed a two-sided ACP mapping mismatch against the pinned Claude

@@ -74,6 +74,24 @@ func decodeAvailableCommands(params json.RawMessage) ([]CommandItem, bool) {
 	return out, true
 }
 
+// decodeContextUsage recognizes the ACP usage_update notification that carries
+// the current context usage and window size (TS-04.R25). Its value is bounded
+// at the provider boundary because context_pct is a 0..1 dashboard contract.
+func decodeContextUsage(params json.RawMessage) (float64, bool) {
+	var su acpSessionUpdate
+	if err := json.Unmarshal(params, &su); err != nil || su.Update.SessionUpdate != "usage_update" {
+		return 0, false
+	}
+	if su.Update.Used < 0 || su.Update.Size <= 0 {
+		return 0, false
+	}
+	pct := float64(su.Update.Used) / float64(su.Update.Size)
+	if pct > 1 {
+		pct = 1
+	}
+	return pct, true
+}
+
 // acpmap.go is the ONLY place ACP wire shapes are decoded (techspec §12.1
 // isolation rule). Everything else in the package sees normalized Events. This
 // keeps the blast radius of an ACP version bump — or a Codex backend — localized
@@ -99,6 +117,10 @@ type acpUpdate struct {
 	Kind       string          `json:"kind"`
 	Status     string          `json:"status"`
 	RawInput   json.RawMessage `json:"rawInput"`
+
+	// usage_update: the current context usage and its window size.
+	Used int `json:"used"`
+	Size int `json:"size"`
 }
 
 // acpContentBlock is a single content item (text or diff). Tool-call content is
@@ -118,10 +140,15 @@ type acpPromptResult struct {
 	Usage      *acpUsage `json:"usage,omitempty"`
 }
 
-// acpUsage carries token usage when the adapter reports it (techspec §4.3).
+// acpUsage is the token accounting returned by the pinned Claude adapter after
+// a prompt. It does not contain a context-window size, so it cannot itself
+// produce context_pct (TS-04.R25).
 type acpUsage struct {
-	Used   int `json:"used"`
-	Window int `json:"window"`
+	InputTokens       int `json:"inputTokens"`
+	OutputTokens      int `json:"outputTokens"`
+	CachedReadTokens  int `json:"cachedReadTokens"`
+	CachedWriteTokens int `json:"cachedWriteTokens"`
+	TotalTokens       int `json:"totalTokens"`
 }
 
 // acpPermissionRequest is the params of a server→client `session/request_permission`
@@ -264,20 +291,15 @@ func mapSessionUpdate(params json.RawMessage) []mappedEvent {
 	}
 }
 
-// mapPromptResult converts the `session/prompt` result into a turn_end event and
-// the turn's context_pct (0 when usage is absent — documented limitation §4.3).
+// mapPromptResult converts the `session/prompt` result into a turn_end event.
+// Context percentage arrives separately in usage_update (TS-04.R25).
 func mapPromptResult(result json.RawMessage) (TurnEndData, bool) {
 	var r acpPromptResult
 	if err := json.Unmarshal(result, &r); err != nil {
 		return TurnEndData{StopReason: "end_turn"}, false
 	}
 	td := TurnEndData{StopReason: defaultStr(r.StopReason, "end_turn")}
-	hasPct := false
-	if r.Usage != nil && r.Usage.Window > 0 {
-		td.ContextPct = float64(r.Usage.Used) / float64(r.Usage.Window)
-		hasPct = true
-	}
-	return td, hasPct
+	return td, false
 }
 
 // toolName picks a normalized tool name: prefer the ACP kind, else the title.

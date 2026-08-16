@@ -304,6 +304,21 @@ ALTER TABLE sessions ADD COLUMN effort TEXT NOT NULL DEFAULT '';
 		version: 13,
 		sql: `
 ALTER TABLE pipeline_attempts ADD COLUMN effort TEXT NOT NULL DEFAULT '';
+		`,
+	},
+	{
+		// AgentDecker proposal tool calls must survive adapter transcript shapes and
+		// be discoverable by a fresh Pipelines page before MCP reports success.
+		version: 14,
+		sql: `
+CREATE TABLE pipeline_proposals (
+  proposal_id  TEXT PRIMARY KEY,
+  kind         TEXT NOT NULL,
+  digest       TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  created_at   TEXT NOT NULL
+);
+CREATE INDEX idx_pipeline_proposals_created ON pipeline_proposals(created_at DESC, proposal_id);
 `,
 	},
 }

@@ -122,8 +122,10 @@ snapshots remain readable after template deletion.
 **R15 — AgentDecker proposals are validated, soft-gated data.** The shared MCP server adds
 proposal tools for a model-neutral template draft and a saved-template run configuration. They are
 available to a token-bound AgentDecker-role chat session, call the canonical validator, and return a
-canonical payload plus digest and proposal id without saving or starting anything. The Pipelines UI
-renders the exact payload and performs the normal Save or Start request only after a one-time explicit
+canonical payload plus digest and proposal id without saving or starting anything. Before reporting
+MCP success, the server commits one content-addressed canonical proposal record to SQLite; a retry of
+the same proposal retains one record. The Pipelines UI reads those records as its approval authority,
+renders the exact payload, and performs the normal Save or Start request only after a one-time explicit
 confirmation. Save and Start are separate; an edited/different digest cannot reuse confirmation.
 
 **R16 — Approval is interaction control, not authentication.** Proposal tools never call
@@ -164,11 +166,12 @@ running, do not contain a second transition engine, and require the dashboard se
 control commands.
 
 **R23 — The Pipelines page has no second state authority.** The React surface uses the
-shared API client/schema, React Query for template/run server state, the existing transcript
-projection for builder proposal tool results, and revision-checked `pipeline_update` invalidation.
-Unsaved editor form state is local to the page; only template CRUD or an approved proposal writes a
-template, and only the run-start endpoint creates a run. CSS selectors, mocks, errors, confirmation
-pending state, and navigation ship with the page (INV §8, §10, §11, §13).
+shared API client/schema and React Query for template/run/proposal server state. It invalidates
+proposal reads after the server publishes a committed proposal update, rather than reconstructing
+proposals from ACP transcript tool-result content or a browser-local builder-session pointer. Unsaved
+editor form state is local to the page; only template CRUD or an approved proposal writes a template,
+and only the run-start endpoint creates a run. CSS selectors, mocks, errors, confirmation pending
+state, and navigation ship with the page (INV §8, §10, §11, §13).
 
 **R24 — Per-stage effort is frozen execution data validated at start.** A run's frozen
 assignment record gains an optional effort per stage beside its backend and model. Each created

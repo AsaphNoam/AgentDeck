@@ -64,37 +64,45 @@ func TestMapToolCallUpdateEmitsDiffOnInProgress(t *testing.T) {
 // SKIPPED so the tree stays green; the /fix session un-skips it as the
 // regression.
 //
-// The pinned Claude adapter 0.59.0 reports context usage in two places, and
-// AgentDeck reads neither correctly:
+// The pinned Claude adapter 0.59.0 reports token accounting in its prompt
+// result and context usage in a separate usage_update notification:
 //
 //  1. The session/prompt result `usage` object is
 //     {inputTokens,outputTokens,cachedReadTokens,cachedWriteTokens,totalTokens}
-//     — it has no `used` and no `window`. mapPromptResult reads
-//     r.Usage.Used/r.Usage.Window, so both decode to 0, the Window>0 guard is
-//     false, and context_pct stays 0 for every real turn.
+//     — it has no `used` and no `window`, so it cannot produce context_pct.
 //  2. The adapter also emits a session/update notification
 //     {sessionUpdate:"usage_update", used:<tokens>, size:<contextWindow>} — the
-//     actual context channel — which mapSessionUpdate drops (default → nil).
+//     actual context channel.
 //
-// fakeacp emits the AgentDeck-invented {used,window} shape, so the existing
-// chat/event tests pass against a double that does not match the real adapter
-// (INV §11). This test uses the adapter's true shapes and must fail against the
-// current mapping.
+// fakeacp now emits these true shapes too (INV §11).
 func TestContextUsageFromRealClaudeAdapterShapes(t *testing.T) {
-	t.Skip("reproduction for context-bar-stuck-at-0pct; un-skip in the fix (FS-02.R26)")
-
 	// (1) Real prompt-result usage shape: token counts only, no used/window.
 	result := `{"stopReason":"end_turn","usage":{"inputTokens":42000,"outputTokens":800,` +
 		`"cachedReadTokens":1200,"cachedWriteTokens":0,"totalTokens":44000}}`
 	td, hasPct := mapPromptResult(json.RawMessage(result))
-	if !hasPct || td.ContextPct <= 0 {
-		t.Fatalf("prompt-result usage produced context_pct=%v hasPct=%v, want a populated non-zero fraction", td.ContextPct, hasPct)
+	if hasPct || td.ContextPct != 0 {
+		t.Fatalf("prompt-result usage produced context_pct=%v hasPct=%v, want no context fraction without a window", td.ContextPct, hasPct)
 	}
 
 	// (2) Real usage_update session notification: used + size (context window).
-	raw := `{"sessionId":"s","update":{"sessionUpdate":"usage_update","used":44000,"size":200000}}`
-	if len(mapSessionUpdate(json.RawMessage(raw))) == 0 {
-		t.Fatalf("usage_update notification produced no event; the real context channel is dropped")
+	for _, tc := range []struct {
+		name    string
+		raw     string
+		wantPct float64
+		wantOK  bool
+	}{
+		{"normal", `{"sessionId":"s","update":{"sessionUpdate":"usage_update","used":44000,"size":200000}}`, 0.22, true},
+		{"zero", `{"sessionId":"s","update":{"sessionUpdate":"usage_update","used":0,"size":200000}}`, 0, true},
+		{"capped", `{"sessionId":"s","update":{"sessionUpdate":"usage_update","used":210000,"size":200000}}`, 1, true},
+		{"negative ignored", `{"sessionId":"s","update":{"sessionUpdate":"usage_update","used":-1,"size":200000}}`, 0, false},
+		{"zero window ignored", `{"sessionId":"s","update":{"sessionUpdate":"usage_update","used":44000,"size":0}}`, 0, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pct, ok := decodeContextUsage(json.RawMessage(tc.raw))
+			if ok != tc.wantOK || pct != tc.wantPct {
+				t.Fatalf("usage_update = pct=%v ok=%v, want %v/%v", pct, ok, tc.wantPct, tc.wantOK)
+			}
+		})
 	}
 }
 
