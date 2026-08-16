@@ -4,6 +4,15 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-16 — Fix: review-finding queue check
+
+There are no open review findings to fix. The two most recent required fixes are already complete,
+and no active change was selected. Your in-progress ideas edit was left untouched.
+
+**Needs attention:** None.
+
+**Next:** Name a ready change or report a new issue when more work is wanted.
+
 ### 2026-08-16 — Fix: pipeline proposal recovery and context usage
 
 AgentDecker proposals are now saved by AgentDeck before the agent is told they succeeded, so they stay
