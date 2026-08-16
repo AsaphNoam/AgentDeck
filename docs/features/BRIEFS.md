@@ -4,6 +4,22 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-16 — Bug investigation: missing AgentDecker pipeline proposals
+
+The bug is confirmed. AgentDecker successfully validates a pipeline proposal, but AgentDeck keeps no
+proposal record of its own: it returns the proposal only to the agent and later tries to reconstruct it
+from one browser-local builder transcript. A captured real session shows the proposal tool completing
+while the adapter stored an empty result, leaving the Pipelines page nothing to display. Proposals made
+from another valid AgentDecker chat or browser are also undiscoverable because that page follows only
+the builder session remembered by the current browser.
+
+**Needs attention:** This is a required fix; successful proposals can currently be lost from every
+approval surface even though AgentDecker reports that they were proposed.
+
+**Next:** Run `/fix` to store accepted proposals through a server-owned durable discovery path and
+make Pipelines read it, with coverage for empty adapter results, reloads, and non-builder AgentDecker
+sessions.
+
 ### 2026-08-15 — Usability review: newest chat and startup changes
 
 The newest chat autocomplete, progress, and startup changes passed a focused real-browser review with

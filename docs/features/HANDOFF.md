@@ -118,13 +118,42 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 ### Open findings
 
-None.
+- **Must fix** — **Confirmed** — AgentDecker pipeline proposals have no durable/discoverable product
+  record, so a successful proposal can appear nowhere. Verbatim field report (2026-08-16):
+  “pipeline proposals made with AgentDecker don't show up anywhere”; current `main`, local macOS
+  environment, with no report-supplied version or logs. The local historical real-adapter evidence
+  reproduces the symptom: `~/.agentdeck/sessions/a_ffdaff/transcript.ndjson` records the
+  `mcp.agentdeck-messaging.propose_pipeline_template` call at seq 372 and its completed terminal
+  `tool_result` at seq 375 with `content:null`, even though the following assistant text reports the
+  returned `pp_...` proposal id. `internal/messaging/pipeline_tools.go:45-88` returns the canonical
+  proposal only to the MCP caller, while `internal/pipeline/proposals.go:16-61` persists nothing.
+  `ui/src/features/pipelines/AgentDeckerBuilder.tsx:17-42,60,105-127,199-208` reconstructs pending
+  proposals solely from tool-result content in the one transcript named by browser-local storage;
+  that key is set only by this browser's dedicated builder launch. Therefore the observed adapter
+  shape loses even a dedicated-builder proposal, and a proposal from another valid token-bound
+  AgentDecker session/browser is undiscoverable by construction. This violates FS-14.R27/A10,
+  TS-09.R15/R23, TS-04.R17, and INV §1/§10/§15. Fix by publishing the validated canonical proposal
+  through a server-owned durable/discoverable seam before returning MCP success, then make the
+  Pipelines approval surface read that authority rather than adapter-rendered tool output or one
+  browser-local session pointer. Regression: exercise the MCP handler through a token-bound
+  AgentDecker, force a terminal ACP result with no forwarded content, reload/open Pipelines without
+  the originating local-storage key, and assert the exact pending proposal remains reviewable once
+  and still requires explicit Save/Start confirmation.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-16 — Investigated the report “pipeline proposals made with AgentDecker don't show up
+  anywhere” against FS-14, TS-09, TS-04, and every invariant class. The defect is confirmed: proposal
+  validation returns canonical data only through the MCP response and stores no proposal record,
+  while Pipelines reconstructs proposals from one browser-local builder transcript. A captured real
+  Codex AgentDecker transcript proves the adapter can report the proposal tool completed with
+  `content:null`, leaving nothing for the UI extractor; ordinary AgentDecker sessions and another
+  browser are also undiscoverable by construction. One Must-fix finding records the shared durable
+  discovery repair and regression. No product code or specification changed.
 
 - 2026-08-15 — Ran a focused real-browser usability review of the newest chat and startup work. In
   one isolated seeded home with a deterministic ACP peer, composer `@`/`#` boundary, filtering,
