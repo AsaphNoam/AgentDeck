@@ -7,13 +7,16 @@ import {
   pipelineTemplateRecordSchema,
   type PipelineRunDetail,
   type PipelineStartRequest,
+  type PipelineProposal,
   type PipelineTemplate,
+  pipelineProposalSchema,
 } from "../schemas/pipeline";
 
 export const PIPELINE_QUERY_KEYS = {
   templates: ["pipelines", "templates"] as const,
   runs: ["pipelines", "runs"] as const,
   run: (id: string) => ["pipelines", "runs", id] as const,
+  proposals: ["pipelines", "proposals"] as const,
 };
 
 interface PipelineErrorBody {
@@ -93,6 +96,10 @@ export function listPipelineRuns() {
   return request("/api/pipeline-runs?limit=100", z.array(pipelineRunSummarySchema));
 }
 
+export function listPipelineProposals() {
+  return request("/api/pipeline-proposals", z.array(pipelineProposalSchema));
+}
+
 export function getPipelineRun(id: string) {
   return request(`/api/pipeline-runs/${encodeURIComponent(id)}`, pipelineRunDetailSchema);
 }
@@ -139,6 +146,10 @@ export function usePipelineTemplates() {
 
 export function usePipelineRuns() {
   return useQuery({ queryKey: PIPELINE_QUERY_KEYS.runs, queryFn: listPipelineRuns });
+}
+
+export function usePipelineProposals() {
+  return useQuery<PipelineProposal[]>({ queryKey: PIPELINE_QUERY_KEYS.proposals, queryFn: listPipelineProposals });
 }
 
 export function usePipelineRun(id: string | null) {

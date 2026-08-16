@@ -72,6 +72,8 @@ func (p *fakePublisher) PublishPipelineNotification(_ PipelineUpdate, kind strin
 	p.notifications = append(p.notifications, kind)
 }
 
+func (p *fakePublisher) PublishPipelineProposalUpdate() {}
+
 func pipelineManagerFixture(t *testing.T) (*Manager, *fakeLifecycle, *fakePublisher) {
 	t.Helper()
 	home := t.TempDir()

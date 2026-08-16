@@ -7,8 +7,7 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { AgentState } from "../../api/types";
 import { useAgentStore } from "../../store/agentStore";
-import { useTranscriptStore } from "../../store/transcriptStore";
-import { AgentDeckerBuilder, extractPipelineProposals } from "./AgentDeckerBuilder";
+import { AgentDeckerBuilder } from "./AgentDeckerBuilder";
 
 const BUILDER_KEY = "agentdeck.pipeline-builder-agent";
 
@@ -29,6 +28,7 @@ const server = setupServer(
     },
   })),
   http.get("/api/sessions/:id/transcript", ({ params }) => HttpResponse.json({ agent_id: params.id, events: [] })),
+  http.get("/api/pipeline-proposals", () => HttpResponse.json([])),
 );
 
 function agent(id: string, running: boolean): AgentState {
@@ -54,7 +54,6 @@ afterEach(() => {
   server.resetHandlers();
   localStorage.clear();
   useAgentStore.setState({ agents: {}, order: [], hydrated: false, hydrating: false });
-  useTranscriptStore.setState({ byAgent: {} });
 });
 afterAll(() => server.close());
 
@@ -80,25 +79,6 @@ describe("AgentDeckerBuilder persisted session", () => {
     expect(screen.queryByRole("link", { name: "Open AgentDecker chat" })).not.toBeInTheDocument();
   });
 
-  // INV §7 / FS-14.R27/A10: a failed transcript read must not be mistaken for a
-  // loaded empty transcript. Doing so would drop the localStorage pointer to a
-  // possibly-pending proposal awaiting its one-time approval. A read failure
-  // leaves the session undecided until a later retry.
-  it("retains a stopped builder's session when the transcript read fails", async () => {
-    localStorage.setItem(BUILDER_KEY, "a_builder");
-    useAgentStore.setState({
-      agents: { a_builder: agent("a_builder", false) }, order: ["a_builder"], hydrated: true, hydrating: false,
-    });
-    server.use(http.get("/api/sessions/:id/transcript", () => new HttpResponse(null, { status: 500 })));
-
-    renderBuilder();
-
-    await screen.findByText(/The builder session has stopped/i);
-    // Let the rejected transcript promise settle; the drop effect must not fire.
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(localStorage.getItem(BUILDER_KEY)).toBe("a_builder");
-  });
-
   it("keeps the session link while the builder is still running", async () => {
     localStorage.setItem(BUILDER_KEY, "a_builder");
     useAgentStore.setState({
@@ -122,35 +102,30 @@ describe("AgentDeckerBuilder persisted session", () => {
     expect(localStorage.getItem(BUILDER_KEY)).toBe("a_builder");
   });
 
-  // FS-14.R27/A10: a proposal can be the final tool result before AgentDecker
-  // exits. Refetch that transcript and retain the review surface, rather than
-  // clearing the only reference to its one-time confirmation.
-  it("keeps a stopped builder's pending proposal available for review", async () => {
-    localStorage.setItem(BUILDER_KEY, "a_builder");
-    useAgentStore.setState({
-      agents: { a_builder: agent("a_builder", false) }, order: ["a_builder"], hydrated: true, hydrating: false,
-    });
-    server.use(http.get("/api/sessions/:id/transcript", ({ params }) => HttpResponse.json({
-      agent_id: params.id,
-      events: [{ kind: "tool_result", tool_call_id: "call_1", content: JSON.stringify({ ok: true, proposal: templateProposal }) }],
-    })));
+  // FS-14.R27/A10 / TS-09.R15,R23: a new Pipelines view has no browser-local
+  // builder pointer and a real ACP adapter may have stored the terminal result
+  // as content:null. The durable proposal API is therefore the only authority.
+  it("reviews one durable proposal without a builder pointer or transcript result", async () => {
+    const reviewed: unknown[] = [];
+    let saveCalls = 0;
+    server.use(
+      http.get("/api/pipeline-proposals", () => HttpResponse.json([templateProposal])),
+      http.post("/api/pipelines", () => {
+        saveCalls++;
+        return HttpResponse.json({});
+      }),
+    );
 
-    renderBuilder();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    render(<QueryClientProvider client={client}><MemoryRouter><AgentDeckerBuilder onTemplateProposal={(proposal) => reviewed.push(proposal)} onRunProposal={() => {}} /></MemoryRouter></QueryClientProvider>);
 
-    await screen.findByRole("button", { name: "Review exact Save proposal" });
-    expect(localStorage.getItem(BUILDER_KEY)).toBe("a_builder");
-    expect(screen.queryByRole("link", { name: "Open AgentDecker chat" })).not.toBeInTheDocument();
-  });
-});
-
-describe("extractPipelineProposals", () => {
-  // FS-14.R27/A10: ACP gives the UI a tool category/title for display, not a
-  // machine-readable MCP tool name. The self-identifying result is authoritative.
-  it("accepts a self-identifying proposal when the ACP tool title is generic", () => {
-    expect(extractPipelineProposals([
-      { kind: "tool_call", tool_call_id: "call_1", name: "other", title: "Use pipeline tool" },
-      { kind: "tool_result", tool_call_id: "call_1", content: JSON.stringify({ ok: true, proposal: templateProposal }) },
-    ])).toEqual([templateProposal]);
+    expect(localStorage.getItem(BUILDER_KEY)).toBeNull();
+    const review = await screen.findByRole("button", { name: "Review exact Save proposal" });
+    expect(screen.getAllByRole("button", { name: "Review exact Save proposal" })).toHaveLength(1);
+    expect(saveCalls).toBe(0);
+    fireEvent.click(review);
+    expect(reviewed).toEqual([templateProposal]);
+    expect(saveCalls).toBe(0);
   });
 });
 

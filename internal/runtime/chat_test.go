@@ -503,11 +503,12 @@ func TestChatStreamText(t *testing.T) {
 		}
 	}
 
-	// turn_end payload carries context_pct = 4200/200000.
+	// turn_end payload carries context_pct = 44000/200000 from the fake
+	// adapter's real-shaped usage_update notification.
 	var td TurnEndData
 	json.Unmarshal(evs[len(evs)-1].Data, &td)
-	if td.ContextPct < 0.02 || td.ContextPct > 0.022 {
-		t.Fatalf("context_pct = %v, want ~0.021", td.ContextPct)
+	if td.ContextPct < 0.219 || td.ContextPct > 0.221 {
+		t.Fatalf("context_pct = %v, want ~0.22", td.ContextPct)
 	}
 
 	// After the turn: idle, busy_since cleared, context_pct written.
@@ -515,8 +516,8 @@ func TestChatStreamText(t *testing.T) {
 	if final.State != "idle" || final.BusySince != nil {
 		t.Fatalf("post-turn status = %+v, want idle + nil busy_since", final)
 	}
-	if final.ContextPct < 0.02 || final.ContextPct > 0.022 {
-		t.Fatalf("post-turn context_pct = %v, want ~0.021", final.ContextPct)
+	if final.ContextPct < 0.219 || final.ContextPct > 0.221 {
+		t.Fatalf("post-turn context_pct = %v, want ~0.22", final.ContextPct)
 	}
 	if final.LastTrace != "Stop" {
 		t.Fatalf("post-turn last_trace = %q, want Stop", final.LastTrace)

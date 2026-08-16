@@ -20,6 +20,15 @@ func (s *Server) handlePipelineTemplates(w http.ResponseWriter, _ *http.Request)
 	writeJSON(w, http.StatusOK, records)
 }
 
+func (s *Server) handlePipelineProposals(w http.ResponseWriter, _ *http.Request) {
+	proposals, err := s.pipelineMgr.ListProposals()
+	if err != nil {
+		writePipelineError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, proposals)
+}
+
 func (s *Server) handlePipelineTemplate(w http.ResponseWriter, r *http.Request) {
 	record, err := s.pipelineTemplates.Read(r.PathValue("id"))
 	if err != nil {

@@ -9,7 +9,7 @@ import (
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
-func pipelineProposalFixture(t *testing.T) (*Server, *pipeline.TemplateStore) {
+func pipelineProposalFixture(t *testing.T) (*Server, *state.Store, *pipeline.TemplateStore) {
 	t.Helper()
 	home := t.TempDir()
 	configStore := config.NewWithHome(home)
@@ -40,7 +40,7 @@ func pipelineProposalFixture(t *testing.T) (*Server, *pipeline.TemplateStore) {
 	server.SetPipelineManager(manager)
 	server.RegisterSession("builder-token", agent.AgentID, "builder-generation")
 	server.RegisterSession("other-token", ordinary.AgentID, "other-generation")
-	return server, templates
+	return server, stateStore, templates
 }
 
 func proposalTemplateArgs() map[string]any {
@@ -61,9 +61,10 @@ func proposalTemplateArgs() map[string]any {
 }
 
 // FS-14.A10 / TS-04.R17: proposal tools are AgentDecker-only, return data and
-// a digest, and cannot mutate the template store themselves.
+// a digest, cannot mutate the template store themselves, and publish exactly
+// one durable review record before MCP reports success.
 func TestPipelineProposalToolIsScopedAndNonMutating(t *testing.T) {
-	server, templates := pipelineProposalFixture(t)
+	server, stateStore, templates := pipelineProposalFixture(t)
 	ordinary := connect(t, server, "other-token")
 	result, isErr := call(t, ordinary, "propose_pipeline_template", proposalTemplateArgs())
 	if !isErr || result["error"] != "proposal_forbidden" {
@@ -81,10 +82,24 @@ func TestPipelineProposalToolIsScopedAndNonMutating(t *testing.T) {
 	if _, err := templates.Read("quality"); err != pipeline.ErrTemplateNotFound {
 		t.Fatalf("proposal mutated template store: %v", err)
 	}
+
+	// A real ACP adapter can persist its terminal tool_result with content:null.
+	// Discard the caller-only result here and prove the token-bound MCP handler
+	// already committed the canonical proposal to the server-owned authority.
+	if _, isErr = call(t, builder, "propose_pipeline_template", proposalTemplateArgs()); isErr {
+		t.Fatalf("repeat builder proposal failed")
+	}
+	proposals, err := stateStore.ListPipelineProposals(10)
+	if err != nil || len(proposals) != 1 {
+		t.Fatalf("durable proposals = %+v err=%v", proposals, err)
+	}
+	if proposals[0].ProposalID != proposal["proposal_id"] || proposals[0].Kind != "save_template" {
+		t.Fatalf("durable proposal = %+v", proposals[0])
+	}
 }
 
 func TestPipelineProposalToolFailsCleanlyWithoutManager(t *testing.T) {
-	server, _ := pipelineProposalFixture(t)
+	server, _, _ := pipelineProposalFixture(t)
 	server.SetPipelineManager(nil)
 	builder := connect(t, server, "builder-token")
 	result, isErr := call(t, builder, "propose_pipeline_template", proposalTemplateArgs())

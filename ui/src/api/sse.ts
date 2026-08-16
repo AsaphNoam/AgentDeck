@@ -44,12 +44,14 @@ class SseClient {
       // by ChatPanel's recovery view, not an unhandled reconnect rejection.
       void this.refetchOpenTranscript().catch(() => undefined);
       queryClient.invalidateQueries({ queryKey: ["pipelines", "runs"] });
+      queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.proposals });
     };
     this.es.onerror = () => useUiStore.getState().setConnection("reconnecting");
     this.es.addEventListener("state_update", (event) => this.onStateUpdate(event as MessageEvent<string>));
     this.es.addEventListener("new_message", (event) => this.onNewMessage(event as MessageEvent<string>));
     this.es.addEventListener("notification", (event) => this.onNotification(event as MessageEvent<string>));
     this.es.addEventListener("pipeline_update", (event) => this.onPipelineUpdate(event as MessageEvent<string>));
+    this.es.addEventListener("pipeline_proposal_update", () => queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.proposals }));
     this.es.addEventListener("config_source_update", () => this.onConfigSourceUpdate());
     this.es.addEventListener("ping", () => {
       this.lastPing = Date.now();

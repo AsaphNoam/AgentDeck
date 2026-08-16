@@ -63,6 +63,28 @@ func TestPipelineTemplateAPICRUDAndValidation(t *testing.T) {
 	}
 }
 
+// TS-03.R16 / TS-09.R15: pending proposals are a server-owned collection, so a
+// fresh Pipelines page can recover them without an ACP tool-result transcript.
+func TestPipelineProposalAPIListsDurableRecords(t *testing.T) {
+	srv := testServer(t, true)
+	proposal, err := srv.pipelineMgr.ProposeTemplate("one-stage", apiTemplate())
+	if err != nil {
+		t.Fatalf("ProposeTemplate: %v", err)
+	}
+
+	rec := doGET(t, srv.routes(), "/api/pipeline-proposals")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list proposals = %d %s", rec.Code, rec.Body.String())
+	}
+	var proposals []pipeline.Proposal
+	if err := json.Unmarshal(rec.Body.Bytes(), &proposals); err != nil {
+		t.Fatalf("decode proposals: %v", err)
+	}
+	if len(proposals) != 1 || proposals[0].ProposalID != proposal.ProposalID || proposals[0].Kind != "save_template" {
+		t.Fatalf("proposals = %+v, want the durable proposal", proposals)
+	}
+}
+
 // FS-14.A8: a same-project conflict is advisory but must be acknowledged before
 // the start endpoint is allowed to create or launch anything.
 func TestPipelineStartRequiresSharedWorkspaceAcknowledgement(t *testing.T) {

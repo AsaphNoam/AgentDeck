@@ -4,6 +4,18 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-16 — Fix: pipeline proposal recovery and context usage
+
+AgentDecker proposals are now saved by AgentDeck before the agent is told they succeeded, so they stay
+available for review after a reload, in another browser, or when an ACP adapter records an empty tool
+result. The Pipelines page reads that durable record and still requires the normal explicit Save or
+Start confirmation. The context bar now uses the Claude adapter's real context-usage update instead
+of misreading end-of-turn token accounting, so real chat sessions report their used context again.
+
+**Needs attention:** None.
+
+**Next:** Authorize a push when these locally committed fixes should be shared with `origin/main`.
+
 ### 2026-08-16 — Bug investigation: context bar stuck at 0%
 
 The bug is confirmed. The context-usage bar on every real chat agent reads "0% context used" because

@@ -52,7 +52,7 @@ export interface NotificationPayload {
 }
 
 export interface BusEvent<T = unknown> {
-  type: "state_update" | "new_message" | "notification" | "pipeline_update" | "ping";
+  type: "state_update" | "new_message" | "notification" | "pipeline_update" | "pipeline_proposal_update" | "ping";
   seq: number;
   ts: number;
   agent_id: string | null;
