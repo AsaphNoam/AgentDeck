@@ -117,6 +117,22 @@ because its parent redirects that stream to the same file. This preserves one co
 and brings package-level `slog` calls under the configured level and format. The file obeys TS-05.R7
 and INV §14; this requirement does not authorize persistence of raw provider or terminal output.
 
+**R16 — Wake-on-message is the resume seam, not a fourth path, behind one exclusive
+claim.** FS-01.R33's wake is one server-owned helper that wraps the exact resume flow
+`POST /resume` uses — the same wakeability gates, `composeResumeSpec` composition, and failure
+teardown — and the prompt route (TS-03.R25), the messaging wake path (TS-04.R26), **and the
+explicit resume handler itself** all route through that helper. No wake caller composes its own
+resume subset (R6/R9). The helper takes one **exclusive per-agent resume claim** (atomic
+check-then-act, INV §5) *before any registration side effect* — hook-token minting, MCP
+registration, hook-settings composition — and releases it only after the registry resume settles;
+the registry's nil-sentinel remains the inner guard. This is required because the existing
+`acquireAgentStart` lease is counting, not exclusive, and the agent-keyed registration
+(`rememberHookToken`, `registerMessagingMCP`, `teardownAgentRegistration`) means a second
+concurrent composer would replace the winner's artifacts and the loser's teardown would then revoke
+them (INV §4). A losing concurrent waker therefore returns the existing conflict outcome without
+composing or tearing down anything, and the winner's hook token, MCP registration, and
+hook-settings file remain intact and in use.
+
 ## 3. Interfaces & data shapes
 
 **Runtime interface** (`internal/runtime/runtime.go`, minimum surface):

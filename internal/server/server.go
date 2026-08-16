@@ -65,6 +65,13 @@ type Server struct {
 	switchMu  sync.Mutex
 	switching map[string]bool
 
+	// resumeMu guards resuming: the set of agents with an in-flight resume
+	// (TS-01.R16 exclusive per-agent resume claim). Explicit resume and both wake
+	// paths take it before any registration side effect, so a losing racer never
+	// replaces or tears down the winner's agent-keyed artifacts.
+	resumeMu sync.Mutex
+	resuming map[string]bool
+
 	archiveMu          sync.Mutex
 	projectArchiving   map[string]bool
 	projectStartLeases map[string]int
@@ -183,6 +190,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		hookTokens:                map[string]string{},
 		mcpCleanups:               map[string]func(){},
 		switching:                 map[string]bool{},
+		resuming:                  map[string]bool{},
 		projectArchiving:          map[string]bool{},
 		projectStartLeases:        map[string]int{},
 		agentArchiving:            map[string]bool{},
@@ -199,6 +207,10 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	s.pipelineTemplates = pipeline.NewTemplateStore(cfgStore)
 	s.pipelineMgr = pipeline.NewManager(stateStore, s.pipelineTemplates, s, s)
 	msg.SetPipelineManager(s.pipelineMgr)
+	// list_agents and send_message resolution both answer from the dashboard's
+	// addressable set, which adds the stopped chat agents a message can wake
+	// (FS-06.R22) to the running registry.
+	msg.SetAddressableAgents(s.addressableAgents)
 	if registry != nil {
 		registry.SetEventSink(func(ev runtime.Event) {
 			eventBus.PublishRuntimeEvent(ev)

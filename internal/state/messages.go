@@ -33,15 +33,69 @@ func address(role, project string) string { return role + "@" + project }
 // registry) joined with identity and latest status (techspec §3.2). Agents with
 // no status row report state "unknown".
 func (s *Store) LiveAgents() ([]LiveAgent, error) {
-	rows, err := s.db.Query(`
+	return s.scanAgents(`
 SELECT a.agent_id, a.name, a.role, a.project, a.interface,
        COALESCE(st.state, 'unknown'), COALESCE(st.detail, ''), COALESCE(st.context_pct, 0)
 FROM running r
 JOIN agents a ON a.agent_id = r.agent_id
 LEFT JOIN status st ON st.agent_id = r.agent_id
-ORDER BY a.name`)
+ORDER BY a.name`, AvailabilityRunning)
+}
+
+// StoppedWakeCandidates returns stopped agents that pass every database-checkable
+// wake gate (FS-01.R33): not archived, chat interface, a persisted session
+// snapshot to resume from, and no pipeline attempt association — a pipeline stage
+// agent was deliberately stopped by its state machine, so no message may revive
+// it. The caller still applies the project-archive gate, which lives in
+// configuration rather than this database. An empty agentID returns every
+// candidate; a non-empty one restricts the query to that agent.
+func (s *Store) StoppedWakeCandidates(agentID string) ([]LiveAgent, error) {
+	return s.scanAgents(`
+SELECT a.agent_id, a.name, a.role, a.project, a.interface,
+       COALESCE(st.state, 'unknown'), COALESCE(st.detail, ''), COALESCE(st.context_pct, 0)
+FROM agents a
+LEFT JOIN status st ON st.agent_id = a.agent_id
+WHERE a.archived = 0
+  AND a.interface = 'chat'
+  AND NOT EXISTS (SELECT 1 FROM running r WHERE r.agent_id = a.agent_id)
+  AND EXISTS (SELECT 1 FROM sessions se WHERE se.agent_id = a.agent_id)
+  AND NOT EXISTS (SELECT 1 FROM pipeline_attempts pa WHERE pa.agent_id = a.agent_id)
+  AND (? = '' OR a.agent_id = ?)
+ORDER BY a.name`, AvailabilityStoppedWakeable, agentID, agentID)
+}
+
+// PendingWakeMailAgents returns the recipients holding at least one unread
+// message whose delivery marker is still "pending" (techspec §3.2). A failed
+// wake stamps those rows "wake_failed", so this durable set is also the
+// no-retry bound for waking a stopped recipient (FS-06.R23).
+func (s *Store) PendingWakeMailAgents() ([]string, error) {
+	rows, err := s.db.Query(`
+SELECT DISTINCT to_agent FROM messages WHERE read = 0 AND delivered_via = 'pending'`)
 	if err != nil {
-		return nil, fmt.Errorf("state: list live agents: %w", err)
+		return nil, fmt.Errorf("state: list pending wake mail: %w", err)
+	}
+	defer rows.Close()
+	out := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("state: scan pending wake mail: %w", err)
+		}
+		out = append(out, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("state: iterate pending wake mail: %w", err)
+	}
+	return out, nil
+}
+
+// scanAgents runs one addressable-agent query and stamps each row with the
+// supplied availability, so the running and stopped-wakeable halves of the
+// addressable set project identically (techspec §3.3).
+func (s *Store) scanAgents(query, availability string, args ...any) ([]LiveAgent, error) {
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("state: list agents: %w", err)
 	}
 	defer rows.Close()
 
@@ -49,37 +103,37 @@ ORDER BY a.name`)
 	for rows.Next() {
 		var la LiveAgent
 		if err := rows.Scan(&la.AgentID, &la.Name, &la.Role, &la.Project, &la.Interface, &la.State, &la.Detail, &la.ContextPct); err != nil {
-			return nil, fmt.Errorf("state: scan live agent: %w", err)
+			return nil, fmt.Errorf("state: scan agent: %w", err)
 		}
 		la.Address = address(la.Role, la.Project)
+		la.Availability = availability
 		out = append(out, la)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("state: iterate live agents: %w", err)
+		return nil, fmt.Errorf("state: iterate agents: %w", err)
 	}
 	return out, nil
 }
 
-// ResolveRecipient resolves a `to` string to a single live agent_id following
-// the techspec §3.4 order (exact agent_id, then role@project, then
-// case-insensitive name). Only live NON-terminal agents are considered as
-// recipients: a terminal agent has no check_messages tool wired, so delivering to
-// it would spin the nudger indefinitely (up to the 7-day mail TTL) without the
-// agent ever draining its mailbox (Finding 4). Excluding it here stops both
-// delivery and the nudge loop (the nudger only fires when unread > 0). On more
-// than one match it returns an *AmbiguousError (wrapping ErrAmbiguousRecipient);
-// on no match, ErrRecipientNotFound.
-func (s *Store) ResolveRecipient(to string) (string, []AgentRef, error) {
+// ResolveRecipient resolves a `to` string against one addressable set to a
+// single agent_id, following the techspec §3.4 order (exact agent_id, then
+// role@project, then case-insensitive name). The caller supplies the set —
+// running agents plus stopped agents a message may wake (FS-06.R22) — so
+// resolution and list_agents always answer from the same directory. Only
+// NON-terminal agents are considered as recipients: a terminal agent has no
+// check_messages tool wired, so delivering to it would spin the nudger
+// indefinitely (up to the 7-day mail TTL) without the agent ever draining its
+// mailbox (Finding 4). Excluding it here stops both delivery and the nudge loop
+// (the nudger only fires when unread > 0). On more than one match it returns an
+// *AmbiguousError (wrapping ErrAmbiguousRecipient); on no match,
+// ErrRecipientNotFound.
+func ResolveRecipient(addressable []LiveAgent, to string) (string, []AgentRef, error) {
 	to = strings.TrimSpace(to)
 	if to == "" {
 		return "", nil, ErrRecipientNotFound
 	}
-	all, err := s.LiveAgents()
-	if err != nil {
-		return "", nil, err
-	}
-	live := make([]LiveAgent, 0, len(all))
-	for _, a := range all {
+	live := make([]LiveAgent, 0, len(addressable))
+	for _, a := range addressable {
 		if a.Interface == "terminal" {
 			continue // terminal agents cannot receive mail (see doc above)
 		}

@@ -35,6 +35,7 @@ type Server struct {
 	onBudgetExceeded  func(agentID, turnID string, used int)
 	onMessageInserted func(fromAgentID, toAgentID string)
 	onMessagesRead    func(agentID string)
+	addressable       func() ([]state.LiveAgent, error)
 	pipelines         *pipeline.Manager
 
 	mcp     *mcp.Server
@@ -71,6 +72,29 @@ func (s *Server) messageInserted(fromAgentID, toAgentID string) {
 	if fn != nil {
 		fn(fromAgentID, toAgentID)
 	}
+}
+
+// SetAddressableAgents supplies the one addressable set list_agents projects and
+// send_message resolves against (techspec §3.3): running agents plus stopped chat
+// agents a message may wake. The dashboard owns it because the wake gates include
+// the project-archive state, which lives in configuration rather than state.db.
+// Without it this server addresses running agents only.
+func (s *Server) SetAddressableAgents(fn func() ([]state.LiveAgent, error)) {
+	s.mu.Lock()
+	s.addressable = fn
+	s.mu.Unlock()
+}
+
+// addressableAgents answers from the dashboard-supplied directory, falling back
+// to the running registry when no dashboard wired one.
+func (s *Server) addressableAgents() ([]state.LiveAgent, error) {
+	s.mu.RLock()
+	fn := s.addressable
+	s.mu.RUnlock()
+	if fn != nil {
+		return fn()
+	}
+	return s.store.LiveAgents()
 }
 
 // SetMessagesReadSink wires check_messages read/delete to a recipient state

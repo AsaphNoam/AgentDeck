@@ -92,6 +92,20 @@ orphaned processes.
   `--new`; no match falls through to a fresh launch.
 - **R12** — Resume optionally re-resolves a bound configuration source with the latest native setup
   (`config_refresh:true`); absent/false reproduces the frozen federation object (see FS-08).
+- **R33** — **Wake on message.** Sending a prompt to a stopped chat agent that passes
+  the **wake gates** transparently performs the same restore as R10 — same frozen snapshot, same
+  live identity row, no `config_refresh` — and then delivers the prompt in the woken session,
+  instead of returning the non-running error. The wake gates are exactly R10's shipped resume gates
+  — the agent is not archived, its project is not archived (a missing project definition does not
+  block, matching FS-05.R34), a persisted session snapshot exists, and the interface is chat —
+  plus one wake-only exclusion: an agent with a pipeline attempt association (FS-14/TS-09) is never
+  woken by a message, because the pipeline state machine deliberately stopped it; the pipeline
+  itself and explicit Resume (R10, unchanged) remain the only ways to revive such an agent.
+  Explicit Stop (R6) therefore acts as a lightweight sleep for a chat conversation: any later
+  message revives it, and Stop remains the way a person reclaims an idle agent's process memory. A
+  failed wake surfaces the applicable typed resume error (R25), leaves the agent stopped, and tears
+  down only the wake's own registration artifacts exactly as a failed explicit resume does. Agents
+  the wake gates exclude keep their existing rejection behavior unchanged.
 
 ### Switch runtime
 
@@ -230,6 +244,15 @@ transitions:
 - **A16** (R32) — The rename and switch-runtime dialogs open from the card menu, validate input,
   reject a no-op switch, submit the same requests as before, and leave the agent unchanged on Cancel.
   *Verify:* `CardContextMenu` component tests and the FS-12.A8 source guard.
+- **A17** (R33) — A launched-then-stopped fake-ACP chat agent receives a prompt: the
+  agent resumes (running row restored, same `agent_id`, frozen snapshot values reapplied) and the
+  prompt's turn streams normally. An individually archived agent, an agent with no snapshot, and a
+  stopped agent with a pipeline attempt association keep their existing rejections; a wake whose
+  resume stage fails returns the typed resume error with teardown of that wake's artifacts; and
+  simultaneous prompt, mail, and explicit-resume wakes on one agent produce exactly one process,
+  conflict errors for the losers, and an intact winner registration (working hook token, MCP
+  registration, and hook-settings file). *Verify:* server integration tests on the prompt route
+  against fake ACP, including the failure and concurrency branches.
 
 ## 6. Deviations & open decisions
 
@@ -260,7 +283,10 @@ transitions:
 
 - Launch compose + rollback: `internal/server/launch.go` (`composeLaunch`, `handleLaunch`,
   `teardownAgentRegistration`, `reapOrphanRuntime`).
-- Resume: `internal/server/resume.go` (`handleResume`, `composeResumeSpec`).
+- Resume: `internal/server/resume.go` (`handleResume`, `resumeSession`, `claimResume`,
+  `composeResumeSpec`).
+- Wake on message: `internal/server/resume.go` (`wakeAgent`, `wakeCandidate`),
+  `internal/server/sessions.go` (`handlePrompt`); `internal/server/wake_test.go`.
 - Archive transition coordination: `internal/server/archive_gate.go`; `TestAgentArchiveClaimBlocksConcurrentResume`.
 - Switch + rollback + matrix: `internal/server/switch.go` (`handleSwitchRuntime`, `rollbackSwitch`,
   `validateSwitchTarget`), `internal/server/terminal.go` (`terminalSupported`).

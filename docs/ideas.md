@@ -30,14 +30,15 @@ Example:
 - **Browse for working directories.** When a form asks for a working-directory path, add a
   **Browse** button that opens a directory picker so users can choose the folder instead of typing
   the path manually.
+- **Approval notifications link to the conversation.** When a pop-up notification fires because an
+  agent needs approval, make it a link that opens that agent's conversation, so the user can jump
+  straight to the pending permission instead of hunting for the right agent.
 
 ### From play session 2026-08-10
 
 - **Crash protection for bad projects.** AgentDeck created invalid projects that broke the process.
   Add input validation on project creation and guard the process against malformed project state.
 - **Adjustable chat window size.** Let the chat window be resized.
-- **Sending a message resumes the conversation.** Sending a message to an idle/exited agent should
-  resume its conversation rather than requiring a separate resume action.
 - **Edit message (fork on older).** Like Codex: editing the most recent message edits it in place;
   editing any older message forks/copies the conversation from that point (this is the "split
   conversation" mechanism).

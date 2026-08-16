@@ -86,6 +86,53 @@ func (s *Server) nudgeOnce(ctx context.Context, onlyAgentID string, stateByAgent
 			}
 		}(row.AgentID, row.PID)
 	}
+	s.wakeOnce(ctx, onlyAgentID, stateByAgent, now)
+}
+
+// wakeOnce resumes the stopped agents holding mail nobody has delivered yet
+// (FS-06.R23). Candidacy is durable: it needs an unread row still marked
+// "pending", so a failed wake — which stamps those rows "wake_failed" — cannot
+// respawn the same broken agent on the next tick or after a dashboard restart,
+// while new mail always inserts as "pending" and re-arms the wake. Woken agents
+// are nudged by the ordinary running path above once they report idle.
+func (s *Server) wakeOnce(ctx context.Context, onlyAgentID string, stateByAgent map[string]nudgeState, now time.Time) {
+	waiting, err := s.stateStore.PendingWakeMailAgents()
+	if err != nil {
+		s.log.Debug("nudger pending wake mail failed", "err", err)
+		return
+	}
+	for _, agentID := range waiting {
+		if onlyAgentID != "" && agentID != onlyAgentID {
+			continue
+		}
+		if _, ok := s.wakeCandidate(agentID); !ok {
+			continue // running, archived, snapshot-less, terminal, or pipeline-owned
+		}
+		ns := stateByAgent[agentID]
+		// The exclusive resume claim is the re-entry guard: this loop must not
+		// wait out a wake, and the nudge in-flight marker belongs to the running
+		// path that delivers check_messages once the agent is back.
+		if s.resumeInFlight(agentID) || now.Sub(ns.lastNudgeAt) < messaging.NudgeCooldown {
+			continue
+		}
+		ns.lastNudgeAt = now
+		stateByAgent[agentID] = ns
+		go func(agentID string) {
+			_, ae := s.wakeAgent(ctx, agentID)
+			if ae == nil {
+				return
+			}
+			s.log.Debug("mail wake failed", "agent", agentID, "err", ae.Message)
+			if ae.Code == runtime.CodeConflict {
+				// Another resume owns this agent; nothing was attempted here, so
+				// the mail stays pending for the next sweep.
+				return
+			}
+			if _, err := s.stateStore.MarkUnreadDeliveredVia(agentID, "wake_failed"); err != nil {
+				s.log.Debug("mark wake failed", "agent", agentID, "err", err)
+			}
+		}(agentID)
+	}
 }
 
 func (s *Server) runMessageJanitor(ctx context.Context) {

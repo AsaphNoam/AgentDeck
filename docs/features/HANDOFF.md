@@ -7,7 +7,32 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** Composer file-and-command autocomplete is implemented (FS-03.R30–R34, TS-03.R24,
+- **State:** Wake-on-message for stopped chat agents is implemented (FS-01.R33/A17, FS-03.R35/A18,
+  FS-06.R22/R23/A11, TS-01.R16, TS-03.R25, TS-04.R26). A prompt to a stopped chat agent that passes
+  the wake gates now resumes it inside the same `POST /prompt` request and then delivers the prompt;
+  agent mail makes such an agent addressable, and the nudger wakes it before the ordinary
+  `check_messages` nudge. `handleResume` was split so one `resumeSession` helper runs every resume —
+  explicit, prompt wake, and mail wake — behind a new exclusive per-agent claim (`claimResume`) taken
+  before any registration side effect, so a losing racer returns `409` without composing or tearing
+  down the winner's hook token, MCP registration, or hook-settings file. The wake gates are ordinary
+  Resume's gates plus a wake-only exclusion of pipeline-associated agents; the database-checkable half
+  is one shared query (`StoppedWakeCandidates`) that also builds the addressable set behind
+  `list_agents` and `send_message`, while the project-archive gate stays in the server because it
+  reads configuration. `list_agents` entries gained the additive `availability` field
+  (`running`/`stopped_wakeable`) with `state` unchanged. A failed mail wake is bounded durably: it
+  stamps the recipient's still-`pending` unread rows `wake_failed` in the existing `delivered_via`
+  column (no migration), and candidacy requires a `pending` row, so the bound survives restarts and
+  same-second mail and re-arms only on new mail; a losing claim is not a failed wake and leaves the
+  rows pending. The stopped-agent composer submits normally and now surfaces the server's own typed
+  error while keeping the draft. FS-01, FS-03, FS-06, and TS-03 moved Partial→Current; TS-01 and
+  TS-04 stay Partial. New regressions: `internal/server/wake_test.go` (wake, gate exclusions, failure
+  teardown, three-way concurrent wake, mail wake/nudge, durable failed-wake bound, pipeline
+  exclusion), `TestStoppedWakeCandidates`, `TestPendingWakeMailAgents`, and two `Composer.test.tsx`
+  cases. `make check-specs`, both Go test modes, focused `-race` on the concurrent-wake paths,
+  `make build`, all 226 UI tests, presentation/style checks, and `make dist` pass. No live-browser
+  pass was run. A stale migration-version guard test (asserting 13 against the shipped 14) was already
+  failing on `main` and now derives its expectation from the migrations slice (INV §9).
+- **Previous state:** Composer file-and-command autocomplete is implemented (FS-03.R30–R34, TS-03.R24,
   TS-04.R24). In a live chat composer, `@` at a word boundary opens a file picker over the chat
   session's working directory — Git tracked/untracked/effective-ignore view when it is a worktree,
   otherwise a bounded walk; `.git` is skipped, directory symlinks are not followed, canonical
@@ -25,58 +50,6 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   `Composer.test.tsx`, presentation/style checks, and `make dist` pass. A 2026-08-15 isolated
   real-browser pass confirmed both pickers, boundary/filter/keyboard behavior, verbatim trailing-space
   submission, stopped-session failure without composer loss, and zero console errors.
-- **Previous state:** Release archive packaging now preserves the package context of the three required npm
-  commands (`claude-agent-acp`, `codex-acp`, and `codex`) while keeping archives symlink-free: each
-  npm `.bin` symlink becomes a regular launcher that calls the private Node runtime on the original
-  in-tree module, so package-relative imports still resolve after extraction. The archive round-trip
-  regression fails against the old byte-flattening behavior and executes successfully now; FS-10.R3/A2
-  and TS-06.R15/R21 are restored. Existing installed release directories remain immutable and need a
-  newly published release plus explicit update/reinstall to receive the repair. Claude ACP startup
-  hardening is implemented. The original 2026-08-10
-  `initialize: runtime: transport closed` cause cannot be recovered because startup stderr was
-  discarded, but the exact pinned 0.59.0 adapter now passes local ACP v1 initialize/session creation
-  and an authenticated one-word streamed turn on this machine. Every ACP initialize/load/new call is
-  capped at 30 seconds; early Claude exits map captured stderr to bounded resource, nested-launch,
-  authentication, or runtime guidance without returning raw output, and launch/resume share fake-ACP
-  exit/timeout regressions plus a focused race pass. FS-09.R48/A21 and TS-04.R22 shipped; TS-04.R10
-  was split so optional-integration probing remains planned as R23. Shared checks, both Go test modes,
-  source/UI builds, presentation checks, and the distribution build pass. Dashboard application logs
-  now append to owner-only `$AGENTDECK_HOME/dashboard.log` for foreground and detached starts;
-  foreground mode also mirrors them to stderr, while detached mode retains one redirected sink.
-  The dashboard logger is the scoped process-wide `slog` default, so package-level diagnostics share
-  its JSON format and level. FS-04.R41/A21 and TS-01.R15 shipped with append, permission, unavailable-
-  path, and no-duplication regressions. Two chat usability items are
-  also implemented: the transcript shows a **Working…** indicator at its end while the open chat agent
-  is `busy` (clearing on turn end, error, or a permission pause to `waiting_input`), and transcript
-  text is selectable/copyable with a distinct `.user-message::selection` colour so a highlight inside
-  the user's own bubble stays visible. FS-03.R28/R29/A13/A14 shipped and FS-03 remains Current. The
-  2026-08-15 browser pass confirmed the Working indicator and its error clear, plus live computed
-  selection styles; browser automation could not establish an actual pointer text selection, so that
-  one visual gesture remains unclaimed. Simple backend creation and
-  global configuration linking is implemented. **Add backend**
-  is now a provider-first dialog: choosing a type supplies a matching editable name and the canonical
-  starter model, and submitting uses the new item-scoped `POST /api/backends`, which adds exactly one
-  backend to the durable catalog without submitting, replacing, or discarding the browser's unsaved
-  whole-catalog Settings draft. Claude/Codex creation also offers **Create and use my configuration**,
-  which makes the backend durable first and then performs the normal project-free Linked connection;
-  a failed connection leaves the valid backend saved, unbound, and retryable. The Settings/onboarding
-  source panel replaced its project selector, discover step, and Linked/Mirrored choice with one
-  **Use my … configuration** action; `project` is optional on the config-source GET/preview/refresh
-  routes, and an `enable_model_sync` bind turns on continuing sync and immediately runs that
-  provider's add-only import into the target backend only. Persistence is catalog-first then manifest
-  with preimage restoration, the generation and SSE publish only after both writes, and one shared
-  `catalogMu` serializes the full-document save, the item create, and the enabled-bind merge (the
-  concurrency regression loses seven of eight entries without it). Catalog read-modify-writes now
-  refuse an unreadable `backends.json` instead of overwriting it with the seed, and the Claude/Codex
-  resolvers no longer treat an absent project as the server process's working directory. FS-04.R40/A20,
-  FS-08.R34/A11, FS-09.R47/A20, TS-03.R22/R23, and TS-07.R16/R17/R18 shipped; FS-08.R23 is superseded
-  and FS-04/TS-03 moved Partial→Current. `make check-specs`, both Go test modes, focused `-race` on the
-  catalog lock, all 214 UI tests, presentation/style checks, source build, and the distribution build
-  pass. The 2026-08-02 real-browser J9 pass confirmed cancel, provider-specific starter creation,
-  dirty-draft preservation, existing and direct create-and-connect linking, target-only import, and
-  unlink with zero browser errors; source-failure/retry and launch through the binding remain
-  unexercised. Full record:
-  [`../archive/reviews/usability-review-run-2026-08-02-backend-creation.md`](../archive/reviews/usability-review-run-2026-08-02-backend-creation.md).
 - **Last reviewed code:** `2727ae8` (2026-08-15), the continuous range after `b6654b5`: catalog
   review fixes, ACP startup diagnostics, dashboard logging, release launcher packaging, and composer
   file/command autocomplete. Both composer findings from that review are now fixed.
@@ -118,49 +91,58 @@ those commits to the shared `origin/main` branch needs explicit human authorizat
 
 ### Open findings
 
-- **Must fix** — concurrent wake/resume can tear down the successful runtime's registrations
-  (high confidence; TS-01.R16, INV §4/§5). Normal trigger: a prompt, mail nudge, or explicit
-  Resume reaches the same stopped agent concurrently. `handleResume` calls
-  `composeResumeSpecWithGeneration` before `Registry.Resume` takes its nil-sentinel claim, so both
-  callers can replace the agent-keyed hook token, MCP cleanup, and generated files; the loser then
-  calls `teardownAgentRegistration(agentID)` and deletes/revokes the winner's artifacts.
-  `acquireAgentStart` is an archive lease, not an exclusive resume claim. Revise the design so one
-  generation-scoped claim occurs before registration side effects (or cleanup is generation-scoped)
-  and explicit Resume uses the same seam; regress simultaneous prompt, mail, and explicit wakes,
-  proving one process, a conflict loser, and intact winner registrations.
-- **Must fix** — the wake predicate silently includes pipeline-stage agents the pipeline deliberately
-  stopped (high confidence; FS-01.R33, FS-06.R22/R23). `stopThenAdvance` calls `StopStage` after an
-  accepted stage result, but that chat agent remains non-archived with a persisted snapshot and
-  therefore satisfies every planned wake gate. A later prompt or agent mail would revive completed
-  stage work outside the pipeline state machine, undercutting the design's rationale that pipeline
-  agents already release their memory. The durable association already exists through
-  `PipelineAssociationForAgent`; resolve whether pipeline-stage identities are excluded or which
-  pipeline states may wake, specify it, and test list/prompt/mail behavior for a completed stage.
-- **Must fix** — failed-wake suppression is contradictory and has no reliable newer-mail cursor
-  (high confidence; FS-06.R23/A11, TS-04.R26, INV §15). FS-06 promises no retry until new mail or
-  human action, while TS-04's process-local marker explicitly permits the same unread row to retry
-  after every dashboard restart. Within one process, `messages.created_at` is stored only to whole
-  seconds and message ids are random, so two same-second rows cannot establish which is newer.
-  Prefer extending the existing durable `delivered_via` state: mark the pending rows whose wake
-  failed and treat only later `pending` rows as a stopped wake candidate. Otherwise define an
-  equally reliable cursor and narrow the FS guarantee. Regress same-second mail and restart after a
-  failed wake.
-- **Must fix** — the additive `list_agents` wake marker has no wire shape (high confidence;
-  FS-06.R3/R22/A11, TS-04.R26). The design promises a stopped/wakeable marker but defines neither
-  its field name/type nor how it relates to the existing `state` vocabulary. Specify the exact
-  backward-compatible field while preserving the agent's last status, and assert stopped wakeable,
-  running, and non-wakeable entries in the MCP integration test.
-- **Worth fixing** — “active project” does not name the exact shipped Resume gate (high confidence;
-  FS-01.R33, FS-05.R34). Ordinary Resume deliberately treats a missing project definition as
-  unavailable-but-active, while the ready change's parenthetical can be implemented as “project
-  file must exist and be active.” Cite and reuse the exact existing not-archived gate, or separately
-  specify an intentional behavior change; cover a stopped agent whose project definition is absent.
+None.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-17 — Implemented wake-on-message for stopped chat agents (FS-01.R33/A17, FS-03.R35/A18,
+  FS-06.R22/R23/A11, TS-01.R16, TS-03.R25, TS-04.R26; **INV §1/§2/§4/§5/§8/§15**). `handleResume`
+  now delegates to one `resumeSession` helper that every resume runs — explicit, prompt wake, and
+  mail wake — behind a new exclusive per-agent claim taken before any registration side effect; the
+  three-way concurrency regression proves one process, two `409` losers, and a winner whose hook
+  token, registered MCP session, and hook-settings file all survive. `handlePrompt` intercepts
+  `ErrNoHandle`, calls the shared `wakeAgent`, and re-sends in the same request; an agent the wake
+  gates exclude keeps today's `404`. Wake candidacy is one SQL predicate
+  (`state.StoppedWakeCandidates`, parameterized for one agent or all) covering not-archived, chat,
+  snapshot-bearing, non-pipeline agents, with the config-backed project-archive gate applied in the
+  server; the same query builds the addressable set the dashboard now injects into messaging, so
+  `list_agents` and `send_message` resolution answer from one directory and `state.ResolveRecipient`
+  became a pure function over it. `LiveAgent` gained the additive `availability` field. The nudger
+  gained a second phase over `PendingWakeMailAgents`: it wakes off the loop goroutine, guarded by the
+  resume claim and the existing per-agent cooldown, and a genuine failure stamps the still-`pending`
+  unread rows `wake_failed` (existing column, no migration) so the no-retry bound is durable across
+  restarts and same-second mail; a losing claim is not a failed wake and leaves the rows pending. The
+  composer now surfaces the server's typed error instead of a fixed string when a send is rejected.
+  Also repaired a stale migration-version guard test that was already failing on `main` (asserted 13
+  against the shipped 14) by deriving both assertions from the migrations slice (INV §9).
+  `make check-specs`, both Go test modes, focused `-race`, `make build`, all 226 UI tests,
+  presentation/style checks, and `make dist` pass. No live-browser pass was run.
+
+- 2026-08-16 — Resolved all five wake-on-message design-review findings; no product code changed.
+  Each was validated against the tree and confirmed. **Concurrency** — verified `acquireAgentStart`
+  is a counting lease and `composeResumeSpec` mints agent-keyed artifacts before the registry
+  sentinel while teardown is agent-keyed; TS-01.R16 now requires one exclusive per-agent resume
+  claim taken before any registration side effect, routes the explicit resume handler through the
+  same helper, and FS-01.A17 gains the simultaneous prompt/mail/explicit-wake regression proving
+  one process, conflict losers, and intact winner registrations. **Pipeline stage agents** —
+  confirmed they pass every original wake gate despite being deliberately stopped; FS-01.R33 now
+  excludes any agent with a pipeline attempt association from wake entirely (pipeline state machine
+  and explicit Resume remain the only revival paths), mirrored in FS-03.R35, FS-06.R22/A11, and
+  TS-04.R26 via `PipelineAssociationForAgent`. **Failed-wake cursor** — confirmed
+  `messages.created_at` is whole-second RFC3339, making a timestamp cursor unsound and the
+  process-local marker contradictory with FS-06's durable promise; adopted the reviewer's
+  `delivered_via` extension: a failed wake durably marks still-`pending` unread rows `wake_failed`,
+  candidacy requires a `pending` row, the bound survives restarts, and the TS deviation is gone.
+  **`list_agents` wire shape** — specified the additive `availability` field
+  (`"running"`/`"stopped_wakeable"`) with `state` preserving the latest durable status, asserted in
+  FS-06.A11. **Project gate wording** — replaced "active project" with R10's exact shipped gate
+  (missing project definition passes; only `archived: true` blocks, FS-05.R34) in FS-01.R33 and the
+  ready change, which also records all four verified evidence items. `make check-specs` and
+  `git diff --check` pass; the change remains waiting to start.
 
 - 2026-08-16 — Reviewed `wake-on-message-for-stopped-agents.md` against every cited planned item,
   the surrounding shipped requirements, all invariant classes, and the actual resume, registration,
@@ -173,6 +155,26 @@ are not promoted to findings without a repeatable failure.
   Worth-fixing ambiguity asks the design to preserve FS-05.R34's missing-project Resume behavior.
   `make check-specs` and `git diff --check` pass. The change remains Waiting to start and must not
   begin until the Must-fix findings are resolved.
+
+- 2026-08-16 — Designed wake-on-message for stopped chat agents; no product code changed. The
+  human's idle-memory idea resolved into the wake half only: pipeline stage agents — the only
+  programmatically created agents — already stop on acceptance (`stopThenAdvance`), and the human
+  decided user-launched agents are never auto-slept, so no pause timer, origin column, or new
+  status value exists. Planned behavior: FS-01.R33/A17 (prompt to a resumable stopped chat agent
+  performs the ordinary frozen-snapshot resume, then delivers the prompt; Stop becomes a
+  lightweight sleep), FS-03.R35/A18 (the stopped-agent composer is an enabled wake surface;
+  failed wake keeps the draft; R19's non-running clause narrows at ship), FS-06.R22/R23/A11
+  (stopped wakeable agents are addressable and marked in `list_agents`; mail inserts durably first,
+  the nudger wakes via the shared helper, and a failed wake is not retried until newer mail —
+  narrowing R4/R8/R9's stopped clauses at ship). Architecture: TS-01.R16 (one wake helper wrapping
+  the exact resume gates/composition/claim/teardown; the registry's resume claim is the INV §5
+  arbiter), TS-03.R25 (synchronous wake inside the prompt request, bounded by TS-04.R22; no new
+  routes or shapes), TS-04.R26 (shared addressable-set query, nudger wake candidacy under the
+  existing cooldown/in-flight map, process-local failed-wake marker with a stated restart
+  deviation). FS-01/FS-03/FS-06/TS-03 moved Current→Partial. The ready change is
+  `wake-on-message-for-stopped-agents.md`; the source idea (including the 2026-08-10
+  "sending a message resumes the conversation" entry) was removed from `docs/ideas.md`.
+  `make check-specs` and `git diff --check` pass.
 
 - 2026-08-16 — `/review-design` found no selectable waiting design. `docs/ready-changes/`
   contains only its index and explicitly lists no changes waiting to start; the handoff likewise

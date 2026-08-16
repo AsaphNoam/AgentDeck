@@ -36,9 +36,10 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
 ### 2.2 Sending and reading mail
 
 - **R4.** `send_message(to, body, subject?, in_reply_to?)` resolves a recipient in this order:
-  exact `agent_id`, exact `role@project`, then case-insensitive display name. Only running
-  chat-interface agents are addressable. No match returns `recipient_not_found`; multiple matches
-  return `ambiguous_recipient` with candidates so the sender can retry by `agent_id`.
+  exact `agent_id`, exact `role@project`, then case-insensitive display name. Addressable agents are
+  running chat-interface agents plus the stopped chat agents a message can wake (R22). No match
+  returns `recipient_not_found`; multiple matches return `ambiguous_recipient` with candidates so the
+  sender can retry by `agent_id`.
 - **R5.** A message body is required and limited to 8,000 characters; an optional subject is
   limited to 200. On success the response returns `message_id`, resolved `to` agent id, and
   canonical `to_address`. The durable row records the session-derived sender id/address/name,
@@ -54,15 +55,17 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   limits return `422 validation`.
 - **R8.** Messages survive agent stop and dashboard restart in `state.db`. Read messages are
   deleted after 24 hours; all messages, including unread mail for stopped agents, are deleted after
-  seven days. Stopped agents retain recent mail but are not addressable or nudged.
+  seven days. A stopped agent retains recent mail; it is addressable and nudged only when a message
+  can wake it (R22–R23), and otherwise stays unaddressable and un-nudged.
 
 ### 2.3 Nudging and per-turn budget
 
 - **R9.** Inserting a message signals the recipient immediately and a two-second sweep is the
   fallback. When a running chat recipient is `idle` with unread mail, AgentDeck marks the pending
   rows `delivered_via="nudge"` and injects a new ACP turn instructing it to call
-  `check_messages`, without a human prompt. Busy, waiting, done, error, stopped, terminal, mail-free,
-  in-flight, and cooldown recipients are not nudged.
+  `check_messages`, without a human prompt. Busy, waiting, done, error, terminal, mail-free,
+  in-flight, and cooldown recipients are not nudged, and neither is a stopped recipient no message
+  can wake (R23).
 - **R10.** A nudge re-checks the recipient state at the runtime boundary before injection, resets
   that agent's per-turn coordination budget, and completes like an ordinary chat turn. One nudge
   may be in flight per agent; retries are separated by a three-second cooldown and a stuck
@@ -123,6 +126,25 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   tool arguments and cannot collide with an agent id — and its sends consume no agent's per-turn
   budget while still updating unread/indicator state transactionally. Messages from the user sender
   follow the normal R6–R10 reading, nudging, indicator, and retention rules.
+- **R22** — **Stopped wakeable agents are addressable.** A stopped chat agent that
+  passes FS-01.R33's wake gates (which exclude archived agents/projects, snapshot-less agents, and
+  pipeline-associated agents) is a valid `send_message` recipient under the same R4 resolution
+  order, and `list_agents` includes it: every entry gains an additive `availability` field —
+  `"running"` for today's live entries, `"stopped_wakeable"` for these — while the existing `state`
+  field keeps the agent's latest durable status (`done` for a stopped agent), so a sender knows
+  delivery implies a wake and its latency. Terminal and pipeline-associated agents remain
+  unaddressable while stopped.
+- **R23** — **Mail wakes a stopped recipient.** Mail for a stopped wakeable recipient
+  is durably inserted first, exactly like mail for a running recipient; the existing insert-time
+  signal and periodic sweep (R9) then treat that recipient as a wake candidate: AgentDeck resumes it
+  with FS-01.R33 semantics and, once idle, nudges it to `check_messages` under the same
+  cooldown and in-flight tracking as running recipients. A failed wake leaves the mail durable and
+  the agent stopped, and durably marks that recipient's still-pending unread rows with the
+  `wake_failed` delivery marker; only unread mail whose delivery marker is still `pending` makes a
+  stopped agent a wake candidate, so the no-retry bound survives a dashboard restart, needs no
+  timestamp ordering, and re-arms automatically because new mail always inserts as `pending`. A
+  broken adapter therefore cannot cause a process-spawn loop. Retention (R8) is unchanged: mail for
+  a never-woken agent still expires on the normal schedule.
 
 ## 5. Acceptance criteria
 
@@ -162,6 +184,14 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
 - **A10** (R21) — A reserved-sender insert raises the recipient's unread badge, nudges an
   idle recipient, consumes no turn budget, and the user identity cannot be produced through MCP tool
   arguments: `internal/server/annotations_test.go::TestAnnotationAgentDeliveryPersistsUserMailAndTranscriptEvent`.
+- **A11** (R22–R23) — `send_message` to a stopped wakeable fake-ACP agent inserts the
+  mail, resumes the agent, and nudges it (`delivered_via="nudge"`), while `list_agents` shows it
+  with `availability:"stopped_wakeable"` (and running agents `"running"`) before the send. A wake
+  whose resume fails marks the pending rows `wake_failed`, retains the mail, leaves the agent
+  stopped, and produces no further spawn attempts — including after a dashboard restart and for
+  mail inserted in the same second — until a new `pending` row arrives. A stopped agent with a
+  pipeline attempt association is absent from `list_agents`, unresolvable as a recipient, and never
+  woken. *Verify:* server messaging integration tests against fake ACP covering all three branches.
 
 ## 6. Deviations & open decisions
 

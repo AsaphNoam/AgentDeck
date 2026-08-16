@@ -35,7 +35,22 @@ func (s *Server) handlePrompt(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError(runtime.CodeValidation, "text is required"))
 		return
 	}
-	if err := s.registry.SendPrompt(r.Context(), id, body.Text); err != nil {
+	err := s.registry.SendPrompt(r.Context(), id, body.Text)
+	// A prompt to a stopped chat agent wakes it and is then delivered in the woken
+	// session (FS-01.R33, TS-03.R25). The wake runs inside this request, so the
+	// caller simply waits out the resume; ACP's per-stage deadlines bound it
+	// (TS-04.R22). An agent the wake gates exclude keeps today's 404.
+	if errors.Is(err, runtime.ErrNoHandle) {
+		woken, ae := s.wakeAgent(r.Context(), id)
+		if ae != nil {
+			writeAPIError(w, ae)
+			return
+		}
+		if woken {
+			err = s.registry.SendPrompt(r.Context(), id, body.Text)
+		}
+	}
+	if err != nil {
 		writeAPIError(w, sessionOpError(err))
 		return
 	}

@@ -140,6 +140,37 @@ describe("Composer autocomplete", () => {
     expect(JSON.parse(promptBodies[0]).text).toBe("@src/app.ts /$plan ");
   });
 
+  // FS-03.R35/A18 — the composer of a stopped chat agent is the wake surface: it
+  // submits the ordinary prompt request, and a rejected wake shows the server's
+  // own error while keeping the draft.
+  it("submits the ordinary prompt request for a stopped agent", async () => {
+    render(<Composer agentId="a_1" busy={false} />);
+    const ta = screen.getByRole("textbox") as HTMLTextAreaElement;
+    type(ta, "wake up");
+    fireEvent.keyDown(ta, { key: "Enter" });
+    await waitFor(() => expect(promptBodies.length).toBe(1));
+    expect(JSON.parse(promptBodies[0]).text).toBe("wake up");
+    expect(ta.value).toBe("");
+  });
+
+  it("shows the server error and restores the draft when the wake is rejected", async () => {
+    server.use(
+      http.post("/api/sessions/:id/prompt", () =>
+        HttpResponse.json(
+          { error: { code: "agent_archived", message: "agent is archived; restore it before resuming" } },
+          { status: 409 },
+        ),
+      ),
+    );
+    render(<Composer agentId="a_1" busy={false} />);
+    const ta = screen.getByRole("textbox") as HTMLTextAreaElement;
+    type(ta, "wake up");
+    fireEvent.keyDown(ta, { key: "Enter" });
+
+    expect(await screen.findByText(/agent is archived; restore it before resuming/)).toBeInTheDocument();
+    await waitFor(() => expect(ta.value).toBe("wake up"));
+  });
+
   it("stays usable when the file source is unavailable", async () => {
     failFileSearch = true;
     render(<Composer agentId="a_1" busy={false} />);

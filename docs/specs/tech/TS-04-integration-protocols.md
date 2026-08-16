@@ -204,6 +204,24 @@ into the terminal turn status and rollup, preserving the existing dashboard and 
 The fake ACP adapter emits these same shapes so protocol tests do not assert an invented wire
 contract (INV §11).
 
+**R26 — Messaging addresses and wakes stopped wakeable agents through one helper.**
+Recipient resolution and `list_agents` draw from a single shared addressable-set query: running
+chat agents plus stopped chat agents passing FS-01.R33's wake gates (which exclude any agent with
+a pipeline attempt association via the existing `PipelineAssociationForAgent` seam). Every
+`list_agents` entry gains the additive `availability` field (`"running"` | `"stopped_wakeable"`,
+FS-06.R22); existing fields, including `state`, are unchanged. Mail insertion stays durable-first
+exactly as today (INV §15). The nudger's existing per-agent cooldown/in-flight map gains stopped
+wakeable recipients with unread mail as wake candidates: the insert-time signal or sweep calls the
+shared wake helper (TS-01.R16) without waiting out the resume, and once the agent is resumed and
+idle, the ordinary running-recipient nudge delivers `check_messages`. A wake reuses that map's
+per-agent cooldown; its re-entry guard is TS-01.R16's exclusive claim rather than the map's
+in-flight marker, which stays with the `check_messages` delivery that follows the wake. The failed-wake bound is durable, not process-local: a failed wake
+marks the recipient's still-`pending` unread rows with the new `delivered_via` value `wake_failed`
+in the existing column (no migration), and wake candidacy requires at least one unread row still
+marked `pending` — `messages.created_at` is whole-second RFC3339, so timestamp comparison cannot
+order same-second rows and is not used. New mail always inserts as `pending`, re-arming the wake;
+the bound therefore holds across dashboard restarts (FS-06.R23).
+
 ## 3. Interfaces & data shapes
 
 - ACP: JSON-RPC messages over newline-delimited child stdin/stdout; adapter determines exact
