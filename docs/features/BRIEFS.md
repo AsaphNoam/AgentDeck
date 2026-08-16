@@ -4,6 +4,17 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-16 — Design review: no waiting change
+
+There is no waiting design to review. The ready-changes directory explicitly lists none, and the
+handoff names no active change. Your uncommitted idea and specification edits were left untouched;
+they were not treated as an approved ready change.
+
+**Needs attention:** A design must be completed and added to the ready-changes directory before it
+can receive this review.
+
+**Next:** Finish or name the intended ready change, then run `/review-design` again.
+
 ### 2026-08-16 — Fix: review-finding queue check
 
 There are no open review findings to fix. The two most recent required fixes are already complete,
