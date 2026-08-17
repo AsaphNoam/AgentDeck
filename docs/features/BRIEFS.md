@@ -4,6 +4,20 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-17 — Bug investigation: projects background actions
+
+Confirmed: right-click actions fail on the blank projects background because the menu listener ends
+with the project cards while the visible main canvas continues below it. Right-clicking inside that
+smaller area works, which is why card actions and the existing heading-based test pass. A live
+1280×720 reproduction showed the projects surface ending around y=293 and the canvas continuing to
+y=720; right-clicking the lower blank area opened no AgentDeck menu, with no browser errors logged.
+
+**Needs attention:** The background **New project** action remains unavailable from most of the
+blank canvas; the persistent header button still works.
+
+**Next:** Run `/fix` to extend the projects interaction surface across the available canvas while
+preserving card-specific menus, then verify a right-click below the final card in the grid journey.
+
 ### 2026-08-17 — Fix and release: wake, proposals, and live context updates
 
 All twelve review findings are fixed. Stopping and waking an agent can no longer race and tear down

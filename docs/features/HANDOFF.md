@@ -122,13 +122,35 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ### Open findings
 
-None.
+- **Must fix** — **Confirmed** — The projects-home background menu does not cover the visible canvas.
+  Field report (verbatim): "right click on the background actions isn't working, only right click on
+  cards pops up the actions". The reporter did not provide a version, environment, or logs. Local
+  reproduction on 2026-08-17 used the current `main` checkout on macOS in the in-app browser at
+  1280×720; the browser console had no warnings or errors. FS-02.R41/A24 requires any non-card point
+  in the projects view to open the **New project** menu. `ProjectDashboard` attaches `onContextMenu`
+  to `.project-dashboard`, but that element is content-height only: in the reproduction it ended at
+  y=292.5 while `.app-main` continued to y=720. A right-click at (640,600) therefore never reached
+  `openBackgroundMenu` and opened no app menu, while right-clicking the Projects heading did open the
+  menu. The existing `ProjectDashboard.test.tsx` case right-clicks that heading, so it proves event
+  bubbling only inside the undersized element and misses the layout boundary. Fix by making the
+  projects-home interaction surface fill the available main canvas (or by owning the route-wide
+  background event at an equivalent boundary) without intercepting project-card menus; retain the
+  component behavior test and add a layout-aware J5/browser regression that right-clicks below the
+  final card. **INV §10** applies.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-17 — Investigated the field report "right click on the background actions isn't working,
+  only right click on cards pops up the actions". Confirmed FS-02.R41/A24 is violated: the projects
+  route's context-menu listener sits on a content-height child while most of the visible main canvas
+  belongs only to `.app-main`. At 1280×720 the child ended at y=292.5 and the main canvas at y=720;
+  right-clicking (640,600) produced no app menu, while right-clicking the Projects heading opened
+  **New project**. No browser warnings or errors occurred. The existing test clicks the heading and
+  misses the geometry failure. No product code, specifications, or reproduction test changed.
 
 - 2026-08-17 — Fixed all twelve findings from the review of stopped-agent wake, pipeline proposals,
   and context usage. Stop and resume/wake now share one lifecycle claim; mail wake attempts claim
