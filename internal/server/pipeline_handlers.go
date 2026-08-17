@@ -68,6 +68,7 @@ func (s *Server) handleCreatePipelineTemplate(w http.ResponseWriter, r *http.Req
 		writePipelineValidation(w, record.Diagnostics)
 		return
 	}
+	s.pipelineMgr.ConsumeTemplateProposal(record.ID, record.Template)
 	writeJSON(w, http.StatusCreated, record)
 }
 
@@ -86,6 +87,8 @@ func (s *Server) handleUpdatePipelineTemplate(w http.ResponseWriter, r *http.Req
 		writePipelineValidation(w, record.Diagnostics)
 		return
 	}
+	// The exact proposed draft is now saved, so its approval offer is consumed.
+	s.pipelineMgr.ConsumeTemplateProposal(record.ID, record.Template)
 	writeJSON(w, http.StatusOK, record)
 }
 

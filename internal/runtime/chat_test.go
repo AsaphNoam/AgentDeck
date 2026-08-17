@@ -524,6 +524,76 @@ func TestChatStreamText(t *testing.T) {
 	}
 }
 
+// TestUsageUpdateRepublishesContextPctMidTurn proves a mid-turn usage_update
+// republishes context_pct through the durable status row immediately, rather
+// than waiting for the next tool/status event or turn_end (TS-04.R25, INV
+// §1). The fake adapter emits usage_update, then a marker chunk, then blocks
+// on a hold file so the turn stays open while the test observes the status
+// row.
+func TestUsageUpdateRepublishesContextPctMidTurn(t *testing.T) {
+	c, spec := newChatTest(t, "context_mid_turn")
+	holdFile := filepath.Join(t.TempDir(), "hold")
+	spec.Env = append(spec.Env, "FAKEACP_HOLD_FILE="+holdFile)
+	ctx := context.Background()
+
+	h, err := c.Start(ctx, spec)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.WriteFile(holdFile, []byte("go"), 0o644)
+		c.Stop(ctx, h.AgentID)
+	})
+
+	ch, unsub, err := c.Subscribe(h.AgentID)
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+	defer unsub()
+
+	if err := c.SendPrompt(ctx, h.AgentID, "hello"); err != nil {
+		t.Fatalf("SendPrompt: %v", err)
+	}
+
+	// Wait for the marker chunk fakeacp emits right after usage_update. ACP
+	// notifications are processed in order on one read loop, so observing
+	// this chunk proves the usage_update was already applied.
+	deadline := time.After(5 * time.Second)
+	found := false
+	for !found {
+		select {
+		case ev := <-ch:
+			if ev.Type == EvAssistantText {
+				var d AssistantTextData
+				if err := json.Unmarshal(ev.Data, &d); err == nil && d.Delta == "usage applied" {
+					found = true
+				}
+			}
+		case <-deadline:
+			t.Fatal("timed out waiting for post-usage_update marker chunk")
+		}
+	}
+
+	// The scenario is blocked on the hold file, so the turn is still open.
+	// The status row must already carry the fresh context_pct.
+	st, err := c.store.ReadStatus(h.AgentID)
+	if err != nil {
+		t.Fatalf("ReadStatus: %v", err)
+	}
+	if st.State != "busy" {
+		t.Fatalf("mid-turn state = %q, want busy (turn should still be open)", st.State)
+	}
+	if st.ContextPct < 0.74 || st.ContextPct > 0.76 {
+		t.Fatalf("mid-turn context_pct = %v, want ~0.75 (republished before turn_end)", st.ContextPct)
+	}
+
+	// Release the hold so the turn can finish cleanly.
+	if err := os.WriteFile(holdFile, []byte("go"), 0o644); err != nil {
+		t.Fatalf("write hold file: %v", err)
+	}
+	drainTurn(t, ch)
+}
+
 func TestChatToolFlow(t *testing.T) {
 	c, spec := newChatTest(t, "tool_flow")
 	ctx := context.Background()

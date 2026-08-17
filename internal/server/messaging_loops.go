@@ -7,6 +7,7 @@ import (
 
 	"github.com/agentdeck/agentdeck/internal/messaging"
 	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/agentdeck/agentdeck/internal/state"
 )
 
 type nudgeState struct {
@@ -77,7 +78,7 @@ func (s *Server) nudgeOnce(ctx context.Context, onlyAgentID string, stateByAgent
 		ns.startedAt = now
 		ns.lastNudgeAt = now
 		stateByAgent[row.AgentID] = ns
-		if _, err := s.stateStore.MarkUnreadDeliveredVia(row.AgentID, "nudge"); err != nil {
+		if _, err := s.stateStore.MarkUnreadDeliveredVia(row.AgentID, state.DeliveryNudge); err != nil {
 			s.log.Debug("nudger mark delivered failed", "agent", row.AgentID, "err", err)
 		}
 		go func(agentID string, pid int) {
@@ -91,10 +92,13 @@ func (s *Server) nudgeOnce(ctx context.Context, onlyAgentID string, stateByAgent
 
 // wakeOnce resumes the stopped agents holding mail nobody has delivered yet
 // (FS-06.R23). Candidacy is durable: it needs an unread row still marked
-// "pending", so a failed wake — which stamps those rows "wake_failed" — cannot
-// respawn the same broken agent on the next tick or after a dashboard restart,
-// while new mail always inserts as "pending" and re-arms the wake. Woken agents
-// are nudged by the ordinary running path above once they report idle.
+// "pending", and an attempt claims exactly the rows it is waking for out of
+// "pending" before it spawns anything. That ordering is what bounds retries. If
+// the attempt were only marked on failure, an adapter that completed its
+// handshake and then died before the first check_messages nudge would leave the
+// rows pending and be respawned by every two-second sweep — the process-spawn
+// loop R23 forbids. Woken agents are nudged by the ordinary running path above
+// once they report idle, and that nudge restamps the claimed rows "nudge".
 func (s *Server) wakeOnce(ctx context.Context, onlyAgentID string, stateByAgent map[string]nudgeState, now time.Time) {
 	waiting, err := s.stateStore.PendingWakeMailAgents()
 	if err != nil {
@@ -105,33 +109,58 @@ func (s *Server) wakeOnce(ctx context.Context, onlyAgentID string, stateByAgent 
 		if onlyAgentID != "" && agentID != onlyAgentID {
 			continue
 		}
-		if _, ok := s.wakeCandidate(agentID); !ok {
+		if _, ok, ae := s.wakeCandidate(agentID); ae != nil {
+			// A gate could not be evaluated (storage or project-definition failure).
+			// Leave the mail pending and retry on the next sweep rather than
+			// consuming this recipient's one wake attempt on an undecided gate.
+			s.log.Debug("mail wake candidacy failed", "agent", agentID, "err", ae.Message)
+			continue
+		} else if !ok {
 			continue // running, archived, snapshot-less, terminal, or pipeline-owned
 		}
 		ns := stateByAgent[agentID]
-		// The exclusive resume claim is the re-entry guard: this loop must not
+		// The exclusive lifecycle claim is the re-entry guard: this loop must not
 		// wait out a wake, and the nudge in-flight marker belongs to the running
 		// path that delivers check_messages once the agent is back.
-		if s.resumeInFlight(agentID) || now.Sub(ns.lastNudgeAt) < messaging.NudgeCooldown {
+		if s.lifecycleInFlight(agentID) || now.Sub(ns.lastNudgeAt) < messaging.NudgeCooldown {
 			continue
 		}
 		ns.lastNudgeAt = now
 		stateByAgent[agentID] = ns
-		go func(agentID string) {
-			_, ae := s.wakeAgent(ctx, agentID)
-			if ae == nil {
-				return
-			}
-			s.log.Debug("mail wake failed", "agent", agentID, "err", ae.Message)
-			if ae.Code == runtime.CodeConflict {
-				// Another resume owns this agent; nothing was attempted here, so
-				// the mail stays pending for the next sweep.
-				return
-			}
-			if _, err := s.stateStore.MarkUnreadDeliveredVia(agentID, "wake_failed"); err != nil {
-				s.log.Debug("mark wake failed", "agent", agentID, "err", err)
-			}
-		}(agentID)
+		go s.wakeForMail(ctx, agentID)
+	}
+}
+
+// wakeForMail runs one bounded wake attempt for a stopped recipient. It claims
+// the pending mail the attempt owns before waking, so the durable outcome is tied
+// to the attempt rather than to whatever happened to be pending when it finished:
+// mail that arrives while the wake is in flight stays "pending" and re-arms the
+// wake, exactly as FS-06.R23 promises.
+func (s *Server) wakeForMail(ctx context.Context, agentID string) {
+	claimed, err := s.stateStore.ClaimPendingWakeMail(agentID)
+	if err != nil {
+		s.log.Debug("claim wake mail failed", "agent", agentID, "err", err)
+		return
+	}
+	if len(claimed) == 0 {
+		return // another attempt already owns this recipient's mail
+	}
+	_, ae := s.wakeAgent(ctx, agentID)
+	if ae == nil {
+		// The claim stands until the check_messages nudge that follows the wake
+		// restamps these rows "nudge". If the woken adapter dies first they remain
+		// claimed, which is precisely the no-respawn bound.
+		return
+	}
+	s.log.Debug("mail wake failed", "agent", agentID, "err", ae.Message)
+	outcome := state.DeliveryWakeFailed
+	if ae.Code == runtime.CodeConflict {
+		// Another lifecycle transition owns this agent; nothing was attempted here,
+		// so release the claim and let the next sweep try again.
+		outcome = state.DeliveryPending
+	}
+	if err := s.stateStore.SetDeliveredVia(claimed, outcome); err != nil {
+		s.log.Debug("record wake outcome failed", "agent", agentID, "outcome", outcome, "err", err)
 	}
 }
 

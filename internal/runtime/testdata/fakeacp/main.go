@@ -182,6 +182,23 @@ func runScenario(name string) string {
 		emitChunk("recovered")
 		return "end_turn"
 
+	case "context_mid_turn":
+		// Emit usage_update mid-turn, then a marker chunk, then block on the
+		// hold file before ending the turn — simulating a long-running turn
+		// so a test can assert the dashboard status already reflects the
+		// fresh context_pct while the turn is still open (TS-04.R25).
+		emitUpdate(map[string]any{"sessionUpdate": "usage_update", "used": 150000, "size": 200000})
+		emitChunk("usage applied")
+		if hold := os.Getenv("FAKEACP_HOLD_FILE"); hold != "" {
+			for {
+				if _, err := os.Stat(hold); err == nil {
+					break
+				}
+				time.Sleep(5 * time.Millisecond)
+			}
+		}
+		return "end_turn"
+
 	case "permission", "permission_approve", "permission_deny", "permission_timeout":
 		return permissionScenario()
 

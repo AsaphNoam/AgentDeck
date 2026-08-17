@@ -65,12 +65,16 @@ type Server struct {
 	switchMu  sync.Mutex
 	switching map[string]bool
 
-	// resumeMu guards resuming: the set of agents with an in-flight resume
-	// (TS-01.R16 exclusive per-agent resume claim). Explicit resume and both wake
-	// paths take it before any registration side effect, so a losing racer never
-	// replaces or tears down the winner's agent-keyed artifacts.
-	resumeMu sync.Mutex
-	resuming map[string]bool
+	// lifecycleMu guards lifecycleBusy: the set of agents with an in-flight
+	// exclusive lifecycle transition (TS-01.R16). Explicit resume, both wake paths,
+	// and Stop take it before any registration side effect, so a losing racer never
+	// replaces or tears down the winner's agent-keyed artifacts. Stop belongs here
+	// because the registry's in-progress nil sentinel is indistinguishable from
+	// "no handle": without the claim, a Stop landing inside a wake tore down the
+	// wake's hook token, MCP session, and hook-settings file while the resume ran
+	// on to report success (INV §4).
+	lifecycleMu   sync.Mutex
+	lifecycleBusy map[string]bool
 
 	archiveMu          sync.Mutex
 	projectArchiving   map[string]bool
@@ -190,7 +194,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		hookTokens:                map[string]string{},
 		mcpCleanups:               map[string]func(){},
 		switching:                 map[string]bool{},
-		resuming:                  map[string]bool{},
+		lifecycleBusy:             map[string]bool{},
 		projectArchiving:          map[string]bool{},
 		projectStartLeases:        map[string]int{},
 		agentArchiving:            map[string]bool{},

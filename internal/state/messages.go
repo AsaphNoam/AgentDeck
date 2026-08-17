@@ -29,48 +29,116 @@ func (e *AmbiguousError) Unwrap() error { return ErrAmbiguousRecipient }
 // address builds the canonical "role@project" addressable form.
 func address(role, project string) string { return role + "@" + project }
 
+// agentColumns is the shared projection every addressable-agent query selects, so
+// the running and stopped-wakeable halves scan identically (INV §2).
+const agentColumns = `a.agent_id, a.name, a.role, a.project, a.interface,
+       COALESCE(st.state, 'unknown'), COALESCE(st.detail, ''), COALESCE(st.context_pct, 0)`
+
+// stoppedWakeGates is the one SQL spelling of FS-01.R33's database-checkable wake
+// gates: not archived, chat interface, a persisted session snapshot to resume
+// from, and no pipeline attempt association — a pipeline stage agent was
+// deliberately stopped by its state machine, so no message may revive it. Both
+// the single-agent candidacy query and the addressable-set query embed this exact
+// text so the two cannot drift (INV §2). The project-archive gate is not here: it
+// reads configuration rather than this database, so the caller applies it.
+const stoppedWakeGates = `a.archived = 0
+  AND a.interface = 'chat'
+  AND EXISTS (SELECT 1 FROM sessions se WHERE se.agent_id = a.agent_id)
+  AND NOT EXISTS (SELECT 1 FROM pipeline_attempts pa WHERE pa.agent_id = a.agent_id)`
+
 // LiveAgents returns every currently-running agent (a row in the running
 // registry) joined with identity and latest status (techspec §3.2). Agents with
 // no status row report state "unknown".
 func (s *Store) LiveAgents() ([]LiveAgent, error) {
 	return s.scanAgents(`
-SELECT a.agent_id, a.name, a.role, a.project, a.interface,
-       COALESCE(st.state, 'unknown'), COALESCE(st.detail, ''), COALESCE(st.context_pct, 0)
+SELECT `+agentColumns+`
 FROM running r
 JOIN agents a ON a.agent_id = r.agent_id
 LEFT JOIN status st ON st.agent_id = r.agent_id
 ORDER BY a.name`, AvailabilityRunning)
 }
 
-// StoppedWakeCandidates returns stopped agents that pass every database-checkable
-// wake gate (FS-01.R33): not archived, chat interface, a persisted session
-// snapshot to resume from, and no pipeline attempt association — a pipeline stage
-// agent was deliberately stopped by its state machine, so no message may revive
-// it. The caller still applies the project-archive gate, which lives in
-// configuration rather than this database. An empty agentID returns every
-// candidate; a non-empty one restricts the query to that agent.
+// AddressableAgents returns the complete addressable set — every running agent
+// plus every stopped chat agent a message can wake — from ONE query, so the two
+// halves are read from a single SQLite snapshot (TS-04.R26). Reading them as two
+// statements let a Stop landing between them return the same agent twice (once
+// running, once stopped-wakeable), which duplicated it in `list_agents` and made
+// role/name resolution report a false ambiguity. Availability comes from the row
+// itself rather than the caller. The project-archive gate still belongs to the
+// caller (it reads configuration, not this database).
+func (s *Store) AddressableAgents() ([]LiveAgent, error) {
+	rows, err := s.db.Query(`
+SELECT ` + agentColumns + `,
+       CASE WHEN r.agent_id IS NOT NULL THEN '` + AvailabilityRunning + `'
+            ELSE '` + AvailabilityStoppedWakeable + `' END
+FROM agents a
+LEFT JOIN running r ON r.agent_id = a.agent_id
+LEFT JOIN status st ON st.agent_id = a.agent_id
+WHERE r.agent_id IS NOT NULL
+   OR (` + stoppedWakeGates + `)
+ORDER BY a.name`)
+	if err != nil {
+		return nil, fmt.Errorf("state: list addressable agents: %w", err)
+	}
+	defer rows.Close()
+
+	out := []LiveAgent{}
+	for rows.Next() {
+		var la LiveAgent
+		if err := rows.Scan(&la.AgentID, &la.Name, &la.Role, &la.Project, &la.Interface,
+			&la.State, &la.Detail, &la.ContextPct, &la.Availability); err != nil {
+			return nil, fmt.Errorf("state: scan addressable agent: %w", err)
+		}
+		la.Address = address(la.Role, la.Project)
+		out = append(out, la)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("state: iterate addressable agents: %w", err)
+	}
+	return out, nil
+}
+
+// StoppedWakeCandidates returns stopped agents passing every database-checkable
+// wake gate (stoppedWakeGates). An empty agentID returns every candidate; a
+// non-empty one restricts the query to that agent.
 func (s *Store) StoppedWakeCandidates(agentID string) ([]LiveAgent, error) {
 	return s.scanAgents(`
-SELECT a.agent_id, a.name, a.role, a.project, a.interface,
-       COALESCE(st.state, 'unknown'), COALESCE(st.detail, ''), COALESCE(st.context_pct, 0)
+SELECT `+agentColumns+`
 FROM agents a
 LEFT JOIN status st ON st.agent_id = a.agent_id
-WHERE a.archived = 0
-  AND a.interface = 'chat'
+WHERE `+stoppedWakeGates+`
   AND NOT EXISTS (SELECT 1 FROM running r WHERE r.agent_id = a.agent_id)
-  AND EXISTS (SELECT 1 FROM sessions se WHERE se.agent_id = a.agent_id)
-  AND NOT EXISTS (SELECT 1 FROM pipeline_attempts pa WHERE pa.agent_id = a.agent_id)
   AND (? = '' OR a.agent_id = ?)
 ORDER BY a.name`, AvailabilityStoppedWakeable, agentID, agentID)
 }
 
+// Delivery markers recorded in messages.delivered_via (FS-06.R23, TS-04.R26).
+// Only DeliveryPending makes a stopped recipient a wake candidate, so claiming a
+// row out of "pending" is what bounds wake retries.
+const (
+	// DeliveryPending — inserted mail nobody has delivered yet.
+	DeliveryPending = "pending"
+	// DeliveryPoll — the recipient read the mail itself.
+	DeliveryPoll = "poll"
+	// DeliveryNudge — a check_messages nudge delivered it.
+	DeliveryNudge = "nudge"
+	// DeliveryWakeAttempted — one wake attempt owns this row. It is set before the
+	// wake spawns anything and is what stops a second attempt: whether the wake
+	// succeeds, fails, or the woken adapter dies before its first nudge, the row is
+	// no longer "pending". Only newer mail re-arms the wake.
+	DeliveryWakeAttempted = "wake_attempted"
+	// DeliveryWakeFailed — the wake attempt owning this row finished by failing.
+	DeliveryWakeFailed = "wake_failed"
+)
+
 // PendingWakeMailAgents returns the recipients holding at least one unread
-// message whose delivery marker is still "pending" (techspec §3.2). A failed
-// wake stamps those rows "wake_failed", so this durable set is also the
-// no-retry bound for waking a stopped recipient (FS-06.R23).
+// message whose delivery marker is still "pending" (techspec §3.2). A wake
+// attempt claims those rows out of "pending" before it spawns anything
+// (ClaimPendingWakeMail), so this durable set is also the no-retry bound for
+// waking a stopped recipient (FS-06.R23).
 func (s *Store) PendingWakeMailAgents() ([]string, error) {
 	rows, err := s.db.Query(`
-SELECT DISTINCT to_agent FROM messages WHERE read = 0 AND delivered_via = 'pending'`)
+SELECT DISTINCT to_agent FROM messages WHERE read = 0 AND delivered_via = '` + DeliveryPending + `'`)
 	if err != nil {
 		return nil, fmt.Errorf("state: list pending wake mail: %w", err)
 	}
@@ -335,6 +403,19 @@ func scanMessage(rows *sql.Rows) (Message, error) {
 	return m, nil
 }
 
+// markReadStmt is the one mark-read statement both the plain and budget-consuming
+// read paths run (INV §2). A row a wake attempt claimed but no nudge ever stamped
+// was, in the end, read by the recipient itself, so it records "poll" rather than
+// leaving the claim marker behind.
+func markReadStmt(placeholders string) string {
+	return `UPDATE messages
+SET read = 1,
+    read_at = ?,
+    delivered_via = CASE WHEN delivered_via IN ('` + DeliveryPending + `', '` + DeliveryWakeAttempted + `')
+                         THEN '` + DeliveryPoll + `' ELSE delivered_via END
+WHERE message_id IN (` + placeholders + `)`
+}
+
 // MarkRead flags the given messages read, stamping read_at with now (techspec §3.5).
 func (s *Store) MarkRead(ids []string) error {
 	if len(ids) == 0 {
@@ -342,29 +423,97 @@ func (s *Store) MarkRead(ids []string) error {
 	}
 	placeholders, args := inClause(ids)
 	args = append([]any{formatTime(time.Now().UTC())}, args...)
-	q := `UPDATE messages
-SET read = 1,
-    read_at = ?,
-    delivered_via = CASE WHEN delivered_via = 'pending' THEN 'poll' ELSE delivered_via END
-WHERE message_id IN (` + placeholders + `)`
+	q := markReadStmt(placeholders)
 	if _, err := s.db.Exec(q, args...); err != nil {
 		return fmt.Errorf("state: mark messages read: %w", err)
 	}
 	return nil
 }
 
-// MarkUnreadDeliveredVia stamps unread pending messages for a recipient with a
-// delivery mechanism ("nudge" today) without marking them read.
+// MarkUnreadDeliveredVia stamps a recipient's undelivered unread messages with a
+// delivery mechanism ("nudge" today) without marking them read. It covers rows a
+// wake attempt claimed as well as still-pending ones: a wake claims the mail it
+// is waking for, and the check_messages nudge that follows the wake is what
+// actually delivers it, so that row's honest final marker is the nudge.
 func (s *Store) MarkUnreadDeliveredVia(agentID, via string) (int64, error) {
 	res, err := s.db.Exec(`
 UPDATE messages
 SET delivered_via = ?
-WHERE to_agent = ? AND read = 0 AND delivered_via = 'pending'`, via, agentID)
+WHERE to_agent = ? AND read = 0
+  AND delivered_via IN ('`+DeliveryPending+`', '`+DeliveryWakeAttempted+`')`, via, agentID)
 	if err != nil {
 		return 0, fmt.Errorf("state: mark messages delivered: %w", err)
 	}
 	n, _ := res.RowsAffected()
 	return n, nil
+}
+
+// ClaimPendingWakeMail takes exclusive ownership of the unread pending mail that
+// one wake attempt is about to act on: in one transaction it reads those rows and
+// stamps them "wake_attempted", so two concurrent sweeps cannot claim the same
+// row (INV §5). The claim is taken BEFORE the wake spawns a process, which is
+// what makes the no-retry bound survive an adapter that completes its handshake
+// and then dies before its first nudge — that row is no longer "pending", so the
+// next sweep does not respawn it (FS-06.R23). Scoping the outcome to the returned
+// ids also keeps mail inserted afterwards out of this attempt: it stays "pending"
+// and re-arms the wake as R23 promises. An empty result means there is nothing to
+// wake for, because another attempt already claimed it.
+func (s *Store) ClaimPendingWakeMail(agentID string) ([]string, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("state: begin claim wake mail: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	rows, err := tx.Query(`
+SELECT message_id FROM messages
+WHERE to_agent = ? AND read = 0 AND delivered_via = '`+DeliveryPending+`'`, agentID)
+	if err != nil {
+		return nil, fmt.Errorf("state: claim pending wake mail: %w", err)
+	}
+	ids := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return nil, fmt.Errorf("state: scan claimed wake mail: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, fmt.Errorf("state: iterate claimed wake mail: %w", err)
+	}
+	rows.Close()
+	if len(ids) == 0 {
+		return ids, nil
+	}
+
+	placeholders, args := inClause(ids)
+	if _, err := tx.Exec(`UPDATE messages SET delivered_via = '`+DeliveryWakeAttempted+
+		`' WHERE message_id IN (`+placeholders+`)`, args...); err != nil {
+		return nil, fmt.Errorf("state: stamp claimed wake mail: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("state: commit claim wake mail: %w", err)
+	}
+	return ids, nil
+}
+
+// SetDeliveredVia records the outcome of one wake attempt on exactly the rows it
+// claimed, leaving mail that arrived afterwards untouched. Read messages are
+// skipped: the recipient already drained them, so the attempt's outcome is moot.
+func (s *Store) SetDeliveredVia(ids []string, via string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	placeholders, args := inClause(ids)
+	args = append([]any{via}, args...)
+	q := `UPDATE messages SET delivered_via = ? WHERE read = 0 AND message_id IN (` + placeholders + `)`
+	if _, err := s.db.Exec(q, args...); err != nil {
+		return fmt.Errorf("state: set messages delivered via: %w", err)
+	}
+	return nil
 }
 
 // DeleteMessages removes the given messages (techspec §3.5).
@@ -594,11 +743,7 @@ WHERE to_agent = ?`
 			}
 		} else if markRead {
 			args = append([]any{formatTime(time.Now().UTC())}, args...)
-			q := `UPDATE messages
-SET read = 1,
-    read_at = ?,
-    delivered_via = CASE WHEN delivered_via = 'pending' THEN 'poll' ELSE delivered_via END
-WHERE message_id IN (` + placeholders + `)`
+			q := markReadStmt(placeholders)
 			if _, err := tx.Exec(q, args...); err != nil {
 				return nil, BudgetStatus{}, false, fmt.Errorf("state: mark messages read with budget: %w", err)
 			}

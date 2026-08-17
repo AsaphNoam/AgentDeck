@@ -31,35 +31,41 @@ type resumeOverride struct {
 	ConfigRefresh bool `json:"config_refresh"`
 }
 
-// claimResume takes the exclusive per-agent resume claim (TS-01.R16, INV §5).
-// It is taken before any registration side effect because the artifacts minted
-// during composition are keyed by agent_id alone: two concurrent composers would
-// leave the second one's token/MCP/hook-settings in place of the first's, and the
-// loser's teardown would then revoke the winner's (INV §4). acquireAgentStart is
-// a counting archive lease and cannot serve this purpose.
-func (s *Server) claimResume(agentID string) bool {
-	s.resumeMu.Lock()
-	defer s.resumeMu.Unlock()
-	if s.resuming[agentID] {
+// claimLifecycle takes the exclusive per-agent lifecycle claim (TS-01.R16,
+// INV §5). It is taken before any registration side effect because the artifacts
+// minted during composition are keyed by agent_id alone: two concurrent composers
+// would leave the second one's token/MCP/hook-settings in place of the first's,
+// and the loser's teardown would then revoke the winner's (INV §4).
+// acquireAgentStart is a counting archive lease and cannot serve this purpose.
+//
+// Stop takes the same claim, so start and stop are one exclusive transition per
+// agent rather than two that can interleave: `Registry.Stop` cannot tell an
+// in-progress resume's nil sentinel from "no handle", so an unclaimed Stop
+// landing mid-wake tore down the wake's registration and reported success while
+// the resume ran on.
+func (s *Server) claimLifecycle(agentID string) bool {
+	s.lifecycleMu.Lock()
+	defer s.lifecycleMu.Unlock()
+	if s.lifecycleBusy[agentID] {
 		return false
 	}
-	s.resuming[agentID] = true
+	s.lifecycleBusy[agentID] = true
 	return true
 }
 
-// resumeInFlight reports whether a resume currently owns this agent. It is a
-// hint for callers that must not block on one (the nudger), never a substitute
-// for claimResume.
-func (s *Server) resumeInFlight(agentID string) bool {
-	s.resumeMu.Lock()
-	defer s.resumeMu.Unlock()
-	return s.resuming[agentID]
+// lifecycleInFlight reports whether an exclusive lifecycle transition currently
+// owns this agent. It is a hint for callers that must not block on one (the
+// nudger), never a substitute for claimLifecycle.
+func (s *Server) lifecycleInFlight(agentID string) bool {
+	s.lifecycleMu.Lock()
+	defer s.lifecycleMu.Unlock()
+	return s.lifecycleBusy[agentID]
 }
 
-func (s *Server) releaseResume(agentID string) {
-	s.resumeMu.Lock()
-	delete(s.resuming, agentID)
-	s.resumeMu.Unlock()
+func (s *Server) releaseLifecycle(agentID string) {
+	s.lifecycleMu.Lock()
+	delete(s.lifecycleBusy, agentID)
+	s.lifecycleMu.Unlock()
 }
 
 // handleResume implements POST /api/sessions/{id}/resume (techspec §7.2).
@@ -85,10 +91,10 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 // same gates, same composition, same failure teardown — under one exclusive
 // per-agent claim. It returns nil once the agent is running again.
 func (s *Server) resumeSession(ctx context.Context, id string, override resumeOverride) *runtime.APIError {
-	if !s.claimResume(id) {
+	if !s.claimLifecycle(id) {
 		return apiError(runtime.CodeConflict, "a resume is already in progress")
 	}
-	defer s.releaseResume(id)
+	defer s.releaseLifecycle(id)
 
 	// 1. Load identity row → 404 if not found.
 	agent, err := s.stateStore.ReadAgent(id)
@@ -250,7 +256,11 @@ func (s *Server) resumeSession(ctx context.Context, id string, override resumeOv
 // excludes the agent, so the caller keeps its existing non-running behavior; a
 // non-nil error means the wake was attempted and failed.
 func (s *Server) wakeAgent(ctx context.Context, agentID string) (bool, *runtime.APIError) {
-	if _, ok := s.wakeCandidate(agentID); !ok {
+	_, ok, ae := s.wakeCandidate(agentID)
+	if ae != nil {
+		return false, ae
+	}
+	if !ok {
 		return false, nil
 	}
 	if ae := s.resumeSession(ctx, agentID, resumeOverride{}); ae != nil {
@@ -264,40 +274,64 @@ func (s *Server) wakeAgent(ctx context.Context, agentID string) (bool, *runtime.
 // (state.StoppedWakeCandidates); the project-archive gate is applied here because
 // it reads configuration, and a missing project definition passes exactly as it
 // does for an explicit resume (FS-05.R34).
-func (s *Server) wakeCandidate(agentID string) (state.LiveAgent, bool) {
+//
+// The three results are distinct on purpose. "Not a candidate" (false, nil) means
+// a gate genuinely excluded the agent and the caller keeps its existing
+// non-running behavior. A non-nil APIError means a gate could not be evaluated —
+// the candidate query failed, or the project definition is unreadable — and is
+// surfaced as the typed failure explicit Resume returns, rather than being
+// flattened into "not wakeable" and reported to the user as a plain 404.
+func (s *Server) wakeCandidate(agentID string) (state.LiveAgent, bool, *runtime.APIError) {
 	candidates, err := s.stateStore.StoppedWakeCandidates(agentID)
 	if err != nil {
 		s.log.Debug("wake candidate lookup failed", "agent", agentID, "err", err)
-		return state.LiveAgent{}, false
+		return state.LiveAgent{}, false, apiError(runtime.CodeInternal, err.Error())
 	}
 	if len(candidates) == 0 {
-		return state.LiveAgent{}, false
+		return state.LiveAgent{}, false, nil
 	}
-	if ae := s.projectArchiveGate(candidates[0].Project, "project is archived"); ae != nil {
-		return state.LiveAgent{}, false
+	switch ae := s.projectArchiveGate(candidates[0].Project, "project is archived"); {
+	case ae == nil:
+		return candidates[0], true, nil
+	case ae.Code == runtime.CodeInternal:
+		// A corrupt or unreadable project definition is a failure to evaluate the
+		// gate, not a decision that the agent is unwakeable.
+		return state.LiveAgent{}, false, ae
+	default:
+		return state.LiveAgent{}, false, nil
 	}
-	return candidates[0], true
 }
 
 // addressableAgents is the one addressable set (TS-04.R26) behind list_agents and
 // send_message resolution: every running agent plus every stopped chat agent a
-// message wakes.
+// message wakes. It reads both halves from one SQLite snapshot so a Stop landing
+// between two separate reads cannot list the same agent twice — once running and
+// once stopped-wakeable — which duplicated it in list_agents and made role/name
+// resolution report a false ambiguity.
 func (s *Server) addressableAgents() ([]state.LiveAgent, error) {
-	running, err := s.stateStore.LiveAgents()
+	agents, err := s.stateStore.AddressableAgents()
 	if err != nil {
 		return nil, err
 	}
-	stopped, err := s.stateStore.StoppedWakeCandidates("")
-	if err != nil {
-		return nil, err
-	}
-	for _, a := range stopped {
-		if ae := s.projectArchiveGate(a.Project, "project is archived"); ae != nil {
-			continue
+	// The project-archive gate reads configuration rather than the database, so it
+	// is applied here. It only ever removes a stopped-wakeable entry: a running
+	// agent stays addressable regardless of its project's archive state, exactly as
+	// before. An unreadable project definition fails the whole read rather than
+	// silently shrinking the directory.
+	out := make([]state.LiveAgent, 0, len(agents))
+	for _, a := range agents {
+		if a.Availability == state.AvailabilityStoppedWakeable {
+			ae := s.projectArchiveGate(a.Project, "project is archived")
+			if ae != nil && ae.Code == runtime.CodeInternal {
+				return nil, errors.New(ae.Message)
+			}
+			if ae != nil {
+				continue
+			}
 		}
-		running = append(running, a)
+		out = append(out, a)
 	}
-	return running, nil
+	return out, nil
 }
 
 // composeResumeSpec mints a fresh hook token + MCP registration and builds the

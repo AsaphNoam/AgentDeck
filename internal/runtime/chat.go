@@ -780,12 +780,16 @@ func (c *ChatRuntime) onNotification(as *agentState, method string, params json.
 		return
 	}
 	// usage_update is live runtime state rather than a transcript event. The
-	// prompt result only contains token accounting, so retain this provider
-	// notification until the turn-end status write republishes it (TS-04.R25).
+	// prompt result only contains token accounting, so this provider
+	// notification is the only source for a fresh context_pct. Republish it
+	// through the existing status-write seam immediately so a long-running
+	// turn's dashboard meter does not go stale waiting for the next
+	// tool/status event or turn_end (TS-04.R25, INV §1).
 	if pct, ok := decodeContextUsage(params); ok {
 		as.mu.Lock()
 		as.contextPct = pct
 		as.mu.Unlock()
+		c.republishContextPct(as)
 		return
 	}
 	for _, m := range mapSessionUpdate(params) {
@@ -1146,6 +1150,28 @@ func (c *ChatRuntime) writeStatus(as *agentState, st state.Status) error {
 	}
 	c.touchState(as.agentID)
 	return nil
+}
+
+// republishContextPct refreshes only the current status row's context
+// percentage from the latest decoded usage_update and republishes it through
+// the same write+touch seam as updateStatus/writeStatus, without disturbing
+// the row's state/detail/trace/busy_since (there is no status transition
+// implied by a usage_update alone).
+func (c *ChatRuntime) republishContextPct(as *agentState) {
+	cur, err := c.store.ReadStatus(as.agentID)
+	if err != nil {
+		// Unlike updateStatus there is no state transition to record, so an
+		// unreadable row is skipped rather than replaced with an empty one; the
+		// next status write carries the value forward.
+		slog.Debug("runtime: read status for usage republish", "agent", as.agentID, "err", err)
+		return
+	}
+	cur.ContextPct = as.lastPct()
+	if err := c.store.WriteStatus(cur); err != nil {
+		slog.Error("runtime: write status", "agent", as.agentID, "err", err)
+		return
+	}
+	c.touchState(as.agentID)
 }
 
 func (c *ChatRuntime) touchState(agentID string) {

@@ -105,7 +105,11 @@ orphaned processes.
   message revives it, and Stop remains the way a person reclaims an idle agent's process memory. A
   failed wake surfaces the applicable typed resume error (R25), leaves the agent stopped, and tears
   down only the wake's own registration artifacts exactly as a failed explicit resume does. Agents
-  the wake gates exclude keep their existing rejection behavior unchanged.
+  the wake gates exclude keep their existing rejection behavior unchanged. A gate that cannot be
+  **evaluated** — the candidacy lookup fails, or the project definition is unreadable — is not a
+  decision that the agent is unwakeable: it surfaces the same typed failure an explicit resume
+  returns, rather than the ordinary not-running rejection, and it fails the messaging directory read
+  rather than silently omitting the agent.
 
 ### Switch runtime
 
@@ -191,6 +195,15 @@ transitions:
   SQLite driver cannot load FTS5. The authoritative session row and lifecycle state still commit,
   derived search-document writes are skipped until an FTS5-capable build returns, and no raw SQLite
   module error reaches the launch/resume response.
+- **R34** — **Stop and resume are one exclusive transition per agent.** Stop (R6), explicit Resume
+  (R10), and every wake (R33) take the same exclusive per-agent lifecycle claim, so an agent is
+  never being started and stopped at once. A Stop that arrives while a resume or wake holds the
+  claim returns `409 conflict` instead of reporting success, and is retried once the transition
+  settles; the in-flight resume completes normally with its registration intact. Without this,
+  Stop could not tell a resume in progress from a stopped agent, so it took its idempotent
+  already-stopped path and removed the running resume's hook token, MCP session, and hook-settings
+  file while that resume went on to report success. Stop remains idempotent (R6) and still returns
+  `404` for an unknown agent (R27) whenever it holds the claim.
 
 ## 5. Acceptance criteria
 
@@ -253,6 +266,13 @@ transitions:
   conflict errors for the losers, and an intact winner registration (working hook token, MCP
   registration, and hook-settings file). *Verify:* server integration tests on the prompt route
   against fake ACP, including the failure and concurrency branches.
+- **A18** (R33–R34) — A Stop issued while a wake is inside its resume returns `409`, the wake
+  completes with its hook token, MCP registration, and hook-settings file intact, and the retried
+  Stop then succeeds — one coherent final state, never a running process whose registration was
+  torn down. A stopped agent whose project definition is unreadable answers a prompt with the typed
+  internal failure rather than the not-running `404`. *Verify:*
+  `internal/server/wake_test.go::TestStopDuringWakeConflictsAndKeepsRegistration` and
+  `TestWakeGateFailureSurfacesTypedError`.
 
 ## 6. Deviations & open decisions
 

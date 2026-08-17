@@ -127,6 +127,27 @@ describe("AgentDeckerBuilder persisted session", () => {
     expect(reviewed).toEqual([templateProposal]);
     expect(saveCalls).toBe(0);
   });
+
+  // FS-14.R33/A13 / TS-09.R26: the approval surface follows the server's pending
+  // records. Once the approved Save or Start commits, the server consumes that
+  // proposal, so a refetch (SSE invalidation or a fresh page load) must stop
+  // offering the same approval instead of leaving it listed forever.
+  it("drops an approved proposal once the server no longer lists it", async () => {
+    let pending = [templateProposal];
+    server.use(http.get("/api/pipeline-proposals", () => HttpResponse.json(pending)));
+
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    render(<QueryClientProvider client={client}><MemoryRouter><AgentDeckerBuilder onTemplateProposal={() => {}} onRunProposal={() => {}} /></MemoryRouter></QueryClientProvider>);
+
+    await screen.findByRole("button", { name: "Review exact Save proposal" });
+    expect(screen.getByText("Pending exact proposals")).toBeInTheDocument();
+
+    pending = [];
+    await client.invalidateQueries({ queryKey: ["pipelines", "proposals"] });
+
+    await waitFor(() => expect(screen.queryByText("Pending exact proposals")).not.toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: "Review exact Save proposal" })).not.toBeInTheDocument();
+  });
 });
 
 // FS-14.R26/A10: the builder launches an ordinary chat agent, which needs a real
