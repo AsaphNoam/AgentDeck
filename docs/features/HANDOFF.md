@@ -7,7 +7,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** All twelve open review findings are fixed. **Lifecycle:** Stop now takes the same
+- **State:** The projects-home background menu now covers the full available canvas, so a
+  right-click below the final project card opens **New project** while a card keeps its own menu
+  (FS-02.R41/A24, **INV §10**). All twelve earlier open review findings are fixed. **Lifecycle:** Stop now takes the same
   exclusive per-agent claim as resume and every wake (`claimLifecycle`, FS-01.R34/A18, TS-01.R16), so
   a Stop landing inside a wake returns `409` instead of taking the idempotent branch and tearing down
   the live resume's registration. **Mail wake:** an attempt now *claims* the pending rows it wakes
@@ -86,7 +88,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   submission, stopped-session failure without composer loss, and zero console errors.
 - **Last reviewed code:** `74da884` (2026-08-17), the continuous range after `2727ae8`: composer
   autocomplete fixes, recent usability/review records, durable AgentDecker proposals, ACP context
-  usage, and stopped-agent wake-on-message. Twelve findings are open below.
+  usage, and stopped-agent wake-on-message. No review findings remain below.
 - **Branch:** `main`.
 
 ## Active change
@@ -122,27 +124,18 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ### Open findings
 
-- **Must fix** — **Confirmed** — The projects-home background menu does not cover the visible canvas.
-  Field report (verbatim): "right click on the background actions isn't working, only right click on
-  cards pops up the actions". The reporter did not provide a version, environment, or logs. Local
-  reproduction on 2026-08-17 used the current `main` checkout on macOS in the in-app browser at
-  1280×720; the browser console had no warnings or errors. FS-02.R41/A24 requires any non-card point
-  in the projects view to open the **New project** menu. `ProjectDashboard` attaches `onContextMenu`
-  to `.project-dashboard`, but that element is content-height only: in the reproduction it ended at
-  y=292.5 while `.app-main` continued to y=720. A right-click at (640,600) therefore never reached
-  `openBackgroundMenu` and opened no app menu, while right-clicking the Projects heading did open the
-  menu. The existing `ProjectDashboard.test.tsx` case right-clicks that heading, so it proves event
-  bubbling only inside the undersized element and misses the layout boundary. Fix by making the
-  projects-home interaction surface fill the available main canvas (or by owning the route-wide
-  background event at an equivalent boundary) without intercepting project-card menus; retain the
-  component behavior test and add a layout-aware J5/browser regression that right-clicks below the
-  final card. **INV §10** applies.
-
+None.
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-17 — Fixed the projects-home background menu (**INV §10**). The existing dashboard
+  interaction surface now fills the main canvas; its component regression uses a lower-canvas pointer
+  coordinate, and a real 1280×720 J5 check confirmed a right-click at `(640,620)` opens **New
+  project** without console warnings/errors while the project card keeps its own menu. Specs already
+  required this behavior, so no specification change was needed.
 
 - 2026-08-17 — Investigated the field report "right click on the background actions isn't working,
   only right click on cards pops up the actions". Confirmed FS-02.R41/A24 is violated: the projects
