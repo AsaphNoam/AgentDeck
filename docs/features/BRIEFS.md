@@ -3116,3 +3116,11 @@ prove references and lifecycle hygiene; only bidirectional review can prove that
 still matches executable behavior.
 
 ::git-commit{cwd="/Users/mcnoam/Projects/AgentDeck"}
+
+### 2026-08-17 — Fix: projects-home background menu
+
+Right-clicking any empty part of the Projects canvas now opens New project, while project cards keep their own menus. The lower canvas was checked in the rebuilt app at desktop size with no browser console errors.
+
+**Needs attention:** None.
+
+**Next:** None.

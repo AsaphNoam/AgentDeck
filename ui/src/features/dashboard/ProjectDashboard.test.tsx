@@ -121,8 +121,8 @@ describe("ProjectDashboard", () => {
     expect(await screen.findByText("title: must be at most 120 characters")).toBeInTheDocument();
   });
 
-  // FS-02.A24: the header button and the background right-click both open the
-  // create modal; a card right-click opens the card menu, not the create menu.
+  // FS-02.A24: the header button and a lower-canvas background right-click both
+  // open the create modal; a card right-click opens the card menu, not the create menu.
   it("opens the create modal from the header button and the background menu, not from a card", async () => {
     renderDashboard();
     const card = (await screen.findByText("App")).closest("article")!;
@@ -133,7 +133,7 @@ describe("ProjectDashboard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 
-    fireEvent.contextMenu(screen.getByRole("heading", { name: "Projects" }));
+    fireEvent.contextMenu(document.querySelector(".project-dashboard")!, { clientX: 640, clientY: 600 });
     const menuItem = (await screen.findAllByRole("button", { name: "New project" })).find((b) => b.getAttribute("data-slot") === "item")!;
     fireEvent.click(menuItem);
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
