@@ -4,6 +4,32 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-17 — Code review: stopped-agent wake, pipeline proposals, and context usage
+
+The newest work is not ready to treat as settled. Eight required corrections surfaced. Stopping an
+agent while it is waking can remove the new process's messaging and hook registrations while the wake
+still reports success. Mail wake also has two retry-boundary failures: an adapter that starts and then
+immediately crashes can be restarted every two seconds forever, while mail arriving during an older
+failed wake is incorrectly marked failed too and cannot trigger its promised retry. Storage or project
+configuration errors during a wake are currently disguised as if the agent simply did not exist.
+The addressable-agent directory is also assembled by two separate database reads, so an agent being
+stopped between them can appear twice and produce a false ambiguous recipient.
+
+Two earlier fixes also need correction. Repeated run proposals can show the agent one exact request
+while saving a different request for approval, which can replay an older run. Provider context updates
+are held only in runtime memory until the turn ends, so the dashboard meter stays stale during a long
+response. The new proposal database table is also missing from the owning persistence specification.
+A smaller lifecycle gap leaves every successfully approved proposal labelled Pending forever, with no
+dismissal or retention rule. Three additional lower-risk issues misreport file-search storage errors,
+let one malformed proposal hide all valid proposals, and still describe messaging as live-agent-only.
+
+**Needs attention:** Fix the eight required findings before relying on wake-on-message or durable
+pipeline approvals. Decide the simple consumed/dismissed retention behavior for approved proposals
+while making that repair.
+
+**Next:** Run `/fix` to validate and repair the findings one at a time, starting with the wake/Stop
+race and proposal payload mismatch.
+
 ### 2026-08-17 — Implementation: stopped chat agents wake when a message arrives
 
 Stopping a chat agent is now a lightweight sleep rather than an ending. Typing into the composer of
