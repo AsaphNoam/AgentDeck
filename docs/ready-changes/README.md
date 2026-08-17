@@ -42,4 +42,4 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-No changes are waiting to start.
+- [`persist-unsent-chat-drafts.md`](persist-unsent-chat-drafts.md)

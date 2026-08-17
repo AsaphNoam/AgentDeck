@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ProjectColorPicker } from "../../components/ui";
+import { BrowseDirectoryButton, ProjectColorPicker } from "../../components/ui";
 import { DEFAULT_PROJECT_COLOR, type ProjectColor } from "../../lib/projectColors";
 import type { ProjectResponse, FieldWarning } from "../../schemas/project";
 
@@ -39,9 +39,11 @@ export function ProjectForm({
   );
   const [addDirs, setAddDirs] = useState<string[]>(initial?.add_dirs ?? []);
   const [addDirsInput, setAddDirsInput] = useState("");
+  const [browseError, setBrowseError] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -88,7 +90,18 @@ export function ProjectForm({
       </div>
       <div className="form-field">
         <label>Working directory (cwd)</label>
-        <input {...register("cwd")} placeholder="~/Projects/my-app" />
+        <div className="field-with-action">
+          <input {...register("cwd")} placeholder="~/Projects/my-app" />
+          <BrowseDirectoryButton
+            label="Browse for working directory"
+            disabled={submitting}
+            onPicked={(path) => {
+              setBrowseError(null);
+              setValue("cwd", path, { shouldValidate: true, shouldDirty: true });
+            }}
+            onError={setBrowseError}
+          />
+        </div>
         {errors.cwd && <span className="form-error">{errors.cwd.message}</span>}
         {cwdWarning && (
           <span className="form-warning">⚠ {cwdWarning.message} (save still succeeds)</span>
@@ -123,6 +136,17 @@ export function ProjectForm({
               }
             }}
           />
+          {/* Browsing only fills the pending entry; Add is still what puts it in
+              the list, and only Update/Create saves the project (FS-04.R42). */}
+          <BrowseDirectoryButton
+            label="Browse for an additional directory"
+            disabled={submitting}
+            onPicked={(path) => {
+              setBrowseError(null);
+              setAddDirsInput(path);
+            }}
+            onError={setBrowseError}
+          />
           <button
             type="button"
             onClick={() => {
@@ -156,6 +180,7 @@ export function ProjectForm({
       {isEdit && (
         <p className="form-hint">Editing a project affects future launches only.</p>
       )}
+      {browseError && <p className="form-error">{browseError}</p>}
       {error && <p className="form-error">{error}</p>}
       <div className="form-actions">
         <button type="button" onClick={onCancel} disabled={submitting}>

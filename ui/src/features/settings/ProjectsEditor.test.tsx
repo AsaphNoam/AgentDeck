@@ -137,6 +137,84 @@ describe("ProjectsEditor", () => {
     expect(deletes).toBe(0);
   });
 
+  // FS-04.A22: Browse fills cwd from the host folder panel, a dismissed panel
+  // leaves the typed value alone, and neither one saves the project.
+  it("browses for cwd, keeps the value on cancel, and never saves by itself", async () => {
+    let posts = 0;
+    let pickerCalls = 0;
+    server.use(
+      http.post("/api/projects", async ({ request }) => {
+        posts += 1;
+        const body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ project: body.project, ...body }, { status: 201 });
+      }),
+      http.post("/api/directory-picker", () => {
+        pickerCalls += 1;
+        // First click selects; the second is a dismissed panel (204, no body).
+        return pickerCalls === 1
+          ? HttpResponse.json({ path: "/Users/me/picked" })
+          : new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    renderWithQuery(<ProjectsEditor />);
+    await screen.findByText("My App");
+    fireEvent.click(screen.getByText("New project"));
+
+    const cwdInput = screen.getByPlaceholderText("~/Projects/my-app") as HTMLInputElement;
+    fireEvent.click(screen.getByRole("button", { name: "Browse for working directory" }));
+    await waitFor(() => expect(cwdInput.value).toBe("/Users/me/picked"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Browse for working directory" }));
+    await waitFor(() => expect(pickerCalls).toBe(2));
+    expect(cwdInput.value).toBe("/Users/me/picked");
+    expect(posts).toBe(0);
+  });
+
+  // FS-04.A22: browsing an additional directory fills the pending entry only —
+  // Add is still what puts it in the list.
+  it("browses an additional directory into the pending entry until Add is clicked", async () => {
+    server.use(
+      http.post("/api/directory-picker", () => HttpResponse.json({ path: "/Users/me/extra" })),
+    );
+
+    renderWithQuery(<ProjectsEditor />);
+    await screen.findByText("My App");
+    fireEvent.click(screen.getByText("New project"));
+
+    const pending = screen.getByPlaceholderText("~/extra-dir") as HTMLInputElement;
+    fireEvent.click(screen.getByRole("button", { name: "Browse for an additional directory" }));
+    await waitFor(() => expect(pending.value).toBe("/Users/me/extra"));
+    expect(screen.queryByRole("button", { name: "Remove /Users/me/extra" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(await screen.findByRole("button", { name: "Remove /Users/me/extra" })).toBeInTheDocument();
+    expect(pending.value).toBe("");
+  });
+
+  // INV §8: a failed browse is visible and still leaves the form usable.
+  it("surfaces a browse failure without touching the field", async () => {
+    server.use(
+      http.post("/api/directory-picker", () =>
+        HttpResponse.json(
+          { error: { code: "directory_picker_failed", message: "could not complete the folder selection" } },
+          { status: 500 },
+        ),
+      ),
+    );
+
+    renderWithQuery(<ProjectsEditor />);
+    await screen.findByText("My App");
+    fireEvent.click(screen.getByText("New project"));
+
+    const cwdInput = screen.getByPlaceholderText("~/Projects/my-app") as HTMLInputElement;
+    fireEvent.change(cwdInput, { target: { value: "/tmp/typed" } });
+    fireEvent.click(screen.getByRole("button", { name: "Browse for working directory" }));
+
+    expect(await screen.findByText(/could not complete the folder selection/i)).toBeInTheDocument();
+    expect(cwdInput.value).toBe("/tmp/typed");
+  });
+
   it("closes dialog on success even when cwd_not_found warnings are present", async () => {
     server.use(
       http.get("/api/projects", () =>

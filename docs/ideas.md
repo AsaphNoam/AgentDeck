@@ -27,9 +27,6 @@ Example:
   is one flat array independent of `group`), so it silently snaps back. Needs whole-card drag (with
   an activation distance so a plain click still opens the agent) and either real cross-group drop
   support or a clear affordance that drag only reorders within a group.
-- **Browse for working directories.** When a form asks for a working-directory path, add a
-  **Browse** button that opens a directory picker so users can choose the folder instead of typing
-  the path manually.
 - **Approval notifications link to the conversation.** When a pop-up notification fires because an
   agent needs approval, make it a link that opens that agent's conversation, so the user can jump
   straight to the pending permission instead of hunting for the right agent.

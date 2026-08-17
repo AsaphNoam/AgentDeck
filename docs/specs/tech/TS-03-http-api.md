@@ -36,7 +36,7 @@ delta; clients must not assume every existing endpoint already uses R3.
 |---|---|
 | Health/live state | `GET /api/health`, `GET /api/sessions`, `GET /api/sessions/{id}`, `GET /api/events`, `GET /api/capabilities` |
 | Lifecycle/chat | `POST /api/sessions`, `prompt`, `cancel`, `stop`, `archive`, `restore`, `rename`, `identity`, `permission`, `resume`, `switch-runtime`, `annotations`; transcript read |
-| Config | role/project CRUD and project `archive`/`restore`; `GET/PUT /api/backends`, `/api/config`, `/api/layout` |
+| Config | role/project CRUD and project `archive`/`restore`; `GET/PUT /api/backends`, `/api/config`, `/api/layout`; `POST /api/directory-picker` |
 | Archive/tracking | `GET /api/archive`, `GET /api/archive/projects/{project}`, session files/commands/messages |
 | Composer autocomplete | session-scoped file search and available-command snapshot reads |
 | Coordination | `POST /api/groups/{group}/release`, `/mcp` GET/POST/DELETE |
@@ -245,6 +245,24 @@ gate-excluded `404` (FS-01.R33, INV §7): "the gate said no" and "the gate could
 different answers, and only the first is an ordinary rejection. `POST /api/sessions/{id}/stop`
 takes the same claim and returns `409` while a resume or wake owns the agent (FS-01.R34).
 
+**R26 — Directory browsing is one synchronous local action.** `POST
+/api/directory-picker` accepts no caller-chosen filesystem path and invokes the standard macOS folder
+panel through the fixed system executable `/usr/bin/osascript`, using fixed script text and direct
+arguments rather than a shell. One process-wide non-blocking claim allows at most one open picker;
+a concurrent request receives the R3 `409 directory_picker_busy` error instead of queueing or
+opening another panel. Selection is verified as an existing absolute directory and returns
+`200 {"path":"<absolute-path>"}`. User cancellation returns `204` with no error and no path.
+Launch failure, invalid output, or a selected path that cannot be verified returns the safe R3
+`500 directory_picker_failed` error without exposing script stderr or a filesystem path.
+
+The handler holds only the request and picker subprocess until selection/cancel, terminates the
+subprocess if the request context or server shuts down, and releases the claim on every outcome. It
+does not enumerate directories, read directory contents, publish SSE, or persist anything; the
+existing project mutation remains the sole configuration write. The route is in R5's Config family,
+inherits the whole-mux `localOnly` guard, and ships with its TypeScript client and form consumers in
+lockstep (R11). Tests replace the command boundary with a deterministic fake; they never open a real
+panel.
+
 ## 3. Interfaces & data shapes
 
 Feature-owned request/response fields are specified in the owning FS, including FS-14 for pipeline
@@ -298,6 +316,13 @@ integers instead of silently applying defaults.
 - Composer autocomplete (R24): routes in `internal/server/routes.go`, handlers beside
   `internal/server/files_commands.go`, runtime command snapshots from TS-04.R24, and client shapes in
   `ui/src/api/{client,types}.ts`.
+- Directory picker (R26): `internal/server/directory_picker.go` (claim, osascript runner, output
+  verification), the client function in `ui/src/api/config.ts`, and
+  `internal/server/directory_picker_test.go` (`TestDirectoryPickerReturnsSelectedDirectory`,
+  `TestDirectoryPickerCancelIsEmptyNoContent`, `TestDirectoryPickerFailuresAreSafeAndOpaque`,
+  `TestDirectoryPickerIsSingleFlight`,
+  `TestDirectoryPickerRequestCancellationClosesPanelAndClaim`, `TestVerifyPickedDirectory`,
+  `TestIsPickerCancel`, `TestPickDirectoryViaOSAScriptHonorsCancelledContext`).
 - Appearance config projection: `internal/server/config_handlers.go`,
   `internal/server/config_endpoint_test.go`, `ui/src/{api/config.ts,schemas/config.ts}`.
 - Regression anchors: `TestUnknownAPIPath404`, `TestStartShutsDownWithOpenSSEClient`,

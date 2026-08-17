@@ -7,7 +7,31 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** The projects-home background menu now covers the full available canvas, so a
+- **State:** Browse for working directories is implemented (FS-04.R42/A22, TS-03.R26, TS-05.R15).
+  One `POST /api/directory-picker` action runs the fixed `/usr/bin/osascript` with fixed script text
+  and no shell, behind a process-wide non-blocking claim (`acquirePicker`), and answers
+  `200 {"path"}` for a verified existing absolute directory, `204` for cancel,
+  `409 directory_picker_busy` for a concurrent request, and one opaque
+  `500 directory_picker_failed` for everything else. Cancel is recognized from AppleScript's stable
+  numeric `-128` rather than its localized message text (INV §12); the runner's only escaping errors
+  are two fixed sentinels, so neither a path nor script stderr can reach a response or a log
+  (TS-05.R15). `POSIX path of` returns a trailing separator, which `verifyPickedDirectory` strips.
+  The handler's only bound is `r.Context()` — the person may take as long as they like, while a
+  closed tab or a shutdown kills the panel through `exec.CommandContext` — and the claim is released
+  on every outcome including abandonment. On the UI side one shared `BrowseDirectoryButton` serves
+  all three surfaces (INV §2): Settings `cwd`, the pending `add_dirs` entry, and onboarding `cwd`;
+  the projects-home create modal reuses `ProjectForm` and therefore gets it too. Cancel and failure
+  leave field values alone, browsing an additional directory only fills the pending entry (Add still
+  commits it), nothing browses its way into a save, and failures surface through each form's existing
+  `.form-error` line. FS-04, TS-03, and TS-05 moved Partial→Current. New regressions: eight in
+  `internal/server/directory_picker_test.go` (selection, cancel, opaque failures, single flight,
+  request cancellation with claim release, non-local Host/Origin, output verification, `-128`
+  classification, and the real runner under a cancelled context — no test opens a panel), three
+  `ProjectsEditor.test.tsx` cases, and one in `ProjectStep.test.tsx`. `make check-specs`, both Go
+  test modes, focused `-race` on the picker claim, `make build`, all 231 UI tests,
+  presentation/style checks, and `make dist` pass. **No live macOS browser pass was run: J2/J9 with
+  the real native panel is still owed.**
+- **Previous state:** The projects-home background menu now covers the full available canvas, so a
   right-click below the final project card opens **New project** while a card keeps its own menu
   (FS-02.R41/A24, **INV §10**). All twelve earlier open review findings are fixed. **Lifecycle:** Stop now takes the same
   exclusive per-agent claim as resume and every wake (`claimLifecycle`, FS-01.R34/A18, TS-01.R16), so
@@ -68,24 +92,6 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   `make build`, all 226 UI tests, presentation/style checks, and `make dist` pass. No live-browser
   pass was run. A stale migration-version guard test (asserting 13 against the shipped 14) was already
   failing on `main` and now derives its expectation from the migrations slice (INV §9).
-- **Previous state:** Composer file-and-command autocomplete is implemented (FS-03.R30–R34, TS-03.R24,
-  TS-04.R24). In a live chat composer, `@` at a word boundary opens a file picker over the chat
-  session's working directory — Git tracked/untracked/effective-ignore view when it is a worktree,
-  otherwise a bounded walk; `.git` is skipped, directory symlinks are not followed, canonical
-  containment is enforced, results are ranked and capped at 50 — and accepting inserts a relative
-  `@path` plus a trailing space. `#` opens a command picker over the running agent's latest ACP
-  `available_commands_update` snapshot and inserts `/<name>`, including a Codex `/$skill`. Both stay
-  ordinary durable prompt text: no structured attachment, embedded contents, or command persistence,
-  so the prompt route and `SendPrompt` are unchanged. The ACP decode boundary stores the replace-only,
-  bounded snapshot (≤256 entries; name ≤256 and description/hint ≤2000 runes; nameless entries skipped)
-  as live runtime state that dies with the agent, and two new session-scoped GET routes (`file-search`,
-  `available-commands`) project it. Missing/unreadable directories return an empty list, unknown agents
-  404, and both a stopped agent (via the running record) and a non-chat agent return the shared typed
-  runtime/conflict error. FS-03 and TS-03 moved Partial→Current; TS-04 stays Partial. `make check-specs`, both Go test
-  modes, focused `-race` on the snapshot, `make build`, all 227 UI tests plus the new
-  `Composer.test.tsx`, presentation/style checks, and `make dist` pass. A 2026-08-15 isolated
-  real-browser pass confirmed both pickers, boundary/filter/keyboard behavior, verbatim trailing-space
-  submission, stopped-session failure without composer loss, and zero console errors.
 - **Last reviewed code:** `74da884` (2026-08-17), the continuous range after `2727ae8`: composer
   autocomplete fixes, recent usability/review records, durable AgentDecker proposals, ACP context
   usage, and stopped-agent wake-on-message. No review findings remain below.
@@ -110,6 +116,8 @@ an explicit specification update. Remove an item when the human resolves it or q
 - [ ] Run pinned, credentialed Claude and Codex chat/MCP/resume checks before claiming those combinations.
 - [ ] Run pinned Claude terminal flags/hooks and live xterm journeys before claiming full terminal support.
 - [ ] Run pinned OpenCode/OpenHands launch/credential checks before claiming those backends beyond fakes.
+- [ ] Run J2 and J9 in a real macOS browser to confirm the native folder panel opens in front,
+  selects, and cancels (FS-04.A22); component tests stand in until then.
 - [ ] Run the Phase 7 federation discovery/precedence/refresh/launch/resume matrix against real Claude and
   Codex installations before promoting FS-08/TS-07 from Partial.
 
@@ -131,11 +139,55 @@ are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
 
+- 2026-08-17 — Implemented Browse for working directories (FS-04.R42/A22, TS-03.R26, TS-05.R15;
+  **INV §2/§5/§8/§10/§12/§13/§14**). One `POST /api/directory-picker` action shows the standard macOS
+  folder panel through the fixed `/usr/bin/osascript` with fixed script text and no shell, behind a
+  process-wide non-blocking claim, and returns only the verified absolute directory the person chose.
+  Cancel is `204`; a concurrent request is `409 directory_picker_busy`; a launch failure, unusable
+  output, or an unverifiable selection is one opaque `500 directory_picker_failed` whose message and
+  log line carry neither a path nor script diagnostics (§14 also covered by a dedicated
+  Host/Origin refusal test). Cancellation is classified from AppleScript's stable numeric `-128`
+  rather than its localized text (§12), and the panel's trailing separator is stripped. The handler
+  is bounded only by `r.Context()`, so the panel dies with a closed tab or a shutdown and the claim
+  is released on every outcome. One shared `BrowseDirectoryButton` serves Settings `cwd`, the pending
+  `add_dirs` entry, and onboarding `cwd` (§2), with the projects-home create modal inheriting it
+  through `ProjectForm` (§10); browsing never commits or saves, and a failure surfaces through each
+  form's existing error line (§8). FS-04, TS-03, and TS-05 moved Partial→Current, and the route
+  joined TS-03.R5's Config family. Twelve new regressions; no test opens a real panel.
+  `make check-specs`, both Go test modes, focused `-race`, `make build`, all 231 UI tests,
+  presentation/style checks, and `make dist` pass. No live macOS browser pass was run.
+
+- 2026-08-17 — Confirmed the `/fix` queue is empty; no product code or specification changed. **No
+  invariant class** applied: `## Review findings` lists none, no change is active, and every finding
+  from the wake/proposal/context review and the projects background-menu investigation is already
+  closed in `9ac67cc` and `25a1e55`. The two recorded leads — the one-off Archive
+  `unterminated string` 500 and the API-only `tmux` calls without explicit timeouts — stay unpromoted
+  because neither has a repeatable failure. The uncommitted design-feature output for
+  `browse-for-working-directories.md` and `persist-unsent-chat-drafts.md` was left untouched and
+  uncommitted; this session committed nothing. `make check-specs` and `git diff --check` pass.
+
+- 2026-08-17 — Specified browser-local unsent chat drafts as FS-03.R36/A19 and TS-01.R17. One
+  feature-local store keeps the 20 most recently edited per-agent drafts without expiry, clears on
+  accepted send/manual emptying and the existing deletion event, and adds no server/API/database
+  path. `persist-unsent-chat-drafts.md` is waiting to start; no product code changed.
+
 - 2026-08-17 — Fixed the projects-home background menu (**INV §10**). The existing dashboard
   interaction surface now fills the main canvas; its component regression uses a lower-canvas pointer
   coordinate, and a real 1280×720 J5 check confirmed a right-click at `(640,620)` opens **New
   project** without console warnings/errors while the project card keeps its own menu. Specs already
   required this behavior, so no specification change was needed.
+
+- 2026-08-17 — Designed Browse for working directories as a deliberately small macOS-native feature;
+  no product code changed. FS-04.R42/A22 adds Browse to Settings `cwd`, new `add_dirs` entries, and
+  onboarding `cwd` while preserving manual entry, explicit Add, and project-save semantics. The
+  browser File System Access API was verified to return a directory handle rather than the absolute
+  host path AgentDeck must persist, so the approved architecture is one synchronous, single-flight
+  `POST /api/directory-picker` action invoking fixed `/usr/bin/osascript` without a shell
+  (TS-03.R26). It returns one verified absolute path, treats user cancel as `204`, maps safe failures,
+  follows request/server cancellation, and adds no listing, persistence, SSE, migration, upload, or
+  recent-path state. TS-05.R15 keeps it under the existing Host/Origin boundary and prevents paths or
+  script diagnostics from entering failure responses/logs. The waiting change is
+  `browse-for-working-directories.md`; FS-04, TS-03, and TS-05 are Partial.
 
 - 2026-08-17 — Investigated the field report "right click on the background actions isn't working,
   only right click on cards pops up the actions". Confirmed FS-02.R41/A24 is violated: the projects

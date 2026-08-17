@@ -32,6 +32,7 @@ func (s *Server) routes() http.Handler {
 	api("PUT /api/config", s.handlePutConfig)
 	api("GET /api/layout", s.handleLayout)
 	api("PUT /api/layout", s.handlePutLayout)
+	api("POST /api/directory-picker", s.handleDirectoryPicker)
 	api("POST /api/hook", s.handleHook)
 	api("GET /api/events", s.handleEvents)
 	api("GET /api/archive", s.handleArchive)

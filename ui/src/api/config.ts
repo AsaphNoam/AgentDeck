@@ -126,6 +126,21 @@ export function useDeleteRole() {
   });
 }
 
+// ---- Directory browsing ----
+
+// pickDirectory opens the host's standard folder panel and resolves to the one
+// absolute directory the person selected, or null when they dismissed it
+// (TS-03.R26). Cancel is a bodyless 204, so this bypasses json() the same way
+// useDeleteProject does. It is a plain function rather than a mutation because
+// nothing is cached or invalidated: the answer only fills a form field.
+export async function pickDirectory(): Promise<string | null> {
+  const res = await fetch("/api/directory-picker", { method: "POST" });
+  if (res.status === 204) return null;
+  if (!res.ok) throw await httpError(res);
+  const body = (await res.json()) as { path?: string };
+  return body.path ?? null;
+}
+
 // ---- Projects ----
 
 export function useProjects() {

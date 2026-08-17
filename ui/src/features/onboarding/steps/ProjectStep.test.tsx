@@ -33,4 +33,23 @@ describe("ProjectStep", () => {
 
     await waitFor(() => expect(created).toMatchObject({ color: [34, 197, 94] }));
   });
+
+  // FS-04.A22: onboarding browses for its cwd and stays manually editable.
+  it("fills the working directory from the folder panel and still accepts typing", async () => {
+    let posts = 0;
+    server.use(
+      http.post("/api/projects", () => { posts += 1; return HttpResponse.json({ project: "app" }, { status: 201 }); }),
+      http.post("/api/directory-picker", () => HttpResponse.json({ path: "/Users/me/code" })),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={queryClient}><ProjectStep onDone={() => {}} /></QueryClientProvider>);
+
+    const cwdInput = screen.getByPlaceholderText("~/Projects/my-app") as HTMLInputElement;
+    fireEvent.click(screen.getByRole("button", { name: "Browse for working directory" }));
+    await waitFor(() => expect(cwdInput.value).toBe("/Users/me/code"));
+    expect(posts).toBe(0);
+
+    fireEvent.change(cwdInput, { target: { value: "/Users/me/code/sub" } });
+    expect(cwdInput.value).toBe("/Users/me/code/sub");
+  });
 });
