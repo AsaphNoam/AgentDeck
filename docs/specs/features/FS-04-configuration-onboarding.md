@@ -1,7 +1,7 @@
 # FS-04 — Configuration & Onboarding
 
 **Status:** Current
-**Code:** `internal/config/`, `internal/server/config_handlers.go`, `ui/src/features/settings/`, `ui/src/features/onboarding/` · **Journeys:** J2, J9
+**Code:** `internal/config/`, `internal/server/config_handlers.go`, `internal/server/directory_picker.go`, `ui/src/features/settings/`, `ui/src/features/onboarding/` · **Journeys:** J2, J9
 **Absorbed:** [`phase-3-config-onboarding.md`](../../archive/phases/phase-3-config-onboarding.md)
 
 ## 1. Purpose
@@ -78,6 +78,17 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   presets as selectable swatches rather than free-form channel inputs, and a newly created project
   defaults to the palette's first accent. The API continues to accept any in-range triple from
   non-UI callers; no server-side enum enforcement is added, preserving compatibility.
+- **R42** — Every first-party project form that asks for a user-selected project
+  directory provides a **Browse** action: Settings create/edit covers both the primary `cwd` and
+  each new `add_dirs` entry, while onboarding covers its primary `cwd`. Browse opens the standard
+  macOS folder picker. Choosing a directory replaces
+  `cwd` or fills the pending additional-directory entry with that directory's absolute path;
+  confirming the project form or explicitly adding the pending additional directory remains the
+  only operation that changes the form, and confirming the project form remains the only operation
+  that saves project configuration. Canceling the picker, closing it, or a browse failure leaves
+  the current field values and project configuration unchanged. Path fields remain directly
+  editable, including support for the existing leading `~` form, so browsing is a convenience
+  rather than a new requirement or storage format.
 
 ### 2.3 Backends & models editing surface
 
@@ -304,6 +315,12 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   `0600`; detached-child logging uses its redirected stderr as the single file sink so records are
   not duplicated. — `TestDashboardLoggerForegroundPersistsAndMirrors`,
   `TestDashboardLoggerAppendsAndTightensPermissions`, `TestDashboardLoggerDaemonUsesRedirectedStderr`.
+- **A22.** (R42) Settings project create/edit can browse for `cwd` and each new
+  `add_dirs` entry, onboarding can browse for `cwd`, and every surface can select, cancel without
+  changing the existing value, and still type or edit a path manually. A selected additional
+  directory is not part of the form until Add is invoked, and selection alone never writes project
+  configuration. — project-form and onboarding component tests plus the project-creation journeys
+  in J2 and J9.
 
 ## 6. Deviations & open decisions
 
@@ -353,3 +370,8 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   `ui/src/features/settings/BackendsEditor.tsx`; pinned by
   `internal/server/backend_create_test.go`, `internal/config/backendcreate_test.go`, and
   `BackendsEditor.test.tsx`.
+- **Directory browsing (R42/A22):** one shared control,
+  `ui/src/components/ui/BrowseDirectoryButton.tsx`, consumed by `ProjectForm.tsx` (cwd and the
+  pending `add_dirs` entry) and `steps/ProjectStep.tsx`; `pickDirectory` in `ui/src/api/config.ts`
+  over `internal/server/directory_picker.go` (TS-03.R26, TS-05.R15). Pinned by the three browse
+  cases in `ProjectsEditor.test.tsx` and one in `ProjectStep.test.tsx`.

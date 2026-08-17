@@ -140,6 +140,18 @@ the idempotent already-stopped path — reaping and running `teardownAgentRegist
 artifacts the live resume had just minted — and answered success while that resume continued.
 A Stop that loses the claim returns the same conflict a losing resume returns.
 
+**R17 (planned) — Chat drafts stay in one bounded browser-local seam.** One feature-local UI module
+owns a single `localStorage` record containing non-empty draft text and last-edited timestamps keyed
+by `agent_id`; the composer reads and writes that module directly rather than adding server state,
+an API, a database/config field, or a global synchronization path. Each write and rehydration keeps
+only the 20 most recently edited entries, ignores malformed stored data by starting empty, and
+treats unavailable or full browser storage as a persistence failure only: the live composer remains
+usable and Send behavior is unchanged. The composer discards its stored entry only after an accepted
+prompt or an explicit empty value, and the existing SSE `state_update.removed` branch discards it on
+agent deletion beside the annotation tray cleanup. Archive, stop, resume, runtime switch, and
+transcript events do not clear or copy the draft. This is the browser-local boundary discipline of
+INV §1 without a timer, expiry service, server cleanup, migration, or second source of chat truth.
+
 ## 3. Interfaces & data shapes
 
 **Runtime interface** (`internal/runtime/runtime.go`, minimum surface):
@@ -200,6 +212,10 @@ type Runtime interface {
 - Sole-writer state: `internal/state/*`, token validation in `internal/state/manager.go`, reconcile
   fallback `internal/server/reconcile.go`.
 - Event flow: `internal/server/hook.go`, `internal/server/sse.go`, `internal/bus/bus.go` (`SubscribeWithSnapshot`).
+- Browser-local chat drafts (planned R17): one feature-local UI store consumed by
+  `ui/src/components/chat/Composer.tsx` and discarded from `ui/src/api/sse.ts`'s existing removed
+  branch; component/store/SSE tests cover restore, pruning, send outcomes, malformed storage, and
+  deletion cleanup.
 - Archive transition gate: `internal/server/archive_gate.go`, `archive_actions.go`, and
   `archive_gate_test.go` (project reservation and agent/project transition barriers).
 - Model catalog autosync: `internal/config/{codexmodels,claudemodels,modelautosync}.go`,

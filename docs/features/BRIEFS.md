@@ -4,6 +4,45 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-17 — Implementation: Browse for working directories
+
+You can now pick a project's working directory with the standard macOS folder chooser instead of
+typing the path. The Browse button sits next to the working-directory field in Settings, in the
+New project dialog on the projects page, and in the onboarding wizard, and next to the box where you
+add an extra directory. Typing a path still works exactly as before, including the `~` shorthand.
+
+Choosing a folder only fills the field in. Nothing is saved until you press Create or Update, an
+extra directory still needs the Add button, and cancelling the chooser leaves whatever you had
+typed untouched. Only one chooser can be open at a time, and if it fails the form tells you and
+stays usable. The server shows the panel and hands back only the one folder you picked — it never
+lists your disk, and a failure message never reveals a path.
+
+The full Go, browser-component, presentation, build, and packaging checks pass, with new tests
+covering selection, cancellation, the one-at-a-time rule, disconnect during a chooser, and the
+security boundary.
+
+**Needs attention:** No one has yet opened the real macOS panel end-to-end in a browser — the
+automated tests deliberately fake it. Please try Browse once in Settings and in the wizard.
+
+**Next:** Try the Browse button; then either name the remaining waiting change (saving unsent chat
+drafts) or ask for a review of this one.
+
+### 2026-08-17 — Fix: review-finding queue check
+
+There are no open review findings to fix. Everything from the last code review and the projects
+background-menu investigation is already fixed and committed, and no change is active. Two older
+leads — a single unexplained archive error and some external terminal calls without explicit
+timeouts — still have no reproduction, so they stay off the list rather than becoming work.
+
+Your two design sessions from today are still sitting uncommitted in the working copy: the
+specifications and waiting-change files for directory browsing and for saving unsent chat drafts. I
+left them exactly as they were rather than committing work I did not produce or verify.
+
+**Needs attention:** Those two design changes are uncommitted. Commit them yourself, or ask for a
+design review first if you want them checked before they land.
+
+**Next:** Name one of the two waiting changes to implement, or report a new issue.
+
 ### 2026-08-17 — Bug investigation: projects background actions
 
 Confirmed: right-click actions fail on the blank projects background because the menu listener ends
@@ -3116,6 +3155,75 @@ prove references and lifecycle hygiene; only bidirectional review can prove that
 still matches executable behavior.
 
 ::git-commit{cwd="/Users/mcnoam/Projects/AgentDeck"}
+### 2026-08-17 — Feature design: browse for working directories
+
+The proposed project forms add Browse beside the working-directory field in Settings and onboarding. Picking a folder fills an absolute path but does not save until the form is confirmed; cancel or failure keeps the existing value, and manual paths including `~` remain supported.
+
+**Needs attention:** Should the same folder picker also be available when adding each “additional directory” in Settings?
+
+**Next:** Confirm that scope; then I’ll design the local directory-picker architecture and finish the ready-to-build change.
+
+### 2026-08-17 — Feature design: directory-picker architecture
+
+Browse now covers the main working directory in Settings and onboarding plus every new additional-directory entry in Settings. Manual entry remains available, and selecting a folder does not save the project or add the pending extra directory by itself. The browser standard returns a directory handle rather than the absolute path AgentDeck must give its local process ([WICG specification](https://wicg.github.io/file-system-access/), [Chrome documentation](https://developer.chrome.com/docs/capabilities/web-apis/file-system-access)).
+
+**Needs attention:** Choose the picker architecture: a macOS-native folder panel launched by the local server, or a larger in-app filesystem browser that exposes directory listings through the API. I recommend the native panel because it returns the absolute path AgentDeck needs while leaving filesystem navigation and visibility with macOS.
+
+**Next:** Approve the native panel or choose the in-app browser; then I’ll write the technical requirements and finish the ready-to-build change.
+
+### 2026-08-17 — Feature design: preserve unsent chat text
+
+The proposed behavior keeps a separate unsent draft for each chat in the current browser. It restores the exact text after navigating away, refreshing, or reopening AgentDeck; removes it after the prompt is accepted or the field is manually emptied; and keeps a failed send available for retry. Drafts stay on that browser profile only—agents, the server API, other browsers, and other devices do not receive or sync them.
+
+**Needs attention:** Should an unsent draft remain until it is sent or manually cleared, or automatically expire after a fixed period? I recommend keeping it until sent or cleared because expiry can recreate the same accidental-loss problem.
+
+**Next:** Choose the retention rule; then I’ll write the feature specification and acceptance checks before designing the storage mechanics.
+
+### 2026-08-17 — Feature design: preserve unsent chat text
+
+The feature draft now specifies one non-expiring draft per chat in the current browser. Exact text returns after navigation, refresh, or reopening AgentDeck; an accepted send or manually emptying the composer removes it; and a failed send keeps it available. Draft text is never sent before Send, added to transcripts, exposed through the server API, or synced across browsers or devices.
+
+**Needs attention:** Confirm the full scope, including this retention consequence: deleting or archiving a chat does not trigger server cleanup of browser-only data, so an inaccessible draft can remain until that browser's AgentDeck site data is cleared.
+
+**Next:** Once confirmed, I’ll inspect the frontend persistence boundaries and invariants, draft the technical requirement, and prepare the ready-to-build change.
+
+### 2026-08-17 — Feature design: preserve unsent chat text
+
+The repository's browser-state safety rule prevents the confirmed unlimited-retention design: an earlier per-agent draft feature accumulated until browser storage failed and could restore stale data if an agent identifier was reused. Avoiding that known defect requires both deletion cleanup and a storage bound.
+
+**Needs attention:** May I use the smallest compliant rule: delete a chat's draft when its agent is deleted and retain only the 20 most recently edited chat drafts, without any time expiry? Creating a draft for a 21st chat would discard the least recently edited draft.
+
+**Next:** Choose that bounded rule or a different limit; then I’ll revise the feature requirement, specify the direct browser-storage implementation, and prepare the ready-to-build change.
+
+### 2026-08-17 — Feature design: preserve unsent chat text
+
+Chat draft persistence is not already supported. The earlier example was the separate annotation tray, which stores pending review annotations per source agent in browser storage; its original unbounded implementation caused the safety rule this design must follow.
+
+Agent-deletion cleanup is already available in the existing deletion-event path, so adding chat-draft cleanup there is trivial rather than special machinery. The remaining bound protects against drafts accumulating across many ordinary, undeleted chats or one very large pasted draft.
+
+**Needs attention:** Confirm a cap of the 20 most recently edited chat drafts, with no time expiry. This can use one small browser-local store and the existing deletion cleanup path.
+
+**Next:** Once confirmed, I’ll update the feature requirement, add the minimal technical constraint, and prepare the ready-to-build change.
+
+### 2026-08-17 — Feature design: preserve unsent chat text
+
+The feature is fully specified and ready to build as a quick, frontend-only change. Each chat will restore its exact unsent text after navigation, refresh, or reopening AgentDeck in the same browser. Accepted sends, manually emptied composers, and agent deletion clear the matching draft; failed sends retain it. The 20 most recently edited chat drafts are kept without time expiry.
+
+The implementation is intentionally small: one browser-local draft module used by the existing composer and deletion-event path. It adds no server endpoint, database or configuration field, migration, timer, background cleanup, cross-device sync, or product code during this design step.
+
+**Needs attention:** None.
+
+**Next:** The waiting change can be started with `/work persist-unsent-chat-drafts`.
+
+### 2026-08-17 — Feature design: browse for working directories ready
+
+The quick-win design is ready to build. Settings and onboarding will use the standard macOS folder panel to fill the main working directory, and Settings will use it for additional directories too. The implementation is intentionally one small local API action backed by macOS’s built-in picker; it adds no custom filesystem browser, directory listing, upload mechanism, database state, migration, or new configuration format. Manual typing, explicit Add for extra directories, and the existing project Save remain unchanged.
+
+Cancellation keeps the current field untouched. Only one picker can be open at once, shutdown closes an outstanding picker, and failures expose neither filesystem paths nor AppleScript diagnostics. Automated tests use a fake command boundary; the real acceptance pass opens the native panel in the macOS browser journey.
+
+**Needs attention:** None.
+
+**Next:** Run `/work` to implement the waiting Browse for working directories change.
 
 ### 2026-08-17 — Fix: projects-home background menu
 

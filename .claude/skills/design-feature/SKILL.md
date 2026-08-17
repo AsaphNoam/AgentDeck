@@ -1,6 +1,6 @@
 ---
 name: design-feature
-description: Explicit invocation only. Run only when the user sends `/design-feature`. Collaboratively turn a fresh prompt idea or an entry from `docs/ideas.md` into planned AgentDeck feature and technical specifications plus a ready-to-implement change file; do not implement product code.
+description: Explicit invocation only. Run only when the user sends `/design-feature`; turn an AgentDeck idea into ready-to-implement specifications without writing product code.
 ---
 
 # Design an implementation-ready feature

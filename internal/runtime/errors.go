@@ -71,6 +71,15 @@ const (
 	// CodeBackendCatalogChanged rejects a whole-catalog replacement whose ETag
 	// predates a committed catalog mutation in another tab.
 	CodeBackendCatalogChanged = "backend_catalog_changed" // 409
+
+	// directory-picker codes (TS-03.R26). Busy is the single-flight refusal: one
+	// process-wide claim allows at most one open folder panel, so a concurrent
+	// request is rejected rather than queued behind it or given a second panel.
+	// Failed is the single safe outcome for a launch failure, unusable output, or
+	// a selection that cannot be verified — none of them may carry script
+	// diagnostics or a filesystem path into the response (TS-05.R15).
+	CodeDirectoryPickerBusy   = "directory_picker_busy"   // 409
+	CodeDirectoryPickerFailed = "directory_picker_failed" // 500
 )
 
 // APIError is the normalized error payload. It serializes to the §7.7 envelope:
@@ -104,7 +113,7 @@ func statusForCode(code string) int {
 	case CodeConflict, CodeAgentNotRunning, CodeSwitchInProgress,
 		CodeSourceChanged, CodeSourceConflict, CodeApprovalRequired,
 		CodeAgentArchived, CodeAgentArchiving, CodeProjectArchived, CodeProjectArchiving,
-		CodeBackendExists, CodeBackendCatalogChanged:
+		CodeBackendExists, CodeBackendCatalogChanged, CodeDirectoryPickerBusy:
 		return http.StatusConflict // 409
 	case CodeNotImplemented:
 		return http.StatusNotImplemented // 501

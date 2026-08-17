@@ -1,6 +1,6 @@
 # FS-03 — Live chat & permission flow
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/runtime/` (`chat.go`, `permission.go`, `event.go`), `internal/server/sessions.go`, `internal/transcript/`, `ui/src/components/chat/`, `ui/src/store/transcriptStore.ts`, `ui/src/api/sse.ts` · **Journeys:** J3, J4, J7
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -53,6 +53,15 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   the optimistic bubble and joins the durable transcript. If delivery fails, it shows an actionable
   error and restores the draft so the user can retry; the optimistic bubble remains visible and is
   not presented as server-acknowledged.
+- **R36 (planned).** Each chat composer keeps its exact non-empty unsent text as a separate draft for
+  that `agent_id` in the current browser profile. Returning to the chat after navigating elsewhere,
+  refreshing, or closing and reopening AgentDeck restores that draft. The draft is removed only
+  when the prompt request is accepted, the person empties the composer, or the browser's AgentDeck
+  site data is cleared; deleting the agent also removes its draft through the existing browser-side
+  deletion event, while archiving does not. A rejected send keeps or restores the same draft for
+  retry. Drafts do not expire, enter the transcript, reach an agent or server API, or sync to another
+  browser profile or device. The browser retains at most the 20 most recently edited non-empty chat
+  drafts; creating or editing another discards the least recently edited retained draft.
 - **R8.** A prompt moves the agent synchronously to `busy`. ACP output is emitted as ordered
   transcript events and a final `turn_end`; successful completion returns the agent to `idle`,
   clears `busy_since`, and updates context usage. A runtime/protocol failure emits an error and
@@ -295,6 +304,13 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   progression from the resulting events, and a rejected wake shows the server error while keeping
   the draft. *Verify:* `Composer`/chat component tests against a mocked prompt route for both
   branches; the end-to-end wake itself is FS-01.A17's server test.
+- **A19 (planned)** (R7, R36) — Distinct text entered in two chat composers survives navigation,
+  remount, and page reload and restores only in its matching chat. An accepted prompt and manually
+  empty composer remove their drafts; a rejected prompt restores and retains its exact text. Agent
+  deletion removes its draft, and retaining a twenty-first draft evicts the least recently edited
+  entry. No draft is included in a transcript or prompt request before Send. *Verify:*
+  browser-storage-backed `Composer` and deletion-event component/unit cases plus a manual
+  reload/navigation check.
 
 ## 6. Deviations & open decisions
 

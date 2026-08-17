@@ -234,6 +234,20 @@ input[type="radio"] {
   justify-content: flex-end;
 }
 
+/* A text input with an inline action beside it — the Browse control on project
+   directory fields (FS-04.R42). The field stays a grid, so the row is its own
+   element rather than a modifier on .form-field. */
+.field-with-action {
+  align-items: center;
+  display: flex;
+  gap: var(--ad-space-2);
+}
+
+.field-with-action input {
+  flex: 1;
+  min-width: 0;
+}
+
 .config-form {
   display: grid;
   gap: var(--ad-space-4);

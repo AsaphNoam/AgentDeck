@@ -72,6 +72,14 @@ that a shell-capable same-user process cannot invoke the ordinary CLI/API. Pipel
 like prompt/transcript content: owner-only and bounded, but not a credential vault or automatically
 redacted secret field.
 
+**R15 — Folder selection reveals only the user's explicit choice.** The directory-picker
+route remains under the whole-mux Host/Origin guard and has the same accepted same-machine authority
+as the rest of the unauthenticated local API (R2–R3). It delegates navigation and visibility to the
+standard macOS folder panel and returns only the one absolute directory the person selects; it adds
+no directory-listing endpoint, recursive walk, content read, upload, bookmark, recent-path store, or
+log field. The command uses the fixed `/usr/bin/osascript` path with fixed script text and no shell,
+and cancellation/failure responses disclose neither a selected path nor script diagnostics.
+
 ## 3. Interfaces & data shapes
 
 Security-relevant interfaces are the single listener, Host/Origin middleware, hook/MCP token
@@ -120,5 +128,8 @@ Their concrete payloads are owned by TS-03, TS-04, and TS-07.
   `internal/server` project/lifecycle composers.
 - Env/redaction: `internal/server/launch.go`, `internal/runtime/chat.go`,
   `internal/configsource/security.go`.
+- Folder selection (R15): `internal/server/directory_picker.go` — the fixed `/usr/bin/osascript`
+  path, the sentinel failures that keep script output out of responses and logs, and
+  `TestDirectoryPickerRejectsNonLocalHost` / `TestDirectoryPickerFailuresAreSafeAndOpaque`.
 - Regression anchors: `TestDNSRebindingHostRejected`, `TestCrossOriginRequestRejected`,
   `TestHomeTreeIsOwnerOnly`, `TestPathTraversalRejected`, federation redaction/symlink tests.

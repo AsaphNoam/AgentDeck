@@ -76,6 +76,13 @@ type Server struct {
 	lifecycleMu   sync.Mutex
 	lifecycleBusy map[string]bool
 
+	// pickerMu guards pickerBusy: the process-wide claim that keeps at most one
+	// macOS folder panel open (TS-03.R26). It is a single flag, not a per-key
+	// map, because the panel is a per-machine resource — a second one would
+	// compete for the same screen and pointer.
+	pickerMu   sync.Mutex
+	pickerBusy bool
+
 	archiveMu          sync.Mutex
 	projectArchiving   map[string]bool
 	projectStartLeases map[string]int
@@ -101,6 +108,11 @@ type Server struct {
 	// inject a second failure to verify the durable fallback is published and
 	// both causes are reported.
 	restoreAgentArchiveStates func(map[string]bool) error
+
+	// pickDirectory is the folder-panel seam; it defaults to the real osascript
+	// runner. Tests inject a deterministic stub so no suite ever opens a panel
+	// and blocks on a human (TS-03.R26).
+	pickDirectory func(ctx context.Context) (path string, cancelled bool, err error)
 
 	// primerSummarizer is the one-shot target-backend summary seam for backend
 	// switches. The default implementation is gated until live CLI invocation is
@@ -206,6 +218,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		writeConfig:               cfgStore.WriteConfig,
 		setAgentsArchived:         stateStore.SetAgentsArchived,
 		restoreAgentArchiveStates: stateStore.RestoreAgentArchiveStates,
+		pickDirectory:             pickDirectoryViaOSAScript,
 		primerSummarizer:          defaultPrimerSummarizer,
 	}
 	s.pipelineTemplates = pipeline.NewTemplateStore(cfgStore)

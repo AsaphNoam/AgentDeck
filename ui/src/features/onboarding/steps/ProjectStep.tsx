@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { configErrorMessage, useCreateProject } from "../../../api/config";
-import { ProjectColorPicker } from "../../../components/ui";
+import { BrowseDirectoryButton, ProjectColorPicker } from "../../../components/ui";
 import { DEFAULT_PROJECT_COLOR, type ProjectColor } from "../../../lib/projectColors";
 
 interface ProjectStepProps {
@@ -72,11 +72,22 @@ export function ProjectStep({ onDone, claimMutation, releaseMutation }: ProjectS
 
       <div className="form-field">
         <label>Working directory</label>
-        <input
-          value={cwd}
-          onChange={(e) => setCwd(e.target.value)}
-          placeholder="~/Projects/my-app"
-        />
+        <div className="field-with-action">
+          <input
+            value={cwd}
+            onChange={(e) => setCwd(e.target.value)}
+            placeholder="~/Projects/my-app"
+          />
+          <BrowseDirectoryButton
+            label="Browse for working directory"
+            disabled={createProject.isPending}
+            onPicked={(path) => {
+              setError(null);
+              setCwd(path);
+            }}
+            onError={setError}
+          />
+        </div>
       </div>
 
       <div className="form-field">

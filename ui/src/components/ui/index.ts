@@ -1,4 +1,5 @@
 export { Badge } from "./Badge";
+export { BrowseDirectoryButton } from "./BrowseDirectoryButton";
 export { Button, IconButton } from "./Button";
 export { ConfirmDialog } from "./ConfirmDialog";
 export { FieldFrame } from "./FieldFrame";
