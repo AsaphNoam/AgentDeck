@@ -4,6 +4,22 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-17 — Fix and release: wake, proposals, and live context updates
+
+All twelve review findings are fixed. Stopping and waking an agent can no longer race and tear down
+the resumed process's registrations; mail wake retries are durably bounded without consuming newer
+mail; wake and file-search storage failures remain visible instead of looking like ordinary stopped
+agents; and agent discovery is consistent during lifecycle changes. Pipeline proposals now preserve
+the exact request offered for approval, disappear only after a successful approval, stay bounded,
+and tolerate one damaged record without hiding the rest. Provider context updates also reach the
+dashboard during a turn, and messaging descriptions now include sleeping agents. The complete Go,
+UI, build, distribution, specification, and focused race checks pass. Release
+[`v0.2.2`](https://github.com/AsaphNoam/AgentDeck/releases/tag/v0.2.2) is published.
+
+**Needs attention:** None.
+
+**Next:** Update to `v0.2.2`; no follow-up engineering work remains for these findings.
+
 ### 2026-08-17 — Code review: stopped-agent wake, pipeline proposals, and context usage
 
 The newest work is not ready to treat as settled. Eight required corrections surfaced. Stopping an

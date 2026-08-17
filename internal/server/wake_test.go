@@ -3,11 +3,14 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -455,4 +458,291 @@ func TestStoppedPipelineAgentIsNeverAddressableOrWoken(t *testing.T) {
 	srv.nudgeOnce(context.Background(), stopped, map[string]nudgeState{})
 	time.Sleep(300 * time.Millisecond)
 	waitRunning(t, srv, stopped, false)
+}
+
+// slowACP wraps the fake adapter in a shell launcher that stalls for the given
+// duration before exec'ing it, so a test can land a second lifecycle action
+// squarely inside a resume instead of racing for a microsecond-wide window.
+func slowACP(t *testing.T, delay string, exitCode int) string {
+	t.Helper()
+	script := filepath.Join(t.TempDir(), "slow-acp")
+	body := "#!/bin/sh\nsleep " + delay + "\n"
+	if exitCode != 0 {
+		body += "exit " + strconv.Itoa(exitCode) + "\n"
+	} else {
+		body += "exec " + buildFakeACP(t) + " \"$@\"\n"
+	}
+	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
+		t.Fatalf("write slow adapter: %v", err)
+	}
+	return script
+}
+
+// waitLifecycleClaim blocks until an exclusive lifecycle transition owns the agent.
+func waitLifecycleClaim(t *testing.T, srv *Server, id string) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for !srv.lifecycleInFlight(id) {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for the lifecycle claim on %s", id)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// FS-01.A17 / TS-01.R16 (INV §4) — Stop joins the same exclusive lifecycle claim
+// as resume, so a Stop arriving while a wake is inside Registry.Resume cannot
+// tear down the wake's registration. Registry.Stop reads an in-progress resume's
+// nil sentinel as "no handle", so before the claim Stop fell into the idempotent
+// reap branch, deleted the winner's hook token/MCP session/hook-settings file, and
+// answered "stopped" while the resume ran on to report success.
+func TestStopDuringWakeConflictsAndKeepsRegistration(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	id := launchThenStop(t, srv, ts)
+	srv.registry.Chat().SetCommand(slowACP(t, "1", 0))
+
+	type result struct {
+		status int
+		body   string
+	}
+	resumed := make(chan result, 1)
+	go func() {
+		resp, body := post(t, ts.URL+"/api/sessions/"+id+"/resume", nil)
+		resumed <- result{resp.StatusCode, string(body)}
+	}()
+	waitLifecycleClaim(t, srv, id)
+
+	resp, body := post(t, ts.URL+"/api/sessions/"+id+"/stop", nil)
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("stop during wake = %d, want 409: %s", resp.StatusCode, body)
+	}
+	if code := apiErrorCode(t, body); code != "conflict" {
+		t.Fatalf("stop during wake code = %q, want conflict: %s", code, body)
+	}
+
+	got := <-resumed
+	if got.status != http.StatusOK {
+		t.Fatalf("resume status = %d, want 200: %s", got.status, got.body)
+	}
+	// One coherent final state: the agent is running, and the resume's own
+	// registration artifacts are all intact and usable.
+	waitRunning(t, srv, id, true)
+	srv.hookMu.Lock()
+	token := srv.hookTokens[id]
+	_, mcpOK := srv.mcpCleanups[id]
+	srv.hookMu.Unlock()
+	if token == "" || !mcpOK {
+		t.Fatalf("resume registration torn down by the racing stop: token=%q mcp=%v", token, mcpOK)
+	}
+	settingsPath := filepath.Join(hooks.Dir(srv.configStore.Home()), "agents", id+".json")
+	if _, err := os.Stat(settingsPath); err != nil {
+		t.Fatalf("hook-settings file removed by the racing stop: %v", err)
+	}
+	// Once the transition settles, the retried stop succeeds normally.
+	if resp, body := post(t, ts.URL+"/api/sessions/"+id+"/stop", nil); resp.StatusCode != http.StatusOK {
+		t.Fatalf("retried stop = %d, want 200: %s", resp.StatusCode, body)
+	}
+	waitRunning(t, srv, id, false)
+}
+
+// FS-06.A11 / TS-04.R26 (INV §15) — a wake attempt claims the mail it wakes for
+// before spawning anything, so an adapter that completes its handshake and then
+// dies before the first check_messages nudge is not respawned by every sweep.
+func TestSuccessfulWakeConsumesMailEvenIfAdapterDiesBeforeNudge(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	stopped := launchThenStop(t, srv, ts)
+
+	if _, err := srv.stateStore.InsertMessage(state.Message{
+		FromAgent: "a_sender", FromAddress: "impl@tmpproj", FromName: "Atlas",
+		ToAgent: stopped, Body: "pick this up",
+	}); err != nil {
+		t.Fatalf("InsertMessage: %v", err)
+	}
+
+	srv.nudgeOnce(context.Background(), stopped, map[string]nudgeState{})
+	waitRunning(t, srv, stopped, true)
+
+	// The wake owns this mail from the moment it started, before any delivery
+	// marker could exist.
+	msgs, err := srv.stateStore.ListMessages(stopped, false, 0)
+	if err != nil {
+		t.Fatalf("ListMessages: %v", err)
+	}
+	if len(msgs) != 1 || msgs[0].DeliveredVia != state.DeliveryWakeAttempted {
+		t.Fatalf("delivery marker after wake = %+v, want one %q row", msgs, state.DeliveryWakeAttempted)
+	}
+
+	// The adapter dies before it is ever nudged.
+	row, err := srv.stateStore.ReadRunning(stopped)
+	if err != nil {
+		t.Fatalf("ReadRunning: %v", err)
+	}
+	if err := syscall.Kill(-row.PID, syscall.SIGKILL); err != nil {
+		t.Fatalf("kill woken adapter: %v", err)
+	}
+	waitRunning(t, srv, stopped, false)
+
+	// The mail is still unread, but it no longer makes the agent a wake candidate,
+	// so no sweep — including one after a dashboard restart's empty nudge map —
+	// respawns the broken adapter.
+	waiting, err := srv.stateStore.PendingWakeMailAgents()
+	if err != nil {
+		t.Fatalf("PendingWakeMailAgents: %v", err)
+	}
+	if len(waiting) != 0 {
+		t.Fatalf("wake candidates after a dead adapter = %v, want none", waiting)
+	}
+	for i := 0; i < 3; i++ {
+		srv.nudgeOnce(context.Background(), "", map[string]nudgeState{})
+	}
+	time.Sleep(300 * time.Millisecond)
+	waitRunning(t, srv, stopped, false)
+}
+
+// FS-06.A11 / TS-04.R26 (INV §5) — a failing wake records its outcome on exactly
+// the rows it claimed. Mail that arrives while the wake is in flight stays
+// pending and re-arms the wake, instead of being consumed by an attempt that
+// never saw it.
+func TestFailedWakeLeavesNewerMailPending(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	stopped := launchThenStop(t, srv, ts)
+	// Fail the resume, but slowly enough that newer mail lands mid-attempt.
+	srv.registry.Chat().SetCommand(slowACP(t, "2", 1))
+
+	first, err := srv.stateStore.InsertMessage(state.Message{
+		FromAgent: "a_sender", FromAddress: "impl@tmpproj", FromName: "Atlas",
+		ToAgent: stopped, Body: "before the wake",
+	})
+	if err != nil {
+		t.Fatalf("InsertMessage first: %v", err)
+	}
+
+	srv.nudgeOnce(context.Background(), stopped, map[string]nudgeState{})
+	// The attempt is now in flight and stalls in the adapter for two seconds. The
+	// second message therefore arrives strictly after the attempt began and
+	// strictly before it fails — the interleaving the attempt must not consume.
+	waitLifecycleClaim(t, srv, stopped)
+	second, err := srv.stateStore.InsertMessage(state.Message{
+		FromAgent: "a_sender", FromAddress: "impl@tmpproj", FromName: "Atlas",
+		ToAgent: stopped, Body: "arrived mid-wake",
+	})
+	if err != nil {
+		t.Fatalf("InsertMessage second: %v", err)
+	}
+
+	// The wake now fails. Only the claimed row carries the failure.
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		msgs, err := srv.stateStore.ListMessages(stopped, false, 0)
+		if err != nil {
+			t.Fatalf("ListMessages: %v", err)
+		}
+		byID := map[string]string{}
+		for _, m := range msgs {
+			byID[m.MessageID] = m.DeliveredVia
+		}
+		if byID[first] == state.DeliveryWakeFailed {
+			if byID[second] != state.DeliveryPending {
+				t.Fatalf("mail inserted mid-wake = %q, want %q (it must re-arm the wake)",
+					byID[second], state.DeliveryPending)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for the wake failure: %+v", msgs)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	waitRunning(t, srv, stopped, false)
+
+	// Because the newer mail is still pending, the recipient is a candidate again.
+	waiting, err := srv.stateStore.PendingWakeMailAgents()
+	if err != nil {
+		t.Fatalf("PendingWakeMailAgents: %v", err)
+	}
+	if len(waiting) != 1 || waiting[0] != stopped {
+		t.Fatalf("wake candidates after the interleaving = %v, want [%s]", waiting, stopped)
+	}
+}
+
+// FS-01.A17 / TS-03.R25 (INV §7/§8) — a wake gate that cannot be evaluated is a
+// typed failure, not a decision that the agent is unwakeable. A corrupt project
+// definition previously collapsed into "not a candidate", so the prompt route
+// answered with the ordinary no-handle 404 and the messaging directory silently
+// omitted the agent.
+func TestWakeGateFailureSurfacesTypedError(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	id := launchThenStop(t, srv, ts)
+
+	projectPath := filepath.Join(srv.configStore.Home(), "projects", "tmpproj.json")
+	if err := os.WriteFile(projectPath, []byte("{not json"), 0o600); err != nil {
+		t.Fatalf("corrupt project definition: %v", err)
+	}
+
+	resp, body := post(t, ts.URL+"/api/sessions/"+id+"/prompt", map[string]string{"text": "hi"})
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("prompt with an unreadable project = %d, want 500: %s", resp.StatusCode, body)
+	}
+	if code := apiErrorCode(t, body); code != "internal" {
+		t.Fatalf("prompt error code = %q, want internal: %s", code, body)
+	}
+	if _, err := srv.addressableAgents(); err == nil {
+		t.Fatal("addressableAgents silently omitted the agent instead of reporting the gate failure")
+	}
+	waitRunning(t, srv, id, false)
+}
+
+// FS-06.A11 / TS-04.R26 (INV §1/§5) — the addressable set is read from one SQLite
+// snapshot, so an agent whose running row disappears mid-read can never be listed
+// twice (once running, once stopped-wakeable). Two separate queries produced that
+// duplicate, which made list_agents show the agent twice and role/name resolution
+// report a false ambiguity.
+func TestAddressableAgentsNeverDuplicatesAcrossStop(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+	row, err := srv.stateStore.ReadRunning(id)
+	if err != nil {
+		t.Fatalf("ReadRunning: %v", err)
+	}
+
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			_ = srv.stateStore.DeleteRunning(id)
+			_ = srv.stateStore.WriteRunning(row)
+		}
+	}()
+
+	for i := 0; i < 400; i++ {
+		agents, err := srv.addressableAgents()
+		if err != nil {
+			close(stop)
+			<-done
+			t.Fatalf("addressableAgents: %v", err)
+		}
+		seen := map[string]string{}
+		for _, a := range agents {
+			if prev, dup := seen[a.AgentID]; dup {
+				close(stop)
+				<-done
+				t.Fatalf("agent %s listed twice (%s and %s) across a stop", a.AgentID, prev, a.Availability)
+			}
+			seen[a.AgentID] = a.Availability
+		}
+		if _, _, err := state.ResolveRecipient(agents, "impl@tmpproj"); err != nil &&
+			errors.Is(err, state.ErrAmbiguousRecipient) {
+			close(stop)
+			<-done
+			t.Fatalf("role@project resolution reported a false ambiguity across a stop")
+		}
+	}
+	close(stop)
+	<-done
 }

@@ -585,3 +585,22 @@ func TestAvailableCommandsEndpointErrors(t *testing.T) {
 		t.Fatalf("stopped agent status = %d body=%s, want 409", rec.Code, rec.Body.String())
 	}
 }
+
+// TestFileSearchStorageErrorIsNotAStoppedAgent — only a missing running row means
+// "stopped". A storage failure reading that row was previously reported to the
+// composer as agent_not_running, hiding a real fault behind an ordinary,
+// expected-looking conflict (TS-03.R24, INV §7).
+func TestFileSearchStorageErrorIsNotAStoppedAgent(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "main.go"), "package main")
+	srv := testServer(t, false)
+	seedChatSessionWithCwd(t, srv, "a_fs_broken", dir)
+	// Make the running-record read fail for a reason that is not "no such row".
+	if _, err := srv.stateStore.DB().Exec(`DROP TABLE running`); err != nil {
+		t.Fatalf("drop running table: %v", err)
+	}
+	rec := doGET(t, srv.routes(), "/api/sessions/a_fs_broken/file-search?q=main")
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("storage failure status = %d body=%s, want 500", rec.Code, rec.Body.String())
+	}
+}

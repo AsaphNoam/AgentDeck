@@ -144,11 +144,11 @@ func New(store *state.Store, log *slog.Logger) *Server {
 	}, nil)
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "list_agents",
-		Description: "List other live agents you can message (by address role@project, name, or agent_id).",
+		Description: "List other agents you can message (by address role@project, name, or agent_id). Includes both running agents and stopped agents a message wakes; each entry's `availability` is \"running\" or \"stopped_wakeable\".",
 	}, s.handleListAgents)
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "send_message",
-		Description: "Send a message to another live agent. `to` is role@project, an agent name, or an agent_id.",
+		Description: "Send a message to another agent, running or stopped-wakeable; a stopped recipient is woken to receive it, which takes longer. `to` is role@project, an agent name, or an agent_id.",
 	}, s.handleSendMessage)
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "check_messages",

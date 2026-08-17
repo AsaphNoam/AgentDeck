@@ -92,6 +92,10 @@ func (m *Manager) Start(ctx context.Context, request StartRequest) (RunDetail, b
 		}
 		return RunDetail{}, false, err
 	}
+	// The run is durable, so the proposal that asked for it is no longer pending.
+	// A proposal's request id is its own content-addressed id, so a manual start
+	// simply matches no record (FS-14.R33, TS-09.R26).
+	m.consumeProposal(request.RequestID)
 	m.publish(created)
 	if err := m.Reconcile(ctx, created.RunID); err != nil {
 		return RunDetail{}, replay, err

@@ -219,6 +219,13 @@ product boundaries in §6.
   model: a shell-capable agent is not cryptographically prevented from invoking the ordinary local
   CLI/API outside this guided flow.
 
+- **R33.** A pending proposal disappears from the Pipelines approval surface once
+  the exact Save or Start it asked for has succeeded, including after a reload, so the same approval
+  cannot be performed twice or replay an older run. A failed or refused approval leaves the proposal
+  pending. There is no Dismiss control: a proposal the person never approves simply ages out, because
+  AgentDeck retains only the newest proposals and prunes older ones. Approving an edited payload
+  creates no consumption, since the edit already invalidated that approval (R27).
+
 ## 5. Acceptance criteria
 
 - **A1** — A person creates and edits one model-neutral four-stage template, starts it
@@ -272,6 +279,13 @@ product boundaries in §6.
 - **A12.** Archiving a project with an active pipeline stops the run before archiving its
   stage agent; no later pipeline recovery or control starts an agent while the project is archived. —
   pipeline/project-archive integration regressions; J14.
+
+- **A13** (R33) — An approved Save and an approved Start each stop appearing under
+  pending proposals after the mutation commits and after a reload, two proposals differing only in a
+  caller request id resolve to one record whose exact payload is what the approval surface holds in
+  either order, and one unreadable proposal record does not hide the others. *Verify:*
+  `internal/pipeline/proposals_test.go`, `internal/state/pipeline_proposals_test.go`, and
+  `ui/src/features/pipelines/AgentDeckerBuilder.test.tsx`.
 
 ## 6. Deviations & open decisions
 

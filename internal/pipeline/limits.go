@@ -17,6 +17,7 @@ const (
 	MaxDetailsRunes     = 16000
 	MaxChecksRunes      = 16000
 	MaxProposalBytes    = 256 * 1024
+	MaxProposalRecords  = 100
 	MaxListPage         = 100
 	MaxVisits           = 32
 )

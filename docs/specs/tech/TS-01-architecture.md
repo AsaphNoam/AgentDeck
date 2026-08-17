@@ -133,6 +133,13 @@ them (INV §4). A losing concurrent waker therefore returns the existing conflic
 composing or tearing down anything, and the winner's hook token, MCP registration, and
 hook-settings file remain intact and in use.
 
+**Stop takes the same claim**, making start and stop one exclusive lifecycle transition per agent
+(FS-01.R34). `Registry.Stop` reads an in-progress resume's nil sentinel as `ErrNoHandle`, which is
+indistinguishable from "this agent is not running", so an unclaimed Stop landing inside a wake took
+the idempotent already-stopped path — reaping and running `teardownAgentRegistration` on the
+artifacts the live resume had just minted — and answered success while that resume continued.
+A Stop that loses the claim returns the same conflict a losing resume returns.
+
 ## 3. Interfaces & data shapes
 
 **Runtime interface** (`internal/runtime/runtime.go`, minimum surface):

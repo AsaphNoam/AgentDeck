@@ -61,8 +61,9 @@ func (f *fakeLifecycle) IsRunning(agentID string) bool {
 }
 
 type fakePublisher struct {
-	updates       []PipelineUpdate
-	notifications []string
+	updates         []PipelineUpdate
+	notifications   []string
+	proposalUpdates int
 }
 
 func (p *fakePublisher) PublishPipelineUpdate(update PipelineUpdate) {
@@ -72,7 +73,7 @@ func (p *fakePublisher) PublishPipelineNotification(_ PipelineUpdate, kind strin
 	p.notifications = append(p.notifications, kind)
 }
 
-func (p *fakePublisher) PublishPipelineProposalUpdate() {}
+func (p *fakePublisher) PublishPipelineProposalUpdate() { p.proposalUpdates++ }
 
 func pipelineManagerFixture(t *testing.T) (*Manager, *fakeLifecycle, *fakePublisher) {
 	t.Helper()

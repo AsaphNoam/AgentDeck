@@ -138,13 +138,20 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   is durably inserted first, exactly like mail for a running recipient; the existing insert-time
   signal and periodic sweep (R9) then treat that recipient as a wake candidate: AgentDeck resumes it
   with FS-01.R33 semantics and, once idle, nudges it to `check_messages` under the same
-  cooldown and in-flight tracking as running recipients. A failed wake leaves the mail durable and
-  the agent stopped, and durably marks that recipient's still-pending unread rows with the
-  `wake_failed` delivery marker; only unread mail whose delivery marker is still `pending` makes a
-  stopped agent a wake candidate, so the no-retry bound survives a dashboard restart, needs no
-  timestamp ordering, and re-arms automatically because new mail always inserts as `pending`. A
-  broken adapter therefore cannot cause a process-spawn loop. Retention (R8) is unchanged: mail for
-  a never-woken agent still expires on the normal schedule.
+  cooldown and in-flight tracking as running recipients. Only unread mail whose delivery marker is
+  still `pending` makes a stopped agent a wake candidate, and a wake attempt **claims** exactly the
+  pending rows it is waking for — durably marking them `wake_attempted` — *before* it starts
+  anything. Claiming up front, rather than marking only on failure, is what bounds retries in every
+  outcome: a wake that fails additionally marks its claimed rows `wake_failed` and leaves the mail
+  durable and the agent stopped; a wake that succeeds has its claimed rows restamped by the
+  `check_messages` nudge that delivers them; and an adapter that completes its handshake and then
+  dies before that first nudge still leaves its rows claimed, so no sweep respawns it. A broken
+  adapter therefore cannot cause a process-spawn loop, the bound survives a dashboard restart, and it
+  needs no timestamp ordering. The outcome is recorded on the claimed rows only, so mail that arrives
+  while a wake is in flight stays `pending` and re-arms the wake, exactly as new mail always does;
+  losing the exclusive lifecycle claim (FS-01.R34) is not an attempt and releases the rows back to
+  `pending`. Retention (R8) is unchanged: mail for a never-woken agent still expires on the normal
+  schedule.
 
 ## 5. Acceptance criteria
 
@@ -192,6 +199,13 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   mail inserted in the same second — until a new `pending` row arrives. A stopped agent with a
   pipeline attempt association is absent from `list_agents`, unresolvable as a recipient, and never
   woken. *Verify:* server messaging integration tests against fake ACP covering all three branches.
+- **A12** (R22–R23) — A wake whose adapter completes its handshake and is then killed before its
+  first nudge leaves the mail unread but claimed, and no later sweep respawns it. Mail inserted
+  while a wake is in flight is still `pending` after that wake fails, so the recipient is a wake
+  candidate again. An agent whose running row disappears while the addressable set is being read is
+  never listed twice, and `role@project` resolution never reports a false ambiguity because of it.
+  *Verify:* `internal/server/wake_test.go::TestSuccessfulWakeConsumesMailEvenIfAdapterDiesBeforeNudge`,
+  `TestFailedWakeLeavesNewerMailPending`, and `TestAddressableAgentsNeverDuplicatesAcrossStop`.
 
 ## 6. Deviations & open decisions
 

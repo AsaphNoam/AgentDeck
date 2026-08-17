@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 )
@@ -145,22 +146,69 @@ func (s *Store) ReadPipelineRequest(requestID string) (runID, requestHash string
 // SavePipelineProposal publishes one canonical proposal durably before its MCP
 // caller receives success. proposal_id is content-derived, so a transport retry
 // leaves one reviewable record rather than duplicating the approval surface.
-func (s *Store) SavePipelineProposal(proposal PipelineProposalRecord) error {
+// The same transaction applies the caller's retention bound, so a backlog of
+// never-approved proposals cannot grow without limit.
+func (s *Store) SavePipelineProposal(proposal PipelineProposalRecord, retain int) error {
 	if proposal.CreatedAt.IsZero() {
 		proposal.CreatedAt = timeNow()
 	}
+	if retain <= 0 {
+		retain = 100
+	}
 	proposal.Payload = nonEmptyJSON(proposal.Payload, `{}`)
-	_, err := s.db.Exec(`
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("state: begin save pipeline proposal: %w", err)
+	}
+	defer tx.Rollback()
+	// Proposing again re-arms the one record rather than adding a second: the id is
+	// content-derived, so a transport retry and a genuine re-proposal are
+	// indistinguishable, and both must leave exactly one reviewable offer. Clearing
+	// consumed_at matters because an agent that re-proposes something already saved
+	// would otherwise get MCP success with nothing on the approval surface.
+	if _, err := tx.Exec(`
 INSERT INTO pipeline_proposals(proposal_id, kind, digest, payload_json, created_at)
 VALUES (?, ?, ?, ?, ?)
-ON CONFLICT(proposal_id) DO NOTHING`,
-		proposal.ProposalID, proposal.Kind, proposal.Digest, string(proposal.Payload), formatTime(proposal.CreatedAt))
-	if err != nil {
+ON CONFLICT(proposal_id) DO UPDATE SET consumed_at = '', created_at = excluded.created_at`,
+		proposal.ProposalID, proposal.Kind, proposal.Digest, string(proposal.Payload), formatTime(proposal.CreatedAt)); err != nil {
 		return fmt.Errorf("state: save pipeline proposal: %w", err)
+	}
+	if _, err := tx.Exec(`
+DELETE FROM pipeline_proposals WHERE proposal_id NOT IN (
+  SELECT proposal_id FROM pipeline_proposals ORDER BY created_at DESC, proposal_id LIMIT ?)`, retain); err != nil {
+		return fmt.Errorf("state: prune pipeline proposals: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("state: commit pipeline proposal: %w", err)
 	}
 	return nil
 }
 
+// ConsumePipelineProposal retires one pending proposal after the exact mutation
+// it proposed committed, so the approval surface stops offering an action that
+// already happened. It reports whether this call was the one that consumed the
+// record, so a replayed approval publishes no second update.
+func (s *Store) ConsumePipelineProposal(proposalID string, at time.Time) (bool, error) {
+	if at.IsZero() {
+		at = timeNow()
+	}
+	result, err := s.db.Exec(`
+UPDATE pipeline_proposals SET consumed_at = ? WHERE proposal_id = ? AND consumed_at = ''`,
+		formatTime(at), proposalID)
+	if err != nil {
+		return false, fmt.Errorf("state: consume pipeline proposal: %w", err)
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("state: consume pipeline proposal count: %w", err)
+	}
+	return count == 1, nil
+}
+
+// ListPipelineProposals returns the pending approval surface. A record whose
+// durable columns cannot be read is isolated and skipped rather than aborting
+// the whole list, because one corrupt row must not hide every approvable
+// proposal (INV §7).
 func (s *Store) ListPipelineProposals(limit int) ([]PipelineProposalRecord, error) {
 	if limit <= 0 {
 		limit = 100
@@ -168,6 +216,7 @@ func (s *Store) ListPipelineProposals(limit int) ([]PipelineProposalRecord, erro
 	rows, err := s.db.Query(`
 SELECT proposal_id, kind, digest, payload_json, created_at
 FROM pipeline_proposals
+WHERE consumed_at = ''
 ORDER BY created_at DESC, proposal_id
 LIMIT ?`, limit)
 	if err != nil {
@@ -182,9 +231,12 @@ LIMIT ?`, limit)
 			return nil, fmt.Errorf("state: scan pipeline proposal: %w", err)
 		}
 		proposal.Payload = nonEmptyJSON([]byte(payload), `{}`)
-		if proposal.CreatedAt, err = parseTime(createdAt); err != nil {
-			return nil, wrapTimeErr("pipeline_proposal.created_at", err)
+		created, timeErr := parseTime(createdAt)
+		if timeErr != nil {
+			slog.Warn("state: skip pipeline proposal with unreadable created_at", "proposal", proposal.ProposalID, "err", timeErr)
+			continue
 		}
+		proposal.CreatedAt = created
 		proposals = append(proposals, proposal)
 	}
 	if err := rows.Err(); err != nil {

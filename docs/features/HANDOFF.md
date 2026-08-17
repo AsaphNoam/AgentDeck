@@ -7,7 +7,41 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** Wake-on-message for stopped chat agents is implemented (FS-01.R33/A17, FS-03.R35/A18,
+- **State:** All twelve open review findings are fixed. **Lifecycle:** Stop now takes the same
+  exclusive per-agent claim as resume and every wake (`claimLifecycle`, FS-01.R34/A18, TS-01.R16), so
+  a Stop landing inside a wake returns `409` instead of taking the idempotent branch and tearing down
+  the live resume's registration. **Mail wake:** an attempt now *claims* the pending rows it wakes
+  for (`ClaimPendingWakeMail` → `wake_attempted`) before spawning anything and records its outcome on
+  exactly those ids (`SetDeliveredVia`), so a handshake-successful adapter that dies before its first
+  nudge is not respawned every sweep, and mail arriving mid-wake stays `pending` and re-arms
+  (FS-06.R23/A12, TS-04.R26). `MarkUnreadDeliveredVia`/`MarkRead` accept `wake_attempted` so the
+  delivering nudge or a direct read restamps it honestly. **Wake gates:** `wakeCandidate` returns a
+  typed `*runtime.APIError` and distinguishes "excluded" from "could not be evaluated", so a corrupt
+  project definition surfaces `500` instead of the no-handle `404` and fails the directory read
+  rather than silently omitting the agent (FS-01.R33, TS-03.R25). **Addressable set:**
+  `state.AddressableAgents` is one query over one snapshot with per-row availability, and both it and
+  `StoppedWakeCandidates` embed one shared `stoppedWakeGates` predicate, so a Stop mid-read can no
+  longer list an agent twice or produce a false `role@project` ambiguity (TS-04.R26).
+  **Proposals:** `ProposeRun` canonicalizes the request id to the derived proposal id before digest
+  and persistence; a proposal is consumed only after its approved Save/Start commits (migration 15
+  adds `consumed_at`), re-proposing the same content re-arms the one record, retention keeps the
+  newest 100, and one unreadable record no longer aborts the approval list (FS-14.R33/A13,
+  TS-09.R26, TS-02.R22). **Context meter:** a mid-turn ACP `usage_update` now republishes through the
+  existing status write+touch seam, so a long turn no longer shows a stale percentage.
+  **Smaller:** file search reports storage failures instead of calling them `agent_not_running`
+  (TS-03.R24), and the `list_agents`/`send_message` MCP descriptions now say stopped wakeable agents
+  are addressable. New regressions: six in `internal/server`
+  (`TestStopDuringWakeConflictsAndKeepsRegistration`,
+  `TestSuccessfulWakeConsumesMailEvenIfAdapterDiesBeforeNudge`,
+  `TestFailedWakeLeavesNewerMailPending`, `TestWakeGateFailureSurfacesTypedError`,
+  `TestAddressableAgentsNeverDuplicatesAcrossStop`, `TestFileSearchStorageErrorIsNotAStoppedAgent`),
+  the new `internal/pipeline/proposals_test.go` and `internal/state/pipeline_proposals_test.go`,
+  `TestUsageUpdateRepublishesContextPctMidTurn`, and one `AgentDeckerBuilder` case. Each was
+  confirmed to fail against the pre-fix code. A `slowACP` test helper (a shell launcher that stalls
+  before exec'ing the fake adapter) makes the lifecycle races deterministic instead of timing-based.
+  `make check-specs`, both Go test modes, focused `-race` on the lifecycle/wake paths, `make build`,
+  all 227 UI tests, presentation/style checks, and `make dist` pass. No live-browser pass was run.
+- **Previous state:** Wake-on-message for stopped chat agents is implemented (FS-01.R33/A17, FS-03.R35/A18,
   FS-06.R22/R23/A11, TS-01.R16, TS-03.R25, TS-04.R26). A prompt to a stopped chat agent that passes
   the wake gates now resumes it inside the same `POST /prompt` request and then delivers the prompt;
   agent mail makes such an agent addressable, and the nudger wakes it before the ordinary
@@ -84,85 +118,28 @@ and creates disposable local configuration homes. On 2026-07-15 this machine has
 the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installed; the new
 `claude-agent-acp`, OpenCode, and OpenHands are not installed globally.
 
-The post-fix usability-review and current code-review state are committed locally on `main`; pushing
-those commits to the shared `origin/main` branch needs explicit human authorization.
-
 ## Review findings
 
 ### Open findings
 
-- **Must fix** — INV §4 / FS-01.R33 / TS-01.R16: `internal/server/sessions.go:395` does not join
-  the exclusive claim in `internal/server/resume.go:87`. If Stop arrives while a wake is inside
-  `Registry.Resume`, the registry's nil sentinel looks like `ErrNoHandle`; Stop then reaps/tears down
-  the agent-keyed registration while Resume continues. The wake can report success with a running
-  process whose hook token, MCP session, and hook-settings file were removed, so Stop is not a
-  reliable sleep action. Make Stop and resume/wake one exclusive lifecycle transition and add a
-  blocked-resume ↔ Stop race regression that asserts one coherent final state and registration.
-- **Must fix** — INV §1/§15 / FS-06.R23/A11 / TS-04.R26: `internal/server/messaging_loops.go:121`
-  treats a completed resume as a successful mail wake before any `check_messages` delivery marker
-  exists. If an adapter completes startup and crashes before the next ordinary nudge, the unread row
-  remains `pending`; every two-second sweep resumes it again, producing the spawn loop R23 forbids.
-  Tie the durable attempt outcome to delivery/runtime survival and regress a handshake-successful
-  adapter that exits before its first nudge.
-- **Must fix** — INV §5/§15 / FS-06.R23/A11 / TS-04.R26: a failed mail wake calls
-  `MarkUnreadDeliveredVia` at `internal/server/messaging_loops.go:131`, whose query at
-  `internal/state/messages.go:358` marks every pending row present at failure time. Mail inserted
-  after the wake began is therefore stamped `wake_failed` too and cannot perform R23's promised
-  automatic re-arm. Claim or snapshot the rows owned by one wake attempt and add an interleaving
-  regression where newer mail arrives before the older attempt fails.
-- **Must fix** — INV §7/§8 / FS-01.R33 / TS-03.R25: `wakeCandidate` at
-  `internal/server/resume.go:267` collapses both a failed candidate query and
-  `projectArchiveGate`'s corrupt/I/O `CodeInternal` result into "not wakeable." A stopped-agent
-  prompt then returns the ordinary no-handle `404`, while discovery/message resolution silently
-  omits the agent, rather than surfacing the typed failure that explicit Resume returns. Preserve
-  internal gate errors through the wake/addressable seams and regress a corrupt project definition.
-- **Must fix** — INV §1/§5 / FS-06.R22 / TS-04.R26: `addressableAgents` at
-  `internal/server/resume.go:285` runs separate live and stopped-candidate queries despite R26's
-  single-query contract. If Stop deletes the running row between those reads, the same agent appears
-  once as running and again as stopped-wakeable; `list_agents` duplicates it and role/name resolution
-  can report a false ambiguity. Build the complete addressable projection from one SQLite snapshot
-  and regress the Stop interleaving.
-- **Must fix** — INV §3 / FS-14.R27 / TS-09.R15–R16: `internal/pipeline/proposals.go:50` excludes
-  `request_id` from a run proposal's digest/id but restores the caller's non-empty value into the
-  payload, while `internal/state/pipelines.go:153` keeps the first payload on id conflict. Two
-  otherwise-identical proposals with different request ids therefore return the second exact
-  payload to MCP but leave the Pipelines approval surface holding the first; approval can replay an
-  old run instead of the proposal just made. Canonicalize one request id before digest/persistence
-  and regress both orderings.
-- **Must fix** — INV §1 / FS-02.R2/R9 / TS-04.R25: `internal/runtime/chat.go:785` updates
-  `contextPct` only in private runtime memory. No status write/touch republishes the adapter's
-  `usage_update` until a later tool/status event or `turn_end`, so a long-running turn leaves the
-  live dashboard meter stale despite current provider data. Republish the bounded value through the
-  existing status/state-update seam and assert the update is observable before turn completion.
-- **Must fix** — INV §10 / TS-02.R12/R17 / TS-09.R15: migration 14 in
-  `internal/state/schema.go:309` adds authoritative `pipeline_proposals` persistence, but TS-02's
-  pipeline authority/migration requirement and TS-09's SQLite ownership shape still name only run,
-  attempt, value, and request records. Update the owning persistence specification during the fix so
-  the new table, authority, bounds, and lifecycle are explicit as TS-02.R12 requires.
-- **Worth fixing** — INV §8/§10 / FS-14.R27 / TS-09.R15/R23:
-  `internal/state/pipelines.go:164` and `ui/src/features/pipelines/AgentDeckerBuilder.tsx:149` have no
-  consumed/dismissed proposal state. After a successful Save or Start, the durable record remains
-  forever under **Pending exact proposals** with the same approval action; records also grow without
-  a retention boundary. Define the proposal lifecycle in the specifications, mark it consumed only
-  after the approved mutation succeeds (plus an explicit safe dismissal/retention rule), and cover
-  reload after approval.
-- **Worth fixing** — INV §7 / TS-03.R24: `internal/server/files_commands.go:84` maps every
-  `ReadRunning` error to `agent_not_running`, including SQLite/read failures. Preserve the stopped
-  conflict only for `state.ErrNotFound`, surface other storage errors, and regress the distinction.
-- **Worth fixing** — INV §7 / TS-09.R15/R23: `ListPipelineProposals` at
-  `internal/state/pipelines.go:164` and `internal/pipeline/proposals.go:71` aborts the entire approval
-  list when one record has a malformed timestamp or payload. Isolate/report the bad proposal while
-  continuing with valid records, as required for durable collection readers.
-- **Worth fixing** — INV §10 / FS-06.R22: the MCP tool descriptions at
-  `internal/messaging/messaging.go:145` still say `list_agents` lists, and `send_message` targets,
-  only "live agents." Update the agent-facing vocabulary to include stopped wakeable recipients so
-  the newly shipped capability is discoverable and honest.
+None.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-17 — Fixed all twelve findings from the review of stopped-agent wake, pipeline proposals,
+  and context usage. Stop and resume/wake now share one lifecycle claim; mail wake attempts claim
+  exactly their pending rows before spawning; wake-gate failures remain typed errors; the complete
+  addressable directory comes from one snapshot; run proposal request ids are canonical; approved
+  proposals are consumed and bounded; malformed proposals no longer hide valid ones; mid-turn ACP
+  usage updates republish immediately; file-search storage errors stay storage errors; and messaging
+  descriptions include stopped wakeable agents. The owning FS/TS requirements and regression tests
+  cover each correction. `make check-specs`, both Go test modes, focused lifecycle/wake race tests,
+  `make build`, all 227 UI tests, presentation/style checks, and `make dist` pass. No live-browser
+  pass was run.
 
 - 2026-08-17 — Reviewed the continuous range after `2727ae8` through `74da884` in both
   specification directions and against every invariant class. Eight Must-fix and four Worth-fixing

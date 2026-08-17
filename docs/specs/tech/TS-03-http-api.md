@@ -225,7 +225,9 @@ containment is checked before a result is returned.
 `{agent_id,commands:[{name,description,input_hint?}]}` from TS-04.R24's latest in-memory snapshot.
 It does not ask the adapter to refresh and creates no persisted row or transcript event. Both lists
 obey R6. An unknown agent is `404`; an existing stopped or non-chat agent uses the shared typed
-runtime/conflict error. Search, Git, traversal, or command-source unavailability returns the safe
+runtime/conflict error. "Stopped" means the running record is genuinely absent: a storage failure
+reading it is surfaced as such, not reported as a stopped agent (INV §7). Search, Git, traversal, or
+command-source unavailability returns the safe
 R3 error/empty shape required by FS-03.R32 and never affects the prompt route. The TypeScript client,
 mocks, and component consumers ship with both handlers under R11.
 
@@ -236,8 +238,12 @@ FS-01.R33 can wake, the handler invokes the shared wake helper (TS-01.R16) insid
 session. The route inventory (R5), request/response shapes, and success status are unchanged; the
 request simply carries the resume latency. Failure mapping: an agent the wake gates exclude keeps
 today's `404`/typed errors; a failed wake returns the typed resume error the explicit resume route
-would return; losing TS-01.R16's shared exclusive wake claim returns the existing `409` conflict,
-which the client may retry.
+would return; losing TS-01.R16's shared exclusive lifecycle claim returns the existing `409`
+conflict, which the client may retry. A wake gate that cannot be **evaluated** — the candidacy query
+fails, or the project definition is unreadable — returns the typed internal error rather than the
+gate-excluded `404` (FS-01.R33, INV §7): "the gate said no" and "the gate could not be read" are
+different answers, and only the first is an ordinary rejection. `POST /api/sessions/{id}/stop`
+takes the same claim and returns `409` while a resume or wake owns the agent (FS-01.R34).
 
 ## 3. Interfaces & data shapes
 

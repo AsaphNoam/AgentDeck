@@ -321,4 +321,13 @@ CREATE TABLE pipeline_proposals (
 CREATE INDEX idx_pipeline_proposals_created ON pipeline_proposals(created_at DESC, proposal_id);
 `,
 	},
+	{
+		// A proposal is an offer, not a standing action: once its approved Save or
+		// Start commits, the record must stop offering that approval. Existing rows
+		// adopt '' and stay pending; retention bounds the never-approved rest.
+		version: 15,
+		sql: `
+ALTER TABLE pipeline_proposals ADD COLUMN consumed_at TEXT NOT NULL DEFAULT '';
+`,
+	},
 }

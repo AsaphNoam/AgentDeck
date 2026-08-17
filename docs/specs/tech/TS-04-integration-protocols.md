@@ -207,7 +207,12 @@ contract (INV §11).
 **R26 — Messaging addresses and wakes stopped wakeable agents through one helper.**
 Recipient resolution and `list_agents` draw from a single shared addressable-set query: running
 chat agents plus stopped chat agents passing FS-01.R33's wake gates (which exclude any agent with
-a pipeline attempt association via the existing `PipelineAssociationForAgent` seam). Every
+a pipeline attempt association via the existing `PipelineAssociationForAgent` seam). "Single" is
+literal — **one** statement over **one** SQLite snapshot, with each row carrying its own
+availability. Reading the two halves as two statements let a Stop landing between them return the
+agent as running and again as stopped-wakeable, duplicating it in `list_agents` and making
+`role@project` resolution report a false ambiguity (INV §1/§5). The two queries also share one SQL
+spelling of the wake gates so single-agent candidacy and the directory cannot drift (INV §2). Every
 `list_agents` entry gains the additive `availability` field (`"running"` | `"stopped_wakeable"`,
 FS-06.R22); existing fields, including `state`, are unchanged. Mail insertion stays durable-first
 exactly as today (INV §15). The nudger's existing per-agent cooldown/in-flight map gains stopped
@@ -215,12 +220,21 @@ wakeable recipients with unread mail as wake candidates: the insert-time signal 
 shared wake helper (TS-01.R16) without waiting out the resume, and once the agent is resumed and
 idle, the ordinary running-recipient nudge delivers `check_messages`. A wake reuses that map's
 per-agent cooldown; its re-entry guard is TS-01.R16's exclusive claim rather than the map's
-in-flight marker, which stays with the `check_messages` delivery that follows the wake. The failed-wake bound is durable, not process-local: a failed wake
-marks the recipient's still-`pending` unread rows with the new `delivered_via` value `wake_failed`
-in the existing column (no migration), and wake candidacy requires at least one unread row still
-marked `pending` — `messages.created_at` is whole-second RFC3339, so timestamp comparison cannot
-order same-second rows and is not used. New mail always inserts as `pending`, re-arming the wake;
-the bound therefore holds across dashboard restarts (FS-06.R23).
+in-flight marker, which stays with the `check_messages` delivery that follows the wake.
+
+The wake bound is durable, not process-local, and is a **claim rather than a failure marker**. Wake
+candidacy requires at least one unread row still marked `pending`, and an attempt takes those exact
+rows out of `pending` into the `delivered_via` value `wake_attempted` — in one transaction, before
+any process is spawned — then records `wake_failed` on those same ids if it fails. Both values live
+in the existing column, so there is no migration. Marking only on failure was insufficient: a
+successful wake left the rows `pending`, so an adapter that completed its handshake and then died
+before the first `check_messages` nudge was respawned by every sweep (INV §15). Scoping the outcome
+to the claimed ids is what lets mail inserted mid-wake stay `pending` and re-arm; a losing lifecycle
+claim releases the rows back to `pending` because nothing was attempted. `MarkUnreadDeliveredVia`
+accepts `wake_attempted` alongside `pending` so the delivering nudge restamps them honestly, and
+reading the mail restamps a still-claimed row `poll`. `messages.created_at` is whole-second RFC3339,
+so timestamp comparison cannot order same-second rows and is not used. New mail always inserts as
+`pending`, re-arming the wake; the bound therefore holds across dashboard restarts (FS-06.R23).
 
 ## 3. Interfaces & data shapes
 

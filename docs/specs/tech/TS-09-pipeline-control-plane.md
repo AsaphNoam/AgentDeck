@@ -131,7 +131,10 @@ confirmation. Save and Start are separate; an edited/different digest cannot reu
 **R16 — Approval is interaction control, not authentication.** Proposal tools never call
 mutating pipeline methods and cannot approve themselves. Template PUT is naturally idempotent; run
 start also carries a client/proposal request id with a unique database constraint so confirmation
-retries return the original run instead of creating another. This guided path does not claim to stop
+retries return the original run instead of creating another. A run proposal's request id is its own
+derived proposal id: a caller-supplied idempotency key is dropped before the digest, the returned
+payload, and the persisted record, so two otherwise-identical proposals cannot return one payload to
+MCP while the approval surface holds another and approval cannot replay an older run. This guided path does not claim to stop
 a same-user shell process from calling the ordinary loopback API, consistent with TS-05.R3.
 
 **R17 — One publication path follows commits.** Every committed run mutation publishes a
@@ -196,6 +199,22 @@ archived project or an archive operation already in progress before a process st
 project does not alter stopped-run state or create a new claim; the person must explicitly start a
 new run.
 
+**R26 — A proposal is consumed by its own approved mutation and otherwise
+expires by retention.** The durable proposal record is an offer, not a standing action. It is marked
+consumed only after the exact mutation it describes commits — the saved template write or the
+created run — and a consumed record stops appearing on the pending approval surface while remaining
+durable. Consumption is keyed by the same content-addressed id creation used (a run proposal's
+request id, a saved draft's recomputed digest), so no proposal id travels through the template or
+start API and an approval that fails changes nothing. Consumption follows the durable mutation and
+can never undo it; the call that actually consumes a record publishes one proposal update so the
+Pipelines page refetches. Proposing the same content again **re-arms** that one record rather than
+adding a second or leaving it silently consumed: the id is content-derived, so a transport retry and
+a genuine re-proposal are indistinguishable, and both must leave exactly one pending offer. Without
+re-arming, an agent re-proposing something already approved would receive success with nothing on
+any human surface — the discoverability defect the durable record exists to remove. There is no
+user-facing dismissal action: unapproved proposals are bounded by the same centralized limits module
+(R19), which retains the newest records and prunes older ones at each write.
+
 ## 3. Interfaces & data shapes
 
 **Template JSON (logical version-1 shape):**
@@ -236,11 +255,14 @@ pipeline_runs       run identity, frozen template/run config, state, revision, p
 pipeline_attempts   immutable visit/attempt lineage, agent link, assignment hash, report/quiescence
 pipeline_values     current run-wide text values plus source provenance
 pipeline_requests   unique start request ids and their resulting run ids
+pipeline_proposals  canonical AgentDecker proposals, their digest, and consumption state
 ```
 
-Exact columns and indexes live in a forward-only TS-02 migration. Foreign keys cascade only within
-the four pipeline tables; `agent_id` remains a non-cascading logical reference to existing agent
-state so pipeline deletion cannot remove an agent.
+Exact columns and indexes live in a forward-only TS-02 migration (TS-02.R17, TS-02.R22). Foreign
+keys cascade only within the four run-scoped pipeline tables; `agent_id` remains a non-cascading
+logical reference to existing agent state so pipeline deletion cannot remove an agent, and
+`pipeline_proposals` has no foreign key in either direction so approval history is independent of
+run and template deletion.
 
 **Manager inputs:** validated start/control commands, accepted stage-result calls, persisted
 `turn_end`, generation-scoped runtime exits, and startup reconciliation. Each command returns the
@@ -255,8 +277,9 @@ new durable run revision or a structured validation/conflict result.
 - **INV §5:** run revision and pending-action claims choose exactly one transition/control winner.
 - **INV §6:** pipeline agents are ordinary chat agents and join every existing persistence,
   messaging, transcript, status, and teardown contract.
-- **INV §7:** template/run list and startup reconciliation isolate malformed rows/files and surface
-  iteration errors without deleting unrelated state.
+- **INV §7:** template/run/proposal list reads and startup reconciliation isolate malformed
+  rows/files and surface iteration errors without deleting unrelated state; one unreadable timestamp
+  or payload never empties an approval or supervision list.
 - **INV §8:** errors and attention reasons use bounded stable vocabulary; every mutation failure is
   visible in the Pipelines UI.
 - **INV §9:** restart recovery corroborates process ownership and all sweeps/shutdown paths are

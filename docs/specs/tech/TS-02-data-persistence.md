@@ -106,7 +106,8 @@ attempt lineage/reports, current named values/provenance, and start idempotency 
 forward-only SQLite tables written only through `internal/state`. Pipeline-table foreign keys may
 cascade within a deleted run but must not cascade into `agents`, `sessions`, transcripts, or archive
 projections. The migration uses non-null JSON defaults/collection decoding, indexes for active-run
-and agent-attempt lookup, and a schema-version guard test. TS-09 owns the logical shapes.
+and agent-attempt lookup, and a schema-version guard test. Durable AgentDecker proposal records are
+part of the same SQLite-owned set and are specified by R22. TS-09 owns the logical shapes.
 
 **R18 — Effort is an additive catalog field and frozen execution data.**
 `backends.json` stays **version 2**: `efforts` and `default_effort` are optional per-model keys and
@@ -162,6 +163,21 @@ introduced. `internal/config` owns the finite write-time validation set; a synta
 unknown value from a hand edit remains readable so the UI can fall back and explain it rather than
 classifying the whole version-1 document as corrupt. Older files decode to Core without rewrite;
 Core is never inserted into the manifest as if it were a skin id.
+
+**R22 — AgentDecker proposal records are authoritative, consumable, and
+bounded.** A forward-only `pipeline_proposals` table is the durable authority for the Pipelines
+approval surface: content-addressed `proposal_id`, kind, digest, non-null canonical `payload_json`,
+`created_at`, and `consumed_at`. A record is committed before its MCP tool reports success. Because
+`proposal_id` is content-addressed, an id conflict is the same record being proposed again: the
+payload and digest are already identical, and the conflict refreshes `created_at` and clears
+`consumed_at` so exactly one pending offer exists — the payload a caller received is always the
+payload the approval surface holds. `consumed_at` is empty until the exact mutation the proposal
+describes commits and is then set once; existing rows adopt the empty value and stay pending, and
+only pending records are listed. Each write applies a newest-first retention bound in
+the same transaction, so a never-approved backlog cannot grow without limit. The table carries no
+foreign key: proposal records neither cascade into nor out of runs, templates, agents, sessions,
+transcripts, or archive projections, so deleting a run or template leaves them alone. TS-09 owns the
+logical payload shapes and the lifecycle's product meaning.
 
 ## 3. Interfaces & data shapes
 

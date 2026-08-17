@@ -390,8 +390,21 @@ func (s *Server) handleCancel(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleStop implements POST /api/sessions/{id}/stop (techspec §7.5).
+//
+// Stop takes the same exclusive per-agent lifecycle claim every resume and wake
+// takes (TS-01.R16). Registry.Stop cannot distinguish an in-progress resume's nil
+// sentinel from "no handle", so an unclaimed Stop arriving mid-wake fell into the
+// idempotent branch below and tore down the wake's freshly minted hook token, MCP
+// session, and hook-settings file while the resume ran on to report success
+// (INV §4). Losing the claim returns the same conflict a losing resume returns;
+// the client may retry once the transition settles.
 func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	if !s.claimLifecycle(id) {
+		writeAPIError(w, apiError(runtime.CodeConflict, "a resume is already in progress"))
+		return
+	}
+	defer s.releaseLifecycle(id)
 	if err := s.registry.Stop(r.Context(), id); err != nil {
 		if errors.Is(err, runtime.ErrNoHandle) {
 			// Not currently running. If the identity still exists, the agent is

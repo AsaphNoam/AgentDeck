@@ -9,6 +9,7 @@ import (
 
 	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/agentdeck/agentdeck/internal/state"
 )
 
 // trackedFile is one row from tracked_files, as returned by GET /api/sessions/{id}/files.
@@ -81,8 +82,14 @@ func (s *Server) handleFileSearch(w http.ResponseWriter, r *http.Request) {
 	// A stopped chat agent keeps its durable session row, but the composer that
 	// consumes this read exists only for a running agent. Gate on the running
 	// record so a stopped agent yields the shared typed runtime error instead of
-	// listing its former working directory (TS-03.R24, INV §1).
+	// listing its former working directory (TS-03.R24, INV §1). Only a missing row
+	// means "stopped": a storage failure is surfaced as such rather than reported
+	// to the composer as a stopped agent (INV §7).
 	if _, err := s.stateStore.ReadRunning(id); err != nil {
+		if !errors.Is(err, state.ErrNotFound) {
+			writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
+			return
+		}
 		writeAPIError(w, apiError(runtime.CodeAgentNotRunning, "agent is not running"))
 		return
 	}
