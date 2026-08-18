@@ -263,6 +263,14 @@ inherits the whole-mux `localOnly` guard, and ships with its TypeScript client a
 lockstep (R11). Tests replace the command boundary with a deterministic fake; they never open a real
 panel.
 
+**R27 — Group release does not return a partial lifecycle-conflict result.** `POST
+`/api/groups/{group}/release` first takes TS-01.R16's exclusive lifecycle claim for every current
+member before it stops any. If any claim is already held, it releases every claim it took, stops no
+member, and returns the R3 `409 conflict` response; the dashboard's existing action-error path
+surfaces it and permits a retry. A successful `200` retains its ordered
+`{group,stopped:[{agent_id,ok,error?}]}` result and has claimed every member for the complete
+stop-and-registration-cleanup operation.
+
 ## 3. Interfaces & data shapes
 
 Feature-owned request/response fields are specified in the owning FS, including FS-14 for pipeline
