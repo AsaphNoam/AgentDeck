@@ -92,9 +92,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   `make build`, all 226 UI tests, presentation/style checks, and `make dist` pass. No live-browser
   pass was run. A stale migration-version guard test (asserting 13 against the shipped 14) was already
   failing on `main` and now derives its expectation from the migrations slice (INV §9).
-- **Last reviewed code:** `74da884` (2026-08-17), the continuous range after `2727ae8`: composer
-  autocomplete fixes, recent usability/review records, durable AgentDecker proposals, ACP context
-  usage, and stopped-agent wake-on-message. No review findings remain below.
+- **Last reviewed code:** `5a4ae2b` (2026-08-18), the continuous range after `74da884`: the
+  wake/proposal/context fix batch, the projects background-menu fix, and browse for working
+  directories. One Must-fix finding is open below (the lifecycle claim omits switch/archive/group/
+  pipeline).
 - **Branch:** `main`.
 
 ## Active change
@@ -132,12 +133,66 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ### Open findings
 
-None.
+- **Must fix** (INV §4/§5, TS-01.R16) — the lifecycle claim does not cover switch/archive/group/pipeline,
+  so wake-on-message can tear down a switch's registration. `claimLifecycle` (`9ac67cc`) is taken only
+  by `resumeSession` (`internal/server/resume.go:94`) and `handleStop` (`internal/server/sessions.go:403`).
+  Four other lifecycle mutators call `registry.Stop`/`registry.Resume` for the same agent without it:
+  switch runtime (`internal/server/switch.go:177,240`), archive-stop (`internal/server/archive_actions.go:13`),
+  bulk group release (`internal/server/groups.go:57`), and pipeline stage resume/stop
+  (`internal/server/pipeline_lifecycle.go:146,158`). Neither existing guard closes the gap: `acquireSwitch`
+  is switch-only, and `acquireAgentStart` is a counting archive lease (`internal/server/archive_gate.go:49`,
+  `agentStartLeases[agent]++`) that does not mutually exclude a switch from a concurrent resume/wake.
+  **Trigger:** an idle chat agent with a frozen snapshot and unread `pending` mail is switched (a
+  backend change with a history primer widens the window to seconds). Switch removes the running row at
+  `switch.go:177`, then composes a fresh MCP token + hook-settings for the same `agent_id`
+  (`composeSwitchSpec`) and resumes at `:240`. During that window the nudger's `wakeOnce`
+  (`internal/server/messaging_loops.go:120`) sees the agent as a stopped wake candidate; its only
+  re-entry guard is `lifecycleInFlight`, which switch never sets, so it fires `wakeForMail` →
+  `resumeSession` and mints a second registration for the same id concurrently with the switch's resume.
+  The loser's `teardownAgentRegistration` then revokes the winner's token/MCP/hook-settings — the exact
+  §4 drift the fix targeted, now reachable because wake-on-message makes the transient switch window
+  wakeable. Explicit `POST /stop` during a switch is unserialized for the same reason.
+  **Fix:** route every lifecycle transition (switch, archive-stop, group release, pipeline resume/stop)
+  through `claimLifecycle`, or make `wakeOnce`/`resumeSession` additionally refuse while a switch/other
+  transition claim is held. **Test:** start a switch on an agent with pending mail and assert a
+  concurrent mail-wake returns `409` and leaves the switch's registration intact (mirroring
+  `TestStopDuringWakeConflictsAndKeepsRegistration`).
+
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
-are not promoted to findings without a repeatable failure.
+are not promoted to findings without a repeatable failure. Also considered and not promoted:
+`isPickerCancel`'s unanchored `-128` substring and `verifyPickedDirectory` skipping `filepath.Clean`
+(both speculative — `POSIX path of (choose folder)` returns a clean absolute path and a real cancel
+always emits `(-128)`), and `wakeForMail` treating a gate-excluded recheck as success (the realistic
+recheck-fail cause is a concurrent resume, whose running-path nudge then delivers the `wake_attempted`
+rows honestly).
 
 ## Recent changelog
+
+- 2026-08-18 — Reviewed the continuous range after `74da884` through `5a4ae2b` in both specification
+  directions and against every invariant class: the wake/proposal/context fix batch (`9ac67cc`), the
+  projects background-menu fix (`25a1e55`), the projects-menu investigation (`f01b667`), the recorded
+  review of that batch (`2822ff8`), and browse for working directories (`5a4ae2b`). One Must-fix
+  finding is open (**INV §4/§5**): the `claimLifecycle` exclusivity added for stopped-agent wake is
+  taken only by explicit resume/wake and Stop, so switch, archive-stop, bulk group release, and
+  pipeline stage resume/stop still run unclaimed for the same agent; because wake-on-message makes the
+  transient switch window wakeable, a mail-wake landing inside a switch can mint a second registration
+  and revoke the winner's token/MCP/hook-settings. Clean/not applicable elsewhere: **§1** the mid-turn
+  ACP `usage_update` republish is dispatched serially per agent; **§2** `BrowseDirectoryButton` is one
+  shared control across all three cwd/add_dirs surfaces and `stoppedWakeGates`/`agentColumns` back both
+  the addressable set and the wake query; **§3** the browse control fills the pending `add_dirs` entry,
+  never a committed field or a save; **§6** the directory-picker is a route, not a new runtime; **§7**
+  `ListProposals`/`ListPipelineProposals` isolate an unreadable proposal row instead of aborting;
+  **§8** picker failure is one opaque `500` with no path or script diagnostics and surfaces through each
+  form's existing error line; **§9** migration 15 (`consumed_at`) is forward-only and the version guard
+  derives from the migrations slice; **§10** the projects background menu now fills the canvas
+  (`min-block-size: 100%`) and a real 1280×720 right-click was verified; **§11** the new proposal/wake
+  collections marshal non-null and `fakeacp` emits the real usage shapes; **§12** cancel is classified
+  from AppleScript's numeric `-128` rather than localized text; **§13** every browse-control className
+  resolves to a defined selector; **§14** `POST /api/directory-picker` sits inside the `localOnly` mux
+  (`TestDirectoryPickerRejectsNonLocalHost`); **§15** the mail-wake claims its pending rows before
+  spawning. No local implementation choice required escalation. `make check-specs` and `git diff --check`
+  pass. No product code or specifications changed during review.
 
 - 2026-08-17 — Implemented Browse for working directories (FS-04.R42/A22, TS-03.R26, TS-05.R15;
   **INV §2/§5/§8/§10/§12/§13/§14**). One `POST /api/directory-picker` action shows the standard macOS

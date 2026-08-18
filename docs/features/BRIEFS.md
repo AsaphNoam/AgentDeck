@@ -4,6 +4,28 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-18 — Review: wake/proposal fixes, projects menu, and directory browsing
+
+I reviewed everything committed since the last review marker: the batch that closed the twelve
+stopped-agent-wake and pipeline-proposal findings, the projects-page right-click fix, and the new
+"Browse for a working directory" feature. The browse feature and the projects-menu fix hold up, and
+the proposal, context-meter, mail-wake, and messaging fixes all do what they claimed.
+
+One real problem remains from the wake work. The safeguard that stops two lifecycle actions from
+colliding on the same agent was only wired into plain Stop and Resume. Switching an agent's runtime,
+archiving it, releasing a group, and pipeline stage stops/resumes all still run without it. Because a
+stopped agent can now be woken by an incoming message, a switch — which briefly stops the agent while
+it rebuilds — leaves a window where an arriving message can wake the same agent at the same moment,
+and the two can overwrite each other's connection credentials. It needs the same claim, and no live
+macOS pass has yet confirmed the folder chooser actually opens in front.
+
+**Needs attention:** The switch/wake collision is a Must-fix and is recorded for the next fix session;
+it is a race, so it will be intermittent rather than constant.
+
+**Next:** A fix session should put every lifecycle action (switch, archive, group release, pipeline
+stop/resume) behind the shared claim and add a regression that wakes an agent mid-switch; someone with
+a Mac should run the owed live folder-chooser check.
+
 ### 2026-08-17 — Implementation: Browse for working directories
 
 You can now pick a project's working directory with the standard macOS folder chooser instead of
