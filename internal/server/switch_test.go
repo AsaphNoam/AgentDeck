@@ -110,6 +110,56 @@ func TestSwitchRuntimeModelSwapSameBackend(t *testing.T) {
 	}
 }
 
+// TS-01.R16 (INV §4/§5) — a runtime switch takes the same exclusive lifecycle
+// claim as resume and stop, so a stop (and, by the same claim, a mail wake or
+// explicit resume) landing inside the switch's stop→resume window loses the claim
+// and returns 409 instead of tearing down the switch's freshly minted registration.
+// Before the claim, acquireSwitch excluded only a second switch and acquireAgentStart
+// was a counting lease, so the transient switch window was wakeable and a racing
+// transition could revoke the winner's token/MCP/hook-settings (the §4 drift the
+// wake-on-message claim targeted, reachable through switch).
+func TestSwitchTakesLifecycleClaim(t *testing.T) {
+	srv, ts := switchTestServer(t)
+	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+
+	// Make the target resume stall so the switch is provably mid-flight while the
+	// concurrent stop lands.
+	srv.registry.Chat().SetCommand(slowACP(t, "1", 0))
+
+	type result struct {
+		status int
+		body   string
+	}
+	switched := make(chan result, 1)
+	go func() {
+		resp, body := post(t, ts.URL+"/api/sessions/"+id+"/switch-runtime", map[string]string{"model": "opus"})
+		switched <- result{resp.StatusCode, string(body)}
+	}()
+	waitLifecycleClaim(t, srv, id)
+
+	resp, body := post(t, ts.URL+"/api/sessions/"+id+"/stop", nil)
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("stop during switch = %d, want 409: %s", resp.StatusCode, body)
+	}
+
+	got := <-switched
+	if got.status != http.StatusOK {
+		t.Fatalf("switch status = %d, want 200: %s", got.status, got.body)
+	}
+	waitRunning(t, srv, id, true)
+	srv.hookMu.Lock()
+	token := srv.hookTokens[id]
+	_, mcpOK := srv.mcpCleanups[id]
+	srv.hookMu.Unlock()
+	if token == "" || !mcpOK {
+		t.Fatalf("switch registration torn down by the racing stop: token=%q mcp=%v", token, mcpOK)
+	}
+	settingsPath := filepath.Join(hooks.Dir(srv.configStore.Home()), "agents", id+".json")
+	if _, err := os.Stat(settingsPath); err != nil {
+		t.Fatalf("hook-settings file removed by the racing stop: %v", err)
+	}
+}
+
 // chat → terminal interface swap on the same agent: the terminal runtime takes
 // over, records its tty/driver in the running row, and status goes hook-driven
 // (techspec §5.2). The transcript/identity survive the swap.

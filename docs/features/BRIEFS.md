@@ -4,6 +4,30 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-18 — Fix: serialize every agent runtime transition
+
+I fixed the collision risk flagged in the last review. The safeguard that stops two runtime actions
+from acting on the same agent at once was only wired into plain Stop and Resume. Now switching an
+agent's runtime, releasing a group, and pipeline stage stops/resumes all take the same claim, so an
+incoming message that wakes a stopped agent can no longer land in the middle of one of those actions
+and overwrite the agent's connection credentials. If two actions do collide, the second one now
+cleanly reports "busy, try again" and leaves the first untouched.
+
+I deliberately left agent/project archiving out of this change: archiving already blocks a
+resume-or-wake through a separate, older guard, so adding the claim there would only have introduced
+a spurious "busy" error when someone stops and archives the same agent at once. I verified this rather
+than assuming it, and recorded the reasoning in the architecture spec.
+
+Three new tests reproduce the original problem — each fails without the fix and passes with it — and
+the full server suite, a race-detector pass on the affected paths, and the build all pass. No
+user-facing screen changed.
+
+**Needs attention:** None. The macOS folder-chooser feature still owes a live in-browser confirmation,
+unchanged by this work.
+
+**Next:** With the review queue clear, a person can pick up the next feature or run the owed live
+macOS check on directory browsing.
+
 ### 2026-08-18 — Review: wake/proposal fixes, projects menu, and directory browsing
 
 I reviewed everything committed since the last review marker: the batch that closed the twelve

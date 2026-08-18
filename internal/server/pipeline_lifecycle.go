@@ -95,6 +95,15 @@ func (s *Server) LaunchStage(ctx context.Context, execution pipeline.StageExecut
 // ContinueStage reuses a live blocked agent or resumes its ordinary persisted
 // session after restart, then submits the durable continuation assignment.
 func (s *Server) ContinueStage(ctx context.Context, execution pipeline.StageExecution) error {
+	// Resuming a stage agent mints a fresh registration, so it takes the shared
+	// exclusive lifecycle claim (TS-01.R16, INV §4/§5) before any registration side
+	// effect — acquireAgentStart is only a counting lease. Without it an explicit
+	// stop/resume of the same agent could tear down or duplicate the registration
+	// inside this resume window.
+	if !s.claimLifecycle(execution.AgentID) {
+		return errors.New("a lifecycle transition is already in progress")
+	}
+	defer s.releaseLifecycle(execution.AgentID)
 	if ae := s.acquireAgentStart(execution.Project, execution.AgentID); ae != nil {
 		return errors.New(ae.Message)
 	}
@@ -148,13 +157,29 @@ func (s *Server) ContinueStage(ctx context.Context, execution pipeline.StageExec
 		return err
 	}
 	if err := s.registry.SendPrompt(ctx, agent.AgentID, execution.Assignment); err != nil {
-		_ = s.StopStage(ctx, agent.AgentID)
+		// Already holding the lifecycle claim here — tear down through the unclaimed
+		// core rather than the public StopStage, which would fail to re-take it.
+		_ = s.stopStageLocked(ctx, agent.AgentID)
 		return err
 	}
 	return nil
 }
 
+// StopStage stops a pipeline stage agent under the shared exclusive lifecycle
+// claim (TS-01.R16, INV §4/§5), so its Stop + teardown cannot race an explicit
+// resume/stop or a switch of the same agent.
 func (s *Server) StopStage(ctx context.Context, agentID string) error {
+	if !s.claimLifecycle(agentID) {
+		return errors.New("a lifecycle transition is already in progress")
+	}
+	defer s.releaseLifecycle(agentID)
+	return s.stopStageLocked(ctx, agentID)
+}
+
+// stopStageLocked performs the stop + teardown. The caller must already hold the
+// lifecycle claim for the agent (ContinueStage calls it from inside its own claim
+// on a failed send).
+func (s *Server) stopStageLocked(ctx context.Context, agentID string) error {
 	if err := s.registry.Stop(ctx, agentID); err != nil {
 		if !errors.Is(err, runtime.ErrNoHandle) {
 			return err

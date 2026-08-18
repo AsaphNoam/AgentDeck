@@ -54,6 +54,17 @@ func (s *Server) releaseAgents(ctx context.Context, ids []string) []releaseGroup
 			for idx := range jobs {
 				id := ids[idx]
 				res := releaseGroupResult{AgentID: id, OK: true}
+				// Bulk release stops and tears down each agent, so it must hold the
+				// shared exclusive lifecycle claim (TS-01.R16, INV §4/§5) across the
+				// Stop + cleanup below. Otherwise a mail wake or explicit resume landing
+				// between the Stop and the cleanup would mint a fresh registration that
+				// cleanupMessagingMCP/cleanupHookSettings then revoke. A loser reports a
+				// conflict for that agent and leaves its live registration intact; the
+				// caller can retry once the other transition settles.
+				if !s.claimLifecycle(id) {
+					results[idx] = releaseGroupResult{AgentID: id, OK: false, Error: "a lifecycle transition is already in progress"}
+					continue
+				}
 				if err := s.registry.Stop(ctx, id); err != nil {
 					if !errors.Is(err, runtime.ErrNoHandle) {
 						res.OK = false
@@ -68,6 +79,7 @@ func (s *Server) releaseAgents(ctx context.Context, ids []string) []releaseGroup
 					s.cleanupMessagingMCP(id)
 					s.cleanupHookSettings(id)
 				}
+				s.releaseLifecycle(id)
 				results[idx] = res
 			}
 		}()
