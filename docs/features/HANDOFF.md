@@ -147,7 +147,27 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ### Open findings
 
-None.
+- **Must fix** — **Confirmed** — Codex Resume abandons the loaded provider conversation while reporting
+  success (FS-01.R10, FS-03.R13, FS-09.R29/A7, TS-04.R1/R11/R20–R22, INV §1/§11/§12). Report,
+  verbatim: “resumed agents don't have the conversation history. Confirmed by continuing a stopped
+  conversation after restarting AgentDeck, as well as stopping/starting a chat without restarting
+  AgentDeck.” Environment: current `main` on macOS with the installed `codex-acp` 1.1.2; no failure
+  was logged, and the resume requests returned `200`. `ChatRuntime.Resume`
+  (`internal/runtime/chat.go`) successfully calls `session/load` but accepts that success only when
+  the response invents a new `sessionId`; the real adapter returns the ACP success shape without
+  that field because the requested id remains authoritative. The runtime therefore falls through to
+  `session/new`, writes a fresh Codex id, and leaves the model without its earlier turns even though
+  AgentDeck's own `transcript.ndjson` still displays them. Local session metadata shows the new ids
+  appended on each reported Resume while the prior Codex rollout files still exist. This exactly
+  reproduces the credentialed 2026-07-26 acceptance finding that was archived but never copied into
+  the live handoff. The fake ACP hid the defect by returning the non-contract
+  `{sessionId:"fake-sess-loaded"}` shape (INV §11). The skipped
+  `TestResumeSuccessfulLoadWithoutSessionIDKeepsPriorSession` mirrors the real empty success result;
+  unskipped it fails with `sessionID = "fake-sess-1", want loaded prior-session-id`. Fix by treating
+  a successful `session/load` as ownership of the requested id and never silently substituting
+  `session/new` for a genuine load error; keep the test as the regression and assert no new-session
+  call occurs. Older pre-isolation Codex sessions remain the separate documented TS-04 deviation and
+  are not needed to trigger this defect.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
@@ -159,6 +179,14 @@ recheck-fail cause is a concurrent resume, whose running-path nudge then deliver
 rows honestly).
 
 ## Recent changelog
+
+- 2026-08-18 — Investigated the report that resumed agents lose conversation history after both an
+  ordinary Stop/Resume and an AgentDeck restart. Confirmed the still-shipped Codex defect against
+  `codex-acp` 1.1.2, the runtime path, local session metadata, and the archived credentialed acceptance
+  run: successful ACP `session/load` returns no `sessionId`, AgentDeck mistakes that valid shape for
+  failure, silently starts a new session, and returns success. AgentDeck's visible transcript remains
+  intact; only the resumed provider/model context is abandoned. Added a skipped reproduction that
+  fails unskipped with the fresh fake session id. No product code or specification changed.
 
 - 2026-08-18 — Implemented browser-local unsent chat drafts (FS-03.R36/A19, TS-01.R17, **INV §1**).
   One feature-local record keeps the 20 most recently edited non-empty drafts keyed by agent id;

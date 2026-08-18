@@ -110,7 +110,13 @@ func handle(msg *rpcMessage) {
 		if dump := os.Getenv("FAKEACP_LOAD_DUMP"); dump != "" {
 			_ = os.WriteFile(dump, msg.Params, 0o600)
 		}
-		// Simulate successful load by returning a distinct resumed session ID.
+		if os.Getenv("FAKEACP_LOAD_EMPTY") != "" {
+			// ACP session/load keeps the requested sessionId authoritative; the
+			// pinned codex-acp adapter therefore returns an empty result on success.
+			respond(*msg.ID, map[string]any{})
+			return
+		}
+		// Legacy fixture shape retained for existing parameter-path coverage.
 		respond(*msg.ID, map[string]any{"sessionId": "fake-sess-loaded"})
 	case "session/set_config_option":
 		if dump := os.Getenv("FAKEACP_EFFORT_DUMP"); dump != "" {

@@ -770,6 +770,28 @@ func TestResumeSessionLoadAppliesMCP(t *testing.T) {
 	}
 }
 
+// Reproduction for the confirmed resume-history finding: ACP session/load does
+// not return a new sessionId. The requested id remains authoritative, but the
+// runtime currently mistakes the empty success result for load failure and
+// falls through to session/new, abandoning the provider conversation history.
+func TestResumeSuccessfulLoadWithoutSessionIDKeepsPriorSession(t *testing.T) {
+	t.Skip("reproduction: resume treats a successful empty session/load response as session/new")
+
+	c, spec := newChatTest(t, "stream_text")
+	ctx := context.Background()
+	spec.Env = append(spec.Env, "FAKEACP_LOAD_EMPTY=1")
+
+	h, err := c.Resume(ctx, spec, "prior-session-id")
+	if err != nil {
+		t.Fatalf("Resume: %v", err)
+	}
+	t.Cleanup(func() { c.Stop(ctx, h.AgentID) })
+
+	if h.SessionID != "prior-session-id" {
+		t.Fatalf("sessionID = %q, want loaded prior-session-id", h.SessionID)
+	}
+}
+
 // TestChatEffortPostSessionApplied guards FS-09.A15/R40: for a claude-acp chat
 // agent the resolved effort is delivered by a post-session
 // `session/set_config_option` call carrying the adapter's option id and value.

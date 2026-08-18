@@ -4,6 +4,23 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-18 — Investigation: resumed Codex conversations lose model memory
+
+Confirmed. AgentDeck successfully loads the old Codex session, but then misreads the adapter's valid
+empty success response as a failed load and silently starts a new session. The old transcript still
+appears in AgentDeck; the resumed model simply has no memory of it. This affects both Stop/Resume in
+one AgentDeck run and Resume after restarting AgentDeck.
+
+The defect was also captured by a credentialed acceptance run in July but was archived without being
+carried into the live fix queue. I restored it there and added a skipped regression that reproduces
+the real adapter response; it fails with a newly created session id when enabled.
+
+**Needs attention:** Until fixed, do not rely on Resume to preserve Codex model context. The visible
+AgentDeck transcript remains intact.
+
+**Next:** Run `/fix` to treat a successful load as retaining the requested session id and to stop
+silently replacing genuine load errors with a fresh conversation.
+
 ### 2026-08-18 — Fix: protect pipeline launches and group releases
 
 Pipeline stages now reserve an agent while they start it and send its first assignment. Stopping that
