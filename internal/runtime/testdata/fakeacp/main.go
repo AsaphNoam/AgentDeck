@@ -99,6 +99,11 @@ func handle(msg *rpcMessage) {
 		}
 		respond(*msg.ID, map[string]any{"protocolVersion": ver, "agentCapabilities": map[string]any{}})
 	case "session/new":
+		// If asked, record that session/new was invoked so a resume test can
+		// prove a successful session/load did NOT fall back to a fresh session.
+		if dump := os.Getenv("FAKEACP_NEW_DUMP"); dump != "" {
+			_ = os.WriteFile(dump, msg.Params, 0o600)
+		}
 		// The real adapters publish an available_commands_update right after a
 		// session is created. Emit it BEFORE the response so the runtime's ordered
 		// read loop has stored the snapshot by the time session/new returns.

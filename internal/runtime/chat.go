@@ -600,20 +600,38 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 	// (ACP loadSession takes the same registration shape as newSession), or an
 	// adapter where session/load succeeds would run without the in-process
 	// messaging MCP server Phase 5 depends on.
-	newSessionID := ""
+	resolvedSessionID := ""
+	loaded := false
 	if sessionID != "" {
-		if loadRes, loadErr := c.startupCall(ctx, as.transport, "session/load", sessionLoadParams(spec, sessionID)); loadErr == nil {
-			var loaded struct {
+		loadRes, loadErr := c.startupCall(ctx, as.transport, "session/load", sessionLoadParams(spec, sessionID))
+		switch {
+		case loadErr == nil:
+			// A successful session/load restored the requested session, so the
+			// requested id stays authoritative. The pinned codex-acp adapter
+			// returns an empty result on success (the id it was handed remains
+			// the session), so an absent sessionId is NOT a failure — mistaking
+			// it for one silently ran session/new and abandoned the provider
+			// conversation history (the resume-history defect). Only a non-empty
+			// echoed id overrides the request.
+			loaded = true
+			resolvedSessionID = sessionID
+			var res struct {
 				SessionID string `json:"sessionId"`
 			}
-			if json.Unmarshal(loadRes, &loaded) == nil && loaded.SessionID != "" {
-				newSessionID = loaded.SessionID
+			if json.Unmarshal(loadRes, &res) == nil && res.SessionID != "" {
+				resolvedSessionID = res.SessionID
 			}
-		} else if errors.Is(loadErr, context.DeadlineExceeded) || errors.Is(loadErr, errTransportClosed) {
+		case errors.Is(loadErr, context.DeadlineExceeded), errors.Is(loadErr, errTransportClosed):
 			return nil, c.startupFailure(as, spec.BackendType, "session/load", loadErr)
+		default:
+			// A non-fatal load error (e.g. the adapter cannot find the prior
+			// rollout) degrades to a fresh session, but never silently: the
+			// resumed agent loses its native history, so record why.
+			slog.Warn("runtime: session/load failed; starting a new session",
+				"agent", as.agentID, "session", sessionID, "err", loadErr)
 		}
 	}
-	if newSessionID == "" {
+	if !loaded {
 		newRes, err := c.startupCall(ctx, as.transport, "session/new", sessionNewParams(spec))
 		if err != nil {
 			return nil, c.startupFailure(as, spec.BackendType, "session/new", err)
@@ -625,31 +643,31 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 			as.shutdown()
 			return nil, fmt.Errorf("runtime: session/new returned no sessionId")
 		}
-		newSessionID = sess.SessionID
+		resolvedSessionID = sess.SessionID
 	}
-	as.sessionID = newSessionID
-	if err := applyPostSessionEffort(ctx, as.transport, ad, spec, newSessionID); err != nil {
+	as.sessionID = resolvedSessionID
+	if err := applyPostSessionEffort(ctx, as.transport, ad, spec, resolvedSessionID); err != nil {
 		as.shutdown()
 		return nil, err
 	}
 
 	// Re-open the existing transcript in append mode (Open skips seq:0 meta for existing files).
-	if err := c.openPersistence(as, spec, newSessionID); err != nil {
+	if err := c.openPersistence(as, spec, resolvedSessionID); err != nil {
 		as.shutdown()
 		return nil, err
 	}
 
 	// Append resumed session_meta with resumed_at to the transcript so the raw
-	// log has a resume boundary marker and the archive can track the new session_id.
+	// log has a resume boundary marker and the archive can track the session_id.
 	resumeNow := time.Now().UTC().Format(time.RFC3339)
-	resumedMeta := runtimeMeta(spec, newSessionID)
+	resumedMeta := runtimeMeta(spec, resolvedSessionID)
 	resumedMeta.ResumedAt = &resumeNow
 	c.emit(as, EvSessionMeta, resumedMeta)
 
 	// Write fresh running row + status row with restored context_pct.
 	now := time.Now().UTC()
 	if err := c.store.WriteRunning(state.RunningEntry{
-		AgentID: as.agentID, PID: pgid, SessionID: newSessionID,
+		AgentID: as.agentID, PID: pgid, SessionID: resolvedSessionID,
 		Interface: "chat", HookToken: spec.HookToken, StartedAt: now,
 	}); err != nil {
 		as.shutdown()
@@ -668,7 +686,7 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 	c.agents[as.agentID] = as
 	c.mu.Unlock()
 
-	return &Handle{AgentID: as.agentID, Pid: pgid, SessionID: newSessionID}, nil
+	return &Handle{AgentID: as.agentID, Pid: pgid, SessionID: resolvedSessionID}, nil
 }
 
 func (c *ChatRuntime) CheckMessages(ctx context.Context, pid int) error {

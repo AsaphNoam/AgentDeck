@@ -7,7 +7,14 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** Unsent chat drafts are complete. Each browser now keeps the exact non-empty draft for
+- **State:** The confirmed Codex resume-history defect is fixed. `ChatRuntime.Resume` now treats a
+  successful `session/load` as ownership of the requested session id — the pinned `codex-acp` returns
+  an empty success result, and the runtime keeps the requested id authoritative instead of re-minting
+  through `session/new` and abandoning the provider conversation. A non-empty echoed id still wins;
+  `session/new` runs only with no prior id or a real load error, now logged rather than silent. TS-04
+  §3 pins the resume session-ownership contract and the reproduction is un-skipped and strengthened.
+  The live credentialed `codex-acp` resume pass (FS-09.A7) is still owed against the real adapter.
+- **Previous state:** Unsent chat drafts are complete. Each browser now keeps the exact non-empty draft for
   up to 20 recently edited chats, restores it after navigation or reload, and drops it only after an
   accepted send, manual emptying, or the existing deleted-agent event. The local record is safely
   ignored when malformed or unavailable; it adds no server, transcript, sync, or migration path.
@@ -109,7 +116,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   pass was run. A stale migration-version guard test (asserting 13 against the shipped 14) was already
   failing on `main` and now derives its expectation from the migrations slice (INV §9).
 - **Last reviewed code:** `a0210e2` (2026-08-18), the continuous lifecycle-claim fix range after
-  `5a4ae2b`. Two Must-fix findings remain below.
+  `5a4ae2b`. No open findings remain.
 - **Branch:** `main`.
 
 ## Active change
@@ -147,27 +154,7 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ### Open findings
 
-- **Must fix** — **Confirmed** — Codex Resume abandons the loaded provider conversation while reporting
-  success (FS-01.R10, FS-03.R13, FS-09.R29/A7, TS-04.R1/R11/R20–R22, INV §1/§11/§12). Report,
-  verbatim: “resumed agents don't have the conversation history. Confirmed by continuing a stopped
-  conversation after restarting AgentDeck, as well as stopping/starting a chat without restarting
-  AgentDeck.” Environment: current `main` on macOS with the installed `codex-acp` 1.1.2; no failure
-  was logged, and the resume requests returned `200`. `ChatRuntime.Resume`
-  (`internal/runtime/chat.go`) successfully calls `session/load` but accepts that success only when
-  the response invents a new `sessionId`; the real adapter returns the ACP success shape without
-  that field because the requested id remains authoritative. The runtime therefore falls through to
-  `session/new`, writes a fresh Codex id, and leaves the model without its earlier turns even though
-  AgentDeck's own `transcript.ndjson` still displays them. Local session metadata shows the new ids
-  appended on each reported Resume while the prior Codex rollout files still exist. This exactly
-  reproduces the credentialed 2026-07-26 acceptance finding that was archived but never copied into
-  the live handoff. The fake ACP hid the defect by returning the non-contract
-  `{sessionId:"fake-sess-loaded"}` shape (INV §11). The skipped
-  `TestResumeSuccessfulLoadWithoutSessionIDKeepsPriorSession` mirrors the real empty success result;
-  unskipped it fails with `sessionID = "fake-sess-1", want loaded prior-session-id`. Fix by treating
-  a successful `session/load` as ownership of the requested id and never silently substituting
-  `session/new` for a genuine load error; keep the test as the regression and assert no new-session
-  call occurs. Older pre-isolation Codex sessions remain the separate documented TS-04 deviation and
-  are not needed to trigger this defect.
+None.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
@@ -179,6 +166,20 @@ recheck-fail cause is a concurrent resume, whose running-path nudge then deliver
 rows honestly).
 
 ## Recent changelog
+
+- 2026-08-18 — Fixed the confirmed Codex resume-history defect (FS-01.R10, FS-03.R13, TS-04.R22,
+  **INV §11**). `ChatRuntime.Resume` now treats a successful `session/load` as ownership of the
+  requested session id: the pinned `codex-acp` returns an empty success result, and the runtime keeps
+  the requested id authoritative instead of mistaking the missing `sessionId` for failure and
+  re-minting through `session/new` (which abandoned the provider conversation history). Only a
+  non-empty echoed id still overrides the request; `session/new` runs only when there is no prior id
+  or `session/load` errors, and that history-losing fallback is now logged rather than silent. TS-04
+  §3 records the resume session-ownership contract. The reproduction
+  `TestResumeSuccessfulLoadWithoutSessionIDKeepsPriorSession` is un-skipped and strengthened to also
+  assert `session/new` is never invoked (a new `FAKEACP_NEW_DUMP` marker); it was confirmed failing
+  against the pre-fix code. `make check-specs`, both Go test modes, focused `-race` on resume, and
+  `make build` pass. No UI changed, so npm/dist were not required. The live credentialed `codex-acp`
+  resume pass (FS-09.A7) is still owed before the fix is claimed against the real adapter.
 
 - 2026-08-18 — Investigated the report that resumed agents lose conversation history after both an
   ordinary Stop/Resume and an AgentDeck restart. Confirmed the still-shipped Codex defect against
