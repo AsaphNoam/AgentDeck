@@ -7,7 +7,13 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** Browse for working directories is implemented (FS-04.R42/A22, TS-03.R26, TS-05.R15).
+- **State:** Reviewed `74da884..5a4ae2b` (wake/proposal/context fixes, the projects background-menu
+  investigation and fix, browse for working directories). Five findings are open below: one INV §2/§4
+  registration-teardown race on the group-release route, one residual INV §10/§13 gap in the projects
+  background menu, one INV §7 read-path defect beside the one just fixed, one missing specification
+  for the mid-turn context republish, and one FS-01.R34 statement no client implements. No **Must
+  fix** finding: nothing in the range is a likely normal-use failure or data-loss risk.
+  Browse for working directories is implemented (FS-04.R42/A22, TS-03.R26, TS-05.R15).
   One `POST /api/directory-picker` action runs the fixed `/usr/bin/osascript` with fixed script text
   and no shell, behind a process-wide non-blocking claim (`acquirePicker`), and answers
   `200 {"path"}` for a verified existing absolute directory, `204` for cancel,
@@ -92,9 +98,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   `make build`, all 226 UI tests, presentation/style checks, and `make dist` pass. No live-browser
   pass was run. A stale migration-version guard test (asserting 13 against the shipped 14) was already
   failing on `main` and now derives its expectation from the migrations slice (INV §9).
-- **Last reviewed code:** `74da884` (2026-08-17), the continuous range after `2727ae8`: composer
-  autocomplete fixes, recent usability/review records, durable AgentDecker proposals, ACP context
-  usage, and stopped-agent wake-on-message. No review findings remain below.
+- **Last reviewed code:** `5a4ae2b` (2026-08-18), the continuous range after `74da884`: the
+  wake/proposal/context fixes, the projects background-menu investigation and fix, and browse for
+  working directories. Five findings are open below.
 - **Branch:** `main`.
 
 ## Active change
@@ -132,12 +138,93 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ### Open findings
 
-None.
+- **Worth fixing** — **INV §2/§4** — Group release tears down an in-flight wake's registration
+  because it does not take the new lifecycle claim. `releaseAgents`
+  (`internal/server/groups.go:41-77`) builds its id list from `ListAgents()`, which includes stopped
+  agents, and runs `registry.Stop` + `cleanupMessagingMCP` + `cleanupHookSettings` per agent with no
+  `claimLifecycle`. Normal-use trigger: a stopped agent in a task group receives mail, the nudger's
+  wake is inside `resumeSession` (hook token minted, MCP registered, hook-settings written, adapter
+  launching), and `POST /api/groups/{group}/release` runs for that group. `registry.Stop` returns
+  `ErrNoHandle`, the worker still counts the result OK, and the two cleanups delete the artifacts the
+  live wake just minted; the wake then reports success and the agent runs with a revoked MCP token
+  and no hook-settings file — messaging tools and status hooks silently dead. This is the same defect
+  FS-01.R34/TS-01.R16 just closed for `POST /api/sessions/{id}/stop`, reached through a second door.
+  Fix by taking `claimLifecycle` inside the release worker (report a loser as not-OK rather than
+  cleaning up) or by routing both verbs through one shared stop-and-teardown helper. Test: reuse the
+  `slowACP` setup from `TestStopDuringWakeConflictsAndKeepsRegistration`, drive the release route
+  instead of stop, and assert the wake's hook token, MCP registration, and hook-settings file survive.
+
+- **Worth fixing** — **INV §10/§13** — The projects background menu still misses the canvas padding,
+  and its regression cannot fail. `.project-dashboard` gained `min-block-size: 100%`
+  (`ui/src/styles/features/dashboard.css:382`), but it is a child of `<main class="app-main">`, whose
+  `padding: var(--ad-space-8)` sits outside it (`ui/src/styles/features/shell.css:130`). A right-click
+  in that 2rem frame — the strip below the canvas, or either side margin — still reaches only
+  `.app-main` and opens the browser's native menu, while FS-02.R41 requires any point in the projects
+  view that is not a project card to open **New project**. Separately,
+  `ProjectDashboard.test.tsx`'s updated case fires `contextMenu` on `.project-dashboard` with
+  coordinates, which jsdom resolves with no layout, so it passes against the pre-fix stylesheet too:
+  the fix has no automated regression (INV §13 — the suite cannot see CSS). Fix by giving the
+  interaction surface the padding (move it from `.app-main` to `.project-dashboard`) or by owning the
+  background event at the route-level container, and pin it with a computed-style/stylesheet
+  assertion or the J5 browser journey rather than a DOM-only case.
+
+- **Worth fixing** — **INV §7** — `handleFileSearch` still reports a storage failure as a missing
+  agent. `internal/server/files_commands.go:73-76` maps every `ReadAgent` error to
+  `404 no such agent`, three lines above the `ReadRunning` branch this same range corrected to
+  separate `state.ErrNotFound` from a real storage failure. A locked or failing SQLite read therefore
+  tells the composer the agent does not exist — the exact confusion TS-03.R24's new sentence records
+  for the running read. Fix by mirroring the branch below (`errors.Is(err, state.ErrNotFound)` → 404,
+  otherwise `CodeInternal`), tested beside `TestFileSearchStorageErrorIsNotAStoppedAgent`.
+
+- **Worth fixing** — **INV §10** — Specification drift: the mid-turn context republish is
+  unspecified, and TS-04.R25 still describes the behavior it replaced. `internal/runtime/chat.go`'s `usage_update`
+  branch now calls `republishContextPct`, writing the status row and publishing a `state_update` on
+  every notification, and its comment cites `TS-04.R25` for doing so. TS-04.R25 still says the value
+  is "carried into the terminal turn status and rollup", and FS-03.R8 still places the context-usage
+  update at turn end; nothing describes a meter that moves during a turn. A fix that changes behavior
+  updates its specification (workflow §8.3, specs README step 5). Fix by extending TS-04.R25 with the
+  immediate republish through the status write+touch seam and giving the user-visible half a home in
+  FS-02.R26 or FS-03.R8; the regression (`TestUsageUpdateRepublishesContextPctMidTurn`) already exists.
+
+- **Worth fixing** — **INV §10** — FS-01.R34 promises a Stop retry that nothing performs. R34 says a Stop losing the
+  claim "returns `409 conflict` instead of reporting success, and is retried once the transition
+  settles", but `stopAgent` (`ui/src/api/client.ts:93`) has no retry and
+  `ui/src/components/grid/CardContextMenu.tsx:159` surfaces "Stop failed" with the server's "a resume
+  is already in progress". TS-03.R25 states the honest version ("which the client may retry"). Normal
+  trigger: a person presses Stop on a card while mail is waking that agent and gets a failure toast
+  for an action the requirement presents as settled. Fix either by retrying the `409` briefly in the
+  stop mutation (with a component case) or by rewording R34 to match TS-03.R25.
+
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
+
+- 2026-08-18 — Reviewed `74da884..5a4ae2b` against FS-01.R33/R34, FS-02.R41/A24, FS-04.R42/A22,
+  FS-06.R22/R23/A12, FS-14.R33/A13, TS-01.R16, TS-02.R22, TS-03.R24/R25/R26, TS-04.R25/R26,
+  TS-05.R15, and TS-09.R16/R26, plus every invariant class. Five **Worth fixing** findings are
+  recorded above; no **Must fix**. Invariant sweep: **§1** applies (the `usage_update` republish and
+  the single-snapshot addressable read are the class's own remedy; its missing specification is a
+  finding); **§2** applies and is clean in the code that extracted `BrowseDirectoryButton`,
+  `stoppedWakeGates`/`agentColumns`, `markReadStmt`, and `templateProposalIdentity` — the group-release
+  drift is the one finding; **§3** applies (browse writes one field and leaves the seeded `add_dirs`
+  list merged) and is clean; **§4** is the group-release finding; **§5** applies and is clean
+  (`acquirePicker`, `claimLifecycle`, `ClaimPendingWakeMail` in one transaction, the conditional
+  consume UPDATE); **§6** has no applicable surface — the range adds no runtime, driver, or interface;
+  **§7** is the file-search identity-read finding, with `ListProposals`, `ListPipelineProposals`, and
+  `AddressableAgents` (including `rows.Err`) clean; **§8** applies and is clean (typed opaque picker
+  errors, browse failures on each form's `.form-error`); **§9** applies and is clean (migration 15's
+  `NOT NULL DEFAULT ''`, the slice-derived version guard); **§10** is the background-menu finding, with
+  the twinned skills and the spec index/status shipped together; **§11** applies and is clean (non-nil
+  slices from every new query, one scalar picker response); **§12** applies and is clean (fixed
+  `/usr/bin/osascript`, cancellation classified from numeric `-128`); **§13** applies (`.field-with-action`
+  defined with its use, `check:styles` green) and is otherwise the CSS-blindness half of the
+  background-menu finding; **§14** applies and is clean (the route is inside the whole-mux `localOnly`
+  wrapper with its own Host/Origin refusal test); **§15** applies and is clean (mail claimed before any
+  spawn, proposals consumed only after the durable mutation). `make check-specs`, `go build ./...`,
+  `go vet`, both Go test modes, all 231 UI tests, presentation/style checks, and `git diff --check`
+  pass on the reviewed tree; no product code or specification was changed.
 
 - 2026-08-17 — Implemented Browse for working directories (FS-04.R42/A22, TS-03.R26, TS-05.R15;
   **INV §2/§5/§8/§10/§12/§13/§14**). One `POST /api/directory-picker` action shows the standard macOS

@@ -4,6 +4,33 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-18 — Review: waking stopped agents, pipeline proposals, the projects menu, and folder browsing
+
+I reviewed everything committed since the last review — the fixes for waking a stopped agent when
+mail arrives and for durable pipeline proposals, the projects-page right-click fix, and the new
+Browse button for working directories — against the written requirements and against the
+repository's catalogue of bug classes. Every automated check passes on that code, and I found
+nothing that risks losing work or breaking an ordinary day's use, so none of it needs backing out.
+
+Five things are worth fixing, and two of them matter most. Releasing a task group can quietly break
+an agent that a teammate's message is waking at that same moment: the release deletes the messaging
+credentials and status wiring the new session just created, then reports success, so the agent looks
+healthy on the dashboard while its messaging tools and status reporting are dead. That is the same
+fault that was just fixed for the Stop button, reached through a different route. Second, the
+projects-page right-click still does nothing in the page's outer margin — a band roughly a
+finger-width wide around the whole canvas — and the test added with that fix cannot catch the
+problem, because the test tools never read stylesheets. The other three are smaller: a failing
+database read still tells the chat composer that the agent does not exist; the context meter now
+updates during a turn, which is an improvement, but no specification says it should; and the written
+rule for the Stop button promises an automatic retry that nothing performs, so pressing Stop while
+an agent is being woken shows "Stop failed" and you have to press it again.
+
+**Needs attention:** None of the five is urgent, but the group-release fault is silent when it
+happens — the agent stays on the dashboard looking fine, and nothing reports that it can no longer
+send or receive messages.
+
+**Next:** Run `/fix` to work through the five findings, starting with the group-release one.
+
 ### 2026-08-17 — Implementation: Browse for working directories
 
 You can now pick a project's working directory with the standard macOS folder chooser instead of
