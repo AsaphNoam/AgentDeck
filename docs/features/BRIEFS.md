@@ -4,6 +4,21 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-18 — Review: lifecycle serialization fix
+
+Two Must-fix problems remain. A pipeline stage can still start an existing agent while another
+lifecycle action is in progress, allowing a normal Stop to remove that new agent's connection
+credentials while its process continues running. Also, releasing a group can now leave a busy member
+running even though the dashboard still promises that the action stops every member; the partial
+result needs an explicit product/API contract or different behavior.
+
+**Needs attention:** Both issues are recorded for a fix session. The first can leave a running
+pipeline agent unreachable; the second leaves people with a group they reasonably believe was fully
+stopped.
+
+**Next:** Run `/fix` to claim pipeline-stage launch and resolve the group-release contract, with
+regression coverage for both.
+
 ### 2026-08-18 — Fix: serialize every agent runtime transition
 
 I fixed the collision risk flagged in the last review. The safeguard that stops two runtime actions

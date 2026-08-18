@@ -7,25 +7,17 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** The exclusive per-agent lifecycle claim (`claimLifecycle`) is now taken by **every**
-  lifecycle transition that stops or resumes an agent's registration, not only explicit resume/wake
-  and Stop (FS-01.R34, TS-01.R16, **INV §4/§5**). Runtime switch takes it across its whole
-  stop→resume window (right after `acquireSwitch`); bulk group release takes it per agent across the
-  Stop + registration cleanup and reports a `409`-style conflict for a loser instead of tearing down
-  a live registration; and the pipeline stage seams take it — `ContinueStage` before its resume and
-  `StopStage` around its stop, with the shared stop/teardown extracted into an unclaimed
-  `stopStageLocked` so `ContinueStage`'s failed-send cleanup does not re-take the claim it already
-  holds. Archive-stop is left unclaimed by design: `beginAgentArchive`/`beginProjectArchive` already
-  make a concurrent resume/wake fail `acquireAgentStart`, so archive can never mint a competing
-  registration, and adding the claim there would only introduce a new stop-vs-archive `409`. This
-  closes the one open Must-fix: a mail wake (whose only re-entry guard is `lifecycleInFlight`, which
-  switch never set) or an explicit stop/resume landing inside a switch's transient window could mint
-  a second registration for the same id whose teardown revoked the winner's token/MCP/hook-settings.
-  New regressions: `TestSwitchTakesLifecycleClaim` (switch mid-flight, concurrent stop `409`,
-  registration intact), `TestReleaseGroupRespectsLifecycleClaim`, and
-  `TestPipelineStageRespectsLifecycleClaim` — each confirmed to fail against the pre-fix code.
-  `make check-specs`, both Go test modes, focused `-race` on the lifecycle/wake paths, and
-  `make build` pass. No UI changed, so npm/dist were not required.
+- **State:** The lifecycle-claim fix covers runtime switch, bulk group release, `ContinueStage`, and
+  `StopStage` (TS-01.R16, **INV §4/§5**), but review found two Must-fix gaps. `LaunchStage` still
+  starts a pre-existing pipeline agent without that claim, so a concurrent ordinary Stop can see the
+  Registry's launch sentinel as already stopped, tear down its fresh hook/MCP/settings registration,
+  and let the launch complete with a live but unreachable process. It needs to take the claim across
+  launch and prompt-send, using `stopStageLocked` for its failed-send cleanup. Separately, a claimed
+  group member now remains running and is returned as `ok:false`, while FS-02 still promises that
+  Release group stops every member; the next fix must either restore that guarantee or specify and
+  surface the partial-conflict/retry outcome in FS-02 and TS-03. Archive-stop remains correctly
+  protected by the archive start gates: archive blocks all competing resume/wake starts before it
+  stops an agent, so it cannot mint a competing registration.
 - **Previous state:** Browse for working directories is implemented (FS-04.R42/A22, TS-03.R26, TS-05.R15).
   One `POST /api/directory-picker` action runs the fixed `/usr/bin/osascript` with fixed script text
   and no shell, behind a process-wide non-blocking claim (`acquirePicker`), and answers
@@ -111,10 +103,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   `make build`, all 226 UI tests, presentation/style checks, and `make dist` pass. No live-browser
   pass was run. A stale migration-version guard test (asserting 13 against the shipped 14) was already
   failing on `main` and now derives its expectation from the migrations slice (INV §9).
-- **Last reviewed code:** `5a4ae2b` (2026-08-18), the continuous range after `74da884`: the
-  wake/proposal/context fix batch, the projects background-menu fix, and browse for working
-  directories. The one Must-fix finding from that review (the lifecycle claim omitting
-  switch/group/pipeline) is now fixed; the fix commit itself is unreviewed.
+- **Last reviewed code:** `a0210e2` (2026-08-18), the continuous lifecycle-claim fix range after
+  `5a4ae2b`. Two Must-fix findings remain below.
 - **Branch:** `main`.
 
 ## Active change
@@ -152,7 +142,9 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ### Open findings
 
-None.
+- **Must fix** — Pipeline launch bypasses the lifecycle claim (`internal/server/pipeline_lifecycle.go:72`, TS-01.R16, **INV §4/§5**). `LaunchStage` launches an existing pipeline agent id without `claimLifecycle`. During `Registry.Launch` its nil launch sentinel makes a concurrent normal Stop take the idempotent `ErrNoHandle` path; that Stop removes the fresh hook token, MCP registration, and hook-settings file, then answers success while `LaunchStage` completes with the process live. Take the claim across launch plus prompt send, and call `stopStageLocked` rather than re-claiming through `StopStage` when the send fails. Add a deterministic slow-ACP regression that stops after the launch sentinel is installed and confirms a `409` plus intact registration.
+
+- **Must fix** — Group release's new partial result contradicts its feature contract (`internal/server/groups.go:64`, FS-02.R20/A8, **INV §4/§5**). When a member is in another lifecycle transition, Release group now returns HTTP 200 with `ok:false` and leaves that member running. The dashboard requirement and acceptance criterion promise the action stops every member, and neither FS-02 nor TS-03 defines a partial-conflict/retry response. Either make the operation preserve the all-members guarantee, or specify the partial result and give the UI a clear retry/error path with coverage.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
@@ -164,6 +156,21 @@ recheck-fail cause is a concurrent resume, whose running-path nudge then deliver
 rows honestly).
 
 ## Recent changelog
+
+- 2026-08-18 — Reviewed `a0210e2` after `5a4ae2b` against FS-01/FS-02, TS-01/TS-03, workflow §7,
+  and every invariant class. Two Must-fix findings are open (**INV §4/§5**): `LaunchStage` still
+  launches a pre-existing pipeline id without `claimLifecycle`, allowing a concurrent normal Stop to
+  tear down a successful launch's fresh registration; and group release intentionally returns a
+  partial `ok:false` member result while FS-02.R20/A8 still promises every group member stops. Clean:
+  switch, group stop/cleanup, ContinueStage, StopStage, rollback, and archive gates otherwise align
+  with TS-01.R16; archive's separate start gate correctly prevents a competing registration. Not
+  applicable: **§1** no changed derived state, **§2** no parallel construction seam, **§3** no
+  persisted one-shot data/form write, **§6** no runtime interface, **§7** no read/repair loop, **§8**
+  no new user-facing payload beyond the recorded group contract mismatch, **§9** no liveness/durability
+  primitive, **§10** no unconnected surface, **§11** no collection boundary, **§12** no external CLI
+  contract, **§13** no CSS, **§14** no route, and **§15** no external-effect ordering change. `make
+  check-specs`, the full server suite, and focused lifecycle `-race` tests pass; the initial sandboxed
+  race run could not open its loopback test listener, then passed when rerun with permission.
 
 - 2026-08-18 — Fixed the open Must-fix finding (**INV §4/§5**, TS-01.R16): the exclusive per-agent
   lifecycle claim covered only explicit resume/wake and Stop, so runtime switch, bulk group release,
