@@ -118,6 +118,19 @@ func (s *Server) handleSwitchRuntime(w http.ResponseWriter, r *http.Request) {
 	}
 	defer s.releaseSwitch(id)
 
+	// Take the shared exclusive lifecycle claim (TS-01.R16, INV §4/§5) across the
+	// whole stop→resume window. acquireSwitch above excludes only a second switch,
+	// and acquireAgentStart is a counting lease, not exclusive — so without this a
+	// mail wake (whose only re-entry guard is lifecycleInFlight) or an explicit
+	// stop/resume landing between the Stop below and the target Resume would mint a
+	// second registration for the same agent_id, and the loser's teardown would then
+	// revoke the winner's hook token, MCP session, and hook-settings file.
+	if !s.claimLifecycle(id) {
+		writeAPIError(w, apiError(runtime.CodeConflict, "a lifecycle transition is already in progress"))
+		return
+	}
+	defer s.releaseLifecycle(id)
+
 	// The switch operates on a live agent (cancel → stop → resume). No running row
 	// → nothing to switch.
 	prev, err := s.stateStore.ReadRunning(id)

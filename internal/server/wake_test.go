@@ -17,6 +17,7 @@ import (
 	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/hooks"
 	"github.com/agentdeck/agentdeck/internal/messaging"
+	"github.com/agentdeck/agentdeck/internal/pipeline"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
@@ -745,4 +746,64 @@ func TestAddressableAgentsNeverDuplicatesAcrossStop(t *testing.T) {
 	}
 	close(stop)
 	<-done
+}
+
+// TS-01.R16 (INV §4/§5) — bulk group release takes the shared exclusive lifecycle
+// claim per agent, so an agent already inside another lifecycle transition (a live
+// resume/wake or switch) is reported as a conflict and its registration is left
+// intact, rather than having its Stop + cleanup revoke the winner's registration.
+func TestReleaseGroupRespectsLifecycleClaim(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+
+	// Hold the claim as another in-flight transition would.
+	if !srv.claimLifecycle(id) {
+		t.Fatalf("could not take the lifecycle claim")
+	}
+	defer srv.releaseLifecycle(id)
+
+	results := srv.releaseAgents(context.Background(), []string{id})
+	if len(results) != 1 || results[0].OK {
+		t.Fatalf("release result = %+v, want a single conflict (OK=false)", results)
+	}
+
+	// The registration the held transition owns is untouched, and the agent is still
+	// running.
+	srv.hookMu.Lock()
+	token := srv.hookTokens[id]
+	_, mcpOK := srv.mcpCleanups[id]
+	srv.hookMu.Unlock()
+	if token == "" || !mcpOK {
+		t.Fatalf("release tore down a claimed agent's registration: token=%q mcp=%v", token, mcpOK)
+	}
+	waitRunning(t, srv, id, true)
+}
+
+// TS-01.R16 (INV §4/§5) — the pipeline stage stop/continue seams take the shared
+// exclusive lifecycle claim, so they refuse an agent already inside another
+// lifecycle transition instead of racing its registration.
+func TestPipelineStageRespectsLifecycleClaim(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+
+	if !srv.claimLifecycle(id) {
+		t.Fatalf("could not take the lifecycle claim")
+	}
+	defer srv.releaseLifecycle(id)
+
+	if err := srv.StopStage(context.Background(), id); err == nil {
+		t.Fatalf("StopStage under a held claim = nil, want a conflict error")
+	}
+	if err := srv.ContinueStage(context.Background(), pipeline.StageExecution{AgentID: id, Project: "tmpproj"}); err == nil {
+		t.Fatalf("ContinueStage under a held claim = nil, want a conflict error")
+	}
+
+	// The claimed registration is intact and the agent is still running.
+	srv.hookMu.Lock()
+	token := srv.hookTokens[id]
+	srv.hookMu.Unlock()
+	if token == "" {
+		t.Fatalf("pipeline stage stop/continue tore down a claimed agent's registration")
+	}
+	waitRunning(t, srv, id, true)
 }

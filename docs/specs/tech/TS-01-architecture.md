@@ -140,6 +140,18 @@ the idempotent already-stopped path — reaping and running `teardownAgentRegist
 artifacts the live resume had just minted — and answered success while that resume continued.
 A Stop that loses the claim returns the same conflict a losing resume returns.
 
+**Every lifecycle transition that stops or resumes an agent's registration takes this one claim**,
+not only explicit resume/wake and Stop: runtime switch's stop→resume window (`handleSwitchRuntime`),
+bulk group release's per-agent stop + registration cleanup (`releaseAgents`), and pipeline stage
+resume/stop (`ContinueStage`/`StopStage`) all take it before any registration side effect and hold
+it across the whole transition. Because wake-on-message makes a stopped agent's transient window
+wakeable and `acquireSwitch`/`acquireAgentStart` are switch-scoped or counting (not mutually
+exclusive with a resume), these paths were otherwise reachable by a concurrent wake or explicit
+resume/stop that minted a second registration whose teardown then revoked the winner's
+token/MCP/hook-settings (INV §4). Agent/project **archive** stop is exempt because its exclusion
+already holds: `beginAgentArchive`/`beginProjectArchive` set flags that make a concurrent resume or
+wake fail `acquireAgentStart`, so archive can never mint a competing registration.
+
 **R17 (planned) — Chat drafts stay in one bounded browser-local seam.** One feature-local UI module
 owns a single `localStorage` record containing non-empty draft text and last-edited timestamps keyed
 by `agent_id`; the composer reads and writes that module directly rather than adding server state,

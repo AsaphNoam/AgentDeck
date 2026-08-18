@@ -7,7 +7,26 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** Browse for working directories is implemented (FS-04.R42/A22, TS-03.R26, TS-05.R15).
+- **State:** The exclusive per-agent lifecycle claim (`claimLifecycle`) is now taken by **every**
+  lifecycle transition that stops or resumes an agent's registration, not only explicit resume/wake
+  and Stop (FS-01.R34, TS-01.R16, **INV §4/§5**). Runtime switch takes it across its whole
+  stop→resume window (right after `acquireSwitch`); bulk group release takes it per agent across the
+  Stop + registration cleanup and reports a `409`-style conflict for a loser instead of tearing down
+  a live registration; and the pipeline stage seams take it — `ContinueStage` before its resume and
+  `StopStage` around its stop, with the shared stop/teardown extracted into an unclaimed
+  `stopStageLocked` so `ContinueStage`'s failed-send cleanup does not re-take the claim it already
+  holds. Archive-stop is left unclaimed by design: `beginAgentArchive`/`beginProjectArchive` already
+  make a concurrent resume/wake fail `acquireAgentStart`, so archive can never mint a competing
+  registration, and adding the claim there would only introduce a new stop-vs-archive `409`. This
+  closes the one open Must-fix: a mail wake (whose only re-entry guard is `lifecycleInFlight`, which
+  switch never set) or an explicit stop/resume landing inside a switch's transient window could mint
+  a second registration for the same id whose teardown revoked the winner's token/MCP/hook-settings.
+  New regressions: `TestSwitchTakesLifecycleClaim` (switch mid-flight, concurrent stop `409`,
+  registration intact), `TestReleaseGroupRespectsLifecycleClaim`, and
+  `TestPipelineStageRespectsLifecycleClaim` — each confirmed to fail against the pre-fix code.
+  `make check-specs`, both Go test modes, focused `-race` on the lifecycle/wake paths, and
+  `make build` pass. No UI changed, so npm/dist were not required.
+- **Previous state:** Browse for working directories is implemented (FS-04.R42/A22, TS-03.R26, TS-05.R15).
   One `POST /api/directory-picker` action runs the fixed `/usr/bin/osascript` with fixed script text
   and no shell, behind a process-wide non-blocking claim (`acquirePicker`), and answers
   `200 {"path"}` for a verified existing absolute directory, `204` for cancel,
@@ -94,8 +113,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   failing on `main` and now derives its expectation from the migrations slice (INV §9).
 - **Last reviewed code:** `5a4ae2b` (2026-08-18), the continuous range after `74da884`: the
   wake/proposal/context fix batch, the projects background-menu fix, and browse for working
-  directories. One Must-fix finding is open below (the lifecycle claim omits switch/archive/group/
-  pipeline).
+  directories. The one Must-fix finding from that review (the lifecycle claim omitting
+  switch/group/pipeline) is now fixed; the fix commit itself is unreviewed.
 - **Branch:** `main`.
 
 ## Active change
@@ -133,30 +152,7 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ### Open findings
 
-- **Must fix** (INV §4/§5, TS-01.R16) — the lifecycle claim does not cover switch/archive/group/pipeline,
-  so wake-on-message can tear down a switch's registration. `claimLifecycle` (`9ac67cc`) is taken only
-  by `resumeSession` (`internal/server/resume.go:94`) and `handleStop` (`internal/server/sessions.go:403`).
-  Four other lifecycle mutators call `registry.Stop`/`registry.Resume` for the same agent without it:
-  switch runtime (`internal/server/switch.go:177,240`), archive-stop (`internal/server/archive_actions.go:13`),
-  bulk group release (`internal/server/groups.go:57`), and pipeline stage resume/stop
-  (`internal/server/pipeline_lifecycle.go:146,158`). Neither existing guard closes the gap: `acquireSwitch`
-  is switch-only, and `acquireAgentStart` is a counting archive lease (`internal/server/archive_gate.go:49`,
-  `agentStartLeases[agent]++`) that does not mutually exclude a switch from a concurrent resume/wake.
-  **Trigger:** an idle chat agent with a frozen snapshot and unread `pending` mail is switched (a
-  backend change with a history primer widens the window to seconds). Switch removes the running row at
-  `switch.go:177`, then composes a fresh MCP token + hook-settings for the same `agent_id`
-  (`composeSwitchSpec`) and resumes at `:240`. During that window the nudger's `wakeOnce`
-  (`internal/server/messaging_loops.go:120`) sees the agent as a stopped wake candidate; its only
-  re-entry guard is `lifecycleInFlight`, which switch never sets, so it fires `wakeForMail` →
-  `resumeSession` and mints a second registration for the same id concurrently with the switch's resume.
-  The loser's `teardownAgentRegistration` then revokes the winner's token/MCP/hook-settings — the exact
-  §4 drift the fix targeted, now reachable because wake-on-message makes the transient switch window
-  wakeable. Explicit `POST /stop` during a switch is unserialized for the same reason.
-  **Fix:** route every lifecycle transition (switch, archive-stop, group release, pipeline resume/stop)
-  through `claimLifecycle`, or make `wakeOnce`/`resumeSession` additionally refuse while a switch/other
-  transition claim is held. **Test:** start a switch on an agent with pending mail and assert a
-  concurrent mail-wake returns `409` and leaves the switch's registration intact (mirroring
-  `TestStopDuringWakeConflictsAndKeepsRegistration`).
+None.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
@@ -168,6 +164,23 @@ recheck-fail cause is a concurrent resume, whose running-path nudge then deliver
 rows honestly).
 
 ## Recent changelog
+
+- 2026-08-18 — Fixed the open Must-fix finding (**INV §4/§5**, TS-01.R16): the exclusive per-agent
+  lifecycle claim covered only explicit resume/wake and Stop, so runtime switch, bulk group release,
+  and pipeline stage resume/stop still ran unclaimed for the same agent. Because wake-on-message makes
+  a stopped agent's transient switch window wakeable and `acquireSwitch`/`acquireAgentStart` are
+  switch-scoped or counting (not exclusive), a mail wake or explicit resume/stop landing inside one of
+  those windows could mint a second registration whose teardown revoked the winner's
+  token/MCP/hook-settings. All three paths now take `claimLifecycle` across their stop→resume window;
+  group release reports a conflict for a claimed agent instead of tearing it down; and the pipeline
+  stop/teardown moved into an unclaimed `stopStageLocked` so `ContinueStage`'s failed-send cleanup
+  does not re-take its own claim. Archive-stop was verified already-exclusive (the archive gate fails
+  a concurrent resume/wake at `acquireAgentStart`) and left unclaimed to avoid a new stop-vs-archive
+  `409`; TS-01.R16 now records that every registration-mutating transition takes the one claim and why
+  archive is exempt. Three regressions (`TestSwitchTakesLifecycleClaim`,
+  `TestReleaseGroupRespectsLifecycleClaim`, `TestPipelineStageRespectsLifecycleClaim`) were each
+  confirmed to fail against the pre-fix code. `make check-specs`, both Go test modes, focused `-race`,
+  and `make build` pass; no UI changed, so npm/dist were not required.
 
 - 2026-08-18 — Reviewed the continuous range after `74da884` through `5a4ae2b` in both specification
   directions and against every invariant class: the wake/proposal/context fix batch (`9ac67cc`), the
