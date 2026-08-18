@@ -7,7 +7,12 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** All open lifecycle-claim findings are fixed. `LaunchStage` now takes the exclusive
+- **State:** Unsent chat drafts are complete. Each browser now keeps the exact non-empty draft for
+  up to 20 recently edited chats, restores it after navigation or reload, and drops it only after an
+  accepted send, manual emptying, or the existing deleted-agent event. The local record is safely
+  ignored when malformed or unavailable; it adds no server, transcript, sync, or migration path.
+  Component/store/SSE coverage and a browser navigation/reload pass confirm the behavior.
+- **Previous state:** All open lifecycle-claim findings are fixed. `LaunchStage` now takes the exclusive
   per-agent claim through launch and its first assignment prompt, and its failed-send cleanup calls
   `stopStageLocked` inside that claim; an ordinary concurrent Stop returns `409` without tearing
   down the fresh hook/MCP/settings registration (TS-01.R16, **INV §4/§5**). Group release now first
@@ -154,6 +159,15 @@ recheck-fail cause is a concurrent resume, whose running-path nudge then deliver
 rows honestly).
 
 ## Recent changelog
+
+- 2026-08-18 — Implemented browser-local unsent chat drafts (FS-03.R36/A19, TS-01.R17, **INV §1**).
+  One feature-local record keeps the 20 most recently edited non-empty drafts keyed by agent id;
+  Composer restores and updates it without changing the prompt API, clears only after an accepted
+  send or manual emptying, and restores rejected sends. The existing deleted-agent SSE branch removes
+  the matching draft alongside annotation state; archive and lifecycle updates leave it alone.
+  Malformed, unavailable, or full browser storage simply disables persistence while typing and Send
+  remain usable. FS-03 is now Current. Component/store/SSE tests, a real browser navigation/reload
+  pass, `make check-specs`, both Go test modes, all 238 UI tests, `make build`, and `make dist` pass.
 
 - 2026-08-18 — Fixed both open Must-fix findings (**INV §4/§5**). `LaunchStage` now holds
   `claimLifecycle` across registration and its initial prompt, and uses `stopStageLocked` for a

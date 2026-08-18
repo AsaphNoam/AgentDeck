@@ -1,5 +1,5 @@
 import React from "react";
-import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
@@ -14,6 +14,7 @@ const filesFor = (q: string) => {
 
 let promptBodies: string[] = [];
 let failFileSearch = false;
+let resolvePrompt: ((response: Response) => void) | null = null;
 
 const server = setupServer(
   http.get("/api/sessions/:id/file-search", ({ request }) => {
@@ -39,9 +40,12 @@ const server = setupServer(
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
 afterEach(() => {
   cleanup();
+  localStorage.clear();
   server.resetHandlers();
   promptBodies = [];
   failFileSearch = false;
+  resolvePrompt = null;
+  vi.restoreAllMocks();
 });
 afterAll(() => server.close());
 
@@ -52,6 +56,54 @@ function type(el: HTMLTextAreaElement, value: string) {
 }
 
 describe("Composer autocomplete", () => {
+  // FS-03.A19: browser-local drafts follow the selected chat through navigation
+  // and remounts, but never cross to another agent.
+  it("restores distinct drafts for their matching chat after navigation and remount", async () => {
+    const view = render(<Composer agentId="a_1" busy={false} />);
+    const ta = screen.getByRole("textbox") as HTMLTextAreaElement;
+    type(ta, "first draft");
+
+    view.rerender(<Composer agentId="a_2" busy={false} />);
+    await waitFor(() => expect(ta.value).toBe(""));
+    type(ta, "second draft");
+
+    view.rerender(<Composer agentId="a_1" busy={false} />);
+    await waitFor(() => expect(ta.value).toBe("first draft"));
+    view.unmount();
+
+    render(<Composer agentId="a_2" busy={false} />);
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("second draft");
+  });
+
+  it("clears the stored draft only after an accepted prompt or manual emptying", async () => {
+    const view = render(<Composer agentId="a_1" busy={false} />);
+    const ta = screen.getByRole("textbox") as HTMLTextAreaElement;
+    type(ta, "send this");
+    fireEvent.keyDown(ta, { key: "Enter" });
+    await waitFor(() => expect(promptBodies).toHaveLength(1));
+    view.unmount();
+
+    render(<Composer agentId="a_1" busy={false} />);
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("");
+    type(screen.getByRole("textbox") as HTMLTextAreaElement, "remove this");
+    type(screen.getByRole("textbox") as HTMLTextAreaElement, "");
+    cleanup();
+
+    render(<Composer agentId="a_1" busy={false} />);
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("");
+  });
+
+  it("keeps the live composer usable when browser storage is unavailable", async () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("storage unavailable"); });
+    render(<Composer agentId="a_1" busy={false} />);
+    const ta = screen.getByRole("textbox") as HTMLTextAreaElement;
+    type(ta, "send without storage");
+    fireEvent.keyDown(ta, { key: "Enter" });
+
+    await waitFor(() => expect(promptBodies).toHaveLength(1));
+    expect(JSON.parse(promptBodies[0]).text).toBe("send without storage");
+  });
+
   it("opens the file picker on `@` at a word boundary but not inside a word", async () => {
     render(<Composer agentId="a_1" busy={false} />);
     const ta = screen.getByRole("textbox") as HTMLTextAreaElement;
@@ -169,6 +221,30 @@ describe("Composer autocomplete", () => {
 
     expect(await screen.findByText(/agent is archived; restore it before resuming/)).toBeInTheDocument();
     await waitFor(() => expect(ta.value).toBe("wake up"));
+    cleanup();
+
+    render(<Composer agentId="a_1" busy={false} />);
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("wake up");
+  });
+
+  it("does not restore a rejected send into a different chat opened while it was pending", async () => {
+    server.use(
+      http.post("/api/sessions/:id/prompt", () => new Promise<Response>((resolve) => { resolvePrompt = resolve; })),
+    );
+    const view = render(<Composer agentId="a_1" busy={false} />);
+    const ta = screen.getByRole("textbox") as HTMLTextAreaElement;
+    type(ta, "first draft");
+    fireEvent.keyDown(ta, { key: "Enter" });
+
+    view.rerender(<Composer agentId="a_2" busy={false} />);
+    await waitFor(() => expect(ta.value).toBe(""));
+    type(ta, "second draft");
+    resolvePrompt?.(HttpResponse.json({ error: { code: "agent_archived", message: "agent is archived" } }, { status: 409 }));
+
+    await waitFor(() => expect(ta.value).toBe("second draft"));
+    view.unmount();
+    render(<Composer agentId="a_1" busy={false} />);
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("first draft");
   });
 
   it("stays usable when the file source is unavailable", async () => {

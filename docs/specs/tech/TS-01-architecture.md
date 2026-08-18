@@ -154,7 +154,7 @@ token/MCP/hook-settings (INV §4). Agent/project **archive** stop is exempt beca
 already holds: `beginAgentArchive`/`beginProjectArchive` set flags that make a concurrent resume or
 wake fail `acquireAgentStart`, so archive can never mint a competing registration.
 
-**R17 (planned) — Chat drafts stay in one bounded browser-local seam.** One feature-local UI module
+**R17 — Chat drafts stay in one bounded browser-local seam.** One feature-local UI module
 owns a single `localStorage` record containing non-empty draft text and last-edited timestamps keyed
 by `agent_id`; the composer reads and writes that module directly rather than adding server state,
 an API, a database/config field, or a global synchronization path. Each write and rehydration keeps
@@ -226,7 +226,7 @@ type Runtime interface {
 - Sole-writer state: `internal/state/*`, token validation in `internal/state/manager.go`, reconcile
   fallback `internal/server/reconcile.go`.
 - Event flow: `internal/server/hook.go`, `internal/server/sse.go`, `internal/bus/bus.go` (`SubscribeWithSnapshot`).
-- Browser-local chat drafts (planned R17): one feature-local UI store consumed by
+- Browser-local chat drafts (R17): one feature-local UI store consumed by
   `ui/src/components/chat/Composer.tsx` and discarded from `ui/src/api/sse.ts`'s existing removed
   branch; component/store/SSE tests cover restore, pruning, send outcomes, malformed storage, and
   deletion cleanup.
