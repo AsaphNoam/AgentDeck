@@ -770,16 +770,16 @@ func TestResumeSessionLoadAppliesMCP(t *testing.T) {
 	}
 }
 
-// Reproduction for the confirmed resume-history finding: ACP session/load does
-// not return a new sessionId. The requested id remains authoritative, but the
-// runtime currently mistakes the empty success result for load failure and
-// falls through to session/new, abandoning the provider conversation history.
+// Regression for the confirmed resume-history finding: ACP session/load does
+// not return a new sessionId. The requested id remains authoritative, so an
+// empty success result must be treated as ownership of that id — never mistaken
+// for load failure and fallen through to session/new, which would abandon the
+// provider conversation history (FS-01.R10, FS-03.R13, TS-04.R22, INV §11).
 func TestResumeSuccessfulLoadWithoutSessionIDKeepsPriorSession(t *testing.T) {
-	t.Skip("reproduction: resume treats a successful empty session/load response as session/new")
-
 	c, spec := newChatTest(t, "stream_text")
 	ctx := context.Background()
-	spec.Env = append(spec.Env, "FAKEACP_LOAD_EMPTY=1")
+	newDump := filepath.Join(t.TempDir(), "new_params.json")
+	spec.Env = append(spec.Env, "FAKEACP_LOAD_EMPTY=1", "FAKEACP_NEW_DUMP="+newDump)
 
 	h, err := c.Resume(ctx, spec, "prior-session-id")
 	if err != nil {
@@ -789,6 +789,9 @@ func TestResumeSuccessfulLoadWithoutSessionIDKeepsPriorSession(t *testing.T) {
 
 	if h.SessionID != "prior-session-id" {
 		t.Fatalf("sessionID = %q, want loaded prior-session-id", h.SessionID)
+	}
+	if _, statErr := os.Stat(newDump); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("session/new was invoked after a successful load (stat err = %v); resume must keep the prior session", statErr)
 	}
 }
 

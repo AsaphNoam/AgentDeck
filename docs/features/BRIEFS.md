@@ -4,6 +4,25 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-18 — Fix: resumed Codex conversations keep their model memory
+
+Fixed. When AgentDeck resumes a stopped chat, it loads the old session and now trusts that load: the
+Codex adapter confirms success with an empty response, and AgentDeck keeps using the original session
+instead of misreading that as a failure and quietly starting a fresh one. The resumed agent now
+carries its earlier conversation again, both for Stop/Resume within one run and Resume after a
+restart. If a load ever genuinely fails, AgentDeck still starts a new session but now records why,
+rather than losing the history silently.
+
+The regression test that reproduces the real adapter's empty response is enabled and now also checks
+that no new session is created on a successful resume. All automated checks pass.
+
+**Needs attention:** The final confirmation against the real installed Codex adapter (a credentialed
+run) is still owed before we call Codex resume proven end to end; the automated tests use a stand-in
+adapter that now mirrors the real empty-success response.
+
+**Next:** Run the credentialed Codex resume check on a machine with the real adapter to close the
+acceptance gate.
+
 ### 2026-08-18 — Investigation: resumed Codex conversations lose model memory
 
 Confirmed. AgentDeck successfully loads the old Codex session, but then misreads the adapter's valid
