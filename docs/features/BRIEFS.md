@@ -4,6 +4,22 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-18 — Review: lifecycle, drafts, and Codex resume
+
+One Must-fix problem remains in chat drafts. If a message send is slow and someone starts typing the
+next message in the same chat, completion of the first send can delete the newer draft; if the first
+send fails, it can replace the newer text with the older message. The send result needs to clear or
+restore a draft only when that draft has not changed since submission.
+
+The lifecycle protections, group release behavior, Codex conversation-history fix, and the rest of
+the browser draft storage behavior match their requirements. The focused automated checks pass.
+
+**Needs attention:** New text typed while an earlier send is pending can be lost from the composer or
+browser storage.
+
+**Next:** Run `/fix` to generation-scope draft clearing/restoration and add delayed success and
+failure tests.
+
 ### 2026-08-18 — Fix: resumed Codex conversations keep their model memory
 
 Fixed. When AgentDeck resumes a stopped chat, it loads the old session and now trusts that load: the
