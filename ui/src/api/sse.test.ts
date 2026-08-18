@@ -41,6 +41,7 @@ describe("SseClient watchdog reconnect", () => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.resetModules();
+    localStorage.clear();
   });
 
   it("does not reap a freshly reconnected stream before its first ping", async () => {
@@ -142,13 +143,16 @@ describe("SseClient watchdog reconnect", () => {
     expect(agents["a_gone"]).toBeUndefined();
   });
 
-  // FS-13.R16: a deleted agent is gone as an annotation source too, and nothing
-  // else ever clears its browser-local tray.
-  it("drops a deleted agent's pending annotation tray", async () => {
+  // FS-13.R16 / FS-03.A19: deletion drops browser-local state keyed to the
+  // agent and leaves other agents' state alone.
+  it("drops a deleted agent's annotation tray and chat draft", async () => {
     const { sseClient } = await import("./sse");
     const { useAnnotationStore } = await import("../store/annotationStore");
+    const { getChatDraft, setChatDraft } = await import("../components/chat/drafts");
     useAnnotationStore.getState().add("a_gone", { seq: 3, excerpt: "line", instruction: "look" });
     useAnnotationStore.getState().add("a_keep", { seq: 4, excerpt: "line", instruction: "look" });
+    setChatDraft("a_gone", "gone draft");
+    setChatDraft("a_keep", "keep draft");
     sseClient.connect();
     const es = FakeEventSource.instances[0];
     es.onopen?.();
@@ -157,6 +161,8 @@ describe("SseClient watchdog reconnect", () => {
 
     expect(useAnnotationStore.getState().bySource["a_gone"]).toBeUndefined();
     expect(useAnnotationStore.getState().bySource["a_keep"]).toHaveLength(1);
+    expect(getChatDraft("a_gone")).toBe("");
+    expect(getChatDraft("a_keep")).toBe("keep draft");
   });
 
   it("invalidates config-source queries on a config_source_update event", async () => {

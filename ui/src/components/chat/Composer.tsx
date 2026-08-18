@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { cancelTurn, getAvailableCommands, searchSessionFiles, sendPrompt } from "../../api/client";
 import type { AvailableCommand } from "../../api/types";
 import { useTranscriptStore } from "../../store/transcriptStore";
+import { discardChatDraft, getChatDraft, setChatDraft } from "./drafts";
 
 // Composer owns one reusable keyboard-operated autocomplete picker for `@` files
 // and `#` ACP commands (FS-03.R30–R34). Both insert ordinary composer text — no
@@ -49,7 +50,7 @@ function filterCommands(commands: AvailableCommand[], query: string): PickerItem
 }
 
 export function Composer({ agentId, busy }: { agentId: string; busy: boolean }) {
-  const [text, setText] = useState("");
+  const [text, setText] = useState(() => getChatDraft(agentId));
   const [error, setError] = useState<string | null>(null);
   const [trigger, setTrigger] = useState<Trigger | null>(null);
   const [items, setItems] = useState<PickerItem[]>([]);
@@ -61,6 +62,17 @@ export function Composer({ agentId, busy }: { agentId: string; busy: boolean }) 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const reqRef = useRef(0);
   const pendingCursor = useRef<number | null>(null);
+  const currentAgentId = useRef(agentId);
+  currentAgentId.current = agentId;
+
+  useEffect(() => {
+    setText(getChatDraft(agentId));
+    setError(null);
+    setTrigger(null);
+    setItems([]);
+    setHighlight(0);
+    setDismissedStart(null);
+  }, [agentId]);
 
   const open = trigger !== null && trigger.start !== dismissedStart;
   const hasSuggestions = open && items.length > 0;
@@ -122,6 +134,7 @@ export function Composer({ agentId, busy }: { agentId: string; busy: boolean }) 
     const caret = trigger.start + item.insert.length;
     pendingCursor.current = caret;
     setText(next);
+    setChatDraft(agentId, next);
     setTrigger(null);
     setItems([]);
     setDismissedStart(null);
@@ -141,13 +154,19 @@ export function Composer({ agentId, busy }: { agentId: string; busy: boolean }) 
       // A stopped chat agent is woken by this same request (FS-03.R35), so the
       // composer submits normally and only the reply takes longer to start.
       await sendPrompt(agentId, prompt);
+      discardChatDraft(agentId);
     } catch (err) {
       // Surface the server's own typed error — a rejected wake included — and
       // restore the draft so the user can retry; the optimistic bubble stays,
       // but the error makes clear it was not delivered.
       const reason = err instanceof Error && err.message ? err.message : "the agent may have stopped";
-      setError(`Failed to send — ${reason}. Your message was restored.`);
-      setText(prompt);
+      setChatDraft(agentId, prompt);
+      // The request belongs to the chat that started it. Do not overwrite a
+      // different chat the person opened while this request was in flight.
+      if (currentAgentId.current === agentId) {
+        setError(`Failed to send — ${reason}. Your message was restored.`);
+        setText(prompt);
+      }
     }
   };
 
@@ -190,7 +209,9 @@ export function Composer({ agentId, busy }: { agentId: string; busy: boolean }) 
           ref={textareaRef}
           value={text}
           onChange={(event) => {
-            setText(event.target.value);
+            const next = event.target.value;
+            setText(next);
+            setChatDraft(agentId, next);
             syncTrigger(event.target);
           }}
           onKeyUp={(event) => syncTrigger(event.currentTarget)}

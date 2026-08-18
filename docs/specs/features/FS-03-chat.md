@@ -1,6 +1,6 @@
 # FS-03 — Live chat & permission flow
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/runtime/` (`chat.go`, `permission.go`, `event.go`), `internal/server/sessions.go`, `internal/transcript/`, `ui/src/components/chat/`, `ui/src/store/transcriptStore.ts`, `ui/src/api/sse.ts` · **Journeys:** J3, J4, J7
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -53,7 +53,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   the optimistic bubble and joins the durable transcript. If delivery fails, it shows an actionable
   error and restores the draft so the user can retry; the optimistic bubble remains visible and is
   not presented as server-acknowledged.
-- **R36 (planned).** Each chat composer keeps its exact non-empty unsent text as a separate draft for
+- **R36.** Each chat composer keeps its exact non-empty unsent text as a separate draft for
   that `agent_id` in the current browser profile. Returning to the chat after navigating elsewhere,
   refreshing, or closing and reopening AgentDeck restores that draft. The draft is removed only
   when the prompt request is accepted, the person empties the composer, or the browser's AgentDeck
@@ -304,7 +304,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   progression from the resulting events, and a rejected wake shows the server error while keeping
   the draft. *Verify:* `Composer`/chat component tests against a mocked prompt route for both
   branches; the end-to-end wake itself is FS-01.A17's server test.
-- **A19 (planned)** (R7, R36) — Distinct text entered in two chat composers survives navigation,
+- **A19** (R7, R36) — Distinct text entered in two chat composers survives navigation,
   remount, and page reload and restores only in its matching chat. An accepted prompt and manually
   empty composer remove their drafts; a rejected prompt restores and retains its exact text. Agent
   deletion removes its draft, and retaining a twenty-first draft evicts the least recently edited
@@ -338,6 +338,10 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `renderers/`, `ui/src/store/transcriptStore.ts`, `ui/src/api/sse.ts`. The header runtime picker
   (R23/R24) reuses `switchRuntime` (`ui/src/api/client.ts`) and the same backend/model/effort reset
   logic as the dashboard Switch dialog (`ui/src/components/grid/CardContextMenu.tsx`).
+- **Browser-local drafts (R36):** `ui/src/components/chat/drafts.ts` owns the bounded browser
+  record; `Composer.tsx` restores and writes it, and `ui/src/api/sse.ts` removes it only with the
+  existing deleted-agent event. `drafts.test.ts`, `Composer.test.tsx`, and `sse.test.ts` cover
+  restore, pruning, send outcomes, malformed/unavailable storage, and deletion cleanup.
 - **Key regression tests:** `TestChatStreamText`, `TestChatToolFlow`,
   `TestLaunchPromptPermissionFlow`, `TestPermissionApprove`, `TestPermissionTimeout`,
   `TestCancelDuringPendingPermission`, `TestCrashMidTurnPersistsDeliveredTranscript`,

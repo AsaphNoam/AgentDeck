@@ -3305,3 +3305,11 @@ Right-clicking any empty part of the Projects canvas now opens New project, whil
 **Needs attention:** None.
 
 **Next:** None.
+
+### 2026-08-18 — Implementation: preserve unsent chat text
+
+Unsent text now stays with its chat in the same browser after navigation or reload. It is kept only locally, never sent before Send or copied to another device, and disappears after a successful send, manual clearing, or deleting the chat. The browser keeps the 20 most recently edited drafts and remains usable if browser storage is unavailable.
+
+**Needs attention:** None.
+
+**Next:** None.

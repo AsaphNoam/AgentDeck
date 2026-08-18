@@ -8,6 +8,7 @@ import { useAgentStore } from "../store/agentStore";
 import { useAnnotationStore } from "../store/annotationStore";
 import { useTranscriptStore } from "../store/transcriptStore";
 import { useUiStore } from "../store/uiStore";
+import { discardChatDraft } from "../components/chat/drafts";
 
 class SseClient {
   private es: EventSource | null = null;
@@ -76,6 +77,7 @@ class SseClient {
       // 404s on it — so its pending tray is dropped with the rest of the state
       // derived from that agent (FS-13.R16). Nothing else ever clears it.
       useAnnotationStore.getState().discard(envelope.agent_id);
+      discardChatDraft(envelope.agent_id);
       return;
     }
     useAgentStore.getState().applyStateUpdate(envelope.data);
