@@ -140,11 +140,13 @@ the idempotent already-stopped path — reaping and running `teardownAgentRegist
 artifacts the live resume had just minted — and answered success while that resume continued.
 A Stop that loses the claim returns the same conflict a losing resume returns.
 
-**Every lifecycle transition that stops or resumes an agent's registration takes this one claim**,
-not only explicit resume/wake and Stop: runtime switch's stop→resume window (`handleSwitchRuntime`),
-bulk group release's per-agent stop + registration cleanup (`releaseAgents`), and pipeline stage
-resume/stop (`ContinueStage`/`StopStage`) all take it before any registration side effect and hold
-it across the whole transition. Because wake-on-message makes a stopped agent's transient window
+**Every lifecycle transition that starts, stops, or resumes an agent's registration takes this one
+claim**, not only explicit resume/wake and Stop: runtime switch's stop→resume window
+(`handleSwitchRuntime`), pipeline stage launch/initial prompt (`LaunchStage`), and pipeline stage
+resume/stop (`ContinueStage`/`StopStage`) all take it before any registration side effect and hold it
+across the whole transition. Bulk group release (`releaseAgents`) first reserves every member's
+claim, then stops and cleans them up in parallel; if one member is busy it releases its reservations
+and returns conflict before stopping any member. Because wake-on-message makes a stopped agent's transient window
 wakeable and `acquireSwitch`/`acquireAgentStart` are switch-scoped or counting (not mutually
 exclusive with a resume), these paths were otherwise reachable by a concurrent wake or explicit
 resume/stop that minted a second registration whose teardown then revoked the winner's

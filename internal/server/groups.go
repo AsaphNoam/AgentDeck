@@ -17,6 +17,8 @@ type releaseGroupResult struct {
 	Error   string `json:"error,omitempty"`
 }
 
+var errGroupLifecycleBusy = errors.New("a lifecycle transition is already in progress")
+
 func (s *Server) handleReleaseGroup(w http.ResponseWriter, r *http.Request) {
 	group := r.PathValue("group")
 	agents, err := s.stateStore.ListAgents()
@@ -35,11 +37,40 @@ func (s *Server) handleReleaseGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	results := s.releaseAgents(r.Context(), ids)
+	results, err := s.releaseAgents(r.Context(), ids)
+	if errors.Is(err, errGroupLifecycleBusy) {
+		// Release is all-or-none with respect to lifecycle contention: a 200
+		// never leaves a claimed member running while its peers were stopped.
+		writeAPIError(w, apiError(runtime.CodeConflict, err.Error()))
+		return
+	}
+	if err != nil {
+		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"group": group, "stopped": results})
 }
 
-func (s *Server) releaseAgents(ctx context.Context, ids []string) []releaseGroupResult {
+// releaseAgents reserves every member before stopping any of them. This keeps
+// Release group faithful to its all-members contract when another lifecycle
+// transition is in progress: it returns conflict with no partial release.
+func (s *Server) releaseAgents(ctx context.Context, ids []string) ([]releaseGroupResult, error) {
+	claimed := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if !s.claimLifecycle(id) {
+			for _, claimedID := range claimed {
+				s.releaseLifecycle(claimedID)
+			}
+			return nil, errGroupLifecycleBusy
+		}
+		claimed = append(claimed, id)
+	}
+	defer func() {
+		for _, id := range claimed {
+			s.releaseLifecycle(id)
+		}
+	}()
+
 	results := make([]releaseGroupResult, len(ids))
 	jobs := make(chan int)
 	workers := releaseGroupWorkers
@@ -54,17 +85,6 @@ func (s *Server) releaseAgents(ctx context.Context, ids []string) []releaseGroup
 			for idx := range jobs {
 				id := ids[idx]
 				res := releaseGroupResult{AgentID: id, OK: true}
-				// Bulk release stops and tears down each agent, so it must hold the
-				// shared exclusive lifecycle claim (TS-01.R16, INV §4/§5) across the
-				// Stop + cleanup below. Otherwise a mail wake or explicit resume landing
-				// between the Stop and the cleanup would mint a fresh registration that
-				// cleanupMessagingMCP/cleanupHookSettings then revoke. A loser reports a
-				// conflict for that agent and leaves its live registration intact; the
-				// caller can retry once the other transition settles.
-				if !s.claimLifecycle(id) {
-					results[idx] = releaseGroupResult{AgentID: id, OK: false, Error: "a lifecycle transition is already in progress"}
-					continue
-				}
 				if err := s.registry.Stop(ctx, id); err != nil {
 					if !errors.Is(err, runtime.ErrNoHandle) {
 						res.OK = false
@@ -79,7 +99,6 @@ func (s *Server) releaseAgents(ctx context.Context, ids []string) []releaseGroup
 					s.cleanupMessagingMCP(id)
 					s.cleanupHookSettings(id)
 				}
-				s.releaseLifecycle(id)
 				results[idx] = res
 			}
 		}()
@@ -89,5 +108,5 @@ func (s *Server) releaseAgents(ctx context.Context, ids []string) []releaseGroup
 	}
 	close(jobs)
 	wg.Wait()
-	return results
+	return results, nil
 }

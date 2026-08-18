@@ -70,6 +70,15 @@ func (s *Server) ValidateStage(_ context.Context, execution pipeline.StageExecut
 // LaunchStage uses the exact manual launch transaction with a pre-associated
 // durable agent id, then starts the assignment as an ordinary user turn.
 func (s *Server) LaunchStage(ctx context.Context, execution pipeline.StageExecution) error {
+	// Launch mints the same agent-keyed registration as resume, so the claim
+	// covers both Registry.Launch and the first assignment prompt. A concurrent
+	// Stop otherwise reads the registry's launch sentinel as an already-stopped
+	// agent and tears down this launch's registration (TS-01.R16, INV §4/§5).
+	if !s.claimLifecycle(execution.AgentID) {
+		return errors.New("a lifecycle transition is already in progress")
+	}
+	defer s.releaseLifecycle(execution.AgentID)
+
 	if !s.registry.Owns(execution.AgentID) {
 		if _, err := s.stateStore.ReadRunning(execution.AgentID); err == nil {
 			if err := s.reapOrphanRuntime(execution.AgentID); err != nil {
@@ -86,7 +95,9 @@ func (s *Server) LaunchStage(ctx context.Context, execution pipeline.StageExecut
 		return errors.New(ae.Message)
 	}
 	if err := s.registry.SendPrompt(ctx, execution.AgentID, execution.Assignment); err != nil {
-		_ = s.StopStage(ctx, execution.AgentID)
+		// The claim is already held, so use the unclaimed core rather than
+		// StopStage, which would reject its own claim.
+		_ = s.stopStageLocked(ctx, execution.AgentID)
 		return err
 	}
 	return nil

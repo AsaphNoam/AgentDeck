@@ -18,6 +18,7 @@ import (
 	"github.com/agentdeck/agentdeck/internal/hooks"
 	"github.com/agentdeck/agentdeck/internal/messaging"
 	"github.com/agentdeck/agentdeck/internal/pipeline"
+	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
@@ -748,13 +749,23 @@ func TestAddressableAgentsNeverDuplicatesAcrossStop(t *testing.T) {
 	<-done
 }
 
-// TS-01.R16 (INV §4/§5) — bulk group release takes the shared exclusive lifecycle
-// claim per agent, so an agent already inside another lifecycle transition (a live
-// resume/wake or switch) is reported as a conflict and its registration is left
-// intact, rather than having its Stop + cleanup revoke the winner's registration.
+// TS-01.R16 / FS-02.A8 (INV §4/§5) — a lifecycle claim on any group member
+// rejects Release group before it stops anyone, so a 200 release never leaves a
+// claimed member running after stopping its peers.
 func TestReleaseGroupRespectsLifecycleClaim(t *testing.T) {
 	srv, ts := wakeTestServer(t)
 	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+	otherID := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+	for _, agentID := range []string{id, otherID} {
+		agent, err := srv.stateStore.ReadAgent(agentID)
+		if err != nil {
+			t.Fatalf("ReadAgent %s: %v", agentID, err)
+		}
+		agent.Group = "release"
+		if err := srv.stateStore.WriteAgent(agent); err != nil {
+			t.Fatalf("WriteAgent %s: %v", agentID, err)
+		}
+	}
 
 	// Hold the claim as another in-flight transition would.
 	if !srv.claimLifecycle(id) {
@@ -762,13 +773,13 @@ func TestReleaseGroupRespectsLifecycleClaim(t *testing.T) {
 	}
 	defer srv.releaseLifecycle(id)
 
-	results := srv.releaseAgents(context.Background(), []string{id})
-	if len(results) != 1 || results[0].OK {
-		t.Fatalf("release result = %+v, want a single conflict (OK=false)", results)
+	resp, body := post(t, ts.URL+"/api/groups/release/release", nil)
+	if resp.StatusCode != http.StatusConflict || apiErrorCode(t, body) != runtime.CodeConflict {
+		t.Fatalf("release during lifecycle transition = %d %s, want 409 conflict", resp.StatusCode, body)
 	}
 
-	// The registration the held transition owns is untouched, and the agent is still
-	// running.
+	// Neither the claimed member nor its peer was stopped, and the registration the
+	// held transition owns is intact.
 	srv.hookMu.Lock()
 	token := srv.hookTokens[id]
 	_, mcpOK := srv.mcpCleanups[id]
@@ -777,6 +788,46 @@ func TestReleaseGroupRespectsLifecycleClaim(t *testing.T) {
 		t.Fatalf("release tore down a claimed agent's registration: token=%q mcp=%v", token, mcpOK)
 	}
 	waitRunning(t, srv, id, true)
+	waitRunning(t, srv, otherID, true)
+}
+
+// TS-01.R16 (INV §4/§5) — LaunchStage holds the shared lifecycle claim from
+// registration through its initial prompt, so a concurrent ordinary Stop returns
+// 409 and cannot tear down the fresh hook/MCP/settings registration.
+func TestPipelineLaunchStageRespectsLifecycleClaim(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	id := "a_pipeline_launch"
+	srv.registry.Chat().SetCommand(slowACP(t, "1", 0))
+
+	done := make(chan error, 1)
+	go func() {
+		done <- srv.LaunchStage(context.Background(), pipeline.StageExecution{
+			AgentID: id, Generation: "g_pipeline_launch", Role: "impl", Project: "tmpproj",
+			Backend: "claude", Model: "sonnet", AgentName: "Pipeline launch", Assignment: "begin",
+		})
+	}()
+	waitLifecycleClaim(t, srv, id)
+
+	resp, body := post(t, ts.URL+"/api/sessions/"+id+"/stop", nil)
+	if resp.StatusCode != http.StatusConflict || apiErrorCode(t, body) != runtime.CodeConflict {
+		t.Fatalf("stop during pipeline launch = %d %s, want 409 conflict", resp.StatusCode, body)
+	}
+	if err := <-done; err != nil {
+		t.Fatalf("LaunchStage: %v", err)
+	}
+	waitRunning(t, srv, id, true)
+
+	srv.hookMu.Lock()
+	token := srv.hookTokens[id]
+	_, mcpOK := srv.mcpCleanups[id]
+	srv.hookMu.Unlock()
+	if token == "" || !mcpOK {
+		t.Fatalf("pipeline launch registration was torn down: token=%q mcp=%v", token, mcpOK)
+	}
+	settingsPath := filepath.Join(hooks.Dir(srv.configStore.Home()), "agents", id+".json")
+	if _, err := os.Stat(settingsPath); err != nil {
+		t.Fatalf("pipeline launch hook settings missing: %v", err)
+	}
 }
 
 // TS-01.R16 (INV §4/§5) — the pipeline stage stop/continue seams take the shared

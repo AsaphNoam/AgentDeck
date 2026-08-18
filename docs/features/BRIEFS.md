@@ -4,6 +4,18 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-18 — Fix: protect pipeline launches and group releases
+
+Pipeline stages now reserve an agent while they start it and send its first assignment. Stopping that
+agent at the same moment now safely reports that it is busy, instead of leaving a running stage
+disconnected from AgentDeck. Releasing a group also now either stops the whole group or reports that
+one member is busy before stopping anyone, so a successful release never quietly leaves a member
+running.
+
+**Needs attention:** None.
+
+**Next:** Continue with the next requested change or acceptance check.
+
 ### 2026-08-18 — Review: lifecycle serialization fix
 
 Two Must-fix problems remain. A pipeline stage can still start an existing agent while another

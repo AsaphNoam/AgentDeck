@@ -117,7 +117,9 @@ shows the group label, member count, and a per-state count summary.
 group in `layout.json` (`groups.<name>.collapsed`).
 
 **R20.** A named group header offers **Release group**, which — after a confirm — stops every agent in
-that group in one action. The Ungrouped section has no release control.
+that group in one action. A lifecycle transition already in progress for any member rejects the
+whole release before it stops a member; the existing action-error toast says the person can retry
+once that transition settles. The Ungrouped section has no release control.
 
 ### Empty state & removal
 
