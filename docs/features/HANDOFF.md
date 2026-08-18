@@ -115,8 +115,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   `make build`, all 226 UI tests, presentation/style checks, and `make dist` pass. No live-browser
   pass was run. A stale migration-version guard test (asserting 13 against the shipped 14) was already
   failing on `main` and now derives its expectation from the migrations slice (INV §9).
-- **Last reviewed code:** `a0210e2` (2026-08-18), the continuous lifecycle-claim fix range after
-  `5a4ae2b`. No open findings remain.
+- **Last reviewed code:** `604866f` (2026-08-18), the continuous range after `a0210e2` covering
+  lifecycle-claim fixes, browser-local chat drafts, and the Codex resume-history fix. One open
+  browser-draft finding remains.
 - **Branch:** `main`.
 
 ## Active change
@@ -154,7 +155,14 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ### Open findings
 
-None.
+- **Must fix** — **INV §1/§5, FS-03.R7/R36:** `ui/src/components/chat/Composer.tsx` does not scope an
+  asynchronous prompt result to the draft generation it submitted. Type and send message A, then
+  type a new unsent message B for the same agent while the request is delayed (a normal wake or slow
+  network path): a successful response calls `discardChatDraft(agentId)` and deletes B from browser
+  storage, while a rejected response writes A back to storage and the live composer, overwriting B.
+  Preserve edits made after submission by capturing and checking a per-agent draft revision/value
+  before clear/restore; add delayed-success and delayed-rejection component tests that type B before
+  A resolves and verify B survives remount.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
@@ -166,6 +174,18 @@ recheck-fail cause is a concurrent resume, whose running-path nudge then deliver
 rows honestly).
 
 ## Recent changelog
+
+- 2026-08-18 — Reviewed the continuous range after `a0210e2` through `604866f` against FS-01/FS-02/
+  FS-03, TS-01/TS-03/TS-04, and every invariant class. One Must-fix finding is open (**INV §1/§5**):
+  completion of a delayed prompt send is keyed only by agent id, so it deletes or overwrites a newer
+  same-agent draft typed while the request is pending. The lifecycle-claim fixes, Codex empty-result
+  resume ownership, draft retention/validation/deletion wiring, generated UI entrypoint, and spec
+  coverage otherwise match their requirements. Not applicable: **§3** no persisted runtime/form
+  field, **§6** no new runtime, **§9** no OS/SQLite durability primitive, **§11** no collection
+  serialization boundary, **§12** no CLI invocation, **§13** no CSS, **§14** no route, and **§15** no
+  new external-effect transaction. `make check-specs`, focused runtime/server suites, all 25 focused
+  UI tests, presentation/style checks, and `git diff --check` pass; the server suite required
+  permitted loopback listeners after the sandboxed run failed to bind.
 
 - 2026-08-18 — Fixed the confirmed Codex resume-history defect (FS-01.R10, FS-03.R13, TS-04.R22,
   **INV §11**). `ChatRuntime.Resume` now treats a successful `session/load` as ownership of the
