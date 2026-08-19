@@ -30,6 +30,11 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   member nor its peer. Archive-stop remains correctly protected by the archive start gates: archive
   blocks all competing resume/wake starts before it stops an agent, so it cannot mint a competing
   registration.
+- **Previous state:** The projects canvas owns the shell padding so its background menu reaches the
+  full visible surface; file-search identity-read failures return a typed server error rather than a
+  false missing-agent result; and the dashboard context meter republishes usage during a turn. The
+  group-release stop path is integrated with the shared teardown work while retaining the all-or-none
+  lifecycle contention contract above.
 - **Previous state:** Browse for working directories is implemented (FS-04.R42/A22, TS-03.R26, TS-05.R15).
   One `POST /api/directory-picker` action runs the fixed `/usr/bin/osascript` with fixed script text
   and no shell, behind a process-wide non-blocking claim (`acquirePicker`), and answers
@@ -141,6 +146,9 @@ an explicit specification update. Remove an item when the human resolves it or q
 - [ ] Run pinned OpenCode/OpenHands launch/credential checks before claiming those backends beyond fakes.
 - [ ] Run J2 and J9 in a real macOS browser to confirm the native folder panel opens in front,
   selects, and cancels (FS-04.A22); component tests stand in until then.
+- [ ] Run J5 in a real browser to confirm a right-click anywhere on the projects canvas — including
+  the padding frame below and beside the cards — opens **New project** (FS-02.A24); the stylesheet
+  assertion stands in until then.
 - [ ] Run the Phase 7 federation discovery/precedence/refresh/launch/resume matrix against real Claude and
   Codex installations before promoting FS-08/TS-07 from Partial.
 

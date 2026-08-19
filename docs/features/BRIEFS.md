@@ -4,6 +4,19 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-19 — Fix: group release, the projects right-click margin, and smaller gaps
+
+The projects canvas now accepts **New project** right-clicks throughout its visible padding frame,
+file-search reports an identity-read failure as a failure instead of a missing agent, and the
+context meter’s mid-turn updates are specified. Group release uses the same stop-and-teardown work as
+the Stop action while reserving every member before stopping any of them: if a member is busy, the
+release returns a retryable conflict and leaves the whole group running.
+
+**Needs attention:** A live browser check of the projects-canvas right-click remains owed; the
+folder-browse browser check remains owed as well.
+
+**Next:** Run J5 in a browser, then continue with the active draft-safety fix.
+
 ### 2026-08-18 — Review: lifecycle, drafts, and Codex resume
 
 One Must-fix problem remains in chat drafts. If a message send is slow and someone starts typing the

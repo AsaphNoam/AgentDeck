@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -390,41 +391,55 @@ func (s *Server) handleCancel(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleStop implements POST /api/sessions/{id}/stop (techspec §7.5).
+func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if ae := s.stopAgent(r.Context(), id); ae != nil {
+		writeAPIError(w, ae)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"stopped": true})
+}
+
+// stopAgent is the one stop-and-teardown seam (FS-01.R34, TS-01.R16): the Stop
+// route and the group-release worker both run exactly this flow, so neither can
+// tear down a live transition's registration through its own door (INV §2).
 //
-// Stop takes the same exclusive per-agent lifecycle claim every resume and wake
-// takes (TS-01.R16). Registry.Stop cannot distinguish an in-progress resume's nil
-// sentinel from "no handle", so an unclaimed Stop arriving mid-wake fell into the
+// It takes the same exclusive per-agent lifecycle claim every resume and wake
+// takes. Registry.Stop cannot distinguish an in-progress resume's nil sentinel
+// from "no handle", so an unclaimed stop arriving mid-wake fell into the
 // idempotent branch below and tore down the wake's freshly minted hook token, MCP
 // session, and hook-settings file while the resume ran on to report success
 // (INV §4). Losing the claim returns the same conflict a losing resume returns;
-// the client may retry once the transition settles.
-func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+// the caller may retry once the transition settles.
+func (s *Server) stopAgent(ctx context.Context, id string) *runtime.APIError {
 	if !s.claimLifecycle(id) {
-		writeAPIError(w, apiError(runtime.CodeConflict, "a resume is already in progress"))
-		return
+		return apiError(runtime.CodeConflict, "a resume is already in progress")
 	}
 	defer s.releaseLifecycle(id)
-	if err := s.registry.Stop(r.Context(), id); err != nil {
-		if errors.Is(err, runtime.ErrNoHandle) {
-			// Not currently running. If the identity still exists, the agent is
-			// already stopped — make stop idempotent so a double-click or a
-			// lost-response retry reads as success, not a phantom "unknown agent".
-			// Check for orphan runtimes left by a prior crash (invariant §4).
-			if _, rerr := s.stateStore.ReadAgent(id); rerr == nil {
-				s.reapOrphanRuntime(id)
-				s.teardownAgentRegistration(id)
-				writeJSON(w, http.StatusOK, map[string]any{"stopped": true})
-				return
-			}
-			writeAPIError(w, apiError(runtime.CodeNotFound, "no such agent: "+id))
-			return
+	return s.stopAgentClaimed(ctx, id)
+}
+
+// stopAgentClaimed stops and tears down an agent whose lifecycle claim is already
+// held by the caller. Group release reserves all member claims before it stops
+// any member, preserving its all-or-nothing contention contract.
+func (s *Server) stopAgentClaimed(ctx context.Context, id string) *runtime.APIError {
+	if err := s.registry.Stop(ctx, id); err != nil {
+		if !errors.Is(err, runtime.ErrNoHandle) {
+			return apiError(runtime.CodeInternal, err.Error())
 		}
-		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
-		return
+		// Not currently running. If the identity still exists, the agent is
+		// already stopped — make stop idempotent so a double-click or a
+		// lost-response retry reads as success, not a phantom "unknown agent".
+		if _, rerr := s.stateStore.ReadAgent(id); rerr != nil {
+			return apiError(runtime.CodeNotFound, "no such agent: "+id)
+		}
+		// Check for orphan runtimes left by a prior crash (invariant §4).
+		if rerr := s.reapOrphanRuntime(id); rerr != nil {
+			s.log.Warn("reap orphan during stop", "agent_id", id, "err", rerr)
+		}
 	}
 	s.teardownAgentRegistration(id)
-	writeJSON(w, http.StatusOK, map[string]any{"stopped": true})
+	return nil
 }
 
 // handlePermission implements POST /api/sessions/{id}/permission (techspec §7.6).

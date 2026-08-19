@@ -132,6 +132,14 @@
   padding: var(--ad-space-8);
 }
 
+/* The projects canvas is its own right-click surface (FS-02.R41), so it owns the
+   shell padding instead of sitting inside it: with the padding on the frame, a
+   right-click in that 2rem strip below or beside the cards reached only
+   .app-main and opened the browser's native menu. */
+.app-main:has(> .project-dashboard) {
+  padding: 0;
+}
+
 .placeholder-view {
   display: grid;
   gap: var(--ad-space-2);
