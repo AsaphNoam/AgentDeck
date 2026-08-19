@@ -367,7 +367,10 @@ at readable contrast. — `AgentCard`/`ProjectDashboard` component tests and the
 right-click menu each open the create modal, while right-clicking a project card opens the card menu
 rather than the create menu. Submitting a valid project creates it through `POST /api/projects` and
 its card appears on the grid without a reload; an invalid submission keeps the modal open showing the
-error, and Cancel closes it with no change. — `ProjectDashboard` component test; J5.
+error, and Cancel closes it with no change. The background surface covers the whole canvas including
+the shell's padding frame (R41), which the component suite cannot observe (INV §13): the padding's
+ownership is asserted against the stylesheets, and J5 checks the live surface. —
+`ProjectDashboard` component test (behavior and stylesheet ownership); J5.
 
 **A25.** (R43) Opening **New agent** from a scoped project dashboard omits the project
 picker and launches with the route project's id; the general modal continues to offer its picker. —

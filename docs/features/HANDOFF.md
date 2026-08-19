@@ -138,20 +138,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ### Open findings
 
-- **Worth fixing** — **INV §10/§13** — The projects background menu still misses the canvas padding,
-  and its regression cannot fail. `.project-dashboard` gained `min-block-size: 100%`
-  (`ui/src/styles/features/dashboard.css:382`), but it is a child of `<main class="app-main">`, whose
-  `padding: var(--ad-space-8)` sits outside it (`ui/src/styles/features/shell.css:130`). A right-click
-  in that 2rem frame — the strip below the canvas, or either side margin — still reaches only
-  `.app-main` and opens the browser's native menu, while FS-02.R41 requires any point in the projects
-  view that is not a project card to open **New project**. Separately,
-  `ProjectDashboard.test.tsx`'s updated case fires `contextMenu` on `.project-dashboard` with
-  coordinates, which jsdom resolves with no layout, so it passes against the pre-fix stylesheet too:
-  the fix has no automated regression (INV §13 — the suite cannot see CSS). Fix by giving the
-  interaction surface the padding (move it from `.app-main` to `.project-dashboard`) or by owning the
-  background event at the route-level container, and pin it with a computed-style/stylesheet
-  assertion or the J5 browser journey rather than a DOM-only case.
-
 - **Worth fixing** — **INV §10** — Specification drift: the mid-turn context republish is
   unspecified, and TS-04.R25 still describes the behavior it replaced. `internal/runtime/chat.go`'s `usage_update`
   branch now calls `republishContextPct`, writing the status row and publishing a `state_update` on
@@ -168,6 +154,15 @@ are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
 
+- 2026-08-19 — Fixed the projects background menu missing the canvas padding, and gave it a
+  regression that can fail (FS-02.R41/A24; **INV §10/§13**). `.project-dashboard` filled the canvas
+  but sat inside `<main class="app-main">`'s 2rem padding, so a right-click in that frame — the strip
+  below the last card or either side margin — reached only `.app-main` and opened the browser's native
+  menu. The projects canvas now owns that padding (`.app-main:has(> .project-dashboard)` drops it),
+  which leaves every other route's geometry untouched. Because Testing Library and jsdom evaluate no
+  CSS, the DOM case passed against the pre-fix stylesheet; the new `ProjectDashboard.test.tsx` case
+  asserts the padding's ownership against the stylesheets themselves and fails against the old rules.
+  A22's live J5 pass remains the only check of the rendered surface.
 - 2026-08-19 — Fixed the file-search identity read reporting a storage failure as a missing agent
   (TS-03.R24; **INV §7**). `handleFileSearch` mapped every `ReadAgent` error to `404 no such agent`,
   three lines above the running read that already separates `state.ErrNotFound` from a real failure;

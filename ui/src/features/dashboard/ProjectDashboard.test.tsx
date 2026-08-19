@@ -1,4 +1,6 @@
 import React from "react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { fireEvent, render, screen, cleanup, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -144,6 +146,19 @@ describe("ProjectDashboard", () => {
     expect(await screen.findByRole("button", { name: "Rename" })).toBeInTheDocument();
     // Only the persistent header button remains; the create menu never opened.
     expect(screen.getAllByRole("button", { name: "New project" })).toHaveLength(1);
+  });
+
+  // FS-02.R41 / INV §13: the canvas must own the shell's 2rem padding. That frame
+  // is part of the projects view, but it belongs to <main class="app-main">, so
+  // with the padding there a right-click below or beside the cards reaches only
+  // .app-main and opens the browser's native menu. jsdom evaluates no layout, so
+  // the DOM case above passes either way — the stylesheet is the only witness.
+  it("gives the projects canvas the shell padding instead of leaving it on the frame", () => {
+    const css = (file: string) => readFileSync(join(process.cwd(), "src/styles/features", file), "utf8");
+    const dashboard = css("dashboard.css").match(/\.project-dashboard \{[^}]*\}/)!;
+    expect(dashboard[0]).toMatch(/padding:\s*var\(--ad-space-8\)/);
+    expect(dashboard[0]).toMatch(/min-block-size:\s*100%/);
+    expect(css("shell.css")).toMatch(/\.app-main:has\(>\s*\.project-dashboard\)\s*\{[^}]*padding:\s*0/);
   });
 
   // FS-02.A24: a valid submission creates the project through POST /api/projects

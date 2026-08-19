@@ -379,7 +379,7 @@
 .context-menu hr {
   margin: var(--ad-space-1) 0;
 }
-.project-dashboard { display: grid; gap: var(--ad-space-4); min-block-size: 100%; }
+.project-dashboard { display: grid; gap: var(--ad-space-4); min-block-size: 100%; padding: var(--ad-space-8); }
 .project-dashboard-header { align-items: center; display: flex; gap: var(--ad-space-4); justify-content: space-between; }
 .project-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: var(--ad-space-4); }
 .project-card { --ad-project-accent: var(--ad-project-fallback); background: color-mix(in srgb, var(--ad-project-accent) 9%, var(--ad-surface-panel)); border: var(--ad-border-thin) solid color-mix(in srgb, var(--ad-project-accent) 50%, var(--ad-border-strong)); border-radius: var(--ad-radius-large); box-shadow: var(--ad-shadow-project-edge); cursor: pointer; display: grid; gap: var(--ad-space-2); padding: var(--ad-space-4) var(--ad-space-4) var(--ad-space-4) var(--ad-space-6); position: relative; }
