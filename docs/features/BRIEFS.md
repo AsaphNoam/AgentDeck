@@ -4,6 +4,33 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-19 — Fix: group release, the projects right-click margin, and three smaller gaps
+
+All five findings from the last review are fixed. Releasing a task group no longer breaks an agent
+that a teammate's message is waking at the same moment: release and the Stop button now run one
+shared stop routine that takes the same exclusive lock, so the release reports that member as not
+stopped and leaves the waking agent's messaging credentials and status wiring intact — press Release
+again once the agent finishes waking and it stops normally. Release also now cleans up one credential
+it used to leave behind.
+
+Right-clicking anywhere on the projects page now opens **New project**, including the outer margin
+below and beside the cards, which was still falling through to the browser's own menu. Because the
+test suite cannot see styling at all, the previous test for this passed against the broken page; the
+new one reads the stylesheet directly and does fail against it. The file picker in the chat box no
+longer says "no such agent" when the database read behind it fails — it reports the failure as a
+failure. And two written requirements now match the product: the context-usage meter is described as
+moving during a turn (which it does), and the Stop button's requirement no longer promises an
+automatic retry that nothing performs.
+
+**Needs attention:** Two things worth your call. The projects-page fix is styling only, so it needs
+one look in a real browser to confirm; the same is still owed for the folder-browse button. And when
+a group release skips a member, the dashboard says nothing — the server reports it, the page ignores
+it. I left that alone rather than widening this fix; tell me if you want the release result surfaced,
+or the Stop button to retry itself instead of showing a failure.
+
+**Next:** Open the projects page in a browser and right-click in the margin below the cards; if it
+opens **New project**, this run is done and the fixes are ready for a review pass.
+
 ### 2026-08-18 — Review: waking stopped agents, pipeline proposals, the projects menu, and folder browsing
 
 I reviewed everything committed since the last review — the fixes for waking a stopped agent when

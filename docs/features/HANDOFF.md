@@ -7,13 +7,31 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** Reviewed `74da884..5a4ae2b` (wake/proposal/context fixes, the projects background-menu
-  investigation and fix, browse for working directories). Five findings are open below: one INV §2/§4
-  registration-teardown race on the group-release route, one residual INV §10/§13 gap in the projects
-  background menu, one INV §7 read-path defect beside the one just fixed, one missing specification
-  for the mid-turn context republish, and one FS-01.R34 statement no client implements. No **Must
-  fix** finding: nothing in the range is a likely normal-use failure or data-loss risk.
-  Browse for working directories is implemented (FS-04.R42/A22, TS-03.R26, TS-05.R15).
+- **State:** All five review findings from `74da884..5a4ae2b` are fixed; none remain open below.
+  **Group release** no longer stops its members through its own spelling of stop + cleanup: it and
+  `POST /api/sessions/{id}/stop` share one `stopAgent` seam (`internal/server/sessions.go`) that takes
+  the exclusive per-agent lifecycle claim, so a release landing inside a live wake reports that member
+  as not stopped instead of reading the resume's nil sentinel as "no handle" and deleting the hook
+  token, MCP session, and hook-settings file the wake had just minted (FS-01.R34/A18, FS-02.R20,
+  TS-01.R16, INV §2/§4). Release also now tears down the hook token it previously left behind.
+  **File search** requires a genuinely absent row for both its rejections, so a failing identity read
+  is a `500` rather than `404 no such agent` (TS-03.R24, INV §7). **The projects canvas** owns the
+  shell's 2rem padding (`.app-main:has(> .project-dashboard)` drops it), so a right-click in the strip
+  below the last card opens **New project** instead of the browser's native menu, and the new
+  `ProjectDashboard.test.tsx` case asserts that ownership against the stylesheets because jsdom sees
+  no CSS (FS-02.R41/A24, INV §13). **Specification**: TS-04.R25 now records the mid-turn `context_pct`
+  republish through the status write+touch seam with FS-02.R26 owning the user-visible half, and
+  FS-01.R34 says a losing stop **may** be retried instead of promising a client retry nothing performs
+  (matching TS-03.R25). New regressions: `TestReleaseGroupDuringWakeKeepsRegistration`, an identity-read
+  and an unknown-agent case in `TestFileSearchStorageErrorIsNotAStoppedAgent`, and the
+  `ProjectDashboard` stylesheet case — each confirmed to fail against the pre-fix code.
+  `make check-specs`, both Go test modes, focused `-race` on the release/stop/wake paths (`-count=2`),
+  `make build`, all 233 UI tests, presentation/style checks, and `make dist` pass. **No live browser
+  pass was run: the projects-canvas fix is CSS, so J5 in a real browser is owed, as are J2/J9.**
+  One note for the next review: `POST /api/groups/{group}/release` returns per-agent results and
+  `CardGrid` ignores them, so a member reported as not stopped is silent on screen (INV §8); that
+  gap predates this fix and was left in place rather than widened into UI plumbing.
+- **Previous state:** Browse for working directories is implemented (FS-04.R42/A22, TS-03.R26, TS-05.R15).
   One `POST /api/directory-picker` action runs the fixed `/usr/bin/osascript` with fixed script text
   and no shell, behind a process-wide non-blocking claim (`acquirePicker`), and answers
   `200 {"path"}` for a verified existing absolute directory, `204` for cancel,
@@ -73,34 +91,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   before exec'ing the fake adapter) makes the lifecycle races deterministic instead of timing-based.
   `make check-specs`, both Go test modes, focused `-race` on the lifecycle/wake paths, `make build`,
   all 227 UI tests, presentation/style checks, and `make dist` pass. No live-browser pass was run.
-- **Previous state:** Wake-on-message for stopped chat agents is implemented (FS-01.R33/A17, FS-03.R35/A18,
-  FS-06.R22/R23/A11, TS-01.R16, TS-03.R25, TS-04.R26). A prompt to a stopped chat agent that passes
-  the wake gates now resumes it inside the same `POST /prompt` request and then delivers the prompt;
-  agent mail makes such an agent addressable, and the nudger wakes it before the ordinary
-  `check_messages` nudge. `handleResume` was split so one `resumeSession` helper runs every resume —
-  explicit, prompt wake, and mail wake — behind a new exclusive per-agent claim (`claimResume`) taken
-  before any registration side effect, so a losing racer returns `409` without composing or tearing
-  down the winner's hook token, MCP registration, or hook-settings file. The wake gates are ordinary
-  Resume's gates plus a wake-only exclusion of pipeline-associated agents; the database-checkable half
-  is one shared query (`StoppedWakeCandidates`) that also builds the addressable set behind
-  `list_agents` and `send_message`, while the project-archive gate stays in the server because it
-  reads configuration. `list_agents` entries gained the additive `availability` field
-  (`running`/`stopped_wakeable`) with `state` unchanged. A failed mail wake is bounded durably: it
-  stamps the recipient's still-`pending` unread rows `wake_failed` in the existing `delivered_via`
-  column (no migration), and candidacy requires a `pending` row, so the bound survives restarts and
-  same-second mail and re-arms only on new mail; a losing claim is not a failed wake and leaves the
-  rows pending. The stopped-agent composer submits normally and now surfaces the server's own typed
-  error while keeping the draft. FS-01, FS-03, FS-06, and TS-03 moved Partial→Current; TS-01 and
-  TS-04 stay Partial. New regressions: `internal/server/wake_test.go` (wake, gate exclusions, failure
-  teardown, three-way concurrent wake, mail wake/nudge, durable failed-wake bound, pipeline
-  exclusion), `TestStoppedWakeCandidates`, `TestPendingWakeMailAgents`, and two `Composer.test.tsx`
-  cases. `make check-specs`, both Go test modes, focused `-race` on the concurrent-wake paths,
-  `make build`, all 226 UI tests, presentation/style checks, and `make dist` pass. No live-browser
-  pass was run. A stale migration-version guard test (asserting 13 against the shipped 14) was already
-  failing on `main` and now derives its expectation from the migrations slice (INV §9).
 - **Last reviewed code:** `5a4ae2b` (2026-08-18), the continuous range after `74da884`: the
   wake/proposal/context fixes, the projects background-menu investigation and fix, and browse for
-  working directories. Five findings are open below.
+  working directories. All five of that review's findings are now fixed; the fixes themselves are
+  unreviewed.
 - **Branch:** `main`.
 
 ## Active change
@@ -124,6 +118,9 @@ an explicit specification update. Remove an item when the human resolves it or q
 - [ ] Run pinned OpenCode/OpenHands launch/credential checks before claiming those backends beyond fakes.
 - [ ] Run J2 and J9 in a real macOS browser to confirm the native folder panel opens in front,
   selects, and cancels (FS-04.A22); component tests stand in until then.
+- [ ] Run J5 in a real browser to confirm a right-click anywhere on the projects canvas — including
+  the padding frame below and beside the cards — opens **New project** (FS-02.A24); the stylesheet
+  assertion stands in until then.
 - [ ] Run the Phase 7 federation discovery/precedence/refresh/launch/resume matrix against real Claude and
   Codex installations before promoting FS-08/TS-07 from Partial.
 
