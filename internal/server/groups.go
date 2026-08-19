@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"sync"
 
@@ -54,19 +53,13 @@ func (s *Server) releaseAgents(ctx context.Context, ids []string) []releaseGroup
 			for idx := range jobs {
 				id := ids[idx]
 				res := releaseGroupResult{AgentID: id, OK: true}
-				if err := s.registry.Stop(ctx, id); err != nil {
-					if !errors.Is(err, runtime.ErrNoHandle) {
-						res.OK = false
-						res.Error = err.Error()
-					}
-					// ErrNoHandle: check for orphan runtimes (invariant §4).
-					if rerr := s.reapOrphanRuntime(id); rerr != nil {
-						s.log.Warn("reap orphan during release", "agent_id", id, "err", rerr)
-					}
-				}
-				if res.OK {
-					s.cleanupMessagingMCP(id)
-					s.cleanupHookSettings(id)
+				// Release runs the shared stop-and-teardown seam, so a member
+				// whose start/stop transition is already in flight is reported
+				// as not stopped instead of tearing down that transition's
+				// registration (FS-01.R34, INV §2/§4).
+				if ae := s.stopAgent(ctx, id); ae != nil {
+					res.OK = false
+					res.Error = ae.Message
 				}
 				results[idx] = res
 			}

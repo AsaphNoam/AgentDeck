@@ -117,7 +117,10 @@ shows the group label, member count, and a per-state count summary.
 group in `layout.json` (`groups.<name>.collapsed`).
 
 **R20.** A named group header offers **Release group**, which — after a confirm — stops every agent in
-that group in one action. The Ungrouped section has no release control.
+that group in one action. The Ungrouped section has no release control. Each member is stopped
+through the shared exclusive stop-and-teardown transition (FS-01.R34), so a member whose start/stop
+transition is already in flight is reported as not stopped for that action rather than having the
+live transition torn down; releasing the group again stops it once the transition settles.
 
 ### Empty state & removal
 
