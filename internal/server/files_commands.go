@@ -72,6 +72,13 @@ func (s *Server) handleFileSearch(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	agent, err := s.stateStore.ReadAgent(id)
 	if err != nil {
+		// As with the running read below, only a missing row means "no such
+		// agent": a failing identity read is a storage fault, not a verdict that
+		// the agent does not exist (TS-03.R24, INV §7).
+		if !errors.Is(err, state.ErrNotFound) {
+			writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
+			return
+		}
 		writeAPIError(w, apiError(runtime.CodeNotFound, "no such agent: "+id))
 		return
 	}

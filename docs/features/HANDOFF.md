@@ -152,14 +152,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
   background event at the route-level container, and pin it with a computed-style/stylesheet
   assertion or the J5 browser journey rather than a DOM-only case.
 
-- **Worth fixing** — **INV §7** — `handleFileSearch` still reports a storage failure as a missing
-  agent. `internal/server/files_commands.go:73-76` maps every `ReadAgent` error to
-  `404 no such agent`, three lines above the `ReadRunning` branch this same range corrected to
-  separate `state.ErrNotFound` from a real storage failure. A locked or failing SQLite read therefore
-  tells the composer the agent does not exist — the exact confusion TS-03.R24's new sentence records
-  for the running read. Fix by mirroring the branch below (`errors.Is(err, state.ErrNotFound)` → 404,
-  otherwise `CodeInternal`), tested beside `TestFileSearchStorageErrorIsNotAStoppedAgent`.
-
 - **Worth fixing** — **INV §10** — Specification drift: the mid-turn context republish is
   unspecified, and TS-04.R25 still describes the behavior it replaced. `internal/runtime/chat.go`'s `usage_update`
   branch now calls `republishContextPct`, writing the status row and publishing a `state_update` on
@@ -176,6 +168,14 @@ are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
 
+- 2026-08-19 — Fixed the file-search identity read reporting a storage failure as a missing agent
+  (TS-03.R24; **INV §7**). `handleFileSearch` mapped every `ReadAgent` error to `404 no such agent`,
+  three lines above the running read that already separates `state.ErrNotFound` from a real failure;
+  a locked or failing SQLite read told the composer the agent does not exist. Both rejections now
+  require a genuinely absent row. `TestFileSearchStorageErrorIsNotAStoppedAgent` gained the identity
+  case (confirmed failing pre-fix) plus an unknown-agent case so the `404` path stays pinned. The
+  three sibling handlers (`files`, `commands`, `available-commands`) still map every `ReadAgent`
+  error to `404`; that sweep is not in this fix's scope.
 - 2026-08-19 — Fixed the group-release teardown race and the Stop-retry promise (FS-01.R34/A18,
   FS-02.R20, TS-01.R16; **INV §2/§4** and **INV §10**). `POST /api/groups/{group}/release` no longer
   stops its members through its own spelling of stop + cleanup: both it and
