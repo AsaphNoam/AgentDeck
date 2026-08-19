@@ -225,8 +225,9 @@ containment is checked before a result is returned.
 `{agent_id,commands:[{name,description,input_hint?}]}` from TS-04.R24's latest in-memory snapshot.
 It does not ask the adapter to refresh and creates no persisted row or transcript event. Both lists
 obey R6. An unknown agent is `404`; an existing stopped or non-chat agent uses the shared typed
-runtime/conflict error. "Stopped" means the running record is genuinely absent: a storage failure
-reading it is surfaced as such, not reported as a stopped agent (INV §7). Search, Git, traversal, or
+runtime/conflict error. Both rejections require a genuinely absent row: a storage failure reading
+either the identity record or the running record is surfaced as such, never reported as an unknown or
+a stopped agent (INV §7). Search, Git, traversal, or
 command-source unavailability returns the safe
 R3 error/empty shape required by FS-03.R32 and never affects the prompt route. The TypeScript client,
 mocks, and component consumers ship with both handlers under R11.
