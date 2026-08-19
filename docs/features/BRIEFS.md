@@ -4,6 +4,24 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-19 — Fix: unsent chat drafts survive a slow send
+
+Typing a new message in a chat while an earlier message is still being sent no longer loses your new
+text. Before, if the first send finished the new draft was deleted, and if the first send failed the
+new draft was replaced with the older message. Each send now clears or restores only the exact text
+it submitted, so anything you type afterward for that chat is left untouched — whether the earlier
+send succeeds or fails.
+
+While confirming the fix I found the full test suite was already failing on the main branch, on a
+check unrelated to this change: a group-release test still expected the old behavior from before
+group release was hardened to stop every member together or none. I updated that test to match the
+shipped behavior, so the suite is green again.
+
+**Needs attention:** None.
+
+**Next:** Resume normal review/fix work; the live browser checks noted below (projects right-click,
+folder browse) are still owed.
+
 ### 2026-08-19 — Fix: group release, the projects right-click margin, and smaller gaps
 
 The projects canvas now accepts **New project** right-clicks throughout its visible padding frame,

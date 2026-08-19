@@ -547,13 +547,14 @@ func TestStopDuringWakeConflictsAndKeepsRegistration(t *testing.T) {
 	waitRunning(t, srv, id, false)
 }
 
-// FS-01.A18 / FS-02.R20 (INV §2/§4) — Release group runs the same exclusive
-// stop-and-teardown seam as Stop, so a release landing inside a wake reports that
-// member as not stopped instead of deleting the live wake's hook token, MCP
-// session, and hook-settings file. Before the shared seam the release worker
-// stopped without the lifecycle claim, read the in-progress resume's nil sentinel
-// as "no handle", counted the member as released, and cleaned up the artifacts the
-// wake had just minted — the FS-01.R34 defect reached through a second door.
+// FS-01.A18 / FS-02.R20 / TS-03.R27 (INV §2/§4/§5) — Release group reserves every
+// member's lifecycle claim before stopping any, so a release landing inside a wake
+// fails closed with a retryable 409 and stops no member, leaving the live wake's
+// hook token, MCP session, and hook-settings file intact. Before the shared claim
+// the release worker stopped without the lifecycle claim, read the in-progress
+// resume's nil sentinel as "no handle", counted the member as released, and cleaned
+// up the artifacts the wake had just minted — the FS-01.R34 defect reached through
+// a second door.
 func TestReleaseGroupDuringWakeKeepsRegistration(t *testing.T) {
 	srv, ts := wakeTestServer(t)
 	resp, body := post(t, ts.URL+"/api/sessions", map[string]string{"role": "impl", "project": "tmpproj", "group": "auth"})
@@ -578,18 +579,15 @@ func TestReleaseGroupDuringWakeKeepsRegistration(t *testing.T) {
 	}()
 	waitLifecycleClaim(t, srv, id)
 
+	// The release reserves every member claim before stopping any, so a member
+	// mid-wake makes the whole release fail closed with a retryable 409 and stops
+	// nobody (FS-02.R20/TS-03.R27, all-or-none).
 	resp, body = post(t, ts.URL+"/api/groups/auth/release", nil)
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("release status = %d: %s", resp.StatusCode, body)
+	if resp.StatusCode != http.StatusConflict || apiErrorCode(t, body) != runtime.CodeConflict {
+		t.Fatalf("release during wake = %d %s, want 409 conflict", resp.StatusCode, body)
 	}
 	var released struct {
 		Stopped []releaseGroupResult `json:"stopped"`
-	}
-	if err := json.Unmarshal(body, &released); err != nil {
-		t.Fatalf("decode release response (%v): %s", err, body)
-	}
-	if len(released.Stopped) != 1 || released.Stopped[0].OK {
-		t.Fatalf("release during wake = %+v, want one not-OK result: %s", released.Stopped, body)
 	}
 
 	if got := <-resumed; got != http.StatusOK {

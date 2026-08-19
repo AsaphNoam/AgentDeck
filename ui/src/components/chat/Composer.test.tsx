@@ -247,6 +247,52 @@ describe("Composer autocomplete", () => {
     expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("first draft");
   });
 
+  // INV §1/§5 — a delayed send's completion is scoped to the draft generation it
+  // submitted, so a newer same-agent draft typed while the request is in flight
+  // is never discarded on success nor overwritten on failure.
+  it("keeps a newer same-agent draft typed while a successful send is in flight", async () => {
+    server.use(
+      http.post("/api/sessions/:id/prompt", () => new Promise<Response>((resolve) => { resolvePrompt = resolve; })),
+    );
+    const view = render(<Composer agentId="a_1" busy={false} />);
+    const ta = screen.getByRole("textbox") as HTMLTextAreaElement;
+    type(ta, "message A");
+    fireEvent.keyDown(ta, { key: "Enter" });
+    await waitFor(() => expect(ta.value).toBe(""));
+
+    // The person starts a new draft for the same chat before A's send resolves.
+    type(ta, "message B");
+    resolvePrompt?.(HttpResponse.json({}, { status: 202 }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // A's accepted send must not discard the newer draft B.
+    expect(ta.value).toBe("message B");
+    view.unmount();
+    render(<Composer agentId="a_1" busy={false} />);
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("message B");
+  });
+
+  it("keeps a newer same-agent draft typed while a rejected send is in flight", async () => {
+    server.use(
+      http.post("/api/sessions/:id/prompt", () => new Promise<Response>((resolve) => { resolvePrompt = resolve; })),
+    );
+    const view = render(<Composer agentId="a_1" busy={false} />);
+    const ta = screen.getByRole("textbox") as HTMLTextAreaElement;
+    type(ta, "message A");
+    fireEvent.keyDown(ta, { key: "Enter" });
+    await waitFor(() => expect(ta.value).toBe(""));
+
+    type(ta, "message B");
+    resolvePrompt?.(HttpResponse.json({ error: { code: "agent_archived", message: "agent is archived" } }, { status: 409 }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // A's rejection must not overwrite the newer draft B with the sent text.
+    expect(ta.value).toBe("message B");
+    view.unmount();
+    render(<Composer agentId="a_1" busy={false} />);
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("message B");
+  });
+
   it("stays usable when the file source is unavailable", async () => {
     failFileSearch = true;
     render(<Composer agentId="a_1" busy={false} />);
