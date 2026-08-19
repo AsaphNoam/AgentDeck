@@ -7,7 +7,17 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** The confirmed Codex resume-history defect is fixed. `ChatRuntime.Resume` now treats a
+- **State:** The one open browser-draft finding is fixed. A delayed prompt send now scopes its
+  completion to the draft generation it submitted — `drafts.ts` keeps a per-agent revision that
+  every mutation bumps, and `Composer.submit` captures it before sending. A newer same-agent draft
+  typed while the request is in flight is neither discarded on acceptance nor overwritten on
+  rejection; only the exact submitted draft is cleared or restored (FS-03.R7/R36, **INV §1/§5**).
+  Separately — and unrelated to the finding — a pre-existing red trunk test was reconciled to shipped
+  behavior: `TestReleaseGroupDuringWakeKeepsRegistration` still asserted the superseded
+  200/per-member group-release result, but the shipped all-or-none contract reserves every member
+  claim first and returns a retryable `409` with no member stopped (FS-02.R20/TS-03.R27). The test
+  now asserts that; `make test` was red on `main` before this. Review findings are empty.
+- **Previous state:** The confirmed Codex resume-history defect is fixed. `ChatRuntime.Resume` now treats a
   successful `session/load` as ownership of the requested session id — the pinned `codex-acp` returns
   an empty success result, and the runtime keeps the requested id authoritative instead of re-minting
   through `session/new` and abandoning the provider conversation. A non-empty echoed id still wins;
@@ -121,8 +131,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   pass was run. A stale migration-version guard test (asserting 13 against the shipped 14) was already
   failing on `main` and now derives its expectation from the migrations slice (INV §9).
 - **Last reviewed code:** `604866f` (2026-08-18), the continuous range after `a0210e2` covering
-  lifecycle-claim fixes, browser-local chat drafts, and the Codex resume-history fix. One open
-  browser-draft finding remains.
+  lifecycle-claim fixes, browser-local chat drafts, and the Codex resume-history fix. Its one open
+  browser-draft finding is now fixed.
 - **Branch:** `main`.
 
 ## Active change
@@ -163,14 +173,7 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ### Open findings
 
-- **Must fix** — **INV §1/§5, FS-03.R7/R36:** `ui/src/components/chat/Composer.tsx` does not scope an
-  asynchronous prompt result to the draft generation it submitted. Type and send message A, then
-  type a new unsent message B for the same agent while the request is delayed (a normal wake or slow
-  network path): a successful response calls `discardChatDraft(agentId)` and deletes B from browser
-  storage, while a rejected response writes A back to storage and the live composer, overwriting B.
-  Preserve edits made after submission by capturing and checking a per-agent draft revision/value
-  before clear/restore; add delayed-success and delayed-rejection component tests that type B before
-  A resolves and verify B survives remount.
+None.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
@@ -182,6 +185,23 @@ recheck-fail cause is a concurrent resume, whose running-path nudge then deliver
 rows honestly).
 
 ## Recent changelog
+
+- 2026-08-19 — Fixed the open Must-fix browser-draft finding (**INV §1/§5**, FS-03.R7/R36). A
+  delayed prompt send now scopes its completion to the draft generation it submitted: `drafts.ts`
+  keeps an in-memory per-agent revision that every draft mutation bumps, and `Composer.submit`
+  captures it before sending, so it discards on acceptance and restores on rejection only when the
+  draft is unchanged. A newer same-agent draft typed while the request is in flight now survives
+  both outcomes. FS-03.R36 and A19 gained a clarifying clause for the in-flight scoping (behavior
+  restoration, not new behavior). Two new `Composer.test.tsx` cases (delayed success and delayed
+  rejection typing B before A resolves and verifying B survives remount) were confirmed failing
+  against the pre-fix code. While verifying, `make test` was found already red on `main` on a test
+  unrelated to the finding: `TestReleaseGroupDuringWakeKeepsRegistration` still asserted the
+  superseded 200/per-member group-release contract, contradicting the shipped all-or-none behavior
+  (reserve every member claim first, return one retryable `409`, stop no member — FS-02.R20/
+  TS-03.R27) that the newer `TestReleaseGroupRespectsLifecycleClaim` already pins. The stale test
+  was reconciled to the shipped contract. `make check-specs`, both Go test modes, focused `-race` on
+  the group-release path, all 241 UI tests, `npm run build`, `make build`, and `make dist` pass. No
+  live-browser pass was run.
 
 - 2026-08-18 — Reviewed the continuous range after `a0210e2` through `604866f` against FS-01/FS-02/
   FS-03, TS-01/TS-03/TS-04, and every invariant class. One Must-fix finding is open (**INV §1/§5**):

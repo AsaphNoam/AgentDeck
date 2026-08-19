@@ -61,7 +61,10 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   deletion event, while archiving does not. A rejected send keeps or restores the same draft for
   retry. Drafts do not expire, enter the transcript, reach an agent or server API, or sync to another
   browser profile or device. The browser retains at most the 20 most recently edited non-empty chat
-  drafts; creating or editing another discards the least recently edited retained draft.
+  drafts; creating or editing another discards the least recently edited retained draft. Draft
+  removal and restoration are scoped to the exact text a send submitted: a newer draft typed for the
+  same agent while that send is still in flight is left untouched — it is not discarded when the
+  earlier send is accepted, nor overwritten when the earlier send is rejected.
 - **R8.** A prompt moves the agent synchronously to `busy`. ACP output is emitted as ordered
   transcript events and a final `turn_end`; successful completion returns the agent to `idle`,
   clears `busy_since`, and updates context usage (which also updates during the turn as the runtime
@@ -307,7 +310,9 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   branches; the end-to-end wake itself is FS-01.A17's server test.
 - **A19** (R7, R36) — Distinct text entered in two chat composers survives navigation,
   remount, and page reload and restores only in its matching chat. An accepted prompt and manually
-  empty composer remove their drafts; a rejected prompt restores and retains its exact text. Agent
+  empty composer remove their drafts; a rejected prompt restores and retains its exact text. A newer
+  same-agent draft typed while an earlier send is in flight survives both that send's acceptance and
+  its rejection. Agent
   deletion removes its draft, and retaining a twenty-first draft evicts the least recently edited
   entry. No draft is included in a transcript or prompt request before Send. *Verify:*
   browser-storage-backed `Composer` and deletion-event component/unit cases plus a manual

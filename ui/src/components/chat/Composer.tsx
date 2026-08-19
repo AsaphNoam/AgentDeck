@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { cancelTurn, getAvailableCommands, searchSessionFiles, sendPrompt } from "../../api/client";
 import type { AvailableCommand } from "../../api/types";
 import { useTranscriptStore } from "../../store/transcriptStore";
-import { discardChatDraft, getChatDraft, setChatDraft } from "./drafts";
+import { chatDraftRevision, discardChatDraft, getChatDraft, setChatDraft } from "./drafts";
 
 // Composer owns one reusable keyboard-operated autocomplete picker for `@` files
 // and `#` ACP commands (FS-03.R30–R34). Both insert ordinary composer text — no
@@ -148,14 +148,22 @@ export function Composer({ agentId, busy }: { agentId: string; busy: boolean }) 
     if (!prompt.trim()) return;
     setError(null);
     append(agentId, { kind: "user_text", text: prompt, message_id: `local-${Date.now()}` });
+    // Capture the draft generation this send owns. If the person edits the draft
+    // for this agent while the request is in flight, the completion must leave
+    // that newer draft alone instead of discarding or overwriting it (INV §1/§5).
+    const draftRev = chatDraftRevision(agentId);
     setText("");
     setTrigger(null);
     try {
       // A stopped chat agent is woken by this same request (FS-03.R35), so the
       // composer submits normally and only the reply takes longer to start.
       await sendPrompt(agentId, prompt);
-      discardChatDraft(agentId);
+      // Only clear the draft we actually sent; a newer same-agent draft survives.
+      if (chatDraftRevision(agentId) === draftRev) discardChatDraft(agentId);
     } catch (err) {
+      // A newer same-agent draft typed while the request was pending wins: leave
+      // it and its live composer untouched rather than restoring the sent text.
+      if (chatDraftRevision(agentId) !== draftRev) return;
       // Surface the server's own typed error — a rejected wake included — and
       // restore the draft so the user can retry; the optimistic bubble stays,
       // but the error makes clear it was not delivered.
