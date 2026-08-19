@@ -138,7 +138,11 @@ hook-settings file remain intact and in use.
 indistinguishable from "this agent is not running", so an unclaimed Stop landing inside a wake took
 the idempotent already-stopped path — reaping and running `teardownAgentRegistration` on the
 artifacts the live resume had just minted — and answered success while that resume continued.
-A Stop that loses the claim returns the same conflict a losing resume returns.
+A Stop that loses the claim returns the same conflict a losing resume returns. Because the claim is
+the only thing standing between a stop and a live resume's registration, **every** stopping verb runs
+one shared server-side stop-and-teardown helper rather than its own spelling of stop + cleanup
+(INV §2): the Stop route and group release (FS-02.R20) both call it, since a second unclaimed stop
+path reintroduces the identical defect through a different door.
 
 **R17 (planned) — Chat drafts stay in one bounded browser-local seam.** One feature-local UI module
 owns a single `localStorage` record containing non-empty draft text and last-edited timestamps keyed

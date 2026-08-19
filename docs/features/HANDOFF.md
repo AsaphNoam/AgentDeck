@@ -138,22 +138,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ### Open findings
 
-- **Worth fixing** — **INV §2/§4** — Group release tears down an in-flight wake's registration
-  because it does not take the new lifecycle claim. `releaseAgents`
-  (`internal/server/groups.go:41-77`) builds its id list from `ListAgents()`, which includes stopped
-  agents, and runs `registry.Stop` + `cleanupMessagingMCP` + `cleanupHookSettings` per agent with no
-  `claimLifecycle`. Normal-use trigger: a stopped agent in a task group receives mail, the nudger's
-  wake is inside `resumeSession` (hook token minted, MCP registered, hook-settings written, adapter
-  launching), and `POST /api/groups/{group}/release` runs for that group. `registry.Stop` returns
-  `ErrNoHandle`, the worker still counts the result OK, and the two cleanups delete the artifacts the
-  live wake just minted; the wake then reports success and the agent runs with a revoked MCP token
-  and no hook-settings file — messaging tools and status hooks silently dead. This is the same defect
-  FS-01.R34/TS-01.R16 just closed for `POST /api/sessions/{id}/stop`, reached through a second door.
-  Fix by taking `claimLifecycle` inside the release worker (report a loser as not-OK rather than
-  cleaning up) or by routing both verbs through one shared stop-and-teardown helper. Test: reuse the
-  `slowACP` setup from `TestStopDuringWakeConflictsAndKeepsRegistration`, drive the release route
-  instead of stop, and assert the wake's hook token, MCP registration, and hook-settings file survive.
-
 - **Worth fixing** — **INV §10/§13** — The projects background menu still misses the canvas padding,
   and its regression cannot fail. `.project-dashboard` gained `min-block-size: 100%`
   (`ui/src/styles/features/dashboard.css:382`), but it is a child of `<main class="app-main">`, whose
@@ -186,21 +170,22 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
   immediate republish through the status write+touch seam and giving the user-visible half a home in
   FS-02.R26 or FS-03.R8; the regression (`TestUsageUpdateRepublishesContextPctMidTurn`) already exists.
 
-- **Worth fixing** — **INV §10** — FS-01.R34 promises a Stop retry that nothing performs. R34 says a Stop losing the
-  claim "returns `409 conflict` instead of reporting success, and is retried once the transition
-  settles", but `stopAgent` (`ui/src/api/client.ts:93`) has no retry and
-  `ui/src/components/grid/CardContextMenu.tsx:159` surfaces "Stop failed" with the server's "a resume
-  is already in progress". TS-03.R25 states the honest version ("which the client may retry"). Normal
-  trigger: a person presses Stop on a card while mail is waking that agent and gets a failure toast
-  for an action the requirement presents as settled. Fix either by retrying the `409` briefly in the
-  stop mutation (with a component case) or by rewording R34 to match TS-03.R25.
-
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
 are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
 
+- 2026-08-19 — Fixed the group-release teardown race and the Stop-retry promise (FS-01.R34/A18,
+  FS-02.R20, TS-01.R16; **INV §2/§4** and **INV §10**). `POST /api/groups/{group}/release` no longer
+  stops its members through its own spelling of stop + cleanup: both it and
+  `POST /api/sessions/{id}/stop` now run one shared `stopAgent` seam, so a release landing inside a
+  live wake reports that member as not stopped instead of reading the in-progress resume's nil
+  sentinel as "no handle" and deleting the hook token, MCP session, and hook-settings file the wake
+  had just minted. Release also now tears down the hook token it previously left behind. FS-01.R34
+  says "may be retried" rather than promising a client retry nothing performs, matching TS-03.R25,
+  and names Release group as a claimant. New regression:
+  `TestReleaseGroupDuringWakeKeepsRegistration` (confirmed failing against the pre-fix worker).
 - 2026-08-18 — Reviewed `74da884..5a4ae2b` against FS-01.R33/R34, FS-02.R41/A24, FS-04.R42/A22,
   FS-06.R22/R23/A12, FS-14.R33/A13, TS-01.R16, TS-02.R22, TS-03.R24/R25/R26, TS-04.R25/R26,
   TS-05.R15, and TS-09.R16/R26, plus every invariant class. Five **Worth fixing** findings are
