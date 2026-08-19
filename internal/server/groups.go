@@ -85,19 +85,11 @@ func (s *Server) releaseAgents(ctx context.Context, ids []string) ([]releaseGrou
 			for idx := range jobs {
 				id := ids[idx]
 				res := releaseGroupResult{AgentID: id, OK: true}
-				if err := s.registry.Stop(ctx, id); err != nil {
-					if !errors.Is(err, runtime.ErrNoHandle) {
-						res.OK = false
-						res.Error = err.Error()
-					}
-					// ErrNoHandle: check for orphan runtimes (invariant §4).
-					if rerr := s.reapOrphanRuntime(id); rerr != nil {
-						s.log.Warn("reap orphan during release", "agent_id", id, "err", rerr)
-					}
-				}
-				if res.OK {
-					s.cleanupMessagingMCP(id)
-					s.cleanupHookSettings(id)
+				// releaseAgents has already reserved every member claim, so use
+				// the shared stop-and-teardown work without trying to claim twice.
+				if ae := s.stopAgentClaimed(ctx, id); ae != nil {
+					res.OK = false
+					res.Error = ae.Message
 				}
 				results[idx] = res
 			}

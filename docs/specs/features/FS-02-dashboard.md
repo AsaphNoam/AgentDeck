@@ -161,6 +161,9 @@ after the agent launched), the card falls back to that id so the agent remains i
 visible percentage label, color-ramped green (`< 0.6`) → amber (`0.6–0.85`) → red (`> 0.85`). Zero
 and absent values normalize to and visibly label `0% context used`; the track alone is never the only
 indication of its meaning.
+The meter tracks the live value during a turn, not only at turn end: each context-usage report the
+runtime receives mid-turn republishes the agent, so a long turn shows the percentage moving rather
+than the figure it started with (TS-04.R25).
 
 **R29.** The home route (`/`) replaces the agent-card grid in R1 with a live project-card
 grid. It contains every configured project, including projects with no agents, plus one unavailable
@@ -366,7 +369,10 @@ at readable contrast. — `AgentCard`/`ProjectDashboard` component tests and the
 right-click menu each open the create modal, while right-clicking a project card opens the card menu
 rather than the create menu. Submitting a valid project creates it through `POST /api/projects` and
 its card appears on the grid without a reload; an invalid submission keeps the modal open showing the
-error, and Cancel closes it with no change. — `ProjectDashboard` component test; J5.
+error, and Cancel closes it with no change. The background surface covers the whole canvas including
+the shell's padding frame (R41), which the component suite cannot observe (INV §13): the padding's
+ownership is asserted against the stylesheets, and J5 checks the live surface. —
+`ProjectDashboard` component test (behavior and stylesheet ownership); J5.
 
 **A25.** (R43) Opening **New agent** from a scoped project dashboard omits the project
 picker and launches with the route project's id; the general modal continues to offer its picker. —

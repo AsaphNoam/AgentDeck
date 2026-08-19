@@ -195,15 +195,20 @@ transitions:
   SQLite driver cannot load FTS5. The authoritative session row and lifecycle state still commit,
   derived search-document writes are skipped until an FTS5-capable build returns, and no raw SQLite
   module error reaches the launch/resume response.
-- **R34** — **Stop and resume are one exclusive transition per agent.** Stop (R6), explicit Resume
-  (R10), and every wake (R33) take the same exclusive per-agent lifecycle claim, so an agent is
-  never being started and stopped at once. A Stop that arrives while a resume or wake holds the
-  claim returns `409 conflict` instead of reporting success, and is retried once the transition
-  settles; the in-flight resume completes normally with its registration intact. Without this,
-  Stop could not tell a resume in progress from a stopped agent, so it took its idempotent
-  already-stopped path and removed the running resume's hook token, MCP session, and hook-settings
-  file while that resume went on to report success. Stop remains idempotent (R6) and still returns
-  `404` for an unknown agent (R27) whenever it holds the claim.
+- **R34** — **Stop and resume are one exclusive transition per agent.** Stop (R6), Release group
+  (FS-02.R20), explicit Resume (R10), and every wake (R33) take the same exclusive per-agent
+  lifecycle claim, so an agent is never being started and stopped at once. Stop and Release group
+  run one shared stop-and-teardown seam rather than two spellings of it, so the claim cannot be
+  bypassed through whichever verb omits it. A stop that arrives while a resume or wake holds the
+  claim returns `409 conflict` instead of reporting success, and may be retried once the transition
+  settles (the client is not obliged to retry automatically; TS-03.R25). Release group reserves every
+  member's claim before stopping any of them, so one busy member rejects the whole release with `409`
+  and leaves every member running. Either way the in-flight resume completes normally with its
+  registration intact. Without this, a stop could not
+  tell a resume in progress from a stopped agent, so it took its idempotent already-stopped path and
+  removed the running resume's hook token, MCP session, and hook-settings file while that resume went
+  on to report success. Stop remains idempotent (R6) and still returns `404` for an unknown agent
+  (R27) whenever it holds the claim.
 
 ## 5. Acceptance criteria
 
@@ -269,10 +274,12 @@ transitions:
 - **A18** (R33–R34) — A Stop issued while a wake is inside its resume returns `409`, the wake
   completes with its hook token, MCP registration, and hook-settings file intact, and the retried
   Stop then succeeds — one coherent final state, never a running process whose registration was
-  torn down. A stopped agent whose project definition is unreadable answers a prompt with the typed
-  internal failure rather than the not-running `404`. *Verify:*
-  `internal/server/wake_test.go::TestStopDuringWakeConflictsAndKeepsRegistration` and
-  `TestWakeGateFailureSurfacesTypedError`.
+  torn down. A Release group covering that agent returns `409` without stopping any group member;
+  the wake keeps its registration and the retried release stops the whole group. A stopped agent whose
+  project definition is unreadable answers a prompt with the typed internal failure rather than the
+  not-running `404`. *Verify:*
+  `internal/server/wake_test.go::TestStopDuringWakeConflictsAndKeepsRegistration`,
+  `TestReleaseGroupDuringWakeKeepsRegistration`, and `TestWakeGateFailureSurfacesTypedError`.
 
 ## 6. Deviations & open decisions
 

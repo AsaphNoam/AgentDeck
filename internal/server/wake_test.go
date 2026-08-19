@@ -547,6 +547,82 @@ func TestStopDuringWakeConflictsAndKeepsRegistration(t *testing.T) {
 	waitRunning(t, srv, id, false)
 }
 
+// FS-01.A18 / FS-02.R20 (INV §2/§4) — Release group runs the same exclusive
+// stop-and-teardown seam as Stop, so a release landing inside a wake reports that
+// member as not stopped instead of deleting the live wake's hook token, MCP
+// session, and hook-settings file. Before the shared seam the release worker
+// stopped without the lifecycle claim, read the in-progress resume's nil sentinel
+// as "no handle", counted the member as released, and cleaned up the artifacts the
+// wake had just minted — the FS-01.R34 defect reached through a second door.
+func TestReleaseGroupDuringWakeKeepsRegistration(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	resp, body := post(t, ts.URL+"/api/sessions", map[string]string{"role": "impl", "project": "tmpproj", "group": "auth"})
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("launch status = %d: %s", resp.StatusCode, body)
+	}
+	var launched sessionResponse
+	if err := json.Unmarshal(body, &launched); err != nil || launched.Agent.AgentID == "" {
+		t.Fatalf("bad launch response (%v): %s", err, body)
+	}
+	id := launched.Agent.AgentID
+	if resp, body := post(t, ts.URL+"/api/sessions/"+id+"/stop", nil); resp.StatusCode != http.StatusOK {
+		t.Fatalf("stop status = %d: %s", resp.StatusCode, body)
+	}
+	waitRunning(t, srv, id, false)
+
+	srv.registry.Chat().SetCommand(slowACP(t, "1", 0))
+	resumed := make(chan int, 1)
+	go func() {
+		resp, _ := post(t, ts.URL+"/api/sessions/"+id+"/resume", nil)
+		resumed <- resp.StatusCode
+	}()
+	waitLifecycleClaim(t, srv, id)
+
+	resp, body = post(t, ts.URL+"/api/groups/auth/release", nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("release status = %d: %s", resp.StatusCode, body)
+	}
+	var released struct {
+		Stopped []releaseGroupResult `json:"stopped"`
+	}
+	if err := json.Unmarshal(body, &released); err != nil {
+		t.Fatalf("decode release response (%v): %s", err, body)
+	}
+	if len(released.Stopped) != 1 || released.Stopped[0].OK {
+		t.Fatalf("release during wake = %+v, want one not-OK result: %s", released.Stopped, body)
+	}
+
+	if got := <-resumed; got != http.StatusOK {
+		t.Fatalf("resume status = %d, want 200", got)
+	}
+	waitRunning(t, srv, id, true)
+	srv.hookMu.Lock()
+	token := srv.hookTokens[id]
+	_, mcpOK := srv.mcpCleanups[id]
+	srv.hookMu.Unlock()
+	if token == "" || !mcpOK {
+		t.Fatalf("wake registration torn down by the racing release: token=%q mcp=%v", token, mcpOK)
+	}
+	settingsPath := filepath.Join(hooks.Dir(srv.configStore.Home()), "agents", id+".json")
+	if _, err := os.Stat(settingsPath); err != nil {
+		t.Fatalf("hook-settings file removed by the racing release: %v", err)
+	}
+
+	// Once the transition settles, the retried release stops the member normally.
+	resp, body = post(t, ts.URL+"/api/groups/auth/release", nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("retried release = %d: %s", resp.StatusCode, body)
+	}
+	released.Stopped = nil
+	if err := json.Unmarshal(body, &released); err != nil {
+		t.Fatalf("decode retried release (%v): %s", err, body)
+	}
+	if len(released.Stopped) != 1 || !released.Stopped[0].OK {
+		t.Fatalf("retried release = %+v, want one OK result: %s", released.Stopped, body)
+	}
+	waitRunning(t, srv, id, false)
+}
+
 // FS-06.A11 / TS-04.R26 (INV §15) — a wake attempt claims the mail it wakes for
 // before spawning anything, so an adapter that completes its handshake and then
 // dies before the first check_messages nudge is not respawned by every sweep.

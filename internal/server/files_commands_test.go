@@ -603,4 +603,20 @@ func TestFileSearchStorageErrorIsNotAStoppedAgent(t *testing.T) {
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("storage failure status = %d body=%s, want 500", rec.Code, rec.Body.String())
 	}
+
+	// The identity read three lines above it answers the same way: a failing
+	// agents read is a storage fault, not "no such agent" (TS-03.R24, INV §7).
+	if _, err := srv.stateStore.DB().Exec(`DROP TABLE agents`); err != nil {
+		t.Fatalf("drop agents table: %v", err)
+	}
+	rec = doGET(t, srv.routes(), "/api/sessions/a_fs_broken/file-search?q=main")
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("identity storage failure status = %d body=%s, want 500", rec.Code, rec.Body.String())
+	}
+	// A genuinely unknown agent still reads as 404.
+	srv2 := testServer(t, false)
+	rec = doGET(t, srv2.routes(), "/api/sessions/a_nope/file-search?q=main")
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("unknown agent status = %d body=%s, want 404", rec.Code, rec.Body.String())
+	}
 }
