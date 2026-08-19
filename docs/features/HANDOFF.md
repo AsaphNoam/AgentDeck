@@ -138,15 +138,7 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ### Open findings
 
-- **Worth fixing** — **INV §10** — Specification drift: the mid-turn context republish is
-  unspecified, and TS-04.R25 still describes the behavior it replaced. `internal/runtime/chat.go`'s `usage_update`
-  branch now calls `republishContextPct`, writing the status row and publishing a `state_update` on
-  every notification, and its comment cites `TS-04.R25` for doing so. TS-04.R25 still says the value
-  is "carried into the terminal turn status and rollup", and FS-03.R8 still places the context-usage
-  update at turn end; nothing describes a meter that moves during a turn. A fix that changes behavior
-  updates its specification (workflow §8.3, specs README step 5). Fix by extending TS-04.R25 with the
-  immediate republish through the status write+touch seam and giving the user-visible half a home in
-  FS-02.R26 or FS-03.R8; the regression (`TestUsageUpdateRepublishesContextPctMidTurn`) already exists.
+None.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
@@ -154,6 +146,14 @@ are not promoted to findings without a repeatable failure.
 
 ## Recent changelog
 
+- 2026-08-19 — Specified the mid-turn context republish that had shipped without one (TS-04.R25,
+  FS-02.R26, FS-03.R8; **INV §10**). The ACP `usage_update` branch republishes `context_pct` through
+  the status write+touch seam on every notification, but TS-04.R25 still described only the value
+  being carried into the terminal turn status and FS-03.R8 placed the update at turn end, so a meter
+  that moves during a turn was undescribed behavior. TS-04.R25 now records the immediate republish and
+  its bounds (the status row's percentage alone, no implied transition, an unreadable row skipped),
+  FS-02.R26 owns the user-visible half, and R25's traceability names the existing regression. No code
+  changed.
 - 2026-08-19 — Fixed the projects background menu missing the canvas padding, and gave it a
   regression that can fail (FS-02.R41/A24; **INV §10/§13**). `.project-dashboard` filled the canvas
   but sat inside `<main class="app-main">`'s 2rem padding, so a right-click in that frame — the strip

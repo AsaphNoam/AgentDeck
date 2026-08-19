@@ -64,7 +64,8 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   drafts; creating or editing another discards the least recently edited retained draft.
 - **R8.** A prompt moves the agent synchronously to `busy`. ACP output is emitted as ordered
   transcript events and a final `turn_end`; successful completion returns the agent to `idle`,
-  clears `busy_since`, and updates context usage. A runtime/protocol failure emits an error and
+  clears `busy_since`, and updates context usage (which also updates during the turn as the runtime
+  receives it — FS-02.R26). A runtime/protocol failure emits an error and
   turn end, marks fatal crashes `error`, and removes the dead running process.
 - **R9.** While the agent is `busy` or `waiting_input`, the Send control becomes Cancel.
   `POST /api/sessions/{id}/cancel` returns `202 {cancelled:true}` when it claims an active turn or

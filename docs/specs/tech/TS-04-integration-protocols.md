@@ -199,8 +199,14 @@ implementations are the compatibility authority, not provider-specific parsing i
 declare a context window, so it does not set `context_pct`. Its `session/update`
 `{sessionUpdate:"usage_update",used,size}` notification is decoded at the ACP boundary and replaces
 the owning live chat runtime's context percentage with `used / size`; invalid negative usage or a
-non-positive size is ignored, and a value above one is capped at one. The current value is carried
-into the terminal turn status and rollup, preserving the existing dashboard and resume contracts.
+non-positive size is ignored, and a value above one is capped at one. Each accepted notification also
+republishes the value immediately through the existing status write+touch seam — the current status
+row's `context_pct` alone, leaving its state, detail, trace, and `busy_since` untouched, because a
+`usage_update` implies no status transition — so a long turn's meter does not hold a stale percentage
+until the next tool/status event (FS-02.R26, INV §1). An unreadable status row is skipped rather than
+replaced with an empty one; the next status write carries the value forward. The current value is
+still carried into the terminal turn status and rollup, preserving the existing dashboard and resume
+contracts.
 The fake ACP adapter emits these same shapes so protocol tests do not assert an invented wire
 contract (INV §11).
 
@@ -297,8 +303,9 @@ so timestamp comparison cannot order same-second rows and is not used. New mail 
 - ACP/runtime: `internal/runtime/chat.go`, `transport.go`, `event.go`, `permission.go`.
 - Available commands (R24): decode in `internal/runtime/acpmap.go`, replace-only snapshot on
   the live `agentState`, registry read projection, and fake-ACP new/load/replacement regressions.
-- Context usage (R25): `decodeContextUsage`, `ChatRuntime.onNotification`, and
-  `TestContextUsageFromRealClaudeAdapterShapes`.
+- Context usage (R25): `decodeContextUsage`, `ChatRuntime.onNotification`,
+  `ChatRuntime.republishContextPct`, `TestContextUsageFromRealClaudeAdapterShapes`, and
+  `TestUsageUpdateRepublishesContextPctMidTurn`.
 - Adapters: `internal/backend/adapter.go`; credential checks in `internal/backend/credcheck`;
   official Claude session metadata and Codex `CODEX_CONFIG` prompt delivery are pinned by runtime
   parameter/environment tests.

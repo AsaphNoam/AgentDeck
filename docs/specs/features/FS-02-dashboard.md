@@ -161,7 +161,9 @@ after the agent launched), the card falls back to that id so the agent remains i
 **R26.** The context-usage meter renders `context_pct` (0..1) as a proportional bar with a rounded,
 visible percentage label, color-ramped green (`< 0.6`) → amber (`0.6–0.85`) → red (`> 0.85`). Zero
 and absent values normalize to and visibly label `0% context used`; the track alone is never the only
-indication of its meaning.
+indication of its meaning. The meter tracks the live value during a turn, not only at turn end: each
+context-usage report the runtime receives mid-turn republishes the agent, so a long turn shows the
+percentage moving rather than the figure it started with (TS-04.R25).
 
 **R29.** The home route (`/`) replaces the agent-card grid in R1 with a live project-card
 grid. It contains every configured project, including projects with no agents, plus one unavailable
