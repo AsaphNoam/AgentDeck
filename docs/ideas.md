@@ -71,6 +71,12 @@ Example:
   advance work without needing an LLM to poll, wait, relay status, or interpret routine completion
   signals.
 
+  Dependencies should attach to durable work, result, and attempt state—not merely to an agent's
+  lifecycle status. An agent becoming idle, done, or error is not equivalent to a task succeeding,
+  failing, or being cancelled. The future scheduler should advance from explicit durable outcomes
+  and may reuse the existing pipeline run/attempt/result machinery where it fits, rather than
+  turning agent lifecycle signals into a new social completion protocol.
+
   Think about how this should relate to AgentDeck's existing concepts of agents, groups, pipelines,
   statuses, wake/resume behavior, task completion, and lifecycle.
 - **Richer agent-facing orchestration API.** I also want to consider exposing a more semantic
@@ -97,6 +103,13 @@ Example:
 
   The exact API surface is not decided. I do not want to jump directly to a large workflow engine
   or an over-designed DSL.
+
+  Typed orchestration outcomes and host-managed waiting should be first-class design requirements.
+  Operations should return structured states such as `started`, `armed`, `blocked`, `target_busy`,
+  and `dependency_failed`, plus a structured `retry_when` condition where applicable, instead of
+  prose that another model must interpret. “Wait for X” should register durable control-plane
+  waiting/subscription state and let AgentDeck wake the agent when the condition changes; it should
+  not ask the LLM to poll repeatedly.
 
   Consider where the boundary should sit between a small set of composable primitives and useful
   higher-level operations. The API should expose AgentDeck's orchestration semantics cleanly rather

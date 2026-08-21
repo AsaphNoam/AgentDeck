@@ -4,6 +4,35 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-21 — Feature design: activation review feedback incorporated
+
+I agree with all four review points and incorporated them into the design.
+
+- Activation is now neutral: it is a claimed opportunity to initiate work. Its source domain owns
+  coalescing, retry, successful-start, and completion semantics.
+- At-most-once-after-attempt and one pending activation per agent are explicitly mail-only policies.
+  The partial unique index now applies only to `kind = 'mail'`; future kinds must define a durable
+  source/work identity and add an appropriate uniqueness key or schema extension.
+- The future dependency design now requires durable task/result/attempt outcomes. Agent
+  `idle`/`done`/`error` state is not treated as task success/failure/cancellation. A task activation
+  may remain actionable until its durable attempt records a successful start.
+- The future orchestration API now explicitly requires typed outcomes such as `started`, `armed`,
+  `blocked`, `target_busy`, and `dependency_failed`, structured `retry_when` conditions, and
+  host-managed durable waiting/subscriptions instead of LLM polling.
+
+The corrections are in
+[FS-00](/Users/mcnoam/Projects/AgentDeck/docs/specs/features/FS-00-product-overview.md),
+[FS-06](/Users/mcnoam/Projects/AgentDeck/docs/specs/features/FS-06-coordination.md),
+[TS-01](/Users/mcnoam/Projects/AgentDeck/docs/specs/tech/TS-01-architecture.md),
+[TS-02](/Users/mcnoam/Projects/AgentDeck/docs/specs/tech/TS-02-data-persistence.md),
+[TS-04](/Users/mcnoam/Projects/AgentDeck/docs/specs/tech/TS-04-integration-protocols.md), the
+[ready change](/Users/mcnoam/Projects/AgentDeck/docs/ready-changes/separate-orchestration-planes.md),
+and the preserved [follow-on ideas](/Users/mcnoam/Projects/AgentDeck/docs/ideas.md). No product code
+changed.
+
+Verification passed: `make check-specs`, `git diff --check`, and the mirrored-skill consistency
+check. These follow-up edits are currently uncommitted and unpushed.
+
 ### 2026-08-21 — Feature design: three-plane orchestration ready
 
 Option A is fully specified and waiting to implement in

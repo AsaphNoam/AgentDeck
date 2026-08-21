@@ -18,7 +18,9 @@ restart, and failed/ignored prior work cannot repeat it. Mail remains durable an
 ## Included work
 
 - Add the payload-free activation migration/state API, atomic message-plus-activation writes,
-  conservative legacy-pending backfill, claim-token transitions, and startup/live cleanup.
+  conservative legacy-pending backfill, mail-specific coalescing/at-most-once transitions, and
+  startup/live cleanup. Activation remains a neutral opportunity concept; this change does not make
+  mail's uniqueness or retry policy universal.
 - Replace the unread-driven nudger and `Runtime.CheckMessages(pid)` with a server activation
   executor and an agent-id-keyed runtime turn gate that commits attempted/local turn state before
   wake/provider effects.
@@ -28,14 +30,17 @@ restart, and failed/ignored prior work cannot repeat it. Mail remains durable an
   mid-flight-mail, and no-payload fake-ACP coverage; update descriptive architecture docs.
 - Do not add context items/links, dependencies, armed agents, new orchestration MCP tools, generic
   activation CRUD, an activation UI/history, parallel pipelines, or a workflow DSL. Those remain
-  separately specified follow-on features even though they are planned for the same release.
+  separately specified follow-on features even though they are planned for the same release. A
+  future kind must define its durable source/work identity, coalescing key, typed start/outcome, and
+  retry/completion policy before extending the schema or executor.
 
 ## How we will know it works
 
-FS-06.A13–A15 pass against fake ACP, including one prompt for a coalesced batch, no replay after an
-attempt or restart, later mail re-arming, stopped-agent race/failure behavior, and message content
-appearing only through `check_messages`. State migration tests prove the partial uniqueness,
-claim-token, recovery, cleanup, and legacy-backfill contracts. The completed change passes
+FS-06.A13–A15 pass against fake ACP, including one prompt for a coalesced mail batch, no mail replay
+after an attempt or restart, later mail re-arming, stopped-agent race/failure behavior, and message
+content appearing only through `check_messages`. State migration tests prove that partial
+uniqueness, claim recovery/cleanup, and legacy backfill are explicitly mail-scoped rather than a
+generic activation contract. The completed change passes
 `make check-specs`, `make build`, `make test`, and `make dist`.
 
 ## Waiting on

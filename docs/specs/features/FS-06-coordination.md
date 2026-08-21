@@ -185,7 +185,8 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   success, launch failure, provider failure, process death, cancellation, or an agent that never
   calls `check_messages` cannot make reconciliation automatically repeat it. The mail remains
   durable and unread, the ordinary agent error/status surfaces remain honest, and later new mail may
-  create another opportunity.
+  create another opportunity. This safety tradeoff belongs to mail and does not define retry or
+  successful-start semantics for future activation kinds.
 - **R27 `(planned)` — Stopped-agent activation reuses ordinary lifecycle semantics.** A pending mail
   activation may resume a stopped recipient only when it passes the existing R22–R23 and FS-01.R33
   wake gates, using the same exclusive lifecycle claim and frozen session snapshot as ordinary

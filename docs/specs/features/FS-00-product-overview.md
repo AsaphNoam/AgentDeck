@@ -146,10 +146,12 @@ row per live agent; live status (`state ∈ {busy, idle, waiting_input, done, er
   this requirement does not introduce the future context-link model.
 - **R15 `(planned)` — Model activation is an explicit plane crossing.** AgentDeck starts a model
   turn only for a user instruction or a host-owned activation that requires model judgment. An
-  activation is payload-free control state that authorizes one bounded attempt to cross into the
-  conversation plane; it is not itself a message, task graph, artifact, transcript event, or live
-  process. FS-06 defines the first activation kind, mail handling. Future activation kinds require
-  their own feature requirements rather than using conversation as an implicit coordination API.
+  activation is payload-free control state representing a claimed opportunity to initiate work
+  across the conversation boundary; it is not itself a message, task graph, artifact, transcript
+  event, or live process. Its source domain owns coalescing, retry, start, and completion semantics.
+  FS-06 defines the first activation kind and its deliberately at-most-once mail policy. Future
+  activation kinds require their own feature requirements rather than inheriting mail semantics or
+  using conversation as an implicit coordination API.
 
 ## 4. Glossary
 
@@ -163,9 +165,9 @@ row per live agent; live status (`state ∈ {busy, idle, waiting_input, done, er
 - **Hook** — a thin shell script registered with the agent CLI that fires on lifecycle events
   (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`) and POSTs to
   `/api/hook` with its per-launch token. The primary status channel for terminal agents. See TS-04.
-- **Activation `(planned)`** — a durable, payload-free control opportunity that may authorize one
-  model turn after AgentDeck claims it. It makes the control-to-conversation crossing explicit; it
-  does not contain the work payload. See FS-06 and TS-01.
+- **Activation `(planned)`** — a durable, payload-free control opportunity to initiate work after
+  AgentDeck claims it. It makes the control-to-conversation crossing explicit without prescribing a
+  universal retry/completion policy or containing the work payload. See FS-06 and TS-01.
 - **Nudger `(current)`** — the existing server loop that detects an idle agent with pending mail
   and wakes it so it processes messages without user intervention. Explicit activation replaces
   unread-driven nudging when FS-06.R24–R27 ship.

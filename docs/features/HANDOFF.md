@@ -15,8 +15,11 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   message-plus-signal commit, claim-token/restart semantics, lifecycle/runtime turn arbitration,
   and the unavoidable one-`session/prompt` provider bridge verified against both pinned adapters.
   Pull-based context links, dependency-aware agents, and the richer orchestration API remain intact
-  as separate ideas and are excluded from this ready change, while its stable target/kind/service
-  seams are intentionally their shared foundation.
+  as separate ideas and are excluded from this ready change. Review clarified that only the neutral
+  opportunity/claim concept is shared: mail's one-pending-per-agent coalescing and
+  at-most-once-after-attempt cleanup are explicitly mail policy, not defaults for a future armed
+  task. Future kinds must declare durable work/source identity, uniqueness, start, retry, and
+  completion semantics before extending the schema/executor.
 - **Previous state:** The one open browser-draft finding is fixed. A delayed prompt send now scopes its
   completion to the draft generation it submitted — `drafts.ts` keeps a per-agent revision that
   every mutation bumps, and `Composer.submit` captures it before sending. A newer same-agent draft
@@ -195,6 +198,15 @@ recheck-fail cause is a concurrent resume, whose running-path nudge then deliver
 rows honestly).
 
 ## Recent changelog
+
+- 2026-08-21 — Incorporated review feedback into the waiting three-plane change. FS-00/TS-01 now
+  define activation neutrally as a claimed opportunity whose source domain owns coalescing, retry,
+  start, and completion; FS-06 retains at-most-once-after-attempt strictly as mail policy. TS-02's
+  partial unique index is now mail-only and explicitly requires future kinds to add a stable
+  source/work identity or kind-specific key when needed. The preserved dependency idea now requires
+  durable task/result/attempt outcomes rather than agent `idle`/`done` state, and the richer API idea
+  now requires typed outcomes plus host-managed waiting/subscriptions instead of LLM polling. No
+  product code changed.
 
 - 2026-08-21 — Completed the confirmed three-plane orchestration design and created waiting ready
   change `separate-orchestration-planes.md`. FS-00 now names control/context/conversation plane
