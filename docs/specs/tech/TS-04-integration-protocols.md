@@ -242,6 +242,27 @@ reading the mail restamps a still-claimed row `poll`. `messages.created_at` is w
 so timestamp comparison cannot order same-second rows and is not used. New mail always inserts as
 `pending`, re-arming the wake; the bound therefore holds across dashboard restarts (FS-06.R23).
 
+**R27 `(planned)` — Provider activation is a deliberate prompt bridge, not a control
+notification.** The pinned ACP v1 surface and packaged adapters expose no portable notification that
+wakes an idle model or initiates tool use: `claude-agent-acp` 0.59.0 and `codex-acp` 1.1.2 both use
+`session/prompt` as the inference entrypoint and accept only `session/cancel` as a relevant
+client-to-agent session notification. ACP `mcp/message` is an unstable transport wrapper, not a
+semantic wake; the pinned Codex adapter advertises ACP-MCP transport unsupported, and ordinary MCP
+resource/list/progress notifications do not start a model turn. AgentDeck therefore implements a
+claimed activation by one ordinary `session/prompt` carrying a short, code-owned, kind-specific
+instruction. For `mail`, it says only that mail work is available and directs the agent to the
+existing `check_messages` tool; no message body, subject, sender, transcript, artifact, or context
+reference is embedded.
+
+The runtime must durably cross TS-01.R21's attempt boundary before writing that prompt frame. It
+emits no synthetic user-authored normalized transcript event for the host instruction, while the
+provider may retain the prompt in its own session context because an actual reasoning turn was
+requested. MCP remains the pull surface for the payload. A future adapter-specific wake or ACP
+extension may replace this bridge only through a separately capability-gated requirement; document
+notifications, `session/resume`, MCP notifications, and unadvertised extension methods must not be
+repurposed as an inferred wake contract. R27 replaces R26's unread/cooldown nudge mechanics when
+FS-06.R24–R27 ship; recipient discovery and the shared wakeability query remain unchanged.
+
 ## 3. Interfaces & data shapes
 
 - ACP: JSON-RPC messages over newline-delimited child stdin/stdout; adapter determines exact
@@ -274,6 +295,8 @@ so timestamp comparison cannot order same-second rows and is not used. New mail 
 - Context usage (R25): Claude's `usage_update` payload
   `{sessionUpdate:"usage_update",used:<tokens>,size:<context-window>}` becomes the live
   `context_pct`; prompt-result token accounting is not interpreted as a percentage.
+- Activation bridge (R27): one code-owned text block in `session/prompt`; no ACP/MCP notification
+  is treated as inference initiation, and message content stays behind `check_messages`.
 
 ## 4. Invariants
 
@@ -292,6 +315,9 @@ so timestamp comparison cannot order same-second rows and is not used. New mail 
   exclusively from the shared fixed metadata; request fields, backend names, models, environment
   values, and provider output cannot add an executable or argument. Probe processes receive no
   stdin, are cancelled on deadline/shutdown, and never become agent/session/runtime records.
+- **INV §5/§11/§15:** activation turn ownership is claimed once, fake ACP asserts the same
+  `session/prompt` contract as the pinned adapters, and the durable attempted/local turn state is
+  committed before the provider frame is written (R27).
 
 ## 5. Deviations & open decisions
 
@@ -313,6 +339,9 @@ so timestamp comparison cannot order same-second rows and is not used. New mail 
 - Context usage (R25): `decodeContextUsage`, `ChatRuntime.onNotification`,
   `ChatRuntime.republishContextPct`, `TestContextUsageFromRealClaudeAdapterShapes`, and
   `TestUsageUpdateRepublishesContextPctMidTurn`.
+- Activation bridge (R27): pinned ACP SDK schema and adapter handler registration under
+  `scripts/release/node_modules/@agentclientprotocol/`; runtime prompt capture and fake-ACP
+  turn-count tests.
 - Adapters: `internal/backend/adapter.go`; credential checks in `internal/backend/credcheck`;
   official Claude session metadata and Codex `CODEX_CONFIG` prompt delivery are pinned by runtime
   parameter/environment tests.

@@ -4,6 +4,126 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-21 — Feature design: three-plane orchestration ready
+
+Option A is fully specified and waiting to implement in
+[separate-orchestration-planes.md](/Users/mcnoam/Projects/AgentDeck/docs/ready-changes/separate-orchestration-planes.md).
+No product code changed.
+
+The architecture now makes these boundaries explicit:
+
+- Control facts stay in typed application state and advance through transactions, claims, lifecycle
+  events, and bounded reconciliation—not mailbox prose or LLM polling.
+- Context and artifacts stay in their owning durable stores and are retrieved deliberately; this
+  change adds no context-link catalog or eager injection mechanism.
+- A model turn occurs only through an explicit user instruction or claimed activation. Activation is
+  payload-free control state, not a message, artifact, transcript event, task graph, or live process.
+
+For mail, message insertion and creation of one pending `mail` activation commit atomically. A
+partial unique index coalesces mail per agent until claim; a claim token protects every transition;
+pre-attempt lifecycle or turn races release the claim; and durable `attempted` state precedes the
+first wake/provider side effect and is never replayed. Unread mail, retention, indicators, and the
+15-action turn budget remain independent. Legacy unread rows still marked `pending` receive one
+coalesced activation during migration; rows that already crossed the old nudge/wake boundary do not.
+
+The pinned protocol check found no portable non-conversational wake in ACP v1,
+`claude-agent-acp` 0.59.0, or `codex-acp` 1.1.2. The runtime therefore uses exactly one intentional,
+minimal `session/prompt` after the durable claim. It contains no mail content and directs the agent
+to pull through `check_messages`; AgentDeck adds no synthetic user-authored transcript event, though
+the provider may retain the prompt because it is a real reasoning turn.
+
+The full pull-based context-link, dependency-aware/armed-agent, and richer orchestration-API ideas
+remain in [ideas.md](/Users/mcnoam/Projects/AgentDeck/docs/ideas.md) and are explicitly excluded from
+this feature. The stable target, closed activation kind, state service, and agent-facing MCP gateway
+give those immediate follow-ons a shared foundation without introducing a workflow engine or DSL.
+
+Verification passed: `make check-specs`, `git diff --check`, and the mirrored-skill consistency
+check.
+
+### 2026-08-21 — Feature design: explicit mail activation selected
+
+Option A is now the feature draft. New agent or reserved-user mail remains autonomous work: it may
+wake a stopped eligible recipient and start one reasoning turn when that agent is ready. AgentDeck
+will first create and durably claim an explicit activation opportunity, so unread state, idle status,
+periodic reconciliation, or restart cannot repeatedly invoke the model for the same opportunity.
+Mail arriving before the claim is coalesced into that turn; mail arriving afterward creates a later
+opportunity.
+
+Message content remains in the durable mailbox and is retrieved through `check_messages`; it is not
+copied into the activation prompt. The person continues to see the existing unread badge and agent
+state, while the agent receives only a minimal work-available signal and pulls the content under its
+scoped identity. Existing message read state and retention remain unchanged. The activation record is
+operational control state, not a transcript event, user artifact, independent audit history, or new
+UI/API resource.
+
+The bounded-inference consequence is deliberate: one activation covers all mail pending when it is
+claimed. If the agent does not read everything—for example, the existing 15-action turn budget limits
+a large backlog—the remaining unread mail does not cause another automatic turn. It stays visible and
+pullable; new mail can create a new activation. Likewise, losing a lifecycle claim before attempting
+work leaves the activation pending, but once AgentDeck actually attempts the wake or provider turn,
+success, failure, cancellation, process death, or an agent that ignores the mailbox cannot make it
+repeat automatically. This favors avoiding duplicate work and runaway inference over guaranteed
+automatic draining.
+
+The feature still excludes context links, dependency graphs, armed agents, semantic orchestration
+tools, and a workflow language. Because those three features will follow immediately and ship in the
+same release, their needs will shape the later shared technical contracts—durable activations,
+context references, stable logical targets, and an agent-facing transport that delegates to domain
+services—without adding their behavior to this feature.
+
+**Needs attention:** Confirm the full behavior above, especially the no-auto-drain consequence for a
+large or partially read batch, at-most-once behavior after any real activation attempt, and no
+independent activation history or UI. I recommend this boundary because it is the smallest one that
+both preserves autonomous coordination and guarantees the same control event cannot keep spending
+model turns.
+
+**Next:** Once confirmed, I will verify the pinned provider/protocol capabilities, design the shared
+technical boundary with the three immediate follow-on features as known consumers, and prepare the
+architecture change for implementation without writing product code.
+
+### 2026-08-20 — Feature design: separate orchestration from model conversations
+
+AgentDeck can establish the three-plane separation incrementally; it does not need a new workflow
+engine or a broad rewrite. The repository already has strong control-plane foundations: SQLite owns
+agent identity and live state, lifecycle claims serialize starts and stops, and the pipeline manager
+advances durable pending actions from explicit results and runtime events without asking a model to
+poll. Durable transcripts, mail bodies, pipeline results and values, tracked files, and project
+resources already form context-like stores, although there is no generic artifact or context-link
+model. User prompts, pipeline assignments and continuations, and annotation instructions are the
+intentional conversation inputs.
+
+The main current leak is narrow and concrete: unread mail is converted into a provider prompt saying
+to call `check_messages`. That invokes the model over its accumulated provider history merely to
+deliver a control fact, and the nudger can invoke it again while the same mail remains unread.
+
+The proposed feature will make plane ownership explicit in the product and architecture contracts,
+keep each domain's existing durable state as its authority, and make every crossing into a model turn
+an explicit activation rather than an incidental consequence of a status change. For mail, message
+content remains durable and pullable through `check_messages`; unread/readiness and activation
+claims remain control state; one claimed batch cannot cause repeated polling turns; and periodic
+reconciliation repairs state without repeatedly invoking the model. Rich payloads remain behind
+their owning read APIs, while Server-Sent Events carry only small state/change signals.
+
+The existing pipeline state machine stays intact and serves as the reference pattern. Launch system
+prompts, pipeline stage assignments, cross-backend history handoff, and user-authored annotations
+remain conversation inputs because their content is the work the model must reason over. This
+feature adds no context-link catalog, dependency graph, armed-agent state, new semantic orchestration
+tools, parallel pipeline execution, or workflow language. The full pull-based context-link,
+dependency-aware-agent, and richer orchestration-API proposals are preserved separately in the ideas
+file without losing their detail.
+
+**Needs attention:** Choose the mail activation contract. Option A preserves autonomous coordination:
+each newly pending mail batch may start one coalesced reasoning turn, with a durable claim preventing
+repeat prompts for that batch. It still costs one inference because a model cannot respond without
+running. Option B is strict queue-only delivery: mail updates unread state but never starts inference;
+the agent sees it only when another user or pipeline turn runs or it checks voluntarily, and a stopped
+agent is not resumed for mail alone. I recommend Option A for this feature because it preserves the
+shipped coordination outcome while removing polling/retry inference; sender-selectable signal-only
+mail belongs with the later semantic orchestration API.
+
+**Next:** Choose Option A or B. I will then draft the feature requirements and acceptance checks,
+present them for confirmation, and only afterward design the technical boundary.
+
 ### 2026-08-19 — Fix: unsent chat drafts survive a slow send
 
 Typing a new message in a chat while an earlier message is still being sent no longer loses your new

@@ -1,6 +1,6 @@
 # TS-02 — Data & persistence
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/config`, `internal/state`, `internal/transcript`, `internal/index`, `internal/archive`, `internal/configsource`
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -179,6 +179,48 @@ foreign key: proposal records neither cascade into nor out of runs, templates, a
 transcripts, or archive projections, so deleting a run or template leaves them alone. TS-09 owns the
 logical payload shapes and the lifecycle's product meaning.
 
+**R23 `(planned)` — Activations are durable, payload-free operational control.** A forward-only
+migration adds:
+
+```sql
+CREATE TABLE activations (
+  activation_id TEXT PRIMARY KEY,
+  agent_id      TEXT NOT NULL REFERENCES agents(agent_id) ON DELETE CASCADE,
+  kind          TEXT NOT NULL,
+  state         TEXT NOT NULL,
+  claim_token   TEXT NOT NULL DEFAULT '',
+  created_at    TEXT NOT NULL,
+  claimed_at    TEXT,
+  attempted_at  TEXT
+);
+CREATE UNIQUE INDEX idx_activations_one_pending
+  ON activations(agent_id, kind) WHERE state = 'pending';
+CREATE INDEX idx_activations_pending
+  ON activations(state, created_at);
+```
+
+The only accepted `kind` in this change is `mail`; accepted states are `pending`, `claimed`, and
+`attempted`. Types and state methods validate both vocabularies rather than treating arbitrary
+strings as executable work. The row contains no source payload and has no association with a live
+pid/session/generation. Message insertion by either MCP or the reserved user sender and
+`EnsurePendingActivation(agent_id, "mail")` share one SQLite transaction, with the partial unique
+index as the final concurrency guard. `delivered_via` remains readable message provenance for
+compatibility but no longer owns activation/wake scheduling.
+
+Claim and transition updates match both `activation_id` and a newly minted `claim_token`; a delayed
+worker cannot mutate a later claim. Startup recovers pre-side-effect `claimed` rows to `pending`, or
+deletes them when another pending row already coalesces the same target/kind, while `attempted` rows
+are recognized as non-replayable and deleted. The live executor likewise deletes attempted rows
+after their bounded handoff. This is reconciliation metadata, not retained history: it has no
+user-configurable TTL, archive copy, transcript/FTS projection, API/SSE representation, or cascade
+into messages. A pending `mail` row with no unread source mail may be deleted without inference.
+
+The migration creates one pending `mail` activation for each agent that has unread legacy mail still
+marked `delivered_via = 'pending'`, coalescing all such rows. Legacy `nudge`, `poll`,
+`wake_attempted`, and `wake_failed` rows are not backfilled because they already crossed or consumed
+the old attempt boundary; reactivating them on upgrade would duplicate work. Message read/hard
+retention and turn-budget rows remain unchanged.
+
 ## 3. Interfaces & data shapes
 
 The durable layout is:
@@ -203,7 +245,7 @@ $AGENTDECK_HOME/
 The binding schemas for roles, projects, backends, and global config are defined by FS-04 and
 FS-09. Federation binding/effective-view shapes are defined by TS-07. SQLite table definitions and
 migration order live in `internal/state/schema.go` and execute through `migrate.go`; that executable schema is subordinate to
-R1–R21 and must be reflected here when its contract changes.
+R1–R23 and must be reflected here when its contract changes.
 
 ## 4. Invariants
 

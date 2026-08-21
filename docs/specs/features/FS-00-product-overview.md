@@ -1,6 +1,6 @@
 # FS-00 — Product Overview
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/server`, `internal/runtime`, `internal/state`, `internal/config`, `ui/src` · **Journeys:** J1, J3
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) §§1–3, §7
 
@@ -131,6 +131,26 @@ row per live agent; live status (`state ∈ {busy, idle, waiting_input, done, er
   remain provider-owned. AgentDeck indexes the durable normalized transcript into FTS5 and can
   rebuild that projection (see FS-03, FS-05, TS-02).
 
+## 3.1 Orchestration planes
+
+- **R13 `(planned)` — Control facts remain application state.** Agent lifecycle, availability,
+  readiness, dependencies, queues, unread mail, wake reasons, permissions, attention requirements,
+  and waiting/blocking relationships are control-plane facts. AgentDeck records and reacts to those
+  facts deterministically where it can; a control fact does not become an LLM conversation turn,
+  transcript event, or mailbox message merely because an agent may eventually need to act.
+- **R14 `(planned)` — Durable context remains independently retrievable.** Transcripts, task
+  results, files, diffs, summaries, and other durable work products remain in their owning
+  context/artifact stores and are exposed through bounded reads or references. Availability does not
+  imply eager prompt injection. Existing launch snapshots, pipeline assignments, annotations, and
+  user prompts remain intentional conversation inputs where their content itself defines the work;
+  this requirement does not introduce the future context-link model.
+- **R15 `(planned)` — Model activation is an explicit plane crossing.** AgentDeck starts a model
+  turn only for a user instruction or a host-owned activation that requires model judgment. An
+  activation is payload-free control state that authorizes one bounded attempt to cross into the
+  conversation plane; it is not itself a message, task graph, artifact, transcript event, or live
+  process. FS-06 defines the first activation kind, mail handling. Future activation kinds require
+  their own feature requirements rather than using conversation as an implicit coordination API.
+
 ## 4. Glossary
 
 - **ACP (Agent Communication Protocol)** — the JSON-RPC / NDJSON protocol the chat runtime speaks to
@@ -143,8 +163,12 @@ row per live agent; live status (`state ∈ {busy, idle, waiting_input, done, er
 - **Hook** — a thin shell script registered with the agent CLI that fires on lifecycle events
   (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`) and POSTs to
   `/api/hook` with its per-launch token. The primary status channel for terminal agents. See TS-04.
-- **Nudger** — a server loop that detects an idle agent with pending mail and wakes it so it
-  processes messages without user intervention; bounded by a per-turn message budget. See FS-06.
+- **Activation `(planned)`** — a durable, payload-free control opportunity that may authorize one
+  model turn after AgentDeck claims it. It makes the control-to-conversation crossing explicit; it
+  does not contain the work payload. See FS-06 and TS-01.
+- **Nudger `(current)`** — the existing server loop that detects an idle agent with pending mail
+  and wakes it so it processes messages without user intervention. Explicit activation replaces
+  unread-driven nudging when FS-06.R24–R27 ship.
 - **Federation** — binding AgentDeck to a backend's native Claude/Codex config files so those files
   stay authoritative and AgentDeck stores only bindings, overrides, and a derived redacted view.
   See FS-08.

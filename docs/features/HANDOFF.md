@@ -7,7 +7,17 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** The one open browser-draft finding is fixed. A delayed prompt send now scopes its
+- **State:** The three-plane orchestration design is ready and waiting in
+  [`separate-orchestration-planes.md`](../ready-changes/separate-orchestration-planes.md). The human
+  confirmed autonomous, at-most-once mail activation including the large-backlog, failure, and
+  operational-retention consequences. Planned FS-00.R13–R15, FS-06.R24–R27/A13–A15,
+  TS-01.R18–R21, TS-02.R23, and TS-04.R27 define a payload-free durable activation, atomic
+  message-plus-signal commit, claim-token/restart semantics, lifecycle/runtime turn arbitration,
+  and the unavoidable one-`session/prompt` provider bridge verified against both pinned adapters.
+  Pull-based context links, dependency-aware agents, and the richer orchestration API remain intact
+  as separate ideas and are excluded from this ready change, while its stable target/kind/service
+  seams are intentionally their shared foundation.
+- **Previous state:** The one open browser-draft finding is fixed. A delayed prompt send now scopes its
   completion to the draft generation it submitted — `drafts.ts` keeps a per-agent revision that
   every mutation bumps, and `Composer.submit` captures it before sending. A newer same-agent draft
   typed while the request is in flight is neither discarded on acceptance nor overwritten on
@@ -185,6 +195,35 @@ recheck-fail cause is a concurrent resume, whose running-path nudge then deliver
 rows honestly).
 
 ## Recent changelog
+
+- 2026-08-21 — Completed the confirmed three-plane orchestration design and created waiting ready
+  change `separate-orchestration-planes.md`. FS-00 now names control/context/conversation plane
+  ownership; TS-01 defines a narrow payload-free activation service and runtime/lifecycle turn gate;
+  TS-02 specifies the activation table, atomic mail write, claim recovery/cleanup, and conservative
+  legacy-pending backfill; TS-04 records verified pinned-provider behavior: neither ACP adapter has a
+  portable non-prompt wake, so one deliberately claimed `session/prompt` remains the bridge. The
+  selected idea left `ideas.md`; the full context-link, dependency-aware-agent, and semantic
+  orchestration-API proposals remain there unchanged as immediate follow-ons. No product code
+  changed.
+
+- 2026-08-21 — The human selected Option A for three-plane orchestration: free-form agent and
+  reserved-user mail remains autonomous work delivery, with one durable coalesced reasoning
+  activation instead of queue-only delivery. FS-06 is now Partial with planned R24–R27/A13–A15:
+  activation is claimed independently of unread state, carries no message/context payload, never
+  repeats merely because mail stays unread, re-arms on mail arriving after the claim, and reuses the
+  ordinary stopped-agent lifecycle gates. The product draft still needs confirmation of the explicit
+  large-backlog, at-most-once failure, and operational-retention consequences before technical
+  design. The three follow-on features remain separate ideas and no product code changed.
+
+- 2026-08-20 — Started the requested three-plane orchestration design. Recorded the core separation
+  idea under definition and preserved the full pull-based context-link, dependency-aware-agent, and
+  richer agent-facing orchestration API proposals as separate future ideas. Repository inspection
+  found the native pipeline manager already provides the desired durable, event-driven control-plane
+  pattern; existing agent identity, lifecycle claims, SQLite ownership, transcripts, mail, MCP, and
+  SSE/refetch seams can be extended incrementally. The concrete leak is the mail nudger: unread state
+  becomes a provider `session/prompt`, and the same unread batch can trigger another turn. Feature
+  behavior waits on whether mail should retain one automatic activation per new batch or become
+  queue-only. No product code or specification requirement changed.
 
 - 2026-08-19 — Fixed the open Must-fix browser-draft finding (**INV §1/§5**, FS-03.R7/R36). A
   delayed prompt send now scopes its completion to the draft generation it submitted: `drafts.ts`
