@@ -1,6 +1,6 @@
 # FS-00 — Product Overview
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/server`, `internal/runtime`, `internal/state`, `internal/config`, `ui/src` · **Journeys:** J1, J3
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) §§1–3, §7
 
@@ -133,18 +133,18 @@ row per live agent; live status (`state ∈ {busy, idle, waiting_input, done, er
 
 ## 3.1 Orchestration planes
 
-- **R13 `(planned)` — Control facts remain application state.** Agent lifecycle, availability,
+- **R13 — Control facts remain application state.** Agent lifecycle, availability,
   readiness, dependencies, queues, unread mail, wake reasons, permissions, attention requirements,
   and waiting/blocking relationships are control-plane facts. AgentDeck records and reacts to those
   facts deterministically where it can; a control fact does not become an LLM conversation turn,
   transcript event, or mailbox message merely because an agent may eventually need to act.
-- **R14 `(planned)` — Durable context remains independently retrievable.** Transcripts, task
+- **R14 — Durable context remains independently retrievable.** Transcripts, task
   results, files, diffs, summaries, and other durable work products remain in their owning
   context/artifact stores and are exposed through bounded reads or references. Availability does not
   imply eager prompt injection. Existing launch snapshots, pipeline assignments, annotations, and
   user prompts remain intentional conversation inputs where their content itself defines the work;
   this requirement does not introduce the future context-link model.
-- **R15 `(planned)` — Model activation is an explicit plane crossing.** AgentDeck starts a model
+- **R15 — Model activation is an explicit plane crossing.** AgentDeck starts a model
   turn only for a user instruction or a host-owned activation that requires model judgment. An
   activation is payload-free control state representing a claimed opportunity to initiate work
   across the conversation boundary; it is not itself a message, task graph, artifact, transcript
@@ -165,7 +165,7 @@ row per live agent; live status (`state ∈ {busy, idle, waiting_input, done, er
 - **Hook** — a thin shell script registered with the agent CLI that fires on lifecycle events
   (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`) and POSTs to
   `/api/hook` with its per-launch token. The primary status channel for terminal agents. See TS-04.
-- **Activation `(planned)`** — a durable, payload-free control opportunity to initiate work after
+- **Activation** — a durable, payload-free control opportunity to initiate work after
   AgentDeck claims it. It makes the control-to-conversation crossing explicit without prescribing a
   universal retry/completion policy or containing the work payload. See FS-06 and TS-01.
 - **Nudger `(current)`** — the existing server loop that detects an idle agent with pending mail

@@ -6,7 +6,7 @@ import (
 )
 
 // ErrNotImplemented is the sentinel returned by stubbed runtimes and dispatch
-// paths (terminal interface, codex backend, Resume, CheckMessages). The API
+// paths (terminal interface, codex backend, Resume, StartActivation). The API
 // layer maps it to HTTP 501 / code "not_implemented" (techspec §3.2, §7.7).
 var ErrNotImplemented = errors.New("not implemented")
 

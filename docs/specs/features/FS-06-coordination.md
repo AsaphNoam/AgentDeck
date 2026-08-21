@@ -1,6 +1,6 @@
 # FS-06 — Agent coordination & notifications
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/messaging/`, `internal/state/messages.go`, `internal/server/` (`messaging_registration.go`, `messaging_loops.go`, `sessions.go`), `internal/bus/`, `ui/src/api/sse.ts`, `ui/src/components/grid/AgentCard.tsx`, `ui/src/components/shell/NotificationCenter.tsx`, `ui/src/features/settings/NotificationsEditor.tsx` · **Journeys:** J10, J11, J12
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) F8/F11 and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -55,27 +55,24 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   limits return `422 validation`.
 - **R8.** Messages survive agent stop and dashboard restart in `state.db`. Read messages are
   deleted after 24 hours; all messages, including unread mail for stopped agents, are deleted after
-  seven days. A stopped agent retains recent mail; it is addressable and nudged only when a message
-  can wake it (R22–R23), and otherwise stays unaddressable and un-nudged.
+  seven days. A stopped agent retains recent mail; it is addressable and activated only when it
+  passes the mail wake gates (R22, R27), and otherwise stays unaddressable.
 
 ### 2.3 Nudging and per-turn budget
 
-- **R9.** Inserting a message signals the recipient immediately and a two-second sweep is the
-  fallback. When a running chat recipient is `idle` with unread mail, AgentDeck marks the pending
-  rows `delivered_via="nudge"` and injects a new ACP turn instructing it to call
-  `check_messages`, without a human prompt. Busy, waiting, done, error, terminal, mail-free,
-  in-flight, and cooldown recipients are not nudged, and neither is a stopped recipient no message
-  can wake (R23).
-- **R10.** A nudge re-checks the recipient state at the runtime boundary before injection, resets
-  that agent's per-turn coordination budget, and completes like an ordinary chat turn. One nudge
-  may be in flight per agent; retries are separated by a three-second cooldown and a stuck
-  in-flight marker expires after 60 seconds.
+- **R9.** Inserting a message signals the mail activation executor immediately and its two-second
+  sweep is the recovery fallback. Only a durable pending mail activation can start a turn; unread
+  count, idle/status changes, cooldown, and process-local in-flight state are not scheduling facts.
+- **R10.** An activation re-checks the recipient at the runtime boundary before injection, holds the
+  agent turn gate, commits mail's attempted boundary and the new turn budget before the ACP prompt,
+  and completes like an ordinary chat turn. A busy recipient leaves its pre-attempt activation
+  pending; an attempted activation is never replayed.
 - **R11.** Each chat turn has a combined inbound-plus-outbound messaging budget of 15. Sending and
   reading consume it transactionally with the message mutation. The action that would exceed the
   budget does not occur: an outbound message is not inserted, and an inbound check returns only as
   many messages as remain. Responses expose remaining/exhausted state and a breach produces
   `message_budget_exceeded`, a warning, and a `budget_exceeded` notification.
-- **R12.** A fresh user-prompt or nudge turn resets the budget under a new turn id. Restart/resume
+- **R12.** A fresh user-prompt or activation turn resets the budget under a new turn id. Restart/resume
   also resets cleanly and retains only one current budget row per agent, so a stale higher turn id
   cannot make the first post-restart turn appear exhausted.
 
@@ -97,15 +94,16 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
 
 - **Registration:** chat launch/resume mints token → registers token→agent → composes the reserved
   MCP server into the live session. Stop/switch/crash cleanup revokes it.
-- **pending → nudged → read:** send inserts unread mail and publishes indicators; an idle recipient
-  is nudged; `check_messages` marks/deletes returned rows and republishes its unread count.
+- **pending → read:** send inserts unread mail and atomically coalesces one pending mail activation;
+  a claimed activation may start one payload-free reasoning turn; `check_messages` marks/deletes
+  returned rows and republishes its unread count independently of activation state.
 - **pending/read → expired:** the janitor removes read mail older than 24 hours and any mail older
   than seven days. Expiration is permanent.
-- **turn budget:** prompt/nudge resets to 15 → each send/read decrements remaining atomically → an
+- **turn budget:** prompt/activation resets to 15 → each send/read decrements remaining atomically → an
   over-limit attempt marks breached and notifies → the next turn resets it.
 - **budget notification:** breach emits SSE → FS-02's shared presentation pipeline applies mute and
   delivery preferences.
-- **mail activation `(planned)`:** message insert plus ensure pending activation commit atomically →
+- **mail activation:** message insert plus ensure pending activation commit atomically →
   executor claims when eligible → lifecycle loss or a busy-turn race releases it before attempt →
   durable attempted precedes wake/provider side effect → the row is retired without replay. New
   mail coalesces while pending and creates a distinct pending activation after claim.
@@ -138,28 +136,13 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   field keeps the agent's latest durable status (`done` for a stopped agent), so a sender knows
   delivery implies a wake and its latency. Terminal and pipeline-associated agents remain
   unaddressable while stopped.
-- **R23** — **Mail wakes a stopped recipient.** Mail for a stopped wakeable recipient
-  is durably inserted first, exactly like mail for a running recipient; the existing insert-time
-  signal and periodic sweep (R9) then treat that recipient as a wake candidate: AgentDeck resumes it
-  with FS-01.R33 semantics and, once idle, nudges it to `check_messages` under the same
-  cooldown and in-flight tracking as running recipients. Only unread mail whose delivery marker is
-  still `pending` makes a stopped agent a wake candidate, and a wake attempt **claims** exactly the
-  pending rows it is waking for — durably marking them `wake_attempted` — *before* it starts
-  anything. Claiming up front, rather than marking only on failure, is what bounds retries in every
-  outcome: a wake that fails additionally marks its claimed rows `wake_failed` and leaves the mail
-  durable and the agent stopped; a wake that succeeds has its claimed rows restamped by the
-  `check_messages` nudge that delivers them; and an adapter that completes its handshake and then
-  dies before that first nudge still leaves its rows claimed, so no sweep respawns it. A broken
-  adapter therefore cannot cause a process-spawn loop, the bound survives a dashboard restart, and it
-  needs no timestamp ordering. The outcome is recorded on the claimed rows only, so mail that arrives
-  while a wake is in flight stays `pending` and re-arms the wake, exactly as new mail always does;
-  losing the exclusive lifecycle claim (FS-01.R34) is not an attempt and releases the rows back to
-  `pending`. Retention (R8) is unchanged: mail for a never-woken agent still expires on the normal
-  schedule.
+- **R23 — superseded 2026-08-21.** The delivery-marker wake policy is replaced by explicit mail
+  activation in R24–R27. `delivered_via` remains readable message provenance; it no longer owns
+  wake scheduling or retry semantics.
 
 ### 4.1 Explicit mail activation
 
-- **R24 `(planned)` — Mail activation is explicit work, not unread polling.** Agent mail and
+- **R24 — Mail activation is explicit work, not unread polling.** Agent mail and
   reserved-user mail retain their autonomous delivery outcome: inserting new mail creates one
   host-owned opportunity to start a mail-handling reasoning turn for the recipient. AgentDeck may
   wake or wait for the recipient and then start that turn only by claiming the opportunity; an
@@ -169,7 +152,7 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   trigger, cooldown, in-flight, and per-message wake-claim mechanics in R9–R10 and R23; insert-time
   notification and a periodic sweep remain only fast-path and recovery signals for durable pending
   activations.
-- **R25 `(planned)` — Mail content remains pull-based.** The activation tells the agent only that
+- **R25 — Mail content remains pull-based.** The activation tells the agent only that
   mail work is available; it does not copy message bodies, transcripts, diffs, pipeline results, or
   other context into the activation prompt. The agent retrieves mailbox content through
   `check_messages` under R6, with the existing limits and per-turn budget. Message read state,
@@ -179,7 +162,7 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   turn or wake is still in flight. If all mail has already been read, deleted, or expired before a
   still-pending opportunity is attempted, AgentDeck retires it deterministically without starting
   an empty model turn.
-- **R26 `(planned)` — A mail activation is at-most-once once attempted.** AgentDeck durably claims
+- **R26 — A mail activation is at-most-once once attempted.** AgentDeck durably claims
   the exact opportunity before wake or prompt side effects. Losing a lifecycle claim is not an
   attempt and leaves the opportunity pending; once AgentDeck actually attempts the wake/activation,
   success, launch failure, provider failure, process death, cancellation, or an agent that never
@@ -187,7 +170,7 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   durable and unread, the ordinary agent error/status surfaces remain honest, and later new mail may
   create another opportunity. This safety tradeoff belongs to mail and does not define retry or
   successful-start semantics for future activation kinds.
-- **R27 `(planned)` — Stopped-agent activation reuses ordinary lifecycle semantics.** A pending mail
+- **R27 — Stopped-agent activation reuses ordinary lifecycle semantics.** A pending mail
   activation may resume a stopped recipient only when it passes the existing R22–R23 and FS-01.R33
   wake gates, using the same exclusive lifecycle claim and frozen session snapshot as ordinary
   Resume. The durable agent, mailbox, and activation exist independently of a live process; the
@@ -207,10 +190,10 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   `TestResolveRecipientExcludesTerminalAgents`.
 - **A3** (R1–R2) — Launch registration writes an HTTP MCP entry with token and cleanup revokes it:
   `internal/server/messaging_registration_test.go::TestRegisterMessagingMCPWritesHTTPConfigAndCleanup`.
-- **A4** (R9–R10) — An idle recipient with unread mail receives a no-user-action nudge and the row
-  records `delivered_via=nudge`:
-  `internal/server/messaging_registration_test.go::TestNudgeOnceWakesIdleAgentAndMarksDelivered`
-  and `internal/runtime/chat_test.go::TestCheckMessagesInjectsNudgeTurn`.
+- **A4** (R9–R10) — An idle recipient with pending mail receives one no-user-action, payload-free
+  activation while the durable mail row remains unread and independent:
+  `internal/server/messaging_registration_test.go::TestMailActivationStartsIdleAgentWithoutMutatingMailProvenance`
+  and `internal/runtime/chat_test.go::TestStartActivationInjectsPayloadFreeMailTurn`.
 - **A5** (R11–R12, R20) — The 16th outbound action is rejected without insertion, inbound reads cap
   to remaining budget, and restart/reset reuses one current row:
   `internal/messaging/messaging_test.go::TestSendMessageBudgetExceeded`,
@@ -248,17 +231,17 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   never listed twice, and `role@project` resolution never reports a false ambiguity because of it.
   *Verify:* `internal/server/wake_test.go::TestSuccessfulWakeConsumesMailEvenIfAdapterDiesBeforeNudge`,
   `TestFailedWakeLeavesNewerMailPending`, and `TestAddressableAgentsNeverDuplicatesAcrossStop`.
-- **A13** `(planned)` (R24–R26) — Several messages present before an idle recipient is claimed
+- **A13** (R24–R26) — Several messages present before an idle recipient is claimed
   produce one mail-handling provider turn. If the agent leaves some or all of those messages unread,
   repeated sweeps, idle transitions, and a dashboard restart produce no second turn for that
   opportunity; mail inserted after the claim produces one later activation. *Verify:* fake-ACP
   server integration tests that count provider prompts across coalescing, unread completion, restart,
   and mid-flight insertion.
-- **A14** `(planned)` (R25) — The activation prompt contains no message body or other context
+- **A14** (R25) — The activation prompt contains no message body or other context
   payload, while `check_messages` returns the durable messages under the existing caller identity,
   limit, budget, read, and indicator behavior. *Verify:* runtime prompt-capture and MCP messaging
   integration tests.
-- **A15** `(planned)` (R26–R27) — A stopped wakeable recipient is resumed once for a claimed mail
+- **A15** (R26–R27) — A stopped wakeable recipient is resumed once for a claimed mail
   opportunity and receives one activation; a lost lifecycle race remains pending, while a real wake,
   launch, or provider attempt that fails is not retried after restart. New mail re-arms a later
   opportunity. Terminal and pipeline-associated stopped agents never start. *Verify:* generation-
@@ -303,15 +286,15 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   `internal/server/messaging_registration.go`.
 - **Durable mail/budget:** `internal/state/messages.go`, `internal/state/migrate.go` (`messages`,
   `turn_budget`), `internal/messaging/constants.go`.
-- **Nudger/retention:** `internal/server/messaging_loops.go`; chat injection in
-  `internal/runtime/chat.go::CheckMessages`.
-- **Explicit activation `(planned)`:** `internal/state/activations.go`, atomic message writers,
+- **Activation executor/retention:** `internal/server/messaging_loops.go`; chat injection in
+  `internal/runtime/chat.go::StartActivation`.
+- **Explicit activation:** `internal/state/activations.go`, atomic message writers,
   server activation executor, agent-id-keyed runtime turn gate, and TS-01.R16's lifecycle claim.
 - **Indicators/budget event:** sinks in `internal/server/server.go`, notification publication in
   `internal/bus/`, `ui/src/api/sse.ts`, `ui/src/components/grid/AgentCard.tsx`,
   `ui/src/components/shell/NotificationCenter.tsx`,
   `ui/src/features/settings/NotificationsEditor.tsx`.
 - **Key regression tests:** `TestSendAndCheckRoundTrip`, `TestSendIdentityNotSpoofable`,
-  `TestNudgeOnceWakesIdleAgentAndMarksDelivered`, `TestSendMessageBudgetExceeded`,
+  `TestMailActivationStartsIdleAgentWithoutMutatingMailProvenance`, `TestSendMessageBudgetExceeded`,
   `TestResetTurnBudgetReusesSingleRow`, `TestCheckMessagesFiresReadSink`,
   `TestResolveRecipientExcludesTerminalAgents`, and `ui/src/api/sse.test.ts`.

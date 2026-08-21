@@ -315,25 +315,14 @@ func (r *Registry) Stop(ctx context.Context, agentID string) error {
 	return nil
 }
 
-// CheckMessages routes a nudger wake-up by process id. The nudger reads pids
-// from the running registry; this method maps that pid back to the owning agent
-// and runtime.
-func (r *Registry) CheckMessages(ctx context.Context, pid int) error {
-	running, err := r.store.ListRunning()
+// StartActivation routes a server-selected activation by stable agent id. The
+// owning runtime holds the per-agent turn gate across before and prompt start.
+func (r *Registry) StartActivation(ctx context.Context, agentID, kind string, before func(string) error) (bool, error) {
+	rt, err := r.ownerFor(agentID)
 	if err != nil {
-		return err
+		return false, err
 	}
-	for _, row := range running {
-		if row.PID != pid {
-			continue
-		}
-		rt, err := r.ownerFor(row.AgentID)
-		if err != nil {
-			return err
-		}
-		return rt.CheckMessages(ctx, pid)
-	}
-	return ErrNoHandle
+	return rt.StartActivation(ctx, agentID, kind, before)
 }
 
 // Permission routes a permission decision to the owning runtime.
@@ -421,8 +410,8 @@ func (n notImplementedRuntime) Resume(context.Context, LaunchSpec, string) (*Han
 	return nil, fmt.Errorf("%w: %s runtime", ErrNotImplemented, n.name)
 }
 
-func (n notImplementedRuntime) CheckMessages(context.Context, int) error {
-	return fmt.Errorf("%w: %s runtime", ErrNotImplemented, n.name)
+func (n notImplementedRuntime) StartActivation(context.Context, string, string, func(string) error) (bool, error) {
+	return false, fmt.Errorf("%w: %s runtime", ErrNotImplemented, n.name)
 }
 
 func (n notImplementedRuntime) Permission(context.Context, string, string, string) error {

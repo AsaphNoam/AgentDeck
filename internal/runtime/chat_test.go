@@ -850,7 +850,7 @@ func TestChatEffortPostSessionFailureLeavesNoAgent(t *testing.T) {
 	}
 }
 
-func TestCheckMessagesInjectsNudgeTurn(t *testing.T) {
+func TestStartActivationInjectsPayloadFreeMailTurn(t *testing.T) {
 	c, spec := newChatTest(t, "stream_text")
 	dump := filepath.Join(t.TempDir(), "prompt.json")
 	spec.Env = append(spec.Env, "FAKEACP_PROMPT_DUMP="+dump)
@@ -866,12 +866,11 @@ func TestCheckMessagesInjectsNudgeTurn(t *testing.T) {
 		t.Fatalf("Subscribe: %v", err)
 	}
 	defer unsub()
-	run, err := c.store.ReadRunning(h.AgentID)
-	if err != nil {
-		t.Fatalf("ReadRunning: %v", err)
-	}
-	if err := c.CheckMessages(ctx, run.PID); err != nil {
-		t.Fatalf("CheckMessages: %v", err)
+	started, err := c.StartActivation(ctx, h.AgentID, "mail", func(turnID string) error {
+		return c.store.ResetTurnBudget(h.AgentID, turnID)
+	})
+	if err != nil || !started {
+		t.Fatalf("StartActivation = %v, %v; want started", started, err)
 	}
 	if budget, err := c.store.CurrentTurnBudget(h.AgentID, 15); err != nil || budget.TurnID != "t_000000000001" || budget.Remaining != 15 {
 		t.Fatalf("turn budget after nudge = %+v err=%v, want fresh t_000000000001", budget, err)

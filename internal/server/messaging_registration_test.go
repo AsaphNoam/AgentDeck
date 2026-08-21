@@ -65,7 +65,7 @@ func TestRegisterMessagingMCPWritesHTTPConfigAndCleanup(t *testing.T) {
 	}
 }
 
-func TestNudgeOnceWakesIdleAgentAndMarksDelivered(t *testing.T) {
+func TestMailActivationStartsIdleAgentWithoutMutatingMailProvenance(t *testing.T) {
 	srv := testServer(t, true)
 	fake := buildServerFakeACP(t)
 	promptDump := filepath.Join(t.TempDir(), "prompt.json")
@@ -114,8 +114,8 @@ func TestNudgeOnceWakesIdleAgentAndMarksDelivered(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListMessages: %v", err)
 	}
-	if len(msgs) != 1 || msgs[0].MessageID != msgID || msgs[0].DeliveredVia != "nudge" {
-		t.Fatalf("message after nudge = %+v, want delivered_via=nudge", msgs)
+	if len(msgs) != 1 || msgs[0].MessageID != msgID || msgs[0].DeliveredVia != state.DeliveryPending {
+		t.Fatalf("message after activation = %+v, want unread mail left pending", msgs)
 	}
 }
 

@@ -1,6 +1,6 @@
 # TS-01 — Architecture
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/server`, `internal/runtime`, `internal/state`, `internal/index`, `internal/bus`, `internal/config`, `internal/configsource`, `internal/messaging`, `internal/pipeline`, `internal/backend`, `internal/archive`, `internal/transcript`, `internal/cli`, `ui/src`
 **Absorbed:** architecture contract from [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md); rationale remains in [`architecture-decisions.md`](../../architecture-decisions.md) D1–D5
 
@@ -38,7 +38,7 @@ runtime — the messaging MCP server and embedded UI live inside the Go binary (
 | `internal/cli` | Cobra CLI: `dashboard start/open`, pidfile, reindex |
 | `ui/src` | React 18 + Vite SPA (Zustand, React Query, Radix, xterm); consumes REST + SSE only |
 
-**R4 — The `Runtime` abstraction is interface-keyed dispatch.** The server programs against a single `Runtime` interface (`internal/runtime/runtime.go`) with methods `Start`, `SendPrompt`, `Cancel`, `Stop`, `Resume`, `CheckMessages`, `Permission`, `Subscribe`, `Transcript`. Two implementations exist: **chat** (ACP JSON-RPC/NDJSON over stdio) and **terminal** (PTY-backed). The `Registry` dispatches every agent by `agent.interface` (`byIface["chat"]` / `byIface["terminal"]`, `internal/runtime/registry.go`). Both implementations wrap the **same** CLI under the **same** stable identity — that is what makes interface/backend/model switching non-destructive (D4).
+**R4 — The `Runtime` abstraction is interface-keyed dispatch.** The server programs against a single `Runtime` interface (`internal/runtime/runtime.go`) with methods `Start`, `SendPrompt`, `Cancel`, `Stop`, `Resume`, `StartActivation`, `Permission`, `Subscribe`, `Transcript`. Two implementations exist: **chat** (ACP JSON-RPC/NDJSON over stdio) and **terminal** (PTY-backed). The `Registry` dispatches every agent by `agent.interface` (`byIface["chat"]` / `byIface["terminal"]`, `internal/runtime/registry.go`). Both implementations wrap the **same** CLI under the **same** stable identity — that is what makes interface/backend/model switching non-destructive (D4).
 
 **R5 — Source-of-truth rules, split by writer (D1).**
 - **Config = plain JSON files** under `~/.agentdeck` (`roles/`, `projects/`, `pipelines/`, `backends.json`, `config.json`, `layout.json`, `config-sources.json`). Hand-editable, git-friendly, single-writer, low-volume.
@@ -46,7 +46,7 @@ runtime — the messaging MCP server and embedded UI live inside the Go binary (
 - **Transcripts = AgentDeck normalized log plus provider artifacts.** The chat runtime appends
   normalized events to `sessions/{id}/transcript.ndjson`; provider-owned session/history artifacts
   may coexist. AgentDeck indexes the normalized log into FTS5 (`internal/index`, `internal/transcript`).
-- **Federation authority is one-way (D1 Phase-7 refinement).** For a bound Claude/Codex backend, the native user/project files remain authoritative; AgentDeck stores only a `config-sources.json` binding plus explicit overrides and derives a redacted effective view. A mirror is disposable cache, never a second authority; only an explicit detached import (planned) makes AgentDeck authoritative.
+- **Federation authority is one-way (D1 Phase-7 refinement).** For a bound Claude/Codex backend, the native user/project files remain authoritative; AgentDeck stores only a `config-sources.json` binding plus explicit overrides and derives a redacted effective view. A mirror is disposable cache, never a second authority; only a future explicit detached import makes AgentDeck authoritative.
 
 **R6 — Config composition happens at launch, through one shared helper.** `project.cwd` + `project.context_prompt` + `role.system_prompt` + backend/model + resolved `skip_permissions`/`add_dirs`/env compose into a `LaunchSpec`. Launch, resume, and switch each build a `LaunchSpec` and MUST route through the shared composition helpers rather than hand-rolling a subset: `composeLaunch` (launch), `composeResumeSpec` (resume), `composeSwitchSpec` (switch), plus the field resolvers `resolveSkip`, `expandAddDirs`, `composeEnv`, and the single `teardownAgentRegistration` cleanup (all `internal/server/launch.go`, with resume/switch in their own files). Edits to config affect **future** launches only; a launched agent's composed spec is frozen into its `sessions` snapshot.
 
@@ -170,7 +170,7 @@ agent deletion beside the annotation tray cleanup. Archive, stop, resume, runtim
 transcript events do not clear or copy the draft. This is the browser-local boundary discipline of
 INV §1 without a timer, expiry service, server cleanup, migration, or second source of chat truth.
 
-**R18 `(planned)` — Control, context/artifact, and conversation are separate architectural
+**R18 — Control, context/artifact, and conversation are separate architectural
 planes.** Control facts are typed state owned by `internal/state` and domain services; they advance
 through transactions, claims, lifecycle events, and bounded reconciliation rather than prose
 protocols between models. Context/artifact payloads remain in their existing authoritative stores
@@ -180,7 +180,7 @@ that needs reasoning. SSE and in-process channels may announce that state change
 they are lossy accelerators and never replace the durable authority or carry rich context by
 default.
 
-**R19 `(planned)` — Activation is one small control-plane primitive.** `internal/state` owns a
+**R19 — Activation is one small control-plane primitive.** `internal/state` owns a
 payload-free activation record with a stable id, stable target `agent_id`, closed code-owned kind,
 state, claim token, and operational timestamps. It represents an opportunity to initiate work; it
 does not define universal coalescing, retry, successful-start, or completion semantics. Those belong
@@ -192,7 +192,7 @@ contract. There is no generic activation CRUD API, UI, graph, plug-in registry, 
 The shared concept is reusable by later context-link, dependency, and semantic orchestration
 features; the initial mail schema and policy are not declared sufficient for those features.
 
-**R20 `(planned)` — Source fact and activation commit together; execution is a separate
+**R20 — Source fact and activation commit together; execution is a separate
 service.** A state-owned transaction first commits the authoritative domain mutation and the
 activation signal appropriate to that domain. Agent and reserved-user mail use one transaction for
 message insert plus a mail-specific rule that permits at most one pending `mail` activation per
@@ -205,8 +205,8 @@ releases or recovers stale pre-attempt claims, and never replays an attempted ro
 publishes no activation SSE/history surface; mail's existing unread state remains the user-facing
 projection.
 
-**R21 `(planned)` — Activation uses the runtime and lifecycle seams without reopening their
-races.** The current `Runtime.CheckMessages(pid)` operation is replaced by an agent-id-keyed,
+**R21 — Activation uses the runtime and lifecycle seams without reopening their
+races.** The runtime activation operation is agent-id-keyed,
 kind-aware activation operation with an atomic turn-start gate. For an already-running chat
 agent, the runtime rechecks idle/no-active-turn, holds the turn gate while the server durably marks
 the kind-owned pre-side-effect transition, commits the ordinary budget/status turn state, and only
@@ -232,15 +232,15 @@ type Runtime interface {
     Cancel(ctx, agentID string) (bool, error)   // false when idle no-op
     Stop(ctx, agentID string) error              // idempotent
     Resume(ctx, spec LaunchSpec, sessionID string) (*Handle, error)
-    CheckMessages(ctx, pid int) error            // nudge drain
+    StartActivation(ctx, agentID, kind string, before func(turnID string) error) (bool, error)
     Permission(ctx, agentID, toolCallID, decision string) error
     Subscribe(agentID string) (<-chan Event, func(), error) // buffered, drop-oldest
     Transcript(agentID string) ([]Event, error)
 }
 ```
 
-When R21 ships, `CheckMessages(pid)` leaves this interface. The replacement is keyed by stable
-`agent_id`, accepts only a server-selected activation kind/instruction, and has a before-side-effect
+`StartActivation` is keyed by stable `agent_id`, accepts only a server-selected activation
+kind/instruction, and has a before-side-effect
 commit hook (or an equivalent two-phase turn token) so runtime turn arbitration and the kind-owned
 durable transition cannot race. The exact Go spelling may follow the implementation, but it must
 return whether a turn actually started and must never report success when idle/turn ownership was

@@ -4,6 +4,14 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-21 — Implementation: explicit mail activation
+
+Mail now creates one durable activation rather than repeatedly nudging an agent from unread state. The activation contains no message content, so agents still retrieve mail through `check_messages`; it is claimed and recorded before any wake or provider prompt, preventing retries after a real attempt while allowing later mail to create new work.
+
+**Needs attention:** None.
+
+**Next:** Run the live provider acceptance checks when authorization is available.
+
 ### 2026-08-21 — Feature design: activation review feedback incorporated
 
 I agree with all four review points and incorporated them into the design.

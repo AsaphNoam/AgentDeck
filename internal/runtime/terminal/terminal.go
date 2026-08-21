@@ -376,14 +376,10 @@ func (r *Runtime) reconcileOrphanStop(agentID string) {
 	}
 }
 
-// CheckMessages wakes an idle terminal agent by writing a nudge prompt (Phase 5
-// nudger support, §3.1).
-func (r *Runtime) CheckMessages(ctx context.Context, pid int) error {
-	a, err := r.lookupByPID(pid)
-	if err != nil {
-		return err
-	}
-	return a.driver.WriteText(a.tab, "You have new messages. Call the check_messages tool and handle them.")
+// StartActivation intentionally rejects terminal agents. They remain excluded
+// from mailbox delivery until they have a verified MCP pull path.
+func (r *Runtime) StartActivation(context.Context, string, string, func(string) error) (bool, error) {
+	return false, fmt.Errorf("%w: terminal activation", rt.ErrNotImplemented)
 }
 
 // Permission has no terminal analogue: an approval prompt surfaces as

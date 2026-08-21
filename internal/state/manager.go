@@ -148,7 +148,7 @@ ON CONFLICT(agent_id) DO UPDATE SET
 		case "UserPromptSubmit":
 			// A terminal agent's UserPromptSubmit marks a new turn boundary. The
 			// chat runtime resets the messaging budget at each turn (ChatRuntime.
-			// SendPrompt/CheckMessages); the terminal runtime has no such call, so
+			// SendPrompt/StartActivation); the terminal runtime has no such call, so
 			// without resetting here a terminal agent rides the implicit
 			// t_000000000000 budget row forever and locks out with
 			// message_budget_exceeded after MessageBudgetPerTurn lifetime actions.

@@ -91,6 +91,13 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 // same gates, same composition, same failure teardown — under one exclusive
 // per-agent claim. It returns nil once the agent is running again.
 func (s *Server) resumeSession(ctx context.Context, id string, override resumeOverride) *runtime.APIError {
+	return s.resumeSessionWithHooks(ctx, id, override, nil, nil)
+}
+
+// resumeSessionWithHooks keeps the lifecycle claim over the optional activation
+// boundaries. Mail uses before immediately before the first resume side effect
+// and after before the lifecycle claim is released.
+func (s *Server) resumeSessionWithHooks(ctx context.Context, id string, override resumeOverride, before, after func() error) *runtime.APIError {
 	if !s.claimLifecycle(id) {
 		return apiError(runtime.CodeConflict, "a resume is already in progress")
 	}
@@ -128,6 +135,11 @@ func (s *Server) resumeSession(ctx context.Context, id string, override resumeOv
 	}
 	if err != nil {
 		return apiError(runtime.CodeInternal, err.Error())
+	}
+	if before != nil {
+		if err := before(); err != nil {
+			return apiError(runtime.CodeInternal, err.Error())
+		}
 	}
 
 	// 4. Resolve the identity to resume. backend/model/interface come from the LIVE
@@ -246,6 +258,11 @@ func (s *Server) resumeSession(ctx context.Context, id string, override resumeOv
 		// token + MCP, so a failed resume leaves nothing behind (launch parity).
 		s.teardownAgentRegistration(id)
 		return resumeStartError(err)
+	}
+	if after != nil {
+		if err := after(); err != nil {
+			return apiError(runtime.CodeInternal, err.Error())
+		}
 	}
 	return nil
 }

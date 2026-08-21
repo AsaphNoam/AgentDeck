@@ -328,6 +328,13 @@ CREATE INDEX idx_pipeline_proposals_created ON pipeline_proposals(created_at DES
 		version: 15,
 		sql: `
 ALTER TABLE pipeline_proposals ADD COLUMN consumed_at TEXT NOT NULL DEFAULT '';
-`,
+		`,
+	},
+	{
+		// Explicit, payload-free mail activation (TS-02.R23). The backfill is an
+		// apply function because legacy rows need one coalesced activation per
+		// recipient, not one activation per message.
+		version: 16,
+		apply:   migrateActivations,
 	},
 }

@@ -256,14 +256,29 @@ func toRefs(agents []LiveAgent) []AgentRef {
 	return refs
 }
 
-// InsertMessage writes one message row, minting a unique message_id ("m_" + 6
-// hex, retrying on the rare collision) and stamping created_at (now if unset),
-// read=false, delivered_via="pending" unless the caller set it (techspec §3.2,
-// §4.1). Returns the minted message_id.
+// InsertMessage writes one message and its mail activation in one transaction.
+// The payload remains in messages; activation is only the coalesced control
+// signal that durable mail work exists.
 func (s *Store) InsertMessage(m Message) (string, error) {
-	id, err := insertMessageTx(s.db, m)
+	if m.DeliveredVia == "" {
+		m.DeliveredVia = DeliveryPending
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return "", fmt.Errorf("state: begin message insert: %w", err)
+	}
+	defer tx.Rollback()
+	id, err := insertMessageTx(tx, m)
 	if err != nil {
 		return "", err
+	}
+	if m.DeliveredVia == DeliveryPending {
+		if err := EnsurePendingMailActivationTx(tx, m.ToAgent); err != nil {
+			return "", err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return "", fmt.Errorf("state: commit message insert: %w", err)
 	}
 	return id, nil
 }
@@ -309,6 +324,9 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?)`,
 // sender's turn budget in the same transaction. On breach, the message is not
 // inserted and the budget row is marked breached.
 func (s *Store) InsertMessageWithBudget(m Message, limit int) (string, BudgetStatus, bool, error) {
+	if m.DeliveredVia == "" {
+		m.DeliveredVia = DeliveryPending
+	}
 	tx, err := s.db.Begin()
 	if err != nil {
 		return "", BudgetStatus{}, false, fmt.Errorf("state: begin message insert budget: %w", err)
@@ -328,6 +346,11 @@ func (s *Store) InsertMessageWithBudget(m Message, limit int) (string, BudgetSta
 	id, err := insertMessageTx(tx, m)
 	if err != nil {
 		return "", BudgetStatus{}, false, err
+	}
+	if m.DeliveredVia == DeliveryPending {
+		if err := EnsurePendingMailActivationTx(tx, m.ToAgent); err != nil {
+			return "", BudgetStatus{}, false, err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return "", BudgetStatus{}, false, fmt.Errorf("state: commit message insert budget: %w", err)

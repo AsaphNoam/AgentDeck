@@ -58,6 +58,44 @@ func liveTerminalAgent(t *testing.T, st *Store, id, name, role, project string) 
 	}
 }
 
+// FS-06.A13 / TS-02.R23 — mail carries one durable, payload-free activation
+// while pending; a later insert after claim creates the next opportunity.
+func TestMailActivationCoalescesClaimsAndRecovers(t *testing.T) {
+	st, _ := newTestStore(t)
+	liveAgent(t, st, "a_mail", "Nova", "reviewer", "my-app")
+	for _, body := range []string{"first", "second"} {
+		if _, err := st.InsertMessage(Message{FromAgent: "a_sender", FromAddress: "impl@my-app", FromName: "Atlas", ToAgent: "a_mail", Body: body}); err != nil {
+			t.Fatalf("InsertMessage %q: %v", body, err)
+		}
+	}
+	pending, err := st.PendingMailActivations("a_mail")
+	if err != nil || len(pending) != 1 {
+		t.Fatalf("PendingMailActivations = %+v, %v; want one", pending, err)
+	}
+	claimedID := pending[0].ActivationID
+	token, claimed, err := st.ClaimMailActivation(claimedID)
+	if err != nil || !claimed {
+		t.Fatalf("ClaimMailActivation = %q, %v, %v; want claim", token, claimed, err)
+	}
+	if _, err := st.InsertMessage(Message{FromAgent: "a_sender", FromAddress: "impl@my-app", FromName: "Atlas", ToAgent: "a_mail", Body: "later"}); err != nil {
+		t.Fatalf("InsertMessage later: %v", err)
+	}
+	pending, err = st.PendingMailActivations("a_mail")
+	if err != nil || len(pending) != 1 {
+		t.Fatalf("PendingMailActivations after claim = %+v, %v; want later activation", pending, err)
+	}
+	if attempted, err := st.AttemptMailActivation(claimedID, token, "t_000000000001"); err != nil || !attempted {
+		t.Fatalf("AttemptMailActivation = %v, %v; want true, nil", attempted, err)
+	}
+	if err := st.RetireMailActivation(claimedID, token); err != nil {
+		t.Fatalf("RetireMailActivation: %v", err)
+	}
+	pending, err = st.PendingMailActivations("a_mail")
+	if err != nil || len(pending) != 1 {
+		t.Fatalf("PendingMailActivations after retire = %+v, %v; want later activation", pending, err)
+	}
+}
+
 // Finding 4 regression: a terminal-interface agent has no check_messages tool, so
 // delivering mail to it would spin the nudger indefinitely (up to the 7-day mail
 // TTL). ResolveRecipient must therefore never select a terminal agent as a

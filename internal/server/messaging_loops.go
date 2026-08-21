@@ -6,162 +6,150 @@ import (
 	"time"
 
 	"github.com/agentdeck/agentdeck/internal/messaging"
-	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
-type nudgeState struct {
-	lastNudgeAt time.Time
-	inFlight    bool
-	startedAt   time.Time
-}
-
 func (s *Server) startMessagingLoops(ctx context.Context) {
-	go s.runNudger(ctx)
+	if err := s.stateStore.RecoverMailActivations(); err != nil {
+		s.log.Debug("recover mail activations failed", "err", err)
+	}
+	go s.runActivationExecutor(ctx)
 	go s.runMessageJanitor(ctx)
 }
 
-func (s *Server) runNudger(ctx context.Context) {
+// nudgeState/nudgeOnce keep older focused tests source-compatible while their
+// behavior now exercises the activation executor rather than unread polling.
+type nudgeState struct{}
+
+func (s *Server) nudgeOnce(ctx context.Context, onlyAgentID string, _ map[string]nudgeState) {
+	s.executePendingMailActivations(ctx, onlyAgentID)
+}
+
+// runActivationExecutor uses its channel only as a fast path. Durable pending
+// activation rows, checked at startup and on every sweep, remain authoritative.
+func (s *Server) runActivationExecutor(ctx context.Context) {
 	ticker := time.NewTicker(messaging.NudgeInterval)
 	defer ticker.Stop()
-	stateByAgent := map[string]nudgeState{}
-
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.nudgeOnce(ctx, "", stateByAgent)
-		case agentID := <-s.nudgeCh:
-			s.nudgeOnce(ctx, agentID, stateByAgent)
+			s.executePendingMailActivations(ctx, "")
+		case agentID := <-s.activationCh:
+			s.executePendingMailActivations(ctx, agentID)
 		}
 	}
 }
 
-func (s *Server) nudgeOnce(ctx context.Context, onlyAgentID string, stateByAgent map[string]nudgeState) {
+func (s *Server) executePendingMailActivations(ctx context.Context, onlyAgentID string) {
 	if s.registry == nil {
 		return
 	}
-	running, err := s.stateStore.ListRunning()
+	activations, err := s.stateStore.PendingMailActivations(onlyAgentID)
 	if err != nil {
-		s.log.Debug("nudger list running failed", "err", err)
+		s.log.Debug("activation list pending mail failed", "err", err)
 		return
 	}
-	now := time.Now()
-	for _, row := range running {
-		if onlyAgentID != "" && row.AgentID != onlyAgentID {
-			continue
-		}
-		ns := stateByAgent[row.AgentID]
-		if ns.inFlight && now.Sub(ns.startedAt) > messaging.NudgeInFlightTimeout {
-			ns.inFlight = false
-		}
-		status, err := s.stateStore.ReadStatus(row.AgentID)
-		if err != nil {
-			stateByAgent[row.AgentID] = ns
-			continue
-		}
-		unread, err := s.stateStore.UnreadCount(row.AgentID)
-		if err != nil {
-			s.log.Debug("nudger unread count failed", "agent", row.AgentID, "err", err)
-			stateByAgent[row.AgentID] = ns
-			continue
-		}
-		if ns.inFlight && status.State == "idle" && unread == 0 {
-			ns.inFlight = false
-		}
-		if status.State != "idle" || unread == 0 || ns.inFlight || now.Sub(ns.lastNudgeAt) < messaging.NudgeCooldown {
-			stateByAgent[row.AgentID] = ns
-			continue
-		}
-		ns.inFlight = true
-		ns.startedAt = now
-		ns.lastNudgeAt = now
-		stateByAgent[row.AgentID] = ns
-		if _, err := s.stateStore.MarkUnreadDeliveredVia(row.AgentID, state.DeliveryNudge); err != nil {
-			s.log.Debug("nudger mark delivered failed", "agent", row.AgentID, "err", err)
-		}
-		go func(agentID string, pid int) {
-			if err := s.registry.CheckMessages(ctx, pid); err != nil && !errors.Is(err, runtime.ErrNoHandle) {
-				s.log.Debug("nudger check_messages failed", "agent", agentID, "err", err)
-			}
-		}(row.AgentID, row.PID)
-	}
-	s.wakeOnce(ctx, onlyAgentID, stateByAgent, now)
-}
-
-// wakeOnce resumes the stopped agents holding mail nobody has delivered yet
-// (FS-06.R23). Candidacy is durable: it needs an unread row still marked
-// "pending", and an attempt claims exactly the rows it is waking for out of
-// "pending" before it spawns anything. That ordering is what bounds retries. If
-// the attempt were only marked on failure, an adapter that completed its
-// handshake and then died before the first check_messages nudge would leave the
-// rows pending and be respawned by every two-second sweep — the process-spawn
-// loop R23 forbids. Woken agents are nudged by the ordinary running path above
-// once they report idle, and that nudge restamps the claimed rows "nudge".
-func (s *Server) wakeOnce(ctx context.Context, onlyAgentID string, stateByAgent map[string]nudgeState, now time.Time) {
-	waiting, err := s.stateStore.PendingWakeMailAgents()
-	if err != nil {
-		s.log.Debug("nudger pending wake mail failed", "err", err)
-		return
-	}
-	for _, agentID := range waiting {
-		if onlyAgentID != "" && agentID != onlyAgentID {
-			continue
-		}
-		if _, ok, ae := s.wakeCandidate(agentID); ae != nil {
-			// A gate could not be evaluated (storage or project-definition failure).
-			// Leave the mail pending and retry on the next sweep rather than
-			// consuming this recipient's one wake attempt on an undecided gate.
-			s.log.Debug("mail wake candidacy failed", "agent", agentID, "err", ae.Message)
-			continue
-		} else if !ok {
-			continue // running, archived, snapshot-less, terminal, or pipeline-owned
-		}
-		ns := stateByAgent[agentID]
-		// The exclusive lifecycle claim is the re-entry guard: this loop must not
-		// wait out a wake, and the nudge in-flight marker belongs to the running
-		// path that delivers check_messages once the agent is back.
-		if s.lifecycleInFlight(agentID) || now.Sub(ns.lastNudgeAt) < messaging.NudgeCooldown {
-			continue
-		}
-		ns.lastNudgeAt = now
-		stateByAgent[agentID] = ns
-		go s.wakeForMail(ctx, agentID)
+	for _, activation := range activations {
+		go s.executeMailActivation(ctx, activation)
 	}
 }
 
-// wakeForMail runs one bounded wake attempt for a stopped recipient. It claims
-// the pending mail the attempt owns before waking, so the durable outcome is tied
-// to the attempt rather than to whatever happened to be pending when it finished:
-// mail that arrives while the wake is in flight stays "pending" and re-arms the
-// wake, exactly as FS-06.R23 promises.
-func (s *Server) wakeForMail(ctx context.Context, agentID string) {
-	claimed, err := s.stateStore.ClaimPendingWakeMail(agentID)
+func (s *Server) executeMailActivation(ctx context.Context, activation state.Activation) {
+	available, err := s.stateStore.HasUnreadMail(activation.AgentID)
 	if err != nil {
-		s.log.Debug("claim wake mail failed", "agent", agentID, "err", err)
+		s.log.Debug("activation source check failed", "agent", activation.AgentID, "err", err)
 		return
 	}
-	if len(claimed) == 0 {
-		return // another attempt already owns this recipient's mail
-	}
-	_, ae := s.wakeAgent(ctx, agentID)
-	if ae == nil {
-		// The claim stands until the check_messages nudge that follows the wake
-		// restamps these rows "nudge". If the woken adapter dies first they remain
-		// claimed, which is precisely the no-respawn bound.
+	if !available {
+		if err := s.stateStore.RetirePendingMailActivation(activation.ActivationID); err != nil {
+			s.log.Debug("retire empty mail activation failed", "activation", activation.ActivationID, "err", err)
+		}
 		return
 	}
-	s.log.Debug("mail wake failed", "agent", agentID, "err", ae.Message)
-	outcome := state.DeliveryWakeFailed
-	if ae.Code == runtime.CodeConflict {
-		// Another lifecycle transition owns this agent; nothing was attempted here,
-		// so release the claim and let the next sweep try again.
-		outcome = state.DeliveryPending
+	token, claimed, err := s.stateStore.ClaimMailActivation(activation.ActivationID)
+	if err != nil {
+		s.log.Debug("claim mail activation failed", "activation", activation.ActivationID, "err", err)
+		return
 	}
-	if err := s.stateStore.SetDeliveredVia(claimed, outcome); err != nil {
-		s.log.Debug("record wake outcome failed", "agent", agentID, "outcome", outcome, "err", err)
+	if !claimed {
+		return
 	}
+	if _, err := s.stateStore.ReadRunning(activation.AgentID); err == nil {
+		s.startRunningMailActivation(ctx, activation, token)
+		return
+	} else if !errors.Is(err, state.ErrNotFound) {
+		s.log.Debug("activation read running failed", "agent", activation.AgentID, "err", err)
+		_ = s.stateStore.ReleaseMailActivation(activation.ActivationID, token)
+		return
+	}
+	s.startStoppedMailActivation(ctx, activation, token)
+}
+
+func (s *Server) startRunningMailActivation(ctx context.Context, activation state.Activation, token string) {
+	attempted := false
+	started, err := s.registry.StartActivation(ctx, activation.AgentID, state.ActivationKindMail, func(turnID string) error {
+		var err error
+		attempted, err = s.stateStore.AttemptMailActivation(activation.ActivationID, token, turnID)
+		if err == nil && !attempted {
+			return errors.New("mail activation claim lost")
+		}
+		return err
+	})
+	if err != nil {
+		s.log.Debug("start running mail activation failed", "agent", activation.AgentID, "err", err)
+	}
+	if !started && !attempted {
+		_ = s.stateStore.ReleaseMailActivation(activation.ActivationID, token)
+		return
+	}
+	if attempted {
+		if err := s.stateStore.RetireMailActivation(activation.ActivationID, token); err != nil {
+			s.log.Debug("retire running mail activation failed", "activation", activation.ActivationID, "err", err)
+		}
+	}
+}
+
+func (s *Server) startStoppedMailActivation(ctx context.Context, activation state.Activation, token string) {
+	if _, ok, ae := s.wakeCandidate(activation.AgentID); ae != nil {
+		s.log.Debug("mail activation wake candidacy failed", "agent", activation.AgentID, "err", ae.Message)
+		_ = s.stateStore.ReleaseMailActivation(activation.ActivationID, token)
+		return
+	} else if !ok {
+		_ = s.stateStore.ReleaseMailActivation(activation.ActivationID, token)
+		return
+	}
+	attempted := false
+	ae := s.resumeSessionWithHooks(ctx, activation.AgentID, resumeOverride{}, func() error {
+		var err error
+		attempted, err = s.stateStore.AttemptMailActivation(activation.ActivationID, token, "")
+		if err == nil && !attempted {
+			return errors.New("mail activation claim lost")
+		}
+		return err
+	}, func() error {
+		started, err := s.registry.StartActivation(ctx, activation.AgentID, state.ActivationKindMail, func(turnID string) error {
+			return s.stateStore.StartAttemptedMailTurn(activation.ActivationID, token, turnID)
+		})
+		if err != nil {
+			return err
+		}
+		if !started {
+			return errors.New("mail activation turn did not start")
+		}
+		return nil
+	})
+	if ae != nil {
+		s.log.Debug("start stopped mail activation failed", "agent", activation.AgentID, "err", ae.Message)
+	}
+	if attempted {
+		if err := s.stateStore.RetireMailActivation(activation.ActivationID, token); err != nil {
+			s.log.Debug("retire stopped mail activation failed", "activation", activation.ActivationID, "err", err)
+		}
+		return
+	}
+	_ = s.stateStore.ReleaseMailActivation(activation.ActivationID, token)
 }
 
 func (s *Server) runMessageJanitor(ctx context.Context) {
