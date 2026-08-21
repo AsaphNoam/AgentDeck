@@ -182,22 +182,26 @@ default.
 
 **R19 `(planned)` — Activation is one small control-plane primitive.** `internal/state` owns a
 payload-free activation record with a stable id, stable target `agent_id`, closed code-owned kind,
-state, claim token, and operational timestamps. `mail` is the only valid kind in this change. The
-record contains no message body, prompt, transcript excerpt, context reference, dependency,
-assignment, retry policy, or arbitrary metadata; adding a kind requires an owning FS requirement
-and an explicit server handler. There is no generic activation CRUD API, UI, graph, plug-in
-registry, or workflow DSL. This narrow shape is intentionally reusable by later context-link,
-dependency, and semantic orchestration features without shipping any of them here.
+state, claim token, and operational timestamps. It represents an opportunity to initiate work; it
+does not define universal coalescing, retry, successful-start, or completion semantics. Those belong
+to the source domain. `mail` is the only valid kind in this change, and FS-06 owns its deliberately
+at-most-once policy. The record contains no message body, prompt, transcript excerpt, context
+reference, dependency, assignment, retry policy, or arbitrary metadata; adding a kind requires an
+owning FS requirement, an explicit server handler, and a declared source identity/coalescing/retry
+contract. There is no generic activation CRUD API, UI, graph, plug-in registry, or workflow DSL.
+The shared concept is reusable by later context-link, dependency, and semantic orchestration
+features; the initial mail schema and policy are not declared sufficient for those features.
 
 **R20 `(planned)` — Source fact and activation commit together; execution is a separate
-service.** A state-owned transaction first commits the authoritative domain mutation and ensures at
-most one pending activation per `(agent_id, kind)`. Agent and reserved-user mail use that transaction
-for message insert plus `mail` activation. The post-commit in-process signal only wakes the
-server-owned activation executor; a bounded sweep and startup recovery discover the same durable
-pending rows. The executor checks kind-specific source availability and eligibility, claims with a
-unique token, and performs no external effect until that exact claim is durably marked attempted.
-A stale or losing pre-attempt claim can be released or recovered; an attempted row is never replayed
-and is deleted once it is no longer needed for conservative restart reconciliation. The executor
+service.** A state-owned transaction first commits the authoritative domain mutation and the
+activation signal appropriate to that domain. Agent and reserved-user mail use one transaction for
+message insert plus a mail-specific rule that permits at most one pending `mail` activation per
+agent. The post-commit in-process signal only wakes the server-owned activation executor; a bounded
+sweep and startup recovery discover the same durable pending rows. The executor dispatches by closed
+kind and lets the kind handler check source availability/eligibility and apply its transition policy;
+it does not impose mail's coalescing or replay rule on every kind. For `mail`, the handler claims
+with a unique token, performs no external effect until that claim is durably marked attempted,
+releases or recovers stale pre-attempt claims, and never replays an attempted row. The executor
 publishes no activation SSE/history surface; mail's existing unread state remains the user-facing
 projection.
 
@@ -205,15 +209,18 @@ projection.
 races.** The current `Runtime.CheckMessages(pid)` operation is replaced by an agent-id-keyed,
 kind-aware activation operation with an atomic turn-start gate. For an already-running chat
 agent, the runtime rechecks idle/no-active-turn, holds the turn gate while the server durably marks
-the claim attempted, commits the ordinary budget/status turn state, and only then issues the
-provider instruction. If another turn wins, no attempt is recorded and the claim returns to
-pending. For a stopped recipient, the executor takes TS-01.R16's exclusive lifecycle claim, marks
-the activation attempted immediately before the first resume side effect, and routes through the
-same claimed resume/composition path; after a successful resume it starts the activation before
-releasing that transition. Lifecycle-claim loss is pre-attempt and releases the activation. Once a
-wake or provider side effect has been attempted, failure, cancellation, crash, or restart can omit
-the work but cannot repeat it. A fixed kind-specific instruction is the only activation data sent
-to the provider, and it is not appended as a user-authored AgentDeck transcript event.
+the kind-owned pre-side-effect transition, commits the ordinary budget/status turn state, and only
+then issues the provider instruction. If another turn wins, no external effect occurs and the kind
+handler decides how its claim remains actionable. For a stopped mail recipient, the executor takes
+TS-01.R16's exclusive lifecycle claim, applies FS-06's attempted transition immediately before the
+first resume side effect, and routes through the same claimed resume/composition path; after a
+successful resume it starts the activation before releasing that transition. Lifecycle-claim loss
+is pre-attempt and returns mail to pending. Once a mail wake or provider side effect has been
+attempted, failure, cancellation, crash, or restart can omit that mail turn but cannot repeat it.
+This is FS-06's policy, not a default for future tasks: a future dependency-backed activation may
+remain actionable until its owning durable task/attempt records a successful start. A fixed
+kind-specific instruction is the only activation data sent to the provider, and it is not appended
+as a user-authored AgentDeck transcript event.
 
 ## 3. Interfaces & data shapes
 
@@ -234,10 +241,10 @@ type Runtime interface {
 
 When R21 ships, `CheckMessages(pid)` leaves this interface. The replacement is keyed by stable
 `agent_id`, accepts only a server-selected activation kind/instruction, and has a before-side-effect
-commit hook (or an equivalent two-phase turn token) so runtime turn arbitration and the durable
-`claimed → attempted` transition cannot race. The exact Go spelling may follow the implementation,
-but it must return whether a turn actually started and must never report success when idle/turn
-ownership was lost.
+commit hook (or an equivalent two-phase turn token) so runtime turn arbitration and the kind-owned
+durable transition cannot race. The exact Go spelling may follow the implementation, but it must
+return whether a turn actually started and must never report success when idle/turn ownership was
+lost.
 
 **On-disk layout (source of truth by writer):**
 ```
@@ -264,8 +271,9 @@ ownership was lost.
 - **INV §6 — A new runtime joins every existing contract.** Binds R4: any new interface/driver walks the §6 checklist (persistence, full LaunchSpec via R6 resolvers, fan-out/drain, messaging, turn boundaries, reconcile, teardown) before it is first-class.
 - **INV §14 — Loopback is not a security boundary.** Binds R2: the bind constraint keeps remote sockets out but is not access control; TS-05 owns the actual boundary.
 - **INV §5/§15 — Claim before firing; commit before side effects.** Bind R19–R21: one claim token
-  owns each activation transition, and durable `attempted` plus ordinary turn state precede wake or
-  provider effects. Channels, status reads, and unread counts cannot substitute for that claim.
+  owns each activation transition, and the kind-owned durable attempt/start transition plus ordinary
+  turn state precedes wake or provider effects. Channels, status reads, and unread counts cannot
+  substitute for that claim.
 - **R10 (local invariant) — `state.db` has exactly one writer.** No package other than `internal/state` (driven by the server process) opens the DB for writing. A second writer is a defect regardless of correctness, because D1's safety argument depends on single-writer.
 
 ## 5. Deviations & open decisions

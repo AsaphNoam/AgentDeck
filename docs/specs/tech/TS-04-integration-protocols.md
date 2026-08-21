@@ -254,14 +254,15 @@ instruction. For `mail`, it says only that mail work is available and directs th
 existing `check_messages` tool; no message body, subject, sender, transcript, artifact, or context
 reference is embedded.
 
-The runtime must durably cross TS-01.R21's attempt boundary before writing that prompt frame. It
-emits no synthetic user-authored normalized transcript event for the host instruction, while the
-provider may retain the prompt in its own session context because an actual reasoning turn was
-requested. MCP remains the pull surface for the payload. A future adapter-specific wake or ACP
-extension may replace this bridge only through a separately capability-gated requirement; document
-notifications, `session/resume`, MCP notifications, and unadvertised extension methods must not be
-repurposed as an inferred wake contract. R27 replaces R26's unread/cooldown nudge mechanics when
-FS-06.R24–R27 ship; recipient discovery and the shared wakeability query remain unchanged.
+The runtime must durably run TS-01.R21's kind-owned pre-side-effect transition before writing that
+prompt frame; for `mail`, this is FS-06's non-replayable attempted boundary. It emits no synthetic
+user-authored normalized transcript event for the host instruction, while the provider may retain
+the prompt in its own session context because an actual reasoning turn was requested. MCP remains
+the pull surface for the payload. A future adapter-specific wake or ACP extension may replace this
+bridge only through a separately capability-gated requirement; document notifications,
+`session/resume`, MCP notifications, and unadvertised extension methods must not be repurposed as an
+inferred wake contract. R27 replaces R26's unread/cooldown nudge mechanics when FS-06.R24–R27 ship;
+recipient discovery and the shared wakeability query remain unchanged.
 
 ## 3. Interfaces & data shapes
 
@@ -316,8 +317,8 @@ FS-06.R24–R27 ship; recipient discovery and the shared wakeability query remai
   values, and provider output cannot add an executable or argument. Probe processes receive no
   stdin, are cancelled on deadline/shutdown, and never become agent/session/runtime records.
 - **INV §5/§11/§15:** activation turn ownership is claimed once, fake ACP asserts the same
-  `session/prompt` contract as the pinned adapters, and the durable attempted/local turn state is
-  committed before the provider frame is written (R27).
+  `session/prompt` contract as the pinned adapters, and the kind-owned durable attempt/start plus
+  local turn state is committed before the provider frame is written (R27).
 
 ## 5. Deviations & open decisions
 

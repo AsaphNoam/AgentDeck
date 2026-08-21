@@ -193,27 +193,33 @@ CREATE TABLE activations (
   claimed_at    TEXT,
   attempted_at  TEXT
 );
-CREATE UNIQUE INDEX idx_activations_one_pending
-  ON activations(agent_id, kind) WHERE state = 'pending';
+CREATE UNIQUE INDEX idx_activations_one_pending_mail
+  ON activations(agent_id) WHERE state = 'pending' AND kind = 'mail';
 CREATE INDEX idx_activations_pending
   ON activations(state, created_at);
 ```
 
-The only accepted `kind` in this change is `mail`; accepted states are `pending`, `claimed`, and
+The only accepted `kind` in this change is `mail`; its accepted states are `pending`, `claimed`, and
 `attempted`. Types and state methods validate both vocabularies rather than treating arbitrary
 strings as executable work. The row contains no source payload and has no association with a live
 pid/session/generation. Message insertion by either MCP or the reserved user sender and
-`EnsurePendingActivation(agent_id, "mail")` share one SQLite transaction, with the partial unique
-index as the final concurrency guard. `delivered_via` remains readable message provenance for
-compatibility but no longer owns activation/wake scheduling.
+`EnsurePendingMailActivation(agent_id)` share one SQLite transaction, with the mail-only partial
+unique index as the final concurrency guard. `delivered_via` remains readable message provenance
+for compatibility but no longer owns activation/wake scheduling. The table name and stable identity
+reserve a shared control-plane concept; the mail-only index is not a universal `(agent_id, kind)`
+coalescing contract. Before another kind is valid, its owning specification must define whether it
+needs a stable source/work id, multiple independent pending rows for one agent, or another
+kind-specific uniqueness key, and add the required forward migration/index.
 
 Claim and transition updates match both `activation_id` and a newly minted `claim_token`; a delayed
-worker cannot mutate a later claim. Startup recovers pre-side-effect `claimed` rows to `pending`, or
-deletes them when another pending row already coalesces the same target/kind, while `attempted` rows
-are recognized as non-replayable and deleted. The live executor likewise deletes attempted rows
-after their bounded handoff. This is reconciliation metadata, not retained history: it has no
-user-configurable TTL, archive copy, transcript/FTS projection, API/SSE representation, or cascade
-into messages. A pending `mail` row with no unread source mail may be deleted without inference.
+worker cannot mutate a later claim. For `mail`, startup recovers pre-side-effect `claimed` rows to
+`pending`, or deletes them when another pending mail row already coalesces that agent, while
+`attempted` rows are recognized as non-replayable and deleted. The live mail handler likewise
+deletes attempted rows after their bounded handoff. This is reconciliation metadata, not retained
+history: it has no user-configurable TTL, archive copy, transcript/FTS projection, API/SSE
+representation, or cascade into messages. A pending `mail` row with no unread source mail may be
+deleted without inference. Future kinds own their retry and durable-start transition; they do not
+inherit this cleanup policy merely by using the table.
 
 The migration creates one pending `mail` activation for each agent that has unread legacy mail still
 marked `delivered_via = 'pending'`, coalescing all such rows. Legacy `nudge`, `poll`,
