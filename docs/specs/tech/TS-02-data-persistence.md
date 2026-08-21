@@ -1,6 +1,6 @@
 # TS-02 — Data & persistence
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/config`, `internal/state`, `internal/transcript`, `internal/index`, `internal/archive`, `internal/configsource`
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -179,7 +179,7 @@ foreign key: proposal records neither cascade into nor out of runs, templates, a
 transcripts, or archive projections, so deleting a run or template leaves them alone. TS-09 owns the
 logical payload shapes and the lifecycle's product meaning.
 
-**R23 `(planned)` — Activations are durable, payload-free operational control.** A forward-only
+**R23 — Activations are durable, payload-free operational control.** A forward-only
 migration adds:
 
 ```sql

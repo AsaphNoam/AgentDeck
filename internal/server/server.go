@@ -53,7 +53,7 @@ type Server struct {
 	pipelineMgr       *pipeline.Manager
 	pipelineTemplates *pipeline.TemplateStore
 	sourceMgr         *configsource.Manager
-	nudgeCh           chan string
+	activationCh      chan string
 
 	hookMu      sync.Mutex
 	hookTokens  map[string]string // agent_id -> per-launch hook token (Phase 2 persists these)
@@ -140,7 +140,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	stateMgr := state.NewManager(stateStore, eventBus)
 	ix := persistindex.New(stateStore.DB())
 	msg := messaging.New(stateStore, log)
-	nudgeCh := make(chan string, 32)
+	activationCh := make(chan string, 32)
 	touch := func(agentID string) {
 		if _, err := stateMgr.Touch(agentID); err != nil {
 			log.Debug("state touch failed", "agent", agentID, "err", err)
@@ -168,7 +168,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	}
 	msg.SetMessageInsertedSink(func(fromAgentID, toAgentID string) {
 		select {
-		case nudgeCh <- toAgentID:
+		case activationCh <- toAgentID:
 		default:
 		}
 		// Touch publishes a state_update (via the manager's bus publisher) for
@@ -200,7 +200,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		indexer:                   ix,
 		messaging:                 msg,
 		sourceMgr:                 sourceMgr,
-		nudgeCh:                   nudgeCh,
+		activationCh:              activationCh,
 		cfg:                       cfg,
 		log:                       log,
 		hookTokens:                map[string]string{},

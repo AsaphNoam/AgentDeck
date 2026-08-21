@@ -144,9 +144,11 @@ type Runtime interface {
 	// ErrNotImplemented. Signature fixed now for Phase 4.
 	Resume(ctx context.Context, spec LaunchSpec, sessionID string) (*Handle, error)
 
-	// CheckMessages wakes an idle agent to drain its mailbox. Chat runtimes inject
-	// a nudge turn; terminal returns ErrNotImplemented until Phase 6.
-	CheckMessages(ctx context.Context, pid int) error
+	// StartActivation starts one host-owned, payload-free reasoning turn. before
+	// runs while the per-agent turn gate is held and must durably commit the
+	// activation's pre-side-effect transition; started is false when the agent is
+	// not idle or another turn owns that gate.
+	StartActivation(ctx context.Context, agentID, kind string, before func(turnID string) error) (started bool, err error)
 
 	// Permission relays an approve/deny decision back over ACP for a pending
 	// permission request. Errors if no such pending request.

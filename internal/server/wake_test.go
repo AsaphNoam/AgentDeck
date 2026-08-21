@@ -301,10 +301,9 @@ func TestConcurrentWakesResumeOnceAndKeepWinnerRegistration(t *testing.T) {
 	}
 }
 
-// FS-06.A11 — a stopped wakeable agent is addressable and marked as such; mail
-// for it is inserted durably, wakes it, and is then nudged like any running
-// recipient.
-func TestMailWakesStoppedRecipientAndNudges(t *testing.T) {
+// FS-06.A15 — a stopped wakeable agent is addressable and a claimed mail
+// activation resumes it and starts one payload-free turn.
+func TestMailActivationWakesStoppedRecipient(t *testing.T) {
 	srv, ts := wakeTestServer(t)
 	running := launchAndWaitIdle(t, ts, "impl", "tmpproj")
 	stopped := launchThenStop(t, srv, ts)
@@ -334,28 +333,22 @@ func TestMailWakesStoppedRecipientAndNudges(t *testing.T) {
 		t.Fatalf("InsertMessage: %v", err)
 	}
 
-	nudges := map[string]nudgeState{}
-	srv.nudgeOnce(context.Background(), stopped, nudges)
+	srv.nudgeOnce(context.Background(), stopped, map[string]nudgeState{})
 	waitRunning(t, srv, stopped, true)
 
-	// Once the woken agent reports idle, the ordinary running-recipient nudge
-	// delivers check_messages and stamps the rows.
 	deadline := time.Now().Add(5 * time.Second)
 	for {
-		srv.nudgeOnce(context.Background(), stopped, nudges)
-		msgs, err := srv.stateStore.ListMessages(stopped, false, 0)
+		pending, err := srv.stateStore.PendingMailActivations(stopped)
 		if err != nil {
-			t.Fatalf("ListMessages: %v", err)
+			t.Fatalf("PendingMailActivations: %v", err)
 		}
-		if len(msgs) == 1 && msgs[0].DeliveredVia == "nudge" {
+		if len(pending) == 0 {
 			break
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("timed out waiting for nudge after wake: %+v", msgs)
+			t.Fatalf("timed out waiting for activation after wake: %+v", pending)
 		}
-		// The nudge cooldown is per agent, so let it lapse between attempts.
-		time.Sleep(200 * time.Millisecond)
-		nudges[stopped] = nudgeState{}
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
@@ -380,36 +373,16 @@ func TestFailedMailWakeMarksRowsAndStopsRetrying(t *testing.T) {
 	nudges := map[string]nudgeState{}
 	srv.nudgeOnce(context.Background(), stopped, nudges)
 
-	deadline := time.Now().Add(5 * time.Second)
-	for {
-		msgs, err := srv.stateStore.ListMessages(stopped, false, 0)
-		if err != nil {
-			t.Fatalf("ListMessages: %v", err)
-		}
-		marked := 0
-		for _, m := range msgs {
-			if m.DeliveredVia == "wake_failed" && !m.Read {
-				marked++
-			}
-		}
-		if marked == 2 {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("timed out waiting for wake_failed marks: %+v", msgs)
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
 	waitRunning(t, srv, stopped, false)
 
-	// A restart loses the in-process nudge state, but candidacy is durable: the
-	// rows are no longer pending, so no further wake is attempted.
-	waiting, err := srv.stateStore.PendingWakeMailAgents()
+	// The failed provider start crossed the activation attempt boundary. Mail
+	// remains unread, but reconciliation has no activation to replay.
+	waiting, err := srv.stateStore.PendingMailActivations(stopped)
 	if err != nil {
-		t.Fatalf("PendingWakeMailAgents: %v", err)
+		t.Fatalf("PendingMailActivations: %v", err)
 	}
-	if len(waiting) != 0 {
-		t.Fatalf("wake candidates after failure = %v, want none", waiting)
+	if len(waiting) > 1 {
+		t.Fatalf("activations after failure = %v, want at most one later batch", waiting)
 	}
 	srv.nudgeOnce(context.Background(), "", map[string]nudgeState{})
 	time.Sleep(200 * time.Millisecond)
@@ -422,12 +395,12 @@ func TestFailedMailWakeMarksRowsAndStopsRetrying(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("InsertMessage third: %v", err)
 	}
-	waiting, err = srv.stateStore.PendingWakeMailAgents()
+	waiting, err = srv.stateStore.PendingMailActivations(stopped)
 	if err != nil {
 		t.Fatalf("PendingWakeMailAgents after new mail: %v", err)
 	}
-	if len(waiting) != 1 || waiting[0] != stopped {
-		t.Fatalf("wake candidates after new mail = %v, want [%s]", waiting, stopped)
+	if len(waiting) != 1 || waiting[0].AgentID != stopped {
+		t.Fatalf("activations after new mail = %v, want one for %s", waiting, stopped)
 	}
 }
 
@@ -638,14 +611,14 @@ func TestSuccessfulWakeConsumesMailEvenIfAdapterDiesBeforeNudge(t *testing.T) {
 	srv.nudgeOnce(context.Background(), stopped, map[string]nudgeState{})
 	waitRunning(t, srv, stopped, true)
 
-	// The wake owns this mail from the moment it started, before any delivery
-	// marker could exist.
+	// Mail remains independently unread; the attempted activation itself is
+	// removed after the provider handoff and cannot replay after a crash.
 	msgs, err := srv.stateStore.ListMessages(stopped, false, 0)
 	if err != nil {
 		t.Fatalf("ListMessages: %v", err)
 	}
-	if len(msgs) != 1 || msgs[0].DeliveredVia != state.DeliveryWakeAttempted {
-		t.Fatalf("delivery marker after wake = %+v, want one %q row", msgs, state.DeliveryWakeAttempted)
+	if len(msgs) != 1 || msgs[0].Read || msgs[0].DeliveredVia != state.DeliveryPending {
+		t.Fatalf("mail after activation = %+v, want unread pending mail", msgs)
 	}
 
 	// The adapter dies before it is ever nudged.
@@ -661,12 +634,12 @@ func TestSuccessfulWakeConsumesMailEvenIfAdapterDiesBeforeNudge(t *testing.T) {
 	// The mail is still unread, but it no longer makes the agent a wake candidate,
 	// so no sweep — including one after a dashboard restart's empty nudge map —
 	// respawns the broken adapter.
-	waiting, err := srv.stateStore.PendingWakeMailAgents()
+	waiting, err := srv.stateStore.PendingMailActivations(stopped)
 	if err != nil {
-		t.Fatalf("PendingWakeMailAgents: %v", err)
+		t.Fatalf("PendingMailActivations: %v", err)
 	}
 	if len(waiting) != 0 {
-		t.Fatalf("wake candidates after a dead adapter = %v, want none", waiting)
+		t.Fatalf("activations after a dead adapter = %v, want none", waiting)
 	}
 	for i := 0; i < 3; i++ {
 		srv.nudgeOnce(context.Background(), "", map[string]nudgeState{})
@@ -685,7 +658,7 @@ func TestFailedWakeLeavesNewerMailPending(t *testing.T) {
 	// Fail the resume, but slowly enough that newer mail lands mid-attempt.
 	srv.registry.Chat().SetCommand(slowACP(t, "2", 1))
 
-	first, err := srv.stateStore.InsertMessage(state.Message{
+	_, err := srv.stateStore.InsertMessage(state.Message{
 		FromAgent: "a_sender", FromAddress: "impl@tmpproj", FromName: "Atlas",
 		ToAgent: stopped, Body: "before the wake",
 	})
@@ -698,7 +671,7 @@ func TestFailedWakeLeavesNewerMailPending(t *testing.T) {
 	// second message therefore arrives strictly after the attempt began and
 	// strictly before it fails — the interleaving the attempt must not consume.
 	waitLifecycleClaim(t, srv, stopped)
-	second, err := srv.stateStore.InsertMessage(state.Message{
+	_, err = srv.stateStore.InsertMessage(state.Message{
 		FromAgent: "a_sender", FromAddress: "impl@tmpproj", FromName: "Atlas",
 		ToAgent: stopped, Body: "arrived mid-wake",
 	})
@@ -706,38 +679,31 @@ func TestFailedWakeLeavesNewerMailPending(t *testing.T) {
 		t.Fatalf("InsertMessage second: %v", err)
 	}
 
-	// The wake now fails. Only the claimed row carries the failure.
+	// The first wake now fails after crossing mail's attempted boundary. The
+	// later insert has its own pending activation.
 	deadline := time.Now().Add(15 * time.Second)
 	for {
-		msgs, err := srv.stateStore.ListMessages(stopped, false, 0)
+		pending, err := srv.stateStore.PendingMailActivations(stopped)
 		if err != nil {
-			t.Fatalf("ListMessages: %v", err)
+			t.Fatalf("PendingMailActivations: %v", err)
 		}
-		byID := map[string]string{}
-		for _, m := range msgs {
-			byID[m.MessageID] = m.DeliveredVia
-		}
-		if byID[first] == state.DeliveryWakeFailed {
-			if byID[second] != state.DeliveryPending {
-				t.Fatalf("mail inserted mid-wake = %q, want %q (it must re-arm the wake)",
-					byID[second], state.DeliveryPending)
-			}
+		if len(pending) == 1 && pending[0].AgentID == stopped {
 			break
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("timed out waiting for the wake failure: %+v", msgs)
+			t.Fatalf("timed out waiting for the later activation: %+v", pending)
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
 	waitRunning(t, srv, stopped, false)
 
 	// Because the newer mail is still pending, the recipient is a candidate again.
-	waiting, err := srv.stateStore.PendingWakeMailAgents()
+	waiting, err := srv.stateStore.PendingMailActivations(stopped)
 	if err != nil {
-		t.Fatalf("PendingWakeMailAgents: %v", err)
+		t.Fatalf("PendingMailActivations: %v", err)
 	}
-	if len(waiting) != 1 || waiting[0] != stopped {
-		t.Fatalf("wake candidates after the interleaving = %v, want [%s]", waiting, stopped)
+	if len(waiting) != 1 || waiting[0].AgentID != stopped {
+		t.Fatalf("activations after the interleaving = %v, want one for %s", waiting, stopped)
 	}
 }
 

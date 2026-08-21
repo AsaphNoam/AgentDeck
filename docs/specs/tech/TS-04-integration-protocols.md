@@ -242,7 +242,7 @@ reading the mail restamps a still-claimed row `poll`. `messages.created_at` is w
 so timestamp comparison cannot order same-second rows and is not used. New mail always inserts as
 `pending`, re-arming the wake; the bound therefore holds across dashboard restarts (FS-06.R23).
 
-**R27 `(planned)` — Provider activation is a deliberate prompt bridge, not a control
+**R27 — Provider activation is a deliberate prompt bridge, not a control
 notification.** The pinned ACP v1 surface and packaged adapters expose no portable notification that
 wakes an idle model or initiates tool use: `claude-agent-acp` 0.59.0 and `codex-acp` 1.1.2 both use
 `session/prompt` as the inference entrypoint and accept only `session/cancel` as a relevant

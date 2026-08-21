@@ -7,19 +7,14 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** The three-plane orchestration design is ready and waiting in
-  [`separate-orchestration-planes.md`](../ready-changes/separate-orchestration-planes.md). The human
-  confirmed autonomous, at-most-once mail activation including the large-backlog, failure, and
-  operational-retention consequences. Planned FS-00.R13–R15, FS-06.R24–R27/A13–A15,
-  TS-01.R18–R21, TS-02.R23, and TS-04.R27 define a payload-free durable activation, atomic
-  message-plus-signal commit, claim-token/restart semantics, lifecycle/runtime turn arbitration,
-  and the unavoidable one-`session/prompt` provider bridge verified against both pinned adapters.
-  Pull-based context links, dependency-aware agents, and the richer orchestration API remain intact
-  as separate ideas and are excluded from this ready change. Review clarified that only the neutral
-  opportunity/claim concept is shared: mail's one-pending-per-agent coalescing and
-  at-most-once-after-attempt cleanup are explicitly mail policy, not defaults for a future armed
-  task. Future kinds must declare durable work/source identity, uniqueness, start, retry, and
-  completion semantics before extending the schema/executor.
+- **State:** Explicit mail activation is complete. New mail atomically creates one payload-free,
+  mail-scoped activation while pending; the executor claims it durably, uses the shared lifecycle
+  and runtime turn gates, and sends the one provider instruction only after the non-replayable
+  attempt boundary. Mail remains pull-based through `check_messages`, and a later insert after a
+  claim creates the next activation. Startup recovers only pre-attempt claims and discards attempted
+  rows, so restart, failure, unread state, and polling cannot replay a model turn. The intended
+  three-plane boundary is now shipped; context links, dependency-aware agents, and a semantic
+  orchestration API remain separate ideas.
 - **Previous state:** The one open browser-draft finding is fixed. A delayed prompt send now scopes its
   completion to the draft generation it submitted — `drafts.ts` keeps a per-agent revision that
   every mutation bumps, and `Composer.submit` captures it before sending. A newer same-agent draft
@@ -198,6 +193,18 @@ recheck-fail cause is a concurrent resume, whose running-path nudge then deliver
 rows honestly).
 
 ## Recent changelog
+
+- 2026-08-21 — Implemented separate orchestration state from model conversations
+  (FS-00.R13–R15, FS-06.R24–R27/A13–A15, TS-01.R18–R21, TS-02.R23, TS-04.R27,
+  **INV §1/§2/§4/§5/§6/§11/§15**). Migration 16 adds payload-free mail activations with a
+  mail-only pending uniqueness index and conservative legacy backfill. Both agent and reserved-user
+  mail writers commit a message plus activation in one transaction. The old unread/cooldown nudger
+  is replaced by a durable executor with claim-token recovery: it never replays an attempted row,
+  retains unread mail and `check_messages` as the payload path, and uses the existing lifecycle
+  claim for stopped recipients. `Runtime.StartActivation` replaces PID-based `CheckMessages` and
+  holds the per-agent turn gate through the durable transition and provider prompt. State, runtime,
+  running/stopped/failure/mid-flight-mail regressions, `make check-specs`, `make test`, `make build`,
+  `make dist`, and `git diff --check` pass.
 
 - 2026-08-21 — Incorporated review feedback into the waiting three-plane change. FS-00/TS-01 now
   define activation neutrally as a claimed opportunity whose source domain owns coalescing, retry,

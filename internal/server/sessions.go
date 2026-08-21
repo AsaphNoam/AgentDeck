@@ -139,7 +139,7 @@ func (s *Server) handleAnnotations(w http.ResponseWriter, r *http.Request) {
 				return apiError(runtime.CodeInternal, err.Error())
 			}
 			select {
-			case s.nudgeCh <- targetID:
+			case s.activationCh <- targetID:
 			default:
 			}
 			if _, err := s.stateMgr.Touch(targetID); err != nil {

@@ -171,14 +171,14 @@ terminal agents from becoming statusless or unmessageable.
   composed flags and hooks (reconciling any flag mismatch) is an acceptance gate requiring
   credentials (credential-gated acceptance). Until cleared, the Claude interactive-CLI flag/resume
   mapping in `launchArgv`/`interactiveBinary` is `(planned)`-tagged and marked GATED in code.
-- **Terminal nudging is excluded.** The terminal runtime retains a `CheckMessages` method, but
+- **Terminal activation is excluded.** The terminal runtime rejects `StartActivation`, but
   recipient resolution and the nudger exclude terminal agents under FS-06.R9/R17, so coordination
   cannot reach that method in the shipped path.
 
 ## 7. Traceability
 
 - **Runtime:** `internal/runtime/terminal/terminal.go` (`Start`/`Resume`/`SendPrompt`/`Cancel`/
-  `Stop`/`CheckMessages`, `launchArgv`, `interactiveBinary`, `reconcileOrphanStop`,
+  `Stop`/`StartActivation`, `launchArgv`, `interactiveBinary`, `reconcileOrphanStop`,
   `scheduleInitialIdle`), `capabilities.go` (`Probe`, `DriverAvailable`), `driver.go`, `xterm.go`,
   `tmux.go`, `iterm2.go`, `ptyhub.go`, `bridge.go`.
 - **Server seam:** `internal/server/terminal.go` (`terminalSupported`, `validateTerminalDriver`,

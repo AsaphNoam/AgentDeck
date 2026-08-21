@@ -689,35 +689,41 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 	return &Handle{AgentID: as.agentID, Pid: pgid, SessionID: resolvedSessionID}, nil
 }
 
-func (c *ChatRuntime) CheckMessages(ctx context.Context, pid int) error {
-	as, err := c.lookupByPID(pid)
+// StartActivation starts a server-owned, payload-free turn. Its callback runs
+// with the same agent turn gate as an ordinary prompt, so a manual prompt and a
+// mail activation cannot both write a provider frame.
+func (c *ChatRuntime) StartActivation(ctx context.Context, agentID, kind string, before func(string) error) (bool, error) {
+	if kind != "mail" {
+		return false, fmt.Errorf("runtime: unsupported activation kind %q", kind)
+	}
+	as, err := c.lookup(agentID)
 	if err != nil {
-		return err
+		return false, err
 	}
 	st, err := c.store.ReadStatus(as.agentID)
 	if err != nil || st.State != "idle" {
-		return nil
+		return false, err
 	}
 	as.mu.Lock()
 	if as.turnActive {
 		as.mu.Unlock()
-		return nil
+		return false, nil
 	}
 	as.turnActive = true
 	as.cancelEscalated = false
 	turnID := as.nextTurnIDLocked()
 	as.mu.Unlock()
-	if err := c.store.ResetTurnBudget(as.agentID, turnID); err != nil {
+	if err := before(turnID); err != nil {
 		as.mu.Lock()
 		as.turnActive = false
 		as.mu.Unlock()
-		return err
+		return false, err
 	}
 
 	now := time.Now().UTC()
 	_ = c.writeStatus(as, state.Status{
 		AgentID: as.agentID, State: "busy", Detail: "checking messages",
-		LastTrace: "MessageNudge", BusySince: &now, ContextPct: as.lastPct(),
+		LastTrace: "MailActivation", BusySince: &now, ContextPct: as.lastPct(),
 	})
 
 	go func() {
@@ -756,7 +762,7 @@ func (c *ChatRuntime) CheckMessages(ctx context.Context, pid int) error {
 		c.applyTurnEndStatus(as, td)
 		c.emit(as, EvTurnEnd, td)
 	}()
-	return nil
+	return true, nil
 }
 
 // --- internals ---
