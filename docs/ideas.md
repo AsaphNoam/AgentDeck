@@ -30,6 +30,83 @@ Example:
 - **Approval notifications link to the conversation.** When a pop-up notification fires because an
   agent needs approval, make it a link that opens that agent's conversation, so the user can jump
   straight to the pending permission instead of hunting for the right agent.
+- **Pull-based context links.** Agents should be able to reference and consume useful context
+  produced by other agents without requiring that context to be copied into mailbox messages or
+  proactively injected into their conversations.
+
+  Potential context sources could include another agent's transcript or selected turns, task/output
+  artifacts, diffs, files, summaries, or other durable AgentDeck-managed information.
+
+  The important idea is signal/reference + pull, rather than automatically pushing large amounts of
+  context between agents.
+
+  For example, Agent A might complete an investigation. Agent B could receive or discover a
+  reference to A's work and retrieve the relevant output, transcript section, diff, or artifact when
+  it actually needs it.
+
+  This should lean on the context/artifact plane rather than treating inter-agent context transfer
+  as ordinary conversation.
+
+  Think about what a first-class “context link” should mean in AgentDeck, how an agent discovers or
+  receives one, how granular retrieval should be, what should be durable, and how it should interact
+  with existing transcripts, mailboxes, task groups, roles, and MCP capabilities.
+- **Dependency-aware / armed agents.** AgentDeck should understand dependencies between pieces of
+  work natively.
+
+  An agent or task should be able to exist in a state roughly like:
+
+  “ready to run once these prerequisites are satisfied”
+
+  rather than relying on another LLM to repeatedly check whether prerequisite agents have finished,
+  or on agents sending conversational “I'm done” messages purely to advance orchestration.
+
+  Examples include:
+
+  - start B when A finishes;
+  - start D after A, B, and C have all completed;
+  - unblock a reviewer after an implementation reaches a terminal state;
+  - allow a pipeline or task graph to advance based on explicit AgentDeck state transitions.
+
+  This is fundamentally a control-plane capability. The host should observe prerequisite state and
+  advance work without needing an LLM to poll, wait, relay status, or interpret routine completion
+  signals.
+
+  Think about how this should relate to AgentDeck's existing concepts of agents, groups, pipelines,
+  statuses, wake/resume behavior, task completion, and lifecycle.
+- **Richer agent-facing orchestration API.** I also want to consider exposing a more semantic
+  orchestration API to agents.
+
+  Today, some orchestration behavior is expressed through relatively low-level mechanisms such as
+  messaging and lifecycle operations. That often forces agents to implement orchestration protocols
+  themselves through prose: ask another agent to do something, poll it, wait, inspect messages,
+  infer completion, pass context manually, and so on.
+
+  Instead, agents should increasingly be able to express orchestration intent directly to AgentDeck,
+  with AgentDeck executing the deterministic parts through its control and context planes.
+
+  Conceptually this might eventually include operations in areas such as:
+
+  - launching or assigning agents;
+  - defining dependencies;
+  - linking or exposing context;
+  - waiting on structured work state;
+  - requesting verification or review;
+  - inspecting agent/task state;
+  - stopping or resuming agents;
+  - coordinating groups of work.
+
+  The exact API surface is not decided. I do not want to jump directly to a large workflow engine
+  or an over-designed DSL.
+
+  Consider where the boundary should sit between a small set of composable primitives and useful
+  higher-level operations. The API should expose AgentDeck's orchestration semantics cleanly rather
+  than making agents reconstruct those semantics themselves through messages and polling.
+
+  AgentDeck already has useful foundations for this direction: persistent agent identity, resumable
+  provider sessions, durable transcripts, mailboxes, lifecycle management, groups/pipelines,
+  MCP-based agent communication, and a distinction between running and stopped agents. These
+  improvements should build on the good abstractions already present rather than replace them
+  wholesale.
 
 ### From play session 2026-08-10
 

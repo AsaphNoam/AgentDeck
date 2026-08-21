@@ -42,4 +42,4 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-None.
+- [Separate orchestration state from model conversations](separate-orchestration-planes.md)

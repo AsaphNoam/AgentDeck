@@ -1,6 +1,6 @@
 # FS-06 — Agent coordination & notifications
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/messaging/`, `internal/state/messages.go`, `internal/server/` (`messaging_registration.go`, `messaging_loops.go`, `sessions.go`), `internal/bus/`, `ui/src/api/sse.ts`, `ui/src/components/grid/AgentCard.tsx`, `ui/src/components/shell/NotificationCenter.tsx`, `ui/src/features/settings/NotificationsEditor.tsx` · **Journeys:** J10, J11, J12
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) F8/F11 and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -105,6 +105,10 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   over-limit attempt marks breached and notifies → the next turn resets it.
 - **budget notification:** breach emits SSE → FS-02's shared presentation pipeline applies mute and
   delivery preferences.
+- **mail activation `(planned)`:** message insert plus ensure pending activation commit atomically →
+  executor claims when eligible → lifecycle loss or a busy-turn race releases it before attempt →
+  durable attempted precedes wake/provider side effect → the row is retired without replay. New
+  mail coalesces while pending and creates a distinct pending activation after claim.
 
 ## 4. Edge cases & errors
 
@@ -152,6 +156,43 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   losing the exclusive lifecycle claim (FS-01.R34) is not an attempt and releases the rows back to
   `pending`. Retention (R8) is unchanged: mail for a never-woken agent still expires on the normal
   schedule.
+
+### 4.1 Explicit mail activation
+
+- **R24 `(planned)` — Mail activation is explicit work, not unread polling.** Agent mail and
+  reserved-user mail retain their autonomous delivery outcome: inserting new mail creates one
+  host-owned opportunity to start a mail-handling reasoning turn for the recipient. AgentDeck may
+  wake or wait for the recipient and then start that turn only by claiming the opportunity; an
+  unread count, idle/status transition, periodic sweep, restart, or other control fact cannot by
+  itself start another turn. Mail already pending when the opportunity is claimed is coalesced into
+  that one activation, rather than producing one turn per row. This replaces the unread-driven
+  trigger, cooldown, in-flight, and per-message wake-claim mechanics in R9–R10 and R23; insert-time
+  notification and a periodic sweep remain only fast-path and recovery signals for durable pending
+  activations.
+- **R25 `(planned)` — Mail content remains pull-based.** The activation tells the agent only that
+  mail work is available; it does not copy message bodies, transcripts, diffs, pipeline results, or
+  other context into the activation prompt. The agent retrieves mailbox content through
+  `check_messages` under R6, with the existing limits and per-turn budget. Message read state,
+  retention, dashboard unread indicators, and manual/API mailbox reads remain independent of
+  activation state: mail left unread after the claimed turn does not cause the same opportunity to
+  activate again. Mail arriving after the claim creates a new opportunity, even while the earlier
+  turn or wake is still in flight. If all mail has already been read, deleted, or expired before a
+  still-pending opportunity is attempted, AgentDeck retires it deterministically without starting
+  an empty model turn.
+- **R26 `(planned)` — A mail activation is at-most-once once attempted.** AgentDeck durably claims
+  the exact opportunity before wake or prompt side effects. Losing a lifecycle claim is not an
+  attempt and leaves the opportunity pending; once AgentDeck actually attempts the wake/activation,
+  success, launch failure, provider failure, process death, cancellation, or an agent that never
+  calls `check_messages` cannot make reconciliation automatically repeat it. The mail remains
+  durable and unread, the ordinary agent error/status surfaces remain honest, and later new mail may
+  create another opportunity.
+- **R27 `(planned)` — Stopped-agent activation reuses ordinary lifecycle semantics.** A pending mail
+  activation may resume a stopped recipient only when it passes the existing R22–R23 and FS-01.R33
+  wake gates, using the same exclusive lifecycle claim and frozen session snapshot as ordinary
+  Resume. The durable agent, mailbox, and activation exist independently of a live process; the
+  process is started because the claimed activation requires one reasoning turn, not merely because
+  the agent is stopped or has unread mail. Terminal and pipeline-associated stopped agents retain
+  their existing exclusions.
 
 ## 5. Acceptance criteria
 
@@ -206,6 +247,21 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   never listed twice, and `role@project` resolution never reports a false ambiguity because of it.
   *Verify:* `internal/server/wake_test.go::TestSuccessfulWakeConsumesMailEvenIfAdapterDiesBeforeNudge`,
   `TestFailedWakeLeavesNewerMailPending`, and `TestAddressableAgentsNeverDuplicatesAcrossStop`.
+- **A13** `(planned)` (R24–R26) — Several messages present before an idle recipient is claimed
+  produce one mail-handling provider turn. If the agent leaves some or all of those messages unread,
+  repeated sweeps, idle transitions, and a dashboard restart produce no second turn for that
+  opportunity; mail inserted after the claim produces one later activation. *Verify:* fake-ACP
+  server integration tests that count provider prompts across coalescing, unread completion, restart,
+  and mid-flight insertion.
+- **A14** `(planned)` (R25) — The activation prompt contains no message body or other context
+  payload, while `check_messages` returns the durable messages under the existing caller identity,
+  limit, budget, read, and indicator behavior. *Verify:* runtime prompt-capture and MCP messaging
+  integration tests.
+- **A15** `(planned)` (R26–R27) — A stopped wakeable recipient is resumed once for a claimed mail
+  opportunity and receives one activation; a lost lifecycle race remains pending, while a real wake,
+  launch, or provider attempt that fails is not retried after restart. New mail re-arms a later
+  opportunity. Terminal and pipeline-associated stopped agents never start. *Verify:* generation-
+  scoped wake/activation race and restart tests against fake ACP.
 
 ## 6. Deviations & open decisions
 
@@ -248,6 +304,8 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   `turn_budget`), `internal/messaging/constants.go`.
 - **Nudger/retention:** `internal/server/messaging_loops.go`; chat injection in
   `internal/runtime/chat.go::CheckMessages`.
+- **Explicit activation `(planned)`:** `internal/state/activations.go`, atomic message writers,
+  server activation executor, agent-id-keyed runtime turn gate, and TS-01.R16's lifecycle claim.
 - **Indicators/budget event:** sinks in `internal/server/server.go`, notification publication in
   `internal/bus/`, `ui/src/api/sse.ts`, `ui/src/components/grid/AgentCard.tsx`,
   `ui/src/components/shell/NotificationCenter.tsx`,

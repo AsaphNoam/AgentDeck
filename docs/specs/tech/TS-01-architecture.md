@@ -23,14 +23,14 @@ runtime — the messaging MCP server and embedded UI live inside the Go binary (
 
 | Package | Owns |
 |---|---|
-| `internal/server` | HTTP surface, launch/resume/switch composition, hook ingest, SSE fan-out, MCP registration wiring, reconciliation watcher |
+| `internal/server` | HTTP surface, launch/resume/switch composition, hook ingest, SSE fan-out, MCP registration wiring, activation execution/reconciliation |
 | `internal/runtime` | Process lifecycle: the `Runtime` interface, chat (ACP) + terminal (PTY) implementations, the interface-keyed `Registry`, permission/cancel races |
-| `internal/state` | `state.db` — sole SQLite writer: identity, running registry, live status, messages, session/transcript metadata, pipeline run state |
+| `internal/state` | `state.db` — sole SQLite writer: identity, running registry, live status, messages, activations, session/transcript metadata, pipeline run state |
 | `internal/index` | FTS5 full-text index over transcript content; in-memory accumulators feeding replace-style writes |
 | `internal/bus` | In-process pub/sub bus backing SSE; snapshot+subscribe atomicity |
 | `internal/config` | Plain-JSON config store under `~/.agentdeck`, atomic writes, slug validation, layout/dir modes, pipeline templates |
 | `internal/configsource` | Phase 7 federation: Claude/Codex native-config discovery, binding, effective view |
-| `internal/messaging` | In-process MCP server and token→agent registry; messaging plus TS-09 pipeline result/proposal tools |
+| `internal/messaging` | In-process agent-facing MCP gateway and token→agent registry; handlers delegate messaging and TS-09 pipeline result/proposal semantics to their owning services |
 | `internal/pipeline` | Template validation, durable sequential run state machine, transition reconciliation, stage-result and AgentDecker proposal services |
 | `internal/backend` | Backend/model adapter contracts, env layering, credential checks (`credcheck`) |
 | `internal/archive` | Session archive queries + FTS-backed search |
@@ -170,6 +170,51 @@ agent deletion beside the annotation tray cleanup. Archive, stop, resume, runtim
 transcript events do not clear or copy the draft. This is the browser-local boundary discipline of
 INV §1 without a timer, expiry service, server cleanup, migration, or second source of chat truth.
 
+**R18 `(planned)` — Control, context/artifact, and conversation are separate architectural
+planes.** Control facts are typed state owned by `internal/state` and domain services; they advance
+through transactions, claims, lifecycle events, and bounded reconciliation rather than prose
+protocols between models. Context/artifact payloads remain in their existing authoritative stores
+and cross a boundary through an explicit bounded read or reference. A model conversation receives
+only a user instruction, an intentional assignment/continuation, or an explicit activation for work
+that needs reasoning. SSE and in-process channels may announce that state changed, but
+they are lossy accelerators and never replace the durable authority or carry rich context by
+default.
+
+**R19 `(planned)` — Activation is one small control-plane primitive.** `internal/state` owns a
+payload-free activation record with a stable id, stable target `agent_id`, closed code-owned kind,
+state, claim token, and operational timestamps. `mail` is the only valid kind in this change. The
+record contains no message body, prompt, transcript excerpt, context reference, dependency,
+assignment, retry policy, or arbitrary metadata; adding a kind requires an owning FS requirement
+and an explicit server handler. There is no generic activation CRUD API, UI, graph, plug-in
+registry, or workflow DSL. This narrow shape is intentionally reusable by later context-link,
+dependency, and semantic orchestration features without shipping any of them here.
+
+**R20 `(planned)` — Source fact and activation commit together; execution is a separate
+service.** A state-owned transaction first commits the authoritative domain mutation and ensures at
+most one pending activation per `(agent_id, kind)`. Agent and reserved-user mail use that transaction
+for message insert plus `mail` activation. The post-commit in-process signal only wakes the
+server-owned activation executor; a bounded sweep and startup recovery discover the same durable
+pending rows. The executor checks kind-specific source availability and eligibility, claims with a
+unique token, and performs no external effect until that exact claim is durably marked attempted.
+A stale or losing pre-attempt claim can be released or recovered; an attempted row is never replayed
+and is deleted once it is no longer needed for conservative restart reconciliation. The executor
+publishes no activation SSE/history surface; mail's existing unread state remains the user-facing
+projection.
+
+**R21 `(planned)` — Activation uses the runtime and lifecycle seams without reopening their
+races.** The current `Runtime.CheckMessages(pid)` operation is replaced by an agent-id-keyed,
+kind-aware activation operation with an atomic turn-start gate. For an already-running chat
+agent, the runtime rechecks idle/no-active-turn, holds the turn gate while the server durably marks
+the claim attempted, commits the ordinary budget/status turn state, and only then issues the
+provider instruction. If another turn wins, no attempt is recorded and the claim returns to
+pending. For a stopped recipient, the executor takes TS-01.R16's exclusive lifecycle claim, marks
+the activation attempted immediately before the first resume side effect, and routes through the
+same claimed resume/composition path; after a successful resume it starts the activation before
+releasing that transition. Lifecycle-claim loss is pre-attempt and releases the activation. Once a
+wake or provider side effect has been attempted, failure, cancellation, crash, or restart can omit
+the work but cannot repeat it. A fixed kind-specific instruction is the only activation data sent
+to the provider, and it is not appended as a user-authored AgentDeck transcript event.
+
 ## 3. Interfaces & data shapes
 
 **Runtime interface** (`internal/runtime/runtime.go`, minimum surface):
@@ -187,6 +232,13 @@ type Runtime interface {
 }
 ```
 
+When R21 ships, `CheckMessages(pid)` leaves this interface. The replacement is keyed by stable
+`agent_id`, accepts only a server-selected activation kind/instruction, and has a before-side-effect
+commit hook (or an equivalent two-phase turn token) so runtime turn arbitration and the durable
+`claimed → attempted` transition cannot race. The exact Go spelling may follow the implementation,
+but it must return whether a turn actually started and must never report success when idle/turn
+ownership was lost.
+
 **On-disk layout (source of truth by writer):**
 ```
 ~/.agentdeck/            (0700; $AGENTDECK_HOME overrides)
@@ -197,7 +249,8 @@ type Runtime interface {
   config.json            port, default_project/role, skip_permissions, mutes
   layout.json            card order + density + group collapse
   config-sources.json    Claude/Codex bindings + overrides (Phase 7)
-  state.db               SQLite — server sole writer (identity, registry, status, messages, pipelines, FTS5)
+  state.db               SQLite — server sole writer (identity, registry, status, messages,
+                         activations, pipelines, FTS5)
   sessions/{id}/         AgentDeck normalized transcript + provider session artifacts
 ```
 
@@ -210,6 +263,9 @@ type Runtime interface {
 - **INV §1 — Crossing a boundary resets or republishes derived state.** Binds R7/R8: resume/switch/reconnect must reset or republish state derived from the old identity/connection; the reconcile fallback must not overwrite fresher runtime-derived state.
 - **INV §6 — A new runtime joins every existing contract.** Binds R4: any new interface/driver walks the §6 checklist (persistence, full LaunchSpec via R6 resolvers, fan-out/drain, messaging, turn boundaries, reconcile, teardown) before it is first-class.
 - **INV §14 — Loopback is not a security boundary.** Binds R2: the bind constraint keeps remote sockets out but is not access control; TS-05 owns the actual boundary.
+- **INV §5/§15 — Claim before firing; commit before side effects.** Bind R19–R21: one claim token
+  owns each activation transition, and durable `attempted` plus ordinary turn state precede wake or
+  provider effects. Channels, status reads, and unread counts cannot substitute for that claim.
 - **R10 (local invariant) — `state.db` has exactly one writer.** No package other than `internal/state` (driven by the server process) opens the DB for writing. A second writer is a defect regardless of correctness, because D1's safety argument depends on single-writer.
 
 ## 5. Deviations & open decisions
@@ -234,6 +290,8 @@ type Runtime interface {
   `ui/src/components/chat/Composer.tsx` and discarded from `ui/src/api/sse.ts`'s existing removed
   branch; component/store/SSE tests cover restore, pruning, send outcomes, malformed storage, and
   deletion cleanup.
+- Activation plane (R18–R21): `internal/state/activations.go`, the server activation executor,
+  runtime turn-start arbitration, and mail/wake integration tests.
 - Archive transition gate: `internal/server/archive_gate.go`, `archive_actions.go`, and
   `archive_gate_test.go` (project reservation and agent/project transition barriers).
 - Model catalog autosync: `internal/config/{codexmodels,claudemodels,modelautosync}.go`,
