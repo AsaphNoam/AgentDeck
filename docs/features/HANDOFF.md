@@ -195,6 +195,47 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
   external effect. Return the status error, release the in-memory turn gate while retaining mail's
   already-attempted no-replay outcome, and add a runtime regression that injects the status-write
   failure and asserts no provider frame is sent.
+- **Must fix** — **INV §5/§15:** `internal/server/messaging_loops.go:79-112` starts a running-agent
+  activation without respecting the exclusive lifecycle claim. During pipeline launch/continue,
+  the runtime can already be idle and registered while the claim still protects its first durable
+  assignment; mail can win the runtime turn gate, consume the activation, and make the assignment
+  fail with `ErrTurnInFlight`, pausing or stopping the stage. Defer a running activation while
+  `lifecycleInFlight(agent_id)` is true, and add a deterministic pipeline initial-prompt race proving
+  the activation stays pending and emits no provider prompt.
+- **Must fix** — **INV §4/§15:** `internal/server/resume.go:255-265` returns directly when the new
+  post-resume activation hook fails, after `Registry.Resume` has created the process, running row,
+  hook token, MCP registration, and settings file. A `StartAttemptedMailTurn` failure therefore
+  leaves a newly running agent with unread mail but no activation turn, while the already-attempted
+  activation is retired. Route this failure through generation-scoped stop and the shared teardown,
+  and inject the post-resume budget/status failure to prove no process or registration artifact
+  remains.
+- **Must fix** — **INV §4/§9/§15:** a stopped activation resumes in a detached executor goroutine,
+  while server shutdown snapshots the registry without waiting for lifecycle claims/executor work
+  (`internal/server/server.go:328-343`, `internal/runtime/chat.go:667-687`). If shutdown lands after
+  the resumed running/status rows are written but before `ChatRuntime.Resume` inserts the runtime
+  into `c.agents`, `Registry.Shutdown` misses it and the resume can register a live orphan after the
+  registry was cleared. Coordinate shutdown with in-flight activation/lifecycle work and add a
+  blocked post-status resume test asserting no process, running row, or registration survives.
+- **Must fix** — **INV §10:** the Current specifications still prescribe the removed mechanism.
+  TS-04.R26 retains unread/cooldown nudging and `delivered_via` wake claims while R27 only says that
+  part is replaced; FS-00 still labels the old Nudger current; FS-07 and FS-06 acceptance/decision
+  text still cite nudging and the retired requirements; and `internal/messaging/constants.go` keeps
+  unused cooldown/in-flight constants. Explicitly supersede the obsolete portion of TS-04.R26 while
+  retaining its addressable-set contract, update the glossary and terminal/coordination wording,
+  and remove the dead constants/comments.
+- **Must fix** — **INV §10:** the new tests do not establish the Current FS-06.A13-A15 acceptance
+  matrix. State coverage proves coalesced rows, one running test captures one prompt, and the stopped
+  test waits for activation retirement without counting provider turns. There is no deterministic
+  proof that several pre-claim messages produce exactly one prompt; unread completion plus repeated
+  sweep/idle/restart cannot replay it; a mid-flight insert produces exactly one later prompt; or
+  lifecycle loss/provider failure/restart preserve the stated stopped-agent outcomes. Add fake-ACP
+  prompt-count and restart coverage for every named A13-A15 branch before treating the requirements
+  as verified.
+- **Worth fixing** — **INV §9/§15:** `internal/server/messaging_loops.go:12-16` logs and ignores a
+  `RecoverMailActivations` failure, then starts an executor that only lists `pending` rows. A claimed
+  pre-attempt row is therefore invisible for the life of that server after a recoverable startup
+  storage failure. Fail startup or retry recovery before normal execution, with an injected recovery
+  failure proving claimed work is not silently stranded.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
@@ -206,6 +247,17 @@ recheck-fail cause is a concurrent resume, whose running-path nudge then deliver
 rows honestly).
 
 ## Recent changelog
+
+- 2026-08-21 — Two clean-context architectural re-reviews of `2310206` (Luna/max and Terra/xhigh)
+  were consolidated and validated against the code, requirements, tests, and all invariant classes.
+  Both independently rediscovered the unread-check/claim race and ignored status-write failure.
+  Additional validated findings cover running activation versus lifecycle claims, cleanup after a
+  post-resume activation failure, shutdown racing an activation resume, stale normative nudger text,
+  incomplete A13-A15 evidence, and fail-open startup recovery. The result is seven Must-fix and one
+  Worth-fixing activation findings. Applicable invariant surfaces were §1, §2, §4-§10, and §15;
+  §1/§4/§5/§9/§10/§15 produced findings, while §2/§6/§7/§8 were otherwise sound. Sections §3 and
+  §11-§14 had no applicable surface. Both reviewers' focused tests passed, including Terra's focused
+  race suite; the parent confirmed every recorded code/spec location and tree-wide coverage gap.
 
 - 2026-08-21 — Reviewed the continuous range after `604866f` through `2310206`. The explicit mail
   activation architecture matches its payload-free, transactional, lifecycle, runtime-turn, and

@@ -4,6 +4,14 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-21 — Review: independent architectural re-review of mail activation
+
+Two fresh, independent reviews found that the change needs broader correction than the first pass showed. Seven issues must be fixed: the two previously identified ordering races, interference with pipeline lifecycle transitions, leaked runtimes after post-resume setup failure, a shutdown orphan race, stale specifications that still prescribe the retired nudger, and missing end-to-end evidence for the promised coalescing/restart/failure matrix. Startup recovery also has one lower-priority fail-open path that can strand claimed work. Focused and race tests pass, so these are uncovered concurrency, failure-injection, specification, and acceptance gaps rather than current red tests.
+
+**Needs attention:** Resolve all seven Must-fix findings before starting another change; address the startup-recovery finding in the same fix if practical.
+
+**Next:** Run `/fix` and handle the findings one at a time with deterministic regressions, starting with the atomic unread-and-claim transition.
+
 ### 2026-08-21 — Review: explicit mail activation
 
 The activation design is sound overall, but two ordering races need correction before starting new work. A mailbox read can drain the last message between the executor's availability check and its claim, causing an empty model turn; separately, a failed busy-status write is ignored and the provider prompt still starts, leaving the dashboard's durable state inaccurate. The specification check and focused state, runtime, and server tests otherwise pass.
