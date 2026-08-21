@@ -138,9 +138,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   `make build`, all 226 UI tests, presentation/style checks, and `make dist` pass. No live-browser
   pass was run. A stale migration-version guard test (asserting 13 against the shipped 14) was already
   failing on `main` and now derives its expectation from the migrations slice (INV §9).
-- **Last reviewed code:** `604866f` (2026-08-18), the continuous range after `a0210e2` covering
-  lifecycle-claim fixes, browser-local chat drafts, and the Codex resume-history fix. Its one open
-  browser-draft finding is now fixed.
+- **Last reviewed code:** `2310206` (2026-08-21), the continuous range after `604866f` covering
+  the intervening reviewed fixes/design work and explicit mail activation. Two activation findings
+  are open.
 - **Branch:** `main`.
 
 ## Active change
@@ -181,7 +181,20 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ### Open findings
 
-None.
+- **Must fix** — **INV §5/§15:** `internal/server/messaging_loops.go:60-71` checks for unread mail and
+  claims the pending activation in separate database operations. A concurrent `check_messages` or
+  manual mailbox read can drain the last unread row after the check but before the claim; the claim
+  then crosses the non-replayable attempt boundary and sends an empty provider turn. This violates
+  FS-06.R25's requirement to retire an opportunity drained before it is attempted. Move the unread
+  test and claim/retire decision into one state transaction, and add a deterministic interleaving
+  regression proving a read immediately before claim produces no `session/prompt`.
+- **Must fix** — **INV §1/§15:** `internal/runtime/chat.go:723-735` ignores `writeStatus` failure after
+  recording the durable activation attempt and still writes the provider prompt. Under a normal
+  state-store write failure, durable/UI state may remain `idle` while the provider is executing the
+  mail turn, contrary to TS-01.R21's requirement that ordinary status state commit before the
+  external effect. Return the status error, release the in-memory turn gate while retaining mail's
+  already-attempted no-replay outcome, and add a runtime regression that injects the status-write
+  failure and asserts no provider frame is sent.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
@@ -193,6 +206,15 @@ recheck-fail cause is a concurrent resume, whose running-path nudge then deliver
 rows honestly).
 
 ## Recent changelog
+
+- 2026-08-21 — Reviewed the continuous range after `604866f` through `2310206`. The explicit mail
+  activation architecture matches its payload-free, transactional, lifecycle, runtime-turn, and
+  restart boundaries overall, but two Must-fix ordering races remain: mailbox drain can occur
+  between availability check and claim, producing an empty turn, and a failed busy-status write is
+  ignored before the provider prompt. The invariant sweep found applicable surfaces in §1, §2, §4,
+  §5, §6, §7, §9, §10, and §15; §1/§5/§15 produced the findings, and the remaining applicable
+  classes were sound. Sections §3, §8, §11, §12, §13, and §14 had no applicable surface in the
+  reviewed product-code diff. `make check-specs` and focused state/runtime/server tests pass.
 
 - 2026-08-21 — Implemented separate orchestration state from model conversations
   (FS-00.R13–R15, FS-06.R24–R27/A13–A15, TS-01.R18–R21, TS-02.R23, TS-04.R27,

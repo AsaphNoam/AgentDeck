@@ -4,6 +4,14 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-21 — Review: explicit mail activation
+
+The activation design is sound overall, but two ordering races need correction before starting new work. A mailbox read can drain the last message between the executor's availability check and its claim, causing an empty model turn; separately, a failed busy-status write is ignored and the provider prompt still starts, leaving the dashboard's durable state inaccurate. The specification check and focused state, runtime, and server tests otherwise pass.
+
+**Needs attention:** Fix both activation ordering findings before starting another change.
+
+**Next:** Run `/fix` to make the unread check and claim atomic and to stop provider dispatch when status persistence fails.
+
 ### 2026-08-21 — Implementation: explicit mail activation
 
 Mail now creates one durable activation rather than repeatedly nudging an agent from unread state. The activation contains no message content, so agents still retrieve mail through `check_messages`; it is claimed and recorded before any wake or provider prompt, preventing retries after a real attempt while allowing later mail to create new work.
