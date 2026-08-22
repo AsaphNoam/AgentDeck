@@ -1,14 +1,14 @@
 # TS-02 — Data & persistence
 
-**Status:** Current
-**Code:** `internal/config`, `internal/state`, `internal/transcript`, `internal/index`, `internal/archive`, `internal/configsource`
+**Status:** Partial
+**Code:** `internal/config`, `internal/state`, `internal/transcript`, `internal/index`, `internal/archive`, `internal/configsource`, `internal/contextref` (planned)
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
 ## 1. Scope
 
 This spec owns durable data boundaries, file formats, SQLite ownership and migrations, transcript
-storage, and rebuildable indexes. Product-visible archive behavior is in FS-05; federation-specific
-source bindings and cache rules are in TS-07.
+storage, context-reference/grant state, and rebuildable indexes. Product-visible archive behavior
+is in FS-05; federation-specific source bindings and cache rules are in TS-07.
 
 ## 2. Design & constraints
 
@@ -228,6 +228,66 @@ marked `delivered_via = 'pending'`, coalescing all such rows. Legacy `nudge`, `p
 the old attempt boundary; reactivating them on upgrade would duplicate work. Message read/hard
 retention and turn-budget rows remain unchanged.
 
+**R24 `(planned)` — Context references, direct grants, and personal projection
+have separate durable rows.** One forward-only migration adds the logical shape below (the
+executable migration may use equivalent check constraints and indexes):
+
+```sql
+CREATE TABLE context_references (
+  context_ref_id      TEXT PRIMARY KEY,
+  source_kind         TEXT NOT NULL,
+  source_agent_id     TEXT NOT NULL DEFAULT '',
+  first_seq           INTEGER,
+  last_seq            INTEGER,
+  pipeline_attempt_id TEXT NOT NULL DEFAULT '',
+  created_at          TEXT NOT NULL
+);
+CREATE UNIQUE INDEX idx_context_ref_transcript
+  ON context_references(source_agent_id, first_seq, last_seq)
+  WHERE source_kind = 'transcript_span';
+CREATE UNIQUE INDEX idx_context_ref_pipeline_report
+  ON context_references(pipeline_attempt_id)
+  WHERE source_kind = 'pipeline_attempt_report';
+
+CREATE TABLE context_grants (
+  grant_id             TEXT PRIMARY KEY,
+  context_ref_id       TEXT NOT NULL REFERENCES context_references(context_ref_id),
+  granted_by_agent_id  TEXT NOT NULL,
+  granted_to_agent_id  TEXT NOT NULL REFERENCES agents(agent_id) ON DELETE CASCADE,
+  label                TEXT NOT NULL DEFAULT '',
+  description          TEXT NOT NULL DEFAULT '',
+  created_at           TEXT NOT NULL,
+  updated_at           TEXT NOT NULL,
+  revoked_at           TEXT,
+  UNIQUE(context_ref_id, granted_by_agent_id, granted_to_agent_id)
+);
+CREATE INDEX idx_context_grants_recipient
+  ON context_grants(granted_to_agent_id, revoked_at, updated_at DESC, grant_id);
+
+CREATE TABLE context_grant_views (
+  grant_id    TEXT PRIMARY KEY REFERENCES context_grants(grant_id) ON DELETE CASCADE,
+  seen_at     TEXT,
+  hidden_at   TEXT
+);
+```
+
+State types validate the closed source-kind vocabulary and its kind-specific locator shape: a
+transcript span has one source agent and positive ordered sequence bounds and no attempt id; a
+pipeline report has one attempt id and no transcript locator. The partial unique indexes are the
+concurrency guard that canonicalization returns one reference for one locator; label, description,
+grant, target, personal state, and creator are deliberately absent from that key. Reference rows
+contain no copied transcript/report content and have no foreign key to source agents, sessions,
+pipeline runs, or attempts, so deletion leaves an honest tombstone rather than cascading or aliasing
+the id. They have no user delete or retention path in this feature.
+
+One active-or-revoked grant row exists per reference/grantor/recipient triple. Sharing that triple
+again updates its presentation, clears `revoked_at`, and clears the recipient's hidden projection in
+one transaction rather than adding duplicate list entries; it does not clear `seen_at`. Grantor ids
+are retained logical provenance without a foreign key. Recipient deletion cascades only its grants
+and views. Revocation changes only the grant row; hiding/seeing changes only the view row. Every
+mutation matches the caller-derived grantor/recipient identity as applicable, and multi-row
+canonicalize-plus-grant operations are atomic (INV §5/§15). No backfill is needed.
+
 ## 3. Interfaces & data shapes
 
 The durable layout is:
@@ -252,7 +312,7 @@ $AGENTDECK_HOME/
 The binding schemas for roles, projects, backends, and global config are defined by FS-04 and
 FS-09. Federation binding/effective-view shapes are defined by TS-07. SQLite table definitions and
 migration order live in `internal/state/schema.go` and execute through `migrate.go`; that executable schema is subordinate to
-R1–R23 and must be reflected here when its contract changes.
+R1–R24 and must be reflected here when its contract changes.
 
 ## 4. Invariants
 
@@ -291,6 +351,9 @@ R1–R23 and must be reflected here when its contract changes.
 - Transcript: `internal/transcript/writer.go`, `reader.go`; runtime append in
   `internal/runtime/chat.go`.
 - Index/archive: `internal/index/indexer.go`, `reindex.go`, `internal/archive/archive.go`.
+- Context reference persistence (R24, planned): forward-only tables and typed state methods in
+  `internal/state`, consumed through `internal/contextref`; canonicalization, cascade, tombstone,
+  grant, and personal-projection regressions named by FS-15.A1–A5/A7.
 - Regression anchors: `TestHomeTreeIsOwnerOnly`, `TestStateDBIsOwnerOnly`,
   `TestTranscriptIsOwnerOnly`, `TestReindexPreservesFinalPartialTurn`,
   `TestEmptyArchiveMarshalsResultsArray`, `TestSearchFallbackFiltersMetadata`,

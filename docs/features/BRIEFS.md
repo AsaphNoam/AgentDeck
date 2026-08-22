@@ -3619,3 +3619,24 @@ Unsent text now stays with its chat in the same browser after navigation or relo
 **Needs attention:** None.
 
 **Next:** None.
+
+### 2026-08-22 — Feature design: pull-based context links
+
+Pull-based context links are fully specified and ready to build. An immutable transcript span or
+accepted pipeline-attempt report gets one reusable, target-neutral reference id. Direct grants,
+future work attachments, and personal seen/hidden state remain separate, so labels can vary by use,
+reassignment does not require copying context, and hiding an ad-hoc share cannot detach task context.
+
+The first change adds one in-process reference service, separate SQLite reference/grant/view rows,
+and token-scoped MCP tools to share, list direct ad-hoc grants, read bounded pages, hide/unhide, and
+revoke. It adds no artifact store, workflow graph, REST/UI context inbox, MCP resource registration,
+mail, activation, prompt injection, transcript event, or SSE content payload. Work-attached discovery,
+durable participation authorization, dependencies, and the richer orchestration API remain recorded
+for their own designs.
+
+Verified with `make check-specs` and `git diff --check`. No product code was changed.
+
+**Needs attention:** None.
+
+**Next:** Start the waiting change with `/work pull-based-context-links`, or run `/review-design`
+first.

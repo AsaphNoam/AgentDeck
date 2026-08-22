@@ -6,6 +6,16 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
+- **Ready change:** Pull-based context links are fully specified in FS-15 and TS-01.R22–R23,
+  TS-02.R24, TS-04.R28, and TS-05.R16. The waiting change is
+  [`pull-based-context-links.md`](../ready-changes/pull-based-context-links.md); it is not active.
+  Canonical references contain only immutable source identity, while direct grants, personal
+  seen/hidden projection, and future work attachments own separate presentation and lifecycle.
+  Initial sources are exact transcript spans and accepted pipeline-attempt reports. Five
+  token-scoped MCP tools create/directly grant, list ad-hoc shares, read bounded pages, change
+  personal visibility, and revoke a direct grant. No context operation creates mail, activation,
+  prompt, transcript event, SSE payload, or copied artifact content. Work objects, dependencies,
+  assignment retrieval, and host-managed waiting remain follow-on features recorded in ideas.
 - **Active change:** None.
 - **State:** Every mail-activation finding is closed, including the eligibility regression the last
   review found. The executor's pre-split gate is now the terminal-interface exclusion alone
@@ -23,8 +33,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   runtime turn gates, and sends the one provider instruction only after the non-replayable attempt
   boundary. Mail remains pull-based through `check_messages`. Startup recovers only pre-attempt
   claims and discards attempted rows, so restart, failure, unread state, and polling cannot replay a
-  model turn. Context links, dependency-aware agents, and a semantic orchestration API remain
-  separate ideas.
+  model turn. Dependency-aware agents and a semantic orchestration API remain separate ideas;
+  context links are now the specified waiting change above.
 - **Previous state:** The one open browser-draft finding is fixed. A delayed prompt send now scopes its
   completion to the draft generation it submitted — `drafts.ts` keeps a per-agent revision that
   every mutation bumps, and `Composer.submit` captures it before sending. A newer same-agent draft
@@ -208,6 +218,16 @@ pre-existing `gofmt` diff in `internal/index/indexer_fts_test.go` (outside this 
 
 ## Recent changelog
 
+- 2026-08-22 — design: specified pull-based context links. FS-15 defines canonical target-neutral
+  references for exact transcript spans and accepted pipeline-attempt reports, separate direct
+  grants and personal seen/hidden projection, and bounded explicit reads that create no
+  mail/activation/prompt/transcript/SSE side effect. TS-01.R22–R23 adds one in-process context
+  service and preserves the reference/grant/work-attachment boundary; TS-02.R24 defines separate
+  durable tables and tombstone semantics; TS-04.R28 adds five tools to the existing token-scoped MCP
+  authority instead of ACP/MCP resource injection; TS-05.R16 pins authorization and content-safe
+  boundaries. Work attachments, dependencies, and the semantic assignment API remain separately
+  recorded follow-on ideas. The waiting change is `pull-based-context-links.md`; no implementation
+  change is active.
 - 2026-08-22 — fix: closed the mail-activation eligibility regression. **INV §2** — the executor
   applied the stopped-only wake exclusions (archived agent, archived project, pipeline association)
   before its running/stopped split, so a running agent with a permanent `pipeline_attempts` row

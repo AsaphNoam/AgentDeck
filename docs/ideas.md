@@ -30,26 +30,6 @@ Example:
 - **Approval notifications link to the conversation.** When a pop-up notification fires because an
   agent needs approval, make it a link that opens that agent's conversation, so the user can jump
   straight to the pending permission instead of hunting for the right agent.
-- **Pull-based context links.** Agents should be able to reference and consume useful context
-  produced by other agents without requiring that context to be copied into mailbox messages or
-  proactively injected into their conversations.
-
-  Potential context sources could include another agent's transcript or selected turns, task/output
-  artifacts, diffs, files, summaries, or other durable AgentDeck-managed information.
-
-  The important idea is signal/reference + pull, rather than automatically pushing large amounts of
-  context between agents.
-
-  For example, Agent A might complete an investigation. Agent B could receive or discover a
-  reference to A's work and retrieve the relevant output, transcript section, diff, or artifact when
-  it actually needs it.
-
-  This should lean on the context/artifact plane rather than treating inter-agent context transfer
-  as ordinary conversation.
-
-  Think about what a first-class “context link” should mean in AgentDeck, how an agent discovers or
-  receives one, how granular retrieval should be, what should be durable, and how it should interact
-  with existing transcripts, mailboxes, task groups, roles, and MCP capabilities.
 - **Dependency-aware / armed agents.** AgentDeck should understand dependencies between pieces of
   work natively.
 
@@ -76,6 +56,14 @@ Example:
   failing, or being cancelled. The future scheduler should advance from explicit durable outcomes
   and may reuse the existing pipeline run/attempt/result machinery where it fits, rather than
   turning agent lifecycle signals into a new social completion protocol.
+
+  Work/context integration should attach a target-neutral canonical context reference to the work
+  object, with attachment-specific label/description, and return those attachments from that work's
+  assignment/detail operation. Work-derived read authorization follows durable participant
+  membership: successful, failed, blocked, cancelled, or otherwise terminal work does not by itself
+  remove access, while reassignment or explicit participant removal revokes the outgoing agent's
+  work-derived route. Direct grants remain independent. Deleting the work removes only that
+  work-derived route and its attachments, not the canonical reference or another grant/attachment.
 
   Think about how this should relate to AgentDeck's existing concepts of agents, groups, pipelines,
   statuses, wake/resume behavior, task completion, and lifecycle.
@@ -110,6 +98,12 @@ Example:
   prose that another model must interpret. “Wait for X” should register durable control-plane
   waiting/subscription state and let AgentDeck wake the agent when the condition changes; it should
   not ask the LLM to poll repeatedly.
+
+  An assignment/read operation should return that work object's attached context-reference ids and
+  attachment-specific presentation metadata. It should not make an activated agent scan a global
+  context-link list and guess which links apply to its current task. A global list remains only a
+  convenience for directly shared ad-hoc context; personal seen/hidden state on that list is
+  control-plane projection and cannot detach or revoke context required by active work.
 
   Consider where the boundary should sit between a small set of composable primitives and useful
   higher-level operations. The API should expose AgentDeck's orchestration semantics cleanly rather

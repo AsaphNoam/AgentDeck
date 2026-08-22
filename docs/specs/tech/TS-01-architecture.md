@@ -1,7 +1,7 @@
 # TS-01 — Architecture
 
-**Status:** Current
-**Code:** `internal/server`, `internal/runtime`, `internal/state`, `internal/index`, `internal/bus`, `internal/config`, `internal/configsource`, `internal/messaging`, `internal/pipeline`, `internal/backend`, `internal/archive`, `internal/transcript`, `internal/cli`, `ui/src`
+**Status:** Partial
+**Code:** `internal/server`, `internal/runtime`, `internal/state`, `internal/index`, `internal/bus`, `internal/config`, `internal/configsource`, `internal/messaging`, `internal/contextref` (planned), `internal/pipeline`, `internal/backend`, `internal/archive`, `internal/transcript`, `internal/cli`, `ui/src`
 **Absorbed:** architecture contract from [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md); rationale remains in [`architecture-decisions.md`](../../architecture-decisions.md) D1–D5
 
 ## 1. Scope
@@ -31,6 +31,7 @@ runtime — the messaging MCP server and embedded UI live inside the Go binary (
 | `internal/config` | Plain-JSON config store under `~/.agentdeck`, atomic writes, slug validation, layout/dir modes, pipeline templates |
 | `internal/configsource` | Phase 7 federation: Claude/Codex native-config discovery, binding, effective view |
 | `internal/messaging` | In-process agent-facing MCP gateway and token→agent registry; handlers delegate messaging and TS-09 pipeline result/proposal semantics to their owning services |
+| `internal/contextref` `(planned)` | Canonical context-reference identity, typed source resolution/rendering, direct-grant authorization, and bounded reads; no artifact payload store or scheduler |
 | `internal/pipeline` | Template validation, durable sequential run state machine, transition reconciliation, stage-result and AgentDecker proposal services |
 | `internal/backend` | Backend/model adapter contracts, env layering, credential checks (`credcheck`) |
 | `internal/archive` | Session archive queries + FTS-backed search |
@@ -237,6 +238,34 @@ remain actionable until its owning durable task/attempt records a successful sta
 kind-specific instruction is the only activation data sent to the provider, and it is not appended
 as a user-authored AgentDeck transcript event.
 
+**R22 `(planned)` — Context references are one in-process context-plane
+service.** `internal/contextref` owns canonicalization of typed immutable source locators, source
+validation, deterministic bounded rendering, direct-grant authorization, and personal direct-share
+projection. It delegates durable rows to `internal/state`, transcript reads to
+`internal/transcript`, pipeline-attempt reads to the existing pipeline/state authority, recipient
+resolution to one context-specific durable chat-agent directory, and agent-facing transport to
+`internal/messaging`. It stores no copied source payload and calls no runtime prompt, activation,
+mail, lifecycle, SSE, or local HTTP path. The server constructs one service and supplies it to the
+existing MCP server; there is no context daemon, second database writer, generic artifact store,
+provider-specific reader, or workflow engine.
+
+The context recipient directory reuses the shared address-matching helper but not FS-06's
+mail-addressable/wake-candidate query: it contains non-archived durable chat identities whether
+running or stopped, and pipeline association is irrelevant because a grant starts no process. This
+separate query is one state snapshot and one code-owned predicate so context sharing cannot inherit
+mail retry/lifecycle policy by accident (INV §2/§5).
+
+**R23 `(planned)` — Reference, authorization, attachment, and personal state
+remain separate.** A canonical reference is keyed only by its immutable source locator. Direct
+grants authorize an agent and own grant-specific presentation; personal seen/hidden projection
+affects only the recipient's ad-hoc list. A future work domain owns its own attachment and durable
+participant membership and presents attached reference ids through that work's API. It may ask the
+context service to validate/read a reference for a participant, but it must not encode work ids,
+assignees, labels, task state, or read state into reference identity, synthesize direct grants, or
+make the global direct-share list the assignment-discovery protocol. Terminal work state alone does
+not revoke participant access; reassignment or explicit participant removal is the owning work
+domain's authorization transition.
+
 ## 3. Interfaces & data shapes
 
 **Runtime interface** (`internal/runtime/runtime.go`, minimum surface):
@@ -315,6 +344,8 @@ lost.
   deletion cleanup.
 - Activation plane (R18–R21): `internal/state/activations.go`, the server activation executor,
   runtime turn-start arbitration, and mail/wake integration tests.
+- Context plane (R22–R23, planned): `internal/contextref`, durable rows in `internal/state`, the
+  existing `internal/messaging` authority, and separation coverage named by FS-15.A1/A6.
 - Archive transition gate: `internal/server/archive_gate.go`, `archive_actions.go`, and
   `archive_gate_test.go` (project reservation and agent/project transition barriers).
 - Model catalog autosync: `internal/config/{codexmodels,claudemodels,modelautosync}.go`,
