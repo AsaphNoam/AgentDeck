@@ -4,6 +4,16 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-22 — Review: mail activation after its fixes
+
+The eight earlier fixes all hold. Batched mail produces exactly one model turn, an emptied mailbox retires the work without prompting, a failed status save stops the turn instead of hiding it, mail defers to a pipeline stage that is mid-launch, a failed setup after waking cleans up completely, shutdown no longer leaves a stray agent, and a failed startup repair stops the dashboard loudly. The full test suite, the specification check, and repeated race-detector runs over the messaging, wake, shutdown, and lifecycle paths are all green, so the architecture itself is in good shape.
+
+Five things are still open, one of which should be fixed before the next change. When a stopped agent is woken to handle mail, the system records "we have attempted this" a little too early — before it has checked that the agent's backend and model still exist. If someone has since renamed or deleted that backend in Settings, the mail opportunity is silently thrown away for a failure that did nothing, and fixing the setting afterwards does not bring it back; the recipient simply never picks up mail that was already sent to it. The four lower-priority items: mail work aimed at an agent that has since been switched to a terminal, archived, or taken over by a pipeline is never cleaned up, so the system retries it every two seconds for up to a week; releasing a reservation fails silently when newer mail has arrived, leaving a stray record until the next restart; a leftover compatibility shim from the retired mechanism is still in the shipped code; and one test's assertion cannot fail, so a guarantee it claims to check is unproven elsewhere in that test. The already-known unreachable wake-tracking code is still there and still unreachable.
+
+**Needs attention:** Fix the early "attempted" marking before starting new work — it is the only one that can silently lose mail handling in ordinary use.
+
+**Next:** Run `/fix` and take the findings one at a time, starting with the early attempt marking.
+
 ### 2026-08-22 — Fix: all eight mail-activation review findings
 
 Every open finding from the two architectural reviews is fixed. Mail no longer starts an empty model turn when someone reads the mailbox just before the work is picked up, and mail can no longer steal the turn from a pipeline stage that is mid-launch. A failed status save now stops the model turn instead of running it invisibly while the dashboard shows the agent as idle. Setup that fails right after waking an agent now cleans up fully instead of leaving a live agent running with nothing to do, shutting down no longer leaves a stray agent process behind, and a failed startup repair now stops the dashboard loudly instead of quietly losing that mail for the rest of the session.
