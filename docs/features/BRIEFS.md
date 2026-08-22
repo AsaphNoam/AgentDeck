@@ -3640,3 +3640,41 @@ Verified with `make check-specs` and `git diff --check`. No product code was cha
 
 **Next:** Start the waiting change with `/work pull-based-context-links`, or run `/review-design`
 first.
+
+### 2026-08-22 — Design review: pull-based context links
+
+I reviewed the pull-based context-links design before any code is written, and it is not ready to
+build yet. Two problems have to be settled first, and six more are worth settling with them.
+
+The first blocker: the design gives the new context service its own way of turning an agent's
+recorded conversation into readable text, and AgentDeck already has two such converters — one in the
+search indexer, one in the chat view. A third copy means the next time we add a new kind of
+conversation event, someone updates one or two of the three and a shared transcript quietly comes
+back missing a whole class of content, with every test still green. This is the exact drift the
+project's invariant list already paid for twice.
+
+The second blocker: the design offers a pipeline stage's finished report as one of the two things an
+agent can share, but the way pipelines already work, a stage agent is stopped as soon as its turn
+ends, and the report stops being reachable at the same moment. The only window in which that share
+can happen is the same turn in which the agent files the report, and no later agent can ever point at
+an earlier stage's report. That may still be worth building, but the design should say so plainly
+instead of presenting it as a first-class source.
+
+The six smaller ones, in short: the "seen / hidden" bookkeeping is recorded but never read by
+anything; deletion rules are written for deleting an agent, which the product currently cannot do;
+the shared material can include credentials, yet only the sharing agent — never you — can withdraw
+access, and nothing ever expires; the promise that no content is silently dropped is contradicted by
+the transcript reader, which does silently drop very large records; there are two error names for
+what looks like one situation and only one is defined; and neither sharing option can cover the turn
+the agent is in the middle of finishing, which is exactly when it would want to hand work over.
+
+The design's factual claims about existing code mostly checked out, and I have recorded those so the
+next pass does not re-verify them.
+
+**Needs attention:** One is a decision only you can make — durable, invisible, never-expiring access
+grants to conversation content that may contain secrets, with no owner-facing way to see or revoke
+them. Either we add a small owner list-and-revoke surface, or we accept it deliberately and write
+down why.
+
+**Next:** Run `/design-feature Pull-based context links` to work the findings through with me;
+implementation should not start until the two blockers are closed.
