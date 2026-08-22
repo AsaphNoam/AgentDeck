@@ -164,16 +164,17 @@ terminal agents from becoming statusless or unmessageable.
 - **Terminal support boundary.** Claude terminal launches
   receive model/directories/system-prompt flags, but that live CLI mapping is not credential-tested;
   Codex (and other non-claude) terminal launches are rejected; and terminal agents cannot receive
-  agent-to-agent messages (R19). This avoids statusless or endlessly nudged agents at the cost of
-  advertised interface×backend combinations. Reverse by verifying each CLI's hook/flag/MCP surfaces
-  and wiring adapter-specific paths before lifting the gates.
+  agent-to-agent messages (R19). This avoids statusless agents or agents repeatedly re-activated for
+  mail they can never drain, at the cost of advertised interface×backend combinations. Reverse by
+  verifying each CLI's hook/flag/MCP surfaces and wiring adapter-specific paths before lifting the
+  gates.
 - **Live-CLI terminal acceptance is credential-gated.** Real Claude terminal launch/switch with the
   composed flags and hooks (reconciling any flag mismatch) is an acceptance gate requiring
   credentials (credential-gated acceptance). Until cleared, the Claude interactive-CLI flag/resume
   mapping in `launchArgv`/`interactiveBinary` is `(planned)`-tagged and marked GATED in code.
 - **Terminal activation is excluded.** The terminal runtime rejects `StartActivation`, but
-  recipient resolution and the nudger exclude terminal agents under FS-06.R9/R17, so coordination
-  cannot reach that method in the shipped path.
+  recipient resolution and the mail activation executor exclude terminal agents under FS-06.R9/R17,
+  so coordination cannot reach that method in the shipped path.
 
 ## 7. Traceability
 

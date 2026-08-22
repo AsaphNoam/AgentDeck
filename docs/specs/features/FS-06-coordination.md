@@ -58,15 +58,16 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   seven days. A stopped agent retains recent mail; it is addressable and activated only when it
   passes the mail wake gates (R22, R27), and otherwise stays unaddressable.
 
-### 2.3 Nudging and per-turn budget
+### 2.3 Mail activation and per-turn budget
 
 - **R9.** Inserting a message signals the mail activation executor immediately and its two-second
   sweep is the recovery fallback. Only a durable pending mail activation can start a turn; unread
   count, idle/status changes, cooldown, and process-local in-flight state are not scheduling facts.
 - **R10.** An activation re-checks the recipient at the runtime boundary before injection, holds the
   agent turn gate, commits mail's attempted boundary and the new turn budget before the ACP prompt,
-  and completes like an ordinary chat turn. A busy recipient leaves its pre-attempt activation
-  pending; an attempted activation is never replayed.
+  and completes like an ordinary chat turn. A busy recipient — or one whose exclusive lifecycle
+  transition is still in flight — leaves its pre-attempt activation pending; an attempted activation
+  is never replayed.
 - **R11.** Each chat turn has a combined inbound-plus-outbound messaging budget of 15. Sending and
   reading consume it transactionally with the message mutation. The action that would exceed the
   budget does not occur: an outbound message is not inserted, and an inbound check returns only as
@@ -216,36 +217,48 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
 - **A10** (R21) — A reserved-sender insert raises the recipient's unread badge, nudges an
   idle recipient, consumes no turn budget, and the user identity cannot be produced through MCP tool
   arguments: `internal/server/annotations_test.go::TestAnnotationAgentDeliveryPersistsUserMailAndTranscriptEvent`.
-- **A11** (R22–R23) — `send_message` to a stopped wakeable fake-ACP agent inserts the
-  mail, resumes the agent, and nudges it (`delivered_via="nudge"`), while `list_agents` shows it
-  with `availability:"stopped_wakeable"` (and running agents `"running"`) before the send. A wake
-  whose resume fails marks the pending rows `wake_failed`, retains the mail, leaves the agent
-  stopped, and produces no further spawn attempts — including after a dashboard restart and for
-  mail inserted in the same second — until a new `pending` row arrives. A stopped agent with a
-  pipeline attempt association is absent from `list_agents`, unresolvable as a recipient, and never
-  woken. *Verify:* server messaging integration tests against fake ACP covering all three branches.
-- **A12** (R22–R23) — A wake whose adapter completes its handshake and is then killed before its
-  first nudge leaves the mail unread but claimed, and no later sweep respawns it. Mail inserted
-  while a wake is in flight is still `pending` after that wake fails, so the recipient is a wake
-  candidate again. An agent whose running row disappears while the addressable set is being read is
-  never listed twice, and `role@project` resolution never reports a false ambiguity because of it.
+- **A11** (R22, R24–R27) — `send_message` to a stopped wakeable fake-ACP agent inserts the mail and
+  its one pending activation, which resumes the agent, while `list_agents` shows it with
+  `availability:"stopped_wakeable"` (and running agents `"running"`) before the send. A wake that
+  fails after crossing the attempt boundary retains the unread mail, leaves the agent stopped, and
+  re-arms nothing — including after a dashboard restart and for mail inserted in the same second —
+  until new mail creates the next opportunity. A stopped agent with a pipeline attempt association
+  is absent from `list_agents`, unresolvable as a recipient, and never woken. *Verify:*
+  `internal/server/wake_test.go::TestMailActivationWakesStoppedRecipient`,
+  `TestFailedMailWakeRetainsMailAndStopsRetrying`, and
+  `TestStoppedPipelineAgentIsNeverAddressableOrWoken`.
+- **A12** (R22, R24–R27) — A wake whose adapter completes its handshake and is then killed before it
+  ever reads its mailbox leaves the mail unread while its attempted activation is retired, and no
+  later sweep respawns it. Mail inserted while a wake is in flight gets its own pending activation
+  and survives that wake's failure, so the recipient is a candidate again. An agent whose running
+  row disappears while the addressable set is being read is never listed twice, and `role@project`
+  resolution never reports a false ambiguity because of it.
   *Verify:* `internal/server/wake_test.go::TestSuccessfulWakeConsumesMailEvenIfAdapterDiesBeforeNudge`,
   `TestFailedWakeLeavesNewerMailPending`, and `TestAddressableAgentsNeverDuplicatesAcrossStop`.
 - **A13** (R24–R26) — Several messages present before an idle recipient is claimed
   produce one mail-handling provider turn. If the agent leaves some or all of those messages unread,
   repeated sweeps, idle transitions, and a dashboard restart produce no second turn for that
-  opportunity; mail inserted after the claim produces one later activation. *Verify:* fake-ACP
-  server integration tests that count provider prompts across coalescing, unread completion, restart,
-  and mid-flight insertion.
+  opportunity; mail inserted after the claim produces one later activation. A mailbox drained before
+  the pending opportunity is claimed retires it without any provider turn. *Verify:* fake-ACP
+  provider-prompt counts in
+  `internal/server/activation_test.go::TestCoalescedMailProducesOnePromptAndIsNeverReplayed` and
+  `TestDrainedMailboxRetiresActivationWithoutPrompting`, plus
+  `internal/state/messages_test.go::TestClaimMailActivationRetiresDrainedMailbox` for the
+  availability-and-claim atomicity those depend on.
 - **A14** (R25) — The activation prompt contains no message body or other context
   payload, while `check_messages` returns the durable messages under the existing caller identity,
-  limit, budget, read, and indicator behavior. *Verify:* runtime prompt-capture and MCP messaging
-  integration tests.
+  limit, budget, read, and indicator behavior. *Verify:* the prompt-payload assertions in
+  `internal/server/activation_test.go::TestCoalescedMailProducesOnePromptAndIsNeverReplayed`,
+  `internal/runtime/chat_test.go::TestStartActivationInjectsPayloadFreeMailTurn`, and
+  `internal/messaging/messaging_test.go::TestSendAndCheckRoundTrip`.
 - **A15** (R26–R27) — A stopped wakeable recipient is resumed once for a claimed mail
   opportunity and receives one activation; a lost lifecycle race remains pending, while a real wake,
   launch, or provider attempt that fails is not retried after restart. New mail re-arms a later
-  opportunity. Terminal and pipeline-associated stopped agents never start. *Verify:* generation-
-  scoped wake/activation race and restart tests against fake ACP.
+  opportunity. Terminal and pipeline-associated stopped agents never start. *Verify:*
+  `internal/server/activation_test.go::TestStoppedMailActivationResumesOnceAndIsNeverReplayed`,
+  `TestFailedStoppedActivationIsNotRetriedAfterRestart`,
+  `TestMailActivationDefersWhileLifecycleClaimIsHeld`, and
+  `internal/server/wake_test.go::TestStoppedPipelineAgentIsNeverAddressableOrWoken`.
 
 ## 6. Deviations & open decisions
 
@@ -257,9 +270,11 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   MCP client and fake ACP sessions, but real Claude Code and Codex acceptance of the generated
   per-session HTTP registration and a live `ping`/tool call remains a manual gate. Do not claim
   compatibility for a CLI until that gate passes; implement a stdio proxy if either rejects HTTP.
-- **No cross-turn loop detector.** R11 caps a tight loop within a turn, and the nudge cooldown
-  bounds its rate, but two agents can continue a slow one-message-per-turn ping-pong indefinitely.
-  Message history and budget rows provide the data for a rolling-window detector; none ships now.
+- **No cross-turn loop detector.** R11 caps a tight loop within a turn, and R24's coalescing keeps a
+  burst of mail to one activation per recipient, but two agents can continue a slow
+  one-message-per-turn ping-pong indefinitely — each reply is new mail and therefore a legitimate new
+  opportunity. Message history and budget rows provide the data for a rolling-window detector; none
+  ships now.
 - **Budget notifications repeat after the first breach.** The intended notification is the first
   breach of a turn, but each over-limit retry currently calls the budget sink again even though the
   budget row was already marked breached. This can produce repeated toasts until the next turn;
@@ -272,10 +287,6 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   (R14), but the retention janitor deletes expired rows without touching affected agents. A
   seven-day unread expiration may therefore leave **Mail N** visible until another state update.
   Tracked advisory to publish for every affected recipient.
-- **Nudge cooldown is keyed only by stable agent id.** A stop/relaunch under the same `agent_id`
-  can inherit the old in-memory in-flight/cooldown entry and delay new mail by up to the cooldown
-  (or until the in-flight timeout in the worst stale case). Key by launch generation or clear state
-  when the running row changes.
 - **Notification mutes depend on a populated config cache.** The SSE client reads preferences from
   React Query cache without fetching them itself. On a deep route that has not loaded config, a
   muted type can fall back to unmuted behavior. Tracked advisory to prefetch config at app start.
@@ -297,4 +308,10 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
 - **Key regression tests:** `TestSendAndCheckRoundTrip`, `TestSendIdentityNotSpoofable`,
   `TestMailActivationStartsIdleAgentWithoutMutatingMailProvenance`, `TestSendMessageBudgetExceeded`,
   `TestResetTurnBudgetReusesSingleRow`, `TestCheckMessagesFiresReadSink`,
-  `TestResolveRecipientExcludesTerminalAgents`, and `ui/src/api/sse.test.ts`.
+  `TestResolveRecipientExcludesTerminalAgents`, `ui/src/api/sse.test.ts`, and the provider-prompt
+  counting suite in `internal/server/activation_test.go`
+  (`TestCoalescedMailProducesOnePromptAndIsNeverReplayed`,
+  `TestDrainedMailboxRetiresActivationWithoutPrompting`,
+  `TestMailActivationDefersWhileLifecycleClaimIsHeld`,
+  `TestStoppedMailActivationResumesOnceAndIsNeverReplayed`,
+  `TestFailedStoppedActivationIsNotRetriedAfterRestart`).

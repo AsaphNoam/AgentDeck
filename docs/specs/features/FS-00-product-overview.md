@@ -168,9 +168,9 @@ row per live agent; live status (`state ∈ {busy, idle, waiting_input, done, er
 - **Activation** — a durable, payload-free control opportunity to initiate work after
   AgentDeck claims it. It makes the control-to-conversation crossing explicit without prescribing a
   universal retry/completion policy or containing the work payload. See FS-06 and TS-01.
-- **Nudger `(current)`** — the existing server loop that detects an idle agent with pending mail
-  and wakes it so it processes messages without user intervention. Explicit activation replaces
-  unread-driven nudging when FS-06.R24–R27 ship.
+- **Mail activation executor `(current)`** — the server loop that claims a durable pending
+  mail activation — a host-owned opportunity, at-most-once once attempted — and starts or wakes the
+  recipient to process it. It replaced the earlier unread-polling nudger. See FS-06, TS-04.
 - **Federation** — binding AgentDeck to a backend's native Claude/Codex config files so those files
   stay authoritative and AgentDeck stores only bindings, overrides, and a derived redacted view.
   See FS-08.

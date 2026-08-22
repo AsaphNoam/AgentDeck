@@ -221,26 +221,13 @@ agent as running and again as stopped-wakeable, duplicating it in `list_agents` 
 spelling of the wake gates so single-agent candidacy and the directory cannot drift (INV §2). Every
 `list_agents` entry gains the additive `availability` field (`"running"` | `"stopped_wakeable"`,
 FS-06.R22); existing fields, including `state`, are unchanged. Mail insertion stays durable-first
-exactly as today (INV §15). The nudger's existing per-agent cooldown/in-flight map gains stopped
-wakeable recipients with unread mail as wake candidates: the insert-time signal or sweep calls the
-shared wake helper (TS-01.R16) without waiting out the resume, and once the agent is resumed and
-idle, the ordinary running-recipient nudge delivers `check_messages`. A wake reuses that map's
-per-agent cooldown; its re-entry guard is TS-01.R16's exclusive claim rather than the map's
-in-flight marker, which stays with the `check_messages` delivery that follows the wake.
+exactly as today (INV §15).
 
-The wake bound is durable, not process-local, and is a **claim rather than a failure marker**. Wake
-candidacy requires at least one unread row still marked `pending`, and an attempt takes those exact
-rows out of `pending` into the `delivered_via` value `wake_attempted` — in one transaction, before
-any process is spawned — then records `wake_failed` on those same ids if it fails. Both values live
-in the existing column, so there is no migration. Marking only on failure was insufficient: a
-successful wake left the rows `pending`, so an adapter that completed its handshake and then died
-before the first `check_messages` nudge was respawned by every sweep (INV §15). Scoping the outcome
-to the claimed ids is what lets mail inserted mid-wake stay `pending` and re-arm; a losing lifecycle
-claim releases the rows back to `pending` because nothing was attempted. `MarkUnreadDeliveredVia`
-accepts `wake_attempted` alongside `pending` so the delivering nudge restamps them honestly, and
-reading the mail restamps a still-claimed row `poll`. `messages.created_at` is whole-second RFC3339,
-so timestamp comparison cannot order same-second rows and is not used. New mail always inserts as
-`pending`, re-arming the wake; the bound therefore holds across dashboard restarts (FS-06.R23).
+**Superseded 2026-08-22:** the per-agent cooldown/in-flight wake-candidacy map and the
+`delivered_via` `wake_attempted`/`wake_failed` claim protocol formerly specified here are removed —
+neither is live code. Explicit mail activation (FS-06.R24–R27) durably claims the opportunity
+instead, and TS-04.R27 describes how a claimed activation reaches the provider. The addressable-set
+contract above this notice is unaffected and still ships.
 
 **R27 — Provider activation is a deliberate prompt bridge, not a control
 notification.** The pinned ACP v1 surface and packaged adapters expose no portable notification that
@@ -261,8 +248,8 @@ the prompt in its own session context because an actual reasoning turn was reque
 the pull surface for the payload. A future adapter-specific wake or ACP extension may replace this
 bridge only through a separately capability-gated requirement; document notifications,
 `session/resume`, MCP notifications, and unadvertised extension methods must not be repurposed as an
-inferred wake contract. R27 replaces R26's unread/cooldown nudge mechanics when FS-06.R24–R27 ship;
-recipient discovery and the shared wakeability query remain unchanged.
+inferred wake contract. R27 replaces the unread/cooldown nudge mechanics superseded in R26;
+FS-06.R24–R27 have shipped. Recipient discovery and the shared wakeability query remain unchanged.
 
 ## 3. Interfaces & data shapes
 

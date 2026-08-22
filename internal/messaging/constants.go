@@ -2,19 +2,14 @@ package messaging
 
 import "time"
 
-// Locked Phase 5 constants (techspec §13). Budget enforcement at the turn
-// boundary and the nudger/janitor loops that use the timing constants land in
-// 5.3; the values are fixed here as the single reference.
+// Messaging budget and timing constants; see TS-04 and FS-06 for the
+// requirements that govern their use.
 const (
 	// MessageBudgetPerTurn caps combined inbound+outbound messaging per turn.
 	MessageBudgetPerTurn = 15
 
-	// NudgeInterval is the nudger ticker period.
+	// NudgeInterval is the mail activation executor's ticker period.
 	NudgeInterval = 2 * time.Second
-	// NudgeCooldown is the minimum gap between re-nudging the same agent.
-	NudgeCooldown = 3 * time.Second
-	// NudgeInFlightTimeout clears a stuck in-flight nudge flag.
-	NudgeInFlightTimeout = 60 * time.Second
 
 	// JanitorInterval is the retention-sweep period.
 	JanitorInterval = 60 * time.Second

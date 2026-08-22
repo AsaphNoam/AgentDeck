@@ -46,11 +46,38 @@ type resumeOverride struct {
 func (s *Server) claimLifecycle(agentID string) bool {
 	s.lifecycleMu.Lock()
 	defer s.lifecycleMu.Unlock()
-	if s.lifecycleBusy[agentID] {
+	if s.lifecycleClosed || s.lifecycleBusy[agentID] {
 		return false
 	}
 	s.lifecycleBusy[agentID] = true
+	s.lifecycleWG.Add(1)
 	return true
+}
+
+// quiesceLifecycle closes the claim gate and waits for every in-flight lifecycle
+// transition to settle. Shutdown runs it before Registry.Shutdown (INV §4/§9): a
+// mail activation resumes its recipient in a detached executor goroutine, and
+// ChatRuntime.Resume writes the durable running and status rows before it inserts
+// the runtime into its agent map. A registry snapshot taken inside that window
+// missed the agent entirely, so StopAll walked past it and the resume then
+// registered a live orphan process into an already-cleared registry.
+//
+// Add is only ever called under lifecycleMu after the closed check, so no claim
+// can race this Wait.
+func (s *Server) quiesceLifecycle(ctx context.Context) {
+	s.lifecycleMu.Lock()
+	s.lifecycleClosed = true
+	s.lifecycleMu.Unlock()
+	done := make(chan struct{})
+	go func() {
+		s.lifecycleWG.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-ctx.Done():
+		s.log.Warn("shutdown timed out waiting for lifecycle transitions")
+	}
 }
 
 // lifecycleInFlight reports whether an exclusive lifecycle transition currently
@@ -66,6 +93,7 @@ func (s *Server) releaseLifecycle(agentID string) {
 	s.lifecycleMu.Lock()
 	delete(s.lifecycleBusy, agentID)
 	s.lifecycleMu.Unlock()
+	s.lifecycleWG.Done()
 }
 
 // handleResume implements POST /api/sessions/{id}/resume (techspec §7.2).
@@ -261,6 +289,16 @@ func (s *Server) resumeSessionWithHooks(ctx context.Context, id string, override
 	}
 	if after != nil {
 		if err := after(); err != nil {
+			// Registry.Resume already created the process, running row, hook token,
+			// MCP registration, and hook-settings file. Returning here left a newly
+			// running agent behind whose activation was already retired as attempted
+			// — unread mail, no turn, and a live process nobody asked for. Route the
+			// failure through the one shared stop-and-teardown every other exit path
+			// uses; the lifecycle claim is still held, so use the claimed variant
+			// (INV §4, TS-01.R16).
+			if sae := s.stopAgentClaimed(ctx, id); sae != nil {
+				s.log.Warn("stop after failed post-resume activation", "agent_id", id, "err", sae.Message)
+			}
 			return apiError(runtime.CodeInternal, err.Error())
 		}
 	}
