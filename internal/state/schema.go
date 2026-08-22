@@ -337,4 +337,14 @@ ALTER TABLE pipeline_proposals ADD COLUMN consumed_at TEXT NOT NULL DEFAULT '';
 		version: 16,
 		apply:   migrateActivations,
 	},
+	{
+		// Pull-based context links (TS-02.R24). References are keyed only by an
+		// immutable source locator; grants own presentation and authorization, and
+		// personal hidden state is a separate row. Reference rows deliberately have
+		// no foreign key to source agents, sessions, pipeline runs, or attempts, so
+		// deleting a source leaves an honest tombstone rather than cascading or
+		// aliasing the id. No backfill: nothing existed before this table.
+		version: 17,
+		apply:   migrateContextLinks,
+	},
 }
