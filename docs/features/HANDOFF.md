@@ -14,7 +14,11 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   mail remains unread. Release coalesces safely when newer mail already owns the pending row and
   reports failures. The superseded wake-tracking API, compatibility shim, and vacuous A11 assertion
   are gone. FS-06, FS-07, TS-01, and TS-02 now describe the shipped boundaries. New state and
-  fake-ACP regressions cover the timing, eligibility, release, and no-replay cases.
+  fake-ACP regressions cover the timing, eligibility, release, and no-replay cases. Reviewed: all six
+  are genuinely closed against their original reproductions, but the new eligibility gates over-apply
+  — the pipeline-association exclusion is a stopped-only gate (FS-01.R33, FS-06.R22) and is now run
+  for running recipients too, so a running pipeline-associated agent accepts mail and is never
+  activated for it. One **Must fix** finding is open.
 - **Previous state:** Explicit mail activation shipped. New mail atomically creates one payload-free,
   mail-scoped activation while pending; the executor claims it durably, uses the shared lifecycle and
   runtime turn gates, and sends the one provider instruction only after the non-replayable attempt
@@ -145,9 +149,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   `make build`, all 226 UI tests, presentation/style checks, and `make dist` pass. No live-browser
   pass was run. A stale migration-version guard test (asserting 13 against the shipped 14) was already
   failing on `main` and now derives its expectation from the migrations slice (INV §9).
-- **Last reviewed code:** `2b4da9d` (2026-08-22), the continuous range after `2310206` covering the
-  mail-activation review records and the eight-finding fix. The current mail-activation fix awaits
-  independent review.
+- **Last reviewed code:** `1fd26ed` (2026-08-22), the continuous range after `2310206`
+  covering the mail-activation review records and both fix passes. Nothing is unreviewed.
 - **Branch:** `main`.
 
 ## Active change
@@ -188,7 +191,29 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ### Open findings
 
-None.
+- **Must fix** — **FS-06.R22/R27, FS-01.R33, INV §2:** the new executor eligibility gates apply a
+  *stopped-only* exclusion to *running* recipients, so a running pipeline-associated agent silently
+  stops receiving mail activations. `internal/server/messaging_loops.go:96-103` discards the
+  opportunity whenever `PipelineAssociationForAgent` returns non-nil, before the running/stopped
+  split at line 113. But FS-01.R33 scopes that gate to wake — "an agent with a pipeline attempt
+  association is never **woken** by a message" — and FS-06.R22 excludes pipeline-associated agents
+  "while stopped"; `addressableAgents` accordingly keeps a running one addressable. The association
+  row is permanent (`PipelineAssociationForAgent` returns the latest `pipeline_attempts` row for the
+  agent, with no completion filter), so any agent that has ever run a pipeline stage is affected for
+  the rest of its life. Normal-use trigger: an agent finishes a pipeline stage, stays running, and a
+  peer sends it mail. `send_message` succeeds, the **Mail N** badge updates, and the recipient is
+  never activated to read it. Confirmed by probe: at `9862682` the same scenario produced 1 provider
+  prompt; at `1fd26ed` it produces 0, with the activation discarded and the mail left unread. The
+  `agent.Archived` and `projectArchiveGate` checks at lines 92 and 104 over-apply in exactly the same
+  way — they are stopped-only gates too (`addressableAgents`: "a running agent stays addressable
+  regardless of its project's archive state") — though archive stops the agent first, so those are
+  not separately reachable today. *Fix:* run the durable-exclusion gates on the stopped branch only,
+  or scope them by the running-row read that already happens at line 113; keep the
+  interface-is-`chat` gate on both branches, since that is the terminal exclusion FS-07 §6 needs.
+  Reusing one predicate with `stoppedWakeGates` rather than a second Go spelling would have caught
+  this (INV §2). *Test:* a running pipeline-associated recipient gets exactly one provider prompt for
+  new mail, while a stopped one still never wakes
+  (`TestStoppedPipelineAgentIsNeverAddressableOrWoken` stays green).
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
@@ -205,6 +230,26 @@ shared); `last_trace: "MailActivation"` (no spec vocabulary or UI surface reads 
 pre-existing `gofmt` diff in `internal/index/indexer_fts_test.go` (outside this range).
 
 ## Recent changelog
+
+- 2026-08-22 — review: verified the fix for the six re-review findings and found one regression it
+  introduced. All six are genuinely closed and re-verified against the original reproductions: the
+  attempted boundary now commits immediately before `composeResumeSpec` (a stopped agent pointed at a
+  removed backend keeps its pending opportunity), `ReleaseMailActivation` is a delete-or-update pair
+  in one transaction (the earlier `UNIQUE constraint failed: activations.agent_id` probe now returns
+  nil and strands nothing), durably ineligible recipients are discarded instead of re-claimed every
+  two seconds, the `nudgeState`/`nudgeOnce` shim and `NudgeInterval` are gone
+  (`ActivationSweepInterval`), the FS-06.A11 assertion is now `len(waiting) == 0`, and the dead
+  wake-claim state API and its `nudge`/`wake_attempted`/`wake_failed` constants are removed with the
+  read-marking `CASE` simplified. Specs moved with the code (FS-06.R10/R27/A15, FS-07 §6, TS-01.R21,
+  TS-02.R23). One new **Must fix**: the new eligibility gates apply the stopped-only
+  pipeline-association exclusion to running recipients too, so a running pipeline-associated agent
+  accepts mail and is never activated for it — confirmed by running the same scenario in a worktree
+  at `9862682` (1 provider prompt) and at `1fd26ed` (0). Invariant sweep over the fix diff —
+  applicable: §1, §2, §4, §5, §7, §9, §10, §15; §2 produced the finding (a second Go spelling of the
+  wake-gate predicate drifted from `stoppedWakeGates`), and §1/§4/§5/§7/§9/§10/§15 were sound.
+  Sections §3, §6, §8, §11, §12, §13, §14 have no applicable surface in this diff. `make check-specs`,
+  `make test`, `make build`, `git diff --check`, and focused `-race` on the activation, wake, and
+  state paths all pass. No product code or specification was changed by this review.
 
 - 2026-08-22 — fix: closed every remaining mail-activation finding. **INV §5** — the stopped
   activation attempt now occurs immediately before `composeResumeSpec`, after every fallible,

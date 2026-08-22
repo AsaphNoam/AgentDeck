@@ -14,6 +14,16 @@ The release path now coalesces safely when newer mail arrives, errors are logged
 
 **Next:** A new review can cover this fix before another change begins.
 
+### 2026-08-22 — Review: verifying the mail activation fixes
+
+All six issues from the last review are genuinely fixed, and I re-ran the original reproductions to confirm rather than taking the fix at its word. Mail no longer burns its one chance to wake an agent when the agent's backend has been removed from Settings; releasing a reservation no longer fails and leaves a stray record; work aimed at an agent that has been switched to a terminal or archived is now cleaned up instead of retried every two seconds for a week; the leftover shim and the unreachable old wake-tracking code are gone; and the test whose assertion could not fail now checks the real thing. The specifications were updated alongside the code, and the full test suite, build, and race-detector runs are green.
+
+The fix did introduce one regression that should be corrected before moving on. The new "is this agent still eligible?" check is applied to every agent, but one of the conditions it checks — having taken part in a pipeline — was only ever meant to stop a *stopped* agent from being woken. The result is that an agent which is running normally, but has run a pipeline stage at some point in its life, now accepts mail (the sender succeeds, the unread badge updates) and is never prompted to read it. Because that pipeline record is never cleared, the agent is affected permanently. I confirmed it by running the same scenario against the code before and after the fix: before, the agent got its mail turn; after, it gets nothing.
+
+**Needs attention:** The pipeline eligibility check needs to apply only when the recipient is stopped. Everything else is ready to move on from.
+
+**Next:** Run `/fix` for that one finding, then this work is done.
+
 ### 2026-08-22 — Review: mail activation after its fixes
 
 The eight earlier fixes all hold. Batched mail produces exactly one model turn, an emptied mailbox retires the work without prompting, a failed status save stops the turn instead of hiding it, mail defers to a pipeline stage that is mid-launch, a failed setup after waking cleans up completely, shutdown no longer leaves a stray agent, and a failed startup repair stops the dashboard loudly. The full test suite, the specification check, and repeated race-detector runs over the messaging, wake, shutdown, and lifecycle paths are all green, so the architecture itself is in good shape.
