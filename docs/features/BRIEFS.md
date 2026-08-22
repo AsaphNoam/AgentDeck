@@ -4,6 +4,16 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-22 — Fix: all eight mail-activation review findings
+
+Every open finding from the two architectural reviews is fixed. Mail no longer starts an empty model turn when someone reads the mailbox just before the work is picked up, and mail can no longer steal the turn from a pipeline stage that is mid-launch. A failed status save now stops the model turn instead of running it invisibly while the dashboard shows the agent as idle. Setup that fails right after waking an agent now cleans up fully instead of leaving a live agent running with nothing to do, shutting down no longer leaves a stray agent process behind, and a failed startup repair now stops the dashboard loudly instead of quietly losing that mail for the rest of the session.
+
+The specifications were also brought back in line: they no longer describe the old unread-polling wake mechanism that was replaced, and the promised guarantees about mail producing exactly one turn are now actually proven by tests that count how many turns reach the model — across batched mail, an emptied mailbox, unread mail left behind, restarts, mail arriving mid-turn, and failed wakes. Four of the fixes have regression tests confirmed to fail against the old code.
+
+**Needs attention:** One lower-priority cleanup was found and deliberately left for a separate pass: the old wake-tracking code the replaced mechanism used is now unreachable but still present, and removing it touches the mailbox read path.
+
+**Next:** Someone should review this fix work; the reviewed-code marker still points at the commit before it.
+
 ### 2026-08-21 — Review: independent architectural re-review of mail activation
 
 Two fresh, independent reviews found that the change needs broader correction than the first pass showed. Seven issues must be fixed: the two previously identified ordering races, interference with pipeline lifecycle transitions, leaked runtimes after post-resume setup failure, a shutdown orphan race, stale specifications that still prescribe the retired nudger, and missing end-to-end evidence for the promised coalescing/restart/failure matrix. Startup recovery also has one lower-priority fail-open path that can strand claimed work. Focused and race tests pass, so these are uncovered concurrency, failure-injection, specification, and acceptance gaps rather than current red tests.
