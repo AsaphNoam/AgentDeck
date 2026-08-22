@@ -43,7 +43,15 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   agent. AgentDeck derives the caller and source identity from the live MCP session and resolves the
   friendly source selector to the exact R2 locator; the caller cannot name another agent's
   transcript or an unrelated pipeline attempt. Sharing returns both the canonical reference id and
-  the direct-grant id.
+  the direct-grant id. `current_turn` is an immutable snapshot through the share call: the intended
+  handoff sequence is to write the reasoning-relevant conclusion first, call `share_context` as the
+  last context-producing action, and then optionally send ordinary mail containing only the returned
+  reference id. Later assistant text is deliberately outside that reference. A pipeline report is
+  shareable only after `report_pipeline_stage_result` succeeds and before that same reporting turn
+  reaches `turn_end`; after pipeline reconciliation advances or completes the run, this selector is
+  unavailable. The narrow pipeline selector remains useful because accepted reports are already
+  concise, immutable, durable results and the same canonical report reference can later be attached
+  by the work-object feature without changing its identity.
 - **R5 (planned) — Direct authorization is separate and reusable.** Sharing creates or refreshes a
   direct grant from the caller to the recipient for the canonical reference. The grant owns its
   label, description, grantor, recipient, and lifecycle. The same reference may have independent
@@ -54,10 +62,10 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   entries. The list does not include future work attachments and is not where an agent is expected
   to infer which context belongs to its current assignment. A future work API returns the reference
   ids and attachment-specific presentation metadata for that work directly.
-- **R7 (planned) — Seen and hidden are personal control state.** Reading a directly granted
-  reference records that the recipient has seen that grant. The recipient may hide or unhide the
-  grant in its ad-hoc list. Seen/hidden state changes no reference, source, authorization, or future
-  work attachment; hiding is not revocation or deletion.
+- **R7 (planned) — Hidden is personal list state.** The recipient may hide or unhide a direct grant
+  in its ad-hoc list. Hidden state changes no reference, source, authorization, or future work
+  attachment; hiding is not revocation or deletion. This feature has no read/unread or seen state:
+  retrieval is not a control signal and no consumer needs such bookkeeping.
 - **R8 (planned) — Revocation is an authorization operation.** A grantor may revoke its own direct
   grant, after which that grant no longer authorizes the recipient or appears in its normal ad-hoc
   list. Revocation does not delete the canonical reference, another direct grant, or a future work
@@ -88,10 +96,10 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   locator; it has no read/unread, target, assignment, or activation state.
 - **Direct grant:** absent → active → revoked; sharing the same reference again by the same grantor
   to the same recipient returns it to active and replaces that grant's presentation metadata.
-- **Personal projection:** unseen/visible → seen/visible → seen/hidden, with unhide returning to
-  visible. Revocation makes the projection irrelevant without changing the reference.
+- **Personal projection:** visible ↔ hidden. Revocation makes the projection irrelevant without
+  changing the reference.
 - **Read:** reference id + effective authorization → bounded page → optional next cursor. Reading is
-  side-effect free except for marking an applicable direct grant seen.
+  side-effect free.
 - **Future work integration:** a work owner stores its own attachment from work id to reference id
   and returns it from that work's assignment/detail operation. Authorization follows the work
   owner's durable participant membership: terminal completion alone does not remove access;
@@ -109,14 +117,19 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   pipeline run/attempt is deleted after a reference was created, the reference remains identifiable
   but reads return a typed `context_source_unavailable` tombstone. AgentDeck neither remaps it to a
   newer source nor retains an implicit content snapshot. Archive is not deletion.
-- **R14 (planned) — Identity deletion has narrow effects.** Deleting a recipient removes its direct
-  grants and personal projections. Deleting a grantor does not delete already granted references or
-  erase their recorded provenance. Deleting or revoking one relationship cannot cascade into the
-  underlying transcript, pipeline run, agent, another grant, or future work attachment.
+- **R14 (planned) — Identity relationships have narrow durable effects.** The schema cascades a
+  recipient row deletion to its direct grants and personal preferences as defensive referential
+  hygiene, while retaining a grantor id as logical provenance without a foreign-key cascade.
+  AgentDeck adds no agent-deletion product operation in this feature. Deleting or revoking one
+  relationship cannot cascade into the underlying transcript, pipeline run, another grant, or
+  future work attachment.
 - **R15 (planned) — Invalid source selection is atomic.** An empty or reversed transcript range, a
   range outside the caller's durable transcript, a current turn with no persisted content, an
   unreported or unrelated pipeline attempt, an invalid recipient, or over-limit presentation
   metadata returns a typed error and creates or changes no reference, grant, or personal state.
+  A friendly selector that has no eligible source at share time returns `source_unavailable`;
+  `context_source_unavailable` is reserved for a previously created reference whose source later
+  became unreadable as described by R13.
 - **R16 (planned) — Mutable and opaque sources remain excluded.** Pipeline named values, tracked-file
   rows, archive search snippets, workspace files, project-resource files, arbitrary filesystem
   paths, URLs, uploaded blobs, authored summaries, and generic artifacts are not context-reference
@@ -138,31 +151,42 @@ All planned; each names the verification to be created with the implementation.
   reference id, while two direct grants retain independent labels without changing that id: planned
   state/service tests under `internal/state` and `internal/contextref`.
 - **A2 (planned)** (R2, R4–R5, R15) — Two token-bound fake-ACP agents share the caller's current-turn
-  and latest-completed-turn transcript spans; recipient grants are durable across server restart,
+  and latest-completed-turn transcript spans; the current-turn case includes conclusion text emitted
+  before the share call and excludes later text; recipient grants are durable across server restart,
   and attempts to name another source agent or unrelated pipeline attempt mutate nothing: planned
   MCP integration tests under `internal/messaging` and `internal/server`.
 - **A3 (planned)** (R2, R4–R5) — A pipeline agent with an accepted report shares a canonical attempt
-  report, while a current mutable named value and an unreported attempt are rejected: planned
-  `internal/contextref`/`internal/pipeline` integration tests.
-- **A4 (planned)** (R6–R8) — Direct-grant listing is caller-scoped and bounded; read marks the grant
-  seen, hide only removes it from the normal list, unhide restores it, grantor revocation removes
-  authorization, and re-share restores that grant without affecting another grant for the same
-  reference: planned MCP and state tests.
+  report inside the reporting turn, while a current mutable named value and an unreported attempt
+  are rejected; after `turn_end` and pipeline quiescence the same friendly selector returns
+  `source_unavailable` without mutation, while the already-created reference remains readable:
+  planned `internal/contextref`/`internal/pipeline` integration tests.
+- **A4 (planned)** (R6–R8) — Direct-grant listing is caller-scoped and bounded; hide only removes
+  a grant from the normal list, unhide restores it, reads create no personal-state
+  mutation, grantor revocation removes authorization, and re-share restores that grant without
+  affecting another grant for the same reference: planned MCP and state tests.
 - **A5 (planned)** (R9–R11) — Authorized transcript and pipeline reads return deterministic bounded
-  pages whose cursors traverse the fixed source; missing and unauthorized ids are indistinguishable,
-  no source content appears in logs/SSE, and mail budget state is unchanged: planned service,
-  protocol, and server-bus tests.
+  pages whose cursors traverse the fixed source; every current normalized event kind is rendered or
+  deliberately classified metadata-only, unknown kinds and skipped oversized records produce
+  bounded markers, missing and unauthorized ids are indistinguishable, no source content appears in
+  logs/SSE, and mail budget state is unchanged: planned service, protocol, and server-bus tests.
 - **A6 (planned)** (R10) — Sharing and listing context produce no provider prompt, activation,
   mailbox row, or normalized transcript event; only an explicit read returns content to the MCP
   caller: planned fake-ACP provider-prompt and persistence assertions.
-- **A7 (planned)** (R12–R14, R17) — Stop/resume and source archive retain reads; source deletion
-  yields a tombstone; recipient deletion removes only its direct grants; and sharing to a stopped
-  pipeline-associated chat agent succeeds without waking it, while an archived or terminal target
-  is rejected: planned lifecycle and deletion integration tests.
+- **A7 (planned)** (R12–R14, R17) — Stop/resume and source archive retain reads; reachable source
+  deletion yields a tombstone without cascading into other grants or sources; and sharing to a
+  stopped pipeline-associated chat agent succeeds without waking it, while an archived or terminal
+  target is rejected: planned lifecycle and deletion integration tests plus state-level foreign-key
+  coverage for the defensive recipient cascade.
 
 ## 6. Deviations & open decisions
 
 - Nothing is shipped; there are no deviations.
+- **Direct grants deliberately have no owner UI or automatic expiry.** A direct grant remains active
+  until its grantor revokes it or its recipient identity is removed. This accepts the narrow risk of
+  long-lived agent access to accidentally sensitive transcript content in the current local,
+  single-user product rather than adding a management surface or a timer that can silently break
+  delayed work. Source content is still never copied into the grant or exposed without an explicit
+  authorized read. Revisit this policy only with evidence that the edge case matters in practice.
 - Work objects, dependency evaluation, task reassignment, host-managed waiting, and semantic
   assignment APIs are deliberately excluded. Their approved integration rule is recorded in §3 so
   those features attach reusable references and expose them through the owning work object rather

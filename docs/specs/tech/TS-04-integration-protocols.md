@@ -259,26 +259,37 @@ caller and launch generation come from the existing token session:
   `source:"current_turn"`, `source:"latest_completed_turn"`, or
   `source:"current_pipeline_report"`. For `current_turn`, the context service snapshots the caller's
   complete normalized turn events after the previous `turn_end` through the highest complete
-  transcript sequence visible at the call. `latest_completed_turn` resolves the exact range ending
-  at the most recent `turn_end`. Session metadata and switch markers before the chosen turn are not
-  included. For `current_pipeline_report`, the service joins the caller plus token generation to the
-  current pipeline attempt and requires its immutable report to be accepted. Each selector is
+  transcript sequence visible at the call. The caller emits its reasoning-relevant conclusion
+  before this call; content emitted later is outside the immutable span. `latest_completed_turn`
+  resolves the exact range ending at the most recent `turn_end` and is available only during a later
+  turn started for some independent reason—context sharing does not create that turn. Session
+  metadata and switch markers before the chosen turn are not included. For
+  `current_pipeline_report`, the service joins the caller plus token generation to the current
+  pipeline attempt and requires its immutable report to be accepted. The call must occur after
+  `report_pipeline_stage_result` succeeds but before the reporting turn's `turn_end`; once pipeline
+  reconciliation advances or completes the run, this friendly selector returns
+  `source_unavailable` and creates nothing. Each selector is
   canonicalized to an exact R2 locator before the transaction creates a grant. `to` uses TS-01.R22's
   context-specific durable chat-agent directory, not mail addressability; success creates only the
   reference/direct grant and emits no message-insert signal or wake. The result returns
   `context_ref_id`, `grant_id`, and the resolved source descriptor.
 - `list_context_links(include_hidden?, limit?, cursor?)` returns only active direct grants to the
   caller, newest first. Each item contains bounded grant presentation/provenance and intrinsic source
-  metadata; it contains no source body and no future work attachment. Default limit is 20 and the
-  accepted range is 1..50.
+  metadata plus its personal hidden state; it contains no source body and no future work attachment.
+  Hidden grants are excluded unless `include_hidden` is true. Default limit is 20 and the accepted
+  range is 1..50.
 - `read_context_link(context_ref_id, cursor?)` rechecks the token-derived caller's effective
   authorization on every page and returns at most 32 KiB of deterministic UTF-8 text, the intrinsic
   source descriptor, `complete`, and an opaque `next_cursor` when content remains. Transcript
-  rendering folds assistant deltas and represents normalized prompts, tool activity/results, diffs,
-  errors, annotations, and turn boundaries as bounded plain text; pipeline rendering includes only
-  the accepted outcome, summary, details, checks, and declared outputs. A single oversized field is
-  chunked through the same cursor rather than copied whole or silently omitted. Reading through one
-  or more active direct grants marks those caller/ref grants seen after the page is produced.
+  rendering consumes TS-01.R22's shared semantic event projection, folds assistant deltas, and
+  represents normalized prompts, tool activity/results, diffs, errors, annotations, and turn
+  boundaries as bounded plain text; an unknown normalized event gets an explicit bounded marker.
+  Pipeline rendering includes only the accepted outcome, summary, details, checks, and declared
+  outputs. A field returned by the transcript/report authority is chunked through the same cursor
+  rather than copied whole or silently omitted. If the tolerant transcript reader skips a physical
+  record above its 8 MiB safety limit, its new diagnostic becomes a bounded
+  `[AgentDeck omitted an oversized transcript record]` marker at that stream position. Reading has
+  no personal-state side effect.
 - `set_context_link_visibility(grant_id, hidden)` lets only the grant recipient hide or unhide its
   personal direct-share projection. It changes no grant authorization.
 - `revoke_context_grant(grant_id)` lets only that grant's grantor revoke it. It changes no reference,
@@ -287,9 +298,12 @@ caller and launch generation come from the existing token session:
 All tools return bounded structured JSON using stable outcomes including `context_not_found`,
 `context_source_unavailable`, `source_unavailable`, `recipient_not_found`,
 `ambiguous_recipient`, `invalid_cursor`, and `validation`; unauthorized and unknown reference/grant
-reads both use `context_not_found`. Label is capped at 200 runes, description at 1,000 runes, and
-cursor/list/page bounds live in one context limits module shared by MCP, service, rendering, and
-tests. These calls do not consume the FS-06 mail budget.
+reads both use `context_not_found`. `source_unavailable` means a share-time friendly selector has no
+eligible current source and no row was created; `context_source_unavailable` means an authorized,
+already-canonical reference now points to a deleted or unreadable source tombstone. Label is capped
+at 200 runes, description at 1,000 runes, and cursor/list/page bounds live in one context limits
+module shared by MCP, service, rendering, and tests. These calls do not consume the FS-06 mail
+budget.
 
 The initial implementation does not register MCP resources/templates or return ACP
 `Resource`/`ResourceLink` prompt blocks. The pinned adapters lower ACP resource blocks into
@@ -390,7 +404,8 @@ global resource list.
 - Hooks: `internal/hooks`, `internal/server/hook.go`, registration in `launch.go`.
 - MCP: `internal/messaging/messaging.go`, `tools.go`, `internal/server/messaging_registration.go`.
 - Context tools (R28, planned): registration/handlers in `internal/messaging`, the shared service in
-  `internal/contextref`, and token-bound fake-ACP coverage named by FS-15.A2–A7.
+  `internal/contextref`, the `internal/transcript` event projection/skipped-record diagnostic, and
+  token-bound fake-ACP coverage named by FS-15.A2–A7.
 - Terminal: `internal/runtime/terminal`, `internal/server/terminal.go`.
 - Regression anchors: `TestLaunchPromptPermissionFlow`, `TestTakePendingSingleWinner`,
   `TestCrashTearsDownAgentRegistration`, `TestLaunchArgvHonorsComposedSpec`,

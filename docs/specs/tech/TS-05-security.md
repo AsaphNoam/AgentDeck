@@ -85,8 +85,8 @@ and cancellation/failure responses disclose neither a selected path nor script d
 operation first resolves the existing per-launch token to caller plus generation. Source creation
 accepts only server-derived ownership selectors; no tool argument may name another agent's
 transcript, another generation's attempt, a filesystem path, URL, SQLite key, or arbitrary source
-payload. Direct grant listing and personal-state mutation are recipient-scoped, grant revocation is
-grantor-scoped, and reading re-evaluates an effective authorization path for every page. Unknown and
+payload. Direct grant listing and personal-visibility mutation are recipient-scoped, grant
+revocation is grantor-scoped, and reading re-evaluates an effective authorization path for every page. Unknown and
 unauthorized reference/grant ids intentionally return the same `context_not_found` result so ids do
 not enumerate another agent's context metadata.
 
@@ -99,6 +99,12 @@ authority and are validated against the separately supplied reference after auth
 or replayed cursors fail without source disclosure. Negative tests cover token spoofing, source-id
 spoofing, cross-agent list/read/hide/revoke attempts, missing-vs-unauthorized equivalence, and
 content-free logs/events (R11, INV §8/§11/§12/§13).
+
+FS-15 §6 deliberately accepts durable direct grants without an owner-management surface or automatic
+expiry in the current local, single-user product. Grantor revocation and recipient deletion remain
+the only revocation transitions. This avoids additional management and timer wiring; the policy must
+be reconsidered if AgentDeck gains a multi-user trust boundary or evidence shows accidental
+sensitive-context sharing is a practical problem.
 
 ## 3. Interfaces & data shapes
 

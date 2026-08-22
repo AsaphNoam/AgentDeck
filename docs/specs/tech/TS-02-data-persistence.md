@@ -228,7 +228,7 @@ marked `delivered_via = 'pending'`, coalescing all such rows. Legacy `nudge`, `p
 the old attempt boundary; reactivating them on upgrade would duplicate work. Message read/hard
 retention and turn-budget rows remain unchanged.
 
-**R24 `(planned)` — Context references, direct grants, and personal projection
+**R24 `(planned)` — Context references, direct grants, and personal preferences
 have separate durable rows.** One forward-only migration adds the logical shape below (the
 executable migration may use equivalent check constraints and indexes):
 
@@ -264,9 +264,8 @@ CREATE TABLE context_grants (
 CREATE INDEX idx_context_grants_recipient
   ON context_grants(granted_to_agent_id, revoked_at, updated_at DESC, grant_id);
 
-CREATE TABLE context_grant_views (
+CREATE TABLE context_grant_preferences (
   grant_id    TEXT PRIMARY KEY REFERENCES context_grants(grant_id) ON DELETE CASCADE,
-  seen_at     TEXT,
   hidden_at   TEXT
 );
 ```
@@ -278,13 +277,16 @@ concurrency guard that canonicalization returns one reference for one locator; l
 grant, target, personal state, and creator are deliberately absent from that key. Reference rows
 contain no copied transcript/report content and have no foreign key to source agents, sessions,
 pipeline runs, or attempts, so deletion leaves an honest tombstone rather than cascading or aliasing
-the id. They have no user delete or retention path in this feature.
+the id. References and grants have no owner-management or automatic-retention path in this feature;
+an active direct grant persists until grantor revocation or the defensive recipient cascade. This is
+the deliberate FS-15 §6 lifecycle policy, not missing janitor wiring.
 
 One active-or-revoked grant row exists per reference/grantor/recipient triple. Sharing that triple
-again updates its presentation, clears `revoked_at`, and clears the recipient's hidden projection in
-one transaction rather than adding duplicate list entries; it does not clear `seen_at`. Grantor ids
-are retained logical provenance without a foreign key. Recipient deletion cascades only its grants
-and views. Revocation changes only the grant row; hiding/seeing changes only the view row. Every
+again updates its presentation, clears `revoked_at`, and clears the recipient's hidden preference in
+one transaction rather than adding duplicate list entries. Grantor ids are retained logical
+provenance without a foreign key. A recipient-row deletion defensively cascades only its grants and
+preferences; this feature adds no agent-deletion product operation. Revocation changes only the
+grant row; hiding changes only the preference row. Every
 mutation matches the caller-derived grantor/recipient identity as applicable, and multi-row
 canonicalize-plus-grant operations are atomic (INV §5/§15). No backfill is needed.
 
@@ -353,7 +355,7 @@ R1–R24 and must be reflected here when its contract changes.
 - Index/archive: `internal/index/indexer.go`, `reindex.go`, `internal/archive/archive.go`.
 - Context reference persistence (R24, planned): forward-only tables and typed state methods in
   `internal/state`, consumed through `internal/contextref`; canonicalization, cascade, tombstone,
-  grant, and personal-projection regressions named by FS-15.A1–A5/A7.
+  grant, and personal-preference regressions named by FS-15.A1–A5/A7.
 - Regression anchors: `TestHomeTreeIsOwnerOnly`, `TestStateDBIsOwnerOnly`,
   `TestTranscriptIsOwnerOnly`, `TestReindexPreservesFinalPartialTurn`,
   `TestEmptyArchiveMarshalsResultsArray`, `TestSearchFallbackFiltersMetadata`,

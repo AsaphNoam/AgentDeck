@@ -3678,3 +3678,74 @@ down why.
 
 **Next:** Run `/design-feature Pull-based context links` to work the findings through with me;
 implementation should not start until the two blockers are closed.
+
+### 2026-08-22 — Design revision: pull-based context links
+
+Seven findings are resolved; one product/privacy decision remains. The change is paused, not ready
+for implementation.
+
+- **Duplicate transcript projection — adopted.** Search and context rendering will share one Go
+  semantic event projection in `internal/transcript`, backed by an exhaustive normalized-event
+  registry/test. Context adds readable framing; search builds its search text from the same decoded
+  parts. The TypeScript chat reducer stays separate because it produces UI objects in another
+  language, while its live and replay paths already share one reducer.
+- **Pipeline-report reachability — adopted, source retained.** The contract now says the only direct
+  selector window is `report_pipeline_stage_result` → `share_context` → `turn_end`. After pipeline
+  reconciliation, selection returns `source_unavailable`; an already-created reference stays
+  readable. Keeping the source is worthwhile because accepted reports are compact immutable results
+  and the imminent work-object feature can attach the same canonical reference.
+- **Seen/hidden projection — partially adopted.** Unused `seen_at` and read-side mutations are gone.
+  Hide/unhide remains because `list_context_links` directly consumes it and it implements the
+  approved rule that hiding an ad-hoc entry does not revoke access or detach work context.
+- **Agent deletion journey — adopted.** No agent-deletion product behavior is invented. The design
+  retains only defensive recipient foreign-key cleanup and grantor provenance; acceptance tests the
+  cascade at state level. Reachable pipeline-source deletion still produces a tombstone.
+- **Owner control/retention — valid, unresolved.** The specs and change file now expose this as a
+  blocking product choice rather than silently accepting indefinite invisible access.
+- **Oversized transcript records — adopted.** Existing tolerant readers may keep skipping records
+  above 8 MiB, but they expose an opt-in diagnostic; context reads must render a bounded omission
+  marker instead of silently returning an apparently complete transcript.
+- **Two unavailable errors — adopted.** `source_unavailable` is a share-time selector failure that
+  creates nothing. `context_source_unavailable` is an authorized existing reference whose durable
+  source was later deleted or became unreadable.
+- **Current-turn conclusion — adopted.** The documented handoff is: emit the reasoning-relevant
+  conclusion, call `share_context` as the final context-producing action, then optionally send mail
+  containing only the reference id. Tests include pre-share text and exclude later text.
+
+The review's non-findings remain unchanged: context correctly uses a separate durable recipient
+directory rather than mail wakeability; per-page transcript rescanning is an optimization to revisit
+with evidence; MCP resources remain behind a real-provider capability gate; and SQLite foreign-key
+cascades are already enabled.
+
+My recommendation for the remaining choice is **A: a minimal owner-only list and revoke surface**.
+It preserves durable context for delayed review and reassignment while giving the human an escape
+hatch for accidental secret sharing. A retention limit is operationally simpler but can silently
+break legitimate long-lived work; permanent agent-only grants are the smallest implementation but
+leave the privacy issue intact.
+
+`make check-specs` and `git diff --check` pass. No product code changed.
+
+**Needs attention:** Choose A (owner list+revoke), B (retention limit), or C (explicitly accepted
+indefinite agent-only grants).
+
+**Next:** Once chosen, I’ll close the final finding and return the change to Waiting to start.
+
+### 2026-08-22 — Pull-based context-link lifecycle decision
+
+Resolved with the simplest policy: no owner-management UI and no automatic expiry wiring. A direct
+grant remains active until its grantor revokes it or the recipient identity is removed. This adds no
+new user workflow and cannot make valid delayed work unexpectedly lose context.
+
+FS-15, TS-02, and TS-05 now record this as an intentional tradeoff for AgentDeck’s current local,
+single-user trust model, not an unresolved omission. They also say to revisit it only if AgentDeck
+gains a multi-user trust boundary or real evidence shows accidental sensitive-context sharing is a
+practical problem.
+
+The final design-review finding is closed, the temporary idea entry is removed, and the pull-based
+context-links change is back to **Waiting to start** with nothing blocking implementation.
+
+`make check-specs` and `git diff --check` pass. No product code changed.
+
+**Needs attention:** None.
+
+**Next:** The reviewed change is ready for `/work pull-based-context-links`.

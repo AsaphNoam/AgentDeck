@@ -240,14 +240,32 @@ as a user-authored AgentDeck transcript event.
 
 **R22 `(planned)` — Context references are one in-process context-plane
 service.** `internal/contextref` owns canonicalization of typed immutable source locators, source
-validation, deterministic bounded rendering, direct-grant authorization, and personal direct-share
-projection. It delegates durable rows to `internal/state`, transcript reads to
-`internal/transcript`, pipeline-attempt reads to the existing pipeline/state authority, recipient
-resolution to one context-specific durable chat-agent directory, and agent-facing transport to
+validation, bounded source composition, direct-grant authorization, and personal direct-share
+projection. It delegates durable rows to `internal/state`, transcript reads and normalized-event
+projection to `internal/transcript`, pipeline-attempt reads to the existing pipeline/state
+authority, recipient resolution to one context-specific durable chat-agent directory, and agent-facing transport to
 `internal/messaging`. It stores no copied source payload and calls no runtime prompt, activation,
 mail, lifecycle, SSE, or local HTTP path. The server constructs one service and supplies it to the
 existing MCP server; there is no context daemon, second database writer, generic artifact store,
 provider-specific reader, or workflow engine.
+
+`internal/transcript.ProjectEvent` is the one Go seam that decodes a `runtime.Event` into typed,
+presentation-neutral text parts and an explicit disposition. The existing indexer derives its
+search bag from that projection, while the context renderer adds readable role/type framing and
+folds adjacent assistant deltas from the same projection; neither owns another event-type switch.
+`runtime.AllEventTypes` is the closed registry used by a table-driven projection test, so every
+current normalized `runtime.Ev*` is classified as rendered or deliberately metadata-only and an
+unknown type produces an explicit bounded marker rather than disappearing. The browser keeps its
+separate UI-object projection because it is a different-language presentation artifact, but its
+live and replay paths continue to share the existing `appendRenderedEvent` reducer. This is the
+cross-consumer boundary required by INV §2, not an attempt to make search text, pull-context prose,
+and chat bubbles identical.
+
+The transcript reader also exposes an additive skipped-record diagnostic to the context path while
+preserving the existing tolerant reader behavior for current callers. If a physical NDJSON record
+exceeds the reader's 8 MiB safety limit inside the selected turn/span, context composition emits one
+bounded omission marker at that record's stream position and continues; it never returns a clean
+page that silently implies the oversized record was rendered.
 
 The context recipient directory reuses the shared address-matching helper but not FS-06's
 mail-addressable/wake-candidate query: it contains non-archived durable chat identities whether
@@ -257,7 +275,7 @@ mail retry/lifecycle policy by accident (INV §2/§5).
 
 **R23 `(planned)` — Reference, authorization, attachment, and personal state
 remain separate.** A canonical reference is keyed only by its immutable source locator. Direct
-grants authorize an agent and own grant-specific presentation; personal seen/hidden projection
+grants authorize an agent and own grant-specific presentation; personal hidden/visible preference
 affects only the recipient's ad-hoc list. A future work domain owns its own attachment and durable
 participant membership and presents attached reference ids through that work's API. It may ask the
 context service to validate/read a reference for a participant, but it must not encode work ids,
@@ -345,7 +363,8 @@ lost.
 - Activation plane (R18–R21): `internal/state/activations.go`, the server activation executor,
   runtime turn-start arbitration, and mail/wake integration tests.
 - Context plane (R22–R23, planned): `internal/contextref`, durable rows in `internal/state`, the
-  existing `internal/messaging` authority, and separation coverage named by FS-15.A1/A6.
+  shared `internal/transcript.ProjectEvent` seam plus skipped-record diagnostics, the existing
+  `internal/messaging` authority, and separation/coverage named by FS-15.A1/A5/A6.
 - Archive transition gate: `internal/server/archive_gate.go`, `archive_actions.go`, and
   `archive_gate_test.go` (project reservation and agent/project transition barriers).
 - Model catalog autosync: `internal/config/{codexmodels,claudemodels,modelautosync}.go`,
