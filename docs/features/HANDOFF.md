@@ -185,7 +185,7 @@ Implementing FS-15 and TS-01.R22–R23, TS-02.R24, TS-04.R28, TS-05.R16 in order
    (TS-04.R28, TS-05.R16, FS-15.R4–R8, R10, R17);
 5. acceptance coverage A1–A7 and the specification status flip.
 
-**Next step:** piece 4 — the five MCP tools and server wiring.
+**Next step:** piece 5 — fake-ACP provider-prompt coverage and the specification status flip.
 
 ## Decisions needing your input
 

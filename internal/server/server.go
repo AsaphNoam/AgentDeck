@@ -13,6 +13,7 @@ import (
 	"github.com/agentdeck/agentdeck/internal/bus"
 	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/configsource"
+	"github.com/agentdeck/agentdeck/internal/contextref"
 	"github.com/agentdeck/agentdeck/internal/hooks"
 	persistindex "github.com/agentdeck/agentdeck/internal/index"
 	"github.com/agentdeck/agentdeck/internal/messaging"
@@ -235,6 +236,11 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	// addressable set, which adds the stopped chat agents a message can wake
 	// (FS-06.R22) to the running registry.
 	msg.SetAddressableAgents(s.addressableAgents)
+	// Context links are their own plane: one in-process service over the same
+	// state store and transcript home, supplied to the existing MCP server. It
+	// gets no runtime, bus, or lifecycle handle, so no context operation can
+	// start a model turn (TS-01.R22, FS-15.R10).
+	msg.SetContextService(contextref.New(stateStore, cfgStore.Home()))
 	if registry != nil {
 		registry.SetEventSink(func(ev runtime.Event) {
 			eventBus.PublishRuntimeEvent(ev)

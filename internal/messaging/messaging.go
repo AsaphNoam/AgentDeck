@@ -16,6 +16,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/agentdeck/agentdeck/internal/contextref"
 	"github.com/agentdeck/agentdeck/internal/pipeline"
 	"github.com/agentdeck/agentdeck/internal/state"
 	"github.com/agentdeck/agentdeck/internal/version"
@@ -37,6 +38,7 @@ type Server struct {
 	onMessagesRead    func(agentID string)
 	addressable       func() ([]state.LiveAgent, error)
 	pipelines         *pipeline.Manager
+	context           *contextref.Service
 
 	mcp     *mcp.Server
 	handler http.Handler
@@ -166,6 +168,26 @@ func New(store *state.Store, log *slog.Logger) *Server {
 		Name:        "propose_pipeline_run",
 		Description: "Validate and propose an exact saved-template run configuration for human approval; this never starts it.",
 	}, s.handleProposePipelineRun)
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "share_context",
+		Description: "Give another chat agent access to context you own — your current turn so far, your latest completed turn, or your accepted pipeline report — without copying it. Returns a reusable context_ref_id; the recipient reads it explicitly and is not woken.",
+	}, s.handleShareContext)
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "list_context_links",
+		Description: "List context other agents shared directly with you, newest first. Returns labels and source metadata only, never the content.",
+	}, s.handleListContextLinks)
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "read_context_link",
+		Description: "Read one bounded page of a context reference you are authorized for; pass the returned cursor to continue.",
+	}, s.handleReadContextLink)
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "set_context_link_visibility",
+		Description: "Hide or unhide one of your shared-context entries. This is your own list state; it revokes nothing.",
+	}, s.handleSetContextLinkVisibility)
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "revoke_context_grant",
+		Description: "Withdraw a context share you granted. The reference and any other grant are unaffected.",
+	}, s.handleRevokeContextGrant)
 
 	// getServer resolves the per-request server. Reading the token header here
 	// proves the per-agent session binding arrives over the transport (§3.1);
