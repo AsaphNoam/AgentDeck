@@ -16,6 +16,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"os"
 	"strconv"
@@ -136,6 +137,15 @@ func handle(msg *rpcMessage) {
 		id := *msg.ID
 		if dump := os.Getenv("FAKEACP_PROMPT_DUMP"); dump != "" {
 			_ = os.WriteFile(dump, msg.Params, 0o600)
+		}
+		// FAKEACP_PROMPT_LOG appends one line per prompt so a test can count how
+		// many provider turns actually crossed the wire, which FAKEACP_PROMPT_DUMP
+		// cannot show because it overwrites.
+		if logPath := os.Getenv("FAKEACP_PROMPT_LOG"); logPath != "" {
+			if f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600); err == nil {
+				_, _ = f.Write(append(bytes.ReplaceAll(msg.Params, []byte("\n"), []byte(" ")), '\n'))
+				_ = f.Close()
+			}
 		}
 		// Run the scenario asynchronously so the read loop keeps handling the
 		// client's permission reply / cancel while the scenario blocks.

@@ -7,14 +7,27 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** Explicit mail activation is complete. New mail atomically creates one payload-free,
-  mail-scoped activation while pending; the executor claims it durably, uses the shared lifecycle
-  and runtime turn gates, and sends the one provider instruction only after the non-replayable
-  attempt boundary. Mail remains pull-based through `check_messages`, and a later insert after a
-  claim creates the next activation. Startup recovers only pre-attempt claims and discards attempted
-  rows, so restart, failure, unread state, and polling cannot replay a model turn. The intended
-  three-plane boundary is now shipped; context links, dependency-aware agents, and a semantic
-  orchestration API remain separate ideas.
+- **State:** All seven Must-fix and the one Worth-fixing mail-activation findings are fixed.
+  Availability and the claim are now one decision, so a mailbox drained before a pending opportunity
+  is claimed retires it instead of prompting an empty turn. `StartActivation` commits the busy turn
+  status before the provider frame and surfaces a failed write with the turn gate released, keeping
+  mail's already-attempted no-replay outcome. The executor defers while an exclusive lifecycle
+  transition owns the agent, so a pipeline stage's first assignment can no longer lose the turn gate
+  to mail. A failed post-resume activation hook routes through the shared claimed stop-and-teardown
+  instead of leaving a live agent behind. Shutdown quiesces lifecycle claims before snapshotting the
+  registry, closing the detached-resume orphan window. Startup fails loudly when activation recovery
+  fails rather than stranding claimed rows. The Current specs no longer prescribe the removed
+  nudger, and FS-06.A13-A15 are now backed by fake-ACP provider-prompt counts across coalescing,
+  drain, unread completion, restart, mid-flight insertion, lifecycle loss, and stopped-agent failure.
+  One new **Worth fixing** finding is open: the superseded wake-claim state API in
+  `internal/state/messages.go` is now unreachable dead code.
+- **Previous state:** Explicit mail activation shipped. New mail atomically creates one payload-free,
+  mail-scoped activation while pending; the executor claims it durably, uses the shared lifecycle and
+  runtime turn gates, and sends the one provider instruction only after the non-replayable attempt
+  boundary. Mail remains pull-based through `check_messages`. Startup recovers only pre-attempt
+  claims and discards attempted rows, so restart, failure, unread state, and polling cannot replay a
+  model turn. Context links, dependency-aware agents, and a semantic orchestration API remain
+  separate ideas.
 - **Previous state:** The one open browser-draft finding is fixed. A delayed prompt send now scopes its
   completion to the draft generation it submitted — `drafts.ts` keeps a per-agent revision that
   every mutation bumps, and `Composer.submit` captures it before sending. A newer same-agent draft
@@ -139,8 +152,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   pass was run. A stale migration-version guard test (asserting 13 against the shipped 14) was already
   failing on `main` and now derives its expectation from the migrations slice (INV §9).
 - **Last reviewed code:** `2310206` (2026-08-21), the continuous range after `604866f` covering
-  the intervening reviewed fixes/design work and explicit mail activation. Two activation findings
-  are open.
+  the intervening reviewed fixes/design work and explicit mail activation. The fix work after it is
+  unreviewed.
 - **Branch:** `main`.
 
 ## Active change
@@ -181,61 +194,17 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ### Open findings
 
-- **Must fix** — **INV §5/§15:** `internal/server/messaging_loops.go:60-71` checks for unread mail and
-  claims the pending activation in separate database operations. A concurrent `check_messages` or
-  manual mailbox read can drain the last unread row after the check but before the claim; the claim
-  then crosses the non-replayable attempt boundary and sends an empty provider turn. This violates
-  FS-06.R25's requirement to retire an opportunity drained before it is attempted. Move the unread
-  test and claim/retire decision into one state transaction, and add a deterministic interleaving
-  regression proving a read immediately before claim produces no `session/prompt`.
-- **Must fix** — **INV §1/§15:** `internal/runtime/chat.go:723-735` ignores `writeStatus` failure after
-  recording the durable activation attempt and still writes the provider prompt. Under a normal
-  state-store write failure, durable/UI state may remain `idle` while the provider is executing the
-  mail turn, contrary to TS-01.R21's requirement that ordinary status state commit before the
-  external effect. Return the status error, release the in-memory turn gate while retaining mail's
-  already-attempted no-replay outcome, and add a runtime regression that injects the status-write
-  failure and asserts no provider frame is sent.
-- **Must fix** — **INV §5/§15:** `internal/server/messaging_loops.go:79-112` starts a running-agent
-  activation without respecting the exclusive lifecycle claim. During pipeline launch/continue,
-  the runtime can already be idle and registered while the claim still protects its first durable
-  assignment; mail can win the runtime turn gate, consume the activation, and make the assignment
-  fail with `ErrTurnInFlight`, pausing or stopping the stage. Defer a running activation while
-  `lifecycleInFlight(agent_id)` is true, and add a deterministic pipeline initial-prompt race proving
-  the activation stays pending and emits no provider prompt.
-- **Must fix** — **INV §4/§15:** `internal/server/resume.go:255-265` returns directly when the new
-  post-resume activation hook fails, after `Registry.Resume` has created the process, running row,
-  hook token, MCP registration, and settings file. A `StartAttemptedMailTurn` failure therefore
-  leaves a newly running agent with unread mail but no activation turn, while the already-attempted
-  activation is retired. Route this failure through generation-scoped stop and the shared teardown,
-  and inject the post-resume budget/status failure to prove no process or registration artifact
-  remains.
-- **Must fix** — **INV §4/§9/§15:** a stopped activation resumes in a detached executor goroutine,
-  while server shutdown snapshots the registry without waiting for lifecycle claims/executor work
-  (`internal/server/server.go:328-343`, `internal/runtime/chat.go:667-687`). If shutdown lands after
-  the resumed running/status rows are written but before `ChatRuntime.Resume` inserts the runtime
-  into `c.agents`, `Registry.Shutdown` misses it and the resume can register a live orphan after the
-  registry was cleared. Coordinate shutdown with in-flight activation/lifecycle work and add a
-  blocked post-status resume test asserting no process, running row, or registration survives.
-- **Must fix** — **INV §10:** the Current specifications still prescribe the removed mechanism.
-  TS-04.R26 retains unread/cooldown nudging and `delivered_via` wake claims while R27 only says that
-  part is replaced; FS-00 still labels the old Nudger current; FS-07 and FS-06 acceptance/decision
-  text still cite nudging and the retired requirements; and `internal/messaging/constants.go` keeps
-  unused cooldown/in-flight constants. Explicitly supersede the obsolete portion of TS-04.R26 while
-  retaining its addressable-set contract, update the glossary and terminal/coordination wording,
-  and remove the dead constants/comments.
-- **Must fix** — **INV §10:** the new tests do not establish the Current FS-06.A13-A15 acceptance
-  matrix. State coverage proves coalesced rows, one running test captures one prompt, and the stopped
-  test waits for activation retirement without counting provider turns. There is no deterministic
-  proof that several pre-claim messages produce exactly one prompt; unread completion plus repeated
-  sweep/idle/restart cannot replay it; a mid-flight insert produces exactly one later prompt; or
-  lifecycle loss/provider failure/restart preserve the stated stopped-agent outcomes. Add fake-ACP
-  prompt-count and restart coverage for every named A13-A15 branch before treating the requirements
-  as verified.
-- **Worth fixing** — **INV §9/§15:** `internal/server/messaging_loops.go:12-16` logs and ignores a
-  `RecoverMailActivations` failure, then starts an executor that only lists `pending` rows. A claimed
-  pre-attempt row is therefore invisible for the life of that server after a recoverable startup
-  storage failure. Fail startup or retry recovery before normal execution, with an injected recovery
-  failure proving claimed work is not silently stranded.
+- **Worth fixing** — **INV §10:** the removed nudger mechanism left an unreachable state-layer API
+  behind. `internal/state/messages.go` still defines `PendingWakeMailAgents`, `ClaimPendingWakeMail`,
+  `SetDeliveredVia`, `MarkUnreadDeliveredVia`, and the `nudge`/`wake_attempted`/`wake_failed`
+  `delivered_via` values, and the read-marking `CASE` at `messages.go:437` still restamps
+  `wake_attempted`. Nothing outside `internal/state/messages_test.go` calls any of it — the wake
+  claim protocol it implements was superseded by explicit mail activation, and TS-04.R26 no longer
+  describes it. Discovered while fixing the TS-04.R26 supersession; not fixed in the same change
+  because it deletes a state API plus `TestPendingWakeMailAgents` and touches the live
+  `check_messages` read path. Confirm the tree-wide call-site check (INV §10), then remove the dead
+  helpers and constants and simplify the read-marking `CASE`, keeping `delivered_via` itself as the
+  provenance column FS-06.R23 retains.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
@@ -243,10 +212,42 @@ are not promoted to findings without a repeatable failure. Also considered and n
 `isPickerCancel`'s unanchored `-128` substring and `verifyPickedDirectory` skipping `filepath.Clean`
 (both speculative — `POSIX path of (choose folder)` returns a clean absolute path and a real cancel
 always emits `(-128)`), and `wakeForMail` treating a gate-excluded recheck as success (the realistic
-recheck-fail cause is a concurrent resume, whose running-path nudge then delivers the `wake_attempted`
-rows honestly).
+recheck-fail cause is a concurrent resume, which leaves the mail durable and unread for the next
+opportunity).
 
 ## Recent changelog
+
+- 2026-08-22 — review fix: all eight open mail-activation findings closed. **INV §5/§15** — the
+  unread test and the claim/retire decision became one atomic `ClaimMailActivation` predicate, so a
+  drain between them can no longer cross the attempt boundary into an empty provider turn
+  (FS-06.R25). **INV §1/§15** — `ChatRuntime.StartActivation` now returns the `writeStatus` failure
+  with the in-memory turn gate released instead of prompting the model behind an `idle` record
+  (TS-01.R21). **INV §5/§15** — the executor defers while `lifecycleInFlight(agent_id)` is true, so a
+  pipeline stage's first durable assignment cannot lose the runtime turn gate to mail (TS-01.R21,
+  FS-06.R10). **INV §4/§15** — a failed post-resume activation hook routes through
+  `stopAgentClaimed`, the one shared stop-and-teardown, rather than returning past a live process and
+  its registration artifacts (TS-01.R16). **INV §4/§9/§15** — shutdown calls `quiesceLifecycle`
+  before `Registry.Shutdown`: it closes the claim gate and waits out in-flight transitions, so a
+  detached activation resume cannot register a live orphan into a cleared registry (TS-01.R16/R21).
+  **INV §9/§15** — `startMessagingLoops` now fails startup when `RecoverMailActivations` fails
+  instead of stranding claimed pre-attempt rows for the life of the process (TS-01.R20). **INV §10**
+  — TS-04.R26's cooldown/in-flight and `delivered_via` wake-claim half is explicitly superseded
+  (its addressable-set contract retained), R27 reads as shipped fact, FS-00's glossary names the
+  activation executor, FS-07's terminal wording is mechanism-neutral, FS-06's §2.3 heading, R10,
+  A11-A15 and traceability match shipped behavior, and the unused `NudgeCooldown`/
+  `NudgeInFlightTimeout` constants are gone. **INV §10** — FS-06.A13-A15 gained the missing
+  acceptance evidence: `internal/server/activation_test.go` counts fake-ACP provider prompts across
+  coalescing, drain-before-claim, unread completion, repeated sweeps, restart, mid-flight insertion,
+  lifecycle-claim loss, post-resume failure, shutdown, and stopped-agent launch failure, using a new
+  `FAKEACP_PROMPT_LOG` append log because `FAKEACP_PROMPT_DUMP` overwrites and cannot count.
+  Regressions confirmed red against the pre-fix code: `TestClaimMailActivationRetiresDrainedMailbox`,
+  `TestStartActivationStatusWriteFailureSendsNoPrompt`,
+  `TestMailActivationDefersWhileLifecycleClaimIsHeld`, and
+  `TestPostResumeActivationFailureLeavesNoRegistration`; the shutdown and startup-recovery tests
+  exercise APIs that did not exist before the fix. `make check-specs`, both Go test variants,
+  focused `-race` on the activation/lifecycle paths, and `make build` pass. No UI change, so no
+  npm run or `make dist`. One new **Worth fixing** finding was recorded rather than fixed here: the
+  superseded wake-claim helpers in `internal/state/messages.go` are now unreachable.
 
 - 2026-08-21 — Two clean-context architectural re-reviews of `2310206` (Luna/max and Terra/xhigh)
   were consolidated and validated against the code, requirements, tests, and all invariant classes.

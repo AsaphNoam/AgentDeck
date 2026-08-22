@@ -73,8 +73,15 @@ type Server struct {
 	// "no handle": without the claim, a Stop landing inside a wake tore down the
 	// wake's hook token, MCP session, and hook-settings file while the resume ran
 	// on to report success (INV §4).
-	lifecycleMu   sync.Mutex
-	lifecycleBusy map[string]bool
+	//
+	// lifecycleClosed/lifecycleWG let shutdown quiesce this set: a mail activation
+	// resumes a stopped recipient from a detached goroutine, so the registry must
+	// not be snapshotted and cleared while such a transition is mid-flight (INV
+	// §4/§9). Add happens only under lifecycleMu after the closed check.
+	lifecycleMu     sync.Mutex
+	lifecycleBusy   map[string]bool
+	lifecycleClosed bool
+	lifecycleWG     sync.WaitGroup
 
 	// pickerMu guards pickerBusy: the process-wide claim that keeps at most one
 	// macOS folder panel open (TS-03.R26). It is a single flag, not a per-key
@@ -299,7 +306,10 @@ func (s *Server) Start(ctx context.Context) error {
 	sweepCtx, stopSweep := context.WithCancel(ctx)
 	defer stopSweep()
 	s.startReconciliationSweep(sweepCtx)
-	s.startMessagingLoops(sweepCtx)
+	if err := s.startMessagingLoops(sweepCtx); err != nil {
+		ln.Close()
+		return err
+	}
 	if s.sourceMgr != nil {
 		// Hydrate persisted bindings so the watcher detects external edits (invariant §1).
 		projects, _ := s.configStore.ListProjects()
@@ -329,6 +339,10 @@ func (s *Server) Start(ctx context.Context) error {
 		s.log.Info("dashboard shutting down")
 		shutCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
+		// Let every in-flight lifecycle transition finish and refuse new ones before
+		// snapshotting the registry, so a detached activation resume cannot register
+		// a live agent after Shutdown already walked past it (INV §4/§9).
+		s.quiesceLifecycle(shutCtx)
 		// Stop every live agent so no orphaned CLI process groups survive (§8.5).
 		if s.registry != nil {
 			s.registry.Shutdown(shutCtx)

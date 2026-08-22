@@ -720,11 +720,21 @@ func (c *ChatRuntime) StartActivation(ctx context.Context, agentID, kind string,
 		return false, err
 	}
 
+	// TS-01.R21/INV §15: the ordinary busy turn state must commit before the
+	// provider frame. Swallowing this write left durable and UI state `idle` while
+	// the model was executing the mail turn. Releasing the in-memory turn gate here
+	// is correct and does not reopen a replay: the caller's kind-owned attempted
+	// boundary already committed, so the activation is retired, not re-armed.
 	now := time.Now().UTC()
-	_ = c.writeStatus(as, state.Status{
+	if err := c.writeStatus(as, state.Status{
 		AgentID: as.agentID, State: "busy", Detail: "checking messages",
 		LastTrace: "MailActivation", BusySince: &now, ContextPct: as.lastPct(),
-	})
+	}); err != nil {
+		as.mu.Lock()
+		as.turnActive = false
+		as.mu.Unlock()
+		return false, fmt.Errorf("runtime: write activation status: %w", err)
+	}
 
 	go func() {
 		params := map[string]any{

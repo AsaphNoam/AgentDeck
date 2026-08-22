@@ -352,11 +352,11 @@ func TestMailActivationWakesStoppedRecipient(t *testing.T) {
 	}
 }
 
-// FS-06.A11 — a failed wake keeps the mail, leaves the agent stopped, marks the
-// still-pending rows wake_failed, and makes no further spawn attempt — including
-// for mail inserted in the same second and after a dashboard restart (a fresh
-// nudge map) — until new pending mail arrives.
-func TestFailedMailWakeMarksRowsAndStopsRetrying(t *testing.T) {
+// FS-06.A11 — a failed wake keeps the mail unread, leaves the agent stopped, and
+// makes no further spawn attempt — including for mail inserted in the same second
+// and after a dashboard restart — because the attempted activation is never
+// replayed. Only new mail creates the next opportunity.
+func TestFailedMailWakeRetainsMailAndStopsRetrying(t *testing.T) {
 	srv, ts := wakeTestServer(t)
 	stopped := launchThenStop(t, srv, ts)
 	srv.registry.Chat().SetCommand("/nonexistent/agentdeck-no-such-binary")
@@ -397,7 +397,7 @@ func TestFailedMailWakeMarksRowsAndStopsRetrying(t *testing.T) {
 	}
 	waiting, err = srv.stateStore.PendingMailActivations(stopped)
 	if err != nil {
-		t.Fatalf("PendingWakeMailAgents after new mail: %v", err)
+		t.Fatalf("PendingMailActivations after new mail: %v", err)
 	}
 	if len(waiting) != 1 || waiting[0].AgentID != stopped {
 		t.Fatalf("activations after new mail = %v, want one for %s", waiting, stopped)

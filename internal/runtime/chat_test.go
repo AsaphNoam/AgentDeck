@@ -892,3 +892,59 @@ func TestStartActivationInjectsPayloadFreeMailTurn(t *testing.T) {
 		t.Fatalf("final status = %+v, want idle", final)
 	}
 }
+
+// TS-01.R21 / INV §15 — the ordinary busy turn state commits before the provider
+// frame. StartActivation used to discard the status write's error and prompt the
+// model anyway, so a store failure left durable and UI state `idle` while the
+// mail turn was running. The failure must surface, send nothing, and release the
+// in-memory turn gate — the caller's already-committed attempted boundary is what
+// keeps mail from being replayed.
+func TestStartActivationStatusWriteFailureSendsNoPrompt(t *testing.T) {
+	c, spec := newChatTest(t, "stream_text")
+	log := filepath.Join(t.TempDir(), "prompts.log")
+	spec.Env = append(spec.Env, "FAKEACP_PROMPT_LOG="+log)
+	ctx := context.Background()
+
+	h, err := c.Start(ctx, spec)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { c.Stop(ctx, h.AgentID) })
+
+	// Fail status writes only; reads keep working, so the activation reaches the
+	// write instead of being turned away by the idle gate above it.
+	if _, err := c.store.DB().Exec(`
+CREATE TRIGGER inject_status_write_failure BEFORE INSERT ON status
+BEGIN SELECT RAISE(ABORT, 'injected status write failure'); END`); err != nil {
+		t.Fatalf("install status trigger: %v", err)
+	}
+
+	before := 0
+	started, err := c.StartActivation(ctx, h.AgentID, "mail", func(turnID string) error {
+		before++
+		return nil
+	})
+	if started || err == nil {
+		t.Fatalf("StartActivation = %v, %v; want not started with the status error surfaced", started, err)
+	}
+	if before != 1 {
+		t.Fatalf("attempt boundary ran %d times, want exactly once", before)
+	}
+
+	// No provider frame may have been written for the failed activation.
+	if raw, rerr := os.ReadFile(log); rerr == nil && len(raw) > 0 {
+		t.Fatalf("provider prompt sent despite status write failure: %s", raw)
+	}
+
+	// The in-memory turn gate must be free again, otherwise the agent is wedged
+	// for the rest of its life over a transient store failure.
+	if _, err := c.store.DB().Exec(`DROP TRIGGER inject_status_write_failure`); err != nil {
+		t.Fatalf("drop status trigger: %v", err)
+	}
+	started, err = c.StartActivation(ctx, h.AgentID, "mail", func(turnID string) error {
+		return c.store.ResetTurnBudget(h.AgentID, turnID)
+	})
+	if err != nil || !started {
+		t.Fatalf("StartActivation after recovery = %v, %v; want started (turn gate leaked)", started, err)
+	}
+}

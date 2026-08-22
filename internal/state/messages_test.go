@@ -343,3 +343,56 @@ func TestPendingWakeMailAgents(t *testing.T) {
 		t.Fatalf("waiting after new mail = %v, want [a_wake]", waiting)
 	}
 }
+
+// FS-06.R25 — availability and the claim are one decision. Testing unread mail
+// and claiming in separate statements let a concurrent check_messages drain the
+// last row in between, after which the claim crossed the non-replayable attempt
+// boundary and started an empty model turn (INV §5/§15). A drained mailbox must
+// retire the opportunity instead of yielding a claim.
+func TestClaimMailActivationRetiresDrainedMailbox(t *testing.T) {
+	st, _ := newTestStore(t)
+	liveAgent(t, st, "a_drain", "Nova", "reviewer", "my-app")
+	if _, err := st.InsertMessage(Message{
+		FromAgent: "a_sender", FromAddress: "impl@my-app", FromName: "Atlas",
+		ToAgent: "a_drain", Body: "only message",
+	}); err != nil {
+		t.Fatalf("InsertMessage: %v", err)
+	}
+	pending, err := st.PendingMailActivations("a_drain")
+	if err != nil || len(pending) != 1 {
+		t.Fatalf("PendingMailActivations = %+v, %v; want one", pending, err)
+	}
+	activationID := pending[0].ActivationID
+
+	// The drain a check_messages call or a dashboard mailbox read performs.
+	if _, err := st.DB().Exec(`UPDATE messages SET read = 1 WHERE to_agent = 'a_drain'`); err != nil {
+		t.Fatalf("drain mailbox: %v", err)
+	}
+
+	token, claimed, err := st.ClaimMailActivation(activationID)
+	if err != nil {
+		t.Fatalf("ClaimMailActivation: %v", err)
+	}
+	if claimed || token != "" {
+		t.Fatalf("ClaimMailActivation = %q, %v; want no claim over a drained mailbox", token, claimed)
+	}
+	after, err := st.PendingMailActivations("a_drain")
+	if err != nil || len(after) != 0 {
+		t.Fatalf("PendingMailActivations after drain = %+v, %v; want the opportunity retired", after, err)
+	}
+
+	// New mail re-arms a fresh opportunity, which still claims normally.
+	if _, err := st.InsertMessage(Message{
+		FromAgent: "a_sender", FromAddress: "impl@my-app", FromName: "Atlas",
+		ToAgent: "a_drain", Body: "later",
+	}); err != nil {
+		t.Fatalf("InsertMessage later: %v", err)
+	}
+	rearmed, err := st.PendingMailActivations("a_drain")
+	if err != nil || len(rearmed) != 1 {
+		t.Fatalf("PendingMailActivations after new mail = %+v, %v; want one", rearmed, err)
+	}
+	if token, claimed, err := st.ClaimMailActivation(rearmed[0].ActivationID); err != nil || !claimed || token == "" {
+		t.Fatalf("ClaimMailActivation(rearmed) = %q, %v, %v; want a claim", token, claimed, err)
+	}
+}

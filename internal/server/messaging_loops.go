@@ -3,18 +3,25 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/agentdeck/agentdeck/internal/messaging"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
-func (s *Server) startMessagingLoops(ctx context.Context) {
+// startMessagingLoops recovers durable activation state and then starts the
+// executor and retention loops. Recovery failure is fatal to startup by design:
+// the executor only ever lists `pending` rows, so a claimed pre-attempt row that
+// recovery could not release stays invisible for the life of the process and its
+// mail never activates. Failing loudly beats silently stranding work (INV §9/§15).
+func (s *Server) startMessagingLoops(ctx context.Context) error {
 	if err := s.stateStore.RecoverMailActivations(); err != nil {
-		s.log.Debug("recover mail activations failed", "err", err)
+		return fmt.Errorf("recover mail activations: %w", err)
 	}
 	go s.runActivationExecutor(ctx)
 	go s.runMessageJanitor(ctx)
+	return nil
 }
 
 // nudgeState/nudgeOnce keep older focused tests source-compatible while their
@@ -57,17 +64,20 @@ func (s *Server) executePendingMailActivations(ctx context.Context, onlyAgentID 
 }
 
 func (s *Server) executeMailActivation(ctx context.Context, activation state.Activation) {
-	available, err := s.stateStore.HasUnreadMail(activation.AgentID)
-	if err != nil {
-		s.log.Debug("activation source check failed", "agent", activation.AgentID, "err", err)
+	// An exclusive lifecycle transition (pipeline stage launch/continue, runtime
+	// switch, stop, resume) can already own this agent while its runtime is
+	// registered and idle — a stage's first durable assignment is composed inside
+	// that claim. Starting an activation in that window lets mail win the runtime
+	// turn gate and fail the transition's own prompt with ErrTurnInFlight, pausing
+	// or stopping the stage. The opportunity is durable, so deferring it to the
+	// next sweep costs nothing (TS-01.R21, INV §5).
+	if s.lifecycleInFlight(activation.AgentID) {
 		return
 	}
-	if !available {
-		if err := s.stateStore.RetirePendingMailActivation(activation.ActivationID); err != nil {
-			s.log.Debug("retire empty mail activation failed", "activation", activation.ActivationID, "err", err)
-		}
-		return
-	}
+	// One statement decides availability and the claim together. Reading unread
+	// mail and claiming separately let a concurrent check_messages drain the last
+	// row in between, after which the claim crossed the non-replayable attempt
+	// boundary and sent an empty provider turn (FS-06.R25, INV §5/§15).
 	token, claimed, err := s.stateStore.ClaimMailActivation(activation.ActivationID)
 	if err != nil {
 		s.log.Debug("claim mail activation failed", "activation", activation.ActivationID, "err", err)

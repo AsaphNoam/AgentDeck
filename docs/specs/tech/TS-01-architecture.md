@@ -138,7 +138,12 @@ hook-settings file remain intact and in use.
 indistinguishable from "this agent is not running", so an unclaimed Stop landing inside a wake took
 the idempotent already-stopped path — reaping and running `teardownAgentRegistration` on the
 artifacts the live resume had just minted — and answered success while that resume continued.
-A Stop that loses the claim returns the same conflict a losing resume returns. Because the claim is
+A Stop that loses the claim returns the same conflict a losing resume returns. **Shutdown quiesces
+this claim**: it closes the gate to new transitions and waits for the in-flight ones before
+snapshotting and clearing the registry, because an activation resumes its recipient from a detached
+goroutine and the runtime's durable running/status rows are written before it joins the registry —
+a snapshot inside that window walked past the agent and let the resume register a live orphan into
+an already-cleared registry (INV §4/§9). Because the claim is
 the only thing standing between a stop and a live resume's registration, **every** stopping verb runs
 one shared server-side stop-and-teardown helper rather than its own spelling of stop + cleanup
 (INV §2): the Stop route and group release (FS-02.R20) both call it, since a second unclaimed stop
@@ -197,7 +202,10 @@ service.** A state-owned transaction first commits the authoritative domain muta
 activation signal appropriate to that domain. Agent and reserved-user mail use one transaction for
 message insert plus a mail-specific rule that permits at most one pending `mail` activation per
 agent. The post-commit in-process signal only wakes the server-owned activation executor; a bounded
-sweep and startup recovery discover the same durable pending rows. The executor dispatches by closed
+sweep and startup recovery discover the same durable pending rows. **Startup recovery failing is
+fatal to startup**, because the executor lists only `pending` rows: a claimed pre-attempt row that
+recovery could not release is invisible for the life of that process and its source work never runs
+(INV §9/§15). The executor dispatches by closed
 kind and lets the kind handler check source availability/eligibility and apply its transition policy;
 it does not impose mail's coalescing or replay rule on every kind. For `mail`, the handler claims
 with a unique token, performs no external effect until that claim is durably marked attempted,
@@ -211,7 +219,13 @@ kind-aware activation operation with an atomic turn-start gate. For an already-r
 agent, the runtime rechecks idle/no-active-turn, holds the turn gate while the server durably marks
 the kind-owned pre-side-effect transition, commits the ordinary budget/status turn state, and only
 then issues the provider instruction. If another turn wins, no external effect occurs and the kind
-handler decides how its claim remains actionable. For a stopped mail recipient, the executor takes
+handler decides how its claim remains actionable. The executor also **defers to an in-flight
+exclusive lifecycle transition** rather than racing it: a stage launch/continue composes its first
+durable assignment inside R16's claim while the runtime is already registered and idle, so an
+activation starting in that window won the turn gate and failed the transition's own prompt.
+Deferring is free because the opportunity is durable. Ordinary status/turn state commits before the
+provider frame, and a failure to commit it releases the turn gate and surfaces rather than prompting
+the model behind an `idle` record (INV §15). For a stopped mail recipient, the executor takes
 TS-01.R16's exclusive lifecycle claim, applies FS-06's attempted transition immediately before the
 first resume side effect, and routes through the same claimed resume/composition path; after a
 successful resume it starts the activation before releasing that transition. Lifecycle-claim loss
