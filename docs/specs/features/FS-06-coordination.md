@@ -256,14 +256,21 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
 - **A15** (R26–R27) — A stopped wakeable recipient is resumed once for a claimed mail
   opportunity and receives one activation; a lost lifecycle race remains pending, while a real wake,
   launch, or provider attempt that fails is not retried after restart. New mail re-arms a later
-  opportunity. Terminal and pipeline-associated stopped agents never start, and a terminal,
-  archived, or pipeline-associated recipient with an already-pending opportunity retires it while
-  retaining unread mail. *Verify:*
+  opportunity. Terminal and pipeline-associated stopped agents never start, and a **stopped**
+  recipient that has become terminal, archived, or pipeline-associated retires its already-pending
+  opportunity while retaining unread mail. *Verify:*
   `internal/server/activation_test.go::TestStoppedMailActivationResumesOnceAndIsNeverReplayed`,
   `TestFailedStoppedActivationIsNotRetriedAfterRestart`,
   `TestMailActivationDefersWhileLifecycleClaimIsHeld`,
   `TestIneligibleMailActivationIsDiscarded`, and
   `internal/server/wake_test.go::TestStoppedPipelineAgentIsNeverAddressableOrWoken`.
+- **A16** (R22, R24, R27) — The archived-agent, archived-project, and pipeline-association
+  exclusions are wake gates and do not apply to a **running** recipient: a running agent that has
+  run a pipeline stage stays in the addressable set (FS-01.R33) and one new message still produces
+  exactly one activation turn for it. Only the terminal-interface exclusion (FS-07 §6) discards a
+  running recipient's opportunity. *Verify:*
+  `internal/server/activation_test.go::TestRunningPipelineAgentStillActivatesForMail` and
+  `TestRunningTerminalRecipientDiscardsPendingActivation`.
 
 ## 6. Deviations & open decisions
 
@@ -319,4 +326,5 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   `TestDrainedMailboxRetiresActivationWithoutPrompting`,
   `TestMailActivationDefersWhileLifecycleClaimIsHeld`,
   `TestStoppedMailActivationResumesOnceAndIsNeverReplayed`,
-  `TestFailedStoppedActivationIsNotRetriedAfterRestart`).
+  `TestFailedStoppedActivationIsNotRetriedAfterRestart`,
+  `TestRunningPipelineAgentStillActivatesForMail`).

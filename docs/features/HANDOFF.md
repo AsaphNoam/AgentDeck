@@ -7,18 +7,17 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** All mail-activation findings are fixed. Mail crosses its non-replayable boundary only
-  immediately before resume composition, so a removed backend or model leaves the pending
-  opportunity intact. A recipient that has become terminal, archived, project-archived, or
-  pipeline-associated retires its pre-attempt opportunity rather than spinning every two seconds;
-  mail remains unread. Release coalesces safely when newer mail already owns the pending row and
-  reports failures. The superseded wake-tracking API, compatibility shim, and vacuous A11 assertion
-  are gone. FS-06, FS-07, TS-01, and TS-02 now describe the shipped boundaries. New state and
-  fake-ACP regressions cover the timing, eligibility, release, and no-replay cases. Reviewed: all six
-  are genuinely closed against their original reproductions, but the new eligibility gates over-apply
-  — the pipeline-association exclusion is a stopped-only gate (FS-01.R33, FS-06.R22) and is now run
-  for running recipients too, so a running pipeline-associated agent accepts mail and is never
-  activated for it. One **Must fix** finding is open.
+- **State:** Every mail-activation finding is closed, including the eligibility regression the last
+  review found. The executor's pre-split gate is now the terminal-interface exclusion alone
+  (FS-07 §6, durable on both branches); the archived-agent, archived-project, and
+  pipeline-association exclusions are wake gates and run only on the stopped branch, where
+  `wakeCandidate`/`stoppedWakeGates` is their single spelling (INV §2). A running agent that has run
+  a pipeline stage therefore stays addressable *and* gets its one activation turn per new message,
+  matching `addressableAgents`. FS-06.A16 records that split; A15 now names the stopped recipient
+  explicitly. Everything else from the earlier passes still holds: mail crosses its non-replayable
+  boundary only immediately before resume composition, a durably ineligible recipient retires its
+  pre-attempt opportunity instead of spinning every two seconds while mail stays unread, and release
+  coalesces safely when newer mail already owns the pending row.
 - **Previous state:** Explicit mail activation shipped. New mail atomically creates one payload-free,
   mail-scoped activation while pending; the executor claims it durably, uses the shared lifecycle and
   runtime turn gates, and sends the one provider instruction only after the non-replayable attempt
@@ -191,29 +190,7 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ### Open findings
 
-- **Must fix** — **FS-06.R22/R27, FS-01.R33, INV §2:** the new executor eligibility gates apply a
-  *stopped-only* exclusion to *running* recipients, so a running pipeline-associated agent silently
-  stops receiving mail activations. `internal/server/messaging_loops.go:96-103` discards the
-  opportunity whenever `PipelineAssociationForAgent` returns non-nil, before the running/stopped
-  split at line 113. But FS-01.R33 scopes that gate to wake — "an agent with a pipeline attempt
-  association is never **woken** by a message" — and FS-06.R22 excludes pipeline-associated agents
-  "while stopped"; `addressableAgents` accordingly keeps a running one addressable. The association
-  row is permanent (`PipelineAssociationForAgent` returns the latest `pipeline_attempts` row for the
-  agent, with no completion filter), so any agent that has ever run a pipeline stage is affected for
-  the rest of its life. Normal-use trigger: an agent finishes a pipeline stage, stays running, and a
-  peer sends it mail. `send_message` succeeds, the **Mail N** badge updates, and the recipient is
-  never activated to read it. Confirmed by probe: at `9862682` the same scenario produced 1 provider
-  prompt; at `1fd26ed` it produces 0, with the activation discarded and the mail left unread. The
-  `agent.Archived` and `projectArchiveGate` checks at lines 92 and 104 over-apply in exactly the same
-  way — they are stopped-only gates too (`addressableAgents`: "a running agent stays addressable
-  regardless of its project's archive state") — though archive stops the agent first, so those are
-  not separately reachable today. *Fix:* run the durable-exclusion gates on the stopped branch only,
-  or scope them by the running-row read that already happens at line 113; keep the
-  interface-is-`chat` gate on both branches, since that is the terminal exclusion FS-07 §6 needs.
-  Reusing one predicate with `stoppedWakeGates` rather than a second Go spelling would have caught
-  this (INV §2). *Test:* a running pipeline-associated recipient gets exactly one provider prompt for
-  new mail, while a stopped one still never wakes
-  (`TestStoppedPipelineAgentIsNeverAddressableOrWoken` stays green).
+None.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
@@ -230,6 +207,22 @@ shared); `last_trace: "MailActivation"` (no spec vocabulary or UI surface reads 
 pre-existing `gofmt` diff in `internal/index/indexer_fts_test.go` (outside this range).
 
 ## Recent changelog
+
+- 2026-08-22 — fix: closed the mail-activation eligibility regression. **INV §2** — the executor
+  applied the stopped-only wake exclusions (archived agent, archived project, pipeline association)
+  before its running/stopped split, so a running agent with a permanent `pipeline_attempts` row
+  accepted mail (`addressableAgents` still lists it) and was never activated for it, for the rest of
+  its life. Those three gates now belong to the stopped branch only, where `startStoppedMailActivation`
+  already applies them through the one shared `wakeCandidate`/`stoppedWakeGates` predicate; only the
+  terminal-interface exclusion still runs before the split, because a terminal agent cannot drain a
+  mailbox on either branch (FS-07 §6). `PipelineAssociationForAgent` keeps its two other callers.
+  FS-06 gained **A16** for the running counterpart and A15 now says "stopped" where it meant it.
+  New regression `TestRunningPipelineAgentStillActivatesForMail` (running, pipeline-associated,
+  addressable, exactly one provider prompt) fails against the pre-fix code with 0 prompts;
+  `TestIneligibleMailActivationIsDiscarded`, `TestRunningTerminalRecipientDiscardsPendingActivation`,
+  and `TestStoppedPipelineAgentIsNeverAddressableOrWoken` stay green. `make check-specs`, both Go
+  test modes, focused `-race` on the activation/wake/pipeline paths, `make build`, and
+  `git diff --check` pass. No UI change.
 
 - 2026-08-22 — review: verified the fix for the six re-review findings and found one regression it
   introduced. All six are genuinely closed and re-verified against the original reproductions: the
