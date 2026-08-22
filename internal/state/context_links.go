@@ -297,8 +297,12 @@ type ContextGrantsPage struct {
 // ListContextGrantsForRecipient returns the recipient's active grants, newest
 // first, bounded by limit. after is the opaque keyset position produced by the
 // previous page (updated_at + grant_id), so traversal stays stable while newer
-// grants arrive.
-func (s *Store) ListContextGrantsForRecipient(recipient string, includeHidden bool, limit int, afterUpdatedAt, afterGrantID string) ([]ContextGrant, error) {
+// grants arrive. A zero after time starts at the newest grant.
+func (s *Store) ListContextGrantsForRecipient(recipient string, includeHidden bool, limit int, after time.Time, afterGrantID string) ([]ContextGrant, error) {
+	afterUpdatedAt := ""
+	if !after.IsZero() {
+		afterUpdatedAt = formatTime(after)
+	}
 	rows, err := s.db.Query(`
 SELECT `+contextGrantColumns+` `+contextGrantJoin+`
 WHERE g.granted_to_agent_id = ?
@@ -321,6 +325,43 @@ LIMIT ?`, recipient, boolInt(includeHidden), afterUpdatedAt, afterUpdatedAt, aft
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("state: iterate context grants: %w", err)
+	}
+	return out, nil
+}
+
+// ContextRecipients is the context-specific durable chat-agent directory
+// (TS-01.R22, FS-15.R17). It deliberately is not AddressableAgents: a grant
+// starts no process, so a stopped agent needs no wake gate, a session snapshot
+// is irrelevant, and pipeline association does not exclude anyone. What it does
+// share is one state snapshot per call and the same LiveAgent projection, so
+// state.ResolveRecipient's address matching stays the single spelling (INV §2).
+// Archived identities are excluded; ResolveRecipient drops terminal agents.
+func (s *Store) ContextRecipients() ([]LiveAgent, error) {
+	rows, err := s.db.Query(`
+SELECT ` + agentColumns + `,
+       CASE WHEN r.agent_id IS NOT NULL THEN '` + AvailabilityRunning + `'
+            ELSE '` + AvailabilityStopped + `' END
+FROM agents a
+LEFT JOIN running r ON r.agent_id = a.agent_id
+LEFT JOIN status st ON st.agent_id = a.agent_id
+WHERE a.archived = 0 AND a.interface = 'chat'
+ORDER BY a.name`)
+	if err != nil {
+		return nil, fmt.Errorf("state: list context recipients: %w", err)
+	}
+	defer rows.Close()
+	out := []LiveAgent{}
+	for rows.Next() {
+		var la LiveAgent
+		if err := rows.Scan(&la.AgentID, &la.Name, &la.Role, &la.Project, &la.Interface,
+			&la.State, &la.Detail, &la.ContextPct, &la.Availability); err != nil {
+			return nil, fmt.Errorf("state: scan context recipient: %w", err)
+		}
+		la.Address = address(la.Role, la.Project)
+		out = append(out, la)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("state: iterate context recipients: %w", err)
 	}
 	return out, nil
 }

@@ -40,6 +40,12 @@ func ReadFile(home, agentID string, opts ReadOptions) ([]runtime.Event, error) {
 	return NewReader(transcriptPath(home, agentID)).ReadAll(opts)
 }
 
+// ForEachFile streams one agent's durable transcript without retaining it in
+// memory, so a bounded reader can render a span of an arbitrarily long session.
+func ForEachFile(home, agentID string, opts ReadOptions, visit func(runtime.Event) error) error {
+	return NewReader(transcriptPath(home, agentID)).ForEach(opts, visit)
+}
+
 func (r *Reader) ReadAll(opts ReadOptions) ([]runtime.Event, error) {
 	out := make([]runtime.Event, 0)
 	if err := r.ForEach(opts, func(ev runtime.Event) error {

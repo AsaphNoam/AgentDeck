@@ -115,10 +115,10 @@ func TestContextGrantListingAndHiddenPreference(t *testing.T) {
 	if err != nil {
 		t.Fatalf("share: %v", err)
 	}
-	if got, err := st.ListContextGrantsForRecipient("a_other", false, 20, "", ""); err != nil || len(got) != 0 {
+	if got, err := st.ListContextGrantsForRecipient("a_other", false, 20, time.Time{}, ""); err != nil || len(got) != 0 {
 		t.Fatalf("other recipient sees %v (%v)", got, err)
 	}
-	got, err := st.ListContextGrantsForRecipient("a_dst", false, 20, "", "")
+	got, err := st.ListContextGrantsForRecipient("a_dst", false, 20, time.Time{}, "")
 	if err != nil || len(got) != 1 || got[0].GrantID != grant.GrantID {
 		t.Fatalf("recipient list = %+v (%v)", got, err)
 	}
@@ -129,10 +129,10 @@ func TestContextGrantListingAndHiddenPreference(t *testing.T) {
 	if ok, err := st.SetContextGrantHidden(grant.GrantID, "a_dst", true); err != nil || !ok {
 		t.Fatalf("hide: %v %v", ok, err)
 	}
-	if got, err := st.ListContextGrantsForRecipient("a_dst", false, 20, "", ""); err != nil || len(got) != 0 {
+	if got, err := st.ListContextGrantsForRecipient("a_dst", false, 20, time.Time{}, ""); err != nil || len(got) != 0 {
 		t.Fatalf("hidden grant still listed: %+v (%v)", got, err)
 	}
-	if got, err := st.ListContextGrantsForRecipient("a_dst", true, 20, "", ""); err != nil || len(got) != 1 || !got[0].Hidden {
+	if got, err := st.ListContextGrantsForRecipient("a_dst", true, 20, time.Time{}, ""); err != nil || len(got) != 1 || !got[0].Hidden {
 		t.Fatalf("include_hidden list = %+v (%v)", got, err)
 	}
 	// Hiding is not revocation: authorization is untouched.
@@ -142,7 +142,7 @@ func TestContextGrantListingAndHiddenPreference(t *testing.T) {
 	if ok, err := st.SetContextGrantHidden(grant.GrantID, "a_dst", false); err != nil || !ok {
 		t.Fatalf("unhide: %v %v", ok, err)
 	}
-	if got, err := st.ListContextGrantsForRecipient("a_dst", false, 20, "", ""); err != nil || len(got) != 1 {
+	if got, err := st.ListContextGrantsForRecipient("a_dst", false, 20, time.Time{}, ""); err != nil || len(got) != 1 {
 		t.Fatalf("unhidden grant missing: %+v (%v)", got, err)
 	}
 	// Only the recipient owns its personal projection.
@@ -176,7 +176,7 @@ func TestRevokeAndReshareContextGrant(t *testing.T) {
 	if ok, err := st.ContextReadAuthorized(ref.ContextRefID, "a_dst"); err != nil || ok {
 		t.Fatalf("revoked grant still authorizes: %v %v", ok, err)
 	}
-	if got, err := st.ListContextGrantsForRecipient("a_dst", true, 20, "", ""); err != nil || len(got) != 0 {
+	if got, err := st.ListContextGrantsForRecipient("a_dst", true, 20, time.Time{}, ""); err != nil || len(got) != 0 {
 		t.Fatalf("revoked grant still listed: %+v (%v)", got, err)
 	}
 	// The peer's independent grant survives, and the reference itself remains.
@@ -226,7 +226,7 @@ func TestReshareClearsHiddenPreference(t *testing.T) {
 	if _, regrant, err := st.ShareContext(span, "a_src", "a_dst", "again", "d2"); err != nil || regrant.Hidden {
 		t.Fatalf("re-share left the grant hidden: %+v (%v)", regrant, err)
 	}
-	if got, err := st.ListContextGrantsForRecipient("a_dst", false, 20, "", ""); err != nil || len(got) != 1 {
+	if got, err := st.ListContextGrantsForRecipient("a_dst", false, 20, time.Time{}, ""); err != nil || len(got) != 1 {
 		t.Fatalf("re-shared grant missing from the normal list: %+v (%v)", got, err)
 	}
 }
@@ -294,7 +294,8 @@ func TestListContextGrantsPagination(t *testing.T) {
 		}
 	}
 	seen := map[string]bool{}
-	afterAt, afterID := "", ""
+	var afterAt time.Time
+	afterID := ""
 	for page := 0; page < 5; page++ {
 		got, err := st.ListContextGrantsForRecipient("a_dst", false, 2, afterAt, afterID)
 		if err != nil {
@@ -310,7 +311,7 @@ func TestListContextGrantsPagination(t *testing.T) {
 			seen[g.GrantID] = true
 		}
 		last := got[len(got)-1]
-		afterAt, afterID = formatTime(last.UpdatedAt), last.GrantID
+		afterAt, afterID = last.UpdatedAt, last.GrantID
 	}
 	if len(seen) != 5 {
 		t.Fatalf("traversal saw %d of 5 grants", len(seen))

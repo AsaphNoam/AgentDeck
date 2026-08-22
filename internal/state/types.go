@@ -132,6 +132,11 @@ type Message struct {
 const (
 	AvailabilityRunning         = "running"
 	AvailabilityStoppedWakeable = "stopped_wakeable"
+	// AvailabilityStopped marks a durable stopped identity in the context
+	// recipient directory. It is deliberately distinct from stopped_wakeable:
+	// a context grant starts no process, so this value must never be read as a
+	// promise that mail would wake the agent (FS-15.R17).
+	AvailabilityStopped = "stopped"
 )
 
 // LiveAgent is an addressable agent — running, or stopped and wakeable — joined
