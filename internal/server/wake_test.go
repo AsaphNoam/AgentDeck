@@ -333,7 +333,7 @@ func TestMailActivationWakesStoppedRecipient(t *testing.T) {
 		t.Fatalf("InsertMessage: %v", err)
 	}
 
-	srv.nudgeOnce(context.Background(), stopped, map[string]nudgeState{})
+	srv.executePendingMailActivations(context.Background(), stopped)
 	waitRunning(t, srv, stopped, true)
 
 	deadline := time.Now().Add(5 * time.Second)
@@ -370,21 +370,27 @@ func TestFailedMailWakeRetainsMailAndStopsRetrying(t *testing.T) {
 		}
 	}
 
-	nudges := map[string]nudgeState{}
-	srv.nudgeOnce(context.Background(), stopped, nudges)
+	srv.executePendingMailActivations(context.Background(), stopped)
 
 	waitRunning(t, srv, stopped, false)
 
 	// The failed provider start crossed the activation attempt boundary. Mail
 	// remains unread, but reconciliation has no activation to replay.
-	waiting, err := srv.stateStore.PendingMailActivations(stopped)
-	if err != nil {
-		t.Fatalf("PendingMailActivations: %v", err)
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		waiting, err := srv.stateStore.PendingMailActivations(stopped)
+		if err != nil {
+			t.Fatalf("PendingMailActivations: %v", err)
+		}
+		if len(waiting) == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("activations after failure = %v, want none", waiting)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
-	if len(waiting) > 1 {
-		t.Fatalf("activations after failure = %v, want at most one later batch", waiting)
-	}
-	srv.nudgeOnce(context.Background(), "", map[string]nudgeState{})
+	srv.executePendingMailActivations(context.Background(), "")
 	time.Sleep(200 * time.Millisecond)
 	waitRunning(t, srv, stopped, false)
 
@@ -395,7 +401,7 @@ func TestFailedMailWakeRetainsMailAndStopsRetrying(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("InsertMessage third: %v", err)
 	}
-	waiting, err = srv.stateStore.PendingMailActivations(stopped)
+	waiting, err := srv.stateStore.PendingMailActivations(stopped)
 	if err != nil {
 		t.Fatalf("PendingMailActivations after new mail: %v", err)
 	}
@@ -430,7 +436,7 @@ func TestStoppedPipelineAgentIsNeverAddressableOrWoken(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("InsertMessage: %v", err)
 	}
-	srv.nudgeOnce(context.Background(), stopped, map[string]nudgeState{})
+	srv.executePendingMailActivations(context.Background(), stopped)
 	time.Sleep(300 * time.Millisecond)
 	waitRunning(t, srv, stopped, false)
 }
@@ -608,7 +614,7 @@ func TestSuccessfulWakeConsumesMailEvenIfAdapterDiesBeforeNudge(t *testing.T) {
 		t.Fatalf("InsertMessage: %v", err)
 	}
 
-	srv.nudgeOnce(context.Background(), stopped, map[string]nudgeState{})
+	srv.executePendingMailActivations(context.Background(), stopped)
 	waitRunning(t, srv, stopped, true)
 
 	// Mail remains independently unread; the attempted activation itself is
@@ -642,7 +648,7 @@ func TestSuccessfulWakeConsumesMailEvenIfAdapterDiesBeforeNudge(t *testing.T) {
 		t.Fatalf("activations after a dead adapter = %v, want none", waiting)
 	}
 	for i := 0; i < 3; i++ {
-		srv.nudgeOnce(context.Background(), "", map[string]nudgeState{})
+		srv.executePendingMailActivations(context.Background(), "")
 	}
 	time.Sleep(300 * time.Millisecond)
 	waitRunning(t, srv, stopped, false)
@@ -666,7 +672,7 @@ func TestFailedWakeLeavesNewerMailPending(t *testing.T) {
 		t.Fatalf("InsertMessage first: %v", err)
 	}
 
-	srv.nudgeOnce(context.Background(), stopped, map[string]nudgeState{})
+	srv.executePendingMailActivations(context.Background(), stopped)
 	// The attempt is now in flight and stalls in the adapter for two seconds. The
 	// second message therefore arrives strictly after the attempt began and
 	// strictly before it fails — the interleaving the attempt must not consume.

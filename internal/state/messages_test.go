@@ -96,6 +96,77 @@ func TestMailActivationCoalescesClaimsAndRecovers(t *testing.T) {
 	}
 }
 
+// TS-02.R23 / INV §5 — mail inserted after a claim owns the replacement pending
+// opportunity. Releasing the older claim must delete it instead of colliding with
+// the mail-only pending uniqueness index and leaving it stranded as claimed.
+func TestReleaseMailActivationCoalescesNewerPendingMail(t *testing.T) {
+	st, _ := newTestStore(t)
+	liveAgent(t, st, "a_release", "Nova", "reviewer", "my-app")
+	if _, err := st.InsertMessage(Message{FromAgent: "a_sender", FromAddress: "impl@my-app", FromName: "Atlas", ToAgent: "a_release", Body: "first"}); err != nil {
+		t.Fatalf("InsertMessage first: %v", err)
+	}
+	pending, err := st.PendingMailActivations("a_release")
+	if err != nil || len(pending) != 1 {
+		t.Fatalf("PendingMailActivations = %+v, %v; want one", pending, err)
+	}
+	token, claimed, err := st.ClaimMailActivation(pending[0].ActivationID)
+	if err != nil || !claimed {
+		t.Fatalf("ClaimMailActivation = %q, %v, %v; want claim", token, claimed, err)
+	}
+	if _, err := st.InsertMessage(Message{FromAgent: "a_sender", FromAddress: "impl@my-app", FromName: "Atlas", ToAgent: "a_release", Body: "later"}); err != nil {
+		t.Fatalf("InsertMessage later: %v", err)
+	}
+	if err := st.ReleaseMailActivation(pending[0].ActivationID, token); err != nil {
+		t.Fatalf("ReleaseMailActivation: %v", err)
+	}
+	left, err := st.PendingMailActivations("a_release")
+	if err != nil || len(left) != 1 {
+		t.Fatalf("PendingMailActivations after release = %+v, %v; want newer pending row", left, err)
+	}
+	var claimedRows int
+	if err := st.DB().QueryRow(`SELECT COUNT(*) FROM activations WHERE agent_id = ? AND kind = ? AND state = ?`, "a_release", ActivationKindMail, ActivationClaimed).Scan(&claimedRows); err != nil {
+		t.Fatalf("count claimed activations: %v", err)
+	}
+	if claimedRows != 0 {
+		t.Fatalf("claimed mail activations = %d, want none", claimedRows)
+	}
+}
+
+func TestDiscardClaimedMailActivationRequiresClaimToken(t *testing.T) {
+	st, _ := newTestStore(t)
+	liveAgent(t, st, "a_discard", "Nova", "reviewer", "my-app")
+	if _, err := st.InsertMessage(Message{FromAgent: "a_sender", FromAddress: "impl@my-app", FromName: "Atlas", ToAgent: "a_discard", Body: "first"}); err != nil {
+		t.Fatalf("InsertMessage: %v", err)
+	}
+	pending, err := st.PendingMailActivations("a_discard")
+	if err != nil || len(pending) != 1 {
+		t.Fatalf("PendingMailActivations = %+v, %v; want one", pending, err)
+	}
+	token, claimed, err := st.ClaimMailActivation(pending[0].ActivationID)
+	if err != nil || !claimed {
+		t.Fatalf("ClaimMailActivation = %q, %v, %v; want claim", token, claimed, err)
+	}
+	if err := st.DiscardClaimedMailActivation(pending[0].ActivationID, "wrong-token"); err != nil {
+		t.Fatalf("DiscardClaimedMailActivation(wrong token): %v", err)
+	}
+	var claimedRows int
+	if err := st.DB().QueryRow(`SELECT COUNT(*) FROM activations WHERE activation_id = ? AND state = ?`, pending[0].ActivationID, ActivationClaimed).Scan(&claimedRows); err != nil {
+		t.Fatalf("count claimed activation: %v", err)
+	}
+	if claimedRows != 1 {
+		t.Fatalf("claimed rows after wrong token = %d, want one", claimedRows)
+	}
+	if err := st.DiscardClaimedMailActivation(pending[0].ActivationID, token); err != nil {
+		t.Fatalf("DiscardClaimedMailActivation: %v", err)
+	}
+	if err := st.DB().QueryRow(`SELECT COUNT(*) FROM activations WHERE activation_id = ?`, pending[0].ActivationID).Scan(&claimedRows); err != nil {
+		t.Fatalf("count discarded activation: %v", err)
+	}
+	if claimedRows != 0 {
+		t.Fatalf("rows after discard = %d, want none", claimedRows)
+	}
+}
+
 // Finding 4 regression: a terminal-interface agent has no check_messages tool, so
 // delivering mail to it would spin the nudger indefinitely (up to the 7-day mail
 // TTL). ResolveRecipient must therefore never select a terminal agent as a
@@ -297,50 +368,6 @@ VALUES ('pr_1','t_1','Build','my-app','ship','running','2026-08-16T10:00:00Z','2
 	id, _, err := ResolveRecipient(directory(t, st), "implementer@my-app")
 	if err != nil || id != "a_wake" {
 		t.Fatalf("ResolveRecipient = %q,%v want a_wake", id, err)
-	}
-}
-
-// FS-06.R23 — wake candidacy is durable: it needs an unread row still marked
-// "pending", so stamping the failed-wake marker retires the recipient until new
-// mail arrives.
-func TestPendingWakeMailAgents(t *testing.T) {
-	st, _ := newTestStore(t)
-	if _, err := st.InsertMessage(Message{
-		FromAgent: "a_from", FromAddress: "x@y", FromName: "X", ToAgent: "a_wake", Body: "hello",
-	}); err != nil {
-		t.Fatalf("InsertMessage: %v", err)
-	}
-	waiting, err := st.PendingWakeMailAgents()
-	if err != nil {
-		t.Fatalf("PendingWakeMailAgents: %v", err)
-	}
-	if len(waiting) != 1 || waiting[0] != "a_wake" {
-		t.Fatalf("waiting = %v, want [a_wake]", waiting)
-	}
-
-	if _, err := st.MarkUnreadDeliveredVia("a_wake", "wake_failed"); err != nil {
-		t.Fatalf("MarkUnreadDeliveredVia: %v", err)
-	}
-	waiting, err = st.PendingWakeMailAgents()
-	if err != nil {
-		t.Fatalf("PendingWakeMailAgents after failure: %v", err)
-	}
-	if len(waiting) != 0 {
-		t.Fatalf("waiting after failed wake = %v, want none", waiting)
-	}
-
-	// New mail always inserts as "pending" and re-arms the wake.
-	if _, err := st.InsertMessage(Message{
-		FromAgent: "a_from", FromAddress: "x@y", FromName: "X", ToAgent: "a_wake", Body: "again",
-	}); err != nil {
-		t.Fatalf("InsertMessage again: %v", err)
-	}
-	waiting, err = st.PendingWakeMailAgents()
-	if err != nil {
-		t.Fatalf("PendingWakeMailAgents after new mail: %v", err)
-	}
-	if len(waiting) != 1 || waiting[0] != "a_wake" {
-		t.Fatalf("waiting after new mail = %v, want [a_wake]", waiting)
 	}
 }
 

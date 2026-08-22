@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/agentdeck/agentdeck/internal/messaging"
+	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
@@ -24,18 +25,10 @@ func (s *Server) startMessagingLoops(ctx context.Context) error {
 	return nil
 }
 
-// nudgeState/nudgeOnce keep older focused tests source-compatible while their
-// behavior now exercises the activation executor rather than unread polling.
-type nudgeState struct{}
-
-func (s *Server) nudgeOnce(ctx context.Context, onlyAgentID string, _ map[string]nudgeState) {
-	s.executePendingMailActivations(ctx, onlyAgentID)
-}
-
 // runActivationExecutor uses its channel only as a fast path. Durable pending
 // activation rows, checked at startup and on every sweep, remain authoritative.
 func (s *Server) runActivationExecutor(ctx context.Context) {
-	ticker := time.NewTicker(messaging.NudgeInterval)
+	ticker := time.NewTicker(messaging.ActivationSweepInterval)
 	defer ticker.Stop()
 	for {
 		select {
@@ -86,12 +79,43 @@ func (s *Server) executeMailActivation(ctx context.Context, activation state.Act
 	if !claimed {
 		return
 	}
+	// A pending activation can outlive the recipient's eligibility: a runtime
+	// switch, archive, or pipeline association happens after the sender inserted
+	// mail. These are durable exclusions, not a deferred attempt, so discard the
+	// opportunity without crossing mail's non-replayable boundary.
+	agent, err := s.stateStore.ReadAgent(activation.AgentID)
+	if err != nil {
+		s.log.Debug("activation read agent failed", "agent", activation.AgentID, "err", err)
+		s.releaseMailActivation(activation, token)
+		return
+	}
+	if agent.Interface != "chat" || agent.Archived {
+		s.discardMailActivation(activation, token)
+		return
+	}
+	if association, err := s.stateStore.PipelineAssociationForAgent(activation.AgentID); err != nil {
+		s.log.Debug("activation read pipeline association failed", "agent", activation.AgentID, "err", err)
+		s.releaseMailActivation(activation, token)
+		return
+	} else if association != nil {
+		s.discardMailActivation(activation, token)
+		return
+	}
+	if ae := s.projectArchiveGate(agent.Project, "project is archived"); ae != nil {
+		if ae.Code == runtime.CodeInternal {
+			s.log.Debug("activation project gate failed", "agent", activation.AgentID, "err", ae.Message)
+			s.releaseMailActivation(activation, token)
+		} else {
+			s.discardMailActivation(activation, token)
+		}
+		return
+	}
 	if _, err := s.stateStore.ReadRunning(activation.AgentID); err == nil {
 		s.startRunningMailActivation(ctx, activation, token)
 		return
 	} else if !errors.Is(err, state.ErrNotFound) {
 		s.log.Debug("activation read running failed", "agent", activation.AgentID, "err", err)
-		_ = s.stateStore.ReleaseMailActivation(activation.ActivationID, token)
+		s.releaseMailActivation(activation, token)
 		return
 	}
 	s.startStoppedMailActivation(ctx, activation, token)
@@ -111,7 +135,7 @@ func (s *Server) startRunningMailActivation(ctx context.Context, activation stat
 		s.log.Debug("start running mail activation failed", "agent", activation.AgentID, "err", err)
 	}
 	if !started && !attempted {
-		_ = s.stateStore.ReleaseMailActivation(activation.ActivationID, token)
+		s.releaseMailActivation(activation, token)
 		return
 	}
 	if attempted {
@@ -124,10 +148,21 @@ func (s *Server) startRunningMailActivation(ctx context.Context, activation stat
 func (s *Server) startStoppedMailActivation(ctx context.Context, activation state.Activation, token string) {
 	if _, ok, ae := s.wakeCandidate(activation.AgentID); ae != nil {
 		s.log.Debug("mail activation wake candidacy failed", "agent", activation.AgentID, "err", ae.Message)
-		_ = s.stateStore.ReleaseMailActivation(activation.ActivationID, token)
+		s.releaseMailActivation(activation, token)
 		return
 	} else if !ok {
-		_ = s.stateStore.ReleaseMailActivation(activation.ActivationID, token)
+		// A concurrent ordinary resume can make a formerly stopped recipient
+		// running between the earlier running-row read and the wake gate. That
+		// is not an exclusion: route it through the running activation path.
+		if _, err := s.stateStore.ReadRunning(activation.AgentID); err == nil {
+			s.startRunningMailActivation(ctx, activation, token)
+			return
+		} else if !errors.Is(err, state.ErrNotFound) {
+			s.log.Debug("activation re-read running failed", "agent", activation.AgentID, "err", err)
+			s.releaseMailActivation(activation, token)
+			return
+		}
+		s.discardMailActivation(activation, token)
 		return
 	}
 	attempted := false
@@ -159,7 +194,19 @@ func (s *Server) startStoppedMailActivation(ctx context.Context, activation stat
 		}
 		return
 	}
-	_ = s.stateStore.ReleaseMailActivation(activation.ActivationID, token)
+	s.releaseMailActivation(activation, token)
+}
+
+func (s *Server) releaseMailActivation(activation state.Activation, token string) {
+	if err := s.stateStore.ReleaseMailActivation(activation.ActivationID, token); err != nil {
+		s.log.Debug("release mail activation failed", "activation", activation.ActivationID, "err", err)
+	}
+}
+
+func (s *Server) discardMailActivation(activation state.Activation, token string) {
+	if err := s.stateStore.DiscardClaimedMailActivation(activation.ActivationID, token); err != nil {
+		s.log.Debug("discard mail activation failed", "activation", activation.ActivationID, "err", err)
+	}
 }
 
 func (s *Server) runMessageJanitor(ctx context.Context) {

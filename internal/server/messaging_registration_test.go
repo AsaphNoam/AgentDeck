@@ -98,7 +98,7 @@ func TestMailActivationStartsIdleAgentWithoutMutatingMailProvenance(t *testing.T
 	if err != nil {
 		t.Fatalf("InsertMessage: %v", err)
 	}
-	srv.nudgeOnce(context.Background(), agent.AgentID, map[string]nudgeState{})
+	srv.executePendingMailActivations(context.Background(), agent.AgentID)
 
 	deadline := time.Now().Add(3 * time.Second)
 	for {

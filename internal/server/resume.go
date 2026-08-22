@@ -164,12 +164,6 @@ func (s *Server) resumeSessionWithHooks(ctx context.Context, id string, override
 	if err != nil {
 		return apiError(runtime.CodeInternal, err.Error())
 	}
-	if before != nil {
-		if err := before(); err != nil {
-			return apiError(runtime.CodeInternal, err.Error())
-		}
-	}
-
 	// 4. Resolve the identity to resume. backend/model/interface come from the LIVE
 	// identity row (which switch-runtime keeps current), NOT the frozen snapshot:
 	// after a chat→terminal switch the snapshot's interface stays "chat" (no
@@ -259,6 +253,14 @@ func (s *Server) resumeSessionWithHooks(ctx context.Context, id string, override
 		Interface: iface,
 		CreatedAt: agent.CreatedAt,
 		Group:     agent.Group,
+	}
+	// Mail commits its non-replayable attempt immediately before composition, the
+	// first resume side effect (hook token, MCP registration, hook-settings file).
+	// All preceding validation must leave the claimed opportunity releasable.
+	if before != nil {
+		if err := before(); err != nil {
+			return apiError(runtime.CodeInternal, err.Error())
+		}
 	}
 	spec, ae := s.composeResumeSpec(resumeAgent, snap, backend, model)
 	if ae != nil {
