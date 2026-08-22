@@ -6,24 +6,25 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
-- **Ready change:** Pull-based context links are fully specified in FS-15 and TS-01.R22–R23,
-  TS-02.R24, TS-04.R28, and TS-05.R16. The waiting change is
-  [`pull-based-context-links.md`](../ready-changes/pull-based-context-links.md); it is not active.
-  Canonical references contain only immutable source identity, while direct grants, personal
-  hidden preference, and future work attachments own separate presentation and lifecycle.
-  Initial sources are exact transcript spans and accepted pipeline-attempt reports. Five
-  token-scoped MCP tools create/directly grant, list ad-hoc shares, read bounded pages, change
-  personal visibility, and revoke a direct grant. No context operation creates mail, activation,
-  prompt, transcript event, SSE payload, or copied artifact content. Work objects, dependencies,
-  assignment retrieval, and host-managed waiting remain follow-on features recorded in ideas.
+- **Ready change:** None waiting. `docs/ready-changes/` is empty.
 - **Active change:** None.
-- **State:** The 2026-08-22 design review raised two **Must fix** and six **Worth fixing** findings.
-  The design revision resolves all eight: it shares one Go normalized-event projection, makes the
-  pipeline-report window and handoff sequence explicit, removes unused seen state, narrows identity
-  deletion to schema hygiene, surfaces oversized-record omission, and defines both unavailable
-  outcomes. Direct grants deliberately remain active until grantor revocation or recipient deletion,
-  with no owner-management surface or automatic expiry in the current local, single-user product.
-  No product code has changed.
+- **State:** Pull-based context links shipped. An agent gives an immutable transcript span or an
+  accepted pipeline-attempt report a stable canonical reference id, grants one durable chat agent
+  access without copying content, and the recipient retrieves it through bounded token-authorized
+  reads. Five MCP tools (`share_context`, `list_context_links`, `read_context_link`,
+  `set_context_link_visibility`, `revoke_context_grant`) join the existing scoped `/mcp` server;
+  references, grant presentation, and personal hidden state are separate rows, and no context
+  operation creates mail, an activation, a provider prompt, a transcript event, or an SSE content
+  payload. `transcript.ProjectEvent` is now the one Go normalized-event projection: the search
+  indexer and the context renderer both derive from it, `runtime.AllEventTypes` closes the registry
+  for a table-driven test, and the reader's new oversized-record diagnostic becomes a bounded
+  omission marker instead of a silently clean page. FS-15 is Current; TS-01, TS-02, and TS-05
+  returned to Current with no `(planned)` items left. Work objects, dependencies, assignment
+  retrieval, and host-managed waiting remain follow-on features recorded in ideas.
+- **Previous state:** The 2026-08-22 design review raised two **Must fix** and six **Worth fixing**
+  findings; the design revision resolved all eight before implementation began. Direct grants
+  deliberately remain active until grantor revocation or recipient deletion, with no
+  owner-management surface or automatic expiry in the current local, single-user product.
 - **Previous state:** Every mail-activation finding is closed, including the eligibility regression the last
   review found. The executor's pre-split gate is now the terminal-interface exclusion alone
   (FS-07 §6, durable on both branches); the archived-agent, archived-project, and
@@ -166,26 +167,15 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   pass was run. A stale migration-version guard test (asserting 13 against the shipped 14) was already
   failing on `main` and now derives its expectation from the migrations slice (INV §9).
 - **Last reviewed code:** `1fd26ed` (2026-08-22), the continuous range after `2310206`
-  covering the mail-activation review records and both fix passes. Nothing is unreviewed.
+  covering the mail-activation review records and both fix passes. The pull-based context-link
+  implementation after `374cb5d` is unreviewed code.
 - **Branch:** `main`.
 
 ## Active change
 
-**State:** in progress — [`pull-based-context-links.md`](../ready-changes/pull-based-context-links.md)
+**State:** none
 
-Implementing FS-15 and TS-01.R22–R23, TS-02.R24, TS-04.R28, TS-05.R16 in order:
-
-1. the shared `transcript.ProjectEvent` normalized-event projection plus the reader's oversized-record
-   diagnostic, with the indexer routed through it (TS-01.R22, INV §2);
-2. the forward-only context migration and `internal/state` canonicalization/grant/preference rows
-   (TS-02.R24);
-3. the `internal/contextref` service — limits, source resolution, rendering, cursors, authorization
-   (FS-15.R1–R3, R9, R11–R16);
-4. the five token-scoped MCP tools, the context recipient directory, and server wiring
-   (TS-04.R28, TS-05.R16, FS-15.R4–R8, R10, R17);
-5. acceptance coverage A1–A7 and the specification status flip.
-
-**Next step:** piece 5 — fake-ACP provider-prompt coverage and the specification status flip.
+No implementation change is active. Do not select a waiting change without the human naming it.
 
 ## Decisions needing your input
 
@@ -223,202 +213,23 @@ None.
 
 ### Design review disposition
 
-Design review of the waiting change `pull-based-context-links.md` (FS-15, TS-01.R22–R23, TS-02.R24,
-TS-04.R28, TS-05.R16). Nothing shipped. All eight findings are resolved in the revised requirements.
-
-- **Resolved — shared Go transcript projection.** **INV §2, TS-01.R22, TS-04.R28:** the design
-  minted a second Go transcript
-  event→text projection without naming or rejecting the existing one. TS-01.R22 gives
-  `internal/contextref` "deterministic bounded rendering", and TS-04.R28 spells out its vocabulary —
-  "normalized prompts, tool activity/results, diffs, errors, annotations, and turn boundaries" plus
-  folded assistant deltas. That is the same per-event-type switch `searchableText` already
-  implements in Go at `internal/index/indexer.go:307-357` (`EvUserPrompt`, `EvAssistantText`,
-  `EvToolCall`, `EvToolResult`, `EvDiff`, `EvPermissionRequest`, `EvAnnotation`), and a third copy of
-  the same projection lives in `ui/src/store/transcriptStore.ts` as `foldTranscript` /
-  `appendRenderedEvent`. INV §2 names this exact drift twice — the delta-coalescing split between
-  live append and replay, and the canonical-helpers registry entry for "identical live and replay
-  event projection". Normal-use trigger: a new normalized event type (or a changed payload field)
-  lands in the runtime and is added to one or two of the three projections; the context read then
-  renders a granted span with a silently missing or stale event class, and no test sees it because
-  each projection has its own fixtures. *Fix:* have TS-01.R22 name the existing Go projection as the
-  seam, extract the shared event→text switch (or state explicitly why a search bag-of-words
-  projection cannot carry a readable rendering and what keeps the two in lockstep), and add its entry
-  to the INV §2 canonical-helpers registry. *Test:* one table-driven case per `runtime.Ev*` constant
-  asserting every event type is handled by every projection, so adding a constant fails until all are
-  updated.
-
-  **Revision:** TS-01.R22 now puts typed event decoding in
-  `internal/transcript.ProjectEvent`, makes the index and context renderer derive their different
-  outputs from it, and adds `runtime.AllEventTypes` exhaustive coverage plus the planned helper to
-  the INV §2 registry. The TypeScript UI reducer remains separate because it produces UI objects,
-  while its live/replay paths already share one reducer.
-
-- **Resolved — pipeline-report selector window.** **FS-15.R4/A3, TS-04.R28, TS-09.R9/R11**
-  (no invariant class): `source:"current_pipeline_report"` was
-  reachable only inside the reporting turn, which no requirement says. TS-04.R28 resolves it by
-  joining "the caller plus token generation to the current pipeline attempt"; the shipped join is
-  `CurrentPipelineAttemptForAgent` (`internal/state/pipelines.go:713-733`), which requires
-  `pipeline_runs.current_agent_id = caller` **and** `pipeline_attempts.attempt_id =
-  pipeline_runs.current_attempt_id`. TS-09.R9 makes the report visible before the tool returns, but
-  TS-09.R10 puts quiescence at the persisted `turn_end`, and TS-09.R11 then claims the transition,
-  stops the reporting agent, and repoints `current_attempt_id`/`current_agent_id` at the next attempt
-  (`internal/pipeline/reconcile.go:161`) or clears them on a final outcome
-  (`internal/pipeline/actions.go:62`). Normal-use trigger: a stage agent reports its result and ends
-  its turn; from that moment its token is revoked and no share is possible, and no later agent can
-  ever reference a completed stage's report because the selector only names the caller's own current
-  attempt. The whole source kind therefore buys a second locator shape, a second partial unique
-  index (`idx_context_ref_pipeline_report`), a second renderer, and the A3/A7 evidence for a
-  single-turn window — while the change file presents "accepted pipeline-attempt reports" as a
-  first-class initial source. *Fix:* either state the window in FS-15.R4 and TS-04.R28 (share must
-  happen in the same turn as `report_pipeline_stage_result`, before `turn_end`) and say what makes
-  that worth the second source kind, or drop the pipeline source from the first cut and let the
-  follow-on work-object feature attach reports when it owns a durable way to reach them. *Test:* a
-  pipeline integration case that reports, ends the turn, reaches quiescence, and asserts the
-  selector's behaviour explicitly rather than only the happy in-turn path A3 currently names.
-
-  **Revision:** FS-15.R4/A3 and TS-04.R28 now require report → share before `turn_end`, define the
-  post-quiescence `source_unavailable` result, and test that an already-created reference remains
-  readable. The source stays because accepted reports are concise immutable results and their
-  canonical identities are reusable by the imminent work-attachment feature.
-
-- **Resolved — remove unused seen state.** **FS-15.R7/R6/A4, TS-02.R24, TS-04.R28:** the personal
-  seen/hidden projection
-  is write-only machinery no requirement consumes. `context_grant_views` is a whole table,
-  `set_context_link_visibility` a whole tool, and R7 three state transitions — yet `seen_at` is
-  written by `read_context_link` and read back by nothing: `list_context_links` returns "bounded
-  grant presentation/provenance and intrinsic source metadata", no unread count, filter, badge, or
-  ordering uses it, and the feature ships no human surface at all. Hiding then serves a list that
-  R6 itself says an agent "is not expected to infer which context belongs to its current assignment"
-  from, bounded at 50 with a cursor. Under workflow §13 lens 1 this is capability held "in case".
-  *Fix:* drop `seen_at`, `set_context_link_visibility`, and `context_grant_views` from the first
-  cut, or give `seen_at` a consumer in FS-15 (an unread marker in `list_context_links`) so the write
-  path has a reason to exist. Revocation and its `revoked_at` column carry their own authorization
-  justification and should stay either way.
-
-  **Revision:** `seen_at` and all read-side mutations are removed. Hidden/unhidden remains because
-  it is directly consumed by `list_context_links` and implements the already-approved “hide this
-  ad-hoc grant, do not detach work context” behavior; the table is narrowed and renamed
-  `context_grant_preferences`.
-
-- **Resolved — narrow deletion to durable hygiene.** **FS-15.R14/A7, TS-02.R24** (no invariant
-  class): identity deletion has no product path, so R14
-  specifies an unreachable operation. There is no agent-delete route — `internal/server/routes.go`
-  exposes archive/restore for agents and DELETE only for roles, projects, pipeline templates,
-  pipeline runs, and config sources — and `state.DeleteAgent` has exactly one caller,
-  `internal/server/launch.go:116`, the failed-launch rollback, where the agent is seconds old and can
-  hold no grants. R14's grantor/recipient asymmetry, the "cannot cascade into another grant" clause,
-  and A7's "recipient deletion removes only its direct grants" integration test therefore describe
-  behaviour nothing can trigger; the only live effect is the `ON DELETE CASCADE` on
-  `granted_to_agent_id`, which mirrors `messages.to_agent` and is cheap enough to keep. Note also
-  that R14 diverges from that precedent by making the grantor a logical id with no foreign key, so a
-  grant may name a grantor row that does not exist and `list_context_links` provenance would show a
-  dangling id — harmless today only because deletion is unreachable. *Fix:* reduce R14 to the
-  durable rule (recipient cascade, grantor retained as provenance, no cascade into transcripts or
-  pipeline records) and drop A7's deletion journey, or record why the requirement is being written
-  ahead of the operation it governs. Source deletion is different and should stay: pipeline runs
-  *are* deletable (`DELETE /api/pipeline-runs/{id}`, TS-09.R14), so R13's tombstone is reachable for
-  the pipeline half.
-
-  **Revision:** R14 now explicitly adds no agent-deletion operation, retains only the defensive
-  recipient FK cascade and logical grantor provenance, and A7 tests the FK at state level rather
-  than inventing a user journey. Reachable pipeline source deletion still tests tombstones.
-
-- **Resolved — accepted narrow lifecycle tradeoff.** **TS-05.R16, FS-15 §6, TS-02.R24**
-  (no invariant class): the feature creates durable cross-agent
-  authorization over data TS-05.R16 itself calls credential-bearing, and gives the human no way to
-  see, audit, revoke, or expire it. Revocation is grantor-scoped (`revoke_context_grant`), so the
-  only party who can withdraw access to a transcript span is the agent that shared it; the exclusion
-  list rules out any dashboard or REST context surface; and TS-02.R24 states outright that
-  references and grants "have no user delete or retention path in this feature", unlike mail's
-  `MailReadTTL`/`MailHardTTL` janitor (`internal/messaging/constants.go`). Normal-use trigger: an
-  agent shares a span containing an API key pasted into chat, then stops; the grant is durable,
-  invisible, and permanent. This is a product/privacy decision (workflow §3), not an implementation
-  detail. *Fix:* put the question to the human — either add a minimal owner surface (list + revoke,
-  reusing the existing owner-only API boundary) or a retention bound, or record in FS-15 §6 that the
-  human accepted permanent invisible grants and why.
-
-  **Revision:** the human classified this as a non-issue edge case and chose the simplest policy
-  without extra wiring: direct grants persist until grantor revocation or recipient deletion, with
-  no owner-management surface or automatic expiry. FS-15 §6, TS-02.R24, TS-05.R16, and the ready
-  change record the local single-user rationale and the conditions for revisiting it.
-
-- **Resolved — visible oversized-record omission.** **TS-04.R28, INV §7:** the "never silently
-  omitted" guarantee contradicts the
-  transcript reader the design reads through. TS-04.R28 promises "A single oversized field is chunked
-  through the same cursor rather than copied whole or silently omitted", and TS-01.R22 delegates
-  transcript reads to `internal/transcript`. That reader caps a record at `maxRecordSize` = 8 MiB and
-  drops any longer record with no error and no marker — `readLine` sets `oversized`, discards the
-  bytes, and `forEachBuffered` skips it (`internal/transcript/reader.go:74-135`, `readLine` at 110). The skip is
-  deliberate, paid for by INV §7 (one oversized line used to abort the whole transcript). Normal-use
-  trigger: a granted span contains one huge tool result or diff; the recipient's read returns a
-  clean, `complete: true` page with that event invisibly absent. *Fix:* say in TS-04.R28 which
-  behaviour wins — either the read surfaces a bounded "record omitted" marker for a skipped
-  oversized record, or the guarantee is scoped to fields the reader actually returns. *Test:* a
-  render case over a span containing an oversized record asserting the chosen outcome.
-
-  **Revision:** TS-01.R22 adds an opt-in skipped-record diagnostic without weakening tolerant reads
-  for existing callers; TS-04.R28 requires the context renderer to emit a bounded omission marker
-  at the skipped record's stream position and adds acceptance coverage.
-
-- **Resolved — distinct unavailable outcomes.** **TS-04.R28, FS-15.R13:** the outcome vocabulary
-  has two overlapping
-  source-unavailable codes and defines one. TS-04.R28's stable-outcome list contains both
-  `context_source_unavailable` and `source_unavailable`; FS-15.R13 defines only
-  `context_source_unavailable` (the deletion tombstone), and no requirement anywhere says when
-  `source_unavailable` fires or how a caller should tell them apart. An agent-facing outcome
-  vocabulary is a contract (FS-15.R9 depends on `context_not_found` being exactly one thing).
-  *Fix:* delete `source_unavailable` or give it a defining requirement.
-
-  **Revision:** `source_unavailable` is now the atomic share-time outcome when a friendly selector
-  has no eligible current source; `context_source_unavailable` is reserved for an authorized
-  canonical reference whose durable source later became unreadable or deleted.
-
-- **Resolved — explicit in-turn handoff sequence.** **FS-15.R1/R2/R10, TS-04.R28:** neither
-  transcript selector can cover the turn
-  the caller is completing, which the outcome story assumes. `current_turn` snapshots "the highest
-  complete transcript sequence visible at the call", so everything the agent writes after invoking
-  `share_context` — including the assistant text that states its conclusion — falls outside the
-  span; and because R1/R2 make the reference an immutable exact range, that span can never be
-  extended, while a later `latest_completed_turn` share mints a *different* reference id for
-  overlapping content. `latest_completed_turn` covers the finished turn but only from inside a
-  *subsequent* turn, and R10 guarantees that no context operation creates an activation, so nothing
-  in this feature can give the agent that subsequent turn. Normal-use trigger: an agent finishes a
-  piece of work and wants to hand it over; sharing in-turn truncates the conclusion, sharing the
-  whole turn requires an unrelated user prompt, mail activation, or pipeline assignment to run
-  first. *Fix:* record in FS-15 §2.2 how the intended hand-off sequence actually runs (most likely
-  "share as the last tool call, then send ordinary mail naming the reference id", which R10 already
-  contemplates) so the implementation and its acceptance evidence exercise that path rather than a
-  synthetic one.
-
-  **Revision:** FS-15.R4/A2 and TS-04.R28 require conclusion text before `share_context`, make the
-  share the final context-producing action, allow optional ordinary mail containing only the id,
-  and test that pre-share text is included while later text is not. `latest_completed_turn` remains
-  available only from a later turn started for an independent reason; context does not wake itself.
-
-Considered and not promoted: reusing `state.ResolveRecipient` even though its terminal-agent filter
-is documented in mail terms (FS-15.R17 adopts that exclusion deliberately, and the helper is a pure
-function over a caller-supplied set, so TS-01.R22's separate directory query is the right split);
-the per-page rescan of `transcript.ndjson` implied by cursor paging (an efficiency question at
-realistic transcript sizes, not a correctness one); the unproven MCP `resources/list`/`resources/read`
-claim in TS-04.R28 and FS-15 §6 (it is stated as an unpassed TS-04.R11 compatibility gate rather than
-an impossibility, and the go-sdk v1.6.1 dependency does not contradict it); and `PRAGMA
-foreign_keys=ON` (verified at `internal/state/state.go:42`, so TS-02.R24's cascades are real).
-
-The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
-and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
-are not promoted to findings without a repeatable failure. Also considered and not promoted:
-`isPickerCancel`'s unanchored `-128` substring and `verifyPickedDirectory` skipping `filepath.Clean`
-(both speculative — `POSIX path of (choose folder)` returns a clean absolute path and a real cancel
-always emits `(-128)`). This review also considered and did not promote: the residual window between
-the executor's `lifecycleInFlight` hint and `StartActivation` taking the turn gate (TS-01.R21 defines
-that check as a hint, and an ordinary user prompt shares the same window); `resumeSessionWithHooks`
-stopping a freshly resumed agent whose status is momentarily not `idle` (harsh, but INV §4-correct,
-and the attempt is already consumed); `startStoppedMailActivation` repeating `wakeAgent`'s
-gate-then-resume shape (only the three-line gate call is duplicated — composition and teardown are
-shared); `last_trace: "MailActivation"` (no spec vocabulary or UI surface reads that field); and the
-pre-existing `gofmt` diff in `internal/index/indexer_fts_test.go` (outside this range).
+The 2026-08-22 design review of pull-based context links is closed. All eight findings were resolved
+in the requirements before implementation, and the change has since shipped; the resolved detail
+lives in FS-15, TS-01.R22–R23, TS-02.R24, TS-04.R28, TS-05.R16 and in Git history.
 
 ## Recent changelog
+
+- 2026-08-22 — Shipped pull-based context links (FS-15, TS-01.R22–R23, TS-02.R24, TS-04.R28,
+  TS-05.R16) in five verified pieces: the shared `transcript.ProjectEvent` projection plus the
+  reader's oversized-record diagnostic with the indexer routed through it (INV §2/§7); migration 17
+  and the canonicalization/grant/preference state layer (INV §5/§15); the `internal/contextref`
+  service with bounded deterministic paging, opaque non-authoritative cursors, and tombstones; the
+  five token-scoped MCP tools and the dashboard wiring; and A1–A7 coverage including live-dashboard
+  fake-ACP proof that no context operation sends a provider prompt. FS-15 is Current and TS-01,
+  TS-02, and TS-05 returned to Current. Both finished change files were removed from
+  `docs/ready-changes/`: `separate-orchestration-planes.md` was residue from the already-shipped
+  mail-activation work. `make check-specs`, `make test` (both tag variants), `make build`,
+  `go vet ./...`, focused `-race` runs, and `git diff --check` pass.
 
 - 2026-08-22 — design decision: closed the final pull-based context-link finding. The human treated
   durable invisible grants as a non-issue edge case and chose no additional owner UI or expiry

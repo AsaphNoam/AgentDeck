@@ -1,7 +1,7 @@
 # TS-01 — Architecture
 
-**Status:** Partial
-**Code:** `internal/server`, `internal/runtime`, `internal/state`, `internal/index`, `internal/bus`, `internal/config`, `internal/configsource`, `internal/messaging`, `internal/contextref` (planned), `internal/pipeline`, `internal/backend`, `internal/archive`, `internal/transcript`, `internal/cli`, `ui/src`
+**Status:** Current
+**Code:** `internal/server`, `internal/runtime`, `internal/state`, `internal/index`, `internal/bus`, `internal/config`, `internal/configsource`, `internal/messaging`, `internal/contextref`, `internal/pipeline`, `internal/backend`, `internal/archive`, `internal/transcript`, `internal/cli`, `ui/src`
 **Absorbed:** architecture contract from [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md); rationale remains in [`architecture-decisions.md`](../../architecture-decisions.md) D1–D5
 
 ## 1. Scope
@@ -31,7 +31,7 @@ runtime — the messaging MCP server and embedded UI live inside the Go binary (
 | `internal/config` | Plain-JSON config store under `~/.agentdeck`, atomic writes, slug validation, layout/dir modes, pipeline templates |
 | `internal/configsource` | Phase 7 federation: Claude/Codex native-config discovery, binding, effective view |
 | `internal/messaging` | In-process agent-facing MCP gateway and token→agent registry; handlers delegate messaging and TS-09 pipeline result/proposal semantics to their owning services |
-| `internal/contextref` `(planned)` | Canonical context-reference identity, typed source resolution/rendering, direct-grant authorization, and bounded reads; no artifact payload store or scheduler |
+| `internal/contextref` | Canonical context-reference identity, typed source resolution/rendering, direct-grant authorization, and bounded reads; no artifact payload store or scheduler |
 | `internal/pipeline` | Template validation, durable sequential run state machine, transition reconciliation, stage-result and AgentDecker proposal services |
 | `internal/backend` | Backend/model adapter contracts, env layering, credential checks (`credcheck`) |
 | `internal/archive` | Session archive queries + FTS-backed search |
@@ -238,7 +238,7 @@ remain actionable until its owning durable task/attempt records a successful sta
 kind-specific instruction is the only activation data sent to the provider, and it is not appended
 as a user-authored AgentDeck transcript event.
 
-**R22 `(planned)` — Context references are one in-process context-plane
+**R22 — Context references are one in-process context-plane
 service.** `internal/contextref` owns canonicalization of typed immutable source locators, source
 validation, bounded source composition, direct-grant authorization, and personal direct-share
 projection. It delegates durable rows to `internal/state`, transcript reads and normalized-event
@@ -273,7 +273,7 @@ running or stopped, and pipeline association is irrelevant because a grant start
 separate query is one state snapshot and one code-owned predicate so context sharing cannot inherit
 mail retry/lifecycle policy by accident (INV §2/§5).
 
-**R23 `(planned)` — Reference, authorization, attachment, and personal state
+**R23 — Reference, authorization, attachment, and personal state
 remain separate.** A canonical reference is keyed only by its immutable source locator. Direct
 grants authorize an agent and own grant-specific presentation; personal hidden/visible preference
 affects only the recipient's ad-hoc list. A future work domain owns its own attachment and durable
@@ -362,7 +362,7 @@ lost.
   deletion cleanup.
 - Activation plane (R18–R21): `internal/state/activations.go`, the server activation executor,
   runtime turn-start arbitration, and mail/wake integration tests.
-- Context plane (R22–R23, planned): `internal/contextref`, durable rows in `internal/state`, the
+- Context plane (R22–R23): `internal/contextref`, durable rows in `internal/state`, the
   shared `internal/transcript.ProjectEvent` seam plus skipped-record diagnostics, the existing
   `internal/messaging` authority, and separation/coverage named by FS-15.A1/A5/A6.
 - Archive transition gate: `internal/server/archive_gate.go`, `archive_actions.go`, and

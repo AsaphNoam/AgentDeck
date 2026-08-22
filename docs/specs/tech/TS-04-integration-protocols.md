@@ -1,7 +1,7 @@
 # TS-04 — Integration protocols
 
 **Status:** Partial
-**Code:** `internal/runtime`, `internal/hooks`, `internal/messaging`, `internal/server`, `internal/backend`, `internal/contextref` (planned)
+**Code:** `internal/runtime`, `internal/hooks`, `internal/messaging`, `internal/server`, `internal/backend`, `internal/contextref`
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
 ## 1. Scope
@@ -251,7 +251,7 @@ bridge only through a separately capability-gated requirement; document notifica
 inferred wake contract. R27 replaces the unread/cooldown nudge mechanics superseded in R26;
 FS-06.R24–R27 have shipped. Recipient discovery and the shared wakeability query remain unchanged.
 
-**R28 `(planned)` — Pull-based context extends the existing scoped MCP
+**R28 — Pull-based context extends the existing scoped MCP
 authority with tools, not prompt resources.** The one `/mcp` server adds five bounded tools whose
 caller and launch generation come from the existing token session:
 
@@ -403,7 +403,7 @@ global resource list.
   `internal/server/config_sources.go` and `internal/config/codexmodels.go`.
 - Hooks: `internal/hooks`, `internal/server/hook.go`, registration in `launch.go`.
 - MCP: `internal/messaging/messaging.go`, `tools.go`, `internal/server/messaging_registration.go`.
-- Context tools (R28, planned): registration/handlers in `internal/messaging`, the shared service in
+- Context tools (R28): registration/handlers in `internal/messaging`, the shared service in
   `internal/contextref`, the `internal/transcript` event projection/skipped-record diagnostic, and
   token-bound fake-ACP coverage named by FS-15.A2–A7.
 - Terminal: `internal/runtime/terminal`, `internal/server/terminal.go`.

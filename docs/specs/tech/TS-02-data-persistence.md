@@ -1,7 +1,7 @@
 # TS-02 — Data & persistence
 
-**Status:** Partial
-**Code:** `internal/config`, `internal/state`, `internal/transcript`, `internal/index`, `internal/archive`, `internal/configsource`, `internal/contextref` (planned)
+**Status:** Current
+**Code:** `internal/config`, `internal/state`, `internal/transcript`, `internal/index`, `internal/archive`, `internal/configsource`, `internal/contextref`
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
 ## 1. Scope
@@ -228,7 +228,7 @@ marked `delivered_via = 'pending'`, coalescing all such rows. Legacy `nudge`, `p
 the old attempt boundary; reactivating them on upgrade would duplicate work. Message read/hard
 retention and turn-budget rows remain unchanged.
 
-**R24 `(planned)` — Context references, direct grants, and personal preferences
+**R24 — Context references, direct grants, and personal preferences
 have separate durable rows.** One forward-only migration adds the logical shape below (the
 executable migration may use equivalent check constraints and indexes):
 
@@ -353,7 +353,7 @@ R1–R24 and must be reflected here when its contract changes.
 - Transcript: `internal/transcript/writer.go`, `reader.go`; runtime append in
   `internal/runtime/chat.go`.
 - Index/archive: `internal/index/indexer.go`, `reindex.go`, `internal/archive/archive.go`.
-- Context reference persistence (R24, planned): forward-only tables and typed state methods in
+- Context reference persistence (R24): forward-only tables and typed state methods in
   `internal/state`, consumed through `internal/contextref`; canonicalization, cascade, tombstone,
   grant, and personal-preference regressions named by FS-15.A1–A5/A7.
 - Regression anchors: `TestHomeTreeIsOwnerOnly`, `TestStateDBIsOwnerOnly`,

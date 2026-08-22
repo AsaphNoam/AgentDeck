@@ -1,7 +1,7 @@
 # TS-05 — Security & trust boundaries
 
-**Status:** Partial
-**Code:** `internal/server`, `internal/config`, `internal/configsource`, `internal/runtime`, `internal/messaging`, `internal/backend`, `internal/contextref` (planned)
+**Status:** Current
+**Code:** `internal/server`, `internal/config`, `internal/configsource`, `internal/runtime`, `internal/messaging`, `internal/backend`, `internal/contextref`
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md), the [phase archive manifest](../../archive/phases/README.md), and [`INVARIANTS.md`](../../features/INVARIANTS.md) §14
 
 ## 1. Scope
@@ -81,7 +81,7 @@ no directory-listing endpoint, recursive walk, content read, upload, bookmark, r
 log field. The command uses the fixed `/usr/bin/osascript` path with fixed script text and no shell,
 and cancellation/failure responses disclose neither a selected path nor script diagnostics.
 
-**R16 `(planned)` — Context retrieval is capability-scoped and content-safe.** Every context MCP
+**R16 — Context retrieval is capability-scoped and content-safe.** Every context MCP
 operation first resolves the existing per-launch token to caller plus generation. Source creation
 accepts only server-derived ownership selectors; no tool argument may name another agent's
 transcript, another generation's attempt, a filesystem path, URL, SQLite key, or arbitrary source
@@ -157,7 +157,7 @@ Their concrete payloads are owned by TS-03, TS-04, and TS-07.
 - Folder selection (R15): `internal/server/directory_picker.go` — the fixed `/usr/bin/osascript`
   path, the sentinel failures that keep script output out of responses and logs, and
   `TestDirectoryPickerRejectsNonLocalHost` / `TestDirectoryPickerFailuresAreSafeAndOpaque`.
-- Context authorization (R16, planned): token-derived identity in `internal/messaging`, centralized
+- Context authorization (R16): token-derived identity in `internal/messaging`, centralized
   authorization/rendering in `internal/contextref`, and adversarial coverage named by FS-15.A2/A5–A7.
 - Regression anchors: `TestDNSRebindingHostRejected`, `TestCrossOriginRequestRejected`,
   `TestHomeTreeIsOwnerOnly`, `TestPathTraversalRejected`, federation redaction/symlink tests.

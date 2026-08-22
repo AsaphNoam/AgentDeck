@@ -4,6 +4,41 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-22 — Implementation: agents can hand each other context without copying it
+
+An agent can now give another agent access to a piece of its own work — the turn it is in the middle
+of, its last finished turn, or the report it just filed for a pipeline stage — and the other agent
+retrieves it only when it actually wants it. The sharer gets back a short id. Nothing is copied,
+nothing is pushed into the other agent's conversation, and the share on its own never starts a model
+turn, sends mail, or wakes a stopped agent. If the sender also wants attention, it sends ordinary
+mail carrying just that id.
+
+The receiving agent can list what has been shared with it, read it a page at a time, hide entries it
+does not care about, and the sender can withdraw a share at any point. Hiding and withdrawing are
+deliberately different things: hiding only tidies one agent's own list. The same piece of work always
+gets the same id no matter how many agents it is shared with, so a later feature can attach it to a
+task without inventing a second identity for it.
+
+Two safety properties are worth calling out. An agent can only share its own work — the request names
+which of *its* things to share, never someone else's — and an id someone is not entitled to read
+looks exactly like an id that does not exist, so ids cannot be used to probe what other agents are
+doing. Archiving an agent keeps its shared context readable; deleting it turns the share into an
+honest "no longer available" rather than quietly pointing at something newer.
+
+One piece of cleanup came with this: search indexing and this new reader now share a single
+description of what a transcript event contains, instead of two copies that would drift. A test
+enumerates every event type so a future one cannot silently vanish from search or from shared
+context, and an oversized record that the reader has always skipped is now visibly marked rather
+than leaving a page that looks complete.
+
+Full test, build, race, and specification checks are green, including a check on the running
+dashboard that sharing and reading send nothing to the model provider.
+
+**Needs attention:** None.
+
+**Next:** A review can cover this implementation; it is the only unreviewed code on `main`. There is
+no waiting change after it — work objects and dependency-aware agents remain ideas.
+
 ### 2026-08-22 — Fix: mail delivery to agents that have run a pipeline
 
 An agent that is running normally now receives its mail again, even if it took part in a pipeline earlier in its life. The last change checked a "was this agent part of a pipeline?" rule against every recipient, but that rule exists only to keep a stopped pipeline agent asleep — the pipeline decided to stop it, so a message should not restart it. Applied to a running agent it meant the sender saw a success, the unread badge went up, and the agent was never prompted to look at its mailbox. Since the pipeline record is never cleared, that agent would have stayed silently unreachable by mail forever.
