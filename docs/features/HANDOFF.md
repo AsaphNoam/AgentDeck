@@ -10,20 +10,20 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   TS-02.R24, TS-04.R28, and TS-05.R16. The waiting change is
   [`pull-based-context-links.md`](../ready-changes/pull-based-context-links.md); it is not active.
   Canonical references contain only immutable source identity, while direct grants, personal
-  seen/hidden projection, and future work attachments own separate presentation and lifecycle.
+  hidden preference, and future work attachments own separate presentation and lifecycle.
   Initial sources are exact transcript spans and accepted pipeline-attempt reports. Five
   token-scoped MCP tools create/directly grant, list ad-hoc shares, read bounded pages, change
   personal visibility, and revoke a direct grant. No context operation creates mail, activation,
   prompt, transcript event, SSE payload, or copied artifact content. Work objects, dependencies,
   assignment retrieval, and host-managed waiting remain follow-on features recorded in ideas.
 - **Active change:** None.
-- **State:** The pull-based context-links design was reviewed on 2026-08-22 before implementation.
-  Two **Must fix** and six **Worth fixing** findings are open under `## Review findings`; the change
-  stays **Waiting to start** and must not begin while the Must-fix items are open (workflow §13).
-  Resolving them is follow-on `/design-feature` work with the human, which removes each finding as it
-  revises. No specification, change file, or product code was edited by the review. The design
-  session's output was still uncommitted at review start; it was committed unchanged as `cee1425`
-  first so the review-state commit does not reference untracked files.
+- **State:** The 2026-08-22 design review raised two **Must fix** and six **Worth fixing** findings.
+  The design revision resolves all eight: it shares one Go normalized-event projection, makes the
+  pipeline-report window and handoff sequence explicit, removes unused seen state, narrows identity
+  deletion to schema hygiene, surfaces oversized-record omission, and defines both unavailable
+  outcomes. Direct grants deliberately remain active until grantor revocation or recipient deletion,
+  with no owner-management surface or automatic expiry in the current local, single-user product.
+  No product code has changed.
 - **Previous state:** Every mail-activation finding is closed, including the eligibility regression the last
   review found. The executor's pre-split gate is now the terminal-interface exclusion alone
   (FS-07 §6, durable on both branches); the archived-agent, archived-project, and
@@ -171,9 +171,21 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Active change
 
-**State:** none
+**State:** in progress — [`pull-based-context-links.md`](../ready-changes/pull-based-context-links.md)
 
-No implementation change is active. Do not select a waiting change without the human naming it.
+Implementing FS-15 and TS-01.R22–R23, TS-02.R24, TS-04.R28, TS-05.R16 in order:
+
+1. the shared `transcript.ProjectEvent` normalized-event projection plus the reader's oversized-record
+   diagnostic, with the indexer routed through it (TS-01.R22, INV §2);
+2. the forward-only context migration and `internal/state` canonicalization/grant/preference rows
+   (TS-02.R24);
+3. the `internal/contextref` service — limits, source resolution, rendering, cursors, authorization
+   (FS-15.R1–R3, R9, R11–R16);
+4. the five token-scoped MCP tools, the context recipient directory, and server wiring
+   (TS-04.R28, TS-05.R16, FS-15.R4–R8, R10, R17);
+5. acceptance coverage A1–A7 and the specification status flip.
+
+**Next step:** piece 1.
 
 ## Decisions needing your input
 
@@ -205,14 +217,17 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-### Open findings
+None.
+
+## Review history
+
+### Design review disposition
 
 Design review of the waiting change `pull-based-context-links.md` (FS-15, TS-01.R22–R23, TS-02.R24,
-TS-04.R28, TS-05.R16). Nothing shipped, so every finding is a specification change made with the
-human under workflow §11; the change stays **Waiting to start** while the two **Must fix** items are
-open.
+TS-04.R28, TS-05.R16). Nothing shipped. All eight findings are resolved in the revised requirements.
 
-- **Must fix** — **INV §2, TS-01.R22, TS-04.R28:** the design mints a second Go transcript
+- **Resolved — shared Go transcript projection.** **INV §2, TS-01.R22, TS-04.R28:** the design
+  minted a second Go transcript
   event→text projection without naming or rejecting the existing one. TS-01.R22 gives
   `internal/contextref` "deterministic bounded rendering", and TS-04.R28 spells out its vocabulary —
   "normalized prompts, tool activity/results, diffs, errors, annotations, and turn boundaries" plus
@@ -232,7 +247,14 @@ open.
   asserting every event type is handled by every projection, so adding a constant fails until all are
   updated.
 
-- **Must fix** — **FS-15.R4/A3, TS-04.R28, TS-09.R9/R11** (no invariant class): `source:"current_pipeline_report"` is
+  **Revision:** TS-01.R22 now puts typed event decoding in
+  `internal/transcript.ProjectEvent`, makes the index and context renderer derive their different
+  outputs from it, and adds `runtime.AllEventTypes` exhaustive coverage plus the planned helper to
+  the INV §2 registry. The TypeScript UI reducer remains separate because it produces UI objects,
+  while its live/replay paths already share one reducer.
+
+- **Resolved — pipeline-report selector window.** **FS-15.R4/A3, TS-04.R28, TS-09.R9/R11**
+  (no invariant class): `source:"current_pipeline_report"` was
   reachable only inside the reporting turn, which no requirement says. TS-04.R28 resolves it by
   joining "the caller plus token generation to the current pipeline attempt"; the shipped join is
   `CurrentPipelineAttemptForAgent` (`internal/state/pipelines.go:713-733`), which requires
@@ -254,7 +276,13 @@ open.
   pipeline integration case that reports, ends the turn, reaches quiescence, and asserts the
   selector's behaviour explicitly rather than only the happy in-turn path A3 currently names.
 
-- **Worth fixing** — **FS-15.R7/R6/A4, TS-02.R24, TS-04.R28:** the personal seen/hidden projection
+  **Revision:** FS-15.R4/A3 and TS-04.R28 now require report → share before `turn_end`, define the
+  post-quiescence `source_unavailable` result, and test that an already-created reference remains
+  readable. The source stays because accepted reports are concise immutable results and their
+  canonical identities are reusable by the imminent work-attachment feature.
+
+- **Resolved — remove unused seen state.** **FS-15.R7/R6/A4, TS-02.R24, TS-04.R28:** the personal
+  seen/hidden projection
   is write-only machinery no requirement consumes. `context_grant_views` is a whole table,
   `set_context_link_visibility` a whole tool, and R7 three state transitions — yet `seen_at` is
   written by `read_context_link` and read back by nothing: `list_context_links` returns "bounded
@@ -267,7 +295,13 @@ open.
   path has a reason to exist. Revocation and its `revoked_at` column carry their own authorization
   justification and should stay either way.
 
-- **Worth fixing** — **FS-15.R14/A7, TS-02.R24** (no invariant class): identity deletion has no product path, so R14
+  **Revision:** `seen_at` and all read-side mutations are removed. Hidden/unhidden remains because
+  it is directly consumed by `list_context_links` and implements the already-approved “hide this
+  ad-hoc grant, do not detach work context” behavior; the table is narrowed and renamed
+  `context_grant_preferences`.
+
+- **Resolved — narrow deletion to durable hygiene.** **FS-15.R14/A7, TS-02.R24** (no invariant
+  class): identity deletion has no product path, so R14
   specifies an unreachable operation. There is no agent-delete route — `internal/server/routes.go`
   exposes archive/restore for agents and DELETE only for roles, projects, pipeline templates,
   pipeline runs, and config sources — and `state.DeleteAgent` has exactly one caller,
@@ -285,7 +319,12 @@ open.
   *are* deletable (`DELETE /api/pipeline-runs/{id}`, TS-09.R14), so R13's tombstone is reachable for
   the pipeline half.
 
-- **Worth fixing** — **TS-05.R16, FS-15 §6, TS-02.R24** (no invariant class): the feature creates durable cross-agent
+  **Revision:** R14 now explicitly adds no agent-deletion operation, retains only the defensive
+  recipient FK cascade and logical grantor provenance, and A7 tests the FK at state level rather
+  than inventing a user journey. Reachable pipeline source deletion still tests tombstones.
+
+- **Resolved — accepted narrow lifecycle tradeoff.** **TS-05.R16, FS-15 §6, TS-02.R24**
+  (no invariant class): the feature creates durable cross-agent
   authorization over data TS-05.R16 itself calls credential-bearing, and gives the human no way to
   see, audit, revoke, or expire it. Revocation is grantor-scoped (`revoke_context_grant`), so the
   only party who can withdraw access to a transcript span is the agent that shared it; the exclusion
@@ -298,7 +337,13 @@ open.
   reusing the existing owner-only API boundary) or a retention bound, or record in FS-15 §6 that the
   human accepted permanent invisible grants and why.
 
-- **Worth fixing** — **TS-04.R28, INV §7:** the "never silently omitted" guarantee contradicts the
+  **Revision:** the human classified this as a non-issue edge case and chose the simplest policy
+  without extra wiring: direct grants persist until grantor revocation or recipient deletion, with
+  no owner-management surface or automatic expiry. FS-15 §6, TS-02.R24, TS-05.R16, and the ready
+  change record the local single-user rationale and the conditions for revisiting it.
+
+- **Resolved — visible oversized-record omission.** **TS-04.R28, INV §7:** the "never silently
+  omitted" guarantee contradicts the
   transcript reader the design reads through. TS-04.R28 promises "A single oversized field is chunked
   through the same cursor rather than copied whole or silently omitted", and TS-01.R22 delegates
   transcript reads to `internal/transcript`. That reader caps a record at `maxRecordSize` = 8 MiB and
@@ -311,7 +356,12 @@ open.
   oversized record, or the guarantee is scoped to fields the reader actually returns. *Test:* a
   render case over a span containing an oversized record asserting the chosen outcome.
 
-- **Worth fixing** — **TS-04.R28, FS-15.R13:** the outcome vocabulary has two overlapping
+  **Revision:** TS-01.R22 adds an opt-in skipped-record diagnostic without weakening tolerant reads
+  for existing callers; TS-04.R28 requires the context renderer to emit a bounded omission marker
+  at the skipped record's stream position and adds acceptance coverage.
+
+- **Resolved — distinct unavailable outcomes.** **TS-04.R28, FS-15.R13:** the outcome vocabulary
+  has two overlapping
   source-unavailable codes and defines one. TS-04.R28's stable-outcome list contains both
   `context_source_unavailable` and `source_unavailable`; FS-15.R13 defines only
   `context_source_unavailable` (the deletion tombstone), and no requirement anywhere says when
@@ -319,7 +369,12 @@ open.
   vocabulary is a contract (FS-15.R9 depends on `context_not_found` being exactly one thing).
   *Fix:* delete `source_unavailable` or give it a defining requirement.
 
-- **Worth fixing** — **FS-15.R1/R2/R10, TS-04.R28:** neither transcript selector can cover the turn
+  **Revision:** `source_unavailable` is now the atomic share-time outcome when a friendly selector
+  has no eligible current source; `context_source_unavailable` is reserved for an authorized
+  canonical reference whose durable source later became unreadable or deleted.
+
+- **Resolved — explicit in-turn handoff sequence.** **FS-15.R1/R2/R10, TS-04.R28:** neither
+  transcript selector can cover the turn
   the caller is completing, which the outcome story assumes. `current_turn` snapshots "the highest
   complete transcript sequence visible at the call", so everything the agent writes after invoking
   `share_context` — including the assistant text that states its conclusion — falls outside the
@@ -334,6 +389,11 @@ open.
   "share as the last tool call, then send ordinary mail naming the reference id", which R10 already
   contemplates) so the implementation and its acceptance evidence exercise that path rather than a
   synthetic one.
+
+  **Revision:** FS-15.R4/A2 and TS-04.R28 require conclusion text before `share_context`, make the
+  share the final context-producing action, allow optional ordinary mail containing only the id,
+  and test that pre-share text is included while later text is not. `latest_completed_turn` remains
+  available only from a later turn started for an independent reason; context does not wake itself.
 
 Considered and not promoted: reusing `state.ResolveRecipient` even though its terminal-agent filter
 is documented in mail terms (FS-15.R17 adopts that exclusion deliberately, and the helper is a pure
@@ -360,6 +420,21 @@ pre-existing `gofmt` diff in `internal/index/indexer_fts_test.go` (outside this 
 
 ## Recent changelog
 
+- 2026-08-22 — design decision: closed the final pull-based context-link finding. The human treated
+  durable invisible grants as a non-issue edge case and chose no additional owner UI or expiry
+  wiring. Direct grants persist until grantor revocation or recipient deletion; the local
+  single-user rationale and revisit conditions are explicit in FS-15 §6, TS-02.R24, and TS-05.R16.
+  The idea is removed from Ideas being defined and the reviewed change is Waiting to start with no
+  open findings. No product code changed.
+- 2026-08-22 — design revision: resolved seven of the eight pull-based context-link review findings.
+  TS-01.R22 and INV §2 now require one shared Go normalized-event projection for search and context
+  consumers plus explicit unknown/oversized-record markers. FS-15/TS-04 state the exact in-turn
+  transcript and pipeline-report handoff windows, define the two unavailable outcomes, and test the
+  post-quiescence path. Unused seen state is removed; personal hiding remains because the ad-hoc list
+  consumes it. Identity deletion is narrowed to defensive schema hygiene. The only open finding is
+  the human product/privacy choice among owner list+revoke, grant retention, or explicitly accepted
+  indefinite agent-only grants; the change is paused and the decision is back under Ideas being
+  defined. No product code changed.
 - 2026-08-22 — review: design-reviewed the waiting `pull-based-context-links.md` change against
   FS-15, TS-01.R22–R23, TS-02.R24, TS-04.R28, TS-05.R16, the shipped boundaries they cite, and INV in
   full. Two **Must fix**: a second Go transcript event→text projection alongside

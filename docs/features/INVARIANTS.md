@@ -76,7 +76,9 @@ Paid for by:
 `expandAddDirs`, `composeEnv`
 (`internal/server/launch.go`); keep `sessionNewParams`/`sessionLoadParams` in lockstep;
 `config.ValidSlug` on **every** verb of every path-keyed resource; `foldTranscript` and live append
-share `appendRenderedEvent` for every render-affecting event transform.
+share `appendRenderedEvent` for every render-affecting event transform; Go transcript
+consumers derive typed text parts from `transcript.ProjectEvent` rather than adding another
+`runtime.Event` switch.
 
 Corollary: permission-relevant re-resolution **fails closed** — on a role-read error, refuse, never
 fall back to the permissive global default (`resolveSkip`).
@@ -403,6 +405,7 @@ constraint. Tests inject the failure after the first would-be side effect and re
 | `seedLocked` | `internal/index/indexer.go` | in-memory buffers feeding replace-style writes (§9) |
 | `config.ValidSlug` | `internal/config/validate.go` | every path-param on every verb (§2) |
 | `foldTranscript` / `appendRenderedEvent` | `ui/src/store/transcriptStore.ts` | identical live and replay event projection (§2) |
+| `transcript.ProjectEvent` / `runtime.AllEventTypes` | `internal/transcript`, `internal/runtime` | every Go transcript text consumer and exhaustive normalized-event coverage (§2) |
 | `clipAnnotationExcerpt` | `ui/src/lib/annotations.ts` (server copy authoritative: `internal/server/sessions.go`) | every UI surface that captures an annotation excerpt (§2) |
 | `localOnly` | `internal/server/security.go` | wraps the whole mux; every new route inherits it (§14) |
 | `notificationPayload` | `internal/bus/` | all notification payloads (§8) |

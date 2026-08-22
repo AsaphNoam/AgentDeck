@@ -17,6 +17,14 @@ const maxRecordSize = 8 * 1024 * 1024
 type ReadOptions struct {
 	SinceSeq    int64
 	IncludeMeta bool
+	// OnOversized, when set, is called once for each physical record the reader
+	// skipped for exceeding maxRecordSize, with the sequence of the last event
+	// parsed before it (0 before the first). It is an additive diagnostic: the
+	// tolerant skip-and-continue behavior every existing caller relies on is
+	// unchanged, but a caller that composes readable context can emit a bounded
+	// omission marker at that stream position instead of returning a clean page
+	// that silently implies the record was rendered (TS-01.R22, INV §7).
+	OnOversized func(afterSeq int64) error
 }
 
 // Reader replays one transcript.ndjson file.
@@ -72,11 +80,18 @@ func forEach(rd io.Reader, opts ReadOptions, visit func(runtime.Event) error) er
 }
 
 func forEachBuffered(br *bufio.Reader, opts ReadOptions, visit func(runtime.Event) error) error {
+	var lastSeq int64
 	for {
 		line, oversized, err := readLine(br)
+		if oversized && opts.OnOversized != nil {
+			if skipErr := opts.OnOversized(lastSeq); skipErr != nil {
+				return fmt.Errorf("transcript: report oversized record after seq %d: %w", lastSeq, skipErr)
+			}
+		}
 		if !oversized && len(line) > 0 {
 			var ev runtime.Event
 			if json.Unmarshal(line, &ev) == nil {
+				lastSeq = ev.Seq
 				keep := true
 				if !opts.IncludeMeta && (ev.Seq == 0 || ev.Type == runtime.EvSessionMeta) {
 					keep = false

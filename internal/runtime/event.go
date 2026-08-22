@@ -208,3 +208,23 @@ type SessionMetaData struct {
 	ResumedAt    *string         `json:"resumed_at"`
 	SessionID    string          `json:"session_id,omitempty"`
 }
+
+// AllEventTypes is the closed registry of normalized transcript event kinds. It
+// exists so every Go consumer that projects events into text can be tested
+// exhaustively: a new Ev* constant added without a matching projection rule
+// fails the table-driven test rather than silently disappearing from search
+// results and pulled context (INV §2, TS-01.R22).
+var AllEventTypes = []string{
+	EvUserPrompt,
+	EvAssistantText,
+	EvToolCall,
+	EvToolResult,
+	EvDiff,
+	EvPermissionRequest,
+	EvPermissionResolved,
+	EvSessionMeta,
+	EvTurnEnd,
+	EvError,
+	EvBackendSwitch,
+	EvAnnotation,
+}

@@ -13,6 +13,7 @@ import (
 	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
 	"github.com/agentdeck/agentdeck/internal/strutil"
+	"github.com/agentdeck/agentdeck/internal/transcript"
 )
 
 // execer is satisfied by both *sql.DB and *sql.Tx so rollup updates can run
@@ -304,58 +305,15 @@ func ftsWritesAvailable(tx *sql.Tx) (bool, error) {
 	return mode != state.SessionsFTSUnavailable, err
 }
 
+// searchableText derives the full-text search bag from the one shared
+// normalized-event projection, so search text and pulled context cannot drift
+// into two independent event-type switches (INV §2, TS-01.R22).
 func searchableText(ev runtime.Event) (string, error) {
-	switch ev.Type {
-	case runtime.EvUserPrompt:
-		var d runtime.UserPromptData
-		if err := json.Unmarshal(ev.Data, &d); err != nil {
-			return "", fmt.Errorf("index: user_text: %w", err)
-		}
-		return d.Text, nil
-	case runtime.EvAssistantText:
-		var d runtime.AssistantTextData
-		if err := json.Unmarshal(ev.Data, &d); err != nil {
-			return "", fmt.Errorf("index: assistant_text: %w", err)
-		}
-		return d.Delta, nil
-	case runtime.EvToolCall:
-		var d runtime.ToolCallData
-		if err := json.Unmarshal(ev.Data, &d); err != nil {
-			return "", fmt.Errorf("index: tool_call: %w", err)
-		}
-		return strings.TrimSpace(d.Name + " " + string(d.Args)), nil
-	case runtime.EvToolResult:
-		var d runtime.ToolResultData
-		if err := json.Unmarshal(ev.Data, &d); err != nil {
-			return "", fmt.Errorf("index: tool_result: %w", err)
-		}
-		return string(d.Content), nil
-	case runtime.EvDiff:
-		var d runtime.DiffData
-		if err := json.Unmarshal(ev.Data, &d); err != nil {
-			return "", fmt.Errorf("index: diff: %w", err)
-		}
-		return strings.TrimSpace(d.Path + " " + d.NewText), nil
-	case runtime.EvPermissionRequest:
-		var d runtime.PermissionRequestData
-		if err := json.Unmarshal(ev.Data, &d); err != nil {
-			return "", fmt.Errorf("index: permission_request: %w", err)
-		}
-		return d.Reason, nil
-	case runtime.EvAnnotation:
-		var d runtime.AnnotationData
-		if err := json.Unmarshal(ev.Data, &d); err != nil {
-			return "", fmt.Errorf("index: annotation: %w", err)
-		}
-		parts := make([]string, 0, len(d.Annotations)*2+1)
-		for _, a := range d.Annotations {
-			parts = append(parts, a.Excerpt, a.Instruction)
-		}
-		parts = append(parts, d.OverallInstruction)
-		return strings.TrimSpace(strings.Join(parts, " ")), nil
-	default:
-		return "", nil
+	projection, err := transcript.ProjectEvent(ev)
+	if err != nil {
+		return "", fmt.Errorf("index: %w", err)
 	}
+	return projection.SearchText(), nil
 }
 
 func (ix *Indexer) trackEvent(agentID string, ev runtime.Event) error {

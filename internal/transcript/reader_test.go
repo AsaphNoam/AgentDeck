@@ -127,3 +127,54 @@ func TestReaderRecoversMaxSeqPastOversized(t *testing.T) {
 		t.Fatalf("recoverMaxSeq = (%d, %v), want (1, true)", maxSeq, existed)
 	}
 }
+
+// TestReadOptionsReportsOversizedRecordPosition covers the additive diagnostic
+// the context reader needs: a skipped record is reported at its stream position
+// (the last sequence parsed before it), while the surrounding records still
+// replay exactly as they do for every existing caller (TS-01.R22).
+func TestReadOptionsReportsOversizedRecordPosition(t *testing.T) {
+	var buf bytes.Buffer
+	write := func(e runtime.Event) {
+		b, err := json.Marshal(e)
+		if err != nil {
+			t.Fatalf("marshal seq %d: %v", e.Seq, err)
+		}
+		buf.Write(b)
+		buf.WriteByte('\n')
+	}
+	write(event(t, 1, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "before"}))
+	write(event(t, 2, runtime.EvAssistantText, runtime.AssistantTextData{Delta: strings.Repeat("x", 9*1024*1024)}))
+	write(event(t, 3, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "after"}))
+
+	var skippedAfter []int64
+	opts := ReadOptions{OnOversized: func(afterSeq int64) error {
+		skippedAfter = append(skippedAfter, afterSeq)
+		return nil
+	}}
+	evs, err := readAll(bytes.NewReader(buf.Bytes()), opts)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if len(evs) != 2 || evs[0].Seq != 1 || evs[1].Seq != 3 {
+		t.Fatalf("events = %+v, want seq 1 and 3", evs)
+	}
+	if len(skippedAfter) != 1 || skippedAfter[0] != 1 {
+		t.Fatalf("oversized reports = %v, want [1]", skippedAfter)
+	}
+}
+
+// A reader with no diagnostic wired keeps the tolerant behavior byte for byte:
+// the record is skipped silently and no error reaches the caller.
+func TestReadOptionsOversizedDiagnosticIsOptional(t *testing.T) {
+	var buf bytes.Buffer
+	b, err := json.Marshal(event(t, 1, runtime.EvAssistantText, runtime.AssistantTextData{Delta: strings.Repeat("x", 9*1024*1024)}))
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	buf.Write(b)
+	buf.WriteByte('\n')
+	evs, err := readAll(bytes.NewReader(buf.Bytes()), ReadOptions{})
+	if err != nil || len(evs) != 0 {
+		t.Fatalf("readAll = %v, %v; want no events and no error", evs, err)
+	}
+}
