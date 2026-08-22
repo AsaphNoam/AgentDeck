@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/agentdeck/agentdeck/internal/messaging"
-	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
@@ -80,34 +79,26 @@ func (s *Server) executeMailActivation(ctx context.Context, activation state.Act
 		return
 	}
 	// A pending activation can outlive the recipient's eligibility: a runtime
-	// switch, archive, or pipeline association happens after the sender inserted
-	// mail. These are durable exclusions, not a deferred attempt, so discard the
-	// opportunity without crossing mail's non-replayable boundary.
+	// switch to terminal happens after the sender inserted mail. A terminal agent
+	// cannot drain a mailbox at all (FS-07 §6), so this exclusion is durable on
+	// both branches: discard the opportunity without crossing mail's
+	// non-replayable boundary.
+	//
+	// The other durable exclusions — archived agent, archived project, pipeline
+	// association — are *stopped-only* wake gates (FS-01.R33, FS-06.R22/R27), and
+	// belong to the stopped branch alone, where startStoppedMailActivation applies
+	// them through the one shared wakeCandidate/stoppedWakeGates predicate (INV
+	// §2). Repeating them here excluded running recipients the addressable set
+	// still accepts mail for: a pipeline attempt row is permanent, so a running
+	// agent that had ever run a stage silently stopped being activated forever.
 	agent, err := s.stateStore.ReadAgent(activation.AgentID)
 	if err != nil {
 		s.log.Debug("activation read agent failed", "agent", activation.AgentID, "err", err)
 		s.releaseMailActivation(activation, token)
 		return
 	}
-	if agent.Interface != "chat" || agent.Archived {
+	if agent.Interface != "chat" {
 		s.discardMailActivation(activation, token)
-		return
-	}
-	if association, err := s.stateStore.PipelineAssociationForAgent(activation.AgentID); err != nil {
-		s.log.Debug("activation read pipeline association failed", "agent", activation.AgentID, "err", err)
-		s.releaseMailActivation(activation, token)
-		return
-	} else if association != nil {
-		s.discardMailActivation(activation, token)
-		return
-	}
-	if ae := s.projectArchiveGate(agent.Project, "project is archived"); ae != nil {
-		if ae.Code == runtime.CodeInternal {
-			s.log.Debug("activation project gate failed", "agent", activation.AgentID, "err", ae.Message)
-			s.releaseMailActivation(activation, token)
-		} else {
-			s.discardMailActivation(activation, token)
-		}
 		return
 	}
 	if _, err := s.stateStore.ReadRunning(activation.AgentID); err == nil {

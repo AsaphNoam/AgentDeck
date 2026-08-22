@@ -286,6 +286,39 @@ func TestRunningTerminalRecipientDiscardsPendingActivation(t *testing.T) {
 	}
 }
 
+// FS-06.A16 (R22/R27), FS-01.R33 — the pipeline-association exclusion is a *wake* gate:
+// it keeps an agent the pipeline state machine deliberately stopped asleep. A
+// running agent that has run a stage stays addressable, so mail sent to it must
+// still start exactly one activation turn. Running the stopped-only gate on the
+// running branch silently swallowed every such activation for the rest of the
+// agent's life, because the attempt row is never cleared.
+func TestRunningPipelineAgentStillActivatesForMail(t *testing.T) {
+	srv, ts, promptLog := activationTestServer(t)
+	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+	associatePipeline(t, srv, id)
+
+	addressable, err := srv.addressableAgents()
+	if err != nil {
+		t.Fatalf("addressableAgents: %v", err)
+	}
+	found := false
+	for _, a := range addressable {
+		if a.AgentID == id {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("running pipeline-associated agent is not addressable: %+v", addressable)
+	}
+
+	insertMail(t, srv, id, "peer needs the stage output")
+	srv.executePendingMailActivations(context.Background(), id)
+	waitPrompts(t, promptLog, 1)
+	if left := pendingActivations(t, srv, id); len(left) != 0 {
+		t.Fatalf("activations after the turn = %+v, want none", left)
+	}
+}
+
 // TS-01.R21 / INV §5 — an exclusive lifecycle transition already owns the agent
 // while its runtime is registered and idle: a pipeline stage composes its first
 // durable assignment inside that claim. A mail activation starting in that window

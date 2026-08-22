@@ -4,6 +4,16 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-22 — Fix: mail delivery to agents that have run a pipeline
+
+An agent that is running normally now receives its mail again, even if it took part in a pipeline earlier in its life. The last change checked a "was this agent part of a pipeline?" rule against every recipient, but that rule exists only to keep a stopped pipeline agent asleep — the pipeline decided to stop it, so a message should not restart it. Applied to a running agent it meant the sender saw a success, the unread badge went up, and the agent was never prompted to look at its mailbox. Since the pipeline record is never cleared, that agent would have stayed silently unreachable by mail forever.
+
+The three rules that only make sense for a stopped agent — archived agent, archived project, and pipeline participation — now run only on the stopped path, where they already had a single shared implementation; the duplicate copy that caused this is gone. The one rule that still applies to both is the terminal interface, since a terminal agent cannot read a mailbox at all. A new test sends mail to a running agent that has run a pipeline stage and checks it gets exactly one prompt, and the tests protecting stopped pipeline agents from being woken still pass. Full test, build, race, and specification checks are green.
+
+**Needs attention:** None.
+
+**Next:** A review can cover this fix, and then the mail activation work is finished.
+
 ### 2026-08-22 — Fix: remaining mail activation findings
 
 Mail activation now waits until resume validation passes before its one non-replayable attempt, so a removed backend or model leaves sent mail ready for retry after Settings are repaired. Work aimed at a recipient that has since become terminal, archived, project-archived, or pipeline-owned is retired rather than retried every two seconds; mail itself stays unread.
