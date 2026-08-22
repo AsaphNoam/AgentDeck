@@ -172,9 +172,10 @@ terminal agents from becoming statusless or unmessageable.
   composed flags and hooks (reconciling any flag mismatch) is an acceptance gate requiring
   credentials (credential-gated acceptance). Until cleared, the Claude interactive-CLI flag/resume
   mapping in `launchArgv`/`interactiveBinary` is `(planned)`-tagged and marked GATED in code.
-- **Terminal activation is excluded.** The terminal runtime rejects `StartActivation`, but
-  recipient resolution and the mail activation executor exclude terminal agents under FS-06.R9/R17,
-  so coordination cannot reach that method in the shipped path.
+- **Terminal activation is excluded.** The terminal runtime rejects `StartActivation`; recipient
+  resolution excludes terminal agents, and the mail executor discards any opportunity that was
+  pending before a runtime switch made its recipient terminal. Coordination therefore cannot reach
+  that method in the shipped path.
 
 ## 7. Traceability
 

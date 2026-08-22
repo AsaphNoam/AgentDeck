@@ -169,13 +169,43 @@ WHERE activation_id = ? AND kind = ? AND state = ?
 // ReleaseMailActivation makes a pre-attempt claim actionable again. The token
 // prevents a delayed worker from releasing a later claim.
 func (s *Store) ReleaseMailActivation(activationID, token string) error {
-	_, err := s.db.Exec(`
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("state: begin release mail activation: %w", err)
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`
+DELETE FROM activations AS claimed
+WHERE activation_id = ? AND kind = ? AND state = ? AND claim_token = ?
+  AND EXISTS (
+    SELECT 1 FROM activations AS pending
+    WHERE pending.agent_id = claimed.agent_id AND pending.kind = claimed.kind AND pending.state = ?
+  )`, activationID, ActivationKindMail, ActivationClaimed, token, ActivationPending); err != nil {
+		return fmt.Errorf("state: coalesce released mail activation: %w", err)
+	}
+	if _, err := tx.Exec(`
 UPDATE activations
 SET state = ?, claim_token = '', claimed_at = NULL
 WHERE activation_id = ? AND kind = ? AND state = ? AND claim_token = ?`,
-		ActivationPending, activationID, ActivationKindMail, ActivationClaimed, token)
-	if err != nil {
+		ActivationPending, activationID, ActivationKindMail, ActivationClaimed, token); err != nil {
 		return fmt.Errorf("state: release mail activation: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("state: commit release mail activation: %w", err)
+	}
+	return nil
+}
+
+// DiscardClaimedMailActivation removes a pre-attempt opportunity whose recipient
+// is durably ineligible to receive mail activation. The token prevents a delayed
+// worker from discarding a later claim.
+func (s *Store) DiscardClaimedMailActivation(activationID, token string) error {
+	_, err := s.db.Exec(`
+DELETE FROM activations
+WHERE activation_id = ? AND kind = ? AND state = ? AND claim_token = ?`,
+		activationID, ActivationKindMail, ActivationClaimed, token)
+	if err != nil {
+		return fmt.Errorf("state: discard claimed mail activation: %w", err)
 	}
 	return nil
 }

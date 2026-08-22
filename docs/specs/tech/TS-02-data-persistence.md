@@ -212,8 +212,9 @@ needs a stable source/work id, multiple independent pending rows for one agent, 
 kind-specific uniqueness key, and add the required forward migration/index.
 
 Claim and transition updates match both `activation_id` and a newly minted `claim_token`; a delayed
-worker cannot mutate a later claim. For `mail`, startup recovers pre-side-effect `claimed` rows to
-`pending`, or deletes them when another pending mail row already coalesces that agent, while
+worker cannot mutate a later claim. For `mail`, a live pre-attempt release and startup recovery both
+delete a claimed row when another pending mail row already coalesces that agent, otherwise restore it to
+`pending`; an ineligible recipient deletes its matching pre-attempt claim, while
 `attempted` rows are recognized as non-replayable and deleted. The live mail handler likewise
 deletes attempted rows after their bounded handoff. This is reconciliation metadata, not retained
 history: it has no user-configurable TTL, archive copy, transcript/FTS projection, API/SSE

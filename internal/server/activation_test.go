@@ -68,13 +68,13 @@ func waitPrompts(t *testing.T, promptLog string, want int) {
 func holdPrompts(t *testing.T, srv *Server, promptLog string, want int) {
 	t.Helper()
 	for i := 0; i < 3; i++ {
-		srv.nudgeOnce(context.Background(), "", map[string]nudgeState{})
+		srv.executePendingMailActivations(context.Background(), "")
 		time.Sleep(150 * time.Millisecond)
 	}
 	if err := srv.stateStore.RecoverMailActivations(); err != nil {
 		t.Fatalf("RecoverMailActivations (restart): %v", err)
 	}
-	srv.nudgeOnce(context.Background(), "", map[string]nudgeState{})
+	srv.executePendingMailActivations(context.Background(), "")
 	time.Sleep(300 * time.Millisecond)
 	if got := promptCount(t, promptLog); got != want {
 		t.Fatalf("provider prompts after sweeps and restart = %d, want %d", got, want)
@@ -115,7 +115,7 @@ func TestCoalescedMailProducesOnePromptAndIsNeverReplayed(t *testing.T) {
 		t.Fatalf("activations for three messages = %+v, want one coalesced opportunity", pending)
 	}
 
-	srv.nudgeOnce(context.Background(), id, map[string]nudgeState{})
+	srv.executePendingMailActivations(context.Background(), id)
 	waitPrompts(t, promptLog, 1)
 
 	// A14: the instruction is code-owned and carries no message payload.
@@ -142,7 +142,7 @@ func TestCoalescedMailProducesOnePromptAndIsNeverReplayed(t *testing.T) {
 
 	// New mail after the claim is a new opportunity — exactly one more turn.
 	insertMail(t, srv, id, "fourth")
-	srv.nudgeOnce(context.Background(), id, map[string]nudgeState{})
+	srv.executePendingMailActivations(context.Background(), id)
 	waitPrompts(t, promptLog, 2)
 	holdPrompts(t, srv, promptLog, 2)
 }
@@ -166,7 +166,7 @@ func TestDrainedMailboxRetiresActivationWithoutPrompting(t *testing.T) {
 		t.Fatalf("drain mailbox: %v", err)
 	}
 
-	srv.nudgeOnce(context.Background(), id, map[string]nudgeState{})
+	srv.executePendingMailActivations(context.Background(), id)
 	time.Sleep(400 * time.Millisecond)
 
 	if got := promptCount(t, promptLog); got != 0 {
@@ -174,6 +174,115 @@ func TestDrainedMailboxRetiresActivationWithoutPrompting(t *testing.T) {
 	}
 	if left := pendingActivations(t, srv, id); len(left) != 0 {
 		t.Fatalf("activations after drain = %+v, want retired", left)
+	}
+}
+
+// TS-01.R21 / FS-06.R26 (INV §5) — a stopped recipient can retain a frozen
+// session that references a backend removed in Settings. That validation fails
+// before resume creates any registration artifact, so mail's opportunity remains
+// pending for the repaired configuration instead of being irreversibly attempted.
+func TestStoppedActivationKeepsPendingWhenBackendIsMissing(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	id := launchThenStop(t, srv, ts)
+
+	if _, err := srv.stateStore.DB().Exec(`UPDATE agents SET backend = ? WHERE agent_id = ?`, "removed", id); err != nil {
+		t.Fatalf("set removed backend: %v", err)
+	}
+	insertMail(t, srv, id, "wait for settings to be repaired")
+	pending := pendingActivations(t, srv, id)
+	if len(pending) != 1 {
+		t.Fatalf("activations before resume = %+v, want one", pending)
+	}
+
+	srv.executeMailActivation(context.Background(), pending[0])
+
+	if left := pendingActivations(t, srv, id); len(left) != 1 || left[0].State != state.ActivationPending {
+		t.Fatalf("activations after missing backend = %+v, want one pending opportunity", left)
+	}
+	msgs, err := srv.stateStore.ListMessages(id, true, 0)
+	if err != nil || len(msgs) != 1 {
+		t.Fatalf("ListMessages unread = %d, %v; want retained mail", len(msgs), err)
+	}
+	if _, err := srv.stateStore.ReadRunning(id); !errors.Is(err, state.ErrNotFound) {
+		t.Fatalf("ReadRunning after failed validation = %v, want no runtime", err)
+	}
+}
+
+// FS-06.R10/R27 / INV §1/§6 — mail inserted before a recipient is switched,
+// archived, or assigned to a pipeline cannot keep re-claiming forever. A durable
+// exclusion discards the opportunity while retaining the unread mail.
+func TestIneligibleMailActivationIsDiscarded(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		makeIneligible func(t *testing.T, srv *Server, id string)
+	}{
+		{
+			name: "terminal interface",
+			makeIneligible: func(t *testing.T, srv *Server, id string) {
+				t.Helper()
+				if _, err := srv.stateStore.DB().Exec(`UPDATE agents SET interface = 'terminal' WHERE agent_id = ?`, id); err != nil {
+					t.Fatalf("set terminal interface: %v", err)
+				}
+			},
+		},
+		{
+			name: "archived agent",
+			makeIneligible: func(t *testing.T, srv *Server, id string) {
+				t.Helper()
+				if _, err := srv.stateStore.DB().Exec(`UPDATE agents SET archived = 1 WHERE agent_id = ?`, id); err != nil {
+					t.Fatalf("archive agent: %v", err)
+				}
+			},
+		},
+		{
+			name: "pipeline association",
+			makeIneligible: func(t *testing.T, srv *Server, id string) {
+				t.Helper()
+				associatePipeline(t, srv, id)
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			srv, ts := wakeTestServer(t)
+			id := launchThenStop(t, srv, ts)
+			insertMail(t, srv, id, "retain this mail")
+			pending := pendingActivations(t, srv, id)
+			if len(pending) != 1 {
+				t.Fatalf("activations before exclusion = %+v, want one", pending)
+			}
+			tc.makeIneligible(t, srv, id)
+			srv.executeMailActivation(context.Background(), pending[0])
+			if left := pendingActivations(t, srv, id); len(left) != 0 {
+				t.Fatalf("activations after durable exclusion = %+v, want none", left)
+			}
+			msgs, err := srv.stateStore.ListMessages(id, true, 0)
+			if err != nil || len(msgs) != 1 {
+				t.Fatalf("ListMessages unread = %d, %v; want retained mail", len(msgs), err)
+			}
+		})
+	}
+}
+
+// FS-07 §6 / FS-06.R10 (INV §6) — a running recipient can keep a pending
+// activation while being switched from chat to terminal. The executor discards
+// it before it reaches terminal.Runtime.StartActivation.
+func TestRunningTerminalRecipientDiscardsPendingActivation(t *testing.T) {
+	srv, ts, promptLog := activationTestServer(t)
+	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+	insertMail(t, srv, id, "already pending before switch")
+	pending := pendingActivations(t, srv, id)
+	if len(pending) != 1 {
+		t.Fatalf("activations before switch = %+v, want one", pending)
+	}
+	if _, err := srv.stateStore.DB().Exec(`UPDATE agents SET interface = 'terminal' WHERE agent_id = ?`, id); err != nil {
+		t.Fatalf("set terminal interface: %v", err)
+	}
+	srv.executeMailActivation(context.Background(), pending[0])
+	if left := pendingActivations(t, srv, id); len(left) != 0 {
+		t.Fatalf("activations after terminal switch = %+v, want none", left)
+	}
+	if got := promptCount(t, promptLog); got != 0 {
+		t.Fatalf("provider prompts = %d, want none for terminal recipient", got)
 	}
 }
 
@@ -190,7 +299,7 @@ func TestMailActivationDefersWhileLifecycleClaimIsHeld(t *testing.T) {
 		t.Fatal("claimLifecycle: could not take the transition claim")
 	}
 	insertMail(t, srv, id, "arrives mid-stage-launch")
-	srv.nudgeOnce(context.Background(), id, map[string]nudgeState{})
+	srv.executePendingMailActivations(context.Background(), id)
 	time.Sleep(400 * time.Millisecond)
 
 	if got := promptCount(t, promptLog); got != 0 {
@@ -203,7 +312,7 @@ func TestMailActivationDefersWhileLifecycleClaimIsHeld(t *testing.T) {
 
 	// Once the transition settles, the same durable opportunity activates.
 	srv.releaseLifecycle(id)
-	srv.nudgeOnce(context.Background(), id, map[string]nudgeState{})
+	srv.executePendingMailActivations(context.Background(), id)
 	waitPrompts(t, promptLog, 1)
 }
 
@@ -256,7 +365,7 @@ func TestShutdownWaitsForActivationResumeAndLeavesNoOrphan(t *testing.T) {
 	srv.registry.Chat().SetCommand(slowACP(t, "1", 0))
 
 	insertMail(t, srv, id, "wake me")
-	go srv.nudgeOnce(context.Background(), id, map[string]nudgeState{})
+	go srv.executePendingMailActivations(context.Background(), id)
 
 	// Wait until the executor actually owns the lifecycle claim, then shut down.
 	waitLifecycleClaim(t, srv, id)
@@ -332,13 +441,13 @@ func TestStoppedMailActivationResumesOnceAndIsNeverReplayed(t *testing.T) {
 	id := launchThenStop(t, srv, ts)
 
 	insertMail(t, srv, id, "first", "second")
-	srv.nudgeOnce(context.Background(), id, map[string]nudgeState{})
+	srv.executePendingMailActivations(context.Background(), id)
 	waitRunning(t, srv, id, true)
 	waitPrompts(t, promptLog, 1)
 	holdPrompts(t, srv, promptLog, 1)
 
 	insertMail(t, srv, id, "third")
-	srv.nudgeOnce(context.Background(), id, map[string]nudgeState{})
+	srv.executePendingMailActivations(context.Background(), id)
 	waitPrompts(t, promptLog, 2)
 	holdPrompts(t, srv, promptLog, 2)
 }
@@ -351,7 +460,7 @@ func TestFailedStoppedActivationIsNotRetriedAfterRestart(t *testing.T) {
 	srv.registry.Chat().SetCommand("/nonexistent/agentdeck-no-such-binary")
 
 	insertMail(t, srv, id, "please pick this up")
-	srv.nudgeOnce(context.Background(), id, map[string]nudgeState{})
+	srv.executePendingMailActivations(context.Background(), id)
 	waitRunning(t, srv, id, false)
 
 	holdPrompts(t, srv, promptLog, 0)

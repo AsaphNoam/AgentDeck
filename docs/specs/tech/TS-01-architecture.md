@@ -227,7 +227,8 @@ Deferring is free because the opportunity is durable. Ordinary status/turn state
 provider frame, and a failure to commit it releases the turn gate and surfaces rather than prompting
 the model behind an `idle` record (INV §15). For a stopped mail recipient, the executor takes
 TS-01.R16's exclusive lifecycle claim, applies FS-06's attempted transition immediately before the
-first resume side effect, and routes through the same claimed resume/composition path; after a
+first resume side effect after all fallible, side-effect-free resume validation, and routes through
+the same claimed resume/composition path; after a
 successful resume it starts the activation before releasing that transition. Lifecycle-claim loss
 is pre-attempt and returns mail to pending. Once a mail wake or provider side effect has been
 attempted, failure, cancellation, crash, or restart can omit that mail turn but cannot repeat it.

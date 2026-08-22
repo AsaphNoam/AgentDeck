@@ -4,6 +4,16 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-22 — Fix: remaining mail activation findings
+
+Mail activation now waits until resume validation passes before its one non-replayable attempt, so a removed backend or model leaves sent mail ready for retry after Settings are repaired. Work aimed at a recipient that has since become terminal, archived, project-archived, or pipeline-owned is retired rather than retried every two seconds; mail itself stays unread.
+
+The release path now coalesces safely when newer mail arrives, errors are logged, and the superseded wake-tracking code and test shim are gone. Tests cover each case; the full test, build, distribution, and specification checks pass.
+
+**Needs attention:** None.
+
+**Next:** A new review can cover this fix before another change begins.
+
 ### 2026-08-22 — Review: mail activation after its fixes
 
 The eight earlier fixes all hold. Batched mail produces exactly one model turn, an emptied mailbox retires the work without prompting, a failed status save stops the turn instead of hiding it, mail defers to a pipeline stage that is mid-launch, a failed setup after waking cleans up completely, shutdown no longer leaves a stray agent, and a failed startup repair stops the dashboard loudly. The full test suite, the specification check, and repeated race-detector runs over the messaging, wake, shutdown, and lifecycle paths are all green, so the architecture itself is in good shape.

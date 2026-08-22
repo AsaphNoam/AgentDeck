@@ -66,8 +66,9 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
 - **R10.** An activation re-checks the recipient at the runtime boundary before injection, holds the
   agent turn gate, commits mail's attempted boundary and the new turn budget before the ACP prompt,
   and completes like an ordinary chat turn. A busy recipient — or one whose exclusive lifecycle
-  transition is still in flight — leaves its pre-attempt activation pending; an attempted activation
-  is never replayed.
+  transition is still in flight — leaves its pre-attempt activation pending; a recipient that now
+  durably fails the chat/interface, archive, project-archive, or pipeline gates retires its
+  pre-attempt opportunity; an attempted activation is never replayed.
 - **R11.** Each chat turn has a combined inbound-plus-outbound messaging budget of 15. Sending and
   reading consume it transactionally with the message mutation. The action that would exceed the
   budget does not occur: an outbound message is not inserted, and an inbound check returns only as
@@ -177,7 +178,8 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   Resume. The durable agent, mailbox, and activation exist independently of a live process; the
   process is started because the claimed activation requires one reasoning turn, not merely because
   the agent is stopped or has unread mail. Terminal and pipeline-associated stopped agents retain
-  their existing exclusions.
+  their existing exclusions; an opportunity that becomes excluded after mail was inserted is retired
+  without attempting a wake.
 
 ## 5. Acceptance criteria
 
@@ -254,10 +256,13 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
 - **A15** (R26–R27) — A stopped wakeable recipient is resumed once for a claimed mail
   opportunity and receives one activation; a lost lifecycle race remains pending, while a real wake,
   launch, or provider attempt that fails is not retried after restart. New mail re-arms a later
-  opportunity. Terminal and pipeline-associated stopped agents never start. *Verify:*
+  opportunity. Terminal and pipeline-associated stopped agents never start, and a terminal,
+  archived, or pipeline-associated recipient with an already-pending opportunity retires it while
+  retaining unread mail. *Verify:*
   `internal/server/activation_test.go::TestStoppedMailActivationResumesOnceAndIsNeverReplayed`,
   `TestFailedStoppedActivationIsNotRetriedAfterRestart`,
-  `TestMailActivationDefersWhileLifecycleClaimIsHeld`, and
+  `TestMailActivationDefersWhileLifecycleClaimIsHeld`,
+  `TestIneligibleMailActivationIsDiscarded`, and
   `internal/server/wake_test.go::TestStoppedPipelineAgentIsNeverAddressableOrWoken`.
 
 ## 6. Deviations & open decisions

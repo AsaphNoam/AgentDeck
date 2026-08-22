@@ -8,8 +8,8 @@ const (
 	// MessageBudgetPerTurn caps combined inbound+outbound messaging per turn.
 	MessageBudgetPerTurn = 15
 
-	// NudgeInterval is the mail activation executor's ticker period.
-	NudgeInterval = 2 * time.Second
+	// ActivationSweepInterval is the mail activation executor's ticker period.
+	ActivationSweepInterval = 2 * time.Second
 
 	// JanitorInterval is the retention-sweep period.
 	JanitorInterval = 60 * time.Second

@@ -7,28 +7,14 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Active change:** None.
-- **State:** All seven Must-fix and the one Worth-fixing mail-activation findings are fixed.
-  Availability and the claim are now one decision, so a mailbox drained before a pending opportunity
-  is claimed retires it instead of prompting an empty turn. `StartActivation` commits the busy turn
-  status before the provider frame and surfaces a failed write with the turn gate released, keeping
-  mail's already-attempted no-replay outcome. The executor defers while an exclusive lifecycle
-  transition owns the agent, so a pipeline stage's first assignment can no longer lose the turn gate
-  to mail. A failed post-resume activation hook routes through the shared claimed stop-and-teardown
-  instead of leaving a live agent behind. Shutdown quiesces lifecycle claims before snapshotting the
-  registry, closing the detached-resume orphan window. Startup fails loudly when activation recovery
-  fails rather than stranding claimed rows. The Current specs no longer prescribe the removed
-  nudger, and FS-06.A13-A15 are now backed by fake-ACP provider-prompt counts across coalescing,
-  drain, unread completion, restart, mid-flight insertion, lifecycle loss, and stopped-agent failure.
-  A post-fix re-review of the whole activation architecture confirmed all eight fixes hold under
-  `make test`, `make check-specs`, and focused `-race`, and opened one **Must fix** and four
-  **Worth fixing** findings: mail's attempted boundary is committed before the resume's remaining
-  side-effect-free gates; a pending activation is never retired when its recipient stops being
-  eligible (runtime switch to terminal, archive, pipeline association), so the executor re-claims and
-  re-releases it every two seconds for up to seven days; `ReleaseMailActivation` collides with the
-  pending unique index once newer mail exists and its error is discarded at every call site; the
-  `nudgeState`/`nudgeOnce` compatibility shim is dead product code; and one FS-06.A11 assertion
-  cannot fail. The earlier **Worth fixing** finding — the superseded wake-claim state API in
-  `internal/state/messages.go` is unreachable dead code — is still open and still accurate.
+- **State:** All mail-activation findings are fixed. Mail crosses its non-replayable boundary only
+  immediately before resume composition, so a removed backend or model leaves the pending
+  opportunity intact. A recipient that has become terminal, archived, project-archived, or
+  pipeline-associated retires its pre-attempt opportunity rather than spinning every two seconds;
+  mail remains unread. Release coalesces safely when newer mail already owns the pending row and
+  reports failures. The superseded wake-tracking API, compatibility shim, and vacuous A11 assertion
+  are gone. FS-06, FS-07, TS-01, and TS-02 now describe the shipped boundaries. New state and
+  fake-ACP regressions cover the timing, eligibility, release, and no-replay cases.
 - **Previous state:** Explicit mail activation shipped. New mail atomically creates one payload-free,
   mail-scoped activation while pending; the executor claims it durably, uses the shared lifecycle and
   runtime turn gates, and sends the one provider instruction only after the non-replayable attempt
@@ -160,7 +146,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   pass was run. A stale migration-version guard test (asserting 13 against the shipped 14) was already
   failing on `main` and now derives its expectation from the migrations slice (INV §9).
 - **Last reviewed code:** `2b4da9d` (2026-08-22), the continuous range after `2310206` covering the
-  mail-activation review records and the eight-finding fix. Nothing is unreviewed.
+  mail-activation review records and the eight-finding fix. The current mail-activation fix awaits
+  independent review.
 - **Branch:** `main`.
 
 ## Active change
@@ -201,83 +188,7 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ### Open findings
 
-- **Must fix** — **TS-01.R21 / FS-06.R26 / INV §5:** a stopped recipient's mail activation is marked
-  attempted before the resume's remaining side-effect-free gates. `internal/server/resume.go:164-169`
-  calls the `before` hook (mail's non-replayable `AttemptMailActivation`) right after the
-  frozen-snapshot read, but four fallible gates that create nothing follow it — `invalid interface`,
-  `read backends`, `unknown backend: X`, `unknown model: X` (`resume.go:196-208`) — and the first
-  real side effect is `composeResumeSpec` at `resume.go:262`, which mints the hook token, MCP
-  registration, and hook-settings file. TS-01.R21 requires the attempted transition "immediately
-  before the first resume side effect", and FS-06.R26 draws the line at a real attempt ("Losing a
-  lifecycle claim is not an attempt and leaves the opportunity pending"). Normal-use trigger: a
-  person renames or deletes a backend or model in Settings that a stopped agent still references, and
-  mail then arrives for that agent. `startStoppedMailActivation`
-  (`internal/server/messaging_loops.go:134-161`) sees `attempted == true`, retires the row, and the
-  opportunity is gone — for a failure that touched nothing. Repairing the configuration does not
-  bring it back; only new mail creates another opportunity, so the recipient silently never activates
-  for the mail already in its mailbox while the sender saw `send_message` succeed. *Fix:* move the
-  `before` call to immediately before `composeResumeSpec`, still inside the lifecycle claim. *Test:*
-  point a stopped agent at a removed backend, insert mail, sweep, and assert the activation is still
-  `pending` and the mail unread.
-
-- **Worth fixing** — **INV §1/§6, FS-07 §6:** a pending mail activation is never retired when its
-  recipient stops being an eligible one, so the executor spins on it. Nothing outside
-  `ClaimMailActivation`'s drained-mailbox retire ever removes a pending row: `internal/server/switch.go`,
-  `archive_actions.go`, and the pipeline paths leave it untouched. A chat agent that received mail and
-  is then switched to the terminal runtime, archived, moved into an archived project, or given a
-  pipeline attempt association fails `stoppedWakeGates`/`wakeCandidate` (`internal/server/resume.go:339`),
-  so `startStoppedMailActivation` releases the claim and the row returns to `pending` — every 2 s
-  sweep (`messaging.NudgeInterval`) then re-claims and re-releases it, two write transactions per
-  sweep, until the mail is read or the seven-day TTL deletes it (~300k cycles). Reproduced by
-  flipping a stopped agent's `interface` to `terminal` (and separately `archived=1`) with one pending
-  activation and sweeping: the row stays pending indefinitely. The running half also contradicts the
-  specification: a *running* switched-to-terminal agent takes the `startRunningMailActivation`
-  branch, so `registry.StartActivation` reaches `terminal.Runtime.StartActivation` and returns
-  `ErrNotImplemented` on every sweep — which FS-07 §6 ("Terminal activation is excluded …
-  coordination cannot reach that method in the shipped path") states cannot happen, making that
-  deviation note inaccurate. *Fix:* retire the activation when the recipient durably fails the
-  interface/wake gates (an ineligible recipient is not a deferral), and correct FS-07 §6. *Test:*
-  assert the row is gone after a sweep against a terminal-interface or archived recipient.
-
-- **Worth fixing** — **INV §5/§7:** `ReleaseMailActivation` collides with the mail-only pending
-  unique index and every caller discards the error. `internal/state/activations.go:171-181` releases
-  by `UPDATE … SET state = 'pending'`, but `idx_activations_one_pending_mail` already holds a row for
-  that agent whenever mail arrived while the claim was held. Reproduced: claim the activation, insert
-  one more message, release → `UNIQUE constraint failed: activations.agent_id`, and the original row
-  is stranded in `claimed` for the life of the process. All four call sites
-  (`internal/server/messaging_loops.go:94, 114, 127, 130, 162`) drop the error with `_ =`, so nothing
-  reports it. No mail work is lost — the newer pending row covers the same coalesced batch, and
-  `RecoverMailActivations` deletes claimed-with-a-pending-sibling rows at the next startup — but the
-  leak is unbounded within one process and the only diagnostic is a discarded error. *Fix:* give
-  release the same two-case shape recovery already uses (delete when a pending sibling exists, update
-  otherwise) and log at the call sites. *Test:* claim, insert newer mail, release, and assert no
-  `claimed` row survives.
-
-- **Worth fixing** — **INV §10:** `nudgeState`/`nudgeOnce`
-  (`internal/server/messaging_loops.go:27-33`) are dead product code kept only so older tests compile.
-  `nudgeState` is an empty struct, the map parameter is discarded, and "nudge" is exactly the
-  vocabulary this change retired everywhere else (specs, `NudgeCooldown`/`NudgeInFlightTimeout`,
-  `nudgeCh` → `activationCh`). `messaging.NudgeInterval` is likewise now the activation executor's
-  sweep period. *Fix:* have the tests call `executePendingMailActivations` directly, delete the shim,
-  and rename the constant (`ActivationSweepInterval`).
-
-- **Worth fixing** — **INV §10:** an FS-06.A11 assertion cannot fail.
-  `internal/server/wake_test.go:385` fails only on `len(waiting) > 1`, but
-  `idx_activations_one_pending_mail` makes more than one pending mail activation per agent
-  impossible, so the check is vacuous; and the follow-up "exactly one after new mail" also passes if
-  the failed attempt had wrongly been left pending. A11's "re-arms nothing" clause is therefore
-  unasserted in this test (A15's `TestFailedStoppedActivationIsNotRetriedAfterRestart` does assert
-  it). *Fix:* assert `len(waiting) == 0` before inserting the third message.
-
-- **Worth fixing** — **INV §10:** the removed nudger mechanism left an unreachable state-layer API
-  behind. `internal/state/messages.go` still defines `PendingWakeMailAgents`, `ClaimPendingWakeMail`,
-  `SetDeliveredVia`, `MarkUnreadDeliveredVia`, and the `nudge`/`wake_attempted`/`wake_failed`
-  `delivered_via` values, and the read-marking `CASE` at `messages.go:437` still restamps
-  `wake_attempted`. Nothing outside `internal/state/messages_test.go` calls any of it — re-confirmed
-  tree-wide in this review — the wake claim protocol it implements was superseded by explicit mail
-  activation, and TS-04.R26 no longer describes it. Confirm the tree-wide call-site check (INV §10),
-  then remove the dead helpers and constants and simplify the read-marking `CASE`, keeping
-  `delivered_via` itself as the provenance column FS-06.R23 retains.
+None.
 
 The one-off Archive `unterminated string` 500 still did not reproduce under direct or suite coverage,
 and the API-only `tmux` calls without explicit timeouts remain an unreproduced source-risk lead; they
@@ -294,6 +205,18 @@ shared); `last_trace: "MailActivation"` (no spec vocabulary or UI surface reads 
 pre-existing `gofmt` diff in `internal/index/indexer_fts_test.go` (outside this range).
 
 ## Recent changelog
+
+- 2026-08-22 — fix: closed every remaining mail-activation finding. **INV §5** — the stopped
+  activation attempt now occurs immediately before `composeResumeSpec`, after every fallible,
+  side-effect-free resume gate; a missing backend keeps its mail opportunity pending. **INV §1/§6**
+  — the executor discards a claimed opportunity when its recipient is terminal, archived,
+  project-archived, or pipeline-associated, while keeping mail unread; a gate-evaluation failure
+  still releases for retry. **INV §5/§7** — transactional release deletes an old claim when newer
+  mail already owns the pending row, otherwise releases it, and every caller reports release errors.
+  **INV §10** — removed the obsolete wake-claim APIs, test shim, and old activation vocabulary;
+  strengthened A11 to prove a failed attempt re-arms nothing. FS-06, FS-07, TS-01, and TS-02 match
+  these boundaries. Focused state/server regressions, `make check-specs`, `make test`, `make build`,
+  `make dist`, and `git diff --check` pass.
 
 - 2026-08-22 — review: re-reviewed the whole explicit mail activation architecture after its
   eight-finding fix, across the continuous range after `2310206` through `2b4da9d`. All eight earlier
