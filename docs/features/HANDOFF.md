@@ -6,6 +6,12 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
+- **Review state:** A retrospective review of the shipped control/context/conversation-plane
+  separation found three **Must fix** and one **Worth fixing** gaps. Mail activation can race a newly
+  acquired lifecycle transition; the top-level product rule omits intentional assignments and
+  continuations; Claude's MCP event order can make a `current_turn` share absorb its own
+  `share_context` call; and the executor's claimed bounded sweep has no batch or concurrency bound.
+  The activation/context split itself was confirmed as a deliberate extension of existing seams.
 - **Ready change:** [Dependency-aware work that starts itself](../ready-changes/dependency-aware-armed-agents.md) is waiting to start. It is specified
   in FS-16 and TS-10 with deltas in FS-02, FS-04, FS-14, TS-01, TS-02, TS-03, TS-04, TS-05, and
   TS-09; every requirement is `(planned)` and no product code has changed. A second design review
@@ -224,10 +230,64 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-None open. Both design reviews of dependency-aware work are resolved in the requirements: the first
-round's nine Must-fix findings and the re-audit's twelve Must-fix plus two Worth-fixing findings.
+- **Must fix** — **Mail activation can steal the runtime turn after a lifecycle transition begins**
+  (**confirmed**, **TS-01.R21, INV §5**). `executeMailActivation` samples
+  `lifecycleInFlight` before claiming mail (`internal/server/messaging_loops.go:58–73`), but that
+  helper is explicitly only a non-claiming hint (`internal/server/resume.go:83–89`). A pipeline
+  Continue can acquire the lifecycle claim immediately after the sample
+  (`internal/server/pipeline_lifecycle.go:108–126`), while the activation proceeds to
+  `StartActivation` and takes `turnActive` (`internal/runtime/chat.go:695–715`); the lifecycle-owned
+  `SendPrompt` then returns `ErrTurnInFlight` (`internal/runtime/chat.go:344–354`). This is the exact
+  stage-pause/stop failure R21 says deferral prevents. The regression only covers a lifecycle claim
+  held before executor entry (`internal/server/activation_test.go:322–350`), not this interleaving.
+  Give lifecycle acquisition and activation turn-start one atomic arbitration point, and add a
+  deterministic test that proves the stage assignment succeeds and mail remains pending.
+- **Must fix** — **The product-level conversation crossing rule excludes shipped intentional
+  assignments and continuations** (**confirmed**, **FS-00.R15**). FS-00.R15 says a model turn starts
+  only for a user instruction or a payload-free activation, but TS-01.R18 correctly names a third
+  crossing: an intentional assignment/continuation. Shipped pipelines already launch a stage with a
+  rich bounded assignment prompt (FS-14.R5, TS-09.R6–R7), not a user instruction and not an
+  activation row. FS-00.R14 even calls pipeline assignments intentional conversation inputs. Make
+  R15 match the architectural rule and explicitly distinguish assignment/continuation prompts from
+  payload-free activations; acceptance should prove neither crossing inherits the other's
+  persistence or retry policy.
+- **Must fix** — **A `current_turn` context share can absorb its own control call and presentation
+  metadata, depending on the provider** (**confirmed**, **FS-15.R1/R3/R4, TS-01.R18/R22,
+  INV §1/§2**).
+  `resolveTranscriptSpan` snapshots through the highest transcript sequence visible inside the
+  `share_context` handler (`internal/contextref/service.go:113–193`), and the context renderer emits
+  every ordinary tool name and raw arguments (`internal/transcript/project.go:105–125`,
+  `internal/contextref/render.go:47–83`). The pinned Claude adapter emits an MCP `tool_call` before its
+  result (`~/.local/lib/node_modules/@agentclientprotocol/claude-agent-acp/dist/acp-agent.js:5062–5155`),
+  so the source can include the invocation's recipient, label, description, and selector; the pinned
+  Codex adapter builds its MCP update from the completed item, making the boundary provider-dependent.
+  The server test calls the MCP handler directly and bypasses both adapters
+  (`internal/server/context_links_test.go:80–153`). Define a provider-independent pre-share boundary
+  or classify context-management events as non-source metadata, and cover both event orders.
+- **Worth fixing** — **The activation executor calls its reconciliation sweep bounded, but neither
+  the read nor fan-out has a bound** (**confirmed**, **TS-01.R18/R20, INV §9**).
+  `PendingMailActivations` returns every pending row with no limit
+  (`internal/state/activations.go:82–105`), and each two-second sweep starts one goroutine per returned
+  activation (`internal/server/messaging_loops.go:29–55`). Specify a fixed batch and in-flight bound,
+  leave excess rows durable for later sweeps, and add a backlog test proving admission never exceeds
+  it.
+
+Both design reviews of dependency-aware work remain resolved in the requirements: the first round's
+nine Must-fix findings and the re-audit's twelve Must-fix plus two Worth-fixing findings.
 
 ## Review history
+
+### Retrospective orchestration-plane design review
+
+The 2026-08-23 retrospective review covered the shipped plane-separation design from `054180a`
+through mail activation and pull-based context links, the current FS-00/FS-06/FS-15 and
+TS-01/TS-02/TS-04/TS-05 contracts, every invariant class, the pinned Claude/Codex adapter event
+shapes, and the concrete activation, lifecycle, transcript-projection, and context-read seams. It
+found three Must-fix and one Worth-fixing gaps recorded above. It also confirmed that the narrow
+activation record, mail-owned attempt policy, one in-process context service, separate non-waking
+context recipient query, and direct-grant-only current authorization do not create parallel
+authorities or premature generic workflow machinery. No product code, specification, or ready-change
+file changed.
 
 ### Second dependency-aware design review
 
@@ -278,6 +338,17 @@ in the requirements before implementation, and the change has since shipped; the
 lives in FS-15, TS-01.R22–R23, TS-02.R24, TS-04.R28, TS-05.R16 and in Git history.
 
 ## Recent changelog
+
+- 2026-08-23 — Retrospectively design-reviewed the shipped separation of control facts,
+  context/artifacts, and model conversations. Three Must-fix findings are open: mail activation's
+  lifecycle deferral is a check-only race that can steal a pipeline continuation's turn; FS-00's
+  exclusive crossing rule omits the intentional assignment/continuation path already used by
+  pipelines; and a real Claude MCP call can make `current_turn` sharing absorb its own
+  `share_context` invocation and access-path metadata while the direct-handler test misses that
+  provider event. One Worth-fixing finding records that the activation executor's promised bounded
+  sweep reads every pending row and launches one goroutine per row. The core separation itself was
+  otherwise confirmed as a small extension of existing lifecycle, MCP, persistence, transcript, and
+  recipient-resolution seams. No product code, specification, or ready-change file changed.
 
 - 2026-08-23 — Validated the design re-audit's fourteen findings, confirmed all fourteen, and revised
   the requirements again; still no product code. Three rested on claims about shipped code and were

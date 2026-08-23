@@ -4,6 +4,28 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-23 — Design review: orchestration-plane separation
+
+The separation between control state, durable context, and model conversations is structurally sound,
+but the retrospective review found three correctness gaps. Mail activation can still race a pipeline
+or other lifecycle transition and take the agent's turn first. The top-level product rule accidentally
+excludes the rich assignment and continuation prompts that pipelines already use. And with Claude's
+real tool-event ordering, sharing the current turn can include the `share_context` call itself — along
+with recipient and label metadata — even though the context source is meant to stay independent of
+its access path. The activation recovery loop also needs a fixed batch/concurrency limit before its
+“bounded” claim is true.
+
+The overall architecture does not need to be replaced. The payload-free activation record,
+mail-specific retry policy, single context service, separate non-waking recipient lookup, and scoped
+pull reads all reuse the intended existing seams without creating a second scheduler, context store,
+or messaging authority.
+
+**Needs attention:** Resolve the three correctness findings before extending activation to dependent
+work; the concurrency bound can follow as a smaller hardening change.
+
+**Next:** Run `/fix` to validate and close the activation race first, then revise the two crossing and
+context-source contracts before implementation continues on dependent work.
+
 ### 2026-08-23 — Design fixes round two: all fourteen re-audit findings closed
 
 All fourteen findings from the second review are fixed in the requirements. Still no product code.
