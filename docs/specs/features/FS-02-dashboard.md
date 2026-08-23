@@ -266,7 +266,8 @@ modal and prefilled launches outside a scoped dashboard retain their existing pr
 behavior.
 
 - **R44** `(planned)` — The dashboard shows how many tasks in view need attention, covering parked
-  `dependency_failed` work and running work whose agent went away without a result (FS-16.R8, R16).
+  `dependency_failed` work and `interrupted` work whose agent went away without a result (FS-16.R8,
+  R16).
   The indicator opens the Tasks view (FS-16.R14); the card grid itself gains no task object, and the
   state badge vocabulary in R3 is unchanged, because an armed task has no agent and therefore no card.
 

@@ -8,7 +8,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 - **Ready change:** [Dependency-aware work that starts itself](../ready-changes/dependency-aware-armed-agents.md) is waiting to start. It is specified
   in FS-16 and TS-10 with deltas in FS-02, FS-04, FS-14, TS-01, TS-02, TS-03, TS-04, TS-05, and
-  TS-09; every requirement is `(planned)` and no product code has changed.
+  TS-09; every requirement is `(planned)` and no product code has changed. Its design review is
+  resolved in the requirements and it is worth re-reviewing before implementation.
 - **Active change:** None.
 - **State:** Dependency-aware work is designed and waiting; nothing about it is implemented. The
   2026-08-23 design review found nine **Must fix** contradictions or missing ownership boundaries,
@@ -221,78 +222,51 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-- **Must fix** — **Interrupted work cannot remain `running` under the design's own meaning of that
-  state** (**confirmed**, **INV §1/§8**). FS-16.R6 and §3 plus TS-10.R4 define `running` as a live
-  runtime that holds the assignment, but FS-16.R16/A3 require a crashed, stopped, or switched-away
-  assignee to leave the task `running` after its runtime claim is released. The retry named by R16
-  also has no transition from that state. Add an explicit interrupted/attention state or change the
-  state meaning and transitions consistently; cover stop, crash, switch, retry, and restart.
-- **Must fix** — **The specified human result recovery has no route or control** (**confirmed**, **INV
-  §10**). FS-16.R3/R16 allow a person to record `success`, `failure`, or `blocked`, which is the only
-  non-cancelling recovery after an assignee disappears, but FS-16.R14, TS-03.R28, and TS-10's HTTP
-  inventory offer only create/read/list/cancel/retry/re-arm/delete; only an assigned agent gets a
-  report tool. Add the person-facing HTTP/UI result action with authorization, atomic rejection, and
-  acceptance evidence, or remove the promised recovery.
-- **Must fix** — **Re-arm/retry cannot repair an unsatisfiable arm** (**confirmed**, **INV §5/§10**).
-  FS-16.R8 and §3 promise `dependency_failed → armed`, but arms never leave `unsatisfiable` and the
-  source result is immutable under TS-10.R8/R10. The task therefore parks again immediately unless
-  retry replaces arms or creates/rebinds prerequisite work, neither of which is specified. Define
-  the repair operation and atomic graph validation, and test that it can actually make progress.
-- **Must fix** — **Prerequisite deletion has contradictory downstream effects** (**confirmed**, **INV
-  §5**). FS-16.R18/A8 say deleting a task parks any dependent, while FS-16 §3 makes satisfied arms
-  monotonic, omits `running → dependency_failed`, and makes finished tasks terminal; TS-10.R8 also
-  retains the deleted source's immutable result. Define deletion separately for unsatisfied,
-  satisfied, running, and finished dependents and add state tests for each case.
-- **Must fix** — **Agent-created-task ownership cannot be enforced by the planned durable shape**
-  (**confirmed**, no invariant class). FS-16.R12 and TS-05.R17 allow an agent to cancel only a task
-  it created, but TS-10's `tasks` row has no creator identity or generation and no other durable
-  ownership record. Persist server-derived creator provenance, define its generation/lifetime
-  semantics, and test spoofed, old-generation, unknown, and authorized cancellation.
-- **Must fix** — **One-active-task-per-agent has no atomic concurrency guard** (**confirmed**, **INV
-  §5**). FS-16.R2 promises at most one active task per agent, but TS-10.R4/R9/R17 specify atomic
-  task and capacity claims without atomically excluding a second task for the same agent; the only
-  planned unique activation key is per `(agent_id, source_id)`, which deliberately permits one row
-  per task. The lifecycle claim serializes start effects only and is released after each transition,
-  so two ready tasks can both become active sequentially. Define a durable conditional/indexed
-  assignment claim and prove concurrent starts leave exactly one active task.
-- **Must fix** — **Reporting a result can stop the reporter before its tool turn reaches quiescence**
-  (**confirmed**, **INV §15**). FS-16.R4 and TS-10.R6/R17 release the claim/slot and stop a created or
-  woken runtime when the result transaction finishes, but `report_task_result` runs inside that
-  runtime's provider turn. Unlike TS-09.R9-R11's existing report-then-persisted-`turn_end` pipeline
-  seam, the task design owns no post-response/quiescence transition; an immediate stop can cut off
-  the MCP response, while releasing the durable claim first leaves restart unable to finish cleanup.
-  Extend the existing quiescence seam (including person-reported and restart cases) and test a real
-  tool response, crash between report and turn end, and exactly-once stop/slot release.
-- **Must fix** — **Startup cannot corroborate a pre-crash runtime through the in-memory registry**
-  (**confirmed**, **INV §9**). FS-16.R17/A8 and TS-10.R15 require restart to promote a `starting` row
-  when its exact generation is live in the registry. `runtime.Handle` is explicitly not persisted,
-  `runtime.NewRegistry` constructs empty ownership/generation maps, and `ReconcileStale` deliberately
-  cleans rows without re-adopting live processes (`internal/runtime/runtime.go`, `registry.go`,
-  `reconcile.go`). Revise recovery around the shipped non-adoption boundary or specify a real durable
-  re-adoption protocol; acceptance must cover a surviving orphan without double-starting it.
-- **Must fix** — **Attachment authorization lifetime contradicts generation-scoped teardown**
-  (**confirmed**, **INV §1/§4**). FS-16.R10/A5 keep the work-derived context route after task finish
-  until task deletion, and TS-10.R12 makes task membership its authority, but TS-10 §4 requires that
-  route to be torn down on every exit through generation-scoped teardown. A stop/resume therefore
-  both must revoke and must preserve the same authorization. Separate durable task membership from
-  per-generation MCP registration teardown and test finish, stop/resume, reassignment exclusion, and
-  task deletion.
+None open. The 2026-08-23 design review's nine Must-fix findings against dependency-aware work are
+all resolved in the requirements; the disposition below records how each was closed.
 
 ## Review history
 
 ### Design review disposition
 
-The 2026-08-23 design review of dependency-aware work is open. Nine confirmed **Must fix** findings
-cover the interrupted-task state, missing human result action, ineffective re-arm, contradictory
-prerequisite deletion, absent creator provenance, non-exclusive assignment, unsafe result/stop
-ordering, impossible registry-based restart corroboration, and contradictory context-route lifetime.
-The change remains Waiting to start and must be revised and re-reviewed before implementation.
+The 2026-08-23 design review of dependency-aware work is resolved in the requirements, before any
+implementation. All nine **Must fix** findings were validated and fixed: `interrupted` is now a real
+state (FS-16.R16, §3); a person can record a result (FS-16.R22, TS-03.R28); re-arm and retry are
+distinct repairs with retry rejected on an unsatisfiable arm (FS-16.R23); deletion is defined per
+dependent state and a satisfied arm survives its source's deletion (FS-16.R18); creator provenance is
+durable and server-derived (FS-16.R24, TS-10.R20); exclusive assignment is a partial unique index
+taken with capacity (TS-10.R18); a reported result is released at the reporting turn's end through a
+turn-end fan-out shared with pipelines (TS-10.R19); recovery no longer asks whether a pre-crash
+runtime survived, because the registry starts empty and never re-adopts (TS-10.R15); and durable
+membership is separated from generation-scoped registration teardown (TS-10.R12, §4). Two findings
+were verified against shipped code before being accepted. The change remains Waiting to start and
+should be re-reviewed before implementation.
 
 The 2026-08-22 design review of pull-based context links is closed. All eight findings were resolved
 in the requirements before implementation, and the change has since shipped; the resolved detail
 lives in FS-15, TS-01.R22–R23, TS-02.R24, TS-04.R28, TS-05.R16 and in Git history.
 
 ## Recent changelog
+
+- 2026-08-23 — Validated the design review's nine Must-fix findings, confirmed all nine, and revised
+  the requirements; still no product code. Two were checked against shipped code rather than taken on
+  the review's word. The registry claim held: `runtime.NewRegistry` builds empty ownership/generation
+  maps and `ReconcileStale` skips a live PID without adopting it (`internal/runtime/registry.go`,
+  `reconcile.go`, FS-01.R20–R21), and no durable generation exists outside `pipeline_attempts` — so
+  TS-10.R15's "corroborate against the live registry" was impossible, and recovery now abandons and
+  reaps `starting` attempts, marks `running` tasks `interrupted`, and completes unfinished releases.
+  The quiescence claim held too: pipelines hold `await_quiescence` between an accepted report and
+  stopping the reporter, and the turn-end dispatch has exactly one hard-coded consumer, so TS-10.R19
+  defers a reported result's stop/release to that turn's end and converts the call site into a shared
+  generation-scoped fan-out (TS-01.R24, TS-09.R27) rather than a second dispatch path. The other
+  seven: `interrupted` became a real state; FS-16.R22 adds the person-recorded result; FS-16.R23
+  splits re-arm (replace arms, the only repair for an unsatisfiable one) from retry (re-attempt
+  execution); FS-16.R18 defines deletion per dependent state, with a satisfied arm surviving its
+  source's deletion because a result outlives its task; FS-16.R24/TS-10.R20 add server-derived creator
+  provenance keyed to the stable agent id; TS-10.R18 makes exclusive assignment a partial unique index
+  taken with capacity; and TS-10.R12/§4 separate durable membership from generation-scoped teardown.
+  FS-16 gained R22–R24 and A10–A13. The concurrency budget default was also raised from four to ten
+  on the human's request (FS-16.R7/R21, FS-04.R43/A23). `make check-specs` and `git diff --check` pass.
 
 - 2026-08-23 — Design-reviewed the waiting dependency-aware/armed-agent change against every cited
   planned requirement, the shipped lifecycle/activation/context/pipeline seams, workflow §13, and

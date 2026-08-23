@@ -4,6 +4,44 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-23 — Design fixes: all nine review findings closed, budget raised to ten
+
+The concurrency budget now defaults to ten, and all nine findings the design review raised are fixed
+in the requirements. Still no product code.
+
+I checked the two findings that rested on claims about existing code rather than taking them on
+trust, and both held — one of them was worse than the review said. It claimed restart could not
+confirm that an agent which survived a crash is still doing its job. That is right: AgentDeck starts
+with an empty picture of which processes it owns, and it deliberately never re-adopts an agent that
+outlived the previous run. So the recovery I had written was asking a question that cannot be
+answered. Recovery now does what the rest of the product already does — it does not pretend anything
+survived. A task caught mid-start has its leftover process cleaned up and is started again; a task
+that was running becomes interrupted and asks for attention; a result that was recorded but whose
+cleanup never finished is finished during recovery.
+
+The second was about stopping an agent too early. Pipelines already wait for the reporting turn to
+finish before stopping the agent that reported, and for good reason: stopping mid-call would cut off
+the very response the agent is waiting for. My design stopped immediately. It now waits the same way,
+and the single place the server notices a turn ending becomes a shared one rather than gaining a
+second copy.
+
+The other seven were real too. A task whose agent crashes is now *interrupted* rather than absurdly
+still "running". A person can record a result, which the design promised but gave no way to do. Re-arm
+and retry are now two different things: retry re-attempts work, re-arm replaces what a task is waiting
+on, and only re-arm can rescue a task stuck behind something that will never happen — retrying that
+now says so instead of quietly re-parking. Deleting a piece of work no longer has contradictory
+effects: a result outlives the task that produced it, so anything already released by it is untouched,
+and only work still waiting gets parked. Tasks record who created them, so "an agent may cancel what
+it created" is enforceable, and it survives that agent being stopped and resumed. One-active-task-per-
+agent is now a database guarantee taken at the same moment as capacity, not a hopeful consequence of
+ordering. And a task's context access is separated from the short-lived per-launch registration, so
+stopping and resuming an agent no longer both revokes and preserves the same permission.
+
+**Needs attention:** None.
+
+**Next:** `docs/ready-changes/dependency-aware-armed-agents.md` is updated and still waiting to start.
+Nine findings on the first pass is worth a second design review before building it.
+
 ### 2026-08-23 — Design revision: budgeted starts, confirmed runtimes, released claims
 
 All three points were right, and the design now reflects them. Nothing is implemented yet.

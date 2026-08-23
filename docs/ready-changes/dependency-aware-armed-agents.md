@@ -4,7 +4,7 @@
 **Why:** Human idea "Dependency-aware / armed agents" in `docs/ideas.md`, defined with the human on
 2026-08-23. It is the third of the three follow-ons the orchestration-plane separation was built for,
 after mail activation and context links.
-**Relevant requirements:** FS-16.R1–R21, FS-16.A1–A9, TS-10.R1–R17, FS-02.R44, FS-02.A26,
+**Relevant requirements:** FS-16.R1–R24, FS-16.A1–A13, TS-10.R1–R20, FS-02.R44, FS-02.A26,
 FS-04.R43, FS-04.A23, FS-14.R34, TS-01.R24, TS-02.R25, TS-03.R28, TS-04.R29, TS-05.R17, TS-09.R27,
 INV §1, §2, §4, §5, §7, §8, §9, §15
 
@@ -30,10 +30,20 @@ Included:
   registered outcome, or a fired project-scoped signal (FS-16.R5, R9). No OR, quorum, negation, or
   expression language.
 - Host-driven starting through `ready → starting → running`, where `running` means the assignment
-  crossed into a confirmed live runtime and a `starting` row names the agent and generation to
-  corroborate after a crash (FS-16.R6, R17, TS-10.R4, R15).
+  crossed into a confirmed live runtime, an exclusive assignment claim is taken in the same statement
+  that grants capacity, and a task whose assignee goes away becomes `interrupted` rather than staying
+  `running` (FS-16.R2, R6, R16, TS-10.R4, R18).
+- Recovery built on the shipped non-adoption boundary: a restart never claims a pre-crash runtime
+  survived, so it abandons and reaps `starting` attempts, marks `running` tasks `interrupted`, and
+  finishes any release a reporting turn never completed (FS-16.R17, TS-10.R15, R19).
+- A reported result is released at the reporting turn's end through a turn-end fan-out shared with
+  pipelines, so the reporting agent always receives its tool response before any stop (TS-10.R19,
+  TS-09.R27, TS-01.R24).
+- Person-recorded results, and re-arm and retry as distinct repairs, so parked and interrupted work
+  can actually make progress (FS-16.R22–R23).
+- Durable server-derived creator provenance behind agent cancel authority (FS-16.R24, TS-10.R20).
 - **Logical fan-out with a physical budget**: every satisfied task becomes ready however many that
-  is, while a configurable install-wide budget (default four) limits how many runtimes AgentDeck
+  is, while a configurable install-wide budget (default ten) limits how many runtimes AgentDeck
   brings up at once, admitting ready work in order as capacity frees (FS-16.R7, R21, TS-10.R17,
   FS-04.R43).
 - Finishing **releases the task's runtime claim** and stops the agent, without archiving it, only
@@ -57,13 +67,17 @@ TS-10 §5.
 
 ## How we will know it works
 
-FS-16.A1–A9, FS-02.A26, and FS-04.A23 are the acceptance set: scheduler and state tests for arming,
+FS-16.A1–A13, FS-02.A26, and FS-04.A23 are the acceptance set: scheduler and state tests for arming,
 restart, and the lifecycle-versus-outcome separation; fake-ACP integration tests proving fan-in
 starts once, that a task reaches `running` only on a confirmed runtime, and that no prompt, mail row,
 or transcript event is produced to poll or announce completion; scheduler and settings tests proving
-fifteen ready tasks run four at a time under the default budget and admit in order as each finishes;
-lifecycle tests for stopping a created or woken runtime, leaving a borrowed one alone, and for an
-agent that exits without reporting; scheduler and state tests for parking, signals, and cycle rejection; MCP and
+fifteen ready tasks run four at a time with the budget set to four, admitting in order as each
+finishes, and that the shipped default is ten;
+lifecycle tests for stopping a created or woken runtime, leaving a borrowed one alone, proving the
+reporter gets its tool response before any stop, and leaving an interrupted task retryable to a real
+result; concurrency tests proving two tasks admitted for one agent leave exactly one active;
+authorization tests for creator-scoped cancel across a stop and resume; deletion tests covering every
+dependent state; scheduler and state tests for parking, signals, and cycle rejection; MCP and
 `internal/contextref` tests for attachment reads and their independence from the global share list;
 HTTP and MCP protocol tests for typed atomic rejections; `internal/pipeline` tests for outcome
 registration; and UI plus restart and deletion integration tests.
@@ -71,6 +85,14 @@ registration; and UI plus restart and deletion integration tests.
 ## Waiting on
 
 Nothing. Every product and architectural decision is recorded in FS-16 and TS-10.
+
+The 2026-08-23 design review's nine Must-fix findings are all resolved in the requirements. Two were
+verified against shipped code first: the runtime registry is in-process and starts empty and stale
+reconciliation deliberately never re-adopts a live process (`internal/runtime/registry.go`,
+`internal/runtime/reconcile.go`, FS-01.R20–R21), so recovery no longer asks whether a pre-crash
+runtime survived; and pipelines really do hold an `await_quiescence` boundary between an accepted
+report and stopping the reporter, through a turn-end dispatch with one hard-coded consumer, so that
+call site becomes a shared fan-out instead of gaining a second path.
 
 Two things the implementing change must also do, since they are true only once this ships: update
 FS-15 §6, which currently lists work objects, dependency evaluation, and assignment APIs as

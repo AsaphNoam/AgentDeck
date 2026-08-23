@@ -109,9 +109,11 @@ sensitive-context sharing is a practical problem.
 
 - **R17** `(planned)` — Every task MCP operation first resolves the existing per-launch token to
   caller plus generation, exactly as R14 and R16 require for pipeline and context operations. A caller
-  may report a result only for the task it is currently assigned to and cancel only a task it created;
-  a task id, assignee, reporter role, filesystem path, or SQLite key supplied in tool arguments is
-  never authority. An unauthorized task and an unknown task are indistinguishable in the response.
+  may report a result only for the task it is currently assigned to and cancel only a task whose
+  durably recorded creator is that same stable agent id (TS-10.R20); a task id, assignee, creator,
+  reporter role, filesystem path, or SQLite key supplied in tool arguments is never authority. Cancel
+  authority follows the stable agent id rather than the launch generation, so a stopped-and-resumed
+  agent is the same principal and a person-created task is never agent-cancellable. An unauthorized task and an unknown task are indistinguishable in the response.
   Attaching a reference requires the caller to be able to read it, and the attachment grants the
   assignee a work-derived read route without synthesizing a direct grant. This adds no authentication
   boundary and does not change the same-machine trust model. See TS-10.

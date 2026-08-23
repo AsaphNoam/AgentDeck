@@ -224,7 +224,10 @@ user-facing dismissal action: unapproved proposals are bounded by the same centr
   the scheduler reading pipeline internals. The run layer stays separate on purpose: a run is a cyclic
   walk over a frozen template with at most one active agent (R11, R20), while a task graph is acyclic
   with real fan-out, so absorbing runs into tasks would force the task domain to grow revisit and
-  back-edge semantics it does not need. See TS-10.
+  back-edge semantics it does not need. The `await_quiescence` boundary between an accepted report
+  and stopping the reporter (R9–R11) is the pattern the task domain follows, and the single
+  hard-coded turn-end consumer becomes a shared generation-scoped fan-out serving both domains rather
+  than a second dispatch path (TS-10.R19). See TS-10.
 
 ## 3. Interfaces & data shapes
 

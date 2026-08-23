@@ -9,7 +9,8 @@
 The durable task, arm, attachment, and shared-result records behind FS-16, the evaluation that decides
 when armed work becomes ready, and the start path that turns a ready task into a running agent. It
 covers the `dependency` activation kind's contract on the existing activation primitive, the
-dispatcher that admits ready work against the concurrency budget, the shared result layer that
+dispatcher that admits ready work against the concurrency budget, the shared turn-end fan-out that
+releases a reported result, the result layer that
 pipelines and tasks both write, restart recovery, and the HTTP/MCP/SSE surfaces.
 
 Out of scope: pipeline template authoring, routing, revisits, and recovery (TS-09); context reference
@@ -37,13 +38,17 @@ Every requirement is `(planned)`; none has shipped.
 - **R4** `(planned)` — **Starting is a claim, an effect, and then a confirmation — three steps, not
   two.** `armed → ready` and `ready → starting` are single-statement conditional updates that decide
   availability and take the claim together, following the `ClaimMailActivation` pattern. The
-  `starting` row durably records the start attempt: its attempt id, the `agent_id` and generation it
-  targets, whether that start will create, wake, or borrow the runtime, and its attempt count. That
+  `ready → starting` statement also takes the exclusive assignment claim for the target agent, so
+  admission, capacity, and exclusivity are decided together and a second task for the same agent
+  cannot interleave between them (R18). The `starting` row durably records the start attempt: its
+  attempt id, the `agent_id` and generation it targets, whether that start will create, wake, or
+  borrow the runtime, and its attempt count. That
   row commits before any launch, resume, or prompt is issued (INV §5, INV §15). Only when the runtime
   is confirmed — the agent is registered live under the recorded generation and holds the assignment —
   does the task move `starting → running`. `running` therefore always means a confirmed live runtime,
-  and a crash between commit and effect leaves a `starting` row naming exactly what to corroborate
-  rather than a `running` row that is not running.
+  and a crash between commit and effect leaves a `starting` row naming exactly what to reap and
+  retry rather than a `running` row that is not running. Confirmation is only meaningful inside the
+  process that owns the runtime; it is never re-derived after a restart (R15).
 - **R17** `(planned)` — **Capacity is granted by a dispatcher, not by the arm evaluator.** Arm
   evaluation decides readiness only. A separate bounded admission step grants capacity to ready tasks
   in the order they became ready, up to the configurable install-wide budget (FS-16.R7, R21), and only
@@ -65,7 +70,8 @@ Every requirement is `(planned)`; none has shipped.
   resumes through the single resume seam that explicit resume and mail wake already use. Finishing a
   task always releases its runtime claim and its slot, and stops the agent through the shared stop
   seam (FS-01.R6, R34) only when the recorded claim says this task created or woke that runtime
-  (FS-16.R4); a borrowed runtime is released untouched. This plane takes the exclusive
+  (FS-16.R4); a borrowed runtime is released untouched. For an agent-reported result that release and
+  stop are deferred to the reporting turn's end (R19), never issued from inside the tool call. This plane takes the exclusive
   per-agent lifecycle claim (TS-01.R16) rather than inventing a second one, and reimplements no
   identity, permission, credential, environment, MCP registration, transcript, or cleanup logic
   (INV §2, TS-09.R6).
@@ -98,6 +104,12 @@ Every requirement is `(planned)`; none has shipped.
   synthesize a direct grant, and never appear in the global direct-share list (TS-01.R23, FS-15.R1).
   Reading an attached reference asks the context service to validate and read that reference for the
   task's assignee; this plane owns the membership answer, and the context service owns the read.
+  Membership is a durable row on the task and is the only thing that authorizes the read. The
+  per-launch MCP registration through which a live agent calls is generation-scoped and is torn down
+  on every runtime exit, which is a different object with a different lifetime: a stop and resume
+  destroys and rebuilds the registration while leaving membership untouched, so a resumed assignee
+  reads exactly what it could read before, and a finished task keeps its route until the task is
+  deleted. Teardown must never be written against membership.
 - **R13** `(planned)` — **Tools extend the one MCP authority.** The task tools register on the existing
   `/mcp` server with the existing per-launch scoped token and generation-scoped teardown (TS-04.R6–R7,
   TS-04.R17). Caller identity, target task ownership, and assignment are all server-derived; no tool
@@ -108,15 +120,20 @@ Every requirement is `(planned)`; none has shipped.
   the shared `{"error":{"code","message","details"}}` envelope (TS-03.R3), serialize empty collections
   as `[]` (TS-03.R6), and are added to the TS-03 route inventory in the same completed change
   (TS-03.R5).
-- **R15** `(planned)` — **Startup recovery is bounded and failing it is fatal to startup.** One sweep
-  re-evaluates unfinished tasks, recomputes slot accounting from surviving runtime claims, and
-  resolves every `starting` row by corroborating its recorded `agent_id` and generation against the
-  live running registry rather than trusting a bare row or a bare pid (INV §9): a match is confirmed
-  to `running`, and anything else abandons the attempt and returns the task to `ready` within its
-  bounded attempt limit. Claims that no live work owns are released. A per-task failure is isolated and parks that task
-  rather than aborting the sweep (INV §7). Recovery failing as a whole is fatal to startup for the
-  same reason it is for mail activations (TS-01.R20): an unreleased claim would be invisible for the
-  life of the process and its work would silently never run.
+- **R15** `(planned)` — **Startup recovery ends runtimes rather than adopting them, and failing it is
+  fatal to startup.** The runtime registry is in-process and starts empty, and stale reconciliation
+  deliberately leaves a still-live agent process as an unadopted orphan rather than re-adopting it
+  (FS-01.R20–R21, `internal/runtime/registry.go`, `internal/runtime/reconcile.go`). There is also no
+  durable generation for an ordinary running agent. Recovery therefore must not ask whether a
+  pre-crash runtime is still live and holding an assignment; that question is unanswerable by
+  construction, and any design that depends on the answer is wrong. Instead one bounded sweep:
+  re-evaluates unfinished tasks; abandons every `starting` attempt, reaps its recorded agent through
+  the ordinary stop seam so the orphan cannot linger, and returns the task to `ready` within its
+  bounded attempt limit; moves every `running` task to `interrupted` (FS-16.R16–R17); completes any
+  release and stop a reporting turn never finished (R19); recomputes slot accounting from surviving
+  claims; and releases claims that no live work owns. A per-task failure is isolated and parks that
+  task rather than aborting the sweep (INV §7). Recovery failing as a whole is fatal to startup for
+  the same reason it is for mail activations (TS-01.R20).
 - **R16** `(planned)` — **Storage is forward-only and does not cascade across domains.** Task, arm,
   attachment, and result rows arrive in one forward-only migration recorded in `schema_migrations`
   (TS-02.R6). Arms and attachments cascade from their task. Agent ids, pipeline run ids, and context
@@ -124,20 +141,49 @@ Every requirement is `(planned)`; none has shipped.
   reference never deletes task history and deleting a task never reaches into agent identity,
   transcripts, the archive, a pipeline run, or a canonical reference (TS-02.R23, TS-09.R14, FS-16.R18).
 
+- **R18** `(planned)` — **Exclusive assignment is a durable index, not a scheduling accident.** A
+  partial unique index over `assigned_agent_id` for tasks in `starting` or `running` makes
+  FS-16.R2's one-active-task-per-agent promise a database guarantee. The exclusive per-agent lifecycle
+  claim (TS-01.R16) serializes start effects but is released after each transition, so it cannot
+  provide this on its own, and the `dependency` activation key `(agent_id, source_id)` deliberately
+  permits one row per task. Losing the assignment claim leaves the task `ready`, not failed.
+- **R19** `(planned)` — **A reported result is released at the reporting turn's end, through a shared
+  turn-end fan-out.** Accepting an agent-reported result commits the outcome and a durable pending
+  release in one transaction, and holds the runtime claim and slot. The stop and release happen when
+  that agent's turn ends, checked generation-scoped against the recorded assignee, mirroring the
+  `await_quiescence` boundary pipelines already use between `report_pipeline_stage_result` and
+  stopping the reporter (TS-09.R9–R11). Without it an immediate stop would cut off the MCP response
+  the reporting agent is still waiting on. The shipped turn-end dispatch invokes exactly one
+  hard-coded consumer (`internal/server`), so this change converts that call site into a generation-
+  scoped subscriber fan-out shared by pipelines and tasks rather than adding a second dispatch path
+  (INV §2). A person-recorded result (FS-16.R22) has no turn and releases within its own transaction.
+  A pending release that its turn never completes is finished by recovery (R15), so the durable claim
+  is never released before the effect it authorizes is either done or reaped (INV §15).
+- **R20** `(planned)` — **Creator provenance is server-derived and durable.** Each task records the
+  creator kind, and for an agent creator the stable `agent_id` resolved from the caller's token at
+  creation, plus the launch generation as provenance only. Cancel authority for an agent compares the
+  stable id, so a stopped-and-resumed agent retains it and a new generation is not a new principal;
+  no tool argument may supply or override it (TS-05.R17, FS-16.R24).
+
 ## 3. Interfaces & data shapes
 
 **Durable rows** (`internal/state`, one forward-only migration):
 
 - `tasks` — `task_id` TEXT PK, `project`, `display_name`, `instruction`, `target_kind`
   (`agent` | `launch`), `target_agent_id` nullable, launch fields (`role`, `backend`, `model`),
-  `state` (`armed` | `ready` | `starting` | `running` | `finished` | `dependency_failed`), `outcome`
-  nullable (`success` | `failure` | `blocked` | `cancelled`), `outcome_summary`, `outcome_details`,
-  `attention_reason`, `assigned_agent_id` nullable, `assigned_generation` nullable,
-  `runtime_claim` nullable (`created` | `woke` | `borrowed`), `start_attempt_id` nullable,
-  `start_attempt_count` INTEGER, `ready_at` nullable, `start_claimed_at` nullable, `revision`
-  INTEGER, `created_at`, `updated_at`, `started_at` nullable, `finished_at` nullable.
+  `state` (`armed` | `ready` | `starting` | `running` | `interrupted` | `finished` |
+  `dependency_failed`), `outcome` nullable (`success` | `failure` | `blocked` | `cancelled`),
+  `outcome_source` nullable (`agent` | `person`), `outcome_summary`, `outcome_details`,
+  `attention_reason`, `created_by_kind` (`person` | `agent`), `created_by_agent_id` nullable,
+  `created_by_generation` nullable, `assigned_agent_id` nullable, `assigned_generation` nullable,
+  `runtime_claim` nullable (`created` | `woke` | `borrowed`), `pending_release` INTEGER,
+  `start_attempt_id` nullable, `start_attempt_count` INTEGER, `ready_at` nullable,
+  `start_claimed_at` nullable, `revision` INTEGER, `created_at`, `updated_at`, `started_at` nullable,
+  `finished_at` nullable.
   `ready_at` is the admission order for the dispatcher; `runtime_claim` decides both slot accounting
-  and whether finishing stops the agent.
+  and whether finishing stops the agent; `pending_release` marks a recorded result whose stop and
+  release its reporting turn has not yet completed (R19). A partial unique index over
+  `assigned_agent_id WHERE state IN ('starting','running')` enforces exclusive assignment (R18).
 - `task_arms` — `arm_id` TEXT PK, `task_id` FK cascade, `kind` (`work_result` | `signal`),
   `source_kind` nullable (`task` | `pipeline_run`), `source_id` nullable, `satisfying_outcomes`
   (bounded closed-vocabulary set), `signal_name` nullable, `state` (`unsatisfied` | `satisfied` |
@@ -151,11 +197,12 @@ Every requirement is `(planned)`; none has shipped.
 
 **MCP tools** on the existing `/mcp` server, all with server-derived caller identity:
 `create_task`, `get_assigned_task`, `report_task_result`, `cancel_task`. Stable outcome codes include
-`task_not_found`, `not_assigned`, `already_reported`, `invalid_outcome`, `dependency_cycle`,
-`target_ineligible`, and `validation`; an unauthorized task and an unknown task are indistinguishable.
+`task_not_found`, `not_assigned`, `not_creator`, `already_reported`, `invalid_outcome`,
+`invalid_state`, `retry_requires_rearm`, `dependency_cycle`, `target_ineligible`, and `validation`; an
+unauthorized task and an unknown task are indistinguishable.
 
-**HTTP** (added to the TS-03 route inventory): create, list, and read tasks; cancel, retry, re-arm,
-and delete a task; and fire a project-scoped signal.
+**HTTP** (added to the TS-03 route inventory): create, list, and read tasks; record a person result
+(FS-16.R22); cancel, retry, re-arm, and delete a task; and fire a project-scoped signal.
 
 **SSE**: `task_update` with `{task_id, revision, state, outcome, attention_reason}`.
 
@@ -165,8 +212,10 @@ and delete a task; and fire a project-scoped signal.
   plane's derived state; a task's view of its agent is re-derived after the boundary, never assumed.
 - **INV §2** — one canonical result-acceptance path (R7), one launch/resume/stop seam (R6), one
   activation executor (R5). Any second implementation of these is a defect.
-- **INV §4** — the work-derived context route and the exclusive lifecycle claim are torn down on every
-  exit path through one generation-scoped teardown.
+- **INV §4** — the per-launch MCP registration and the exclusive lifecycle claim are torn down on
+  every exit path through one generation-scoped teardown. Durable task membership and the runtime
+  claim are deliberately *not* in that set: they outlive a runtime by design (R12), and writing
+  teardown against them would revoke authorization that a stop and resume must preserve.
 - **INV §5** — `armed → ready` and `ready → starting` are atomic claims, never check-then-act, and
   admitting a task against the budget takes its slot in the same statement that grants it (R4, R17).
 - **INV §7** — the startup sweep and evaluation isolate per-task failures rather than aborting or
@@ -178,7 +227,9 @@ and delete a task; and fire a project-scoped signal.
   corroborating the recorded generation against the live registry rather than by a bare pid check
   (R15).
 - **INV §15** — the durable transition commits before the launch, resume, prompt, or stop it
-  authorizes, and no retryable error is returned after an irreversible effect (R4).
+  authorizes, and no retryable error is returned after an irreversible effect (R4). A recorded result
+  commits with its pending release before the reporter is stopped, so the claim is never released
+  ahead of the effect it authorizes and recovery can always finish an interrupted release (R19).
 
 ## 5. Deviations & open decisions
 

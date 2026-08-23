@@ -293,7 +293,10 @@ domain's authorization transition.
   at-most-once retirement. The record still carries no instruction, prompt, arm set, context
   reference, or retry counter. The task domain that owns it is the "future work domain" of R23: it
   owns its own attachment and assignee membership, presents attached reference ids through its own
-  API, and never encodes task ids or assignees into context-reference identity. See TS-10.
+  API, and never encodes task ids or assignees into context-reference identity. The shipped turn-end
+  dispatch invokes one hard-coded consumer; it becomes a generation-scoped subscriber fan-out shared
+  by the pipeline and task domains rather than gaining a second dispatch path (INV §2, TS-10.R19).
+  See TS-10.
 
 ## 3. Interfaces & data shapes
 
