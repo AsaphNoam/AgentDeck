@@ -166,9 +166,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   `make build`, all 226 UI tests, presentation/style checks, and `make dist` pass. No live-browser
   pass was run. A stale migration-version guard test (asserting 13 against the shipped 14) was already
   failing on `main` and now derives its expectation from the migrations slice (INV §9).
-- **Last reviewed code:** `1fd26ed` (2026-08-22), the continuous range after `2310206`
-  covering the mail-activation review records and both fix passes. The pull-based context-link
-  implementation after `374cb5d` is unreviewed code.
+- **Last reviewed code:** `c987724` (2026-08-23), the continuous range after `1fd26ed` covering the
+  final mail-activation review/fix pair, pull-based context-link design records, and the complete
+  context-link implementation. Four context-link findings remain open below.
 - **Branch:** `main`.
 
 ## Active change
@@ -207,7 +207,36 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-None.
+- **Must fix** — `latest_completed_turn` is shareable with no later turn in progress (INV §1).
+  `internal/contextref/service.go:200` accepts the selector whenever any completed turn exists;
+  `internal/server/context_links_test.go:96` currently exercises and blesses that idle-token path.
+  After an agent finishes a turn, a caller using its still-valid MCP token can create a reference and
+  grant immediately, although FS-15.R4 and TS-04.R28 make the selector available only inside a later
+  turn started for an independent reason. Require a persisted open turn after the selected completed
+  turn; add a regression that the idle call returns `source_unavailable` without mutation, then starts
+  a separate turn and proves the same selector succeeds.
+- **Must fix** — `current_turn` can absorb an interrupted pre-resume turn (INV §1).
+  `internal/contextref/service.go:164` scans with metadata excluded and resets its open span only on
+  `turn_end`; `internal/transcript/reader.go:102` therefore hides the resume `session_meta` boundary
+  appended by `internal/runtime/chat.go:660`. If an agent stops or crashes without `turn_end`, resumes,
+  and shares during its next turn, the canonical range starts in the abandoned earlier turn and can
+  expose stale text as current work, violating FS-15.R4/R15 and TS-04.R28. Make the selector scanner
+  observe session boundaries without including their content, and add a crash/stop→resume regression
+  proving the new current span begins after the resume marker.
+- **Must fix** — an oversized record at a selected span edge is silently omitted (INV §7).
+  `internal/contextref/render.go:60` emits the marker only when the last readable sequence before the
+  skipped record is already inside the canonical range. When the oversized physical record is the
+  first event of a turn, the selector starts at the next readable event; when it is last, the range
+  ends at the preceding readable event. In both cases the recipient gets a clean partial page instead
+  of the marker required by FS-15.A5, TS-01.R22, and TS-04.R28. Add leading and trailing oversized-record
+  regressions and carry enough positional information through source resolution/rendering to mark both.
+- **Worth fixing** — a forged numeric cursor can split UTF-8 instead of failing (INV §8/§11).
+  `internal/contextref/page.go:73` accepts any base64-encoded reference id plus numeric byte offset, and
+  `pageWriter.write` at line 30 slices directly at that offset. An authorized caller can alter a cursor
+  to land inside a multibyte rune (or beyond the source), producing replacement text or a misleading
+  empty completion rather than `invalid_cursor`; this breaks FS-15.R9/R11 and TS-04.R28/TS-05.R16's
+  opaque, deterministic UTF-8 page contract. Validate source bounds and rune boundaries (or otherwise
+  make issued positions tamper-evident), with regressions for interior-rune and past-end offsets.
 
 ## Review history
 
@@ -218,6 +247,21 @@ in the requirements before implementation, and the change has since shipped; the
 lives in FS-15, TS-01.R22–R23, TS-02.R24, TS-04.R28, TS-05.R16 and in Git history.
 
 ## Recent changelog
+
+- 2026-08-23 — Reviewed the continuous range after `1fd26ed` through `c987724` in both specification
+  directions and against every invariant class. Three Must-fix context-selection/rendering findings
+  are open: `latest_completed_turn` is accepted while idle instead of only during a later independent
+  turn; `current_turn` crosses a resume marker when the prior turn ended without `turn_end`; and an
+  oversized first or last record is silently omitted rather than marked. One Worth-fixing cursor
+  finding allows a forged byte offset to split UTF-8 or skip beyond the source instead of returning
+  `invalid_cursor`. Applicable invariant surfaces were §1, §2, §5, §7–§11, §14, and §15;
+  §1/§7/§8/§11 produced findings, while the shared projection/recipient seams, state transactions,
+  migration, wiring, whole-mux guard, and commit-before-effect boundaries were otherwise sound.
+  Sections §3, §4, §6, §12, and §13 had no applicable product-code surface. The final mail-activation
+  eligibility fix is correct. `make check-specs`, `git diff --check`, focused context/state/transcript/
+  messaging tests, and full `make test` in both SQLite modes pass; the sandboxed full run first failed
+  only because it could not bind an ephemeral loopback listener, then passed with that permission.
+  No product code or specifications changed, and no local implementation choice required escalation.
 
 - 2026-08-22 — Shipped pull-based context links (FS-15, TS-01.R22–R23, TS-02.R24, TS-04.R28,
   TS-05.R16) in five verified pieces: the shared `transcript.ProjectEvent` projection plus the

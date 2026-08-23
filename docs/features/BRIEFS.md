@@ -4,6 +4,21 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-23 — Review: pull-based context links
+
+The storage, authorization, mail separation, and tool wiring are sound, and the full test suite is
+green. The review found three cases where a shared transcript can describe the wrong slice of work:
+an agent can share its last finished turn while it is idle even though that option is meant for a
+later independent turn; a new turn after an interrupted stop or crash can accidentally include text
+from before the resume; and an oversized record at the start or end of a selected turn can disappear
+without the promised omission marker. A lower-priority cursor issue can also produce damaged text if
+a caller alters a page cursor to point inside a multi-byte character.
+
+**Needs attention:** Fix the three turn-selection and omission-marker findings before building more
+features on context references; the cursor validation should follow in the same pass if practical.
+
+**Next:** Run `/fix` and handle the findings one at a time, starting with the idle last-turn share.
+
 ### 2026-08-22 — Implementation: agents can hand each other context without copying it
 
 An agent can now give another agent access to a piece of its own work — the turn it is in the middle
