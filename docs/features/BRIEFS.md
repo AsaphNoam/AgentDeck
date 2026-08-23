@@ -4,6 +4,42 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-23 — Design fixes round two: all fourteen re-audit findings closed
+
+All fourteen findings from the second review are fixed in the requirements. Still no product code.
+
+Three of them rested on claims about how AgentDeck already works, so I checked those instead of
+taking them at face value, and two turned out to be partly wrong in a way that made the fix smaller.
+The review worried that deleting a half-finished pipeline could leave work waiting forever on a
+result that will never come. It can't: AgentDeck already refuses to delete a pipeline that hasn't
+finished, and a pipeline that has finished records its result in the same moment, so by the time
+deletion is even possible everything waiting on it has already been released or parked. I wrote down
+why rather than building the machinery the review asked for. The review also said pipelines decide
+what to do next in the same step where they accept an agent's report; they don't, that happens later.
+So tasks and pipelines now share only what is genuinely the same — the words for a result, the size
+limits, and the check that the reporter still owns the work — instead of pretending one shared step
+could do both jobs.
+
+The third claim held, and was worse than described: the instruction an agent receives when AgentDeck
+wakes it is hard-coded to say "you have new messages", in one place, with the word "mail" written
+literally into every database statement behind it. An agent woken for a task would have gone looking
+through its inbox and found nothing. That instruction is now per-kind and code-owned.
+
+The rest were real design mistakes. Deleting a task while its agent is still running would have
+thrown away the only record of that agent — deletion is now refused until cleanup finishes. Restart
+would have killed an agent a person was using, because the task had merely borrowed it — restart now
+checks what the task actually owns before stopping anything. Retry had no limit and no rule for what
+counts as a failure, so a busy machine could have burned through a task's chances; only genuine
+failures count now, and waiting your turn never does. A person recording a result, or cancelling,
+could have left a live agent behind if the machine died at the wrong moment; every ending now writes
+down what still needs cleaning up before it does it. And retry now says which agent picks the work
+back up, instead of leaving it to chance.
+
+**Needs attention:** None.
+
+**Next:** `docs/ready-changes/dependency-aware-armed-agents.md` is updated and still waiting to start.
+Two review rounds have now landed twenty-three findings; a third pass is worth it before building.
+
 ### 2026-08-23 — Design review: dependency-aware work still has lifecycle gaps
 
 The change is not ready to implement. The second review found twelve must-fix gaps and two smaller

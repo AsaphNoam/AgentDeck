@@ -4,7 +4,7 @@
 **Why:** Human idea "Dependency-aware / armed agents" in `docs/ideas.md`, defined with the human on
 2026-08-23. It is the third of the three follow-ons the orchestration-plane separation was built for,
 after mail activation and context links.
-**Relevant requirements:** FS-16.R1–R24, FS-16.A1–A13, TS-10.R1–R20, FS-02.R44, FS-02.A26,
+**Relevant requirements:** FS-16.R1–R26, FS-16.A1–A17, TS-10.R1–R21, FS-02.R44, FS-02.A26,
 FS-04.R43, FS-04.A23, FS-14.R34, TS-01.R24, TS-02.R25, TS-03.R28, TS-04.R29, TS-05.R17, TS-09.R27,
 INV §1, §2, §4, §5, §7, §8, §9, §15
 
@@ -42,6 +42,13 @@ Included:
 - Person-recorded results, and re-arm and retry as distinct repairs, so parked and interrupted work
   can actually make progress (FS-16.R22–R23).
 - Durable server-derived creator provenance behind agent cancel authority (FS-16.R24, TS-10.R20).
+- A bounded start-attempt policy where only real failures spend an attempt and contention never does,
+  and where re-arm and retry each say plainly what they repair (FS-16.R23, R25).
+- A code-owned dependency activation instruction and status, and the kind-parameterized activation
+  statements it needs, so an activated agent is told it has a task rather than told to check its mail
+  (FS-16.R26, TS-10.R5).
+- Deletion refused while a task still owns a runtime or an unfinished release, and a restart that
+  never stops a runtime a task merely borrowed (FS-16.R4, R18, TS-10.R15, R16).
 - **Logical fan-out with a physical budget**: every satisfied task becomes ready however many that
   is, while a configurable install-wide budget (default ten) limits how many runtimes AgentDeck
   brings up at once, admitting ready work in order as capacity frees (FS-16.R7, R21, TS-10.R17,
@@ -67,7 +74,7 @@ TS-10 §5.
 
 ## How we will know it works
 
-FS-16.A1–A13, FS-02.A26, and FS-04.A23 are the acceptance set: scheduler and state tests for arming,
+FS-16.A1–A17, FS-02.A26, and FS-04.A23 are the acceptance set: scheduler and state tests for arming,
 restart, and the lifecycle-versus-outcome separation; fake-ACP integration tests proving fan-in
 starts once, that a task reaches `running` only on a confirmed runtime, and that no prompt, mail row,
 or transcript event is produced to poll or announce completion; scheduler and settings tests proving
@@ -86,8 +93,16 @@ registration; and UI plus restart and deletion integration tests.
 
 Nothing. Every product and architectural decision is recorded in FS-16 and TS-10.
 
-The 2026-08-23 design review's nine Must-fix findings are all resolved in the requirements. Two were
-verified against shipped code first: the runtime registry is in-process and starts empty and stale
+Both design reviews are resolved in the requirements: the first review's nine Must-fix findings and
+the re-audit's twelve Must-fix plus two Worth-fixing findings. Five findings across the two rounds
+were verified against shipped code before being accepted, and that verification changed two of the
+re-audit's remedies. Deleting a paused pipeline run cannot strand an arm, because the shipped delete
+path refuses any run that is not terminal and a terminal run registers its outcome in the same
+commit — so no fan-out into the pipeline delete path is added (TS-10.R21, FS-16.A14). And
+`AcceptPipelineReport` does not own routing as the review stated; it writes the attempt report,
+declared stage outputs, and `await_quiescence`, so what is shared with tasks is the vocabulary,
+limits, and staleness check, called inside each domain's own transaction (TS-10.R7, TS-09.R27).
+From the first round: the runtime registry is in-process and starts empty and stale
 reconciliation deliberately never re-adopts a live process (`internal/runtime/registry.go`,
 `internal/runtime/reconcile.go`, FS-01.R20–R21), so recovery no longer asks whether a pre-crash
 runtime survived; and pipelines really do hold an `await_quiescence` boundary between an accepted

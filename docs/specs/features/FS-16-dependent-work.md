@@ -37,18 +37,26 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   agent or a person may record `success`, `failure`, or `blocked`; `cancelled` is written only by
   AgentDeck when the task is cancelled or its agent's work is abandoned. An agent becoming `idle`,
   `done`, or `error` (FS-01.R17–R20) never sets, implies, or clears a task outcome, and no unread
-  count, status transition, sweep, or restart records one. The vocabulary is deliberately identical to
-  the pipeline stage-result vocabulary (FS-14.R19) so one result concept serves both.
+  count, status transition, sweep, or restart records one. What an agent may report is deliberately the
+  same set a pipeline stage report accepts — `success`, `failure`, `blocked` (FS-14.R6, R19) — so one
+  vocabulary, one set of field limits, and one validation serve both. The wider set differs by design
+  and is not merged: `cancelled` is task-only and host-written, and a pipeline *run*'s registered
+  terminal outcome is `success`, `failure`, or `cancelled` (R13), which is a different event from a
+  stage report and happens later.
 - **R4** `(planned)` — **Finishing releases the task's claim on its runtime, and stops only the
   runtime the task itself brought up.** A task records at start time whether it created the runtime by
   launching a new agent, woke it by resuming a stopped one, or merely borrowed a runtime that was
   already up for its own reasons. When the task finishes it always releases its claim. AgentDeck then
   stops the agent through the shared stop seam (FS-01.R6, R34) only in the first two cases, returning
   it to the state the task found it in. A borrowed runtime is left alone, so completing a task never
-  kills a conversation a person is in the middle of. When the agent reported the result itself, the
-  release and any stop happen when that reporting turn ends, never inside the tool call, so the agent
-  always receives its own tool response; the claim and its budget slot are held until then. When a
-  person records the result (R22) there is no reporting turn and the release happens at once. A stopped agent becomes a stopped, non-archived
+  kills a conversation a person is in the middle of. Every terminal transition — an agent-reported
+  result, a person-recorded result, and a cancel — commits the terminal state together with a durable
+  intent to release, and only then performs the stop. When the agent reported the result itself the
+  stop is deferred until that reporting turn ends, never issued inside the tool call, so the agent
+  always receives its own tool response; the claim and its budget slot are held until then. In the
+  other two cases the stop follows the commit immediately. Because the intent is durable, a crash or a
+  failed stop between the commit and the effect never strands a live task-owned runtime: recovery
+  finishes the release that was already promised (R17). A stopped agent becomes a stopped, non-archived
   agent (FS-01.R31): its card, identity, and transcript stay visible and it resumes like any other
   stopped conversation. Nothing is ever archived or deleted by finishing a task.
 
@@ -122,7 +130,12 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   attachments are created over the local HTTP API and its UI, and by a token-bound chat agent through
   scoped MCP tools that create a task, read its own assignment, report its result, and cancel a task
   it created. Caller identity is always server-derived (TS-04.R7); no tool argument names another
-  agent as the reporter or as a task's creator. Every task durably records who created it (R24). This deliberately opens what FS-14 keeps closed for pipelines: an agent can
+  agent as the reporter or as a task's creator. Every task durably records who created it (R24).
+  An agent-created task may target a launch specification, itself, or another chat agent named the
+  same way a message names its recipient — a friendly selector that AgentDeck resolves server-side
+  against durable identities, returning the same unknown and ambiguous recipient errors coordination
+  already returns (FS-06). A raw agent id in a tool argument is not a target and is never authority;
+  resolution, not the caller, decides which agent a task points at. This deliberately opens what FS-14 keeps closed for pipelines: an agent can
   cause new work to start without a person in the loop, which is the point of expressing orchestration
   as control state rather than prose.
 - **R13** `(planned)` — **Pipeline results register in the shared result layer.** When a pipeline run
@@ -134,7 +147,8 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   recovery; this requirement adds no cross-run join, parallel branch, or child pipeline to FS-14.
 - **R14** `(planned)` — **Dependent work has its own view.** A Tasks view lists tasks for a project
   with their state, outcome, what each armed task is waiting on, and which parked task needs
-  attention, and it offers create, record a result (R22), re-arm, retry, cancel, and delete (R23). The dashboard is unchanged apart
+  attention, and it offers create, record a result (R22), re-arm, retry, cancel, and delete (R18,
+  R23). The dashboard is unchanged apart
   from an indicator of how many tasks need attention (FS-02.R44).
 
 - **R22** `(planned)` — **A person can record a result when no agent will.** A person records
@@ -147,12 +161,37 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   wait for. It is marked as person-recorded so it is never mistaken for an agent's own report.
 - **R23** `(planned)` — **Repairing arms and retrying execution are different operations.** *Re-arm*
   replaces a task's arm set atomically, revalidating the whole graph (R15), and returns the task to
-  `armed`, or straight to `ready` when the new arms are already satisfied. It is the only repair for a
-  task parked because an arm can never be satisfied, since a recorded result is immutable and retrying
-  the same arms parks it again immediately. *Retry* changes no arms and re-attempts execution: it
-  returns an `interrupted` task, or one parked because its start attempts were exhausted, to `ready`
-  with a fresh attempt budget. Retry is rejected on a task parked by an unsatisfiable arm, with a
-  typed error naming re-arm as the repair, so neither operation silently fails to make progress.
+  `armed`, or straight to `ready` when the new arms are already satisfied. It is accepted only on an
+  `armed`, `ready`, or `dependency_failed` task and is rejected with a typed error on a `starting`,
+  `running`, `interrupted`, or `finished` one, whose arms have already been passed or are moot. It is
+  the only repair for a task parked because an arm can never be satisfied, since a recorded result is
+  immutable and retrying the same arms parks it again immediately. *Retry* changes no arms and
+  re-attempts execution: it returns an `interrupted` task, or one parked because its start attempts
+  were exhausted, to `ready` with a fresh attempt allowance (R25). Retry is rejected on a task parked
+  by an unsatisfiable arm, with a typed error naming re-arm as the repair, so neither operation
+  silently fails to make progress.
+  Retry acts on the assignee the task already has rather than inventing a second one. A task targeting
+  an existing agent retries against that same target. A launch-spec task that never confirmed an
+  assignee launches fresh, because nothing was ever confirmed. A launch-spec task that did confirm one
+  resumes that same agent, which keeps its transcript continuous and its attached-context membership
+  valid; minting a second agent would fork both and would require the reassignment this feature
+  excludes. If that assignee has since been deleted or archived, retry is rejected with a typed error
+  naming the reason, and the work is restarted by creating a new task.
+- **R25** `(planned)` — **Start attempts are bounded, and only real failures spend them.** A task gets
+  three start attempts. An attempt is spent only when bringing the work up genuinely fails: a launch
+  that does not start, a resume that does not complete, or a target that has become ineligible. Being
+  deferred spends nothing and is not a failure — losing a race for the exclusive assignment claim,
+  finding the agent's lifecycle busy, or waiting for capacity all return the task to `ready` with its
+  allowance intact and its place in the admission order kept, so a busy machine can never exhaust a
+  task's attempts. There is no timed backoff; re-admission happens on the next dispatch, and the
+  attempt count is the bound. When the three are spent the task parks as `dependency_failed` recording
+  the last failure, and an explicit Retry (R23) restores the full allowance.
+- **R26** `(planned)` — **An agent started for a task is told it has a task.** The activation that
+  crosses into an existing conversation carries one short, code-owned instruction to read its
+  assignment and act on it, and its own status text while that turn runs. It does not reuse mail's
+  instruction or mail's status, because an agent told to check its messages will do exactly that and
+  never find its task. The instruction carries no task id, arm set, context reference, or assignment
+  text: the agent reads all of that through R11, which keeps the activation payload-free.
 - **R24** `(planned)` — **Every task records who created it.** A task durably records whether a person
   or an agent created it and, for an agent, that agent's stable id, captured server-side at creation
   from the caller's token. An agent may cancel only a task whose recorded creator is that same agent
@@ -182,13 +221,20 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   terminal outcome, is parked, or is deleted. An arm never returns from `satisfied` to `unsatisfied`,
   and deleting a prerequisite whose result already satisfied an arm leaves that arm satisfied (R18).
   An `unsatisfiable` arm is never repaired in place; re-arming replaces the whole set (R23).
-- **Outcome:** absent while `armed`, `ready`, `running`, or `dependency_failed`; exactly one value
-  once `finished`. An accepted outcome is immutable.
-- **Assignment and runtime claim:** a task acquires its agent id and generation when its start is
-  confirmed and retains them as durable provenance afterwards, including after that agent stops or is
-  archived. It records at the same moment whether it created, woke, or borrowed that runtime (R4), and
-  holds a claim on it until the task's result is recorded and, for an agent-reported result, that
-  reporting turn has ended. Reassignment does not exist in this feature, so the assignee is written
+- **Outcome:** absent in every non-terminal state — `armed`, `ready`, `starting`, `running`,
+  `interrupted`, and `dependency_failed` — and exactly one value once `finished`. There is no state in
+  which an outcome is partially recorded. An accepted outcome is immutable, and it records whether an
+  agent or a person supplied it (R22).
+- **Assignment and runtime claim — reserved first, confirmed second.** A task *reserves* its target
+  agent when it is admitted to `starting`, recording the agent id, the generation it intends to act
+  on, and whether that start will create, wake, or borrow the runtime (R4). The reservation is what
+  the exclusive assignment claim (R2) holds and what recovery reads, and it exists before any effect
+  precisely so a crash mid-start is identifiable. It is *confirmed* into durable assignee membership
+  only when the assignment crosses into a live runtime and the task becomes `running`; membership is
+  what authorizes reading attached context (R10). An abandoned reservation releases the claim and
+  authorizes nothing. A confirmed assignee is retained as durable provenance afterwards, including
+  after that agent stops or is archived, and its claim is held until the task's result is recorded
+  and, for an agent-reported result, that reporting turn has ended. Reassignment does not exist in this feature, so the assignee is written
   once. The assignee's durable membership is what authorizes reading attached context (R10); it is
   separate from the per-launch MCP registration, which is torn down whenever that runtime exits and
   re-established on the next one.
@@ -213,15 +259,25 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   deliberately does not re-adopt an agent process that outlived a previous server (FS-01.R20), so
   after a restart no task runtime is owned and none can be trusted to still hold its assignment.
   Recovery therefore never claims one survived. Armed and ready tasks are re-evaluated from their
-  durable rows and satisfied arms stay satisfied. A task that was `starting` has its attempt
-  abandoned, its recorded agent reaped through the ordinary orphan path (FS-01.R21), and returns to
-  `ready` to be started once more within its bounded attempt limit. A task that was `running` becomes
-  `interrupted` under R16, because its agent is now an unowned orphan. A task whose result was already
+  durable rows and satisfied arms stay satisfied. A task that was `starting` is resolved by the
+  reservation it recorded. If that start would have created or woken the runtime, the leftover agent
+  is reaped through the ordinary orphan path (FS-01.R21) and the task returns to `ready` to be started
+  once more within its attempt limit (R25). If it would have borrowed a runtime that was already up
+  for someone else's reasons, that runtime is never touched — R4's promise does not lapse because
+  AgentDeck restarted — and because it cannot be known whether the assignment reached that
+  conversation, the task becomes `interrupted` for a person to resolve rather than being silently
+  delivered twice. A task that was `running` becomes `interrupted` under R16, because its agent is now
+  an unowned orphan. A task whose result was already
   recorded stays finished, and any stop and release its reporting turn never completed is finished
   during recovery. Budget slots are recomputed from surviving claims. Nothing is resumed on a guess
   and no unit of work gets two agents, matching FS-14.R14.
-- **R18** `(planned)` — **Deletion has narrow effects, decided per dependent.** Deleting a task
-  removes its arms, its attachments, and its work-derived context route. Its recorded result is not
+- **R18** `(planned)` — **Deletion has narrow effects, decided per dependent, and never abandons a
+  runtime.** Deletion is rejected with a typed error while a task still owns something live: while it
+  is `starting` or `running`, and while a finished or cancelled task's stop and release have not
+  completed. Cancel it first and let its cleanup finish, then delete. This keeps the task row — the
+  only record of the runtime claim, the budget slot, and the pending release — alive until nothing
+  depends on it, so deleting can never strand a running agent or leak a slot. Deleting an otherwise
+  eligible task removes its arms, its attachments, and its work-derived context route. Its recorded result is not
   removed: a result is keyed to its source and outlives the task that produced it, so a dependent
   whose arm that result already satisfied is completely unaffected, whatever state that dependent is
   in. Only an arm still waiting on the deleted task becomes unsatisfiable, which parks its `armed` or
@@ -296,7 +352,9 @@ Each names the verification that demonstrates it.
   through settings with its default of ten: scheduler and settings tests.
 - **A10** `(planned)` (R16, R22–R23) — An assignee that crashes, is stopped, or is switched away leaves
   its task `interrupted` with its claim and slot released; retry returns it to `ready` and it runs to
-  a real result; a person-recorded result finishes it and releases the claim at once; recording a
+  a real result on the same assignee it already had, asserted by agent id and by a new generation,
+  while a launch-spec task that never confirmed an assignee launches a fresh one and a retry whose
+  prior assignee was archived is rejected with a typed error; a person-recorded result finishes it and releases the claim at once; recording a
   result on an `armed` or `finished` task is rejected without mutation: lifecycle, scheduler, and HTTP
   tests.
 - **A11** `(planned)` (R8, R23) — A task parked by an unsatisfiable arm is rejected for retry with an
@@ -307,6 +365,24 @@ Each names the verification that demonstrates it.
   and leaves untouched a dependent whose arm that prerequisite had already satisfied, in each of the
   `ready`, `starting`, `running`, `interrupted`, and `finished` dependent states: state tests covering
   every case.
+- **A14** `(planned)` (R5, R13, R18) — A pipeline run cannot be deleted before it is terminal, and a
+  run that reaches a terminal state registers its outcome in the same commit, so deleting it
+  afterwards leaves every arm that waited on it already resolved — satisfied arms stay satisfied and
+  non-matching ones are already parked — with no arm left waiting on a run that no longer exists:
+  `internal/pipeline` and scheduler deletion tests.
+- **A15** `(planned)` (R6, R11, R26) — A fake provider agent activated for a task receives the task
+  instruction rather than the mail instruction, shows the task status text, and calls the assignment
+  route to obtain its instruction and attached references; a mail activation for the same agent is
+  unchanged: fake-ACP and activation tests.
+- **A16** `(planned)` (R25) — Losing the assignment claim, finding the lifecycle busy, and waiting for
+  capacity each return a task to `ready` without spending an attempt or losing its place; three real
+  launch or resume failures park it as `dependency_failed` recording the last one; and an explicit
+  Retry restores the full allowance: scheduler tests.
+- **A17** `(planned)` (R4, R17–R18, R22) — Deleting a `starting`, `running`, or not-yet-released task
+  is refused with a typed error and mutates nothing; a restart never stops a runtime a task borrowed
+  and leaves that task `interrupted`; and a crash between committing a person-recorded result or a
+  cancel and its stop leaves a durable release that recovery completes exactly once: deletion,
+  restart, and lifecycle integration tests.
 - **A13** `(planned)` (R2, R24) — Two tasks admitted concurrently for the same agent leave exactly one
   `starting` or `running` and the other `ready`, under repeated concurrent execution; and an agent can
   cancel a task it created, still can after being stopped and resumed, and cannot cancel a task

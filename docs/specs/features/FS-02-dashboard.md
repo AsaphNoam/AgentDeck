@@ -384,8 +384,9 @@ ownership is asserted against the stylesheets, and J5 checks the live surface. �
 picker and launches with the route project's id; the general modal continues to offer its picker. —
 `CardGrid.test.tsx`, `NewAgentModal.test.tsx`; J5.
 
-- **A26** `(planned)` (R44) — The needs-attention count reflects parked and result-less running
-  tasks, updates after their authoritative commit, and reads zero when no task needs attention:
+- **A26** `(planned)` (R44) — The needs-attention count reflects exactly the `dependency_failed` and
+  `interrupted` tasks in view, updates after their authoritative commit, does not count an ordinary
+  `armed`, `ready`, `starting`, or `running` task, and reads zero when no task needs attention:
   dashboard UI tests.
 
 ## 6. Deviations & open decisions

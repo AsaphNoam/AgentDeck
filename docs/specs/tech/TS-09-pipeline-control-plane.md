@@ -216,9 +216,12 @@ user-facing dismissal action: unapproved proposals are bounded by the same centr
 (R19), which retains the newest records and prunes older ones at each write.
 
 - **R27** `(planned)` — **The result layer converges with the task domain; the run layer does not.**
-  The outcome vocabulary, its validation, its bounded summary/details limits, and the transaction that
-  accepts a reported result are defined once and used by both `report_pipeline_stage_result` (R8–R9)
-  and the task report tool; two acceptance implementations are a defect under INV §2. A run reaching a
+  The agent-reportable outcome vocabulary, its bounded summary/details/checks limits, and the
+  staleness check are defined once and used by both `report_pipeline_stage_result` (R8–R9) and the
+  task report tool; duplicating them is a defect under INV §2. The accepting transaction stays
+  domain-owned, because stage acceptance also writes declared outputs into run-scoped values and sets
+  `await_quiescence`, which no task has; the shared helper is called inside each domain's own
+  transaction (TS-10.R7). A run reaching a
   terminal state registers its normalized outcome in the shared result layer in the same transaction
   that commits that terminal state (FS-14.R34), which is what lets other work depend on a run without
   the scheduler reading pipeline internals. The run layer stays separate on purpose: a run is a cyclic
