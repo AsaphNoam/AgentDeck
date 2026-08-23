@@ -4,9 +4,9 @@
 **Why:** Human idea "Dependency-aware / armed agents" in `docs/ideas.md`, defined with the human on
 2026-08-23. It is the third of the three follow-ons the orchestration-plane separation was built for,
 after mail activation and context links.
-**Relevant requirements:** FS-16.R1–R20, FS-16.A1–A8, TS-10.R1–R16, FS-02.R44, FS-02.A26,
-FS-14.R34, TS-01.R24, TS-02.R25, TS-03.R28, TS-04.R29, TS-05.R17, TS-09.R27, INV §1, §2, §4, §5,
-§7, §8, §9, §15
+**Relevant requirements:** FS-16.R1–R21, FS-16.A1–A9, TS-10.R1–R17, FS-02.R44, FS-02.A26,
+FS-04.R43, FS-04.A23, FS-14.R34, TS-01.R24, TS-02.R25, TS-03.R28, TS-04.R29, TS-05.R17, TS-09.R27,
+INV §1, §2, §4, §5, §7, §8, §9, §15
 
 ## Outcome
 
@@ -29,10 +29,16 @@ Included:
 - **Arms**: an AND-conjunction of prerequisites over another task's outcome, a pipeline run's
   registered outcome, or a fired project-scoped signal (FS-16.R5, R9). No OR, quorum, negation, or
   expression language.
-- Host-driven starting: full fan-out, launch-spec tasks launch, existing-agent tasks cross through
-  the new `dependency` activation kind on the shared activation primitive (FS-16.R6–R7, TS-01.R24).
-- Finishing **stops the assigned agent without archiving it**, so the card stays visible and
-  resumable while the process is freed (FS-16.R4).
+- Host-driven starting through `ready → starting → running`, where `running` means the assignment
+  crossed into a confirmed live runtime and a `starting` row names the agent and generation to
+  corroborate after a crash (FS-16.R6, R17, TS-10.R4, R15).
+- **Logical fan-out with a physical budget**: every satisfied task becomes ready however many that
+  is, while a configurable install-wide budget (default four) limits how many runtimes AgentDeck
+  brings up at once, admitting ready work in order as capacity frees (FS-16.R7, R21, TS-10.R17,
+  FS-04.R43).
+- Finishing **releases the task's runtime claim** and stops the agent, without archiving it, only
+  when the task created or woke that runtime; a borrowed runtime a person is using is left alone
+  (FS-16.R4).
 - An unsatisfiable prerequisite parks the dependent as `dependency_failed` and surfaces it; nothing
   is silently cancelled or left waiting forever (FS-16.R8).
 - **Result-layer convergence with pipelines**: one outcome vocabulary, one validation, one accept
@@ -51,11 +57,13 @@ TS-10 §5.
 
 ## How we will know it works
 
-FS-16.A1–A8 and FS-02.A26 are the acceptance set: scheduler and state tests for arming, restart, and
-the lifecycle-versus-outcome separation; fake-ACP integration tests proving fan-in starts once,
-simultaneous fan-out all starts, and that no prompt, mail row, or transcript event is produced to
-poll or announce completion; lifecycle tests for stop-without-archive and for an agent that exits
-without reporting; scheduler and state tests for parking, signals, and cycle rejection; MCP and
+FS-16.A1–A9, FS-02.A26, and FS-04.A23 are the acceptance set: scheduler and state tests for arming,
+restart, and the lifecycle-versus-outcome separation; fake-ACP integration tests proving fan-in
+starts once, that a task reaches `running` only on a confirmed runtime, and that no prompt, mail row,
+or transcript event is produced to poll or announce completion; scheduler and settings tests proving
+fifteen ready tasks run four at a time under the default budget and admit in order as each finishes;
+lifecycle tests for stopping a created or woken runtime, leaving a borrowed one alone, and for an
+agent that exits without reporting; scheduler and state tests for parking, signals, and cycle rejection; MCP and
 `internal/contextref` tests for attachment reads and their independence from the global share list;
 HTTP and MCP protocol tests for typed atomic rejections; `internal/pipeline` tests for outcome
 registration; and UI plus restart and deletion integration tests.

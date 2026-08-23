@@ -273,7 +273,8 @@ surfaces it and permits a retry. A successful `200` retains its ordered
 stop-and-registration-cleanup operation.
 
 - **R28** `(planned)` — The route inventory gains task creation, listing, and detail; cancel, retry,
-  re-arm, and delete; and a project-scoped signal fire. All use the shared error envelope (R3) and
+  re-arm, and delete; a project-scoped signal fire; and the task concurrency budget on the existing
+  settings surface (FS-04.R43). All use the shared error envelope (R3) and
   serialize empty collections as `[]` (R6). `task_update` joins the versioned SSE vocabulary and is
   published only after its authoritative commit (R8), carrying a bounded `{task_id, revision, state,
   outcome, attention_reason}` payload; clients ignore stale revisions and refetch detail over REST,

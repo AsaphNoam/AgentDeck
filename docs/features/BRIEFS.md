@@ -4,6 +4,35 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-23 — Design revision: budgeted starts, confirmed runtimes, released claims
+
+All three points were right, and the design now reflects them. Nothing is implemented yet.
+
+Readiness and running processes are no longer the same question. A graph that fans out to fifteen
+tasks still has fifteen ready tasks — the dependency model is never narrowed to fit a machine — but a
+budget, four by default and adjustable in settings, limits how many agent processes AgentDeck brings
+up for that work at once. As each one finishes and its process is stopped, the next ready task starts,
+in the order they became ready. A task that lands on an agent already running for its own reasons
+costs no slot, because it starts no process. The budget can be changed at any time and never changes
+what a graph means.
+
+The start path now has the step it was missing. A task goes ready, then starting, then running, and
+`running` means the assignment genuinely crossed into a live runtime. The starting record names the
+agent, the generation, and the attempt, so after a crash AgentDeck checks whether that exact runtime
+is alive: if it is, the task is running; if it is not, the attempt is abandoned and the task goes back
+to ready to be started once more. There are no longer rows that claim to be running when nothing is.
+
+Finishing a task now releases the task's hold on the runtime, and stopping is a consequence rather
+than the rule. If the task launched the agent, or woke a dormant one just to do the work, that agent
+is stopped and left visible and resumable, as before. If the task merely borrowed a runtime someone
+was already using, it is left alone — finishing a piece of work no longer ends a conversation that
+was never about it.
+
+**Needs attention:** None.
+
+**Next:** The ready change `docs/ready-changes/dependency-aware-armed-agents.md` is updated and still
+waiting to start. FS-04 joins the specs that flip back from `Partial` when it ships.
+
 ### 2026-08-23 — Design: dependency-aware work that starts itself
 
 Dependency-aware work is specified and waiting to build. No product code changed.

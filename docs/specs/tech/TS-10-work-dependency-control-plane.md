@@ -8,8 +8,9 @@
 
 The durable task, arm, attachment, and shared-result records behind FS-16, the evaluation that decides
 when armed work becomes ready, and the start path that turns a ready task into a running agent. It
-covers the `dependency` activation kind's contract on the existing activation primitive, the shared
-result layer that pipelines and tasks both write, restart recovery, and the HTTP/MCP/SSE surfaces.
+covers the `dependency` activation kind's contract on the existing activation primitive, the
+dispatcher that admits ready work against the concurrency budget, the shared result layer that
+pipelines and tasks both write, restart recovery, and the HTTP/MCP/SSE surfaces.
 
 Out of scope: pipeline template authoring, routing, revisits, and recovery (TS-09); context reference
 identity, canonicalization, and bounded reads (TS-05.R16 and the context service); agent launch,
@@ -33,24 +34,38 @@ Every requirement is `(planned)`; none has shipped.
   registration (R7) or signal fire re-evaluates only the arms that name that source. Startup performs
   one bounded sweep over unfinished tasks. There is no unbounded polling loop and no periodic full
   graph walk.
-- **R4** `(planned)` — **Becoming ready and starting are atomic claims made before any side effect.**
-  The `armed → ready` and `ready → running` transitions are single-statement conditional updates that
-  decide availability and take the claim together, following the `ClaimMailActivation` pattern. The
-  durable transition commits before any launch, resume, or prompt is issued (INV §5, INV §15), so a
-  crash between commit and effect leaves recoverable state rather than a lost or duplicated start.
+- **R4** `(planned)` — **Starting is a claim, an effect, and then a confirmation — three steps, not
+  two.** `armed → ready` and `ready → starting` are single-statement conditional updates that decide
+  availability and take the claim together, following the `ClaimMailActivation` pattern. The
+  `starting` row durably records the start attempt: its attempt id, the `agent_id` and generation it
+  targets, whether that start will create, wake, or borrow the runtime, and its attempt count. That
+  row commits before any launch, resume, or prompt is issued (INV §5, INV §15). Only when the runtime
+  is confirmed — the agent is registered live under the recorded generation and holds the assignment —
+  does the task move `starting → running`. `running` therefore always means a confirmed live runtime,
+  and a crash between commit and effect leaves a `starting` row naming exactly what to corroborate
+  rather than a `running` row that is not running.
+- **R17** `(planned)` — **Capacity is granted by a dispatcher, not by the arm evaluator.** Arm
+  evaluation decides readiness only. A separate bounded admission step grants capacity to ready tasks
+  in the order they became ready, up to the configurable install-wide budget (FS-16.R7, R21), and only
+  starts that will create or wake a runtime consume a slot. A slot is held by the task's runtime claim
+  and released when the task finishes, is cancelled, loses its agent (FS-16.R16), or abandons its
+  start attempt. Slot accounting is derived from committed runtime claims and recomputed at startup,
+  never held only in memory (INV §9), so it cannot drift into a permanent deadlock after a crash.
 - **R5** `(planned)` — **The `dependency` activation kind declares its own contract.** The existing
   activation record (TS-01.R19, TS-02.R23) gains a nullable stable source work id, which the
   `dependency` kind sets to its owning task id and `mail` leaves empty. Its uniqueness key is one
   pending row per `(agent_id, source_id)`, not mail's one-pending-row-per-agent. Its retry policy is
   the one TS-01.R21 already reserves: a dependency activation remains actionable until its owning task
-  records a confirmed start, so a lost claim, a busy lifecycle, or a failed resume is released back to
-  pending rather than retired. Repeated start failure is bounded and parks the task (FS-16.R8) instead
+  confirms its start under R4, so a lost claim, a busy lifecycle, or a failed resume returns the
+  activation to pending and the task to `ready` rather than retiring either. Repeated start failure is bounded and parks the task (FS-16.R8) instead
   of retrying forever. The record still carries no instruction, prompt, arm set, context reference, or
   retry counter as payload.
 - **R6** `(planned)` — **Starting reuses the existing launch, resume, and stop seams.** A launch-spec
   task composes its launch through the existing launch composition helpers, and an existing-agent task
   resumes through the single resume seam that explicit resume and mail wake already use. Finishing a
-  task stops its agent through the shared stop seam (FS-01.R6, R34). This plane takes the exclusive
+  task always releases its runtime claim and its slot, and stops the agent through the shared stop
+  seam (FS-01.R6, R34) only when the recorded claim says this task created or woke that runtime
+  (FS-16.R4); a borrowed runtime is released untouched. This plane takes the exclusive
   per-agent lifecycle claim (TS-01.R16) rather than inventing a second one, and reimplements no
   identity, permission, credential, environment, MCP registration, transcript, or cleanup logic
   (INV §2, TS-09.R6).
@@ -94,8 +109,11 @@ Every requirement is `(planned)`; none has shipped.
   as `[]` (TS-03.R6), and are added to the TS-03 route inventory in the same completed change
   (TS-03.R5).
 - **R15** `(planned)` — **Startup recovery is bounded and failing it is fatal to startup.** One sweep
-  releases claims that no live work owns, re-evaluates unfinished tasks, and starts exactly once any
-  ready task whose start was never confirmed. A per-task failure is isolated and parks that task
+  re-evaluates unfinished tasks, recomputes slot accounting from surviving runtime claims, and
+  resolves every `starting` row by corroborating its recorded `agent_id` and generation against the
+  live running registry rather than trusting a bare row or a bare pid (INV §9): a match is confirmed
+  to `running`, and anything else abandons the attempt and returns the task to `ready` within its
+  bounded attempt limit. Claims that no live work owns are released. A per-task failure is isolated and parks that task
   rather than aborting the sweep (INV §7). Recovery failing as a whole is fatal to startup for the
   same reason it is for mail activations (TS-01.R20): an unreleased claim would be invisible for the
   life of the process and its work would silently never run.
@@ -112,10 +130,14 @@ Every requirement is `(planned)`; none has shipped.
 
 - `tasks` — `task_id` TEXT PK, `project`, `display_name`, `instruction`, `target_kind`
   (`agent` | `launch`), `target_agent_id` nullable, launch fields (`role`, `backend`, `model`),
-  `state` (`armed` | `ready` | `running` | `finished` | `dependency_failed`), `outcome` nullable
-  (`success` | `failure` | `blocked` | `cancelled`), `outcome_summary`, `outcome_details`,
-  `attention_reason`, `assigned_agent_id` nullable, `assigned_generation` nullable, `revision`
+  `state` (`armed` | `ready` | `starting` | `running` | `finished` | `dependency_failed`), `outcome`
+  nullable (`success` | `failure` | `blocked` | `cancelled`), `outcome_summary`, `outcome_details`,
+  `attention_reason`, `assigned_agent_id` nullable, `assigned_generation` nullable,
+  `runtime_claim` nullable (`created` | `woke` | `borrowed`), `start_attempt_id` nullable,
+  `start_attempt_count` INTEGER, `ready_at` nullable, `start_claimed_at` nullable, `revision`
   INTEGER, `created_at`, `updated_at`, `started_at` nullable, `finished_at` nullable.
+  `ready_at` is the admission order for the dispatcher; `runtime_claim` decides both slot accounting
+  and whether finishing stops the agent.
 - `task_arms` — `arm_id` TEXT PK, `task_id` FK cascade, `kind` (`work_result` | `signal`),
   `source_kind` nullable (`task` | `pipeline_run`), `source_id` nullable, `satisfying_outcomes`
   (bounded closed-vocabulary set), `signal_name` nullable, `state` (`unsatisfied` | `satisfied` |
@@ -145,13 +167,16 @@ and delete a task; and fire a project-scoped signal.
   activation executor (R5). Any second implementation of these is a defect.
 - **INV §4** — the work-derived context route and the exclusive lifecycle claim are torn down on every
   exit path through one generation-scoped teardown.
-- **INV §5** — `armed → ready` and `ready → running` are atomic claims, never check-then-act (R4).
+- **INV §5** — `armed → ready` and `ready → starting` are atomic claims, never check-then-act, and
+  admitting a task against the budget takes its slot in the same statement that grants it (R4, R17).
 - **INV §7** — the startup sweep and evaluation isolate per-task failures rather than aborting or
   amplifying (R15).
 - **INV §8** — task state, outcome, and attention reason reaching the UI are bounded and
   in-vocabulary; a failure to start always surfaces rather than leaving work silently armed.
-- **INV §9** — any in-memory index of armed work reseeds lazily from the durable table on first use
-  and is never treated as authoritative.
+- **INV §9** — any in-memory index of armed work or slot accounting reseeds lazily from the durable
+  rows on first use and is never treated as authoritative, and a `starting` row is resolved by
+  corroborating the recorded generation against the live registry rather than by a bare pid check
+  (R15).
 - **INV §15** — the durable transition commits before the launch, resume, prompt, or stop it
   authorizes, and no retryable error is returned after an irreversible effect (R4).
 
@@ -166,6 +191,10 @@ and delete a task; and fire a project-scoped signal.
 - **No general condition or query engine.** Arms are a conjunction over registered results and fired
   signals. There is no expression language, no derived predicate, and no agent-facing graph query, so
   this plane cannot become a workflow DSL by accident.
+- **The concurrency budget is a resource policy, never a dependency semantic.** Readiness is decided
+  entirely by arms; the budget only decides when a ready task is admitted. Nothing about the budget
+  may narrow, reorder, or fail a dependency, so a graph's meaning is identical at any budget value and
+  the setting can be changed at any time without changing what the graph says.
 - **The in-process bus stays non-durable.** This plane deliberately does not add an event log or
   replayable stream; durable rows plus a bounded startup sweep are the recovery mechanism (R2, R15).
 

@@ -7,7 +7,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Ready change:** [Dependency-aware work that starts itself](../ready-changes/dependency-aware-armed-agents.md) is waiting to start. It is specified
-  in FS-16 and TS-10 with deltas in FS-02, FS-14, TS-01, TS-02, TS-03, TS-04, TS-05, and
+  in FS-16 and TS-10 with deltas in FS-02, FS-04, FS-14, TS-01, TS-02, TS-03, TS-04, TS-05, and
   TS-09; every requirement is `(planned)` and no product code has changed.
 - **Active change:** None.
 - **State:** Dependency-aware work is designed and waiting; nothing about it is implemented.
@@ -230,6 +230,23 @@ in the requirements before implementation, and the change has since shipped; the
 lives in FS-15, TS-01.R22–R23, TS-02.R24, TS-04.R28, TS-05.R16 and in Git history.
 
 ## Recent changelog
+
+- 2026-08-23 — Revised the dependency-aware design on three points from the human, before any
+  implementation. (1) Readiness and process concurrency are now separate: every satisfied task
+  becomes ready however many that is, while a configurable install-wide budget (default four,
+  FS-04.R43) limits how many runtimes AgentDeck brings up, admitting ready work in `ready_at` order
+  as capacity frees; only starts that create or wake a runtime consume a slot, so the budget never
+  changes what a graph means (FS-16.R7, R21, TS-10.R17). The earlier "no queue, ceiling, or fairness
+  policy" wording fought the process-memory reason for stopping agents on finish. (2) The start path
+  is `ready → starting → running`, where `starting` durably records the attempt id, target
+  `agent_id`, generation, and runtime-claim kind, and `running` means the assignment crossed into a
+  confirmed live runtime. Restart corroborates each `starting` row against the live registry rather
+  than trusting a `running` row that may not be running — which is the object TS-01.R21's "confirmed
+  start" always implied (TS-10.R4, R15, FS-16.R17). (3) Finishing releases the task's runtime claim
+  and stops the agent only when the task created or woke that runtime; a borrowed runtime a person is
+  already using is left alone (FS-16.R4, TS-10.R6). FS-16 gained R21 and A9, FS-04 gained R43/A23 and
+  flips to `Partial`, and the ready change and spec index were updated to match. `make check-specs`
+  and `git diff --check` pass.
 
 - 2026-08-23 — Designed dependency-aware/armed work into FS-16 and TS-10 and created the ready
   change `dependency-aware-armed-agents.md`; no product code changed. AgentDeck gains a durable
