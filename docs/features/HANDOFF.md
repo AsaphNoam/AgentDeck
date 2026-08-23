@@ -8,13 +8,15 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 - **Ready change:** [Dependency-aware work that starts itself](../ready-changes/dependency-aware-armed-agents.md) is waiting to start. It is specified
   in FS-16 and TS-10 with deltas in FS-02, FS-04, FS-14, TS-01, TS-02, TS-03, TS-04, TS-05, and
-  TS-09; every requirement is `(planned)` and no product code has changed. Its design review is
-  resolved in the requirements and it is worth re-reviewing before implementation.
+  TS-09; every requirement is `(planned)` and no product code has changed. A second design review
+  found twelve **Must fix** and two **Worth fixing** gaps, so it is not ready to implement.
 - **Active change:** None.
 - **State:** Dependency-aware work is designed and waiting; nothing about it is implemented. The
-  2026-08-23 design review found nine **Must fix** contradictions or missing ownership boundaries,
-  so the change is not ready for implementation until its planned requirements are revised and
-  re-reviewed.
+  first design review's nine findings were resolved, but the second pass found unresolved contracts
+  around active-task deletion and cancellation, borrowed-runtime recovery, assignment timing and
+  retry identity, start-attempt limits, dependency activation, pipeline-result convergence and
+  deletion, agent-created targets, plus two stale acceptance/invariant contradictions. The change
+  remains waiting until the planned requirements are revised and reviewed again.
   Pull-based context links shipped and the review findings against them are fixed. Turn
   selection is now honest at both ends: `latest_completed_turn` resolves only from inside a later
   turn started for an independent reason, and a session or backend-switch marker closes a turn a
@@ -222,10 +224,110 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-None open. The 2026-08-23 design review's nine Must-fix findings against dependency-aware work are
-all resolved in the requirements; the disposition below records how each was closed.
+- **Must fix** — **Deleting active work can erase the only owner of a live runtime or unfinished
+  release** (**confirmed**, **INV §4/§15**). FS-16.R14 offers Delete without a state restriction and
+  R18 says deletion removes the task, its arms, and attachments, while FS-16.R4 and TS-10.R19 require
+  the task row to retain the runtime claim, budget slot, and pending release until cleanup completes.
+  Deleting a `starting`/`running` task, or a `finished` task with `pending_release=1`, can cascade away
+  that ownership while the agent continues. Reject deletion while a runtime claim or pending release
+  exists (requiring cancel/cleanup first), or define an equally durable delete-and-cleanup transition;
+  extend FS-16.A8 with active and pending-release deletion cases.
+- **Must fix** — **Restart recovery can stop a borrowed runtime that belongs to the person**
+  (**confirmed**, **INV §1/§15**). FS-16.R4 promises never to stop a runtime a task merely borrowed,
+  but TS-10.R4 records `borrowed` on `starting` before the assignment effect and TS-10.R15 then reaps
+  every pre-crash `starting` attempt's recorded agent. A crash during activation of an already-running
+  personal agent would therefore kill that conversation and may retry an assignment whose handoff is
+  unknown. Recovery must branch on the recorded runtime claim: never reap a borrowed runtime, and
+  define whether that task becomes `interrupted` or can be safely retried; cover it in FS-16.A8.
+- **Must fix** — **The dependency activation has no specified instruction contract** (**confirmed**,
+  **INV §2/§8**). FS-16.R6/R11 require the target agent to receive one bounded turn and discover its
+  assignment through `get_assigned_task`, while TS-10.R5 adds a payload-free `dependency` activation.
+  The shipped `ChatRuntime.StartActivation` accepts only `mail` and hard-codes the mail instruction
+  and mail status text (`internal/runtime/chat.go`); adding a kind alone would tell the agent to check
+  messages, not its task. Specify one bounded code-owned dependency instruction (without embedding
+  task/context payload), its status vocabulary, and the extension of the existing activation seam;
+  prove the fake provider receives it and calls the assignment route.
+- **Must fix** — **The dashboard acceptance criterion counts healthy running work as attention**
+  (**confirmed**, **INV §8**). FS-02.R44 defines attention as `dependency_failed` plus `interrupted`,
+  but FS-02.A26 says “result-less running tasks”; every ordinary running task is result-less until it
+  finishes. Make A26 match R44 and prove a normal running task does not increment the count.
+- **Must fix** — **TS-10 still carries the recovery rule the previous review proved impossible**
+  (**confirmed**, **INV §9**). TS-10.R15 correctly says the new registry is empty and recovery must
+  not corroborate a pre-crash generation, but TS-10 §4's INV §9 bullet still requires a `starting`
+  row to be resolved by corroborating that generation against the live registry. Remove the stale
+  rule and make the invariant summary match R15 and shipped non-adoption.
+- **Must fix** — **Assignment and runtime-claim timing has two incompatible definitions**
+  (**confirmed**, **INV §5**). FS-16 §3 says a task acquires `agent_id`, generation, and
+  created/woke/borrowed claim only when start is confirmed. FS-16.R2 and TS-10.R4/R18 instead require
+  those values during `ready → starting` so the partial unique index can reserve the agent and
+  recovery can identify the attempt before any effect. Define reservation fields versus confirmed
+  assignee membership, or consistently populate the assignment at admission; ensure attachment
+  authorization and recovery use the intended phase and test both sides of confirmation.
+- **Must fix** — **Automatic start retry has no actual bound or failure policy** (**confirmed**,
+  **INV §8/§9**). FS-16.R8/R17/R23 and TS-10.R5/R15 repeatedly promise a bounded attempt limit and a
+  “fresh attempt budget”, but no requirement gives the limit, retry cadence, or which launch/resume/
+  activation failures consume it versus park immediately. Implementations can spin, park on the
+  first transient conflict, or choose incompatible limits. Define a fixed smallest useful policy and
+  add acceptance for transient claim loss, repeated real failure, exhaustion, and explicit Retry.
+- **Must fix** — **Person results and cancellation lack a durable stop/release transaction**
+  (**confirmed**, **INV §5/§15**). FS-16.R4/R22 say a person-recorded result releases “at once”, and
+  §3 permits cancellation from any state, but stopping a created/woken runtime is an external effect
+  that cannot complete inside the result transaction. TS-10.R19's durable `pending_release` recovery
+  is described only for an agent-reported turn. A crash or stop failure after a person result or
+  cancellation can therefore leave a live task-owned runtime after the immutable terminal state has
+  discarded its claim; cancellation can also race a committed `starting` effect into existence.
+  Give every terminal path a durable cleanup intent, define the cancel-versus-start winner and
+  rollback, and test failures/restart between commit and stop.
+- **Must fix** — **Retry does not define which agent executes an interrupted launch-spec task**
+  (**confirmed**, **INV §1/§4**). FS-16.R2 says a launch target creates a new agent when the task
+  starts, FS-16 §3 says the assignee is written once and retained, and R23 returns an interrupted task
+  to `ready` without saying whether it resumes/relaunches that assignee or mints another one. The
+  choice changes transcript continuity, context membership, lifecycle cleanup, and the unique
+  assignment claim. Define retry separately for existing-agent and launch-spec targets, including an
+  archived/deleted prior assignee, and make FS-16.A10 assert agent identity and generation.
+- **Must fix** — **The claimed single result vocabulary and acceptance transaction do not exist**
+  (**confirmed**, **INV §2**). FS-16.R3 says task outcomes (`success`, `failure`, `blocked`, with
+  system-only `cancelled`) are identical to pipeline stage results, but shipped FS-14.R7/R19 accepts
+  only agent-reported `success|failure|blocked`, while a terminal pipeline-run registration is
+  `success|failure|cancelled` and occurs later than `report_pipeline_stage_result`. TS-10.R7 and
+  TS-09.R27 nevertheless require one acceptance transaction for a task result and a pipeline stage
+  report, even though the latter also atomically owns outputs, routing, and `await_quiescence` in
+  `AcceptPipelineReport`. Separate stage-report acceptance from normalized terminal-source
+  registration; share only the genuinely identical vocabulary/limits/insert helper inside each
+  domain-owned transaction, and test both terminal and non-terminal pipeline reports.
+- **Must fix** — **Deleting an unfinished pipeline prerequisite has no dependency transition**
+  (**confirmed**, **INV §2/§15**). FS-16.R5 permits pipeline-run arms and R8 says deletion of an
+  unsatisfied prerequisite parks the dependent, but FS-16.R18/A12 cover task deletion only and
+  FS-14.R34/TS-09.R27 add only terminal result registration. The shipped non-active run deletion path
+  has no planned fan-out into arm evaluation, so deleting a paused run with no result can leave work
+  armed forever. Extend the existing pipeline deletion transaction/notification seam to mark waiting
+  arms unsatisfiable, define satisfied-arm behavior, and add deletion acceptance for both.
+- **Must fix** — **Agent-created tasks cannot target an existing agent under the MCP contract**
+  (**confirmed**, **INV §2**). FS-16.R2/R12 allow an agent-created task to target an existing chat
+  agent, which requires a target selector, but TS-10.R13 says no task-tool argument names another
+  agent and TS-04.R29 says assignment is server-derived. Define a safe friendly target selector and
+  server-side resolution like messaging, or explicitly restrict agent-created work to self/launch
+  targets; test ambiguity, spoofed identity, and the allowed target forms.
+- **Worth fixing** — **Re-arm eligibility is implicit rather than specified.** FS-16 §3 permits
+  `dependency_failed → armed|ready`, but R23's broad “Re-arm replaces a task's arm set” does not
+  explicitly reject `starting`, `running`, `interrupted`, or `finished`. State the allowed source
+  states and typed rejection for all others, with one HTTP/state rejection test.
+- **Worth fixing** — **The outcome state summary omits two non-terminal states.** FS-16 §3 says an
+  outcome is absent while `armed`, `ready`, `running`, or `dependency_failed`, omitting `starting`
+  and `interrupted` even though R3/R22 allow no outcome there. List every non-terminal state so the
+  nullable storage and API projection have one complete contract.
 
 ## Review history
+
+### Second dependency-aware design review
+
+The 2026-08-23 re-review found twelve **Must fix** and two **Worth fixing** findings after the first
+nine were closed. The review covered every cited planned requirement, surrounding shipped
+lifecycle/activation/pipeline/context requirements, all invariants, and the concrete registry,
+launch/resume/stop, activation, pipeline-report, and turn-end seams. The independent audit
+corroborated active deletion, borrowed-runtime recovery, dependency activation, dashboard attention,
+and re-arm eligibility. The change remains Waiting to start; no product code, specification, or
+ready-change file changed.
 
 ### Design review disposition
 
@@ -247,6 +349,17 @@ in the requirements before implementation, and the change has since shipped; the
 lives in FS-15, TS-01.R22–R23, TS-02.R24, TS-04.R28, TS-05.R16 and in Git history.
 
 ## Recent changelog
+
+- 2026-08-23 — Re-reviewed dependency-aware work after the first nine findings were resolved and
+  recorded twelve Must-fix plus two Worth-fixing design findings. The main blockers are lost runtime
+  ownership on delete/cancel/person-result paths; recovery reaping a borrowed personal runtime;
+  contradictory assignment timing and retry identity; an undefined start-attempt policy and
+  dependency activation instruction; false pipeline/task result convergence; missing pipeline-run
+  deletion fan-out; and an impossible existing-agent target contract for agent-created tasks. Two
+  stale lines still contradict the intended recovery and dashboard-attention behavior. The shipped
+  code checks confirmed the registry non-adoption premise, the mail-only hard-coded activation
+  instruction, the existing pipeline-specific report transaction, and the single hard-coded turn-end
+  consumer. No product code, specification, or ready-change file changed.
 
 - 2026-08-23 — Validated the design review's nine Must-fix findings, confirmed all nine, and revised
   the requirements; still no product code. Two were checked against shipped code rather than taken on

@@ -4,6 +4,34 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-23 — Design review: dependency-aware work still has lifecycle gaps
+
+The change is not ready to implement. The second review found twelve must-fix gaps and two smaller
+ambiguities even after the first review’s fixes. The most serious cases can lose ownership of a live
+agent: deleting or cancelling active work can erase the cleanup record, restart can stop a personal
+agent that the task only borrowed, and a person-recorded result can become final before its required
+stop is durably recoverable.
+
+The start path also lacks a complete contract. Assignment is recorded at two different moments,
+retry does not say whether an interrupted launch-created task reuses its agent or creates another,
+and the promised bounded automatic retries have no limit or failure policy. The existing activation
+path only knows how to tell an agent to check mail, so dependent work needs its own fixed instruction
+to retrieve the assignment.
+
+Pipeline integration needs narrowing. A pipeline stage report and a terminal pipeline-run result are
+different events with different vocabularies and transactions, so they cannot share the single
+acceptance transaction currently required. Deleting an unfinished pipeline run also has no path that
+parks tasks still waiting on it. Two smaller stale lines count healthy running work as needing
+attention and ask restart to consult an in-memory registry that is empty by design.
+
+No product code, specifications, or ready-change file changed.
+
+**Needs attention:** Revise the planned lifecycle, retry, activation, deletion, and result-layer
+contracts before implementation.
+
+**Next:** Use `/design-feature Dependency-aware / armed agents` to resolve every finding, then run
+`/review-design Dependency-aware / armed agents` again.
+
 ### 2026-08-23 — Design fixes: all nine review findings closed, budget raised to ten
 
 The concurrency budget now defaults to ten, and all nine findings the design review raised are fixed
