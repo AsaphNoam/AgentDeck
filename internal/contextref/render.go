@@ -19,6 +19,13 @@ type transcriptRenderer struct {
 	pending strings.Builder // folded assistant deltas awaiting a boundary
 	folding bool
 	empty   bool
+	// Edge bookkeeping for skipped oversized records. An oversized record has no
+	// sequence of its own, so its position is only knowable from the readable
+	// records around it: adjacent means nothing readable has intervened since it
+	// was skipped, and closed records whether the span's last event ended a turn.
+	started  bool
+	adjacent bool
+	closed   bool
 }
 
 func newTranscriptRenderer(span state.ContextSource, out *pageWriter) *transcriptRenderer {
@@ -26,8 +33,27 @@ func newTranscriptRenderer(span state.ContextSource, out *pageWriter) *transcrip
 }
 
 func (r *transcriptRenderer) event(ev runtime.Event) error {
-	if ev.Seq < r.span.FirstSeq || ev.Seq > r.span.LastSeq {
+	// Session snapshots and switch markers carry no span content, but they are
+	// still stream positions: an oversized record on their far side belongs to
+	// the other session and must not be marked at this span's leading edge.
+	if ev.Seq == 0 || ev.Type == runtime.EvSessionMeta || ev.Type == runtime.EvBackendSwitch {
+		r.adjacent = false
 		return nil
+	}
+	if ev.Seq < r.span.FirstSeq || ev.Seq > r.span.LastSeq {
+		r.adjacent = false
+		return nil
+	}
+	if !r.started {
+		r.started = true
+		if r.adjacent {
+			// The skipped record opened this turn: mark it before its content.
+			r.emit(OversizedRecordMarker + "\n\n")
+		}
+	}
+	r.adjacent = false
+	if ev.Seq == r.span.LastSeq {
+		r.closed = ev.Type == runtime.EvTurnEnd
 	}
 	p, err := transcript.ProjectEvent(ev)
 	if err != nil {
@@ -55,9 +81,21 @@ func (r *transcriptRenderer) event(ev runtime.Event) error {
 }
 
 // oversized records the reader's skipped-record diagnostic at its stream
-// position, but only when that position falls inside the selected span.
+// position whenever that position falls inside the selected span — including
+// its two edges, where the skipped record is the turn's first or last record
+// and the selector could only see the readable events beside it (FS-15.A5,
+// TS-01.R22, TS-04.R28, INV §7).
 func (r *transcriptRenderer) oversized(afterSeq int64) error {
-	if afterSeq < r.span.FirstSeq || afterSeq >= r.span.LastSeq {
+	switch {
+	case afterSeq >= r.span.FirstSeq && afterSeq < r.span.LastSeq:
+		// Interior: readable records of this span sit on both sides of it.
+	case afterSeq == r.span.LastSeq && !r.closed:
+		// Trailing edge of a span that no turn_end closed: the record was written
+		// inside the same still-open turn, after its last readable event.
+	default:
+		// Possibly the leading edge. Only the next readable record can tell, so
+		// defer to event and let anything readable in between clear it.
+		r.adjacent = true
 		return nil
 	}
 	r.flush()

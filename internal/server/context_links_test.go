@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -76,7 +78,7 @@ func callContextTool(t *testing.T, cs *mcp.ClientSession, name string, args map[
 // explicit read returns the bytes, and it returns them to the MCP caller rather
 // than to any provider conversation.
 func TestContextSharingStartsNoModelTurn(t *testing.T) {
-	srv, ts, promptLog := activationTestServer(t)
+	srv, ts, promptLog, hold := heldTurnServer(t)
 	sharer := launchAndWaitIdle(t, ts, "impl", "tmpproj")
 	recipient := launchAndWaitIdle(t, ts, "impl", "tmpproj")
 
@@ -85,6 +87,9 @@ func TestContextSharingStartsNoModelTurn(t *testing.T) {
 	// appear anywhere except the recipient's explicit read result.
 	secret := "the credential rotation plan"
 	promptAndWaitTurnEnd(t, srv, ts, sharer, secret)
+	// The finished turn is shareable only from inside a later turn started for
+	// an independent reason (TS-04.R28), so hold one open across the share.
+	startHeldTurn(t, srv, ts, sharer, hold, "keep working")
 
 	baseline := promptCount(t, promptLog)
 	if baseline == 0 {
@@ -151,10 +156,11 @@ func TestContextSharingStartsNoModelTurn(t *testing.T) {
 // FS-15.A7 (R12) — a stopped recipient keeps its grants and reads them after an
 // ordinary resume; the grant itself never woke it.
 func TestStoppedRecipientKeepsContextAcrossResume(t *testing.T) {
-	srv, ts, promptLog := activationTestServer(t)
+	srv, ts, promptLog, hold := heldTurnServer(t)
 	sharer := launchAndWaitIdle(t, ts, "impl", "tmpproj")
 	recipient := launchThenStop(t, srv, ts)
 	promptAndWaitTurnEnd(t, srv, ts, sharer, "durable conclusion")
+	startHeldTurn(t, srv, ts, sharer, hold, "keep working")
 
 	baseline := promptCount(t, promptLog)
 	if baseline == 0 {
@@ -188,6 +194,53 @@ func TestStoppedRecipientKeepsContextAcrossResume(t *testing.T) {
 	if read, isErr := callContextTool(t, recipientCS, "read_context_link",
 		map[string]any{"context_ref_id": refID}); isErr || !strings.Contains(read["text"].(string), "durable conclusion") {
 		t.Fatalf("resumed recipient read = %v", read)
+	}
+}
+
+// heldTurnServer is activationTestServer whose fake adapter blocks every turn on
+// a hold file until that file exists. The file starts present, so an ordinary
+// prompt still completes; removing it lets a test keep one real turn open while
+// it drives MCP calls.
+func heldTurnServer(t *testing.T) (*Server, *httptest.Server, string, string) {
+	t.Helper()
+	srv, ts, promptLog := activationTestServer(t)
+	hold := filepath.Join(t.TempDir(), "hold")
+	if err := os.WriteFile(hold, nil, 0o600); err != nil {
+		t.Fatalf("write hold file: %v", err)
+	}
+	// Registered after the server's shutdown cleanup so it runs before it: a
+	// blocked turn must never outlive the test.
+	t.Cleanup(func() { _ = os.WriteFile(hold, nil, 0o600) })
+	t.Setenv("FAKEACP_SCENARIO", "context_mid_turn")
+	t.Setenv("FAKEACP_HOLD_FILE", hold)
+	return srv, ts, promptLog, hold
+}
+
+// startHeldTurn sends a prompt the fake adapter will not finish until the hold
+// file returns, and waits until that turn has durable transcript content — the
+// live "inside a later turn" state a completed-turn share requires.
+func startHeldTurn(t *testing.T, srv *Server, ts *httptest.Server, agentID, hold, text string) {
+	t.Helper()
+	if err := os.Remove(hold); err != nil {
+		t.Fatalf("block the next turn: %v", err)
+	}
+	if resp, body := post(t, ts.URL+"/api/sessions/"+agentID+"/prompt",
+		map[string]string{"text": text}); resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("prompt status = %d: %s", resp.StatusCode, body)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		open := false
+		for _, ev := range readTestTranscript(t, srv, agentID) {
+			open = ev.Type != runtime.EvTurnEnd && ev.Type != runtime.EvSessionMeta
+		}
+		if open {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("no open turn for %s", agentID)
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 }
 

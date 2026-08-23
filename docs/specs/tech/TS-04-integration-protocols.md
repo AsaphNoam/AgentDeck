@@ -263,7 +263,9 @@ caller and launch generation come from the existing token session:
   before this call; content emitted later is outside the immutable span. `latest_completed_turn`
   resolves the exact range ending at the most recent `turn_end` and is available only during a later
   turn started for some independent reason—context sharing does not create that turn. Session
-  metadata and switch markers before the chosen turn are not included. For
+  metadata and switch markers before the chosen turn are not included, and such a marker also
+  closes any turn left open on its far side: a stop or crash that never wrote `turn_end` cannot
+  extend into the turn that follows the resume. For
   `current_pipeline_report`, the service joins the caller plus token generation to the current
   pipeline attempt and requires its immutable report to be accepted. The call must occur after
   `report_pipeline_stage_result` succeeds but before the reporting turn's `turn_end`; once pipeline
@@ -288,8 +290,11 @@ caller and launch generation come from the existing token session:
   outputs. A field returned by the transcript/report authority is chunked through the same cursor
   rather than copied whole or silently omitted. If the tolerant transcript reader skips a physical
   record above its 8 MiB safety limit, its new diagnostic becomes a bounded
-  `[AgentDeck omitted an oversized transcript record]` marker at that stream position. Reading has
-  no personal-state side effect.
+  `[AgentDeck omitted an oversized transcript record]` marker at that stream position, including
+  when the skipped record is the selected turn's first or last record; a record skipped outside the
+  selected turn is not marked. A supplied cursor must name a rune boundary inside the fixed source:
+  an offset that splits a rune or reaches past the end returns `invalid_cursor` rather than
+  replacement text or a false `complete`. Reading has no personal-state side effect.
 - `set_context_link_visibility(grant_id, hidden)` lets only the grant recipient hide or unhide its
   personal direct-share projection. It changes no grant authorization.
 - `revoke_context_grant(grant_id)` lets only that grant's grantor revoke it. It changes no reference,

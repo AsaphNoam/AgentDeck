@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
@@ -63,6 +64,16 @@ func ev(t *testing.T, typ string, data any) runtime.Event {
 		t.Fatalf("marshal %s: %v", typ, err)
 	}
 	return runtime.Event{Type: typ, Data: raw, Ts: "2026-08-22T10:00:00Z"}
+}
+
+// evSeq is ev with an explicit sequence, which session_meta needs: the writer
+// only auto-numbers records that are not session snapshots, so a resume marker
+// has to carry the sequence the runtime would have given it.
+func evSeq(t *testing.T, seq int64, typ string, data any) runtime.Event {
+	t.Helper()
+	e := ev(t, typ, data)
+	e.Seq = seq
+	return e
 }
 
 func (f *fixture) conversation(t *testing.T, agentID string) {
@@ -610,5 +621,163 @@ func TestDeletedPipelineAttemptTombstones(t *testing.T) {
 	}
 	if _, err := f.store.ReadContextReference(res.ContextRefID); err != nil {
 		t.Fatalf("tombstone lost its reference row: %v", err)
+	}
+}
+
+// A2 — latest_completed_turn is available only from inside a later turn started
+// for some independent reason. An idle session token holds no shareable
+// finished work, and the refusal mutates nothing (TS-04.R28, FS-15.R4/R15).
+func TestLatestCompletedTurnNeedsALaterTurn(t *testing.T) {
+	f := newFixture(t)
+	f.agent(t, "a_src", "src")
+	f.agent(t, "a_dst", "dst")
+	f.appendEvents(t, "a_src",
+		ev(t, runtime.EvUserPrompt, runtime.UserPromptData{Text: "first question"}),
+		ev(t, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "first answer"}),
+		ev(t, runtime.EvTurnEnd, runtime.TurnEndData{StopReason: "end_turn"}),
+	)
+	caller := Caller{AgentID: "a_src", Generation: "g1"}
+
+	if _, err := f.svc.Share(caller, SelectorLatestCompletedTurn, "a_dst", "", ""); code(err) != CodeSourceUnavailable {
+		t.Fatalf("idle share = %v, want %s", err, CodeSourceUnavailable)
+	}
+	var refs, grants int
+	if err := f.store.DB().QueryRow(
+		`SELECT (SELECT COUNT(*) FROM context_references), (SELECT COUNT(*) FROM context_grants)`).Scan(&refs, &grants); err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	if refs != 0 || grants != 0 {
+		t.Fatalf("idle share created %d references and %d grants", refs, grants)
+	}
+
+	// A separate later turn makes the same selector resolvable.
+	f.appendEvents(t, "a_src", ev(t, runtime.EvUserPrompt, runtime.UserPromptData{Text: "second question"}))
+	res := mustShare(t, f, caller, SelectorLatestCompletedTurn, "a_dst")
+	if res.Source.FirstSeq != 1 || res.Source.LastSeq != 3 {
+		t.Fatalf("completed span = %d..%d, want 1..3", res.Source.FirstSeq, res.Source.LastSeq)
+	}
+}
+
+// A2 — a turn interrupted without turn_end is closed by the resume marker, so
+// the turn after the resume cannot absorb stale pre-crash text
+// (TS-04.R28, FS-15.R4/R15, INV §1).
+func TestCurrentTurnStartsAfterAResumeBoundary(t *testing.T) {
+	f := newFixture(t)
+	f.agent(t, "a_src", "src")
+	f.agent(t, "a_dst", "dst")
+	f.appendEvents(t, "a_src",
+		ev(t, runtime.EvUserPrompt, runtime.UserPromptData{Text: "finished question"}),
+		ev(t, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "finished answer"}),
+		ev(t, runtime.EvTurnEnd, runtime.TurnEndData{StopReason: "end_turn"}),
+		// The agent crashed here: this turn never reached turn_end.
+		ev(t, runtime.EvUserPrompt, runtime.UserPromptData{Text: "abandoned question"}),
+		ev(t, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "stale abandoned reasoning"}),
+		evSeq(t, 6, runtime.EvSessionMeta, runtime.SessionMetaData{
+			Name: "src", Backend: "claude-acp", CreatedAt: "2026-08-22T10:00:00Z"}),
+		ev(t, runtime.EvUserPrompt, runtime.UserPromptData{Text: "fresh question"}),
+		ev(t, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "fresh conclusion"}),
+	)
+
+	res := mustShare(t, f, Caller{AgentID: "a_src"}, SelectorCurrentTurn, "a_dst")
+	if res.Source.FirstSeq != 7 || res.Source.LastSeq != 8 {
+		t.Fatalf("current span = %d..%d, want 7..8 (starting after the resume marker)",
+			res.Source.FirstSeq, res.Source.LastSeq)
+	}
+	page, err := f.svc.Read(Caller{AgentID: "a_dst"}, res.ContextRefID, "")
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if !strings.Contains(page.Text, "fresh conclusion") {
+		t.Fatalf("current turn lost its own content: %q", page.Text)
+	}
+	if strings.Contains(page.Text, "abandoned") || strings.Contains(page.Text, "stale") {
+		t.Fatalf("current turn absorbed the interrupted pre-resume turn: %q", page.Text)
+	}
+}
+
+// A5 — an oversized record at either edge of the selected span is marked, and a
+// record skipped outside the span still is not (TS-01.R22, TS-04.R28, INV §7).
+func TestReadMarksOversizedRecordsAtSpanEdges(t *testing.T) {
+	f := newFixture(t)
+	f.agent(t, "a_src", "src")
+	f.agent(t, "a_dst", "dst")
+	huge := runtime.AssistantTextData{Delta: strings.Repeat("x", 9*1024*1024)}
+	f.appendEvents(t, "a_src",
+		ev(t, runtime.EvUserPrompt, runtime.UserPromptData{Text: "finished question"}),
+		ev(t, runtime.EvTurnEnd, runtime.TurnEndData{StopReason: "end_turn"}),
+		ev(t, runtime.EvAssistantText, huge), // first record of the next turn
+		ev(t, runtime.EvUserPrompt, runtime.UserPromptData{Text: "current question"}),
+		ev(t, runtime.EvAssistantText, huge), // last record of the still-open turn
+	)
+	reader := Caller{AgentID: "a_dst"}
+
+	current := mustShare(t, f, Caller{AgentID: "a_src"}, SelectorCurrentTurn, "a_dst")
+	page, err := f.svc.Read(reader, current.ContextRefID, "")
+	if err != nil {
+		t.Fatalf("read current turn: %v", err)
+	}
+	if got := strings.Count(page.Text, OversizedRecordMarker); got != 2 {
+		t.Fatalf("leading and trailing oversized records produced %d markers: %q", got, page.Text)
+	}
+	if !strings.Contains(page.Text, "current question") {
+		t.Fatalf("the readable record between the markers was lost: %q", page.Text)
+	}
+
+	// The same skipped record sits outside the finished turn, which ends at its
+	// turn_end, so that page stays clean.
+	completed := mustShare(t, f, Caller{AgentID: "a_src"}, SelectorLatestCompletedTurn, "a_dst")
+	done, err := f.svc.Read(reader, completed.ContextRefID, "")
+	if err != nil {
+		t.Fatalf("read completed turn: %v", err)
+	}
+	if strings.Contains(done.Text, OversizedRecordMarker) {
+		t.Fatalf("a record skipped after turn_end was marked inside the finished turn: %q", done.Text)
+	}
+	if !strings.Contains(done.Text, "finished question") {
+		t.Fatalf("completed turn lost its content: %q", done.Text)
+	}
+}
+
+// A5 — an altered page offset fails as invalid_cursor instead of splitting a
+// rune or reporting a false completion (FS-15.R9/R11, TS-05.R16).
+func TestReadRejectsForgedCursorOffsets(t *testing.T) {
+	f := newFixture(t)
+	f.agent(t, "a_src", "src")
+	f.agent(t, "a_dst", "dst")
+	f.appendEvents(t, "a_src",
+		ev(t, runtime.EvUserPrompt, runtime.UserPromptData{Text: "explain"}),
+		ev(t, runtime.EvAssistantText, runtime.AssistantTextData{Delta: strings.Repeat("é", 40000)}),
+	)
+	res := mustShare(t, f, Caller{AgentID: "a_src"}, SelectorCurrentTurn, "a_dst")
+	reader := Caller{AgentID: "a_dst"}
+
+	page, err := f.svc.Read(reader, res.ContextRefID, "")
+	if err != nil {
+		t.Fatalf("first page: %v", err)
+	}
+	if page.Complete || page.NextCursor == "" {
+		t.Fatal("expected a multi-page source")
+	}
+	offset, cerr := decodeCursor(res.ContextRefID, page.NextCursor)
+	if cerr != nil {
+		t.Fatalf("decode issued cursor: %v", cerr)
+	}
+
+	// One byte past the issued boundary lands inside a two-byte rune.
+	interior := encodeCursor(res.ContextRefID, offset+1)
+	if _, err := f.svc.Read(reader, res.ContextRefID, interior); code(err) != CodeInvalidCursor {
+		t.Fatalf("interior-rune offset = %v, want %s", err, CodeInvalidCursor)
+	}
+	if _, err := f.svc.Read(reader, res.ContextRefID, encodeCursor(res.ContextRefID, 1<<30)); code(err) != CodeInvalidCursor {
+		t.Fatalf("past-end offset = %v, want %s", err, CodeInvalidCursor)
+	}
+
+	// The honestly issued cursor still traverses the source.
+	next, err := f.svc.Read(reader, res.ContextRefID, page.NextCursor)
+	if err != nil {
+		t.Fatalf("issued cursor stopped working: %v", err)
+	}
+	if !utf8.ValidString(next.Text) || next.Text == "" {
+		t.Fatalf("continuation page is not valid UTF-8 text: %q", next.Text[:min(64, len(next.Text))])
 	}
 }

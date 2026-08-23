@@ -87,7 +87,9 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
 - **R11 — Context reads have their own bounds.** Context operations do not consume or
   reset FS-06's mail budget. List size, metadata fields, rendered source fields, and each returned
   content page are capped by the context feature's own fixed limits. Empty collections are arrays,
-  and a continuation cursor never embeds source content or authorization data.
+  and a continuation cursor never embeds source content or authorization data. A cursor that does
+  not name a position inside the fixed source is rejected rather than answered with damaged text or
+  a false completion.
 
 ## 3. States & transitions
 
@@ -166,7 +168,8 @@ Each names the verification that demonstrates it.
 - **A5** (R9–R11) — Authorized transcript and pipeline reads return deterministic bounded
   pages whose cursors traverse the fixed source; every current normalized event kind is rendered or
   deliberately classified metadata-only, unknown kinds and skipped oversized records produce
-  bounded markers, missing and unauthorized ids are indistinguishable, no source content appears in
+  bounded markers including at a selected span's leading and trailing edges, an altered page cursor
+  is rejected, missing and unauthorized ids are indistinguishable, no source content appears in
   logs/SSE, and mail budget state is unchanged: service, protocol, and server-bus tests.
 - **A6** (R10) — Sharing and listing context produce no provider prompt, activation,
   mailbox row, or normalized transcript event; only an explicit read returns content to the MCP

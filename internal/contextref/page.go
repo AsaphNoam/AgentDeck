@@ -17,6 +17,8 @@ type pageWriter struct {
 	buf      strings.Builder
 	dropped  int
 	overflow bool
+	total    int  // bytes the source produced, used to bound a supplied offset
+	split    bool // the supplied offset landed inside a multibyte rune
 }
 
 func newPageWriter(offset, limit int) *pageWriter {
@@ -27,6 +29,7 @@ func (w *pageWriter) write(s string) {
 	if s == "" {
 		return
 	}
+	w.total += len(s)
 	if w.dropped < w.skip {
 		need := w.skip - w.dropped
 		if len(s) <= need {
@@ -34,6 +37,10 @@ func (w *pageWriter) write(s string) {
 			return
 		}
 		w.dropped = w.skip
+		if !utf8.RuneStart(s[need]) {
+			// Issued offsets are always rune boundaries, so this one was altered.
+			w.split = true
+		}
 		s = s[need:]
 	}
 	room := w.limit - w.buf.Len()
@@ -53,6 +60,19 @@ func (w *pageWriter) write(s string) {
 	}
 	w.buf.WriteString(s[:cut])
 	w.overflow = true
+}
+
+// validOffset reports whether the offset the caller supplied actually names a
+// position this source has: inside it, and on a rune boundary. Cursors are
+// opaque and every issued one has content after it, so an offset that splits a
+// rune or reaches past the end was forged or corrupted and must fail rather
+// than return replacement characters or a misleading empty completion
+// (FS-15.R9/R11, TS-04.R28, TS-05.R16, INV §8/§11).
+func (w *pageWriter) validOffset() bool {
+	if w.skip == 0 {
+		return true
+	}
+	return !w.split && w.skip < w.total
 }
 
 // page returns the collected text, the absolute offset to resume from, and

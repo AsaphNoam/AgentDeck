@@ -8,10 +8,18 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 - **Ready change:** None waiting. `docs/ready-changes/` is empty.
 - **Active change:** None.
-- **State:** Pull-based context links shipped. An agent gives an immutable transcript span or an
-  accepted pipeline-attempt report a stable canonical reference id, grants one durable chat agent
-  access without copying content, and the recipient retrieves it through bounded token-authorized
-  reads. Five MCP tools (`share_context`, `list_context_links`, `read_context_link`,
+- **State:** Pull-based context links shipped and the review findings against them are fixed. Turn
+  selection is now honest at both ends: `latest_completed_turn` resolves only from inside a later
+  turn started for an independent reason, and a session or backend-switch marker closes a turn a
+  stop or crash left open, so the span after a resume cannot absorb abandoned pre-crash text. An
+  oversized physical record skipped at a selected span's leading or trailing edge now produces the
+  same bounded omission marker an interior one does, while a record skipped outside the turn stays
+  unmarked, and a read cursor whose byte offset splits a rune or reaches past the source returns
+  `invalid_cursor` instead of replacement text or a false `complete`. TS-04.R28, TS-05.R16,
+  FS-15.R11, and FS-15.A5 record those boundaries. The shipped feature itself is unchanged: an agent
+  gives an immutable transcript span or an accepted pipeline-attempt report a stable canonical
+  reference id, grants one durable chat agent access without copying content, and the recipient
+  retrieves it through bounded token-authorized reads. Five MCP tools (`share_context`, `list_context_links`, `read_context_link`,
   `set_context_link_visibility`, `revoke_context_grant`) join the existing scoped `/mcp` server;
   references, grant presentation, and personal hidden state are separate rows, and no context
   operation creates mail, an activation, a provider prompt, a transcript event, or an SSE content
@@ -207,36 +215,8 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-- **Must fix** — `latest_completed_turn` is shareable with no later turn in progress (INV §1).
-  `internal/contextref/service.go:200` accepts the selector whenever any completed turn exists;
-  `internal/server/context_links_test.go:96` currently exercises and blesses that idle-token path.
-  After an agent finishes a turn, a caller using its still-valid MCP token can create a reference and
-  grant immediately, although FS-15.R4 and TS-04.R28 make the selector available only inside a later
-  turn started for an independent reason. Require a persisted open turn after the selected completed
-  turn; add a regression that the idle call returns `source_unavailable` without mutation, then starts
-  a separate turn and proves the same selector succeeds.
-- **Must fix** — `current_turn` can absorb an interrupted pre-resume turn (INV §1).
-  `internal/contextref/service.go:164` scans with metadata excluded and resets its open span only on
-  `turn_end`; `internal/transcript/reader.go:102` therefore hides the resume `session_meta` boundary
-  appended by `internal/runtime/chat.go:660`. If an agent stops or crashes without `turn_end`, resumes,
-  and shares during its next turn, the canonical range starts in the abandoned earlier turn and can
-  expose stale text as current work, violating FS-15.R4/R15 and TS-04.R28. Make the selector scanner
-  observe session boundaries without including their content, and add a crash/stop→resume regression
-  proving the new current span begins after the resume marker.
-- **Must fix** — an oversized record at a selected span edge is silently omitted (INV §7).
-  `internal/contextref/render.go:60` emits the marker only when the last readable sequence before the
-  skipped record is already inside the canonical range. When the oversized physical record is the
-  first event of a turn, the selector starts at the next readable event; when it is last, the range
-  ends at the preceding readable event. In both cases the recipient gets a clean partial page instead
-  of the marker required by FS-15.A5, TS-01.R22, and TS-04.R28. Add leading and trailing oversized-record
-  regressions and carry enough positional information through source resolution/rendering to mark both.
-- **Worth fixing** — a forged numeric cursor can split UTF-8 instead of failing (INV §8/§11).
-  `internal/contextref/page.go:73` accepts any base64-encoded reference id plus numeric byte offset, and
-  `pageWriter.write` at line 30 slices directly at that offset. An authorized caller can alter a cursor
-  to land inside a multibyte rune (or beyond the source), producing replacement text or a misleading
-  empty completion rather than `invalid_cursor`; this breaks FS-15.R9/R11 and TS-04.R28/TS-05.R16's
-  opaque, deterministic UTF-8 page contract. Validate source bounds and rune boundaries (or otherwise
-  make issued positions tamper-evident), with regressions for interior-rune and past-end offsets.
+None open. The 2026-08-23 review's three Must-fix and one Worth-fixing context findings are fixed
+and covered by regressions.
 
 ## Review history
 
@@ -247,6 +227,22 @@ in the requirements before implementation, and the change has since shipped; the
 lives in FS-15, TS-01.R22–R23, TS-02.R24, TS-04.R28, TS-05.R16 and in Git history.
 
 ## Recent changelog
+
+- 2026-08-23 — Fixed all four open context-link review findings (INV §1 for both turn-selection
+  findings, §7 for the omission marker, §8/§11 for the cursor). `latest_completed_turn` now requires
+  a persisted later turn, so an idle session token can no longer hand out finished work; the
+  transcript scan reads session and backend-switch markers as boundaries that close an interrupted
+  turn without entering any span, so a crash-then-resume `current_turn` starts after the resume
+  marker; the renderer derives an oversized record's position from the readable records around it
+  and marks the leading and trailing edges of a span while leaving a record skipped after a
+  `turn_end` outside the finished turn unmarked; and `pageWriter` now bounds a supplied offset
+  against the source and rejects one that splits a rune, returning `invalid_cursor`. Four new
+  `internal/contextref` regressions each fail against the pre-fix code. The two live-dashboard
+  context tests now share from inside a real held-open fake-ACP turn (`heldTurnServer`,
+  `startHeldTurn`) instead of blessing the idle path. TS-04.R28, TS-05.R16, FS-15.R11, and FS-15.A5
+  gained the matching boundary text. `make check-specs`, `make test` in both tag variants, focused
+  `-race` on the context/messaging/server paths, `make build`, and `git diff --check` pass. No UI or
+  build-output change, so `npm test` and `make dist` were not applicable.
 
 - 2026-08-23 — Reviewed the continuous range after `1fd26ed` through `c987724` in both specification
   directions and against every invariant class. Three Must-fix context-selection/rendering findings

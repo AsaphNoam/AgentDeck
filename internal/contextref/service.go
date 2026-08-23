@@ -161,11 +161,15 @@ type turnScan struct {
 
 func (s *Service) resolveTranscriptSpan(agentID, selector string) (state.ContextSource, *Error) {
 	var scan turnScan
-	// IncludeMeta stays false, so session snapshots never enter a span. Backend
-	// switch markers are skipped explicitly for the same reason (TS-04.R28).
-	err := transcript.ForEachFile(s.home, agentID, transcript.ReadOptions{}, func(ev runtime.Event) error {
+	// IncludeMeta is true only so the scan can see session and backend-switch
+	// boundaries; their content never enters a span. A boundary closes whatever
+	// turn was left open on the other side of it, so a stop or crash without a
+	// turn_end cannot make the turn after the resume start inside the abandoned
+	// one (TS-04.R28, FS-15.R4/R15, INV §1).
+	err := transcript.ForEachFile(s.home, agentID, transcript.ReadOptions{IncludeMeta: true}, func(ev runtime.Event) error {
 		switch ev.Type {
-		case runtime.EvBackendSwitch:
+		case runtime.EvSessionMeta, runtime.EvBackendSwitch:
+			scan.openHas = false
 			return nil
 		case runtime.EvTurnEnd:
 			if scan.openHas {
@@ -176,6 +180,9 @@ func (s *Service) resolveTranscriptSpan(agentID, selector string) (state.Context
 			scan.completedLast = ev.Seq
 			scan.completedHas = true
 			scan.openHas = false
+			return nil
+		}
+		if ev.Seq == 0 {
 			return nil
 		}
 		if !scan.openHas {
@@ -201,6 +208,14 @@ func (s *Service) resolveTranscriptSpan(agentID, selector string) (state.Context
 		if !scan.completedHas {
 			return state.ContextSource{}, failf(CodeSourceUnavailable,
 				"This agent has no completed transcript turn yet.")
+		}
+		// The completed turn is available only from inside a later turn started
+		// for some independent reason: context sharing does not create that turn,
+		// and an idle session token must not be able to hand out finished work
+		// (TS-04.R28).
+		if !scan.openHas {
+			return state.ContextSource{}, failf(CodeSourceUnavailable,
+				"The latest completed turn is shareable only from inside a later turn.")
 		}
 		span.FirstSeq, span.LastSeq = scan.completedFirst, scan.completedLast
 	}
@@ -344,6 +359,9 @@ func (s *Service) Read(caller Caller, refID, cursor string) (ReadResult, error) 
 		return ReadResult{}, sourceGone()
 	}
 
+	if !out.validOffset() {
+		return ReadResult{}, failf(CodeInvalidCursor, "Cursor does not name a position in this source.")
+	}
 	text, nextOffset, complete := out.page()
 	result := ReadResult{
 		ContextRefID: refID,
@@ -366,10 +384,10 @@ func (s *Service) renderSpan(source state.ContextSource, out *pageWriter) *Error
 		return unavailable(err)
 	}
 	renderer := newTranscriptRenderer(source, out)
-	opts := transcript.ReadOptions{
-		SinceSeq:    source.FirstSeq - 1,
-		OnOversized: renderer.oversized,
-	}
+	// The renderer range-filters the span itself and needs the records before it
+	// as stream positions, so this read neither seeks past them nor lets the
+	// reader hide a session boundary from the oversized-record edge rules.
+	opts := transcript.ReadOptions{IncludeMeta: true, OnOversized: renderer.oversized}
 	if err := transcript.ForEachFile(s.home, source.AgentID, opts, renderer.event); err != nil {
 		return unavailable(err)
 	}

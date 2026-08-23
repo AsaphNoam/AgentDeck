@@ -4,6 +4,29 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-23 — Fix: context sharing now points at the right work
+
+All four problems the review found in context sharing are fixed. An agent can no longer hand over
+its last finished turn while it is sitting idle — that option now only works from inside a turn it
+started for its own reasons, which is what it was always meant for. If an agent is interrupted or
+crashes mid-turn and is then resumed, the work it shares afterwards starts cleanly at the resume
+instead of dragging in abandoned text from before. When a transcript record is too large for
+AgentDeck to read and it happens to be the first or last record of the shared turn, the reader now
+sees the same "something was omitted here" note it already got for records in the middle, so a page
+never looks complete when it is not. And a page cursor that has been altered to point into the
+middle of a character, or past the end of the shared text, is now refused instead of returning
+damaged text or falsely claiming there is nothing more.
+
+Each fix has a test that fails against the old code, and the two full-dashboard tests now share from
+inside a genuinely open turn rather than the idle shortcut they were accidentally endorsing. The
+written product rules were updated to state these boundaries explicitly. The whole test suite is
+green in both database modes.
+
+**Needs attention:** None.
+
+**Next:** Context links are clear of findings, so the next move is yours: pick the follow-on feature
+(work objects and assignment retrieval are the recorded candidates) or ask for a fresh review.
+
 ### 2026-08-23 — Review: pull-based context links
 
 The storage, authorization, mail separation, and tool wiring are sound, and the full test suite is
