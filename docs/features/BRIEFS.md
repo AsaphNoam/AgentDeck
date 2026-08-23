@@ -3895,3 +3895,17 @@ context-links change is back to **Waiting to start** with nothing blocking imple
 **Needs attention:** None.
 
 **Next:** The reviewed change is ready for `/work pull-based-context-links`.
+
+### 2026-08-23 — Design review: dependency-aware work
+
+The design is not ready to implement. Nine confirmed gaps make normal recovery and concurrency
+ambiguous or impossible, including what state a task enters when its agent disappears, how a person
+records the missing result, how retry repairs a failed dependency, how one agent is protected from
+two active tasks, when a reporting agent may safely be stopped, and how restart handles an in-flight
+start. Creator ownership and attached-context lifetime also lack coherent durable contracts.
+
+**Needs attention:** Revise the planned design before implementation; several fixes require explicit
+choices about interrupted-task recovery, retry, and deletion behavior.
+
+**Next:** Use `/design-feature Dependency-aware / armed agents` to resolve every finding, then run
+`/review-design Dependency-aware / armed agents` again.

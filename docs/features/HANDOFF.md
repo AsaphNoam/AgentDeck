@@ -10,7 +10,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   in FS-16 and TS-10 with deltas in FS-02, FS-04, FS-14, TS-01, TS-02, TS-03, TS-04, TS-05, and
   TS-09; every requirement is `(planned)` and no product code has changed.
 - **Active change:** None.
-- **State:** Dependency-aware work is designed and waiting; nothing about it is implemented.
+- **State:** Dependency-aware work is designed and waiting; nothing about it is implemented. The
+  2026-08-23 design review found nine **Must fix** contradictions or missing ownership boundaries,
+  so the change is not ready for implementation until its planned requirements are revised and
+  re-reviewed.
   Pull-based context links shipped and the review findings against them are fixed. Turn
   selection is now honest at both ends: `latest_completed_turn` resolves only from inside a later
   turn started for an independent reason, and a session or backend-switch marker closes a turn a
@@ -218,18 +221,90 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-None open. The 2026-08-23 review's three Must-fix and one Worth-fixing context findings are fixed
-and covered by regressions.
+- **Must fix** — **Interrupted work cannot remain `running` under the design's own meaning of that
+  state** (**confirmed**, **INV §1/§8**). FS-16.R6 and §3 plus TS-10.R4 define `running` as a live
+  runtime that holds the assignment, but FS-16.R16/A3 require a crashed, stopped, or switched-away
+  assignee to leave the task `running` after its runtime claim is released. The retry named by R16
+  also has no transition from that state. Add an explicit interrupted/attention state or change the
+  state meaning and transitions consistently; cover stop, crash, switch, retry, and restart.
+- **Must fix** — **The specified human result recovery has no route or control** (**confirmed**, **INV
+  §10**). FS-16.R3/R16 allow a person to record `success`, `failure`, or `blocked`, which is the only
+  non-cancelling recovery after an assignee disappears, but FS-16.R14, TS-03.R28, and TS-10's HTTP
+  inventory offer only create/read/list/cancel/retry/re-arm/delete; only an assigned agent gets a
+  report tool. Add the person-facing HTTP/UI result action with authorization, atomic rejection, and
+  acceptance evidence, or remove the promised recovery.
+- **Must fix** — **Re-arm/retry cannot repair an unsatisfiable arm** (**confirmed**, **INV §5/§10**).
+  FS-16.R8 and §3 promise `dependency_failed → armed`, but arms never leave `unsatisfiable` and the
+  source result is immutable under TS-10.R8/R10. The task therefore parks again immediately unless
+  retry replaces arms or creates/rebinds prerequisite work, neither of which is specified. Define
+  the repair operation and atomic graph validation, and test that it can actually make progress.
+- **Must fix** — **Prerequisite deletion has contradictory downstream effects** (**confirmed**, **INV
+  §5**). FS-16.R18/A8 say deleting a task parks any dependent, while FS-16 §3 makes satisfied arms
+  monotonic, omits `running → dependency_failed`, and makes finished tasks terminal; TS-10.R8 also
+  retains the deleted source's immutable result. Define deletion separately for unsatisfied,
+  satisfied, running, and finished dependents and add state tests for each case.
+- **Must fix** — **Agent-created-task ownership cannot be enforced by the planned durable shape**
+  (**confirmed**, no invariant class). FS-16.R12 and TS-05.R17 allow an agent to cancel only a task
+  it created, but TS-10's `tasks` row has no creator identity or generation and no other durable
+  ownership record. Persist server-derived creator provenance, define its generation/lifetime
+  semantics, and test spoofed, old-generation, unknown, and authorized cancellation.
+- **Must fix** — **One-active-task-per-agent has no atomic concurrency guard** (**confirmed**, **INV
+  §5**). FS-16.R2 promises at most one active task per agent, but TS-10.R4/R9/R17 specify atomic
+  task and capacity claims without atomically excluding a second task for the same agent; the only
+  planned unique activation key is per `(agent_id, source_id)`, which deliberately permits one row
+  per task. The lifecycle claim serializes start effects only and is released after each transition,
+  so two ready tasks can both become active sequentially. Define a durable conditional/indexed
+  assignment claim and prove concurrent starts leave exactly one active task.
+- **Must fix** — **Reporting a result can stop the reporter before its tool turn reaches quiescence**
+  (**confirmed**, **INV §15**). FS-16.R4 and TS-10.R6/R17 release the claim/slot and stop a created or
+  woken runtime when the result transaction finishes, but `report_task_result` runs inside that
+  runtime's provider turn. Unlike TS-09.R9-R11's existing report-then-persisted-`turn_end` pipeline
+  seam, the task design owns no post-response/quiescence transition; an immediate stop can cut off
+  the MCP response, while releasing the durable claim first leaves restart unable to finish cleanup.
+  Extend the existing quiescence seam (including person-reported and restart cases) and test a real
+  tool response, crash between report and turn end, and exactly-once stop/slot release.
+- **Must fix** — **Startup cannot corroborate a pre-crash runtime through the in-memory registry**
+  (**confirmed**, **INV §9**). FS-16.R17/A8 and TS-10.R15 require restart to promote a `starting` row
+  when its exact generation is live in the registry. `runtime.Handle` is explicitly not persisted,
+  `runtime.NewRegistry` constructs empty ownership/generation maps, and `ReconcileStale` deliberately
+  cleans rows without re-adopting live processes (`internal/runtime/runtime.go`, `registry.go`,
+  `reconcile.go`). Revise recovery around the shipped non-adoption boundary or specify a real durable
+  re-adoption protocol; acceptance must cover a surviving orphan without double-starting it.
+- **Must fix** — **Attachment authorization lifetime contradicts generation-scoped teardown**
+  (**confirmed**, **INV §1/§4**). FS-16.R10/A5 keep the work-derived context route after task finish
+  until task deletion, and TS-10.R12 makes task membership its authority, but TS-10 §4 requires that
+  route to be torn down on every exit through generation-scoped teardown. A stop/resume therefore
+  both must revoke and must preserve the same authorization. Separate durable task membership from
+  per-generation MCP registration teardown and test finish, stop/resume, reassignment exclusion, and
+  task deletion.
 
 ## Review history
 
 ### Design review disposition
+
+The 2026-08-23 design review of dependency-aware work is open. Nine confirmed **Must fix** findings
+cover the interrupted-task state, missing human result action, ineffective re-arm, contradictory
+prerequisite deletion, absent creator provenance, non-exclusive assignment, unsafe result/stop
+ordering, impossible registry-based restart corroboration, and contradictory context-route lifetime.
+The change remains Waiting to start and must be revised and re-reviewed before implementation.
 
 The 2026-08-22 design review of pull-based context links is closed. All eight findings were resolved
 in the requirements before implementation, and the change has since shipped; the resolved detail
 lives in FS-15, TS-01.R22–R23, TS-02.R24, TS-04.R28, TS-05.R16 and in Git history.
 
 ## Recent changelog
+
+- 2026-08-23 — Design-reviewed the waiting dependency-aware/armed-agent change against every cited
+  planned requirement, the shipped lifecycle/activation/context/pipeline seams, workflow §13, and
+  every invariant class. Nine **Must fix** findings are open: the state machine calls an absent
+  assignee `running`; the promised human result recovery has no route; re-arm cannot repair immutable
+  unsatisfiable arms; prerequisite deletion contradicts satisfied/running/finished semantics; agent
+  creator ownership has no durable field; one-active-task assignment has no atomic guard; a task
+  result can stop its own reporter before tool-turn quiescence; restart cannot corroborate a prior
+  process through the newly empty in-memory registry; and durable attachment access conflicts with
+  generation teardown. The independent design audit corroborated the state/recovery defects. No
+  product code, specification, or ready-change file changed. `make check-specs` and
+  `git diff --check` pass after recording review state.
 
 - 2026-08-23 — Revised the dependency-aware design on three points from the human, before any
   implementation. (1) Readiness and process concurrency are now separate: every satisfied task
