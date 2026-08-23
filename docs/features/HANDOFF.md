@@ -275,6 +275,14 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 Both design reviews of dependency-aware work remain resolved in the requirements: the first round's
 nine Must-fix findings and the re-audit's twelve Must-fix plus two Worth-fixing findings.
 
+## Design consistency notes
+
+Page-level defects for the next design pass to sweep: an acceptance item that drifted from the
+requirement it verifies, a list missing a state named elsewhere, a sentence an earlier edit left
+stale. These never gate implementation (workflow §13).
+
+- None.
+
 ## Review history
 
 ### Retrospective orchestration-plane design review
@@ -338,6 +346,22 @@ in the requirements before implementation, and the change has since shipped; the
 lives in FS-15, TS-01.R22–R23, TS-02.R24, TS-04.R28, TS-05.R16 and in Git history.
 
 ## Recent changelog
+
+- 2026-08-23 — Reworked `/review-design` (workflow §13 and both skill launchers) after auditing the
+  23 findings the two dependency-aware design reviews produced. Roughly eight would have failed in
+  ordinary use, nine were real but self-correcting during implementation, six were page-level only,
+  and two asserted scenarios the shipped code already prevents. Three changes target that mix.
+  Every finding must now name who experiences what and when, and one that cannot be stated that way
+  is not a finding — that alone filters the page-level class. A reviewer's own finding is a claim
+  under lens 3 and must be checked against the tree before it is asserted, with the evidence cited,
+  because a scenario the code forbids costs a revision that deletes a real protection's
+  justification. Page-level defects go to a new `## Design consistency notes` section instead of
+  competing with impact findings in one flat Must-fix list, and they never gate implementation; most
+  of them are churn from the previous round's own edits. And the review now has an exit: a round with
+  no user-visible or unbuildable finding closes the design, so falling severity reads as readiness
+  rather than a reason to look harder. Not done: three of the page-level items are close to lintable
+  in `scripts/check-specs.sh`, which would remove them from the loop permanently — proposed
+  separately. `make check-specs`, the twin-skill comparison, and `git diff --check` pass.
 
 - 2026-08-23 — Retrospectively design-reviewed the shipped separation of control facts,
   context/artifacts, and model conversations. Three Must-fix findings are open: mail activation's

@@ -213,13 +213,38 @@ matching invariant classes before judging. Then review through three lenses, in 
    actual code, the pinned tool's real surface, newer releases, and better alternatives — a direct
    approach, an existing seam, an official package — with the evidence in the change file. An
    unverified impossibility claim is a finding, and the workaround it motivated is re-judged under
-   lens 1 once the claim falls.
+   lens 1 once the claim falls. Your own findings are claims too and earn the same rigor: before
+   asserting that something fails, check whether the tree already prevents it — a guard, an existing
+   validation, an ordering the design inherits — and cite what you read. A finding whose scenario the
+   shipped code forbids is worse than silence, because the revision it forces deletes a real
+   protection's justification.
 
 Also check the design's own hygiene: planned items tagged `(planned)`; no contradiction with
 shipped requirements or invariant classes; failure, concurrency, and rollback paths owned;
-acceptance evidence observable; and no product decision silently pre-made.
+acceptance evidence observable; and no product decision silently pre-made. Where a hygiene defect has
+a real consequence it is a finding; where it exists only on the page it is a consistency note.
+
+**Every finding names its consequence.** Write each one as who experiences what, and when: the person
+or agent affected, the situation that reaches them, and what goes wrong. A finding you cannot finish
+that sentence for is not a finding. "Two requirements word this differently" is not a consequence; "an
+agent that reports a result never receives its tool response" is. Order findings by that consequence,
+worst first, so severity is visible without reading all of them.
+
+**Findings and consistency defects are separate outputs.** A defect that exists only on the page — an
+acceptance item that drifted from the requirement it verifies, a list missing a state named elsewhere,
+a sentence an earlier edit left stale — goes in `## Design consistency notes` in `HANDOFF.md` as a
+plain list for the next design pass to sweep. It is not a Must fix, it does not gate implementation,
+and it does not belong in `## Review findings`. Mixing the two flattens severity and makes a
+proofreading pass read like a broken design. Expect most of them to come from the previous round's own
+edits: report them, do not dramatise them.
+
+**The review has an exit.** A round that produces no finding with a user-visible or unbuildable
+consequence closes the design for review — say so plainly, record it in the review history, and do not
+ask for another pass. Without an exit the answer to "did you find anything" is always yes, because any
+document can be sharpened indefinitely. Falling severity across rounds is evidence the design is
+ready, not a reason to look harder.
 
 Record findings in `## Review findings` in `HANDOFF.md` using the §7 format. The change stays
-`Waiting to start` — implementation must not begin while a design has open Must-fix findings. With
-no findings, say so plainly and leave the change untouched. Commit only the state files and finish
-with the §6 human update.
+`Waiting to start` — implementation must not begin while a design has open Must-fix findings.
+Consistency notes never hold it. With no findings, say so plainly and leave the change untouched.
+Commit only the state files and finish with the §6 human update.
