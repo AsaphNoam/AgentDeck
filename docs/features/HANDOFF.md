@@ -6,9 +6,12 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
-- **Ready change:** None waiting. `docs/ready-changes/` is empty.
+- **Ready change:** [Dependency-aware work that starts itself](../ready-changes/dependency-aware-armed-agents.md) is waiting to start. It is specified
+  in FS-16 and TS-10 with deltas in FS-02, FS-14, TS-01, TS-02, TS-03, TS-04, TS-05, and
+  TS-09; every requirement is `(planned)` and no product code has changed.
 - **Active change:** None.
-- **State:** Pull-based context links shipped and the review findings against them are fixed. Turn
+- **State:** Dependency-aware work is designed and waiting; nothing about it is implemented.
+  Pull-based context links shipped and the review findings against them are fixed. Turn
   selection is now honest at both ends: `latest_completed_turn` resolves only from inside a later
   turn started for an independent reason, and a session or backend-switch marker closes a turn a
   stop or crash left open, so the span after a resume cannot absorb abandoned pre-crash text. An
@@ -227,6 +230,25 @@ in the requirements before implementation, and the change has since shipped; the
 lives in FS-15, TS-01.R22–R23, TS-02.R24, TS-04.R28, TS-05.R16 and in Git history.
 
 ## Recent changelog
+
+- 2026-08-23 — Designed dependency-aware/armed work into FS-16 and TS-10 and created the ready
+  change `dependency-aware-armed-agents.md`; no product code changed. AgentDeck gains a durable
+  project-scoped task with one explicit outcome (`success`/`failure`/`blocked`/`cancelled`), an
+  AND-conjunction of arms over another task's outcome, a pipeline run's registered outcome, or a
+  fired project-scoped signal, and host-driven starting with full fan-out. An existing-agent target
+  crosses through a new `dependency` activation kind — the second kind on the primitive TS-01.R19
+  and TS-02.R23 reserved — carrying a nullable stable source work id, keyed on `(agent_id,
+  source_id)`, and taking the "actionable until a confirmed start" retry policy TS-01.R21 already
+  wrote for it. Finishing stops the assigned agent without archiving it, on the human's call, so a
+  long chain frees processes while cards stay visible and resumable. An unsatisfiable prerequisite
+  parks the dependent as `dependency_failed` rather than cancelling or hanging. Pipelines converge
+  at the result layer only: one outcome vocabulary, validation, and accept transaction shared with
+  `report_pipeline_stage_result`, plus a run's normalized terminal outcome registered so runs can be
+  prerequisites — the run layer stays separate because a run is a cyclic template walk and a task
+  graph is acyclic. Context attachment lands without reassignment or participant membership.
+  Deltas: FS-02.R44/A26, FS-14.R34, TS-01.R24, TS-02.R25, TS-03.R28, TS-04.R29, TS-05.R17,
+  TS-09.R27; FS-02, TS-01, TS-02, TS-03, TS-05, and TS-09 flip to `Partial` until it ships.
+  `make check-specs`, the twin-skill comparison, and `git diff --check` pass.
 
 - 2026-08-23 — Fixed all four open context-link review findings (INV §1 for both turn-selection
   findings, §7 for the omission marker, §8/§11 for the cursor). `latest_completed_turn` now requires

@@ -28,7 +28,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 |----|------|--------|--------|
 | FS-00 | [features/FS-00-product-overview.md](features/FS-00-product-overview.md) | Current | Product summary, goals/non-goals, core concepts, orchestration planes, glossary |
 | FS-01 | [features/FS-01-agent-lifecycle.md](features/FS-01-agent-lifecycle.md) | Current | Launch, stop, cancel, resume, clone, rename, switch runtime, crash handling, identity, wake on message |
-| FS-02 | [features/FS-02-dashboard.md](features/FS-02-dashboard.md) | Current | Card grid, live status, layout/density, task groups, notifications, project creation |
+| FS-02 | [features/FS-02-dashboard.md](features/FS-02-dashboard.md) | Partial | Card grid, live status, layout/density, task groups, notifications, project creation |
 | FS-03 | [features/FS-03-chat.md](features/FS-03-chat.md) | Current | Streaming chat panel, tool calls/diffs, permission prompts, transcript view, header runtime picker, composer file/skill mentions, browser-local drafts |
 | FS-04 | [features/FS-04-configuration-onboarding.md](features/FS-04-configuration-onboarding.md) | Current | Roles/projects/backends CRUD, backend creation, settings UI, onboarding wizard, appearance preference, directory browsing |
 | FS-05 | [features/FS-05-archive-tracking.md](features/FS-05-archive-tracking.md) | Current | Session archive, full-text search, resume from archive, file/command tracking |
@@ -42,20 +42,22 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-13 | [features/FS-13-annotate-assign.md](features/FS-13-annotate-assign.md) | Current | Annotate and assign: select diff lines/transcript events, instruct, route to an agent or new task |
 | FS-14 | [features/FS-14-configurable-pipelines.md](features/FS-14-configurable-pipelines.md) | Partial | Model-neutral multi-stage pipelines with run-time model assignment, text artifacts, routing, and recovery |
 | FS-15 | [features/FS-15-context-links.md](features/FS-15-context-links.md) | Current | Target-neutral durable context references, direct grants, personal discovery state, and bounded pull retrieval |
+| FS-16 | [features/FS-16-dependent-work.md](features/FS-16-dependent-work.md) | Partial | Durable tasks with explicit outcomes, prerequisite arms, host-started armed work, and task context attachments |
 
 ### Technical specs
 
 | ID | Spec | Status | Covers |
 |----|------|--------|--------|
-| TS-01 | [tech/TS-01-architecture.md](tech/TS-01-architecture.md) | Current | Process model, package boundaries, runtime abstraction, source-of-truth rules |
-| TS-02 | [tech/TS-02-data-persistence.md](tech/TS-02-data-persistence.md) | Current | SQLite schema & migrations, activations, context references/grants, config files, transcripts, FTS index |
-| TS-03 | [tech/TS-03-http-api.md](tech/TS-03-http-api.md) | Current | REST surface, error envelope, SSE contract, status codes, composer autocomplete reads, directory-picker action |
+| TS-01 | [tech/TS-01-architecture.md](tech/TS-01-architecture.md) | Partial | Process model, package boundaries, runtime abstraction, source-of-truth rules |
+| TS-02 | [tech/TS-02-data-persistence.md](tech/TS-02-data-persistence.md) | Partial | SQLite schema & migrations, activations, context references/grants, config files, transcripts, FTS index |
+| TS-03 | [tech/TS-03-http-api.md](tech/TS-03-http-api.md) | Partial | REST surface, error envelope, SSE contract, status codes, composer autocomplete reads, directory-picker action |
 | TS-04 | [tech/TS-04-integration-protocols.md](tech/TS-04-integration-protocols.md) | Partial | ACP, hooks, MCP messaging, PTY/WebSocket, external-CLI tolerance |
-| TS-05 | [tech/TS-05-security.md](tech/TS-05-security.md) | Current | Loopback boundary, tokens, context authorization, file modes, permission model, release-install trust notes, directory-picker disclosure boundary |
+| TS-05 | [tech/TS-05-security.md](tech/TS-05-security.md) | Partial | Loopback boundary, tokens, context authorization, file modes, permission model, release-install trust notes, directory-picker disclosure boundary |
 | TS-06 | [tech/TS-06-build-test.md](tech/TS-06-build-test.md) | Current | Build tags, embed pipeline, release runtime, install, test strategy & conventions |
 | TS-07 | [tech/TS-07-federation.md](tech/TS-07-federation.md) | Partial | Native configuration authority, resolvers, consent, freshness, redaction, launch freezing |
 | TS-08 | [tech/TS-08-frontend-presentation.md](tech/TS-08-frontend-presentation.md) | Current | Core visual architecture, presentation contracts, maintenance safeguards, local assets, renderer styling, and built-in skin selection |
-| TS-09 | [tech/TS-09-pipeline-control-plane.md](tech/TS-09-pipeline-control-plane.md) | Current | Native sequential pipeline templates, durable run state machine, stage-result tools, recovery, and AgentDecker proposals |
+| TS-09 | [tech/TS-09-pipeline-control-plane.md](tech/TS-09-pipeline-control-plane.md) | Partial | Native sequential pipeline templates, durable run state machine, stage-result tools, recovery, and AgentDecker proposals |
+| TS-10 | [tech/TS-10-work-dependency-control-plane.md](tech/TS-10-work-dependency-control-plane.md) | Partial | Durable task/arm/attachment records, arm evaluation, the `dependency` activation kind, the shared result layer, and task recovery |
 | INV | [../features/INVARIANTS.md](../features/INVARIANTS.md) | Current | Bug-class constraint catalog (path kept stable for hooks/history) |
 
 Related, non-spec: [`../ideas.md`](../ideas.md) (new ideas and known things to improve — not

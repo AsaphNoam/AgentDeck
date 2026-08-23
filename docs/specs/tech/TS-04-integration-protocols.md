@@ -317,6 +317,15 @@ has not passed the real-provider compatibility gate. A later resource template m
 same token authorization and read service; it cannot become a second context authority or expose a
 global resource list.
 
+- **R29** `(planned)` — The existing `/mcp` server adds `create_task`, `get_assigned_task`,
+  `report_task_result`, and `cancel_task`. All derive caller identity, task ownership, and assignment
+  from the per-launch token under R6–R7, return bounded structured JSON with stable outcome codes, and
+  take cursor and size bounds from the shared limits module, as R17 and R28 established for the
+  pipeline and context tools. There is deliberately no task-graph query or listing tool, because that
+  would reintroduce the polling the feature exists to remove. Registration, token generation,
+  teardown, transport, and redaction remain the R6–R7 authority; no second MCP server appears. See
+  TS-10.
+
 ## 3. Interfaces & data shapes
 
 - ACP: JSON-RPC messages over newline-delimited child stdin/stdout; adapter determines exact

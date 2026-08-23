@@ -1,6 +1,6 @@
 # TS-01 — Architecture
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/server`, `internal/runtime`, `internal/state`, `internal/index`, `internal/bus`, `internal/config`, `internal/configsource`, `internal/messaging`, `internal/contextref`, `internal/pipeline`, `internal/backend`, `internal/archive`, `internal/transcript`, `internal/cli`, `ui/src`
 **Absorbed:** architecture contract from [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md); rationale remains in [`architecture-decisions.md`](../../architecture-decisions.md) D1–D5
 
@@ -283,6 +283,17 @@ assignees, labels, task state, or read state into reference identity, synthesize
 make the global direct-share list the assignment-discovery protocol. Terminal work state alone does
 not revoke participant access; reassignment or explicit participant removal is the owning work
 domain's authorization transition.
+
+- **R24** `(planned)` — **`dependency` is the second activation kind, and it declares its own
+  contract.** The activation record gains a nullable stable source work id so a kind may name the
+  durable work it belongs to, as R19 and TS-02.R23 anticipated; `mail` leaves it empty and its
+  one-pending-row-per-agent index is unchanged. The `dependency` kind sets it to its owning task id,
+  keys uniqueness on `(agent_id, source_id)`, and takes the retry policy R21 already reserved for it:
+  it remains actionable until its owning task records a confirmed start, rather than mail's
+  at-most-once retirement. The record still carries no instruction, prompt, arm set, context
+  reference, or retry counter. The task domain that owns it is the "future work domain" of R23: it
+  owns its own attachment and assignee membership, presents attached reference ids through its own
+  API, and never encodes task ids or assignees into context-reference identity. See TS-10.
 
 ## 3. Interfaces & data shapes
 

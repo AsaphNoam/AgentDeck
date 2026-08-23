@@ -1,6 +1,6 @@
 # TS-09 — Pipeline control plane
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/pipeline`, `internal/config`, `internal/state`, `internal/server`, `internal/messaging`, `internal/cli`, `ui/src/features/pipelines`
 **Absorbed:** —
 
@@ -214,6 +214,17 @@ re-arming, an agent re-proposing something already approved would receive succes
 any human surface — the discoverability defect the durable record exists to remove. There is no
 user-facing dismissal action: unapproved proposals are bounded by the same centralized limits module
 (R19), which retains the newest records and prunes older ones at each write.
+
+- **R27** `(planned)` — **The result layer converges with the task domain; the run layer does not.**
+  The outcome vocabulary, its validation, its bounded summary/details limits, and the transaction that
+  accepts a reported result are defined once and used by both `report_pipeline_stage_result` (R8–R9)
+  and the task report tool; two acceptance implementations are a defect under INV §2. A run reaching a
+  terminal state registers its normalized outcome in the shared result layer in the same transaction
+  that commits that terminal state (FS-14.R34), which is what lets other work depend on a run without
+  the scheduler reading pipeline internals. The run layer stays separate on purpose: a run is a cyclic
+  walk over a frozen template with at most one active agent (R11, R20), while a task graph is acyclic
+  with real fan-out, so absorbing runs into tasks would force the task domain to grow revisit and
+  back-edge semantics it does not need. See TS-10.
 
 ## 3. Interfaces & data shapes
 

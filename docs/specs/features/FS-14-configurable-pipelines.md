@@ -124,6 +124,13 @@ product boundaries in §6.
   and stage association but does not replace those existing surfaces or use display names/group
   labels as identity.
 
+- **R34** `(planned)` — A pipeline run that reaches a terminal state registers its outcome in the
+  shared result layer so other work can depend on it: `success` when it completes with the final
+  outcome `success`, `failure` for any other template-defined final outcome, and `cancelled` when it
+  was stopped, retaining the raw label for display (FS-16.R13). Template authoring, routing, revisits,
+  recovery, and the run's own vocabulary are unchanged, and this adds no cross-run join, parallel
+  branch, or child pipeline. Verified by FS-16.A7.
+
 ## 3. States & transitions
 
 - **Template:** absent → saved → edited or deleted. Editing/deleting affects no existing run because

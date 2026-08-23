@@ -1,6 +1,6 @@
 # FS-02 — Dashboard (card grid home view)
 
-**Status:** Current
+**Status:** Partial
 **Code:** `ui/src/components/grid/`, `ui/src/store/`, `ui/src/components/shell/NotificationCenter.tsx`, `ui/src/features/settings/NotificationsEditor.tsx`, `ui/src/api/sse.ts` · `internal/bus/`, `internal/state/`, `internal/server/handlers.go` (layout, reconcile) · **Journeys:** J5 (grid & layout), J11 (failure & recovery), J12 (restart durability)
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) F1/F2/F11 and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -265,6 +265,11 @@ render a project picker, and its submission always sends that project id. The un
 modal and prefilled launches outside a scoped dashboard retain their existing project selection
 behavior.
 
+- **R44** `(planned)` — The dashboard shows how many tasks in view need attention, covering parked
+  `dependency_failed` work and running work whose agent went away without a result (FS-16.R8, R16).
+  The indicator opens the Tasks view (FS-16.R14); the card grid itself gains no task object, and the
+  state badge vocabulary in R3 is unchanged, because an armed task has no agent and therefore no card.
+
 ## 5. Acceptance criteria
 
 **A1.** Launching an agent adds its card within ~1s with no manual refresh; a status change flips the
@@ -377,6 +382,10 @@ ownership is asserted against the stylesheets, and J5 checks the live surface. �
 **A25.** (R43) Opening **New agent** from a scoped project dashboard omits the project
 picker and launches with the route project's id; the general modal continues to offer its picker. —
 `CardGrid.test.tsx`, `NewAgentModal.test.tsx`; J5.
+
+- **A26** `(planned)` (R44) — The needs-attention count reflects parked and result-less running
+  tasks, updates after their authoritative commit, and reads zero when no task needs attention:
+  dashboard UI tests.
 
 ## 6. Deviations & open decisions
 

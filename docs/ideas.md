@@ -30,43 +30,6 @@ Example:
 - **Approval notifications link to the conversation.** When a pop-up notification fires because an
   agent needs approval, make it a link that opens that agent's conversation, so the user can jump
   straight to the pending permission instead of hunting for the right agent.
-- **Dependency-aware / armed agents.** AgentDeck should understand dependencies between pieces of
-  work natively.
-
-  An agent or task should be able to exist in a state roughly like:
-
-  “ready to run once these prerequisites are satisfied”
-
-  rather than relying on another LLM to repeatedly check whether prerequisite agents have finished,
-  or on agents sending conversational “I'm done” messages purely to advance orchestration.
-
-  Examples include:
-
-  - start B when A finishes;
-  - start D after A, B, and C have all completed;
-  - unblock a reviewer after an implementation reaches a terminal state;
-  - allow a pipeline or task graph to advance based on explicit AgentDeck state transitions.
-
-  This is fundamentally a control-plane capability. The host should observe prerequisite state and
-  advance work without needing an LLM to poll, wait, relay status, or interpret routine completion
-  signals.
-
-  Dependencies should attach to durable work, result, and attempt state—not merely to an agent's
-  lifecycle status. An agent becoming idle, done, or error is not equivalent to a task succeeding,
-  failing, or being cancelled. The future scheduler should advance from explicit durable outcomes
-  and may reuse the existing pipeline run/attempt/result machinery where it fits, rather than
-  turning agent lifecycle signals into a new social completion protocol.
-
-  Work/context integration should attach a target-neutral canonical context reference to the work
-  object, with attachment-specific label/description, and return those attachments from that work's
-  assignment/detail operation. Work-derived read authorization follows durable participant
-  membership: successful, failed, blocked, cancelled, or otherwise terminal work does not by itself
-  remove access, while reassignment or explicit participant removal revokes the outgoing agent's
-  work-derived route. Direct grants remain independent. Deleting the work removes only that
-  work-derived route and its attachments, not the canonical reference or another grant/attachment.
-
-  Think about how this should relate to AgentDeck's existing concepts of agents, groups, pipelines,
-  statuses, wake/resume behavior, task completion, and lifecycle.
 - **Richer agent-facing orchestration API.** I also want to consider exposing a more semantic
   orchestration API to agents.
 

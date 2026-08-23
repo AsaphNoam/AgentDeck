@@ -42,5 +42,4 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-- [Pull-based context links](pull-based-context-links.md)
-- [Separate orchestration state from model conversations](separate-orchestration-planes.md)
+- [Dependency-aware work that starts itself](dependency-aware-armed-agents.md)

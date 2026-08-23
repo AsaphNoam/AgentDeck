@@ -4,6 +4,50 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-23 — Design: dependency-aware work that starts itself
+
+Dependency-aware work is specified and waiting to build. No product code changed.
+
+The reason this was impossible before is that AgentDeck had nothing durable to hang a dependency on.
+A task group is only a dashboard label, "assign to a new task" launches an agent on the spot, and an
+agent's status describes its process, not its work — `done` is what you get from an ordinary Stop and
+from a terminal window closing, so it never meant "the work succeeded". Only pipelines recorded a
+real result, and only inside a single run.
+
+So the design adds the missing piece: a task. It is a durable record with a name, an instruction, who
+runs it, and one explicit result — succeeded, failed, blocked, or cancelled. The result is always
+reported, by the agent or by you, and is never guessed from an agent going idle, stopping, or
+crashing. A task can wait on other work: on another task's result, on a pipeline run's result, or on
+a named signal you or an outside system fires when something AgentDeck cannot see is ready. All the
+conditions have to be met, and there is no expression language to learn.
+
+When the last condition is met, AgentDeck starts the work itself. If several pieces become ready at
+once, all of them start, because fan-out is the point. Nothing polls, waits, or sends an "I'm done"
+message to release the next step. When a task finishes, its agent is stopped but not archived, so the
+process stops eating memory while the card stays where it is and can be resumed like any other
+stopped conversation. If something a task was waiting on ends in a way that can never satisfy it, the
+task parks and asks for attention instead of being quietly cancelled or waiting forever. If an agent
+disappears without reporting, its task says so and everything downstream keeps waiting.
+
+Pipelines and tasks converge where they genuinely duplicated each other and nowhere else. They now
+share one result vocabulary and one path for accepting a reported result, and a finished run
+registers its outcome so other work can depend on it. Their run machinery stays separate on purpose:
+a pipeline run walks a fixed template and can loop back on itself, while a task graph never has
+cycles, so folding runs into tasks would have forced the task model to grow a loop engine it does not
+need.
+
+A task can also carry context references with their own labels, so an agent starting dependent work
+is handed what it needs instead of scanning a shared list and guessing. Reassignment and shared
+ownership of a task are deliberately left out, along with any way for an agent to browse the task
+graph — that would put back the polling this exists to remove.
+
+**Needs attention:** None.
+
+**Next:** The change is `docs/ready-changes/dependency-aware-armed-agents.md`, waiting to start. It
+is the largest of the three orchestration follow-ons, so a design review before building it would be
+time well spent. The sibling idea, a richer orchestration API for agents, is still in `ideas.md` and
+now has a much smaller gap to close.
+
 ### 2026-08-23 — Fix: context sharing now points at the right work
 
 All four problems the review found in context sharing are fixed. An agent can no longer hand over

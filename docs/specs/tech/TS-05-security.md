@@ -1,6 +1,6 @@
 # TS-05 — Security & trust boundaries
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/server`, `internal/config`, `internal/configsource`, `internal/runtime`, `internal/messaging`, `internal/backend`, `internal/contextref`
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md), the [phase archive manifest](../../archive/phases/README.md), and [`INVARIANTS.md`](../../features/INVARIANTS.md) §14
 
@@ -106,6 +106,15 @@ expiry in the current local, single-user product. Grantor revocation and recipie
 the only revocation transitions. This avoids additional management and timer wiring; the policy must
 be reconsidered if AgentDeck gains a multi-user trust boundary or evidence shows accidental
 sensitive-context sharing is a practical problem.
+
+- **R17** `(planned)` — Every task MCP operation first resolves the existing per-launch token to
+  caller plus generation, exactly as R14 and R16 require for pipeline and context operations. A caller
+  may report a result only for the task it is currently assigned to and cancel only a task it created;
+  a task id, assignee, reporter role, filesystem path, or SQLite key supplied in tool arguments is
+  never authority. An unauthorized task and an unknown task are indistinguishable in the response.
+  Attaching a reference requires the caller to be able to read it, and the attachment grants the
+  assignee a work-derived read route without synthesizing a direct grant. This adds no authentication
+  boundary and does not change the same-machine trust model. See TS-10.
 
 ## 3. Interfaces & data shapes
 
