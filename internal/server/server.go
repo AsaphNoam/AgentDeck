@@ -57,6 +57,9 @@ type Server struct {
 	activationCh      chan string
 	// activationSlots bounds mail activations in flight across sweeps (TS-01.R20).
 	activationSlots chan struct{}
+	// taskStartSlots bounds task starts in flight across dispatch passes. The
+	// budget bounds runtimes; this bounds workers (TS-10.R3, R17).
+	taskStartSlots chan struct{}
 
 	hookMu      sync.Mutex
 	hookTokens  map[string]string // agent_id -> per-launch hook token (Phase 2 persists these)
@@ -212,6 +215,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		sourceMgr:                 sourceMgr,
 		activationCh:              activationCh,
 		activationSlots:           make(chan struct{}, messaging.ActivationBatch),
+		taskStartSlots:            make(chan struct{}, taskDispatchBatch),
 		cfg:                       cfg,
 		log:                       log,
 		hookTokens:                map[string]string{},
@@ -319,6 +323,7 @@ func (s *Server) Start(ctx context.Context) error {
 		ln.Close()
 		return err
 	}
+	s.startTaskDispatcher(sweepCtx)
 	if s.sourceMgr != nil {
 		// Hydrate persisted bindings so the watcher detects external edits (invariant §1).
 		projects, _ := s.configStore.ListProjects()
