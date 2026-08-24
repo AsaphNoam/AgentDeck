@@ -88,6 +88,13 @@ func (s *Server) dispatchReadyTasks(ctx context.Context) {
 // creates, wakes, or borrows that runtime (TS-10.R4).
 func (s *Server) planTaskStart(task state.Task) (state.TaskReservation, bool) {
 	attemptID := "ta_" + mintHookToken()
+	// A task that already confirmed an assignee acts on that same agent, whatever
+	// its target kind. A retried launch-spec task resumes the agent it created
+	// rather than minting a second one, which would fork its transcript and its
+	// attached-context membership (FS-16.R23).
+	if task.AssignedAgentID != "" {
+		return s.planExistingAgentStart(task, attemptID, task.AssignedAgentID)
+	}
 	switch task.TargetKind {
 	case state.TargetLaunch:
 		agentID, err := s.stateStore.NewAgentID()
@@ -102,22 +109,27 @@ func (s *Server) planTaskStart(task state.Task) (state.TaskReservation, bool) {
 			Claim: state.ClaimCreated,
 		}, true
 	default:
-		// Borrowing a runtime that is already up brings up no process and takes no
-		// budget; waking a stopped one does. Eligibility is deliberately not decided
-		// here: a target that can never be started parks its task, and parking is a
-		// transition out of starting, so it happens after the reservation exists.
-		claim := state.ClaimWoke
-		if _, err := s.stateStore.ReadRunning(task.TargetAgentID); err == nil {
-			claim = state.ClaimBorrowed
-		} else if !errors.Is(err, state.ErrNotFound) {
-			s.log.Debug("task target liveness read failed", "task", task.TaskID, "err", err)
-			return state.TaskReservation{}, false
-		}
-		return state.TaskReservation{
-			AttemptID: attemptID, AgentID: task.TargetAgentID, Generation: attemptID,
-			Claim: claim,
-		}, true
+		return s.planExistingAgentStart(task, attemptID, task.TargetAgentID)
 	}
+}
+
+// planExistingAgentStart decides how this start would treat an agent that
+// already exists. Borrowing a runtime that is already up brings up no process
+// and takes no budget; waking a stopped one does. Eligibility is deliberately
+// not decided here: a target that can never be started parks its task, and
+// parking is a transition out of starting, so it happens once the reservation
+// exists.
+func (s *Server) planExistingAgentStart(task state.Task, attemptID, agentID string) (state.TaskReservation, bool) {
+	claim := state.ClaimWoke
+	if _, err := s.stateStore.ReadRunning(agentID); err == nil {
+		claim = state.ClaimBorrowed
+	} else if !errors.Is(err, state.ErrNotFound) {
+		s.log.Debug("task target liveness read failed", "task", task.TaskID, "err", err)
+		return state.TaskReservation{}, false
+	}
+	return state.TaskReservation{
+		AttemptID: attemptID, AgentID: agentID, Generation: attemptID, Claim: claim,
+	}, true
 }
 
 // startAdmittedTask performs the effect the reservation authorized. A task that

@@ -61,6 +61,11 @@ func (s *Server) routes() http.Handler {
 	api("GET /api/tasks", s.handleTasks)
 	api("POST /api/tasks", s.handleCreateTask)
 	api("GET /api/tasks/{id}", s.handleTaskDetail)
+	api("DELETE /api/tasks/{id}", s.handleDeleteTask)
+	api("POST /api/tasks/{id}/cancel", s.handleCancelTask)
+	api("POST /api/tasks/{id}/result", s.handleRecordTaskResult)
+	api("POST /api/tasks/{id}/retry", s.handleRetryTask)
+	api("POST /api/tasks/{id}/rearm", s.handleRearmTask)
 	api("POST /api/signals", s.handleFireSignal)
 
 	// Phase 1 session lifecycle (launch, control). The {id} routes

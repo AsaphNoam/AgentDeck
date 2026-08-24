@@ -290,22 +290,30 @@ func (s *Store) CreateTask(task Task) (Task, error) {
 	now := timeNow()
 	task.CreatedAt, task.UpdatedAt = now, now
 	task.Revision = 1
-	task.State = initialTaskState(task.Arms)
-	if task.State == TaskReady {
-		task.ReadyAt = &now
-	}
 
 	if err := validateTaskArms(tx, task); err != nil {
 		return Task{}, err
 	}
+	stamped, err := stampArmsFromResults(tx, task.Arms, now)
+	if err != nil {
+		return Task{}, err
+	}
+	task.Arms = stamped
+	task.State = initialTaskState(task.Arms)
+	if task.State == TaskReady {
+		task.ReadyAt = &now
+	}
+	if task.State == TaskDependencyFailed {
+		task.AttentionReason = parkedAttentionReason
+	}
 
 	if _, err := tx.Exec(`
 INSERT INTO tasks(task_id, project, display_name, instruction, target_kind, target_agent_id,
-  role, backend, model, state, created_by_kind, created_by_agent_id, created_by_generation,
-  revision, ready_at, created_at, updated_at)
-VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  role, backend, model, state, attention_reason, created_by_kind, created_by_agent_id,
+  created_by_generation, revision, ready_at, created_at, updated_at)
+VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		task.TaskID, task.Project, task.DisplayName, task.Instruction, task.TargetKind,
-		task.TargetAgentID, task.Role, task.Backend, task.Model, task.State,
+		task.TargetAgentID, task.Role, task.Backend, task.Model, task.State, task.AttentionReason,
 		task.CreatedByKind, task.CreatedByAgentID, task.CreatedByGeneration,
 		task.Revision, formatOptionalTime(task.ReadyAt), formatTime(task.CreatedAt),
 		formatTime(task.UpdatedAt)); err != nil {
@@ -320,15 +328,61 @@ VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 	return s.ReadTask(task.TaskID)
 }
 
-// initialTaskState is armed while any arm is unsatisfied. A task with no arms is
-// ready the moment it is created (FS-16.R5).
+// initialTaskState is armed while any arm is unsatisfied and ready when every
+// one is satisfied; a task with no arms is ready the moment it is created
+// (FS-16.R5). Parking wins over readiness, because an unsatisfiable arm can
+// never be repaired in place (FS-16.R8).
 func initialTaskState(arms []TaskArm) string {
+	ready := true
 	for _, arm := range arms {
-		if arm.State != ArmSatisfied {
-			return TaskArmed
+		switch arm.State {
+		case ArmUnsatisfiable:
+			return TaskDependencyFailed
+		case ArmSatisfied:
+		default:
+			ready = false
 		}
 	}
-	return TaskReady
+	if ready {
+		return TaskReady
+	}
+	return TaskArmed
+}
+
+// parkedAttentionReason is the one wording for a task held by a prerequisite
+// that can never be satisfied, wherever that is decided.
+const parkedAttentionReason = "a prerequisite can no longer be satisfied"
+
+// stampArmsFromResults decides each new arm's state from the results already
+// registered. A task armed on work that has already finished must not wait for
+// an event that has already happened: it is ready, or parked, the moment it is
+// created or re-armed (FS-16.R5, R8, R23).
+func stampArmsFromResults(tx *sql.Tx, arms []TaskArm, now time.Time) ([]TaskArm, error) {
+	stamped := make([]TaskArm, len(arms))
+	copy(stamped, arms)
+	for i := range stamped {
+		if stamped[i].Kind != ArmWorkResult {
+			stamped[i].State = ArmUnsatisfied
+			continue
+		}
+		var outcome string
+		err := tx.QueryRow(`SELECT outcome FROM work_results WHERE source_kind = ? AND source_id = ?`,
+			stamped[i].SourceKind, stamped[i].SourceID).Scan(&outcome)
+		if errors.Is(err, sql.ErrNoRows) {
+			stamped[i].State = ArmUnsatisfied
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("state: read registered result for arm: %w", err)
+		}
+		if containsString(stamped[i].SatisfyingOutcomes, outcome) {
+			at := now
+			stamped[i].State, stamped[i].SatisfiedAt = ArmSatisfied, &at
+			continue
+		}
+		stamped[i].State = ArmUnsatisfiable
+	}
+	return stamped, nil
 }
 
 func insertTaskArms(tx *sql.Tx, taskID string, arms []TaskArm) error {
@@ -869,7 +923,7 @@ func advanceArmedTasks(tx *sql.Tx, taskIDs []string, now time.Time) ([]string, e
 UPDATE tasks SET state = ?, attention_reason = ?, revision = revision + 1, updated_at = ?
 WHERE task_id = ? AND state IN (?, ?)
   AND EXISTS (SELECT 1 FROM task_arms WHERE task_id = tasks.task_id AND state = ?)`,
-			TaskDependencyFailed, "a prerequisite can no longer be satisfied", stamp,
+			TaskDependencyFailed, parkedAttentionReason, stamp,
 			id, TaskArmed, TaskReady, ArmUnsatisfiable)
 		if err != nil {
 			return nil, fmt.Errorf("state: park task: %w", err)
@@ -1351,4 +1405,260 @@ VALUES(?, ?, ?, ?, ?)`, taskID, a.ContextRefID, a.Label, a.Description, now); er
 		return fmt.Errorf("state: commit attach task context: %w", err)
 	}
 	return nil
+}
+
+// ErrTaskHoldsRuntime is returned when deletion is refused because the task
+// still owns a runtime claim or an unfinished release (FS-16.R18, TS-10.R16).
+var ErrTaskHoldsRuntime = errors.New("state: task still owns a runtime or an unfinished release")
+
+// ErrRetryRequiresRearm is returned for a retry on a task parked by an arm that
+// can never be satisfied. A recorded result is immutable, so retrying the same
+// arms would park it again at once: the repair is re-arming (FS-16.R23).
+var ErrRetryRequiresRearm = errors.New("state: this task is parked by an unsatisfiable prerequisite; re-arm it instead")
+
+// ErrTaskNotRetryable is returned for a retry on a task whose state has no
+// execution to re-attempt.
+var ErrTaskNotRetryable = errors.New("state: task cannot be retried in this state")
+
+// ErrTaskNotRearmable is returned for a re-arm on a task whose arms have already
+// been passed or are moot (FS-16.R23).
+var ErrTaskNotRearmable = errors.New("state: task arms cannot be replaced in this state")
+
+// CancelTask writes the one host-owned outcome. It is accepted in every
+// non-terminal state, commits the terminal state together with a durable release
+// intent while the claim is still held, and registers `cancelled` so a dependent
+// armed on this task is resolved rather than left waiting (FS-16.R3, R8,
+// TS-10.R19).
+func (s *Store) CancelTask(taskID string) (Task, error) {
+	return s.finishTask(taskID, TaskResult{Outcome: OutcomeCancelled, Summary: "cancelled"}, "",
+		[]string{TaskArmed, TaskReady, TaskStarting, TaskRunning, TaskInterrupted, TaskDependencyFailed})
+}
+
+// RecordPersonTaskResult is the only non-cancelling way to resolve work whose
+// agent went away. It is the counterpart to the agent's report tool rather than
+// an override of it, so it is accepted only where no agent will report: on a
+// running or interrupted task (FS-16.R22).
+func (s *Store) RecordPersonTaskResult(taskID string, result TaskResult) (Task, error) {
+	if err := ValidateAgentReport(result.Outcome, result.Summary, result.Details, ""); err != nil {
+		return Task{}, err
+	}
+	return s.finishTask(taskID, result, "person", []string{TaskRunning, TaskInterrupted})
+}
+
+// finishTask commits one terminal transition, its release intent, and its result
+// registration together. The release intent is set only when the task still owns
+// a runtime, so a task that never started leaves nothing to release.
+func (s *Store) finishTask(taskID string, result TaskResult, source string, from []string) (Task, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return Task{}, fmt.Errorf("state: begin finish task: %w", err)
+	}
+	defer tx.Rollback()
+
+	var taskState, claim string
+	err = tx.QueryRow(`SELECT state, runtime_claim FROM tasks WHERE task_id = ?`, taskID).
+		Scan(&taskState, &claim)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Task{}, ErrNotFound
+	}
+	if err != nil {
+		return Task{}, fmt.Errorf("state: read task to finish: %w", err)
+	}
+	if !containsString(from, taskState) {
+		return Task{}, ErrTaskNotReportable
+	}
+	now := timeNow()
+	stamp := formatTime(now)
+	release := 0
+	if claim != "" {
+		release = 1
+	}
+	if _, err := tx.Exec(`
+UPDATE tasks SET state = ?, outcome = ?, outcome_source = ?, outcome_summary = ?,
+  outcome_details = ?, attention_reason = '', pending_release = ?, finished_at = ?,
+  revision = revision + 1, updated_at = ?
+WHERE task_id = ? AND state = ?`,
+		TaskFinished, result.Outcome, source, result.Summary, result.Details,
+		release, stamp, stamp, taskID, taskState); err != nil {
+		return Task{}, fmt.Errorf("state: finish task: %w", err)
+	}
+	if err := RegisterWorkResultTx(tx, WorkResult{
+		SourceKind: SourceTask, SourceID: taskID, Outcome: result.Outcome, Summary: result.Summary,
+	}, now); err != nil && !errors.Is(err, ErrWorkResultRecorded) {
+		return Task{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return Task{}, fmt.Errorf("state: commit finish task: %w", err)
+	}
+	return s.ReadTask(taskID)
+}
+
+// RetryTask re-attempts execution without touching arms. It restores the full
+// start-attempt allowance and returns the task to ready, keeping the assignee it
+// already confirmed so its transcript and its attached-context membership stay
+// continuous (FS-16.R23, R25).
+func (s *Store) RetryTask(taskID string) (Task, error) {
+	task, err := s.ReadTask(taskID)
+	if err != nil {
+		return Task{}, err
+	}
+	switch task.State {
+	case TaskInterrupted:
+	case TaskDependencyFailed:
+		// The two parked reasons need different repairs, and the arms say which
+		// one this is without a second column to keep honest.
+		for _, arm := range task.Arms {
+			if arm.State == ArmUnsatisfiable {
+				return Task{}, ErrRetryRequiresRearm
+			}
+		}
+	default:
+		return Task{}, ErrTaskNotRetryable
+	}
+	now := timeNow()
+	stamp := formatTime(now)
+	res, err := s.db.Exec(`
+UPDATE tasks SET state = ?, start_attempt_count = 0, attention_reason = '',
+  ready_at = ?, revision = revision + 1, updated_at = ?
+WHERE task_id = ? AND state = ?`, TaskReady, stamp, stamp, taskID, task.State)
+	if err != nil {
+		return Task{}, fmt.Errorf("state: retry task: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return Task{}, ErrTaskConflict
+	}
+	return s.ReadTask(taskID)
+}
+
+// RearmTask replaces a task's whole arm set atomically, revalidating the graph
+// inside the same transaction. An unsatisfiable arm is never repaired in place,
+// so replacing the set is the repair (FS-16.R15, R23).
+func (s *Store) RearmTask(taskID string, arms []TaskArm) (Task, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return Task{}, fmt.Errorf("state: begin rearm task: %w", err)
+	}
+	defer tx.Rollback()
+
+	var taskState, project string
+	err = tx.QueryRow(`SELECT state, project FROM tasks WHERE task_id = ?`, taskID).Scan(&taskState, &project)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Task{}, ErrNotFound
+	}
+	if err != nil {
+		return Task{}, fmt.Errorf("state: read task to rearm: %w", err)
+	}
+	if taskState != TaskArmed && taskState != TaskReady && taskState != TaskDependencyFailed {
+		return Task{}, ErrTaskNotRearmable
+	}
+	if _, err := tx.Exec(`DELETE FROM task_arms WHERE task_id = ?`, taskID); err != nil {
+		return Task{}, fmt.Errorf("state: clear task arms: %w", err)
+	}
+	candidate := Task{TaskID: taskID, Project: project, Arms: arms}
+	if err := validateTaskArms(tx, candidate); err != nil {
+		return Task{}, err
+	}
+	now := timeNow()
+	stamped, err := stampArmsFromResults(tx, arms, now)
+	if err != nil {
+		return Task{}, err
+	}
+	if err := insertTaskArms(tx, taskID, stamped); err != nil {
+		return Task{}, err
+	}
+	stamp := formatTime(now)
+	next := initialTaskState(stamped)
+	readyAt := any(nil)
+	if next == TaskReady {
+		readyAt = stamp
+	}
+	reason := ""
+	if next == TaskDependencyFailed {
+		reason = parkedAttentionReason
+	}
+	if _, err := tx.Exec(`
+UPDATE tasks SET state = ?, attention_reason = ?, ready_at = ?, revision = revision + 1,
+  updated_at = ?
+WHERE task_id = ? AND state = ?`, next, reason, readyAt, stamp, taskID, taskState); err != nil {
+		return Task{}, fmt.Errorf("state: rearm task: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return Task{}, fmt.Errorf("state: commit rearm task: %w", err)
+	}
+	return s.ReadTask(taskID)
+}
+
+// DeleteTask removes a task and, in the same transaction, resolves the arms that
+// were still waiting on it. Deletion is refused in the statement that checks it
+// while the task owns a runtime claim or an unfinished release, so the row — the
+// only record of that claim — outlives anything depending on it (FS-16.R18,
+// TS-10.R16, INV §4/§15).
+//
+// A result the task already registered is deliberately not removed: it is keyed
+// to its source and outlives the task, so a dependent whose arm it already
+// satisfied is completely unaffected, whatever state that dependent is in.
+func (s *Store) DeleteTask(taskID string) ([]Task, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("state: begin delete task: %w", err)
+	}
+	defer tx.Rollback()
+
+	dependents, err := queryTaskIDs(tx, armsNamingSource(SourceTask, taskID))
+	if err != nil {
+		return nil, err
+	}
+	res, err := tx.Exec(`
+DELETE FROM tasks
+WHERE task_id = ? AND state NOT IN (?, ?) AND pending_release = 0`,
+		taskID, TaskStarting, TaskRunning)
+	if err != nil {
+		return nil, fmt.Errorf("state: delete task: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		// The check has to run on this transaction's own connection: the store
+		// keeps a single connection, so reading through it while this transaction
+		// is open would wait for a connection this goroutine is holding.
+		var exists int
+		switch err := tx.QueryRow(`SELECT 1 FROM tasks WHERE task_id = ?`, taskID).Scan(&exists); {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, ErrNotFound
+		case err != nil:
+			return nil, fmt.Errorf("state: read task after refused delete: %w", err)
+		}
+		return nil, ErrTaskHoldsRuntime
+	}
+	// Only an arm still waiting on it becomes unsatisfiable; one its result
+	// already satisfied stays satisfied (FS-16.R18).
+	if _, err := tx.Exec(`
+UPDATE task_arms SET state = ?
+WHERE kind = ? AND source_kind = ? AND source_id = ? AND state = ?`,
+		ArmUnsatisfiable, ArmWorkResult, SourceTask, taskID, ArmUnsatisfied); err != nil {
+		return nil, fmt.Errorf("state: park arms for deleted task: %w", err)
+	}
+	changed, err := advanceArmedTasks(tx, dependents, timeNow())
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("state: commit delete task: %w", err)
+	}
+	parked := []Task{}
+	for _, id := range changed {
+		task, err := s.ReadTask(id)
+		if err != nil {
+			return nil, err
+		}
+		parked = append(parked, task)
+	}
+	return parked, nil
+}
+
+func containsString(all []string, want string) bool {
+	for _, v := range all {
+		if v == want {
+			return true
+		}
+	}
+	return false
 }

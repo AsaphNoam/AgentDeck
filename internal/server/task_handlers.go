@@ -305,7 +305,165 @@ func writeTaskError(w http.ResponseWriter, err error) {
 		writeAPIError(w, apiError(runtime.CodeValidation, err.Error()))
 	case errors.Is(err, state.ErrTaskConflict):
 		writeAPIError(w, apiError(runtime.CodeConflict, "the task changed while this request was in flight"))
+	case errors.Is(err, state.ErrTaskHoldsRuntime):
+		ae := apiError(runtime.CodeConflict, err.Error())
+		ae.Details = map[string]any{"code": "task_holds_runtime"}
+		writeAPIError(w, ae)
+	case errors.Is(err, state.ErrRetryRequiresRearm):
+		ae := apiError(runtime.CodeValidation, err.Error())
+		ae.Details = map[string]any{"code": "retry_requires_rearm"}
+		writeAPIError(w, ae)
+	case errors.Is(err, state.ErrTaskNotRetryable), errors.Is(err, state.ErrTaskNotRearmable),
+		errors.Is(err, state.ErrTaskNotReportable):
+		ae := apiError(runtime.CodeValidation, err.Error())
+		ae.Details = map[string]any{"code": "invalid_state"}
+		writeAPIError(w, ae)
+	case errors.Is(err, state.ErrInvalidOutcome):
+		ae := apiError(runtime.CodeValidation, err.Error())
+		ae.Details = map[string]any{"code": "invalid_outcome"}
+		writeAPIError(w, ae)
+	case errors.Is(err, state.ErrInvalidReportFields):
+		writeAPIError(w, apiError(runtime.CodeValidation, err.Error()))
 	default:
 		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
 	}
+}
+
+// handleCancelTask implements POST /api/tasks/{id}/cancel (FS-16.R3, R20).
+func (s *Server) handleCancelTask(w http.ResponseWriter, r *http.Request) {
+	task, err := s.stateStore.CancelTask(r.PathValue("id"))
+	if err != nil {
+		writeTaskError(w, err)
+		return
+	}
+	// A cancel has no reporting turn to wait for, so the stop follows its commit
+	// immediately (TS-10.R19).
+	s.finishInterruptedRelease(r.Context(), task)
+	s.evaluateTaskResult(task.TaskID)
+	s.publishTaskUpdate(task)
+	writeJSON(w, http.StatusOK, s.taskDetail(s.rereadTask(task)))
+}
+
+type personResultRequest struct {
+	Outcome string `json:"outcome"`
+	Summary string `json:"summary"`
+	Details string `json:"details,omitempty"`
+}
+
+// handleRecordTaskResult implements POST /api/tasks/{id}/result (FS-16.R22). It
+// is the only non-cancelling way to resolve work whose agent went away, and it
+// is marked person-recorded so it is never mistaken for an agent's own report.
+func (s *Server) handleRecordTaskResult(w http.ResponseWriter, r *http.Request) {
+	var req personResultRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeAPIError(w, apiError(runtime.CodeValidation, "invalid JSON body"))
+		return
+	}
+	task, err := s.stateStore.RecordPersonTaskResult(r.PathValue("id"), state.TaskResult{
+		Outcome: req.Outcome, Summary: req.Summary, Details: req.Details,
+	})
+	if err != nil {
+		writeTaskError(w, err)
+		return
+	}
+	s.finishInterruptedRelease(r.Context(), task)
+	s.evaluateTaskResult(task.TaskID)
+	s.publishTaskUpdate(task)
+	writeJSON(w, http.StatusOK, s.taskDetail(s.rereadTask(task)))
+}
+
+// handleRetryTask implements POST /api/tasks/{id}/retry (FS-16.R23, R25).
+func (s *Server) handleRetryTask(w http.ResponseWriter, r *http.Request) {
+	existing, err := s.stateStore.ReadTask(r.PathValue("id"))
+	if err != nil {
+		writeTaskError(w, err)
+		return
+	}
+	// Retry acts on the assignee the task already has, so an assignee that has
+	// since gone is a typed refusal rather than a start that will fail three
+	// times: the work is restarted by creating a new task (FS-16.R23).
+	if ae := s.retryAssigneeGate(existing); ae != nil {
+		writeAPIError(w, ae)
+		return
+	}
+	task, err := s.stateStore.RetryTask(existing.TaskID)
+	if err != nil {
+		writeTaskError(w, err)
+		return
+	}
+	s.publishTaskUpdate(task)
+	writeJSON(w, http.StatusOK, s.taskDetail(task))
+}
+
+func (s *Server) retryAssigneeGate(task state.Task) *runtime.APIError {
+	target := task.AssignedAgentID
+	if target == "" {
+		target = task.TargetAgentID
+	}
+	if target == "" {
+		return nil
+	}
+	agent, err := s.stateStore.ReadAgent(target)
+	if err != nil {
+		ae := apiError(runtime.CodeValidation, "the agent this task was assigned to no longer exists")
+		ae.Details = map[string]any{"code": "target_ineligible"}
+		return ae
+	}
+	if agent.Archived {
+		ae := apiError(runtime.CodeValidation, "the agent this task was assigned to is archived")
+		ae.Details = map[string]any{"code": "target_ineligible"}
+		return ae
+	}
+	return nil
+}
+
+type rearmRequest struct {
+	Arms []createArmRequest `json:"arms"`
+}
+
+// handleRearmTask implements POST /api/tasks/{id}/rearm (FS-16.R23).
+func (s *Server) handleRearmTask(w http.ResponseWriter, r *http.Request) {
+	var req rearmRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeAPIError(w, apiError(runtime.CodeValidation, "invalid JSON body"))
+		return
+	}
+	if len(req.Arms) > maxTaskArms {
+		writeAPIError(w, apiError(runtime.CodeValidation, "too many prerequisites"))
+		return
+	}
+	arms, ae := composeTaskArms(req.Arms)
+	if ae != nil {
+		writeAPIError(w, ae)
+		return
+	}
+	task, err := s.stateStore.RearmTask(r.PathValue("id"), arms)
+	if err != nil {
+		writeTaskError(w, err)
+		return
+	}
+	s.publishTaskUpdate(task)
+	writeJSON(w, http.StatusOK, s.taskDetail(task))
+}
+
+// handleDeleteTask implements DELETE /api/tasks/{id} (FS-16.R18).
+func (s *Server) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
+	parked, err := s.stateStore.DeleteTask(r.PathValue("id"))
+	if err != nil {
+		writeTaskError(w, err)
+		return
+	}
+	for _, dependent := range parked {
+		s.publishTaskUpdate(dependent)
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// rereadTask re-reads a task after an effect that may have changed it, falling
+// back to what the caller already holds.
+func (s *Server) rereadTask(task state.Task) state.Task {
+	if fresh, err := s.stateStore.ReadTask(task.TaskID); err == nil {
+		return fresh
+	}
+	return task
 }

@@ -1,8 +1,10 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/agentdeck/agentdeck/internal/state"
@@ -168,5 +170,310 @@ func TestFiringASignalReleasesItsArms(t *testing.T) {
 	resp, body = post(t, ts.URL+"/api/signals", map[string]any{"project": "ghost", "name": "ci-green"})
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("signal outside a known project = %d: %s", resp.StatusCode, body)
+	}
+}
+
+// createTaskHTTP creates a task over the API and returns it.
+func createTaskHTTP(t *testing.T, ts *httptest.Server, body map[string]any) state.Task {
+	t.Helper()
+	resp, raw := post(t, ts.URL+"/api/tasks", body)
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("create status = %d: %s", resp.StatusCode, raw)
+	}
+	return decodeTask(t, raw)
+}
+
+func launchTaskBody(name string) map[string]any {
+	return map[string]any{
+		"project": "tmpproj", "display_name": name, "instruction": "do " + name,
+		"target_kind": "launch", "role": "impl",
+	}
+}
+
+// FS-16.R3, R4 — cancelling is the host's own outcome. It resolves the work,
+// releases the runtime the task brought up, and resolves dependents rather than
+// leaving them waiting for a result that will never come.
+func TestCancellingATaskFinishesItAndReleasesItsRuntime(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	task := createTaskHTTP(t, ts, launchTaskBody("cancel me"))
+	dependent := createTaskHTTP(t, ts, map[string]any{
+		"project": "tmpproj", "display_name": "after", "instruction": "after it succeeds",
+		"target_kind": "launch", "role": "impl",
+		"arms": []map[string]any{{
+			"kind": "work_result", "source_kind": "task", "source_id": task.TaskID,
+			"satisfying_outcomes": []string{"success"},
+		}},
+	})
+	srv.dispatchReadyTasks(context.Background())
+	running := waitTaskState(t, srv, task.TaskID, state.TaskRunning)
+
+	resp, body := post(t, ts.URL+"/api/tasks/"+task.TaskID+"/cancel", nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("cancel status = %d: %s", resp.StatusCode, body)
+	}
+	cancelled := decodeTask(t, body)
+	if cancelled.State != state.TaskFinished || cancelled.Outcome != state.OutcomeCancelled {
+		t.Fatalf("cancelled task = %s/%s", cancelled.State, cancelled.Outcome)
+	}
+	if cancelled.OutcomeSource != "" {
+		t.Fatalf("cancel recorded a reporter %q; it is host-written", cancelled.OutcomeSource)
+	}
+	if cancelled.PendingRelease || cancelled.RuntimeClaim != "" {
+		t.Fatalf("cancel left the release unfinished: %+v", cancelled)
+	}
+	waitRunning(t, srv, running.AssignedAgentID, false)
+
+	parked, err := srv.stateStore.ReadTask(dependent.TaskID)
+	if err != nil {
+		t.Fatalf("ReadTask: %v", err)
+	}
+	if parked.State != state.TaskDependencyFailed {
+		t.Fatalf("dependent = %s after its prerequisite was cancelled, want parked", parked.State)
+	}
+
+	// A finished task is terminal.
+	resp, body = post(t, ts.URL+"/api/tasks/"+task.TaskID+"/cancel", nil)
+	if resp.StatusCode != 422 {
+		t.Fatalf("second cancel = %d: %s", resp.StatusCode, body)
+	}
+}
+
+// FS-16.R22 — a person resolves work whose agent went away, and it is marked
+// person-recorded. It is rejected in every state where an agent will report or
+// where the work never ran.
+func TestAPersonRecordsAResultOnlyWhereNoAgentWill(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	armed := createTaskHTTP(t, ts, map[string]any{
+		"project": "tmpproj", "display_name": "armed", "instruction": "wait",
+		"target_kind": "launch", "role": "impl",
+		"arms": []map[string]any{{"kind": "signal", "signal_name": "never"}},
+	})
+	resp, body := post(t, ts.URL+"/api/tasks/"+armed.TaskID+"/result",
+		map[string]any{"outcome": "success", "summary": "no"})
+	if resp.StatusCode != 422 {
+		t.Fatalf("result on an armed task = %d: %s", resp.StatusCode, body)
+	}
+
+	task := createTaskHTTP(t, ts, launchTaskBody("abandoned"))
+	srv.dispatchReadyTasks(context.Background())
+	running := waitTaskState(t, srv, task.TaskID, state.TaskRunning)
+	if resp, body := post(t, ts.URL+"/api/sessions/"+running.AssignedAgentID+"/stop", nil); resp.StatusCode != 200 {
+		t.Fatalf("stop status = %d: %s", resp.StatusCode, body)
+	}
+	waitTaskState(t, srv, task.TaskID, state.TaskInterrupted)
+
+	resp, body = post(t, ts.URL+"/api/tasks/"+task.TaskID+"/result",
+		map[string]any{"outcome": "blocked", "summary": "needs a person"})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("person result = %d: %s", resp.StatusCode, body)
+	}
+	finished := decodeTask(t, body)
+	if finished.State != state.TaskFinished || finished.OutcomeSource != "person" {
+		t.Fatalf("person result = %s by %q", finished.State, finished.OutcomeSource)
+	}
+	if result, err := srv.stateStore.ReadWorkResult(state.SourceTask, task.TaskID); err != nil ||
+		result.Outcome != state.OutcomeBlocked {
+		t.Fatalf("registered result = %+v, %v", result, err)
+	}
+
+	resp, body = post(t, ts.URL+"/api/tasks/"+task.TaskID+"/result",
+		map[string]any{"outcome": "success", "summary": "changed my mind"})
+	if resp.StatusCode != 422 {
+		t.Fatalf("second person result = %d: %s", resp.StatusCode, body)
+	}
+	if apiErrorCode(t, body) == "" {
+		t.Fatalf("rejection carried no code: %s", body)
+	}
+}
+
+// FS-16.R23, R25 — retry and re-arm repair different things and say so. Retry on
+// a task parked by an unsatisfiable arm is refused naming re-arm; re-arming it
+// onto an already-satisfied prerequisite makes it ready and it starts.
+func TestRetryAndRearmRepairDifferentThings(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	failing := createTaskHTTP(t, ts, launchTaskBody("will fail"))
+	succeeding := createTaskHTTP(t, ts, launchTaskBody("will succeed"))
+	dependent := createTaskHTTP(t, ts, map[string]any{
+		"project": "tmpproj", "display_name": "dependent", "instruction": "after success",
+		"target_kind": "launch", "role": "impl",
+		"arms": []map[string]any{{
+			"kind": "work_result", "source_kind": "task", "source_id": failing.TaskID,
+			"satisfying_outcomes": []string{"success"},
+		}},
+	})
+
+	// Both prerequisites run and record opposite outcomes.
+	for _, prereq := range []struct {
+		task    state.Task
+		outcome string
+	}{{failing, state.OutcomeFailure}, {succeeding, state.OutcomeSuccess}} {
+		running := dispatchUntilTaskState(t, srv, prereq.task.TaskID, state.TaskRunning)
+		if _, err := srv.stateStore.RecordAgentTaskResult(prereq.task.TaskID,
+			running.AssignedAgentID, running.AssignedGeneration,
+			state.TaskResult{Outcome: prereq.outcome, Summary: "done"}); err != nil {
+			t.Fatalf("RecordAgentTaskResult: %v", err)
+		}
+		srv.evaluateTaskResult(prereq.task.TaskID)
+		srv.dispatchTurnEnd(running.AssignedAgentID, running.AssignedGeneration)
+	}
+	parked, err := srv.stateStore.ReadTask(dependent.TaskID)
+	if err != nil {
+		t.Fatalf("ReadTask: %v", err)
+	}
+	if parked.State != state.TaskDependencyFailed {
+		t.Fatalf("dependent = %s, want parked", parked.State)
+	}
+
+	resp, body := post(t, ts.URL+"/api/tasks/"+dependent.TaskID+"/retry", nil)
+	if resp.StatusCode != 422 {
+		t.Fatalf("retry on an unsatisfiable park = %d: %s", resp.StatusCode, body)
+	}
+	var envelope struct {
+		Error struct {
+			Details map[string]any `json:"details"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if envelope.Error.Details["code"] != "retry_requires_rearm" {
+		t.Fatalf("retry refusal = %v, want it to name re-arm", envelope.Error.Details)
+	}
+
+	resp, body = post(t, ts.URL+"/api/tasks/"+dependent.TaskID+"/rearm", map[string]any{
+		"arms": []map[string]any{{
+			"kind": "work_result", "source_kind": "task", "source_id": succeeding.TaskID,
+			"satisfying_outcomes": []string{"success"},
+		}},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("rearm = %d: %s", resp.StatusCode, body)
+	}
+	rearmed := decodeTask(t, body)
+	if rearmed.State != state.TaskReady {
+		t.Fatalf("rearmed onto a satisfied prerequisite = %s, want ready", rearmed.State)
+	}
+	srv.dispatchReadyTasks(context.Background())
+	waitTaskState(t, srv, dependent.TaskID, state.TaskRunning)
+}
+
+// FS-16.R23, R25 — retry on an interrupted task restores the full allowance and
+// runs it again on the assignee it already had, rather than minting a second one.
+func TestRetryRunsAgainOnTheSameAssignee(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	task := createTaskHTTP(t, ts, launchTaskBody("interrupted"))
+	srv.dispatchReadyTasks(context.Background())
+	running := waitTaskState(t, srv, task.TaskID, state.TaskRunning)
+	first := running.AssignedAgentID
+
+	if resp, body := post(t, ts.URL+"/api/sessions/"+first+"/stop", nil); resp.StatusCode != 200 {
+		t.Fatalf("stop status = %d: %s", resp.StatusCode, body)
+	}
+	waitTaskState(t, srv, task.TaskID, state.TaskInterrupted)
+
+	resp, body := post(t, ts.URL+"/api/tasks/"+task.TaskID+"/retry", nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("retry = %d: %s", resp.StatusCode, body)
+	}
+	if retried := decodeTask(t, body); retried.State != state.TaskReady || retried.StartAttemptCount != 0 {
+		t.Fatalf("retried task = %s after %d attempts, want ready with a full allowance",
+			retried.State, retried.StartAttemptCount)
+	}
+	srv.dispatchReadyTasks(context.Background())
+	again := waitTaskState(t, srv, task.TaskID, state.TaskRunning)
+	if again.AssignedAgentID != first {
+		t.Fatalf("retry ran on %q, want the assignee it already had (%q)", again.AssignedAgentID, first)
+	}
+	if again.AssignedGeneration == running.AssignedGeneration {
+		t.Fatalf("retry reused generation %q, want a new one", again.AssignedGeneration)
+	}
+	if again.RuntimeClaim != state.ClaimWoke {
+		t.Fatalf("retry claim = %q, want %q for an agent it woke", again.RuntimeClaim, state.ClaimWoke)
+	}
+}
+
+// FS-16.R18 / TS-10.R16 — deletion is refused while a task still owns something
+// live, removes only its own rows once it does not, and parks only a dependent
+// whose arm was still waiting.
+func TestDeletionIsRefusedWhileATaskOwnsARuntime(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	task := createTaskHTTP(t, ts, launchTaskBody("busy"))
+	satisfied := createTaskHTTP(t, ts, launchTaskBody("finishes first"))
+	srv.dispatchReadyTasks(context.Background())
+	running := waitTaskState(t, srv, task.TaskID, state.TaskRunning)
+	satisfiedRunning := waitTaskState(t, srv, satisfied.TaskID, state.TaskRunning)
+
+	req, _ := http.NewRequest(http.MethodDelete, ts.URL+"/api/tasks/"+task.TaskID, nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("DELETE: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("delete of a running task = %d, want 409", resp.StatusCode)
+	}
+	if _, err := srv.stateStore.ReadTask(task.TaskID); err != nil {
+		t.Fatalf("a refused delete removed the task: %v", err)
+	}
+
+	// A dependent whose arm the prerequisite already satisfied is untouched by
+	// that prerequisite's deletion; one still waiting is parked.
+	if _, err := srv.stateStore.RecordAgentTaskResult(satisfied.TaskID,
+		satisfiedRunning.AssignedAgentID, satisfiedRunning.AssignedGeneration,
+		state.TaskResult{Outcome: state.OutcomeSuccess, Summary: "done"}); err != nil {
+		t.Fatalf("RecordAgentTaskResult: %v", err)
+	}
+	srv.dispatchTurnEnd(satisfiedRunning.AssignedAgentID, satisfiedRunning.AssignedGeneration)
+	settled := createTaskHTTP(t, ts, map[string]any{
+		"project": "tmpproj", "display_name": "already satisfied", "instruction": "go",
+		"target_kind": "launch", "role": "impl",
+		"arms": []map[string]any{{
+			"kind": "work_result", "source_kind": "task", "source_id": satisfied.TaskID,
+			"satisfying_outcomes": []string{"success"},
+		}},
+	})
+	if settled.State != state.TaskReady {
+		t.Fatalf("a task armed on an already-satisfied prerequisite = %s, want ready", settled.State)
+	}
+	waiting := createTaskHTTP(t, ts, map[string]any{
+		"project": "tmpproj", "display_name": "still waiting", "instruction": "go",
+		"target_kind": "launch", "role": "impl",
+		"arms": []map[string]any{{
+			"kind": "work_result", "source_kind": "task", "source_id": task.TaskID,
+			"satisfying_outcomes": []string{"success"},
+		}},
+	})
+
+	if _, err := srv.stateStore.CancelTask(task.TaskID); err != nil {
+		t.Fatalf("CancelTask: %v", err)
+	}
+	srv.finishInterruptedRelease(context.Background(), srv.rereadTask(state.Task{TaskID: task.TaskID}))
+	waitRunning(t, srv, running.AssignedAgentID, false)
+
+	req, _ = http.NewRequest(http.MethodDelete, ts.URL+"/api/tasks/"+task.TaskID, nil)
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("DELETE: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("delete of a released task = %d, want 204", resp.StatusCode)
+	}
+	if _, err := srv.stateStore.ReadTask(task.TaskID); err == nil {
+		t.Fatal("the task survived its deletion")
+	}
+	// Its agent, and the dependent its result already satisfied, are untouched.
+	if _, err := srv.stateStore.ReadAgent(running.AssignedAgentID); err != nil {
+		t.Fatalf("deleting a task deleted its agent: %v", err)
+	}
+	if still, err := srv.stateStore.ReadTask(settled.TaskID); err != nil || still.State != state.TaskReady {
+		t.Fatalf("an unrelated dependent changed: %+v, %v", still, err)
+	}
+	parked, err := srv.stateStore.ReadTask(waiting.TaskID)
+	if err != nil {
+		t.Fatalf("ReadTask: %v", err)
+	}
+	if parked.State != state.TaskDependencyFailed {
+		t.Fatalf("a dependent still waiting on the deleted task = %s, want parked", parked.State)
 	}
 }
