@@ -135,9 +135,9 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   same way a message names its recipient — a friendly selector that AgentDeck resolves server-side
   against durable identities, returning the same unknown and ambiguous recipient errors coordination
   already returns (FS-06). A raw agent id in a tool argument is not a target and is never authority;
-  resolution, not the caller, decides which agent a task points at. This deliberately opens what FS-14 keeps closed for pipelines: an agent can
-  cause new work to start without a person in the loop, which is the point of expressing orchestration
-  as control state rather than prose.
+  resolution, not the caller, decides which agent a task points at. This deliberately opens what
+  FS-14 keeps closed for pipelines: an agent can cause new work to start without a person in the loop,
+  which is the point of expressing orchestration as control state rather than prose.
 - **R13** `(planned)` — **Pipeline results register in the shared result layer.** When a pipeline run
   reaches a terminal state, AgentDeck registers its outcome in the same result vocabulary as R3:
   `success` when the run completes with the final outcome `success`, `failure` when it completes with
@@ -148,9 +148,8 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
 - **R14** `(planned)` — **Dependent work has its own view.** A Tasks view lists tasks for a project
   with their state, outcome, what each armed task is waiting on, and which parked task needs
   attention, and it offers create, record a result (R22), re-arm, retry, cancel, and delete (R18,
-  R23). The dashboard is unchanged apart
-  from an indicator of how many tasks need attention (FS-02.R44).
-
+  R23). The dashboard is unchanged apart from an indicator of how many tasks need attention
+  (FS-02.R44).
 - **R22** `(planned)` — **A person can record a result when no agent will.** A person records
   `success`, `failure`, or `blocked` on a `running` or `interrupted` task over the local HTTP API and
   its Tasks view. This is the only non-cancelling way to resolve work whose agent went away, and it is
@@ -234,10 +233,9 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   what authorizes reading attached context (R10). An abandoned reservation releases the claim and
   authorizes nothing. A confirmed assignee is retained as durable provenance afterwards, including
   after that agent stops or is archived, and its claim is held until the task's result is recorded
-  and, for an agent-reported result, that reporting turn has ended. Reassignment does not exist in this feature, so the assignee is written
-  once. The assignee's durable membership is what authorizes reading attached context (R10); it is
-  separate from the per-launch MCP registration, which is torn down whenever that runtime exits and
-  re-established on the next one.
+  and, for an agent-reported result, that reporting turn has ended. Reassignment does not exist in
+  this feature, so the assignee is written once. That membership is separate from the per-launch MCP
+  registration, which is torn down whenever the runtime exits and re-established on the next one.
 - **Attachment:** absent → attached → removed with its task. Attachment state is independent of task
   state, of the canonical reference, and of every direct grant.
 
@@ -267,9 +265,8 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   AgentDeck restarted — and because it cannot be known whether the assignment reached that
   conversation, the task becomes `interrupted` for a person to resolve rather than being silently
   delivered twice. A task that was `running` becomes `interrupted` under R16, because its agent is now
-  an unowned orphan. A task whose result was already
-  recorded stays finished, and any stop and release its reporting turn never completed is finished
-  during recovery. Budget slots are recomputed from surviving claims. Nothing is resumed on a guess
+  an unowned orphan. A task whose result was already recorded stays finished, and any stop and
+  release its reporting turn never completed is finished during recovery. Budget slots are recomputed from surviving claims. Nothing is resumed on a guess
   and no unit of work gets two agents, matching FS-14.R14.
 - **R18** `(planned)` — **Deletion has narrow effects, decided per dependent, and never abandons a
   runtime.** Deletion is rejected with a typed error while a task still owns something live: while it
@@ -277,8 +274,8 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   completed. Cancel it first and let its cleanup finish, then delete. This keeps the task row — the
   only record of the runtime claim, the budget slot, and the pending release — alive until nothing
   depends on it, so deleting can never strand a running agent or leak a slot. Deleting an otherwise
-  eligible task removes its arms, its attachments, and its work-derived context route. Its recorded result is not
-  removed: a result is keyed to its source and outlives the task that produced it, so a dependent
+  eligible task removes its arms, its attachments, and its work-derived context route. Its recorded
+  result is not removed: a result is keyed to its source and outlives the task that produced it, so a dependent
   whose arm that result already satisfied is completely unaffected, whatever state that dependent is
   in. Only an arm still waiting on the deleted task becomes unsatisfiable, which parks its `armed` or
   `ready` dependent under R8. A dependent that is already `starting`, `running`, `interrupted`, or
@@ -295,9 +292,12 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   it delays a start, never fails one.
 - **R20** `(planned)` — **Invalid task operations are typed and atomic.** Reporting an outcome for a
   task the caller is not assigned to, reporting twice, reporting an outcome outside the vocabulary,
-  reporting an over-limit summary, cancelling a finished task, firing a signal outside the caller's
-  project, or attaching a reference the caller cannot read returns a stable typed error and mutates
-  nothing.
+  reporting an over-limit summary, cancelling a finished task, cancelling a task the caller did not
+  create (R24), recording a person result on a task that is neither `running` nor `interrupted` (R22),
+  retrying a task parked as `arm_unsatisfiable` (R23), re-arming a task outside `armed`, `ready`, or
+  `dependency_failed` (R23), re-arming into a cycle (R15), deleting a task that still owns a runtime
+  or an unfinished release (R18), firing a signal outside the caller's project, or attaching a
+  reference the caller cannot read returns a stable typed error and mutates nothing.
 
 ## 5. Acceptance criteria
 
