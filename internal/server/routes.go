@@ -56,6 +56,13 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/pipeline-runs/{id}/retry", s.handleRetryPipelineRun)
 	api("POST /api/pipeline-runs/{id}/stop", s.handleStopPipelineRun)
 
+	// Durable dependent work: tasks, their arms, and project-scoped signals
+	// (FS-16 / TS-10).
+	api("GET /api/tasks", s.handleTasks)
+	api("POST /api/tasks", s.handleCreateTask)
+	api("GET /api/tasks/{id}", s.handleTaskDetail)
+	api("POST /api/signals", s.handleFireSignal)
+
 	// Phase 1 session lifecycle (launch, control). The {id} routes
 	// are more specific than the GET /api/ catch-all and win via mux precedence.
 	api("POST /api/sessions", s.handleLaunch)

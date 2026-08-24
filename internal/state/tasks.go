@@ -1328,3 +1328,27 @@ func (s *Store) TasksAwaitingRelease() ([]Task, error) {
 func placeholders(n int) string {
 	return strings.TrimSuffix(strings.Repeat("?,", n), ",")
 }
+
+// AttachTaskContext binds canonical context references to a task. The attachment
+// holds only the reference id and this task's own presentation: it copies no
+// content, duplicates no reference, and creates no direct grant (FS-16.R10,
+// TS-10.R12).
+func (s *Store) AttachTaskContext(taskID string, attachments []TaskAttachment) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("state: begin attach task context: %w", err)
+	}
+	defer tx.Rollback()
+	now := formatTime(timeNow())
+	for _, a := range attachments {
+		if _, err := tx.Exec(`
+INSERT OR REPLACE INTO task_attachments(task_id, context_ref_id, label, description, created_at)
+VALUES(?, ?, ?, ?, ?)`, taskID, a.ContextRefID, a.Label, a.Description, now); err != nil {
+			return fmt.Errorf("state: attach task context: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("state: commit attach task context: %w", err)
+	}
+	return nil
+}
