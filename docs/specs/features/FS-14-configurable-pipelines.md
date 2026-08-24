@@ -1,6 +1,6 @@
 # FS-14 — Configurable pipeline runs
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/pipeline`, `internal/config`, `internal/state`, `internal/server`, `internal/messaging`, `internal/cli`, `ui/src/features/pipelines` · **Journeys:** J14
 **Absorbed:** —
 
@@ -20,8 +20,8 @@ free-form agent messaging.
 
 ## 2. Behavior
 
-Requirements explicitly tagged `(planned)` are unshipped; all other requirements reflect the shipped
-product boundaries in §6.
+Every requirement here reflects shipped behavior; the product boundaries deliberately outside it are
+recorded in §6.
 
 ### 2.1 Templates and starting a run
 
@@ -124,7 +124,7 @@ product boundaries in §6.
   and stage association but does not replace those existing surfaces or use display names/group
   labels as identity.
 
-- **R34** `(planned)` — A pipeline run that reaches a terminal state registers its outcome in the
+- **R34** — A pipeline run that reaches a terminal state registers its outcome in the
   shared result layer so other work can depend on it: `success` when it completes with the final
   outcome `success`, `failure` for any other template-defined final outcome, and `cancelled` when it
   was stopped, retaining the raw label for display (FS-16.R13). Template authoring, routing, revisits,

@@ -4075,3 +4075,30 @@ Dependent work can now reserve an agent and capacity atomically before any runti
 **Needs attention:** None.
 
 **Next:** Continue implementation by connecting admitted tasks to the existing launch and resume paths and confirm them as running only after the assignment reaches the live agent.
+
+### 2026-08-24 — Implementation: work that waits for other work and starts itself
+
+You can now describe a piece of work, say what it is waiting for, and AgentDeck starts it when those
+things are done — no agent polls another, waits, or sends a message just to say it finished. Work can
+wait on another piece of work finishing a particular way, on a pipeline run, or on a signal you fire
+by name from outside (a CI result, an approval). AgentDeck either launches a fresh agent with the
+instruction or hands the work to an agent you already have, and it only calls the work "running" once
+the agent really has it. A new Tasks screen shows everything a project is waiting on, and the
+dashboard tells you how many pieces need you.
+
+Finishing is explicit. An agent reports success, failure, or blocked and gets its answer back before
+anything stops it; you can record the result yourself when an agent went away without one. An agent
+that crashes never turns into a "success" — the work is marked interrupted for you to retry or
+resolve. AgentDeck stops only the agents it started for the work and never touches a conversation you
+were already in, restarts pick up exactly where they left off, and a limit you control (ten by
+default) keeps it from bringing up more agents at once than your machine wants.
+
+Two older bugs surfaced and are fixed: starting two agents in the same project at the same moment
+could fail one of them, and one internal delete check could hang.
+
+**Needs attention:** None of this has been run against the real Claude or Codex CLIs yet — it is
+proven against the test adapter, the database, and the interface tests. That live pass is the one
+thing owed before trusting it with real work.
+
+**Next:** Run one real task end to end with a live provider, then decide whether anything about the
+Tasks screen needs to change once you have used it.

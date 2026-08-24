@@ -1,6 +1,6 @@
 # TS-09 — Pipeline control plane
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/pipeline`, `internal/config`, `internal/state`, `internal/server`, `internal/messaging`, `internal/cli`, `ui/src/features/pipelines`
 **Absorbed:** —
 
@@ -215,7 +215,7 @@ any human surface — the discoverability defect the durable record exists to re
 user-facing dismissal action: unapproved proposals are bounded by the same centralized limits module
 (R19), which retains the newest records and prunes older ones at each write.
 
-- **R27** `(planned)` — **The result layer converges with the task domain; the run layer does not.**
+- **R27** — **The result layer converges with the task domain; the run layer does not.**
   The agent-reportable outcome vocabulary, its bounded summary/details/checks limits, and the
   staleness check are defined once and used by both `report_pipeline_stage_result` (R8–R9) and the
   task report tool; duplicating them is a defect under INV §2. The accepting transaction stays

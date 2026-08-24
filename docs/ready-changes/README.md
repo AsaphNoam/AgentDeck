@@ -42,4 +42,4 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-- [Dependency-aware work that starts itself](dependency-aware-armed-agents.md)
+- None.

@@ -1,6 +1,6 @@
 # TS-01 — Architecture
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/server`, `internal/runtime`, `internal/state`, `internal/index`, `internal/bus`, `internal/config`, `internal/configsource`, `internal/messaging`, `internal/contextref`, `internal/pipeline`, `internal/backend`, `internal/archive`, `internal/transcript`, `internal/cli`, `ui/src`
 **Absorbed:** architecture contract from [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md); rationale remains in [`architecture-decisions.md`](../../architecture-decisions.md) D1–D5
 
@@ -292,7 +292,7 @@ make the global direct-share list the assignment-discovery protocol. Terminal wo
 not revoke participant access; reassignment or explicit participant removal is the owning work
 domain's authorization transition.
 
-- **R24** `(planned)` — **`dependency` is the second activation kind, and it declares its own
+- **R24** — **`dependency` is the second activation kind, and it declares its own
   contract.** The activation record gains a nullable stable source work id so a kind may name the
   durable work it belongs to, as R19 and TS-02.R23 anticipated; `mail` leaves it empty and its
   one-pending-row-per-agent index is unchanged. The `dependency` kind sets it to its owning task id,

@@ -1,6 +1,6 @@
 # FS-04 — Configuration & Onboarding
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/config/`, `internal/server/config_handlers.go`, `internal/server/directory_picker.go`, `ui/src/features/settings/`, `ui/src/features/onboarding/` · **Journeys:** J2, J9
 **Absorbed:** [`phase-3-config-onboarding.md`](../../archive/phases/phase-3-config-onboarding.md)
 
@@ -184,7 +184,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
 - **R20.** The Launch step launches the first agent (`POST /api/sessions`, interface `chat`) and, on
   success, sets `onboarding_complete: true` via `PUT /api/config`, then closes the wizard.
 
-- **R43** `(planned)` — Settings expose the install-wide task concurrency budget: how many agent
+- **R43** — Settings expose the install-wide task concurrency budget: how many agent
   runtimes AgentDeck may bring up for dependent work at one time, defaulting to ten (FS-16.R7, R21).
   It is a single positive integer, validated and persisted like every other setting on this screen,
   and it never counts or affects agents a person launches or resumes themselves.
@@ -327,7 +327,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   configuration. — project-form and onboarding component tests plus the project-creation journeys
   in J2 and J9.
 
-- **A23** `(planned)` (R43) — The task concurrency budget round-trips through settings with its
+- **A23** (R43) — The task concurrency budget round-trips through settings with its
   default of ten, rejects a non-positive value without persisting it, and is read back by the
   dispatcher: settings UI and API tests.
 

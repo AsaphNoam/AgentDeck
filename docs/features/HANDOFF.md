@@ -13,12 +13,15 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   `share_context` call that created it on either adapter, and the activation sweep has a fixed batch
   and in-flight bound. The activation/context split itself was confirmed as a deliberate extension of
   existing seams.
-- **Active change:** [Dependency-aware work that starts itself](../ready-changes/dependency-aware-armed-agents.md) — implementation started. It is
-  specified in FS-16 and TS-10 with deltas in FS-02, FS-04, FS-14, TS-01, TS-02, TS-03, TS-04, TS-05,
-  and TS-09. Both design reviews are resolved in the requirements and the retrospective review's
-  findings are closed, so it was cleared to start. Only the durable substrate has landed; see
-  **Active change** below for exactly what and what comes next.
-- **State:** Both design reviews of dependency-aware work are closed — the first round's nine
+- **Active change:** None. Dependency-aware work that starts itself is finished and its change file is
+  removed; FS-16 and TS-10 are Current, as are the FS-02, FS-04, FS-14, TS-01, TS-02, TS-03, TS-05,
+  and TS-09 deltas it carried. TS-04 stays Partial for its two unrelated provider-gate items.
+- **State:** Dependency-aware work is shipped and verified against the fake adapter; a live-provider
+  pass is owed and recorded as a deviation in FS-16 §6 and as an acceptance gate below. Two defects
+  in shipped code were found and fixed on the way: `EnsureProjectResources` failed a second
+  concurrent launch into one project with EEXIST — nothing had launched agents concurrently before —
+  and a task delete refusal read through the store while its own transaction held the single
+  connection. Both design reviews of dependency-aware work are closed — the first round's nine
   Must-fix findings and the re-audit's twelve Must-fix plus two Worth-fixing — and the retrospective
   review's four findings against shipped code are now fixed too, including the two in the activation
   executor this change extends.
@@ -195,70 +198,35 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Active change
 
-**State:** in progress — [Dependency-aware work that starts itself](../ready-changes/dependency-aware-armed-agents.md)
+**State:** none in progress.
 
-**Landed so far:** the durable substrate only, in `internal/state/tasks.go` behind migration 18:
-`tasks`, `task_arms`, `task_attachments`, and `work_results`, plus `activations.source_id` and the
-partial unique index the `dependency` kind keys its pending row on. With it, `CreateTask` (arms
-validated and the reachability walk run inside the insert transaction, so a rejected create mutates
-nothing), `ReadTask`/`ListTasks`, `RegisterWorkResult`/`ReadWorkResult`, and `UpdateTaskCAS`. The
-exclusive-assignee partial index is live, and the tests prove a cycle, a self-arm, an unknown or
-cross-project source, a second active task for one agent, a second result registration for one
-source, a stale-revision writer, and a reopened finished task are all refused.
+Dependency-aware work shipped in full. What it now does, end to end: a durable, project-scoped task
+records an instruction, a target, an explicit outcome, and an AND-conjunction of prerequisites over
+another task's outcome, a pipeline run's registered outcome, or a fired project signal. When the last
+arm is satisfied the host starts the work itself — launching a new agent with the instruction as its
+assignment, or crossing into an existing conversation through the new `dependency` activation kind —
+and the task is `running` only once that assignment is in a confirmed live runtime. Admission takes
+capacity and the exclusive assignee claim in one statement against an install-wide budget (default
+ten, in Settings), and only starts that create or wake a runtime consume a slot. Reporting a result
+commits the terminal state, a durable release intent, and the shared result registration together;
+the stop follows at the reporting turn's end, so the agent always receives its own tool response.
+Recovery resolves every unfinished row from what it durably reserved and never asks whether a
+pre-crash runtime survived. Agents create, read, report, and cancel through four scoped MCP tools
+with server-derived identity; people do the same over HTTP with a Tasks view, and the dashboard shows
+how many tasks need attention.
 
-Arm evaluation is landed on top of it: `EvaluateSource` reads the durable registration rather than
-taking an outcome from its caller, so it cannot disagree with the record and re-running it is a
-no-op — which is what the startup sweep needs. `MarkSourceUnsatisfiable` covers a prerequisite that
-was parked or deleted and so will never register one, and `FireSignal` releases every arm on that
-name in that project. Both promotions are single conditional statements, and parking wins over
-readiness. Fan-in becomes ready exactly once, on the last arm.
+**Owed before this can be called proven in the field:** no live-provider pass. Everything is verified
+against the fake ACP adapter, the durable rows, and the UI tests — the pinned Claude and Codex
+adapters have never been driven through a task start, an assignment turn, or a reported result. That
+deviation is recorded in FS-16 §6.
 
-Half of TS-10.R5 is done: `ChatRuntime.StartActivation` no longer branches on `kind != "mail"` or
-carries mail's prompt and status as literals. Both come from `internal/runtime/activation_kinds.go`,
-a closed registry keyed by kind, and a kind with no row cannot start — it fails loudly rather than
-prompting the model with another kind's instruction, and leaves the turn gate free.
+**Not built, deliberately:** reassignment, participant membership, an agent-facing graph query, and
+time-based or webhook triggers. Each is recorded in FS-16 §6 and TS-10 §5.
 
-The other half of TS-10.R5 and the dispatcher's durable admission are now done too. Kind-agnostic
-activation statements take a kind while mail keeps its unread predicate, pending-row coalescing, and
-recovery policy. `AdmitReadyTask` moves `ready → starting` in one conditional statement that records
-the reservation, takes the exclusive assignee claim, and counts only created/woken runtime claims
-against capacity; contention and a full budget leave the task ready without spending an attempt.
-The install-wide budget now defaults to ten, round-trips through the existing config API and a Tasks
-settings editor, and rejects non-positive writes without changing the saved value.
-
-The dispatcher now runs. `dispatchReadyTasks` admits ready rows serially in admission order and runs
-each start on a bounded worker, so the order is kept while a launch does not hold the pass. A
-launch-spec task mints its agent id and generation, launches through the existing launch seam, sends
-the instruction as its assignment, and only then confirms into `running`. An existing-agent task
-crosses into the conversation through the `dependency` activation kind, whose registry row tells the
-agent to call `get_assigned_task` rather than to check its mail. The two turn-starting halves of the
-mail executor are now shared and kind-parameterized (`runActivationTurn`, `wakeForActivation`) with
-each kind keeping its own claim policy. `get_assigned_task` answers the caller's own assignment —
-instruction plus attached reference ids with per-attachment labels — from the session token alone.
-
-**Next small step:** close the loop, in this order. First `report_task_result`: the shared
-vocabulary, limits, and staleness check called inside a task-owned transaction that commits the
-terminal state with `pending_release` (TS-10.R7, R19), then the turn-end fan-out that releases the
-claim and stops a created or woken runtime after the reporting turn ends (TS-09.R9–R11 already hold
-that boundary for pipelines; convert that one hard-coded consumer into a subscriber fan-out).
-Registering the result must then call `EvaluateSource`, which nothing in `internal/server` calls yet
-— that call is what makes a dependent become ready and the dispatcher start it, and until it exists
-an armed task never runs. `FireSignal` needs the same wiring from its HTTP route.
-
-Still unbuilt after that: recovery (TS-10.R15), an assignee that exits without reporting
-(FS-16.R16), person results, cancel, retry, re-arm, deletion refusal (TS-10.R16), `create_task` and
-`cancel_task`, the HTTP/SSE surface, the Tasks view and its dashboard count, and pipeline-run outcome
-registration (FS-14.R34, TS-09.R27).
-
-**Deliberately not flipped:** every requirement in FS-16 and TS-10 is still `(planned)`. The rows
-exist but no behavior above them is observable yet, and parts of the requirements the substrate
-touches are genuinely unbuilt — TS-10.R16's refusal to delete a task holding a runtime claim or a
-`pending_release`, for instance. Flip each tag when its behavior ships, not when its table does.
-
-Two things the change must still do at the end, from the ready-change file: update FS-15 §6, which
-lists work objects, dependency evaluation, and assignment APIs as deliberately excluded, and flip the
-`(planned)` tags and statuses across FS-02, FS-14, FS-16, TS-01, TS-02, TS-03, TS-04, TS-05, TS-09,
-and TS-10.
+**Worth a reviewer's attention:** the admission pass is woken only by its two-second ticker, not by a
+channel, so a newly ready task starts within one tick (TS-10 §5 records this). `stopStageLocked` is
+now the shared stop core for pipelines and tasks alike and its pipeline-flavoured name no longer
+describes it.
 
 ## Decisions needing your input
 
@@ -278,6 +246,8 @@ an explicit specification update. Remove an item when the human resolves it or q
 - [ ] Run J5 in a real browser to confirm a right-click anywhere on the projects canvas — including
   the padding frame below and beside the cards — opens **New project** (FS-02.A24); the stylesheet
   assertion stands in until then.
+- [ ] Run a task start, an assignment turn, and a reported result against the pinned Claude and Codex
+      adapters before claiming dependent work works with real providers (FS-16 §6).
 - [ ] Run the Phase 7 federation discovery/precedence/refresh/launch/resume matrix against real Claude and
   Codex installations before promoting FS-08/TS-07 from Partial.
 
@@ -367,6 +337,19 @@ in the requirements before implementation, and the change has since shipped; the
 lives in FS-15, TS-01.R22–R23, TS-02.R24, TS-04.R28, TS-05.R16 and in Git history.
 
 ## Recent changelog
+
+- 2026-08-24 — Dependency-aware work shipped end to end: durable tasks with prerequisite arms and
+  explicit outcomes, a dispatcher that admits ready work against an install-wide runtime budget and
+  starts it by launching an agent or activating an existing conversation, the `dependency` activation
+  kind with its own instruction, result reporting released at the reporting turn's end, restart
+  recovery that resolves every unfinished row from what it reserved, person-recorded results, retry
+  and re-arm as distinct repairs, deletion refused while a task owns a runtime, four scoped MCP tools
+  with server-derived identity, the HTTP/SSE surface, a Tasks view, and a dashboard attention count.
+  Pipeline runs now register their terminal outcome in the same commit that makes them terminal, so a
+  run can be a prerequisite. FS-16 and TS-10 are Current along with every delta they carried. Two
+  shipped-code defects were found and fixed on the way — the project-resources creation race and a
+  single-connection deadlock in the delete refusal path. Both Go test variants, focused `-race` runs,
+  all 248 UI tests, presentation and style checks, and `make dist` pass. No live-provider pass.
 
 - 2026-08-24 — Dependent work now starts itself. The dispatcher admits ready tasks against the
   budget and in admission order, then either launches a new agent with the task instruction as its

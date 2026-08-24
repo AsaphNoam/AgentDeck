@@ -317,7 +317,7 @@ has not passed the real-provider compatibility gate. A later resource template m
 same token authorization and read service; it cannot become a second context authority or expose a
 global resource list.
 
-- **R29** `(planned)` — The existing `/mcp` server adds `create_task`, `get_assigned_task`,
+- **R29** — The existing `/mcp` server adds `create_task`, `get_assigned_task`,
   `report_task_result`, and `cancel_task`. All derive caller identity, task ownership, and assignment
   from the per-launch token under R6–R7, return bounded structured JSON with stable outcome codes, and
   take cursor and size bounds from the shared limits module, as R17 and R28 established for the

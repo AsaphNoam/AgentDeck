@@ -1,6 +1,6 @@
 # TS-10 — Work dependency control plane
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/state`, `internal/server`, `internal/messaging`, `ui/src/features/tasks`
 **Absorbed:** —
 
@@ -18,24 +18,22 @@ identity, canonicalization, and bounded reads (TS-05.R16 and the context service
 resume, stop, and archive mechanics (TS-01). This specification consumes those seams and adds no
 parallel copy of them.
 
-Every requirement is `(planned)`; none has shipped.
-
 ## 2. Design & constraints
 
-- **R1** `(planned)` — **One in-process authority, no second scheduler.** Arm evaluation and start
+- **R1** — **One in-process authority, no second scheduler.** Arm evaluation and start
   scheduling run inside the existing server process alongside the activation executor and the pipeline
   reconciler. There is no second daemon, embedded scheduler database, message broker, external queue,
   or self-HTTP call, matching TS-01.R5 and TS-09.R1. `internal/state` remains the sole writer of
   `state.db` (TS-02.R2).
-- **R2** `(planned)` — **Durable rows are authoritative; the bus is a fast path.** Arm satisfaction,
+- **R2** — **Durable rows are authoritative; the bus is a fast path.** Arm satisfaction,
   task state, and start confirmation are decided only from committed rows. The in-process bus and the
   activation channel are latency hints that may be dropped without changing any outcome, exactly as
   FS-06.R9 treats the mail fast path. A dropped notification costs latency, never correctness.
-- **R3** `(planned)` — **Evaluation is event-driven with a bounded startup sweep.** A committed result
+- **R3** — **Evaluation is event-driven with a bounded startup sweep.** A committed result
   registration (R7) or signal fire re-evaluates only the arms that name that source. Startup performs
   one bounded sweep over unfinished tasks. There is no unbounded polling loop and no periodic full
   graph walk.
-- **R4** `(planned)` — **Starting is a claim, an effect, and then a confirmation — three steps, not
+- **R4** — **Starting is a claim, an effect, and then a confirmation — three steps, not
   two.** `armed → ready` and `ready → starting` are single-statement conditional updates that decide
   availability and take the claim together, following the `ClaimMailActivation` pattern. The
   `ready → starting` statement also takes the exclusive assignment claim for the target agent, so
@@ -52,7 +50,7 @@ Every requirement is `(planned)`; none has shipped.
   and a crash between commit and effect leaves a `starting` row naming exactly what to reap and
   retry rather than a `running` row that is not running. Confirmation is only meaningful inside the
   process that owns the runtime; it is never re-derived after a restart (R15).
-- **R17** `(planned)` — **Capacity is granted by a dispatcher, not by the arm evaluator.** Arm
+- **R17** — **Capacity is granted by a dispatcher, not by the arm evaluator.** Arm
   evaluation decides readiness only. A separate bounded admission step grants capacity to ready tasks
   in the order they became ready, up to the configurable install-wide budget (FS-16.R7, R21), and only
   starts that will create or wake a runtime consume a slot. A slot is held by the task's runtime claim
@@ -62,7 +60,7 @@ Every requirement is `(planned)`; none has shipped.
   failed attempt (FS-16.R25), so contention cannot exhaust work. Slot accounting is derived from
   committed runtime claims and recomputed at startup, never held only in memory (INV §9), so it cannot
   drift into a permanent deadlock after a crash.
-- **R5** `(planned)` — **The `dependency` activation kind declares its own contract.** The existing
+- **R5** — **The `dependency` activation kind declares its own contract.** The existing
   activation record (TS-01.R19, TS-02.R23) gains a nullable stable source work id, which the
   `dependency` kind sets to its owning task id and `mail` leaves empty. Its uniqueness key is one
   pending row per `(agent_id, source_id)`, not mail's one-pending-row-per-agent. Its retry policy is
@@ -77,7 +75,7 @@ Every requirement is `(planned)`; none has shipped.
   kind-parameterized, and the per-kind instruction and status detail come from one code-owned table
   rather than a literal at the call site, so a third kind adds a row instead of a branch (INV §2) and
   no kind can inherit another's instruction by accident (FS-16.R26).
-- **R6** `(planned)` — **Starting reuses the existing launch, resume, and stop seams.** A launch-spec
+- **R6** — **Starting reuses the existing launch, resume, and stop seams.** A launch-spec
   task composes its launch through the existing launch composition helpers, and an existing-agent task
   resumes through the single resume seam that explicit resume and mail wake already use. Finishing a
   task always releases its runtime claim and its slot, and stops the agent through the shared stop
@@ -87,7 +85,7 @@ Every requirement is `(planned)`; none has shipped.
   per-agent lifecycle claim (TS-01.R16) rather than inventing a second one, and reimplements no
   identity, permission, credential, environment, MCP registration, transcript, or cleanup logic
   (INV §2, TS-09.R6).
-- **R7** `(planned)` — **The shared result code is the vocabulary and validation, not one transaction.**
+- **R7** — **The shared result code is the vocabulary and validation, not one transaction.**
   The agent-reportable vocabulary (`success`, `failure`, `blocked`), its bounded summary, details, and
   checks limits, and the staleness check that a caller still owns the work it is reporting on are
   defined once and used by both the task report tool and `report_pipeline_stage_result` (TS-09.R8–R9);
@@ -98,24 +96,24 @@ Every requirement is `(planned)`; none has shipped.
   inside it. Registering a normalized outcome in the shared result layer happens in whichever
   transaction commits that domain's terminal state — for a task its result, for a pipeline its run
   reaching a terminal state, which is a later and separate event from a stage report.
-- **R8** `(planned)` — **The shared result layer is a small keyed registration, not a second history.**
+- **R8** — **The shared result layer is a small keyed registration, not a second history.**
   A registration records the source kind (`task` or `pipeline_run`), the source id, the normalized
   outcome (FS-16.R3, R13), the raw template-defined label where one exists, and a bounded summary. It
   is unique per source and immutable once written. Arm evaluation reads only this layer, so the
   scheduler never reaches into pipeline internals and pipelines gain no dependency on the scheduler.
-- **R9** `(planned)` — **Acyclicity is enforced inside the write transaction.** The reachability check
+- **R9** — **Acyclicity is enforced inside the write transaction.** The reachability check
   that rejects a cycle runs in the same transaction that inserts or replaces a task's arms, so two
   concurrent writers cannot interleave into a cycle. A rejected write mutates nothing (FS-16.R15).
-- **R10** `(planned)` — **Task state advances monotonically under compare-and-set.** Every task row
+- **R10** — **Task state advances monotonically under compare-and-set.** Every task row
   carries a revision that only increases. Mutations are compare-and-set against the observed revision,
   an accepted outcome is immutable, and recovery may resume a pending transition but never rewrites
   history or reopens a finished task, following TS-09.R20.
-- **R11** `(planned)` — **Publication follows the commit.** A `task_update` SSE event is published only
+- **R11** — **Publication follows the commit.** A `task_update` SSE event is published only
   after its authoritative commit (TS-03.R8, TS-01.R8). Its bounded payload carries the task id, the
   monotonic revision, the state, the outcome, and the attention reason; clients ignore stale revisions
   and refetch detail over REST. Reconnect hydrates the Tasks view through REST rather than replaying
   an event log, following TS-03.R17.
-- **R12** `(planned)` — **Attachment authorization delegates to the context service.** A task
+- **R12** — **Attachment authorization delegates to the context service.** A task
   attachment stores only the task id, the canonical reference id, and its bounded label and
   description. Task ids, assignees, arm state, and task state never enter reference identity, never
   synthesize a direct grant, and never appear in the global direct-share list (TS-01.R23, FS-15.R1).
@@ -127,7 +125,7 @@ Every requirement is `(planned)`; none has shipped.
   destroys and rebuilds the registration while leaving membership untouched, so a resumed assignee
   reads exactly what it could read before, and a finished task keeps its route until the task is
   deleted. Teardown must never be written against membership.
-- **R13** `(planned)` — **Tools extend the one MCP authority.** The task tools register on the existing
+- **R13** — **Tools extend the one MCP authority.** The task tools register on the existing
   `/mcp` server with the existing per-launch scoped token and generation-scoped teardown (TS-04.R6–R7,
   TS-04.R17). Caller identity, target task ownership, and assignment are all server-derived; no tool
   argument names another agent's task, a filesystem path, or a raw SQLite key (TS-05.R14, R16). A
@@ -136,11 +134,11 @@ Every requirement is `(planned)`; none has shipped.
   uses (FS-06, FS-16.R12) — never a raw agent id, and never a selector naming a transcript, a
   generation, a path, or a key. Tools return bounded structured JSON with stable outcome codes, and cursor and
   size bounds come from one shared limits module, following TS-04.R28. There is no second MCP server.
-- **R14** `(planned)` — **HTTP follows the shared envelope and route discipline.** New routes return
+- **R14** — **HTTP follows the shared envelope and route discipline.** New routes return
   the shared `{"error":{"code","message","details"}}` envelope (TS-03.R3), serialize empty collections
   as `[]` (TS-03.R6), and are added to the TS-03 route inventory in the same completed change
   (TS-03.R5).
-- **R15** `(planned)` — **Startup recovery ends runtimes rather than adopting them, and failing it is
+- **R15** — **Startup recovery ends runtimes rather than adopting them, and failing it is
   fatal to startup.** The runtime registry is in-process and starts empty, and stale reconciliation
   deliberately leaves a still-live agent process as an unadopted orphan rather than re-adopting it
   (FS-01.R20–R21, `internal/runtime/registry.go`, `internal/runtime/reconcile.go`). There is also no
@@ -156,7 +154,7 @@ Every requirement is `(planned)`; none has shipped.
   claims; and releases claims that no live work owns. A per-task failure is isolated and parks that
   task rather than aborting the sweep (INV §7). Recovery failing as a whole is fatal to startup for
   the same reason it is for mail activations (TS-01.R20).
-- **R16** `(planned)` — **Storage is forward-only and does not cascade across domains.** Task, arm,
+- **R16** — **Storage is forward-only and does not cascade across domains.** Task, arm,
   attachment, and result rows arrive in one forward-only migration recorded in `schema_migrations`
   (TS-02.R6). Arms and attachments cascade from their task. Agent ids, pipeline run ids, and context
   reference ids are logical references without cascades, so deleting an agent, a pipeline run, or a
@@ -165,7 +163,7 @@ Every requirement is `(planned)`; none has shipped.
   Deletion of a task is refused in the same statement that checks it whenever the task still holds a
   runtime claim or a `pending_release`, so the cascade can never remove the only record of a live
   runtime or an unfinished release (INV §4, INV §15).
-- **R21** `(planned)` — **A deleted pipeline run needs no dependency fan-out, because its result
+- **R21** — **A deleted pipeline run needs no dependency fan-out, because its result
   already outlived it.** The shipped delete path refuses any run that is not `completed` or `stopped`
   (`ErrPipelineActive`, `internal/state/pipelines.go`), and a run reaching either state registers its
   normalized outcome in the same transaction that commits it (TS-09.R27, FS-14.R34). Every deletable
@@ -175,13 +173,13 @@ Every requirement is `(planned)`; none has shipped.
   away. No hook into the pipeline delete path is added, and none is needed: an arm cannot be left
   waiting on a run that no longer exists. Acceptance proves this rather than assuming it (FS-16.A14).
 
-- **R18** `(planned)` — **Exclusive assignment is a durable index, not a scheduling accident.** A
+- **R18** — **Exclusive assignment is a durable index, not a scheduling accident.** A
   partial unique index over `assigned_agent_id` for tasks in `starting` or `running` makes
   FS-16.R2's one-active-task-per-agent promise a database guarantee. The exclusive per-agent lifecycle
   claim (TS-01.R16) serializes start effects but is released after each transition, so it cannot
   provide this on its own, and the `dependency` activation key `(agent_id, source_id)` deliberately
   permits one row per task. Losing the assignment claim leaves the task `ready`, not failed.
-- **R19** `(planned)` — **Every terminal path commits a durable release intent before its stop.**
+- **R19** — **Every terminal path commits a durable release intent before its stop.**
   An agent-reported result, a person-recorded result, and a cancel each commit the terminal task state
   and `pending_release` in one transaction while still holding the runtime claim and slot. The stop is
   the effect that follows, never part of the same transaction, because stopping a process cannot be
@@ -198,7 +196,7 @@ Every requirement is `(planned)`; none has shipped.
   standing intent immediately releases. The shipped turn-end dispatch invokes exactly one hard-coded
   consumer (`internal/server`), so this change converts that call site into a generation-scoped
   subscriber fan-out shared by pipelines and tasks rather than adding a second dispatch path (INV §2).
-- **R20** `(planned)` — **Creator provenance is server-derived and durable.** Each task records the
+- **R20** — **Creator provenance is server-derived and durable.** Each task records the
   creator kind, and for an agent creator the stable `agent_id` resolved from the caller's token at
   creation, plus the launch generation as provenance only. Cancel authority for an agent compares the
   stable id, so a stopped-and-resumed agent retains it and a new generation is not a new principal;
@@ -273,7 +271,10 @@ unauthorized task and an unknown task are indistinguishable.
 
 ## 5. Deviations & open decisions
 
-- Nothing in this specification has shipped.
+- **The dispatcher's notification path is the ticker.** Arm evaluation runs on the committing event,
+  but the admission pass itself is woken only by its two-second sweep rather than by a channel, so a
+  newly ready task starts within one tick. Durable rows are the authority either way (R2), and a
+  channel is a latency change, not a correctness one.
 - **Pipelines converge only at the result layer.** Absorbing pipeline runs into tasks would require
   this plane to grow revisit and back-edge semantics, because a pipeline run is a cyclic walk over a
   frozen template with one active agent, while a task graph is acyclic with real fan-out. R7 and R8
@@ -291,9 +292,11 @@ unauthorized task and an unknown task are indistinguishable.
 
 ## 6. Traceability
 
-Anchors (planned): task, arm, attachment, and result rows plus their forward-only migration in
-`internal/state`; arm evaluation and start scheduling beside the existing activation executor in
-`internal/server`; the `dependency` activation kind on the shared activation primitive; the shared
+Anchors: `internal/state/tasks.go` (rows, migration 18, admission, settlement, evaluation),
+`internal/state/work_report.go` (the shared vocabulary, limits, and staleness check),
+`internal/server/task_dispatcher.go` (admission, starting, turn-end release, recovery),
+`internal/server/task_handlers.go` (HTTP and the agent-facing control plane),
+`internal/state/pipelines.go` (`registerPipelineRunOutcomeTx`), the `dependency` activation kind on the shared activation primitive; the shared
 result-acceptance path with `internal/pipeline`; scoped tools on the existing MCP server in
 `internal/messaging`; attached-reference reads through `internal/contextref`; the Tasks view in
 `ui/src/features/tasks`.

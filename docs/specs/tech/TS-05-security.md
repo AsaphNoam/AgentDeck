@@ -1,6 +1,6 @@
 # TS-05 — Security & trust boundaries
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/server`, `internal/config`, `internal/configsource`, `internal/runtime`, `internal/messaging`, `internal/backend`, `internal/contextref`
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md), the [phase archive manifest](../../archive/phases/README.md), and [`INVARIANTS.md`](../../features/INVARIANTS.md) §14
 
@@ -107,7 +107,7 @@ the only revocation transitions. This avoids additional management and timer wir
 be reconsidered if AgentDeck gains a multi-user trust boundary or evidence shows accidental
 sensitive-context sharing is a practical problem.
 
-- **R17** `(planned)` — Every task MCP operation first resolves the existing per-launch token to
+- **R17** — Every task MCP operation first resolves the existing per-launch token to
   caller plus generation, exactly as R14 and R16 require for pipeline and context operations. A caller
   may report a result only for the task it is currently assigned to and cancel only a task whose
   durably recorded creator is that same stable agent id (TS-10.R20); a task id, assignee, creator,

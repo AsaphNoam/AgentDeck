@@ -1,6 +1,6 @@
 # TS-03 — HTTP, SSE & WebSocket API
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/server`, `ui/src/api`
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) API sections and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -40,6 +40,7 @@ delta; clients must not assume every existing endpoint already uses R3.
 | Archive/tracking | `GET /api/archive`, `GET /api/archive/projects/{project}`, session files/commands/messages |
 | Composer autocomplete | session-scoped file search and available-command snapshot reads |
 | Coordination | `POST /api/groups/{group}/release`, `/mcp` GET/POST/DELETE |
+| Dependent work | `GET/POST /api/tasks`, `GET/DELETE /api/tasks/{id}`, task `cancel`/`result`/`retry`/`rearm`; `POST /api/signals` |
 | Federation | config-source list, preview, bind, refresh, delete |
 | Producers/terminal | `POST /api/hook`, terminal WebSocket |
 
@@ -55,7 +56,8 @@ boundary lets the client prune absent agents. Periodic `ping` supports liveness;
 new hydration generation.
 
 **R8 — SSE event types are versioned by payload contract.** Current types include `state_update`,
-`new_message`, `notification`, `config_source_update`, `hydrated`, and `ping`. Unknown event types
+`new_message`, `notification`, `config_source_update`, `pipeline_update`, `task_update`, `hydrated`,
+and `ping`. Unknown event types
 are ignored by clients. Producers publish only after authoritative state is committed.
 
 **R9 — Slow subscribers cannot block the server.** Bus/subscription buffers are bounded; overflow
@@ -272,7 +274,7 @@ surfaces it and permits a retry. A successful `200` retains its ordered
 `{group,stopped:[{agent_id,ok,error?}]}` result and has claimed every member for the complete
 stop-and-registration-cleanup operation.
 
-- **R28** `(planned)` — The route inventory gains task creation, listing, and detail; cancel, retry,
+- **R28** — The route inventory gains task creation, listing, and detail; cancel, retry,
   re-arm, and delete; a person-recorded task result (FS-16.R22); a project-scoped signal fire; and the
   task concurrency budget on the existing settings surface (FS-04.R43). All use the shared error envelope (R3) and
   serialize empty collections as `[]` (R6). `task_update` joins the versioned SSE vocabulary and is

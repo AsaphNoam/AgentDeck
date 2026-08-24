@@ -1,6 +1,6 @@
 # TS-02 — Data & persistence
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/config`, `internal/state`, `internal/transcript`, `internal/index`, `internal/archive`, `internal/configsource`, `internal/contextref`
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -290,7 +290,7 @@ grant row; hiding changes only the preference row. Every
 mutation matches the caller-derived grantor/recipient identity as applicable, and multi-row
 canonicalize-plus-grant operations are atomic (INV §5/§15). No backfill is needed.
 
-- **R25** `(planned)` — One forward-only migration adds the durable task domain: `tasks`,
+- **R25** — One forward-only migration adds the durable task domain: `tasks`,
   `task_arms`, `task_attachments`, and a `work_results` registration unique per source, plus a
   nullable `source_id` on `activations` with a partial unique index for the `dependency` kind, which is
   the kind-specific uniqueness key R23 requires before a second kind is valid. Arms and attachments
