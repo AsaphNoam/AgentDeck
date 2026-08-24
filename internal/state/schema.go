@@ -347,4 +347,13 @@ ALTER TABLE pipeline_proposals ADD COLUMN consumed_at TEXT NOT NULL DEFAULT '';
 		version: 17,
 		apply:   migrateContextLinks,
 	},
+	{
+		// Dependency-aware work (TS-10.R16). Tasks, arms, attachments, and the
+		// shared result layer arrive together, plus the activation source id the
+		// dependency kind keys its pending row on. Agent, pipeline-run, and
+		// context-reference ids stay logical references without cascades, so this
+		// plane can never delete work history or reach into another domain.
+		version: 18,
+		apply:   migrateTasks,
+	},
 }

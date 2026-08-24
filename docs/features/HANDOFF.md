@@ -13,16 +13,15 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   `share_context` call that created it on either adapter, and the activation sweep has a fixed batch
   and in-flight bound. The activation/context split itself was confirmed as a deliberate extension of
   existing seams.
-- **Ready change:** [Dependency-aware work that starts itself](../ready-changes/dependency-aware-armed-agents.md) is waiting to start. It is specified
-  in FS-16 and TS-10 with deltas in FS-02, FS-04, FS-14, TS-01, TS-02, TS-03, TS-04, TS-05, and
-  TS-09; every requirement is `(planned)` and no product code has changed. Both design reviews are
-  resolved in the requirements and the retrospective review's findings are closed, so it is ready to
-  implement.
-- **Active change:** None.
-- **State:** Dependency-aware work is designed and waiting; nothing about it is implemented. Both
-  design reviews of it are closed — the first round's nine Must-fix findings and the re-audit's
-  twelve Must-fix plus two Worth-fixing — and the retrospective review's four findings against
-  shipped code are now fixed too, including the two in the activation executor this change extends.
+- **Active change:** [Dependency-aware work that starts itself](../ready-changes/dependency-aware-armed-agents.md) — implementation started. It is
+  specified in FS-16 and TS-10 with deltas in FS-02, FS-04, FS-14, TS-01, TS-02, TS-03, TS-04, TS-05,
+  and TS-09. Both design reviews are resolved in the requirements and the retrospective review's
+  findings are closed, so it was cleared to start. Only the durable substrate has landed; see
+  **Active change** below for exactly what and what comes next.
+- **State:** Both design reviews of dependency-aware work are closed — the first round's nine
+  Must-fix findings and the re-audit's twelve Must-fix plus two Worth-fixing — and the retrospective
+  review's four findings against shipped code are now fixed too, including the two in the activation
+  executor this change extends.
   Pull-based context links shipped and the review findings against them are fixed. Turn
   selection is now honest at both ends: `latest_completed_turn` resolves only from inside a later
   turn started for an independent reason, and a session or backend-switch marker closes a turn a
@@ -196,9 +195,31 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Active change
 
-**State:** none
+**State:** in progress — [Dependency-aware work that starts itself](../ready-changes/dependency-aware-armed-agents.md)
 
-No implementation change is active. Do not select a waiting change without the human naming it.
+**Landed so far:** the durable substrate only, in `internal/state/tasks.go` behind migration 18:
+`tasks`, `task_arms`, `task_attachments`, and `work_results`, plus `activations.source_id` and the
+partial unique index the `dependency` kind keys its pending row on. With it, `CreateTask` (arms
+validated and the reachability walk run inside the insert transaction, so a rejected create mutates
+nothing), `ReadTask`/`ListTasks`, `RegisterWorkResult`/`ReadWorkResult`, and `UpdateTaskCAS`. The
+exclusive-assignee partial index is live, and the tests prove a cycle, a self-arm, an unknown or
+cross-project source, a second active task for one agent, a second result registration for one
+source, a stale-revision writer, and a reopened finished task are all refused.
+
+**Next small step:** arm evaluation — satisfy or make unsatisfiable the arms naming a source when its
+result registers or its signal fires, and move the owning task `armed → ready` or
+`armed`/`ready` → `dependency_failed`, as single-statement conditional updates (TS-10.R3, R4;
+FS-16.R5, R8, R9). It needs no runtime, so it is the next piece that is complete on its own.
+
+**Deliberately not flipped:** every requirement in FS-16 and TS-10 is still `(planned)`. The rows
+exist but no behavior above them is observable yet, and parts of the requirements the substrate
+touches are genuinely unbuilt — TS-10.R16's refusal to delete a task holding a runtime claim or a
+`pending_release`, for instance. Flip each tag when its behavior ships, not when its table does.
+
+Two things the change must still do at the end, from the ready-change file: update FS-15 §6, which
+lists work objects, dependency evaluation, and assignment APIs as deliberately excluded, and flip the
+`(planned)` tags and statuses across FS-02, FS-14, FS-16, TS-01, TS-02, TS-03, TS-04, TS-05, TS-09,
+and TS-10.
 
 ## Decisions needing your input
 
@@ -308,6 +329,15 @@ lives in FS-15, TS-01.R22–R23, TS-02.R24, TS-04.R28, TS-05.R16 and in Git hist
 
 ## Recent changelog
 
+- 2026-08-24 — Started dependency-aware work with its durable substrate: migration 18 and
+  `internal/state/tasks.go`. The graph checks that matter run inside the insert transaction rather
+  than beside it — a reachability walk over task arms, the self-reference, and the unknown or
+  cross-project source — because a check outside it lets two writers each see an acyclic graph and
+  commit the edge that closes the loop. Exclusive assignment is a partial unique index over
+  `assigned_agent_id` for `starting`/`running` rather than a scheduling rule, since the exclusive
+  lifecycle claim is released after each transition and cannot hold it. `work_results` is keyed per
+  source and immutable, so no arm can be re-decided, and it holds no foreign key into the domain that
+  produced it. Nothing above the rows is built and no `(planned)` tag moved.
 - 2026-08-24 — Closed the retrospective review's last two findings (INV §1/§2, §9). A `current_turn`
   span no longer ends on a tool invocation, so the `share_context` call that creates it cannot be
   inside it: Claude writes that MCP `tool_call` record before invoking the tool and Codex writes it
