@@ -412,3 +412,14 @@ WHERE activation_id = ? AND kind = ? AND state = ?`,
 func (s *Store) ReleaseActivation(kind, activationID, token string) error {
 	return releaseActivationTx(s.db, kind, activationID, token)
 }
+
+// DiscardDependencyActivations removes every dependency activation at startup.
+// One belongs to an in-flight start attempt and nothing else, and recovery
+// resolves every start attempt from the task rows, so none can legitimately
+// survive a restart. The next attempt creates its own (TS-10.R5, R15).
+func (s *Store) DiscardDependencyActivations() error {
+	if _, err := s.db.Exec(`DELETE FROM activations WHERE kind = ?`, ActivationKindDependency); err != nil {
+		return fmt.Errorf("state: discard dependency activations: %w", err)
+	}
+	return nil
+}

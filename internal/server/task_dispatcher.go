@@ -362,3 +362,115 @@ func (s *Server) evaluateTaskResult(taskID string) {
 		s.log.Debug("evaluate task result failed", "task", taskID, "err", err)
 	}
 }
+
+// recoverTasks is the one bounded startup sweep over dependent work. It never
+// asks whether a pre-crash runtime survived, because the registry starts empty
+// and stale reconciliation deliberately never re-adopts a live process, so that
+// question is unanswerable by construction. Every `starting` row is resolved from
+// what it durably reserved instead (TS-10.R15, FS-16.R17).
+//
+// Failing as a whole is fatal to startup for the same reason it is for mail
+// activations: a task left `starting` is invisible to the dispatcher, which only
+// ever lists ready rows, so its work would never run again. A single task's
+// failure is isolated and does not abort the sweep (INV §7).
+func (s *Server) recoverTasks(ctx context.Context) error {
+	if err := s.stateStore.DiscardDependencyActivations(); err != nil {
+		return err
+	}
+	awaiting, err := s.stateStore.TasksAwaitingRelease()
+	if err != nil {
+		return err
+	}
+	for _, task := range awaiting {
+		s.finishInterruptedRelease(ctx, task)
+	}
+	unfinished, err := s.stateStore.TasksInStates(state.TaskStarting, state.TaskRunning)
+	if err != nil {
+		return err
+	}
+	for _, task := range unfinished {
+		if task.State == state.TaskRunning {
+			// Its agent is an unowned orphan now, which the ordinary reconciliation
+			// sweep reaps. Nothing is resumed on a guess and no outcome is invented.
+			s.interruptTask(task, "the server restarted while this task was running")
+			continue
+		}
+		s.recoverStartAttempt(ctx, task)
+	}
+	// Arms may have been satisfied by a result committed just before the crash.
+	// Re-evaluating is a no-op when nothing changed, because evaluation reads the
+	// durable registration rather than an event.
+	armed, err := s.stateStore.TasksInStates(state.TaskArmed)
+	if err != nil {
+		return err
+	}
+	for _, task := range armed {
+		for _, arm := range task.Arms {
+			if arm.Kind != state.ArmWorkResult || arm.State != state.ArmUnsatisfied {
+				continue
+			}
+			if _, err := s.stateStore.EvaluateSource(arm.SourceKind, arm.SourceID); err != nil {
+				s.log.Warn("task recovery re-evaluation failed", "task", task.TaskID, "err", err)
+			}
+		}
+	}
+	return nil
+}
+
+// recoverStartAttempt resolves one interrupted start by the runtime claim it
+// reserved. A runtime this attempt would have created or woken is reaped and the
+// task is started once more within its attempt limit; a runtime it merely
+// borrowed is never touched, because it belongs to someone else and this
+// feature's promise does not lapse because AgentDeck restarted. That task becomes
+// interrupted, since whether the assignment reached that conversation cannot be
+// known and delivering it twice is worse than asking a person (FS-16.R4, R17).
+func (s *Server) recoverStartAttempt(ctx context.Context, task state.Task) {
+	if task.RuntimeClaim == state.ClaimBorrowed {
+		s.interruptTask(task, "the server restarted while this task was starting in an existing conversation")
+		return
+	}
+	if task.AssignedAgentID != "" {
+		if err := s.StopStage(ctx, task.AssignedAgentID); err != nil {
+			s.log.Warn("reap interrupted task runtime failed", "task", task.TaskID, "err", err)
+		}
+	}
+	if _, _, err := s.stateStore.FailTaskStart(task.TaskID, task.StartAttemptID,
+		"the server restarted during this start attempt"); err != nil {
+		s.log.Warn("recover start attempt failed", "task", task.TaskID, "err", err)
+	}
+}
+
+// finishInterruptedRelease completes a stop and release a reporting turn never
+// finished, so a recorded result can never leave a task-owned runtime up with
+// nothing owning it (TS-10.R19, INV §15).
+func (s *Server) finishInterruptedRelease(ctx context.Context, task state.Task) {
+	if task.RuntimeClaim == state.ClaimCreated || task.RuntimeClaim == state.ClaimWoke {
+		if err := s.StopStage(ctx, task.AssignedAgentID); err != nil {
+			s.log.Warn("finish interrupted task release failed", "task", task.TaskID, "err", err)
+			return
+		}
+	}
+	if err := s.stateStore.CompleteTaskRelease(task.TaskID); err != nil {
+		s.log.Warn("complete interrupted task release failed", "task", task.TaskID, "err", err)
+	}
+}
+
+func (s *Server) interruptTask(task state.Task, reason string) {
+	if _, _, err := s.stateStore.InterruptTask(task.TaskID, reason); err != nil {
+		s.log.Warn("interrupt task failed", "task", task.TaskID, "err", err)
+	}
+}
+
+// interruptTaskOnExit is the runtime-exit half of FS-16.R16: an assignee that
+// goes away before recording a result leaves its task interrupted, needing
+// attention, with its claim and slot released — never converted into a result.
+// A task that already recorded one is untouched, which is what makes the stop
+// that follows a report safe.
+func (s *Server) interruptTaskOnExit(agentID, generation, cause string) {
+	if _, ok, err := s.stateStore.InterruptTaskForAgent(agentID, generation,
+		"the assigned agent went away before recording a result: "+cause); err != nil {
+		s.log.Warn("interrupt task on agent exit", "agent_id", agentID, "err", err)
+	} else if ok {
+		s.log.Info("task interrupted by agent exit", "agent_id", agentID, "cause", cause)
+	}
+}

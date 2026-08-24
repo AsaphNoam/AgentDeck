@@ -540,3 +540,115 @@ func TestAnUnsatisfyingResultParksTheDependent(t *testing.T) {
 		t.Fatalf("a parked task started on its own: %+v, %v", again, err)
 	}
 }
+
+// FS-16.R16 — an assignee that goes away before recording a result leaves its
+// task interrupted and needing attention, with its claim released. AgentDeck
+// never converts a process event into success or failure.
+func TestAnAgentThatGoesAwayLeavesItsTaskInterrupted(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	task := newLaunchTask(t, srv, "long job")
+	srv.dispatchReadyTasks(context.Background())
+	running := waitTaskState(t, srv, task.TaskID, state.TaskRunning)
+
+	if resp, body := post(t, ts.URL+"/api/sessions/"+running.AssignedAgentID+"/stop", nil); resp.StatusCode != 200 {
+		t.Fatalf("stop status = %d: %s", resp.StatusCode, body)
+	}
+	interrupted := waitTaskState(t, srv, task.TaskID, state.TaskInterrupted)
+	if interrupted.Outcome != "" {
+		t.Fatalf("an agent going away recorded outcome %q", interrupted.Outcome)
+	}
+	if interrupted.AttentionReason == "" {
+		t.Fatal("an interrupted task does not say why its agent went away")
+	}
+	if interrupted.RuntimeClaim != "" {
+		t.Fatalf("an interrupted task still holds a runtime claim: %+v", interrupted)
+	}
+	if interrupted.AssignedAgentID != running.AssignedAgentID {
+		t.Fatalf("assignee provenance = %q, want it retained", interrupted.AssignedAgentID)
+	}
+}
+
+// FS-16.R17 / TS-10.R15 — a restart resolves every unfinished task from its own
+// durable row, never by asking whether a pre-crash runtime survived. A start that
+// would have created a runtime is reaped and retried within its limit; one that
+// merely borrowed a live conversation never touches it and becomes interrupted;
+// a running task becomes interrupted; and a release a reporting turn never
+// finished is completed.
+func TestRestartResolvesUnfinishedTasksFromTheirOwnRows(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	borrowedRunning := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+	borrowedStarting := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+
+	// A running task on a conversation it borrowed.
+	runningTask := newAgentTask(t, srv, borrowedRunning, "running")
+	srv.dispatchReadyTasks(context.Background())
+	waitTaskState(t, srv, runningTask.TaskID, state.TaskRunning)
+
+	// A start attempt that had reserved a borrowed runtime and crashed before any
+	// effect, and one that would have created its own.
+	startingBorrowed := newAgentTask(t, srv, borrowedStarting, "starting borrowed")
+	if _, ok, err := srv.stateStore.AdmitReadyTask(startingBorrowed.TaskID,
+		state.TaskReservation{AttemptID: "ta_borrow", AgentID: borrowedStarting,
+			Generation: "g_borrow", Claim: state.ClaimBorrowed}, 10); err != nil || !ok {
+		t.Fatalf("admit borrowed start: %v, %v", ok, err)
+	}
+	startingCreated := newLaunchTask(t, srv, "starting created")
+	if _, ok, err := srv.stateStore.AdmitReadyTask(startingCreated.TaskID,
+		state.TaskReservation{AttemptID: "ta_ghost", AgentID: "a_ghost",
+			Generation: "g_ghost", Claim: state.ClaimCreated}, 10); err != nil || !ok {
+		t.Fatalf("admit created start: %v, %v", ok, err)
+	}
+
+	// A recorded result whose stop never happened.
+	reported := newLaunchTask(t, srv, "reported")
+	srv.dispatchReadyTasks(context.Background())
+	reportedRunning := waitTaskState(t, srv, reported.TaskID, state.TaskRunning)
+	if _, err := srv.stateStore.RecordAgentTaskResult(reported.TaskID,
+		reportedRunning.AssignedAgentID, reportedRunning.AssignedGeneration,
+		state.TaskResult{Outcome: state.OutcomeSuccess, Summary: "done"}); err != nil {
+		t.Fatalf("RecordAgentTaskResult: %v", err)
+	}
+
+	if err := srv.recoverTasks(context.Background()); err != nil {
+		t.Fatalf("recoverTasks: %v", err)
+	}
+
+	check := func(taskID, wantState string) state.Task {
+		t.Helper()
+		task, err := srv.stateStore.ReadTask(taskID)
+		if err != nil {
+			t.Fatalf("ReadTask: %v", err)
+		}
+		if task.State != wantState {
+			t.Fatalf("%s = %s after recovery, want %s", task.DisplayName, task.State, wantState)
+		}
+		return task
+	}
+	check(runningTask.TaskID, state.TaskInterrupted)
+	check(startingBorrowed.TaskID, state.TaskInterrupted)
+	retryable := check(startingCreated.TaskID, state.TaskReady)
+	if retryable.StartAttemptCount != 1 {
+		t.Fatalf("a restarted start attempt spent %d attempts, want 1", retryable.StartAttemptCount)
+	}
+	released := check(reported.TaskID, state.TaskFinished)
+	if released.PendingRelease || released.RuntimeClaim != "" {
+		t.Fatalf("recovery did not finish the promised release: %+v", released)
+	}
+	waitRunning(t, srv, reportedRunning.AssignedAgentID, false)
+
+	// Neither borrowed conversation was touched: R4's promise does not lapse
+	// because AgentDeck restarted.
+	for _, agentID := range []string{borrowedRunning, borrowedStarting} {
+		if _, err := srv.stateStore.ReadRunning(agentID); err != nil {
+			t.Fatalf("recovery stopped a runtime a task only borrowed: %v", err)
+		}
+	}
+	// The in-flight activation rows are gone; the next attempt makes its own.
+	pending, err := srv.stateStore.PendingActivations(state.ActivationKindDependency, "", 10)
+	if err != nil {
+		t.Fatalf("PendingActivations: %v", err)
+	}
+	if len(pending) != 0 {
+		t.Fatalf("dependency activations survived a restart: %+v", pending)
+	}
+}

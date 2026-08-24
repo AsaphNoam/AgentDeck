@@ -1224,3 +1224,107 @@ WHERE task_id = ? AND pending_release = 1`, formatTime(timeNow()), taskID); err 
 	}
 	return nil
 }
+
+// InterruptTaskForAgent moves the task this agent generation was executing to
+// interrupted, releasing its runtime claim and its budget slot. An agent that
+// exits, crashes, is stopped, or has its runtime switched without recording an
+// outcome leaves work interrupted, never successful and never failed: AgentDeck
+// does not convert a process event into a result (FS-16.R16).
+//
+// The generation is required, so a resumed agent's exit cannot interrupt work
+// assigned to the runtime that replaced it. A task that already recorded a
+// result is untouched, which is what makes the stop that follows a report safe.
+func (s *Store) InterruptTaskForAgent(agentID, generation, reason string) (Task, bool, error) {
+	return s.interrupt(reason, `
+WHERE assigned_agent_id = ? AND assigned_generation = ? AND state IN (?, ?)`,
+		[]any{agentID, generation, TaskStarting, TaskRunning})
+}
+
+// InterruptTask interrupts one task by id, for a recovery sweep that already
+// knows which rows it is resolving (TS-10.R15).
+func (s *Store) InterruptTask(taskID, reason string) (Task, bool, error) {
+	return s.interrupt(reason, `WHERE task_id = ? AND state IN (?, ?)`,
+		[]any{taskID, TaskStarting, TaskRunning})
+}
+
+func (s *Store) interrupt(reason, where string, args []any) (Task, bool, error) {
+	var taskID string
+	err := s.db.QueryRow(`SELECT task_id FROM tasks `+where, args...).Scan(&taskID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Task{}, false, nil
+	}
+	if err != nil {
+		return Task{}, false, fmt.Errorf("state: find task to interrupt: %w", err)
+	}
+	res, err := s.db.Exec(`
+UPDATE tasks SET state = ?, attention_reason = ?, assigned_generation = '',
+  runtime_claim = '', start_attempt_id = '', start_claimed_at = NULL,
+  revision = revision + 1, updated_at = ?
+WHERE task_id = ? AND state IN (?, ?)`,
+		TaskInterrupted, reason, formatTime(timeNow()), taskID, TaskStarting, TaskRunning)
+	if err != nil {
+		return Task{}, false, fmt.Errorf("state: interrupt task: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return Task{}, false, nil
+	}
+	task, err := s.ReadTask(taskID)
+	return task, err == nil, err
+}
+
+// TasksInStates lists every task in one of the given states, oldest first. It is
+// the startup sweep's bounded read over unfinished work (TS-10.R15).
+func (s *Store) TasksInStates(states ...string) ([]Task, error) {
+	if len(states) == 0 {
+		return []Task{}, nil
+	}
+	args := make([]any, 0, len(states))
+	for _, st := range states {
+		args = append(args, st)
+	}
+	rows, err := s.db.Query(taskSelect+`
+WHERE state IN (`+placeholders(len(states))+`) ORDER BY created_at, task_id`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("state: list tasks by state: %w", err)
+	}
+	defer rows.Close()
+	tasks := []Task{}
+	for rows.Next() {
+		task, err := scanTask(rows)
+		if err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, task)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("state: iterate tasks by state: %w", err)
+	}
+	return tasks, nil
+}
+
+// TasksAwaitingRelease lists tasks whose recorded result committed a release its
+// stop never completed, so recovery can finish exactly what was promised
+// (TS-10.R19, FS-16.R17).
+func (s *Store) TasksAwaitingRelease() ([]Task, error) {
+	rows, err := s.db.Query(taskSelect + ` WHERE pending_release = 1 ORDER BY finished_at, task_id`)
+	if err != nil {
+		return nil, fmt.Errorf("state: list tasks awaiting release: %w", err)
+	}
+	defer rows.Close()
+	tasks := []Task{}
+	for rows.Next() {
+		task, err := scanTask(rows)
+		if err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, task)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("state: iterate tasks awaiting release: %w", err)
+	}
+	return tasks, nil
+}
+
+func placeholders(n int) string {
+	return strings.TrimSuffix(strings.Repeat("?,", n), ",")
+}

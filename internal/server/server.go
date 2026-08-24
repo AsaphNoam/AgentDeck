@@ -267,6 +267,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	if registry != nil {
 		registry.SetExitHook(func(agentID, generation, cause string) {
 			s.teardownAgentRegistration(agentID)
+			s.interruptTaskOnExit(agentID, generation, cause)
 			if s.pipelineMgr != nil {
 				go func() {
 					if err := s.pipelineMgr.OnExit(agentID, generation, cause); err != nil {
@@ -322,6 +323,10 @@ func (s *Server) Start(ctx context.Context) error {
 	if err := s.startMessagingLoops(sweepCtx); err != nil {
 		ln.Close()
 		return err
+	}
+	if err := s.recoverTasks(sweepCtx); err != nil {
+		ln.Close()
+		return fmt.Errorf("recover dependent work: %w", err)
 	}
 	s.startTaskDispatcher(sweepCtx)
 	if s.sourceMgr != nil {
