@@ -63,6 +63,11 @@ func (s *Server) executeMailActivation(ctx context.Context, activation state.Act
 	// turn gate and fail the transition's own prompt with ErrTurnInFlight, pausing
 	// or stopping the stage. The opportunity is durable, so deferring it to the
 	// next sweep costs nothing (TS-01.R21, INV §5).
+	//
+	// This is only a fast path that avoids taking a mail claim we would give
+	// straight back. It is a non-claiming hint, so it cannot decide the race by
+	// itself; both branches below arbitrate on the claim itself — the stopped one
+	// through resumeSessionWithHooks, the running one directly.
 	if s.lifecycleInFlight(activation.AgentID) {
 		return
 	}
@@ -113,6 +118,19 @@ func (s *Server) executeMailActivation(ctx context.Context, activation state.Act
 }
 
 func (s *Server) startRunningMailActivation(ctx context.Context, activation state.Activation, token string) {
+	// The turn gate this is about to take is the one a stage's own prompt needs,
+	// so taking it has to be arbitrated against the exclusive lifecycle claim in
+	// one place rather than sampled beforehand: a Continue that claims after the
+	// caller's hint read false still composes its assignment into an agent this
+	// activation has since made busy, and ErrTurnInFlight pauses the run. The
+	// stopped branch already arbitrates this way through resumeSessionWithHooks;
+	// a running recipient needs the same claim held across the turn start
+	// (TS-01.R21, INV §5). Losing it is pre-attempt, so mail returns to pending.
+	if !s.claimLifecycle(activation.AgentID) {
+		s.releaseMailActivation(activation, token)
+		return
+	}
+	defer s.releaseLifecycle(activation.AgentID)
 	attempted := false
 	started, err := s.registry.StartActivation(ctx, activation.AgentID, state.ActivationKindMail, func(turnID string) error {
 		var err error

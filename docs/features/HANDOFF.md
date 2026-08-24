@@ -7,22 +7,21 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 ## Current position
 
 - **Review state:** A retrospective review of the shipped control/context/conversation-plane
-  separation found three **Must fix** and one **Worth fixing** gaps. Mail activation can race a newly
-  acquired lifecycle transition; the top-level product rule omits intentional assignments and
-  continuations; Claude's MCP event order can make a `current_turn` share absorb its own
-  `share_context` call; and the executor's claimed bounded sweep has no batch or concurrency bound.
-  The activation/context split itself was confirmed as a deliberate extension of existing seams.
+  separation found three **Must fix** and one **Worth fixing** gaps; two Must-fix items are fixed.
+  Mail activation no longer races a newly acquired lifecycle transition, and the top-level product
+  rule now names all three conversation crossings. Still open: Claude's MCP event order can make a
+  `current_turn` share absorb its own `share_context` call, and the executor's claimed bounded sweep
+  has no batch or concurrency bound. The activation/context split itself was confirmed as a
+  deliberate extension of existing seams.
 - **Ready change:** [Dependency-aware work that starts itself](../ready-changes/dependency-aware-armed-agents.md) is waiting to start. It is specified
   in FS-16 and TS-10 with deltas in FS-02, FS-04, FS-14, TS-01, TS-02, TS-03, TS-04, TS-05, and
-  TS-09; every requirement is `(planned)` and no product code has changed. A second design review
-  found twelve **Must fix** and two **Worth fixing** gaps, so it is not ready to implement.
+  TS-09; every requirement is `(planned)` and no product code has changed. Both design reviews are
+  resolved in the requirements, so it is implementable once the open findings above are closed.
 - **Active change:** None.
-- **State:** Dependency-aware work is designed and waiting; nothing about it is implemented. The
-  first design review's nine findings were resolved, but the second pass found unresolved contracts
-  around active-task deletion and cancellation, borrowed-runtime recovery, assignment timing and
-  retry identity, start-attempt limits, dependency activation, pipeline-result convergence and
-  deletion, agent-created targets, plus two stale acceptance/invariant contradictions. The change
-  remains waiting until the planned requirements are revised and reviewed again.
+- **State:** Dependency-aware work is designed and waiting; nothing about it is implemented. Both
+  design reviews of it are closed — the first round's nine Must-fix findings and the re-audit's
+  twelve Must-fix plus two Worth-fixing — so the remaining gate is the retrospective review's open
+  findings against shipped code, two of which sit in the activation executor this change extends.
   Pull-based context links shipped and the review findings against them are fixed. Turn
   selection is now honest at both ends: `latest_completed_turn` resolves only from inside a later
   turn started for an independent reason, and a session or backend-switch marker closes a turn a
@@ -230,27 +229,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-- **Must fix** — **Mail activation can steal the runtime turn after a lifecycle transition begins**
-  (**confirmed**, **TS-01.R21, INV §5**). `executeMailActivation` samples
-  `lifecycleInFlight` before claiming mail (`internal/server/messaging_loops.go:58–73`), but that
-  helper is explicitly only a non-claiming hint (`internal/server/resume.go:83–89`). A pipeline
-  Continue can acquire the lifecycle claim immediately after the sample
-  (`internal/server/pipeline_lifecycle.go:108–126`), while the activation proceeds to
-  `StartActivation` and takes `turnActive` (`internal/runtime/chat.go:695–715`); the lifecycle-owned
-  `SendPrompt` then returns `ErrTurnInFlight` (`internal/runtime/chat.go:344–354`). This is the exact
-  stage-pause/stop failure R21 says deferral prevents. The regression only covers a lifecycle claim
-  held before executor entry (`internal/server/activation_test.go:322–350`), not this interleaving.
-  Give lifecycle acquisition and activation turn-start one atomic arbitration point, and add a
-  deterministic test that proves the stage assignment succeeds and mail remains pending.
-- **Must fix** — **The product-level conversation crossing rule excludes shipped intentional
-  assignments and continuations** (**confirmed**, **FS-00.R15**). FS-00.R15 says a model turn starts
-  only for a user instruction or a payload-free activation, but TS-01.R18 correctly names a third
-  crossing: an intentional assignment/continuation. Shipped pipelines already launch a stage with a
-  rich bounded assignment prompt (FS-14.R5, TS-09.R6–R7), not a user instruction and not an
-  activation row. FS-00.R14 even calls pipeline assignments intentional conversation inputs. Make
-  R15 match the architectural rule and explicitly distinguish assignment/continuation prompts from
-  payload-free activations; acceptance should prove neither crossing inherits the other's
-  persistence or retry policy.
 - **Must fix** — **A `current_turn` context share can absorb its own control call and presentation
   metadata, depending on the provider** (**confirmed**, **FS-15.R1/R3/R4, TS-01.R18/R22,
   INV §1/§2**).
@@ -347,6 +325,16 @@ lives in FS-15, TS-01.R22–R23, TS-02.R24, TS-04.R28, TS-05.R16 and in Git hist
 
 ## Recent changelog
 
+- 2026-08-24 — Fixed the first two retrospective review findings (INV §5, §2). Mail activation now
+  arbitrates against the exclusive lifecycle claim instead of sampling it: a running recipient takes
+  `claimLifecycle` across the turn start, the way the stopped branch already did through
+  `resumeSessionWithHooks`, so a stage Continue that claims after the executor read the hint no
+  longer finds the runtime turn taken and fails its own assignment with `ErrTurnInFlight` — which
+  paused the run. The regression reproduces that exact interleaving and fails without the fix.
+  TS-01.R21 now says the deferral is decided by taking the claim, not by reading it. Separately,
+  FS-00.R15 named only two conversation crossings while shipped pipelines use a third; it now names
+  all three and says none inherits another's persistence or retry policy, with each policy's
+  existing acceptance cited (FS-06.A13–A14 against FS-14.A2/A4) rather than duplicated.
 - 2026-08-23 — Reworked `/review-design` (workflow §13 and both skill launchers) after auditing the
   23 findings the two dependency-aware design reviews produced. Roughly eight would have failed in
   ordinary use, nine were real but self-correcting during implementation, six were page-level only,

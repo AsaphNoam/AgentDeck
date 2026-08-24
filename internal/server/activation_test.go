@@ -349,6 +349,48 @@ func TestMailActivationDefersWhileLifecycleClaimIsHeld(t *testing.T) {
 	waitPrompts(t, promptLog, 1)
 }
 
+// TS-01.R21 / INV §5 — the claim the test above holds before the executor runs was
+// only ever sampled, and the sample is not the race. A stage Continue that takes
+// the exclusive claim *after* the executor read the hint and claimed its mail row
+// used to find the activation already holding the runtime turn, so its own
+// assignment failed with ErrTurnInFlight and the run paused. Arbitration has to
+// happen on the claim, at the turn start.
+func TestMailActivationDefersToALifecycleClaimTakenAfterTheHint(t *testing.T) {
+	srv, ts, promptLog := activationTestServer(t)
+	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+
+	insertMail(t, srv, id, "arrives just as the stage continues")
+	pending := pendingActivations(t, srv, id)
+	if len(pending) != 1 {
+		t.Fatalf("activations for one message = %+v, want one", pending)
+	}
+
+	// Replay the interleaving exactly: the executor has already read the hint as
+	// false and taken its mail claim, and only then does the stage claim.
+	token, claimed, err := srv.stateStore.ClaimMailActivation(pending[0].ActivationID)
+	if err != nil || !claimed {
+		t.Fatalf("ClaimMailActivation = %v, %v; want a claim", claimed, err)
+	}
+	if !srv.claimLifecycle(id) {
+		t.Fatal("claimLifecycle: could not take the transition claim")
+	}
+	srv.startRunningMailActivation(context.Background(), pending[0], token)
+
+	if got := promptCount(t, promptLog); got != 0 {
+		t.Fatalf("provider prompts = %d, want none; the activation raced the transition", got)
+	}
+	// The stage's own assignment is what the deferral exists to protect.
+	if err := srv.registry.SendPrompt(context.Background(), id, "stage assignment"); err != nil {
+		t.Fatalf("stage assignment inside its own claim: %v", err)
+	}
+	srv.releaseLifecycle(id)
+	waitPrompts(t, promptLog, 1)
+
+	if left := pendingActivations(t, srv, id); len(left) != 1 {
+		t.Fatalf("activations after the deferral = %+v, want the opportunity still pending", left)
+	}
+}
+
 // INV §4 / TS-01.R16 — a post-resume activation hook that fails runs after the
 // registry has already created the process, running row, hook token, MCP
 // registration, and hook-settings file. Returning the error without teardown left

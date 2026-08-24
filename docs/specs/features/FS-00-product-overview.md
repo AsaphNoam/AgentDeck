@@ -144,14 +144,19 @@ row per live agent; live status (`state ∈ {busy, idle, waiting_input, done, er
   imply eager prompt injection. Existing launch snapshots, pipeline assignments, annotations, and
   user prompts remain intentional conversation inputs where their content itself defines the work;
   this requirement does not introduce the future context-link model.
-- **R15 — Model activation is an explicit plane crossing.** AgentDeck starts a model
-  turn only for a user instruction or a host-owned activation that requires model judgment. An
-  activation is payload-free control state representing a claimed opportunity to initiate work
-  across the conversation boundary; it is not itself a message, task graph, artifact, transcript
-  event, or live process. Its source domain owns coalescing, retry, start, and completion semantics.
-  FS-06 defines the first activation kind and its deliberately at-most-once mail policy. Future
-  activation kinds require their own feature requirements rather than inheriting mail semantics or
-  using conversation as an implicit coordination API.
+- **R15 — Every model turn is an explicit plane crossing.** AgentDeck starts a model
+  turn for exactly three reasons: a user instruction, an intentional assignment or continuation
+  whose own bounded content defines the work, or a host-owned activation that requires model
+  judgment (TS-01.R18). They are distinct crossings, and none inherits another's persistence or
+  retry policy. An assignment or continuation is a durable bounded prompt the recipient reads as
+  ordinary conversation, composed per attempt by the domain that issued it — pipeline stages today
+  (FS-14.R5). An activation is payload-free control state representing a claimed opportunity to
+  initiate work across the conversation boundary; it is not itself a message, task graph, artifact,
+  transcript event, or live process. Its source domain owns coalescing, retry, start, and completion
+  semantics. FS-06 defines the first activation kind and its deliberately at-most-once mail policy
+  (FS-06.A13–A14), which the per-attempt assignment policy (FS-14.A2, A4) deliberately does not
+  share. Future activation kinds require their own feature requirements rather than inheriting mail
+  semantics or using conversation as an implicit coordination API.
 
 ## 4. Glossary
 

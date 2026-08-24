@@ -224,7 +224,10 @@ handler decides how its claim remains actionable. The executor also **defers to 
 exclusive lifecycle transition** rather than racing it: a stage launch/continue composes its first
 durable assignment inside R16's claim while the runtime is already registered and idle, so an
 activation starting in that window won the turn gate and failed the transition's own prompt.
-Deferring is free because the opportunity is durable. Ordinary status/turn state commits before the
+The deferral is decided by **taking R16's claim across the turn start**, for a running recipient as
+well as a stopped one; a non-claiming read of it is at most a fast path, because it cannot order a
+transition that claims after the read. Deferring is free because the opportunity is durable, and
+losing the claim is pre-attempt. Ordinary status/turn state commits before the
 provider frame, and a failure to commit it releases the turn gate and surfaces rather than prompting
 the model behind an `idle` record (INV §15). For a stopped mail recipient, the executor takes
 TS-01.R16's exclusive lifecycle claim, applies FS-06's attempted transition immediately before the
