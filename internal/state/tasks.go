@@ -1057,3 +1057,52 @@ func (s *Store) settleTaskStart(taskID, attemptID, stmt string, leading []any, w
 	task, err := s.ReadTask(taskID)
 	return task, err == nil, err
 }
+
+// AssignedTask returns the one task this agent is executing — starting or
+// running — or ErrNotFound. The partial unique index guarantees there is at most
+// one, so this needs no ordering or tie-break (FS-16.R2, TS-10.R18).
+func (s *Store) AssignedTask(agentID string) (Task, error) {
+	task, err := scanTask(s.db.QueryRow(taskSelect+`
+WHERE assigned_agent_id = ? AND state IN (?, ?)`, agentID, TaskStarting, TaskRunning))
+	if errors.Is(err, sql.ErrNoRows) {
+		return Task{}, ErrNotFound
+	}
+	if err != nil {
+		return Task{}, err
+	}
+	arms, err := s.readTaskArms(task.TaskID)
+	if err != nil {
+		return Task{}, err
+	}
+	task.Arms = arms
+	return task, nil
+}
+
+// ListTaskAttachments returns a task's context attachments, oldest first. The
+// attachment holds only the canonical reference id and its own presentation: it
+// authorizes nothing and copies no content (FS-16.R10, TS-10.R12).
+func (s *Store) ListTaskAttachments(taskID string) ([]TaskAttachment, error) {
+	rows, err := s.db.Query(`
+SELECT task_id, context_ref_id, label, description, created_at
+FROM task_attachments WHERE task_id = ? ORDER BY created_at, context_ref_id`, taskID)
+	if err != nil {
+		return nil, fmt.Errorf("state: list task attachments: %w", err)
+	}
+	defer rows.Close()
+	out := []TaskAttachment{}
+	for rows.Next() {
+		var a TaskAttachment
+		var createdAt string
+		if err := rows.Scan(&a.TaskID, &a.ContextRefID, &a.Label, &a.Description, &createdAt); err != nil {
+			return nil, fmt.Errorf("state: scan task attachment: %w", err)
+		}
+		if a.CreatedAt, err = parseTime(createdAt); err != nil {
+			return nil, wrapTimeErr("task attachment created_at", err)
+		}
+		out = append(out, a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("state: iterate task attachments: %w", err)
+	}
+	return out, nil
+}

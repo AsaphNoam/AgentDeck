@@ -169,6 +169,10 @@ func New(store *state.Store, log *slog.Logger) *Server {
 		Description: "Validate and propose an exact saved-template run configuration for human approval; this never starts it.",
 	}, s.handleProposePipelineRun)
 	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "get_assigned_task",
+		Description: "Read the task you are currently assigned: its instruction and the context references attached to it. Returns assigned=false when you have none.",
+	}, s.handleGetAssignedTask)
+	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "share_context",
 		Description: "Give another chat agent access to context you own — your current turn so far, your latest completed turn, or your accepted pipeline report — without copying it. Returns a reusable context_ref_id; the recipient reads it explicitly and is not woken.",
 	}, s.handleShareContext)
