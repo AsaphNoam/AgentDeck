@@ -361,7 +361,12 @@ func (s *Store) UpdatePipelineRunCAS(runID string, expectedRevision int64, updat
 	if update.UpdatedAt.IsZero() {
 		update.UpdatedAt = timeNow()
 	}
-	result, err := s.db.Exec(`
+	tx, err := s.db.Begin()
+	if err != nil {
+		return PipelineRunRecord{}, fmt.Errorf("state: begin update pipeline run: %w", err)
+	}
+	defer tx.Rollback()
+	result, err := tx.Exec(`
 UPDATE pipeline_runs SET
   state = ?, revision = revision + 1, pending_action = ?, current_stage_id = ?,
   current_attempt_id = ?, current_agent_id = ?, attention_reason = ?,
@@ -379,12 +384,57 @@ WHERE run_id = ? AND revision = ?`,
 		return PipelineRunRecord{}, fmt.Errorf("state: pipeline update count: %w", err)
 	}
 	if count == 0 {
-		if _, err := s.ReadPipelineRun(runID); errors.Is(err, ErrNotFound) {
+		// This transaction owns the store's single connection, so the check runs
+		// on it rather than through the store.
+		var exists int
+		switch err := tx.QueryRow(`SELECT 1 FROM pipeline_runs WHERE run_id = ?`, runID).Scan(&exists); {
+		case errors.Is(err, sql.ErrNoRows):
 			return PipelineRunRecord{}, ErrNotFound
+		case err != nil:
+			return PipelineRunRecord{}, fmt.Errorf("state: read pipeline run after conflict: %w", err)
 		}
 		return PipelineRunRecord{}, ErrPipelineConflict
 	}
+	if err := registerPipelineRunOutcomeTx(tx, runID, update.State, update.FinalOutcome, update.UpdatedAt); err != nil {
+		return PipelineRunRecord{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return PipelineRunRecord{}, fmt.Errorf("state: commit update pipeline run: %w", err)
+	}
 	return s.ReadPipelineRun(runID)
+}
+
+// registerPipelineRunOutcomeTx normalizes a run's terminal outcome into the
+// shared result layer, in the same transaction that commits that terminal state.
+// That is what makes a run usable as a prerequisite, and doing it in the same
+// commit is why deleting a run afterwards can never strand an arm: the
+// registration is keyed to the source and holds no foreign key into the run
+// (FS-14.R34, FS-16.R13, TS-09.R27, TS-10.R21).
+//
+// A completed run maps its template-defined final outcome onto the shared
+// vocabulary — `success` for success and `failure` for every other final label,
+// whose raw value is kept as a display detail — and a stopped run is `cancelled`.
+func registerPipelineRunOutcomeTx(tx *sql.Tx, runID, runState, finalOutcome string, at time.Time) error {
+	outcome := OutcomeCancelled
+	switch runState {
+	case "completed":
+		outcome = OutcomeFailure
+		if finalOutcome == "success" {
+			outcome = OutcomeSuccess
+		}
+	case "stopped":
+	default:
+		return nil
+	}
+	err := RegisterWorkResultTx(tx, WorkResult{
+		SourceKind: SourcePipelineRun, SourceID: runID, Outcome: outcome, RawLabel: finalOutcome,
+	}, at)
+	// A registration is immutable, so a run that somehow re-commits its terminal
+	// state keeps the outcome it already published rather than re-deciding arms.
+	if errors.Is(err, ErrWorkResultRecorded) {
+		return nil
+	}
+	return err
 }
 
 func (s *Store) DeletePipelineRun(runID string) error {

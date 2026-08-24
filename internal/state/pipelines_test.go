@@ -135,3 +135,76 @@ func TestListActivePipelineRunsExcludesTerminalHistory(t *testing.T) {
 		t.Fatalf("active runs = %+v err=%v", runs, err)
 	}
 }
+
+// FS-14.R34 / FS-16.R13 / TS-09.R27, TS-10.R21 — a run registers its terminal
+// outcome in the same commit that makes it terminal, mapped onto the shared
+// vocabulary with its template-defined label kept as a display detail. That
+// registration is what makes a run usable as a prerequisite, and because it is
+// keyed to the source and holds no foreign key into the run, deleting the run
+// afterwards leaves every arm that waited on it already resolved.
+func TestTerminalPipelineRunsRegisterTheirOutcome(t *testing.T) {
+	cases := []struct {
+		name         string
+		runState     string
+		finalOutcome string
+		want         string
+	}{
+		{"completed with success", "completed", "success", OutcomeSuccess},
+		{"completed with another final label", "completed", "needs-rework", OutcomeFailure},
+		{"stopped", "stopped", "stopped", OutcomeCancelled},
+		{"still running", "running", "", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			store, _ := newTestStore(t)
+			now := time.Date(2026, 8, 24, 12, 0, 0, 0, time.UTC)
+			runID, err := store.NewPipelineRunID()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := store.CreatePipelineRun(CreatePipelineRunParams{
+				Run: PipelineRunRecord{
+					RunID: runID, TemplateID: "quality",
+					TemplateSnapshot: json.RawMessage(`{"version":1,"inputs":[],"stages":[]}`),
+					DisplayName:      "Quality run", Project: "app", Goal: "Ship it",
+					Inputs: json.RawMessage(`{}`), Assignments: json.RawMessage(`{}`),
+					State: "queued", Revision: 1, PendingAction: "launch_stage",
+					CurrentStageID: "work", CreatedAt: now, UpdatedAt: now,
+				},
+				RequestID: "request-" + tc.name, RequestHash: "hash",
+			}); err != nil {
+				t.Fatalf("CreatePipelineRun: %v", err)
+			}
+			if _, err := store.UpdatePipelineRunCAS(runID, 1, PipelineRunUpdate{
+				State: tc.runState, FinalOutcome: tc.finalOutcome, CurrentStageID: "work",
+			}); err != nil {
+				t.Fatalf("UpdatePipelineRunCAS: %v", err)
+			}
+			result, err := store.ReadWorkResult(SourcePipelineRun, runID)
+			if tc.want == "" {
+				if !errors.Is(err, ErrNotFound) {
+					t.Fatalf("a non-terminal run registered %+v, %v", result, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("ReadWorkResult: %v", err)
+			}
+			if result.Outcome != tc.want {
+				t.Fatalf("registered outcome = %q, want %q", result.Outcome, tc.want)
+			}
+			if result.RawLabel != tc.finalOutcome {
+				t.Fatalf("raw label = %q, want the template's own %q", result.RawLabel, tc.finalOutcome)
+			}
+
+			// Deleting the run leaves the registration in place, which is why an
+			// arm can never be left waiting on a run that no longer exists.
+			if err := store.DeletePipelineRun(runID); err != nil {
+				t.Fatalf("DeletePipelineRun: %v", err)
+			}
+			if _, err := store.ReadWorkResult(SourcePipelineRun, runID); err != nil {
+				t.Fatalf("the registration was removed with its run: %v", err)
+			}
+		})
+	}
+}

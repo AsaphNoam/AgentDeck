@@ -9,6 +9,7 @@ import (
 	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/pipeline"
 	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/agentdeck/agentdeck/internal/state"
 )
 
 // AcquirePipelineStart is the control-plane's shared project start lease. The
@@ -209,6 +210,15 @@ func (s *Server) IsRunning(agentID string) bool {
 
 func (s *Server) PublishPipelineUpdate(update pipeline.PipelineUpdate) {
 	s.eventBus.Publish("pipeline_update", nil, update)
+	// A run that has reached a terminal state has already registered its outcome
+	// in the commit that made it terminal, so the arms waiting on it can be
+	// released now. Evaluation reads that registration rather than this
+	// notification, so a dropped or repeated publish changes nothing (TS-10.R3).
+	if update.State == "completed" || update.State == "stopped" {
+		if _, err := s.stateStore.EvaluateSource(state.SourcePipelineRun, update.RunID); err != nil {
+			s.log.Debug("evaluate pipeline run result failed", "run", update.RunID, "err", err)
+		}
+	}
 }
 
 func (s *Server) PublishPipelineProposalUpdate() {
