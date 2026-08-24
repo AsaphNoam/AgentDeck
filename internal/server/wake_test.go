@@ -338,7 +338,7 @@ func TestMailActivationWakesStoppedRecipient(t *testing.T) {
 
 	deadline := time.Now().Add(5 * time.Second)
 	for {
-		pending, err := srv.stateStore.PendingMailActivations(stopped, messaging.ActivationBatch)
+		pending, err := srv.stateStore.PendingActivations(state.ActivationKindMail, stopped, messaging.ActivationBatch)
 		if err != nil {
 			t.Fatalf("PendingMailActivations: %v", err)
 		}
@@ -378,7 +378,7 @@ func TestFailedMailWakeRetainsMailAndStopsRetrying(t *testing.T) {
 	// remains unread, but reconciliation has no activation to replay.
 	deadline := time.Now().Add(5 * time.Second)
 	for {
-		waiting, err := srv.stateStore.PendingMailActivations(stopped, messaging.ActivationBatch)
+		waiting, err := srv.stateStore.PendingActivations(state.ActivationKindMail, stopped, messaging.ActivationBatch)
 		if err != nil {
 			t.Fatalf("PendingMailActivations: %v", err)
 		}
@@ -401,7 +401,7 @@ func TestFailedMailWakeRetainsMailAndStopsRetrying(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("InsertMessage third: %v", err)
 	}
-	waiting, err := srv.stateStore.PendingMailActivations(stopped, messaging.ActivationBatch)
+	waiting, err := srv.stateStore.PendingActivations(state.ActivationKindMail, stopped, messaging.ActivationBatch)
 	if err != nil {
 		t.Fatalf("PendingMailActivations after new mail: %v", err)
 	}
@@ -640,7 +640,7 @@ func TestSuccessfulWakeConsumesMailEvenIfAdapterDiesBeforeNudge(t *testing.T) {
 	// The mail is still unread, but it no longer makes the agent a wake candidate,
 	// so no sweep — including one after a dashboard restart's empty nudge map —
 	// respawns the broken adapter.
-	waiting, err := srv.stateStore.PendingMailActivations(stopped, messaging.ActivationBatch)
+	waiting, err := srv.stateStore.PendingActivations(state.ActivationKindMail, stopped, messaging.ActivationBatch)
 	if err != nil {
 		t.Fatalf("PendingMailActivations: %v", err)
 	}
@@ -689,7 +689,7 @@ func TestFailedWakeLeavesNewerMailPending(t *testing.T) {
 	// later insert has its own pending activation.
 	deadline := time.Now().Add(15 * time.Second)
 	for {
-		pending, err := srv.stateStore.PendingMailActivations(stopped, messaging.ActivationBatch)
+		pending, err := srv.stateStore.PendingActivations(state.ActivationKindMail, stopped, messaging.ActivationBatch)
 		if err != nil {
 			t.Fatalf("PendingMailActivations: %v", err)
 		}
@@ -704,7 +704,7 @@ func TestFailedWakeLeavesNewerMailPending(t *testing.T) {
 	waitRunning(t, srv, stopped, false)
 
 	// Because the newer mail is still pending, the recipient is a candidate again.
-	waiting, err := srv.stateStore.PendingMailActivations(stopped, messaging.ActivationBatch)
+	waiting, err := srv.stateStore.PendingActivations(state.ActivationKindMail, stopped, messaging.ActivationBatch)
 	if err != nil {
 		t.Fatalf("PendingMailActivations: %v", err)
 	}

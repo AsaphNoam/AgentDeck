@@ -69,7 +69,7 @@ func TestMailActivationCoalescesClaimsAndRecovers(t *testing.T) {
 			t.Fatalf("InsertMessage %q: %v", body, err)
 		}
 	}
-	pending, err := st.PendingMailActivations("a_mail", 10)
+	pending, err := st.PendingActivations(ActivationKindMail, "a_mail", 10)
 	if err != nil || len(pending) != 1 {
 		t.Fatalf("PendingMailActivations = %+v, %v; want one", pending, err)
 	}
@@ -81,17 +81,17 @@ func TestMailActivationCoalescesClaimsAndRecovers(t *testing.T) {
 	if _, err := st.InsertMessage(Message{FromAgent: "a_sender", FromAddress: "impl@my-app", FromName: "Atlas", ToAgent: "a_mail", Body: "later"}); err != nil {
 		t.Fatalf("InsertMessage later: %v", err)
 	}
-	pending, err = st.PendingMailActivations("a_mail", 10)
+	pending, err = st.PendingActivations(ActivationKindMail, "a_mail", 10)
 	if err != nil || len(pending) != 1 {
 		t.Fatalf("PendingMailActivations after claim = %+v, %v; want later activation", pending, err)
 	}
-	if attempted, err := st.AttemptMailActivation(claimedID, token, "t_000000000001"); err != nil || !attempted {
+	if attempted, err := st.AttemptActivation(ActivationKindMail, claimedID, token, "t_000000000001"); err != nil || !attempted {
 		t.Fatalf("AttemptMailActivation = %v, %v; want true, nil", attempted, err)
 	}
-	if err := st.RetireMailActivation(claimedID, token); err != nil {
+	if err := st.RetireActivation(ActivationKindMail, claimedID, token); err != nil {
 		t.Fatalf("RetireMailActivation: %v", err)
 	}
-	pending, err = st.PendingMailActivations("a_mail", 10)
+	pending, err = st.PendingActivations(ActivationKindMail, "a_mail", 10)
 	if err != nil || len(pending) != 1 {
 		t.Fatalf("PendingMailActivations after retire = %+v, %v; want later activation", pending, err)
 	}
@@ -123,7 +123,7 @@ func TestPendingMailActivationsReadsABoundedOldestFirstBatch(t *testing.T) {
 		}
 	}
 
-	batch, err := st.PendingMailActivations("", 5)
+	batch, err := st.PendingActivations(ActivationKindMail, "", 5)
 	if err != nil {
 		t.Fatalf("PendingMailActivations: %v", err)
 	}
@@ -140,7 +140,7 @@ func TestPendingMailActivationsReadsABoundedOldestFirstBatch(t *testing.T) {
 	}
 
 	// Nothing was consumed by reading: the whole backlog is still durable.
-	all, err := st.PendingMailActivations("", 100)
+	all, err := st.PendingActivations(ActivationKindMail, "", 100)
 	if err != nil || len(all) != 12 {
 		t.Fatalf("PendingMailActivations after a bounded read = %d rows, %v; want all 12 still pending", len(all), err)
 	}
@@ -155,7 +155,7 @@ func TestReleaseMailActivationCoalescesNewerPendingMail(t *testing.T) {
 	if _, err := st.InsertMessage(Message{FromAgent: "a_sender", FromAddress: "impl@my-app", FromName: "Atlas", ToAgent: "a_release", Body: "first"}); err != nil {
 		t.Fatalf("InsertMessage first: %v", err)
 	}
-	pending, err := st.PendingMailActivations("a_release", 10)
+	pending, err := st.PendingActivations(ActivationKindMail, "a_release", 10)
 	if err != nil || len(pending) != 1 {
 		t.Fatalf("PendingMailActivations = %+v, %v; want one", pending, err)
 	}
@@ -169,7 +169,7 @@ func TestReleaseMailActivationCoalescesNewerPendingMail(t *testing.T) {
 	if err := st.ReleaseMailActivation(pending[0].ActivationID, token); err != nil {
 		t.Fatalf("ReleaseMailActivation: %v", err)
 	}
-	left, err := st.PendingMailActivations("a_release", 10)
+	left, err := st.PendingActivations(ActivationKindMail, "a_release", 10)
 	if err != nil || len(left) != 1 {
 		t.Fatalf("PendingMailActivations after release = %+v, %v; want newer pending row", left, err)
 	}
@@ -188,7 +188,7 @@ func TestDiscardClaimedMailActivationRequiresClaimToken(t *testing.T) {
 	if _, err := st.InsertMessage(Message{FromAgent: "a_sender", FromAddress: "impl@my-app", FromName: "Atlas", ToAgent: "a_discard", Body: "first"}); err != nil {
 		t.Fatalf("InsertMessage: %v", err)
 	}
-	pending, err := st.PendingMailActivations("a_discard", 10)
+	pending, err := st.PendingActivations(ActivationKindMail, "a_discard", 10)
 	if err != nil || len(pending) != 1 {
 		t.Fatalf("PendingMailActivations = %+v, %v; want one", pending, err)
 	}
@@ -196,7 +196,7 @@ func TestDiscardClaimedMailActivationRequiresClaimToken(t *testing.T) {
 	if err != nil || !claimed {
 		t.Fatalf("ClaimMailActivation = %q, %v, %v; want claim", token, claimed, err)
 	}
-	if err := st.DiscardClaimedMailActivation(pending[0].ActivationID, "wrong-token"); err != nil {
+	if err := st.DiscardClaimedActivation(ActivationKindMail, pending[0].ActivationID, "wrong-token"); err != nil {
 		t.Fatalf("DiscardClaimedMailActivation(wrong token): %v", err)
 	}
 	var claimedRows int
@@ -206,7 +206,7 @@ func TestDiscardClaimedMailActivationRequiresClaimToken(t *testing.T) {
 	if claimedRows != 1 {
 		t.Fatalf("claimed rows after wrong token = %d, want one", claimedRows)
 	}
-	if err := st.DiscardClaimedMailActivation(pending[0].ActivationID, token); err != nil {
+	if err := st.DiscardClaimedActivation(ActivationKindMail, pending[0].ActivationID, token); err != nil {
 		t.Fatalf("DiscardClaimedMailActivation: %v", err)
 	}
 	if err := st.DB().QueryRow(`SELECT COUNT(*) FROM activations WHERE activation_id = ?`, pending[0].ActivationID).Scan(&claimedRows); err != nil {
@@ -435,7 +435,7 @@ func TestClaimMailActivationRetiresDrainedMailbox(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("InsertMessage: %v", err)
 	}
-	pending, err := st.PendingMailActivations("a_drain", 10)
+	pending, err := st.PendingActivations(ActivationKindMail, "a_drain", 10)
 	if err != nil || len(pending) != 1 {
 		t.Fatalf("PendingMailActivations = %+v, %v; want one", pending, err)
 	}
@@ -453,7 +453,7 @@ func TestClaimMailActivationRetiresDrainedMailbox(t *testing.T) {
 	if claimed || token != "" {
 		t.Fatalf("ClaimMailActivation = %q, %v; want no claim over a drained mailbox", token, claimed)
 	}
-	after, err := st.PendingMailActivations("a_drain", 10)
+	after, err := st.PendingActivations(ActivationKindMail, "a_drain", 10)
 	if err != nil || len(after) != 0 {
 		t.Fatalf("PendingMailActivations after drain = %+v, %v; want the opportunity retired", after, err)
 	}
@@ -465,7 +465,7 @@ func TestClaimMailActivationRetiresDrainedMailbox(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("InsertMessage later: %v", err)
 	}
-	rearmed, err := st.PendingMailActivations("a_drain", 10)
+	rearmed, err := st.PendingActivations(ActivationKindMail, "a_drain", 10)
 	if err != nil || len(rearmed) != 1 {
 		t.Fatalf("PendingMailActivations after new mail = %+v, %v; want one", rearmed, err)
 	}

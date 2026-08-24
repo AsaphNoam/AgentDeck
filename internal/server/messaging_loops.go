@@ -45,7 +45,7 @@ func (s *Server) executePendingMailActivations(ctx context.Context, onlyAgentID 
 	if s.registry == nil {
 		return
 	}
-	activations, err := s.stateStore.PendingMailActivations(onlyAgentID, messaging.ActivationBatch)
+	activations, err := s.stateStore.PendingActivations(state.ActivationKindMail, onlyAgentID, messaging.ActivationBatch)
 	if err != nil {
 		s.log.Debug("activation list pending mail failed", "err", err)
 		return
@@ -147,7 +147,7 @@ func (s *Server) startRunningMailActivation(ctx context.Context, activation stat
 	attempted := false
 	started, err := s.registry.StartActivation(ctx, activation.AgentID, state.ActivationKindMail, func(turnID string) error {
 		var err error
-		attempted, err = s.stateStore.AttemptMailActivation(activation.ActivationID, token, turnID)
+		attempted, err = s.stateStore.AttemptActivation(state.ActivationKindMail, activation.ActivationID, token, turnID)
 		if err == nil && !attempted {
 			return errors.New("mail activation claim lost")
 		}
@@ -161,7 +161,7 @@ func (s *Server) startRunningMailActivation(ctx context.Context, activation stat
 		return
 	}
 	if attempted {
-		if err := s.stateStore.RetireMailActivation(activation.ActivationID, token); err != nil {
+		if err := s.stateStore.RetireActivation(state.ActivationKindMail, activation.ActivationID, token); err != nil {
 			s.log.Debug("retire running mail activation failed", "activation", activation.ActivationID, "err", err)
 		}
 	}
@@ -190,14 +190,14 @@ func (s *Server) startStoppedMailActivation(ctx context.Context, activation stat
 	attempted := false
 	ae := s.resumeSessionWithHooks(ctx, activation.AgentID, resumeOverride{}, func() error {
 		var err error
-		attempted, err = s.stateStore.AttemptMailActivation(activation.ActivationID, token, "")
+		attempted, err = s.stateStore.AttemptActivation(state.ActivationKindMail, activation.ActivationID, token, "")
 		if err == nil && !attempted {
 			return errors.New("mail activation claim lost")
 		}
 		return err
 	}, func() error {
 		started, err := s.registry.StartActivation(ctx, activation.AgentID, state.ActivationKindMail, func(turnID string) error {
-			return s.stateStore.StartAttemptedMailTurn(activation.ActivationID, token, turnID)
+			return s.stateStore.StartAttemptedTurn(state.ActivationKindMail, activation.ActivationID, token, turnID)
 		})
 		if err != nil {
 			return err
@@ -211,7 +211,7 @@ func (s *Server) startStoppedMailActivation(ctx context.Context, activation stat
 		s.log.Debug("start stopped mail activation failed", "agent", activation.AgentID, "err", ae.Message)
 	}
 	if attempted {
-		if err := s.stateStore.RetireMailActivation(activation.ActivationID, token); err != nil {
+		if err := s.stateStore.RetireActivation(state.ActivationKindMail, activation.ActivationID, token); err != nil {
 			s.log.Debug("retire stopped mail activation failed", "activation", activation.ActivationID, "err", err)
 		}
 		return
@@ -226,7 +226,7 @@ func (s *Server) releaseMailActivation(activation state.Activation, token string
 }
 
 func (s *Server) discardMailActivation(activation state.Activation, token string) {
-	if err := s.stateStore.DiscardClaimedMailActivation(activation.ActivationID, token); err != nil {
+	if err := s.stateStore.DiscardClaimedActivation(state.ActivationKindMail, activation.ActivationID, token); err != nil {
 		s.log.Debug("discard mail activation failed", "activation", activation.ActivationID, "err", err)
 	}
 }

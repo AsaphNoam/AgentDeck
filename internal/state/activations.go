@@ -23,9 +23,12 @@ type Activation struct {
 	Kind         string
 	State        string
 	ClaimToken   string
-	CreatedAt    time.Time
-	ClaimedAt    *time.Time
-	AttemptedAt  *time.Time
+	// SourceID names the durable work a kind activates for, and is empty for a
+	// kind whose uniqueness is per agent alone, such as mail (TS-10.R5).
+	SourceID    string
+	CreatedAt   time.Time
+	ClaimedAt   *time.Time
+	AttemptedAt *time.Time
 }
 
 func migrateActivations(tx *sql.Tx) error {
@@ -79,19 +82,19 @@ SELECT ?, agent_id, ?, ?, ? FROM agents WHERE agent_id = ?`,
 	return nil
 }
 
-// PendingMailActivations lists at most limit rows of durable mail work waiting
+// PendingActivations lists at most limit rows of one kind's durable work waiting
 // for the executor, oldest first. The limit is required: the caller decides how
 // much of a backlog one sweep admits, and whatever it leaves stays pending for
 // the next one (TS-01.R20, INV §9).
-func (s *Store) PendingMailActivations(agentID string, limit int) ([]Activation, error) {
+func (s *Store) PendingActivations(kind, agentID string, limit int) ([]Activation, error) {
 	rows, err := s.db.Query(`
-SELECT activation_id, agent_id, kind, state, claim_token, created_at, claimed_at, attempted_at
+SELECT activation_id, agent_id, kind, state, claim_token, source_id, created_at, claimed_at, attempted_at
 FROM activations
 WHERE kind = ? AND state = ? AND (? = '' OR agent_id = ?)
 ORDER BY created_at, activation_id
-LIMIT ?`, ActivationKindMail, ActivationPending, agentID, agentID, limit)
+LIMIT ?`, kind, ActivationPending, agentID, agentID, limit)
 	if err != nil {
-		return nil, fmt.Errorf("state: list pending mail activations: %w", err)
+		return nil, fmt.Errorf("state: list pending activations: %w", err)
 	}
 	defer rows.Close()
 	out := []Activation{}
@@ -103,7 +106,7 @@ LIMIT ?`, ActivationKindMail, ActivationPending, agentID, agentID, limit)
 		out = append(out, a)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("state: iterate pending mail activations: %w", err)
+		return nil, fmt.Errorf("state: iterate pending activations: %w", err)
 	}
 	return out, nil
 }
@@ -113,7 +116,7 @@ func scanActivation(rows *sql.Rows) (Activation, error) {
 	var createdAt string
 	var claimedAt, attemptedAt sql.NullString
 	if err := rows.Scan(&a.ActivationID, &a.AgentID, &a.Kind, &a.State, &a.ClaimToken,
-		&createdAt, &claimedAt, &attemptedAt); err != nil {
+		&a.SourceID, &createdAt, &claimedAt, &attemptedAt); err != nil {
 		return Activation{}, fmt.Errorf("state: scan activation: %w", err)
 	}
 	var err error
@@ -170,8 +173,10 @@ WHERE activation_id = ? AND kind = ? AND state = ?
 	return "", false, nil
 }
 
-// ReleaseMailActivation makes a pre-attempt claim actionable again. The token
-// prevents a delayed worker from releasing a later claim.
+// ReleaseMailActivation makes a pre-attempt claim actionable again. Coalescing
+// the released row into a newer pending one is mail's own at-most-once rule —
+// one pending opportunity per recipient — and not a property of activations, so
+// it stays here rather than in the shared release statement (FS-06.R25).
 func (s *Store) ReleaseMailActivation(activationID, token string) error {
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -187,12 +192,8 @@ WHERE activation_id = ? AND kind = ? AND state = ? AND claim_token = ?
   )`, activationID, ActivationKindMail, ActivationClaimed, token, ActivationPending); err != nil {
 		return fmt.Errorf("state: coalesce released mail activation: %w", err)
 	}
-	if _, err := tx.Exec(`
-UPDATE activations
-SET state = ?, claim_token = '', claimed_at = NULL
-WHERE activation_id = ? AND kind = ? AND state = ? AND claim_token = ?`,
-		ActivationPending, activationID, ActivationKindMail, ActivationClaimed, token); err != nil {
-		return fmt.Errorf("state: release mail activation: %w", err)
+	if err := releaseActivationTx(tx, ActivationKindMail, activationID, token); err != nil {
+		return err
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("state: commit release mail activation: %w", err)
@@ -200,47 +201,47 @@ WHERE activation_id = ? AND kind = ? AND state = ? AND claim_token = ?`,
 	return nil
 }
 
-// DiscardClaimedMailActivation removes a pre-attempt opportunity whose recipient
-// is durably ineligible to receive mail activation. The token prevents a delayed
+// DiscardClaimedActivation removes a pre-attempt opportunity whose recipient is
+// durably ineligible for this kind of activation. The token prevents a delayed
 // worker from discarding a later claim.
-func (s *Store) DiscardClaimedMailActivation(activationID, token string) error {
+func (s *Store) DiscardClaimedActivation(kind, activationID, token string) error {
 	_, err := s.db.Exec(`
 DELETE FROM activations
 WHERE activation_id = ? AND kind = ? AND state = ? AND claim_token = ?`,
-		activationID, ActivationKindMail, ActivationClaimed, token)
+		activationID, kind, ActivationClaimed, token)
 	if err != nil {
-		return fmt.Errorf("state: discard claimed mail activation: %w", err)
+		return fmt.Errorf("state: discard claimed activation: %w", err)
 	}
 	return nil
 }
 
-// AttemptMailActivation crosses mail's non-replayable boundary before a wake or
+// AttemptActivation crosses the non-replayable boundary before a wake or
 // provider side effect. A running activation supplies turnID so its budget reset
 // commits atomically with this boundary; a stopped activation supplies "" and
-// opens its freshly resumed turn through StartAttemptedMailTurn.
-func (s *Store) AttemptMailActivation(activationID, token, turnID string) (bool, error) {
+// opens its freshly resumed turn through StartAttemptedTurn.
+func (s *Store) AttemptActivation(kind, activationID, token, turnID string) (bool, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
-		return false, fmt.Errorf("state: begin mail activation attempt: %w", err)
+		return false, fmt.Errorf("state: begin activation attempt: %w", err)
 	}
 	defer tx.Rollback()
 	var agentID string
 	if err := tx.QueryRow(`
 SELECT agent_id FROM activations
 WHERE activation_id = ? AND kind = ? AND state = ? AND claim_token = ?`,
-		activationID, ActivationKindMail, ActivationClaimed, token).Scan(&agentID); err == sql.ErrNoRows {
+		activationID, kind, ActivationClaimed, token).Scan(&agentID); err == sql.ErrNoRows {
 		return false, nil
 	} else if err != nil {
-		return false, fmt.Errorf("state: read claimed mail activation: %w", err)
+		return false, fmt.Errorf("state: read claimed activation: %w", err)
 	}
 	res, err := tx.Exec(`
 UPDATE activations
 SET state = ?, attempted_at = ?
 WHERE activation_id = ? AND kind = ? AND state = ? AND claim_token = ?`,
-		ActivationAttempted, formatTime(time.Now().UTC()), activationID, ActivationKindMail,
+		ActivationAttempted, formatTime(time.Now().UTC()), activationID, kind,
 		ActivationClaimed, token)
 	if err != nil {
-		return false, fmt.Errorf("state: mark mail activation attempted: %w", err)
+		return false, fmt.Errorf("state: mark activation attempted: %w", err)
 	}
 	n, _ := res.RowsAffected()
 	if n != 1 {
@@ -252,44 +253,59 @@ WHERE activation_id = ? AND kind = ? AND state = ? AND claim_token = ?`,
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		return false, fmt.Errorf("state: commit mail activation attempt: %w", err)
+		return false, fmt.Errorf("state: commit activation attempt: %w", err)
 	}
 	return true, nil
 }
 
-// StartAttemptedMailTurn initializes the runtime turn budget for the claimed
+// StartAttemptedTurn initializes the runtime turn budget for the claimed
 // activation that already crossed the wake boundary.
-func (s *Store) StartAttemptedMailTurn(activationID, token, turnID string) error {
+func (s *Store) StartAttemptedTurn(kind, activationID, token, turnID string) error {
 	tx, err := s.db.Begin()
 	if err != nil {
-		return fmt.Errorf("state: begin attempted mail turn: %w", err)
+		return fmt.Errorf("state: begin attempted activation turn: %w", err)
 	}
 	defer tx.Rollback()
 	var agentID string
 	if err := tx.QueryRow(`
 SELECT agent_id FROM activations
 WHERE activation_id = ? AND kind = ? AND state = ? AND claim_token = ?`,
-		activationID, ActivationKindMail, ActivationAttempted, token).Scan(&agentID); err != nil {
-		return fmt.Errorf("state: read attempted mail activation: %w", err)
+		activationID, kind, ActivationAttempted, token).Scan(&agentID); err != nil {
+		return fmt.Errorf("state: read attempted activation: %w", err)
 	}
 	if err := resetTurnBudgetTx(tx, agentID, turnID); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("state: commit attempted mail turn: %w", err)
+		return fmt.Errorf("state: commit attempted activation turn: %w", err)
 	}
 	return nil
 }
 
-// RetireMailActivation removes an attempted record after its one bounded
-// handoff. Attempted rows are not history and are never replayed.
-func (s *Store) RetireMailActivation(activationID, token string) error {
+// RetireActivation removes an attempted record after its one bounded handoff.
+// Attempted rows are not history and are never replayed.
+func (s *Store) RetireActivation(kind, activationID, token string) error {
 	_, err := s.db.Exec(`
 DELETE FROM activations
 WHERE activation_id = ? AND kind = ? AND state = ? AND claim_token = ?`,
-		activationID, ActivationKindMail, ActivationAttempted, token)
+		activationID, kind, ActivationAttempted, token)
 	if err != nil {
-		return fmt.Errorf("state: retire mail activation: %w", err)
+		return fmt.Errorf("state: retire activation: %w", err)
+	}
+	return nil
+}
+
+// releaseActivationTx returns one pre-attempt claim to pending. The token
+// prevents a delayed worker from releasing a later claim. It is the whole of the
+// kind-agnostic release: any coalescing against another pending row is the
+// calling kind's own uniqueness rule.
+func releaseActivationTx(tx *sql.Tx, kind, activationID, token string) error {
+	if _, err := tx.Exec(`
+UPDATE activations
+SET state = ?, claim_token = '', claimed_at = NULL
+WHERE activation_id = ? AND kind = ? AND state = ? AND claim_token = ?`,
+		ActivationPending, activationID, kind, ActivationClaimed, token); err != nil {
+		return fmt.Errorf("state: release activation: %w", err)
 	}
 	return nil
 }

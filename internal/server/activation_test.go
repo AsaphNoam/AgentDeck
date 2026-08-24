@@ -96,7 +96,7 @@ func insertMail(t *testing.T, srv *Server, to string, bodies ...string) {
 
 func pendingActivations(t *testing.T, srv *Server, agentID string) []state.Activation {
 	t.Helper()
-	pending, err := srv.stateStore.PendingMailActivations(agentID, messaging.ActivationBatch)
+	pending, err := srv.stateStore.PendingActivations(state.ActivationKindMail, agentID, messaging.ActivationBatch)
 	if err != nil {
 		t.Fatalf("PendingMailActivations: %v", err)
 	}
