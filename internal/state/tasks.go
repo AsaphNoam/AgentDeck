@@ -1037,6 +1037,19 @@ WHERE task_id = ? AND state = ? AND start_attempt_id = ?`,
 			MaxTaskStartAttempts, reason}, "fail task start")
 }
 
+// ParkTaskStart parks a task whose target can never become eligible — a deleted,
+// archived, or terminal-interface agent. Retrying that is not a repair, so it
+// spends no attempt and goes straight to dependency_failed with the reason
+// (FS-16.R8, R19).
+func (s *Store) ParkTaskStart(taskID, attemptID, reason string) (Task, bool, error) {
+	return s.settleTaskStart(taskID, attemptID, `
+UPDATE tasks SET state = ?, attention_reason = ?, assigned_agent_id = NULL,
+  assigned_generation = '', runtime_claim = '', start_attempt_id = '',
+  start_claimed_at = NULL, revision = revision + 1, updated_at = ?
+WHERE task_id = ? AND state = ? AND start_attempt_id = ?`,
+		[]any{TaskDependencyFailed, reason}, "park task start")
+}
+
 // settleTaskStart runs one conditional statement that resolves a starting row,
 // guarded by the attempt id that reserved it. A statement that matches nothing
 // means the attempt is no longer the task's current one, which is an outcome

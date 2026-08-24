@@ -9,6 +9,11 @@ import (
 
 const (
 	ActivationKindMail = "mail"
+	// ActivationKindDependency is dependent work crossing into an existing
+	// conversation. Its uniqueness key is one pending row per (agent, task)
+	// rather than mail's one per agent, and it stays actionable until its owning
+	// task confirms its start (TS-10.R5).
+	ActivationKindDependency = "dependency"
 
 	ActivationPending   = "pending"
 	ActivationClaimed   = "claimed"
@@ -299,7 +304,7 @@ WHERE activation_id = ? AND kind = ? AND state = ? AND claim_token = ?`,
 // prevents a delayed worker from releasing a later claim. It is the whole of the
 // kind-agnostic release: any coalescing against another pending row is the
 // calling kind's own uniqueness rule.
-func releaseActivationTx(tx *sql.Tx, kind, activationID, token string) error {
+func releaseActivationTx(tx execer, kind, activationID, token string) error {
 	if _, err := tx.Exec(`
 UPDATE activations
 SET state = ?, claim_token = '', claimed_at = NULL
@@ -340,4 +345,70 @@ WHERE kind = ? AND state = ?`, ActivationPending, ActivationKindMail, Activation
 		return fmt.Errorf("state: commit recover mail activations: %w", err)
 	}
 	return nil
+}
+
+// EnsurePendingDependencyActivation returns the pending opportunity for one
+// task's assignee, creating it when there is none. The partial unique index on
+// (agent_id, source_id) makes this idempotent: a start attempt abandoned before
+// its turn leaves its row pending, and the next attempt reuses it rather than
+// queueing a second turn for the same task (TS-10.R5).
+func (s *Store) EnsurePendingDependencyActivation(agentID, taskID string) (Activation, error) {
+	var b [12]byte
+	if _, err := randRead(b[:]); err != nil {
+		return Activation{}, fmt.Errorf("state: read activation random: %w", err)
+	}
+	if _, err := s.db.Exec(`
+INSERT OR IGNORE INTO activations(activation_id, agent_id, kind, state, source_id, created_at)
+SELECT ?, agent_id, ?, ?, ?, ? FROM agents WHERE agent_id = ?`,
+		"a_"+hex.EncodeToString(b[:]), ActivationKindDependency, ActivationPending, taskID,
+		formatTime(timeNow()), agentID); err != nil {
+		return Activation{}, fmt.Errorf("state: ensure pending dependency activation: %w", err)
+	}
+	rows, err := s.db.Query(`
+SELECT activation_id, agent_id, kind, state, claim_token, source_id, created_at, claimed_at, attempted_at
+FROM activations
+WHERE kind = ? AND state = ? AND agent_id = ? AND source_id = ?`,
+		ActivationKindDependency, ActivationPending, agentID, taskID)
+	if err != nil {
+		return Activation{}, fmt.Errorf("state: read pending dependency activation: %w", err)
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return Activation{}, fmt.Errorf("state: read pending dependency activation: %w", err)
+		}
+		return Activation{}, ErrNotFound
+	}
+	return scanActivation(rows)
+}
+
+// ClaimActivation reserves one pending opportunity of a kind whose availability
+// is decided entirely by the row's own state. Mail is the exception and keeps its
+// own claim, because its availability also depends on unread mail existing at
+// claim time (FS-06.R25). A false result with no error means another worker won.
+func (s *Store) ClaimActivation(kind, activationID string) (string, bool, error) {
+	var b [16]byte
+	if _, err := randRead(b[:]); err != nil {
+		return "", false, fmt.Errorf("state: read activation claim random: %w", err)
+	}
+	token := hex.EncodeToString(b[:])
+	res, err := s.db.Exec(`
+UPDATE activations
+SET state = ?, claim_token = ?, claimed_at = ?
+WHERE activation_id = ? AND kind = ? AND state = ?`,
+		ActivationClaimed, token, formatTime(timeNow()), activationID, kind, ActivationPending)
+	if err != nil {
+		return "", false, fmt.Errorf("state: claim activation: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n != 1 {
+		return "", false, nil
+	}
+	return token, true, nil
+}
+
+// ReleaseActivation makes a pre-attempt claim actionable again for a kind whose
+// pending rows do not coalesce. Mail's release is separate because collapsing a
+// released row into a newer pending one is mail's at-most-once rule.
+func (s *Store) ReleaseActivation(kind, activationID, token string) error {
+	return releaseActivationTx(s.db, kind, activationID, token)
 }

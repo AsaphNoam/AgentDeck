@@ -967,7 +967,7 @@ func TestStartActivationRefusesAKindWithNoRegisteredContract(t *testing.T) {
 	t.Cleanup(func() { c.Stop(ctx, h.AgentID) })
 
 	called := false
-	started, err := c.StartActivation(ctx, h.AgentID, "dependency", func(string) error {
+	started, err := c.StartActivation(ctx, h.AgentID, "not-a-registered-kind", func(string) error {
 		called = true
 		return nil
 	})
@@ -1006,5 +1006,20 @@ func TestStartActivationRefusesAKindWithNoRegisteredContract(t *testing.T) {
 	}
 	if !strings.Contains(string(raw), mail.Instruction) {
 		t.Fatalf("prompt = %s, want the registered instruction %q", raw, mail.Instruction)
+	}
+
+	// FS-16.R26 — dependent work has its own row. An agent told to check its
+	// messages would do exactly that and never find its task, so the two kinds
+	// must not share an instruction or a status.
+	dependency, ok := LookupActivationKind("dependency")
+	if !ok {
+		t.Fatal("dependency has no registered activation contract")
+	}
+	if dependency.Instruction == mail.Instruction || dependency.StatusDetail == mail.StatusDetail {
+		t.Fatalf("dependency inherited mail's contract: %+v", dependency)
+	}
+	if !strings.Contains(dependency.Instruction, "get_assigned_task") {
+		t.Fatalf("dependency instruction = %q, want it to name the tool that reads the assignment",
+			dependency.Instruction)
 	}
 }

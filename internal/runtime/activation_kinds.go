@@ -28,6 +28,15 @@ var activationKinds = map[string]ActivationKind{
 		StatusDetail: "checking messages",
 		LastTrace:    "MailActivation",
 	},
+	// An agent told to check its messages will do exactly that and never find its
+	// task, so dependent work has its own instruction and its own status. It
+	// carries no task id, arm set, or assignment text: the agent reads all of that
+	// through get_assigned_task (FS-16.R26, R11).
+	state.ActivationKindDependency: {
+		Instruction:  "You have been assigned a task. Call the get_assigned_task tool to read your assignment, then carry it out.",
+		StatusDetail: "starting assigned task",
+		LastTrace:    "TaskActivation",
+	},
 }
 
 // LookupActivationKind returns the contract for a kind and whether it exists.

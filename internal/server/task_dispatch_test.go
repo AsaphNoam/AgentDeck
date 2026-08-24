@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
@@ -249,5 +250,121 @@ func TestRepeatedStartFailuresParkTheTask(t *testing.T) {
 	// Nothing is left holding a runtime or a slot.
 	if parked.RuntimeClaim != "" || parked.AssignedAgentID != "" {
 		t.Fatalf("parked task still holds %+v", parked)
+	}
+}
+
+// newAgentTask creates a ready task that crosses into an existing agent.
+func newAgentTask(t *testing.T, srv *Server, agentID, name string) state.Task {
+	t.Helper()
+	id, err := srv.stateStore.NewTaskID()
+	if err != nil {
+		t.Fatalf("NewTaskID: %v", err)
+	}
+	task, err := srv.stateStore.CreateTask(state.Task{
+		TaskID: id, Project: "tmpproj", DisplayName: name,
+		Instruction:   "please do " + name,
+		TargetKind:    state.TargetAgent,
+		TargetAgentID: agentID,
+		CreatedByKind: "person",
+	})
+	if err != nil {
+		t.Fatalf("CreateTask %s: %v", name, err)
+	}
+	return task
+}
+
+// FS-16.R6, R26 / TS-10.R5 — a task targeting a running agent gives it one
+// bounded turn through the dependency activation kind. The agent is told it has
+// a task, not told to check its mail, and its runtime is borrowed: it was already
+// up for its own reasons, so the task takes no budget slot.
+func TestATaskForARunningAgentActivatesThatConversation(t *testing.T) {
+	srv, ts, promptLog := activationTestServer(t)
+	agentID := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+	task := newAgentTask(t, srv, agentID, "review the migration")
+
+	srv.dispatchReadyTasks(context.Background())
+	running := waitTaskState(t, srv, task.TaskID, state.TaskRunning)
+	if running.AssignedAgentID != agentID || running.RuntimeClaim != state.ClaimBorrowed {
+		t.Fatalf("task assigned %q claiming %q, want %q borrowed",
+			running.AssignedAgentID, running.RuntimeClaim, agentID)
+	}
+
+	waitPrompts(t, promptLog, 1)
+	raw, err := os.ReadFile(promptLog)
+	if err != nil {
+		t.Fatalf("read prompt log: %v", err)
+	}
+	dependency, ok := runtime.LookupActivationKind(state.ActivationKindDependency)
+	if !ok {
+		t.Fatal("the dependency activation kind has no registered contract")
+	}
+	if !strings.Contains(string(raw), dependency.Instruction) {
+		t.Fatalf("prompt = %s, want the task instruction %q", raw, dependency.Instruction)
+	}
+	mail, _ := runtime.LookupActivationKind(state.ActivationKindMail)
+	if strings.Contains(string(raw), mail.Instruction) {
+		t.Fatalf("the activated agent was told to check its messages: %s", raw)
+	}
+	// The activation record is consumed rather than left to fire again.
+	pending, err := srv.stateStore.PendingActivations(state.ActivationKindDependency, agentID, 10)
+	if err != nil {
+		t.Fatalf("PendingActivations: %v", err)
+	}
+	if len(pending) != 0 {
+		t.Fatalf("dependency activations still pending after the turn: %+v", pending)
+	}
+	if _, err := srv.stateStore.ReadRunning(agentID); err != nil {
+		t.Fatalf("the borrowed runtime was disturbed: %v", err)
+	}
+}
+
+// FS-16.R6, R19 — a task targeting a stopped agent wakes it on the same terms
+// mail does, and records that it woke the runtime, which is what decides whether
+// finishing the task stops it again.
+func TestATaskForAStoppedAgentWakesIt(t *testing.T) {
+	srv, ts, promptLog := activationTestServer(t)
+	agentID := launchThenStop(t, srv, ts)
+	task := newAgentTask(t, srv, agentID, "pick this back up")
+
+	srv.dispatchReadyTasks(context.Background())
+	running := waitTaskState(t, srv, task.TaskID, state.TaskRunning)
+	if running.RuntimeClaim != state.ClaimWoke {
+		t.Fatalf("runtime claim = %q, want %q", running.RuntimeClaim, state.ClaimWoke)
+	}
+	waitRunning(t, srv, agentID, true)
+	waitPrompts(t, promptLog, 1)
+	raw, err := os.ReadFile(promptLog)
+	if err != nil {
+		t.Fatalf("read prompt log: %v", err)
+	}
+	dependency, _ := runtime.LookupActivationKind(state.ActivationKindDependency)
+	if !strings.Contains(string(raw), dependency.Instruction) {
+		t.Fatalf("woken prompt = %s, want the task instruction", raw)
+	}
+}
+
+// FS-16.R2, R19 — a target that can never execute work parks its task instead of
+// spending attempts on a start that cannot succeed.
+func TestATaskForAnIneligibleTargetParksWithoutSpendingAttempts(t *testing.T) {
+	srv, _ := wakeTestServer(t)
+	if err := srv.stateStore.WriteAgent(state.Agent{
+		AgentID: "a_term", Name: "Shell", Role: "impl", Project: "tmpproj",
+		Backend: "claude-acp", Model: "sonnet", Interface: "terminal",
+		CreatedAt: time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("WriteAgent: %v", err)
+	}
+	task := newAgentTask(t, srv, "a_term", "cannot run here")
+
+	srv.dispatchReadyTasks(context.Background())
+	parked := waitTaskState(t, srv, task.TaskID, state.TaskDependencyFailed)
+	if parked.StartAttemptCount != 0 {
+		t.Fatalf("parking a terminal target spent %d attempts, want 0", parked.StartAttemptCount)
+	}
+	if !strings.Contains(parked.AttentionReason, "terminal") {
+		t.Fatalf("attention reason = %q, want it to name the terminal interface", parked.AttentionReason)
+	}
+	if parked.AssignedAgentID != "" || parked.RuntimeClaim != "" {
+		t.Fatalf("a parked task still holds a reservation: %+v", parked)
 	}
 }

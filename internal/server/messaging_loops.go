@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/agentdeck/agentdeck/internal/messaging"
+	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
@@ -131,31 +132,7 @@ func (s *Server) executeMailActivation(ctx context.Context, activation state.Act
 }
 
 func (s *Server) startRunningMailActivation(ctx context.Context, activation state.Activation, token string) {
-	// The turn gate this is about to take is the one a stage's own prompt needs,
-	// so taking it has to be arbitrated against the exclusive lifecycle claim in
-	// one place rather than sampled beforehand: a Continue that claims after the
-	// caller's hint read false still composes its assignment into an agent this
-	// activation has since made busy, and ErrTurnInFlight pauses the run. The
-	// stopped branch already arbitrates this way through resumeSessionWithHooks;
-	// a running recipient needs the same claim held across the turn start
-	// (TS-01.R21, INV §5). Losing it is pre-attempt, so mail returns to pending.
-	if !s.claimLifecycle(activation.AgentID) {
-		s.releaseMailActivation(activation, token)
-		return
-	}
-	defer s.releaseLifecycle(activation.AgentID)
-	attempted := false
-	started, err := s.registry.StartActivation(ctx, activation.AgentID, state.ActivationKindMail, func(turnID string) error {
-		var err error
-		attempted, err = s.stateStore.AttemptActivation(state.ActivationKindMail, activation.ActivationID, token, turnID)
-		if err == nil && !attempted {
-			return errors.New("mail activation claim lost")
-		}
-		return err
-	})
-	if err != nil {
-		s.log.Debug("start running mail activation failed", "agent", activation.AgentID, "err", err)
-	}
+	attempted, started := s.runActivationTurn(ctx, state.ActivationKindMail, activation, token)
 	if !started && !attempted {
 		s.releaseMailActivation(activation, token)
 		return
@@ -165,6 +142,38 @@ func (s *Server) startRunningMailActivation(ctx context.Context, activation stat
 			s.log.Debug("retire running mail activation failed", "activation", activation.ActivationID, "err", err)
 		}
 	}
+}
+
+// runActivationTurn starts one host-owned turn of this kind on a live agent and
+// reports whether the kind's non-replayable boundary was crossed. It owns the
+// turn start and nothing else: what to do with a claim that never crossed one is
+// the calling kind's own policy.
+//
+// The turn gate it takes is the one a pipeline stage's own prompt needs, so
+// taking it has to be arbitrated against the exclusive lifecycle claim in one
+// place rather than sampled beforehand: a Continue that claims after the caller's
+// hint read false still composes its assignment into an agent this activation has
+// since made busy, and ErrTurnInFlight pauses the run. The stopped branch
+// arbitrates the same way through resumeSessionWithHooks; a running recipient
+// needs the same claim held across the turn start (TS-01.R21, INV §5). Losing it
+// is pre-attempt, so it is reported as neither started nor attempted.
+func (s *Server) runActivationTurn(ctx context.Context, kind string, activation state.Activation, token string) (attempted, started bool) {
+	if !s.claimLifecycle(activation.AgentID) {
+		return false, false
+	}
+	defer s.releaseLifecycle(activation.AgentID)
+	started, err := s.registry.StartActivation(ctx, activation.AgentID, kind, func(turnID string) error {
+		var err error
+		attempted, err = s.stateStore.AttemptActivation(kind, activation.ActivationID, token, turnID)
+		if err == nil && !attempted {
+			return errors.New("activation claim lost")
+		}
+		return err
+	})
+	if err != nil {
+		s.log.Debug("start running activation failed", "kind", kind, "agent", activation.AgentID, "err", err)
+	}
+	return attempted, started
 }
 
 func (s *Server) startStoppedMailActivation(ctx context.Context, activation state.Activation, token string) {
@@ -187,36 +196,47 @@ func (s *Server) startStoppedMailActivation(ctx context.Context, activation stat
 		s.discardMailActivation(activation, token)
 		return
 	}
-	attempted := false
-	ae := s.resumeSessionWithHooks(ctx, activation.AgentID, resumeOverride{}, func() error {
-		var err error
-		attempted, err = s.stateStore.AttemptActivation(state.ActivationKindMail, activation.ActivationID, token, "")
-		if err == nil && !attempted {
-			return errors.New("mail activation claim lost")
-		}
-		return err
-	}, func() error {
-		started, err := s.registry.StartActivation(ctx, activation.AgentID, state.ActivationKindMail, func(turnID string) error {
-			return s.stateStore.StartAttemptedTurn(state.ActivationKindMail, activation.ActivationID, token, turnID)
-		})
-		if err != nil {
-			return err
-		}
-		if !started {
-			return errors.New("mail activation turn did not start")
-		}
-		return nil
-	})
-	if ae != nil {
-		s.log.Debug("start stopped mail activation failed", "agent", activation.AgentID, "err", ae.Message)
-	}
-	if attempted {
+	// Mail spends its opportunity at the boundary: a resume that failed afterwards
+	// is not replayed, which is what at-most-once means for it.
+	if attempted, _ := s.wakeForActivation(ctx, state.ActivationKindMail, activation, token); attempted {
 		if err := s.stateStore.RetireActivation(state.ActivationKindMail, activation.ActivationID, token); err != nil {
 			s.log.Debug("retire stopped mail activation failed", "activation", activation.ActivationID, "err", err)
 		}
 		return
 	}
 	s.releaseMailActivation(activation, token)
+}
+
+// wakeForActivation resumes a stopped agent and starts one turn of this kind
+// inside that resume. It reports whether the non-replayable boundary was crossed
+// and how the resume itself ended, because those are different facts: the
+// boundary is crossed in the pre-side-effect hook, so a resume can fail after a
+// kind has already spent its opportunity (INV §15).
+func (s *Server) wakeForActivation(ctx context.Context, kind string, activation state.Activation, token string) (bool, *runtime.APIError) {
+	attempted := false
+	ae := s.resumeSessionWithHooks(ctx, activation.AgentID, resumeOverride{}, func() error {
+		var err error
+		attempted, err = s.stateStore.AttemptActivation(kind, activation.ActivationID, token, "")
+		if err == nil && !attempted {
+			return errors.New("activation claim lost")
+		}
+		return err
+	}, func() error {
+		started, err := s.registry.StartActivation(ctx, activation.AgentID, kind, func(turnID string) error {
+			return s.stateStore.StartAttemptedTurn(kind, activation.ActivationID, token, turnID)
+		})
+		if err != nil {
+			return err
+		}
+		if !started {
+			return errors.New("activation turn did not start")
+		}
+		return nil
+	})
+	if ae != nil {
+		s.log.Debug("start stopped activation failed", "kind", kind, "agent", activation.AgentID, "err", ae.Message)
+	}
+	return attempted, ae
 }
 
 func (s *Server) releaseMailActivation(activation state.Activation, token string) {
