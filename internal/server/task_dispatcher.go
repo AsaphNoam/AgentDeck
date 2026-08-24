@@ -313,3 +313,52 @@ func (s *Server) taskConcurrencyBudget() int {
 	}
 	return cfg.TaskConcurrency
 }
+
+// dispatchTurnEnd fans one completed turn out to every control plane that waits
+// for a turn boundary. Both wait for the same thing and for the same reason —
+// an agent that reported a result is still receiving that call's response, so
+// nothing may stop it until the turn ends — so this is one dispatch with two
+// subscribers rather than two paths (TS-10.R19, TS-09.R9–R11, INV §2).
+func (s *Server) dispatchTurnEnd(agentID, generation string) {
+	if s.pipelineMgr != nil {
+		if err := s.pipelineMgr.OnTurnEnd(agentID, generation); err != nil {
+			s.log.Warn("pipeline turn boundary", "agent_id", agentID, "err", err)
+		}
+	}
+	s.releaseReportedTask(context.Background(), agentID, generation)
+}
+
+// releaseReportedTask completes the release a recorded result already promised:
+// it stops a runtime this task created or woke and leaves a borrowed one alone,
+// then drops the claim (FS-16.R4, TS-10.R19). A stop that cannot happen now
+// leaves the durable intent standing for recovery to finish, because dropping
+// the claim first would abandon a live runtime nothing owns (INV §15).
+func (s *Server) releaseReportedTask(ctx context.Context, agentID, generation string) {
+	task, err := s.stateStore.PendingReleaseTask(agentID, generation)
+	if errors.Is(err, state.ErrNotFound) {
+		return
+	}
+	if err != nil {
+		s.log.Debug("read pending task release failed", "agent", agentID, "err", err)
+		return
+	}
+	if task.RuntimeClaim == state.ClaimCreated || task.RuntimeClaim == state.ClaimWoke {
+		if err := s.StopStage(ctx, agentID); err != nil {
+			s.log.Debug("stop task runtime failed", "task", task.TaskID, "agent", agentID, "err", err)
+			return
+		}
+	}
+	if err := s.stateStore.CompleteTaskRelease(task.TaskID); err != nil {
+		s.log.Debug("complete task release failed", "task", task.TaskID, "err", err)
+	}
+}
+
+// evaluateTaskResult releases the arms waiting on a task that just recorded its
+// outcome. Evaluation reads the durable registration rather than an outcome
+// handed to it, so a dropped or repeated notification changes nothing
+// (TS-10.R3).
+func (s *Server) evaluateTaskResult(taskID string) {
+	if _, err := s.stateStore.EvaluateSource(state.SourceTask, taskID); err != nil {
+		s.log.Debug("evaluate task result failed", "task", taskID, "err", err)
+	}
+}

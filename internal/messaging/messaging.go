@@ -36,6 +36,7 @@ type Server struct {
 	onBudgetExceeded  func(agentID, turnID string, used int)
 	onMessageInserted func(fromAgentID, toAgentID string)
 	onMessagesRead    func(agentID string)
+	onTaskResult      func(taskID string)
 	addressable       func() ([]state.LiveAgent, error)
 	pipelines         *pipeline.Manager
 	context           *contextref.Service
@@ -108,6 +109,24 @@ func (s *Server) SetMessagesReadSink(fn func(agentID string)) {
 	s.mu.Unlock()
 }
 
+// SetTaskResultSink wires an accepted task result back to the control plane that
+// evaluates the arms waiting on it. It is a notification, never the authority:
+// the registration is already committed when it fires (TS-10.R2).
+func (s *Server) SetTaskResultSink(fn func(taskID string)) {
+	s.mu.Lock()
+	s.onTaskResult = fn
+	s.mu.Unlock()
+}
+
+func (s *Server) taskResultRecorded(taskID string) {
+	s.mu.RLock()
+	fn := s.onTaskResult
+	s.mu.RUnlock()
+	if fn != nil {
+		fn(taskID)
+	}
+}
+
 func (s *Server) messagesRead(agentID string) {
 	s.mu.RLock()
 	fn := s.onMessagesRead
@@ -172,6 +191,10 @@ func New(store *state.Store, log *slog.Logger) *Server {
 		Name:        "get_assigned_task",
 		Description: "Read the task you are currently assigned: its instruction and the context references attached to it. Returns assigned=false when you have none.",
 	}, s.handleGetAssignedTask)
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "report_task_result",
+		Description: "Record the authoritative success, failure, or blocked result for the task you are assigned. Your runtime is released after this turn ends, so you still receive this response.",
+	}, s.handleReportTaskResult)
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "share_context",
 		Description: "Give another chat agent access to context you own — your current turn so far, your latest completed turn, or your accepted pipeline report — without copying it. Returns a reusable context_ref_id; the recipient reads it explicitly and is not woken.",

@@ -368,3 +368,175 @@ func TestATaskForAnIneligibleTargetParksWithoutSpendingAttempts(t *testing.T) {
 		t.Fatalf("a parked task still holds a reservation: %+v", parked)
 	}
 }
+
+// FS-16.R4 / TS-10.R19 — finishing releases the claim and stops the runtime the
+// task itself brought up, at the reporting turn's end rather than inside the
+// call, and leaves a non-archived, resumable agent behind.
+func TestFinishingStopsTheRuntimeTheTaskCreated(t *testing.T) {
+	srv, _ := wakeTestServer(t)
+	task := newLaunchTask(t, srv, "build the thing")
+	srv.dispatchReadyTasks(context.Background())
+	running := waitTaskState(t, srv, task.TaskID, state.TaskRunning)
+
+	agentID := running.AssignedAgentID
+	generation := srv.registry.Generation(agentID)
+	if generation != running.AssignedGeneration {
+		t.Fatalf("live generation %q is not the one the task reserved (%q)",
+			generation, running.AssignedGeneration)
+	}
+	finished, err := srv.stateStore.RecordAgentTaskResult(task.TaskID, agentID, generation,
+		state.TaskResult{Outcome: state.OutcomeSuccess, Summary: "built it"})
+	if err != nil {
+		t.Fatalf("RecordAgentTaskResult: %v", err)
+	}
+	if !finished.PendingRelease {
+		t.Fatal("a recorded result committed no release intent")
+	}
+	// Still up: the reporting agent is receiving its own tool response.
+	if _, err := srv.stateStore.ReadRunning(agentID); err != nil {
+		t.Fatalf("the reporter was stopped inside its own call: %v", err)
+	}
+
+	srv.dispatchTurnEnd(agentID, generation)
+	waitRunning(t, srv, agentID, false)
+	released, err := srv.stateStore.ReadTask(task.TaskID)
+	if err != nil {
+		t.Fatalf("ReadTask: %v", err)
+	}
+	if released.PendingRelease || released.RuntimeClaim != "" {
+		t.Fatalf("the release never completed: %+v", released)
+	}
+	if released.AssignedAgentID != agentID {
+		t.Fatalf("assignee provenance = %q, want it retained", released.AssignedAgentID)
+	}
+	agent, err := srv.stateStore.ReadAgent(agentID)
+	if err != nil {
+		t.Fatalf("ReadAgent: %v", err)
+	}
+	if agent.Archived {
+		t.Fatal("finishing a task archived its agent")
+	}
+}
+
+// FS-16.R4 — a borrowed runtime was already up for someone else's reasons, so
+// finishing releases the claim and leaves the conversation running.
+func TestFinishingLeavesABorrowedRuntimeAlone(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	agentID := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+	task := newAgentTask(t, srv, agentID, "review this")
+	srv.dispatchReadyTasks(context.Background())
+	running := waitTaskState(t, srv, task.TaskID, state.TaskRunning)
+
+	if _, err := srv.stateStore.RecordAgentTaskResult(task.TaskID, agentID, running.AssignedGeneration,
+		state.TaskResult{Outcome: state.OutcomeBlocked, Summary: "needs a decision"}); err != nil {
+		t.Fatalf("RecordAgentTaskResult: %v", err)
+	}
+	srv.dispatchTurnEnd(agentID, running.AssignedGeneration)
+
+	if _, err := srv.stateStore.ReadRunning(agentID); err != nil {
+		t.Fatalf("finishing a task killed a conversation it only borrowed: %v", err)
+	}
+	released, err := srv.stateStore.ReadTask(task.TaskID)
+	if err != nil {
+		t.Fatalf("ReadTask: %v", err)
+	}
+	if released.PendingRelease || released.RuntimeClaim != "" {
+		t.Fatalf("the borrowed claim was not released: %+v", released)
+	}
+}
+
+// FS-16.R5, R6 / TS-10.R3 — the loop closes: a dependent stays armed until its
+// prerequisite records a satisfying outcome, then becomes ready and is started,
+// with no agent polling, waiting, or announcing anything.
+func TestADependentStartsWhenItsPrerequisiteRecordsItsResult(t *testing.T) {
+	srv, _ := wakeTestServer(t)
+	first := newLaunchTask(t, srv, "first")
+	id, err := srv.stateStore.NewTaskID()
+	if err != nil {
+		t.Fatalf("NewTaskID: %v", err)
+	}
+	second, err := srv.stateStore.CreateTask(state.Task{
+		TaskID: id, Project: "tmpproj", DisplayName: "second", Instruction: "after the first",
+		TargetKind: state.TargetLaunch, Role: "impl", CreatedByKind: "person",
+		Arms: []state.TaskArm{{
+			Kind: state.ArmWorkResult, SourceKind: state.SourceTask, SourceID: first.TaskID,
+			SatisfyingOutcomes: []string{state.OutcomeSuccess},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if second.State != state.TaskArmed {
+		t.Fatalf("dependent = %s, want armed", second.State)
+	}
+
+	srv.dispatchReadyTasks(context.Background())
+	running := waitTaskState(t, srv, first.TaskID, state.TaskRunning)
+	// The dependent is untouched while its prerequisite runs: liveness is not a
+	// result (FS-16.R3).
+	if waiting, err := srv.stateStore.ReadTask(second.TaskID); err != nil || waiting.State != state.TaskArmed {
+		t.Fatalf("dependent = %+v, %v; want still armed", waiting, err)
+	}
+
+	generation := running.AssignedGeneration
+	if _, err := srv.stateStore.RecordAgentTaskResult(first.TaskID, running.AssignedAgentID, generation,
+		state.TaskResult{Outcome: state.OutcomeSuccess, Summary: "done"}); err != nil {
+		t.Fatalf("RecordAgentTaskResult: %v", err)
+	}
+	srv.evaluateTaskResult(first.TaskID)
+
+	ready, err := srv.stateStore.ReadTask(second.TaskID)
+	if err != nil {
+		t.Fatalf("ReadTask: %v", err)
+	}
+	if ready.State != state.TaskReady {
+		t.Fatalf("dependent = %s after its prerequisite succeeded, want ready", ready.State)
+	}
+	srv.dispatchTurnEnd(running.AssignedAgentID, generation)
+	srv.dispatchReadyTasks(context.Background())
+	waitTaskState(t, srv, second.TaskID, state.TaskRunning)
+}
+
+// FS-16.R8 — a prerequisite that finishes outside its arm's satisfying set parks
+// the dependent instead of leaving it waiting on an outcome that can never come.
+func TestAnUnsatisfyingResultParksTheDependent(t *testing.T) {
+	srv, _ := wakeTestServer(t)
+	first := newLaunchTask(t, srv, "first")
+	id, err := srv.stateStore.NewTaskID()
+	if err != nil {
+		t.Fatalf("NewTaskID: %v", err)
+	}
+	second, err := srv.stateStore.CreateTask(state.Task{
+		TaskID: id, Project: "tmpproj", DisplayName: "second", Instruction: "only after success",
+		TargetKind: state.TargetLaunch, Role: "impl", CreatedByKind: "person",
+		Arms: []state.TaskArm{{
+			Kind: state.ArmWorkResult, SourceKind: state.SourceTask, SourceID: first.TaskID,
+			SatisfyingOutcomes: []string{state.OutcomeSuccess},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	srv.dispatchReadyTasks(context.Background())
+	running := waitTaskState(t, srv, first.TaskID, state.TaskRunning)
+	if _, err := srv.stateStore.RecordAgentTaskResult(first.TaskID, running.AssignedAgentID,
+		running.AssignedGeneration,
+		state.TaskResult{Outcome: state.OutcomeFailure, Summary: "could not"}); err != nil {
+		t.Fatalf("RecordAgentTaskResult: %v", err)
+	}
+	srv.evaluateTaskResult(first.TaskID)
+
+	parked, err := srv.stateStore.ReadTask(second.TaskID)
+	if err != nil {
+		t.Fatalf("ReadTask: %v", err)
+	}
+	if parked.State != state.TaskDependencyFailed || parked.AttentionReason == "" {
+		t.Fatalf("dependent = %s (%q), want it parked and surfaced", parked.State, parked.AttentionReason)
+	}
+	srv.dispatchReadyTasks(context.Background())
+	time.Sleep(100 * time.Millisecond)
+	if again, err := srv.stateStore.ReadTask(second.TaskID); err != nil ||
+		again.State != state.TaskDependencyFailed {
+		t.Fatalf("a parked task started on its own: %+v, %v", again, err)
+	}
+}

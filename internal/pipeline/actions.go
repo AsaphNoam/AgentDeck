@@ -194,13 +194,15 @@ func (m *Manager) Report(agentID, generation string, report StageReport) (RunDet
 	if err != nil {
 		return RunDetail{}, err
 	}
-	if attempt.AgentID != agentID || attempt.AgentGeneration != generation || run.PendingAction != "await_result" {
+	if !state.OwnsReportedWork(agentID, generation, attempt.AgentID, attempt.AgentGeneration) || run.PendingAction != "await_result" {
 		return RunDetail{}, controlError("stale_assignment", "caller is not the current stage attempt")
 	}
-	if report.Outcome != "success" && report.Outcome != "failure" && report.Outcome != "blocked" {
+	// The vocabulary and the field bounds are the shared work-result rules, so a
+	// stage report and a task report can never drift apart (TS-10.R7).
+	switch err := state.ValidateAgentReport(report.Outcome, report.Summary, report.Details, report.Checks); {
+	case errors.Is(err, state.ErrInvalidOutcome):
 		return RunDetail{}, validationError("invalid stage result", []Diagnostic{{Field: "outcome", Code: "invalid", Message: "outcome must be success, failure, or blocked"}})
-	}
-	if strings.TrimSpace(report.Summary) == "" || utf8.RuneCountInString(report.Summary) > MaxSummaryRunes || utf8.RuneCountInString(report.Details) > MaxDetailsRunes || utf8.RuneCountInString(report.Checks) > MaxChecksRunes {
+	case err != nil:
 		return RunDetail{}, validationError("invalid stage result", []Diagnostic{{Field: "summary", Code: "invalid", Message: "summary is required and report fields must fit their documented limits"}})
 	}
 	if report.Outputs == nil {

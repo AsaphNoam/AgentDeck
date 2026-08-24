@@ -248,16 +248,16 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	// gets no runtime, bus, or lifecycle handle, so no context operation can
 	// start a model turn (TS-01.R22, FS-15.R10).
 	msg.SetContextService(contextref.New(stateStore, cfgStore.Home()))
+	// An accepted task result releases the arms waiting on it. The registration is
+	// already committed when this fires, so a dropped notification only delays the
+	// dependent's start until the next dispatch sweep (TS-10.R2, R3).
+	msg.SetTaskResultSink(s.evaluateTaskResult)
 	if registry != nil {
 		registry.SetEventSink(func(ev runtime.Event) {
 			eventBus.PublishRuntimeEvent(ev)
-			if ev.Type == runtime.EvTurnEnd && s.pipelineMgr != nil {
+			if ev.Type == runtime.EvTurnEnd {
 				generation := registry.Generation(ev.AgentID)
-				go func() {
-					if err := s.pipelineMgr.OnTurnEnd(ev.AgentID, generation); err != nil {
-						s.log.Warn("pipeline turn boundary", "agent_id", ev.AgentID, "err", err)
-					}
-				}()
+				go s.dispatchTurnEnd(ev.AgentID, generation)
 			}
 		})
 	}

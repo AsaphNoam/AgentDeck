@@ -1119,3 +1119,108 @@ FROM task_attachments WHERE task_id = ? ORDER BY created_at, context_ref_id`, ta
 	}
 	return out, nil
 }
+
+// ErrTaskNotAssigned is returned when the caller does not hold the assignment it
+// is reporting on — a different agent, or the same agent's earlier generation.
+var ErrTaskNotAssigned = errors.New("state: caller does not hold this assignment")
+
+// ErrTaskNotReportable is returned when a task is in no state to take a result.
+var ErrTaskNotReportable = errors.New("state: task cannot take a result in this state")
+
+// TaskResult is one recorded outcome for a task.
+type TaskResult struct {
+	Outcome string
+	Summary string
+	Details string
+}
+
+// RecordAgentTaskResult commits the assignee's result and a durable intent to
+// release its runtime in one transaction, and registers the outcome in the
+// shared result layer in the same commit (TS-10.R7, R19, FS-16.R3).
+//
+// The stop is deliberately not part of it: stopping a process cannot be
+// transactional, and the reporting agent is still waiting on this call's own
+// response. The claim and the budget slot stay held until the reporting turn
+// ends, and because the intent is durable a crash in between cannot strand a
+// live task-owned runtime (INV §15).
+func (s *Store) RecordAgentTaskResult(taskID, agentID, generation string, result TaskResult) (Task, error) {
+	if err := ValidateAgentReport(result.Outcome, result.Summary, result.Details, ""); err != nil {
+		return Task{}, err
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return Task{}, fmt.Errorf("state: begin record task result: %w", err)
+	}
+	defer tx.Rollback()
+
+	var taskState, assignedAgent, assignedGeneration string
+	err = tx.QueryRow(`
+SELECT state, COALESCE(assigned_agent_id, ''), assigned_generation
+FROM tasks WHERE task_id = ?`, taskID).Scan(&taskState, &assignedAgent, &assignedGeneration)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Task{}, ErrNotFound
+	}
+	if err != nil {
+		return Task{}, fmt.Errorf("state: read task for result: %w", err)
+	}
+	if !OwnsReportedWork(agentID, generation, assignedAgent, assignedGeneration) {
+		return Task{}, ErrTaskNotAssigned
+	}
+	// A result is accepted from the assignment's own states only. A finished task
+	// is immutable, and an interrupted one has no live assignee to report it
+	// (FS-16.R3, R22).
+	if taskState != TaskStarting && taskState != TaskRunning {
+		return Task{}, ErrTaskNotReportable
+	}
+	now := timeNow()
+	stamp := formatTime(now)
+	if _, err := tx.Exec(`
+UPDATE tasks SET state = ?, outcome = ?, outcome_source = ?, outcome_summary = ?,
+  outcome_details = ?, attention_reason = '', pending_release = 1, finished_at = ?,
+  revision = revision + 1, updated_at = ?
+WHERE task_id = ? AND state = ?`,
+		TaskFinished, result.Outcome, "agent", result.Summary, result.Details,
+		stamp, stamp, taskID, taskState); err != nil {
+		return Task{}, fmt.Errorf("state: record task result: %w", err)
+	}
+	if err := RegisterWorkResultTx(tx, WorkResult{
+		SourceKind: SourceTask, SourceID: taskID, Outcome: result.Outcome,
+		Summary: result.Summary,
+	}, now); err != nil {
+		return Task{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return Task{}, fmt.Errorf("state: commit task result: %w", err)
+	}
+	return s.ReadTask(taskID)
+}
+
+// PendingReleaseTask returns the task whose release this agent's generation owes,
+// or ErrNotFound. The generation matters: a resumed agent is a new runtime, and
+// the release belonged to the one that reported (TS-10.R19).
+func (s *Store) PendingReleaseTask(agentID, generation string) (Task, error) {
+	task, err := scanTask(s.db.QueryRow(taskSelect+`
+WHERE assigned_agent_id = ? AND assigned_generation = ? AND pending_release = 1`,
+		agentID, generation))
+	if errors.Is(err, sql.ErrNoRows) {
+		return Task{}, ErrNotFound
+	}
+	if err != nil {
+		return Task{}, err
+	}
+	return task, nil
+}
+
+// CompleteTaskRelease clears the runtime claim and the release intent once the
+// stop has actually happened or the runtime has been reaped. Until it does, the
+// intent stands and recovery finishes it, so no terminal state ever discards
+// ownership of a live runtime (TS-10.R19, INV §15).
+func (s *Store) CompleteTaskRelease(taskID string) error {
+	if _, err := s.db.Exec(`
+UPDATE tasks SET pending_release = 0, runtime_claim = '', revision = revision + 1,
+  updated_at = ?
+WHERE task_id = ? AND pending_release = 1`, formatTime(timeNow()), taskID); err != nil {
+		return fmt.Errorf("state: complete task release: %w", err)
+	}
+	return nil
+}
