@@ -1,6 +1,7 @@
 import { getTranscript } from "./client";
 import { QUERY_KEYS, queryClient } from "./config";
 import { PIPELINE_QUERY_KEYS } from "./pipelines";
+import { TASK_QUERY_KEYS } from "./tasks";
 import type { Config } from "../schemas/config";
 import type { AgentState, BusEvent, NotificationPayload, TranscriptEvent } from "./types";
 import { pipelineUpdateSchema, type PipelineRunDetail } from "../schemas/pipeline";
@@ -46,6 +47,7 @@ class SseClient {
       void this.refetchOpenTranscript().catch(() => undefined);
       queryClient.invalidateQueries({ queryKey: ["pipelines", "runs"] });
       queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.proposals });
+      queryClient.invalidateQueries({ queryKey: TASK_QUERY_KEYS.all });
     };
     this.es.onerror = () => useUiStore.getState().setConnection("reconnecting");
     this.es.addEventListener("state_update", (event) => this.onStateUpdate(event as MessageEvent<string>));
@@ -53,6 +55,9 @@ class SseClient {
     this.es.addEventListener("notification", (event) => this.onNotification(event as MessageEvent<string>));
     this.es.addEventListener("pipeline_update", (event) => this.onPipelineUpdate(event as MessageEvent<string>));
     this.es.addEventListener("pipeline_proposal_update", () => queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.proposals }));
+    // A task_update carries only enough to decide whether to refetch; detail
+    // comes back over REST, and a reconnect rehydrates the same way (TS-03.R28).
+    this.es.addEventListener("task_update", () => queryClient.invalidateQueries({ queryKey: TASK_QUERY_KEYS.all }));
     this.es.addEventListener("config_source_update", () => this.onConfigSourceUpdate());
     this.es.addEventListener("ping", () => {
       this.lastPing = Date.now();

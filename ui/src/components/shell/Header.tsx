@@ -10,6 +10,7 @@ export function Header() {
       </Link>
       <nav className="app-nav" data-slot="navigation" aria-label="Primary navigation">
         <NavLink to="/" end>Dashboard</NavLink>
+        <NavLink to="/tasks">Tasks</NavLink>
         <NavLink to="/pipelines">Pipelines</NavLink>
         <NavLink to="/archive">Archive</NavLink>
         <NavLink to="/settings">Settings</NavLink>

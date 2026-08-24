@@ -1,6 +1,7 @@
 import { DndContext, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, rectSortingStrategy } from "@dnd-kit/sortable";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { getLayout, putLayout, releaseGroup } from "../../api/client";
 import type { AgentState, TranscriptEvent } from "../../api/types";
 import { useAgentStore } from "../../store/agentStore";
@@ -12,6 +13,8 @@ import { DensityControl } from "./DensityControl";
 import { EmptyState } from "./EmptyState";
 import { NewAgentModal } from "../../features/launch/NewAgentModal";
 import { useProjects } from "../../api/config";
+import { useTasks } from "../../api/tasks";
+import { needsAttention } from "../../features/tasks/TasksPage";
 import { Button, ConfirmDialog, PageHeader } from "../ui";
 
 // projectID scopes which agents the grid shows; fixedProject locks New Agent to a
@@ -20,6 +23,20 @@ import { Button, ConfirmDialog, PageHeader } from "../ui";
 // catalog member (deleted/hand-removed): fixing the launch to it would hide the
 // picker and every launch would be rejected as `unknown project` (FS-02.R43/A25,
 // INV §10). The caller passes fixedProject only for an active catalog member.
+/** TaskAttentionLink is the dashboard's one task-shaped element: how many tasks
+ *  in view need a person, opening the Tasks view (FS-02.R44). The card grid
+ *  itself gains no task object — an armed task has no agent and so no card. */
+function TaskAttentionLink({ projectID }: { projectID?: string }) {
+  const { data: tasks } = useTasks(projectID);
+  const count = (tasks ?? []).filter((task) => needsAttention(task)).length;
+  if (!projectID) return null;
+  return (
+    <Link className="task-attention-link" to={`/tasks?project=${encodeURIComponent(projectID)}`}>
+      {count} task{count === 1 ? "" : "s"} need attention
+    </Link>
+  );
+}
+
 export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?: string; projectTitle?: string; fixedProject?: string } = {}) {
   const agents = useAgentStore((state) => state.agents);
   const order = useAgentStore((state) => state.order);
@@ -92,7 +109,7 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
         className="grid-toolbar"
         eyebrow="Live operations"
         title={projectTitle ?? "Agents"}
-        actions={<><Button variant="primary" type="button" onClick={() => setShowNewAgent(true)}>New agent</Button><DensityControl /></>}
+        actions={<><TaskAttentionLink projectID={projectID} /><Button variant="primary" type="button" onClick={() => setShowNewAgent(true)}>New agent</Button><DensityControl /></>}
         data-slot="header"
       />
       <DndContext onDragEnd={onDragEnd}>

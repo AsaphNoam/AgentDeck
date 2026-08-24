@@ -1,0 +1,131 @@
+@layer ad-features {
+.tasks-page {
+  display: grid;
+  gap: var(--ad-space-8);
+  margin: 0 auto;
+  max-width: 1680px;
+}
+
+.tasks-toolbar {
+  align-items: end;
+  display: flex;
+  gap: var(--ad-space-4);
+  justify-content: space-between;
+}
+
+.tasks-toolbar label,
+.task-create label,
+.task-signal label {
+  display: grid;
+  gap: var(--ad-space-2);
+  font-size: 0.8rem;
+}
+
+.tasks-attention-count {
+  color: var(--ad-state-busy);
+  font-family: var(--ad-font-mono);
+  font-size: 0.8rem;
+}
+
+.tasks-authoring-grid {
+  align-items: start;
+  display: grid;
+  gap: var(--ad-space-6);
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+}
+
+.task-create form,
+.task-signal form {
+  display: grid;
+  gap: var(--ad-space-3);
+}
+
+.task-list {
+  display: grid;
+  gap: var(--ad-space-4);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.task-row {
+  background: var(--ad-surface-panel);
+  border: var(--ad-border-thin) solid var(--ad-border-strong);
+  border-radius: var(--ad-radius-large) var(--ad-radius-large) var(--ad-radius-small) var(--ad-radius-large);
+  display: grid;
+  gap: var(--ad-space-2);
+  padding: var(--ad-space-4);
+}
+
+.task-row-top {
+  align-items: center;
+  display: flex;
+  gap: var(--ad-space-3);
+}
+
+.task-state,
+.task-outcome {
+  flex: 0 0 auto;
+}
+
+.task-name {
+  font-weight: 600;
+}
+
+.task-instruction {
+  color: var(--ad-text-muted);
+  margin: 0;
+}
+
+.task-waiting,
+.task-attention {
+  font-family: var(--ad-font-mono);
+  font-size: 0.78rem;
+  margin: 0;
+}
+
+.task-attention {
+  color: var(--ad-state-busy);
+}
+
+.task-row-meta {
+  color: var(--ad-text-muted);
+  display: flex;
+  font-size: 0.78rem;
+  gap: var(--ad-space-4);
+}
+
+.task-row-actions {
+  display: flex;
+  gap: var(--ad-space-2);
+}
+
+.task-rearm {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-3);
+}
+
+.task-rearm label {
+  display: grid;
+  font-size: 0.78rem;
+  gap: var(--ad-space-1);
+}
+
+.task-attention-link {
+  color: var(--ad-state-busy);
+  font-family: var(--ad-font-mono);
+  font-size: 0.78rem;
+}
+
+.tasks-empty {
+  color: var(--ad-text-muted);
+}
+
+@media (max-width: 1100px) {
+  .tasks-authoring-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+}

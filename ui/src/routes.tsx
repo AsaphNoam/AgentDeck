@@ -6,6 +6,7 @@ import { OnboardingGate } from "./features/onboarding/OnboardingGate";
 import { ArchivePage } from "./features/archive/ArchivePage";
 import { ArchiveAgentPage } from "./features/archive/ArchiveAgentPage";
 import { PipelinesPage } from "./features/pipelines/PipelinesPage";
+import { TasksPage } from "./features/tasks/TasksPage";
 import { ProjectDashboard, ScopedProjectDashboard } from "./features/dashboard/ProjectDashboard";
 
 const developmentRoutes = import.meta.env.DEV
@@ -31,6 +32,7 @@ export const router = createBrowserRouter([
       { path: "archive", element: <ArchivePage /> },
       { path: "archive/:id", element: <ArchiveAgentPage /> },
       { path: "pipelines", element: <PipelinesPage /> },
+      { path: "tasks", element: <TasksPage /> },
       { path: "settings", element: <SettingsPage /> },
       ...developmentRoutes,
       { path: "*", element: <Navigate to="/" replace /> },

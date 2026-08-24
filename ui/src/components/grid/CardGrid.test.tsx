@@ -54,6 +54,32 @@ function renderWithQuery(ui: React.ReactElement) {
 
 describe("CardGrid", () => {
 
+  // FS-02.R44 / A26: the dashboard's only task-shaped element is how many tasks
+  // in view need a person — parked work and work whose agent went away — and it
+  // counts no ordinary armed, ready, starting, or running task.
+  it("counts only the tasks in view that need attention", async () => {
+    server.use(http.get("/api/tasks", () => HttpResponse.json({
+      tasks: [
+        { task_id: "tk_1", project: "my-app", display_name: "parked", instruction: "x", target_kind: "launch", state: "dependency_failed", created_by_kind: "person", revision: 1, created_at: "2026-08-24T10:00:00Z", arms: [], attachments: [] },
+        { task_id: "tk_2", project: "my-app", display_name: "abandoned", instruction: "x", target_kind: "launch", state: "interrupted", created_by_kind: "person", revision: 1, created_at: "2026-08-24T10:00:00Z", arms: [], attachments: [] },
+        { task_id: "tk_3", project: "my-app", display_name: "running", instruction: "x", target_kind: "launch", state: "running", created_by_kind: "person", revision: 1, created_at: "2026-08-24T10:00:00Z", arms: [], attachments: [] },
+        { task_id: "tk_4", project: "my-app", display_name: "armed", instruction: "x", target_kind: "launch", state: "armed", created_by_kind: "person", revision: 1, created_at: "2026-08-24T10:00:00Z", arms: [], attachments: [] },
+      ],
+    })));
+    act(() => useAgentStore.setState({ agents: { a_1: agent("a_1") }, order: ["a_1"] }));
+    renderWithQuery(<CardGrid projectID="my-app" projectTitle="My App" />);
+
+    const link = await screen.findByText("2 tasks need attention");
+    expect(link).toHaveAttribute("href", "/tasks?project=my-app");
+  });
+
+  it("reads zero when no task needs attention", async () => {
+    server.use(http.get("/api/tasks", () => HttpResponse.json({ tasks: [] })));
+    act(() => useAgentStore.setState({ agents: { a_1: agent("a_1") }, order: ["a_1"] }));
+    renderWithQuery(<CardGrid projectID="my-app" projectTitle="My App" />);
+    expect(await screen.findByText("0 tasks need attention")).toBeInTheDocument();
+  });
+
   // FS-02.A25: New Agent opened from a project dashboard is bound to that
   // route's project (via fixedProject), so a person cannot accidentally launch it
   // elsewhere.
