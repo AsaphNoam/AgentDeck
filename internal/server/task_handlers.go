@@ -1,12 +1,14 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
 	"unicode/utf8"
 
+	"github.com/agentdeck/agentdeck/internal/messaging"
 	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
@@ -158,37 +160,51 @@ func (s *Server) composeTask(req createTaskRequest) (state.Task, *runtime.APIErr
 func composeTaskArms(requested []createArmRequest) ([]state.TaskArm, *runtime.APIError) {
 	arms := make([]state.TaskArm, 0, len(requested))
 	for _, arm := range requested {
+		arms = append(arms, state.TaskArm{
+			Kind: arm.Kind, SourceKind: arm.SourceKind, SourceID: arm.SourceID,
+			SatisfyingOutcomes: arm.SatisfyingOutcomes, SignalName: strings.TrimSpace(arm.SignalName),
+		})
+	}
+	if ae := validateTaskArmSet(arms); ae != nil {
+		return nil, ae
+	}
+	return arms, nil
+}
+
+// validateTaskArmSet is the one check of an arm set's shape and vocabulary,
+// shared by the HTTP surface and the agent-facing tool so the two cannot accept
+// different graphs (INV §2). The graph properties themselves — cycles, unknown
+// and cross-project sources — are checked inside the write transaction.
+func validateTaskArmSet(arms []state.TaskArm) *runtime.APIError {
+	if len(arms) > maxTaskArms {
+		return apiError(runtime.CodeValidation, "too many prerequisites")
+	}
+	for _, arm := range arms {
 		switch arm.Kind {
 		case state.ArmSignal:
-			name := strings.TrimSpace(arm.SignalName)
-			if name == "" || utf8.RuneCountInString(name) > maxSignalNameRunes {
-				return nil, apiError(runtime.CodeValidation, "signal_name is required and bounded")
+			if arm.SignalName == "" || utf8.RuneCountInString(arm.SignalName) > maxSignalNameRunes {
+				return apiError(runtime.CodeValidation, "signal_name is required and bounded")
 			}
-			arms = append(arms, state.TaskArm{Kind: state.ArmSignal, SignalName: name})
 		case state.ArmWorkResult:
 			if arm.SourceKind != state.SourceTask && arm.SourceKind != state.SourcePipelineRun {
-				return nil, apiError(runtime.CodeValidation, "source_kind must be task or pipeline_run")
+				return apiError(runtime.CodeValidation, "source_kind must be task or pipeline_run")
 			}
 			if strings.TrimSpace(arm.SourceID) == "" {
-				return nil, apiError(runtime.CodeValidation, "source_id is required")
+				return apiError(runtime.CodeValidation, "source_id is required")
 			}
 			if len(arm.SatisfyingOutcomes) == 0 {
-				return nil, apiError(runtime.CodeValidation, "satisfying_outcomes is required")
+				return apiError(runtime.CodeValidation, "satisfying_outcomes is required")
 			}
 			for _, outcome := range arm.SatisfyingOutcomes {
 				if !state.AgentReportableOutcome(outcome) && outcome != state.OutcomeCancelled {
-					return nil, apiError(runtime.CodeValidation, "unknown outcome: "+outcome)
+					return apiError(runtime.CodeValidation, "unknown outcome: "+outcome)
 				}
 			}
-			arms = append(arms, state.TaskArm{
-				Kind: state.ArmWorkResult, SourceKind: arm.SourceKind, SourceID: arm.SourceID,
-				SatisfyingOutcomes: arm.SatisfyingOutcomes,
-			})
 		default:
-			return nil, apiError(runtime.CodeValidation, "arm kind must be work_result or signal")
+			return apiError(runtime.CodeValidation, "arm kind must be work_result or signal")
 		}
 	}
-	return arms, nil
+	return nil
 }
 
 func taskAttachments(requested []createAttachmentRequest) []state.TaskAttachment {
@@ -466,4 +482,81 @@ func (s *Server) rereadTask(task state.Task) state.Task {
 		return fresh
 	}
 	return task
+}
+
+// CreateAgentTask creates a task on behalf of a token-bound agent (FS-16.R12,
+// R24, TS-10.R20). It shares every validation the HTTP surface uses; what
+// differs is only where the facts come from. The creator, its generation, and
+// the project are the session's, so no tool argument can name another creator
+// or reach into another project.
+func (s *Server) CreateAgentTask(req messaging.AgentTaskRequest) (state.Task, error) {
+	task := state.Task{
+		Project: req.Project, DisplayName: strings.TrimSpace(req.DisplayName),
+		Instruction:   strings.TrimSpace(req.Instruction),
+		Arms:          req.Arms,
+		CreatedByKind: "agent", CreatedByAgentID: req.CreatorAgentID,
+		CreatedByGeneration: req.CreatorGeneration,
+	}
+	if task.DisplayName == "" || utf8.RuneCountInString(task.DisplayName) > maxTaskNameRunes {
+		return state.Task{}, &messaging.ToolError{Code: "validation", Message: "display_name is required and bounded"}
+	}
+	if task.Instruction == "" || utf8.RuneCountInString(task.Instruction) > maxTaskInstructionRunes {
+		return state.Task{}, &messaging.ToolError{Code: "validation", Message: "instruction is required and bounded"}
+	}
+	if ae := validateTaskArmSet(task.Arms); ae != nil {
+		return state.Task{}, &messaging.ToolError{Code: "validation", Message: ae.Message}
+	}
+	if req.TargetAgentID != "" {
+		agent, err := s.stateStore.ReadAgent(req.TargetAgentID)
+		if err != nil {
+			return state.Task{}, &messaging.ToolError{Code: "target_ineligible", Message: "that agent cannot be assigned work"}
+		}
+		if agent.Project != req.Project || agent.Interface != "chat" || agent.Archived {
+			return state.Task{}, &messaging.ToolError{Code: "target_ineligible", Message: "that agent cannot be assigned work"}
+		}
+		task.TargetKind, task.TargetAgentID = state.TargetAgent, agent.AgentID
+	} else {
+		role := strings.TrimSpace(req.Role)
+		if role == "" {
+			return state.Task{}, &messaging.ToolError{Code: "validation", Message: "name a target agent or a role to launch"}
+		}
+		if _, err := s.configStore.ReadRole(role); err != nil {
+			return state.Task{}, &messaging.ToolError{Code: "validation", Message: "unknown role: " + role}
+		}
+		task.TargetKind, task.Role, task.Backend, task.Model = state.TargetLaunch, role, req.Backend, req.Model
+	}
+	id, err := s.stateStore.NewTaskID()
+	if err != nil {
+		return state.Task{}, err
+	}
+	task.TaskID = id
+	created, err := s.stateStore.CreateTask(task)
+	if err != nil {
+		return state.Task{}, err
+	}
+	s.publishTaskUpdate(created)
+	return created, nil
+}
+
+// CancelAgentTask cancels a task the calling agent created. Authority is the
+// durably recorded creator id, so a stopped-and-resumed agent keeps it, and a
+// task it did not create is refused with the same answer an unknown task gets:
+// a caller must not be able to probe for work it does not own (FS-16.R24,
+// TS-05.R14, R17).
+func (s *Server) CancelAgentTask(taskID, creatorAgentID string) (state.Task, error) {
+	existing, err := s.stateStore.ReadTask(taskID)
+	if err != nil {
+		return state.Task{}, err
+	}
+	if existing.CreatedByKind != "agent" || existing.CreatedByAgentID != creatorAgentID {
+		return state.Task{}, &messaging.ToolError{Code: "not_creator", Message: "No such task."}
+	}
+	task, err := s.stateStore.CancelTask(taskID)
+	if err != nil {
+		return state.Task{}, err
+	}
+	s.finishInterruptedRelease(context.Background(), task)
+	s.evaluateTaskResult(task.TaskID)
+	s.publishTaskUpdate(task)
+	return s.rereadTask(task), nil
 }

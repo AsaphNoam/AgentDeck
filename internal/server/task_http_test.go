@@ -3,10 +3,12 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/agentdeck/agentdeck/internal/messaging"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
@@ -475,5 +477,53 @@ func TestDeletionIsRefusedWhileATaskOwnsARuntime(t *testing.T) {
 	}
 	if parked.State != state.TaskDependencyFailed {
 		t.Fatalf("a dependent still waiting on the deleted task = %s, want parked", parked.State)
+	}
+}
+
+// FS-16.R24 / TS-10.R20, TS-05.R17 — creator provenance is server-derived and
+// durable. An agent may cancel work it created, still may after being stopped
+// and resumed, and may not cancel a peer's or a person's work.
+func TestAgentCancelAuthorityIsTheRecordedCreator(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	creator := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+
+	mine, err := srv.CreateAgentTask(messaging.AgentTaskRequest{
+		CreatorAgentID: creator, CreatorGeneration: srv.registry.Generation(creator),
+		Project: "tmpproj", DisplayName: "mine", Instruction: "do it", Role: "impl",
+	})
+	if err != nil {
+		t.Fatalf("CreateAgentTask: %v", err)
+	}
+	if mine.CreatedByKind != "agent" || mine.CreatedByAgentID != creator {
+		t.Fatalf("creator = %s/%s, want the calling agent", mine.CreatedByKind, mine.CreatedByAgentID)
+	}
+	if mine.CreatedByGeneration == "" {
+		t.Fatal("the creating generation was not recorded as provenance")
+	}
+
+	// A peer cannot cancel it, and the refusal says nothing about its existence.
+	_, err = srv.CancelAgentTask(mine.TaskID, "a_someone_else")
+	var toolErr *messaging.ToolError
+	if !errors.As(err, &toolErr) || toolErr.Code != "not_creator" {
+		t.Fatalf("peer cancel = %v, want not_creator", err)
+	}
+	// Neither can an agent cancel a person's work.
+	theirs := createTaskHTTP(t, ts, launchTaskBody("person's"))
+	if _, err := srv.CancelAgentTask(theirs.TaskID, creator); !errors.As(err, &toolErr) ||
+		toolErr.Code != "not_creator" {
+		t.Fatalf("cancelling a person's task = %v, want not_creator", err)
+	}
+
+	// The stable id is the authority, so a new generation is not a new principal:
+	// stop the creator and cancel with the same id afterwards.
+	if resp, body := post(t, ts.URL+"/api/sessions/"+creator+"/stop", nil); resp.StatusCode != 200 {
+		t.Fatalf("stop status = %d: %s", resp.StatusCode, body)
+	}
+	cancelled, err := srv.CancelAgentTask(mine.TaskID, creator)
+	if err != nil {
+		t.Fatalf("cancel after a stop: %v", err)
+	}
+	if cancelled.State != state.TaskFinished || cancelled.Outcome != state.OutcomeCancelled {
+		t.Fatalf("cancelled = %s/%s", cancelled.State, cancelled.Outcome)
 	}
 }

@@ -252,6 +252,9 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	// already committed when this fires, so a dropped notification only delays the
 	// dependent's start until the next dispatch sweep (TS-10.R2, R3).
 	msg.SetTaskResultSink(s.evaluateTaskResult)
+	// The task tools own identity, resolution, and shape; validating a target and
+	// committing the record stay here, with the plane that owns them (TS-10.R13).
+	msg.SetTaskControl(s)
 	if registry != nil {
 		registry.SetEventSink(func(ev runtime.Event) {
 			eventBus.PublishRuntimeEvent(ev)

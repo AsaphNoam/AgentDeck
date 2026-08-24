@@ -201,3 +201,101 @@ func TestReportTaskResultRefusesWorkTheCallerDoesNotHold(t *testing.T) {
 		t.Fatalf("a refused report registered a result: %v", err)
 	}
 }
+
+// stubTaskControl records what the tools hand the control plane, so the tool's
+// own contract — identity, resolution, shape — is tested without a server.
+type stubTaskControl struct {
+	created   AgentTaskRequest
+	cancelled struct{ taskID, creator string }
+	err       error
+}
+
+func (s *stubTaskControl) CreateAgentTask(req AgentTaskRequest) (state.Task, error) {
+	s.created = req
+	if s.err != nil {
+		return state.Task{}, s.err
+	}
+	return state.Task{TaskID: "tk_new", State: state.TaskArmed}, nil
+}
+
+func (s *stubTaskControl) CancelAgentTask(taskID, creatorAgentID string) (state.Task, error) {
+	s.cancelled.taskID, s.cancelled.creator = taskID, creatorAgentID
+	if s.err != nil {
+		return state.Task{}, s.err
+	}
+	return state.Task{TaskID: taskID, State: state.TaskFinished, Outcome: state.OutcomeCancelled}, nil
+}
+
+// FS-16.R12, R24 / TS-05.R17 — an agent creates work without a person in the
+// loop. The creator, its generation, and the project come from the session
+// token, and the target is the friendly selector coordination already resolves.
+func TestCreateTaskDerivesItsCreatorAndResolvesItsTarget(t *testing.T) {
+	f := newContextFixture(t)
+	liveAgent(t, f.store, "a_impl", "Atlas", "implementer", "my-app")
+	liveAgent(t, f.store, "a_rev", "Nova", "reviewer", "my-app")
+	f.srv.RegisterSession("tok-impl", "a_impl", "gen-a_impl")
+	f.srv.SetAddressableAgents(func() ([]state.LiveAgent, error) {
+		return f.store.AddressableAgents()
+	})
+	control := &stubTaskControl{}
+	f.srv.SetTaskControl(control)
+
+	impl := connect(t, f.srv, "tok-impl")
+	res, isErr := call(t, impl, "create_task", map[string]any{
+		"display_name": "review the migration", "instruction": "check migration 19",
+		"to": "reviewer@my-app",
+		"arms": []map[string]any{{
+			"kind": "work_result", "source_kind": "task", "source_id": "tk_first",
+			"satisfying_outcomes": []string{"success"},
+		}},
+	})
+	if isErr || res["ok"] != true || res["task_id"] != "tk_new" {
+		t.Fatalf("create_task = %v", res)
+	}
+	got := control.created
+	if got.CreatorAgentID != "a_impl" || got.CreatorGeneration != "gen-a_impl" {
+		t.Fatalf("creator = %q/%q, want the session's", got.CreatorAgentID, got.CreatorGeneration)
+	}
+	if got.Project != "my-app" {
+		t.Fatalf("project = %q, want the creator's own", got.Project)
+	}
+	if got.TargetAgentID != "a_rev" {
+		t.Fatalf("target = %q, want the resolved reviewer", got.TargetAgentID)
+	}
+	if len(got.Arms) != 1 || got.Arms[0].SourceID != "tk_first" {
+		t.Fatalf("arms = %+v", got.Arms)
+	}
+
+	res, isErr = call(t, impl, "create_task", map[string]any{
+		"display_name": "x", "instruction": "x", "to": "nobody@my-app",
+	})
+	if !isErr || res["error"] != "recipient_not_found" {
+		t.Fatalf("unknown target = %v", res)
+	}
+}
+
+// FS-16.R24 / TS-05.R14 — cancel authority is the durably recorded creator, and
+// a task the caller did not create is refused with the same answer an unknown
+// task gets, so no caller can probe for work it does not own.
+func TestCancelTaskAsksTheControlPlaneWhoCreatedIt(t *testing.T) {
+	f := newContextFixture(t)
+	liveAgent(t, f.store, "a_impl", "Atlas", "implementer", "my-app")
+	f.srv.RegisterSession("tok-impl", "a_impl", "gen-a_impl")
+	control := &stubTaskControl{}
+	f.srv.SetTaskControl(control)
+
+	impl := connect(t, f.srv, "tok-impl")
+	res, isErr := call(t, impl, "cancel_task", map[string]any{"task_id": "tk_mine"})
+	if isErr || res["outcome"] != state.OutcomeCancelled {
+		t.Fatalf("cancel_task = %v", res)
+	}
+	if control.cancelled.taskID != "tk_mine" || control.cancelled.creator != "a_impl" {
+		t.Fatalf("cancel asked about %+v, want the caller's own identity", control.cancelled)
+	}
+
+	control.err = &ToolError{Code: "not_creator", Message: "No such task."}
+	res, isErr = call(t, impl, "cancel_task", map[string]any{"task_id": "tk_theirs"})
+	if !isErr || res["error"] != "not_creator" || res["message"] != "No such task." {
+		t.Fatalf("cancelling another creator's task = %v", res)
+	}
+}

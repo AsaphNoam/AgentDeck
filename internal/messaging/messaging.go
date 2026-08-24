@@ -37,6 +37,7 @@ type Server struct {
 	onMessageInserted func(fromAgentID, toAgentID string)
 	onMessagesRead    func(agentID string)
 	onTaskResult      func(taskID string)
+	tasks             TaskControl
 	addressable       func() ([]state.LiveAgent, error)
 	pipelines         *pipeline.Manager
 	context           *contextref.Service
@@ -191,6 +192,14 @@ func New(store *state.Store, log *slog.Logger) *Server {
 		Name:        "get_assigned_task",
 		Description: "Read the task you are currently assigned: its instruction and the context references attached to it. Returns assigned=false when you have none.",
 	}, s.handleGetAssignedTask)
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "create_task",
+		Description: "Create durable work that AgentDeck starts when its prerequisites are satisfied. Assign it to an existing agent by role@project, name, or agent_id, or omit the target to have a new agent launched. Never poll or wait for other work: arm this task on it instead.",
+	}, s.handleCreateTask)
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "cancel_task",
+		Description: "Cancel a task you created. Its outcome becomes cancelled and anything waiting on it is resolved.",
+	}, s.handleCancelTask)
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "report_task_result",
 		Description: "Record the authoritative success, failure, or blocked result for the task you are assigned. Your runtime is released after this turn ends, so you still receive this response.",
