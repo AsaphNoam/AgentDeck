@@ -23,6 +23,7 @@ export const configSchema = z.object({
   appearance_skin_warning: z.enum(["unsupported", "config_unreadable"]).optional(),
   skip_permissions: z.boolean(),
   onboarding_complete: z.boolean(),
+  task_concurrency: z.number().int().positive(),
   notifications: z.object({
     desktop_enabled: z.boolean(),
     muted: z.record(z.boolean()),

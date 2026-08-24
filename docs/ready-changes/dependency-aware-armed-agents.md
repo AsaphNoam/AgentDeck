@@ -1,6 +1,6 @@
 # Dependency-aware work that starts itself
 
-**State:** Waiting to start
+**State:** In progress
 **Why:** Human idea "Dependency-aware / armed agents" in `docs/ideas.md`, defined with the human on
 2026-08-23. It is the third of the three follow-ons the orchestration-plane separation was built for,
 after mail activation and context links.

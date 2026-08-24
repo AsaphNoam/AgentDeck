@@ -106,6 +106,10 @@ type Config struct {
 	OnboardingComplete bool                `json:"onboarding_complete"` // set after first launch
 	Notifications      NotificationsConfig `json:"notifications"`
 	Switch             SwitchConfig        `json:"switch"`
+	// TaskConcurrency is how many agent runtimes dependent work may bring up at
+	// once, install-wide. It never counts agents a person launched or resumed
+	// (FS-04.R43, FS-16.R21).
+	TaskConcurrency int `json:"task_concurrency"`
 }
 
 type NotificationsConfig struct {

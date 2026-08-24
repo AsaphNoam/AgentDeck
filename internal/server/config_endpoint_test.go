@@ -210,6 +210,43 @@ func TestPutConfigMergesFields(t *testing.T) {
 	}
 }
 
+// FS-04.A23 — the dependent-work runtime budget round-trips and invalid values
+// cannot replace the durable setting.
+func TestTaskConcurrencySettingRoundTripsAndRejectsNonPositive(t *testing.T) {
+	srv := testServerWithOkCreds(t)
+	h := srv.routes()
+
+	rec := doGET(t, h, "/api/config")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/config status = %d", rec.Code)
+	}
+	var initial configResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &initial); err != nil {
+		t.Fatal(err)
+	}
+	if initial.TaskConcurrency != 10 {
+		t.Fatalf("default task_concurrency = %d, want 10", initial.TaskConcurrency)
+	}
+
+	rec = doRequest(t, h, http.MethodPut, "/api/config", map[string]any{"task_concurrency": 4})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT task_concurrency status = %d body=%s", rec.Code, rec.Body)
+	}
+	got, err := srv.configStore.ReadConfig()
+	if err != nil || got.TaskConcurrency != 4 {
+		t.Fatalf("saved task_concurrency = %d, %v; want 4", got.TaskConcurrency, err)
+	}
+
+	rec = doRequest(t, h, http.MethodPut, "/api/config", map[string]any{"task_concurrency": 0})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("PUT zero task_concurrency status = %d, want 400", rec.Code)
+	}
+	got, err = srv.configStore.ReadConfig()
+	if err != nil || got.TaskConcurrency != 4 {
+		t.Fatalf("task_concurrency after rejection = %d, %v; want 4", got.TaskConcurrency, err)
+	}
+}
+
 func TestPutConfigRejectsImmutableFields(t *testing.T) {
 	srv := testServerWithOkCreds(t)
 	h := srv.routes()

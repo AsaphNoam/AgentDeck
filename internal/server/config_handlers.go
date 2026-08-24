@@ -717,6 +717,7 @@ func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		ob.Satisfied = true
 	}
 	normalizeNotifications(&cfg)
+	normalizeTaskConcurrency(&cfg)
 
 	writeJSON(w, http.StatusOK, configResponse{
 		Config:                cfg,
@@ -740,6 +741,12 @@ func normalizeNotifications(cfg *config.Config) {
 	}
 }
 
+func normalizeTaskConcurrency(cfg *config.Config) {
+	if cfg.TaskConcurrency <= 0 {
+		cfg.TaskConcurrency = config.DefaultConfig().TaskConcurrency
+	}
+}
+
 // configPutBody is the request body for PUT /api/config (§5.5).
 // Only the user-editable subset; version and port are rejected.
 type configPutBody struct {
@@ -748,6 +755,7 @@ type configPutBody struct {
 	DefaultRole        *string                     `json:"default_role"`
 	AppearanceSkin     *string                     `json:"appearance_skin"`
 	Notifications      *config.NotificationsConfig `json:"notifications"`
+	TaskConcurrency    *int                        `json:"task_concurrency"`
 	// Sentinel fields: reject if present.
 	Version *int `json:"version"`
 	Port    *int `json:"port"`
@@ -772,6 +780,12 @@ func (s *Server) handlePutConfig(w http.ResponseWriter, r *http.Request) {
 	if body.AppearanceSkin != nil && !config.ValidAppearanceSkin(*body.AppearanceSkin) {
 		writeValidationError(w, &config.ValidationErrors{Errors: []config.FieldError{
 			{Field: "appearance_skin", Code: "unsupported", Message: "unsupported appearance skin: " + *body.AppearanceSkin},
+		}})
+		return
+	}
+	if body.TaskConcurrency != nil && *body.TaskConcurrency <= 0 {
+		writeValidationError(w, &config.ValidationErrors{Errors: []config.FieldError{
+			{Field: "task_concurrency", Code: "invalid", Message: "task concurrency must be a positive integer"},
 		}})
 		return
 	}
@@ -833,6 +847,9 @@ func (s *Server) handlePutConfig(w http.ResponseWriter, r *http.Request) {
 	if body.Notifications != nil {
 		cfg.Notifications = *body.Notifications
 		normalizeNotifications(&cfg)
+	}
+	if body.TaskConcurrency != nil {
+		cfg.TaskConcurrency = *body.TaskConcurrency
 	}
 
 	if err := s.writeConfig(cfg); err != nil {

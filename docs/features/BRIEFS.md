@@ -4067,3 +4067,11 @@ choices about interrupted-task recovery, retry, and deletion behavior.
 
 **Next:** Use `/design-feature Dependency-aware / armed agents` to resolve every finding, then run
 `/review-design Dependency-aware / armed agents` again.
+
+### 2026-08-24 — Implementation: dependent-work admission and concurrency setting
+
+Dependent work can now reserve an agent and capacity atomically before any runtime starts, so concurrent tasks cannot both claim the same agent and a full budget defers work without consuming a retry. The install-wide task-runtime limit defaults to ten and can be changed in Settings; invalid values are refused without overwriting the saved setting.
+
+**Needs attention:** None.
+
+**Next:** Continue implementation by connecting admitted tasks to the existing launch and resume paths and confirm them as running only after the assignment reaches the live agent.

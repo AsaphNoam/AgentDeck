@@ -218,17 +218,19 @@ carries mail's prompt and status as literals. Both come from `internal/runtime/a
 a closed registry keyed by kind, and a kind with no row cannot start — it fails loudly rather than
 prompting the model with another kind's instruction, and leaves the turn gate free.
 
-**Next small step:** the other half of TS-10.R5 and then the dispatcher. Every statement in
-`internal/state/activations.go` still writes `mail` as a literal; parameterize the kind-agnostic ones
-(list, release, discard, retire, the attempt boundary) and leave mail's policy-bearing predicates
-where they are — the unread-mail test inside `ClaimMailActivation` and the one-pending-per-agent
-coalescing in release and recovery are mail's at-most-once rule, and TS-10.R5 gives `dependency` a
-different one: it stays actionable until its owning task confirms its start, so a lost claim or a
-failed resume returns it to pending instead of retiring it. Add the `dependency` row to the runtime
-registry with that kind's own instruction (FS-16.R26) as part of that piece, not before it has a
-caller. Then the dispatcher: `ready → starting` takes capacity and the exclusive assignment claim in
-one statement (TS-10.R4, R17, R18), and the start path uses the existing launch/resume seams and
-confirms into `running` (TS-10.R6).
+The other half of TS-10.R5 and the dispatcher's durable admission are now done too. Kind-agnostic
+activation statements take a kind while mail keeps its unread predicate, pending-row coalescing, and
+recovery policy. `AdmitReadyTask` moves `ready → starting` in one conditional statement that records
+the reservation, takes the exclusive assignee claim, and counts only created/woken runtime claims
+against capacity; contention and a full budget leave the task ready without spending an attempt.
+The install-wide budget now defaults to ten, round-trips through the existing config API and a Tasks
+settings editor, and rejects non-positive writes without changing the saved value.
+
+**Next small step:** build the dispatcher over `ReadyTasks` and `AdmitReadyTask`. It must resolve an
+existing target into borrowed/woke behavior or compose a launch target through the existing
+launch/resume seams, use the dependency activation registry row and its retryable pre-confirmation
+policy, and confirm the reservation into `running` only after the assignment crosses into the live
+runtime (TS-10.R5–R6, R17–R18; FS-16.A2, A15–A16).
 
 **Deliberately not flipped:** every requirement in FS-16 and TS-10 is still `(planned)`. The rows
 exist but no behavior above them is observable yet, and parts of the requirements the substrate
@@ -347,6 +349,14 @@ in the requirements before implementation, and the change has since shipped; the
 lives in FS-15, TS-01.R22–R23, TS-02.R24, TS-04.R28, TS-05.R16 and in Git history.
 
 ## Recent changelog
+
+- 2026-08-24 — Continued dependent-work admission through its settings boundary. The activation
+  state statements are kind-parameterized while mail retains its own coalescing and recovery policy;
+  ready-task admission takes capacity, reservation, and the durable exclusive-assignee claim in one
+  statement, with borrowed runtimes outside the budget and every deferral leaving its attempt count
+  untouched. The install-wide concurrency budget now defaults to ten, persists through the existing
+  config route, rejects non-positive writes atomically, and is editable in Settings. Focused state,
+  config, server, and UI coverage passes; dispatcher runtime effects remain next.
 
 - 2026-08-24 — Started dependency-aware work with its durable substrate: migration 18 and
   `internal/state/tasks.go`. The graph checks that matter run inside the insert transaction rather
