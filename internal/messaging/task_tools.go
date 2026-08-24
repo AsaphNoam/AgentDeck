@@ -159,6 +159,7 @@ type AgentTaskRequest struct {
 	Backend       string
 	Model         string
 	Arms          []state.TaskArm
+	Attachments   []state.TaskAttachment
 }
 
 // TaskControl is the control plane behind the agent-facing task tools. This
@@ -192,6 +193,15 @@ type createTaskArgs struct {
 	Backend string           `json:"backend,omitempty" jsonschema:"optional backend for a new agent"`
 	Model   string           `json:"model,omitempty" jsonschema:"optional model for a new agent"`
 	Arms    []createArmInput `json:"arms,omitempty" jsonschema:"prerequisites that must all be satisfied before this starts"`
+	// Attachments are context_ref_ids you can already read; the assignee reads
+	// them through its own assignment, not through a share to it.
+	Attachments []createAttachmentInput `json:"attachments,omitempty" jsonschema:"context references to attach for the assignee"`
+}
+
+type createAttachmentInput struct {
+	ContextRefID string `json:"context_ref_id" jsonschema:"a context_ref_id you can read"`
+	Label        string `json:"label,omitempty" jsonschema:"short label for the assignee"`
+	Description  string `json:"description,omitempty" jsonschema:"why this context matters to the work"`
 }
 
 type createArmInput struct {
@@ -252,6 +262,12 @@ func (s *Server) handleCreateTask(_ context.Context, req *mcp.CallToolRequest, i
 		request.Arms = append(request.Arms, state.TaskArm{
 			Kind: arm.Kind, SourceKind: arm.SourceKind, SourceID: arm.SourceID,
 			SatisfyingOutcomes: arm.SatisfyingOutcomes, SignalName: arm.SignalName,
+		})
+	}
+	for _, attachment := range input.Attachments {
+		request.Attachments = append(request.Attachments, state.TaskAttachment{
+			ContextRefID: attachment.ContextRefID, Label: attachment.Label,
+			Description: attachment.Description,
 		})
 	}
 	task, err := control.CreateAgentTask(request)

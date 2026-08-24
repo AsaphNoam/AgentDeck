@@ -525,6 +525,23 @@ func (s *Server) CreateAgentTask(req messaging.AgentTaskRequest) (state.Task, er
 		}
 		task.TargetKind, task.Role, task.Backend, task.Model = state.TargetLaunch, role, req.Backend, req.Model
 	}
+	if len(req.Attachments) > maxTaskAttachments {
+		return state.Task{}, &messaging.ToolError{Code: "validation", Message: "too many attachments"}
+	}
+	// Attaching is not a way to reach context: a caller may only attach what it
+	// can already read, and the attachment grants the assignee a work-derived
+	// route rather than synthesizing a direct grant (TS-05.R17, FS-16.R10).
+	for _, attachment := range req.Attachments {
+		authorized, err := s.stateStore.ContextReadAuthorized(attachment.ContextRefID, req.CreatorAgentID)
+		if err != nil {
+			return state.Task{}, err
+		}
+		if !authorized {
+			return state.Task{}, &messaging.ToolError{
+				Code: "validation", Message: "you cannot read " + attachment.ContextRefID,
+			}
+		}
+	}
 	id, err := s.stateStore.NewTaskID()
 	if err != nil {
 		return state.Task{}, err
@@ -533,6 +550,11 @@ func (s *Server) CreateAgentTask(req messaging.AgentTaskRequest) (state.Task, er
 	created, err := s.stateStore.CreateTask(task)
 	if err != nil {
 		return state.Task{}, err
+	}
+	if len(req.Attachments) > 0 {
+		if err := s.stateStore.AttachTaskContext(created.TaskID, req.Attachments); err != nil {
+			return state.Task{}, err
+		}
 	}
 	s.publishTaskUpdate(created)
 	return created, nil

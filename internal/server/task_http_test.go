@@ -527,3 +527,28 @@ func TestAgentCancelAuthorityIsTheRecordedCreator(t *testing.T) {
 		t.Fatalf("cancelled = %s/%s", cancelled.State, cancelled.Outcome)
 	}
 }
+
+// FS-16.R10 / TS-05.R17 — attaching is not a way to reach context: an agent may
+// attach only what it can already read, and the attachment grants the assignee a
+// work-derived route rather than a direct share.
+func TestAnAgentAttachesOnlyContextItCanRead(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	creator := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+
+	_, err := srv.CreateAgentTask(messaging.AgentTaskRequest{
+		CreatorAgentID: creator, CreatorGeneration: srv.registry.Generation(creator),
+		Project: "tmpproj", DisplayName: "with context", Instruction: "read it", Role: "impl",
+		Attachments: []state.TaskAttachment{{ContextRefID: "cx_not_mine", Label: "someone else's"}},
+	})
+	var toolErr *messaging.ToolError
+	if !errors.As(err, &toolErr) || toolErr.Code != "validation" {
+		t.Fatalf("attaching unreadable context = %v, want a validation refusal", err)
+	}
+	tasks, err := srv.stateStore.ListTasks("tmpproj")
+	if err != nil {
+		t.Fatalf("ListTasks: %v", err)
+	}
+	if len(tasks) != 0 {
+		t.Fatalf("a refused attachment created %d tasks", len(tasks))
+	}
+}
