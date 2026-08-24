@@ -900,3 +900,160 @@ WHERE task_id = ? AND state = ?
 	}
 	return changed, nil
 }
+
+// MaxTaskStartAttempts bounds how many times a task's start may genuinely fail
+// before it parks. A deferral is not a failure and spends none of them
+// (FS-16.R25).
+const MaxTaskStartAttempts = 3
+
+// TaskReservation is what a start attempt records durably before any launch,
+// resume, or prompt happens. It identifies the attempt for recovery and holds
+// the exclusive assignment claim; it authorizes nothing on its own, and only
+// confirmation turns it into the assignee membership that authorizes attached
+// context reads (TS-10.R4, FS-16 §3).
+type TaskReservation struct {
+	AttemptID  string
+	AgentID    string
+	Generation string
+	// Claim is created, woke, or borrowed: whether this start will bring the
+	// runtime up, wake a stopped one, or use one that is already up for someone
+	// else's reasons. Only the first two consume a budget slot and only the first
+	// two are stopped when the task finishes (FS-16.R4, R7).
+	Claim string
+}
+
+// ReadyTasks lists tasks waiting for admission in the order they became ready,
+// at most limit of them. The limit is the caller's: whatever one dispatch pass
+// leaves is still ready for the next one.
+func (s *Store) ReadyTasks(limit int) ([]Task, error) {
+	rows, err := s.db.Query(taskSelect+`
+WHERE state = ? ORDER BY ready_at, task_id LIMIT ?`, TaskReady, limit)
+	if err != nil {
+		return nil, fmt.Errorf("state: list ready tasks: %w", err)
+	}
+	defer rows.Close()
+	tasks := []Task{}
+	for rows.Next() {
+		task, err := scanTask(rows)
+		if err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, task)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("state: iterate ready tasks: %w", err)
+	}
+	return tasks, nil
+}
+
+// AdmitReadyTask moves one ready task to starting, taking capacity and the
+// exclusive assignment claim in the same statement that records the reservation
+// (TS-10.R4, R17, R18, INV §5). Deciding availability and claiming separately
+// would let two dispatch passes each see a free slot, or two tasks each see the
+// same agent unassigned, and both commit.
+//
+// It reports false with no error when the task was not admitted: it is no longer
+// ready, the budget is full, or another task already holds its target agent.
+// None of those is a failed start attempt — the task is still ready
+// with its allowance and its place in the admission order intact (FS-16.R25) —
+// so they are one answer rather than distinct errors.
+func (s *Store) AdmitReadyTask(taskID string, reservation TaskReservation, budget int) (Task, bool, error) {
+	now := timeNow()
+	stamp := formatTime(now)
+	res, err := s.db.Exec(`
+UPDATE tasks
+SET state = ?, assigned_agent_id = ?, assigned_generation = ?, runtime_claim = ?,
+  start_attempt_id = ?, start_claimed_at = ?, revision = revision + 1, updated_at = ?
+WHERE task_id = ? AND state = ?
+  AND (? = ? OR (
+    SELECT COUNT(*) FROM tasks AS live
+    WHERE live.runtime_claim IN (?, ?) AND live.state IN (?, ?)) < ?)`,
+		TaskStarting, reservation.AgentID, reservation.Generation, reservation.Claim,
+		reservation.AttemptID, stamp, stamp,
+		taskID, TaskReady,
+		reservation.Claim, ClaimBorrowed,
+		ClaimCreated, ClaimWoke, TaskStarting, TaskRunning, budget)
+	if isUniqueViolation(err) {
+		// The partial unique index over an active assignee refused the claim:
+		// another task is already starting or running on this agent (TS-10.R18).
+		// The loser stays ready and nothing was written.
+		return Task{}, false, nil
+	}
+	if err != nil {
+		return Task{}, false, fmt.Errorf("state: admit ready task: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return Task{}, false, fmt.Errorf("state: admit ready task rows: %w", err)
+	}
+	if n == 0 {
+		return Task{}, false, nil
+	}
+	task, err := s.ReadTask(taskID)
+	return task, err == nil, err
+}
+
+// ConfirmTaskStart promotes a reservation into durable assignee membership once
+// the assignment has crossed into a live runtime: only then is the task running
+// (TS-10.R4, FS-16.R6). The attempt id is required, so a start abandoned and
+// re-admitted cannot be confirmed by its predecessor's late success.
+func (s *Store) ConfirmTaskStart(taskID, attemptID string) (Task, bool, error) {
+	return s.settleTaskStart(taskID, attemptID, `
+UPDATE tasks SET state = ?, started_at = ?, revision = revision + 1, updated_at = ?
+WHERE task_id = ? AND state = ? AND start_attempt_id = ?`,
+		[]any{TaskRunning, formatTime(timeNow())}, "confirm task start")
+}
+
+// AbandonTaskStart returns a task whose start produced no confirmed runtime to
+// ready, releasing its assignment claim and its slot and spending no attempt.
+// This is the deferral path — a lost lifecycle claim, a start the caller gave up
+// before any effect, or a recovery sweep resolving a reservation it reaped
+// (FS-16.R25, TS-10.R15).
+func (s *Store) AbandonTaskStart(taskID, attemptID string) (Task, bool, error) {
+	return s.settleTaskStart(taskID, attemptID, `
+UPDATE tasks SET state = ?, assigned_agent_id = NULL, assigned_generation = '',
+  runtime_claim = '', start_attempt_id = '', start_claimed_at = NULL,
+  revision = revision + 1, updated_at = ?
+WHERE task_id = ? AND state = ? AND start_attempt_id = ?`,
+		[]any{TaskReady}, "abandon task start")
+}
+
+// FailTaskStart spends one attempt on a start that genuinely failed — a launch
+// that did not start, a resume that did not complete, or a target that became
+// ineligible — and returns the task to ready. When the last attempt is spent the
+// task parks as dependency_failed recording that failure, so a start can never
+// retry forever and never fails silently (FS-16.R8, R25, INV §8).
+func (s *Store) FailTaskStart(taskID, attemptID, reason string) (Task, bool, error) {
+	return s.settleTaskStart(taskID, attemptID, `
+UPDATE tasks SET
+  state = CASE WHEN start_attempt_count + 1 >= ? THEN ? ELSE ? END,
+  attention_reason = CASE WHEN start_attempt_count + 1 >= ? THEN ? ELSE attention_reason END,
+  start_attempt_count = start_attempt_count + 1,
+  assigned_agent_id = NULL, assigned_generation = '', runtime_claim = '',
+  start_attempt_id = '', start_claimed_at = NULL,
+  revision = revision + 1, updated_at = ?
+WHERE task_id = ? AND state = ? AND start_attempt_id = ?`,
+		[]any{MaxTaskStartAttempts, TaskDependencyFailed, TaskReady,
+			MaxTaskStartAttempts, reason}, "fail task start")
+}
+
+// settleTaskStart runs one conditional statement that resolves a starting row,
+// guarded by the attempt id that reserved it. A statement that matches nothing
+// means the attempt is no longer the task's current one, which is an outcome
+// rather than an error: a late worker must never overwrite a newer transition.
+func (s *Store) settleTaskStart(taskID, attemptID, stmt string, leading []any, what string) (Task, bool, error) {
+	args := append(append([]any{}, leading...), formatTime(timeNow()), taskID, TaskStarting, attemptID)
+	res, err := s.db.Exec(stmt, args...)
+	if err != nil {
+		return Task{}, false, fmt.Errorf("state: %s: %w", what, err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return Task{}, false, fmt.Errorf("state: %s rows: %w", what, err)
+	}
+	if n == 0 {
+		return Task{}, false, nil
+	}
+	task, err := s.ReadTask(taskID)
+	return task, err == nil, err
+}

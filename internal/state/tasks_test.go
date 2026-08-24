@@ -2,6 +2,7 @@ package state
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -465,5 +466,275 @@ func TestFiringASignalReleasesOnlyItsProjectsArms(t *testing.T) {
 	}
 	if len(repeat) != 0 {
 		t.Fatalf("re-firing changed %+v, want nothing", repeat)
+	}
+}
+
+// reserve builds a start reservation for one agent. Every field is the caller's:
+// the state layer never invents an assignee or decides how a runtime is claimed.
+func reservation(attemptID, agentID, claim string) TaskReservation {
+	return TaskReservation{
+		AttemptID: attemptID, AgentID: agentID, Generation: "g_" + attemptID, Claim: claim,
+	}
+}
+
+// FS-16.R7 / TS-10.R4, R17 — admission decides capacity and takes the claim in
+// one statement. Two dispatch passes reading a free slot and then claiming it
+// would both commit, so the budget has to be part of the update itself. A start
+// that borrows a runtime already up creates no process and consumes no slot.
+func TestAdmissionTakesCapacityInTheStatementThatGrantsIt(t *testing.T) {
+	st, _ := newTestStore(t)
+	first := newTask(t, st, "my-app", "first")
+	second := newTask(t, st, "my-app", "second")
+	third := newTask(t, st, "my-app", "third")
+	borrower := newTask(t, st, "my-app", "borrower")
+
+	admit := func(task Task, agentID, claim string) bool {
+		t.Helper()
+		_, ok, err := st.AdmitReadyTask(task.TaskID, reservation("at_"+task.DisplayName, agentID, claim), 2)
+		if err != nil {
+			t.Fatalf("AdmitReadyTask %s: %v", task.DisplayName, err)
+		}
+		return ok
+	}
+	if !admit(first, "a_one", ClaimCreated) || !admit(second, "a_two", ClaimWoke) {
+		t.Fatal("the first two starts did not take the budget's two slots")
+	}
+	if admit(third, "a_three", ClaimCreated) {
+		t.Fatal("a third runtime started with the budget set to two")
+	}
+	if !admit(borrower, "a_four", ClaimBorrowed) {
+		t.Fatal("a borrowed runtime was refused for capacity it does not consume")
+	}
+
+	// The refused task is ready and waiting, not failed, and spent no attempt.
+	waiting, err := st.ReadTask(third.TaskID)
+	if err != nil {
+		t.Fatalf("ReadTask: %v", err)
+	}
+	if waiting.State != TaskReady || waiting.StartAttemptCount != 0 {
+		t.Fatalf("task waiting for capacity = %s after %d attempts, want %s after 0",
+			waiting.State, waiting.StartAttemptCount, TaskReady)
+	}
+	if waiting.AssignedAgentID != "" {
+		t.Fatalf("a task that was not admitted reserved %q", waiting.AssignedAgentID)
+	}
+
+	// A slot frees only when its task stops holding a runtime claim.
+	if _, ok, err := st.AbandonTaskStart(first.TaskID, "at_first"); err != nil || !ok {
+		t.Fatalf("AbandonTaskStart = %v, %v", ok, err)
+	}
+	if !admit(third, "a_three", ClaimCreated) {
+		t.Fatal("a freed slot did not admit the waiting task")
+	}
+}
+
+// FS-16.R2 / TS-10.R18 — two tasks admitted for the same agent leave exactly
+// one active. The loser is refused by the durable index rather than by ordering
+// luck, stays ready, and spends no attempt.
+func TestAdmissionRefusesASecondTaskForOneAgent(t *testing.T) {
+	st, _ := newTestStore(t)
+	first := newTask(t, st, "my-app", "first")
+	second := newTask(t, st, "my-app", "second")
+
+	if _, ok, err := st.AdmitReadyTask(first.TaskID, reservation("at_1", "a_worker", ClaimBorrowed), 10); err != nil || !ok {
+		t.Fatalf("first admission = %v, %v", ok, err)
+	}
+	_, ok, err := st.AdmitReadyTask(second.TaskID, reservation("at_2", "a_worker", ClaimBorrowed), 10)
+	if err != nil {
+		t.Fatalf("second admission: %v", err)
+	}
+	if ok {
+		t.Fatal("both tasks were admitted for the same agent")
+	}
+	loser, err := st.ReadTask(second.TaskID)
+	if err != nil {
+		t.Fatalf("ReadTask: %v", err)
+	}
+	if loser.State != TaskReady || loser.StartAttemptCount != 0 || loser.StartAttemptID != "" {
+		t.Fatalf("loser = %s with attempt %q after %d attempts, want an untouched ready task",
+			loser.State, loser.StartAttemptID, loser.StartAttemptCount)
+	}
+}
+
+// TS-10.R4 — running means a confirmed runtime, and every settlement is guarded
+// by the attempt id that reserved it, so a worker whose attempt was already
+// abandoned cannot confirm, fail, or re-abandon a newer one.
+func TestOnlyTheCurrentAttemptSettlesAStart(t *testing.T) {
+	st, _ := newTestStore(t)
+	task := newTask(t, st, "my-app", "work")
+
+	starting, ok, err := st.AdmitReadyTask(task.TaskID, reservation("at_1", "a_worker", ClaimCreated), 10)
+	if err != nil || !ok {
+		t.Fatalf("AdmitReadyTask = %v, %v", ok, err)
+	}
+	if starting.State != TaskStarting || starting.RuntimeClaim != ClaimCreated {
+		t.Fatalf("admitted task = %s claiming %q, want %s claiming %s",
+			starting.State, starting.RuntimeClaim, TaskStarting, ClaimCreated)
+	}
+	if starting.AssignedAgentID != "a_worker" || starting.AssignedGeneration != "g_at_1" {
+		t.Fatalf("reservation = %q/%q, want the agent and generation it will act on",
+			starting.AssignedAgentID, starting.AssignedGeneration)
+	}
+	if starting.StartedAt != nil {
+		t.Fatal("a task that has not confirmed a runtime already has a start time")
+	}
+
+	if _, ok, err := st.ConfirmTaskStart(task.TaskID, "at_stale"); err != nil || ok {
+		t.Fatalf("ConfirmTaskStart(stale attempt) = %v, %v; want no settlement", ok, err)
+	}
+	// The first attempt is given up before any effect, then re-admitted.
+	if _, ok, err := st.AbandonTaskStart(task.TaskID, "at_1"); err != nil || !ok {
+		t.Fatalf("AbandonTaskStart = %v, %v", ok, err)
+	}
+	if _, ok, err := st.AdmitReadyTask(task.TaskID, reservation("at_2", "a_worker", ClaimWoke), 10); err != nil || !ok {
+		t.Fatalf("second admission = %v, %v", ok, err)
+	}
+	if _, ok, err := st.ConfirmTaskStart(task.TaskID, "at_1"); err != nil || ok {
+		t.Fatalf("the abandoned attempt confirmed the task = %v, %v", ok, err)
+	}
+	running, ok, err := st.ConfirmTaskStart(task.TaskID, "at_2")
+	if err != nil || !ok {
+		t.Fatalf("ConfirmTaskStart = %v, %v", ok, err)
+	}
+	if running.State != TaskRunning || running.StartedAt == nil {
+		t.Fatalf("confirmed task = %s started at %v, want %s with a start time",
+			running.State, running.StartedAt, TaskRunning)
+	}
+	if running.StartAttemptCount != 0 {
+		t.Fatalf("a start that succeeded spent %d attempts, want 0", running.StartAttemptCount)
+	}
+}
+
+// FS-16.R25 / TS-10.R17 — only real failures spend an attempt, and the third
+// parks the task recording that failure. A deferral in between leaves the
+// allowance intact, so a busy machine can never exhaust a task's attempts.
+func TestOnlyRealStartFailuresSpendTheBoundedAttempts(t *testing.T) {
+	st, _ := newTestStore(t)
+	task := newTask(t, st, "my-app", "work")
+
+	fail := func(attempt, reason string) Task {
+		t.Helper()
+		if _, ok, err := st.AdmitReadyTask(task.TaskID, reservation(attempt, "a_worker", ClaimCreated), 10); err != nil || !ok {
+			t.Fatalf("AdmitReadyTask %s = %v, %v", attempt, ok, err)
+		}
+		after, ok, err := st.FailTaskStart(task.TaskID, attempt, reason)
+		if err != nil || !ok {
+			t.Fatalf("FailTaskStart %s = %v, %v", attempt, ok, err)
+		}
+		return after
+	}
+
+	if after := fail("at_1", "the launch did not start"); after.State != TaskReady || after.StartAttemptCount != 1 {
+		t.Fatalf("after one failure = %s after %d attempts, want %s after 1",
+			after.State, after.StartAttemptCount, TaskReady)
+	}
+
+	// A deferral between two failures: admitted, then given up with no effect.
+	if _, ok, err := st.AdmitReadyTask(task.TaskID, reservation("at_deferred", "a_worker", ClaimCreated), 10); err != nil || !ok {
+		t.Fatalf("deferred admission = %v, %v", ok, err)
+	}
+	deferred, ok, err := st.AbandonTaskStart(task.TaskID, "at_deferred")
+	if err != nil || !ok {
+		t.Fatalf("AbandonTaskStart = %v, %v", ok, err)
+	}
+	if deferred.State != TaskReady || deferred.StartAttemptCount != 1 {
+		t.Fatalf("after a deferral = %s after %d attempts, want %s with the allowance intact",
+			deferred.State, deferred.StartAttemptCount, TaskReady)
+	}
+	if deferred.RuntimeClaim != "" || deferred.AssignedAgentID != "" || deferred.StartClaimedAt != nil {
+		t.Fatalf("a deferred task still holds a reservation: %+v", deferred)
+	}
+
+	if after := fail("at_2", "the resume did not complete"); after.State != TaskReady {
+		t.Fatalf("after two failures = %s, want %s", after.State, TaskReady)
+	}
+	parked := fail("at_3", "the target is archived")
+	if parked.State != TaskDependencyFailed || parked.StartAttemptCount != MaxTaskStartAttempts {
+		t.Fatalf("after three failures = %s after %d attempts, want %s after %d",
+			parked.State, parked.StartAttemptCount, TaskDependencyFailed, MaxTaskStartAttempts)
+	}
+	if parked.AttentionReason != "the target is archived" {
+		t.Fatalf("parked reason = %q, want the last failure", parked.AttentionReason)
+	}
+	if parked.Outcome != "" {
+		t.Fatalf("a parked task recorded outcome %q; parking is not a result", parked.Outcome)
+	}
+}
+
+// FS-16.R7 — ready work is admitted in the order it became ready, and a task
+// that is not ready is never offered to the dispatcher.
+func TestReadyTasksAreListedInAdmissionOrder(t *testing.T) {
+	st, _ := newTestStore(t)
+	first := newTask(t, st, "my-app", "first")
+	second := newTask(t, st, "other-app", "second")
+	third := newTask(t, st, "my-app", "third")
+	armed := newTask(t, st, "my-app", "armed", taskArm(first.TaskID, OutcomeSuccess))
+
+	for i, id := range []string{third.TaskID, first.TaskID, second.TaskID} {
+		stamp := time.Date(2026, 8, 24, 10, i, 0, 0, time.UTC)
+		if _, err := st.DB().Exec(`UPDATE tasks SET ready_at = ? WHERE task_id = ?`,
+			formatTime(stamp), id); err != nil {
+			t.Fatalf("stamp ready_at: %v", err)
+		}
+	}
+	ready, err := st.ReadyTasks(10)
+	if err != nil {
+		t.Fatalf("ReadyTasks: %v", err)
+	}
+	var names []string
+	for _, task := range ready {
+		names = append(names, task.DisplayName)
+	}
+	if len(names) != 3 || names[0] != "third" || names[1] != "first" || names[2] != "second" {
+		t.Fatalf("admission order = %v, want third, first, second across every project", names)
+	}
+	if _, err := st.ReadTask(armed.TaskID); err != nil {
+		t.Fatalf("ReadTask: %v", err)
+	}
+
+	bounded, err := st.ReadyTasks(2)
+	if err != nil {
+		t.Fatalf("ReadyTasks(2): %v", err)
+	}
+	if len(bounded) != 2 || bounded[0].DisplayName != "third" {
+		t.Fatalf("bounded pass = %d rows starting at %q, want the 2 oldest", len(bounded), bounded[0].DisplayName)
+	}
+}
+
+// FS-16.A13 — under real concurrency two tasks admitted for one agent still
+// leave exactly one active. The single statement is what makes this true; a read
+// followed by a write would let both pass the check. Each round borrows its
+// runtime so the exclusive claim is the only thing under test: a created or woken
+// one would also hold a budget slot across rounds.
+func TestConcurrentAdmissionForOneAgentLeavesExactlyOneActive(t *testing.T) {
+	st, _ := newTestStore(t)
+	for round := 0; round < 20; round++ {
+		first := newTask(t, st, "my-app", "first")
+		second := newTask(t, st, "my-app", "second")
+		agentID := fmt.Sprintf("a_worker%02d", round)
+
+		results := make(chan bool, 2)
+		start := make(chan struct{})
+		for i, task := range []Task{first, second} {
+			go func(i int, task Task) {
+				<-start
+				_, ok, err := st.AdmitReadyTask(task.TaskID,
+					reservation(fmt.Sprintf("at_%d_%d", round, i), agentID, ClaimBorrowed), 10)
+				if err != nil {
+					t.Errorf("AdmitReadyTask: %v", err)
+				}
+				results <- ok
+			}(i, task)
+		}
+		close(start)
+		admitted := 0
+		for i := 0; i < 2; i++ {
+			if <-results {
+				admitted++
+			}
+		}
+		if admitted != 1 {
+			t.Fatalf("round %d admitted %d tasks for one agent, want exactly 1", round, admitted)
+		}
 	}
 }
