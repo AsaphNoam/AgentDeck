@@ -5,13 +5,11 @@ import (
 	"errors"
 	"time"
 
+	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
 const (
-	// defaultTaskConcurrency is the shipped install-wide budget for runtimes
-	// dependent work brings up (FS-16.R7, R21, FS-04.R43).
-	defaultTaskConcurrency = 10
 	// taskDispatchInterval is the dispatcher's ticker. Durable rows are the
 	// authority, so a missed notification costs latency, never correctness
 	// (TS-10.R2).
@@ -121,14 +119,20 @@ func (s *Server) planTaskStart(task state.Task) (state.TaskReservation, bool) {
 // exists.
 func (s *Server) planExistingAgentStart(task state.Task, attemptID, agentID string) (state.TaskReservation, bool) {
 	claim := state.ClaimWoke
+	generation := attemptID
 	if _, err := s.stateStore.ReadRunning(agentID); err == nil {
 		claim = state.ClaimBorrowed
+		generation = s.registry.Generation(agentID)
+		if generation == "" {
+			s.log.Debug("task target runtime has no local generation", "task", task.TaskID, "agent", agentID)
+			return state.TaskReservation{}, false
+		}
 	} else if !errors.Is(err, state.ErrNotFound) {
 		s.log.Debug("task target liveness read failed", "task", task.TaskID, "err", err)
 		return state.TaskReservation{}, false
 	}
 	return state.TaskReservation{
-		AttemptID: attemptID, AgentID: agentID, Generation: attemptID, Claim: claim,
+		AttemptID: attemptID, AgentID: agentID, Generation: generation, Claim: claim,
 	}, true
 }
 
@@ -136,6 +140,16 @@ func (s *Server) planExistingAgentStart(task state.Task, attemptID, agentID stri
 // brings up its own agent launches it; one that targets an existing agent crosses
 // into that conversation through the dependency activation kind (FS-16.R6).
 func (s *Server) startAdmittedTask(ctx context.Context, task state.Task) {
+	s.taskStartMu.Lock()
+	defer s.taskStartMu.Unlock()
+	// Admission and the effect are deliberately separated, so cancellation can
+	// finish in between. Re-read under the same server claim cancel takes before
+	// launching, resuming, or prompting (TS-10.R4, INV §5).
+	fresh, err := s.stateStore.ReadTask(task.TaskID)
+	if err != nil || fresh.State != state.TaskStarting || fresh.StartAttemptID != task.StartAttemptID {
+		return
+	}
+	task = fresh
 	if task.RuntimeClaim == state.ClaimCreated {
 		s.startLaunchedTask(ctx, task)
 		return
@@ -169,6 +183,9 @@ func (s *Server) startLaunchedTask(ctx context.Context, task state.Task) {
 		// The claim is already held, so use the unclaimed stop core.
 		if stopErr := s.stopStageLocked(ctx, task.AssignedAgentID); stopErr != nil {
 			s.log.Debug("stop failed task runtime failed", "agent", task.AssignedAgentID, "err", stopErr)
+			// The starting reservation is the only durable ownership of this
+			// runtime. Keep it until recovery can stop the runtime (INV §4/§15).
+			return
 		}
 		s.failTaskStart(task, "assignment was not delivered: "+err.Error())
 		return
@@ -249,6 +266,14 @@ func (s *Server) startExistingAgentTask(ctx context.Context, task state.Task) {
 		return
 	}
 	attempted, wakeErr := s.wakeForActivation(ctx, state.ActivationKindDependency, activation, token)
+	if wakeErr == nil {
+		if _, ok, err := s.stateStore.SetTaskStartGeneration(task.TaskID, task.StartAttemptID, s.registry.Generation(task.AssignedAgentID)); err != nil || !ok {
+			s.log.Debug("record woken task generation failed", "task", task.TaskID, "err", err)
+			s.releaseDependencyActivation(activation, token)
+			return
+		}
+		task, _ = s.stateStore.ReadTask(task.TaskID)
+	}
 	s.settleActivationStart(task, activation, token, attempted, wakeErr == nil)
 }
 
@@ -281,26 +306,33 @@ func (s *Server) releaseDependencyActivation(activation state.Activation, token 
 // confirmTaskStart is the only transition into running: the assignment is in a
 // live runtime that holds it (FS-16.R6, TS-10.R4).
 func (s *Server) confirmTaskStart(task state.Task) {
-	if _, ok, err := s.stateStore.ConfirmTaskStart(task.TaskID, task.StartAttemptID); err != nil {
+	if confirmed, ok, err := s.stateStore.ConfirmTaskStart(task.TaskID, task.StartAttemptID); err != nil {
 		s.log.Debug("confirm task start failed", "task", task.TaskID, "err", err)
 	} else if !ok {
 		s.log.Debug("task start was settled by someone else", "task", task.TaskID)
+	} else {
+		s.publishTaskUpdate(confirmed)
 	}
 }
 
 // parkTaskStart stops a task whose target can never become startable, spending no
 // attempt, because retrying it is not a repair (FS-16.R8, R19).
 func (s *Server) parkTaskStart(task state.Task, reason string) {
-	if _, _, err := s.stateStore.ParkTaskStart(task.TaskID, task.StartAttemptID, reason); err != nil {
+	if parked, ok, err := s.stateStore.ParkTaskStart(task.TaskID, task.StartAttemptID, reason); err != nil {
 		s.log.Debug("park task start failed", "task", task.TaskID, "err", err)
+	} else if ok {
+		s.publishTaskUpdate(parked)
+		s.propagateTaskFailure(parked)
 	}
 }
 
 // deferTaskStart gives an admitted reservation back without spending an attempt:
 // contention is not a failed start (FS-16.R25).
 func (s *Server) deferTaskStart(task state.Task, why string) {
-	if _, _, err := s.stateStore.AbandonTaskStart(task.TaskID, task.StartAttemptID); err != nil {
+	if deferred, ok, err := s.stateStore.AbandonTaskStart(task.TaskID, task.StartAttemptID); err != nil {
 		s.log.Debug("abandon task start failed", "task", task.TaskID, "why", why, "err", err)
+	} else if ok {
+		s.publishTaskUpdate(deferred)
 	}
 }
 
@@ -308,8 +340,11 @@ func (s *Server) deferTaskStart(task state.Task, why string) {
 // last one, so a start that keeps failing surfaces instead of retrying forever
 // (FS-16.R8, R25, INV §8).
 func (s *Server) failTaskStart(task state.Task, reason string) {
-	if _, _, err := s.stateStore.FailTaskStart(task.TaskID, task.StartAttemptID, reason); err != nil {
+	if failed, ok, err := s.stateStore.FailTaskStart(task.TaskID, task.StartAttemptID, reason); err != nil {
 		s.log.Debug("fail task start failed", "task", task.TaskID, "err", err)
+	} else if ok {
+		s.publishTaskUpdate(failed)
+		s.propagateTaskFailure(failed)
 	}
 }
 
@@ -321,7 +356,7 @@ func (s *Server) taskConcurrencyBudget() int {
 		cfg = fromDisk
 	}
 	if cfg.TaskConcurrency <= 0 {
-		return defaultTaskConcurrency
+		return config.DefaultTaskConcurrency
 	}
 	return cfg.TaskConcurrency
 }
@@ -370,8 +405,28 @@ func (s *Server) releaseReportedTask(ctx context.Context, agentID, generation st
 // handed to it, so a dropped or repeated notification changes nothing
 // (TS-10.R3).
 func (s *Server) evaluateTaskResult(taskID string) {
-	if _, err := s.stateStore.EvaluateSource(state.SourceTask, taskID); err != nil {
+	if changed, err := s.stateStore.EvaluateSource(state.SourceTask, taskID); err != nil {
 		s.log.Debug("evaluate task result failed", "task", taskID, "err", err)
+	} else {
+		for _, task := range changed {
+			s.publishTaskUpdate(task)
+			s.propagateTaskFailure(task)
+		}
+	}
+}
+
+func (s *Server) propagateTaskFailure(task state.Task) {
+	if task.State != state.TaskDependencyFailed {
+		return
+	}
+	changed, err := s.stateStore.MarkSourceUnsatisfiable(state.SourceTask, task.TaskID)
+	if err != nil {
+		s.log.Debug("propagate task failure", "task", task.TaskID, "err", err)
+		return
+	}
+	for _, dependent := range changed {
+		s.publishTaskUpdate(dependent)
+		s.propagateTaskFailure(dependent)
 	}
 }
 
@@ -444,11 +499,18 @@ func (s *Server) recoverStartAttempt(ctx context.Context, task state.Task) {
 	if task.AssignedAgentID != "" {
 		if err := s.StopStage(ctx, task.AssignedAgentID); err != nil {
 			s.log.Warn("reap interrupted task runtime failed", "task", task.TaskID, "err", err)
+			// The starting row still owns this runtime. Do not clear that only
+			// durable claim after a failed reap; the next recovery pass can try
+			// again without admitting a second agent (INV §4/§15).
+			return
 		}
 	}
-	if _, _, err := s.stateStore.FailTaskStart(task.TaskID, task.StartAttemptID,
+	if failed, ok, err := s.stateStore.FailTaskStart(task.TaskID, task.StartAttemptID,
 		"the server restarted during this start attempt"); err != nil {
 		s.log.Warn("recover start attempt failed", "task", task.TaskID, "err", err)
+	} else if ok {
+		s.publishTaskUpdate(failed)
+		s.propagateTaskFailure(failed)
 	}
 }
 
@@ -468,8 +530,10 @@ func (s *Server) finishInterruptedRelease(ctx context.Context, task state.Task) 
 }
 
 func (s *Server) interruptTask(task state.Task, reason string) {
-	if _, _, err := s.stateStore.InterruptTask(task.TaskID, reason); err != nil {
+	if interrupted, ok, err := s.stateStore.InterruptTask(task.TaskID, reason); err != nil {
 		s.log.Warn("interrupt task failed", "task", task.TaskID, "err", err)
+	} else if ok {
+		s.publishTaskUpdate(interrupted)
 	}
 }
 
@@ -479,10 +543,11 @@ func (s *Server) interruptTask(task state.Task, reason string) {
 // A task that already recorded one is untouched, which is what makes the stop
 // that follows a report safe.
 func (s *Server) interruptTaskOnExit(agentID, generation, cause string) {
-	if _, ok, err := s.stateStore.InterruptTaskForAgent(agentID, generation,
+	if task, ok, err := s.stateStore.InterruptTaskForAgent(agentID, generation,
 		"the assigned agent went away before recording a result: "+cause); err != nil {
 		s.log.Warn("interrupt task on agent exit", "agent_id", agentID, "err", err)
 	} else if ok {
+		s.publishTaskUpdate(task)
 		s.log.Info("task interrupted by agent exit", "agent_id", agentID, "cause", cause)
 	}
 }

@@ -80,6 +80,14 @@ describe("CardGrid", () => {
     expect(await screen.findByText("0 tasks need attention")).toBeInTheDocument();
   });
 
+	 it("keeps task attention visible when the project has no agents", async () => {
+		server.use(http.get("/api/tasks", () => HttpResponse.json({ tasks: [
+			{ task_id: "tk_1", project: "my-app", display_name: "parked", instruction: "x", target_kind: "launch", state: "dependency_failed", created_by_kind: "person", revision: 1, created_at: "2026-08-24T10:00:00Z", arms: [], attachments: [] },
+		] })));
+		renderWithQuery(<CardGrid projectID="my-app" projectTitle="My App" />);
+		expect(await screen.findByText("1 task needs attention")).toHaveAttribute("href", "/tasks?project=my-app");
+	 });
+
   // FS-02.A25: New Agent opened from a project dashboard is bound to that
   // route's project (via fixedProject), so a person cannot accidentally launch it
   // elsewhere.

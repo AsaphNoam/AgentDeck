@@ -8,6 +8,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/agentdeck/agentdeck/internal/contextref"
 	"github.com/agentdeck/agentdeck/internal/messaging"
 	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
@@ -68,19 +70,18 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, ae)
 		return
 	}
-	created, err := s.stateStore.CreateTask(task)
+	created, err := s.stateStore.CreateTaskWithAttachments(task, taskAttachments(req.Attachments), "")
 	if err != nil {
-		writeTaskError(w, err)
+		s.writeTaskError(w, err)
 		return
 	}
-	if len(req.Attachments) > 0 {
-		if err := s.stateStore.AttachTaskContext(created.TaskID, taskAttachments(req.Attachments)); err != nil {
-			writeTaskError(w, err)
-			return
-		}
-	}
 	s.publishTaskUpdate(created)
-	writeJSON(w, http.StatusCreated, s.taskDetail(created))
+	detail, err := s.taskDetail(created)
+	if err != nil {
+		s.writeTaskError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, detail)
 }
 
 // composeTask validates everything that is not a graph property; the graph
@@ -91,8 +92,11 @@ func (s *Server) composeTask(req createTaskRequest) (state.Task, *runtime.APIErr
 	if project == "" {
 		return state.Task{}, apiError(runtime.CodeValidation, "project is required")
 	}
-	if _, err := s.configStore.ReadProject(project); err != nil {
+	if _, err := s.configStore.ReadProject(project); errors.Is(err, config.ErrNotFound) {
 		return state.Task{}, apiError(runtime.CodeNotFound, "unknown project: "+project)
+	} else if err != nil {
+		s.log.Error("read task project", "project", project, "err", err)
+		return state.Task{}, apiError(runtime.CodeInternal, "The task operation could not be completed.")
 	}
 	name := strings.TrimSpace(req.DisplayName)
 	if name == "" || utf8.RuneCountInString(name) > maxTaskNameRunes {
@@ -108,6 +112,9 @@ func (s *Server) composeTask(req createTaskRequest) (state.Task, *runtime.APIErr
 	if len(req.Attachments) > maxTaskAttachments {
 		return state.Task{}, apiError(runtime.CodeValidation, "too many attachments")
 	}
+	if ae := validateTaskAttachments(req.Attachments); ae != nil {
+		return state.Task{}, ae
+	}
 
 	task := state.Task{
 		Project: project, DisplayName: name, Instruction: instruction,
@@ -116,8 +123,11 @@ func (s *Server) composeTask(req createTaskRequest) (state.Task, *runtime.APIErr
 	switch req.TargetKind {
 	case state.TargetAgent:
 		agent, err := s.stateStore.ReadAgent(req.TargetAgentID)
-		if err != nil {
+		if errors.Is(err, state.ErrNotFound) {
 			return state.Task{}, apiError(runtime.CodeNotFound, "unknown target agent")
+		} else if err != nil {
+			s.log.Error("read task target agent", "agent", req.TargetAgentID, "err", err)
+			return state.Task{}, apiError(runtime.CodeInternal, "The task operation could not be completed.")
 		}
 		// A target that could never execute the work is rejected at authoring time
 		// rather than parked later (FS-16.R2, R15).
@@ -135,8 +145,11 @@ func (s *Server) composeTask(req createTaskRequest) (state.Task, *runtime.APIErr
 		if strings.TrimSpace(req.Role) == "" {
 			return state.Task{}, apiError(runtime.CodeValidation, "role is required for a launch target")
 		}
-		if _, err := s.configStore.ReadRole(req.Role); err != nil {
+		if _, err := s.configStore.ReadRole(req.Role); errors.Is(err, config.ErrNotFound) {
 			return state.Task{}, apiError(runtime.CodeNotFound, "unknown role: "+req.Role)
+		} else if err != nil {
+			s.log.Error("read task role", "role", req.Role, "err", err)
+			return state.Task{}, apiError(runtime.CodeInternal, "The task operation could not be completed.")
 		}
 		task.Role, task.Backend, task.Model = req.Role, req.Backend, req.Model
 	default:
@@ -217,6 +230,21 @@ func taskAttachments(requested []createAttachmentRequest) []state.TaskAttachment
 	return out
 }
 
+func validateTaskAttachments(attachments []createAttachmentRequest) *runtime.APIError {
+	for _, attachment := range attachments {
+		if strings.TrimSpace(attachment.ContextRefID) == "" {
+			return apiError(runtime.CodeValidation, "context_ref_id is required")
+		}
+		if utf8.RuneCountInString(attachment.Label) > contextref.MaxLabelRunes {
+			return apiError(runtime.CodeValidation, "attachment label is too long")
+		}
+		if utf8.RuneCountInString(attachment.Description) > contextref.MaxDescriptionRunes {
+			return apiError(runtime.CodeValidation, "attachment description is too long")
+		}
+	}
+	return nil
+}
+
 // handleTasks implements GET /api/tasks?project= (TS-03.R28, FS-16.R14).
 func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
 	project := r.URL.Query().Get("project")
@@ -226,12 +254,17 @@ func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
 	}
 	tasks, err := s.stateStore.ListTasks(project)
 	if err != nil {
-		writeTaskError(w, err)
+		s.writeTaskError(w, err)
 		return
 	}
 	details := make([]taskDetailResponse, 0, len(tasks))
 	for _, task := range tasks {
-		details = append(details, s.taskDetail(task))
+		detail, err := s.taskDetail(task)
+		if err != nil {
+			s.writeTaskError(w, err)
+			return
+		}
+		details = append(details, detail)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"tasks": details})
 }
@@ -240,10 +273,15 @@ func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleTaskDetail(w http.ResponseWriter, r *http.Request) {
 	task, err := s.stateStore.ReadTask(r.PathValue("id"))
 	if err != nil {
-		writeTaskError(w, err)
+		s.writeTaskError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, s.taskDetail(task))
+	detail, err := s.taskDetail(task)
+	if err != nil {
+		s.writeTaskError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, detail)
 }
 
 type fireSignalRequest struct {
@@ -271,7 +309,7 @@ func (s *Server) handleFireSignal(w http.ResponseWriter, r *http.Request) {
 	}
 	released, err := s.stateStore.FireSignal(req.Project, name)
 	if err != nil {
-		writeTaskError(w, err)
+		s.writeTaskError(w, err)
 		return
 	}
 	for _, task := range released {
@@ -285,13 +323,12 @@ type taskDetailResponse struct {
 	Attachments []state.TaskAttachment `json:"attachments"`
 }
 
-func (s *Server) taskDetail(task state.Task) taskDetailResponse {
+func (s *Server) taskDetail(task state.Task) (taskDetailResponse, error) {
 	attachments, err := s.stateStore.ListTaskAttachments(task.TaskID)
 	if err != nil {
-		s.log.Debug("list task attachments failed", "task", task.TaskID, "err", err)
-		attachments = []state.TaskAttachment{}
+		return taskDetailResponse{}, err
 	}
-	return taskDetailResponse{Task: task, Attachments: attachments}
+	return taskDetailResponse{Task: task, Attachments: attachments}, nil
 }
 
 // publishTaskUpdate publishes after the authoritative commit, never before, and
@@ -309,7 +346,7 @@ func (s *Server) publishTaskUpdate(task state.Task) {
 
 // writeTaskError maps the state layer's typed refusals onto the shared envelope
 // (TS-03.R3, FS-16.R20).
-func writeTaskError(w http.ResponseWriter, err error) {
+func (s *Server) writeTaskError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, state.ErrNotFound):
 		writeAPIError(w, apiError(runtime.CodeNotFound, "no such task"))
@@ -341,15 +378,18 @@ func writeTaskError(w http.ResponseWriter, err error) {
 	case errors.Is(err, state.ErrInvalidReportFields):
 		writeAPIError(w, apiError(runtime.CodeValidation, err.Error()))
 	default:
-		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
+		s.log.Error("task API operation failed", "err", err)
+		writeAPIError(w, apiError(runtime.CodeInternal, "The task operation could not be completed."))
 	}
 }
 
 // handleCancelTask implements POST /api/tasks/{id}/cancel (FS-16.R3, R20).
 func (s *Server) handleCancelTask(w http.ResponseWriter, r *http.Request) {
+	s.taskStartMu.Lock()
+	defer s.taskStartMu.Unlock()
 	task, err := s.stateStore.CancelTask(r.PathValue("id"))
 	if err != nil {
-		writeTaskError(w, err)
+		s.writeTaskError(w, err)
 		return
 	}
 	// A cancel has no reporting turn to wait for, so the stop follows its commit
@@ -357,7 +397,12 @@ func (s *Server) handleCancelTask(w http.ResponseWriter, r *http.Request) {
 	s.finishInterruptedRelease(r.Context(), task)
 	s.evaluateTaskResult(task.TaskID)
 	s.publishTaskUpdate(task)
-	writeJSON(w, http.StatusOK, s.taskDetail(s.rereadTask(task)))
+	detail, err := s.taskDetail(s.rereadTask(task))
+	if err != nil {
+		s.writeTaskError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, detail)
 }
 
 type personResultRequest struct {
@@ -379,20 +424,25 @@ func (s *Server) handleRecordTaskResult(w http.ResponseWriter, r *http.Request) 
 		Outcome: req.Outcome, Summary: req.Summary, Details: req.Details,
 	})
 	if err != nil {
-		writeTaskError(w, err)
+		s.writeTaskError(w, err)
 		return
 	}
 	s.finishInterruptedRelease(r.Context(), task)
 	s.evaluateTaskResult(task.TaskID)
 	s.publishTaskUpdate(task)
-	writeJSON(w, http.StatusOK, s.taskDetail(s.rereadTask(task)))
+	detail, err := s.taskDetail(s.rereadTask(task))
+	if err != nil {
+		s.writeTaskError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, detail)
 }
 
 // handleRetryTask implements POST /api/tasks/{id}/retry (FS-16.R23, R25).
 func (s *Server) handleRetryTask(w http.ResponseWriter, r *http.Request) {
 	existing, err := s.stateStore.ReadTask(r.PathValue("id"))
 	if err != nil {
-		writeTaskError(w, err)
+		s.writeTaskError(w, err)
 		return
 	}
 	// Retry acts on the assignee the task already has, so an assignee that has
@@ -404,11 +454,16 @@ func (s *Server) handleRetryTask(w http.ResponseWriter, r *http.Request) {
 	}
 	task, err := s.stateStore.RetryTask(existing.TaskID)
 	if err != nil {
-		writeTaskError(w, err)
+		s.writeTaskError(w, err)
 		return
 	}
 	s.publishTaskUpdate(task)
-	writeJSON(w, http.StatusOK, s.taskDetail(task))
+	detail, err := s.taskDetail(task)
+	if err != nil {
+		s.writeTaskError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, detail)
 }
 
 func (s *Server) retryAssigneeGate(task state.Task) *runtime.APIError {
@@ -455,22 +510,28 @@ func (s *Server) handleRearmTask(w http.ResponseWriter, r *http.Request) {
 	}
 	task, err := s.stateStore.RearmTask(r.PathValue("id"), arms)
 	if err != nil {
-		writeTaskError(w, err)
+		s.writeTaskError(w, err)
 		return
 	}
 	s.publishTaskUpdate(task)
-	writeJSON(w, http.StatusOK, s.taskDetail(task))
+	detail, err := s.taskDetail(task)
+	if err != nil {
+		s.writeTaskError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, detail)
 }
 
 // handleDeleteTask implements DELETE /api/tasks/{id} (FS-16.R18).
 func (s *Server) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
 	parked, err := s.stateStore.DeleteTask(r.PathValue("id"))
 	if err != nil {
-		writeTaskError(w, err)
+		s.writeTaskError(w, err)
 		return
 	}
 	for _, dependent := range parked {
 		s.publishTaskUpdate(dependent)
+		s.propagateTaskFailure(dependent)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -528,6 +589,11 @@ func (s *Server) CreateAgentTask(req messaging.AgentTaskRequest) (state.Task, er
 	if len(req.Attachments) > maxTaskAttachments {
 		return state.Task{}, &messaging.ToolError{Code: "validation", Message: "too many attachments"}
 	}
+	for _, attachment := range req.Attachments {
+		if utf8.RuneCountInString(attachment.Label) > contextref.MaxLabelRunes || utf8.RuneCountInString(attachment.Description) > contextref.MaxDescriptionRunes || strings.TrimSpace(attachment.ContextRefID) == "" {
+			return state.Task{}, &messaging.ToolError{Code: "validation", Message: "task attachment is invalid"}
+		}
+	}
 	// Attaching is not a way to reach context: a caller may only attach what it
 	// can already read, and the attachment grants the assignee a work-derived
 	// route rather than synthesizing a direct grant (TS-05.R17, FS-16.R10).
@@ -547,14 +613,9 @@ func (s *Server) CreateAgentTask(req messaging.AgentTaskRequest) (state.Task, er
 		return state.Task{}, err
 	}
 	task.TaskID = id
-	created, err := s.stateStore.CreateTask(task)
+	created, err := s.stateStore.CreateTaskWithAttachments(task, req.Attachments, req.CreatorAgentID)
 	if err != nil {
 		return state.Task{}, err
-	}
-	if len(req.Attachments) > 0 {
-		if err := s.stateStore.AttachTaskContext(created.TaskID, req.Attachments); err != nil {
-			return state.Task{}, err
-		}
 	}
 	s.publishTaskUpdate(created)
 	return created, nil
@@ -566,6 +627,8 @@ func (s *Server) CreateAgentTask(req messaging.AgentTaskRequest) (state.Task, er
 // a caller must not be able to probe for work it does not own (FS-16.R24,
 // TS-05.R14, R17).
 func (s *Server) CancelAgentTask(taskID, creatorAgentID string) (state.Task, error) {
+	s.taskStartMu.Lock()
+	defer s.taskStartMu.Unlock()
 	existing, err := s.stateStore.ReadTask(taskID)
 	if err != nil {
 		return state.Task{}, err

@@ -60,6 +60,10 @@ type Server struct {
 	// taskStartSlots bounds task starts in flight across dispatch passes. The
 	// budget bounds runtimes; this bounds workers (TS-10.R3, R17).
 	taskStartSlots chan struct{}
+	// taskStartMu serializes an admitted task's first effect with cancellation.
+	// A cancel that wins before the worker reaches its effect changes the durable
+	// row first, and the worker's guarded re-read becomes a no-op (INV §5).
+	taskStartMu sync.Mutex
 
 	hookMu      sync.Mutex
 	hookTokens  map[string]string // agent_id -> per-launch hook token (Phase 2 persists these)

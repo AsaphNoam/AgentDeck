@@ -281,6 +281,14 @@ func (s *Store) NewTaskID() (string, error) {
 // two concurrent writers cannot interleave into a cycle (TS-10.R9, FS-16.R15).
 // A rejected create mutates nothing.
 func (s *Store) CreateTask(task Task) (Task, error) {
+	return s.CreateTaskWithAttachments(task, nil, "")
+}
+
+// CreateTaskWithAttachments creates the task, its graph, and its context
+// attachments in one transaction. An agent creator's direct grants are checked
+// by that same transaction, so a revocation cannot slip between authorization
+// and insertion (FS-16.R10/R12, TS-10.R12, INV §5/§15).
+func (s *Store) CreateTaskWithAttachments(task Task, attachments []TaskAttachment, creatorAgentID string) (Task, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return Task{}, fmt.Errorf("state: begin create task: %w", err)
@@ -322,10 +330,39 @@ VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 	if err := insertTaskArms(tx, task.TaskID, task.Arms); err != nil {
 		return Task{}, err
 	}
+	if err := insertTaskAttachments(tx, task.TaskID, attachments, creatorAgentID, now); err != nil {
+		return Task{}, err
+	}
 	if err := tx.Commit(); err != nil {
 		return Task{}, fmt.Errorf("state: commit create task: %w", err)
 	}
 	return s.ReadTask(task.TaskID)
+}
+
+func insertTaskAttachments(tx *sql.Tx, taskID string, attachments []TaskAttachment, creatorAgentID string, now time.Time) error {
+	for _, attachment := range attachments {
+		var exists int
+		if err := tx.QueryRow(`SELECT 1 FROM context_references WHERE context_ref_id = ?`, attachment.ContextRefID).Scan(&exists); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrTaskArmSource
+			}
+			return fmt.Errorf("state: read task context reference: %w", err)
+		}
+		if creatorAgentID != "" {
+			var authorized int
+			err := tx.QueryRow(`SELECT 1 FROM context_grants WHERE context_ref_id = ? AND granted_to_agent_id = ? AND revoked_at IS NULL`, attachment.ContextRefID, creatorAgentID).Scan(&authorized)
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrTaskNotAssigned
+			}
+			if err != nil {
+				return fmt.Errorf("state: authorize task context attachment: %w", err)
+			}
+		}
+		if _, err := tx.Exec(`INSERT INTO task_attachments(task_id, context_ref_id, label, description, created_at) VALUES(?, ?, ?, ?, ?)`, taskID, attachment.ContextRefID, attachment.Label, attachment.Description, formatTime(now)); err != nil {
+			return fmt.Errorf("state: attach task context: %w", err)
+		}
+	}
+	return nil
 }
 
 // initialTaskState is armed while any arm is unsatisfied and ready when every
@@ -1056,6 +1093,18 @@ func (s *Store) ConfirmTaskStart(taskID, attemptID string) (Task, bool, error) {
 UPDATE tasks SET state = ?, started_at = ?, revision = revision + 1, updated_at = ?
 WHERE task_id = ? AND state = ? AND start_attempt_id = ?`,
 		[]any{TaskRunning, formatTime(timeNow())}, "confirm task start")
+}
+
+// SetTaskStartGeneration replaces a stopped agent's provisional attempt id
+// with the generation its resume actually registered before confirmation.
+func (s *Store) SetTaskStartGeneration(taskID, attemptID, generation string) (Task, bool, error) {
+	if generation == "" {
+		return Task{}, false, nil
+	}
+	return s.settleTaskStart(taskID, attemptID, `
+UPDATE tasks SET assigned_generation = ?, revision = revision + 1, updated_at = ?
+WHERE task_id = ? AND state = ? AND start_attempt_id = ?`,
+		[]any{generation}, "set task start generation")
 }
 
 // AbandonTaskStart returns a task whose start produced no confirmed runtime to

@@ -25,6 +25,7 @@ export interface CreateTaskInput {
   backend?: string;
   model?: string;
   arms?: TaskArmInput[];
+	attachments?: { context_ref_id: string; label?: string; description?: string }[];
 }
 
 /** TaskAPIError carries the shared envelope's stable code so a caller can act on
@@ -102,9 +103,9 @@ export function useRetryTask(project: string | undefined) {
 }
 
 export function useRecordTaskResult(project: string | undefined) {
-  return useTaskAction(project, (input: { taskID: string; outcome: string; summary: string }) =>
-    request(`/api/tasks/${encodeURIComponent(input.taskID)}/result`, taskSchema,
-      json({ outcome: input.outcome, summary: input.summary })));
+	return useTaskAction(project, (input: { taskID: string; outcome: string; summary: string; details?: string }) =>
+		request(`/api/tasks/${encodeURIComponent(input.taskID)}/result`, taskSchema,
+			json({ outcome: input.outcome, summary: input.summary, details: input.details }))); 
 }
 
 export function useRearmTask(project: string | undefined) {

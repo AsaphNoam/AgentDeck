@@ -5,6 +5,10 @@ import (
 	"os"
 )
 
+// DefaultTaskConcurrency is the single shipped default for dependent-work
+// runtime admission (FS-04.R43, TS-10.R10).
+const DefaultTaskConcurrency = 10
+
 // Seed data and in-memory defaults.
 //
 // SeedIfAbsent writes the Phase 0 seed set, but ONLY for targets that do not
@@ -33,7 +37,7 @@ func DefaultConfig() Config {
 			},
 		},
 		Switch:          SwitchConfig{PrimerTokenBudget: 8000},
-		TaskConcurrency: 10,
+		TaskConcurrency: DefaultTaskConcurrency,
 	}
 }
 

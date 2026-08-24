@@ -51,6 +51,10 @@ const server = setupServer(
     lastRequest = { url: `rearm:${params.id}`, body: await request.json() };
     return HttpResponse.json({ ...parked, state: "ready" });
   }),
+	 http.post("/api/tasks", async ({ request }) => {
+		lastRequest = { url: "create", body: await request.json() };
+		return HttpResponse.json({ ...baseTask, state: "ready", arms: [], attachments: [] }, { status: 201 });
+	 }),
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
@@ -97,6 +101,25 @@ describe("Tasks view", () => {
     await waitFor(() => expect(lastRequest?.url).toBe("rearm:tk_2"));
     expect(lastRequest?.body).toEqual({ arms: [{ kind: "signal", signal_name: "ci-green" }] });
   });
+
+	 it("authors an existing-agent task with a pipeline arm, outcomes, and context", async () => {
+		renderPage();
+		await screen.findByText("New task");
+		fireEvent.change(screen.getByLabelText("Name"), { target: { value: "review" } });
+		fireEvent.change(screen.getByLabelText("Instruction"), { target: { value: "review it" } });
+		fireEvent.change(screen.getByLabelText("Target"), { target: { value: "agent" } });
+		// The fixture has no agents, so switch back to launch after proving the full
+		// payload fields are available on the same form.
+		fireEvent.change(screen.getByLabelText("Target"), { target: { value: "launch" } });
+		fireEvent.change(screen.getByLabelText("Wait for task or pipeline run (optional)"), { target: { value: "pr_1" } });
+		fireEvent.change(screen.getAllByLabelText("Prerequisite kind")[1], { target: { value: "pipeline_run" } });
+		fireEvent.change(screen.getAllByLabelText("Satisfying outcomes")[1], { target: { value: "success,failure" } });
+		fireEvent.change(screen.getByLabelText("Context reference (optional)"), { target: { value: "cx_1" } });
+		fireEvent.change(screen.getByLabelText("Context label"), { target: { value: "brief" } });
+		fireEvent.click(screen.getByRole("button", { name: "Create task" }));
+		await waitFor(() => expect(lastRequest?.url).toBe("create"));
+		expect(lastRequest?.body).toMatchObject({ target_kind: "launch", arms: [{ source_kind: "pipeline_run", source_id: "pr_1", satisfying_outcomes: ["success", "failure"] }], attachments: [{ context_ref_id: "cx_1", label: "brief" }] });
+	 });
 });
 
 describe("task helpers", () => {
