@@ -738,3 +738,140 @@ func TestConcurrentAdmissionForOneAgentLeavesExactlyOneActive(t *testing.T) {
 		}
 	}
 }
+
+// FS-16.R21 / A9 — lowering the budget below the number of runtimes already up
+// stops nothing and admits nothing until the count falls, because capacity is
+// only ever consulted when admitting.
+func TestLoweringTheBudgetStopsNothingAndAdmitsNothing(t *testing.T) {
+	st, _ := newTestStore(t)
+	var running []Task
+	for i := 0; i < 3; i++ {
+		task := newTask(t, st, "my-app", fmt.Sprintf("running%d", i))
+		admitted, ok, err := st.AdmitReadyTask(task.TaskID,
+			reservation(fmt.Sprintf("at_%d", i), fmt.Sprintf("a_%d", i), ClaimCreated), 3)
+		if err != nil || !ok {
+			t.Fatalf("admit %d = %v, %v", i, ok, err)
+		}
+		running = append(running, admitted)
+	}
+	waiting := newTask(t, st, "my-app", "waiting")
+
+	// The budget is now one, below the three runtimes already up.
+	if _, ok, err := st.AdmitReadyTask(waiting.TaskID, reservation("at_w", "a_w", ClaimCreated), 1); err != nil || ok {
+		t.Fatalf("admission under a lowered budget = %v, %v; want refused", ok, err)
+	}
+	for _, task := range running {
+		still, err := st.ReadTask(task.TaskID)
+		if err != nil {
+			t.Fatalf("ReadTask: %v", err)
+		}
+		if still.State != TaskStarting || still.RuntimeClaim == "" {
+			t.Fatalf("lowering the budget disturbed %s: %+v", still.DisplayName, still)
+		}
+	}
+
+	// Only when the count falls under the budget does the next one in.
+	for _, task := range running {
+		if _, _, err := st.AbandonTaskStart(task.TaskID, task.StartAttemptID); err != nil {
+			t.Fatalf("AbandonTaskStart: %v", err)
+		}
+	}
+	if _, ok, err := st.AdmitReadyTask(waiting.TaskID, reservation("at_w", "a_w", ClaimCreated), 1); err != nil || !ok {
+		t.Fatalf("admission once the count fell = %v, %v", ok, err)
+	}
+}
+
+// FS-16.R18 / A12 — deleting a prerequisite parks only a dependent whose arm was
+// still waiting. A dependent that has passed its arms — starting, running,
+// interrupted, or finished — is never reopened, and one the result already
+// satisfied is untouched whatever state it is in.
+func TestDeletingAPrerequisiteParksOnlyWhatWasStillWaiting(t *testing.T) {
+	st, _ := newTestStore(t)
+	prerequisite := newTask(t, st, "my-app", "prerequisite")
+
+	waiting := map[string]Task{}
+	for i, taskState := range []string{TaskArmed, TaskStarting, TaskRunning, TaskInterrupted, TaskFinished} {
+		dependent := newTask(t, st, "my-app", "dependent-"+taskState,
+			taskArm(prerequisite.TaskID, OutcomeSuccess))
+		// Put the dependent in the state under test directly: what matters here is
+		// what deletion does to it, not how it got there.
+		if _, err := st.DB().Exec(`UPDATE tasks SET state = ?, assigned_agent_id = ? WHERE task_id = ?`,
+			taskState, fmt.Sprintf("a_dep%d", i), dependent.TaskID); err != nil {
+			t.Fatalf("set %s: %v", taskState, err)
+		}
+		waiting[taskState] = dependent
+	}
+	// One more whose arm the prerequisite already satisfied.
+	if err := st.RegisterWorkResult(WorkResult{
+		SourceKind: SourceTask, SourceID: prerequisite.TaskID, Outcome: OutcomeSuccess,
+	}); err != nil {
+		t.Fatalf("RegisterWorkResult: %v", err)
+	}
+	satisfied := newTask(t, st, "my-app", "already satisfied", taskArm(prerequisite.TaskID, OutcomeSuccess))
+	if satisfied.State != TaskReady {
+		t.Fatalf("a dependent of finished work = %s, want ready", satisfied.State)
+	}
+
+	if _, err := st.DeleteTask(prerequisite.TaskID); err != nil {
+		t.Fatalf("DeleteTask: %v", err)
+	}
+	for taskState, dependent := range waiting {
+		after, err := st.ReadTask(dependent.TaskID)
+		if err != nil {
+			t.Fatalf("ReadTask: %v", err)
+		}
+		want := taskState
+		if taskState == TaskArmed {
+			want = TaskDependencyFailed
+		}
+		if after.State != want {
+			t.Fatalf("dependent in %s became %s after the deletion, want %s", taskState, after.State, want)
+		}
+	}
+	still, err := st.ReadTask(satisfied.TaskID)
+	if err != nil {
+		t.Fatalf("ReadTask: %v", err)
+	}
+	if still.State != TaskReady || still.Arms[0].State != ArmSatisfied {
+		t.Fatalf("a satisfied dependent changed: %+v", still)
+	}
+	// The result outlives the task that produced it, which is why that is true.
+	if _, err := st.ReadWorkResult(SourceTask, prerequisite.TaskID); err != nil {
+		t.Fatalf("the deleted task's result was removed: %v", err)
+	}
+}
+
+// FS-16.R13 / A7 — a task armed on a pipeline run is released by that run's
+// registered outcome, with no cross-plane reach: evaluation reads the shared
+// result layer, never pipeline internals.
+func TestATaskArmedOnAPipelineRunIsReleasedByItsOutcome(t *testing.T) {
+	st, _ := newTestStore(t)
+	runID := "run_quality"
+	if _, err := st.DB().Exec(`
+INSERT INTO pipeline_runs(run_id, template_id, display_name, project, goal, state, revision,
+  current_stage_id, created_at, updated_at)
+VALUES(?, 'quality', 'Quality run', 'my-app', 'ship', 'running', 1, 'work', ?, ?)`,
+		runID, formatTime(timeNow()), formatTime(timeNow())); err != nil {
+		t.Fatalf("insert run: %v", err)
+	}
+	dependent := newTask(t, st, "my-app", "after the run", TaskArm{
+		Kind: ArmWorkResult, SourceKind: SourcePipelineRun, SourceID: runID,
+		SatisfyingOutcomes: []string{OutcomeSuccess},
+	})
+	if dependent.State != TaskArmed {
+		t.Fatalf("dependent = %s, want armed", dependent.State)
+	}
+
+	if err := st.RegisterWorkResult(WorkResult{
+		SourceKind: SourcePipelineRun, SourceID: runID, Outcome: OutcomeSuccess, RawLabel: "success",
+	}); err != nil {
+		t.Fatalf("RegisterWorkResult: %v", err)
+	}
+	changed, err := st.EvaluateSource(SourcePipelineRun, runID)
+	if err != nil {
+		t.Fatalf("EvaluateSource: %v", err)
+	}
+	if len(changed) != 1 || changed[0].State != TaskReady {
+		t.Fatalf("evaluation released %+v, want the dependent ready", changed)
+	}
+}
