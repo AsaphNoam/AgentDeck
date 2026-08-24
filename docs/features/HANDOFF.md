@@ -226,11 +226,29 @@ against capacity; contention and a full budget leave the task ready without spen
 The install-wide budget now defaults to ten, round-trips through the existing config API and a Tasks
 settings editor, and rejects non-positive writes without changing the saved value.
 
-**Next small step:** build the dispatcher over `ReadyTasks` and `AdmitReadyTask`. It must resolve an
-existing target into borrowed/woke behavior or compose a launch target through the existing
-launch/resume seams, use the dependency activation registry row and its retryable pre-confirmation
-policy, and confirm the reservation into `running` only after the assignment crosses into the live
-runtime (TS-10.R5–R6, R17–R18; FS-16.A2, A15–A16).
+The dispatcher now runs. `dispatchReadyTasks` admits ready rows serially in admission order and runs
+each start on a bounded worker, so the order is kept while a launch does not hold the pass. A
+launch-spec task mints its agent id and generation, launches through the existing launch seam, sends
+the instruction as its assignment, and only then confirms into `running`. An existing-agent task
+crosses into the conversation through the `dependency` activation kind, whose registry row tells the
+agent to call `get_assigned_task` rather than to check its mail. The two turn-starting halves of the
+mail executor are now shared and kind-parameterized (`runActivationTurn`, `wakeForActivation`) with
+each kind keeping its own claim policy. `get_assigned_task` answers the caller's own assignment —
+instruction plus attached reference ids with per-attachment labels — from the session token alone.
+
+**Next small step:** close the loop, in this order. First `report_task_result`: the shared
+vocabulary, limits, and staleness check called inside a task-owned transaction that commits the
+terminal state with `pending_release` (TS-10.R7, R19), then the turn-end fan-out that releases the
+claim and stops a created or woken runtime after the reporting turn ends (TS-09.R9–R11 already hold
+that boundary for pipelines; convert that one hard-coded consumer into a subscriber fan-out).
+Registering the result must then call `EvaluateSource`, which nothing in `internal/server` calls yet
+— that call is what makes a dependent become ready and the dispatcher start it, and until it exists
+an armed task never runs. `FireSignal` needs the same wiring from its HTTP route.
+
+Still unbuilt after that: recovery (TS-10.R15), an assignee that exits without reporting
+(FS-16.R16), person results, cancel, retry, re-arm, deletion refusal (TS-10.R16), `create_task` and
+`cancel_task`, the HTTP/SSE surface, the Tasks view and its dashboard count, and pipeline-run outcome
+registration (FS-14.R34, TS-09.R27).
 
 **Deliberately not flipped:** every requirement in FS-16 and TS-10 is still `(planned)`. The rows
 exist but no behavior above them is observable yet, and parts of the requirements the substrate
@@ -349,6 +367,17 @@ in the requirements before implementation, and the change has since shipped; the
 lives in FS-15, TS-01.R22–R23, TS-02.R24, TS-04.R28, TS-05.R16 and in Git history.
 
 ## Recent changelog
+
+- 2026-08-24 — Dependent work now starts itself. The dispatcher admits ready tasks against the
+  budget and in admission order, then either launches a new agent with the task instruction as its
+  assignment or activates an existing conversation through the new `dependency` activation kind; a
+  task becomes `running` only once that assignment is in a live runtime. Contention, a full budget,
+  and a target whose liveness changed all return the task to ready without spending an attempt;
+  three real failures park it; a target that can never execute work parks immediately. The mail
+  executor's two turn-starting halves became shared kind-parameterized helpers rather than a second
+  copy, and `get_assigned_task` lets an activated agent read its own instruction and attached
+  reference ids from its session token alone. Both Go test variants, focused `-race` on the
+  dispatcher, and `make build` pass.
 
 - 2026-08-24 — Continued dependent-work admission through its settings boundary. The activation
   state statements are kind-parameterized while mail retains its own coalescing and recovery policy;
