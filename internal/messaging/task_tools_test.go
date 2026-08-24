@@ -2,9 +2,11 @@ package messaging
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
@@ -297,5 +299,81 @@ func TestCancelTaskAsksTheControlPlaneWhoCreatedIt(t *testing.T) {
 	res, isErr = call(t, impl, "cancel_task", map[string]any{"task_id": "tk_theirs"})
 	if !isErr || res["error"] != "not_creator" || res["message"] != "No such task." {
 		t.Fatalf("cancelling another creator's task = %v", res)
+	}
+}
+
+// FS-16.R10, R11 / TS-10.R12 — an assignee reads a task's attached reference
+// through a work-derived route: no direct grant is created, the route survives
+// the task finishing, it does not depend on the global share list, and deleting
+// the task ends it while leaving the canonical reference intact.
+func TestAnAssigneeReadsAttachedContextWithoutAGrant(t *testing.T) {
+	f := newContextFixture(t)
+	liveAgent(t, f.store, "a_owner", "Atlas", "implementer", "my-app")
+	liveAgent(t, f.store, "a_worker", "Nova", "reviewer", "my-app")
+	f.transcriptEvents(t, "a_owner",
+		contextEvent(t, runtime.EvUserPrompt, runtime.UserPromptData{Text: "assess the migration"}),
+		contextEvent(t, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "the migration is forward-only"}),
+	)
+	f.srv.RegisterSession("tok-owner", "a_owner", "gen-owner")
+	f.srv.RegisterSession("tok-worker", "a_worker", "gen-a_worker")
+
+	// The owner shares with itself only to mint a canonical reference; the worker
+	// is deliberately given no grant.
+	owner := connect(t, f.srv, "tok-owner")
+	shared, isErr := call(t, owner, "share_context", map[string]any{
+		"to": "implementer@my-app", "source": "current_turn", "label": "migration analysis",
+	})
+	if isErr || shared["ok"] != true {
+		t.Fatalf("share_context: %v", shared)
+	}
+	refID, _ := shared["context_ref_id"].(string)
+
+	worker := connect(t, f.srv, "tok-worker")
+	if res, isErr := call(t, worker, "read_context_link", map[string]any{"context_ref_id": refID}); !isErr {
+		t.Fatalf("an unrelated agent read the reference: %v", res)
+	}
+
+	task := assignTask(t, f.store, "a_worker", "review", "read the analysis", state.TaskRunning)
+	if _, err := f.store.DB().Exec(`UPDATE tasks SET started_at = ? WHERE task_id = ?`,
+		time.Now().UTC().Format(time.RFC3339), task.TaskID); err != nil {
+		t.Fatalf("confirm start: %v", err)
+	}
+	if err := f.store.AttachTaskContext(task.TaskID, []state.TaskAttachment{
+		{ContextRefID: refID, Label: "what to review"},
+	}); err != nil {
+		t.Fatalf("AttachTaskContext: %v", err)
+	}
+
+	res, isErr := call(t, worker, "read_context_link", map[string]any{"context_ref_id": refID})
+	if isErr || res["ok"] == false {
+		t.Fatalf("assignee read = %v", res)
+	}
+	if text, _ := res["text"].(string); !strings.Contains(text, "forward-only") {
+		t.Fatalf("read text = %q, want the shared span", text)
+	}
+	// The attachment created no grant, so the worker's own list stays empty.
+	list, isErr := call(t, worker, "list_context_links", nil)
+	if isErr || len(list["links"].([]any)) != 0 {
+		t.Fatalf("attachment appeared on the global share list: %v", list)
+	}
+
+	// A terminal outcome does not revoke the route.
+	if _, err := f.store.DB().Exec(`UPDATE tasks SET state = ? WHERE task_id = ?`,
+		state.TaskFinished, task.TaskID); err != nil {
+		t.Fatalf("finish: %v", err)
+	}
+	if res, isErr := call(t, worker, "read_context_link", map[string]any{"context_ref_id": refID}); isErr {
+		t.Fatalf("finishing the task revoked its route: %v", res)
+	}
+
+	// Deleting the task ends the route and leaves the reference itself alone.
+	if _, err := f.store.DeleteTask(task.TaskID); err != nil {
+		t.Fatalf("DeleteTask: %v", err)
+	}
+	if res, isErr := call(t, worker, "read_context_link", map[string]any{"context_ref_id": refID}); !isErr {
+		t.Fatalf("the route outlived its task: %v", res)
+	}
+	if res, isErr := call(t, owner, "read_context_link", map[string]any{"context_ref_id": refID}); isErr {
+		t.Fatalf("deleting a task disturbed the canonical reference: %v", res)
 	}
 }

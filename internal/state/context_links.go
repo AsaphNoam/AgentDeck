@@ -373,9 +373,21 @@ ORDER BY a.name`)
 func (s *Store) ContextReadAuthorized(refID, reader string) (bool, error) {
 	var one int
 	err := s.db.QueryRow(`
-SELECT 1 FROM context_grants
-WHERE context_ref_id = ? AND granted_to_agent_id = ? AND revoked_at IS NULL
-LIMIT 1`, refID, reader).Scan(&one)
+SELECT 1 WHERE EXISTS (
+  SELECT 1 FROM context_grants
+  WHERE context_ref_id = ? AND granted_to_agent_id = ? AND revoked_at IS NULL
+) OR EXISTS (
+  -- The work-derived route: this reader is the confirmed assignee of a task
+  -- that attaches this reference. Membership is a durable row on the task, and
+  -- started_at is written only when a start is confirmed, so a reservation that
+  -- was abandoned authorizes nothing. It outlives the runtime deliberately: a
+  -- stop and resume rebuilds the per-launch registration while leaving
+  -- membership untouched, and a finished task keeps its route until the task is
+  -- deleted (FS-16.R10, TS-10.R12).
+  SELECT 1 FROM task_attachments a
+  JOIN tasks t ON t.task_id = a.task_id
+  WHERE a.context_ref_id = ? AND t.assigned_agent_id = ? AND t.started_at IS NOT NULL
+)`, refID, reader, refID, reader).Scan(&one)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
