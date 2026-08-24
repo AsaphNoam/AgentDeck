@@ -4,6 +4,40 @@ Newest first. Each entry is the exact final response from a feature-design, impl
 fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history. Earlier
 entries are preserved in [`../archive/state/BRIEFS-pre-sdd.md`](../archive/state/BRIEFS-pre-sdd.md).
 
+### 2026-08-24 — Fixes then build: review findings closed, dependent work started
+
+All four findings from the last review are fixed, each with a test that fails without the fix. Mail
+activation no longer races a pipeline for the same agent's turn — it now competes for the same lock
+the pipeline takes, instead of glancing at whether one was held a moment earlier, so a pipeline stage
+can no longer be paused by a message arriving at the wrong instant. Sharing the current turn can no
+longer include the share call itself: that was leaking the recipient and the private label and
+description you wrote for them into the content the recipient reads, and only on Claude, so the same
+share behaved differently depending on the backend. The rule about when AgentDeck starts a model turn
+now matches what it actually does. And the loop that wakes agents with waiting mail now has a real
+limit — before, fifty agents with unread mail meant fifty agent processes starting at once, every two
+seconds.
+
+With those closed I started dependent work — the feature where a piece of work waits on other work
+and then starts by itself. Three pieces are in and each stands on its own. Work items, their
+prerequisites, and a shared record of what finished with what outcome now exist and survive restart.
+The logic that decides when waiting work becomes runnable is in and tested: a task waiting on three
+things becomes runnable exactly once, when the last one lands, and a prerequisite that fails or is
+deleted parks its dependents visibly instead of leaving them waiting forever. And the instruction
+AgentDeck sends when it wakes an agent is now looked up per reason rather than hard-coded to mail, so
+"you have a task" can be said differently from "you have mail".
+
+None of this is reachable from the app yet, and nothing in the specification is marked as shipped —
+the tables and logic exist, the feature does not. The next piece is the part that actually starts the
+work: taking a slot and claiming the agent in one step, then launching or waking it.
+
+**Needs attention:** One test failed once, early on, in a run of several packages together, and then
+passed in every run afterwards — six full suite runs and several targeted ones. I could not identify
+or reproduce it, so there is nothing to fix yet, but it is worth knowing that something in that area
+may be timing-sensitive.
+
+**Next:** Continue building dependent work — the scheduler that admits ready work against the
+concurrency budget and starts its agent. No decision needed from you.
+
 ### 2026-08-23 — Design review: orchestration-plane separation
 
 The separation between control state, durable context, and model conversations is structurally sound,
