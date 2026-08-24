@@ -711,3 +711,192 @@ func decodeOutcomeSet(raw string) []string {
 	}
 	return strings.Split(raw, ",")
 }
+
+// EvaluateSource applies one source's registered result to every arm naming it,
+// then advances the tasks those arms belong to. Evaluation is event-driven: a
+// committed registration re-evaluates only the arms that name that source, never
+// the whole graph (TS-10.R3). It reads the durable registration rather than
+// taking an outcome from the caller, so it cannot disagree with the record and
+// is safe to re-run — which is what the startup sweep does (TS-10.R15).
+func (s *Store) EvaluateSource(sourceKind, sourceID string) ([]Task, error) {
+	result, err := s.ReadWorkResult(sourceKind, sourceID)
+	if errors.Is(err, ErrNotFound) {
+		return []Task{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return s.resolveArms(func(tx *sql.Tx, now time.Time) error {
+		// An arm is satisfied when the registered outcome is in its set and
+		// unsatisfiable on any other terminal outcome — the two are decided in the
+		// same pass so no arm is left waiting on a result that already arrived
+		// (FS-16.R5, R8).
+		if _, err := tx.Exec(`
+UPDATE task_arms SET state = ?, satisfied_at = ?
+WHERE kind = ? AND source_kind = ? AND source_id = ? AND state = ?
+  AND instr(',' || satisfying_outcomes || ',', ',' || ? || ',') > 0`,
+			ArmSatisfied, formatTime(now), ArmWorkResult, sourceKind, sourceID,
+			ArmUnsatisfied, result.Outcome); err != nil {
+			return fmt.Errorf("state: satisfy arms: %w", err)
+		}
+		if _, err := tx.Exec(`
+UPDATE task_arms SET state = ?
+WHERE kind = ? AND source_kind = ? AND source_id = ? AND state = ?`,
+			ArmUnsatisfiable, ArmWorkResult, sourceKind, sourceID, ArmUnsatisfied); err != nil {
+			return fmt.Errorf("state: park arms: %w", err)
+		}
+		return nil
+	}, armsNamingSource(sourceKind, sourceID))
+}
+
+// MarkSourceUnsatisfiable parks every arm still waiting on a source that can no
+// longer produce a result — a prerequisite task that was itself parked, or one
+// that was deleted. An arm a result already satisfied is untouched, so deleting a
+// finished prerequisite leaves its dependents completely unaffected (FS-16.R8,
+// R18).
+func (s *Store) MarkSourceUnsatisfiable(sourceKind, sourceID string) ([]Task, error) {
+	return s.resolveArms(func(tx *sql.Tx, _ time.Time) error {
+		if _, err := tx.Exec(`
+UPDATE task_arms SET state = ?
+WHERE kind = ? AND source_kind = ? AND source_id = ? AND state = ?`,
+			ArmUnsatisfiable, ArmWorkResult, sourceKind, sourceID, ArmUnsatisfied); err != nil {
+			return fmt.Errorf("state: park arms for source: %w", err)
+		}
+		return nil
+	}, armsNamingSource(sourceKind, sourceID))
+}
+
+// FireSignal satisfies every signal arm in a project waiting on that name at this
+// moment. A signal is not a stored object: firing a name no arm is waiting on
+// succeeds and changes nothing, and an arm may name a signal never fired
+// (FS-16.R9).
+func (s *Store) FireSignal(project, name string) ([]Task, error) {
+	owners := `
+SELECT DISTINCT a.task_id FROM task_arms a JOIN tasks t ON t.task_id = a.task_id
+WHERE a.kind = ? AND a.signal_name = ? AND t.project = ?`
+	return s.resolveArms(func(tx *sql.Tx, now time.Time) error {
+		if _, err := tx.Exec(`
+UPDATE task_arms SET state = ?, satisfied_at = ?
+WHERE kind = ? AND signal_name = ? AND state = ?
+  AND task_id IN (SELECT task_id FROM tasks WHERE project = ?)`,
+			ArmSatisfied, formatTime(now), ArmSignal, name, ArmUnsatisfied, project); err != nil {
+			return fmt.Errorf("state: fire signal: %w", err)
+		}
+		return nil
+	}, ownerQuery{sql: owners, args: []any{ArmSignal, name, project}})
+}
+
+type ownerQuery struct {
+	sql  string
+	args []any
+}
+
+func armsNamingSource(sourceKind, sourceID string) ownerQuery {
+	return ownerQuery{
+		sql: `SELECT DISTINCT task_id FROM task_arms
+WHERE kind = ? AND source_kind = ? AND source_id = ?`,
+		args: []any{ArmWorkResult, sourceKind, sourceID},
+	}
+}
+
+// resolveArms runs one arm transition and the task advance it implies in a single
+// transaction, so a task can never be observed with every arm satisfied while
+// still armed. It returns the tasks whose state actually changed.
+func (s *Store) resolveArms(transition func(*sql.Tx, time.Time) error, owners ownerQuery) ([]Task, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("state: begin arm evaluation: %w", err)
+	}
+	defer tx.Rollback()
+
+	taskIDs, err := queryTaskIDs(tx, owners)
+	if err != nil {
+		return nil, err
+	}
+	now := timeNow()
+	if err := transition(tx, now); err != nil {
+		return nil, err
+	}
+	changed, err := advanceArmedTasks(tx, taskIDs, now)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("state: commit arm evaluation: %w", err)
+	}
+
+	tasks := []Task{}
+	for _, id := range changed {
+		task, err := s.ReadTask(id)
+		if err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, task)
+	}
+	return tasks, nil
+}
+
+func queryTaskIDs(tx *sql.Tx, owners ownerQuery) ([]string, error) {
+	rows, err := tx.Query(owners.sql, owners.args...)
+	if err != nil {
+		return nil, fmt.Errorf("state: list arm owners: %w", err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("state: scan arm owner: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("state: iterate arm owners: %w", err)
+	}
+	return ids, nil
+}
+
+// advanceArmedTasks applies both promotions as single conditional statements, so
+// availability and the transition are decided together and two evaluators racing
+// on one task cannot both advance it (TS-10.R4, INV §5). Parking wins over
+// readiness: an unsatisfiable arm can never be repaired in place, so a task
+// carrying one is never ready however many others are satisfied (FS-16.R8).
+func advanceArmedTasks(tx *sql.Tx, taskIDs []string, now time.Time) ([]string, error) {
+	stamp := formatTime(now)
+	var changed []string
+	for _, id := range taskIDs {
+		res, err := tx.Exec(`
+UPDATE tasks SET state = ?, attention_reason = ?, revision = revision + 1, updated_at = ?
+WHERE task_id = ? AND state IN (?, ?)
+  AND EXISTS (SELECT 1 FROM task_arms WHERE task_id = tasks.task_id AND state = ?)`,
+			TaskDependencyFailed, "a prerequisite can no longer be satisfied", stamp,
+			id, TaskArmed, TaskReady, ArmUnsatisfiable)
+		if err != nil {
+			return nil, fmt.Errorf("state: park task: %w", err)
+		}
+		parked, err := res.RowsAffected()
+		if err != nil {
+			return nil, fmt.Errorf("state: park task rows: %w", err)
+		}
+		if parked > 0 {
+			changed = append(changed, id)
+			continue
+		}
+		res, err = tx.Exec(`
+UPDATE tasks SET state = ?, ready_at = ?, revision = revision + 1, updated_at = ?
+WHERE task_id = ? AND state = ?
+  AND NOT EXISTS (SELECT 1 FROM task_arms WHERE task_id = tasks.task_id AND state != ?)`,
+			TaskReady, stamp, stamp, id, TaskArmed, ArmSatisfied)
+		if err != nil {
+			return nil, fmt.Errorf("state: ready task: %w", err)
+		}
+		ready, err := res.RowsAffected()
+		if err != nil {
+			return nil, fmt.Errorf("state: ready task rows: %w", err)
+		}
+		if ready > 0 {
+			changed = append(changed, id)
+		}
+	}
+	return changed, nil
+}

@@ -206,10 +206,21 @@ exclusive-assignee partial index is live, and the tests prove a cycle, a self-ar
 cross-project source, a second active task for one agent, a second result registration for one
 source, a stale-revision writer, and a reopened finished task are all refused.
 
-**Next small step:** arm evaluation — satisfy or make unsatisfiable the arms naming a source when its
-result registers or its signal fires, and move the owning task `armed → ready` or
-`armed`/`ready` → `dependency_failed`, as single-statement conditional updates (TS-10.R3, R4;
-FS-16.R5, R8, R9). It needs no runtime, so it is the next piece that is complete on its own.
+Arm evaluation is landed on top of it: `EvaluateSource` reads the durable registration rather than
+taking an outcome from its caller, so it cannot disagree with the record and re-running it is a
+no-op — which is what the startup sweep needs. `MarkSourceUnsatisfiable` covers a prerequisite that
+was parked or deleted and so will never register one, and `FireSignal` releases every arm on that
+name in that project. Both promotions are single conditional statements, and parking wins over
+readiness. Fan-in becomes ready exactly once, on the last arm.
+
+**Next small step:** the dispatcher and the `dependency` activation kind. Admission takes capacity and
+the exclusive assignment claim in one statement (`ready → starting`, TS-10.R4, R17, R18), then the
+start path uses the existing launch/resume seams and confirms into `running` (TS-10.R6). That is
+where TS-10.R5's kind-parameterized activation statements are needed — every statement in
+`internal/state/activations.go` still writes the `mail` kind as a literal, and
+`ChatRuntime.StartActivation` still rejects any kind but `mail` and hard-codes mail's prompt and
+status detail. Parameterize those first, with the per-kind instruction and status coming from one
+code-owned table, so a third kind is a row rather than a branch.
 
 **Deliberately not flipped:** every requirement in FS-16 and TS-10 is still `(planned)`. The rows
 exist but no behavior above them is observable yet, and parts of the requirements the substrate
@@ -337,7 +348,11 @@ lives in FS-15, TS-01.R22–R23, TS-02.R24, TS-04.R28, TS-05.R16 and in Git hist
   `assigned_agent_id` for `starting`/`running` rather than a scheduling rule, since the exclusive
   lifecycle claim is released after each transition and cannot hold it. `work_results` is keyed per
   source and immutable, so no arm can be re-decided, and it holds no foreign key into the domain that
-  produced it. Nothing above the rows is built and no `(planned)` tag moved.
+  produced it. Arm evaluation followed: it reads the durable registration instead of trusting a
+  caller's outcome, so re-running it is a no-op and the startup sweep can use the same call; a
+  prerequisite that was parked or deleted has its own entry point, since it will never register a
+  result at all. Parking wins over readiness, because an unsatisfiable arm is never repaired in
+  place. Nothing above the rows is built and no `(planned)` tag moved.
 - 2026-08-24 — Closed the retrospective review's last two findings (INV §1/§2, §9). A `current_turn`
   span no longer ends on a tool invocation, so the `share_context` call that creates it cannot be
   inside it: Claude writes that MCP `tool_call` record before invoking the tool and Codex writes it

@@ -297,3 +297,173 @@ VALUES(?, ?, ?, ?, ?)`, task.TaskID, "ctxref_1", "the plan", "", formatTime(time
 		t.Fatalf("dependent after its prerequisite was deleted: %v", err)
 	}
 }
+
+// FS-16.R5 / TS-10.R3 — fan-in. A task waiting on three prerequisites becomes
+// ready exactly once, when the last one registers a satisfying result, and never
+// before. Each registration re-evaluates only the arms naming that source.
+func TestFanInBecomesReadyOnlyOnTheLastArm(t *testing.T) {
+	st, _ := newTestStore(t)
+	a := newTask(t, st, "my-app", "a")
+	b := newTask(t, st, "my-app", "b")
+	c := newTask(t, st, "my-app", "c")
+	join := newTask(t, st, "my-app", "join",
+		taskArm(a.TaskID, OutcomeSuccess), taskArm(b.TaskID, OutcomeSuccess),
+		taskArm(c.TaskID, OutcomeSuccess, OutcomeBlocked))
+
+	for i, src := range []Task{a, b} {
+		if err := st.RegisterWorkResult(WorkResult{
+			SourceKind: SourceTask, SourceID: src.TaskID, Outcome: OutcomeSuccess,
+		}); err != nil {
+			t.Fatalf("register %d: %v", i, err)
+		}
+		changed, err := st.EvaluateSource(SourceTask, src.TaskID)
+		if err != nil {
+			t.Fatalf("EvaluateSource %d: %v", i, err)
+		}
+		if len(changed) != 0 {
+			t.Fatalf("task advanced after %d of 3 arms: %+v", i+1, changed)
+		}
+		current, err := st.ReadTask(join.TaskID)
+		if err != nil {
+			t.Fatalf("ReadTask: %v", err)
+		}
+		if current.State != TaskArmed {
+			t.Fatalf("state after %d of 3 arms = %s, want %s", i+1, current.State, TaskArmed)
+		}
+	}
+
+	if err := st.RegisterWorkResult(WorkResult{
+		SourceKind: SourceTask, SourceID: c.TaskID, Outcome: OutcomeBlocked,
+	}); err != nil {
+		t.Fatalf("register c: %v", err)
+	}
+	changed, err := st.EvaluateSource(SourceTask, c.TaskID)
+	if err != nil {
+		t.Fatalf("EvaluateSource c: %v", err)
+	}
+	if len(changed) != 1 || changed[0].TaskID != join.TaskID || changed[0].State != TaskReady {
+		t.Fatalf("last arm produced %+v, want join ready", changed)
+	}
+	if changed[0].ReadyAt == nil {
+		t.Fatal("a ready task carries no admission order")
+	}
+
+	// Re-running evaluation is the startup sweep's behaviour: it must not
+	// advance the task a second time or move it off ready.
+	again, err := st.EvaluateSource(SourceTask, c.TaskID)
+	if err != nil {
+		t.Fatalf("re-evaluate: %v", err)
+	}
+	if len(again) != 0 {
+		t.Fatalf("re-evaluation advanced %+v, want nothing", again)
+	}
+	final, err := st.ReadTask(join.TaskID)
+	if err != nil {
+		t.Fatalf("ReadTask: %v", err)
+	}
+	if final.State != TaskReady || final.Revision != changed[0].Revision {
+		t.Fatalf("task after a repeated evaluation = %s rev %d, want %s rev %d",
+			final.State, final.Revision, TaskReady, changed[0].Revision)
+	}
+}
+
+// FS-16.R8 — an outcome outside an arm's satisfying set parks the dependent
+// instead of leaving it waiting forever, and parking wins over readiness: a task
+// whose other arms are all satisfied still parks. Nothing is silently cancelled.
+func TestUnsatisfiableArmParksTheDependent(t *testing.T) {
+	st, _ := newTestStore(t)
+	good := newTask(t, st, "my-app", "good")
+	bad := newTask(t, st, "my-app", "bad")
+	dependent := newTask(t, st, "my-app", "dependent",
+		taskArm(good.TaskID, OutcomeSuccess), taskArm(bad.TaskID, OutcomeSuccess))
+
+	if err := st.RegisterWorkResult(WorkResult{
+		SourceKind: SourceTask, SourceID: good.TaskID, Outcome: OutcomeSuccess,
+	}); err != nil {
+		t.Fatalf("register good: %v", err)
+	}
+	if _, err := st.EvaluateSource(SourceTask, good.TaskID); err != nil {
+		t.Fatalf("EvaluateSource good: %v", err)
+	}
+	if err := st.RegisterWorkResult(WorkResult{
+		SourceKind: SourceTask, SourceID: bad.TaskID, Outcome: OutcomeFailure,
+	}); err != nil {
+		t.Fatalf("register bad: %v", err)
+	}
+	changed, err := st.EvaluateSource(SourceTask, bad.TaskID)
+	if err != nil {
+		t.Fatalf("EvaluateSource bad: %v", err)
+	}
+	if len(changed) != 1 || changed[0].TaskID != dependent.TaskID || changed[0].State != TaskDependencyFailed {
+		t.Fatalf("failing prerequisite produced %+v, want the dependent parked", changed)
+	}
+	if changed[0].AttentionReason == "" {
+		t.Fatal("a parked task surfaces no reason")
+	}
+	states := map[string]string{}
+	for _, arm := range changed[0].Arms {
+		states[arm.SourceID] = arm.State
+	}
+	if states[good.TaskID] != ArmSatisfied || states[bad.TaskID] != ArmUnsatisfiable {
+		t.Fatalf("arm states = %v, want the satisfied one kept and the other unsatisfiable", states)
+	}
+
+	// A prerequisite that is itself parked, or deleted, makes the same arms
+	// unsatisfiable without any registered result.
+	other := newTask(t, st, "my-app", "other")
+	waiting := newTask(t, st, "my-app", "waiting", taskArm(other.TaskID, OutcomeSuccess))
+	parked, err := st.MarkSourceUnsatisfiable(SourceTask, other.TaskID)
+	if err != nil {
+		t.Fatalf("MarkSourceUnsatisfiable: %v", err)
+	}
+	if len(parked) != 1 || parked[0].TaskID != waiting.TaskID || parked[0].State != TaskDependencyFailed {
+		t.Fatalf("parking a prerequisite produced %+v, want the dependent parked", parked)
+	}
+}
+
+// FS-16.R9 — a signal is a named release, not a stored object. Firing satisfies
+// every arm waiting on that name in that project at that moment; firing a name
+// nothing waits on succeeds and changes nothing; and another project's arm on the
+// same name is untouched.
+func TestFiringASignalReleasesOnlyItsProjectsArms(t *testing.T) {
+	st, _ := newTestStore(t)
+	mine := newTask(t, st, "my-app", "mine", TaskArm{Kind: ArmSignal, SignalName: "ci-green"})
+	theirs := newTask(t, st, "other-app", "theirs", TaskArm{Kind: ArmSignal, SignalName: "ci-green"})
+
+	quiet, err := st.FireSignal("my-app", "never-awaited")
+	if err != nil {
+		t.Fatalf("FireSignal for an unawaited name: %v", err)
+	}
+	if len(quiet) != 0 {
+		t.Fatalf("firing an unawaited name changed %+v, want nothing", quiet)
+	}
+
+	changed, err := st.FireSignal("my-app", "ci-green")
+	if err != nil {
+		t.Fatalf("FireSignal: %v", err)
+	}
+	if len(changed) != 1 || changed[0].TaskID != mine.TaskID || changed[0].State != TaskReady {
+		t.Fatalf("fired signal produced %+v, want only this project's task ready", changed)
+	}
+	if changed[0].Arms[0].SatisfiedAt == nil {
+		t.Fatal("firing was not recorded on the arm it satisfied")
+	}
+
+	elsewhere, err := st.ReadTask(theirs.TaskID)
+	if err != nil {
+		t.Fatalf("ReadTask: %v", err)
+	}
+	if elsewhere.State != TaskArmed {
+		t.Fatalf("other project's task = %s, want %s", elsewhere.State, TaskArmed)
+	}
+
+	// Firing again is harmless: the arm is already satisfied and the task has
+	// already advanced.
+	repeat, err := st.FireSignal("my-app", "ci-green")
+	if err != nil {
+		t.Fatalf("re-fire: %v", err)
+	}
+	if len(repeat) != 0 {
+		t.Fatalf("re-firing changed %+v, want nothing", repeat)
+	}
+}
