@@ -6,16 +6,19 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
-- **Review state:** The retrospective review of the shipped control/context/conversation-plane
-  separation is closed. All three **Must fix** and the one **Worth fixing** finding are fixed:
-  mail activation arbitrates on the lifecycle claim instead of sampling it, the top-level product
-  rule names all three conversation crossings, a `current_turn` span can no longer absorb the
-  `share_context` call that created it on either adapter, and the activation sweep has a fixed batch
-  and in-flight bound. The activation/context split itself was confirmed as a deliberate extension of
-  existing seams.
-- **Active change:** None. Dependency-aware work that starts itself is finished and its change file is
-  removed; FS-16 and TS-10 are Current, as are the FS-02, FS-04, FS-14, TS-01, TS-02, TS-03, TS-05,
-  and TS-09 deltas it carried. TS-04 stays Partial for its two unrelated provider-gate items.
+- **Review state:** The continuous review through `76b1493` found ten **Must fix** and three
+  **Worth fixing** findings in shipped dependency-aware work. The Must-fix set covers incorrect
+  existing-agent generation ownership, a cancel/start race, incomplete dependency-failure
+  propagation, missing dispatcher SSE publication, lost cleanup ownership, non-atomic context
+  attachment creation, missing attachment bounds, incomplete task authoring/re-arm controls, a
+  person-result control limited to `blocked`, and a hidden dashboard attention link when a project
+  has no agents. The Worth-fixing set covers false/silent task UI failures, unsafe or dishonest task
+  API error handling, and a duplicated concurrency default. Details and required regressions are
+  recorded below; no product code or specification changed during review.
+- **Active change:** None. Dependency-aware work that starts itself is shipped, its change file is
+  removed, and the implementation review findings below remain open; FS-16 and TS-10 are Current,
+  as are the FS-02, FS-04, FS-14, TS-01, TS-02, TS-03, TS-05, and TS-09 deltas it carried. TS-04
+  stays Partial for its two unrelated provider-gate items.
 - **State:** Dependency-aware work is shipped and verified against the fake adapter; a live-provider
   pass is owed and recorded as a deviation in FS-16 §6 and as an acceptance gate below. Two defects
   in shipped code were found and fixed on the way: `EnsureProjectResources` failed a second
@@ -191,9 +194,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   `make build`, all 226 UI tests, presentation/style checks, and `make dist` pass. No live-browser
   pass was run. A stale migration-version guard test (asserting 13 against the shipped 14) was already
   failing on `main` and now derives its expectation from the migrations slice (INV §9).
-- **Last reviewed code:** `c987724` (2026-08-23), the continuous range after `1fd26ed` covering the
-  final mail-activation review/fix pair, pull-based context-link design records, and the complete
-  context-link implementation. Four context-link findings remain open below.
+- **Last reviewed code:** `76b1493` (2026-08-24), the continuous range after `c987724` covering the
+  dependency-aware design-review workflow revision, both dependency-aware design reviews and their
+  disposition, the complete dependency-aware implementation, and its integration fixes. Ten
+  **Must fix** and three **Worth fixing** findings remain open below.
 - **Branch:** `main`.
 
 ## Active change
@@ -260,11 +264,113 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-None. The retrospective orchestration-plane review's three **Must fix** and one **Worth fixing**
-findings are all fixed, with a regression test each.
+- **Must fix** — existing-agent task generations do not match the runtime they reserve.
+  `planExistingAgentStart` stores the start-attempt id as `assigned_generation` for both a borrowed
+  live runtime and a stopped runtime that resume will register under its own generation
+  (`internal/server/task_dispatcher.go:122-132`). Result recording, exit interruption, and deferred
+  release all require the runtime token's real generation. When an agent targeted by an ordinary
+  task calls `report_task_result`, the store rejects it as `not_assigned`; later release and exit
+  handling can miss the same task. Preserve or mint the actual runtime generation at the lifecycle
+  boundary and add borrowed- and woken-agent tests that report with the real MCP token
+  (FS-16.R4/R12/R17, TS-10.R4/R19, **INV §1/§5/§15**).
 
-Both design reviews of dependency-aware work remain resolved in the requirements: the first round's
-nine Must-fix findings and the re-audit's twelve Must-fix plus two Worth-fixing findings.
+- **Must fix** — cancelling a just-admitted task can still launch or prompt its agent. The dispatcher
+  commits `starting` and hands that snapshot to a goroutine (`internal/server/task_dispatcher.go:79-82`),
+  while cancel can finish and release the row before the goroutine runs. A missing runtime then makes
+  interrupted-release cleanup look complete, but `startAdmittedTask` never revalidates the task state
+  or attempt before launching, waking, or prompting (`internal/server/task_dispatcher.go:138-176`).
+  Revalidate/claim the admitted attempt immediately before the effect and add a deterministic blocked-
+  worker cancellation test that proves no runtime or prompt appears (TS-10.R4/R19,
+  **INV §5/§15**).
+
+- **Must fix** — dependency failure does not propagate to the full downstream graph. `ParkTaskStart`
+  and the terminal `FailTaskStart` path can make a prerequisite `dependency_failed`, but the
+  dispatcher never calls the unsatisfiable-source fan-out (`internal/server/task_dispatcher.go:293-313`).
+  `EvaluateSource` and deletion likewise settle only their immediate dependents. In a three-task
+  chain, making the first task impossible can park the second while leaving the third armed forever.
+  Propagate each newly failed task to a fixpoint and cover start parking, exhausted starts, result
+  mismatch, and deletion with three-level graph tests (FS-16.R8/A4, TS-10.R3,
+  **INV §10**).
+
+- **Must fix** — dispatcher-owned task transitions are not published to the Tasks view. Confirm,
+  park, defer, fail, interrupt, and result-arm evaluation mutate durable rows without calling
+  `publishTaskUpdate` (`internal/server/task_dispatcher.go:283-313,372-376,470-474`). Ordinary
+  dispatch, runtime exit, turn-end release, or recovery therefore leaves the browser's cache stale
+  until a refresh or unrelated reconnect. Publish every changed task after commit and test the SSE
+  payload/cache result for each dispatcher transition (FS-16.R14, TS-03.R28, TS-10.R11,
+  **INV §1/§10**).
+
+- **Must fix** — failed runtime cleanup clears the only durable ownership claim. After an assignment
+  send fails, `startLaunchedTask` records a failed start even when stopping the launched runtime also
+  failed (`internal/server/task_dispatcher.go:168-173`); restart recovery does the same after a
+  failed reap (`internal/server/task_dispatcher.go:444-452`). `FailTaskStart` clears the runtime
+  claim, so a live process can become unowned and a retry can create a second agent. Keep a durable
+  cleanup/release state until stop succeeds and cover both paths with injected stop failures
+  (FS-16.R4/R17/R25, TS-10.R4/R15, **INV §4/§15**).
+
+- **Must fix** — task creation and context attachment are neither atomic nor consistently authorized.
+  HTTP creation commits the task before attaching unchecked reference ids
+  (`internal/server/task_handlers.go:60-83`); agent creation authorizes references before a later task
+  transaction, so revocation can race it; `AttachTaskContext` only inserts the supplied ids
+  (`internal/state/tasks.go:1386-1407`). Invalid HTTP references, a grant revoked between check and
+  insert, or an attachment write failure can leave a broken/unauthorized route or a task returned as
+  failed after it was persisted. Authorize the creator and create the task, arms, and attachments in
+  one state transaction shared by both surfaces; test nonexistent, revoked, and injected-failure
+  cases leave no task (FS-16.R10/R20, TS-05.R17, TS-10.R12, **INV §5/§15**).
+
+- **Must fix** — attachment presentation fields bypass their required bounds. Both HTTP and MCP
+  creation pass `label` and `description` directly to `AttachTaskContext`, which persists them
+  without the shared context limits (`internal/server/task_handlers.go:210-217,528-558`,
+  `internal/state/tasks.go:1390-1407`). Oversized presentation can therefore enter durable state and
+  later reach assignees. Enforce the canonical label/description limits inside the atomic creation
+  boundary and test rejection through both surfaces (FS-15.R3/R11, TS-04.R28, TS-10.R12,
+  **INV §2/§8**).
+
+- **Must fix** — the Tasks UI cannot author or repair the documented task shapes. The create form
+  always launches a role and supports only one optional signal; it cannot target an existing agent,
+  choose backend/model, add task or pipeline prerequisites with outcome sets, or attach context
+  (`ui/src/features/tasks/TasksPage.tsx:156-214`). Re-arm accepts only one successful task and one
+  signal, with no pipeline or outcome choices (`ui/src/features/tasks/TasksPage.tsx:48-87`). Extend
+  the UI to cover the HTTP contract and test full create and re-arm payloads (FS-16.R5/R10/R12/R14,
+  **INV §10**).
+
+- **Must fix** — a person can record only `blocked` from the Tasks view. The sole result action is a
+  hard-coded `blocked` outcome and summary (`ui/src/features/tasks/TasksPage.tsx:138-146`). A person
+  cannot resolve running or interrupted work as success or failure or supply its result details.
+  Offer all three outcomes with bounded summary/details and test their submitted payloads
+  (FS-16.R14/R22, TS-03.R28, **INV §10**).
+
+- **Must fix** — project task attention disappears when that project has no agent cards.
+  `TaskAttentionLink` is rendered only inside the non-empty card-grid header; the zero-agent branch
+  returns only `EmptyState` (`ui/src/components/grid/CardGrid.tsx:103-112`). A project with parked or
+  interrupted work but no visible agent therefore shows neither the required count nor a path to the
+  Tasks view. Render the project attention control in the empty branch and test a zero-agent project
+  with attention-needed work (FS-02.R44/A26, **INV §10**).
+
+- **Worth fixing** — task UI failures are presented as successful emptiness or silence. Signal
+  firing discards every rejection (`ui/src/features/tasks/TasksPage.tsx:217-236`), and both the Tasks
+  page and dashboard attention link turn a failed task query into an empty list and zero count
+  (`ui/src/features/tasks/TasksPage.tsx:239-245`, `ui/src/components/grid/CardGrid.tsx:29-36`). Show a
+  stable error without clearing the input or replacing known task state, and test rejected mutations
+  and queries (FS-16.R14, **INV §7/§8**).
+
+- **Worth fixing** — the task API boundary is not honest or safe about internal read failures.
+  Project/role read errors are all reported as unknown resources (`internal/server/task_handlers.go:89-96,134-140`),
+  task detail logs and replaces attachment-read failures with an empty array, and the default task
+  error response echoes `err.Error()` as an internal API message. Storage or malformed-config
+  failures can therefore masquerade as missing/empty data or disclose internal details. Preserve
+  typed not-found distinctions, fail dependent reads, log server detail, and return one opaque 500;
+  add injected errors containing a sentinel secret (TS-03.R3/R28, **INV §7/§8**).
+
+- **Worth fixing** — the task concurrency default has two authorities. Configuration seeds ten in
+  `internal/config/seed.go`, while the dispatcher defines its own `defaultTaskConcurrency = 10` and
+  uses it for invalid/read-failure fallback (`internal/server/task_dispatcher.go:11-14,316-326`). A
+  future default change can make a fresh config and a fallback config schedule different amounts of
+  work. Derive the fallback from the canonical config default and add a guard test
+  (FS-04.R43, TS-10.R10, **INV §2**).
+
+Both design reviews of dependency-aware work remain resolved in the requirements; these findings
+are against the shipped implementation and integration surfaces.
 
 ## Design consistency notes
 
@@ -276,13 +382,25 @@ stale. These never gate implementation (workflow §13).
 
 ## Review history
 
+### Dependency-aware implementation review
+
+The 2026-08-24 review covered the continuous range after `c987724` through `76b1493`: the
+dependency-aware design-review workflow changes, both design reviews and their disposition, and the
+complete shipped implementation. It checked FS-16 and TS-10 in full, every changed supporting
+requirement, the concrete task state/dispatcher/API/MCP/UI seams, and every invariant class. Classes
+1–5, 7–11, and 13–15 were applicable; classes 6 and 12 had no new runtime/driver or external CLI
+surface. The sweep found ten **Must fix** and three **Worth fixing** findings recorded above.
+`make check-specs`, focused state/pipeline/messaging tests, the server suite outside the sandbox (its
+local listener is blocked inside it), all 248 UI tests, presentation/style checks, and
+`git diff --check` pass. No product code or specification changed.
+
 ### Retrospective orchestration-plane design review
 
 The 2026-08-23 retrospective review covered the shipped plane-separation design from `054180a`
 through mail activation and pull-based context links, the current FS-00/FS-06/FS-15 and
 TS-01/TS-02/TS-04/TS-05 contracts, every invariant class, the pinned Claude/Codex adapter event
-shapes, and the concrete activation, lifecycle, transcript-projection, and context-read seams. It
-found three Must-fix and one Worth-fixing gaps recorded above. It also confirmed that the narrow
+shapes, and the concrete activation, lifecycle, transcript-projection, and context-read seams. Its
+three Must-fix and one Worth-fixing gaps were subsequently resolved. It also confirmed that the narrow
 activation record, mail-owned attempt policy, one in-process context service, separate non-waking
 context recipient query, and direct-grant-only current authorization do not create parallel
 authorities or premature generic workflow machinery. No product code, specification, or ready-change
@@ -337,6 +455,13 @@ in the requirements before implementation, and the change has since shipped; the
 lives in FS-15, TS-01.R22–R23, TS-02.R24, TS-04.R28, TS-05.R16 and in Git history.
 
 ## Recent changelog
+
+- 2026-08-24 — Reviewed the continuous dependency-aware implementation range through `76b1493`.
+  Ten Must-fix and three Worth-fixing findings remain open across runtime generation/ownership,
+  cancellation, transitive dependency failure, task-update publication, context-attachment
+  authorization and bounds, task UI completeness/error handling, task API errors, and the duplicated
+  concurrency default. The full invariant sweep and focused automated suites pass; no product code
+  or specification changed.
 
 - 2026-08-24 — Dependency-aware work shipped end to end: durable tasks with prerequisite arms and
   explicit outcomes, a dispatcher that admits ready work against an install-wide runtime budget and

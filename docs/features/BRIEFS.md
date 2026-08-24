@@ -4102,3 +4102,17 @@ thing owed before trusting it with real work.
 
 **Next:** Run one real task end to end with a live provider, then decide whether anything about the
 Tasks screen needs to change once you have used it.
+
+### 2026-08-24 — Review: dependent work
+
+The review found ten must-fix and three worth-fixing issues. The most urgent are that tasks assigned
+to existing agents cannot report results reliably, cancellation can still launch work, failed
+prerequisites can strand downstream tasks, cleanup can lose ownership of a live runtime, and task
+state changes can remain stale in the interface. Context attachment creation and the Tasks interface
+also need validation and completeness fixes. The existing automated suites remain green but do not
+cover these paths.
+
+**Needs attention:** Do not treat dependent work as complete until the must-fix findings are resolved;
+live-provider validation also remains outstanding.
+
+**Next:** Run `/fix` to address the recorded findings, starting with runtime ownership and reporting.
