@@ -121,3 +121,37 @@ func TestProjectResourcesPathDoesNotCreate(t *testing.T) {
 		t.Fatalf("ProjectResourcesPath created the directory (stat err = %v)", err)
 	}
 }
+
+// FS-11.A1 / TS-02.R13: two agents launching into one project at the same moment
+// both get the resource directory. Creating it is check-then-create, so the loser
+// of that race saw "does not exist" and then met an existing directory; that is
+// not a failure, and treating it as one made a concurrent launch fail.
+func TestEnsureProjectResourcesToleratesAConcurrentCreator(t *testing.T) {
+	home := t.TempDir()
+	s := NewWithHome(home)
+
+	const racers = 8
+	start := make(chan struct{})
+	results := make(chan error, racers)
+	for i := 0; i < racers; i++ {
+		go func() {
+			<-start
+			_, err := s.EnsureProjectResources("myproj")
+			results <- err
+		}()
+	}
+	close(start)
+	for i := 0; i < racers; i++ {
+		if err := <-results; err != nil {
+			t.Fatalf("concurrent EnsureProjectResources: %v", err)
+		}
+	}
+
+	fi, err := os.Stat(filepath.Join(home, "project-resources", "myproj"))
+	if err != nil {
+		t.Fatalf("stat leaf: %v", err)
+	}
+	if fi.Mode().Perm() != 0o700 {
+		t.Fatalf("leaf mode = %v, want 0700", fi.Mode().Perm())
+	}
+}

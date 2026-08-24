@@ -58,15 +58,25 @@ func ensureOwnerDir(dir string) error {
 	fi, err := os.Lstat(dir)
 	switch {
 	case err == nil:
-		if fi.Mode()&os.ModeSymlink != 0 {
-			return fmt.Errorf("config: %q is a symlink; refusing to follow", dir)
-		}
-		if !fi.IsDir() {
-			return fmt.Errorf("config: %q exists but is not a directory", dir)
+		if err := checkOwnerDir(dir, fi); err != nil {
+			return err
 		}
 	case os.IsNotExist(err):
 		if mkErr := os.Mkdir(dir, 0o700); mkErr != nil {
-			return fmt.Errorf("config: create %q: %w", dir, mkErr)
+			// Another launch into the same project can create it between the Lstat
+			// above and this Mkdir. That is not a failure — but what appeared is
+			// re-validated rather than assumed, because it could be a symlink or a
+			// file someone else just put there.
+			if !os.IsExist(mkErr) {
+				return fmt.Errorf("config: create %q: %w", dir, mkErr)
+			}
+			raced, statErr := os.Lstat(dir)
+			if statErr != nil {
+				return fmt.Errorf("config: stat %q: %w", dir, statErr)
+			}
+			if err := checkOwnerDir(dir, raced); err != nil {
+				return err
+			}
 		}
 	default:
 		return fmt.Errorf("config: stat %q: %w", dir, err)
@@ -74,6 +84,19 @@ func ensureOwnerDir(dir string) error {
 	// Guarantee owner-only regardless of umask or a pre-existing looser mode.
 	if err := os.Chmod(dir, 0o700); err != nil {
 		return fmt.Errorf("config: chmod %q: %w", dir, err)
+	}
+	return nil
+}
+
+// checkOwnerDir rejects anything at dir that is not a real directory. A symlink
+// is refused rather than followed, so a resource path can never be redirected
+// outside the AgentDeck home.
+func checkOwnerDir(dir string, fi os.FileInfo) error {
+	if fi.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("config: %q is a symlink; refusing to follow", dir)
+	}
+	if !fi.IsDir() {
+		return fmt.Errorf("config: %q exists but is not a directory", dir)
 	}
 	return nil
 }
