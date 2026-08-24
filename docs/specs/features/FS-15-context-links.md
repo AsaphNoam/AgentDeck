@@ -45,7 +45,11 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   the direct-grant id. `current_turn` is an immutable snapshot through the share call: the intended
   handoff sequence is to write the reasoning-relevant conclusion first, call `share_context` as the
   last context-producing action, and then optionally send ordinary mail containing only the returned
-  reference id. Later assistant text is deliberately outside that reference. A pipeline report is
+  reference id. Later assistant text is deliberately outside that reference, and so is the share
+  call itself: a span never ends on a tool invocation, so the boundary is the caller's last settled
+  content rather than whatever its backend happened to have written down by the time the tool ran.
+  No recipient, label, description, or selector can reach the shared source through the call that
+  created it, and a turn that has produced nothing else yet has nothing to share. A pipeline report is
   shareable only after `report_pipeline_stage_result` succeeds and before that same reporting turn
   reaches `turn_end`; after pipeline reconciliation advances or completes the run, this selector is
   unavailable. The narrow pipeline selector remains useful because accepted reports are already
@@ -155,7 +159,10 @@ Each names the verification that demonstrates it.
   and latest-completed-turn transcript spans; the current-turn case includes conclusion text emitted
   before the share call and excludes later text; recipient grants are durable across server restart,
   and attempts to name another source agent or unrelated pipeline attempt mutate nothing:
-  MCP integration tests under `internal/messaging` and `internal/server`.
+  MCP integration tests under `internal/messaging` and `internal/server`. Both adapter event orders —
+  the invoking `tool_call` already durable, and not yet written — resolve one identical span that
+  carries none of the share's own arguments:
+  `internal/contextref/service_test.go::TestCurrentTurnSpanExcludesTheInFlightShareCall`.
 - **A3** (R2, R4–R5) — A pipeline agent with an accepted report shares a canonical attempt
   report inside the reporting turn, while a current mutable named value and an unreported attempt
   are rejected; after `turn_end` and pipeline quiescence the same friendly selector returns

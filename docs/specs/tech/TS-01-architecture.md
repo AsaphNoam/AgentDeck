@@ -203,7 +203,12 @@ service.** A state-owned transaction first commits the authoritative domain muta
 activation signal appropriate to that domain. Agent and reserved-user mail use one transaction for
 message insert plus a mail-specific rule that permits at most one pending `mail` activation per
 agent. The post-commit in-process signal only wakes the server-owned activation executor; a bounded
-sweep and startup recovery discover the same durable pending rows. **Startup recovery failing is
+sweep and startup recovery discover the same durable pending rows. **Bounded is a fixed number, both
+ways**: one sweep reads at most a fixed batch of pending rows, oldest first, and admits an activation
+only while the count in flight is under the same fixed bound. The bound spans sweeps rather than
+resetting per tick, because an activation that wakes a stopped recipient starts a process and
+outlives the tick. A row the sweep does not admit is not read, claimed, or modified, so the backlog
+drains over later sweeps in age order instead of launching every backlogged recipient at once. **Startup recovery failing is
 fatal to startup**, because the executor lists only `pending` rows: a claimed pre-attempt row that
 recovery could not release is invisible for the life of that process and its source work never runs
 (INV §9/§15). The executor dispatches by closed

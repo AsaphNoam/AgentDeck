@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/agentdeck/agentdeck/internal/hooks"
+	"github.com/agentdeck/agentdeck/internal/messaging"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
@@ -95,7 +96,7 @@ func insertMail(t *testing.T, srv *Server, to string, bodies ...string) {
 
 func pendingActivations(t *testing.T, srv *Server, agentID string) []state.Activation {
 	t.Helper()
-	pending, err := srv.stateStore.PendingMailActivations(agentID)
+	pending, err := srv.stateStore.PendingMailActivations(agentID, messaging.ActivationBatch)
 	if err != nil {
 		t.Fatalf("PendingMailActivations: %v", err)
 	}
@@ -389,6 +390,36 @@ func TestMailActivationDefersToALifecycleClaimTakenAfterTheHint(t *testing.T) {
 	if left := pendingActivations(t, srv, id); len(left) != 1 {
 		t.Fatalf("activations after the deferral = %+v, want the opportunity still pending", left)
 	}
+}
+
+// TS-01.R20 / INV §9 — admission is bounded across sweeps, not only within one.
+// An activation that wakes a stopped recipient outlives the two-second tick, so
+// the executor used to stack one goroutine per backlogged agent on every tick
+// with nothing counting them. A sweep that finds no free slot must leave the row
+// exactly as it found it.
+func TestMailActivationDefersWhenNoAdmissionSlotIsFree(t *testing.T) {
+	srv, ts, promptLog := activationTestServer(t)
+	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+
+	for i := 0; i < messaging.ActivationBatch; i++ {
+		srv.activationSlots <- struct{}{}
+	}
+	insertMail(t, srv, id, "arrives behind a full backlog")
+	srv.executePendingMailActivations(context.Background(), id)
+	time.Sleep(400 * time.Millisecond)
+
+	if got := promptCount(t, promptLog); got != 0 {
+		t.Fatalf("provider prompts = %d, want none while every admission slot is taken", got)
+	}
+	pending := pendingActivations(t, srv, id)
+	if len(pending) != 1 || pending[0].State != state.ActivationPending {
+		t.Fatalf("activations at the bound = %+v, want one untouched pending row", pending)
+	}
+
+	// Freeing one slot admits the same durable opportunity on the next sweep.
+	<-srv.activationSlots
+	srv.executePendingMailActivations(context.Background(), id)
+	waitPrompts(t, promptLog, 1)
 }
 
 // INV §4 / TS-01.R16 — a post-resume activation hook that fails runs after the

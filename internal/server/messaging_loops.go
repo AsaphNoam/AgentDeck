@@ -45,13 +45,26 @@ func (s *Server) executePendingMailActivations(ctx context.Context, onlyAgentID 
 	if s.registry == nil {
 		return
 	}
-	activations, err := s.stateStore.PendingMailActivations(onlyAgentID)
+	activations, err := s.stateStore.PendingMailActivations(onlyAgentID, messaging.ActivationBatch)
 	if err != nil {
 		s.log.Debug("activation list pending mail failed", "err", err)
 		return
 	}
 	for _, activation := range activations {
-		go s.executeMailActivation(ctx, activation)
+		// Admission is bounded across sweeps, not just within one: an activation
+		// that resumes a stopped recipient outlives the two-second tick, so
+		// counting only per-sweep rows would still let ticks stack their process
+		// launches. A row we do not admit is untouched and still pending
+		// (TS-01.R20, INV §9).
+		select {
+		case s.activationSlots <- struct{}{}:
+		default:
+			return
+		}
+		go func() {
+			defer func() { <-s.activationSlots }()
+			s.executeMailActivation(ctx, activation)
+		}()
 	}
 }
 

@@ -271,6 +271,12 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   running recipient's opportunity. *Verify:*
   `internal/server/activation_test.go::TestRunningPipelineAgentStillActivatesForMail` and
   `TestRunningTerminalRecipientDiscardsPendingActivation`.
+- **A17** (R24–R26, TS-01.R20) — A backlog of recipients with waiting mail is admitted a
+  bounded batch at a time, oldest first, and a sweep that finds the in-flight bound full leaves each
+  remaining opportunity untouched and pending rather than dropping or replaying it; freeing a slot
+  admits the same durable opportunity. *Verify:*
+  `internal/state/messages_test.go::TestPendingMailActivationsReadsABoundedOldestFirstBatch` and
+  `internal/server/activation_test.go::TestMailActivationDefersWhenNoAdmissionSlotIsFree`.
 
 ## 6. Deviations & open decisions
 

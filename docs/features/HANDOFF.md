@@ -6,22 +6,23 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
-- **Review state:** A retrospective review of the shipped control/context/conversation-plane
-  separation found three **Must fix** and one **Worth fixing** gaps; two Must-fix items are fixed.
-  Mail activation no longer races a newly acquired lifecycle transition, and the top-level product
-  rule now names all three conversation crossings. Still open: Claude's MCP event order can make a
-  `current_turn` share absorb its own `share_context` call, and the executor's claimed bounded sweep
-  has no batch or concurrency bound. The activation/context split itself was confirmed as a
-  deliberate extension of existing seams.
+- **Review state:** The retrospective review of the shipped control/context/conversation-plane
+  separation is closed. All three **Must fix** and the one **Worth fixing** finding are fixed:
+  mail activation arbitrates on the lifecycle claim instead of sampling it, the top-level product
+  rule names all three conversation crossings, a `current_turn` span can no longer absorb the
+  `share_context` call that created it on either adapter, and the activation sweep has a fixed batch
+  and in-flight bound. The activation/context split itself was confirmed as a deliberate extension of
+  existing seams.
 - **Ready change:** [Dependency-aware work that starts itself](../ready-changes/dependency-aware-armed-agents.md) is waiting to start. It is specified
   in FS-16 and TS-10 with deltas in FS-02, FS-04, FS-14, TS-01, TS-02, TS-03, TS-04, TS-05, and
   TS-09; every requirement is `(planned)` and no product code has changed. Both design reviews are
-  resolved in the requirements, so it is implementable once the open findings above are closed.
+  resolved in the requirements and the retrospective review's findings are closed, so it is ready to
+  implement.
 - **Active change:** None.
 - **State:** Dependency-aware work is designed and waiting; nothing about it is implemented. Both
   design reviews of it are closed — the first round's nine Must-fix findings and the re-audit's
-  twelve Must-fix plus two Worth-fixing — so the remaining gate is the retrospective review's open
-  findings against shipped code, two of which sit in the activation executor this change extends.
+  twelve Must-fix plus two Worth-fixing — and the retrospective review's four findings against
+  shipped code are now fixed too, including the two in the activation executor this change extends.
   Pull-based context links shipped and the review findings against them are fixed. Turn
   selection is now honest at both ends: `latest_completed_turn` resolves only from inside a later
   turn started for an independent reason, and a session or backend-switch marker closes a turn a
@@ -229,26 +230,8 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-- **Must fix** — **A `current_turn` context share can absorb its own control call and presentation
-  metadata, depending on the provider** (**confirmed**, **FS-15.R1/R3/R4, TS-01.R18/R22,
-  INV §1/§2**).
-  `resolveTranscriptSpan` snapshots through the highest transcript sequence visible inside the
-  `share_context` handler (`internal/contextref/service.go:113–193`), and the context renderer emits
-  every ordinary tool name and raw arguments (`internal/transcript/project.go:105–125`,
-  `internal/contextref/render.go:47–83`). The pinned Claude adapter emits an MCP `tool_call` before its
-  result (`~/.local/lib/node_modules/@agentclientprotocol/claude-agent-acp/dist/acp-agent.js:5062–5155`),
-  so the source can include the invocation's recipient, label, description, and selector; the pinned
-  Codex adapter builds its MCP update from the completed item, making the boundary provider-dependent.
-  The server test calls the MCP handler directly and bypasses both adapters
-  (`internal/server/context_links_test.go:80–153`). Define a provider-independent pre-share boundary
-  or classify context-management events as non-source metadata, and cover both event orders.
-- **Worth fixing** — **The activation executor calls its reconciliation sweep bounded, but neither
-  the read nor fan-out has a bound** (**confirmed**, **TS-01.R18/R20, INV §9**).
-  `PendingMailActivations` returns every pending row with no limit
-  (`internal/state/activations.go:82–105`), and each two-second sweep starts one goroutine per returned
-  activation (`internal/server/messaging_loops.go:29–55`). Specify a fixed batch and in-flight bound,
-  leave excess rows durable for later sweeps, and add a backlog test proving admission never exceeds
-  it.
+None. The retrospective orchestration-plane review's three **Must fix** and one **Worth fixing**
+findings are all fixed, with a regression test each.
 
 Both design reviews of dependency-aware work remain resolved in the requirements: the first round's
 nine Must-fix findings and the re-audit's twelve Must-fix plus two Worth-fixing findings.
@@ -325,6 +308,18 @@ lives in FS-15, TS-01.R22–R23, TS-02.R24, TS-04.R28, TS-05.R16 and in Git hist
 
 ## Recent changelog
 
+- 2026-08-24 — Closed the retrospective review's last two findings (INV §1/§2, §9). A `current_turn`
+  span no longer ends on a tool invocation, so the `share_context` call that creates it cannot be
+  inside it: Claude writes that MCP `tool_call` record before invoking the tool and Codex writes it
+  after, so the same share used to resolve to different spans, and on Claude the shared source
+  carried the share's own recipient, label, description, and selector — the presentation fields
+  FS-15.R1/R3 keep out of the reference entirely. A turn holding nothing but that call now reports no
+  shareable content instead of a reversed range. Separately, the activation sweep is bounded both
+  ways: it reads at most `messaging.ActivationBatch` pending rows oldest first, and admits an
+  activation only while fewer than that many are in flight, counted across sweeps rather than per
+  tick — an activation that wakes a stopped recipient starts a process and outlives the two-second
+  ticker, so per-sweep counting would still stack launches. Unadmitted rows are not read, claimed, or
+  modified. FS-06.A17 and TS-01.R20 record it.
 - 2026-08-24 — Fixed the first two retrospective review findings (INV §5, §2). Mail activation now
   arbitrates against the exclusive lifecycle claim instead of sampling it: a running recipient takes
   `claimLifecycle` across the turn start, the way the stopped branch already did through

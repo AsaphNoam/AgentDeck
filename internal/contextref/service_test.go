@@ -148,6 +148,70 @@ func TestShareResolvesTranscriptSelectors(t *testing.T) {
 	}
 }
 
+// FS-15.R1/R3/R4, INV §1/§2 — the pre-share boundary is the same on both pinned
+// adapters. Claude writes the MCP tool_call record before it invokes the tool, so
+// the share's own recipient, label, description, and selector were sitting at the
+// highest visible sequence and landed inside the span it produced; Codex builds
+// its update from the completed item, so the same share resolved to a shorter
+// span. A tool_call never ends a span, so both orders now resolve identically and
+// neither can absorb the invocation.
+func TestCurrentTurnSpanExcludesTheInFlightShareCall(t *testing.T) {
+	shareCall := func(t *testing.T) runtime.Event {
+		t.Helper()
+		return ev(t, runtime.EvToolCall, runtime.ToolCallData{
+			ToolCallID: "tc_1", Name: "other", Title: "share_context",
+			Args: json.RawMessage(`{"to":"reviewer@proj","source":"current_turn",` +
+				`"label":"secret label","description":"secret description"}`),
+			Status: "in_progress",
+		})
+	}
+
+	// Codex order: the record does not exist yet when the handler runs.
+	codex := newFixture(t)
+	codex.agent(t, "a_src", "src")
+	codex.agent(t, "a_dst", "dst")
+	codex.conversation(t, "a_src")
+	codexShare := mustShare(t, codex, Caller{AgentID: "a_src"}, SelectorCurrentTurn, "a_dst")
+
+	// Claude order: the record is already durable when the handler runs.
+	claude := newFixture(t)
+	claude.agent(t, "a_src", "src")
+	claude.agent(t, "a_dst", "dst")
+	claude.conversation(t, "a_src")
+	claude.appendEvents(t, "a_src", shareCall(t))
+	claudeShare := mustShare(t, claude, Caller{AgentID: "a_src"}, SelectorCurrentTurn, "a_dst")
+
+	if claudeShare.Source.FirstSeq != codexShare.Source.FirstSeq ||
+		claudeShare.Source.LastSeq != codexShare.Source.LastSeq {
+		t.Fatalf("span is provider-dependent: claude %d..%d, codex %d..%d",
+			claudeShare.Source.FirstSeq, claudeShare.Source.LastSeq,
+			codexShare.Source.FirstSeq, codexShare.Source.LastSeq)
+	}
+
+	page, err := claude.svc.Read(Caller{AgentID: "a_dst"}, claudeShare.ContextRefID, "")
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if !strings.Contains(page.Text, "the conclusion") {
+		t.Fatalf("shared span lost its conclusion: %q", page.Text)
+	}
+	for _, leaked := range []string{"reviewer@proj", "secret label", "secret description", "share_context"} {
+		if strings.Contains(page.Text, leaked) {
+			t.Fatalf("shared span absorbed its own share call (%q): %q", leaked, page.Text)
+		}
+	}
+
+	// A turn whose only record so far is that unresolved call has nothing to hand
+	// over, and says so rather than producing a reversed or empty range.
+	empty := newFixture(t)
+	empty.agent(t, "a_src", "src")
+	empty.agent(t, "a_dst", "dst")
+	empty.appendEvents(t, "a_src", shareCall(t))
+	if _, err := empty.svc.Share(Caller{AgentID: "a_src"}, SelectorCurrentTurn, "a_dst", "", ""); code(err) != CodeSourceUnavailable {
+		t.Fatalf("share from a turn holding only its own call = %v, want %s", err, CodeSourceUnavailable)
+	}
+}
+
 // A2 — a caller cannot name another agent's transcript: the selector is
 // server-resolved from the session identity alone (TS-05.R16).
 func TestShareSelectorIsServerDerived(t *testing.T) {

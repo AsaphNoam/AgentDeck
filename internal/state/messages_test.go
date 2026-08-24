@@ -2,6 +2,7 @@ package state
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -68,7 +69,7 @@ func TestMailActivationCoalescesClaimsAndRecovers(t *testing.T) {
 			t.Fatalf("InsertMessage %q: %v", body, err)
 		}
 	}
-	pending, err := st.PendingMailActivations("a_mail")
+	pending, err := st.PendingMailActivations("a_mail", 10)
 	if err != nil || len(pending) != 1 {
 		t.Fatalf("PendingMailActivations = %+v, %v; want one", pending, err)
 	}
@@ -80,7 +81,7 @@ func TestMailActivationCoalescesClaimsAndRecovers(t *testing.T) {
 	if _, err := st.InsertMessage(Message{FromAgent: "a_sender", FromAddress: "impl@my-app", FromName: "Atlas", ToAgent: "a_mail", Body: "later"}); err != nil {
 		t.Fatalf("InsertMessage later: %v", err)
 	}
-	pending, err = st.PendingMailActivations("a_mail")
+	pending, err = st.PendingMailActivations("a_mail", 10)
 	if err != nil || len(pending) != 1 {
 		t.Fatalf("PendingMailActivations after claim = %+v, %v; want later activation", pending, err)
 	}
@@ -90,9 +91,58 @@ func TestMailActivationCoalescesClaimsAndRecovers(t *testing.T) {
 	if err := st.RetireMailActivation(claimedID, token); err != nil {
 		t.Fatalf("RetireMailActivation: %v", err)
 	}
-	pending, err = st.PendingMailActivations("a_mail")
+	pending, err = st.PendingMailActivations("a_mail", 10)
 	if err != nil || len(pending) != 1 {
 		t.Fatalf("PendingMailActivations after retire = %+v, %v; want later activation", pending, err)
+	}
+}
+
+// TS-01.R20 / INV §9 — the sweep reads a bounded batch. Every recipient with
+// waiting mail owns a pending row, so an unbounded read handed the executor one
+// goroutine per backlogged agent every two seconds, each able to launch a CLI
+// process. The rows past the batch are untouched and the next sweep takes them,
+// oldest first.
+func TestPendingMailActivationsReadsABoundedOldestFirstBatch(t *testing.T) {
+	st, _ := newTestStore(t)
+	ids := make([]string, 0, 12)
+	for i := 0; i < 12; i++ {
+		id := fmt.Sprintf("a_back%02d", i)
+		ids = append(ids, id)
+		liveAgent(t, st, id, "Nova"+id, "reviewer", "my-app")
+		if _, err := st.InsertMessage(Message{
+			FromAgent: "a_sender", FromAddress: "impl@my-app", FromName: "Atlas",
+			ToAgent: id, Body: "queued",
+		}); err != nil {
+			t.Fatalf("InsertMessage %s: %v", id, err)
+		}
+		// A backlog built inside one second would otherwise tie on created_at and
+		// fall back to the opaque activation id, which says nothing about age.
+		stamp := formatTime(time.Now().UTC().Add(time.Duration(i) * time.Minute))
+		if _, err := st.DB().Exec(`UPDATE activations SET created_at = ? WHERE agent_id = ?`, stamp, id); err != nil {
+			t.Fatalf("stagger created_at for %s: %v", id, err)
+		}
+	}
+
+	batch, err := st.PendingMailActivations("", 5)
+	if err != nil {
+		t.Fatalf("PendingMailActivations: %v", err)
+	}
+	if len(batch) != 5 {
+		t.Fatalf("bounded sweep read %d rows, want 5", len(batch))
+	}
+	for i, a := range batch {
+		if a.AgentID != ids[i] {
+			t.Fatalf("batch[%d] = %s, want the oldest row %s", i, a.AgentID, ids[i])
+		}
+		if a.State != ActivationPending {
+			t.Fatalf("batch[%d] state = %s, want pending", i, a.State)
+		}
+	}
+
+	// Nothing was consumed by reading: the whole backlog is still durable.
+	all, err := st.PendingMailActivations("", 100)
+	if err != nil || len(all) != 12 {
+		t.Fatalf("PendingMailActivations after a bounded read = %d rows, %v; want all 12 still pending", len(all), err)
 	}
 }
 
@@ -105,7 +155,7 @@ func TestReleaseMailActivationCoalescesNewerPendingMail(t *testing.T) {
 	if _, err := st.InsertMessage(Message{FromAgent: "a_sender", FromAddress: "impl@my-app", FromName: "Atlas", ToAgent: "a_release", Body: "first"}); err != nil {
 		t.Fatalf("InsertMessage first: %v", err)
 	}
-	pending, err := st.PendingMailActivations("a_release")
+	pending, err := st.PendingMailActivations("a_release", 10)
 	if err != nil || len(pending) != 1 {
 		t.Fatalf("PendingMailActivations = %+v, %v; want one", pending, err)
 	}
@@ -119,7 +169,7 @@ func TestReleaseMailActivationCoalescesNewerPendingMail(t *testing.T) {
 	if err := st.ReleaseMailActivation(pending[0].ActivationID, token); err != nil {
 		t.Fatalf("ReleaseMailActivation: %v", err)
 	}
-	left, err := st.PendingMailActivations("a_release")
+	left, err := st.PendingMailActivations("a_release", 10)
 	if err != nil || len(left) != 1 {
 		t.Fatalf("PendingMailActivations after release = %+v, %v; want newer pending row", left, err)
 	}
@@ -138,7 +188,7 @@ func TestDiscardClaimedMailActivationRequiresClaimToken(t *testing.T) {
 	if _, err := st.InsertMessage(Message{FromAgent: "a_sender", FromAddress: "impl@my-app", FromName: "Atlas", ToAgent: "a_discard", Body: "first"}); err != nil {
 		t.Fatalf("InsertMessage: %v", err)
 	}
-	pending, err := st.PendingMailActivations("a_discard")
+	pending, err := st.PendingMailActivations("a_discard", 10)
 	if err != nil || len(pending) != 1 {
 		t.Fatalf("PendingMailActivations = %+v, %v; want one", pending, err)
 	}
@@ -385,7 +435,7 @@ func TestClaimMailActivationRetiresDrainedMailbox(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("InsertMessage: %v", err)
 	}
-	pending, err := st.PendingMailActivations("a_drain")
+	pending, err := st.PendingMailActivations("a_drain", 10)
 	if err != nil || len(pending) != 1 {
 		t.Fatalf("PendingMailActivations = %+v, %v; want one", pending, err)
 	}
@@ -403,7 +453,7 @@ func TestClaimMailActivationRetiresDrainedMailbox(t *testing.T) {
 	if claimed || token != "" {
 		t.Fatalf("ClaimMailActivation = %q, %v; want no claim over a drained mailbox", token, claimed)
 	}
-	after, err := st.PendingMailActivations("a_drain")
+	after, err := st.PendingMailActivations("a_drain", 10)
 	if err != nil || len(after) != 0 {
 		t.Fatalf("PendingMailActivations after drain = %+v, %v; want the opportunity retired", after, err)
 	}
@@ -415,7 +465,7 @@ func TestClaimMailActivationRetiresDrainedMailbox(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("InsertMessage later: %v", err)
 	}
-	rearmed, err := st.PendingMailActivations("a_drain")
+	rearmed, err := st.PendingMailActivations("a_drain", 10)
 	if err != nil || len(rearmed) != 1 {
 		t.Fatalf("PendingMailActivations after new mail = %+v, %v; want one", rearmed, err)
 	}

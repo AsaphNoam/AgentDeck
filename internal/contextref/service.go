@@ -189,6 +189,18 @@ func (s *Service) resolveTranscriptSpan(agentID, selector string) (state.Context
 			scan.openFirst = ev.Seq
 			scan.openHas = true
 		}
+		// A tool_call never ends a span. The call this share is running inside is
+		// unresolved by definition — its result is this handler's return value —
+		// but one adapter writes that record before invoking the tool and another
+		// writes it after, so a span ending on a trailing tool_call would carry
+		// the share's own recipient, label, description, and selector on Claude
+		// and not on Codex. Skipping the record here makes the pre-share boundary
+		// the same on both, and costs nothing: a trailing tool_call has no result
+		// in the span either way, while one that did complete is an interior
+		// record its own result keeps (FS-15.R1/R3/R4, TS-04.R28, INV §1/§2).
+		if ev.Type == runtime.EvToolCall {
+			return nil
+		}
 		scan.openLast = ev.Seq
 		return nil
 	})
@@ -199,7 +211,10 @@ func (s *Service) resolveTranscriptSpan(agentID, selector string) (state.Context
 	span := state.ContextSource{Kind: state.ContextSourceTranscriptSpan, AgentID: agentID}
 	switch selector {
 	case SelectorCurrentTurn:
-		if !scan.openHas {
+		// openLast stays behind openFirst when everything the turn has produced so
+		// far is the share's own unresolved invocation: there is content-free
+		// framing but nothing to hand over.
+		if !scan.openHas || scan.openLast < scan.openFirst {
 			return state.ContextSource{}, failf(CodeSourceUnavailable,
 				"The current turn has no persisted transcript content yet.")
 		}

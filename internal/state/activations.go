@@ -79,13 +79,17 @@ SELECT ?, agent_id, ?, ?, ? FROM agents WHERE agent_id = ?`,
 	return nil
 }
 
-// PendingMailActivations lists durable mail work waiting for the executor.
-func (s *Store) PendingMailActivations(agentID string) ([]Activation, error) {
+// PendingMailActivations lists at most limit rows of durable mail work waiting
+// for the executor, oldest first. The limit is required: the caller decides how
+// much of a backlog one sweep admits, and whatever it leaves stays pending for
+// the next one (TS-01.R20, INV §9).
+func (s *Store) PendingMailActivations(agentID string, limit int) ([]Activation, error) {
 	rows, err := s.db.Query(`
 SELECT activation_id, agent_id, kind, state, claim_token, created_at, claimed_at, attempted_at
 FROM activations
 WHERE kind = ? AND state = ? AND (? = '' OR agent_id = ?)
-ORDER BY created_at, activation_id`, ActivationKindMail, ActivationPending, agentID, agentID)
+ORDER BY created_at, activation_id
+LIMIT ?`, ActivationKindMail, ActivationPending, agentID, agentID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("state: list pending mail activations: %w", err)
 	}

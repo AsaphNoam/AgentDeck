@@ -10,6 +10,12 @@ const (
 
 	// ActivationSweepInterval is the mail activation executor's ticker period.
 	ActivationSweepInterval = 2 * time.Second
+	// ActivationBatch bounds one sweep both ways: how many pending rows it reads
+	// and how many activations may be in flight at once. Each one can resume a
+	// stopped recipient, which starts a CLI process, so an unbounded backlog of
+	// agents with waiting mail would launch all of them together every tick. The
+	// rows it leaves behind are durable and the next sweep takes them.
+	ActivationBatch = 8
 
 	// JanitorInterval is the retention-sweep period.
 	JanitorInterval = 60 * time.Second

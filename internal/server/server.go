@@ -55,6 +55,8 @@ type Server struct {
 	pipelineTemplates *pipeline.TemplateStore
 	sourceMgr         *configsource.Manager
 	activationCh      chan string
+	// activationSlots bounds mail activations in flight across sweeps (TS-01.R20).
+	activationSlots chan struct{}
 
 	hookMu      sync.Mutex
 	hookTokens  map[string]string // agent_id -> per-launch hook token (Phase 2 persists these)
@@ -209,6 +211,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		messaging:                 msg,
 		sourceMgr:                 sourceMgr,
 		activationCh:              activationCh,
+		activationSlots:           make(chan struct{}, messaging.ActivationBatch),
 		cfg:                       cfg,
 		log:                       log,
 		hookTokens:                map[string]string{},
