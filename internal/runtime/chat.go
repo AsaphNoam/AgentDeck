@@ -690,10 +690,13 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 }
 
 // StartActivation starts a server-owned, payload-free turn. Its callback runs
-// with the same agent turn gate as an ordinary prompt, so a manual prompt and a
-// mail activation cannot both write a provider frame.
+// with the same agent turn gate as an ordinary prompt, so a manual prompt and an
+// activation cannot both write a provider frame. The instruction and status come
+// from the kind's row in the code-owned registry, never from a literal here or
+// from the caller (TS-01.R21, TS-10.R5).
 func (c *ChatRuntime) StartActivation(ctx context.Context, agentID, kind string, before func(string) error) (bool, error) {
-	if kind != "mail" {
+	contract, ok := LookupActivationKind(kind)
+	if !ok {
 		return false, fmt.Errorf("runtime: unsupported activation kind %q", kind)
 	}
 	as, err := c.lookup(agentID)
@@ -727,8 +730,8 @@ func (c *ChatRuntime) StartActivation(ctx context.Context, agentID, kind string,
 	// boundary already committed, so the activation is retired, not re-armed.
 	now := time.Now().UTC()
 	if err := c.writeStatus(as, state.Status{
-		AgentID: as.agentID, State: "busy", Detail: "checking messages",
-		LastTrace: "MailActivation", BusySince: &now, ContextPct: as.lastPct(),
+		AgentID: as.agentID, State: "busy", Detail: contract.StatusDetail,
+		LastTrace: contract.LastTrace, BusySince: &now, ContextPct: as.lastPct(),
 	}); err != nil {
 		as.mu.Lock()
 		as.turnActive = false
@@ -739,8 +742,7 @@ func (c *ChatRuntime) StartActivation(ctx context.Context, agentID, kind string,
 	go func() {
 		params := map[string]any{
 			"sessionId": as.sessionID,
-			"prompt": []map[string]any{{"type": "text",
-				"text": "You have new messages. Call the check_messages tool and handle them."}},
+			"prompt":    []map[string]any{{"type": "text", "text": contract.Instruction}},
 		}
 		res, err := as.transport.Call(as.ctx, "session/prompt", params)
 		if err != nil {

@@ -948,3 +948,63 @@ BEGIN SELECT RAISE(ABORT, 'injected status write failure'); END`); err != nil {
 		t.Fatalf("StartActivation after recovery = %v, %v; want started (turn gate leaked)", started, err)
 	}
 }
+
+// TS-10.R5 / FS-16.R26 (INV §2) — the instruction and status a host-owned turn
+// carries come from the kind's row in the code-owned registry, not from a literal
+// at the call site and never from the caller. A kind with no row cannot start, so
+// an unregistered kind fails loudly instead of prompting the model with mail's
+// instruction, and it leaves the turn gate free for the real turn behind it.
+func TestStartActivationRefusesAKindWithNoRegisteredContract(t *testing.T) {
+	c, spec := newChatTest(t, "stream_text")
+	dump := filepath.Join(t.TempDir(), "prompt.json")
+	spec.Env = append(spec.Env, "FAKEACP_PROMPT_DUMP="+dump)
+	ctx := context.Background()
+
+	h, err := c.Start(ctx, spec)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { c.Stop(ctx, h.AgentID) })
+
+	called := false
+	started, err := c.StartActivation(ctx, h.AgentID, "dependency", func(string) error {
+		called = true
+		return nil
+	})
+	if started || err == nil {
+		t.Fatalf("StartActivation for an unregistered kind = %v, %v; want a refusal", started, err)
+	}
+	if called {
+		t.Fatal("an unregistered kind ran its pre-side-effect callback")
+	}
+	if _, statErr := os.Stat(dump); statErr == nil {
+		t.Fatal("an unregistered kind sent a provider prompt")
+	}
+
+	// The gate is untouched, so mail still activates behind the refusal and gets
+	// its own registered instruction.
+	ch, unsub, err := c.Subscribe(h.AgentID)
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+	defer unsub()
+	started, err = c.StartActivation(ctx, h.AgentID, "mail", func(turnID string) error {
+		return c.store.ResetTurnBudget(h.AgentID, turnID)
+	})
+	if err != nil || !started {
+		t.Fatalf("StartActivation after the refusal = %v, %v; want started (turn gate leaked)", started, err)
+	}
+	_ = drainTurn(t, ch)
+
+	mail, ok := LookupActivationKind("mail")
+	if !ok {
+		t.Fatal("mail has no registered activation contract")
+	}
+	raw, err := os.ReadFile(dump)
+	if err != nil {
+		t.Fatalf("read prompt dump: %v", err)
+	}
+	if !strings.Contains(string(raw), mail.Instruction) {
+		t.Fatalf("prompt = %s, want the registered instruction %q", raw, mail.Instruction)
+	}
+}

@@ -213,14 +213,22 @@ was parked or deleted and so will never register one, and `FireSignal` releases 
 name in that project. Both promotions are single conditional statements, and parking wins over
 readiness. Fan-in becomes ready exactly once, on the last arm.
 
-**Next small step:** the dispatcher and the `dependency` activation kind. Admission takes capacity and
-the exclusive assignment claim in one statement (`ready → starting`, TS-10.R4, R17, R18), then the
-start path uses the existing launch/resume seams and confirms into `running` (TS-10.R6). That is
-where TS-10.R5's kind-parameterized activation statements are needed — every statement in
-`internal/state/activations.go` still writes the `mail` kind as a literal, and
-`ChatRuntime.StartActivation` still rejects any kind but `mail` and hard-codes mail's prompt and
-status detail. Parameterize those first, with the per-kind instruction and status coming from one
-code-owned table, so a third kind is a row rather than a branch.
+Half of TS-10.R5 is done: `ChatRuntime.StartActivation` no longer branches on `kind != "mail"` or
+carries mail's prompt and status as literals. Both come from `internal/runtime/activation_kinds.go`,
+a closed registry keyed by kind, and a kind with no row cannot start — it fails loudly rather than
+prompting the model with another kind's instruction, and leaves the turn gate free.
+
+**Next small step:** the other half of TS-10.R5 and then the dispatcher. Every statement in
+`internal/state/activations.go` still writes `mail` as a literal; parameterize the kind-agnostic ones
+(list, release, discard, retire, the attempt boundary) and leave mail's policy-bearing predicates
+where they are — the unread-mail test inside `ClaimMailActivation` and the one-pending-per-agent
+coalescing in release and recovery are mail's at-most-once rule, and TS-10.R5 gives `dependency` a
+different one: it stays actionable until its owning task confirms its start, so a lost claim or a
+failed resume returns it to pending instead of retiring it. Add the `dependency` row to the runtime
+registry with that kind's own instruction (FS-16.R26) as part of that piece, not before it has a
+caller. Then the dispatcher: `ready → starting` takes capacity and the exclusive assignment claim in
+one statement (TS-10.R4, R17, R18), and the start path uses the existing launch/resume seams and
+confirms into `running` (TS-10.R6).
 
 **Deliberately not flipped:** every requirement in FS-16 and TS-10 is still `(planned)`. The rows
 exist but no behavior above them is observable yet, and parts of the requirements the substrate
@@ -352,7 +360,10 @@ lives in FS-15, TS-01.R22–R23, TS-02.R24, TS-04.R28, TS-05.R16 and in Git hist
   caller's outcome, so re-running it is a no-op and the startup sweep can use the same call; a
   prerequisite that was parked or deleted has its own entry point, since it will never register a
   result at all. Parking wins over readiness, because an unsatisfiable arm is never repaired in
-  place. Nothing above the rows is built and no `(planned)` tag moved.
+  place. Then the runtime half of the activation-kind contract: the instruction and status a
+  host-owned turn carries now come from one closed registry keyed by kind instead of a literal at the
+  call site, so a second kind is a row rather than a branch, and a kind with no row is refused instead
+  of inheriting mail's instruction. Nothing above the rows is built and no `(planned)` tag moved.
 - 2026-08-24 — Closed the retrospective review's last two findings (INV §1/§2, §9). A `current_turn`
   span no longer ends on a tool invocation, so the `share_context` call that creates it cannot be
   inside it: Claude writes that MCP `tool_call` record before invoking the tool and Codex writes it
