@@ -85,7 +85,7 @@ describe("CardGrid", () => {
 			{ task_id: "tk_1", project: "my-app", display_name: "parked", instruction: "x", target_kind: "launch", state: "dependency_failed", created_by_kind: "person", revision: 1, created_at: "2026-08-24T10:00:00Z", arms: [], attachments: [] },
 		] })));
 		renderWithQuery(<CardGrid projectID="my-app" projectTitle="My App" />);
-		expect(await screen.findByText("1 task needs attention")).toHaveAttribute("href", "/tasks?project=my-app");
+		expect(await screen.findByText("1 task need attention")).toHaveAttribute("href", "/tasks?project=my-app");
 	 });
 
   // FS-02.A25: New Agent opened from a project dashboard is bound to that

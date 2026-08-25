@@ -143,7 +143,7 @@ function TaskRow({ task, project }: { task: Task; project: string }) {
         {(task.state === "interrupted" || task.state === "dependency_failed") && (
           <Button size="small" onClick={() => act(() => retry.mutateAsync(task.task_id))}>Retry</Button>
         )}
-		{(task.state === "running" || task.state === "interrupted") && <form className="task-result" onSubmit={(event) => { event.preventDefault(); act(() => record.mutateAsync({ taskID: task.task_id, outcome, summary, details })); }}>
+		{(task.state === "running" || task.state === "interrupted") && <form onSubmit={(event) => { event.preventDefault(); act(() => record.mutateAsync({ taskID: task.task_id, outcome, summary, details })); }}>
 			<label>Result<select aria-label="Result outcome" value={outcome} onChange={(e) => setOutcome(e.target.value)}><option value="success">Success</option><option value="failure">Failure</option><option value="blocked">Blocked</option></select></label>
 			<label>Summary<input aria-label="Result summary" value={summary} onChange={(e) => setSummary(e.target.value)} required /></label>
 			<label>Details<textarea aria-label="Result details" value={details} onChange={(e) => setDetails(e.target.value)} /></label>

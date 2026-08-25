@@ -102,10 +102,10 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
 
   const body =
     ids.length === 0 ? (
-		<section className="grid-view" data-ui="dashboard">
-			<PageHeader className="grid-toolbar" eyebrow="Live operations" title={projectTitle ?? "Agents"} actions={<><TaskAttentionLink projectID={projectID} /><Button variant="primary" type="button" onClick={() => setShowNewAgent(true)}>New agent</Button><DensityControl /></>} data-slot="header" />
+		<>
+			<TaskAttentionLink projectID={projectID} />
 			<EmptyState onNewAgent={() => setShowNewAgent(true)} />
-		</section>
+		</>
     ) : (
       <section className="grid-view" data-ui="dashboard">
       <PageHeader

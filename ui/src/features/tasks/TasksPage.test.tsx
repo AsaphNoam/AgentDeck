@@ -112,8 +112,10 @@ describe("Tasks view", () => {
 		// payload fields are available on the same form.
 		fireEvent.change(screen.getByLabelText("Target"), { target: { value: "launch" } });
 		fireEvent.change(screen.getByLabelText("Wait for task or pipeline run (optional)"), { target: { value: "pr_1" } });
-		fireEvent.change(screen.getAllByLabelText("Prerequisite kind")[1], { target: { value: "pipeline_run" } });
-		fireEvent.change(screen.getAllByLabelText("Satisfying outcomes")[1], { target: { value: "success,failure" } });
+		const prerequisiteKinds = screen.getAllByLabelText("Prerequisite kind");
+		const satisfyingOutcomes = screen.getAllByLabelText("Satisfying outcomes");
+		fireEvent.change(prerequisiteKinds[prerequisiteKinds.length - 1], { target: { value: "pipeline_run" } });
+		fireEvent.change(satisfyingOutcomes[satisfyingOutcomes.length - 1], { target: { value: "success,failure" } });
 		fireEvent.change(screen.getByLabelText("Context reference (optional)"), { target: { value: "cx_1" } });
 		fireEvent.change(screen.getByLabelText("Context label"), { target: { value: "brief" } });
 		fireEvent.click(screen.getByRole("button", { name: "Create task" }));

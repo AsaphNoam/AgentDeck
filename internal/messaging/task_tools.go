@@ -319,6 +319,8 @@ func taskToolError(err error) (*mcp.CallToolResult, any, error) {
 			"message": "These prerequisites would make the task graph cyclic."})
 	case errors.Is(err, state.ErrTaskArmSource):
 		return errResult(map[string]any{"ok": false, "error": "validation", "message": err.Error()})
+	case errors.Is(err, state.ErrTaskNotAssigned):
+		return errResult(map[string]any{"ok": false, "error": "validation", "message": "You cannot read that context reference."})
 	case errors.Is(err, state.ErrNotFound):
 		return errResult(map[string]any{"ok": false, "error": "task_not_found", "message": "No such task."})
 	case errors.Is(err, state.ErrTaskNotReportable):

@@ -140,8 +140,8 @@ func (s *Server) planExistingAgentStart(task state.Task, attemptID, agentID stri
 // brings up its own agent launches it; one that targets an existing agent crosses
 // into that conversation through the dependency activation kind (FS-16.R6).
 func (s *Server) startAdmittedTask(ctx context.Context, task state.Task) {
-	s.taskStartMu.Lock()
-	defer s.taskStartMu.Unlock()
+	unlock := s.lockTaskStart(task.TaskID)
+	defer unlock()
 	// Admission and the effect are deliberately separated, so cancellation can
 	// finish in between. Re-read under the same server claim cancel takes before
 	// launching, resuming, or prompting (TS-10.R4, INV §5).
@@ -155,6 +155,31 @@ func (s *Server) startAdmittedTask(ctx context.Context, task state.Task) {
 		return
 	}
 	s.startExistingAgentTask(ctx, task)
+}
+
+// lockTaskStart serializes only one task's effect with its cancellation. The
+// dispatcher may still launch independent tasks concurrently up to its worker
+// and runtime budgets (FS-16.R7, INV §5).
+func (s *Server) lockTaskStart(taskID string) func() {
+	s.taskStartMu.Lock()
+	lock := s.taskStartLocks[taskID]
+	if lock == nil {
+		lock = &taskStartLock{}
+		s.taskStartLocks[taskID] = lock
+	}
+	lock.refs++
+	s.taskStartMu.Unlock()
+
+	lock.mu.Lock()
+	return func() {
+		lock.mu.Unlock()
+		s.taskStartMu.Lock()
+		lock.refs--
+		if lock.refs == 0 {
+			delete(s.taskStartLocks, taskID)
+		}
+		s.taskStartMu.Unlock()
+	}
 }
 
 // startLaunchedTask brings up a new agent for a launch-spec task and then settles

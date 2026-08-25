@@ -34,6 +34,44 @@ func taskArm(sourceID string, outcomes ...string) TaskArm {
 	}
 }
 
+// FS-16.R10 / TS-10.R12 — creating follow-on work accepts every effective
+// context authorization path, including the durable work-derived path rather
+// than only a direct grant.
+func TestCreateTaskAttachmentsAcceptsWorkDerivedAuthorization(t *testing.T) {
+	st, _ := newTestStore(t)
+	contextAgent(t, st, "a_src", "source")
+	contextAgent(t, st, "a_creator", "creator")
+	contextAgent(t, st, "a_other", "other")
+	ref, _, err := st.ShareContext(transcriptSpan("a_src", 1, 2), "a_src", "a_other", "", "")
+	if err != nil {
+		t.Fatalf("ShareContext: %v", err)
+	}
+
+	owner := newTask(t, st, "proj", "owner")
+	if err := st.AttachTaskContext(owner.TaskID, []TaskAttachment{{ContextRefID: ref.ContextRefID}}); err != nil {
+		t.Fatalf("AttachTaskContext: %v", err)
+	}
+	if _, err := st.DB().Exec(`UPDATE tasks SET assigned_agent_id = ?, started_at = ? WHERE task_id = ?`, "a_creator", formatTime(timeNow()), owner.TaskID); err != nil {
+		t.Fatalf("make confirmed assignee: %v", err)
+	}
+
+	id, err := st.NewTaskID()
+	if err != nil {
+		t.Fatalf("NewTaskID: %v", err)
+	}
+	created, err := st.CreateTaskWithAttachments(Task{
+		TaskID: id, Project: "proj", DisplayName: "follow-up", Instruction: "use the context",
+		TargetKind: TargetLaunch, Role: "impl", CreatedByKind: "agent", CreatedByAgentID: "a_creator",
+	}, []TaskAttachment{{ContextRefID: ref.ContextRefID, Label: "prior work"}}, "a_creator")
+	if err != nil {
+		t.Fatalf("CreateTaskWithAttachments: %v", err)
+	}
+	attachments, err := st.ListTaskAttachments(created.TaskID)
+	if err != nil || len(attachments) != 1 || attachments[0].ContextRefID != ref.ContextRefID {
+		t.Fatalf("attachments = %+v, %v", attachments, err)
+	}
+}
+
 // FS-16.R5 / TS-10.R16 — a task with no arms is ready the moment it is created,
 // and one with an unsatisfied arm is armed. The arms round-trip with their
 // satisfying set intact.

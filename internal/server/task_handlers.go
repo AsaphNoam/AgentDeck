@@ -385,8 +385,8 @@ func (s *Server) writeTaskError(w http.ResponseWriter, err error) {
 
 // handleCancelTask implements POST /api/tasks/{id}/cancel (FS-16.R3, R20).
 func (s *Server) handleCancelTask(w http.ResponseWriter, r *http.Request) {
-	s.taskStartMu.Lock()
-	defer s.taskStartMu.Unlock()
+	unlock := s.lockTaskStart(r.PathValue("id"))
+	defer unlock()
 	task, err := s.stateStore.CancelTask(r.PathValue("id"))
 	if err != nil {
 		s.writeTaskError(w, err)
@@ -627,8 +627,8 @@ func (s *Server) CreateAgentTask(req messaging.AgentTaskRequest) (state.Task, er
 // a caller must not be able to probe for work it does not own (FS-16.R24,
 // TS-05.R14, R17).
 func (s *Server) CancelAgentTask(taskID, creatorAgentID string) (state.Task, error) {
-	s.taskStartMu.Lock()
-	defer s.taskStartMu.Unlock()
+	unlock := s.lockTaskStart(taskID)
+	defer unlock()
 	existing, err := s.stateStore.ReadTask(taskID)
 	if err != nil {
 		return state.Task{}, err

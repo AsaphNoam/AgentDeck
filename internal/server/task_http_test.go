@@ -105,6 +105,7 @@ func TestCreateTaskRejectionsAreTypedAndAtomic(t *testing.T) {
 		{"unknown role", map[string]any{"project": "tmpproj", "display_name": "x", "instruction": "x", "target_kind": "launch", "role": "ghost"}, 404},
 		{"unknown target kind", map[string]any{"project": "tmpproj", "display_name": "x", "instruction": "x", "target_kind": "whatever"}, 422},
 		{"unknown target agent", map[string]any{"project": "tmpproj", "display_name": "x", "instruction": "x", "target_kind": "agent", "target_agent_id": "a_ghost"}, 404},
+		{"unknown context attachment", map[string]any{"project": "tmpproj", "display_name": "x", "instruction": "x", "target_kind": "launch", "role": "impl", "attachments": []map[string]any{{"context_ref_id": "cx_ghost"}}}, 422},
 		{"arm with no source", map[string]any{"project": "tmpproj", "display_name": "x", "instruction": "x", "target_kind": "launch", "role": "impl",
 			"arms": []map[string]any{{"kind": "work_result", "source_kind": "task", "satisfying_outcomes": []string{"success"}}}}, 422},
 		{"arm with an empty outcome set", map[string]any{"project": "tmpproj", "display_name": "x", "instruction": "x", "target_kind": "launch", "role": "impl",

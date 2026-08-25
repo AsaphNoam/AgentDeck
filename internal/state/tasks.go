@@ -350,7 +350,13 @@ func insertTaskAttachments(tx *sql.Tx, taskID string, attachments []TaskAttachme
 		}
 		if creatorAgentID != "" {
 			var authorized int
-			err := tx.QueryRow(`SELECT 1 FROM context_grants WHERE context_ref_id = ? AND granted_to_agent_id = ? AND revoked_at IS NULL`, attachment.ContextRefID, creatorAgentID).Scan(&authorized)
+			err := tx.QueryRow(`SELECT 1 WHERE EXISTS (
+  SELECT 1 FROM context_grants
+  WHERE context_ref_id = ? AND granted_to_agent_id = ? AND revoked_at IS NULL
+) OR EXISTS (
+  SELECT 1 FROM task_attachments a JOIN tasks t ON t.task_id = a.task_id
+  WHERE a.context_ref_id = ? AND t.assigned_agent_id = ? AND t.started_at IS NOT NULL
+)`, attachment.ContextRefID, creatorAgentID, attachment.ContextRefID, creatorAgentID).Scan(&authorized)
 			if errors.Is(err, sql.ErrNoRows) {
 				return ErrTaskNotAssigned
 			}

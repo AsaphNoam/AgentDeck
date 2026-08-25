@@ -60,10 +60,10 @@ type Server struct {
 	// taskStartSlots bounds task starts in flight across dispatch passes. The
 	// budget bounds runtimes; this bounds workers (TS-10.R3, R17).
 	taskStartSlots chan struct{}
-	// taskStartMu serializes an admitted task's first effect with cancellation.
-	// A cancel that wins before the worker reaches its effect changes the durable
-	// row first, and the worker's guarded re-read becomes a no-op (INV §5).
-	taskStartMu sync.Mutex
+	// taskStartMu protects taskStartLocks. The locks themselves are per task, so
+	// unrelated task launches retain the configured concurrency (INV §5).
+	taskStartMu    sync.Mutex
+	taskStartLocks map[string]*taskStartLock
 
 	hookMu      sync.Mutex
 	hookTokens  map[string]string // agent_id -> per-launch hook token (Phase 2 persists these)
@@ -147,6 +147,11 @@ type Server struct {
 	catalogMu sync.Mutex
 }
 
+type taskStartLock struct {
+	mu   sync.Mutex
+	refs int
+}
+
 // New constructs a Server. The config supplies the port; the stores back the data
 // handlers; the registry drives agent runtimes; the logger is used by middleware.
 func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Registry, cfg config.Config, log *slog.Logger) *Server {
@@ -220,6 +225,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		activationCh:              activationCh,
 		activationSlots:           make(chan struct{}, messaging.ActivationBatch),
 		taskStartSlots:            make(chan struct{}, taskDispatchBatch),
+		taskStartLocks:            map[string]*taskStartLock{},
 		cfg:                       cfg,
 		log:                       log,
 		hookTokens:                map[string]string{},

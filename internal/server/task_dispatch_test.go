@@ -11,6 +11,23 @@ import (
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
+// INV §5 / FS-16.R7 — cancellation serializes with only its own task's effect;
+// an unrelated launch must retain the dispatcher's configured parallelism.
+func TestTaskStartLocksArePerTask(t *testing.T) {
+	srv := testServer(t, true)
+	releaseFirst := srv.lockTaskStart("tk_first")
+	defer releaseFirst()
+
+	enteredSecond := make(chan func(), 1)
+	go func() { enteredSecond <- srv.lockTaskStart("tk_second") }()
+	select {
+	case releaseSecond := <-enteredSecond:
+		releaseSecond()
+	case <-time.After(time.Second):
+		t.Fatal("an unrelated task start waited behind the first task")
+	}
+}
+
 // newLaunchTask creates a ready task that brings up its own agent.
 func newLaunchTask(t *testing.T, srv *Server, name string) state.Task {
 	t.Helper()
@@ -331,6 +348,10 @@ func TestATaskForAStoppedAgentWakesIt(t *testing.T) {
 	if running.RuntimeClaim != state.ClaimWoke {
 		t.Fatalf("runtime claim = %q, want %q", running.RuntimeClaim, state.ClaimWoke)
 	}
+	realGeneration := srv.registry.Generation(agentID)
+	if realGeneration == "" || running.AssignedGeneration != realGeneration {
+		t.Fatalf("woken assignment generation = %q, runtime generation = %q", running.AssignedGeneration, realGeneration)
+	}
 	waitRunning(t, srv, agentID, true)
 	waitPrompts(t, promptLog, 1)
 	raw, err := os.ReadFile(promptLog)
@@ -341,6 +362,12 @@ func TestATaskForAStoppedAgentWakesIt(t *testing.T) {
 	if !strings.Contains(string(raw), dependency.Instruction) {
 		t.Fatalf("woken prompt = %s, want the task instruction", raw)
 	}
+	if _, err := srv.stateStore.RecordAgentTaskResult(task.TaskID, agentID, realGeneration,
+		state.TaskResult{Outcome: state.OutcomeSuccess, Summary: "done"}); err != nil {
+		t.Fatalf("RecordAgentTaskResult with runtime token: %v", err)
+	}
+	srv.dispatchTurnEnd(agentID, realGeneration)
+	waitRunning(t, srv, agentID, false)
 }
 
 // FS-16.R2, R19 — a target that can never execute work parks its task instead of
@@ -426,12 +453,16 @@ func TestFinishingLeavesABorrowedRuntimeAlone(t *testing.T) {
 	task := newAgentTask(t, srv, agentID, "review this")
 	srv.dispatchReadyTasks(context.Background())
 	running := waitTaskState(t, srv, task.TaskID, state.TaskRunning)
+	realGeneration := srv.registry.Generation(agentID)
+	if realGeneration == "" || running.AssignedGeneration != realGeneration {
+		t.Fatalf("borrowed assignment generation = %q, runtime generation = %q", running.AssignedGeneration, realGeneration)
+	}
 
-	if _, err := srv.stateStore.RecordAgentTaskResult(task.TaskID, agentID, running.AssignedGeneration,
+	if _, err := srv.stateStore.RecordAgentTaskResult(task.TaskID, agentID, realGeneration,
 		state.TaskResult{Outcome: state.OutcomeBlocked, Summary: "needs a decision"}); err != nil {
 		t.Fatalf("RecordAgentTaskResult: %v", err)
 	}
-	srv.dispatchTurnEnd(agentID, running.AssignedGeneration)
+	srv.dispatchTurnEnd(agentID, realGeneration)
 
 	if _, err := srv.stateStore.ReadRunning(agentID); err != nil {
 		t.Fatalf("finishing a task killed a conversation it only borrowed: %v", err)
