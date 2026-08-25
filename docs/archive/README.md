@@ -13,7 +13,8 @@ instructions; follow the current workflow and specifications instead.
   acceptance notes, with an exact current-authority migration map.
 - `reviews/` — immutable usability-review reports and evidence.
 - `snapshots/` — historical HTML guides/demos that are not maintained with the product.
-- `state/` — pre-SDD handoff and brief history.
+- `state/` — historical handoff and brief history, including pre-SDD records and dated live-brief
+  archives.
 
 For current product truth, use [`../specs/README.md`](../specs/README.md). For current work state,
 use [`../features/HANDOFF.md`](../features/HANDOFF.md).
