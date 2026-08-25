@@ -13,6 +13,55 @@ All thirteen dependent-work review findings are now closed. Tasks assigned to ex
 
 **Next:** Run one task end to end with each pinned provider when authorized.
 
+### 2026-08-25 — Feature design: telling agents whether a refused tool call is worth retrying
+
+Most of what your "richer agent-facing orchestration API" idea asked for is already built. I checked
+the code rather than the notes. Tools already answer agents in structured data with stable codes, not
+prose. Agents already say "start this work when that other work finishes" and AgentDeck already wakes
+them when it does, with no polling and no model in the loop. An agent given a task already receives
+that task's own attached context directly, instead of scanning a shared list and guessing which
+entries are meant for it. Those were the idea's three main asks.
+
+Two real gaps were left. The first is that when a tool says no, an agent cannot tell what kind of no
+it is. A malformed request, a name that matches two agents, a per-turn message allowance that has run
+out, and a database hiccup all come back as an English sentence the model has to interpret. It gets
+this wrong in the case that costs something: told "this message was not sent", an agent re-sends
+inside the same turn, which cannot work. The second is that results are handed over as text that
+happens to contain structured data, so every client re-parses a string the protocol could carry
+properly.
+
+I also went looking for the "wait until X, then retry" condition your idea described, and it has no
+home. Asking an agent to do work while it is busy is not refused at all — the work is recorded and
+starts when there is room. The one refusal that names a target is permanent, not temporary: it means
+that agent can never be given work, not that it is occupied right now. So there is nothing for a
+retry condition to point at, and the honest version is a plain label saying which of four kinds of no
+this was: never, try again with different arguments, not in this turn, or a temporary glitch. I wrote
+the label as a small object rather than a bare word so a real condition can be added later without
+renaming anything.
+
+You made four calls: keep the deliberate rule that agents cannot browse the work graph, since letting
+them would bring back exactly the polling this design removes; have waiting keep working the way it
+does now, where an agent finishes its turn and AgentDeck starts a fresh one when the wait ends, rather
+than holding a conversation open; add structured results alongside the existing text rather than
+replacing it, so nothing breaks; and build the reduced version rather than parking it.
+
+This is specification and planning only — no product code changed. The new specification is FS-17
+with two supporting technical requirements, and the change is queued in `docs/ready-changes/` and not
+started. The pieces you set aside — letting an agent repair its own stuck work, letting it inspect
+work state, letting it stop or resume other agents, creating groups of tasks at once, and declaring
+formal result schemas — are recorded in `docs/ideas.md` with what each one still needs.
+
+**Needs attention:** The working tree already has uncommitted changes to the task dispatcher and its
+tests — per-task start locks replacing a single shared one, and a cancellation check before an
+admitted task launches — which look like in-progress fixes for two of the open review findings. They
+are not mine and I left them alone, so the count of what is still open may be lower than the handoff
+says. The dependency work this design builds on still carries those findings, including task creation
+that is not atomic and task changes that never reach the browser. This change only reshapes what
+tools hand back and adds nothing on top of those paths, but its tests will run against them.
+
+**Next:** Nothing of mine is in progress. Finishing the dispatcher fixes already underway is the more
+valuable next step; the queued change is ready to build after that.
+
 ### 2026-08-24 — Fixes then build: review findings closed, dependent work started
 
 All four findings from the last review are fixed, each with a test that fails without the fix. Mail

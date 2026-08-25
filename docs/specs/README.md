@@ -43,6 +43,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-14 | [features/FS-14-configurable-pipelines.md](features/FS-14-configurable-pipelines.md) | Current | Model-neutral multi-stage pipelines with run-time model assignment, text artifacts, routing, and recovery |
 | FS-15 | [features/FS-15-context-links.md](features/FS-15-context-links.md) | Current | Target-neutral durable context references, direct grants, personal discovery state, and bounded pull retrieval |
 | FS-16 | [features/FS-16-dependent-work.md](features/FS-16-dependent-work.md) | Current | Durable tasks with explicit outcomes, prerequisite arms, host-started armed work, and task context attachments |
+| FS-17 | [features/FS-17-agent-tool-results.md](features/FS-17-agent-tool-results.md) | Partial | Cross-cutting agent-facing MCP tool result contract: retry classification and structured result delivery |
 
 ### Technical specs
 
@@ -83,6 +84,7 @@ has not reached an FS/TS update belongs only in `docs/ideas.md`.
 | Configurable pipelines | FS-14 templates, sequential runs, recovery, and supervision | Shipped |
 | Dependent work | FS-16 durable tasks, prerequisite arms, host-started work, task context | Shipped |
 | Extension boundaries | FS-07 terminal; FS-08 federation | Shipped core with explicitly tagged planned work; Partial |
+| Agent-facing API surface | FS-17 tool result contract | Specified, not yet built; Partial |
 
 ---
 

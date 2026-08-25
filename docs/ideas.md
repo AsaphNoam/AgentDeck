@@ -30,53 +30,6 @@ Example:
 - **Approval notifications link to the conversation.** When a pop-up notification fires because an
   agent needs approval, make it a link that opens that agent's conversation, so the user can jump
   straight to the pending permission instead of hunting for the right agent.
-- **Richer agent-facing orchestration API.** I also want to consider exposing a more semantic
-  orchestration API to agents.
-
-  Today, some orchestration behavior is expressed through relatively low-level mechanisms such as
-  messaging and lifecycle operations. That often forces agents to implement orchestration protocols
-  themselves through prose: ask another agent to do something, poll it, wait, inspect messages,
-  infer completion, pass context manually, and so on.
-
-  Instead, agents should increasingly be able to express orchestration intent directly to AgentDeck,
-  with AgentDeck executing the deterministic parts through its control and context planes.
-
-  Conceptually this might eventually include operations in areas such as:
-
-  - launching or assigning agents;
-  - defining dependencies;
-  - linking or exposing context;
-  - waiting on structured work state;
-  - requesting verification or review;
-  - inspecting agent/task state;
-  - stopping or resuming agents;
-  - coordinating groups of work.
-
-  The exact API surface is not decided. I do not want to jump directly to a large workflow engine
-  or an over-designed DSL.
-
-  Typed orchestration outcomes and host-managed waiting should be first-class design requirements.
-  Operations should return structured states such as `started`, `armed`, `blocked`, `target_busy`,
-  and `dependency_failed`, plus a structured `retry_when` condition where applicable, instead of
-  prose that another model must interpret. “Wait for X” should register durable control-plane
-  waiting/subscription state and let AgentDeck wake the agent when the condition changes; it should
-  not ask the LLM to poll repeatedly.
-
-  An assignment/read operation should return that work object's attached context-reference ids and
-  attachment-specific presentation metadata. It should not make an activated agent scan a global
-  context-link list and guess which links apply to its current task. A global list remains only a
-  convenience for directly shared ad-hoc context; personal seen/hidden state on that list is
-  control-plane projection and cannot detach or revoke context required by active work.
-
-  Consider where the boundary should sit between a small set of composable primitives and useful
-  higher-level operations. The API should expose AgentDeck's orchestration semantics cleanly rather
-  than making agents reconstruct those semantics themselves through messages and polling.
-
-  AgentDeck already has useful foundations for this direction: persistent agent identity, resumable
-  provider sessions, durable transcripts, mailboxes, lifecycle management, groups/pipelines,
-  MCP-based agent communication, and a distinction between running and stopped agents. These
-  improvements should build on the good abstractions already present rather than replace them
-  wholesale.
 
 ### From play session 2026-08-10
 
@@ -94,6 +47,24 @@ Example:
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
 
+- **Richer agent-facing orchestration API (remainder).** The first slice — typed retry
+  classification on refused tool calls and structured result delivery — is specified in FS-17 and
+  queued as `docs/ready-changes/agent-tool-retry-classification.md`. Investigation of the original
+  idea found that most of what it asked for had already shipped: tools return typed JSON with stable
+  codes, `create_task` arms already register durable host-managed waiting instead of polling, and
+  `get_assigned_task` already returns a task's own context-reference ids with per-attachment
+  presentation. What remains unbuilt, each needing its own product decision:
+  - **Agent-side re-arm and retry.** `POST /api/tasks/{id}/rearm` and `/retry` exist for people but
+    have no MCP counterpart, so an agent told `retry_requires_rearm` cannot act on it.
+  - **Work inspection.** Reading work you created or are assigned to. FS-16 §6 and TS-04.R29
+    deliberately exclude any task-graph query as anti-polling; on 2026-08-25 the user chose to hold
+    that exclusion. Reversing it needs a reason stronger than convenience.
+  - **Lifecycle control.** Agent-callable stop, resume, or launch of another agent without going
+    through a task. Largest new authority surface; no threat model yet.
+  - **Group fan-out.** Multiple arms already give fan-in/join; creating several related tasks as one
+    unit does not exist. TS-10 §5 excludes it.
+  - **Declared tool output schemas.** Deferred until the pinned Claude and Codex adapters' handling
+    of `outputSchema` is verified.
 - **Real-provider acceptance.** Run the credentialed OpenCode/OpenHands and Claude/Codex federation
   checks, then reconcile any observed provider incompatibility before making release claims.
 - **AgentDeck product knowledge MCP.** Define a versioned, non-secret `agentdeck_docs` topic service

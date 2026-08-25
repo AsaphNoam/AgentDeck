@@ -326,6 +326,26 @@ global resource list.
   teardown, transport, and redaction remain the R6–R7 authority; no second MCP server appears. See
   TS-10.
 
+- **R30 — One classifier owns retry classification, not the tools. (planned)** A single table in
+  `internal/messaging` maps every agent-facing refusal code to its FS-17.R2 class, and the shared
+  refusal helper applies it. No handler classifies inline and no domain package carries a second
+  map, because two classification sites drift and the drift is invisible to the caller. A refusal
+  code with no table entry classifies `transient` (FS-17.R9) and fails a guard test that derives the
+  code set from the emitting call sites rather than a hand-written list. Classification is a
+  presentation of the refusal the tool already returned: it runs after the decision, reads no
+  storage, starts no transaction, and cannot change an outcome code. See FS-17.
+
+- **R31 — Structured content is emitted by the shared result helpers. (planned)** The existing
+  `jsonResult` and `errResult` helpers in `internal/messaging` set
+  `mcp.CallToolResult.StructuredContent` to the same value they marshal into the text content block,
+  so no handler can emit one channel without the other and the two cannot disagree (FS-17.R7). The
+  pinned `github.com/modelcontextprotocol/go-sdk/mcp` supports setting that field directly on the
+  result; because every handler's typed output parameter is the empty interface, the SDK derives no
+  output schema, so this adds no `outputSchema` to `tools/list` and changes no handler signature or
+  input schema. Declaring output schemas later is additive and is deliberately deferred until the
+  pinned Claude and Codex adapters' handling of them is verified (FS-17.A6). Values that cannot
+  marshal to a JSON object omit the field rather than fail the call (FS-17.R12).
+
 ## 3. Interfaces & data shapes
 
 - ACP: JSON-RPC messages over newline-delimited child stdin/stdout; adapter determines exact

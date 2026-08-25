@@ -25,6 +25,11 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   the runtime's true generation, cancellation and start serialize per task, failed dependencies
   propagate fully, dispatcher transitions publish after commit, failed cleanup retains ownership,
   attachment creation is atomic and bounded, and the Tasks UI and API cover their specified paths.
+- **2026-08-25 — design:** Defined FS-17 (agent-facing tool result contract) and TS-04.R30–R31, and
+  queued `docs/ready-changes/agent-tool-retry-classification.md`. Investigation of the "richer
+  agent-facing orchestration API" idea found most of it already shipped; the remainder is trimmed in
+  `../ideas.md`. The task-graph query exclusion (FS-16 §6, TS-04.R29) was reaffirmed by the user.
+
 ## Decisions needing your input
 
 These are product decisions needed for a future change or shipped boundaries whose reversal needs
