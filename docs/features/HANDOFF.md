@@ -6,9 +6,12 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
-- **Review state:** Every finding from the review through `895348e` is closed. The two purported
-  agent-facing `request_conflict` and `revision_conflict` codes were confirmed HTTP-only; the three
-  MCP-reachable pipeline codes are classified and guarded.
+- **Review state:** Verification of the fixes for the review through `895348e`: seven of the nine
+  findings are closed in code and test, and three residual items are listed under
+  `## Review findings`. The two purported agent-facing `request_conflict` and `revision_conflict`
+  codes were independently confirmed HTTP-only — neither `ProposeRun`, `ProposeTemplate`, nor
+  `Report` reaches the call sites that raise them — so classifying the other three is correct and
+  complete.
 - **Active change:** None. Agent-facing retry classification and structured result delivery is shipped;
   FS-17 and TS-04.R30–R31 are Current.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
@@ -22,6 +25,12 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Changelog
 
+- **2026-08-26 — review:** Verified the fixes for the nine findings against the tree. Seven are
+  closed with real regression coverage, including a three-level chain test that also exposed the
+  restart re-evaluation having been a no-op because `TasksInStates` never populated `Arms`. Three
+  residual items are recorded below. `make test`, `make build`, `make check-specs`,
+  `git diff --check`, `npm test` (251 passing), and `npm run build` are green;
+  `TestRetryRunsAgainOnTheSameAssignee` failed once in three full-suite runs and did not reproduce.
 - **2026-08-26 — work:** `/work` found no active change and no waiting ready change, so no
   implementation started. The repository remains clean and ready for the next designed change.
 - **2026-08-26 — fix:** Closed all nine review findings. Source evaluation now publishes and
@@ -81,4 +90,34 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-None.
+- **Worth fixing** — FS-17.A1 and A3, and half of A4, still describe verification that does not
+  exist. A4's contradictory "byte-identical" wording is corrected and A2's guard now genuinely
+  guards, but nothing in `internal/messaging` produces each code in R3's table from a real call to
+  the tool that emits it (A1), asserts over that enumeration that no refusal leaks a non-participant
+  identifier or a count/delay/deadline (A3), or makes one *successful* call per tool (A4).
+  `TestRegisteredToolsShareResultContract` exercises only `session_unknown`, and
+  `TestPipelineRefusalsUseDeclaredRetryClasses` calls the `pipelineToolError` helper rather than a
+  tool. No test file cites `FS-17.A1` or `FS-17.A3`. Adjacent: A2's guard scans `"error"` literals in
+  `internal/messaging` only, so the three dynamically forwarded `pipeline.ControlError` codes are a
+  hand-written list (`internal/messaging/tool_result_contract_test.go:38-41`) and a new control-plane
+  code would still reach an agent unclassified. Build the per-code enumeration, or narrow A1/A3/A4 to
+  what the suite actually proves (FS-17.A1/A3/A4, **INV §10**).
+
+- **Worth fixing** — a task can still sit in `starting` indefinitely on the two stop-failure
+  branches, and no requirement says so. The lost-generation path now settles its attempt, but
+  `startLaunchedTask` still returns without settling when stopping the launched runtime fails
+  (`internal/server/task_dispatcher.go:208-215`), and `recoverStartAttempt` does the same after a
+  failed reap (`internal/server/task_dispatcher.go:553-560`). Both are the right call for runtime
+  ownership, but `starting` is not an attention state (`ui/src/schemas/task.ts:16`), so the person
+  who created the task sees it stalled mid-start with no signal and no repair until the next server
+  start. Either surface the state or record the indefinite outcome in FS-16 alongside R25's attempt
+  bound (FS-16.R25, TS-10.R4, **INV §4/§8**).
+
+- **Worth fixing** — `TestRetryRunsAgainOnTheSameAssignee` is flaky under full-suite load. It failed
+  once in three `make test` runs with `409 a resume is already in progress` on its first Stop
+  (`internal/server/task_http_test.go:390-392`), and did not reproduce in three further full-package
+  runs at this commit or three at `f97cc89`, so it is not attributable to the fix. Diagnosis: the
+  test polls the durable row for `running`, but `startLaunchedTask` holds the per-agent lifecycle
+  claim across `confirmTaskStart`'s write and publish, so a Stop issued inside that window gets the
+  designed conflict. Have the test wait for the claim to settle rather than only for the row
+  (no invariant class).

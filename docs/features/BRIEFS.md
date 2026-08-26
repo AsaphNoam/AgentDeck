@@ -5,6 +5,32 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-26 — Review: checking the fixes actually landed
+
+I went back over each of the nine items from this morning's review against the current code and ran
+the full checks. Seven are genuinely fixed, with tests that would catch a regression rather than just
+code that looks right. The pipeline dependency failure now reaches the Tasks view and travels all the
+way down a chain of waiting work, and chasing it turned up a further problem worth knowing about: the
+same repair after a restart had never worked at all, because the recovery pass was reading a list of
+prerequisites that was always empty. That is fixed too.
+
+One of my two headline items was partly my error. I said five pipeline refusals were being described
+to agents as worth retrying; three of them were, and those are fixed. The other two can only come
+from actions a person takes in the browser, never from a tool an agent can call, so they were
+correctly left alone.
+
+Three things remain open, none urgent. The tool-contract document still promises a few checks that
+were never written, so it claims more testing than exists. A task whose agent cannot be shut down
+after a failed start still sits silently part-way through starting until the server restarts — a
+deliberate choice to avoid abandoning a live process, but nothing tells the person waiting. And one
+existing test fails occasionally under load because it stops an agent a fraction of a second before
+the system is ready to accept it; the product behaves correctly, the test is just impatient.
+
+**Needs attention:** None. Everything left is small and recorded.
+
+**Next:** A fix session can take the three remaining items whenever convenient; nothing blocks new
+work.
+
 ### 2026-08-26 — Review: dependent-work fixes and the new agent tool result contract
 
 I reviewed the two rounds of dependent-work fixes and the newly shipped rule for how AgentDeck answers
