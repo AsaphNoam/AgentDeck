@@ -605,3 +605,14 @@ The fix did introduce one regression that should be corrected before moving on. 
 **Needs attention:** The pipeline eligibility check needs to apply only when the recipient is stopped. Everything else is ready to move on from.
 
 **Next:** Run `/fix` for that one finding, then this work is done.
+### 2026-08-26 — Implementation: clearer agent tool results
+
+Agents now receive a machine-readable retry class whenever an AgentDeck tool refuses a call, so they
+can distinguish permanent mistakes, argument fixes, next-turn limits, and temporary host failures.
+Tool results also arrive as native structured content while keeping the existing text response
+unchanged for older clients. The full automated test suite and production build are green.
+
+**Needs attention:** Live Claude and Codex compatibility still needs the existing credentialed
+provider check before those adapters are claimed as verified.
+
+**Next:** An independent reviewer should review this implementation.

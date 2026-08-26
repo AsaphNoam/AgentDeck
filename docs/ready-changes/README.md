@@ -42,5 +42,4 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-- [Tell agents whether a refused tool call is worth retrying](agent-tool-retry-classification.md) —
-  typed retry classification and structured result delivery on the agent-facing MCP surface (FS-17).
+None.

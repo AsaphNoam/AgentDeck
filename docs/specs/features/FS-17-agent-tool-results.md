@@ -1,6 +1,6 @@
 # FS-17 — Agent-facing tool result contract
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/messaging` · **Journeys:** —
 **Absorbed:** —
 
@@ -24,13 +24,13 @@ FS-16 (tasks); this spec adds no tool and changes no tool's arguments, authority
 
 ### 2.1 Retry classification
 
-- **R1 — Every refusal classifies its retry behavior. (planned)** An agent-facing MCP tool result
+- **R1 — Every refusal classifies its retry behavior.** An agent-facing MCP tool result
   that reports a refusal carries a `retry` object beside its existing `error` code and `message`.
   `retry.class` holds exactly one value from the closed vocabulary in R2. The classification is
   advisory: it never gates a call, never obligates the host, and never changes what the refused call
   did or did not do.
 
-- **R2 — The four classes have fixed meanings. (planned)**
+- **R2 — The four classes have fixed meanings.**
   - `never` — the identical call from the same caller will not succeed. Caller errors, closed
     states, and authorization refusals.
   - `after_change` — the same call can succeed with different arguments. Any repair fields the
@@ -40,7 +40,7 @@ FS-16 (tasks); this spec adds no tool and changes no tool's arguments, authority
   - `transient` — a host-side read or dependency failed. A later identical call may succeed, and
     there is nothing durable to wait on.
 
-- **R3 — Every refusal code declares one class. (planned)** Each outcome code an agent-facing tool
+- **R3 — Every refusal code declares one class.** Each outcome code an agent-facing tool
   can emit maps to exactly one class:
 
   | Class | Codes |
@@ -52,28 +52,28 @@ FS-16 (tasks); this spec adds no tool and changes no tool's arguments, authority
 
   A refusal keeps every field it carries today; classification only adds `retry`.
 
-- **R4 — Classification never discloses other work and never asks an agent to poll. (planned)** No
+- **R4 — Classification never discloses other work and never asks an agent to poll.** No
   `retry` value names a task, pipeline run, agent, message, or context reference that the caller is
   not already a participant in, and no class directs an agent to re-call a tool on a schedule.
   Waiting on other work remains expressible only as a prerequisite arm at task creation
   (FS-16.R5), which AgentDeck resolves without a model in the loop (FS-16.R6). This spec adds no
   condition language, no wait tool, and no task-graph query.
 
-- **R5 — A successful result carries no retry field. (planned)** `retry` appears only on a refusal.
+- **R5 — A successful result carries no retry field.** `retry` appears only on a refusal.
 
 ### 2.2 Result delivery
 
-- **R6 — Every tool result is delivered as structured content and as text. (planned)** Each
+- **R6 — Every tool result is delivered as structured content and as text.** Each
   agent-facing tool result, successful or refused, populates the MCP `structuredContent` field with
   the same value it renders into its text content block.
 
-- **R7 — Structured delivery is additive and never the only channel. (planned)** The text content
+- **R7 — Structured delivery is additive and never the only channel.** The text content
   block keeps the encoding it has today, byte for byte, including on refusals and including
   `isError`. `structuredContent` never carries a field the text block lacks and never omits one it
   has, so the two can never disagree and a client that reads only text behaves exactly as before.
   No tool declares an output schema in this change.
 
-- **R8 — The contract covers the whole agent-facing surface. (planned)** R1–R7 apply to every tool
+- **R8 — The contract covers the whole agent-facing surface.** R1–R7 apply to every tool
   registered on AgentDeck's single MCP authority — the messaging, pipeline, context, and task tools
   named by TS-04.R6, R17, R28, and R29 — and to any tool added to it later.
 
@@ -84,20 +84,20 @@ counted. No row, migration, notification, activation, transcript event, or SSE p
 
 ## 4. Edge cases & errors
 
-- **R9 — An unclassified refusal is `transient`. (planned)** A refusal whose code is not in R3's
+- **R9 — An unclassified refusal is `transient`.** A refusal whose code is not in R3's
   table classifies as `transient`, because the realistic unmapped case is an internal or storage
   failure. Shipping an agent-facing refusal code that R3 does not list is a defect, not a
   supported state.
 
-- **R10 — An unknown session is `never`, not `transient`. (planned)** `session_unknown` means the
+- **R10 — An unknown session is `never`, not `transient`.** `session_unknown` means the
   token was never issued or its agent generation ended. Neither is repaired by retrying within that
   session, so it does not invite one.
 
-- **R11 — Classification carries no retry budget. (planned)** `retry` never includes a count, a
+- **R11 — Classification carries no retry budget.** `retry` never includes a count, a
   delay, a backoff, a deadline, or a timestamp. AgentDeck does not track how many times a caller
   retried and does not refuse a call for having retried.
 
-- **R12 — A result that cannot be structured still answers. (planned)** If a result value cannot be
+- **R12 — A result that cannot be structured still answers.** If a result value cannot be
   encoded as a JSON object, the call still returns its text content block and its outcome code
   unchanged, and omits `structuredContent` rather than failing the call.
 
@@ -128,7 +128,7 @@ Each names the verification that demonstrates it.
 
 ## 6. Deviations & open decisions
 
-Nothing in this spec has shipped; every item is `(planned)`.
+The contract is shipped. Live-provider compatibility remains tracked as acceptance gate A6.
 
 - The idea that prompted this work asked for a structured `retry_when` condition an agent could
   wait on. Tracing every refusal the MCP layer emits found none that a durable wait would repair:
@@ -149,6 +149,7 @@ Nothing in this spec has shipped; every item is `(planned)`.
 
 Anchors: the single MCP authority and its shared result helpers in `internal/messaging`
 (`tools.go` `jsonResult`/`errResult`); tool registration in `internal/messaging/messaging.go`;
+contract coverage in `internal/messaging/tool_result_contract_test.go`;
 refusal sources in `internal/messaging/task_tools.go`, `context_tools.go`, and `pipeline_tools.go`,
 plus the control-plane `ToolError` codes raised in `internal/server/task_handlers.go`. The
 protocol-level structured-content field is `CallToolResult.StructuredContent` in the pinned

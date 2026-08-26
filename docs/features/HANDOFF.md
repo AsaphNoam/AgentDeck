@@ -9,9 +9,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 - **Review state:** The review through `76b1493` found ten **Must fix** and three **Worth fixing**
   findings in the shipped dependency-aware work. All are resolved in `e1e827b` and `b121fd0`; those
   two fix commits still need independent review.
-- **Active change:** None. The dependency-aware work change is shipped; FS-16 and TS-10 are Current.
-- **State:** Automated verification used the fake ACP adapter. A pinned Claude/Codex live-provider
-  task pass remains owed before claiming the feature works with real providers.
+- **Active change:** None. Agent-facing retry classification and structured result delivery is shipped;
+  FS-17 and TS-04.R30–R31 are Current.
+- **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
+  remain owed before claiming those adapters accept structured results.
 - **Last reviewed code:** `76b1493` (2026-08-24).
 - **Branch:** `main`.
 
@@ -21,6 +22,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Changelog
 
+- **2026-08-26 — implementation:** Shipped the agent-facing tool result contract. Every MCP refusal
+  now carries a centralized four-class retry hint, successful and refused JSON objects are mirrored
+  into structured content without changing the text block, and registration-derived tests cover the
+  complete tool surface and deferred output-schema boundary.
 - **2026-08-25 — fix:** Closed all thirteen dependent-work review findings. Task starts now retain
   the runtime's true generation, cancellation and start serialize per task, failed dependencies
   propagate fully, dispatcher transitions publish after commit, failed cleanup retains ownership,
@@ -50,6 +55,8 @@ an explicit specification update. Remove an item when the human resolves it or q
   assertion stands in until then.
 - [ ] Run a task start, an assignment turn, and a reported result against the pinned Claude and Codex
       adapters before claiming dependent work works with real providers (FS-16 §6).
+- [ ] Run one successful and one refused MCP tool call through pinned Claude and Codex adapters before
+      claiming they accept structured tool results without losing the text block (FS-17.A6).
 - [ ] Run the Phase 7 federation discovery/precedence/refresh/launch/resume matrix against real Claude and
   Codex installations before promoting FS-08/TS-07 from Partial.
 

@@ -21,22 +21,100 @@ func (s *Server) caller(req *mcp.CallToolRequest) (SessionIdentity, bool) {
 	return s.LookupSession(req.Extra.Header.Get(TokenHeader))
 }
 
-// jsonResult marshals v into a single text-content tool result.
+type retryClass string
+
+const (
+	retryNever       retryClass = "never"
+	retryAfterChange retryClass = "after_change"
+	retryNextTurn    retryClass = "next_turn"
+	retryTransient   retryClass = "transient"
+)
+
+var refusalRetryClasses = map[string]retryClass{
+	"validation":                 retryNever,
+	"invalid_body":               retryNever,
+	"invalid_subject":            retryNever,
+	"invalid_outcome":            retryNever,
+	"invalid_state":              retryNever,
+	"invalid_cursor":             retryNever,
+	"dependency_cycle":           retryNever,
+	"target_ineligible":          retryNever,
+	"already_reported":           retryNever,
+	"not_assigned":               retryNever,
+	"not_creator":                retryNever,
+	"retry_requires_rearm":       retryNever,
+	"task_not_found":             retryNever,
+	"context_not_found":          retryNever,
+	"context_source_unavailable": retryNever,
+	"proposal_forbidden":         retryNever,
+	"session_unknown":            retryNever,
+
+	"ambiguous_recipient": retryAfterChange,
+	"recipient_not_found": retryAfterChange,
+	"source_unavailable":  retryAfterChange,
+
+	"message_budget_exceeded": retryNextTurn,
+
+	"internal":             retryTransient,
+	"store_unavailable":    retryTransient,
+	"context_unavailable":  retryTransient,
+	"pipeline_unavailable": retryTransient,
+}
+
+func classifyRetry(code string) retryClass {
+	if class, ok := refusalRetryClasses[code]; ok {
+		return class
+	}
+	return retryTransient
+}
+
+// jsonResult marshals v into a single text-content tool result and mirrors JSON
+// objects into MCP structuredContent. Non-object values keep the text channel.
 func jsonResult(v any) (*mcp.CallToolResult, any, error) {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return nil, nil, err
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(b)}}}, nil, nil
+	return &mcp.CallToolResult{
+		Content:           []mcp.Content{&mcp.TextContent{Text: string(b)}},
+		StructuredContent: structuredObject(b),
+	}, nil, nil
 }
 
 // errResult marshals v into a tool result flagged IsError.
 func errResult(v any) (*mcp.CallToolResult, any, error) {
+	if payload, ok := v.(map[string]any); ok {
+		payload = cloneMap(payload)
+		if code, ok := payload["error"].(string); ok {
+			payload["retry"] = map[string]any{"class": classifyRetry(code)}
+		}
+		v = payload
+	}
 	b, err := json.Marshal(v)
 	if err != nil {
 		return nil, nil, err
 	}
-	return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: string(b)}}}, nil, nil
+	return &mcp.CallToolResult{
+		IsError:           true,
+		Content:           []mcp.Content{&mcp.TextContent{Text: string(b)}},
+		StructuredContent: structuredObject(b),
+	}, nil, nil
+}
+
+func structuredObject(b []byte) any {
+	var object map[string]any
+	if err := json.Unmarshal(b, &object); err != nil || object == nil {
+		return nil
+	}
+	return object
+}
+
+func cloneMap(src map[string]any) map[string]any {
+	dst := make(map[string]any, len(src)+1)
+	for key, value := range src {
+		dst[key] = value
+	}
+	return dst
 }
 
 // sessionUnknown is the structured error for a call on an unknown/revoked
