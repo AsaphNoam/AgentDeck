@@ -45,9 +45,12 @@ type Server struct {
 	stateMgr    *state.Manager
 	eventBus    *bus.Bus
 	registry    *runtime.Registry
-	terminal    *terminal.Runtime
-	cfg         config.Config
-	log         *slog.Logger
+	// taskGeneration is the task dispatcher's generation lookup. Tests replace
+	// it to cover a runtime disappearing between wake and durable confirmation.
+	taskGeneration func(string) string
+	terminal       *terminal.Runtime
+	cfg            config.Config
+	log            *slog.Logger
 
 	indexer           *persistindex.Indexer
 	messaging         *messaging.Server
@@ -218,6 +221,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		stateMgr:                  stateMgr,
 		eventBus:                  eventBus,
 		registry:                  registry,
+		taskGeneration:            registry.Generation,
 		terminal:                  term,
 		indexer:                   ix,
 		messaging:                 msg,

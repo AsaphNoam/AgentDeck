@@ -648,3 +648,17 @@ unchanged for older clients. The full automated test suite and production build 
 provider check before those adapters are claimed as verified.
 
 **Next:** An independent reviewer should review this implementation.
+
+### 2026-08-26 — Fix: dependent work and agent tool results
+
+Dependent tasks now update immediately and propagate failures through chained work when a pipeline
+finishes or the server restarts. Task assignments also confirm the live runtime generation before
+starting, context attachment checks share one authorization rule, invalid attachments use clear
+wording, and the dashboard no longer reports zero attention when its task query failed. Agent tool
+retry guidance now covers the pipeline refusals those tools can actually emit, with the malformed-
+argument boundary documented. The full test suite, production builds, and distributable build pass.
+
+**Needs attention:** Live Claude and Codex compatibility still needs the existing credentialed
+provider check before those adapters are claimed as verified.
+
+**Next:** An independent reviewer should review these fixes.

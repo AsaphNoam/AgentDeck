@@ -54,6 +54,9 @@ func TestCreateTaskAttachmentsAcceptsWorkDerivedAuthorization(t *testing.T) {
 	if _, err := st.DB().Exec(`UPDATE tasks SET assigned_agent_id = ?, started_at = ? WHERE task_id = ?`, "a_creator", formatTime(timeNow()), owner.TaskID); err != nil {
 		t.Fatalf("make confirmed assignee: %v", err)
 	}
+	if authorized, err := st.ContextReadAuthorized(ref.ContextRefID, "a_creator"); err != nil || !authorized {
+		t.Fatalf("work-derived ContextReadAuthorized = %v, %v", authorized, err)
+	}
 
 	id, err := st.NewTaskID()
 	if err != nil {

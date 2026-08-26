@@ -356,6 +356,10 @@ func (s *Server) writeTaskError(w http.ResponseWriter, err error) {
 		writeAPIError(w, ae)
 	case errors.Is(err, state.ErrTaskArmSource):
 		writeAPIError(w, apiError(runtime.CodeValidation, err.Error()))
+	case errors.Is(err, state.ErrTaskAttachmentReference):
+		ae := apiError(runtime.CodeValidation, "unknown context reference")
+		ae.Details = map[string]any{"code": "context_not_found"}
+		writeAPIError(w, ae)
 	case errors.Is(err, state.ErrTaskConflict):
 		writeAPIError(w, apiError(runtime.CodeConflict, "the task changed while this request was in flight"))
 	case errors.Is(err, state.ErrTaskHoldsRuntime):

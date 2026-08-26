@@ -270,6 +270,7 @@ behavior.
   R16).
   The indicator opens the Tasks view (FS-16.R14); the card grid itself gains no task object, and the
   state badge vocabulary in R3 is unchanged, because an armed task has no agent and therefore no card.
+  If the task query fails, the indicator says attention is unavailable rather than asserting a zero count.
 
 ## 5. Acceptance criteria
 
@@ -387,7 +388,7 @@ picker and launches with the route project's id; the general modal continues to 
 - **A26** (R44) — The needs-attention count reflects exactly the `dependency_failed` and
   `interrupted` tasks in view, updates after their authoritative commit, does not count an ordinary
   `armed`, `ready`, `starting`, or `running` task, and reads zero when no task needs attention:
-  dashboard UI tests.
+  dashboard UI tests. A failed task query renders the unavailable state instead of zero.
 
 ## 6. Deviations & open decisions
 

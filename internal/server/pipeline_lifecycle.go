@@ -215,9 +215,7 @@ func (s *Server) PublishPipelineUpdate(update pipeline.PipelineUpdate) {
 	// released now. Evaluation reads that registration rather than this
 	// notification, so a dropped or repeated publish changes nothing (TS-10.R3).
 	if update.State == "completed" || update.State == "stopped" {
-		if _, err := s.stateStore.EvaluateSource(state.SourcePipelineRun, update.RunID); err != nil {
-			s.log.Debug("evaluate pipeline run result failed", "run", update.RunID, "err", err)
-		}
+		s.evaluateSourceResult(state.SourcePipelineRun, update.RunID)
 	}
 }
 

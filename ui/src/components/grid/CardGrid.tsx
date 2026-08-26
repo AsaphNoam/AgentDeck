@@ -27,12 +27,12 @@ import { Button, ConfirmDialog, PageHeader } from "../ui";
  *  in view need a person, opening the Tasks view (FS-02.R44). The card grid
  *  itself gains no task object — an armed task has no agent and so no card. */
 function TaskAttentionLink({ projectID }: { projectID?: string }) {
-  const { data: tasks } = useTasks(projectID);
+  const { data: tasks, isError } = useTasks(projectID);
   const count = (tasks ?? []).filter((task) => needsAttention(task)).length;
   if (!projectID) return null;
   return (
     <Link className="task-attention-link" to={`/tasks?project=${encodeURIComponent(projectID)}`}>
-      {count} task{count === 1 ? "" : "s"} need attention
+      {isError ? "Task attention unavailable" : `${count} task${count === 1 ? "" : "s"} need attention`}
     </Link>
   );
 }

@@ -122,7 +122,7 @@ func (s *Server) planExistingAgentStart(task state.Task, attemptID, agentID stri
 	generation := attemptID
 	if _, err := s.stateStore.ReadRunning(agentID); err == nil {
 		claim = state.ClaimBorrowed
-		generation = s.registry.Generation(agentID)
+		generation = s.taskGeneration(agentID)
 		if generation == "" {
 			s.log.Debug("task target runtime has no local generation", "task", task.TaskID, "agent", agentID)
 			return state.TaskReservation{}, false
@@ -274,6 +274,20 @@ func (s *Server) startExistingAgentTask(ctx context.Context, task state.Task) {
 		return
 	}
 	if running {
+		generation := s.taskGeneration(task.AssignedAgentID)
+		if generation == "" {
+			s.settleActivationStart(task, activation, token, false, false)
+			return
+		}
+		if generation != task.AssignedGeneration {
+			updated, ok, err := s.stateStore.SetTaskStartGeneration(task.TaskID, task.StartAttemptID, generation)
+			if err != nil || !ok {
+				s.log.Debug("record borrowed task generation failed", "task", task.TaskID, "err", err)
+				s.settleActivationStart(task, activation, token, false, false)
+				return
+			}
+			task = updated
+		}
 		attempted, started := s.runActivationTurn(ctx, state.ActivationKindDependency, activation, token)
 		s.settleActivationStart(task, activation, token, attempted, started)
 		return
@@ -292,9 +306,15 @@ func (s *Server) startExistingAgentTask(ctx context.Context, task state.Task) {
 	}
 	attempted, wakeErr := s.wakeForActivation(ctx, state.ActivationKindDependency, activation, token)
 	if wakeErr == nil {
-		if _, ok, err := s.stateStore.SetTaskStartGeneration(task.TaskID, task.StartAttemptID, s.registry.Generation(task.AssignedAgentID)); err != nil || !ok {
+		generation := s.taskGeneration(task.AssignedAgentID)
+		if generation == "" {
+			s.log.Debug("woken task runtime has no generation", "task", task.TaskID)
+			s.settleActivationStart(task, activation, token, attempted, false)
+			return
+		}
+		if _, ok, err := s.stateStore.SetTaskStartGeneration(task.TaskID, task.StartAttemptID, generation); err != nil || !ok {
 			s.log.Debug("record woken task generation failed", "task", task.TaskID, "err", err)
-			s.releaseDependencyActivation(activation, token)
+			s.settleActivationStart(task, activation, token, attempted, false)
 			return
 		}
 		task, _ = s.stateStore.ReadTask(task.TaskID)
@@ -430,8 +450,12 @@ func (s *Server) releaseReportedTask(ctx context.Context, agentID, generation st
 // handed to it, so a dropped or repeated notification changes nothing
 // (TS-10.R3).
 func (s *Server) evaluateTaskResult(taskID string) {
-	if changed, err := s.stateStore.EvaluateSource(state.SourceTask, taskID); err != nil {
-		s.log.Debug("evaluate task result failed", "task", taskID, "err", err)
+	s.evaluateSourceResult(state.SourceTask, taskID)
+}
+
+func (s *Server) evaluateSourceResult(sourceKind, sourceID string) {
+	if changed, err := s.stateStore.EvaluateSource(sourceKind, sourceID); err != nil {
+		s.log.Debug("evaluate work result failed", "source_kind", sourceKind, "source_id", sourceID, "err", err)
 	} else {
 		for _, task := range changed {
 			s.publishTaskUpdate(task)
@@ -497,13 +521,17 @@ func (s *Server) recoverTasks(ctx context.Context) error {
 		return err
 	}
 	for _, task := range armed {
+		taskID := task.TaskID
+		task, err = s.stateStore.ReadTask(taskID)
+		if err != nil {
+			s.log.Warn("task recovery read arms failed", "task", taskID, "err", err)
+			continue
+		}
 		for _, arm := range task.Arms {
 			if arm.Kind != state.ArmWorkResult || arm.State != state.ArmUnsatisfied {
 				continue
 			}
-			if _, err := s.stateStore.EvaluateSource(arm.SourceKind, arm.SourceID); err != nil {
-				s.log.Warn("task recovery re-evaluation failed", "task", task.TaskID, "err", err)
-			}
+			s.evaluateSourceResult(arm.SourceKind, arm.SourceID)
 		}
 	}
 	return nil

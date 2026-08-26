@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/agentdeck/agentdeck/internal/messaging"
@@ -138,6 +139,23 @@ func TestCreateTaskRejectionsAreTypedAndAtomic(t *testing.T) {
 // FS-16.R9 — firing a signal releases every arm waiting on that name in that
 // project at that moment, and firing an unwatched name succeeds and changes
 // nothing.
+func TestUnknownTaskAttachmentUsesContextWording(t *testing.T) {
+	_, ts := wakeTestServer(t)
+	resp, body := post(t, ts.URL+"/api/tasks", map[string]any{
+		"project": "tmpproj", "display_name": "x", "instruction": "x",
+		"target_kind": "launch", "role": "impl",
+		"attachments": []map[string]any{{"context_ref_id": "cx_ghost"}},
+	})
+	if resp.StatusCode != 422 {
+		t.Fatalf("status = %d: %s", resp.StatusCode, body)
+	}
+	response := string(body)
+	if !strings.Contains(response, `"code":"context_not_found"`) ||
+		!strings.Contains(response, `"message":"unknown context reference"`) || strings.Contains(response, "arm") {
+		t.Fatalf("attachment refusal = %s", body)
+	}
+}
+
 func TestFiringASignalReleasesItsArms(t *testing.T) {
 	srv, ts := wakeTestServer(t)
 	_, body := post(t, ts.URL+"/api/tasks", map[string]any{

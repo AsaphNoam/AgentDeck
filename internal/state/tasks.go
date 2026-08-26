@@ -70,6 +70,10 @@ var ErrTaskCycle = errors.New("state: task arms would create a cycle")
 // exist or belongs to another project.
 var ErrTaskArmSource = errors.New("state: task arm names an unusable source")
 
+// ErrTaskAttachmentReference is returned when an attachment names a context
+// reference that does not exist.
+var ErrTaskAttachmentReference = errors.New("state: unknown context reference")
+
 // ErrWorkResultRecorded is returned when a source already registered a result.
 // Registrations are immutable (TS-10.R8).
 var ErrWorkResultRecorded = errors.New("state: work result already registered")
@@ -344,24 +348,17 @@ func insertTaskAttachments(tx *sql.Tx, taskID string, attachments []TaskAttachme
 		var exists int
 		if err := tx.QueryRow(`SELECT 1 FROM context_references WHERE context_ref_id = ?`, attachment.ContextRefID).Scan(&exists); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return ErrTaskArmSource
+				return ErrTaskAttachmentReference
 			}
 			return fmt.Errorf("state: read task context reference: %w", err)
 		}
 		if creatorAgentID != "" {
-			var authorized int
-			err := tx.QueryRow(`SELECT 1 WHERE EXISTS (
-  SELECT 1 FROM context_grants
-  WHERE context_ref_id = ? AND granted_to_agent_id = ? AND revoked_at IS NULL
-) OR EXISTS (
-  SELECT 1 FROM task_attachments a JOIN tasks t ON t.task_id = a.task_id
-  WHERE a.context_ref_id = ? AND t.assigned_agent_id = ? AND t.started_at IS NOT NULL
-)`, attachment.ContextRefID, creatorAgentID, attachment.ContextRefID, creatorAgentID).Scan(&authorized)
-			if errors.Is(err, sql.ErrNoRows) {
-				return ErrTaskNotAssigned
-			}
+			authorized, err := contextReadAuthorized(tx, attachment.ContextRefID, creatorAgentID)
 			if err != nil {
 				return fmt.Errorf("state: authorize task context attachment: %w", err)
+			}
+			if !authorized {
+				return ErrTaskNotAssigned
 			}
 		}
 		if _, err := tx.Exec(`INSERT INTO task_attachments(task_id, context_ref_id, label, description, created_at) VALUES(?, ?, ?, ?, ?)`, taskID, attachment.ContextRefID, attachment.Label, attachment.Description, formatTime(now)); err != nil {

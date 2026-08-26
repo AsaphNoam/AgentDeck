@@ -2,34 +2,69 @@ package messaging
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"reflect"
+	"regexp"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/agentdeck/agentdeck/internal/pipeline"
 )
 
 // FS-17.A2: the classifier is closed over the specified refusal vocabulary and
 // fails safely for a newly emitted code until the guard is updated.
 func TestRefusalRetryClasses(t *testing.T) {
-	want := map[string]retryClass{
-		"validation": retryNever, "invalid_body": retryNever, "invalid_subject": retryNever,
-		"invalid_outcome": retryNever, "invalid_state": retryNever, "invalid_cursor": retryNever,
-		"dependency_cycle": retryNever, "target_ineligible": retryNever, "already_reported": retryNever,
-		"not_assigned": retryNever, "not_creator": retryNever, "retry_requires_rearm": retryNever,
-		"task_not_found": retryNever, "context_not_found": retryNever,
-		"context_source_unavailable": retryNever, "proposal_forbidden": retryNever,
-		"session_unknown":     retryNever,
-		"ambiguous_recipient": retryAfterChange, "recipient_not_found": retryAfterChange,
-		"source_unavailable":      retryAfterChange,
-		"message_budget_exceeded": retryNextTurn,
-		"internal":                retryTransient, "store_unavailable": retryTransient,
-		"context_unavailable": retryTransient, "pipeline_unavailable": retryTransient,
+	emitted := map[string]bool{}
+	literal := regexp.MustCompile(`"error"\s*:\s*"([^"]+)"`)
+	files, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(refusalRetryClasses, want) {
-		t.Fatalf("refusal classifier = %#v, want %#v", refusalRetryClasses, want)
+	for _, file := range files {
+		if filepath.Ext(file) != ".go" || filepath.Base(file) == "tool_result_contract_test.go" ||
+			len(file) >= 8 && file[len(file)-8:] == "_test.go" {
+			continue
+		}
+		source, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, match := range literal.FindAllSubmatch(source, -1) {
+			emitted[string(match[1])] = true
+		}
+	}
+	// pipelineToolError forwards these control-plane codes dynamically.
+	for _, code := range []string{"assignment_unknown", "stale_assignment", "validation_failed"} {
+		emitted[code] = true
+	}
+	for code := range emitted {
+		if _, ok := refusalRetryClasses[code]; !ok {
+			t.Errorf("emitted refusal %q has no retry classification", code)
+		}
 	}
 	if got := classifyRetry("new_unclassified_refusal"); got != retryTransient {
 		t.Fatalf("unclassified refusal = %q, want %q", got, retryTransient)
+	}
+}
+
+func TestPipelineRefusalsUseDeclaredRetryClasses(t *testing.T) {
+	cases := map[string]retryClass{
+		"assignment_unknown": retryNever,
+		"stale_assignment":   retryNever,
+		"validation_failed":  retryAfterChange,
+	}
+	for code, want := range cases {
+		result, _, err := pipelineToolError(&pipeline.ControlError{Code: code, Message: "refused"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		object := result.StructuredContent.(map[string]any)
+		retry := object["retry"].(map[string]any)
+		if got := retry["class"]; got != string(want) {
+			t.Errorf("%s retry class = %v, want %s", code, got, want)
+		}
 	}
 }
 
@@ -121,6 +156,20 @@ func TestRegisteredToolsShareResultContract(t *testing.T) {
 		if retry["class"] != string(retryNever) {
 			t.Errorf("%s retry = %#v", tool.Name, retry)
 		}
+	}
+}
+
+// FS-17 §6: malformed arguments rejected by the pinned SDK never reach an
+// AgentDeck handler and therefore retain the SDK's plain-text error boundary.
+func TestSDKArgumentRejectionIsOutsideResultContract(t *testing.T) {
+	srv := New(newStore(t), nil)
+	cs := connect(t, srv, "unknown-token")
+	res, err := cs.CallTool(t.Context(), &mcp.CallToolParams{Name: "check_messages", Arguments: map[string]any{"limit": "many"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.IsError || res.StructuredContent != nil {
+		t.Fatalf("SDK argument refusal = %+v", res)
 	}
 }
 

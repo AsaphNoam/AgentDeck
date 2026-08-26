@@ -103,9 +103,9 @@ export function useRetryTask(project: string | undefined) {
 }
 
 export function useRecordTaskResult(project: string | undefined) {
-	return useTaskAction(project, (input: { taskID: string; outcome: string; summary: string; details?: string }) =>
-		request(`/api/tasks/${encodeURIComponent(input.taskID)}/result`, taskSchema,
-			json({ outcome: input.outcome, summary: input.summary, details: input.details }))); 
+  return useTaskAction(project, (input: { taskID: string; outcome: string; summary: string; details?: string }) =>
+    request(`/api/tasks/${encodeURIComponent(input.taskID)}/result`, taskSchema,
+      json({ outcome: input.outcome, summary: input.summary, details: input.details })));
 }
 
 export function useRearmTask(project: string | undefined) {

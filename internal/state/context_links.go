@@ -371,8 +371,20 @@ ORDER BY a.name`)
 // domain adds its own participant path without changing reference identity
 // (TS-01.R23). It is re-evaluated for every page (TS-05.R16).
 func (s *Store) ContextReadAuthorized(refID, reader string) (bool, error) {
+	authorized, err := contextReadAuthorized(s.db, refID, reader)
+	if err != nil {
+		return false, fmt.Errorf("state: check context authorization: %w", err)
+	}
+	return authorized, nil
+}
+
+type contextAuthorizationQuerier interface {
+	QueryRow(query string, args ...any) *sql.Row
+}
+
+func contextReadAuthorized(q contextAuthorizationQuerier, refID, reader string) (bool, error) {
 	var one int
-	err := s.db.QueryRow(`
+	err := q.QueryRow(`
 SELECT 1 WHERE EXISTS (
   SELECT 1 FROM context_grants
   WHERE context_ref_id = ? AND granted_to_agent_id = ? AND revoked_at IS NULL
@@ -392,7 +404,7 @@ SELECT 1 WHERE EXISTS (
 		return false, nil
 	}
 	if err != nil {
-		return false, fmt.Errorf("state: check context authorization: %w", err)
+		return false, err
 	}
 	return true, nil
 }

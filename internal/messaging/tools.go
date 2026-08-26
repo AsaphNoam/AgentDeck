@@ -48,10 +48,13 @@ var refusalRetryClasses = map[string]retryClass{
 	"context_source_unavailable": retryNever,
 	"proposal_forbidden":         retryNever,
 	"session_unknown":            retryNever,
+	"assignment_unknown":         retryNever,
+	"stale_assignment":           retryNever,
 
 	"ambiguous_recipient": retryAfterChange,
 	"recipient_not_found": retryAfterChange,
 	"source_unavailable":  retryAfterChange,
+	"validation_failed":   retryAfterChange,
 
 	"message_budget_exceeded": retryNextTurn,
 

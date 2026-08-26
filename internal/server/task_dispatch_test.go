@@ -2,11 +2,13 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/agentdeck/agentdeck/internal/pipeline"
 	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
@@ -99,6 +101,97 @@ func stampReadyOrder(t *testing.T, srv *Server, tasks ...state.Task) {
 			t.Fatalf("stamp ready_at: %v", err)
 		}
 	}
+}
+
+func newDependentTask(t *testing.T, srv *Server, name, sourceKind, sourceID string) state.Task {
+	t.Helper()
+	id, err := srv.stateStore.NewTaskID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	task, err := srv.stateStore.CreateTask(state.Task{
+		TaskID: id, Project: "tmpproj", DisplayName: name, Instruction: name,
+		TargetKind: state.TargetLaunch, Role: "impl", CreatedByKind: "person",
+		Arms: []state.TaskArm{{Kind: state.ArmWorkResult, SourceKind: sourceKind, SourceID: sourceID,
+			SatisfyingOutcomes: []string{state.OutcomeSuccess}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return task
+}
+
+func seedPipelineRun(t *testing.T, srv *Server, runID string) {
+	t.Helper()
+	now := time.Now().UTC()
+	_, _, err := srv.stateStore.CreatePipelineRun(state.CreatePipelineRunParams{
+		Run: state.PipelineRunRecord{RunID: runID, TemplateID: "quality",
+			TemplateSnapshot: json.RawMessage(`{"version":1,"inputs":[],"stages":[]}`),
+			DisplayName:      "Quality", Project: "tmpproj", Goal: "test",
+			Inputs: json.RawMessage(`{}`), Assignments: json.RawMessage(`{}`),
+			State: "queued", Revision: 1, CreatedAt: now, UpdatedAt: now},
+		RequestID: "request_" + runID, RequestHash: "hash_" + runID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func assertDependencyChainParked(t *testing.T, srv *Server, tasks ...state.Task) {
+	t.Helper()
+	for _, original := range tasks {
+		task, err := srv.stateStore.ReadTask(original.TaskID)
+		if err != nil || task.State != state.TaskDependencyFailed || task.AttentionReason == "" {
+			t.Fatalf("task %s = %+v, %v; want surfaced dependency failure", original.TaskID, task, err)
+		}
+	}
+}
+
+// FS-16.A4 / TS-10.R3,R11 — a terminal pipeline result publishes and recursively
+// propagates a failure through a three-level dependency chain.
+func TestTerminalPipelineFailurePublishesAndPropagatesDependencyFailure(t *testing.T) {
+	srv := testServer(t, true)
+	seedPipelineRun(t, srv, "pr_failed")
+	first := newDependentTask(t, srv, "first", state.SourcePipelineRun, "pr_failed")
+	second := newDependentTask(t, srv, "second", state.SourceTask, first.TaskID)
+	if err := srv.stateStore.RegisterWorkResult(state.WorkResult{SourceKind: state.SourcePipelineRun,
+		SourceID: "pr_failed", Outcome: state.OutcomeFailure}); err != nil {
+		t.Fatal(err)
+	}
+	events, unsubscribe := srv.eventBus.Subscribe()
+	defer unsubscribe()
+	srv.PublishPipelineUpdate(pipeline.PipelineUpdate{RunID: "pr_failed", State: "completed"})
+	assertDependencyChainParked(t, srv, first, second)
+	seen := map[string]bool{}
+	for len(seen) < 2 {
+		select {
+		case event := <-events:
+			if event.Type == "task_update" {
+				if data, ok := event.Data.(map[string]any); ok {
+					seen[data["task_id"].(string)] = true
+				}
+			}
+		case <-time.After(time.Second):
+			t.Fatalf("task_update events = %v", seen)
+		}
+	}
+}
+
+// FS-16.A7 / TS-10.R15 — restart re-evaluation uses the same publication and
+// recursive propagation loop as the live result path.
+func TestRestartReevaluationPublishesAndPropagatesDependencyFailure(t *testing.T) {
+	srv := testServer(t, true)
+	seedPipelineRun(t, srv, "pr_failed")
+	first := newDependentTask(t, srv, "first", state.SourcePipelineRun, "pr_failed")
+	second := newDependentTask(t, srv, "second", state.SourceTask, first.TaskID)
+	if err := srv.stateStore.RegisterWorkResult(state.WorkResult{SourceKind: state.SourcePipelineRun,
+		SourceID: "pr_failed", Outcome: state.OutcomeFailure}); err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.recoverTasks(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	assertDependencyChainParked(t, srv, first, second)
 }
 
 // FS-16.R6 / TS-10.R4 — ready work starts without a model in the loop: the host
@@ -370,6 +463,27 @@ func TestATaskForAStoppedAgentWakesIt(t *testing.T) {
 	waitRunning(t, srv, agentID, false)
 }
 
+// FS-16.R25 / TS-10.R4 — once a wake delivered the assignment turn, losing
+// its generation before confirmation spends the attempt and never strands the
+// task in starting.
+func TestWokenTaskWithMissingGenerationSettlesItsAttempt(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	agentID := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+	if resp, body := post(t, ts.URL+"/api/sessions/"+agentID+"/stop", nil); resp.StatusCode != 200 {
+		t.Fatalf("stop status = %d: %s", resp.StatusCode, body)
+	}
+	task := newAgentTask(t, srv, agentID, "wake then disappear")
+	srv.taskGeneration = func(string) string { return "" }
+	srv.dispatchReadyTasks(context.Background())
+	ready := waitTaskState(t, srv, task.TaskID, state.TaskReady)
+	if ready.StartAttemptCount != 1 {
+		t.Fatalf("spent attempts = %d, want 1", ready.StartAttemptCount)
+	}
+	if ready.RuntimeClaim != "" || ready.StartAttemptID != "" {
+		t.Fatalf("missing generation left a starting claim: %+v", ready)
+	}
+}
+
 // FS-16.R2, R19 — a target that can never execute work parks its task instead of
 // spending attempts on a start that cannot succeed.
 func TestATaskForAnIneligibleTargetParksWithoutSpendingAttempts(t *testing.T) {
@@ -473,6 +587,26 @@ func TestFinishingLeavesABorrowedRuntimeAlone(t *testing.T) {
 	}
 	if released.PendingRelease || released.RuntimeClaim != "" {
 		t.Fatalf("the borrowed claim was not released: %+v", released)
+	}
+}
+
+// FS-16.R4/R12 / TS-10.R4 — effect-time generation wins over the planning
+// snapshot when a borrowed runtime was relaunched before its assignment turn.
+func TestBorrowedTaskRefreshesGenerationBeforeAssignment(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	agentID := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+	task := newAgentTask(t, srv, agentID, "use the current runtime")
+	reserved, ok, err := srv.stateStore.AdmitReadyTask(task.TaskID, state.TaskReservation{
+		AttemptID: "ta_stale", AgentID: agentID, Generation: "g_stale", Claim: state.ClaimBorrowed,
+	}, 10)
+	if err != nil || !ok {
+		t.Fatalf("AdmitReadyTask: %+v, %v, %v", reserved, ok, err)
+	}
+	srv.startAdmittedTask(context.Background(), reserved)
+	running := waitTaskState(t, srv, task.TaskID, state.TaskRunning)
+	current := srv.registry.Generation(agentID)
+	if current == "" || running.AssignedGeneration != current || running.AssignedGeneration == "g_stale" {
+		t.Fatalf("assigned generation = %q, current = %q", running.AssignedGeneration, current)
 	}
 }
 

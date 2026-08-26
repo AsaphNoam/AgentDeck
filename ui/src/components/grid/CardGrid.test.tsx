@@ -80,6 +80,14 @@ describe("CardGrid", () => {
     expect(await screen.findByText("0 tasks need attention")).toBeInTheDocument();
   });
 
+  it("does not claim zero attention when the task query fails", async () => {
+    server.use(http.get("/api/tasks", () => HttpResponse.json({ error: "unavailable" }, { status: 500 })));
+    act(() => useAgentStore.setState({ agents: { a_1: agent("a_1") }, order: ["a_1"] }));
+    renderWithQuery(<CardGrid projectID="my-app" projectTitle="My App" />);
+    expect(await screen.findByText("Task attention unavailable")).toHaveAttribute("href", "/tasks?project=my-app");
+    expect(screen.queryByText("0 tasks need attention")).not.toBeInTheDocument();
+  });
+
 	 it("keeps task attention visible when the project has no agents", async () => {
 		server.use(http.get("/api/tasks", () => HttpResponse.json({ tasks: [
 			{ task_id: "tk_1", project: "my-app", display_name: "parked", instruction: "x", target_kind: "launch", state: "dependency_failed", created_by_kind: "person", revision: 1, created_at: "2026-08-24T10:00:00Z", arms: [], attachments: [] },

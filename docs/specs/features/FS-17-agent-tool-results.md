@@ -45,8 +45,8 @@ FS-16 (tasks); this spec adds no tool and changes no tool's arguments, authority
 
   | Class | Codes |
   |---|---|
-  | `never` | `validation`, `invalid_body`, `invalid_subject`, `invalid_outcome`, `invalid_state`, `invalid_cursor`, `dependency_cycle`, `target_ineligible`, `already_reported`, `not_assigned`, `not_creator`, `retry_requires_rearm`, `task_not_found`, `context_not_found`, `context_source_unavailable`, `proposal_forbidden`, `session_unknown` |
-  | `after_change` | `ambiguous_recipient`, `recipient_not_found`, `source_unavailable` |
+  | `never` | `validation`, `invalid_body`, `invalid_subject`, `invalid_outcome`, `invalid_state`, `invalid_cursor`, `dependency_cycle`, `target_ineligible`, `already_reported`, `not_assigned`, `not_creator`, `retry_requires_rearm`, `task_not_found`, `context_not_found`, `context_source_unavailable`, `proposal_forbidden`, `session_unknown`, `assignment_unknown`, `stale_assignment` |
+  | `after_change` | `ambiguous_recipient`, `recipient_not_found`, `source_unavailable`, `validation_failed` |
   | `next_turn` | `message_budget_exceeded` |
   | `transient` | `internal`, `store_unavailable`, `context_unavailable`, `pipeline_unavailable` |
 
@@ -67,8 +67,8 @@ FS-16 (tasks); this spec adds no tool and changes no tool's arguments, authority
   agent-facing tool result, successful or refused, populates the MCP `structuredContent` field with
   the same value it renders into its text content block.
 
-- **R7 — Structured delivery is additive and never the only channel.** The text content
-  block keeps the encoding it has today, byte for byte, including on refusals and including
+- **R7 — Structured delivery is additive and never the only channel.** The delivery change adds
+  nothing to the text content block after R1's `retry` field is applied, and does not change
   `isError`. `structuredContent` never carries a field the text block lacks and never omits one it
   has, so the two can never disagree and a client that reads only text behaves exactly as before.
   No tool declares an output schema in this change.
@@ -114,9 +114,9 @@ Each names the verification that demonstrates it.
 - **A3** (R4, R11) — No refusal payload in A1's enumeration contains a task, run, agent, message, or
   context reference identifier the caller is not a participant in, and none contains a count, delay,
   or deadline: assertions over the same table-driven enumeration.
-- **A4** (R6–R7) — For one successful and one refused call per tool, the text content block is
-  byte-identical to the encoding produced before this change, `structuredContent` unmarshals to the
-  identical value, `isError` is unchanged, and no tool advertises an output schema in `tools/list`:
+- **A4** (R6–R7) — For one successful and one refused call per tool, the delivery layer adds
+  nothing to the text content block, `structuredContent` unmarshals to the identical value,
+  `isError` is unchanged, and no tool advertises an output schema in `tools/list`:
   golden-encoding and protocol tests under `internal/messaging`.
 - **A5** (R8, R10, R12) — Every tool registered on the MCP server appears in A1's and A4's
   enumerations rather than a hand-written list, `session_unknown` classifies `never`, and an
@@ -142,6 +142,10 @@ The contract is shipped. Live-provider compatibility remains tracked as acceptan
   task-graph query (FS-16 §6, TS-04.R29) is deliberately upheld by R4.
 - Output schemas are not declared. The pinned Claude and Codex adapters' handling of a tool
   `outputSchema` is unverified, and declaring one later is additive.
+- Argument shapes rejected by the pinned MCP SDK before an AgentDeck handler runs are outside
+  R1–R8. The SDK returns its own plain-text `isError` result for schema-validation and decoding
+  failures, so those results have neither AgentDeck's stable error code and retry class nor
+  `structuredContent`. Handler-produced validation refusals remain fully covered by this contract.
 - No HTTP surface changes. The REST error envelope and its mixed legacy forms (TS-03.R3) are
   untouched; this contract is the MCP tool surface only.
 
