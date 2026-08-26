@@ -5,6 +5,38 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-26 — Review: dependent-work fixes and the new agent tool result contract
+
+I reviewed the two rounds of dependent-work fixes and the newly shipped rule for how AgentDeck answers
+an agent's tool call. The fixes hold up on the paths they were written for, but two problems are
+serious enough to fix before relying on either feature.
+
+First, dependency failure still goes unnoticed when the thing that failed is a pipeline run rather
+than another task. The waiting work is parked correctly in the database, but the Tasks view and the
+dashboard's attention count keep showing it as still waiting until someone refreshes, and any work
+queued behind that parked task waits forever with nothing left to release it. The same gap opens
+after a server restart. The previous round fixed exactly this, but only for task-to-task
+dependencies.
+
+Second, the new retry advice is wrong for the pipeline tools. Five of their refusals are missing from
+the classification table, so an agent that reports a stage result too late — or proposes a malformed
+pipeline — is told the call might work if it tries again, when it never will. That is the one mistake
+this feature exists to prevent. The test meant to guard against a missing entry cannot catch it,
+because it only compares the table to a copy of itself.
+
+Seven smaller items are recorded too: the rule for who may attach shared context is now written out
+twice and the two copies already drifted apart once; two paths can leave a task stuck part-way
+through starting with nothing signalling it to a person; the dashboard says "0 tasks need attention"
+when it could not load the tasks at all; a mistyped context reference is reported as a prerequisite
+error in raw internal wording; and several of the tool-contract acceptance checks describe tests that
+were never written.
+
+**Needs attention:** The two serious items above. Both are the same class of problem the last round
+closed, surviving on a path that round did not cover.
+
+**Next:** A fix session should take them in the order listed, starting with the pipeline dependency
+failure.
+
 ### 2026-08-25 — Fix: dependent-work review findings
 
 All thirteen dependent-work review findings are now closed. Tasks assigned to existing agents keep the real runtime identity, independent task starts run in parallel again, and context attachments respect every valid authorization path. The task workflow is protected by Go and interface regressions rather than only manual review.
