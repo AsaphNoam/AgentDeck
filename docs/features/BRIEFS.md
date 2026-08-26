@@ -662,3 +662,12 @@ argument boundary documented. The full test suite, production builds, and distri
 provider check before those adapters are claimed as verified.
 
 **Next:** An independent reviewer should review these fixes.
+
+### 2026-08-26 — Work: no change available
+
+There is no active implementation and no designed change waiting to start, so no product code was
+changed. The repository remains ready for the next change once one has been designed and queued.
+
+**Needs attention:** None.
+
+**Next:** Define and queue the next change with `/design-feature`, then run `/work` again.
