@@ -51,16 +51,14 @@ started. The pieces you set aside — letting an agent repair its own stuck work
 work state, letting it stop or resume other agents, creating groups of tasks at once, and declaring
 formal result schemas — are recorded in `docs/ideas.md` with what each one still needs.
 
-**Needs attention:** The working tree already has uncommitted changes to the task dispatcher and its
-tests — per-task start locks replacing a single shared one, and a cancellation check before an
-admitted task launches — which look like in-progress fixes for two of the open review findings. They
-are not mine and I left them alone, so the count of what is still open may be lower than the handoff
-says. The dependency work this design builds on still carries those findings, including task creation
-that is not atomic and task changes that never reach the browser. This change only reshapes what
-tools hand back and adds nothing on top of those paths, but its tests will run against them.
+**Needs attention:** Corrected on 2026-08-26. When I wrote this, the dispatcher fixes were sitting
+uncommitted in the working tree and I described the dependency work as still carrying its review
+findings. That is no longer true: all ten **Must fix** and three **Worth fixing** findings from the
+review through `76b1493` were closed in `e1e827b` and `b121fd0`. What remains is that those two fix
+commits have not themselves been independently reviewed. This design has no dependency on either.
 
-**Next:** Nothing of mine is in progress. Finishing the dispatcher fixes already underway is the more
-valuable next step; the queued change is ready to build after that.
+**Next:** Nothing of mine is in progress. Either review the two dependent-work fix commits, or build
+the queued change; neither blocks the other.
 
 ### 2026-08-24 — Fixes then build: review findings closed, dependent work started
 
