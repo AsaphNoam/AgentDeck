@@ -5,6 +5,52 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-27 — Usability review: everything user-facing since the last version
+
+I drove the changes released since the previous version through a real browser against the built
+app, on throwaway copies of the config so nothing touched your own setup. That meant the new Tasks
+page and the dependent-work flow end to end, the "needs attention" count on the dashboard, the new
+limit on how many tasks run at once, unsent chat drafts, the browse-for-a-folder button, and the
+right-click menu on the projects canvas.
+
+The headline is that dependent work holds up. I created work that waits on other work, satisfied it,
+failed it, cancelled it, repaired it, deleted it, and restarted the server underneath it — and the
+page told the truth at every step, updating live without a refresh. A task interrupted by a restart
+says so in plain words and offers a working Retry. The concurrency limit refuses bad numbers, saves
+correctly, and actually holds. Chat drafts survive navigating away and reloading, don't leak between
+conversations, and don't come back after you send them. No blockers, and no console errors anywhere.
+
+One problem needs fixing. If you point a project at a folder that doesn't exist — a typo, or a repo
+you haven't cloned yet — it saves silently. The server does notice and sends back a warning saying
+the directory isn't there, and the form even has the text prepared to show it, but the dialog closes
+in the same instant the warning arrives, so the warning is never displayed. You find out later, when
+launching an agent in that project fails. It affects creating a project as well as editing one, and
+it isn't new in this release.
+
+Five smaller items are recorded for the fix pass: the Tasks page never tells you which agent is
+actually doing a task, so there's no way to jump to that conversation; a waiting task names what it
+is waiting for by internal id rather than by the name shown two rows above it; the new-task form
+ignores your configured default role and quietly preselects the internal AgentDeck helper role
+instead; a task parked by a failed prerequisite offers a Retry button that can never work, when the
+repair it needs is sitting beside it; and the attention count says "1 task need attention".
+
+I also closed a check that had been sitting open: right-clicking anywhere on the projects canvas,
+including the empty margin around the cards, really does offer New project, verified in a real
+browser at eight different spots. The related folder-picker check is now narrowed — the buttons are
+all present and wired, but the macOS folder panel itself opens a real system dialog that automation
+can't drive, so confirming it needs you at the keyboard for about a minute.
+
+Full detail and screenshots: `docs/archive/reviews/usability-review-run-2026-08-27-release-delta.md`.
+
+**Needs attention:** Another session was editing the shared handoff file at the same time as this
+run — it added a code review with three findings while I was working. I appended to it rather than
+overwriting, and nothing was lost, but two agents writing that file at once will eventually drop
+something. Worth checking whether that second session was intentional.
+
+**Next:** Run the fix pass on the six recorded findings, starting with the silently-saved bad project
+directory. Separately, when you have a minute at the machine, click one of the Browse… buttons so
+the folder-panel check can be closed.
+
 ### 2026-08-26 — Review: checking the fixes actually landed
 
 I went back over each of the nine items from this morning's review against the current code and ran

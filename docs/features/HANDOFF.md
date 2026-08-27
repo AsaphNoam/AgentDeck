@@ -16,6 +16,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   FS-17 and TS-04.R30–R31 are Current.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
   remain owed before claiming those adapters accept structured results.
+- **Usability state:** The v0.2.2 → v0.2.3 user-facing delta was driven through a real browser on
+  2026-08-27. Dependent work, the attention count, the concurrency budget and chat drafts all
+  behave as specified; one **Must fix** and five **Worth fixing** items are listed under
+  `## Review findings`. FS-02.A24 is closed; FS-04.A22 is narrowed to the native panel.
 - **Last reviewed code:** `895348e` (2026-08-26).
 - **Branch:** `main`.
 
@@ -25,6 +29,14 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Changelog
 
+- **2026-08-27 — usability review:** Drove the user-facing changes released between `v0.2.2` and
+  `v0.2.3` through a real Chromium against the release binary on isolated fixtures: dependent work
+  end to end, the dashboard attention count, the task-concurrency budget, browser-local chat drafts,
+  the directory-browse control, and the projects-canvas context menu. One **Must fix** and five
+  **Worth fixing** findings recorded below; no blocker. The FS-02.A24 right-click gate is closed and
+  the FS-04.A22 gate is narrowed to the native panel alone. J15–J17 were added to the journey matrix
+  because FS-15, FS-16 and FS-17 shipped citing no journey at all. Full run:
+  [`../archive/reviews/usability-review-run-2026-08-27-release-delta.md`](../archive/reviews/usability-review-run-2026-08-27-release-delta.md).
 - **2026-08-26 — review:** Verified the fixes for the nine findings against the tree. Seven are
   closed with real regression coverage, including a three-level chain test that also exposed the
   restart re-evaluation having been a no-op because `TasksInStates` never populated `Arms`. Three
@@ -69,11 +81,16 @@ an explicit specification update. Remove an item when the human resolves it or q
 - [ ] Run pinned, credentialed Claude and Codex chat/MCP/resume checks before claiming those combinations.
 - [ ] Run pinned Claude terminal flags/hooks and live xterm journeys before claiming full terminal support.
 - [ ] Run pinned OpenCode/OpenHands launch/credential checks before claiming those backends beyond fakes.
-- [ ] Run J2 and J9 in a real macOS browser to confirm the native folder panel opens in front,
-  selects, and cancels (FS-04.A22); component tests stand in until then.
-- [ ] Run J5 in a real browser to confirm a right-click anywhere on the projects canvas — including
-  the padding frame below and beside the cards — opens **New project** (FS-02.A24); the stylesheet
-  assertion stands in until then.
+- [ ] Run J2/J9/J16 in a real macOS browser to confirm the native folder panel opens in front,
+  selects, and cancels (FS-04.A22). Narrowed on 2026-08-27: a real browser confirmed the **Browse…**
+  controls are present and enabled for `cwd` and the pending `add_dirs` entry in both the Settings
+  project form and the New project modal, and that the onboarding wizard renders styled. Only the
+  native `osascript` panel itself is still unverified, and it needs a human at the machine.
+- [x] **Closed 2026-08-27.** A real Chromium confirmed a right-click anywhere on the projects
+  canvas opens **New project** (FS-02.A24): eight background points including the padding frame on
+  every edge and corner, while a card right-click still opens the card menu, and the menu opens a
+  styled create modal. Evidence in the J16 section of
+  [`../archive/reviews/usability-review-run-2026-08-27-release-delta.md`](../archive/reviews/usability-review-run-2026-08-27-release-delta.md).
 - [ ] Run a task start, an assignment turn, and a reported result against the pinned Claude and Codex
       adapters before claiming dependent work works with real providers (FS-16 §6).
 - [ ] Run one successful and one refused MCP tool call through pinned Claude and Codex adapters before
@@ -121,3 +138,49 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
   claim across `confirmTaskStart`'s write and publish, so a Stop issued inside that window gets the
   designed conflict. Have the test wait for the claim to settle rather than only for the row
   (no invariant class).
+
+- **Must fix** — J17: saving a project working directory that does not exist warns nobody. In
+  Settings → Projects → Edit, setting `cwd` to a non-existent path and pressing Update closes the
+  dialog and persists the path with no alert and no inline warning. The server already returns
+  `warnings: [{code: "cwd_not_found", message: "directory … does not exist yet"}]` and
+  `ui/src/features/settings/ProjectForm.tsx:107` already has the markup to render it — but
+  `ProjectsEditor.tsx:69-72` calls `setWarnings(resp.warnings)` and `setOpen(false)` in the same
+  success handler, unmounting the only component that shows it. The create path (`:78-81`) has the
+  identical shape. The person discovers the broken project later, when a launch in it fails. This is
+  pre-existing rather than new in this release, but the release added the Browse… control to this
+  same form. Suggested fix: keep the dialog open, or surface the warning outside the dialog, when
+  the response carries one; regression test that a `cwd_not_found` response renders visibly on both
+  create and edit (FS-04.A22, FS-04 §6, **INV §8**).
+
+- **Worth fixing** — J15: the Tasks view never says which agent is doing a launch-target task. The
+  row's meta line reads only `launches implementer`; even once the task is `running` and the API
+  carries `assigned_agent_id`, no id, name, or link to that conversation appears, because
+  `ui/src/features/tasks/TasksPage.tsx:136` shows an assignee only when `target_kind === "agent"`
+  (and then as a raw id). A person supervising work has no route from the task to the agent doing
+  it. Suggested fix: render the assigned agent for both target kinds, linked to `/agent/{id}`
+  FS-16.A8 (no invariant class).
+
+- **Worth fixing** — J15: an armed task names its prerequisite by durable id. The row reads
+  `Waiting on: task tk_8caec11d865acf33 → success` while the prerequisite's display name is rendered
+  two rows above, because `waitingOn()` (`TasksPage.tsx:39-47`) formats `arm.source_id` directly.
+  The product forbids exactly this elsewhere — J5 requires each card show its project title, not its
+  durable id. Suggested fix: resolve the id against the task list already in hand and fall back to
+  the id only when it is not there FS-16.R14/A8 (no invariant class).
+
+- **Worth fixing** — J15: the New task form ignores the configured default role. `TasksPage.tsx:181`
+  is `role || roleNames[0]`, so the select preselects `agentdecker` — the internal AgentDeck-expert
+  role — rather than the configured `default_role`. `NewAgentModal.tsx:53-64` deliberately prefers
+  the configured default, so the two launch surfaces disagree, and a person who does not notice the
+  dropdown silently assigns work to the wrong kind of agent. Suggested fix: seed the select from
+  `config.default_role` with `roleNames[0]` as fallback FS-16.A8, FS-04 (no invariant class).
+
+- **Worth fixing** — J15: a parked task offers a Retry button that can never succeed. Retry renders
+  for `dependency_failed` as well as `interrupted`, and on a parked task it is always refused with
+  `422 "this task is parked by an unsatisfiable prerequisite; re-arm it instead"`. The refusal is
+  correct and well-worded (FS-16.A11), and Re-arm sits in the same row — but offering a control that
+  cannot work for that state costs the person a failed round trip to learn it. Suggested fix: render
+  Retry only for `interrupted`, and give Re-arm the prominence on a parked row FS-16.A11 (no invariant class).
+
+- **Worth fixing** — J16: the attention count does not pluralise its verb. With exactly one item it
+  reads "1 task need attention". `ui/src/components/grid/CardGrid.tsx:35` pluralises the noun but
+  not the verb. One-line fix FS-02.A26 (no invariant class).
