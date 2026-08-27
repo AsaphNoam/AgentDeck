@@ -5,6 +5,23 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-27 — Fix: active-first Ordering design
+
+The Ordering design now uses the same running-first card sequence for what the person sees and what
+the drag library measures. A drag within the running or stopped block can reorder that block without
+making cards from the other block jump into the wrong places, while the saved layout remains the
+same flat manual order used today. Dropping across the running/stopped boundary does nothing and
+writes nothing, so the forced active-first split cannot create a hidden reorder.
+
+The broader whole-card and cross-group drag problems remain separate work. The design evidence also
+now names the `unknown` status fallback instead of miscounting the status vocabulary. No product code
+changed.
+
+**Needs attention:** None.
+
+**Next:** Run `/review-design Ordering` once more; if it closes cleanly, implement it with
+`/work Ordering`.
+
 ### 2026-08-27 — Implementation: diagrams in the chat window
 
 Agents can now answer with a diagram instead of diagram source. When a reply contains a fenced

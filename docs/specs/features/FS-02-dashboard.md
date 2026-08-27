@@ -284,6 +284,10 @@ behavior.
   order it produced, and the same shared preferences continue to drive every scoped project grid
   (R36). Because the manual order is one flat list shared by every project view, a drag inside one
   block is recorded in that shared list and does not become a per-project or per-status preference.
+  During that drag, only cards in the same running/stopped block shift to show the possible drop;
+  cards in the other block hold their positions. Dropping onto a card in the other block performs no
+  reorder and does not save the layout, because manual drag order cannot override the running-first
+  boundary. The existing separate cross-group drag behavior is unchanged.
 
 ## 5. Acceptance criteria
 
@@ -410,11 +414,13 @@ picker and launches with the route project's id; the general modal continues to 
 - **A28** *(planned)* (R45) — In a group containing running and stopped agents in interleaved
   manual order, the grid renders every running agent before every stopped one while preserving the
   manual order inside each block; flipping one agent's `running` via a `state_update` moves only that
-  card across the boundary and leaves both blocks otherwise unchanged; a drag inside a block still
-  produces the same `PUT /api/layout` order payload it produces today; and the Ungrouped section
-  stays last. *Verify by* new cases in `ui/src/components/grid/CardGrid.test.tsx` beside the existing
-  scoped-reorder case, and by **J5** in `docs/features/USABILITY-REVIEW.md` for the live start/stop
-  movement in a real browser.
+  card across the boundary and leaves both blocks otherwise unchanged; during a drag inside one
+  block, only that block's cards shift, and the completed drag produces the same `PUT /api/layout`
+  order payload it produces today and survives reload; a drop onto the other block leaves both the
+  displayed order and persisted layout unchanged; and the Ungrouped section stays last. *Verify by*
+  new render, drag-geometry, payload, and no-request cases in
+  `ui/src/components/grid/CardGrid.test.tsx` beside the existing scoped-reorder case, and by **J5** in
+  `docs/features/USABILITY-REVIEW.md` for the live start/stop and drag behavior in a real browser.
 
 ## 6. Deviations & open decisions
 
