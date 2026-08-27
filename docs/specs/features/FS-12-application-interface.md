@@ -1,6 +1,6 @@
 # FS-12 — Core interface design
 
-**Status:** Current
+**Status:** Partial
 **Code:** `ui/src` · **Journeys:** J2–J9, J11, J14
 **Absorbed:** —
 
@@ -72,6 +72,12 @@ Requirements are user-observable.
 - **R10** — Card construction uses recognizable AgentDeck geometry, a clear drag grip,
   a strong state edge/marker, compact technical metadata, and a designed context meter. Waiting-input
   and error states receive higher salience without changing order, grouping, or action behavior.
+- **R37** *(planned)* — R10's "without changing order" clause is narrowed to the five live
+  `state` values it was written about: `busy`, `idle`, `waiting_input`, `done`, and `error` still
+  express themselves through salience alone and never reorder cards. Whether an agent is running is
+  a separate axis and may order cards, as FS-02.R45 specifies. Grouping and action behavior remain
+  unchanged by either axis, so raising a card's salience still never moves it and never changes what
+  its menu offers.
 - **R11** — Task-group headers, collapse controls, state summaries, density controls,
   and Release group share the same visual system while preserving their current placement and
   behavior. The empty Dashboard receives a complete composition with the existing New Agent action,
@@ -266,6 +272,11 @@ Requirements are user-observable.
 - **A12** (R36) — Tool-run summary, call, result, and failure fixtures remain visible as plain
   text without a coloured or boxed surface. *Verify:* the tool-activity states in
   `ui/src/presentation/VisualMatrix.tsx`.
+
+- **A13** *(planned)* (R37) — A card whose agent is `waiting_input` or `error` renders its
+  higher-salience treatment while holding its position, and a card's position changes only when its
+  `running` value changes. *Verify by* the FS-02.A28 grid cases together with the existing card
+  salience fixtures in the visual matrix.
 
 ## 6. Deviations & open decisions
 

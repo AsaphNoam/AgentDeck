@@ -45,5 +45,8 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 - [Render Mermaid diagrams in the chat transcript](mermaid-diagrams-in-chat.md) — a closed
   ```mermaid fence in an assistant message renders as a themed diagram, sanitized at one seam and
   loaded on demand (FS-03.R37–R38, TS-08.R40).
+- [Place running agents before stopped ones in a project grid](active-agents-before-stopped.md) —
+  running agents sort ahead of stopped ones inside each group, preserving manual order within each
+  block, and FS-12.R10's ordering clause is narrowed to match (FS-02.R45, FS-12.R37).
 - [Split the Pipelines surface into runs and templates](split-pipelines-surface.md) — separate template authoring from run supervision, and give a run its own page with an
   execution timeline and its stage and delegated agents (FS-14.R35–R45).

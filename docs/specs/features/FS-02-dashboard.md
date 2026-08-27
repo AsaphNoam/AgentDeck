@@ -1,6 +1,6 @@
 # FS-02 — Dashboard (card grid home view)
 
-**Status:** Current
+**Status:** Partial
 **Code:** `ui/src/components/grid/`, `ui/src/store/`, `ui/src/components/shell/NotificationCenter.tsx`, `ui/src/features/settings/NotificationsEditor.tsx`, `ui/src/api/sse.ts` · `internal/bus/`, `internal/state/`, `internal/server/handlers.go` (layout, reconcile) · **Journeys:** J5 (grid & layout), J11 (failure & recovery), J12 (restart durability)
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) F1/F2/F11 and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -272,6 +272,19 @@ behavior.
   state badge vocabulary in R3 is unchanged, because an armed task has no agent and therefore no card.
   If the task query fails, the indicator says attention is unavailable rather than asserting a zero count.
 
+- **R45** *(planned)* — Within each group section of an agent card grid, running agents are
+  placed before agents that are not running, and the persisted manual order (R12) is preserved
+  within each of those two blocks. `running` is the sole test, matching the dimmed stopped treatment
+  in R6; the five live `state` values in R3 do not affect placement, so a `busy` and an `idle`
+  running agent keep their relative manual order. Group sections keep the order R18 gives them, with
+  Ungrouped last, and this rule reorders cards only inside a section. The split is applied when the
+  grid renders, so a card moves across the boundary as soon as its agent starts or stops, with no
+  reload. Nothing is persisted for it: `layout.json` continues to hold exactly the order, density,
+  and per-group collapse state it holds today (R14), a drag still commits and persists the manual
+  order it produced, and the same shared preferences continue to drive every scoped project grid
+  (R36). Because the manual order is one flat list shared by every project view, a drag inside one
+  block is recorded in that shared list and does not become a per-project or per-status preference.
+
 ## 5. Acceptance criteria
 
 **A1.** Launching an agent adds its card within ~1s with no manual refresh; a status change flips the
@@ -393,6 +406,15 @@ picker and launches with the route project's id; the general modal continues to 
   `interrupted` tasks in view, updates after their authoritative commit, does not count an ordinary
   `armed`, `ready`, `starting`, or `running` task, and reads zero when no task needs attention:
   dashboard UI tests. A failed task query renders the unavailable state instead of zero.
+
+- **A28** *(planned)* (R45) — In a group containing running and stopped agents in interleaved
+  manual order, the grid renders every running agent before every stopped one while preserving the
+  manual order inside each block; flipping one agent's `running` via a `state_update` moves only that
+  card across the boundary and leaves both blocks otherwise unchanged; a drag inside a block still
+  produces the same `PUT /api/layout` order payload it produces today; and the Ungrouped section
+  stays last. *Verify by* new cases in `ui/src/components/grid/CardGrid.test.tsx` beside the existing
+  scoped-reorder case, and by **J5** in `docs/features/USABILITY-REVIEW.md` for the live start/stop
+  movement in a real browser.
 
 ## 6. Deviations & open decisions
 
