@@ -178,6 +178,19 @@ func runScenario(name string) string {
 		}
 		return "end_turn"
 
+	case "stress_stream":
+		chunks := envInt("FAKEACP_STRESS_CHUNKS", 500, 1, 10000)
+		chunkBytes := envInt("FAKEACP_STRESS_CHUNK_BYTES", 128, 1, 4096)
+		delay := time.Duration(envInt("FAKEACP_STRESS_DELAY_MS", 2, 0, 1000)) * time.Millisecond
+		chunk := strings.Repeat("x", chunkBytes)
+		for i := 0; i < chunks; i++ {
+			emitChunk(chunk)
+			if delay > 0 {
+				time.Sleep(delay)
+			}
+		}
+		return "end_turn"
+
 	case "tool_flow":
 		emitUpdate(map[string]any{
 			"sessionUpdate": "tool_call", "toolCallId": "tc_1",
@@ -240,6 +253,18 @@ func runScenario(name string) string {
 		emitChunk("unknown scenario: " + name)
 		return "end_turn"
 	}
+}
+
+func envInt(key string, fallback, min, max int) int {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < min || value > max {
+		return fallback
+	}
+	return value
 }
 
 // permissionScenario requests permission for a tool and blocks until the client

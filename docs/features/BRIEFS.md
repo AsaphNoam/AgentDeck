@@ -5,6 +5,31 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-27 — Bug investigation: multi-tab dashboard freeze
+
+The root cause is confirmed: AgentDeck opens one permanent server-sent-event connection per tab over
+plain HTTP/1.x. In Chromium, five populated tabs loaded normally; the sixth opened its live-event
+connection, exhausted the same-origin connection pool, and stayed on “Loading project…” because its
+ordinary data requests never reached AgentDeck. Closing one older tab released a connection and the
+stalled page completed in 127 milliseconds. This explains the complete symptom cluster: older tabs
+keep receiving notifications, the terminal shows only successful requests, agent work continues,
+and memory pressure is irrelevant.
+
+I added a deterministic local stress fixture with one orchestrator and six workers displayed as
+Claude Haiku, backed by the repository's fake agent so it uses no credentials or provider spend. Run
+`go run ./scripts/stress-fixture` and add tabs to the printed URL one at a time. The configured run
+produced 7,000 streamed deltas and the tab failure also reproduced with the agents idle, so the
+pipeline load is an amplifier, not the root cause. The earlier configuration-source and transcript
+scaling findings remain real independent defects, but evidence from this computer cannot be
+attributed to the separately affected Mac.
+
+**Needs attention:** The product fix is a medium-sized transport/lifecycle change: either share one
+live-event stream across tabs or move live events off per-tab long-lived HTTP connections. It should
+be handled separately with a six-tab browser regression.
+
+**Next:** If you want the fix now, have me implement the smallest robust transport option and verify
+it with this fixture.
+
 ### 2026-08-27 — Bug investigation: pipeline-era dashboard freeze
 
 The strongest cause is a configuration-source refresh storm: unchanged 30-second sweeps and project

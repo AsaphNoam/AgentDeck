@@ -6,11 +6,11 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
-- **Bug investigation:** A 2026-08-27 field report of post-pipeline dashboard unresponsiveness is
-  diagnosed below. The probable incident cause is a confirmed configuration-source refresh/refetch
-  storm, with two confirmed transcript scaling paths as possible contributors. The inspected
-  default home now has zero running rows; its dashboard shut down gracefully at 07:47 and four
-  surviving browser tabs show `RECONNECTING`.
+- **Bug investigation:** The 2026-08-27 all-200/no-page-load report is reproduced and diagnosed below.
+  Five same-origin dashboard tabs consume five long-lived SSE connections; the sixth tab opens the
+  sixth SSE connection and then its REST queries queue in Chromium's HTTP/1.x per-origin connection
+  pool. Closing one older tab unblocks the sixth immediately. Earlier attribution to this machine's
+  default home is withdrawn: the reported incident occurred on another computer.
 - **Review state:** Verification of the fixes for the review through `895348e`: seven of the nine
   findings are closed in code and test, and three residual items are listed under
   `## Review findings`. The two purported agent-facing `request_conflict` and `revision_conflict`
@@ -34,13 +34,14 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Changelog
 
-- **2026-08-27 — bug investigation:** Diagnosed the all-200/no-page-load report against the live
-  default home, its 71 MB dashboard log, durable state, four surviving browser tabs, and the
-  config-source/session/SSE paths. Unchanged source generations publish updates and globally
-  invalidate active queries; file-writing agents can accelerate the loop through watched project
-  roots. The log reached 100 duplicate config-source reads per minute while handlers stayed fast.
-  Recorded the confirmed storm, two probable transcript amplifiers, and missing shutdown/hot-path
-  observability below; added one skipped reproduction test. No product code or specification changed.
+- **2026-08-27 — bug investigation correction and reproduction:** Built a deterministic production-UI
+  stress fixture with one Claude Haiku-labelled orchestrator, six workers, and 7,000 streamed ACP
+  deltas. A real Chromium reproduced the field symptom at the sixth same-origin tab: the shell and
+  SSE opened, REST queries never reached the server, and the page remained on `Loading project…`.
+  Closing one existing tab released an SSE connection and the stalled tab completed in 127 ms. This
+  confirms browser HTTP/1.x connection starvation as the root cause. The earlier default-home
+  analysis inspected a different computer and is not incident evidence; its config-source and
+  transcript findings remain independent scaling defects only.
 - **2026-08-27 — usability review:** Drove the user-facing changes released between `v0.2.2` and
   `v0.2.3` through a real Chromium against the release binary on isolated fixtures: dependent work
   end to end, the dashboard attention count, the task-concurrency budget, browser-local chat drafts,
@@ -119,62 +120,67 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-- **Must fix** — **Probable incident cause; refresh/refetch mechanism confirmed.** Field report
+- **Must fix** — **Confirmed incident root cause: one SSE connection per tab exhausts the browser's
+  same-origin HTTP/1.x connection pool.** Field report
   (verbatim; AgentDeck version/commit unknown): “After running a pipeline it became Super
   unresponsive, something fishy is going on, nothing sus is being logged in the terminal (all 200s)
   but the pages don't load. Memory isn't chocked up, MacBook Pro showing 24 physical memory, 18
   memory, 5 cached and only 5 swap. It looks like the agent sessions might still be running and
   progressing, one of the windows I already have open show the notifications popping up, I just
-  can't be sure”. The default-home log contains 768 `GET /api/config-sources` requests in its final
-  hour and peaks at 100/minute; all completed in 0–5 ms. Four open `127.0.0.1:4317` tabs exactly
-  match the four long-lived SSE handlers closed at shutdown, so fast 200s and live notifications do
-  not rule out client saturation. `SourceManager` refreshes every retained generation each 30-second
-  sweep and on debounced events beneath approved project roots
+  can't be sure”. In an isolated production-server fixture, five populated tabs loaded in 144–155 ms.
+  A sixth loaded the shell, reported `SSE open`, and remained on `Loading project…`; after its root
+  and static assets, no REST request from that tab reached the server. Closing one older tab ended
+  its `/api/events` request and the stalled tab completed in 127 ms, with its queued REST handlers
+  taking 0–2 ms. `SseClient.connect` creates one permanent `EventSource("/api/events")` per tab
+  (`ui/src/api/sse.ts:22-30`), while the loopback server is plain HTTP over `net.Listen`
+  (`internal/server/server.go:300-334`). At six tabs those long-lived streams occupy Chromium's six
+  same-origin HTTP/1.x connections, so fetches queue in the browser rather than failing or reaching
+  AgentDeck. Existing tabs still receive notifications over their already-open streams. The terminal
+  looks healthy because request logging runs only after a handler returns
+  (`internal/server/middleware.go:49-60`): completed REST calls are fast 200s, and each SSE is itself a
+  200 logged only when it closes. Replace the per-tab long-lived HTTP connection with a transport or
+  cross-tab sharing scheme that leaves REST capacity, and cover six same-origin dashboard tabs
+  loading and refetching concurrently (FS-02.R9/R30–R32, TS-03.R7–R9, INV §8).
+
+- **Worth fixing** — **Confirmed independent defect, not attributed to this incident:** unchanged
+  config-source generations publish and refetch in every tab. `SourceManager` refreshes every
+  retained generation each 30-second sweep and on debounced events beneath approved project roots
   (`internal/configsource/watch.go:33-55,87-112,124-165`), while `commit` publishes
   `config_source_update` even when `changedFields` is empty, contradicting its own changed-view
   comment (`internal/configsource/manager.go:254-279`). Every tab globally invalidates the source
   query (`ui/src/api/sse.ts:120-126`), and the closed New Agent modal keeps that query active
   (`ui/src/features/launch/NewAgentModal.tsx:95-98,109-118`). Pipeline agents writing project files
-  can therefore amplify unchanged refreshes into repeated discovery/refetch/render work. Suppress an
+  can therefore amplify unchanged refreshes into repeated discovery/refetch/render work. This path
+  was confirmed statically and by `TestSweepDoesNotPublishUnchangedGeneration`, but the prior request
+  counts came from this computer rather than the reported one. Suppress an
   unchanged publication (or make the client ignore a genuinely empty/no-health-change update), then
   unskip `TestSweepDoesNotPublishUnchangedGeneration` and cover multiple mounted clients. Confirm
   whether FS-08.R15 needs a clarification that only materially changed generation/health state is
   announced; the current behavior defeats TS-07.R7's acceleration boundary and the bounded,
   non-blocking intent of TS-03.R9 (INV §8).
 
-- **Worth fixing** — **Probable incident contributor; server amplification path confirmed.** Every
+- **Worth fixing** — **Confirmed independent scaling defect; not required for the reproduction.** Every
   create/write event in the sessions tree runs a whole-tree reconciliation
   (`internal/server/reconcile.go:43-55,75-93`), and that pass reads each complete transcript and
   rebuilds its assistant preview line by line (`:122-154`). Runtime streaming persists each
   normalized delta as another append (`internal/runtime/chat.go:1028-1067`,
   `internal/transcript/writer.go:89-129`), so an active pipeline can repeatedly rescan all historical
-  transcript bytes while its stage agent streams. The incident log has no scan timing/file/byte
-  telemetry, so contribution is not attributable after the fact. Debounce/coalesce session writes or
+  transcript bytes while its stage agent streams. The connection-starvation symptom reproduces with
+  idle agents, so this is not the root cause. Debounce/coalesce session writes or
   reconcile only the changed session incrementally, and add a regression that streams many deltas
   with several retained transcripts while bounding scans and latency (FS-14.R16, INV §7/§9).
 
-- **Worth fixing** — **Probable incident contributor; browser amplification path confirmed.** The SSE
+- **Worth fixing** — **Confirmed independent scaling defect; not required for the reproduction.** The SSE
   client appends every agent's `new_message`, not only the open chat
   (`ui/src/api/sse.ts:96-117`); each append clones the global per-agent transcript map and target
   array (`ui/src/store/transcriptStore.ts:99-134`). `CardGrid` subscribes to the whole transcript map
   and recomputes every visible card's latest text (`ui/src/components/grid/CardGrid.tsx:49,77-89,
   118-153,221-229`). Pipeline agents are intentionally ordinary agents (FS-14.R16), but their
   streamed deltas need not force full-dashboard transcript allocation and recomputation. The
-  surviving tab state and continued notifications fit main-thread churn, but no performance trace
-  survived, so causation remains probable. Store card previews separately/boundedly or select only
+  connection-starvation symptom reproduces with idle agents, so this is not the root cause. Store
+  card previews separately/boundedly or select only
   per-card preview state, with a render-count/load regression for a busy multi-stage run
   (FS-02.R9, FS-03.R10, INV §8).
-
-- **Worth fixing** — **Undetermined shutdown cause; missing observability confirmed.** The default
-  dashboard logged a graceful shutdown at `2026-08-27T07:47:57+03:00`; only the signal-cancelled
-  context reaches that path, but the log records neither PID nor SIGINT/SIGTERM/caller. It also logs
-  no config-source refresh trigger/change count, session reconciliation elapsed/files/bytes, or
-  browser event-handler backlog. The durable snapshot after shutdown has zero `running` rows; its
-  only run is an older paused run with no current agent, so the reported AgentDeck pipeline sessions
-  are confirmed not running now, but why the dashboard stopped is undetermined. Log the shutdown
-  cause plus bounded active-run/agent counts, and sampled source-refresh/session-reconcile rates and
-  elapsed work, so a future all-200 report distinguishes server churn, browser churn, and an external
-  stop (TS-09.R13, TS-03.R9, INV §8/§9).
 
 - **Worth fixing** — FS-17.A1 and A3, and half of A4, still describe verification that does not
   exist. A4's contradictory "byte-identical" wording is corrected and A2's guard now genuinely
