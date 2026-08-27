@@ -5,6 +5,20 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-27 — Design review: Mermaid diagrams in chat
+
+The design uses the right existing chat and presentation seams, but three gaps need to be resolved
+before implementation. A diagram can currently ask Mermaid to load an attacker-controlled image
+before the proposed sanitizer gets a chance to inspect the generated markup. A timeout around
+main-thread rendering cannot interrupt a diagram that has already blocked the page. And a diagram's
+generated colors would remain stale if someone switches appearance while the transcript is open.
+
+**Needs attention:** Add a pre-render no-network boundary, make the render-work bound enforceable,
+and make mounted diagrams react to appearance changes.
+
+**Next:** Revise the Mermaid requirements and acceptance evidence for these three findings, then run
+the design review again.
+
 ### 2026-08-27 — Fix: Pipelines experience design
 
 The Pipelines design is ready to implement as a deliberate product experience rather than a page

@@ -28,6 +28,15 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Changelog
 
+- **2026-08-27 — design review:** Reviewed the waiting Mermaid chat-rendering change against FS-03,
+  TS-08, the shipped Markdown/presentation/archive seams, Mermaid 11.17.2, and every invariant
+  class. The existing `AssistantText` and presentation adapters are the right extension points, and
+  the closed-fence state is recoverable from react-markdown's source-position metadata. Three
+  implementation-gating findings remain: Mermaid image nodes can make an attacker-chosen request
+  before returned SVG can be sanitized, a main-thread render cannot be interrupted by the promised
+  elapsed-time budget, and an already-rendered SVG does not observe a later skin change. No product
+  code, specification, or change file was edited.
+
 - **2026-08-27 — fix:** Closed all four Pipelines design-review findings (INV §7/§8/§10).
   FS-14.R36/R39 now require frozen human stage titles, complete attempt-agent cards, correct
   same-agent continuation attribution, and retained-history pagination; R44–R45 and A20–A23 make
@@ -146,4 +155,29 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-None.
+- **Must fix** — Mermaid can make an attacker-chosen network request before the specified sanitizer
+  runs (FS-03.R38, TS-08.R40, INV §8). A person who opens an assistant message containing a
+  flowchart image node such as `A@{ img: "https://attacker.example/pixel" }` causes Mermaid to load
+  that URL while laying out the diagram, before `render()` returns the SVG string to the proposed
+  sanitizing insertion seam. Mermaid 11.17.2 officially supports URL-backed image nodes, and its
+  upstream image-policy proposal identifies both the eager preload and later SVG emission; strict
+  mode and post-render DOMPurify therefore cannot uphold the design's "no network request" promise
+  or prevent disclosure to the remote host. Specify a pre-render URL/resource rejection boundary
+  that cannot be weakened by diagram configuration, and add an acceptance case proving no request
+  occurs, not merely that the final DOM lacks the URL.
+- **Must fix** — The promised render-time budget cannot stop a diagram that blocks the browser thread
+  (FS-03.R38, INV §8). A person who opens a pathological but size-compliant assistant diagram can
+  have the chat panel freeze inside Mermaid parsing/layout/rendering. The planned dynamic import and
+  a Promise timeout can choose not to insert a late result, but they cannot pre-empt synchronous work
+  already executing on the main thread; the change defines neither an interruptible worker boundary
+  nor a purely structural bound proven to cap render work. Specify an enforceable availability
+  boundary and test a worst-case input against it, or narrow the product promise to a source/shape
+  bound whose protection is demonstrated.
+- **Worth fixing** — A visible diagram keeps the old skin's baked SVG colors after appearance changes
+  (FS-03.R37, TS-08.R40). A person who switches between Core and Sky & Grove while a chat or archive
+  transcript remains mounted sees surrounding UI update immediately while the diagram retains its
+  prior palette until another event, reload, or remount happens. `AppearanceRoot` only mutates the
+  document's `data-skin`; `AssistantText` does not subscribe to that marker, and
+  `resolvePresentationColors` only reads values when markup is generated. Define reuse of the
+  existing presentation-color observer (or an equivalent shared rerender signal) for diagrams and
+  test a mounted diagram across a skin-marker change.
