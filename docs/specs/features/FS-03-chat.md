@@ -1,6 +1,6 @@
 # FS-03 — Live chat & permission flow
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/runtime/` (`chat.go`, `permission.go`, `event.go`), `internal/server/sessions.go`, `internal/transcript/`, `ui/src/components/chat/`, `ui/src/store/transcriptStore.ts`, `ui/src/api/sse.ts` · **Journeys:** J3, J4, J7
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -179,6 +179,20 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   inserted command is ordinary composer text and is submitted and recorded exactly as displayed.
   AgentDeck neither invents commands nor attempts to classify a provider's entries as skills.
 
+### 2.7 Diagram rendering (planned)
+
+- **R37** *(planned)*. A fenced code block tagged `mermaid` inside an assistant message renders as a
+  diagram in place of the code block, themed from the core presentation values so it reads correctly
+  under Core and every built-in skin (TS-08.R40). Because a partially streamed block is not valid
+  diagram source, the block renders as the ordinary syntax-highlighted code block (R2) until its
+  fence closes, and only then becomes a diagram; the reader therefore never sees a diagram flicker
+  or error mid-stream. Each rendered diagram offers a control that shows its original source and
+  returns to the diagram. Diagram rendering is presentation only: it changes no durable event, no
+  sequence, no fold boundary (R4), and no archived or searched content, so the same message replays
+  identically after a reload and renders identically in an archived transcript (FS-05.R14).
+  Rendering applies only to assistant text. Tool calls, tool results, diffs, user prompts, and
+  annotations are unchanged, and AgentDeck neither authors, edits, exports, nor downloads diagrams.
+
 ## 3. States & transitions
 
 - **Open/reload:** panel fetches durable events → normalizes/folds them → subscribes to live SSE
@@ -206,6 +220,17 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   the existing chat error surface and preserves the composer draft.
 - **R20.** The UI sanitizes assistant Markdown before inserting it into the DOM; transcript content
   cannot inject arbitrary HTML or script through Markdown rendering.
+- **R38** *(planned)*. Diagram rendering (R37) upholds R20 rather than excepting it. Diagram source
+  is treated as untrusted, because assistant text can carry content the agent read from a repository
+  or the network. The rendered diagram is produced with the renderer's own interactivity disabled —
+  no click handlers, no scripts, no HTML in labels — and the resulting markup is sanitized again
+  before it reaches the DOM, so neither a renderer bug nor a crafted diagram can inject active
+  content. Markup produced this way enters the DOM at exactly one reviewed place in the UI, and no
+  other transcript renderer gains a raw-markup path. Rendering makes no network request. Source that
+  fails to parse leaves the ordinary code block visible with a short note that it is not a valid
+  diagram; it neither empties the message, nor throws to the event-level error boundary (R5), nor
+  blocks the rest of the transcript. A diagram whose rendering exceeds a bounded time or size budget
+  falls back to the same code block rather than hanging the panel.
 - **R21.** A permission decision must be exactly `approve` or `deny`; invalid JSON or any other
   decision returns `422 validation`. A failed UI decision leaves the buttons available and shows an
   error instead of optimistically resolving the prompt.
@@ -318,6 +343,23 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   browser-storage-backed `Composer` and deletion-event component/unit cases plus a manual
   reload/navigation check.
 
+- **A20** *(planned)* (R37) — A closed ```mermaid fence in an assistant message renders a diagram;
+  the same block renders as a code block while its fence is still open, and becomes the diagram once
+  the closing fence arrives; the source toggle returns the original text; a ```mermaid fence in a
+  tool result, a diff, or a user prompt renders exactly as it does today. Replaying the identical
+  durable events produces the identical rendered output. *Verify by* a new
+  `ui/src/components/chat/renderers/AssistantText.test.tsx` covering the streaming, closed-fence,
+  toggle, and non-assistant cases, plus a `transcriptStore` replay case.
+- **A21** *(planned)* (R38, R20) — Diagram source carrying a script element, an HTML label, an
+  event-handler attribute, and a click/interaction directive produces rendered output containing
+  none of them and executes nothing; unparseable source leaves a visible code block with its note
+  and the following events still render; and the reviewed injection seam is the only place in
+  `ui/src` that inserts renderer-produced markup. *Verify by* injection cases in the same renderer
+  test, and a repository check that asserts the single seam.
+- **A22** *(planned)* (R37) — A real browser renders a diagram in a live streamed reply and in the
+  archived transcript of the same session, correct under Core and Sky & Grove: journey **J3** in
+  `docs/features/USABILITY-REVIEW.md`.
+
 ## 6. Deviations & open decisions
 
 - **Concurrent transcript refetches have no ordering token.** Open, reconnect, and gap-repair
@@ -344,6 +386,12 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `renderers/`, `ui/src/store/transcriptStore.ts`, `ui/src/api/sse.ts`. The header runtime picker
   (R23/R24) reuses `switchRuntime` (`ui/src/api/client.ts`) and the same backend/model/effort reset
   logic as the dashboard Switch dialog (`ui/src/components/grid/CardContextMenu.tsx`).
+- **Diagram rendering (R37–R38, planned):** one branch in
+  `ui/src/components/chat/renderers/AssistantText.tsx`'s existing `code` component override, which
+  already receives the fence's language tag. The renderer library is loaded on demand so it stays
+  out of the initial bundle, and its theme is supplied by the presentation adapter seam in
+  `ui/src/presentation/integrations.ts` beside `syntaxTheme` and `xtermTheme` (TS-08.R13/R40).
+  Durable events, `transcriptStore` folding, the transcript endpoint, and the archive are unchanged.
 - **Browser-local drafts (R36):** `ui/src/components/chat/drafts.ts` owns the bounded browser
   record; `Composer.tsx` restores and writes it, and `ui/src/api/sse.ts` removes it only with the
   existing deleted-agent event. `drafts.test.ts`, `Composer.test.tsx`, and `sse.test.ts` cover

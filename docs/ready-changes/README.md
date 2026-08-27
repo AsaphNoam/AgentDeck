@@ -42,5 +42,8 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
+- [Render Mermaid diagrams in the chat transcript](mermaid-diagrams-in-chat.md) — a closed
+  ```mermaid fence in an assistant message renders as a themed diagram, sanitized at one seam and
+  loaded on demand (FS-03.R37–R38, TS-08.R40).
 - [Split the Pipelines surface into runs and templates](split-pipelines-surface.md) — separate template authoring from run supervision, and give a run its own page with an
   execution timeline and its stage and delegated agents (FS-14.R35–R45).

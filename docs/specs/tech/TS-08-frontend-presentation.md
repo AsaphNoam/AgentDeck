@@ -1,6 +1,6 @@
 # TS-08 — Frontend presentation architecture
 
-**Status:** Current
+**Status:** Partial
 **Code:** `ui/src`, `ui/package.json`, `ui/vite.config.ts`
 **Absorbed:** —
 
@@ -227,6 +227,22 @@ primitive seam; the rejected alternatives are recorded in §5.
   normalized events already supplied by the feature owner, retains the original event nodes when
   expanded for their existing annotation behavior, and neither fetches, persists, folds, nor
   changes transcript data.
+
+- **R40** *(planned)* — The transcript diagram renderer (FS-03.R37) joins the existing
+  third-party integration seam of R13 rather than introducing a second styling path: one adapter
+  module beside `syntaxTheme` and `xtermTheme` maps the core semantic `--ad-*` values into the
+  library's theme, so the library keeps no independent default palette and diagrams follow Core and
+  every skin. Because the library resolves its own colors while generating markup, the adapter reads
+  computed values through the shared `resolvePresentationColors` helper rather than duplicating
+  literals. The library is a repository-owned bundled dependency loaded through a dynamic import, so
+  it forms its own build chunk, never enters the initial bundle, and makes no content-delivery-network
+  request (R10). Its version is pinned at or above the release that fixes the known diagram-source
+  HTML-injection defect. Diagram markup reaches the DOM through one seam that disables the library's
+  interactive features and sanitizes the generated markup before insertion; that seam is the only
+  place in `ui/src` permitted to insert renderer-produced markup, and it is recorded in the
+  presentation exception manifest with its path, rule, and reason (R14, R17–R20). Markup the library
+  generates at runtime is outside the static audit's reach, which is why the sanitizing seam, not the
+  audit, is the control.
 
 ## 3. Interfaces & data shapes
 

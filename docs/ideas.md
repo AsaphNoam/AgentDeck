@@ -41,6 +41,13 @@ Example:
   build instead of being frozen into per-install JSON at first run, and would let non-AgentDecker
   roles reach the same answers. Prompted by the 2026-08-27 usability review.
 
+- **No Content-Security-Policy.** Neither the Go server nor `ui/index.html` sets a CSP header or
+  meta tag. CSP is the third layer every diagram/Markdown-rendering hardening guide recommends
+  alongside sanitization, and it would also bound the existing Markdown, diff, and xterm surfaces.
+  Kept separate from `docs/ready-changes/mermaid-diagrams-in-chat.md` on 2026-08-27 because it is a
+  server-wide change that could affect the dev proxy, xterm, and inline styles. Noted while
+  researching safe diagram rendering.
+
 - **Approval notifications link to the conversation.** When a pop-up notification fires because an
   agent needs approval, make it a link that opens that agent's conversation, so the user can jump
   straight to the pending permission instead of hunting for the right agent.
