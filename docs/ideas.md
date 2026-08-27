@@ -57,9 +57,6 @@ Example:
 - **Crash protection for bad projects.** AgentDeck created invalid projects that broke the process.
   Add input validation on project creation and guard the process against malformed project state.
 - **Adjustable chat window size.** Let the chat window be resized.
-- **Edit message (fork on older).** Like Codex: editing the most recent message edits it in place;
-  editing any older message forks/copies the conversation from that point (this is the "split
-  conversation" mechanism).
 - **'Approve for me' mode.** Like the agents already have — just expose the toggle, with the default
   persisting to whatever was last selected.
 
@@ -68,6 +65,32 @@ Example:
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
 
+- **Edit a sent chat message.** From the 2026-08-10 play session: like Codex, editing the most
+  recent message edits it in place, and editing an older one forks the conversation from that point.
+  Designing this on 2026-08-27 established that AgentDeck cannot give it the meaning Codex does, and
+  the user chose to hold the idea rather than ship a weaker meaning under the same name. Codex owns
+  its own conversation state; AgentDeck supervises a provider CLI session that has already ingested
+  the message. Findings, so a later attempt does not re-derive them:
+  - **The protocol has no rewind.** The ACP client is hand-rolled and pins protocol version 1. The
+    complete implemented session-method set is `session/new`, `session/load`, `session/prompt`,
+    `session/cancel`, `session/request_permission`, `session/set_config_option`, and
+    `session/update`. Nothing edits, rewinds, truncates, forks, or resumes from a point;
+    `session/load` is a whole-session resume keyed by id and takes no offset or sequence.
+  - **The transcript is append-only.** `internal/transcript/writer.go` exposes only
+    `Append`/`Sync`/`Close`, and `Open()` repairs a torn trailing record on the assumption that only
+    the final line can ever be incomplete (TS-02.R8, INV §9).
+  - **The search index is immutable per turn.** One FTS document per completed turn, never reread or
+    rewritten (TS-02.R16), and one document blends several messages by seq range — so an edited
+    message's original text stays searchable no matter what the UI shows. FS-05.R32 names the
+    transcript and search index as things archival may not change.
+  - **The only rewind-shaped seam is lossy.** The switch-runtime history primer
+    (`internal/server/primer.go`) rebuilds a session from an 8000-token budget: the last six turns
+    verbatim and a summary of everything older. Using it to fix a typo would silently discard the
+    agent's context.
+  Anything shippable is therefore one of: correct-and-resend as a new turn with the supersession
+  stated honestly; a true session rebuild that accepts the primer's context loss; or a display-only
+  supersede that makes the visible history stop matching what the agent received. Each needs a
+  product decision about what "edit" should promise.
 - **Richer agent-facing orchestration API (remainder).** The first slice — typed retry
   classification on refused tool calls and structured result delivery — is specified in FS-17 and
   queued as `docs/ready-changes/agent-tool-retry-classification.md`. Investigation of the original

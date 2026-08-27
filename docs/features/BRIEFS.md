@@ -19,6 +19,35 @@ and make mounted diagrams react to appearance changes.
 **Next:** Revise the Mermaid requirements and acceptance evidence for these three findings, then run
 the design review again.
 
+### 2026-08-27 — Design: Mermaid in chat, active-first ordering
+
+Two of the three requested features are ready to implement, and the third is deliberately held.
+
+Mermaid diagrams will render inline in the chat transcript. A fenced `mermaid` block in an assistant
+reply becomes a themed diagram once its fence closes, stays an ordinary code block while it is still
+streaming, can be toggled back to its source, and falls back to a code block with a short note when
+the source does not parse. Nothing durable changes, so replay, archive, and search are untouched.
+The renderer is bundled and loaded on demand, so the initial download is unaffected, and it is
+pinned above the release that fixes a known diagram HTML-injection defect. Safety follows what
+established tools converged on rather than a new boundary: interactivity off and a second sanitizing
+pass over the generated markup at a single reviewed seam, because neither strict mode nor sandbox
+mode alone has held up in practice. That matters here specifically, since this renders agent output.
+
+Project grids will put running agents ahead of stopped ones inside each group, keeping the manual
+drag order within each block and moving a card the moment its agent starts or stops. Nothing new is
+stored. This required narrowing an interface requirement that forbade status from affecting order.
+
+Editing a sent chat message was not specified. AgentDeck cannot give it the meaning Codex does: the
+protocol version in use has no rewind, the transcript and search index are append-only, and the only
+rewind-shaped mechanism would silently discard the agent's context. Rather than ship a weaker
+meaning under the same name, the idea is held with those findings recorded so a later attempt starts
+from evidence.
+
+**Needs attention:** AgentDeck sets no Content-Security-Policy anywhere. Recorded as its own idea,
+deliberately kept out of the diagram change because it is server-wide.
+
+**Next:** Implement either waiting change; both are independent and need no decision to start.
+
 ### 2026-08-27 — Fix: Pipelines experience design
 
 The Pipelines design is ready to implement as a deliberate product experience rather than a page

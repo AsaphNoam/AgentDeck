@@ -10,8 +10,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   tabs now share one long-lived SSE connection, leaving the browser's HTTP/1.x pool available for
   REST queries; the related config-source, transcript-reconciliation, and card-preview amplification
   paths are bounded as described in the changelog.
-- **Review state:** Every review and usability finding through 2026-08-27 is closed in code, tests,
-  or an explicit specification boundary. No open review finding remains.
+- **Review state:** Three open design-review findings against the waiting Mermaid change are
+  recorded below; every other review and usability finding through 2026-08-27 is closed in code,
+  tests, or an explicit specification boundary.
 - **Active change:** None. Agent-facing retry classification and structured result delivery is shipped;
   FS-17 and TS-04.R30–R31 are Current.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
@@ -36,6 +37,22 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   before returned SVG can be sanitized, a main-thread render cannot be interrupted by the promised
   elapsed-time budget, and an already-rendered SVG does not observe a later skin change. No product
   code, specification, or change file was edited.
+
+- **2026-08-27 — design:** Defined two small UI changes and held a third. FS-03.R37–R38 and
+  A20–A22 specify Mermaid rendering in assistant messages, gated on the closed fence because every
+  delta re-renders the whole message, with a code-block fallback and one sanitizing injection seam;
+  TS-08.R40 puts the renderer on the existing R13 adapter seam as a dynamically imported chunk
+  pinned at or above the release fixing the known diagram HTML-injection defect. FS-02.R45 and A28
+  order running agents before stopped ones inside each group while preserving the manual order, and
+  FS-12.R37 narrows R10's ordering clause, which forbade it. FS-02, FS-03, FS-12 and TS-08 are now
+  Partial; J3 and J5 cover the new evidence. Queued `mermaid-diagrams-in-chat.md` and
+  `active-agents-before-stopped.md`. Edit-a-sent-message was **not** specified: ACP v1 as
+  implemented has no rewind method, the transcript and FTS documents are append-only, and the only
+  rewind-shaped seam is the lossy switch primer, so the user chose to hold it with those findings
+  recorded in `../ideas.md`. The absent Content-Security-Policy is recorded there too.
+  `make check-specs`, the twin-skill comparison and `git diff --check` are green.
+  The Mermaid requirements were reviewed after this entry was written; see the three open findings
+  below, which supersede R38's no-network and render-budget promises until they are revised.
 
 - **2026-08-27 — fix:** Closed all four Pipelines design-review findings (INV §7/§8/§10).
   FS-14.R36/R39 now require frozen human stage titles, complete attempt-agent cards, correct
