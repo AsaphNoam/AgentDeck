@@ -85,3 +85,41 @@ export function xtermTheme(colors: PresentationColors) {
     brightWhite: colors.foreground,
   };
 }
+
+// Mermaid resolves its own colors while generating markup, so the adapter feeds it computed
+// core values rather than `var(--ad-*)` references (TS-08.R13/R40).
+export function mermaidTheme(colors: PresentationColors) {
+  return {
+    background: colors.background,
+    mainBkg: colors.surface,
+    primaryColor: colors.surface,
+    primaryTextColor: colors.foreground,
+    primaryBorderColor: colors.line,
+    secondaryColor: colors.background,
+    secondaryTextColor: colors.foreground,
+    secondaryBorderColor: colors.line,
+    tertiaryColor: colors.background,
+    tertiaryTextColor: colors.foreground,
+    tertiaryBorderColor: colors.line,
+    nodeBorder: colors.line,
+    clusterBkg: colors.background,
+    clusterBorder: colors.line,
+    lineColor: colors.muted,
+    textColor: colors.foreground,
+    titleColor: colors.foreground,
+    labelTextColor: colors.foreground,
+    edgeLabelBackground: colors.background,
+    noteBkgColor: colors.surface,
+    noteTextColor: colors.foreground,
+    noteBorderColor: colors.line,
+    actorBkg: colors.surface,
+    actorBorder: colors.line,
+    actorTextColor: colors.foreground,
+    signalColor: colors.muted,
+    signalTextColor: colors.foreground,
+    altBackground: colors.surface,
+    errorBkgColor: colors.error,
+    errorTextColor: colors.foreground,
+    fontFamily: colors.fontFamily,
+  };
+}

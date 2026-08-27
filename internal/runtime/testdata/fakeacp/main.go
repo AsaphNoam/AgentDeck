@@ -191,6 +191,28 @@ func runScenario(name string) string {
 		}
 		return "end_turn"
 
+	case "diagram_stream":
+		// A Mermaid fence delivered across deltas, so a reader can watch the block stay a code
+		// block while the fence is open and become a diagram once it closes (FS-03.R37, J3).
+		delay := time.Duration(envInt("FAKEACP_DIAGRAM_DELAY_MS", 400, 0, 5000)) * time.Millisecond
+		for _, chunk := range []string{
+			"Here is the flow:\n\n```mer",
+			"maid\ngraph TD;\n",
+			"  Deck-->Agent;\n",
+			"  Agent-->Task;\n",
+			"```\n",
+		} {
+			emitChunk(chunk)
+			time.Sleep(delay)
+		}
+		return "end_turn"
+
+	case "diagram_injection":
+		// A diagram whose source carries a script element and an HTML label, so J3 can confirm
+		// neither reaches the page (FS-03.R38).
+		emitChunk("```mermaid\ngraph TD;\n  A[\"<script>window.__injected = true;</script>\"]-->B[\"<img src=x onerror='window.__injected = true'>\"];\n```\n")
+		return "end_turn"
+
 	case "tool_flow":
 		emitUpdate(map[string]any{
 			"sessionUpdate": "tool_call", "toolCallId": "tc_1",

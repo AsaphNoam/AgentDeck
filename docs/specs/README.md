@@ -29,7 +29,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-00 | [features/FS-00-product-overview.md](features/FS-00-product-overview.md) | Current | Product summary, goals/non-goals, core concepts, orchestration planes, glossary |
 | FS-01 | [features/FS-01-agent-lifecycle.md](features/FS-01-agent-lifecycle.md) | Current | Launch, stop, cancel, resume, clone, rename, switch runtime, crash handling, identity, wake on message |
 | FS-02 | [features/FS-02-dashboard.md](features/FS-02-dashboard.md) | Partial | Card grid, live status, layout/density, task groups, notifications, project creation |
-| FS-03 | [features/FS-03-chat.md](features/FS-03-chat.md) | Partial | Streaming chat panel, tool calls/diffs, permission prompts, transcript view, header runtime picker, composer file/skill mentions, browser-local drafts |
+| FS-03 | [features/FS-03-chat.md](features/FS-03-chat.md) | Current | Streaming chat panel, tool calls/diffs, permission prompts, transcript view, header runtime picker, composer file/skill mentions, browser-local drafts |
 | FS-04 | [features/FS-04-configuration-onboarding.md](features/FS-04-configuration-onboarding.md) | Current | Roles/projects/backends CRUD, backend creation, settings UI, onboarding wizard, appearance preference, directory browsing |
 | FS-05 | [features/FS-05-archive-tracking.md](features/FS-05-archive-tracking.md) | Current | Session archive, full-text search, resume from archive, file/command tracking |
 | FS-06 | [features/FS-06-coordination.md](features/FS-06-coordination.md) | Current | Agent-to-agent messaging, explicit mail activation, budgets, unread indicators, stopped-agent wake |
@@ -56,7 +56,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | TS-05 | [tech/TS-05-security.md](tech/TS-05-security.md) | Current | Loopback boundary, tokens, context authorization, file modes, permission model, release-install trust notes, directory-picker disclosure boundary |
 | TS-06 | [tech/TS-06-build-test.md](tech/TS-06-build-test.md) | Current | Build tags, embed pipeline, release runtime, install, test strategy & conventions |
 | TS-07 | [tech/TS-07-federation.md](tech/TS-07-federation.md) | Partial | Native configuration authority, resolvers, consent, freshness, redaction, launch freezing |
-| TS-08 | [tech/TS-08-frontend-presentation.md](tech/TS-08-frontend-presentation.md) | Partial | Core visual architecture, presentation contracts, maintenance safeguards, local assets, renderer styling, and built-in skin selection |
+| TS-08 | [tech/TS-08-frontend-presentation.md](tech/TS-08-frontend-presentation.md) | Current | Core visual architecture, presentation contracts, maintenance safeguards, local assets, renderer styling, and built-in skin selection |
 | TS-09 | [tech/TS-09-pipeline-control-plane.md](tech/TS-09-pipeline-control-plane.md) | Partial | Native sequential pipeline templates, durable run state machine, stage-result tools, recovery, and AgentDecker proposals |
 | TS-10 | [tech/TS-10-work-dependency-control-plane.md](tech/TS-10-work-dependency-control-plane.md) | Current | Durable task/arm/attachment records, arm evaluation, the `dependency` activation kind, the shared result layer, and task recovery |
 | INV | [../features/INVARIANTS.md](../features/INVARIANTS.md) | Current | Bug-class constraint catalog (path kept stable for hooks/history) |

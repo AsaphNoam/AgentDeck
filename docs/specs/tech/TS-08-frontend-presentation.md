@@ -1,6 +1,6 @@
 # TS-08 — Frontend presentation architecture
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src`, `ui/package.json`, `ui/vite.config.ts`
 **Absorbed:** —
 
@@ -228,7 +228,7 @@ primitive seam; the rejected alternatives are recorded in §5.
   expanded for their existing annotation behavior, and neither fetches, persists, folds, nor
   changes transcript data.
 
-- **R40** *(planned)* — The transcript diagram renderer (FS-03.R37) joins the existing
+- **R40** — The transcript diagram renderer (FS-03.R37) joins the existing
   third-party integration seam of R13 rather than introducing a second styling path: one adapter
   module beside `syntaxTheme` and `xtermTheme` maps the core semantic `--ad-*` values into the
   library's theme, so the library keeps no independent default palette and diagrams follow Core and
@@ -453,6 +453,7 @@ boundary; the manifest remains the visual contract and arbitrary ids never becom
   `ui/src/presentation/contract.json`, `ui/src/assets/`.
 - Third-party renderers: `AssistantText.tsx` (`react-syntax-highlighter`), `DiffBlock.tsx`
   (`react-diff-viewer-continued`), `TerminalTab.tsx` (xterm.js),
+  `chat/renderers/{MermaidDiagram.tsx,mermaid.ts}` (Mermaid plus DOMPurify, R40),
   `ui/src/presentation/{integrations,resolveColors}.ts`.
 - Data-driven inline styles retained by R14: `AgentCard.tsx`, `CardGrid.tsx`, `ContextBar.tsx`,
   `CardContextMenu.tsx`, `ProjectForm.tsx`, `ProjectsEditor.tsx`.

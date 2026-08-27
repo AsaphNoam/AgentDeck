@@ -10,10 +10,11 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   tabs now share one long-lived SSE connection, leaving the browser's HTTP/1.x pool available for
   REST queries; the related config-source, transcript-reconciliation, and card-preview amplification
   paths are bounded as described in the changelog.
-- **Review state:** Every review and usability finding through 2026-08-27 is closed in code, tests,
-  or an explicit specification boundary. No open review finding remains.
-- **Active change:** None. Agent-facing retry classification and structured result delivery is shipped;
-  FS-17 and TS-04.R30–R31 are Current.
+- **Review state:** One open design-review finding blocks the waiting active-first Ordering change;
+  every other review and usability finding through 2026-08-27 is closed in code, tests, or an
+  explicit specification boundary.
+- **Active change:** None. Mermaid diagram rendering in the chat transcript is shipped; FS-03 and
+  TS-08 are Current.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
   remain owed before claiming those adapters accept structured results.
 - **Usability state:** The v0.2.2 → v0.2.3 user-facing delta was driven through a real browser on
@@ -27,6 +28,27 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 **State:** none in progress.
 
 ## Changelog
+
+- **2026-08-27 — design review:** Reviewed the waiting active-first Ordering change against FS-02,
+  FS-12, the shipped card-grid/layout/SSE seams, dnd-kit's pinned sortable implementation, and every
+  invariant class. The render-time `running` partition cleanly extends the existing group projection
+  and needs no server or persistence change, but the design leaves `SortableContext` keyed to the
+  differently ordered flat manual list. One implementation-gating drag finding and one consistency
+  note remain. No product code, specification, or change file was edited.
+
+- **2026-08-27 — work:** Shipped Mermaid rendering in assistant messages (FS-03.R37–R38,
+  TS-08.R40). A closed ```mermaid fence becomes a themed diagram; an open one stays a code block
+  until its closing delta arrives, decided from react-markdown's source span. `renderers/mermaid.ts`
+  owns the 50,000-code-unit bound, the refused external-image grammar, strict initialization, and a
+  directly declared DOMPurify pass that also strips remote references from the generated `<style>`;
+  `MermaidDiagram.tsx` is the only markup-insertion seam, now enforced by a new `renderer-markup`
+  rule in the presentation audit plus its manifest entry and a repository check. Mermaid and
+  DOMPurify load on demand, so the initial bundle grows only by the host code (1,813.87 → 1,818.43
+  kB). J3's diagram steps were driven through a real Chromium against the production server and
+  embedded UI on the deterministic `diagram_stream`/`diagram_injection` fake-ACP scenarios: open
+  fence stayed a code block, the closing delta promoted it, the source toggle round-tripped, a live
+  skin change regenerated the mounted diagram, reload and the archived transcript matched, and the
+  injected script/HTML-label case rendered inert with no console error and no external request.
 
 - **2026-08-27 — fix:** Closed all three Mermaid design-review findings (INV §8/§10). The design
   now rejects Mermaid's pinned external-image grammar before rendering, directly owns DOMPurify,
@@ -174,6 +196,22 @@ and creates disposable local configuration homes. On 2026-07-15 this machine has
 the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installed; the new
 `claude-agent-acp`, OpenCode, and OpenHands are not installed globally.
 
+## Design consistency notes
+
+- The ready change calls `state` a five-value enum, but the shipped `AgentStatus` type also includes
+  the `unknown` fallback. This does not change the design because `running` is the sole ordering test.
+
 ## Review findings
 
-None.
+- **Must fix** — The planned running-first projection makes dnd-kit's logical item order disagree
+  with the rendered card order inside a mixed group (FS-02.R12/R45/A28, INV §10). A person dragging
+  one running card over another while stopped cards are interleaved in the persisted manual order
+  can see those stopped cards animate into running positions or have the drop target shift, because
+  `SortableContext` currently receives the flat `ids` list while `rectSortingStrategy` indexes the
+  cards' measured rectangles in that list's order; the new render projection would display a
+  different order. This worsens the drag behavior that the ready change says is unaffected and can
+  make its required within-block reorder unreliable even though the eventual layout payload is
+  correct. Define how the sortable registry stays aligned with the rendered running/stopped blocks
+  while translating a completed drop back to the unchanged flat persisted order, define what a
+  cross-block drop does, and add mixed-status component/browser evidence that stopped cards do not
+  move during an in-block drag and that the intended drop persists after reload.

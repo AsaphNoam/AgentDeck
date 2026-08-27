@@ -7,7 +7,7 @@ import valueParser from "postcss-value-parser";
 import ts from "typescript";
 
 const LAYERS = ["ad-reset", "ad-tokens", "ad-base", "ad-components", "ad-features", "ad-integrations", "ad-skins"];
-const EXCEPTION_RULES = new Set(["inline-style", "raw-color", "raw-font", "raw-shadow", "raw-radius", "raw-spacing", "native-dialog"]);
+const EXCEPTION_RULES = new Set(["inline-style", "raw-color", "raw-font", "raw-shadow", "raw-radius", "raw-spacing", "native-dialog", "renderer-markup"]);
 const DATA_ATTRIBUTES = ["data-ui", "data-slot", "data-state", "data-variant"];
 
 function walk(dir, suffixes) {
@@ -517,6 +517,10 @@ export function auditPresentation(root) {
           const allowed = kind === "data-preview-skin" ? value === "core" || declaredSkins.has(value) : declaredSkins.has(value);
           if (!allowed) add(sourceName, "skin-state", `undocumented ${kind} ${value || "<empty>"}`);
         }
+      }
+
+      if (jsxAttribute(opening, "dangerouslySetInnerHTML")) {
+        addRaw(sourceName, "renderer-markup", "renderer-produced markup requires an exact exception");
       }
 
       const styleAttribute = jsxAttribute(opening, "style");

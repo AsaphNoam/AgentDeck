@@ -142,6 +142,17 @@ test("does not let a dynamic exception hide a static visual literal", () => {
   }), "inline-style-literal");
 });
 
+test("requires an exact exception for renderer-produced markup", () => {
+  expectFailure(fixture({ component: 'export function Component({ html }: { html: string }) { return <div className="known" data-ui="surface" dangerouslySetInnerHTML={{ __html: html }} />; }' }), "renderer-markup");
+});
+
+test("accepts the documented renderer-markup seam", () => {
+  assert.deepEqual(auditPresentation(fixture({
+    component: 'export function Component({ html }: { html: string }) { return <div className="known" data-ui="surface" dangerouslySetInnerHTML={{ __html: html }} />; }',
+    exceptions: [{ file: "src/Component.tsx", rule: "renderer-markup", reason: "The single reviewed sanitized-markup seam" }],
+  })), []);
+});
+
 test("rejects stale exceptions", () => {
   expectFailure(fixture({ exceptions: [{ file: "src/Component.tsx", rule: "inline-style", reason: "No style remains in this fixture" }] }), "stale exception");
 });

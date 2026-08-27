@@ -5,6 +5,47 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-27 — Implementation: diagrams in the chat window
+
+Agents can now answer with a diagram instead of diagram source. When a reply contains a fenced
+`mermaid` block, the chat shows the drawn diagram once the block is complete; while the reply is
+still streaming it stays a plain code block, so nothing flickers or shows a half-drawn error. Each
+diagram has a **Show source** control that flips back to the original text, and a diagram that is
+too large, unparseable, or asks to load an external image quietly stays a code block with a short
+note rather than breaking the message. Diagrams pick up the app's colours, including the Sky & Grove
+appearance, and re-draw immediately if you change appearance while reading.
+
+Because agent replies can repeat text an agent read from a repository or the web, diagram source is
+treated as untrusted: the drawing library runs with its interactive features off, the drawn result is
+cleaned before it reaches the page, and it can make no network request. A diagram carrying a script
+and an HTML label was driven through a real browser and reached the page as harmless text. The
+drawing library only downloads when a diagram is actually shown, so the app starts as fast as before.
+
+**Needs attention:** None.
+
+**Next:** Two designed changes are still waiting: ordering running agents ahead of stopped ones,
+which has an open drag-behaviour question from its design review, and splitting the Pipelines
+surface. Pick whichever you want built next.
+
+### 2026-08-27 — Design review: active-first Ordering
+
+The running-first split is the right small extension: it can reuse the existing project-grid,
+grouping, live-update, and saved-layout paths without adding an API, preference, or parallel ordering
+system. One drag interaction needs design work before implementation. The drag library currently
+indexes cards in saved manual order, but the new grid would render them in running-first order. In a
+mixed group, dragging between running cards can therefore animate stopped cards into the wrong places
+or make the drop target unstable even when the eventual saved order is correct.
+
+The ready-change evidence also calls agent state a five-value enum even though the shipped fallback
+adds an `unknown` value; that is a documentation-only consistency note because ordering uses the
+separate running flag.
+
+**Needs attention:** Align the drag library's logical order with the rendered running/stopped blocks,
+define cross-block drops, and verify that an in-block drag moves no stopped card and survives reload.
+
+**Next:** Revise the Ordering design and acceptance evidence for that drag mapping, then run
+`/review-design Ordering` again.
+
 ### 2026-08-27 — Fix: Mermaid diagram design
 
 The Mermaid design is now the small integration it should be. Mermaid remains responsible for

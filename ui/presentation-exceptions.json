@@ -43,5 +43,10 @@
     "file": "src/presentation/VisualMatrix.tsx",
     "rule": "inline-style",
     "reason": "Fixture cards render the fixed declared project-accent palette"
+  },
+  {
+    "file": "src/components/chat/renderers/MermaidDiagram.tsx",
+    "rule": "renderer-markup",
+    "reason": "The single reviewed seam for sanitized Mermaid diagram markup (FS-03.R38, TS-08.R40)"
   }
 ]

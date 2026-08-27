@@ -22,4 +22,39 @@
 .terminal-xterm .xterm-viewport {
   scrollbar-color: var(--ad-technical-muted) var(--ad-technical-background);
 }
+
+/* A diagram supplies its own frame, so the Markdown `pre` around it drops the code-block chrome. */
+.assistant-message pre:has(.mermaid-diagram) {
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+
+.mermaid-diagram {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ad-space-2);
+}
+
+.mermaid-diagram-figure {
+  /* Mermaid gives its SVG `width: 100%`, so the box must hug the diagram rather than stretch. */
+  width: fit-content;
+  background: var(--ad-technical-background);
+  border: var(--ad-border-thin) solid var(--ad-technical-muted);
+  border-radius: var(--ad-radius-small) var(--ad-radius-large) var(--ad-radius-large) var(--ad-radius-large);
+  max-width: 100%;
+  overflow: auto;
+  padding: var(--ad-space-3);
+}
+
+.mermaid-diagram-figure svg {
+  height: auto;
+  max-width: 100%;
+}
+
+.mermaid-diagram-note {
+  color: var(--ad-text-muted);
+  font-size: 0.82rem;
+}
 }

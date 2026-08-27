@@ -165,4 +165,26 @@ describe("transcriptStore", () => {
     ]);
     expect(useTranscriptStore.getState().byAgent.a_timeout[0].resolved).toBe("timeout");
   });
+  // FS-03.A20: a streamed diagram fence and its replay must fold to the identical text, so the
+  // rendered message is the same live, after a reload, and in an archived transcript.
+  it("folds a streamed diagram fence into the same text a replay produces", () => {
+    const deltas = ["Here it is:\n\n```mer", "maid\ngraph TD;\n  Start-->Fin", "ish;\n```\n"];
+    deltas.forEach((delta, index) => {
+      useTranscriptStore.getState().appendMessage("a_diagram", {
+        agent_id: "a_diagram", seq: index + 1, type: "assistant_text", ts: `t${index + 1}`,
+        data: { message_id: "m_diagram", delta },
+      });
+    });
+
+    useTranscriptStore.getState().setTranscript("a_replay", deltas.map((delta, index) => ({
+      agent_id: "a_replay", seq: index + 1, type: "assistant_text", ts: `t${index + 1}`,
+      data: { message_id: "m_diagram", delta },
+    })));
+
+    const live = useTranscriptStore.getState().byAgent.a_diagram;
+    const replayed = useTranscriptStore.getState().byAgent.a_replay;
+    expect(live).toHaveLength(1);
+    expect(live[0].text).toBe("Here it is:\n\n```mermaid\ngraph TD;\n  Start-->Finish;\n```\n");
+    expect(replayed.map((event) => ({ ...event, agent_id: undefined }))).toEqual(live.map((event) => ({ ...event, agent_id: undefined })));
+  });
 });

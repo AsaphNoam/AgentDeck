@@ -153,6 +153,7 @@ export function VisualMatrix() {
             <code>inline_code()</code>
           </article>
           <AssistantText event={{ seq: 17, kind: "assistant_text", text: "```ts\nconst appearance = 'sky-grove';\n```" }} />
+          <AssistantText event={{ seq: 19, kind: "assistant_text", text: "```mermaid\ngraph TD;\n  Deck-->Agent;\n  Agent-->Task;\n```" }} />
           <DiffBlock
             event={{ seq: 18, kind: "diff", path: "ui/src/styles/skins/sky-grove.css", old_text: "--surface: core;", new_text: "--surface: sky;" }}
             onAnnotate={() => undefined}
