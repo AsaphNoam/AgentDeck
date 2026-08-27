@@ -239,6 +239,25 @@ func TestSweepRecoversMissedEvent(t *testing.T) {
 	}
 }
 
+func TestSweepDoesNotPublishUnchangedGeneration(t *testing.T) {
+	t.Skip("BUG: unchanged source sweeps publish config_source_update and trigger global UI refetches")
+
+	// Reproduction for the confirmed 2026-08-27 config-source refresh-storm finding.
+	m, store, rec, root, project := managerFixture(t)
+	writeBinding(t, store, "claude", Binding{
+		Provider: ProviderClaude, Mode: ModeLinked, Root: root,
+		Claims: []string{"launch_defaults"}, Approved: []string{root, project.Cwd},
+	})
+	if _, _, _, err := m.ResolveFresh(context.Background(), "claude", "proj", project); err != nil {
+		t.Fatalf("initial ResolveFresh: %v", err)
+	}
+	before := len(rec.snapshot())
+	m.Sweep(context.Background())
+	if after := len(rec.snapshot()); after != before {
+		t.Fatalf("unchanged sweep published %d updates, want 0", after-before)
+	}
+}
+
 // TestWatchReresolvesOnFilesystemEvent exercises the real fsnotify path end to
 // end: a write to a watched file triggers a debounced re-resolve.
 func TestWatchReresolvesOnFilesystemEvent(t *testing.T) {

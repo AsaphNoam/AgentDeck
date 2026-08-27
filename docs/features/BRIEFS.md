@@ -5,6 +5,24 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-27 — Bug investigation: pipeline-era dashboard freeze
+
+The strongest cause is a configuration-source refresh storm: unchanged 30-second sweeps and project
+file writes emitted live updates that forced every open AgentDeck tab to refetch, reaching 100
+duplicate reads per minute while the server still returned fast 200s. Pipeline transcript writes
+also hit two confirmed scaling hot paths — full transcript-tree rescans on every file event and
+whole-dashboard transcript recomputation on every streamed agent delta — but the logs cannot prove
+how much they contributed. The dashboard has since shut down; four surviving tabs show Reconnecting,
+and the durable default home has zero running sessions, so those AgentDeck pipeline agents are not
+still progressing now.
+
+**Needs attention:** The shutdown was graceful but its source is undetermined because AgentDeck logs
+neither the terminating signal/caller nor active-session counts. The config-source storm is captured
+in a skipped regression test for the fix session.
+
+**Next:** Run `/fix` to suppress unchanged configuration-source publications/refetches first, then
+benchmark and bound the two transcript amplification paths and add sampled liveness diagnostics.
+
 ### 2026-08-27 — Usability review: everything user-facing since the last version
 
 I drove the changes released since the previous version through a real browser against the built
