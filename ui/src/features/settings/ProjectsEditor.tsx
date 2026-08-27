@@ -67,8 +67,9 @@ export function ProjectsEditor() {
         { id: editing.project, data: fields },
         {
           onSuccess: (resp) => {
-            setWarnings(resp.warnings ?? []);
-            setOpen(false);
+            const nextWarnings = resp.warnings ?? [];
+            setWarnings(nextWarnings);
+            if (nextWarnings.length === 0) setOpen(false);
           },
           onError: (e) => setFormError(configErrorMessage(e)),
         },
@@ -76,8 +77,16 @@ export function ProjectsEditor() {
     } else {
       createProject.mutate(data, {
         onSuccess: (resp) => {
-          setWarnings(resp.warnings ?? []);
-          setOpen(false);
+          const nextWarnings = resp.warnings ?? [];
+          setWarnings(nextWarnings);
+          if (nextWarnings.length === 0) {
+            setOpen(false);
+          } else {
+            // The create already succeeded. Switch the still-open form to edit
+            // mode so acknowledging the warning cannot accidentally create a
+            // duplicate project on a second submit.
+            setEditing(resp);
+          }
         },
         onError: (e) => setFormError(String(e)),
       });

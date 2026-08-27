@@ -1,9 +1,9 @@
 import { DndContext, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, rectSortingStrategy } from "@dnd-kit/sortable";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { Link } from "react-router-dom";
 import { getLayout, putLayout, releaseGroup } from "../../api/client";
-import type { AgentState, TranscriptEvent } from "../../api/types";
+import type { AgentState } from "../../api/types";
 import { useAgentStore } from "../../store/agentStore";
 import { useTranscriptStore } from "../../store/transcriptStore";
 import { useUiStore } from "../../store/uiStore";
@@ -32,7 +32,7 @@ function TaskAttentionLink({ projectID }: { projectID?: string }) {
   if (!projectID) return null;
   return (
     <Link className="task-attention-link" to={`/tasks?project=${encodeURIComponent(projectID)}`}>
-      {isError ? "Task attention unavailable" : `${count} task${count === 1 ? "" : "s"} need attention`}
+      {isError ? "Task attention unavailable" : `${count} task${count === 1 ? "" : "s"} ${count === 1 ? "needs" : "need"} attention`}
     </Link>
   );
 }
@@ -46,7 +46,6 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
   const groupLayout = useUiStore((state) => state.groupLayout);
   const setGroupLayout = useUiStore((state) => state.setGroupLayout);
   const toggleGroupCollapsed = useUiStore((state) => state.toggleGroupCollapsed);
-  const transcripts = useTranscriptStore((state) => state.byAgent);
   const pushError = useUiStore((state) => state.pushError);
   const [showNewAgent, setShowNewAgent] = useState(false);
   const [releaseGroupLabel, setReleaseGroupLabel] = useState<string | null>(null);
@@ -142,10 +141,9 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
                   {!collapsed && (
                     <div className="card-grid" data-slot="grid" style={{ gridTemplateColumns: `repeat(${density.perRow}, minmax(0, 1fr))`, gap: density.gap }}>
                       {group.agents.map((agent) => (
-                        <AgentCard
+                        <LiveAgentCard
                           key={agent.agent_id}
                           agent={agent}
-                          lastLine={lastAssistantLine(transcripts[agent.agent_id])}
                           projectColor={projects.data?.[agent.project]?.color}
                           projectTitle={projects.data?.[agent.project]?.title}
                           showProject={!projectID}
@@ -218,12 +216,7 @@ function summary(agents: AgentState[]) {
   return Object.entries(counts).map(([state, count]) => `${count} ${state}`).join(" · ");
 }
 
-function lastAssistantLine(events: TranscriptEvent[] = []) {
-  for (let i = events.length - 1; i >= 0; i--) {
-    const event = events[i];
-    if ((event.kind ?? event.type) !== "assistant_text") continue;
-    const text = String(event.text ?? event.delta ?? "");
-    if (text.trim()) return text.trim();
-  }
-  return "";
+function LiveAgentCard(props: Omit<ComponentProps<typeof AgentCard>, "lastLine">) {
+  const lastLine = useTranscriptStore((state) => state.previewByAgent[props.agent.agent_id] ?? "");
+  return <AgentCard {...props} lastLine={lastLine} />;
 }

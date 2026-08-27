@@ -273,9 +273,13 @@ func (m *Manager) commit(backendID, projectID string, project config.Project, b 
 			gen.report.Warnings = append(gen.report.Warnings, "mirror cache write failed")
 		}
 	}
+	changed := changedFields(prev, gen)
+	if prev != nil && len(changed) == 0 && prev.health == gen.health && prev.stale == gen.stale {
+		return
+	}
 	m.publish(Update{
 		BackendID: backendID, ProjectID: projectID, Generation: gen.id,
-		Health: HealthOK, Changed: changedFields(prev, gen), Stale: false,
+		Health: HealthOK, Changed: changed, Stale: false,
 	})
 }
 

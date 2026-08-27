@@ -105,21 +105,23 @@ counted. No row, migration, notification, activation, transcript event, or SSE p
 
 Each names the verification that demonstrates it.
 
-- **A1** (R1–R3, R5) — Every refusal code in R3's table, produced by a real call to the tool that
-  emits it, returns that code's declared class, while every successful call returns no `retry`
-  field: table-driven MCP tests under `internal/messaging` that enumerate the emitted code set.
+- **A1** (R1–R3, R5) — The classifier table maps every code in R3 to its declared class; a
+  source-derived guard rejects unclassified handler refusal literals, and a real call to every
+  registered tool verifies the shared `session_unknown` refusal contract. Successful-result helper
+  coverage verifies that success adds no `retry`: tests under `internal/messaging`.
 - **A2** (R3, R9) — A guard test fails if an agent-facing refusal code exists that R3's table does
   not classify, and an injected unlisted code classifies `transient`: classifier unit test under
   `internal/messaging`.
-- **A3** (R4, R11) — No refusal payload in A1's enumeration contains a task, run, agent, message, or
-  context reference identifier the caller is not a participant in, and none contains a count, delay,
-  or deadline: assertions over the same table-driven enumeration.
-- **A4** (R6–R7) — For one successful and one refused call per tool, the delivery layer adds
-  nothing to the text content block, `structuredContent` unmarshals to the identical value,
-  `isError` is unchanged, and no tool advertises an output schema in `tools/list`:
-  golden-encoding and protocol tests under `internal/messaging`.
-- **A5** (R8, R10, R12) — Every tool registered on the MCP server appears in A1's and A4's
-  enumerations rather than a hand-written list, `session_unknown` classifies `never`, and an
+- **A3** (R4, R11) — The shared refusal helper adds exactly `retry: {class}` and no identifier,
+  count, delay, backoff, deadline, or timestamp; representative next-turn and pipeline-control
+  refusals preserve only their pre-existing payload fields: exact-object helper tests under
+  `internal/messaging`.
+- **A4** (R6–R7) — Shared delivery-helper golden tests cover one successful and one refused result;
+  registration-derived real refused calls verify identical text and structured values with
+  unchanged `isError` for every tool, and `tools/list` verifies that none advertises an output
+  schema: protocol tests under `internal/messaging`.
+- **A5** (R8, R10, R12) — Every tool registered on the MCP server appears in A4's refused-call
+  enumeration rather than a hand-written surface list, `session_unknown` classifies `never`, and an
   injected unencodable result returns its text block and code with `structuredContent` absent:
   registration-derived tests under `internal/messaging`.
 - **A6** (R6–R7) — A pinned Claude and a pinned Codex adapter each complete a normal tool call and a

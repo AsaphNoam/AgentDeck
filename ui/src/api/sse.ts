@@ -12,7 +12,7 @@ import { useUiStore } from "../store/uiStore";
 import { discardChatDraft } from "../components/chat/drafts";
 
 class SseClient {
-  private es: EventSource | null = null;
+  private es: EventSourceLike | null = null;
   private watchdog: number | null = null;
   private lastPing = Date.now();
   private hydrationIds: string[] = [];
@@ -26,7 +26,7 @@ class SseClient {
     // the new stream before its first ping arrives, looping forever.
     this.lastPing = Date.now();
     useUiStore.getState().setConnection("connecting");
-    this.es = new EventSource("/api/events");
+    this.es = createEventSource();
     this.es.onopen = () => {
       useUiStore.getState().setConnection("open");
       // Every (re)open is a hydration/liveness boundary — including the browser's
@@ -114,7 +114,10 @@ class SseClient {
         return;
       }
     }
-    useTranscriptStore.getState().appendMessage(agentId, envelope.data);
+    useTranscriptStore.getState().updatePreview(agentId, envelope.data);
+    if (agentId === this.openAgentId) {
+      useTranscriptStore.getState().appendMessage(agentId, envelope.data);
+    }
   }
 
   // A federation source changed on disk (or was refreshed/bound): invalidate the
@@ -171,6 +174,67 @@ class SseClient {
     const transcript = await getTranscript(this.openAgentId);
     useTranscriptStore.getState().setTranscript(transcript.agent_id, transcript.events);
   }
+}
+
+interface EventSourceLike {
+  onopen: ((event: Event) => unknown) | null;
+  onerror: ((event: Event) => unknown) | null;
+  addEventListener(type: string, listener: (event: MessageEvent<string>) => void): void;
+  close(): void;
+}
+
+type SharedWorkerMessage =
+  | { kind: "open" }
+  | { kind: "error" }
+  | { kind: "event"; type: string; data: string };
+
+class SharedWorkerEventSource implements EventSourceLike {
+  onopen: ((event: Event) => unknown) | null = null;
+  onerror: ((event: Event) => unknown) | null = null;
+  private readonly listeners = new Map<string, Set<(event: MessageEvent<string>) => void>>();
+  private readonly port: MessagePort;
+
+  constructor() {
+    const worker = new SharedWorker(new URL("./sse-shared-worker.ts", import.meta.url), {
+      name: "agentdeck-events",
+      type: "module",
+    });
+    this.port = worker.port;
+    this.port.onmessage = (event: MessageEvent<SharedWorkerMessage>) => this.receive(event.data);
+    this.port.start();
+  }
+
+  addEventListener(type: string, callback: (event: MessageEvent<string>) => void) {
+    let listeners = this.listeners.get(type);
+    if (!listeners) this.listeners.set(type, (listeners = new Set()));
+    listeners.add(callback);
+  }
+
+  close() {
+    this.port.close();
+  }
+
+  private receive(message: SharedWorkerMessage) {
+    if (message.kind === "open") {
+      this.onopen?.(new Event("open"));
+      return;
+    }
+    if (message.kind === "error") {
+      this.onerror?.(new Event("error"));
+      return;
+    }
+    const event = new MessageEvent(message.type, { data: message.data });
+    for (const listener of this.listeners.get(message.type) ?? []) {
+      listener(event);
+    }
+  }
+}
+
+function createEventSource(): EventSourceLike {
+  // SharedWorker is origin-scoped, so every dashboard tab uses one underlying
+  // SSE connection. Older embedded browsers retain the direct transport.
+  if (typeof SharedWorker !== "undefined") return new SharedWorkerEventSource();
+  return new EventSource("/api/events");
 }
 
 export const sseClient = new SseClient();

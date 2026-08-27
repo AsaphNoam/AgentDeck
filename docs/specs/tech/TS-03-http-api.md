@@ -50,10 +50,13 @@ Adding, removing, or changing a route requires a TS-03 delta plus the owning FS/
 events, tracked files/commands, messages, bindings, candidates, and validation errors serialize as
 `[]` where their schema is a list.
 
-**R7 — The global SSE stream is snapshot-then-live.** `GET /api/events` atomically subscribes and
-captures the current agent snapshot, emits the hydration burst, then live events. A `hydrated`
-boundary lets the client prune absent agents. Periodic `ping` supports liveness; reconnect starts a
-new hydration generation.
+**R7 — The global SSE stream is snapshot-then-live and shared across browser tabs.** `GET
+/api/events` atomically subscribes and captures the current agent snapshot, emits the hydration
+burst, then live events. A `hydrated` boundary lets the client prune absent agents. Periodic `ping`
+supports liveness; reconnect starts a new hydration generation. Dashboard tabs from one browser
+origin share one underlying stream so long-lived SSE requests cannot consume the origin's HTTP/1.x
+connection pool and block REST requests. Attaching a tab restarts that shared stream so the newcomer
+and existing tabs receive a complete hydration generation.
 
 **R8 — SSE event types are versioned by payload contract.** Current types include `state_update`,
 `new_message`, `notification`, `config_source_update`, `pipeline_update`, `task_update`, `hydrated`,

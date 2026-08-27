@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/agentdeck/agentdeck/internal/messaging"
 	"github.com/agentdeck/agentdeck/internal/state"
@@ -386,6 +387,13 @@ func TestRetryRunsAgainOnTheSameAssignee(t *testing.T) {
 	srv.dispatchReadyTasks(context.Background())
 	running := waitTaskState(t, srv, task.TaskID, state.TaskRunning)
 	first := running.AssignedAgentID
+	deadline := time.Now().Add(2 * time.Second)
+	for srv.lifecycleInFlight(first) && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if srv.lifecycleInFlight(first) {
+		t.Fatal("task start lifecycle claim did not settle")
+	}
 
 	if resp, body := post(t, ts.URL+"/api/sessions/"+first+"/stop", nil); resp.StatusCode != 200 {
 		t.Fatalf("stop status = %d: %s", resp.StatusCode, body)

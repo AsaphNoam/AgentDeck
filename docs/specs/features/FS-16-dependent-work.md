@@ -182,7 +182,10 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   allowance intact and its place in the admission order kept, so a busy machine can never exhaust a
   task's attempts. There is no timed backoff; re-admission happens on the next dispatch, and the
   attempt count is the bound. When the three are spent the task parks as `dependency_failed` recording
-  the last failure, and an explicit Retry (R23) restores the full allowance.
+  the last failure, and an explicit Retry (R23) restores the full allowance. If AgentDeck cannot stop
+  or reap a runtime after assignment delivery or restart recovery fails, the task deliberately remains
+  `starting`: that reservation is its only durable ownership record, so clearing or settling it could
+  admit duplicate work. A later server restart retries the reap before the task can advance.
 - **R26** — **An agent started for a task is told it has a task.** The activation that
   crosses into an existing conversation carries one short, code-owned instruction to read its
   assignment and act on it, and its own status text while that turn runs. It does not reuse mail's

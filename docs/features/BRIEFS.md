@@ -5,6 +5,19 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-27 — Fix: dashboard reliability and review findings
+
+Dashboard tabs now share one live-event connection, preventing the sixth-tab freeze while keeping
+live updates and ordinary data requests responsive. I also removed the amplification paths around
+unchanged configuration refreshes and busy agent transcripts, kept missing-directory warnings
+visible, improved task supervision and defaults, removed controls that could never succeed, and
+aligned the remaining technical acceptance text with what is actually verified. All automated
+tests, builds, specification checks, and the distributable build pass.
+
+**Needs attention:** None.
+
+**Next:** An independent review should verify the completed fixes and the six-tab browser behavior.
+
 ### 2026-08-27 — Bug investigation: multi-tab dashboard freeze
 
 The root cause is confirmed: AgentDeck opens one permanent server-sent-event connection per tab over

@@ -39,7 +39,8 @@ let lastRequest: { url: string; body: unknown } | null = null;
 
 const server = setupServer(
   http.get("/api/projects", () => HttpResponse.json({ "my-app": { title: "My App", cwd: "/tmp" } })),
-  http.get("/api/roles", () => HttpResponse.json({ impl: { title: "Impl" } })),
+  http.get("/api/roles", () => HttpResponse.json({ agentdecker: { title: "AgentDecker" }, impl: { title: "Impl" } })),
+  http.get("/api/config", () => HttpResponse.json({ default_role: "impl" })),
   http.get("/api/tasks", () => HttpResponse.json({ tasks: [baseTask, parked] })),
   http.post("/api/tasks/:id/retry", async ({ params }) => {
     lastRequest = { url: `retry:${params.id}`, body: null };
@@ -85,16 +86,14 @@ describe("Tasks view", () => {
     expect(screen.getByText("1 need attention")).toBeInTheDocument();
   });
 
-  // FS-16.R23 / A11 — retry on a task parked by an unsatisfiable arm is refused
-  // with the reason, and re-arming it is the repair the view offers next to it.
-  it("surfaces the retry refusal and re-arms in place", async () => {
+  // FS-16.R23 / A11 — parked work offers only the repair that can succeed.
+  it("omits retry on parked work and re-arms in place", async () => {
     renderPage();
     await screen.findByText("parked work");
     const rows = screen.getAllByRole("listitem");
     const parkedRow = rows[1];
 
-    fireEvent.click(within(parkedRow).getByRole("button", { name: "Retry" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("re-arm it instead");
+    expect(within(parkedRow).queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
 
     fireEvent.change(within(parkedRow).getByLabelText("Wait for signal"), { target: { value: "ci-green" } });
     fireEvent.click(within(parkedRow).getByRole("button", { name: "Re-arm" }));
@@ -122,6 +121,23 @@ describe("Tasks view", () => {
 		await waitFor(() => expect(lastRequest?.url).toBe("create"));
 		expect(lastRequest?.body).toMatchObject({ target_kind: "launch", arms: [{ source_kind: "pipeline_run", source_id: "pr_1", satisfying_outcomes: ["success", "failure"] }], attachments: [{ context_ref_id: "cx_1", label: "brief" }] });
 	 });
+
+  it("uses the configured default role for a new launch task", async () => {
+    renderPage();
+    await waitFor(() => {
+      const select = screen.getByRole("combobox", { name: "Role to launch" }).querySelector("select") ??
+        screen.getByRole("combobox", { name: "Role to launch" });
+      expect((select as HTMLSelectElement).value).toBe("impl");
+    });
+  });
+
+  it("links a launch task to its assigned agent", async () => {
+    server.use(http.get("/api/tasks", () => HttpResponse.json({
+      tasks: [{ ...baseTask, state: "running", arms: [], assigned_agent_id: "a_worker" }],
+    })));
+    renderPage();
+    expect(await screen.findByRole("link", { name: "a_worker" })).toHaveAttribute("href", "/agent/a_worker");
+  });
 });
 
 describe("task helpers", () => {
@@ -140,5 +156,11 @@ describe("task helpers", () => {
       { kind: "signal", signal_name: "ci", state: "unsatisfied" } as never,
       { kind: "work_result", source_kind: "task", source_id: "tk_9", satisfying_outcomes: ["success"], state: "satisfied" } as never,
     ])).toEqual(["signal ci"]);
+  });
+
+  it("uses a prerequisite task's display name when it is loaded", () => {
+    expect(waitingOn([
+      { kind: "work_result", source_kind: "task", source_id: "tk_9", satisfying_outcomes: ["success"], state: "unsatisfied" } as never,
+    ], { tk_9: "Compile assets" })).toEqual(["task Compile assets → success"]);
   });
 });

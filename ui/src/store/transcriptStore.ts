@@ -4,7 +4,10 @@ import type { PermissionResolution, TranscriptEvent } from "../api/types";
 interface TranscriptStoreState {
   byAgent: Record<string, TranscriptEvent[]>;
   pending: Record<string, TranscriptEvent | null>;
+  previewByAgent: Record<string, string>;
+  previewKindByAgent: Record<string, string | undefined>;
   appendMessage: (agentId: string, event: TranscriptEvent) => void;
+  updatePreview: (agentId: string, event: TranscriptEvent) => void;
   setTranscript: (agentId: string, events: TranscriptEvent[]) => void;
   resolvePermission: (agentId: string, toolCallId: string, decision: "approve" | "deny") => void;
 }
@@ -96,6 +99,8 @@ export function foldTranscript(raw: TranscriptEvent[] | null | undefined): Trans
 export const useTranscriptStore = create<TranscriptStoreState>((set) => ({
   byAgent: {},
   pending: {},
+  previewByAgent: {},
+  previewKindByAgent: {},
   appendMessage: (agentId, raw) =>
     set((state) => {
       const event = normalizeEvent(raw);
@@ -132,8 +137,36 @@ export const useTranscriptStore = create<TranscriptStoreState>((set) => ({
         pending: kind === "permission_request" ? { ...state.pending, [agentId]: event } : state.pending,
       };
     }),
+  updatePreview: (agentId, raw) =>
+    set((state) => {
+      const event = normalizeEvent(raw);
+      const kind = kindOf(event);
+      const nextKinds = { ...state.previewKindByAgent, [agentId]: kind };
+      if (kind !== "assistant_text") return { previewKindByAgent: nextKinds };
+      const delta = String(textOf(event));
+      const prior = state.previewKindByAgent[agentId] === "assistant_text" ? state.previewByAgent[agentId] ?? "" : "";
+      const preview = `${prior}${delta}`.trim().slice(-120);
+      return {
+        previewByAgent: { ...state.previewByAgent, [agentId]: preview },
+        previewKindByAgent: nextKinds,
+      };
+    }),
   setTranscript: (agentId, events) =>
-    set((state) => ({ byAgent: { ...state.byAgent, [agentId]: foldTranscript(events) } })),
+    set((state) => {
+      const folded = foldTranscript(events);
+      let preview = "";
+      for (let i = folded.length - 1; i >= 0; i--) {
+        if (kindOf(folded[i]) === "assistant_text") {
+          preview = String(textOf(folded[i])).trim().slice(-120);
+          break;
+        }
+      }
+      return {
+        byAgent: { ...state.byAgent, [agentId]: folded },
+        previewByAgent: { ...state.previewByAgent, [agentId]: preview },
+        previewKindByAgent: { ...state.previewKindByAgent, [agentId]: kindOf(folded[folded.length - 1] ?? {}) },
+      };
+    }),
   resolvePermission: (agentId, toolCallId, decision) =>
     set((state) => ({
       byAgent: { ...state.byAgent, [agentId]: markResolved(state.byAgent[agentId] ?? [], toolCallId, decision) },

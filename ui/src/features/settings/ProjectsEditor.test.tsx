@@ -215,7 +215,7 @@ describe("ProjectsEditor", () => {
     expect(cwdInput.value).toBe("/tmp/typed");
   });
 
-  it("closes dialog on success even when cwd_not_found warnings are present", async () => {
+  it("keeps cwd_not_found visible after create and switches the saved project to edit mode", async () => {
     server.use(
       http.get("/api/projects", () =>
         HttpResponse.json({
@@ -232,8 +232,8 @@ describe("ProjectsEditor", () => {
         const body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(
           {
-            project: body.project,
             ...body,
+            project: "phantom-123",
             warnings: [
               { field: "cwd", code: "cwd_not_found", message: "directory does not exist yet" },
             ],
@@ -253,9 +253,32 @@ describe("ProjectsEditor", () => {
     });
     fireEvent.click(screen.getByText("Create"));
 
-    // Dialog closes on success; warnings are non-blocking (A13).
-    await waitFor(() =>
-      expect(screen.queryByPlaceholderText("e.g. My App")).not.toBeInTheDocument()
+    expect(await screen.findByText(/directory does not exist yet/i)).toBeInTheDocument();
+    expect(screen.getByText("Edit project")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("phantom-123")).toBeDisabled();
+  });
+
+  it("keeps cwd_not_found visible after editing a project", async () => {
+    server.use(
+      http.put("/api/projects/my-app", async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({
+          ...body,
+          project: "my-app",
+          warnings: [{ field: "cwd", code: "cwd_not_found", message: "edited directory does not exist yet" }],
+        });
+      }),
     );
+
+    renderWithQuery(<ProjectsEditor />);
+    await screen.findByText("My App");
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByPlaceholderText("~/Projects/my-app"), {
+      target: { value: "/no/such/edited-dir" },
+    });
+    fireEvent.click(screen.getByText("Update"));
+
+    expect(await screen.findByText(/edited directory does not exist yet/i)).toBeInTheDocument();
+    expect(screen.getByText("Edit project")).toBeInTheDocument();
   });
 });

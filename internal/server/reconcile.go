@@ -15,6 +15,7 @@ import (
 )
 
 const reconcileInterval = 30 * time.Second
+const reconcileDebounce = 250 * time.Millisecond
 
 func (s *Server) startReconciliationSweep(ctx context.Context) {
 	go func() {
@@ -36,6 +37,9 @@ func (s *Server) startReconciliationSweep(ctx context.Context) {
 
 		ticker := time.NewTicker(reconcileInterval)
 		defer ticker.Stop()
+		var debounce *time.Timer
+		var debounceC <-chan time.Time
+		pending := make(map[string]struct{})
 		for {
 			select {
 			case <-ctx.Done():
@@ -44,10 +48,30 @@ func (s *Server) startReconciliationSweep(ctx context.Context) {
 				if ev.Has(fsnotify.Create) || ev.Has(fsnotify.Write) {
 					if info, err := os.Stat(ev.Name); err == nil && info.IsDir() {
 						_ = watcher.Add(ev.Name)
+					} else {
+						pending[ev.Name] = struct{}{}
 					}
-					s.reconcileSessionsOnce(time.Now().Add(-reconcileInterval))
-					s.pruneStaleRunning()
+					if debounce == nil {
+						debounce = time.NewTimer(reconcileDebounce)
+					} else {
+						if !debounce.Stop() {
+							select {
+							case <-debounce.C:
+							default:
+							}
+						}
+						debounce.Reset(reconcileDebounce)
+					}
+					debounceC = debounce.C
 				}
+			case <-debounceC:
+				staleBefore := time.Now().Add(-reconcileInterval)
+				for path := range pending {
+					s.reconcileSessionPath(path, staleBefore)
+					delete(pending, path)
+				}
+				s.pruneStaleRunning()
+				debounceC = nil
 			case err := <-watcher.Errors:
 				s.log.Warn("reconcile: watcher error", "err", err)
 			case <-ticker.C:
@@ -56,6 +80,21 @@ func (s *Server) startReconciliationSweep(ctx context.Context) {
 			}
 		}
 	}()
+}
+
+func (s *Server) reconcileSessionPath(path string, staleBefore time.Time) bool {
+	sessionsDir := filepath.Join(s.configStore.Home(), "sessions")
+	agentID := agentIDFromSessionPath(sessionsDir, path)
+	if agentID == "" {
+		return false
+	}
+	preview := lastAssistantPreview(path)
+	if _, ok, err := s.stateMgr.ApplyStaleCorrection(agentID, preview, staleBefore); err != nil {
+		s.log.Debug("reconcile: correction skipped", "agent", agentID, "err", err)
+		return false
+	} else {
+		return ok
+	}
 }
 
 func (s *Server) reconcileSessionsTimer(ctx context.Context) {
@@ -79,14 +118,7 @@ func (s *Server) reconcileSessionsOnce(staleBefore time.Time) int {
 		if err != nil || d.IsDir() {
 			return nil
 		}
-		agentID := agentIDFromSessionPath(sessionsDir, path)
-		if agentID == "" {
-			return nil
-		}
-		preview := lastAssistantPreview(path)
-		if _, ok, err := s.stateMgr.ApplyStaleCorrection(agentID, preview, staleBefore); err != nil {
-			s.log.Debug("reconcile: correction skipped", "agent", agentID, "err", err)
-		} else if ok {
+		if s.reconcileSessionPath(path, staleBefore) {
 			applied++
 		}
 		return nil

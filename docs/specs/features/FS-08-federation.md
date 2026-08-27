@@ -83,8 +83,10 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
 
 - **R15** — A successful resolution installs an immutable per-backend/per-project generation.
   File-system events are debounced, a 30-second sweep recovers missed events, and
-  `config_source_update` SSE announces generation, health, changed high-level fields, and stale
-  state so the UI can invalidate its project-scoped source query.
+  `config_source_update` SSE announces only a materially changed effective view, health, or stale
+  state, carrying the generation and changed high-level fields so the UI can invalidate its
+  project-scoped source query. An unchanged successful sweep installs its fresh generation without
+  publishing or forcing mounted clients to refetch.
 - **R16** — Every new launch synchronously resolves the source again. A prior last-known-good view
   may remain visible, but `source_invalid`, missing/unapproved content, or another failed fresh
   resolution blocks the dependent launch; stale cache is never used as launch input.

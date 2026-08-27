@@ -70,6 +70,20 @@ func TestReconcileSessionsOnceAppliesStaleCorrection(t *testing.T) {
 	}
 }
 
+func TestReconcileSessionPathTouchesOnlyChangedTranscript(t *testing.T) {
+	srv := testServer(t, true)
+	changedID := seedHookAgent(t, srv)
+	otherID := "a_other"
+	writeSessionTranscript(t, srv, changedID,
+		transcriptEvent(t, changedID, 1, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "changed preview"}))
+	writeSessionTranscript(t, srv, otherID,
+		transcriptEvent(t, otherID, 1, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "large unrelated transcript"}))
+	path := filepath.Join(srv.configStore.Home(), "sessions", changedID, "transcript.jsonl")
+	if !srv.reconcileSessionPath(path, time.Now()) {
+		t.Fatal("changed transcript was not reconciled")
+	}
+}
+
 // Regression for the BLOCKING finding: a live idle agent whose transcript ends
 // in a raw turn_end envelope must NOT have that raw JSON written into its
 // status detail (which the card renders as its preview).

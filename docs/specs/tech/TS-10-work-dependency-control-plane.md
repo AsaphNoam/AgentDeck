@@ -49,7 +49,9 @@ parallel copy of them.
   does the task move `starting → running`. `running` therefore always means a confirmed live runtime,
   and a crash between commit and effect leaves a `starting` row naming exactly what to reap and
   retry rather than a `running` row that is not running. Confirmation is only meaningful inside the
-  process that owns the runtime; it is never re-derived after a restart (R15).
+  process that owns the runtime; it is never re-derived after a restart (R15). A failed stop or reap
+  never clears the `starting` row: preserving the durable runtime claim takes precedence over settling
+  the task, and startup recovery retries the reap before admitting the work again (INV §4, INV §15).
 - **R17** — **Capacity is granted by a dispatcher, not by the arm evaluator.** Arm
   evaluation decides readiness only. A separate bounded admission step grants capacity to ready tasks
   in the order they became ready, up to the configurable install-wide budget (FS-16.R7, R21), and only

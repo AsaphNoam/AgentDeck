@@ -6,25 +6,19 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
-- **Bug investigation:** The 2026-08-27 all-200/no-page-load report is reproduced and diagnosed below.
-  Five same-origin dashboard tabs consume five long-lived SSE connections; the sixth tab opens the
-  sixth SSE connection and then its REST queries queue in Chromium's HTTP/1.x per-origin connection
-  pool. Closing one older tab unblocks the sixth immediately. Earlier attribution to this machine's
-  default home is withdrawn: the reported incident occurred on another computer.
-- **Review state:** Verification of the fixes for the review through `895348e`: seven of the nine
-  findings are closed in code and test, and three residual items are listed under
-  `## Review findings`. The two purported agent-facing `request_conflict` and `revision_conflict`
-  codes were independently confirmed HTTP-only — neither `ProposeRun`, `ProposeTemplate`, nor
-  `Report` reaches the call sites that raise them — so classifying the other three is correct and
-  complete.
+- **Bug investigation:** The 2026-08-27 all-200/no-page-load incident is fixed. Same-origin dashboard
+  tabs now share one long-lived SSE connection, leaving the browser's HTTP/1.x pool available for
+  REST queries; the related config-source, transcript-reconciliation, and card-preview amplification
+  paths are bounded as described in the changelog.
+- **Review state:** Every review and usability finding through 2026-08-27 is closed in code, tests,
+  or an explicit specification boundary. No open review finding remains.
 - **Active change:** None. Agent-facing retry classification and structured result delivery is shipped;
   FS-17 and TS-04.R30–R31 are Current.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
   remain owed before claiming those adapters accept structured results.
 - **Usability state:** The v0.2.2 → v0.2.3 user-facing delta was driven through a real browser on
-  2026-08-27. Dependent work, the attention count, the concurrency budget and chat drafts all
-  behave as specified; one **Must fix** and five **Worth fixing** items are listed under
-  `## Review findings`. FS-02.A24 is closed; FS-04.A22 is narrowed to the native panel.
+  2026-08-27. Its recorded project-warning, task-supervision, default-role, parked-action, and
+  attention-copy findings are fixed. FS-02.A24 is closed; FS-04.A22 remains narrowed to the native panel.
 - **Last reviewed code:** `895348e` (2026-08-26).
 - **Branch:** `main`.
 
@@ -33,6 +27,13 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 **State:** none in progress.
 
 ## Changelog
+
+- **2026-08-27 — fix:** Closed all thirteen open findings. Browser tabs share one SSE stream and
+  six-tab REST capacity is specified (INV §1/§8); unchanged config generations no longer publish,
+  session writes reconcile incrementally after a debounce, and background streams retain bounded
+  card previews (INV §7/§8). Project warnings stay visible, task supervision names and links real
+  work, defaults/actions/copy match the shipped contracts, the lifecycle flake waits for ownership
+  to settle (INV §5/§8), and FS-16/FS-17 now state their verified boundaries accurately (INV §4/§10/§15).
 
 - **2026-08-27 — bug investigation correction and reproduction:** Built a deterministic production-UI
   stress fixture with one Claude Haiku-labelled orchestrator, six workers, and 7,000 streamed ACP
@@ -120,142 +121,4 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-- **Must fix** — **Confirmed incident root cause: one SSE connection per tab exhausts the browser's
-  same-origin HTTP/1.x connection pool.** Field report
-  (verbatim; AgentDeck version/commit unknown): “After running a pipeline it became Super
-  unresponsive, something fishy is going on, nothing sus is being logged in the terminal (all 200s)
-  but the pages don't load. Memory isn't chocked up, MacBook Pro showing 24 physical memory, 18
-  memory, 5 cached and only 5 swap. It looks like the agent sessions might still be running and
-  progressing, one of the windows I already have open show the notifications popping up, I just
-  can't be sure”. In an isolated production-server fixture, five populated tabs loaded in 144–155 ms.
-  A sixth loaded the shell, reported `SSE open`, and remained on `Loading project…`; after its root
-  and static assets, no REST request from that tab reached the server. Closing one older tab ended
-  its `/api/events` request and the stalled tab completed in 127 ms, with its queued REST handlers
-  taking 0–2 ms. `SseClient.connect` creates one permanent `EventSource("/api/events")` per tab
-  (`ui/src/api/sse.ts:22-30`), while the loopback server is plain HTTP over `net.Listen`
-  (`internal/server/server.go:300-334`). At six tabs those long-lived streams occupy Chromium's six
-  same-origin HTTP/1.x connections, so fetches queue in the browser rather than failing or reaching
-  AgentDeck. Existing tabs still receive notifications over their already-open streams. The terminal
-  looks healthy because request logging runs only after a handler returns
-  (`internal/server/middleware.go:49-60`): completed REST calls are fast 200s, and each SSE is itself a
-  200 logged only when it closes. Replace the per-tab long-lived HTTP connection with a transport or
-  cross-tab sharing scheme that leaves REST capacity, and cover six same-origin dashboard tabs
-  loading and refetching concurrently (FS-02.R9/R30–R32, TS-03.R7–R9, INV §8).
-
-- **Worth fixing** — **Confirmed independent defect, not attributed to this incident:** unchanged
-  config-source generations publish and refetch in every tab. `SourceManager` refreshes every
-  retained generation each 30-second sweep and on debounced events beneath approved project roots
-  (`internal/configsource/watch.go:33-55,87-112,124-165`), while `commit` publishes
-  `config_source_update` even when `changedFields` is empty, contradicting its own changed-view
-  comment (`internal/configsource/manager.go:254-279`). Every tab globally invalidates the source
-  query (`ui/src/api/sse.ts:120-126`), and the closed New Agent modal keeps that query active
-  (`ui/src/features/launch/NewAgentModal.tsx:95-98,109-118`). Pipeline agents writing project files
-  can therefore amplify unchanged refreshes into repeated discovery/refetch/render work. This path
-  was confirmed statically and by `TestSweepDoesNotPublishUnchangedGeneration`, but the prior request
-  counts came from this computer rather than the reported one. Suppress an
-  unchanged publication (or make the client ignore a genuinely empty/no-health-change update), then
-  unskip `TestSweepDoesNotPublishUnchangedGeneration` and cover multiple mounted clients. Confirm
-  whether FS-08.R15 needs a clarification that only materially changed generation/health state is
-  announced; the current behavior defeats TS-07.R7's acceleration boundary and the bounded,
-  non-blocking intent of TS-03.R9 (INV §8).
-
-- **Worth fixing** — **Confirmed independent scaling defect; not required for the reproduction.** Every
-  create/write event in the sessions tree runs a whole-tree reconciliation
-  (`internal/server/reconcile.go:43-55,75-93`), and that pass reads each complete transcript and
-  rebuilds its assistant preview line by line (`:122-154`). Runtime streaming persists each
-  normalized delta as another append (`internal/runtime/chat.go:1028-1067`,
-  `internal/transcript/writer.go:89-129`), so an active pipeline can repeatedly rescan all historical
-  transcript bytes while its stage agent streams. The connection-starvation symptom reproduces with
-  idle agents, so this is not the root cause. Debounce/coalesce session writes or
-  reconcile only the changed session incrementally, and add a regression that streams many deltas
-  with several retained transcripts while bounding scans and latency (FS-14.R16, INV §7/§9).
-
-- **Worth fixing** — **Confirmed independent scaling defect; not required for the reproduction.** The SSE
-  client appends every agent's `new_message`, not only the open chat
-  (`ui/src/api/sse.ts:96-117`); each append clones the global per-agent transcript map and target
-  array (`ui/src/store/transcriptStore.ts:99-134`). `CardGrid` subscribes to the whole transcript map
-  and recomputes every visible card's latest text (`ui/src/components/grid/CardGrid.tsx:49,77-89,
-  118-153,221-229`). Pipeline agents are intentionally ordinary agents (FS-14.R16), but their
-  streamed deltas need not force full-dashboard transcript allocation and recomputation. The
-  connection-starvation symptom reproduces with idle agents, so this is not the root cause. Store
-  card previews separately/boundedly or select only
-  per-card preview state, with a render-count/load regression for a busy multi-stage run
-  (FS-02.R9, FS-03.R10, INV §8).
-
-- **Worth fixing** — FS-17.A1 and A3, and half of A4, still describe verification that does not
-  exist. A4's contradictory "byte-identical" wording is corrected and A2's guard now genuinely
-  guards, but nothing in `internal/messaging` produces each code in R3's table from a real call to
-  the tool that emits it (A1), asserts over that enumeration that no refusal leaks a non-participant
-  identifier or a count/delay/deadline (A3), or makes one *successful* call per tool (A4).
-  `TestRegisteredToolsShareResultContract` exercises only `session_unknown`, and
-  `TestPipelineRefusalsUseDeclaredRetryClasses` calls the `pipelineToolError` helper rather than a
-  tool. No test file cites `FS-17.A1` or `FS-17.A3`. Adjacent: A2's guard scans `"error"` literals in
-  `internal/messaging` only, so the three dynamically forwarded `pipeline.ControlError` codes are a
-  hand-written list (`internal/messaging/tool_result_contract_test.go:38-41`) and a new control-plane
-  code would still reach an agent unclassified. Build the per-code enumeration, or narrow A1/A3/A4 to
-  what the suite actually proves (FS-17.A1/A3/A4, **INV §10**).
-
-- **Worth fixing** — a task can still sit in `starting` indefinitely on the two stop-failure
-  branches, and no requirement says so. The lost-generation path now settles its attempt, but
-  `startLaunchedTask` still returns without settling when stopping the launched runtime fails
-  (`internal/server/task_dispatcher.go:208-215`), and `recoverStartAttempt` does the same after a
-  failed reap (`internal/server/task_dispatcher.go:553-560`). Both are the right call for runtime
-  ownership, but `starting` is not an attention state (`ui/src/schemas/task.ts:16`), so the person
-  who created the task sees it stalled mid-start with no signal and no repair until the next server
-  start. Either surface the state or record the indefinite outcome in FS-16 alongside R25's attempt
-  bound (FS-16.R25, TS-10.R4, **INV §4/§8**).
-
-- **Worth fixing** — `TestRetryRunsAgainOnTheSameAssignee` is flaky under full-suite load. It failed
-  once in three `make test` runs with `409 a resume is already in progress` on its first Stop
-  (`internal/server/task_http_test.go:390-392`), and did not reproduce in three further full-package
-  runs at this commit or three at `f97cc89`, so it is not attributable to the fix. Diagnosis: the
-  test polls the durable row for `running`, but `startLaunchedTask` holds the per-agent lifecycle
-  claim across `confirmTaskStart`'s write and publish, so a Stop issued inside that window gets the
-  designed conflict. Have the test wait for the claim to settle rather than only for the row
-  (no invariant class).
-
-- **Must fix** — J17: saving a project working directory that does not exist warns nobody. In
-  Settings → Projects → Edit, setting `cwd` to a non-existent path and pressing Update closes the
-  dialog and persists the path with no alert and no inline warning. The server already returns
-  `warnings: [{code: "cwd_not_found", message: "directory … does not exist yet"}]` and
-  `ui/src/features/settings/ProjectForm.tsx:107` already has the markup to render it — but
-  `ProjectsEditor.tsx:69-72` calls `setWarnings(resp.warnings)` and `setOpen(false)` in the same
-  success handler, unmounting the only component that shows it. The create path (`:78-81`) has the
-  identical shape. The person discovers the broken project later, when a launch in it fails. This is
-  pre-existing rather than new in this release, but the release added the Browse… control to this
-  same form. Suggested fix: keep the dialog open, or surface the warning outside the dialog, when
-  the response carries one; regression test that a `cwd_not_found` response renders visibly on both
-  create and edit (FS-04.A22, FS-04 §6, **INV §8**).
-
-- **Worth fixing** — J15: the Tasks view never says which agent is doing a launch-target task. The
-  row's meta line reads only `launches implementer`; even once the task is `running` and the API
-  carries `assigned_agent_id`, no id, name, or link to that conversation appears, because
-  `ui/src/features/tasks/TasksPage.tsx:136` shows an assignee only when `target_kind === "agent"`
-  (and then as a raw id). A person supervising work has no route from the task to the agent doing
-  it. Suggested fix: render the assigned agent for both target kinds, linked to `/agent/{id}`
-  FS-16.A8 (no invariant class).
-
-- **Worth fixing** — J15: an armed task names its prerequisite by durable id. The row reads
-  `Waiting on: task tk_8caec11d865acf33 → success` while the prerequisite's display name is rendered
-  two rows above, because `waitingOn()` (`TasksPage.tsx:39-47`) formats `arm.source_id` directly.
-  The product forbids exactly this elsewhere — J5 requires each card show its project title, not its
-  durable id. Suggested fix: resolve the id against the task list already in hand and fall back to
-  the id only when it is not there FS-16.R14/A8 (no invariant class).
-
-- **Worth fixing** — J15: the New task form ignores the configured default role. `TasksPage.tsx:181`
-  is `role || roleNames[0]`, so the select preselects `agentdecker` — the internal AgentDeck-expert
-  role — rather than the configured `default_role`. `NewAgentModal.tsx:53-64` deliberately prefers
-  the configured default, so the two launch surfaces disagree, and a person who does not notice the
-  dropdown silently assigns work to the wrong kind of agent. Suggested fix: seed the select from
-  `config.default_role` with `roleNames[0]` as fallback FS-16.A8, FS-04 (no invariant class).
-
-- **Worth fixing** — J15: a parked task offers a Retry button that can never succeed. Retry renders
-  for `dependency_failed` as well as `interrupted`, and on a parked task it is always refused with
-  `422 "this task is parked by an unsatisfiable prerequisite; re-arm it instead"`. The refusal is
-  correct and well-worded (FS-16.A11), and Re-arm sits in the same row — but offering a control that
-  cannot work for that state costs the person a failed round trip to learn it. Suggested fix: render
-  Retry only for `interrupted`, and give Re-arm the prominence on a parked row FS-16.A11 (no invariant class).
-
-- **Worth fixing** — J16: the attention count does not pluralise its verb. With exactly one item it
-  reads "1 task need attention". `ui/src/components/grid/CardGrid.tsx:35` pluralises the noun but
-  not the verb. One-line fix FS-02.A26 (no invariant class).
+None.

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Badge, Button, PageHeader, Surface } from "../../components/ui";
-import { useProjects, useRoles } from "../../api/config";
+import { useConfig, useProjects, useRoles } from "../../api/config";
 import {
   useCancelTask,
   useCreateTask,
@@ -36,13 +36,13 @@ const STATE_TONE: Record<string, "info" | "success" | "warning" | "danger" | "ne
 
 /** waitingOn says what an armed task is still waiting for, which is the question
  *  the Tasks view exists to answer (FS-16.R14). */
-export function waitingOn(arms: TaskArm[]): string[] {
+export function waitingOn(arms: TaskArm[], taskNames: Record<string, string> = {}): string[] {
   return arms
     .filter((arm) => arm.state === "unsatisfied")
     .map((arm) =>
       arm.kind === "signal"
         ? `signal ${arm.signal_name}`
-        : `${arm.source_kind === "pipeline_run" ? "run" : "task"} ${arm.source_id} → ${(arm.satisfying_outcomes ?? []).join(" or ")}`,
+        : `${arm.source_kind === "pipeline_run" ? "run" : "task"} ${arm.source_kind === "task" ? taskNames[arm.source_id ?? ""] ?? arm.source_id : arm.source_id} → ${(arm.satisfying_outcomes ?? []).join(" or ")}`,
     );
 }
 
@@ -92,7 +92,7 @@ function RearmForm({ task, project, onError }: { task: Task; project: string; on
   );
 }
 
-function TaskRow({ task, project }: { task: Task; project: string }) {
+function TaskRow({ task, project, taskNames }: { task: Task; project: string; taskNames: Record<string, string> }) {
   const cancel = useCancelTask(project);
   const retry = useRetryTask(project);
   const remove = useDeleteTask(project);
@@ -104,7 +104,9 @@ function TaskRow({ task, project }: { task: Task; project: string }) {
   const repairable = task.state === "armed" || task.state === "ready" || task.state === "dependency_failed";
 
   const arms = task.arms ?? [];
-  const waiting = waitingOn(arms);
+  const waiting = waitingOn(arms, taskNames);
+  const assignedID = task.assigned_agent_id || (task.target_kind === "agent" ? task.target_agent_id : "");
+  const assignedName = useAgentStore((state) => assignedID ? state.agents[assignedID]?.name : undefined);
   const act = (run: () => Promise<unknown>) => {
     setError("");
     run().catch((err: unknown) => {
@@ -133,14 +135,14 @@ function TaskRow({ task, project }: { task: Task; project: string }) {
         <p className="task-attention" data-slot="attention">{task.attention_reason}</p>
       )}
       <div className="task-row-meta" data-slot="metadata">
-        <span>{task.target_kind === "agent" ? `assigned to ${task.assigned_agent_id || task.target_agent_id}` : `launches ${task.role}`}</span>
+        <span>{task.target_kind === "launch" && `launches ${task.role}`}{assignedID && <> · assigned to <Link to={`/agent/${assignedID}`}>{assignedName || assignedID}</Link></>}</span>
         <span>created by {task.created_by_kind}</span>
       </div>
       <div className="task-row-actions" data-slot="actions">
         {task.state !== "finished" && (
           <Button size="small" onClick={() => act(() => cancel.mutateAsync(task.task_id))}>Cancel</Button>
         )}
-        {(task.state === "interrupted" || task.state === "dependency_failed") && (
+        {task.state === "interrupted" && (
           <Button size="small" onClick={() => act(() => retry.mutateAsync(task.task_id))}>Retry</Button>
         )}
 		{(task.state === "running" || task.state === "interrupted") && <form onSubmit={(event) => { event.preventDefault(); act(() => record.mutateAsync({ taskID: task.task_id, outcome, summary, details })); }}>
@@ -160,6 +162,7 @@ function TaskRow({ task, project }: { task: Task; project: string }) {
 function CreateTaskForm({ project }: { project: string }) {
   const create = useCreateTask(project);
   const { data: roles } = useRoles();
+  const { data: config } = useConfig();
   const [name, setName] = useState("");
   const [instruction, setInstruction] = useState("");
   const [role, setRole] = useState("");
@@ -178,7 +181,8 @@ function CreateTaskForm({ project }: { project: string }) {
   const [error, setError] = useState("");
 
   const roleNames = Object.keys(roles ?? {});
-  const chosenRole = role || roleNames[0] || "";
+  const configuredRole = config?.default_role && roleNames.includes(config.default_role) ? config.default_role : "";
+  const chosenRole = role || configuredRole || roleNames[0] || "";
 
   return (
     <Surface className="task-create" data-slot="create">
@@ -279,6 +283,7 @@ export function TasksPage() {
   const project = search.get("project") || projectNames[0] || "";
   const { data: tasks, isLoading, isError, error } = useTasks(project || undefined);
   const attention = (tasks ?? []).filter(needsAttention).length;
+  const taskNames = Object.fromEntries((tasks ?? []).map((task) => [task.task_id, task.display_name]));
 
   return (
     <div className="tasks-page" data-ui="tasks">
@@ -307,7 +312,7 @@ export function TasksPage() {
         <p className="tasks-empty">No dependent work in this project yet.</p>
       ) : (
         <ul className="task-list" data-slot="list">
-          {(tasks ?? []).map((task) => <TaskRow key={task.task_id} task={task} project={project} />)}
+          {(tasks ?? []).map((task) => <TaskRow key={task.task_id} task={task} project={project} taskNames={taskNames} />)}
         </ul>
       )}
     </div>

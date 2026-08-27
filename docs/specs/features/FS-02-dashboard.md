@@ -285,6 +285,10 @@ order once"; `sse.test.ts` state_update selector-isolation cases.
 cards). — `agentStore.test.ts` "removes stale agents after hydration completes"; `sse.test.ts`
 "resets the hydration generation on auto-reconnect so deleted agents are pruned".
 
+**A27.** Six same-origin dashboard tabs share one underlying SSE connection and can load and refetch
+REST data concurrently without waiting for another tab to close. — shared-stream transport tests and
+the production-browser six-tab regression.
+
 **A4.** Reorder, density, and group-collapse persist across page reload and server restart. — J5;
 `TestPutLayoutValidatesAndPersists`, `TestLayoutDefault`.
 
