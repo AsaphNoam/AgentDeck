@@ -17,7 +17,9 @@ it a syntax-highlighted code block until the fence closes, because a partially s
 not valid source; a per-diagram source toggle; a code-block fallback with a short note when the
 source does not parse or exceeds the render budget; a theme adapter that feeds the core `--ad-*`
 values into the library beside the existing `syntaxTheme` and `xtermTheme`; and one sanitizing
-injection seam.
+injection seam. The fixed render budget is 50,000 UTF-16 code units, not an elapsed-time timeout;
+Mermaid external-image nodes are unsupported and refused before the renderer runs; and mounted
+diagrams reuse the existing presentation-color observer when appearance changes.
 
 Not included: user messages, tool results, diffs, and annotations, which do not render Markdown
 today; authoring, editing, exporting, or downloading diagrams; interactive diagram features (click
@@ -32,12 +34,13 @@ separately in `docs/ideas.md` as a server-wide concern.
   toggle returns the original text, and non-assistant surfaces are unchanged. Plus a
   `transcriptStore` replay case proving identical output from identical durable events.
 - **FS-03.A21** — injection cases in the same test (script element, HTML label, event-handler
-  attribute, click directive) render none of them and execute nothing; unparseable source leaves a
+  attribute, click directive) render none of them and execute nothing; an external-image node is
+  rejected before parse/render and makes no request; over-limit and unparseable source leave a
   visible code block and the following events still render; a repository check asserts the single
   injection seam.
 - **FS-03.A22 / J3** — a real browser renders a diagram in a live streamed reply and in the archived
-  transcript, correct under both built-in skins, with the script/HTML-label case confirmed on the
-  page.
+  transcript, correct under both built-in skins and after switching between them without remounting,
+  with the script/HTML-label case confirmed on the page.
 - `npm run check:styles` (Stylelint plus the presentation-contract audit) stays green, with the
   injection seam recorded in `ui/presentation-exceptions.json` with its path, rule, and reason.
 - `npm run build` shows the library in its own chunk, leaving the initial bundle unchanged.
@@ -58,6 +61,10 @@ Checked against the real package and the current code, not from memory:
   the validity probe and `render(id, def)` returning `{svg, bindFunctions}` — an SVG **string**,
   which is why an injection seam exists at all.
 - `securityLevel` accepts `'strict' | 'loose' | 'antiscript' | 'sandbox'`, with `strict` the default.
+- Mermaid 11.17.2's external resource surface includes flowchart image nodes using
+  `@{ img: "<url>" }`; the host rejects that pinned grammar before invoking Mermaid because its eager
+  image load occurs before returned markup can be sanitized. Interactive links remain disabled by
+  strict host initialization and returned URL-bearing attributes are removed at the insertion seam.
 - `dangerouslySetInnerHTML` currently appears nowhere in `ui/src`; the seam in R38 is the first and
   is required to stay the only one.
 - The presentation-contract audit is a static TypeScript/PostCSS check over `ui/src`, so it cannot
@@ -71,9 +78,15 @@ floor. Sandbox mode alone is not sufficient either: GitLab shipped sandboxed Mer
 CVE-2026-0752, an escape-sequence bypass, and sandbox costs theming and parse-error handling. The
 converged practice — Snyk Labs' diagram-renderer research and Open WebUI's own XSS fix, which
 wrapped parser output in `DOMPurify.sanitize()` — is strict plus a sanitizer pass over the rendered
-markup. Mermaid already bundles DOMPurify, so the second layer adds no dependency. The threat model
-is real for AgentDeck specifically: this renders agent output, which is prompt-injectable from
+markup. DOMPurify is declared directly rather than relying on Mermaid's transitive dependency. The
+threat model is real for AgentDeck specifically: this renders agent output, which is prompt-injectable from
 repository content, and DeepChat took an XSS-to-RCE through exactly that path.
+
+The design intentionally does not add a worker, iframe renderer, or custom Mermaid parser. Mermaid
+owns parsing and layout; AgentDeck owns only the existing Markdown branch, a fixed source bound, the
+one unsupported external-image grammar, sanitization, theme adaptation, and fallback. A true
+elapsed-time deadline is not promised because Mermaid runs on the main browser thread and cannot be
+interrupted there; isolation can be designed later only if the fixed bound proves insufficient.
 
 ## Waiting on
 

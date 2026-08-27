@@ -183,7 +183,8 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 
 - **R37** *(planned)*. A fenced code block tagged `mermaid` inside an assistant message renders as a
   diagram in place of the code block, themed from the core presentation values so it reads correctly
-  under Core and every built-in skin (TS-08.R40). Because a partially streamed block is not valid
+  under Core and every built-in skin (TS-08.R40), including when appearance changes while the
+  transcript stays open. Because a partially streamed block is not valid
   diagram source, the block renders as the ordinary syntax-highlighted code block (R2) until its
   fence closes, and only then becomes a diagram; the reader therefore never sees a diagram flicker
   or error mid-stream. Each rendered diagram offers a control that shows its original source and
@@ -227,10 +228,13 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   before it reaches the DOM, so neither a renderer bug nor a crafted diagram can inject active
   content. Markup produced this way enters the DOM at exactly one reviewed place in the UI, and no
   other transcript renderer gains a raw-markup path. Rendering makes no network request. Source that
-  fails to parse leaves the ordinary code block visible with a short note that it is not a valid
-  diagram; it neither empties the message, nor throws to the event-level error boundary (R5), nor
-  blocks the rest of the transcript. A diagram whose rendering exceeds a bounded time or size budget
-  falls back to the same code block rather than hanging the panel.
+  uses Mermaid's external-image node syntax is rejected before the renderer is called, and URL or
+  active-content attributes are removed from returned markup before insertion. Source that fails to
+  parse or exceeds 50,000 UTF-16 code units leaves the ordinary code block visible with a short note
+  that it cannot be rendered; it neither empties the message, nor throws to the event-level error
+  boundary (R5), nor blocks the rest of the transcript. The size bound limits ordinary accidental
+  cost; the UI does not claim that main-thread Mermaid execution has an interruptible elapsed-time
+  deadline.
 - **R21.** A permission decision must be exactly `approve` or `deny`; invalid JSON or any other
   decision returns `422 validation`. A failed UI decision leaves the buttons available and shows an
   error instead of optimistically resolving the prompt.
@@ -352,13 +356,16 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   toggle, and non-assistant cases, plus a `transcriptStore` replay case.
 - **A21** *(planned)* (R38, R20) — Diagram source carrying a script element, an HTML label, an
   event-handler attribute, and a click/interaction directive produces rendered output containing
-  none of them and executes nothing; unparseable source leaves a visible code block with its note
-  and the following events still render; and the reviewed injection seam is the only place in
-  `ui/src` that inserts renderer-produced markup. *Verify by* injection cases in the same renderer
-  test, and a repository check that asserts the single seam.
+  none of them and executes nothing; Mermaid external-image node syntax is rejected without invoking
+  `parse` or `render` and makes no request; a 50,001-code-unit or unparseable source leaves a visible
+  code block with its note and the following events still render; and the reviewed injection seam is
+  the only place in `ui/src` that inserts renderer-produced markup. *Verify by* injection,
+  renderer-spy, request-spy, size-bound, and failure cases in the same renderer test, plus a
+  repository check that asserts the single seam.
 - **A22** *(planned)* (R37) — A real browser renders a diagram in a live streamed reply and in the
-  archived transcript of the same session, correct under Core and Sky & Grove: journey **J3** in
-  `docs/features/USABILITY-REVIEW.md`.
+  archived transcript of the same session, correct under Core and Sky & Grove; switching between
+  the two while the transcript remains mounted regenerates the diagram with the new palette:
+  journey **J3** in `docs/features/USABILITY-REVIEW.md`.
 
 ## 6. Deviations & open decisions
 

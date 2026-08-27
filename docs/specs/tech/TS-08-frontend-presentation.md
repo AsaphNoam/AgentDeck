@@ -234,15 +234,24 @@ primitive seam; the rejected alternatives are recorded in §5.
   library's theme, so the library keeps no independent default palette and diagrams follow Core and
   every skin. Because the library resolves its own colors while generating markup, the adapter reads
   computed values through the shared `resolvePresentationColors` helper rather than duplicating
-  literals. The library is a repository-owned bundled dependency loaded through a dynamic import, so
+  literals, and each mounted diagram reuses `observePresentationColors` to regenerate when the root
+  appearance marker changes rather than introducing another theme signal. The library is a
+  repository-owned bundled dependency loaded through a dynamic import, so
   it forms its own build chunk, never enters the initial bundle, and makes no content-delivery-network
   request (R10). Its version is pinned at or above the release that fixes the known diagram-source
-  HTML-injection defect. Diagram markup reaches the DOM through one seam that disables the library's
-  interactive features and sanitizes the generated markup before insertion; that seam is the only
-  place in `ui/src` permitted to insert renderer-produced markup, and it is recorded in the
-  presentation exception manifest with its path, rule, and reason (R14, R17–R20). Markup the library
-  generates at runtime is outside the static audit's reach, which is why the sanitizing seam, not the
-  audit, is the control.
+  HTML-injection defect. A fixed host-owned 50,000-code-unit check runs before the library, and the
+  pinned Mermaid external-image node grammar is rejected at that same preflight so it cannot perform
+  its eager URL load; this is a deliberately unsupported Mermaid feature, not a second parser.
+  Renderer initialization is host-owned and diagram directives cannot weaken those limits or enable
+  interaction. Diagram markup reaches the DOM through one seam that disables the library's
+  interactive features and sanitizes the generated markup with a directly declared DOMPurify
+  dependency before insertion; that seam is the only place in `ui/src` permitted to insert
+  renderer-produced markup, and it is recorded in the presentation exception manifest with its
+  path, rule, and reason (R14, R17–R20). Markup the library generates at runtime is outside the
+  static audit's reach, which is why the preflight and sanitizing seam, not the audit, are the
+  controls. No elapsed-time timeout is claimed: main-thread Mermaid work is not interruptible, and
+  adding an isolation runtime without evidence that the fixed input bound is insufficient would be
+  disproportionate machinery.
 
 ## 3. Interfaces & data shapes
 

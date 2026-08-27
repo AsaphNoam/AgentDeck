@@ -10,9 +10,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   tabs now share one long-lived SSE connection, leaving the browser's HTTP/1.x pool available for
   REST queries; the related config-source, transcript-reconciliation, and card-preview amplification
   paths are bounded as described in the changelog.
-- **Review state:** Three open design-review findings against the waiting Mermaid change are
-  recorded below; every other review and usability finding through 2026-08-27 is closed in code,
-  tests, or an explicit specification boundary.
+- **Review state:** Every review and usability finding through 2026-08-27 is closed in code, tests,
+  or an explicit specification boundary. No open review finding remains.
 - **Active change:** None. Agent-facing retry classification and structured result delivery is shipped;
   FS-17 and TS-04.R30–R31 are Current.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
@@ -28,6 +27,13 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 **State:** none in progress.
 
 ## Changelog
+
+- **2026-08-27 — fix:** Closed all three Mermaid design-review findings (INV §8/§10). The design
+  now rejects Mermaid's pinned external-image grammar before rendering, directly owns DOMPurify,
+  replaces the unenforceable main-thread timeout with an exact 50,000-code-unit source bound, and
+  reuses the existing presentation observer to regenerate mounted diagrams after a skin change.
+  It explicitly avoids a worker, iframe renderer, or custom parser; acceptance tests cover the
+  no-request preflight, size fallback, and live palette change.
 
 - **2026-08-27 — design review:** Reviewed the waiting Mermaid chat-rendering change against FS-03,
   TS-08, the shipped Markdown/presentation/archive seams, Mermaid 11.17.2, and every invariant
@@ -51,8 +57,6 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   rewind-shaped seam is the lossy switch primer, so the user chose to hold it with those findings
   recorded in `../ideas.md`. The absent Content-Security-Policy is recorded there too.
   `make check-specs`, the twin-skill comparison and `git diff --check` are green.
-  The Mermaid requirements were reviewed after this entry was written; see the three open findings
-  below, which supersede R38's no-network and render-budget promises until they are revised.
 
 - **2026-08-27 — fix:** Closed all four Pipelines design-review findings (INV §7/§8/§10).
   FS-14.R36/R39 now require frozen human stage titles, complete attempt-agent cards, correct
@@ -172,29 +176,4 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-- **Must fix** — Mermaid can make an attacker-chosen network request before the specified sanitizer
-  runs (FS-03.R38, TS-08.R40, INV §8). A person who opens an assistant message containing a
-  flowchart image node such as `A@{ img: "https://attacker.example/pixel" }` causes Mermaid to load
-  that URL while laying out the diagram, before `render()` returns the SVG string to the proposed
-  sanitizing insertion seam. Mermaid 11.17.2 officially supports URL-backed image nodes, and its
-  upstream image-policy proposal identifies both the eager preload and later SVG emission; strict
-  mode and post-render DOMPurify therefore cannot uphold the design's "no network request" promise
-  or prevent disclosure to the remote host. Specify a pre-render URL/resource rejection boundary
-  that cannot be weakened by diagram configuration, and add an acceptance case proving no request
-  occurs, not merely that the final DOM lacks the URL.
-- **Must fix** — The promised render-time budget cannot stop a diagram that blocks the browser thread
-  (FS-03.R38, INV §8). A person who opens a pathological but size-compliant assistant diagram can
-  have the chat panel freeze inside Mermaid parsing/layout/rendering. The planned dynamic import and
-  a Promise timeout can choose not to insert a late result, but they cannot pre-empt synchronous work
-  already executing on the main thread; the change defines neither an interruptible worker boundary
-  nor a purely structural bound proven to cap render work. Specify an enforceable availability
-  boundary and test a worst-case input against it, or narrow the product promise to a source/shape
-  bound whose protection is demonstrated.
-- **Worth fixing** — A visible diagram keeps the old skin's baked SVG colors after appearance changes
-  (FS-03.R37, TS-08.R40). A person who switches between Core and Sky & Grove while a chat or archive
-  transcript remains mounted sees surrounding UI update immediately while the diagram retains its
-  prior palette until another event, reload, or remount happens. `AppearanceRoot` only mutates the
-  document's `data-skin`; `AssistantText` does not subscribe to that marker, and
-  `resolvePresentationColors` only reads values when markup is generated. Define reuse of the
-  existing presentation-color observer (or an equivalent shared rerender signal) for diagrams and
-  test a mounted diagram across a skin-marker change.
+None.

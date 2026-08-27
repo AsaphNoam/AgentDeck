@@ -5,6 +5,20 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-27 — Fix: Mermaid diagram design
+
+The Mermaid design is now the small integration it should be. Mermaid remains responsible for
+parsing and drawing; AgentDeck adds only its existing Markdown hook, lazy loading, sanitization,
+theme adaptation, and fallback. External-image nodes are rejected before Mermaid can load their
+URLs, oversized input has one exact source limit instead of an unenforceable browser-thread timeout,
+and visible diagrams update through the existing appearance observer when the skin changes. No
+worker, iframe renderer, custom parser, persistence change, or server API is being added.
+
+**Needs attention:** None.
+
+**Next:** Run `/review-design mermaid-diagrams-in-chat` once more; if it closes cleanly, implement it
+with `/work mermaid-diagrams-in-chat`.
+
 ### 2026-08-27 — Design review: Mermaid diagrams in chat
 
 The design uses the right existing chat and presentation seams, but three gaps need to be resolved
