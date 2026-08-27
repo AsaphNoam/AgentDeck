@@ -1,6 +1,6 @@
 # FS-14 — Configurable pipeline runs
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/pipeline`, `internal/config`, `internal/state`, `internal/server`, `internal/messaging`, `internal/cli`, `ui/src/features/pipelines` · **Journeys:** J14
 **Absorbed:** —
 
@@ -20,8 +20,8 @@ free-form agent messaging.
 
 ## 2. Behavior
 
-Every requirement here reflects shipped behavior; the product boundaries deliberately outside it are
-recorded in §6.
+Every requirement here reflects shipped behavior except the §4.3 items tagged `(planned)`; the
+product boundaries deliberately outside this feature are recorded in §6.
 
 ### 2.1 Templates and starting a run
 
@@ -187,11 +187,11 @@ recorded in §6.
 
 ### 4.2 Pipelines page and AgentDecker-assisted creation
 
-- **R25.** A dedicated **Pipelines** page lists reusable templates and active/completed/
-  stopped runs; provides a simple vertical stage-list template editor, Start Run form with per-stage
-  runtime selectors, and run detail/history; and offers **Create manually** and **Create with
-  AgentDecker**. It does not present a graph canvas. Templates are also hand-editable as versioned
-  AgentDeck JSON through the same validation contract.
+- **R25 — superseded 2026-08-27 by R35–R45:** A single dedicated **Pipelines** page carried the
+  template list, template editor, Start Run form, and run detail/history together on one scrolling
+  screen. Combining authoring with supervision made both jobs hard to read and left a live run's
+  position visible only as a stage id. R35–R45 split the surface and replace it; the no-graph-canvas
+  boundary is carried forward by R35 and hand-editable versioned template JSON by R41.
 - **R26.** Create with AgentDecker first lets the user choose one configured active project,
   backend, and model for the template-building AgentDecker session. The project picker lists every
   configured active project and defaults to the configured default project only when that project
@@ -232,6 +232,90 @@ recorded in §6.
   pending. There is no Dismiss control: a proposal the person never approves simply ages out, because
   AgentDeck retains only the newest proposals and prunes older ones. Approving an edited payload
   creates no consumption, since the edit already invalidated that approval (R27).
+
+### 4.3 Split pipelines surface (planned)
+
+- **R35** (planned) — Pipelines is one shell destination with two addressable
+  sub-destinations, **Runs** and **Templates**, and Runs is where the destination opens. Supervising
+  a run and authoring a template never share a screen. Every run and every template has its own
+  addressable page that can be linked to, bookmarked, and reloaded directly. The surface still does
+  not present a graph canvas (carried forward from R25).
+- **R36** (planned) — The Runs sub-destination lists pipeline runs with each run's
+  display name, project, state, final outcome when it has one, and the current stage's human title
+  from that run's frozen template snapshot rather than only its stage id. Rows are newest first and
+  load in bounded pages through an explicit **More runs** action until the retained history is
+  exhausted; already loaded rows stay visible while another page or a live refresh is loading, and
+  the end of the history is explicit rather than a silent first-page cutoff. It offers a
+  **Start run** action that collects the whole run-start surface R3 and R31 already define —
+  template, display name, project, goal, required named inputs, per-stage backend/model/effort, and
+  the shared-workspace warning of R21 — in a dialog rather than a permanently mounted form. A
+  successful start opens that run's own page; a rejected start keeps the entered values visible with
+  its named field errors.
+- **R37** (planned) — A run's page shows its goal, project, state and final outcome, the
+  attention reason when one is set, its frozen setup including each stage's effective
+  backend/model/effort, and its named values with the run input or stage attempt that produced each.
+  It carries the **Open agent**, **Continue**, **Retry stage**, **Stop run**, and **Delete run
+  record** actions under exactly the validity gating R11, R12, R13, and R20 already define, and a
+  refused action stays visible and retryable.
+- **R38** (planned) — A run's page presents its attempts as an **execution timeline** in
+  the order they actually ran, so a bounded repair loop appears as repeated entries for the same
+  stage rather than being collapsed into one. Each entry names its stage, visit number, effective
+  runtime, reported outcome or attempt state, result summary, and its result details and checks. An
+  attempt that produced no result says so rather than appearing complete.
+- **R39** (planned) — Each timeline entry also shows compact agent cards: the stage agent
+  for that attempt, plus one card for every agent assigned to a task that this stage agent created
+  directly during that attempt. Delegation is followed exactly one hop; an agent a delegated agent
+  creates in turn is ordinary dependent work visible on the Tasks surface and does not appear here.
+  A card shows the
+  agent's name, current state, and a bounded short preview. An available card opens that agent's live
+  conversation when it is running or its archived transcript when it is not. A retained task whose
+  agent identity or current status is unavailable still produces one honest, non-linking fallback
+  card named from its task and agent id rather than disappearing or failing the run page. Cards
+  perform no lifecycle action: stopping, renaming, cloning, and every other agent mutation stay on
+  the surfaces FS-01 and FS-02 own.
+- **R40** (planned) — When a run has advanced past, or finished after, a stage whose
+  delegated agents are still running, the run's page states how many remain running. This is
+  disclosure only: it does not delay a transition, change R7's advance rule, add an attention
+  reason, or stop any agent.
+- **R41** (planned) — The Templates sub-destination lists saved templates with each
+  template's title, id, stage count, and validation state, and offers **Create manually** and
+  **Create with AgentDecker** under the rules R26, R27, R30, and R33 already define. A template
+  opens in its own full-width editor page carrying the stage-list editing surface R1 and R17
+  define. Templates remain hand-editable as versioned AgentDeck JSON through the same validation
+  contract (carried forward from R25).
+- **R42** (planned) — A pending AgentDecker proposal appears on the sub-destination that
+  can act on it: a `save_template` proposal on Templates and a `start_run` proposal on Runs. The
+  other sub-destination shows a count of the proposals waiting on it so neither is hidden. Proposal
+  approval, one-time consumption, and edit invalidation are unchanged from R27 and R33.
+- **R43** (planned) — A previously shared link to the combined page's selected run opens
+  that run's page instead of failing. A link naming a run or template that no longer exists explains
+  that it is gone and returns the person to the corresponding list rather than showing an empty page.
+- **R44** (planned) — The split is a purpose-built supervision and authoring experience,
+  not the existing panels rearranged. The Pipelines heading and Runs/Templates switcher remain
+  spatially stable across its routes. Runs is a compact operational ledger rather than a card grid.
+  A run page gives its live state, current stage, attention, and valid actions the primary position;
+  the execution timeline owns the main reading column, while frozen setup and named values are
+  secondary disclosures. Timeline entries expose their stage/outcome/runtime summary at a glance,
+  keep the current or attention-bearing entry open, and let completed result details, checks, and
+  agent rows expand without making every historical attempt full height.
+
+  Template editing uses the full page as a focused workspace: a compact numbered stage navigator
+  remains visible beside one selected stage form, run inputs have their own disclosure, switching
+  stages preserves the unsaved draft, and validation identifies the affected stage/field. Starting
+  a run uses one three-step dialog — **Setup**, **Runtimes**, and **Review** — with a stable footer;
+  Back/Next preserve every value, the runtime step uses compact per-stage rows, and a rejected start
+  returns to and focuses the owning step/field without losing the rest of the setup. These layouts
+  use the available width without horizontal page overflow at the existing desktop floor and stack
+  their secondary rail before reducing the primary timeline/editor to an unreadable measure.
+- **R45** (planned) — Pipelines motion communicates continuity and state, never decorates
+  waiting. Sub-destination/page changes, dialog open/close, disclosures, and a newly appended
+  timeline entry use brief, restrained transitions consistent with the existing core controls; the
+  persistent shell, Pipelines heading, and already rendered content do not jump or remount. First
+  load reserves the destination's final geometry, while background REST refetches retain the last
+  successful content with a quiet updating treatment instead of replacing the page with a loading
+  blank. Status/SSE refetches do not replay entrance motion. Under `prefers-reduced-motion: reduce`,
+  non-essential transform/entrance motion is removed and every state change remains immediate and
+  equally legible.
 
 ## 5. Acceptance criteria
 
@@ -294,6 +378,55 @@ recorded in §6.
   `internal/pipeline/proposals_test.go`, `internal/state/pipeline_proposals_test.go`, and
   `ui/src/features/pipelines/AgentDeckerBuilder.test.tsx`.
 
+- **A14** (R35/R36/R41) — Opening Pipelines lands on Runs; switching to Templates shows
+  the template library with no run history and no start form on screen, and switching back shows no
+  template editor. A run page and a template page each reload correctly from their own URL. *Verify:*
+  `ui/src/features/pipelines` routing tests and J14.
+- **A15** (R36/R37) — Start run collects template, name, project, goal, required inputs,
+  and per-stage runtime in a dialog; a valid start opens the new run's page, and a start rejected
+  for an undeclared effort level or a missing required input keeps the dialog open with the named
+  field error and starts no process. *Verify:* Pipelines run-setup UI tests and J14.
+- **A16** (R38) — A completed run whose validation failure routed through Fix and back
+  through Review and Validate shows each of those visits as its own timeline entry in execution
+  order, each naming its stage, visit number, runtime, outcome, and result; an interrupted attempt
+  with no report is shown as unreported. *Verify:* run-detail UI test over a fake looping run and J14.
+- **A17** (R39/R40) — For a stage agent that created two tasks, the attempt shows three
+  cards — the stage agent and both assigned agents — a running card opens `/agent/{id}` while a
+  finished one opens its archive transcript, an agent created by a delegated agent does not appear,
+  and no card exposes a lifecycle action. When blocked continuation reuses one stage agent across
+  two attempts, a task appears only under the attempt during which it was created. A run that
+  finished while a delegated agent is still running states the distinct remaining-agent count even
+  when the visible delegated cards are capped. *Verify:* run-detail UI tests over a fixture with
+  delegated tasks, and J14.
+- **A18** (R42) — A pending `save_template` proposal is actionable on Templates and
+  counted on Runs, a pending `start_run` proposal is actionable on Runs and counted on Templates,
+  and approving either still consumes it exactly once. *Verify:*
+  `ui/src/features/pipelines/AgentDeckerBuilder.test.tsx` and J14.
+- **A19** (R43) — A link to the combined page carrying a selected run opens that run's
+  page, and a link naming a deleted run or template explains the absence and returns to the matching
+  list. *Verify:* Pipelines routing tests.
+- **A20** (R44) — Deterministic browser fixtures cover an empty and populated Runs ledger,
+  a long looping run, and a maximum-shape 32-stage/64-declaration template. At the existing desktop
+  floor, the run keeps live state/actions ahead of secondary setup and values, completed attempts
+  remain compact until opened, the template editor mounts one selected stage form rather than all
+  32 full forms, and the three-step start dialog retains values and keeps its navigation/actions
+  available without horizontal page overflow. *Verify:* Pipelines visual-matrix fixtures and J14.
+- **A21** (R45) — In a real browser, switching Runs/Templates, opening the start dialog,
+  expanding an attempt, and receiving one new attempt each use one brief continuity transition;
+  a background refetch leaves the rendered list/detail in place and does not replay those entrances.
+  With reduced motion emulated, the same route, dialog, disclosure, and live-update sequence is
+  fully usable with transform/entrance motion absent. *Verify:* component state-preservation tests,
+  presentation-contract/static CSS checks, and J14 in normal and reduced-motion modes.
+- **A22** (R36) — A fixture with 121 retained runs initially shows the first bounded page,
+  states the total, loads the rest through **More runs** without duplicates, and reaches an explicit
+  complete-history state. A run whose template was later edited or deleted still shows its frozen
+  current-stage title in the ledger. *Verify:* run-list API/UI pagination tests and J14.
+- **A23** (R39) — Reloading a run detail before the global live snapshot hydrates still
+  renders the stage and delegated cards with bounded previews from the detail response; a delegated
+  task whose agent state is missing renders one honest non-linking fallback card, while a later
+  `state_update` refreshes an available card in place and updates its explicit live/archive route.
+  *Verify:* run detail projection/API/UI tests and J14.
+
 ## 6. Deviations & open decisions
 
 The shipped first version deliberately keeps these product boundaries:
@@ -317,17 +450,24 @@ The shipped first version deliberately keeps these product boundaries:
   not claim filesystem isolation.
 - Arguments and stage artifacts are named opaque text only. Templates declare input/output bindings;
   there is no typed path, file copying, or content verification.
-- The dedicated Pipelines page supports manual editing and a provider/model-selected AgentDecker
+- The Pipelines destination supports manual editing and a provider/model-selected AgentDecker
   builder. AgentDecker submits a validated model-neutral draft and may request Save or Start, but
   each exact action requires a separate one-time human confirmation. This is a guided-flow guard,
   not a change to AgentDeck's same-user local-API trust boundary.
+- The planned §4.3 split reorganizes the pipeline surface only. It changes no template, routing,
+  approval, loop-bound, recovery, or run-state behavior, adds no agent-facing tool or payload, and
+  adds no attention reason. Delegated agents are followed one hop from a stage agent and are shown
+  for supervision, not treated as pipeline participants: they cannot report a stage result, do not
+  gate a transition, and are not stopped when the run advances or ends. A stage still runs exactly
+  one agent of its own at a time (R5, R9); genuine parallel stage execution remains out of scope.
+- The split adds no per-surface item to FS-12, which carries no Pipelines entry today. FS-12's
+  shared page-frame, route-heading, dialog, and repeated-surface rules govern the new pages as they
+  govern the existing ones; R44–R45 define the Pipelines-specific hierarchy, disclosure, continuity,
+  and reduced-motion behavior those shared rules do not.
 - Runs start through the Pipelines page or local CLI/API, including AgentDecker invoking that surface
   after a user request; there is no start-run MCP tool or child pipeline in v1.
 - Only needs-attention and completed pipeline notifications join the existing notification/mute
   surface.
-
-Effort selection is explicitly outside this feature and is recorded at the top of `docs/ideas.md` as
-a separate cross-backend launch capability.
 
 ## 7. Traceability
 
@@ -337,6 +477,10 @@ a separate cross-backend launch capability.
 - Existing agent-to-agent messaging and token-bound identity: FS-06.
 - Shared project-directory boundary: FS-00 and FS-11.
 - Native pipeline state machine, persistence, tools, API, and restart contracts: TS-09.
+- Planned split surface: TS-02 (targeted task-read index), TS-09 (attempt-window delegated-agent
+  projection), TS-03 (run-list pagination and run-detail response), and TS-08.R7/R8 (presentation
+  hooks for the new pipeline surfaces); R44–R45 are exercised through J14 and deterministic visual
+  fixtures.
 - Primary regression anchors: `internal/pipeline/{templates,manager}_test.go`,
   `internal/state/pipelines_test.go`, `internal/messaging/pipeline_tools_test.go`,
   `internal/server/pipeline_handlers_test.go`, and `ui/src/api/{pipelines,sse}.test.ts`.

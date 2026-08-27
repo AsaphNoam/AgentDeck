@@ -1,6 +1,6 @@
 # TS-09 — Pipeline control plane
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/pipeline`, `internal/config`, `internal/state`, `internal/server`, `internal/messaging`, `internal/cli`, `ui/src/features/pipelines`
 **Absorbed:** —
 
@@ -231,6 +231,42 @@ user-facing dismissal action: unapproved proposals are bounded by the same centr
   and stopping the reporter (R9–R11) is the pattern the task domain follows, and the single
   hard-coded turn-end consumer becomes a shared generation-scoped fan-out serving both domains rather
   than a second dispatch path (TS-10.R19). See TS-10.
+
+- **R28** (planned) — **The delegated-agent view is a derived read, not control-plane
+  state.** A stage agent may create dependent work (FS-16), and the run page shows those agents
+  under the attempt that spawned them (FS-14.R39). The projection is computed per request by
+  joining each attempt's non-empty `agent_id`/`agent_generation` and creation-time window against
+  assigned tasks in the run's project on `created_by_agent_id`/`created_by_generation`. A task is
+  attributed to the latest matching attempt whose creation time is not after the task and before
+  the next attempt that reuses that same agent generation, so blocked continuation cannot duplicate
+  one agent's tasks under both attempts. The projection is followed exactly one hop and stores no
+  projection or pipeline-owned task state. The pipeline manager stays free of task-store knowledge
+  — the composition happens at the HTTP boundary, where `Detail` output is joined with targeted
+  state reads, so neither `internal/pipeline` nor the pipeline tables gain a task dependency.
+
+  The targeted state read is not `ListTasks`: it returns only the task summary fields TS-03.R29
+  names, never loads arms/attachments, and uses a windowed query over the attempt creator windows
+  to compute each attempt's newest 20 rows, true total, and distinct running-agent count in one
+  result. The partial `(project, created_by_agent_id, created_by_generation, created_at DESC,
+  task_id)` index of TS-02.R26 bounds the scan to assigned agent-created tasks for those creators
+  instead of all retained tasks in the project. The cap lives beside the existing centralized
+  pipeline list/presentation bounds. Query or row iteration failure fails the detail read visibly
+  under INV §7; an individual missing agent state
+  produces TS-03.R29's honest fallback summary rather than dropping the task or failing the page.
+
+  Stage-agent presentation data comes from one bulk state read, while the targeted delegate query
+  joins the same durable identity/running/status sources. When `status.detail` is empty, the composer
+  falls back to the attempt result summary for a stage agent or the task outcome summary for a
+  delegate, then to a short explicit no-activity label; the selected text is clipped to the existing
+  preview bound. This derived block may be stale relative to a later state event, but the frontend's
+  normal `state_update` path refreshes an available card in place and `task_update` refetches task
+  membership as TS-03.R29 specifies.
+
+  A delegated agent is informational only. It never reports a stage result, never satisfies or
+  gates a transition, is not stopped when the run advances or terminates, and cannot change a run
+  revision. R20's run monotonicity and the advance rule of FS-14.R7 are untouched, so a stale or
+  missing projection can never corrupt run state — at worst a card carries the explicit unavailable
+  fallback until a later read or state event can enrich it.
 
 ## 3. Interfaces & data shapes
 

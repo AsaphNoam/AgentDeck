@@ -1,6 +1,6 @@
 # TS-03 — HTTP, SSE & WebSocket API
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/server`, `ui/src/api`
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) API sections and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -285,6 +285,48 @@ stop-and-registration-cleanup operation.
   outcome, attention_reason}` payload; clients ignore stale revisions and refetch detail over REST,
   and reconnect hydrates the Tasks view through REST rather than replaying an event log, as R17
   established for `pipeline_update`. Shapes are specified in TS-10.
+
+- **R29** (planned) — **The run detail response gains one additive, bounded agent-summary
+  block; no route is added, removed, or renamed.** `GET /api/pipeline-runs/{id}` keeps every field it
+  returns today and adds `agents_by_attempt`, one entry per attempt keyed by `attempt_id`
+  (FS-14.R39, TS-09.R28). Each entry carries one `stage_agent` summary and `delegated_agents` plus
+  `delegated_total`, and `delegated_running_count`. An agent summary contains `agent_id`, `name`,
+  `running`, `state`, `preview`, `route`, and `available`; a delegated item contains that summary
+  plus the originating task's `task_id`, `display_name`, `state`, and `outcome`. `preview` is human
+  text capped at the existing agent-card preview bound. No instruction text, task arm, or attachment
+  is included.
+
+  The delegated list is capped at 20 per attempt, newest first, and its true total plus distinct
+  running-agent count are reported so a truncated row is stated rather than silently short. Missing
+  stage-agent ids produce `stage_agent:null`; a retained assigned task whose agent identity/status is missing retains its
+  item with `available:false`, `running:false`, state `unknown`, route `unavailable`, a task/id-derived
+  name, and a bounded fallback preview. Available running/stopped summaries use route
+  `live`/`archive`; unavailable cards do not link. Every collection, including an empty
+  `delegated_agents`, serializes as `[]` under R6. The block is composed with one bulk durable
+  agent/running/status read so every card has a reload-safe initial value; subsequent `state_update`
+  events may update that card from the existing frontend agent store without changing the response
+  contract. An older client ignoring the block is unaffected.
+
+  Live refresh reuses the existing vocabulary rather than adding an event: an open run page
+  invalidates its own run-detail query on `task_update` (R28) as well as on `pipeline_update` (R17),
+  since `task_update`'s bounded payload deliberately carries no creator identity to filter on. That
+  keeps R8's publish-after-commit rule and R17's refetch-over-replay boundary intact.
+
+- **R30** (planned) — **Run-list pagination and human stage titles extend the existing
+  route additively.** Each `GET /api/pipeline-runs` summary adds `current_stage_title`, resolved from
+  that run's frozen template snapshot and falling back to `current_stage_id` only when the snapshot
+  cannot supply a title; the existing per-run diagnostic states that fallback. The response remains the
+  same JSON array, the route keeps its existing `limit`/`offset` parameters, and an additive
+  `X-Total-Count` response header reports the number of retained runs from the same read transaction
+  as the page. The Runs client requests 50 rows per page and shows **More runs** only while its
+  loaded count is below that total. This exposes an exact count/end state without a new route or
+  breaking older array consumers. Loaded pages are keyed/deduplicated by `run_id`, remain visible
+  during page fetches and live invalidation, and preserve newest-first order.
+
+  The list projection decodes only the run row and frozen template snapshot needed for its summary;
+  it does not call full run `Detail` or load attempts/values for every row. `pipeline_update` and SSE
+  reconnect invalidate the paginated list as one query family, while `task_update` invalidates open
+  run details only and never resets Runs pagination.
 
 ## 3. Interfaces & data shapes
 

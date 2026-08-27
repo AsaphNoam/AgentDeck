@@ -1,6 +1,6 @@
 # TS-02 — Data & persistence
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/config`, `internal/state`, `internal/transcript`, `internal/index`, `internal/archive`, `internal/configsource`, `internal/contextref`
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -299,6 +299,20 @@ canonicalize-plus-grant operations are atomic (INV §5/§15). No backfill is nee
   deleting a task never reaches into agent identity, transcripts, the archive, a pipeline run, or a
   canonical reference. Shapes and ownership are specified in TS-10.
 
+- **R26** (planned) — One forward-only migration adds the partial read index used by the
+  pipeline delegated-agent projection (TS-09.R28):
+
+  ```sql
+  CREATE INDEX idx_tasks_project_creator_created
+    ON tasks(project, created_by_agent_id, created_by_generation, created_at DESC, task_id)
+    WHERE created_by_kind = 'agent' AND assigned_agent_id IS NOT NULL;
+  ```
+
+  It adds no column, row, foreign key, write authority, or retention behavior. The predicate matches
+  the projection exactly: person-created work and agent-created work that has no assigned agent can
+  never produce a delegated-agent card. Migration and query-plan tests prove that the targeted read
+  uses this index and does not regress to scanning every task retained by the project.
+
 ## 3. Interfaces & data shapes
 
 The durable layout is:
@@ -323,7 +337,7 @@ $AGENTDECK_HOME/
 The binding schemas for roles, projects, backends, and global config are defined by FS-04 and
 FS-09. Federation binding/effective-view shapes are defined by TS-07. SQLite table definitions and
 migration order live in `internal/state/schema.go` and execute through `migrate.go`; that executable schema is subordinate to
-R1–R24 and must be reflected here when its contract changes.
+R1–R26 and must be reflected here when its contract changes.
 
 ## 4. Invariants
 
@@ -365,6 +379,8 @@ R1–R24 and must be reflected here when its contract changes.
 - Context reference persistence (R24): forward-only tables and typed state methods in
   `internal/state`, consumed through `internal/contextref`; canonicalization, cascade, tombstone,
   grant, and personal-preference regressions named by FS-15.A1–A5/A7.
+- Planned pipeline supervision read index (R26): task migration/query-plan regressions named by
+  FS-14.A17/A23 and TS-09.R28.
 - Regression anchors: `TestHomeTreeIsOwnerOnly`, `TestStateDBIsOwnerOnly`,
   `TestTranscriptIsOwnerOnly`, `TestReindexPreservesFinalPartialTurn`,
   `TestEmptyArchiveMarshalsResultsArray`, `TestSearchFallbackFiltersMetadata`,

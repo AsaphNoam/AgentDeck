@@ -5,6 +5,28 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-27 — Fix: Pipelines experience design
+
+The Pipelines design is ready to implement as a deliberate product experience rather than a page
+split alone. Runs is now a compact operational ledger with human stage names, an exact retained
+count, and load-more history. A run gives live state and valid actions priority, keeps the execution
+timeline as the main reading surface, and moves frozen setup, values, completed results, and agent
+details into purposeful disclosure. Template authoring becomes a focused one-stage-at-a-time
+workspace, and starting a run becomes a stable Setup, Runtimes, Review flow that preserves input and
+returns errors to the right step.
+
+The design now specifies brief route, dialog, disclosure, and live-entry transitions without blanking
+content during background refresh, plus an equally complete reduced-motion mode. Reloaded run pages
+receive human-readable, bounded stage and delegated-agent summaries immediately; unavailable agents
+remain honest non-linking cards. Older runs no longer disappear after 100, and delegated work is
+read through one bounded, indexed projection that attributes reused agents' tasks to the correct
+attempt without loading every task and prerequisite in the project.
+
+**Needs attention:** None.
+
+**Next:** Implement the waiting Pipelines change from the revised specification and acceptance
+fixtures.
+
 ### 2026-08-27 — Design review: Pipelines experience
 
 The Runs/Templates split is the right foundation, but it is not ready to implement as the sleek,

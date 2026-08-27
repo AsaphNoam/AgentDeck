@@ -42,4 +42,5 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-None.
+- [Split the Pipelines surface into runs and templates](split-pipelines-surface.md) — separate template authoring from run supervision, and give a run its own page with an
+  execution timeline and its stage and delegated agents (FS-14.R35–R45).

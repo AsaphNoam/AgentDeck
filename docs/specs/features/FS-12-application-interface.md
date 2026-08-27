@@ -1,7 +1,7 @@
 # FS-12 — Core interface design
 
 **Status:** Current
-**Code:** `ui/src` · **Journeys:** J2–J9, J11
+**Code:** `ui/src` · **Journeys:** J2–J9, J11, J14
 **Absorbed:** —
 
 ## 1. Purpose
@@ -219,7 +219,7 @@ Requirements are user-observable.
   active and archived sessions, every Settings section, menus, notifications, permissions, and
   representative errors. Every first-party surface clearly belongs to one core AgentDeck design and
   none uses a metaphorical skin concept. *Verify:* visual fixture/screenshot matrix plus existing
-  journeys J2–J9 and J11 for behavioral regression.
+  journeys J2–J9, J11, and J14 for behavioral regression.
 - **A2** (R2–R5) — The shell, controls, cards, messages, technical content, forms, and
   overlays demonstrably share the chosen typography, geometry, palette, border/depth, spacing, and
   component-state rules. *Verify:* component visual matrix and design review against the approved
