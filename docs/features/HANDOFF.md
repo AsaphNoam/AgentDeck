@@ -28,6 +28,22 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Changelog
 
+- **2026-08-27 — design review:** Reviewed the waiting Pipelines split against FS-12, FS-14,
+  TS-03, TS-08, TS-09, the shipped frontend/server seams, and every invariant class. The separation
+  into Runs and Templates is sound, but four implementation-gating findings remain: the requested
+  high-end interaction outcome has no observable contract, the list/card data shapes cannot render
+  all promised human-facing content, retained run history silently stops at the first page, and the
+  delegated-work response cap does not bound the work used to build it. One stale effort sentence
+  is recorded separately as a consistency note. No product code, specification, or change file was
+  edited.
+
+- **2026-08-27 — design:** Defined the Pipelines surface split. FS-14.R25 is superseded by R35–R43
+  and A14–A19; TS-09.R28 specifies the derived one-hop delegated-agent projection composed at the
+  HTTP boundary with no new schema; TS-03.R29 specifies the additive capped run-detail block and its
+  `task_update` refetch rule. FS-14, TS-09 and TS-03 are now Partial and J14 covers the split
+  surface. Queued `docs/ready-changes/split-pipelines-surface.md`; the source idea is removed.
+  `make check-specs`, the twin-skill comparison and `git diff --check` are green.
+
 - **2026-08-27 — fix:** Closed all thirteen open findings. Browser tabs share one SSE stream and
   six-tab REST capacity is specified (INV §1/§8); unchanged config generations no longer publish,
   session writes reconcile incrementally after a debounce, and background streams retain bounded
@@ -121,4 +137,43 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-None.
+- **Must fix** — The requested high-end experience has no observable design contract. Location:
+  FS-14.R35–R43/A14–A19, with only the generic frame/component rules of FS-12.R4/R7 and
+  TS-08.R7–R8 cited. A person opening Runs, Templates, a run, or a template can receive the existing
+  panels and fully expanded form rows merely rearranged across four URLs, with no required spatial
+  hierarchy, progressive disclosure for the supported 32 stages/64 declarations, transition or
+  loading continuity, motion treatment, or reduced-motion behavior; every named acceptance check
+  would still pass while the surface remains as clunky as the one being replaced. Revise the
+  planned behavior and J14/visual evidence to make the composition, dense/long-state space
+  management, purposeful transition feedback, and reduced-motion result observable without
+  prescribing a new animation framework.
+- **Must fix** — The planned response shapes cannot render the human-facing stage and agent content
+  the feature promises (INV §8/§10). Location: FS-14.R36/R39/A17 and TS-03.R29; confirmed in
+  `internal/pipeline.RunSummary`, `state.PipelineAttemptRecord`, and `ui/src/schemas/pipeline.ts`.
+  A person scanning Runs still receives only `current_stage_id`, the exact low-level presentation
+  the change says it replaces, and an attempt supplies only its stage agent id while the new
+  delegated entry omits the required short preview. Consequently the list cannot reliably show the
+  frozen stage title after a template is edited/deleted, and a reloaded card cannot satisfy R39
+  from the specified detail response. Extend the existing summary/detail projections, or explicitly
+  specify the existing agent snapshot join and its missing/archive fallback; cover frozen stage
+  titles and live/archived card previews in the UI/API fixtures.
+- **Must fix** — Retained run history becomes undiscoverable after 100 runs (INV §10). Location: FS-14.R36/A14
+  and `ui/src/api/pipelines.ts:listPipelineRuns`; confirmed against TS-09.R19 and the existing
+  `limit`/`offset` route. A person whose project history exceeds the first 100 retained records sees
+  no older runs and no indication that more exist, even though run records have no automatic expiry.
+  Specify and verify a bounded pagination or load-more interaction (including its total/end state)
+  on Runs rather than hard-coding the first page.
+- **Worth fixing** — The capped delegated-work block is built with an unbounded project-wide read.
+  Location: TS-09.R28/TS-03.R29; confirmed in `internal/state.ListTasks`, which loads every task in a
+  project and then loads every task's arms separately. A person opening a run in a mature project,
+  or leaving it open while `task_update` events arrive, pays work proportional to all retained
+  project tasks before most rows are discarded, so the supposedly capped detail can become slow
+  precisely on the supervision page meant to feel immediate. Specify a targeted state read for the
+  run's direct creator-agent ids that computes the cap and honest total without loading arms; add a
+  bound/query-count regression and add an index only if measurement shows the existing one is
+  insufficient.
+
+## Design consistency notes
+
+- FS-14 §6 still says effort selection is outside this feature and lives in `docs/ideas.md`, but
+  shipped R31 and A11 already make per-stage effort part of run setup and supervision.

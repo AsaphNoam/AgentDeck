@@ -5,6 +5,50 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-27 — Design review: Pipelines experience
+
+The Runs/Templates split is the right foundation, but it is not ready to implement as the sleek,
+high-end experience requested. The design currently proves that content moved to separate pages,
+not that those pages have deliberate hierarchy, progressive disclosure, smooth state changes, good
+use of space, or a reduced-motion equivalent; the existing dense forms could simply be rearranged
+and still pass every check. The data contract also lacks the human-readable current-stage title and
+agent preview the new views promise, older retained runs silently disappear after the first 100,
+and the delegated-agent block applies its display cap only after reading every task in the project.
+
+**Needs attention:** The experience, response shapes, run-history pagination, and bounded delegated
+read need one follow-up design pass before implementation.
+
+**Next:** Revise the waiting Pipelines design against the recorded findings, then review the revised
+design before starting product code.
+
+### 2026-08-27 — Design: split the Pipelines surface
+
+The Pipelines page is specified to split in two. Today it stacks the AgentDecker builder, the
+template editor, the start-run form and the run browser onto one scrolling screen, and a live run
+shows its position only as a stage identifier. The designed replacement gives Pipelines two
+sub-destinations: Runs, where it opens, and Templates. Each run and each template gets its own
+addressable page, so authoring and supervision never share a screen.
+
+A run's page shows its goal, project, state, frozen setup and named values, and then an execution
+timeline: every attempt in the order it actually ran, so a repair loop reads as repeated entries
+instead of collapsing into one. Under each attempt sit compact agent cards — the stage agent, plus
+the agents it delegated work to, followed one hop. A card shows the agent's name, state and a short
+preview and opens its live conversation or its archived transcript; it performs no lifecycle action.
+When a run moves past a stage whose delegated agents are still running, the page says how many
+remain. Starting a run moves into a dialog on Runs and opens the run it created, and old links
+carrying a selected run still resolve.
+
+Nothing about how pipelines behave changes: the template model, routing, approval gates, loop
+bounds, recovery and the run state machine are untouched, no agent-facing tool or payload changes,
+and no database column, index or migration is added. The one server change is an additive, capped
+block on the run detail response listing each attempt's delegated agents with the work they were
+given, composed from data that is already stored and already served.
+
+**Needs attention:** None. Every product and technical decision is resolved.
+
+**Next:** The change is queued at `docs/ready-changes/split-pipelines-surface.md` and is waiting to
+start. A design review before implementation would be reasonable given its size.
+
 ### 2026-08-27 — Fix: dashboard reliability and review findings
 
 Dashboard tabs now share one live-event connection, preventing the sixth-tab freeze while keeping
