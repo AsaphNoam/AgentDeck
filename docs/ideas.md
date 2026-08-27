@@ -27,6 +27,20 @@ Example:
   is one flat array independent of `group`), so it silently snaps back. Needs whole-card drag (with
   an activation distance so a plain click still opens the agent) and either real cross-group drop
   support or a clear affordance that drag only reorders within a group.
+- **Revisit the AgentDeck knowledgebase — and consider making it a skill, not a role.** The
+  AgentDecker system prompt in `internal/config/seed.go` is the product's self-description, and it
+  went stale the moment FS-15/FS-16/FS-17 shipped: it never mentions dependent work (`create_task`,
+  `report_task_result`, `cancel_task`, `get_assigned_task`, arms, signals, the concurrency budget)
+  or context links (`share_context`, `read_context_link`, …), it advertises an agent toolset of
+  three tools when more than a dozen are registered, and it still describes mail wake-ups in the
+  superseded auto-nudge terms that FS-06.R24 replaced. Two problems compound it: `SeedIfAbsent`
+  writes roles only when absent, so a corrected prompt never reaches an existing install; and
+  nothing ties the knowledgebase to the specs, so every future capability repeats the drift.
+  Worth considering whether this belongs as a role at all — a skill (or a generated,
+  spec-derived context document that any role can pull) would let the knowledge refresh with the
+  build instead of being frozen into per-install JSON at first run, and would let non-AgentDecker
+  roles reach the same answers. Prompted by the 2026-08-27 usability review.
+
 - **Approval notifications link to the conversation.** When a pop-up notification fires because an
   agent needs approval, make it a link that opens that agent's conversation, so the user can jump
   straight to the pending permission instead of hunting for the right agent.
