@@ -17,7 +17,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   changelog.
 - **Review state:** Every review and usability finding through 2026-08-28 is closed in code, tests,
   or an explicit specification boundary, including the six recorded against the split Pipelines
-  surface. The four bug-investigation findings below are open, joined by nine
+  surface. The four bug-investigation findings below are open, joined by eight
   from the 2026-08-28 review of `790c01c`. Separately, three commits have never had their shipped
   diff read against the specs: `c35ff8c` (Mermaid rendering) and `9114df7` + `69c2f99` (the
   Pipelines split and its fixes). Each had a design review before implementation and a usability
@@ -46,8 +46,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 **State:** Ready for the next human-selected change.
 
-**Next:** Run `/fix` on the open findings, starting with the three Must-fix items from the
-`790c01c` review, then the four bug-investigation findings (un-skip
+**Next:** Run `/fix` on the open findings, starting with the Must-fix shared-worker transport item
+from the `790c01c` review, then the four bug-investigation findings (un-skip
 `internal/pipeline/blocked_chat_answer_test.go` first). The second bug-investigation finding needs
 the user's product decision before it can close. The independent code review of the three commits
 named under Review state is still owed.
@@ -56,12 +56,17 @@ named under Review state is still owed.
 
 - **2026-08-28 — review:** Read the shipped diff of `790c01c` (the thirteen dashboard/SSE and
   usability fixes) against FS-02, FS-04, FS-08, FS-16, FS-17, TS-03, TS-07, TS-10 and every
-  invariant class. Nine findings recorded below: three **Must fix** and six **Worth fixing**. The
+  invariant class. Eight findings recorded below: one **Must fix** and seven **Worth fixing**. The
   headline fixes are real — tabs do share one SSE stream, reconciliation is debounced to the changed
   session, card previews no longer clone the whole transcript map, and the six usability items are
-  closed — but the shared-stream transport ships with no failure path and no test, the config-source
-  publication gate is narrower than the view it guards, and the Tasks Retry gate now hides the repair
-  FS-16.R23 requires. Classes with no finding: §3 (the create-then-edit switch in `ProjectsEditor` is
+  closed — but the shared-stream transport ships with no failure path and no test, and the Tasks
+  Retry gate hides the repair FS-16.R23 requires. Two findings changed after the user reviewed them
+  on 2026-08-28: the narrowed config-source publication gate (`changedFields` suppressing every
+  change outside model/effort/assets, so an open Settings → Sources panel keeps a superseded view
+  until reload) is the user's accepted boundary and is removed, leaving the amended FS-08.R15 as
+  written; and the Tasks Retry finding drops to **Worth fixing** because the blank Re-arm form does
+  return the task to `ready`, so the defect is discoverability and FS-16.R23 conformance rather than
+  unrecoverable work. Classes with no finding: §3 (the create-then-edit switch in `ProjectsEditor` is
   correct), §5 (the reconcile debounce timer's stop/drain/reset is race-free), §7
   (`lastAssistantPreview` returning empty on an unreadable path cannot blank a card, because
   `ApplyStaleCorrection` refuses an empty detail), §9, §11 (`changedFields` returns a non-nil slice),
@@ -375,7 +380,7 @@ diagnosis below is from the code path and a local reproduction, not from inciden
 
 From the 2026-08-28 review of `790c01c` (the thirteen dashboard/SSE and usability fixes):
 
-- **Must fix** — the Tasks view no longer offers Retry on a task parked by exhausted start
+- **Worth fixing** — the Tasks view no longer offers Retry on a task parked by exhausted start
   attempts, and no other control performs that repair. Closing the "Retry can never succeed on a
   parked task" usability finding narrowed the button to `task.state === "interrupted"` alone
   (`ui/src/features/tasks/TasksPage.tsx:145`), but `dependency_failed` is reached three ways and only
@@ -387,36 +392,19 @@ From the 2026-08-28 review of `790c01c` (the thirteen dashboard/SSE and usabilit
   `ready` with a fresh attempt allowance", with FS-16 §3 repeating it. Re-arm is not a substitute:
   `RearmTask` replaces the arm set and never resets `start_attempt_count` (`:1587-1640`), so a
   re-armed task returns to `ready` with its allowance still spent and parks again on its first
-  failure. A person whose launch failed three times because a provider was briefly down now has no
-  route back except deleting the task and recreating it, losing its arms, attachments, and assignee
-  continuity. The UI test that covered the old behavior was replaced with one asserting the button's
-  absence against a fixture whose arm is `unsatisfiable`
+  failure. Impact, checked precisely on 2026-08-28: the work is *recoverable* — submitting the
+  Re-arm form with both fields blank clears the arm set, `initialTaskState` treats no arms as `ready`
+  (`:375-389`), and nothing in dispatch consults `start_attempt_count`, so the task starts. But that
+  route is undiscoverable (the control is labelled Re-arm and its inputs ask for a prerequisite; R23
+  describes it as the repair for an unsatisfiable arm), it destroys the task's recorded
+  prerequisites, and it leaves the allowance spent so the next genuine start failure parks the task
+  again at once. The specified repair — Retry restoring the full allowance — has no control at all.
+  The UI test that covered the old behavior was replaced with one asserting the button's absence
+  against a fixture whose arm is `unsatisfiable`
   (`ui/src/features/tasks/TasksPage.test.tsx:89-97`), so nothing catches this. Fix: gate on the same
   predicate the server uses — render Retry for `interrupted`, and for `dependency_failed` when no
   arm has `state === "unsatisfiable"`; regression-test both `dependency_failed` fixtures
   (FS-16.R23/R25, A11, **INV §10**).
-
-- **Must fix** — the new config-source publication gate is far narrower than the view it guards, so
-  a real change to a user's native configuration now silently never reaches an open Settings panel.
-  `commit` returns without publishing when `changedFields` is empty
-  (`internal/configsource/manager.go:276-279`), but `changedFields` compares only `Effective.Model`,
-  `Effective.Effort`, and a path+SHA digest of `Effective.Assets` (`:471-488`). It ignores
-  `FallbackModel`, `Verbosity`, `Provider`, `Models`, `EnvKeys`, `MCPServers`, `Provenance`, and the
-  entire `Report` — `files_read`, `skipped`, `unknown_keys`, `warnings`, `fingerprints`,
-  `approved_roots` (`internal/configsource/types.go:39-91`). Before this change `Changed` was only a
-  hint on a publication that always fired, and the client invalidates the whole `["config-sources"]`
-  prefix regardless of it (`ui/src/api/sse.ts:131`), so the omissions were harmless; making it a gate
-  turned every one of them into a missed update. Normal-use trigger: with Settings → Sources open, a
-  user edits `~/.claude/settings.json` to add an MCP server, set `verbosity`, or configure an
-  environment key — or the resolver newly skips a path or raises a warning. The sweep re-resolves and
-  installs the new generation, `changedFields` returns empty, nothing publishes, and the panel keeps
-  showing the superseded effective view, inventory, and warnings until the page is reloaded. This
-  also contradicts the amended FS-08.R15, which now promises the SSE announces "a materially changed
-  effective view". Fix: gate on `report.SourceDigest`, the content hash of every file read that the
-  package already computes for the bind TOCTOU recheck (`manager.go:225`, `security.go:56-67`), and
-  keep `Changed` as the high-level hint it has always been; extend
-  `TestSweepDoesNotPublishUnchangedGeneration` with a changed-but-unsummarized field that must still
-  publish (FS-08.R15, TS-07.R7, **INV §1/§10**).
 
 - **Must fix** — the shared-worker SSE transport has no failure path, so the direct-`EventSource`
   fallback it ships with is unreachable. `createEventSource` picks the shared worker on

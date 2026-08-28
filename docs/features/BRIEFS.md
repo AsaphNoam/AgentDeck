@@ -14,20 +14,7 @@ background sweep that used to re-read every stored conversation on every write n
 one that changed; and busy agents no longer make the whole card grid recompute. Nine problems came
 out of the read, three of them worth fixing before anything else.
 
-The one most likely to bite you: on the Tasks page, the **Retry** button was removed from every
-parked task. That was the right call for one kind of parked task — one waiting on something that can
-never happen — but it also removed it from the other kind, a task that simply failed to start three
-times, say because a provider was briefly unreachable. Restarting that is exactly what Retry is for,
-and there is now no other way to do it; **Re-arm** does not restore the attempts, so the task parks
-again immediately. Recreating the task from scratch is the only route left, and that loses its
-prerequisites and its attachments.
-
-Second: a change meant to stop the settings screen refreshing constantly went too far. It now only
-announces a change when the model, the effort setting, or a skill file changed. If you edit your
-Claude configuration to add an MCP server, change verbosity, or set an environment key, an open
-Settings → Sources panel will quietly keep showing the old picture until you reload the page.
-
-Third: the new shared-connection mechanism has no failure path. It has a perfectly good fallback to
+The one worth fixing before anything else: the new shared-connection mechanism has no failure path. It has a perfectly good fallback to
 the old direct connection sitting right beside it, but nothing can ever reach it — if the shared
 worker fails to start or fails to load in a given browser, the dashboard sits on "connecting"
 forever with no live updates and no message saying why. It also has no test at all, and because the
@@ -35,17 +22,29 @@ test environment does not provide the browser feature it uses, every existing co
 still exercising the old path. The six-tab browser check that would have caught this was written
 into the specification as evidence but never actually run after the fix.
 
-The remaining six are smaller: the shared connection restarts for everyone each time a tab opens
+Next in weight: on the Tasks page, the **Retry** button was removed from every parked task. That was
+right for one kind of parked task — one waiting on something that can never happen — but it also
+removed it from the other kind, a task that simply failed to start three times because, say, a
+provider was briefly unreachable. Restarting that is exactly what Retry is for. The work is not
+lost: submitting the **Re-arm** form with both boxes empty does put the task back in the queue. But
+nothing tells you that, the form is labelled and worded for repairing prerequisites, doing it wipes
+the prerequisites you recorded, and the task keeps its spent attempts, so the next failed start
+parks it again immediately.
+
+The remaining five are smaller: the shared connection restarts for everyone each time a tab opens
 (so opening six tabs costs far more work than it should), the worker never forgets closed tabs, card
 previews now show the end of a message live but the beginning after a reload, one new test does not
 check what its name says it checks, and an agent-assigned task row starts with a stray "·".
 
-**Needs attention:** The Tasks Retry gap is a real dead end for work that failed to start — that one
-should be fixed before the next release.
+You judged the settings-refresh finding a non-issue and I have removed it — the change that stopped
+the constant refreshing also means an open Settings → Sources panel can keep showing a superseded
+view until you reload, and that is the accepted trade.
 
-**Next:** Run `/fix` on the three Must-fix items, then the four open pipeline findings from
-yesterday's investigation. The Mermaid diagram work and the Pipelines split still have no code
-review.
+**Needs attention:** None.
+
+**Next:** Run `/fix` on the shared-connection failure path, then the seven smaller items and the
+four open pipeline findings from yesterday's investigation. The Mermaid diagram work and the
+Pipelines split still have no code review.
 
 ### 2026-08-28 — Bug investigation: the blocked pipeline stage that could not report back
 
