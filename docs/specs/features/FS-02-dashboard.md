@@ -1,6 +1,6 @@
 # FS-02 — Dashboard (card grid home view)
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src/components/grid/`, `ui/src/store/`, `ui/src/components/shell/NotificationCenter.tsx`, `ui/src/features/settings/NotificationsEditor.tsx`, `ui/src/api/sse.ts` · `internal/bus/`, `internal/state/`, `internal/server/handlers.go` (layout, reconcile) · **Journeys:** J5 (grid & layout), J11 (failure & recovery), J12 (restart durability)
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) F1/F2/F11 and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -272,7 +272,7 @@ behavior.
   state badge vocabulary in R3 is unchanged, because an armed task has no agent and therefore no card.
   If the task query fails, the indicator says attention is unavailable rather than asserting a zero count.
 
-- **R45** *(planned)* — Within each group section of an agent card grid, running agents are
+- **R45** — Within each group section of an agent card grid, running agents are
   placed before agents that are not running, and the persisted manual order (R12) is preserved
   within each of those two blocks. `running` is the sole test, matching the dimmed stopped treatment
   in R6; the five live `state` values in R3 do not affect placement, so a `busy` and an `idle`
@@ -411,7 +411,7 @@ picker and launches with the route project's id; the general modal continues to 
   `armed`, `ready`, `starting`, or `running` task, and reads zero when no task needs attention:
   dashboard UI tests. A failed task query renders the unavailable state instead of zero.
 
-- **A28** *(planned)* (R45) — In a group containing running and stopped agents in interleaved
+- **A28** (R45) — In a group containing running and stopped agents in interleaved
   manual order, the grid renders every running agent before every stopped one while preserving the
   manual order inside each block; flipping one agent's `running` via a `state_update` moves only that
   card across the boundary and leaves both blocks otherwise unchanged; during a drag inside one
@@ -463,4 +463,5 @@ picker and launches with the route project's id; the general modal continues to 
   `TestPruneStaleRunning`, `TestReleaseGroupStopsMembers`, `TestPutLayoutValidatesAndPersists`;
   UI: `agentStore.test.ts`, `sse.test.ts`, `CardContextMenu.test.tsx`, `NotificationsEditor.test.tsx`,
   `NotificationCenter.test.tsx`, `ProjectDashboard.test.tsx` (project cards, context menus, and the
-  New project create modal — A22/A24).
+  New project create modal — A22/A24), `CardGrid.test.tsx` (running-first placement, the sortable
+  registry order, and same-block/cross-block drop behavior — A28).

@@ -87,10 +87,30 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
 
   const grouped = useMemo(() => groupAgents(ids.map((id) => agents[id]).filter(Boolean)), [agents, ids]);
 
+  // dnd-kit derives sortable indices and measured-rect transforms from the order it
+  // is handed, so this must be the order the cards actually render in: running-first
+  // within each section, sections in their R18 order, and nothing from a collapsed
+  // section (whose cards mount no sortable node at all) (FS-02.R45/A28).
+  const sortableIDs = useMemo(
+    () =>
+      grouped
+        .filter((group) => !(groupLayout[group.key]?.collapsed ?? false))
+        .flatMap((group) => group.agents.map((agent) => agent.agent_id)),
+    [grouped, groupLayout],
+  );
+
   const onDragEnd = (event: DragEndEvent) => {
     if (!event.over || event.active.id === event.over.id) return;
-    const oldIndex = ids.indexOf(String(event.active.id));
-    const newIndex = ids.indexOf(String(event.over.id));
+    const activeID = String(event.active.id);
+    const overID = String(event.over.id);
+    // Manual drag order cannot override the running-first boundary (FS-02.R45), so a
+    // drop onto the other block reorders nothing and writes no layout — returning here
+    // keeps both `arrayMove` and the persisted order untouched.
+    if (agents[activeID]?.running !== agents[overID]?.running) return;
+    const oldIndex = ids.indexOf(activeID);
+    const newIndex = ids.indexOf(overID);
+    // The flat manual order stays the source for the move, so a same-block drag commits
+    // exactly the order it committed before the split existed (FS-02.R12/R14).
     const reordered = arrayMove(ids, oldIndex, newIndex);
     if (!projectID) {
       setOrder(reordered);
@@ -115,7 +135,7 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
         data-slot="header"
       />
       <DndContext onDragEnd={onDragEnd}>
-        <SortableContext items={ids} strategy={rectSortingStrategy}>
+        <SortableContext items={sortableIDs} strategy={rectSortingStrategy}>
           <div className="group-stack" data-slot="groups">
             {grouped.map((group) => {
               const collapsed = groupLayout[group.key]?.collapsed ?? false;
@@ -205,7 +225,14 @@ function groupAgents(items: AgentState[]) {
       if (b === "_ungrouped") return -1;
       return a.localeCompare(b);
     })
-    .map(([key, agents]) => ({ key, label: key === "_ungrouped" ? "Ungrouped" : key, agents }));
+    .map(([key, agents]) => ({
+      key,
+      label: key === "_ungrouped" ? "Ungrouped" : key,
+      // Running agents lead each section and the manual order survives inside each
+      // block, so supervision starts with live work (FS-02.R45). `running` is the sole
+      // test — the live `state` values never move a card (FS-12.R37).
+      agents: [...agents.filter((agent) => agent.running), ...agents.filter((agent) => !agent.running)],
+    }));
 }
 
 function summary(agents: AgentState[]) {

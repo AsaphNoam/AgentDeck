@@ -42,6 +42,4 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-- [Place running agents before stopped ones in a project grid](active-agents-before-stopped.md) —
-  running agents sort ahead of stopped ones inside each group, preserving manual order within each
-  block, and FS-12.R10's ordering clause is narrowed to match (FS-02.R45, FS-12.R37).
+None.

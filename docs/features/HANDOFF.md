@@ -22,16 +22,20 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   diff read against the specs: `c35ff8c` (Mermaid rendering) and `9114df7` + `69c2f99` (the
   Pipelines split and its fixes). Each had a design review before implementation and a usability
   review after; neither substitutes for the §7 code review.
-- **Active change:** None. The Pipelines surface split is finished and committed (`9114df7`, with
-  its usability fixes in `69c2f99`) and is ready for an independent review; its change file is
-  removed, and FS-14 is the authority on what shipped.
+- **Active change:** None. Running-first card placement shipped on 2026-08-28 (FS-02.R45/A28,
+  FS-12.R37/A13); its change file is removed and both specs are now Current. The Pipelines surface
+  split is finished and committed (`9114df7`, with its usability fixes in `69c2f99`) and is ready
+  for an independent review; its change file is removed, and FS-14 is the authority on what
+  shipped.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
   remain owed before claiming those adapters accept structured results.
 - **Usability state:** The split Pipelines surface was driven through a real Chromium on
   2026-08-28 against the working tree's own release build. Every FS-14.A14–A23 item was exercised;
   A14, A16–A20, A22 and A23 passed outright, and the A15 and A21 gaps are now fixed in code and
   tests. The badge, rail-order and append-motion fixes are unverified in a real browser: no browser
-  run has been made since them.
+  run has been made since them. J5 is likewise owed for running-first card placement: the live
+  start/stop boundary crossing, the in-drag geometry inside one block, and the refused cross-block
+  drop have unit coverage but no real-browser run — this session had no browser available.
   The earlier v0.2.2 → v0.2.3 delta remains closed: FS-02.A24 is closed and FS-04.A22 remains
   narrowed to the native panel.
 - **Last reviewed code:** `6a16126` (2026-08-26). Corrected on 2026-08-28: `f97cc89` set this to
@@ -44,7 +48,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 **Change:** None.
 
-**State:** Ready for the next human-selected change.
+**State:** Ready for the next human-selected change. No change is waiting to start.
 
 **Next:** Run `/fix` on the remaining six Worth-fixing items from the `790c01c` review, then the
 four bug-investigation findings (un-skip
@@ -53,6 +57,26 @@ the user's product decision before it can close. The independent code review of 
 named under Review state is still owed.
 
 ## Changelog
+
+- **2026-08-28 — work:** Shipped running-first card placement. Inside every group section of an
+  agent card grid, running agents now render before stopped ones and the persisted manual order
+  survives inside each of those two blocks, so a card crosses the boundary the moment its agent
+  starts or stops with no reload. `running` is the sole test: the live `state` values still express
+  themselves through salience alone and never move a card, which is why FS-12.R10's "without
+  changing order" clause is narrowed by FS-12.R37 instead of being contradicted. Nothing new is
+  persisted — `layout.json` keeps exactly the order, density, and per-group collapse state it held
+  before, and a same-block drag still commits the identical flat manual order it committed before
+  the split existed. Two things the split forced: dnd-kit now receives the order the cards actually
+  render in, skipping collapsed sections whose cards mount no sortable node, because its indices and
+  rect transforms are derived from that list; and a drop onto the other running/stopped block
+  returns before `arrayMove` and before any layout write, so manual drag cannot override the
+  boundary or make a hidden change (INV §10). Seven new `CardGrid.test.tsx` cases cover placement,
+  the live flip, the registry order under a collapsed section, salience-without-movement, Ungrouped
+  staying last, the same-block payload, and the cross-block no-request; five fail against the
+  pre-change component. FS-02 and FS-12 have no `(planned)` items left, so both move to Current in
+  their headers and the spec index. `make test` (both Go variants), `make build`, `make embed`,
+  `make check-specs`, `git diff --check`, `tsc --noEmit`, `npm test` (289 passing) and `npm run
+  build` are green. J5's real-browser half is owed: no browser was available in this session.
 
 - **2026-08-28 — docs:** Replaced `/design`'s rigid one-repair/one-confirmation stopping rule with a
   quality gate. Agents still batch rendered findings, but they continue repairing and re-rendering

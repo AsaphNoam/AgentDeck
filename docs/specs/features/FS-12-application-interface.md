@@ -1,6 +1,6 @@
 # FS-12 — Core interface design
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src` · **Journeys:** J2–J9, J11, J14
 **Absorbed:** —
 
@@ -72,7 +72,7 @@ Requirements are user-observable.
 - **R10** — Card construction uses recognizable AgentDeck geometry, a clear drag grip,
   a strong state edge/marker, compact technical metadata, and a designed context meter. Waiting-input
   and error states receive higher salience without changing order, grouping, or action behavior.
-- **R37** *(planned)* — R10's "without changing order" clause is narrowed to the five live
+- **R37** — R10's "without changing order" clause is narrowed to the five live
   `state` values it was written about: `busy`, `idle`, `waiting_input`, `done`, and `error` still
   express themselves through salience alone and never reorder cards. Whether an agent is running is
   a separate axis and may order cards, as FS-02.R45 specifies. Grouping and action behavior remain
@@ -273,7 +273,7 @@ Requirements are user-observable.
   text without a coloured or boxed surface. *Verify:* the tool-activity states in
   `ui/src/presentation/VisualMatrix.tsx`.
 
-- **A13** *(planned)* (R37) — A card whose agent is `waiting_input` or `error` renders its
+- **A13** (R37) — A card whose agent is `waiting_input` or `error` renders its
   higher-salience treatment while holding its position, and a card's position changes only when its
   `running` value changes. *Verify by* the FS-02.A28 grid cases together with the existing card
   salience fixtures in the visual matrix.
@@ -312,4 +312,6 @@ Requirements are user-observable.
 - Presentation completeness and visual-value enforcement:
   `ui/scripts/check-presentation-contract.mjs`, `ui/scripts/check-presentation-contract.test.mjs`,
   `ui/stylelint.config.mjs`, `ui/scripts/stylelint-config.test.mjs`.
+- Salience-versus-order separation: `ui/src/components/grid/CardGrid.test.tsx` (a raised-salience
+  card holds its position; only `running` moves one — A13).
 - Cross-cutting UI bug classes: INV §8, §10, §11, and §13.

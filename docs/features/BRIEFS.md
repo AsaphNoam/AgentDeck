@@ -5,6 +5,29 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-28 — Implementation: running agents now sit at the top of a project's grid
+
+Opening a project dashboard starts with live work. Inside each group on the grid, the agents that
+are actually running are drawn first and the stopped ones follow, so you no longer hunt for a
+running agent among cards sitting wherever you last dragged them.
+
+Your manual order is untouched. It still decides the sequence within the running block and within
+the stopped block, and it is still the one order saved for every project view — nothing new is
+stored and no new setting appeared. Starting or stopping an agent moves just that card across the
+line straight away, with no reload. A card that is waiting for input or has errored still stands
+out more without moving, because only running or stopped changes a card's place.
+
+Dragging works as before inside a block, and the saved order after a drag is exactly what it would
+have been before this change. Dragging a card onto the other side of the running/stopped line does
+nothing and saves nothing, since a manual drag cannot put a stopped agent above a running one.
+
+**Needs attention:** This is verified by automated tests, not by a person in a real browser. The
+live start/stop movement, how the other block behaves mid-drag, and the refused cross-boundary drop
+should be watched once on screen. No browser was available in this session.
+
+**Next:** Someone should open a project with a mix of running and stopped agents, stop one, drag
+another, and confirm it feels right; then the outstanding fix and review work can continue.
+
 ### 2026-08-28 — Workflow correction: rendered iteration stops on quality, not pass count
 
 The `/design` workflow no longer imposes exactly one repair pass and one confirmation. That rule
