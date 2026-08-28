@@ -17,11 +17,11 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   changelog.
 - **Review state:** Every review and usability finding through 2026-08-28 is closed in code, tests,
   or an explicit specification boundary, including the six recorded against the split Pipelines
-  surface. The four bug-investigation findings below are open. Separately, four commits have never
-  had their shipped diff read against the specs: `790c01c` (thirteen dashboard/SSE fixes),
-  `c35ff8c` (Mermaid rendering), and `9114df7` + `69c2f99` (the Pipelines split and its fixes). Each
-  had a design review before implementation and a usability review after; neither substitutes for
-  the §7 code review.
+  surface. The four bug-investigation findings below are open, joined by nine
+  from the 2026-08-28 review of `790c01c`. Separately, three commits have never had their shipped
+  diff read against the specs: `c35ff8c` (Mermaid rendering) and `9114df7` + `69c2f99` (the
+  Pipelines split and its fixes). Each had a design review before implementation and a usability
+  review after; neither substitutes for the §7 code review.
 - **Active change:** None. The Pipelines surface split is finished and committed (`9114df7`, with
   its usability fixes in `69c2f99`) and is ready for an independent review; its change file is
   removed, and FS-14 is the authority on what shipped.
@@ -46,12 +46,29 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 **State:** Ready for the next human-selected change.
 
-**Next:** Run `/fix` on the four open bug-investigation findings, starting by un-skipping
-`internal/pipeline/blocked_chat_answer_test.go`. The second finding needs the user's product
-decision before it can close. The independent code review of the four commits named under Review
-state is still owed.
+**Next:** Run `/fix` on the open findings, starting with the three Must-fix items from the
+`790c01c` review, then the four bug-investigation findings (un-skip
+`internal/pipeline/blocked_chat_answer_test.go` first). The second bug-investigation finding needs
+the user's product decision before it can close. The independent code review of the three commits
+named under Review state is still owed.
 
 ## Changelog
+
+- **2026-08-28 — review:** Read the shipped diff of `790c01c` (the thirteen dashboard/SSE and
+  usability fixes) against FS-02, FS-04, FS-08, FS-16, FS-17, TS-03, TS-07, TS-10 and every
+  invariant class. Nine findings recorded below: three **Must fix** and six **Worth fixing**. The
+  headline fixes are real — tabs do share one SSE stream, reconciliation is debounced to the changed
+  session, card previews no longer clone the whole transcript map, and the six usability items are
+  closed — but the shared-stream transport ships with no failure path and no test, the config-source
+  publication gate is narrower than the view it guards, and the Tasks Retry gate now hides the repair
+  FS-16.R23 requires. Classes with no finding: §3 (the create-then-edit switch in `ProjectsEditor` is
+  correct), §5 (the reconcile debounce timer's stop/drain/reset is race-free), §7
+  (`lastAssistantPreview` returning empty on an unreadable path cannot blank a card, because
+  `ApplyStaleCorrection` refuses an empty detail), §9, §11 (`changedFields` returns a non-nil slice),
+  §13 (the diff ships no new className), §14 (no new route; the worker's `/api/events` request is
+  same-origin and inherits `localOnly`) and §15. `make check-specs`, `git diff --check`, `go test`
+  for `internal/{configsource,server,state}`, `tsc --noEmit` and the 277-test UI suite are all green.
+  `Last reviewed code` stays at `6a16126`: this review read one named commit, not a continuous range.
 
 - **2026-08-28 — docs:** Corrected the review-state bookkeeping. `Last reviewed code` moves from
   `895348e` to `6a16126`, the last code commit actually read — `bbbdc90` verified it and did not
@@ -355,3 +372,140 @@ diagnosis below is from the code path and a local reproduction, not from inciden
   `stale_assignment`. Not reproduced: it needs a concurrent bump in a narrow window, and no field
   log exists to confirm it happened here. Fix: re-read the run under the lock as `Report` does, and
   log the conflict.
+
+From the 2026-08-28 review of `790c01c` (the thirteen dashboard/SSE and usability fixes):
+
+- **Must fix** — the Tasks view no longer offers Retry on a task parked by exhausted start
+  attempts, and no other control performs that repair. Closing the "Retry can never succeed on a
+  parked task" usability finding narrowed the button to `task.state === "interrupted"` alone
+  (`ui/src/features/tasks/TasksPage.tsx:145`), but `dependency_failed` is reached three ways and only
+  one of them is an unsatisfiable arm: `FailTaskStart` parks a task when its third start attempt
+  genuinely fails (`internal/state/tasks.go:1133`), and `ParkTaskStart` parks one whose target agent
+  was deleted, archived, or is a terminal interface (`:1150`). `RetryTask` accepts both — it refuses
+  only when an arm is `unsatisfiable` (`:1557-1565`) — and FS-16.R23 states outright that Retry
+  "returns an `interrupted` task, **or one parked because its start attempts were exhausted**, to
+  `ready` with a fresh attempt allowance", with FS-16 §3 repeating it. Re-arm is not a substitute:
+  `RearmTask` replaces the arm set and never resets `start_attempt_count` (`:1587-1640`), so a
+  re-armed task returns to `ready` with its allowance still spent and parks again on its first
+  failure. A person whose launch failed three times because a provider was briefly down now has no
+  route back except deleting the task and recreating it, losing its arms, attachments, and assignee
+  continuity. The UI test that covered the old behavior was replaced with one asserting the button's
+  absence against a fixture whose arm is `unsatisfiable`
+  (`ui/src/features/tasks/TasksPage.test.tsx:89-97`), so nothing catches this. Fix: gate on the same
+  predicate the server uses — render Retry for `interrupted`, and for `dependency_failed` when no
+  arm has `state === "unsatisfiable"`; regression-test both `dependency_failed` fixtures
+  (FS-16.R23/R25, A11, **INV §10**).
+
+- **Must fix** — the new config-source publication gate is far narrower than the view it guards, so
+  a real change to a user's native configuration now silently never reaches an open Settings panel.
+  `commit` returns without publishing when `changedFields` is empty
+  (`internal/configsource/manager.go:276-279`), but `changedFields` compares only `Effective.Model`,
+  `Effective.Effort`, and a path+SHA digest of `Effective.Assets` (`:471-488`). It ignores
+  `FallbackModel`, `Verbosity`, `Provider`, `Models`, `EnvKeys`, `MCPServers`, `Provenance`, and the
+  entire `Report` — `files_read`, `skipped`, `unknown_keys`, `warnings`, `fingerprints`,
+  `approved_roots` (`internal/configsource/types.go:39-91`). Before this change `Changed` was only a
+  hint on a publication that always fired, and the client invalidates the whole `["config-sources"]`
+  prefix regardless of it (`ui/src/api/sse.ts:131`), so the omissions were harmless; making it a gate
+  turned every one of them into a missed update. Normal-use trigger: with Settings → Sources open, a
+  user edits `~/.claude/settings.json` to add an MCP server, set `verbosity`, or configure an
+  environment key — or the resolver newly skips a path or raises a warning. The sweep re-resolves and
+  installs the new generation, `changedFields` returns empty, nothing publishes, and the panel keeps
+  showing the superseded effective view, inventory, and warnings until the page is reloaded. This
+  also contradicts the amended FS-08.R15, which now promises the SSE announces "a materially changed
+  effective view". Fix: gate on `report.SourceDigest`, the content hash of every file read that the
+  package already computes for the bind TOCTOU recheck (`manager.go:225`, `security.go:56-67`), and
+  keep `Changed` as the high-level hint it has always been; extend
+  `TestSweepDoesNotPublishUnchangedGeneration` with a changed-but-unsummarized field that must still
+  publish (FS-08.R15, TS-07.R7, **INV §1/§10**).
+
+- **Must fix** — the shared-worker SSE transport has no failure path, so the direct-`EventSource`
+  fallback it ships with is unreachable. `createEventSource` picks the shared worker on
+  `typeof SharedWorker !== "undefined"` alone (`ui/src/api/sse.ts:236-241`) — a presence check, not a
+  working check — and `new SharedWorker(url, { type: "module" })` in the constructor (`:200-208`) is
+  neither wrapped in `try`/`catch` nor given a `worker.onerror` handler. Two normal-use failures
+  follow. If construction throws (a browser whose `SharedWorker` exists but rejects module workers,
+  or a blocked worker context) the exception escapes `SseClient.connect`, `this.es` is never
+  assigned, `startWatchdog()` is never reached, and the dashboard sits on `connecting` with no live
+  updates, no error, and no retry — forever. If the worker *script* fails to load instead (a stale
+  or partially-deployed asset, a 404 on the emitted `sse-shared-worker-*.js`), the `error` event
+  fires on the `SharedWorker` object where nothing listens, `onopen` never arrives, and the watchdog
+  reconnects into the same dead worker every 25 seconds. Either way the person sees a dashboard that
+  never updates and no message explaining why, on a transport that has a working alternative sitting
+  three lines below. This is INV §12's class in a browser rather than a CLI, and the same
+  detect-and-fall-back shape as `runClaudeAuthStatus`. Fix: construct inside `try`/`catch`, attach
+  `worker.onerror`, and fall back to `new EventSource("/api/events")` on either signal; also treat a
+  first `open` that never arrives within the watchdog window as a transport failure rather than a
+  reconnect (TS-03.R7, FS-02.R9/A27, **INV §6/§8/§12**).
+
+- **Worth fixing** — FS-02.A27 names verification that does not exist, and the whole SSE suite runs
+  against the transport production no longer uses. A27 claims "shared-stream transport tests and the
+  production-browser six-tab regression", but no file in the repository cites `FS-02.A27`, no test
+  mentions `SharedWorker` or `sse-shared-worker`, and no six-tab browser run has been recorded since
+  the fix landed. Worse, `ui/src/api/sse.test.ts` stubs a `FakeEventSource` global (`:9,37`) and
+  jsdom defines no `SharedWorker`, so every SSE test — hydration generations, watchdog reaping,
+  selector isolation — exercises the legacy branch while the shipped path has zero coverage. This is
+  the same defect this very commit corrected for FS-17.A1/A3/A4, reintroduced one requirement later,
+  plus INV §11's "test doubles must mirror what the real transport does". Fix: inject a
+  `SharedWorker` stub and cover port fan-out, the `open`/`error`/event message kinds, and the
+  fallback branch; then either run the six-tab browser check or narrow A27's wording to what the
+  suite proves (FS-02.A27, **INV §10/§11**).
+
+- **Worth fixing** — every tab that attaches restarts the one shared stream for every other tab, so
+  the cost of opening the dashboard grows with the square of the tab count. `self.onconnect` calls
+  `connect()` unconditionally, which closes and reopens the shared `EventSource`
+  (`ui/src/api/sse-shared-worker.ts:26-48`), and TS-03.R7 now specifies this. Each reopen broadcasts
+  `open` to *all* ports, and every tab's `onopen` starts a fresh hydration generation, refetches the
+  open transcript, and invalidates the pipeline-runs, proposals, and tasks queries
+  (`ui/src/api/sse.ts:30-51`). Opening six tabs therefore costs fifteen extra full hydrations and
+  about sixty extra REST refetches, and any single tab reloading re-hydrates all the others — on the
+  exact six-tab workload this change exists to make fast. The reopen window also drops `new_message`
+  deltas for every tab, not only the newcomer (recoverable: the open chat refetches, card previews
+  self-heal on the next delta). Fix: have the worker retain the latest `state_update` rows plus the
+  `hydrated` boundary and replay them to the joining port alone, leaving the live stream and the
+  other tabs untouched (TS-03.R7, FS-02.A27, **INV §1/§8**).
+
+- **Worth fixing** — the shared worker never removes a port. `ports.add(port)` has no matching
+  delete on any path (`ui/src/api/sse-shared-worker.ts:8,40-48`), and the client mints a *new* port
+  on every reconnect: the watchdog calls `this.es.close()`, which closes only the `MessagePort`
+  (`ui/src/api/sse.ts:216-218,168-171`), then `connect()` constructs another
+  `SharedWorkerEventSource`. `broadcast` keeps iterating the dead ones and the worker holds a strong
+  reference to each for its whole lifetime, which is as long as any dashboard tab stays open.
+  `postMessage` to a closed port is a silent no-op, so the only symptom is memory that grows with
+  every closed tab and every reconnect on a dashboard left open for days. This is INV §4's
+  create/teardown symmetry: the port is the artifact created at attach and nothing tears it down.
+  Fix: send a close message (or listen for `port.onmessage` with a `bye` kind) before
+  `this.port.close()` and delete the port in the worker; drop the shared `EventSource` when the set
+  empties (**INV §4/§1**).
+
+- **Worth fixing** — the same card preview is now derived two ways that disagree about which end of
+  a long message to keep. The client keeps the **last** 120 UTF-16 code units of the streamed text
+  (`ui/src/store/transcriptStore.ts:148,163` — `.slice(-120)`), while the server keeps the **first**
+  120 *runes* (`clipPreview`, `internal/server/reconcile.go:196-202`, whose own comment claims it
+  mirrors a tail clip). `AgentCard` renders `agent.detail || lastLine`
+  (`ui/src/components/grid/AgentCard.tsx:19`), so the same agent's card shows the end of its last
+  message while streaming and the beginning of it after a reload or a reconcile sweep. `.slice(-120)`
+  also cuts UTF-16 code units, so a preview whose 120-unit boundary lands inside an emoji renders a
+  replacement character — precisely what the server-side helper documents itself as avoiding. This is
+  INV §2's "two paths building the same artifact will drift", appearing in the same commit that
+  created the second path. Fix: pick one end, share one helper, and clip by code point on the client
+  (`Array.from(text).slice(...)`) (FS-02.R9, **INV §2/§8**).
+
+- **Worth fixing** — the reconciliation regression does not test what its name claims, and the load
+  bound the finding asked for was never added.
+  `TestReconcileSessionPathTouchesOnlyChangedTranscript`
+  (`internal/server/reconcile_test.go:73-86`) writes a second, unrelated transcript and then asserts
+  only that `reconcileSessionPath` returns `true` for the changed one — it never asserts that the
+  other file was not read, which is the entire claim in its name and the entire point of the fix. The
+  closed finding asked for "a regression that streams many deltas with several retained transcripts
+  while bounding scans and latency"; nothing bounds either. A future change that restores the
+  whole-tree walk on every write would leave this test green. Fix: count transcript reads (or assert
+  on the untouched agent's status row being unmodified) across a many-delta stream with several
+  retained sessions (FS-14.R16, **INV §7/§10**).
+
+- **Worth fixing** — a task targeting an existing agent renders its metadata line starting with a
+  stray separator. `ui/src/features/tasks/TasksPage.tsx:138` emits
+  `{task.target_kind === "launch" && ...}{assignedID && <> · assigned to …</>}`, so when the target
+  kind is `agent` the first expression renders nothing and the line reads "· assigned to Bob ·
+  created by person". Every agent-target task row in the Tasks view shows it. Fix: build the segment
+  list and join it, rather than prefixing each optional segment with its own separator
+  (FS-16.A8, **INV §8**).
