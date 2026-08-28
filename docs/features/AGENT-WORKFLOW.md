@@ -325,7 +325,10 @@ Frequency is a gate. High-frequency and keyboard-driven actions should normally 
 occasional transitions may be brief; rare lifecycle milestones have the most room for expression.
 Animate only when the purpose named in the direction improves comprehension. Prefer the cheapest
 existing mechanism, usually a narrow CSS transition or animation, and do not install a motion
-library for an effect CSS already handles.
+library for an effect CSS already handles. Prefer compositor-friendly `transform` and `opacity`
+over animating layout properties. Match easing to the motion's type — for example, ease-out for
+entrances — and keep routine UI transitions roughly 100–250ms and normally under 300ms, deviating
+only when the specific interaction justifies it.
 
 Motion must preserve stable reading and interaction: do not move content the person is reading for
 decoration; make triggered motion interruptible where repeat input is possible; use an origin that
@@ -337,10 +340,16 @@ transition, not on initial render, reload, background refetch, or history replay
 
 Rendered review is required for material visual work. Run the working tree's actual UI in a real
 browser and inspect the affected route or fixture after fonts, data, and motion settle. The visual
-matrix is repeatable input, not a substitute for the product surface. Choose viewports from the
-governing requirements and affected layout rather than assuming universal mobile support; always
-include the supported desktop floor when layout changes. Compare Core and Sky & Grove when a shared
-token, primitive, hook, integration, or feature composition changes.
+matrix is repeatable input, not a substitute for the product surface. When the inspection needs
+representative product states — live, blocked, or delegated sessions, permission prompts,
+failures — reuse the rendered-run setup from [`USABILITY-REVIEW.md`](USABILITY-REVIEW.md) §2 as
+applicable: the real built binary, an isolated review-owned `AGENTDECK_HOME`, and the
+deterministic `fakeacp` backend. This borrows that environment only; a small visual edit whose
+states the affected route already reaches does not inherit the full usability-review ceremony.
+Choose viewports from the governing requirements and affected layout rather than assuming
+universal mobile support; always include the supported desktop floor when layout changes. Compare
+Core and Sky & Grove when a shared token, primitive, hook, integration, or feature composition
+changes.
 
 Exercise the important state matrix from the direction, including interaction states that static
 fixtures cannot prove. For motion, observe the transition at normal speed, repeat or interrupt it,
