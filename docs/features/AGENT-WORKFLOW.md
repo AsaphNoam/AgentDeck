@@ -346,8 +346,9 @@ Critique against the direction rather than personal taste. Name rendered evidenc
 rank implementation findings as **Must fix**, **Worth fixing**, or polish, and remove unsupported
 decoration before adding more. A major new or redesigned surface benefits from an independent,
 fresh-context rendered critique when delegation is available; a narrow edit does not justify that
-overhead. In a build/fix role, batch the in-scope repairs, render once more to confirm them, then
-stop. A standalone `/design` critique reports rendered evidence and findings in the conversation and
-edits no repository file. A §7 code review records findings and state updates exactly as §7 directs.
-Source review alone cannot close a visual claim, and open-ended polishing is not a completion
-strategy.
+overhead. In a build/fix role, batch the in-scope findings into a repair pass and render again. If
+material in-scope problems remain, repair them and re-render; otherwise stop. Do not continue
+iterating on subjective polish once the direction and material findings are satisfied. A standalone
+`/design` critique reports rendered evidence and findings in the conversation and edits no
+repository file. A §7 code review records findings and state updates exactly as §7 directs. Source
+review alone cannot close a visual claim, and open-ended polishing is not a completion strategy.

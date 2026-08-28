@@ -54,6 +54,12 @@ named under Review state is still owed.
 
 ## Changelog
 
+- **2026-08-28 — docs:** Replaced `/design`'s rigid one-repair/one-confirmation stopping rule with a
+  quality gate. Agents still batch rendered findings, but they continue repairing and re-rendering
+  while material in-scope problems remain; they stop when the direction and material findings are
+  satisfied, without drifting into subjective polish. The twinned launcher and canonical workflow
+  use the same rule.
+
 - **2026-08-28 — implementation:** Added the twinned first-party `/design` skill and canonical
   workflow §14 after researching Impeccable, Emil Kowalski's design/animation skills, Anthropic's
   frontend-design skill, and designer-skills' design-review flow. Automatic discovery is deliberately
@@ -62,12 +68,12 @@ named under Review state is still owed.
   workflow records one compact direction, derives specificity from AgentDeck's operator and
   lifecycle/coordination states, gates motion by purpose and frequency, extends TS-08's tokens,
   primitives, hooks, appearances, and visual matrix, and requires a bounded real-browser critique
-  with one batched repair and one confirmation. It adds no product code, design-system layer,
-  vendored skill pack, detector, script, screenshot baseline, or runtime dependency. Standalone
-  critique remains read-only, and automatic invocation never selects or enlarges work. Independent
-  forward tests covered an open Pipelines redesign, an incidental API/UI field, and a read-only
-  Dashboard critique; the skill twins, YAML frontmatter, specification checks, and whitespace checks
-  are green.
+  that continues while material in-scope problems remain and stops before subjective polish. It adds
+  no product code, design-system layer, vendored skill pack, detector, script, screenshot baseline,
+  or runtime dependency. Standalone critique remains read-only, and automatic invocation never
+  selects or enlarges work. Independent forward tests covered an open Pipelines redesign, an
+  incidental API/UI field, and a read-only Dashboard critique; the skill twins, YAML frontmatter,
+  specification checks, and whitespace checks are green.
 
 - **2026-08-28 — fix:** Closed the Tasks Retry finding from the `790c01c` review (INV §10). The
   view now gates Retry on the same predicate the server uses — `interrupted`, or `dependency_failed`

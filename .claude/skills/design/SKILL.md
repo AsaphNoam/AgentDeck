@@ -39,5 +39,7 @@ Finish by inspecting the running UI in a real browser at the viewports and state
 requirements actually support. Compare Core and Sky & Grove when shared presentation changes, and
 exercise reduced motion when motion changes. Critique the rendered result for hierarchy,
 specificity, density, state clarity, interaction feedback, accessibility, overflow, and finish;
-batch one repair pass, confirm it once, and stop. Source inspection or the visual matrix alone is
-not visual verification.
+batch findings into a repair pass and render again. If material in-scope problems remain, repair
+them and re-render; otherwise stop. Do not continue iterating on subjective polish once the
+direction and material findings are satisfied. Source inspection or the visual matrix alone is not
+visual verification.

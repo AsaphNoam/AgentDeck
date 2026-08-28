@@ -5,6 +5,23 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-28 — Workflow correction: rendered iteration stops on quality, not pass count
+
+The `/design` workflow no longer imposes exactly one repair pass and one confirmation. That rule
+could force an agent to stop after confirming obvious regressions introduced by its own repair.
+
+Agents still batch rendered findings into a coherent repair pass and render again. If material
+in-scope problems remain, they repair and re-render them; otherwise they stop. The guard against
+runaway pixel polishing is now outcome-based: iteration ends once the chosen direction and material
+findings are satisfied, and does not continue for subjective polish alone.
+
+The small skill and canonical workflow now use the same rule.
+
+**Needs attention:** The commits remain local. Pushing to `github.com/AsaphNoam/AgentDeck` requires
+your explicit approval of that destination.
+
+**Next:** Explicitly approve that GitHub destination if you want both commits pushed.
+
 ### 2026-08-28 — Implementation: a first-party UI design workflow
 
 AgentDeck now has a `/design` workflow that activates automatically only when UI work genuinely
