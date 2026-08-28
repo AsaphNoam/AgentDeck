@@ -17,8 +17,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   changelog.
 - **Review state:** Every review and usability finding through 2026-08-28 is closed in code, tests,
   or an explicit specification boundary, including the six recorded against the split Pipelines
-  surface. The four bug-investigation findings below are open, joined by eight
-  from the 2026-08-28 review of `790c01c`. Separately, three commits have never had their shipped
+  surface. The four bug-investigation findings below are open, joined by seven
+  from the 2026-08-28 review of `790c01c` — its one Must fix is closed. Separately, three commits have never had their shipped
   diff read against the specs: `c35ff8c` (Mermaid rendering) and `9114df7` + `69c2f99` (the
   Pipelines split and its fixes). Each had a design review before implementation and a usability
   review after; neither substitutes for the §7 code review.
@@ -46,13 +46,29 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 **State:** Ready for the next human-selected change.
 
-**Next:** Run `/fix` on the open findings, starting with the Must-fix shared-worker transport item
-from the `790c01c` review, then the four bug-investigation findings (un-skip
+**Next:** Run `/fix` on the remaining seven Worth-fixing items from the `790c01c` review — the
+Tasks Retry gate is the most user-visible — then the four bug-investigation findings (un-skip
 `internal/pipeline/blocked_chat_answer_test.go` first). The second bug-investigation finding needs
 the user's product decision before it can close. The independent code review of the three commits
 named under Review state is still owed.
 
 ## Changelog
+
+- **2026-08-28 — fix:** Closed the one Must-fix finding from the `790c01c` review (INV §6/§8/§12).
+  The shared-worker SSE transport now has a reachable failure path: construction runs inside
+  `try`/`catch`, the `SharedWorker` object's `error` event is handled, and a stream that never opens
+  within the liveness window is demoted rather than reconnected into. All three routes fall back to
+  the direct `/api/events` stream for the rest of the session, so a browser that exposes
+  `SharedWorker` but cannot run it — or a worker asset that fails to load — no longer leaves the
+  dashboard on `connecting` with no live data, no error and no retry. TS-03.R7 now states that
+  sharing is best-effort and names the fallback, which was previously unspecified. `sse.test.ts`
+  gains a `SharedWorker` stub and four cases: port fan-out including a ping satisfying the liveness
+  window, and one per fallback route; each fails against the pre-fix code. Bookkeeping while
+  verifying: the FS-02.A27 finding is narrowed to the un-run six-tab browser check now that the
+  transport has tests, and a new finding records that `index.html` and one worker asset are
+  force-tracked under the ignored embed directory. `make test`, `make build`, `make embed`,
+  `make check-specs`, `git diff --check`, `tsc --noEmit`, `npm test` (281 passing) and `npm run
+  build` are green.
 
 - **2026-08-28 — review:** Read the shipped diff of `790c01c` (the thirteen dashboard/SSE and
   usability fixes) against FS-02, FS-04, FS-08, FS-16, FS-17, TS-03, TS-07, TS-10 and every
@@ -406,37 +422,17 @@ From the 2026-08-28 review of `790c01c` (the thirteen dashboard/SSE and usabilit
   arm has `state === "unsatisfiable"`; regression-test both `dependency_failed` fixtures
   (FS-16.R23/R25, A11, **INV §10**).
 
-- **Must fix** — the shared-worker SSE transport has no failure path, so the direct-`EventSource`
-  fallback it ships with is unreachable. `createEventSource` picks the shared worker on
-  `typeof SharedWorker !== "undefined"` alone (`ui/src/api/sse.ts:236-241`) — a presence check, not a
-  working check — and `new SharedWorker(url, { type: "module" })` in the constructor (`:200-208`) is
-  neither wrapped in `try`/`catch` nor given a `worker.onerror` handler. Two normal-use failures
-  follow. If construction throws (a browser whose `SharedWorker` exists but rejects module workers,
-  or a blocked worker context) the exception escapes `SseClient.connect`, `this.es` is never
-  assigned, `startWatchdog()` is never reached, and the dashboard sits on `connecting` with no live
-  updates, no error, and no retry — forever. If the worker *script* fails to load instead (a stale
-  or partially-deployed asset, a 404 on the emitted `sse-shared-worker-*.js`), the `error` event
-  fires on the `SharedWorker` object where nothing listens, `onopen` never arrives, and the watchdog
-  reconnects into the same dead worker every 25 seconds. Either way the person sees a dashboard that
-  never updates and no message explaining why, on a transport that has a working alternative sitting
-  three lines below. This is INV §12's class in a browser rather than a CLI, and the same
-  detect-and-fall-back shape as `runClaudeAuthStatus`. Fix: construct inside `try`/`catch`, attach
-  `worker.onerror`, and fall back to `new EventSource("/api/events")` on either signal; also treat a
-  first `open` that never arrives within the watchdog window as a transport failure rather than a
-  reconnect (TS-03.R7, FS-02.R9/A27, **INV §6/§8/§12**).
-
 - **Worth fixing** — FS-02.A27 names verification that does not exist, and the whole SSE suite runs
   against the transport production no longer uses. A27 claims "shared-stream transport tests and the
   production-browser six-tab regression", but no file in the repository cites `FS-02.A27`, no test
   mentions `SharedWorker` or `sse-shared-worker`, and no six-tab browser run has been recorded since
-  the fix landed. Worse, `ui/src/api/sse.test.ts` stubs a `FakeEventSource` global (`:9,37`) and
-  jsdom defines no `SharedWorker`, so every SSE test — hydration generations, watchdog reaping,
-  selector isolation — exercises the legacy branch while the shipped path has zero coverage. This is
-  the same defect this very commit corrected for FS-17.A1/A3/A4, reintroduced one requirement later,
-  plus INV §11's "test doubles must mirror what the real transport does". Fix: inject a
-  `SharedWorker` stub and cover port fan-out, the `open`/`error`/event message kinds, and the
-  fallback branch; then either run the six-tab browser check or narrow A27's wording to what the
-  suite proves (FS-02.A27, **INV §10/§11**).
+  the fix landed. Narrowed on 2026-08-28 by the transport-fallback fix: `ui/src/api/sse.test.ts` now
+  stubs `SharedWorker` and covers port fan-out, the `open`/`error`/event message kinds, and all
+  three fallback routes, so the shipped path is no longer untested. What remains is A27's own
+  claim — no test cites `FS-02.A27`, and the "production-browser six-tab regression" it names has
+  never been run against a build carrying the shared stream. Fix: run the six-tab check on a `make
+  dist` build and cite it, or narrow A27's wording to what the suite proves
+  (FS-02.A27, **INV §10**).
 
 - **Worth fixing** — every tab that attaches restarts the one shared stream for every other tab, so
   the cost of opening the dashboard grows with the square of the tab count. `self.onconnect` calls
@@ -489,6 +485,17 @@ From the 2026-08-28 review of `790c01c` (the thirteen dashboard/SSE and usabilit
   whole-tree walk on every write would leave this test green. Fix: count transcript reads (or assert
   on the untouched agent's status row being unmodified) across a many-delta stream with several
   retained sessions (FS-14.R16, **INV §7/§10**).
+
+- **Worth fixing** — two generated files under the ignored embed directory are force-tracked, and
+  one of them names an asset the repository does not contain. `.gitignore:10` ignores
+  `internal/server/ui/dist/*`, but `790c01c` added `internal/server/ui/dist/index.html` and
+  `assets/sse-shared-worker-DxpB4Ebi.js` to the index, so gitignore no longer applies to them while
+  every other emitted chunk stays ignored. The tracked `index.html` therefore points at
+  `/assets/index-*.js`, which is untracked, and it goes stale on any UI change — every `make embed`
+  now produces a spurious diff a committer has to decide about, and a fresh clone's embedded
+  `index.html` references a file that is not there. CLAUDE.md states this whole tree is generated by
+  `make embed`. Fix: `git rm --cached` both paths so the ignore rule governs the directory uniformly
+  (**INV §10**).
 
 - **Worth fixing** — a task targeting an existing agent renders its metadata line starting with a
   stray separator. `ui/src/features/tasks/TasksPage.tsx:138` emits

@@ -5,6 +5,37 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-28 — Fix: the dashboard now recovers when the shared connection cannot run
+
+I fixed the one item I flagged as must-fix. The change that made browser tabs share a single live
+connection had no way to fail safely: it checked whether your browser *has* the shared-worker
+feature, but never whether it actually works here. If it existed but refused to start, the error
+escaped before the connection watchdog was even switched on, and the dashboard sat on "connecting"
+with no live updates, no message, and nothing that would ever try again — a reload failed the same
+way. If the worker's script failed to load instead, nothing was listening for that either, so the
+watchdog just kept reconnecting into the same dead worker every twenty-five seconds.
+
+There was already a perfectly good fallback to the old one-connection-per-tab behaviour sitting in
+the same file; nothing could reach it. Now all three failure routes reach it — the feature refusing
+to start, its script failing to load, and a connection that never opens within the liveness window.
+That tab quietly drops back to its own direct connection for the rest of the session and keeps
+working. It gives up the connection-pool benefit, which is the right trade against showing nothing.
+
+I also wrote the fallback into the connection specification, which had promised sharing
+unconditionally, and added tests for the shared connection itself. That matters more than it sounds:
+the test environment does not provide the shared-worker feature, so every existing connection test
+had been silently exercising the old path. There are now four covering the real one.
+
+Two pieces of bookkeeping came out of verifying it. The six-tab browser check that would have caught
+this is still owed — it was written into the specification as evidence but never run — and I noticed
+that two generated files are committed inside a directory the repository otherwise ignores, one of
+which points at a file that is not in the repository at all.
+
+**Needs attention:** None.
+
+**Next:** Seven smaller items remain from this review; the Tasks Retry button is the one you are
+most likely to notice. Say the word and I will take them one at a time as before.
+
 ### 2026-08-28 — Review: the dashboard and SSE fixes shipped on 27 August
 
 I read the shipped code for the batch of thirteen dashboard, connection, and small usability fixes.

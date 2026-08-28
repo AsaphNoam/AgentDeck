@@ -30,6 +30,33 @@ class FakeEventSource {
   }
 }
 
+// A minimal fake SharedWorker + MessagePort pair. The real transport reaches
+// the client only through port messages, so the fake needs nothing more than a
+// port to post on and the `error` hook the worker fires when its script dies.
+class FakeMessagePort {
+  onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
+  started = false;
+  closed = false;
+  start() {
+    this.started = true;
+  }
+  close() {
+    this.closed = true;
+  }
+  deliver(message: unknown) {
+    this.onmessage?.({ data: message } as MessageEvent<unknown>);
+  }
+}
+
+class FakeSharedWorker {
+  static instances: FakeSharedWorker[] = [];
+  onerror: (() => void) | null = null;
+  port = new FakeMessagePort();
+  constructor() {
+    FakeSharedWorker.instances.push(this);
+  }
+}
+
 describe("SseClient watchdog reconnect", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -231,6 +258,91 @@ describe("SseClient watchdog reconnect", () => {
       data: { type: "notification", notification_type: "done", agent_id: "a_1", title: "Done", ts: "2026-06-29T00:00:00Z" },
     }));
     expect(useUiStore.getState().toasts).toEqual([]);
+  });
+
+  // TS-03.R7 / FS-02.A27: the shared stream is the preferred transport, and the
+  // events a tab renders must arrive over it unchanged.
+  it("delivers shared-worker port messages as stream events", async () => {
+    FakeSharedWorker.instances = [];
+    vi.stubGlobal("SharedWorker", FakeSharedWorker as unknown as typeof SharedWorker);
+    const { sseClient } = await import("./sse");
+    const { useUiStore } = await import("../store/uiStore");
+    sseClient.connect();
+
+    expect(FakeSharedWorker.instances).toHaveLength(1);
+    expect(FakeEventSource.instances).toHaveLength(0);
+    const port = FakeSharedWorker.instances[0].port;
+    expect(port.started).toBe(true);
+
+    port.deliver({ kind: "open" });
+    expect(useUiStore.getState().connection).toBe("open");
+
+    // A ping arriving over the port must satisfy the same liveness window a
+    // direct stream's ping does, or the watchdog reaps a healthy shared stream.
+    vi.advanceTimersByTime(20_000);
+    port.deliver({ kind: "event", type: "ping", data: "" });
+    vi.advanceTimersByTime(20_000);
+    expect(FakeEventSource.instances).toHaveLength(0);
+  });
+
+  // Regression (review fix, Must fix): SharedWorker EXISTING is not proof it
+  // works. A browser that exposes it but refuses a module worker threw out of
+  // connect(), so `es` was never assigned and the watchdog never even started:
+  // the dashboard sat on "connecting" with no live data, no error, and no retry.
+  it("falls back to the direct stream when the shared worker cannot be constructed", async () => {
+    vi.stubGlobal("SharedWorker", function BrokenSharedWorker() {
+      throw new Error("module workers are not supported");
+    } as unknown as typeof SharedWorker);
+    const { sseClient } = await import("./sse");
+    const { useUiStore } = await import("../store/uiStore");
+
+    expect(() => sseClient.connect()).not.toThrow();
+    expect(FakeEventSource.instances).toHaveLength(1);
+
+    // The direct stream is fully wired, watchdog included.
+    FakeEventSource.instances[0].onopen?.();
+    expect(useUiStore.getState().connection).toBe("open");
+    vi.advanceTimersByTime(30_000);
+    expect(FakeEventSource.instances).toHaveLength(2);
+  });
+
+  // Regression (review fix, Must fix): a worker script that 404s or fails to
+  // evaluate fires `error` on the SharedWorker object, where nothing listened.
+  // No port message could follow, so the tab never opened and never recovered.
+  it("falls back to the direct stream when the shared worker script fails to load", async () => {
+    FakeSharedWorker.instances = [];
+    vi.stubGlobal("SharedWorker", FakeSharedWorker as unknown as typeof SharedWorker);
+    const { sseClient } = await import("./sse");
+    sseClient.connect();
+    expect(FakeEventSource.instances).toHaveLength(0);
+
+    FakeSharedWorker.instances[0].onerror?.();
+
+    expect(FakeSharedWorker.instances[0].port.closed).toBe(true);
+    expect(FakeEventSource.instances).toHaveLength(1);
+    FakeEventSource.instances[0].onopen?.();
+    expect(FakeEventSource.instances).toHaveLength(1);
+  });
+
+  // Regression (review fix, Must fix): a worker that constructs and loads but
+  // never opens gave the watchdog nothing to distinguish from a dropped
+  // connection, so it reconnected into the same dead worker every 25s forever.
+  it("demotes a shared worker that never opens instead of reconnecting into it", async () => {
+    FakeSharedWorker.instances = [];
+    vi.stubGlobal("SharedWorker", FakeSharedWorker as unknown as typeof SharedWorker);
+    const { sseClient } = await import("./sse");
+    sseClient.connect();
+
+    vi.advanceTimersByTime(30_000);
+    expect(FakeSharedWorker.instances).toHaveLength(1);
+    expect(FakeEventSource.instances).toHaveLength(1);
+
+    // Once demoted the session stays on the direct stream: a later reap must
+    // reconnect directly rather than retrying the worker.
+    FakeEventSource.instances[0].onopen?.();
+    vi.advanceTimersByTime(30_000);
+    expect(FakeSharedWorker.instances).toHaveLength(1);
+    expect(FakeEventSource.instances).toHaveLength(2);
   });
 
   it("uses Web Notification for hidden tabs when permission is granted", async () => {

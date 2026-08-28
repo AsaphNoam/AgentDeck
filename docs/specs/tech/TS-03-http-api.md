@@ -56,7 +56,11 @@ burst, then live events. A `hydrated` boundary lets the client prune absent agen
 supports liveness; reconnect starts a new hydration generation. Dashboard tabs from one browser
 origin share one underlying stream so long-lived SSE requests cannot consume the origin's HTTP/1.x
 connection pool and block REST requests. Attaching a tab restarts that shared stream so the newcomer
-and existing tabs receive a complete hydration generation.
+and existing tabs receive a complete hydration generation. Sharing is best-effort: a tab whose
+browser cannot construct the shared stream, whose worker script does not load, or whose shared
+stream never opens within the liveness window falls back to its own direct `/api/events` connection
+for the rest of the session, so live updates are never silently lost. That tab counts against the
+origin's connection pool again.
 
 **R8 — SSE event types are versioned by payload contract.** Current types include `state_update`,
 `new_message`, `notification`, `config_source_update`, `pipeline_update`, `task_update`, `hydrated`,

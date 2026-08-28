@@ -15,6 +15,8 @@ class SseClient {
   private es: EventSourceLike | null = null;
   private watchdog: number | null = null;
   private lastPing = Date.now();
+  private opened = false;
+  private sharedStreamUnavailable = false;
   private hydrationIds: string[] = [];
   private openAgentId: string | null = null;
   private lastAgentSeq: Record<string, number> = {};
@@ -25,9 +27,11 @@ class SseClient {
     // can reap it; otherwise a stale lastPing from a prior stream would close
     // the new stream before its first ping arrives, looping forever.
     this.lastPing = Date.now();
+    this.opened = false;
     useUiStore.getState().setConnection("connecting");
-    this.es = createEventSource();
+    this.es = this.createTransport();
     this.es.onopen = () => {
+      this.opened = true;
       useUiStore.getState().setConnection("open");
       // Every (re)open is a hydration/liveness boundary — including the browser's
       // automatic EventSource reconnect, which fires onopen again on the SAME
@@ -161,10 +165,45 @@ class SseClient {
     queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.runs });
   }
 
+  // The shared worker is preferred, but SharedWorker EXISTING is not proof that
+  // it WORKS here: a browser can expose it and still refuse a module worker, and
+  // a stale or missing worker asset fails asynchronously. Both must reach the
+  // direct stream that already sits here, or the tab shows no live data at all
+  // with nothing to explain it (INV §6/§8/§12).
+  private createTransport(): EventSourceLike {
+    if (this.sharedStreamUnavailable || typeof SharedWorker === "undefined") {
+      return new EventSource("/api/events");
+    }
+    try {
+      return new SharedWorkerEventSource(() => this.useDirectStream());
+    } catch {
+      this.sharedStreamUnavailable = true;
+      return new EventSource("/api/events");
+    }
+  }
+
+  // Demote the transport for the rest of the session and reconnect directly.
+  // Idempotent: the load error and the never-opened watchdog can both fire.
+  private useDirectStream() {
+    if (this.sharedStreamUnavailable) return;
+    this.sharedStreamUnavailable = true;
+    this.es?.close();
+    this.es = null;
+    useUiStore.getState().setConnection("reconnecting");
+    this.connect();
+  }
+
   private startWatchdog() {
     if (this.watchdog) window.clearInterval(this.watchdog);
     this.watchdog = window.setInterval(() => {
       if (Date.now() - this.lastPing <= 25_000) return;
+      // A stream that never opened at all is a broken transport, not a dropped
+      // connection. Reconnecting it would loop on the same dead worker forever,
+      // so demote once and let the direct stream take the liveness window.
+      if (!this.opened && !this.sharedStreamUnavailable) {
+        this.useDirectStream();
+        return;
+      }
       this.es?.close();
       this.es = null;
       useUiStore.getState().setConnection("down");
@@ -197,11 +236,15 @@ class SharedWorkerEventSource implements EventSourceLike {
   private readonly listeners = new Map<string, Set<(event: MessageEvent<string>) => void>>();
   private readonly port: MessagePort;
 
-  constructor() {
+  constructor(onTransportFailure: () => void) {
     const worker = new SharedWorker(new URL("./sse-shared-worker.ts", import.meta.url), {
       name: "agentdeck-events",
       type: "module",
     });
+    // An `error` on the SharedWorker itself means its script never loaded or
+    // never evaluated. No port message can follow, so nothing else would ever
+    // notice: neither onopen nor onerror on this object can fire.
+    worker.onerror = () => onTransportFailure();
     this.port = worker.port;
     this.port.onmessage = (event: MessageEvent<SharedWorkerMessage>) => this.receive(event.data);
     this.port.start();
@@ -231,13 +274,6 @@ class SharedWorkerEventSource implements EventSourceLike {
       listener(event);
     }
   }
-}
-
-function createEventSource(): EventSourceLike {
-  // SharedWorker is origin-scoped, so every dashboard tab uses one underlying
-  // SSE connection. Older embedded browsers retain the direct transport.
-  if (typeof SharedWorker !== "undefined") return new SharedWorkerEventSource();
-  return new EventSource("/api/events");
 }
 
 export const sseClient = new SseClient();
