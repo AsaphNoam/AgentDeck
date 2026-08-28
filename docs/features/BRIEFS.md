@@ -5,6 +5,41 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-28 — Usability review: the redesigned Pipelines surface
+
+I drove the new Pipelines surface through a real browser against a release build of the current
+working tree, on three separate throwaway setups: one with nothing in it, one where I started a run
+from scratch through the dialog, and one loaded up with a run that looped through a repair cycle
+seven times, runs paused for approval, for a blocked stage and for a crashed agent, 121 stored runs,
+26 pieces of delegated work under a single attempt, a helper whose agent record no longer exists,
+and a 32-stage template.
+
+It holds up well. Nothing is broken, no journey dead-ends, and there was not a single error in the
+browser console anywhere on the surface. Landing on Runs, opening a run from its own link, reading a
+repair loop as separate attempts in the order they happened, opening the agents that did the work
+(live ones to their conversation, finished ones to their transcript), paging through the whole
+history to a definite end, editing one stage of a 32-stage template without losing unsaved changes,
+old links still resolving, deleted things explaining themselves, and the reduced-motion version of
+the whole flow all behaved exactly as intended, in both appearances.
+
+Six things are worth fixing, none of them blocking. Two are layout: the small numbered badge on each
+attempt is positioned wrong and ends up half off the left edge of the window on every run page, and
+on a narrow desktop window the run's setup details get pushed above the timeline, so the attempts you
+opened the page to read start a full screen down. Two are the same missing explanation: when a
+template needs a named input you haven't filled, and when you have no templates at all, the Start
+button in the dialog simply goes grey without saying what is missing. One is a stray technical error
+string on a deleted run's page. The last is a small promise in the specification—a gentle fade when a
+new attempt appears—that the code does not implement; I could not trigger a live attempt with the
+stand-in agent, so that one may be better fixed by trimming the promise than by adding the animation.
+Full detail is in the run report at `docs/archive/reviews/usability-review-run-2026-08-28-pipelines.md`.
+
+**Needs attention:** The whole redesign—code, specifications and notes—is still sitting uncommitted
+in the working tree. I did not commit my review notes on their own, because that would have put a
+"shipped the redesign" entry into the history without the code it describes. Committing the redesign
+is your call, and my notes should go in with it or right after.
+
+**Next:** Commit the staged redesign, then hand the six findings to a fix pass.
+
 ### 2026-08-28 — Implementation: Pipelines redesign
 
 Pipelines is now two focused experiences instead of one dense page. Runs opens as a compact
