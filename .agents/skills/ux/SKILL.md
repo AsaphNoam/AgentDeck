@@ -1,6 +1,6 @@
 ---
 name: ux
-description: "Use automatically with `/design-feature` whenever meaningful user-facing behavior is being defined, and for implementation whose acceptance depends on a materially new or changed task flow, state model, consequence, recovery path, or AI interaction. Also run when the user sends `/ux` for a focused critique. Do not trigger for frozen technical design, internal data wiring, style-only changes, specification-preserving fixes, or the broad acceptance review owned by `/usability-review`."
+description: "Use automatically with `/design-feature` or implementation only when work changes an established task flow or introduces an unfamiliar or consequential decision, ambiguous state, recovery path, long-running operation, or AI uncertainty. Also run when the user sends `/ux` for focused critique. Do not trigger for ordinary user-facing additions, familiar interactions, internal data wiring, style-only changes, specification-preserving fixes, or the broad acceptance review owned by `/usability-review`."
 ---
 
 # Shape and test the AgentDeck experience

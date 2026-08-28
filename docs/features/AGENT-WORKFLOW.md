@@ -128,11 +128,12 @@ Build and fix sessions edit specifications. Review sessions report missing or in
 `/design-feature` turns one new or recorded idea into work that is ready to implement. It changes
 specifications and planning documents, not product code.
 
-When the feature materially changes how a person accomplishes a task, understands system state or
-consequences, recovers, or works with automated/AI behavior, `/ux` accompanies this role
-automatically under §15. Apply its task framing and walkthrough before presenting the proposed
-behavior in step 4. Put durable results into the planned FS requirements and acceptance items, not
-into a separate UX artifact.
+Make the lightweight `/ux` trigger check in §15 while shaping behavior. A full UX pass accompanies
+this role only when the feature changes an established task flow or introduces an unfamiliar or
+consequential decision, ambiguous state, recovery path, long-running operation, or AI uncertainty.
+When it runs, apply its task framing before presenting the proposed behavior in step 4. Put durable
+results into the planned FS requirements and acceptance items, not into a separate UX artifact. If
+the trigger does not pass, continue without recording a UX ceremony or rationale.
 
 1. Use the idea named by the user. If none is named, take the first entry under `New ideas` in
    `docs/ideas.md`; this explicit default is the only time an agent selects future work itself.
@@ -371,41 +372,48 @@ review alone cannot close a visual claim, and open-ended polishing is not a comp
 ## 15. Shape and test the experience
 
 `/ux` improves how a person understands and completes a task across AgentDeck's interface, CLI,
-and AI-assisted behavior. It runs explicitly when named and accompanies `/design-feature`
-automatically whenever meaningful user-facing behavior is being defined. It also accompanies
-implementation when acceptance materially depends on a new or changed task flow, state model,
-consequence, recovery path, long-running operation, or AI interaction. It stays out of frozen
-technical design, internal APIs and data wiring, style-only visual changes, familiar behavior whose
-contract is unchanged, and specification-preserving fixes.
+and AI-assisted behavior. It runs explicitly when named. During `/design-feature` or implementation,
+use it automatically only when the work changes an established task flow or introduces an
+unfamiliar or consequential decision, ambiguous state, recovery path, long-running operation, or AI
+uncertainty. Ordinary user-facing additions, familiar interactions, internal APIs and data wiring,
+style-only visual changes, and specification-preserving fixes do not pass this trigger.
 
 The workflow does not authorize work by itself. It never selects a feature, enlarges the request,
 turns critique into implementation, invents user evidence, or replaces `/design-feature`,
 `/design`, `/review`, or `/usability-review`. It is primarily a design-time companion; rendered
 validation tests the resulting experience after it exists.
 
+AgentDeck currently serves a small set of experienced internal operators. Default to their actual
+knowledge, learned habits, and repeated-use needs: speed, density, keyboard flow, predictability,
+and control. Do not simplify a workflow for a hypothetical novice. First-use guidance matters when
+onboarding is the task; rediscoverability matters when an operation is rare or consequential enough
+for even an expert to forget it.
+
 ### 15.1 Start with the human task
 
 Read the governing feature requirements and acceptance items, the adjacent shipped experience, and
-the affected UI, CLI, or AI boundary. Frame only the one to three realistic tasks with the greatest
-first-use or consequence risk:
+the affected UI, CLI, or AI boundary. Frame one primary task with the greatest frequency or
+consequence risk. Add a second only when it is a materially different high-risk branch:
 
-- who is acting, what they know at entry, and the outcome they are trying to reach;
+- who is acting, what they already know and habitually do, the task's frequency, and the outcome;
 - the entry point, necessary decisions, critical path, completion signal, and useful next step;
 - relevant empty, waiting, success, error, permission, interruption, and recovery states;
 - meaningful time, cost, privacy, destructive, or automation consequences.
 
-When first use, novelty, complexity, or infrequency makes learnability uncertain, walk each critical
-step with two questions: given what the person knows now, will they know what to do and find the
-action; after acting, will the response explain what changed, whether they progressed, and what to
-do next? State the likely failure story before proposing a repair. An expert walkthrough identifies
-risk; it is not evidence that representative users will succeed.
+When the trigger rests on a changed learned workflow, an unfamiliar decision, or an infrequent
+consequential task, walk each critical step with two questions: given this operator's actual
+knowledge and habits, will the intended action remain obvious and efficient; after acting, will the
+response explain what changed, whether they progressed, and what to do next? State the likely
+failure story before proposing a repair. An expert walkthrough identifies risk; it is not evidence
+that other users will succeed.
 
 Use judgment, not a heuristic inventory. The strongest recurring decisions are:
 
 - shape sequence, grouping, and language around the person's goal rather than storage, protocol, or
   implementation structure;
 - keep the essential path visible and reveal advanced or rare choices in a clear next layer without
-  hiding frequent, risky, or prerequisite decisions;
+  hiding frequent, risky, or prerequisite decisions; learned shortcuts and dense expert controls
+  are preferable when they make repeated work faster without obscuring state or consequence;
 - make empty states explain what belongs there and offer the natural start, success say what
   happened and what is next, and errors preserve work while naming a practical repair;
 - make every available, unavailable, in-progress, completed, and failed action explain its state,
@@ -426,12 +434,12 @@ scope.
 
 ### 15.2 Harden behavior before the contract hardens
 
-During feature design, use the walkthrough to revise proposed behavior before the human confirms
-it. Resolve missing steps, hidden prerequisites, unclear state, unsafe consequences, and dead ends
-in the feature specification. Acceptance items should exercise the actual task and its material
-state or recovery branch, not assert that a heuristic or component exists. Keep transient task
-framing in the working plan or conversation; keep durable behavior only in the governing FS and
-ready change.
+During feature design, when the trigger passes, use the task frame and any warranted walkthrough to
+revise proposed behavior before the human confirms it. Resolve missing steps, hidden prerequisites,
+unclear state, unsafe consequences, and dead ends in the feature specification. Acceptance items
+should exercise the actual task and its material state or recovery branch, not assert that a
+heuristic or component exists. Keep transient task framing in the working plan or conversation;
+keep durable behavior only in the governing FS and ready change.
 
 Ask the human only for decisions the normal workflow reserves for them. When evidence about real
 people, frequency, comprehension, or model quality is absent, name the assumption and the validation
@@ -439,12 +447,15 @@ still needed instead of manufacturing research.
 
 ### 15.3 Exercise the task in the real product
 
-For post-implementation validation, run the working tree's real product and complete the framed
-task from the state a person actually enters with, without relying on source-code knowledge to find
-the route. Reuse `USABILITY-REVIEW.md` §§2 and 5 for an isolated `AGENTDECK_HOME`, the built binary,
+Run post-implementation validation only when rendered interaction, timing or state transition,
+recovery behavior, or the unresolved design-time risk could change the judgment. Ordinary behavior
+fully established by acceptance tests does not earn a browser pass; an explicit standalone `/ux`
+critique does. When validation is warranted, run the working tree's real product and complete the
+framed task from the operator's normal entry state. Reuse `USABILITY-REVIEW.md` §§2 and 5 for an
+isolated `AGENTDECK_HOME`, the built binary,
 `fakeacp` when deterministic live behavior is needed, and the browser fallback ladder. Exercise the
-critical path plus the one state, consequence, interruption, or recovery branch most likely to
-change the judgment. Source inspection and static rendering may identify risks but cannot prove an
+primary task plus only the state, consequence, interruption, or recovery branch likely to change
+the judgment. Source inspection and static rendering may identify risks but cannot prove an
 experienced finding.
 
 Every finding must name:

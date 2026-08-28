@@ -58,6 +58,21 @@ named under Review state is still owed.
 
 ## Changelog
 
+- **2026-08-28 — workflow:** Retuned `/ux` for AgentDeck's actual small, experienced internal
+  operator set. Automatic use now starts with a no-artifact trigger check and runs a full pass only
+  when work changes an established task or introduces an unfamiliar or consequential decision,
+  ambiguous state, recovery path, long-running operation, or AI uncertainty; ordinary user-facing
+  additions and familiar interactions stay in their normal workflow. The task frame now defaults to
+  one primary repeated-use task, adds a second only for a materially different high-risk branch,
+  and explicitly favors speed, density, keyboard flow, predictability, learned shortcuts, and
+  control over hypothetical-novice simplification. Walkthrough questions use the operator's real
+  knowledge and habits; onboarding and rediscoverability apply only when the task makes them real.
+  Real-browser validation now runs only when rendered interaction, timing/state, recovery, or an
+  unresolved design risk can change the judgment, plus explicit standalone critique; behavior fully
+  established by acceptance tests does not earn the harness cost. The canonical workflow, routing
+  summary, and Claude/Codex launchers agree; skill twins, YAML parsing, specification checks, and
+  whitespace checks are green.
+
 - **2026-08-28 — workflow:** Added the twinned first-party `/ux` skill and canonical workflow §15.
   It accompanies `/design-feature` automatically before meaningful user-facing behavior is
   confirmed, joins implementation only when acceptance materially depends on task flow, state,

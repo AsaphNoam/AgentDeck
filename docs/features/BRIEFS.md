@@ -5,6 +5,30 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-28 — Workflow correction: `/ux` now optimizes for expert operators
+
+`/ux` no longer runs a full process for every meaningful user-facing design. It first makes a cheap
+trigger decision and continues with an ordinary feature workflow unless the work changes an
+established task or introduces a consequential decision, ambiguous state, recovery path,
+long-running operation, or AI uncertainty. A skipped pass creates no rationale or UX artifact.
+
+The default user is now AgentDeck's actual experienced internal operator. The workflow optimizes
+repeated work for speed, density, keyboard flow, predictability, learned shortcuts, and control. It
+frames one primary task by default and adds another only for a materially different high-risk
+branch. Onboarding and discoverability are considered when they are genuinely in scope or when a
+rare consequential action must be rediscovered—not to simplify the whole product for hypothetical
+new users.
+
+Real-browser UX validation is also conditional now. It runs when rendered interaction, timing or
+state transitions, recovery behavior, or an unresolved design risk could change the answer, and for
+an explicit standalone `/ux` critique. Behavior already established by acceptance tests does not
+pay for the browser harness merely because `/ux` was considered.
+
+**Needs attention:** None.
+
+**Next:** Use the lightweight trigger on the next feature design; most ordinary or familiar
+additions should proceed without a full `/ux` pass.
+
 ### 2026-08-28 — Workflow: first-party UX judgment before behavior hardens
 
 AgentDeck now has a `/ux` workflow for the experience of accomplishing a task, not just whether the
