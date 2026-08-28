@@ -5,6 +5,23 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-28 — Housekeeping: the idea list and the Pipelines paperwork
+
+I removed the two ideas you said were already done — the projects-page rework and the three items
+from the August 10 play session — and tidied up after the Pipelines redesign. Its change file was
+still sitting in the queue marked finished while also being listed as work waiting to start, which
+made shipped work look unstarted; the file is gone and the specification is now the only place that
+describes what the surface does.
+
+I checked the other two against the code before deleting them, and they are not done. Dragging a
+card still only works from the small handle in its corner, not the card itself, and there is still
+no Content-Security-Policy anywhere in the server or the page. You chose to keep both, so both are
+still on the list.
+
+**Needs attention:** None.
+
+**Next:** Run the independent code review of the Pipelines redesign, or pick the next idea to design.
+
 ### 2026-08-28 — Fix: nothing left to fix
 
 There are no open problems on the list. Everything found by the last code review and the last

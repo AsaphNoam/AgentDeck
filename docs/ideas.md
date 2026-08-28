@@ -14,11 +14,6 @@ Example:
 - **Pinned agents.** Let people keep frequently used agents at the top of the dashboard.
 ```
 
-- **Projects page problems (new design).** Remaining redesigned-projects-page issues (the context
-  menu and six-preset colors were promoted to
-  `docs/ready-changes/project-context-menu-and-preset-colors.md`; "create a new project from the
-  projects page" moved to Ideas being defined):
-  1. The new design looks bad and needs rework.
 - **Fix card drag-and-drop usability.** Dashboard card reorder (FS-02.R12) technically works but
   reads as broken: the drag listener is bound only to the tiny 28×28px `::` handle
   (`AgentCard.tsx`), not the card itself, so dragging the card body does nothing — and because the
@@ -51,14 +46,6 @@ Example:
 - **Approval notifications link to the conversation.** When a pop-up notification fires because an
   agent needs approval, make it a link that opens that agent's conversation, so the user can jump
   straight to the pending permission instead of hunting for the right agent.
-
-### From play session 2026-08-10
-
-- **Crash protection for bad projects.** AgentDeck created invalid projects that broke the process.
-  Add input validation on project creation and guard the process against malformed project state.
-- **Adjustable chat window size.** Let the chat window be resized.
-- **'Approve for me' mode.** Like the agents already have — just expose the toggle, with the default
-  persisting to whatever was last selected.
 
 ## Ideas being defined
 

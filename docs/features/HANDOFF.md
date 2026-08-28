@@ -13,8 +13,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 - **Review state:** Every review and usability finding through 2026-08-28 is closed in code, tests,
   or an explicit specification boundary, including the six recorded against the split Pipelines
   surface.
-- **Active change:** None. The Pipelines surface split is committed and ready for an independent
-  review; see `../ready-changes/split-pipelines-surface.md`.
+- **Active change:** None. The Pipelines surface split is finished and committed (`9114df7`, with
+  its usability fixes in `69c2f99`) and is ready for an independent review; its change file is
+  removed, and FS-14 is the authority on what shipped.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
   remain owed before claiming those adapters accept structured results.
 - **Usability state:** The split Pipelines surface was driven through a real Chromium on
@@ -36,6 +37,13 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 **Next:** Run the independent code review of the committed Pipelines redesign and its fixes.
 
 ## Changelog
+
+- **2026-08-28 — docs:** Retired the completed *Projects page problems* and 2026-08-10
+  play-session ideas at the user's direction, and closed out the Pipelines redesign paperwork: its
+  finished change file is removed and it no longer appears under *Changes waiting to start*, with
+  FS-14 left as the authority on what shipped. The card drag-and-drop and Content-Security-Policy
+  ideas were checked against the tree and kept: drag listeners are still bound to the handle button
+  alone and no CSP exists in the server, the UI shell, or the specs.
 
 - **2026-08-28 — fix:** No open review findings. `## Review findings` was empty and the
   working tree was clean, so no code, test, or specification changed. The committed Pipelines
