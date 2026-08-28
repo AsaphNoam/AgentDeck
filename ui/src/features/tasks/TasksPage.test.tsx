@@ -35,6 +35,17 @@ const parked = {
   arms: [{ ...baseTask.arms[0], arm_id: "tk_2_arm00", task_id: "tk_2", state: "unsatisfiable" as const }],
 };
 
+// Parked because its three start attempts were spent: every arm is satisfied,
+// so Retry — not Re-arm — is the repair that restores the allowance (FS-16.R25).
+const exhausted = {
+  ...baseTask,
+  task_id: "tk_3",
+  display_name: "exhausted work",
+  state: "dependency_failed" as const,
+  attention_reason: "the last start attempt failed",
+  arms: [{ ...baseTask.arms[0], arm_id: "tk_3_arm00", task_id: "tk_3", state: "satisfied" as const }],
+};
+
 let lastRequest: { url: string; body: unknown } | null = null;
 
 const server = setupServer(
@@ -95,6 +106,7 @@ describe("Tasks view", () => {
 
     expect(within(parkedRow).queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
 
+
     fireEvent.change(within(parkedRow).getByLabelText("Wait for signal"), { target: { value: "ci-green" } });
     fireEvent.click(within(parkedRow).getByRole("button", { name: "Re-arm" }));
     await waitFor(() => expect(lastRequest?.url).toBe("rearm:tk_2"));
@@ -121,6 +133,27 @@ describe("Tasks view", () => {
 		await waitFor(() => expect(lastRequest?.url).toBe("create"));
 		expect(lastRequest?.body).toMatchObject({ target_kind: "launch", arms: [{ source_kind: "pipeline_run", source_id: "pr_1", satisfying_outcomes: ["success", "failure"] }], attachments: [{ context_ref_id: "cx_1", label: "brief" }] });
 	 });
+
+  // Regression (review fix): narrowing Retry to `interrupted` also removed it
+  // from a task parked by exhausted start attempts, whose only specified repair
+  // it is. Re-arm is not a substitute — it never restores the allowance — so the
+  // person was left with no route back for work that simply failed to start.
+  it("offers retry on work parked by exhausted start attempts", async () => {
+    server.use(http.get("/api/tasks", () => HttpResponse.json({ tasks: [exhausted, parked] })));
+    server.use(http.post("/api/tasks/:id/retry", async ({ params }) => {
+      lastRequest = { url: `retry:${params.id}`, body: null };
+      return HttpResponse.json({ ...exhausted, state: "ready" });
+    }));
+    renderPage();
+    await screen.findByText("exhausted work");
+    const rows = screen.getAllByRole("listitem");
+
+    // The unsatisfiable-arm park in the same list must still withhold it.
+    expect(within(rows[1]).queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+
+    fireEvent.click(within(rows[0]).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(lastRequest?.url).toBe("retry:tk_3"));
+  });
 
   it("uses the configured default role for a new launch task", async () => {
     renderPage();

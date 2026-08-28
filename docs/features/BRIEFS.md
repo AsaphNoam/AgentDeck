@@ -5,6 +5,30 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-28 — Fix: the Tasks page offers Retry again where Retry is the repair
+
+A task can end up parked for two quite different reasons, and the fix that shipped last week treated
+them as one. If a task is waiting on something that can never happen, retrying it is pointless and
+re-arming it is the repair — that part was right, and the Retry button was correctly removed.
+But a task can also park simply because it failed to start three times, say because a provider was
+briefly unreachable, or because the agent it was meant to run in was deleted. For those, Retry *is*
+the repair: it hands the task a fresh set of attempts and puts it back in the queue. Hiding the
+button removed the only sensible route back.
+
+The page now decides the same way the server does: Retry appears for interrupted work, and for
+parked work unless something it depends on has become impossible. In the second case you still get
+Re-arm and no Retry, so you are never offered a button that would only come back with an error.
+
+I also recorded this in the acceptance criteria. The rule that parked work is repairable was checked
+only on the server side; nothing verified that the page offers the right repair for each reason,
+which is exactly how the two got collapsed. There is now a test with both kinds of parked task in
+one list.
+
+**Needs attention:** None.
+
+**Next:** Five smaller items remain from the review, plus one I found while verifying this batch.
+Say the word for the next one.
+
 ### 2026-08-28 — Fix: the dashboard now recovers when the shared connection cannot run
 
 I fixed the one item I flagged as must-fix. The change that made browser tabs share a single live

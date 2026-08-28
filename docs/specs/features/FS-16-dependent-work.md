@@ -361,7 +361,9 @@ Each names the verification that demonstrates it.
 - **A11** (R8, R23) — A task parked by an unsatisfiable arm is rejected for retry with an
   error naming re-arm, and re-arming it onto a different, already-satisfied prerequisite moves it to
   `ready` and it starts — so the parked state is demonstrably repairable rather than permanent:
-  scheduler and HTTP tests.
+  scheduler and HTTP tests. The Tasks view offers each park reason only the repair that can succeed:
+  Retry on a task parked by exhausted start attempts, and Re-arm without Retry on one parked by an
+  unsatisfiable arm: UI test.
 - **A12** (R18) — Deleting a prerequisite parks a dependent whose arm was still waiting,
   and leaves untouched a dependent whose arm that prerequisite had already satisfied, in each of the
   `ready`, `starting`, `running`, `interrupted`, and `finished` dependent states: state tests covering

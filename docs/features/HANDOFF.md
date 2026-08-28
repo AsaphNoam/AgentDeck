@@ -17,8 +17,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   changelog.
 - **Review state:** Every review and usability finding through 2026-08-28 is closed in code, tests,
   or an explicit specification boundary, including the six recorded against the split Pipelines
-  surface. The four bug-investigation findings below are open, joined by seven
-  from the 2026-08-28 review of `790c01c` — its one Must fix is closed. Separately, three commits have never had their shipped
+  surface. The four bug-investigation findings below are open, joined by six
+  from the 2026-08-28 review of `790c01c` — its Must fix and the Tasks Retry gate are closed. Separately, three commits have never had their shipped
   diff read against the specs: `c35ff8c` (Mermaid rendering) and `9114df7` + `69c2f99` (the
   Pipelines split and its fixes). Each had a design review before implementation and a usability
   review after; neither substitutes for the §7 code review.
@@ -46,13 +46,24 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 **State:** Ready for the next human-selected change.
 
-**Next:** Run `/fix` on the remaining seven Worth-fixing items from the `790c01c` review — the
-Tasks Retry gate is the most user-visible — then the four bug-investigation findings (un-skip
+**Next:** Run `/fix` on the remaining six Worth-fixing items from the `790c01c` review, then the
+four bug-investigation findings (un-skip
 `internal/pipeline/blocked_chat_answer_test.go` first). The second bug-investigation finding needs
 the user's product decision before it can close. The independent code review of the three commits
 named under Review state is still owed.
 
 ## Changelog
+
+- **2026-08-28 — fix:** Closed the Tasks Retry finding from the `790c01c` review (INV §10). The
+  view now gates Retry on the same predicate the server uses — `interrupted`, or `dependency_failed`
+  with no `unsatisfiable` arm — instead of on `interrupted` alone. A task parked because its three
+  start attempts were spent, or because its target became ineligible, gets back the repair FS-16.R23
+  names for it; a task parked by an arm that can never be satisfied still shows Re-arm and no Retry,
+  so the view never offers a control that would be refused. No behavior beyond the specification
+  changed, so this restores FS-16.R23/R25 rather than altering them; A11 gains the UI half of its
+  verification, which had no home before. A new regression covers both parked kinds in one list and
+  fails against the pre-fix gate. `make test`, `make build`, `make embed`, `make check-specs`,
+  `git diff --check`, `tsc --noEmit`, `npm test` (282 passing) and `npm run build` are green.
 
 - **2026-08-28 — fix:** Closed the one Must-fix finding from the `790c01c` review (INV §6/§8/§12).
   The shared-worker SSE transport now has a reachable failure path: construction runs inside
@@ -395,32 +406,6 @@ diagnosis below is from the code path and a local reproduction, not from inciden
   log the conflict.
 
 From the 2026-08-28 review of `790c01c` (the thirteen dashboard/SSE and usability fixes):
-
-- **Worth fixing** — the Tasks view no longer offers Retry on a task parked by exhausted start
-  attempts, and no other control performs that repair. Closing the "Retry can never succeed on a
-  parked task" usability finding narrowed the button to `task.state === "interrupted"` alone
-  (`ui/src/features/tasks/TasksPage.tsx:145`), but `dependency_failed` is reached three ways and only
-  one of them is an unsatisfiable arm: `FailTaskStart` parks a task when its third start attempt
-  genuinely fails (`internal/state/tasks.go:1133`), and `ParkTaskStart` parks one whose target agent
-  was deleted, archived, or is a terminal interface (`:1150`). `RetryTask` accepts both — it refuses
-  only when an arm is `unsatisfiable` (`:1557-1565`) — and FS-16.R23 states outright that Retry
-  "returns an `interrupted` task, **or one parked because its start attempts were exhausted**, to
-  `ready` with a fresh attempt allowance", with FS-16 §3 repeating it. Re-arm is not a substitute:
-  `RearmTask` replaces the arm set and never resets `start_attempt_count` (`:1587-1640`), so a
-  re-armed task returns to `ready` with its allowance still spent and parks again on its first
-  failure. Impact, checked precisely on 2026-08-28: the work is *recoverable* — submitting the
-  Re-arm form with both fields blank clears the arm set, `initialTaskState` treats no arms as `ready`
-  (`:375-389`), and nothing in dispatch consults `start_attempt_count`, so the task starts. But that
-  route is undiscoverable (the control is labelled Re-arm and its inputs ask for a prerequisite; R23
-  describes it as the repair for an unsatisfiable arm), it destroys the task's recorded
-  prerequisites, and it leaves the allowance spent so the next genuine start failure parks the task
-  again at once. The specified repair — Retry restoring the full allowance — has no control at all.
-  The UI test that covered the old behavior was replaced with one asserting the button's absence
-  against a fixture whose arm is `unsatisfiable`
-  (`ui/src/features/tasks/TasksPage.test.tsx:89-97`), so nothing catches this. Fix: gate on the same
-  predicate the server uses — render Retry for `interrupted`, and for `dependency_failed` when no
-  arm has `state === "unsatisfiable"`; regression-test both `dependency_failed` fixtures
-  (FS-16.R23/R25, A11, **INV §10**).
 
 - **Worth fixing** — FS-02.A27 names verification that does not exist, and the whole SSE suite runs
   against the transport production no longer uses. A27 claims "shared-stream transport tests and the

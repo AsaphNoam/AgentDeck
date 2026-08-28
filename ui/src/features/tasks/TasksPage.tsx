@@ -105,6 +105,15 @@ function TaskRow({ task, project, taskNames }: { task: Task; project: string; ta
 
   const arms = task.arms ?? [];
   const waiting = waitingOn(arms, taskNames);
+  // `dependency_failed` is reached three ways and only one of them — an arm that
+  // can never be satisfied — is repaired by re-arming. A task parked because its
+  // start attempts were spent, or because its target became ineligible, is
+  // repaired by Retry, which restores the full allowance (FS-16.R23/R25). Gate on
+  // the same predicate the server uses so the view never offers a refusal and
+  // never withholds the repair that works.
+  const retryable =
+    task.state === "interrupted" ||
+    (task.state === "dependency_failed" && !arms.some((arm) => arm.state === "unsatisfiable"));
   const assignedID = task.assigned_agent_id || (task.target_kind === "agent" ? task.target_agent_id : "");
   const assignedName = useAgentStore((state) => assignedID ? state.agents[assignedID]?.name : undefined);
   const act = (run: () => Promise<unknown>) => {
@@ -142,7 +151,7 @@ function TaskRow({ task, project, taskNames }: { task: Task; project: string; ta
         {task.state !== "finished" && (
           <Button size="small" onClick={() => act(() => cancel.mutateAsync(task.task_id))}>Cancel</Button>
         )}
-        {task.state === "interrupted" && (
+        {retryable && (
           <Button size="small" onClick={() => act(() => retry.mutateAsync(task.task_id))}>Retry</Button>
         )}
 		{(task.state === "running" || task.state === "interrupted") && <form onSubmit={(event) => { event.preventDefault(); act(() => record.mutateAsync({ taskID: task.task_id, outcome, summary, details })); }}>
