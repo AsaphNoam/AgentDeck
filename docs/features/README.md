@@ -2,7 +2,7 @@
 
 This directory contains process and live state, not product specifications.
 
-- [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) — shared process for implementation, review, and UI
+- [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) — shared process for implementation, review, UX, and UI
   design judgment.
 - [`HANDOFF.md`](HANDOFF.md) — current resumable work, decisions, gates, and findings.
 - [`BRIEFS.md`](BRIEFS.md) — short, plain-language session updates for the human.

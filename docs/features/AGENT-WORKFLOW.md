@@ -128,6 +128,12 @@ Build and fix sessions edit specifications. Review sessions report missing or in
 `/design-feature` turns one new or recorded idea into work that is ready to implement. It changes
 specifications and planning documents, not product code.
 
+When the feature materially changes how a person accomplishes a task, understands system state or
+consequences, recovers, or works with automated/AI behavior, `/ux` accompanies this role
+automatically under §15. Apply its task framing and walkthrough before presenting the proposed
+behavior in step 4. Put durable results into the planned FS requirements and acceptance items, not
+into a separate UX artifact.
+
 1. Use the idea named by the user. If none is named, take the first entry under `New ideas` in
    `docs/ideas.md`; this explicit default is the only time an agent selects future work itself.
 2. Move the idea to `Ideas being defined` and work with the user to understand its outcome, scope,
@@ -352,3 +358,114 @@ iterating on subjective polish once the direction and material findings are sati
 `/design` critique reports rendered evidence and findings in the conversation and edits no
 repository file. A §7 code review records findings and state updates exactly as §7 directs. Source
 review alone cannot close a visual claim, and open-ended polishing is not a completion strategy.
+
+## 15. Shape and test the experience
+
+`/ux` improves how a person understands and completes a task across AgentDeck's interface, CLI,
+and AI-assisted behavior. It runs explicitly when named and accompanies `/design-feature`
+automatically whenever meaningful user-facing behavior is being defined. It also accompanies
+implementation when acceptance materially depends on a new or changed task flow, state model,
+consequence, recovery path, long-running operation, or AI interaction. It stays out of frozen
+technical design, internal APIs and data wiring, style-only visual changes, familiar behavior whose
+contract is unchanged, and specification-preserving fixes.
+
+The workflow does not authorize work by itself. It never selects a feature, enlarges the request,
+turns critique into implementation, invents user evidence, or replaces `/design-feature`,
+`/design`, `/review`, or `/usability-review`. It is primarily a design-time companion; rendered
+validation tests the resulting experience after it exists.
+
+### 15.1 Start with the human task
+
+Read the governing feature requirements and acceptance items, the adjacent shipped experience, and
+the affected UI, CLI, or AI boundary. Frame only the one to three realistic tasks with the greatest
+first-use or consequence risk:
+
+- who is acting, what they know at entry, and the outcome they are trying to reach;
+- the entry point, necessary decisions, critical path, completion signal, and useful next step;
+- relevant empty, waiting, success, error, permission, interruption, and recovery states;
+- meaningful time, cost, privacy, destructive, or automation consequences.
+
+When first use, novelty, complexity, or infrequency makes learnability uncertain, walk each critical
+step with two questions: given what the person knows now, will they know what to do and find the
+action; after acting, will the response explain what changed, whether they progressed, and what to
+do next? State the likely failure story before proposing a repair. An expert walkthrough identifies
+risk; it is not evidence that representative users will succeed.
+
+Use judgment, not a heuristic inventory. The strongest recurring decisions are:
+
+- shape sequence, grouping, and language around the person's goal rather than storage, protocol, or
+  implementation structure;
+- keep the essential path visible and reveal advanced or rare choices in a clear next layer without
+  hiding frequent, risky, or prerequisite decisions;
+- make empty states explain what belongs there and offer the natural start, success say what
+  happened and what is next, and errors preserve work while naming a practical repair;
+- make every available, unavailable, in-progress, completed, and failed action explain its state,
+  consequence, and next recovery step in product language;
+- acknowledge long work promptly; show stage, progress, or time only when trustworthy; preserve
+  context and offer safe leave, cancel, retry, resume, or history behavior as the task warrants;
+- prevent consequential errors with clear labels, scope, and previews; interrupt with confirmation
+  only when the cost or irreversibility earns it, and prefer undo or recovery where feasible;
+- for AI behavior, set honest capability and quality expectations, expose relevant uncertainty,
+  permissions, time, and cost, and preserve practical ways to correct, dismiss, edit, retry, or
+  stop. Do not imply human understanding or invent model quality evidence;
+- for CLI behavior, preserve predictable syntax, composable input/output, meaningful exit status,
+  concise help and examples, human-repairable errors, and non-interactive behavior outside a TTY.
+
+Do not add a modal, explanation, progress display, option, or recovery mechanism merely because a
+source guideline mentions it. Add only what resolves a concrete task risk at the smallest coherent
+scope.
+
+### 15.2 Harden behavior before the contract hardens
+
+During feature design, use the walkthrough to revise proposed behavior before the human confirms
+it. Resolve missing steps, hidden prerequisites, unclear state, unsafe consequences, and dead ends
+in the feature specification. Acceptance items should exercise the actual task and its material
+state or recovery branch, not assert that a heuristic or component exists. Keep transient task
+framing in the working plan or conversation; keep durable behavior only in the governing FS and
+ready change.
+
+Ask the human only for decisions the normal workflow reserves for them. When evidence about real
+people, frequency, comprehension, or model quality is absent, name the assumption and the validation
+still needed instead of manufacturing research.
+
+### 15.3 Exercise the task in the real product
+
+For post-implementation validation, run the working tree's real product and complete the framed
+task from the state a person actually enters with, without relying on source-code knowledge to find
+the route. Reuse `USABILITY-REVIEW.md` §§2 and 5 for an isolated `AGENTDECK_HOME`, the built binary,
+`fakeacp` when deterministic live behavior is needed, and the browser fallback ladder. Exercise the
+critical path plus the one state, consequence, interruption, or recovery branch most likely to
+change the judgment. Source inspection and static rendering may identify risks but cannot prove an
+experienced finding.
+
+Every finding must name:
+
+- the human task and entry context;
+- the observed friction and evidence;
+- the consequence for understanding, progress, control, or recovery;
+- one concrete, proportionate improvement.
+
+Rank implementation or review findings using the active role's severity terms. In a build/fix role,
+repair in-scope findings under the normal specification-first rules and repeat the task while
+material friction remains. In a §7 review, record findings as §7 directs. A standalone `/ux`
+critique reports evidence and improvements in the conversation and edits no product code,
+specification, handoff, or brief. If the real-product path cannot run, say what remains unverified;
+do not convert a static hypothesis into a finding.
+
+Stop when the person can complete the scoped task, understand the resulting state and consequences,
+and recover from the material branch. Do not expand into a product-wide tour or continue tuning
+subjective preferences. `/usability-review` owns the broad acceptance-journey regression and its
+stored run reports.
+
+### 15.4 Work with `/design` without splitting the experience
+
+`/ux` owns the task outcome, sequence, terminology, discoverability, state and consequence model,
+and control or recovery need. `/design` owns composition, visual hierarchy, typography, spacing,
+color, motion, and finish. Their concerns overlap whenever visual treatment affects whether a person
+can find an action, read state, predict a consequence, or understand feedback.
+
+When both trigger, share one task frame and one rendered browser pass. Describe the user problem
+once: `/ux` establishes what the experience must communicate or enable, and `/design` makes that
+need perceptible and coherent in AgentDeck's visual system. Do not bounce a finding between the two,
+duplicate evidence, or let visual polish stand in for a missing step, unsafe action, or absent
+recovery path.

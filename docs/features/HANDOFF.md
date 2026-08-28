@@ -58,6 +58,25 @@ named under Review state is still owed.
 
 ## Changelog
 
+- **2026-08-28 — workflow:** Added the twinned first-party `/ux` skill and canonical workflow §15.
+  It accompanies `/design-feature` automatically before meaningful user-facing behavior is
+  confirmed, joins implementation only when acceptance materially depends on task flow, state,
+  consequence, recovery, long-running work, or AI interaction, and remains available as a focused
+  read-only critique. The workflow distills cognitive walkthroughs, NN/g heuristics and focused
+  patterns, Microsoft HAX, CLI Guidelines, Good Services, and the non-duplicative PAIR caution
+  against implying human understanding into task framing, a two-question walkthrough, behavioral
+  contract hardening, and focused real-product validation. Findings must name the actual task,
+  observed friction, consequence, evidence, and a proportionate repair. `/design` continues to own
+  visual composition and polish while sharing task frames and browser passes where the lenses
+  overlap; `/usability-review` continues to own the product-wide acceptance matrix. Independent
+  forward tests against the Pipelines split, Mermaid rendering, and running-first card placement
+  recovered the existing blocked-run chat/Continue failure, produced no Mermaid false positive,
+  and isolated cross-boundary drag feedback as an unverified J5 risk rather than a finding. The
+  internal SharedWorker fallback correctly did not trigger the skill. Specification checks, all
+  skill-twin comparisons, YAML frontmatter parsing, and whitespace checks are green. The bundled
+  skill validator itself could not start because the host Python lacks PyYAML; its covered
+  frontmatter/name/placeholders were checked directly instead.
+
 - **2026-08-28 — work:** Shipped running-first card placement. Inside every group section of an
   agent card grid, running agents now render before stopped ones and the persisted manual order
   survives inside each of those two blocks, so a card crosses the boundary the moment its agent

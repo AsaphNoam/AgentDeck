@@ -4,7 +4,7 @@ Guidance for coding agents working in this repository.
 
 ## Read order
 
-Before feature design, implementation, review, fix-review, or usability-review work, read:
+Before feature design, implementation, review, fix-review, usability-review, or UX work, read:
 
 1. [`docs/features/HANDOFF.md`](docs/features/HANDOFF.md) — current state and relevant requirement IDs.
 2. The change file named by the handoff, if a change is in progress.
@@ -35,6 +35,9 @@ rationale, history, or sequencing but do not override an FS/TS requirement.
   extension over new mechanism, and unverified assumptions are findings; change nothing.
 - **Design UI:** §14. `/design` is explicit or automatically accompanies work with material visual
   judgment; it improves direction and rendered iteration without selecting or enlarging the work.
+- **Shape and test UX:** §15. `/ux` is explicit or automatically accompanies feature design and
+  implementation when material task-flow, state, consequence, recovery, or AI-interaction judgment
+  is needed; it leads with design-time behavior and validates focused tasks in the real product.
 
 `docs/ideas.md` holds new ideas and known product improvements. `docs/ready-changes/` holds changes
 that are specified and ready to start. `HANDOFF.md` records only the change already in progress.

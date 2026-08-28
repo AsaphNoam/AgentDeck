@@ -5,6 +5,40 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-28 — Workflow: first-party UX judgment before behavior hardens
+
+AgentDeck now has a `/ux` workflow for the experience of accomplishing a task, not just whether the
+feature works. It joins feature design automatically whenever meaningful user-facing behavior is
+being defined, before the interaction contract hardens. It frames the few tasks that matter, walks
+them from what a person actually knows at each step, and turns hidden prerequisites, unclear state,
+unsafe consequences, and recovery dead ends into concrete feature behavior and acceptance evidence.
+
+After implementation it can drive the focused task in the real product, using AgentDeck's isolated
+browser fixtures when needed. A finding must name the task, observed friction, consequence, and a
+proportionate improvement; source inspection alone is only a risk lead. Standalone `/ux` critique
+is read-only. `/design` still owns composition, visual hierarchy, motion, and polish, while the two
+share one task frame and browser pass when visual treatment affects understanding. The broader
+`/usability-review` remains the product-wide acceptance regression.
+
+The guidance distills
+[cognitive walkthroughs](https://www.nngroup.com/articles/cognitive-walkthroughs/),
+[NN/g's usability heuristics](https://www.nngroup.com/articles/ten-usability-heuristics/),
+[Microsoft HAX](https://www.microsoft.com/en-us/haxtoolkit/ai-guidelines/),
+[CLI Guidelines](https://clig.dev/), and
+[Good Services](https://good.services/15-principles-of-good-service-design) without reproducing
+their checklists. PAIR contributed only the useful caution against implying human understanding;
+HAX already covers the operational AI controls. Forward tests on Pipelines, Mermaid diagrams, and
+running-first cards caught the existing blocked-run continuation failure, avoided a false Mermaid
+finding, and identified drag-refusal feedback as a browser-dependent risk rather than invented
+evidence. An internal connection fallback correctly stayed outside `/ux`.
+
+**Needs attention:** The real-browser check already owed for running-first card placement should
+observe whether a refused cross-boundary drop feels intentionally constrained or simply broken;
+that static risk is not a finding yet.
+
+**Next:** Let `/ux` accompany the next user-facing `/design-feature`, and include that drag-feedback
+observation when someone completes the owed dashboard browser check.
+
 ### 2026-08-28 — Implementation: running agents now sit at the top of a project's grid
 
 Opening a project dashboard starts with live work. Inside each group on the grid, the agents that
