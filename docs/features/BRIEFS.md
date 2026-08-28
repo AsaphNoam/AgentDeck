@@ -5,6 +5,38 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-28 — Bug investigation: the blocked pipeline stage that could not report back
+
+I found it, and I could reproduce it. When a stage agent says it is blocked and needs an answer from
+you, AgentDeck pauses the run but deliberately leaves that agent alive and idle so it can carry on
+later — and the run screen offers **Open agent** right next to the **Continue** box. If you answer
+the question in the agent's own chat, which is the natural thing to do because the question is
+sitting right there, the agent does the work and then tries to file its result, and AgentDeck refuses
+it with "caller is not the current stage attempt". That sentence is simply untrue: it is the current
+stage agent, and AgentDeck's own records say so. The real reason is that the run already recorded
+this agent's "blocked" answer and is waiting for you to press **Continue**. Worse, the refusal is
+tagged as one the agent must never retry, so it gives up and a full turn of its work is thrown away.
+Pressing **Continue** genuinely works; it is only the chat route that dead-ends.
+
+Three smaller things came out of it. Nothing ever tells the agent that answering in chat is out of
+band, so it cannot avoid the trap or explain it to you. Nothing about this refusal is written to the
+server log at all, which is why your report could not be checked against any log on this machine —
+the only record was inside the agent's own transcript. And there is a narrow timing hole where a run
+can quietly stop advancing with no error and no notification, which I could not reproduce and have
+recorded as unconfirmed.
+
+I changed no product behavior. The only thing I added to the code is a test that reproduces the
+failure, committed switched off so the repository stays green until it is fixed.
+
+**Needs attention:** One product decision is yours. Right now the boundary is that a paused agent's
+chat is not part of the pipeline, and the fix on that basis is to say so honestly — in the agent's
+instructions and in the refusal — so the work is never wasted. The alternative is to make answering
+in chat actually continue the run. The first is a small fix; the second is a real feature. Tell me
+which and I will fix accordingly.
+
+**Next:** I fix the wrong refusal, the missing log line and the timing hole, once you have told me
+which side of that boundary you want.
+
 ### 2026-08-28 — Housekeeping: the idea list and the Pipelines paperwork
 
 I removed the two ideas you said were already done — the projects-page rework and the three items

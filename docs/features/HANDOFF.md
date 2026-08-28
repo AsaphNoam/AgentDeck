@@ -6,13 +6,18 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
-- **Bug investigation:** The 2026-08-27 all-200/no-page-load incident is fixed. Same-origin dashboard
-  tabs now share one long-lived SSE connection, leaving the browser's HTTP/1.x pool available for
-  REST queries; the related config-source, transcript-reconciliation, and card-preview amplification
-  paths are bounded as described in the changelog.
+- **Bug investigation:** The 2026-08-28 pipeline `stale_assignment` report is diagnosed and open for
+  `/fix`: answering a blocked stage agent in its own chat, instead of through **Continue**, gets its
+  next report refused as `stale_assignment` even though it is the run's current attempt. Reproduced
+  by the committed skipped test in `internal/pipeline/blocked_chat_answer_test.go`. Four findings
+  below; the second needs a product decision. The earlier 2026-08-27 all-200/no-page-load incident
+  is fixed. Same-origin dashboard tabs now share one long-lived SSE connection, leaving the
+  browser's HTTP/1.x pool available for REST queries; the related config-source,
+  transcript-reconciliation, and card-preview amplification paths are bounded as described in the
+  changelog.
 - **Review state:** Every review and usability finding through 2026-08-28 is closed in code, tests,
   or an explicit specification boundary, including the six recorded against the split Pipelines
-  surface.
+  surface. The four bug-investigation findings below are open.
 - **Active change:** None. The Pipelines surface split is finished and committed (`9114df7`, with
   its usability fixes in `69c2f99`) and is ready for an independent review; its change file is
   removed, and FS-14 is the authority on what shipped.
@@ -34,9 +39,25 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 **State:** Ready for the next human-selected change.
 
-**Next:** Run the independent code review of the committed Pipelines redesign and its fixes.
+**Next:** Run `/fix` on the four open bug-investigation findings, starting by un-skipping
+`internal/pipeline/blocked_chat_answer_test.go`. The second finding needs the user's product
+decision before it can close. The independent code review of the committed Pipelines redesign is
+still owed.
 
 ## Changelog
+
+- **2026-08-28 — bug investigation:** Diagnosed the field report that a blocked pipeline stage agent
+  got `stale_assignment` when it tried to continue. Reproduced the most reachable route locally: a
+  `blocked` report leaves the stage agent live and idle and the run offers **Open agent** beside
+  **Continue**, so answering the question in that chat makes the agent's next report land on
+  `internal/pipeline/actions.go:198`, which returns `stale_assignment` / "caller is not the current
+  stage attempt" for a caller that *is* the current attempt under the current generation — a retry
+  class of `never` (FS-17) on a false reason, discarding a full turn of work. Refusing is specified
+  (FS-14.R19); the code, the message, and the silence around them are not. Four findings recorded:
+  the misclassified refusal, the unspecified blocked-pause boundary (needs a user product
+  decision), the total absence of refusal logging, and an unlocked-read compare-and-swap in
+  `OnTurnEnd`/`OnExit` that can park a run at `await_quiescence` (INV §5, probable). No product code
+  or specification changed; the only tree change is the skipped reproduction test.
 
 - **2026-08-28 — docs:** Retired the completed *Projects page problems* and 2026-08-10
   play-session ideas at the user's direction, and closed out the Pipelines redesign paperwork: its
@@ -257,4 +278,67 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-None.
+From the 2026-08-28 bug investigation of the field report: *"An AgentDecker session blocked the
+progression of a pipeline because it needed an answer from me, then when it tried to continue it got
+`stale_assignment` from AgentDeck."* No AgentDeck version, environment, or log was supplied, and this
+machine's `~/.agentdeck` holds no run newer than 2026-08-01, so it is not the incident home — the
+diagnosis below is from the code path and a local reproduction, not from incident logs.
+
+- **Must fix** (confirmed) `internal/pipeline/actions.go:198` refuses with
+  `stale_assignment` / "caller is not the current stage attempt" for three different conditions,
+  including one where the caller *is* the current stage attempt under the current generation. A
+  `blocked` report pauses the run with its stage agent still live and idle (FS-14.R11) and the run
+  detail offers **Open agent** beside **Continue** (`ui/src/features/pipelines/RunBrowser.tsx:132`),
+  so the ordinary human move — answering the question in the chat that is showing it — leads
+  straight here: the agent finishes the stage, calls `report_pipeline_stage_result`, and is told it
+  is not the current attempt. Refusing is right (FS-14.R19 forbids a second accepted result), but
+  the code and message are wrong: the real reason is that this attempt's report was already
+  accepted and the run is paused waiting for a human Continue, and FS-17 classifies
+  `stale_assignment` as retry `never`, so the agent abandons the stage on a false reason and a full
+  turn of work is silently discarded. `already_reported` is the shared vocabulary's name for this
+  condition and the task path already returns it
+  (`internal/messaging/task_tools.go:114`), so the second meaning here is also INV §2 drift.
+  Reproduced by the committed skipped test
+  `internal/pipeline/blocked_chat_answer_test.go` (`TestBlockedStageAgentAnsweredInChatIsNotCalledStale`);
+  un-skip it to start the fix. Fix: split the predicate — keep `stale_assignment` for a genuine
+  agent/generation mismatch, return `already_reported` naming the human Continue for the run's own
+  current attempt (INV §8).
+
+- **Must fix** (confirmed) Nothing tells a stage agent that a `blocked` report ends its
+  participation until a new assignment arrives. `renderAssignment`
+  (`internal/pipeline/assignment.go:35`) says only "call `report_pipeline_stage_result` exactly
+  once", and the accepted report returns `"awaiting":"quiescence"`
+  (`internal/messaging/pipeline_tools.go:35`) — neither states that chat input received during the
+  pause is out of band, that the person's answer arrives as a new assignment, or that work done
+  meanwhile cannot be recorded. FS-14 and TS-09 have no requirement covering this, so it is a
+  specification gap as well as the trigger for the finding above. The same dead end is reachable a
+  second way and there the work is unrecoverable by design: after a restart `RecoverRuns`
+  (`internal/pipeline/manager.go:320`) pauses an `await_result` run as `restart_recovery` and stops
+  the agent, `Continue` rejects that state (`internal/pipeline/actions.go:35`), and an ordinary
+  chat resume of that agent mints an unrelated generation
+  (`internal/server/resume.go:419`), so its report is refused forever and only **Retry** — a fresh
+  agent, from scratch — moves the run. FS-14.R20 puts that boundary in place deliberately, so
+  closing this needs a product decision from the user, not an agent's choice: either state the
+  boundary and say it in the assignment text and the refusal, or give the blocked pause a real
+  in-chat route. The **Open agent** action shipped on a pause where following it is a dead end
+  (INV §10).
+
+- **Worth fixing** (confirmed) No refusal from `report_pipeline_stage_result` is logged anywhere:
+  `internal/messaging/pipeline_tools.go` and `internal/pipeline/actions.go` have no logger on the
+  report path, and `internal/pipeline` logs only from `proposals.go`. `~/.agentdeck/dashboard.log`
+  records every HTTP request but not one control-plane refusal, so this report could not be
+  corroborated from the server log and the next one will be equally undiagnosable — the only trace
+  is inside the agent's own transcript. Log at Warn on refusal: run id, attempt id, caller agent
+  id/generation, the attempt's agent id/generation, the run's pending action, and the code. That
+  set is exactly what separates the three conditions the first finding conflates
+  (no invariant class).
+
+- **Worth fixing** (probable) `OnTurnEnd` and `OnExit` (`internal/pipeline/actions.go:281` and
+  `:305`) read the run *outside* `runLock`, then compare-and-swap on that captured revision *inside*
+  the lock and return `nil` when it conflicts. `Report` re-reads the run under the lock; these two
+  do not (INV §5). A revision bump in that window leaves a run parked at `await_quiescence` — state
+  `running`, no attention reason, no notification, no log — with no further turn boundary coming, so
+  the run silently stops progressing and any later report is refused with the same
+  `stale_assignment`. Not reproduced: it needs a concurrent bump in a narrow window, and no field
+  log exists to confirm it happened here. Fix: re-read the run under the lock as `Report` does, and
+  log the conflict.
