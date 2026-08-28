@@ -1,6 +1,6 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
@@ -50,6 +50,17 @@ describe("Pipelines routing", () => {
     fireEvent.click(await screen.findByRole("link", { name: /Delivery/ }));
     expect(await screen.findByRole("heading", { name: "Delivery", level: 2 })).toBeInTheDocument();
     expect(screen.queryByText("Operational ledger")).not.toBeInTheDocument();
+  });
+
+  // FS-14.R36: with no runnable template, Start run is not a dead end that opens
+  // a dialog which can never proceed.
+  it("points a template-less home to Templates instead of an unusable start dialog", async () => {
+    server.use(http.get("/api/pipelines", () => HttpResponse.json([])));
+    renderPipelines("/pipelines/runs");
+
+    expect(await screen.findByRole("heading", { name: "Runs", level: 2 })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Start run" })).toBeDisabled());
+    expect(screen.getByRole("link", { name: "Create one in Templates" })).toHaveAttribute("href", "/pipelines/templates");
   });
 
   it("redirects a legacy selected-run link to the run page", async () => {

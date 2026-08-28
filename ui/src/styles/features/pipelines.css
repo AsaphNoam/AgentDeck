@@ -76,6 +76,9 @@
   padding: var(--ad-space-4) 0 var(--ad-space-2);
 }
 
+.pipeline-start-gate { display: grid; gap: var(--ad-space-1); justify-items: end; }
+.pipeline-start-gate small { color: var(--ad-text-secondary); font-size: 0.75rem; text-align: right; }
+
 .pipeline-section-heading h2,
 .pipeline-editor-heading h2 {
   font-size: clamp(2rem, 4vw, 3.4rem);
@@ -300,9 +303,10 @@
 .pipeline-timeline-item:last-child .pipeline-timeline-line { bottom: 50%; }
 .pipeline-timeline-item > details { background: var(--ad-surface-panel); border: var(--ad-border-thin) solid var(--ad-border-default); min-width: 0; transition: border-color 120ms ease, box-shadow 120ms ease; }
 .pipeline-timeline-current > details { border-color: var(--ad-action-secondary); box-shadow: var(--ad-shadow-keyline); }
+.pipeline-timeline-appended > details { animation: pipeline-disclosure-in 160ms ease-out; }
 .pipeline-timeline-item > details > summary { align-items: center; cursor: pointer; display: grid; gap: var(--ad-space-3); grid-template-columns: auto minmax(0, 1fr) auto auto; list-style: none; min-height: 76px; padding: var(--ad-space-3) var(--ad-space-4); }
 .pipeline-timeline-item > details > summary::-webkit-details-marker { display: none; }
-.pipeline-timeline-item .pipeline-stage-number { left: calc(var(--ad-space-8) * -1.5); position: absolute; top: var(--ad-space-3); }
+.pipeline-timeline-item .pipeline-stage-number { left: 0; position: absolute; top: var(--ad-space-3); }
 .pipeline-stage-number { align-items: center; background: var(--ad-technical-surface); border-radius: var(--ad-radius-small); color: var(--ad-technical-text); display: inline-flex; flex: 0 0 auto; font-family: var(--ad-font-mono); height: var(--ad-space-8); justify-content: center; width: var(--ad-space-8); }
 .pipeline-disclosure-chevron { color: var(--ad-text-muted); transition: transform 120ms ease; }
 .pipeline-timeline-item details[open] .pipeline-disclosure-chevron { transform: rotate(180deg); }
@@ -382,6 +386,8 @@
 .pipeline-template-editor select,
 .pipeline-template-editor textarea { min-width: 0; width: 100%; }
 .pipeline-small-field { max-width: 150px; }
+.pipeline-field-missing > span { color: var(--ad-state-error); }
+.pipeline-field-missing textarea { border-color: var(--ad-state-error); }
 .pipeline-inline-row { align-items: end; display: grid; gap: var(--ad-space-2); grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto auto; }
 .pipeline-check { align-items: center; color: var(--ad-text-muted); display: flex; font-size: 0.74rem; gap: var(--ad-space-1); min-height: 38px; white-space: nowrap; }
 .pipeline-transitions { display: grid; gap: var(--ad-space-3); grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -406,6 +412,7 @@
 .pipeline-review-hero { background: var(--ad-technical-background); color: var(--ad-technical-text); padding: var(--ad-space-4); }
 .pipeline-review-hero h3 { color: var(--ad-technical-text); font-size: 2rem; }
 .pipeline-review-hero p:last-child { color: var(--ad-technical-muted); margin-top: var(--ad-space-2); }
+.pipeline-start-blocker { color: var(--ad-text-secondary); font-size: 0.75rem; }
 .pipeline-start-actions { align-items: center; background: var(--ad-surface-panel); border-top: var(--ad-border-thick) solid var(--ad-border-strong); display: grid; gap: var(--ad-space-2); grid-template-columns: auto 1fr auto auto; padding-top: var(--ad-space-3); }
 
 .pipeline-diagnostics { background: color-mix(in srgb, var(--ad-state-error) 8%, var(--ad-surface-panel)); border-left: var(--ad-space-1) solid var(--ad-state-error); color: var(--ad-state-error); display: grid; gap: var(--ad-space-1); margin: 0; padding: var(--ad-space-3) var(--ad-space-6); }
@@ -425,7 +432,7 @@
 @media (max-width: 1100px) {
   .pipeline-run-workspace,
   .pipeline-editor-workspace { grid-template-columns: minmax(0, 1fr); }
-  .pipeline-run-rail,
+  .pipeline-run-rail { position: static; }
   .pipeline-stage-navigator { order: -1; position: static; }
   .pipeline-stage-navigator > ol { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .pipeline-agent-grid { grid-template-columns: minmax(0, 1fr); }
@@ -442,6 +449,7 @@
   .pipeline-attempt-body,
   .pipeline-disclosure-body,
   .pipeline-start-pane,
+  .pipeline-timeline-appended > details,
   .pipeline-skeleton > span { animation: none; }
   .pipeline-ledger-row,
   .pipeline-template-row,

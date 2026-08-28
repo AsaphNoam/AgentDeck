@@ -51,6 +51,7 @@ export function PipelinesIndex() {
 
 export function RunsPage() {
   const navigate = useNavigate();
+  const templates = usePipelineTemplates();
   const [startOpen, setStartOpen] = useState(false);
   const [proposal, setProposal] = useState<Extract<PipelineProposal, { kind: "start_run" }> | null>(null);
 
@@ -59,11 +60,18 @@ export function RunsPage() {
     setStartOpen(true);
   };
 
+  // FS-14.R36: with no runnable template the dialog could only open onto a
+  // permanently disabled Next, so the gate names the missing step instead.
+  const noTemplate = templates.isSuccess && templates.data.every((record) => !record.valid);
+
   return (
     <div className="pipeline-destination pipeline-runs-destination">
       <header className="pipeline-section-heading">
         <div><p className="pipeline-eyebrow">Operational ledger</p><h2>Runs</h2><p>Follow what is active now, then drill into the full execution record.</p></div>
-        <Button variant="primary" onClick={() => { setProposal(null); setStartOpen(true); }}>Start run</Button>
+        <div className="pipeline-start-gate">
+          <Button variant="primary" disabled={noTemplate} onClick={() => { setProposal(null); setStartOpen(true); }}>Start run</Button>
+          {noTemplate && <small>No template is ready to run yet. <Link to="/pipelines/templates">Create one in Templates</Link>.</small>}
+        </div>
       </header>
       <AgentDeckerBuilder proposalKind="start_run" showLauncher={false} onRunProposal={reviewProposal} />
       <RunsLedger />

@@ -5,6 +5,34 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-28 — Fix: the six Pipelines review findings
+
+All six problems the usability review found on the redesigned Pipelines surface are fixed, and the
+redesign itself, the review notes, and these fixes are now committed rather than sitting loose in
+the working tree.
+
+The numbered badge on each attempt now sits on the timeline line instead of half off the left edge
+of the window, and in a narrow desktop window the attempts come first again instead of being pushed
+a full screen down by the run's setup details. The Start button no longer goes grey in silence: when
+a required field is still empty the dialog names it and marks the field, and on a setup with no
+usable template yet, Start run points at Templates instead of opening a dialog that can never
+proceed. A new attempt arriving on a live run now gets the brief fade the design called for, played
+only for the entry that actually just arrived and never for the ones already on screen. A deleted
+run's page explains itself in ordinary language; a run that fails to load for any other reason now
+says that instead, and still shows the underlying error rather than hiding it.
+
+On the one finding the review left open as a judgement call, I added the fade rather than trimming
+the promise out of the specification: it is a few lines of code and it is what the design says the
+surface does. The specification now also records the two new "say what is missing" behaviors, which
+no requirement covered before.
+
+**Needs attention:** The three visual fixes — the badge, the narrow-window order, and the new-attempt
+fade — are backed by tests and by the stylesheets, not by a browser run. The next time someone drives
+this surface in a real browser, those are the three to look at.
+
+**Next:** Run the independent code review of the Pipelines redesign, now that it and its fixes are
+committed.
+
 ### 2026-08-28 — Usability review: the redesigned Pipelines surface
 
 I drove the new Pipelines surface through a real browser against a release build of the current

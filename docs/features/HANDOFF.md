@@ -10,16 +10,18 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   tabs now share one long-lived SSE connection, leaving the browser's HTTP/1.x pool available for
   REST queries; the related config-source, transcript-reconciliation, and card-preview amplification
   paths are bounded as described in the changelog.
-- **Review state:** Every review and usability finding through 2026-08-27 is closed in code, tests,
-  or an explicit specification boundary. The 2026-08-28 usability review of the split Pipelines
-  surface recorded five **Worth fixing** findings and no blocker; they are listed below.
-- **Active change:** None. The Pipelines surface split is finished and ready for an independent
+- **Review state:** Every review and usability finding through 2026-08-28 is closed in code, tests,
+  or an explicit specification boundary, including the six recorded against the split Pipelines
+  surface.
+- **Active change:** None. The Pipelines surface split is committed and ready for an independent
   review; see `../ready-changes/split-pipelines-surface.md`.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
   remain owed before claiming those adapters accept structured results.
 - **Usability state:** The split Pipelines surface was driven through a real Chromium on
   2026-08-28 against the working tree's own release build. Every FS-14.A14–A23 item was exercised;
-  A14, A16–A20, A22 and A23 pass outright, A15 and A21 pass except for the gaps recorded below.
+  A14, A16–A20, A22 and A23 passed outright, and the A15 and A21 gaps are now fixed in code and
+  tests. The badge, rail-order and append-motion fixes are unverified in a real browser: no browser
+  run has been made since them.
   The earlier v0.2.2 → v0.2.3 delta remains closed: FS-02.A24 is closed and FS-04.A22 remains
   narrowed to the native panel.
 - **Last reviewed code:** `895348e` (2026-08-26).
@@ -31,11 +33,19 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 **State:** Ready for the next human-selected change.
 
-**Next:** Commit the staged Pipelines redesign — code, specifications and state are staged
-together but uncommitted — then fix the five usability findings below and run the independent
-code review.
+**Next:** Run the independent code review of the committed Pipelines redesign and its fixes.
 
 ## Changelog
+
+- **2026-08-28 — fix:** Closed all six Pipelines usability findings. The attempt badge sits on the
+  timeline rule instead of off the left window edge and the run rail no longer hoists itself above
+  the timeline at the desktop floor (INV §13). The start path explains every gate it applies: with
+  no valid template **Start run** is refused with a link to Templates, and a disabled step control
+  names the missing value and marks the empty required input (INV §8/§10) — new behavior, specified
+  as FS-14.R46/A24. A newly appended timeline entry now plays the one brief entrance FS-14.R45/A21
+  already promised, tracked from the ids present at first render so neither the initial list nor a
+  background refetch replays it (INV §10). A deleted run explains itself in product language, while
+  any other read failure says so honestly and keeps its transport detail (INV §8).
 
 - **2026-08-28 — usability review:** Drove the split Pipelines surface through a real Chromium
   against a `make dist` build of the working tree, on three isolated fixtures: an empty home, a home
@@ -235,61 +245,4 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-- **Worth fixing** — J14: every attempt-number badge renders off the left edge of the window.
-  `ui/src/styles/features/pipelines.css:305` sets
-  `.pipeline-timeline-item .pipeline-stage-number { left: calc(var(--ad-space-8) * -1.5) }`, but the
-  positioning context already carries a 32 px left padding to hold the badge, so the offset
-  overshoots by one and a half badge widths. Every run page at every viewport width renders its
-  attempt numbers at `left: -4 px`, clipped by the window frame and detached from the timeline they
-  label; the seven-attempt repair-loop run shows a column of half-cut numbers against the edge.
-  Measured at 1024, 1280, 1440 and 1728. `left: 0` centres the 32 px badge on the 15 px timeline
-  rule. Relevant requirement: FS-14.R44 (INV §13 — the test suite cannot see CSS). Suggested test:
-  a presentation/visual-matrix assertion that no `.pipeline-route` descendant has a negative left
-  edge on a populated run page.
-
-- **Worth fixing** — J14: at the desktop floor the run page stacks frozen setup and named values above
-  the execution timeline. `ui/src/styles/features/pipelines.css:425-429` collapses
-  `.pipeline-run-workspace` to one column at `max-width: 1100px` and gives `.pipeline-run-rail`
-  `order: -1`. At 1024×768 the secondary rail renders at y = 550 and the first timeline entry at
-  y = 1125, so the attempts a person opened the page to read start a full viewport below the fold,
-  behind Frozen setup and Named values. FS-14.R44 makes the timeline the main reading column with
-  setup and values as secondary disclosures and permits stacking the rail, not hoisting it ahead of
-  the primary content. `order: -1` on `.pipeline-stage-navigator` in the same block is appropriate
-  and should stay (INV §13 — the test suite cannot see CSS). Suggested fix: drop `order: -1` for
-  `.pipeline-run-rail` only. Suggested test: a floor-width assertion that `.pipeline-timeline`
-  precedes `.pipeline-run-rail` vertically.
-
-- **Worth fixing** — J14: the start dialog disables Next without naming the missing field. With a
-  template that declares a required named input, filling only the display name and goal leaves
-  **Next** greyed with no message, no marking on the empty required field and no title or aria hint.
-  The client-side gate means the server rejection FS-14.A15 describes is never reached, so the
-  "named field error" that item promises is never rendered; the person must discover that the
-  separate Named inputs block below is what blocks them. Relevant requirement: FS-14.A15 / R44.
-  Suggested fix: mark the empty required input and state the reason beside the disabled control, the
-  way the blocked-stage Continue button already does with its adjacent input box. Suggested test: a
-  `RunStartForm` test asserting the named field error is visible while Next is disabled.
-
-- **Worth fixing** — J14: with no templates saved, Start run opens a dialog that cannot proceed. On
-  an onboarded home with zero templates — the state a person reaches immediately after onboarding —
-  **Start run** is still offered and opens the dialog with an empty Template select and a permanently
-  disabled Next, with nothing pointing to Templates. Same class as the finding above but reached
-  earlier and by every new user. The empty Runs state one layer behind already carries the right
-  sentence. Relevant requirement: FS-14.R36. Suggested fix: either disable Start run with a reason
-  or have the dialog's empty template state link to Templates. Suggested test: a Runs-page test over
-  a zero-template fixture.
-
-- **Worth fixing** — J14: a newly appended timeline entry has no continuity transition.
-  FS-14.R45 and A21 name "a newly appended timeline entry" as one of the four continuity transitions
-  the surface uses, but `.pipeline-timeline-item` and its `<details>` compute `animationName: none`
-  in both normal and reduced-motion modes and `RunBrowser.tsx` emits no append-time class; the only
-  entrance animation on the surface is the page-level `pipeline-route-in`, which plays on route
-  mount. **Confidence note:** a live append could not be produced — advancing a stage needs the stage
-  agent to report through the MCP tool, which the deterministic fake peer does not do — so this rests
-  on the rendered app's computed styles plus the component source, not on an observed append. The
-  correct resolution may be to narrow R45/A21 rather than to add the motion; that is a product call
-  (INV §10 — a shipped requirement whose wiring is absent).
-
-- **Worth fixing** — J14: a deleted run's page shows the raw API error string (cosmetic; a one-line
-  copy fix). Revisiting a deleted run's URL renders "This run is gone." followed by the transport message "pipeline resource not found".
-  The template equivalent already reads "It may have been deleted in another tab. Existing runs still
-  retain their frozen setup." Relevant requirement: FS-14.R43.
+None.

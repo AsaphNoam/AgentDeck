@@ -39,25 +39,27 @@ const run = {
   created_at: "2026-07-26T00:00:00Z", updated_at: "2026-07-26T00:00:00Z",
 };
 
+const detail = {
+  run,
+  template,
+  inputs: {},
+  assignments: { work: { backend: "codex", model: "gpt-5.6-sol" } },
+  attempts: [attempt("at_1", "a_stopped", 1, "crashed"), attempt("at_2", "a_live", 2, "running")],
+  values: [],
+  diagnostics: [],
+  agents_by_attempt: {
+    at_1: { stage_agent: { agent_id: "a_stopped", name: "Stopped", running: false, state: "error", preview: "Stopped", route: "archive", available: true }, delegated_agents: [], delegated_total: 0, delegated_running_count: 0 },
+    at_2: { stage_agent: { agent_id: "a_live", name: "Live", running: true, state: "busy", preview: "Working", route: "live", available: true }, delegated_agents: [], delegated_total: 0, delegated_running_count: 0 },
+  },
+};
+
 const server = setupServer(
   http.get("/api/pipeline-runs", () => HttpResponse.json([{
     run_id: "run_1", template_id: "delivery", display_name: "Ship", project: "app", state: "running",
     revision: 4, pending_action: "await_result", current_stage_id: "work", current_agent_id: "a_live",
     attention_reason: "", final_outcome: "", updated_at: "2026-07-26T00:00:00Z", diagnostics: [],
   }])),
-  http.get("/api/pipeline-runs/run_1", () => HttpResponse.json({
-    run,
-    template,
-    inputs: {},
-    assignments: { work: { backend: "codex", model: "gpt-5.6-sol" } },
-    attempts: [attempt("at_1", "a_stopped", 1, "crashed"), attempt("at_2", "a_live", 2, "running")],
-    values: [],
-    diagnostics: [],
-    agents_by_attempt: {
-      at_1: { stage_agent: { agent_id: "a_stopped", name: "Stopped", running: false, state: "error", preview: "Stopped", route: "archive", available: true }, delegated_agents: [], delegated_total: 0, delegated_running_count: 0 },
-      at_2: { stage_agent: { agent_id: "a_live", name: "Live", running: true, state: "busy", preview: "Working", route: "live", available: true }, delegated_agents: [], delegated_total: 0, delegated_running_count: 0 },
-    },
-  })),
+  http.get("/api/pipeline-runs/run_1", () => HttpResponse.json(detail)),
 );
 
 function agent(id: string, running: boolean): AgentState {
@@ -123,5 +125,52 @@ describe("RunBrowser attempt transcripts", () => {
     expect(await screen.findByText("121 of 121 retained runs")).toBeInTheDocument();
     expect(screen.getByText("Complete history loaded")).toBeInTheDocument();
     expect(screen.getAllByText("Frozen Work")).toHaveLength(121);
+  });
+});
+
+describe("RunDetail continuity and absence", () => {
+  // FS-14.A21: only an attempt that arrives after the first render plays the
+  // append transition; the attempts already on screen do not replay it.
+  it("marks only the attempt appended after the first render", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    const { container } = render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter><RunBrowser selectedID="run_1" /></MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await screen.findByRole("heading", { name: "Ship", level: 2 });
+    expect(container.querySelectorAll('[data-slot="attempt"]')).toHaveLength(2);
+    expect(container.querySelectorAll(".pipeline-timeline-appended")).toHaveLength(0);
+
+    server.use(http.get("/api/pipeline-runs/run_1", () => HttpResponse.json({
+      ...detail,
+      attempts: [...detail.attempts, attempt("at_3", "a_live", 3, "running")],
+    })));
+    void client.invalidateQueries();
+
+    await waitFor(() => expect(container.querySelectorAll('[data-slot="attempt"]')).toHaveLength(3));
+    const appended = [...container.querySelectorAll(".pipeline-timeline-appended")];
+    expect(appended).toHaveLength(1);
+    expect(appended[0]).toBe(container.querySelectorAll('[data-slot="attempt"]')[2]);
+  });
+
+  // FS-14.R43: a deleted run explains itself in product language instead of
+  // rendering the transport error string.
+  it("explains a deleted run without the raw API message", async () => {
+    server.use(http.get("/api/pipeline-runs/run_1", () => HttpResponse.json(
+      { error: { code: "not_found", message: "pipeline resource not found" } },
+      { status: 404 },
+    )));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter><RunBrowser selectedID="run_1" /></MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText("This run is gone.")).toBeInTheDocument();
+    expect(screen.queryByText("pipeline resource not found")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Return to Runs" })).toHaveAttribute("href", "/pipelines/runs");
   });
 });

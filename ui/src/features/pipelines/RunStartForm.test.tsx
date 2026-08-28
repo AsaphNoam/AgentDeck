@@ -67,6 +67,32 @@ describe("RunStartForm", () => {
     expect(screen.getByLabelText("Backend")).toHaveFocus();
   });
 
+  // FS-14.A15: a disabled Next names the value it is still waiting for, and the
+  // empty required input is marked, so the gate is not silent.
+  it("names the missing required input while Next stays disabled", async () => {
+    server.use(http.get("/api/pipelines", () => HttpResponse.json([{
+      id: "delivery",
+      template: { ...template, inputs: [{ name: "spec_url", description: "Where the spec lives", required: true }] },
+      valid: true,
+      diagnostics: [],
+    }])));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    const { container } = render(<QueryClientProvider client={client}><RunStartForm stepMode onCancel={() => {}} onStarted={() => {}} /></QueryClientProvider>);
+
+    await screen.findByRole("option", { name: "Delivery (delivery)" });
+    fireEvent.change(screen.getByLabelText("Template"), { target: { value: "delivery" } });
+    fireEvent.change(screen.getByLabelText("Run goal"), { target: { value: "Ship it" } });
+
+    expect(await screen.findByText("Fill the required named input: spec_url")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+    expect(container.querySelector('[data-field="inputs.spec_url"]')).toHaveClass("pipeline-field-missing");
+
+    fireEvent.change(screen.getByLabelText(/spec_url/), { target: { value: "https://example.invalid/spec" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Next" })).toBeEnabled());
+    expect(screen.queryByText(/Fill the required named input/)).not.toBeInTheDocument();
+    expect(container.querySelector('[data-field="inputs.spec_url"]')).not.toHaveClass("pipeline-field-missing");
+  });
+
   // FS-14.A20/A21: the dialog sequence preserves the draft while moving
   // through one stable Setup → Runtimes → Review flow.
   it("preserves setup values across the three start steps", async () => {

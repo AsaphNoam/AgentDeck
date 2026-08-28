@@ -153,11 +153,24 @@ export function RunStartForm({
     );
   };
 
-  const requiredMissing = template?.inputs.some((input) => input.required && !inputs[input.name]?.trim()) ?? true;
+  const missingInputs = template?.inputs.filter((input) => input.required && !inputs[input.name]?.trim()) ?? [];
+  const requiredMissing = template ? missingInputs.length > 0 : true;
   const assignmentsMissing = template?.stages.some((stage) => !assignments[stage.id]?.backend || !assignments[stage.id]?.model) ?? true;
   const projectAvailable = Boolean(project && projects.data?.[project] && !projects.data[project].archived);
   const cannotStart = !template || !projectAvailable || !goal.trim() || requiredMissing || assignmentsMissing || start.isPending;
   const setupIncomplete = !template || !projectAvailable || !goal.trim() || requiredMissing;
+  // FS-14.A15: a disabled step control names the value it is still waiting for
+  // instead of leaving the person to hunt for it.
+  const setupBlocker = !template
+    ? "Select a template to continue."
+    : !projectAvailable
+      ? "Select an active project to continue."
+      : !goal.trim()
+        ? "Enter the run goal to continue."
+        : missingInputs.length > 0
+          ? `Fill the required named input${missingInputs.length === 1 ? "" : "s"}: ${missingInputs.map((input) => input.name).join(", ")}`
+          : null;
+  const blocker = setupBlocker ?? (assignmentsMissing && (!stepMode || step > 0) ? "Assign a backend and model to every stage." : null);
 
   return (
     <section ref={formRef} className={stepMode ? "pipeline-run-start pipeline-run-start-dialog" : "pipeline-panel pipeline-run-start"} data-ui="pipeline-start-dialog">
@@ -186,7 +199,7 @@ export function RunStartForm({
       {template && template.inputs.length > 0 && <div className="pipeline-subsection">
         <h3>Named inputs</h3>
         <div className="pipeline-input-list">
-          {template.inputs.map((input) => <label className="form-field" data-field={`inputs.${input.name}`} key={input.name}>
+          {template.inputs.map((input) => <label className={input.required && !inputs[input.name]?.trim() ? "form-field pipeline-field-missing" : "form-field"} data-field={`inputs.${input.name}`} key={input.name}>
             <span>{input.name}{input.required ? " · required" : ""}</span>
             <small>{input.description}</small>
             <textarea rows={2} value={inputs[input.name] ?? ""} onChange={(event) => { edit(); setInputs((current) => ({ ...current, [input.name]: event.target.value })); }} />
@@ -247,11 +260,11 @@ export function RunStartForm({
       {error && <p className="form-error">{error}</p>}
       {stepMode ? <div className="pipeline-start-actions" data-slot="actions">
         <button type="button" onClick={onCancel}>Cancel</button>
-        <span />
+        <span className="pipeline-start-blocker">{blocker}</span>
         {step > 0 && <button type="button" onClick={() => setStep((value) => value - 1)}>Back</button>}
         {step < 2 && <button type="button" disabled={step === 0 ? setupIncomplete : assignmentsMissing} onClick={() => setStep((value) => value + 1)}>Next</button>}
         {step === 2 && <button type="button" disabled={cannotStart} onClick={() => submit(false)}>{start.isPending ? "Starting…" : proposal ? "Confirm and start exact proposal" : "Start run"}</button>}
-      </div> : <div className="form-actions"><button type="button" disabled={cannotStart} onClick={() => submit(false)}>{start.isPending ? "Starting…" : proposal ? "Confirm and start exact proposal" : "Start run"}</button></div>}
+      </div> : <div className="form-actions"><span className="pipeline-start-blocker">{blocker}</span><button type="button" disabled={cannotStart} onClick={() => submit(false)}>{start.isPending ? "Starting…" : proposal ? "Confirm and start exact proposal" : "Start run"}</button></div>}
     </section>
   );
 }

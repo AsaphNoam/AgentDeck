@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  PipelineAPIError,
   useDeletePipelineRun,
   usePipelineControl,
   usePipelineRun,
@@ -50,6 +51,30 @@ export function RunsLedger() {
   );
 }
 
+// FS-14.R45: only an attempt that arrives after this page's first render is
+// newly appended; the initial list rides the page entrance instead of each row
+// replaying it, and a background refetch of unchanged attempts appends nothing.
+function useAppendedAttempts(ids: string[], loaded: boolean) {
+  const key = ids.join("\n");
+  const seen = useRef<Set<string> | null>(null);
+  const [appended, setAppended] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    if (!loaded) return;
+    const current = key ? key.split("\n") : [];
+    if (!seen.current) {
+      seen.current = new Set(current);
+      return;
+    }
+    const known = seen.current;
+    const fresh = current.filter((id) => !known.has(id));
+    for (const id of current) known.add(id);
+    if (fresh.length > 0) setAppended(new Set(fresh));
+  }, [key, loaded]);
+
+  return appended;
+}
+
 export function RunDetail({ runID, onDeleted }: { runID: string; onDeleted: () => void }) {
   const detail = usePipelineRun(runID);
   const continueRun = usePipelineControl("continue");
@@ -58,10 +83,21 @@ export function RunDetail({ runID, onDeleted }: { runID: string; onDeleted: () =
   const deleteRun = useDeletePipelineRun();
   const [continuation, setContinuation] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const appended = useAppendedAttempts(detail.data?.attempts.map((item) => item.attempt_id) ?? [], detail.isSuccess);
 
   if (detail.isLoading) return <RunDetailSkeleton />;
   if (!detail.data) {
-    return <section className="pipeline-missing"><p className="pipeline-eyebrow">Run unavailable</p><h2>This run is gone.</h2><p>{detail.error?.message ?? "It may have been deleted in another tab."}</p><Link to="/pipelines/runs">Return to Runs</Link></section>;
+    // FS-14.R43: a deleted run explains itself in product language; any other
+    // read failure keeps its transport detail visible rather than claiming the
+    // record is gone.
+    const deleted = detail.error instanceof PipelineAPIError && detail.error.status === 404;
+    return <section className="pipeline-missing">
+      <p className="pipeline-eyebrow">Run unavailable</p>
+      <h2>{deleted ? "This run is gone." : "This run could not be loaded."}</h2>
+      <p>{deleted ? "It may have been deleted in another tab. Other runs still retain their frozen setup." : "The run record could not be read just now. Return to Runs and open it again."}</p>
+      {!deleted && detail.error && <p className="form-error">{detail.error.message}</p>}
+      <Link to="/pipelines/runs">Return to Runs</Link>
+    </section>;
   }
 
   const data = detail.data;
@@ -107,7 +143,7 @@ export function RunDetail({ runID, onDeleted }: { runID: string; onDeleted: () =
         <section className="pipeline-timeline" data-slot="timeline">
           <div className="pipeline-timeline-heading"><div><p className="pipeline-eyebrow">Execution timeline</p><h3>{data.attempts.length} attempt{data.attempts.length === 1 ? "" : "s"}</h3></div><span>Oldest → newest</span></div>
           <ol>
-            {data.attempts.map((item) => <TimelineAttempt key={item.attempt_id} data={data} attemptID={item.attempt_id} current={item.attempt_id === run.current_attempt_id} attention={item.attempt_id === run.current_attempt_id && Boolean(run.attention_reason)} />)}
+            {data.attempts.map((item) => <TimelineAttempt key={item.attempt_id} data={data} attemptID={item.attempt_id} appended={appended.has(item.attempt_id)} current={item.attempt_id === run.current_attempt_id} attention={item.attempt_id === run.current_attempt_id && Boolean(run.attention_reason)} />)}
           </ol>
         </section>
         <aside className="pipeline-run-rail">
@@ -122,7 +158,7 @@ export function RunDetail({ runID, onDeleted }: { runID: string; onDeleted: () =
   );
 }
 
-function TimelineAttempt({ data, attemptID, current, attention }: { data: PipelineRunDetail; attemptID: string; current: boolean; attention: boolean }) {
+function TimelineAttempt({ data, attemptID, appended, current, attention }: { data: PipelineRunDetail; attemptID: string; appended: boolean; current: boolean; attention: boolean }) {
   const item = data.attempts.find((attempt) => attempt.attempt_id === attemptID)!;
   const stage = data.template.stages.find((candidate) => candidate.id === item.stage_id);
   const effort = data.assignments[item.stage_id]?.effort;
@@ -134,7 +170,7 @@ function TimelineAttempt({ data, attemptID, current, attention }: { data: Pipeli
     if (current || attention) setExpanded(true);
   }, [attention, current]);
 
-  return <li className={current ? "pipeline-timeline-item pipeline-timeline-current" : "pipeline-timeline-item"} data-slot="attempt">
+  return <li className={`${current ? "pipeline-timeline-item pipeline-timeline-current" : "pipeline-timeline-item"}${appended ? " pipeline-timeline-appended" : ""}`} data-slot="attempt">
     <span className="pipeline-timeline-line" aria-hidden="true" />
     <details open={expanded} onToggle={(event) => setExpanded(event.currentTarget.open)}>
       <summary>

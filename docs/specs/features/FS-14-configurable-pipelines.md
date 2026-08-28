@@ -316,6 +316,12 @@ feature are recorded in §6.
   blank. Status/SSE refetches do not replay entrance motion. Under `prefers-reduced-motion: reduce`,
   non-essential transform/entrance motion is removed and every state change remains immediate and
   equally legible.
+- **R46** — The run-start path never presents an unexplained dead end. When no
+  saved template is valid to run, **Start run** is refused with a visible reason that points to
+  Templates instead of opening a dialog that cannot proceed. While a start-dialog step control is
+  disabled, the dialog names the value it is still waiting for beside that control and marks the
+  empty required named input, so the client-side gate explains itself exactly as the server-side
+  rejection of R36 does.
 
 ## 5. Acceptance criteria
 
@@ -426,6 +432,12 @@ feature are recorded in §6.
   task whose agent state is missing renders one honest non-linking fallback card, while a later
   `state_update` refreshes an available card in place and updates its explicit live/archive route.
   *Verify:* run detail projection/API/UI tests and J14.
+- **A24** (R46) — On a home with no valid template, Runs disables **Start run** and
+  offers a link to Templates. With a template that declares a required named input, filling only the
+  display name and goal leaves **Next** disabled beside a message naming that input, with the empty
+  input marked; filling it enables **Next** and clears both. *Verify:*
+  `ui/src/features/pipelines/PipelinesPage.test.tsx` and
+  `ui/src/features/pipelines/RunStartForm.test.tsx`.
 
 ## 6. Deviations & open decisions
 
@@ -454,7 +466,7 @@ The shipped first version deliberately keeps these product boundaries:
   builder. AgentDecker submits a validated model-neutral draft and may request Save or Start, but
   each exact action requires a separate one-time human confirmation. This is a guided-flow guard,
   not a change to AgentDeck's same-user local-API trust boundary.
-- The planned §4.3 split reorganizes the pipeline surface only. It changes no template, routing,
+- The §4.3 split reorganizes the pipeline surface only. It changes no template, routing,
   approval, loop-bound, recovery, or run-state behavior, adds no agent-facing tool or payload, and
   adds no attention reason. Delegated agents are followed one hop from a stage agent and are shown
   for supervision, not treated as pipeline participants: they cannot report a stage result, do not
