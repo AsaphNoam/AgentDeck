@@ -5,6 +5,33 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-28 — Implementation: a first-party UI design workflow
+
+AgentDeck now has a `/design` workflow that activates automatically only when UI work genuinely
+depends on design judgment: new screens, redesigns, meaningful layout or styling, motion, visual
+polish, and critique. Routine frontend wiring and style-preserving fixes stay out of it.
+
+The workflow distills the strongest ideas from
+[Impeccable](https://github.com/pbakaus/impeccable),
+[Emil Kowalski's skills](https://github.com/emilkowalski/skills),
+[Anthropic's frontend-design skill](https://github.com/anthropics/skills/tree/main/skills/frontend-design),
+and [designer-skills' design review](https://github.com/julianoczkowski/designer-skills/tree/main/design-review).
+Agents now establish a compact, product-specific direction before material visual work, compose
+hierarchy before decorating, avoid category-default “AI UI,” make motion justify itself through
+feedback or lifecycle clarity, and finish by inspecting the actual running interface. Major visual
+work gets one batched repair pass and one confirmation instead of an open-ended polish loop.
+
+This builds on AgentDeck's existing tokens, primitives, presentation contract, Core and Sky & Grove
+appearances, deterministic visual matrix, and browser checks. No skill pack was installed or
+vendored, and no design framework, detector suite, screenshot baseline, or runtime dependency was
+added. Standalone critique remains read-only, and automatic invocation never authorizes or enlarges
+the underlying task.
+
+**Needs attention:** None.
+
+**Next:** Use `/design` directly for a visual critique or design task; it should also join the next
+material UI change automatically.
+
 ### 2026-08-28 — Fix: the Tasks page offers Retry again where Retry is the repair
 
 A task can end up parked for two quite different reasons, and the fix that shipped last week treated

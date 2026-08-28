@@ -2,7 +2,8 @@
 
 This directory contains process and live state, not product specifications.
 
-- [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) — shared process for implementation and review.
+- [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) — shared process for implementation, review, and UI
+  design judgment.
 - [`HANDOFF.md`](HANDOFF.md) — current resumable work, decisions, gates, and findings.
 - [`BRIEFS.md`](BRIEFS.md) — short, plain-language session updates for the human.
 - [`USABILITY-REVIEW.md`](USABILITY-REVIEW.md) — verification protocol derived from feature-spec

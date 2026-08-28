@@ -248,3 +248,106 @@ Record findings in `## Review findings` in `HANDOFF.md` using the §7 format. Th
 `Waiting to start` — implementation must not begin while a design has open Must-fix findings.
 Consistency notes never hold it. With no findings, say so plainly and leave the change untouched.
 Commit only the state files and finish with the §6 human update.
+
+## 14. Design UI
+
+`/design` is the design-quality workflow for AgentDeck's interface. It runs explicitly when named
+and accompanies another role automatically when that role materially depends on visual judgment:
+a new screen, redesign, meaningful composition or styling change, motion, visual polish, or design
+critique. It stays out of data wiring, state fixes, behavior tests, copy-only changes, and other
+frontend engineering whose visual result should remain unchanged.
+
+The workflow does not authorize work by itself. It never chooses an idea or ready change, enlarges
+the active request, replaces `/design-feature`, turns review into implementation, or relaxes the
+specification and role rules above. It adds design reasoning and rendered verification to the work
+the human already selected. A design-only or critique request edits no product code; an explicit
+implementation request follows §§1–6 and §10, including specification-first behavior changes.
+
+### 14.1 Ground the direction
+
+Read the governing feature requirements, FS-12, TS-08, `ui/AGENTS.md`, the affected components and
+styles, and at least one representative rendered incumbent surface. Treat the shipped presentation
+as authority unless the request is a redesign. A local addition inherits its surrounding visual
+language; it is not a reason to invent another skin, theme, component layer, or identity.
+
+Before implementation, capture a compact direction in the working plan or existing change document:
+
+- **Operator and job:** who uses this surface, the repeated task, its frequency, and the one result
+  the first view must make easiest.
+- **Composition:** first-view thesis, reading order, density, focal point, and what stays quiet.
+- **AgentDeck proof:** one choice rooted in agent lifecycle, coordination, technical work, or another
+  real product mechanism; name why it belongs here rather than in any administration dashboard.
+- **States and interaction:** real content ranges plus relevant empty, loading, error, permission,
+  paused, active, and completed states; feedback for every action in scope.
+- **Motion decision:** no motion, or one named purpose: feedback, spatial continuity, state
+  indication, or bridging a jarring change. Delight is reserved for rare moments.
+- **Anti-goals:** the incumbent behavior and visual commitments that must survive, plus category
+  defaults the result must not fall into.
+
+For a standalone `/design` critique, do not create a direction or change document. Use the governing
+requirements and the rendered incumbent surface as the evaluation direction, report the evidence in
+the conversation, and edit no repository file.
+
+Do not create a parallel design-brief hierarchy. Keep transient direction in the plan; put durable
+user-visible behavior in the governing FS and durable presentation architecture in TS-08. If a
+genuinely open new screen or redesign has materially different viable structures, show the human two
+or three named compositions that differ in hierarchy, density, interaction, or motion before
+building. Do not run this exploration for a narrow extension or an already-settled direction.
+
+### 14.2 Compose before decorating
+
+Make hierarchy legible before adding polish. Structure must encode real information: sequence,
+ownership, state, dependency, urgency, or scope. Avoid flattening the interface into equal cards,
+nested surfaces, decorative labels, or repeated icon tiles. Use real product-shaped content while
+designing so long names, dense runs, blocked work, errors, and empty states influence the result.
+
+Spend visual boldness in one place and keep the operating surface disciplined around it. AgentDeck's
+lifecycle and coordination states are strong material: transitions between working, waiting,
+blocked, delegated, failed, and completed can carry hierarchy and continuity. Expression must never
+obscure the task, state, familiar control, semantic status color, or technical content. Typography,
+spacing, alignment, and copy carry most of the finish in a frequently used tool.
+
+Implement through TS-08's existing seams: semantic `--ad-*` tokens, `components/ui`, feature-owned
+composition, the versioned presentation hooks, Core, Sky & Grove, and the deterministic visual
+matrix. Extend a seam only when the requested result requires it. Do not add a design framework,
+theme provider, one-off token system, screenshot baseline, runtime dependency, or generic design
+detector as part of this workflow.
+
+### 14.3 Make motion earn its place
+
+Frequency is a gate. High-frequency and keyboard-driven actions should normally be instant;
+occasional transitions may be brief; rare lifecycle milestones have the most room for expression.
+Animate only when the purpose named in the direction improves comprehension. Prefer the cheapest
+existing mechanism, usually a narrow CSS transition or animation, and do not install a motion
+library for an effect CSS already handles.
+
+Motion must preserve stable reading and interaction: do not move content the person is reading for
+decoration; make triggered motion interruptible where repeat input is possible; use an origin that
+explains where an overlay or item came from; gate hover behavior to hover-capable pointers; and ship
+a `prefers-reduced-motion` treatment with the change. Lifecycle motion plays for a newly observed
+transition, not on initial render, reload, background refetch, or history replay.
+
+### 14.4 Inspect the rendered result
+
+Rendered review is required for material visual work. Run the working tree's actual UI in a real
+browser and inspect the affected route or fixture after fonts, data, and motion settle. The visual
+matrix is repeatable input, not a substitute for the product surface. Choose viewports from the
+governing requirements and affected layout rather than assuming universal mobile support; always
+include the supported desktop floor when layout changes. Compare Core and Sky & Grove when a shared
+token, primitive, hook, integration, or feature composition changes.
+
+Exercise the important state matrix from the direction, including interaction states that static
+fixtures cannot prove. For motion, observe the transition at normal speed, repeat or interrupt it,
+and check reduced motion. A valid inspection checks hierarchy, scan path, density, state salience,
+copy, focus and hover feedback, contrast, alignment, clipping, overflow, stacking, and whether the
+result still belongs unmistakably to AgentDeck.
+
+Critique against the direction rather than personal taste. Name rendered evidence and consequence,
+rank implementation findings as **Must fix**, **Worth fixing**, or polish, and remove unsupported
+decoration before adding more. A major new or redesigned surface benefits from an independent,
+fresh-context rendered critique when delegation is available; a narrow edit does not justify that
+overhead. In a build/fix role, batch the in-scope repairs, render once more to confirm them, then
+stop. A standalone `/design` critique reports rendered evidence and findings in the conversation and
+edits no repository file. A §7 code review records findings and state updates exactly as §7 directs.
+Source review alone cannot close a visual claim, and open-ended polishing is not a completion
+strategy.

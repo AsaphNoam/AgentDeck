@@ -3,6 +3,11 @@
 Read `docs/specs/features/FS-12-application-interface.md` and
 `docs/specs/tech/TS-08-frontend-presentation.md` before changing presentation code.
 
+Use the repository's `/design` workflow for new screens, redesigns, meaningful layout or styling,
+motion, visual polish, or critique. It may trigger automatically for those tasks, but stays out of
+routine frontend work whose presentation is incidental. The workflow extends the rules below; it
+does not create another design system or replace feature specifications.
+
 ## Dependency direction
 
 Presentation is a leaf. Feature components own state, data, mutations, routing, Radix behavior,

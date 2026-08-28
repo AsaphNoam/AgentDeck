@@ -33,6 +33,8 @@ rationale, history, or sequencing but do not override an FS/TS requirement.
   for fix; change no product code or specs beyond a skipped reproduction test.
 - **Review design:** §13. Review a waiting ready change before implementation — over-engineering,
   extension over new mechanism, and unverified assumptions are findings; change nothing.
+- **Design UI:** §14. `/design` is explicit or automatically accompanies work with material visual
+  judgment; it improves direction and rendered iteration without selecting or enlarging the work.
 
 `docs/ideas.md` holds new ideas and known product improvements. `docs/ready-changes/` holds changes
 that are specified and ready to start. `HANDOFF.md` records only the change already in progress.

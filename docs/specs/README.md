@@ -214,6 +214,8 @@ Agents do not choose future work on their own.
   the governing FS/TS/INV items; edits no product code or specs beyond a skipped reproduction test.
 - **review-design:** reviews a waiting ready change before implementation for over-engineering,
   extension over new mechanism, and unverified assumptions; records findings and edits nothing.
+- **design:** accompanies any role when UI work materially depends on visual judgment, and runs
+  explicitly as `/design`; it does not select work or change the active role's edit authority.
 
 ## Lint
 
