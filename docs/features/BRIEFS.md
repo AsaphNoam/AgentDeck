@@ -37,6 +37,25 @@ which and I will fix accordingly.
 **Next:** I fix the wrong refusal, the missing log line and the timing hole, once you have told me
 which side of that boundary you want.
 
+### 2026-08-28 — Housekeeping: correcting what has actually been reviewed
+
+The handoff's "last reviewed code" marker was stale. It pointed at a commit from before the last
+review pass, because that pass verified the fixes and then forgot to move the marker. Anything
+reading the file cold — including me, earlier today — would conclude that twenty-plus commits had
+never been looked at, when most of them are review sessions themselves.
+
+The marker now points at the last commit that was genuinely read, and the handoff names the four
+commits that really have had no code review of what shipped: the thirteen dashboard fixes, the
+Mermaid diagram rendering, and the Pipelines split with its follow-up fixes. Each of those had a
+design review before it was built and a usability pass after, which is useful but is not the same as
+someone reading the code against the specification.
+
+**Needs attention:** None.
+
+**Next:** Those four commits are the review backlog. Note that a separate session has since filed
+four bug findings on the pipeline `stale_assignment` report, and one of them needs a product
+decision from you before it can close.
+
 ### 2026-08-28 — Housekeeping: the idea list and the Pipelines paperwork
 
 I removed the two ideas you said were already done — the projects-page rework and the three items

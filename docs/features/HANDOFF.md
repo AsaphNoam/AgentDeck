@@ -17,7 +17,11 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   changelog.
 - **Review state:** Every review and usability finding through 2026-08-28 is closed in code, tests,
   or an explicit specification boundary, including the six recorded against the split Pipelines
-  surface. The four bug-investigation findings below are open.
+  surface. The four bug-investigation findings below are open. Separately, four commits have never
+  had their shipped diff read against the specs: `790c01c` (thirteen dashboard/SSE fixes),
+  `c35ff8c` (Mermaid rendering), and `9114df7` + `69c2f99` (the Pipelines split and its fixes). Each
+  had a design review before implementation and a usability review after; neither substitutes for
+  the §7 code review.
 - **Active change:** None. The Pipelines surface split is finished and committed (`9114df7`, with
   its usability fixes in `69c2f99`) and is ready for an independent review; its change file is
   removed, and FS-14 is the authority on what shipped.
@@ -30,7 +34,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   run has been made since them.
   The earlier v0.2.2 → v0.2.3 delta remains closed: FS-02.A24 is closed and FS-04.A22 remains
   narrowed to the native panel.
-- **Last reviewed code:** `895348e` (2026-08-26).
+- **Last reviewed code:** `6a16126` (2026-08-26). Corrected on 2026-08-28: `f97cc89` set this to
+  `895348e`, then `bbbdc90` verified `6a16126`'s fixes against the tree without advancing the
+  pointer, so it under-reported the reviewed range by one code commit and made every commit
+  behind it look unreviewed.
 - **Branch:** `main`.
 
 ## Active change
@@ -41,10 +48,16 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 **Next:** Run `/fix` on the four open bug-investigation findings, starting by un-skipping
 `internal/pipeline/blocked_chat_answer_test.go`. The second finding needs the user's product
-decision before it can close. The independent code review of the committed Pipelines redesign is
-still owed.
+decision before it can close. The independent code review of the four commits named under Review
+state is still owed.
 
 ## Changelog
+
+- **2026-08-28 — docs:** Corrected the review-state bookkeeping. `Last reviewed code` moves from
+  `895348e` to `6a16126`, the last code commit actually read — `bbbdc90` verified it and did not
+  advance the pointer. Review state now names the four commits whose diffs have had no §7 code
+  review (`790c01c`, `c35ff8c`, `9114df7`, `69c2f99`), so the stale pointer stops implying that
+  the twenty-plus commits behind it are all unreviewed when most are review sessions themselves.
 
 - **2026-08-28 — bug investigation:** Diagnosed the field report that a blocked pipeline stage agent
   got `stale_assignment` when it tried to continue. Reproduced the most reachable route locally: a
