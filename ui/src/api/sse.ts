@@ -45,7 +45,7 @@ class SseClient {
       // The open route can outlive its agent. Missing transcripts are represented
       // by ChatPanel's recovery view, not an unhandled reconnect rejection.
       void this.refetchOpenTranscript().catch(() => undefined);
-      queryClient.invalidateQueries({ queryKey: ["pipelines", "runs"] });
+      queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.runs });
       queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.proposals });
       queryClient.invalidateQueries({ queryKey: TASK_QUERY_KEYS.all });
     };
@@ -57,7 +57,10 @@ class SseClient {
     this.es.addEventListener("pipeline_proposal_update", () => queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.proposals }));
     // A task_update carries only enough to decide whether to refetch; detail
     // comes back over REST, and a reconnect rehydrates the same way (TS-03.R28).
-    this.es.addEventListener("task_update", () => queryClient.invalidateQueries({ queryKey: TASK_QUERY_KEYS.all }));
+    this.es.addEventListener("task_update", () => {
+      queryClient.invalidateQueries({ queryKey: TASK_QUERY_KEYS.all });
+      queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.runDetails });
+    });
     this.es.addEventListener("config_source_update", () => this.onConfigSourceUpdate());
     this.es.addEventListener("ping", () => {
       this.lastPing = Date.now();

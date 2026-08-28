@@ -103,11 +103,12 @@ func (s *Server) handleDeletePipelineTemplate(w http.ResponseWriter, r *http.Req
 func (s *Server) handlePipelineRuns(w http.ResponseWriter, r *http.Request) {
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
-	runs, err := s.pipelineMgr.List(limit, offset)
+	runs, total, err := s.pipelineMgr.ListPage(limit, offset)
 	if err != nil {
 		writePipelineError(w, err)
 		return
 	}
+	w.Header().Set("X-Total-Count", strconv.Itoa(total))
 	writeJSON(w, http.StatusOK, runs)
 }
 
@@ -117,7 +118,15 @@ func (s *Server) handlePipelineRun(w http.ResponseWriter, r *http.Request) {
 		writePipelineError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, detail)
+	agentsByAttempt, err := s.pipelineAttemptAgents(detail)
+	if err != nil {
+		writePipelineError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, pipelineRunDetailResponse{
+		RunDetail:       detail,
+		AgentsByAttempt: agentsByAttempt,
+	})
 }
 
 type startPipelineRequest struct {

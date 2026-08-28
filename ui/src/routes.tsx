@@ -5,7 +5,14 @@ import { SettingsPage } from "./features/settings/SettingsPage";
 import { OnboardingGate } from "./features/onboarding/OnboardingGate";
 import { ArchivePage } from "./features/archive/ArchivePage";
 import { ArchiveAgentPage } from "./features/archive/ArchiveAgentPage";
-import { PipelinesPage } from "./features/pipelines/PipelinesPage";
+import {
+  PipelineRunPage,
+  PipelinesIndex,
+  PipelinesLayout,
+  PipelineTemplatePage,
+  RunsPage,
+  TemplatesPage,
+} from "./features/pipelines/PipelinesPage";
 import { TasksPage } from "./features/tasks/TasksPage";
 import { ProjectDashboard, ScopedProjectDashboard } from "./features/dashboard/ProjectDashboard";
 
@@ -31,7 +38,17 @@ export const router = createBrowserRouter([
       { path: "agent/:id", element: <ChatPanel /> },
       { path: "archive", element: <ArchivePage /> },
       { path: "archive/:id", element: <ArchiveAgentPage /> },
-      { path: "pipelines", element: <PipelinesPage /> },
+      {
+        path: "pipelines",
+        element: <PipelinesLayout />,
+        children: [
+          { index: true, element: <PipelinesIndex /> },
+          { path: "runs", element: <RunsPage /> },
+          { path: "runs/:runID", element: <PipelineRunPage /> },
+          { path: "templates", element: <TemplatesPage /> },
+          { path: "templates/:templateID", element: <PipelineTemplatePage /> },
+        ],
+      },
       { path: "tasks", element: <TasksPage /> },
       { path: "settings", element: <SettingsPage /> },
       ...developmentRoutes,

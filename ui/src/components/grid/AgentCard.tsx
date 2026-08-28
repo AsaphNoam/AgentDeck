@@ -55,7 +55,7 @@ export function AgentCard({ agent, lastLine, projectColor, projectTitle, showPro
       {agent.pipeline && (
         <Link
           className="pipeline-association"
-          to={`/pipelines?run=${encodeURIComponent(agent.pipeline.run_id)}`}
+          to={`/pipelines/runs/${encodeURIComponent(agent.pipeline.run_id)}`}
           onClick={(event) => event.stopPropagation()}
         >
           {agent.pipeline.run_name} · {agent.pipeline.stage_id} · attempt {agent.pipeline.attempt_no}

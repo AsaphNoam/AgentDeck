@@ -356,4 +356,15 @@ ALTER TABLE pipeline_proposals ADD COLUMN consumed_at TEXT NOT NULL DEFAULT '';
 		version: 18,
 		apply:   migrateTasks,
 	},
+	{
+		// The run-detail delegated-agent projection reads only assigned,
+		// agent-created work for one creator/generation window (TS-02.R26).
+		// This is a read index only: it changes no task ownership or retention.
+		version: 19,
+		sql: `
+CREATE INDEX idx_tasks_project_creator_created
+  ON tasks(project, created_by_agent_id, created_by_generation, created_at DESC, task_id)
+  WHERE created_by_kind = 'agent' AND assigned_agent_id IS NOT NULL;
+`,
+	},
 }

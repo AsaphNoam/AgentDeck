@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useBackends, useConfig, useProjects } from "../../api/config";
 import {
   pipelineDiagnostics,
@@ -22,9 +23,13 @@ function requestID() {
 export function RunStartForm({
   proposal: proposalSeed,
   onStarted,
+  stepMode = false,
+  onCancel,
 }: {
   proposal?: Extract<PipelineProposal, { kind: "start_run" }> | null;
   onStarted: (runID: string) => void;
+  stepMode?: boolean;
+  onCancel?: () => void;
 }) {
   const templates = usePipelineTemplates();
   const projects = useProjects();
@@ -43,6 +48,8 @@ export function RunStartForm({
   const [diagnostics, setDiagnostics] = useState<PipelineDiagnostic[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = useState(0);
+  const formRef = useRef<HTMLElement>(null);
 
   const templateRecord = useMemo(
     () => templates.data?.find((entry) => entry.id === templateID),
@@ -67,7 +74,16 @@ export function RunStartForm({
     setDiagnostics([]);
     setNotice("Review the exact AgentDecker run proposal before confirming Start.");
     setError(null);
+    setStep(0);
   }, [proposalSeed]);
+
+  useEffect(() => {
+    const field = diagnostics[0]?.field;
+    if (!field) return;
+    const owner = [...(formRef.current?.querySelectorAll<HTMLElement>("[data-field]") ?? [])]
+      .find((item) => field === item.dataset.field || field.startsWith(`${item.dataset.field}.`));
+    owner?.querySelector<HTMLElement>("input, select, textarea")?.focus();
+  }, [diagnostics, step]);
 
   useEffect(() => {
     if (project || !config.data?.default_project) return;
@@ -129,6 +145,9 @@ export function RunStartForm({
           setConflicts(shared);
           setDiagnostics(pipelineDiagnostics(reason));
           setError(shared.length === 0 ? (reason instanceof Error ? reason.message : String(reason)) : null);
+          const fields = pipelineDiagnostics(reason).map((item) => item.field);
+          if (fields.some((field) => field.startsWith("assignments."))) setStep(1);
+          else if (fields.length > 0) setStep(0);
         },
       },
     );
@@ -138,46 +157,50 @@ export function RunStartForm({
   const assignmentsMissing = template?.stages.some((stage) => !assignments[stage.id]?.backend || !assignments[stage.id]?.model) ?? true;
   const projectAvailable = Boolean(project && projects.data?.[project] && !projects.data[project].archived);
   const cannotStart = !template || !projectAvailable || !goal.trim() || requiredMissing || assignmentsMissing || start.isPending;
+  const setupIncomplete = !template || !projectAvailable || !goal.trim() || requiredMissing;
 
   return (
-    <section className="pipeline-panel pipeline-run-start">
-      <div className="pipeline-panel-header">
+    <section ref={formRef} className={stepMode ? "pipeline-run-start pipeline-run-start-dialog" : "pipeline-panel pipeline-run-start"} data-ui="pipeline-start-dialog">
+      {!stepMode && <div className="pipeline-panel-header">
         <div>
           <p className="pipeline-eyebrow">Frozen run snapshot</p>
           <h2>Start run</h2>
         </div>
-      </div>
-      <div className="pipeline-form-grid">
-        <label className="form-field"><span>Template</span><select value={templateID} onChange={(event) => { edit(); setTemplateID(event.target.value); }}>
+      </div>}
+      {stepMode && <ol className="pipeline-start-steps" aria-label="Start run steps" data-slot="steps">
+        {["Setup", "Runtimes", "Review"].map((label, index) => <li key={label} className={step === index ? "pipeline-start-step-active" : step > index ? "pipeline-start-step-complete" : ""}><span>{index + 1}</span>{label}</li>)}
+      </ol>}
+      {(!stepMode || step === 0) && <div className="pipeline-start-pane" data-slot="content"><div className="pipeline-form-grid">
+        <label className="form-field" data-field="template_id"><span>Template</span><select value={templateID} onChange={(event) => { edit(); setTemplateID(event.target.value); }}>
           <option value="">Select a valid template</option>
           {(templates.data ?? []).filter((record) => record.valid).map((record) => <option key={record.id} value={record.id}>{record.template.title} ({record.id})</option>)}
         </select></label>
-        <label className="form-field"><span>Run display name</span><input value={displayName} placeholder={template?.title || "Delivery run"} onChange={(event) => { edit(); setDisplayName(event.target.value); }} /></label>
-        <label className="form-field"><span>Project</span><select value={project} onChange={(event) => { edit(); setProject(event.target.value); }}>
+        <label className="form-field" data-field="display_name"><span>Run display name</span><input value={displayName} placeholder={template?.title || "Delivery run"} onChange={(event) => { edit(); setDisplayName(event.target.value); }} /></label>
+        <label className="form-field" data-field="project"><span>Project</span><select value={project} onChange={(event) => { edit(); setProject(event.target.value); }}>
           <option value="">Select project</option>
           {Object.entries(projects.data ?? {}).filter(([, item]) => !item.archived).map(([projectID, item]) => <option key={projectID} value={projectID}>{item.title} ({projectID})</option>)}
         </select></label>
       </div>
-      <label className="form-field"><span>Run goal</span><textarea rows={3} value={goal} onChange={(event) => { edit(); setGoal(event.target.value); }} /></label>
+      <label className="form-field" data-field="goal"><span>Run goal</span><textarea rows={3} value={goal} onChange={(event) => { edit(); setGoal(event.target.value); }} /></label>
 
       {template && template.inputs.length > 0 && <div className="pipeline-subsection">
         <h3>Named inputs</h3>
         <div className="pipeline-input-list">
-          {template.inputs.map((input) => <label className="form-field" key={input.name}>
+          {template.inputs.map((input) => <label className="form-field" data-field={`inputs.${input.name}`} key={input.name}>
             <span>{input.name}{input.required ? " · required" : ""}</span>
             <small>{input.description}</small>
             <textarea rows={2} value={inputs[input.name] ?? ""} onChange={(event) => { edit(); setInputs((current) => ({ ...current, [input.name]: event.target.value })); }} />
           </label>)}
         </div>
-      </div>}
+      </div>}</div>}
 
-      {template && <div className="pipeline-subsection">
+      {template && (!stepMode || step === 1) && <div className={stepMode ? "pipeline-start-pane" : "pipeline-subsection"} data-slot="content">
         <h3>Stage runtimes</h3>
         <div className="pipeline-runtime-list">
           {template.stages.map((stage, index) => {
             const assignment = assignments[stage.id] ?? { backend: "", model: "", effort: "" };
             const backend = backends.data?.backends[assignment.backend];
-            return <div className="pipeline-runtime-row" key={stage.id}>
+            return <div className="pipeline-runtime-row" data-field={`assignments.${stage.id}`} key={stage.id}>
               <span className="pipeline-stage-number">{index + 1}</span>
               <div><strong>{stage.title}</strong><small>{stage.role}</small></div>
               <label className="form-field"><span>Backend</span><select value={assignment.backend} onChange={(event) => {
@@ -202,7 +225,13 @@ export function RunStartForm({
         </div>
       </div>}
 
-      {proposal && <pre className="pipeline-proposal-payload">{JSON.stringify(proposal.payload, null, 2)}</pre>}
+      {stepMode && step === 2 && <div className="pipeline-start-pane pipeline-start-review" data-slot="content">
+        <div className="pipeline-review-hero"><p className="pipeline-eyebrow">Ready to launch</p><h3>{displayName || template?.title || "Untitled run"}</h3><p>{goal}</p></div>
+        <dl className="pipeline-review-facts"><div><dt>Template</dt><dd>{template?.title || templateID}</dd></div><div><dt>Project</dt><dd>{projects.data?.[project]?.title || project}</dd></div><div><dt>Stages</dt><dd>{template?.stages.length ?? 0}</dd></div><div><dt>Named inputs</dt><dd>{Object.values(inputs).filter((value) => value.trim()).length}</dd></div></dl>
+        <ol className="pipeline-review-runtimes">{template?.stages.map((stage, index) => { const runtime = assignments[stage.id]; return <li key={stage.id}><span>{index + 1}</span><div><strong>{stage.title}</strong><small>{[runtime?.backend, runtime?.model, runtime?.effort].filter(Boolean).join(" · ")}</small></div></li>; })}</ol>
+      </div>}
+
+      {proposal && (!stepMode || step === 2) && <pre className="pipeline-proposal-payload">{JSON.stringify(proposal.payload, null, 2)}</pre>}
       {conflicts.length > 0 && <div className="pipeline-warning">
         <strong>Shared project workspace</strong>
         <p>These active agents or runs use the same project directory. AgentDeck does not isolate their filesystem changes.</p>
@@ -216,11 +245,36 @@ export function RunStartForm({
         </ul>
       )}
       {error && <p className="form-error">{error}</p>}
-      <div className="form-actions">
-        <button type="button" disabled={cannotStart} onClick={() => submit(false)}>
-          {start.isPending ? "Starting…" : proposal ? "Confirm and start exact proposal" : "Start run"}
-        </button>
-      </div>
+      {stepMode ? <div className="pipeline-start-actions" data-slot="actions">
+        <button type="button" onClick={onCancel}>Cancel</button>
+        <span />
+        {step > 0 && <button type="button" onClick={() => setStep((value) => value - 1)}>Back</button>}
+        {step < 2 && <button type="button" disabled={step === 0 ? setupIncomplete : assignmentsMissing} onClick={() => setStep((value) => value + 1)}>Next</button>}
+        {step === 2 && <button type="button" disabled={cannotStart} onClick={() => submit(false)}>{start.isPending ? "Starting…" : proposal ? "Confirm and start exact proposal" : "Start run"}</button>}
+      </div> : <div className="form-actions"><button type="button" disabled={cannotStart} onClick={() => submit(false)}>{start.isPending ? "Starting…" : proposal ? "Confirm and start exact proposal" : "Start run"}</button></div>}
     </section>
   );
+}
+
+export function RunStartDialog({
+  open,
+  onOpenChange,
+  proposal,
+  onStarted,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  proposal?: Extract<PipelineProposal, { kind: "start_run" }> | null;
+  onStarted: (runID: string) => void;
+}) {
+  return <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    <Dialog.Portal>
+      <Dialog.Overlay className="dialog-overlay" data-ui="dialog" data-slot="overlay" />
+      <Dialog.Content className="dialog-content pipeline-start-modal" data-ui="dialog" data-slot="content" data-variant="default">
+        <Dialog.Title data-slot="title">Start pipeline run</Dialog.Title>
+        <Dialog.Description className="pipeline-start-description">Configure one frozen run snapshot. Nothing launches until the final review.</Dialog.Description>
+        <RunStartForm stepMode proposal={proposal} onCancel={() => onOpenChange(false)} onStarted={(runID) => { onOpenChange(false); onStarted(runID); }} />
+      </Dialog.Content>
+    </Dialog.Portal>
+  </Dialog.Root>;
 }

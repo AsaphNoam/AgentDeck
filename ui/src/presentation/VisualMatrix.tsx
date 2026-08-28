@@ -182,16 +182,15 @@ export function VisualMatrix() {
       </section>
 
       <section className="visual-matrix-section visual-matrix-columns">
-        <div className="pipeline-panel pipeline-runs">
-          <div className="pipeline-panel-header">
-            <div><span className="pipeline-eyebrow">Pipelines</span><h2>Release verification</h2></div>
-            <Badge variant="warning">needs attention</Badge>
-          </div>
-          <div className="pipeline-stage-card">
-            <div className="pipeline-stage-heading"><span className="pipeline-stage-number">02</span><strong>Visual review</strong></div>
-            <p>Compare Core and Sky & Grove against the same deterministic fixture.</p>
-          </div>
-        </div>
+        <article className="pipeline-run-page" data-ui="pipeline-run">
+          <section className="pipeline-run-hero" data-slot="live">
+            <div className="pipeline-run-kicker"><code>run_release</code><Badge variant="warning">needs attention</Badge></div>
+            <div className="pipeline-run-title"><div><h2>Release verification</h2><p>Compare Core and Sky & Grove against the same deterministic fixture.</p></div><div className="pipeline-live-stage"><small>Current stage</small><strong>Visual review</strong><span>Visit 2 · attempt 4</span></div></div>
+          </section>
+          <section className="pipeline-timeline" data-slot="timeline">
+            <ol><li className="pipeline-timeline-item pipeline-timeline-current" data-slot="attempt"><span className="pipeline-timeline-line" aria-hidden="true" /><details open><summary><span className="pipeline-stage-number">04</span><span className="pipeline-attempt-identity"><strong>Visual review</strong><small>Claude · Sonnet</small></span><span className="pipeline-state pipeline-state-paused">paused</span><span className="pipeline-disclosure-chevron">⌄</span></summary><div className="pipeline-attempt-body"><p className="pipeline-result-summary">One focused attempt owns the main reading column.</p><div className="pipeline-agent-grid" data-slot="agents"><div className="pipeline-agent-card"><span className="pipeline-agent-dot pipeline-agent-dot-idle" /><span><strong>Reviewer</strong><small>Stage agent · waiting</small><em>Review ready for approval</em></span><span>↗</span></div></div></div></details></li></ol>
+          </section>
+        </article>
         <div className="dialog-content onboarding-wizard" data-ui="dialog" data-slot="content" data-variant="onboarding">
           <div className="onboarding-flow" data-ui="onboarding" data-state="current">
             <div className="wizard-progress" data-slot="progress">Step 2 of 4</div>

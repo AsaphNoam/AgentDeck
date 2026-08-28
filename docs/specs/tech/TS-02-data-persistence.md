@@ -1,6 +1,6 @@
 # TS-02 — Data & persistence
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/config`, `internal/state`, `internal/transcript`, `internal/index`, `internal/archive`, `internal/configsource`, `internal/contextref`
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -299,7 +299,7 @@ canonicalize-plus-grant operations are atomic (INV §5/§15). No backfill is nee
   deleting a task never reaches into agent identity, transcripts, the archive, a pipeline run, or a
   canonical reference. Shapes and ownership are specified in TS-10.
 
-- **R26** (planned) — One forward-only migration adds the partial read index used by the
+- **R26** — One forward-only migration adds the partial read index used by the
   pipeline delegated-agent projection (TS-09.R28):
 
   ```sql
@@ -379,7 +379,7 @@ R1–R26 and must be reflected here when its contract changes.
 - Context reference persistence (R24): forward-only tables and typed state methods in
   `internal/state`, consumed through `internal/contextref`; canonicalization, cascade, tombstone,
   grant, and personal-preference regressions named by FS-15.A1–A5/A7.
-- Planned pipeline supervision read index (R26): task migration/query-plan regressions named by
+- Pipeline supervision read index (R26): task migration/query-plan regressions named by
   FS-14.A17/A23 and TS-09.R28.
 - Regression anchors: `TestHomeTreeIsOwnerOnly`, `TestStateDBIsOwnerOnly`,
   `TestTranscriptIsOwnerOnly`, `TestReindexPreservesFinalPartialTurn`,

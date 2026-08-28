@@ -17,6 +17,7 @@ const (
 	MaxValueRunes       = 64000
 	MaxProposalRecords  = 100
 	MaxListPage         = 100
+	MaxDelegatedAgents  = 20
 	MaxVisits           = 32
 	MaxProposalBytes    = 256 * 1024
 )

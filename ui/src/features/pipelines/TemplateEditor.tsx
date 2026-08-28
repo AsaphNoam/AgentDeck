@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useRoles } from "../../api/config";
 import {
   pipelineDiagnostics,
@@ -41,7 +42,17 @@ function copyTemplate(template: PipelineTemplate): PipelineTemplate {
   return structuredClone(template);
 }
 
-export function TemplateEditor({ seed }: { seed?: TemplateEditorSeed | null }) {
+export function TemplateEditor({
+  seed,
+  createNew: createNewRoute = false,
+  onSaved,
+  onDeleted,
+}: {
+  seed?: TemplateEditorSeed | null;
+  createNew?: boolean;
+  onSaved?: (id: string) => void;
+  onDeleted?: () => void;
+}) {
   const templates = usePipelineTemplates();
   const roles = useRoles();
   const save = useSavePipelineTemplate();
@@ -53,6 +64,14 @@ export function TemplateEditor({ seed }: { seed?: TemplateEditorSeed | null }) {
   const [diagnostics, setDiagnostics] = useState<PipelineDiagnostic[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedStage, setSelectedStage] = useState(0);
+
+  const applyDiagnostics = (items: PipelineDiagnostic[]) => {
+    setDiagnostics(items);
+    const field = items[0]?.field ?? "";
+    const match = /stages(?:\.|\[)(\d+)/.exec(field);
+    if (match) setSelectedStage(Math.min(Number(match[1]), draft.stages.length - 1));
+  };
 
   useEffect(() => {
     if (!seed) return;
@@ -63,7 +82,20 @@ export function TemplateEditor({ seed }: { seed?: TemplateEditorSeed | null }) {
     setDiagnostics([]);
     setNotice(seed.proposal ? "Review the exact AgentDecker proposal below before confirming Save." : null);
     setError(null);
+    setSelectedStage(0);
   }, [seed]);
+
+  useEffect(() => {
+    if (!createNewRoute || seed) return;
+    setID("");
+    setDraft(blankTemplate());
+    setSavedID(null);
+    setProposal(undefined);
+    setDiagnostics([]);
+    setNotice(null);
+    setError(null);
+    setSelectedStage(0);
+  }, [createNewRoute, seed]);
 
   const mutate = (fn: (next: PipelineTemplate) => void) => {
     setDraft((current) => {
@@ -78,36 +110,14 @@ export function TemplateEditor({ seed }: { seed?: TemplateEditorSeed | null }) {
     setDiagnostics([]);
   };
 
-  const selectTemplate = (templateID: string) => {
-    const record = templates.data?.find((entry) => entry.id === templateID);
-    if (!record) return;
-    setID(record.id);
-    setDraft(copyTemplate(record.template));
-    setSavedID(record.id);
-    setProposal(undefined);
-    setDiagnostics(record.diagnostics);
-    setNotice(null);
-    setError(null);
-  };
-
-  const createNew = () => {
-    setID("");
-    setDraft(blankTemplate());
-    setSavedID(null);
-    setProposal(undefined);
-    setDiagnostics([]);
-    setNotice(null);
-    setError(null);
-  };
-
   const validate = async () => {
     setError(null);
     try {
       const record = await validatePipelineTemplate(id, draft);
-      setDiagnostics(record.diagnostics);
+      applyDiagnostics(record.diagnostics);
       setNotice(record.valid ? "Template is valid." : null);
     } catch (reason) {
-      setDiagnostics(pipelineDiagnostics(reason));
+      applyDiagnostics(pipelineDiagnostics(reason));
       setError(reason instanceof Error ? reason.message : String(reason));
     }
   };
@@ -120,12 +130,13 @@ export function TemplateEditor({ seed }: { seed?: TemplateEditorSeed | null }) {
         onSuccess: (record) => {
           setSavedID(record.id);
           setDraft(copyTemplate(record.template));
-          setDiagnostics(record.diagnostics);
+          applyDiagnostics(record.diagnostics);
           setNotice(proposal ? "Exact AgentDecker proposal saved." : "Template saved.");
           setProposal(undefined);
+          onSaved?.(record.id);
         },
         onError: (reason) => {
-          setDiagnostics(pipelineDiagnostics(reason));
+          applyDiagnostics(pipelineDiagnostics(reason));
           setError(reason instanceof Error ? reason.message : String(reason));
         },
       },
@@ -135,32 +146,23 @@ export function TemplateEditor({ seed }: { seed?: TemplateEditorSeed | null }) {
   const deleteDraft = () => {
     if (!savedID) return;
     remove.mutate(savedID, {
-      onSuccess: createNew,
+      onSuccess: onDeleted,
       onError: (reason) => setError(reason instanceof Error ? reason.message : String(reason)),
     });
   };
 
   return (
-    <section className="pipeline-panel pipeline-template-editor">
-      <div className="pipeline-panel-header">
+    <section className="pipeline-template-editor" data-ui="pipeline-template-editor">
+      <Link className="pipeline-back-link" to="/pipelines/templates">← All templates</Link>
+      <div className="pipeline-editor-heading">
         <div>
-          <p className="pipeline-eyebrow">Reusable definition</p>
-          <h2>Template editor</h2>
+          <p className="pipeline-eyebrow">Reusable definition · version 1</p>
+          <h2>{draft.title || (savedID ? id : "New template")}</h2>
+          <p>Shape one stage at a time. Runtime choices remain outside the reusable definition.</p>
         </div>
-        <button type="button" onClick={createNew}>Create manually</button>
       </div>
 
-      <label className="form-field">
-        <span>Saved templates</span>
-        <select value={savedID ?? ""} onChange={(event) => selectTemplate(event.target.value)}>
-          <option value="">New template</option>
-          {(templates.data ?? []).map((record) => (
-            <option key={record.id} value={record.id}>{record.template.title || record.id}</option>
-          ))}
-        </select>
-      </label>
-
-      <div className="pipeline-form-grid">
+      <div className="pipeline-editor-basics">
         <label className="form-field">
           <span>Template id</span>
           <input
@@ -176,9 +178,11 @@ export function TemplateEditor({ seed }: { seed?: TemplateEditorSeed | null }) {
         </label>
       </div>
 
-      <div className="pipeline-subsection">
+      <details className="pipeline-disclosure pipeline-editor-inputs" data-slot="inputs">
+        <summary>Run inputs <span>{draft.inputs.length}</span></summary>
+        <div className="pipeline-disclosure-body">
         <div className="pipeline-subsection-header">
-          <h3>Run inputs</h3>
+          <p>Named values collected before a run can start.</p>
           <button type="button" onClick={() => mutate((next) => next.inputs.push({ name: "", description: "", required: true }))}>Add input</button>
         </div>
         {draft.inputs.length === 0 && <p className="pipeline-empty">No run inputs.</p>}
@@ -190,11 +194,12 @@ export function TemplateEditor({ seed }: { seed?: TemplateEditorSeed | null }) {
             <button type="button" onClick={() => mutate((next) => { next.inputs.splice(index, 1); })}>Remove</button>
           </div>
         ))}
-      </div>
+        </div>
+      </details>
 
-      <div className="pipeline-subsection">
-        <div className="pipeline-subsection-header">
-          <h3>Stages</h3>
+      <div className="pipeline-editor-workspace">
+        <aside className="pipeline-stage-navigator" data-slot="navigator">
+          <div className="pipeline-stage-nav-heading"><div><p className="pipeline-eyebrow">Flow order</p><h3>Stages</h3></div>
           <button type="button" onClick={() => mutate((next) => next.stages.push({
             id: `stage-${next.stages.length + 1}`,
             title: "",
@@ -204,15 +209,16 @@ export function TemplateEditor({ seed }: { seed?: TemplateEditorSeed | null }) {
             outputs: [],
             max_visits: 1,
             transitions: { success: blankTransition(), failure: { ...blankTransition(), final: "failure" } },
-          }))}>Add stage</button>
-        </div>
-        <div className="pipeline-stage-list">
-          {draft.stages.map((stage, stageIndex) => (
+          }))}>+</button></div>
+          <ol>{draft.stages.map((stage, stageIndex) => <li key={`nav-${stageIndex}`}><button type="button" className={selectedStage === stageIndex ? "pipeline-stage-nav-item pipeline-stage-nav-item-active" : "pipeline-stage-nav-item"} onClick={() => setSelectedStage(stageIndex)}><span>{String(stageIndex + 1).padStart(2, "0")}</span><span><strong>{stage.title || stage.id || "Untitled stage"}</strong><small>{stage.role || "No role"}</small></span>{diagnostics.some((item) => item.field.includes(`stages.${stageIndex}`) || item.field.includes(`stages[${stageIndex}]`)) && <em>!</em>}</button></li>)}</ol>
+        </aside>
+        <div className="pipeline-stage-focus" data-slot="stage">
+          {draft.stages.map((stage, stageIndex) => stageIndex === selectedStage && (
             <article className="pipeline-stage-card" key={`stage-${stageIndex}`}>
               <div className="pipeline-stage-heading">
                 <span className="pipeline-stage-number">{stageIndex + 1}</span>
                 <strong>{stage.title || stage.id || "Untitled stage"}</strong>
-                <button type="button" disabled={draft.stages.length === 1} onClick={() => mutate((next) => { next.stages.splice(stageIndex, 1); })}>Remove</button>
+                <button type="button" disabled={draft.stages.length === 1} onClick={() => { mutate((next) => { next.stages.splice(stageIndex, 1); }); setSelectedStage(Math.max(0, stageIndex - 1)); }}>Remove stage</button>
               </div>
               <div className="pipeline-form-grid pipeline-form-grid-three">
                 <label className="form-field"><span>Stage id</span><input value={stage.id} onChange={(event) => mutate((next) => { next.stages[stageIndex].id = event.target.value; })} /></label>
@@ -284,7 +290,7 @@ export function TemplateEditor({ seed }: { seed?: TemplateEditorSeed | null }) {
       {notice && <p className="form-info">{notice}</p>}
       {error && <p className="form-error">{error}</p>}
       {proposal && <pre className="pipeline-proposal-payload">{JSON.stringify(proposal.payload, null, 2)}</pre>}
-      <div className="form-actions pipeline-editor-actions">
+      <div className="form-actions pipeline-editor-actions" data-slot="actions">
         {savedID && <button type="button" className="btn-danger" disabled={remove.isPending} onClick={deleteDraft}>Delete</button>}
         <button type="button" disabled={!id || save.isPending} onClick={() => void validate()}>Validate</button>
         <button type="button" disabled={!id || save.isPending} onClick={saveDraft}>

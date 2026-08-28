@@ -15,9 +15,13 @@ export function shouldDropBuilderSession(builderID: string | null, live: boolean
 export function AgentDeckerBuilder({
   onTemplateProposal,
   onRunProposal,
+  proposalKind,
+  showLauncher = true,
 }: {
-  onTemplateProposal: (proposal: Extract<PipelineProposal, { kind: "save_template" }>) => void;
-  onRunProposal: (proposal: Extract<PipelineProposal, { kind: "start_run" }>) => void;
+  onTemplateProposal?: (proposal: Extract<PipelineProposal, { kind: "save_template" }>) => void;
+  onRunProposal?: (proposal: Extract<PipelineProposal, { kind: "start_run" }>) => void;
+  proposalKind?: PipelineProposal["kind"];
+  showLauncher?: boolean;
 }) {
   const roles = useRoles();
   const backends = useBackends();
@@ -113,13 +117,16 @@ export function AgentDeckerBuilder({
   // default naming a project that no longer exists) must hold the launch closed
   // rather than enabling a button whose only outcome is a rejected launch.
   const builderReady = Boolean(roles.data?.agentdecker && project && projects.data?.[project] && !projects.data[project].archived && backendID && modelID && description.trim());
+  const visibleProposals = (proposals.data ?? []).filter((proposal) => !proposalKind || proposal.kind === proposalKind);
+
+  if (!showLauncher && visibleProposals.length === 0) return null;
 
   return <section className="pipeline-panel pipeline-builder">
-    <div className="pipeline-panel-header">
+    {showLauncher && <div className="pipeline-panel-header">
       <div><p className="pipeline-eyebrow">Guided drafting</p><h2>Create with AgentDecker</h2></div>
       <button type="button" onClick={() => setOpen((value) => !value)}>{open ? "Close builder setup" : "Create with AgentDecker"}</button>
-    </div>
-    {open && <div className="pipeline-builder-form">
+    </div>}
+    {showLauncher && open && <div className="pipeline-builder-form">
       <p>Choose the project and chat runtime for the ordinary AgentDecker session. This choice is not stored in the model-neutral template.</p>
       {!roles.data?.agentdecker && <p className="form-error">The configured <code>agentdecker</code> role is required.</p>}
       {projectEntries.length === 0 && <p className="form-error">Configure a project before launching the builder.</p>}
@@ -142,18 +149,18 @@ export function AgentDeckerBuilder({
       <div className="form-actions"><button type="button" disabled={!builderReady || launching} onClick={() => void launchBuilder()}>{launching ? "Launching…" : "Launch AgentDecker builder"}</button></div>
     </div>}
 
-    {builderID && <div className="pipeline-builder-session">
+    {showLauncher && builderID && <div className="pipeline-builder-session">
       <p>{!agentsHydrated ? "Loading builder session…" : builderRunning ? <>Builder session: <code>{builderID}</code></> : "The builder session has stopped. Its pending proposals remain available below."}</p>
       {builderRunning && <Link to={`/agent/${builderID}`}>Open AgentDecker chat</Link>}
     </div>}
-    {(proposals.data?.length ?? 0) > 0 && <div className="pipeline-proposal-list">
+    {visibleProposals.length > 0 && <div className="pipeline-proposal-list">
       <h3>Pending exact proposals</h3>
-      {proposals.data?.map((proposal) => <article className="pipeline-proposal" key={proposal.proposal_id}>
+      {visibleProposals.map((proposal) => <article className="pipeline-proposal" key={proposal.proposal_id}>
         <div><strong>{proposal.kind === "save_template" ? "Save template" : "Start run"}</strong><code>{proposal.proposal_id}</code></div>
         <pre className="pipeline-proposal-payload">{JSON.stringify(proposal.payload, null, 2)}</pre>
         {proposal.kind === "save_template"
-          ? <button type="button" onClick={() => onTemplateProposal(proposal)}>Review exact Save proposal</button>
-          : <button type="button" onClick={() => onRunProposal(proposal)}>Review exact Start proposal</button>}
+          ? <button type="button" onClick={() => onTemplateProposal?.(proposal)}>Review exact Save proposal</button>
+          : <button type="button" onClick={() => onRunProposal?.(proposal)}>Review exact Start proposal</button>}
       </article>)}
     </div>}
   </section>;

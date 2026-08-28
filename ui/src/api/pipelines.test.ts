@@ -47,6 +47,6 @@ describe("pipeline API", () => {
       diagnostics: [{ field: "", code: "run_read_failed", message: "run detail could not be decoded" }],
     };
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify([summary]), { status: 200 })));
-    await expect(listPipelineRuns()).resolves.toEqual([summary]);
+    await expect(listPipelineRuns()).resolves.toEqual({ runs: [{ ...summary, current_stage_title: "" }], total: 1 });
   });
 });

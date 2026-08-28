@@ -259,29 +259,53 @@ func (m *Manager) Detail(runID string) (RunDetail, error) {
 }
 
 func (m *Manager) List(limit, offset int) ([]RunSummary, error) {
+	runs, _, err := m.ListPage(limit, offset)
+	return runs, err
+}
+
+// ListPage builds the bounded Runs projection without loading per-run attempts
+// or values. The exact retained total is returned with the same state snapshot
+// as the page for the additive HTTP pagination contract.
+func (m *Manager) ListPage(limit, offset int) ([]RunSummary, int, error) {
 	if limit <= 0 || limit > MaxListPage {
 		limit = MaxListPage
 	}
-	runs, err := m.store.ListPipelineRuns(limit, offset)
+	page, err := m.store.ListPipelineRunPage(limit, offset)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	out := make([]RunSummary, 0, len(runs))
-	for _, run := range runs {
+	out := make([]RunSummary, 0, len(page.Runs))
+	for _, run := range page.Runs {
 		diagnostics := []Diagnostic{}
-		if _, detailErr := m.Detail(run.RunID); detailErr != nil {
+		stageTitle := run.CurrentStageID
+		var snapshot Template
+		if err := json.Unmarshal(run.TemplateSnapshot, &snapshot); err != nil {
 			diagnostics = appendBounded(diagnostics, Diagnostic{Field: "", Code: "run_read_failed", Message: "run detail could not be decoded"})
+			diagnostics = appendBounded(diagnostics, Diagnostic{Field: "current_stage_title", Code: "frozen_stage_title_unavailable", Message: "frozen template snapshot could not be decoded"})
+		} else {
+			foundTitle := false
+			for _, stage := range snapshot.Stages {
+				if stage.ID == run.CurrentStageID && stage.Title != "" {
+					stageTitle = stage.Title
+					foundTitle = true
+					break
+				}
+			}
+			if !foundTitle && run.CurrentStageID != "" {
+				diagnostics = appendBounded(diagnostics, Diagnostic{Field: "current_stage_title", Code: "frozen_stage_title_unavailable", Message: "frozen template snapshot has no current stage title"})
+			}
 		}
 		out = append(out, RunSummary{
 			RunID: run.RunID, TemplateID: run.TemplateID, DisplayName: run.DisplayName,
 			Project: run.Project, State: run.State, Revision: run.Revision,
 			PendingAction: run.PendingAction, CurrentStageID: run.CurrentStageID,
-			CurrentAgentID: run.CurrentAgentID, AttentionReason: run.AttentionReason,
+			CurrentStageTitle: stageTitle,
+			CurrentAgentID:    run.CurrentAgentID, AttentionReason: run.AttentionReason,
 			FinalOutcome: run.FinalOutcome, UpdatedAt: run.UpdatedAt.Format(time.RFC3339Nano),
 			Diagnostics: diagnostics,
 		})
 	}
-	return out, nil
+	return out, page.Total, nil
 }
 
 func (m *Manager) Startup(ctx context.Context) error {

@@ -1,6 +1,6 @@
 # FS-14 — Configurable pipeline runs
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/pipeline`, `internal/config`, `internal/state`, `internal/server`, `internal/messaging`, `internal/cli`, `ui/src/features/pipelines` · **Journeys:** J14
 **Absorbed:** —
 
@@ -20,8 +20,8 @@ free-form agent messaging.
 
 ## 2. Behavior
 
-Every requirement here reflects shipped behavior except the §4.3 items tagged `(planned)`; the
-product boundaries deliberately outside this feature are recorded in §6.
+Every requirement here reflects shipped behavior; the product boundaries deliberately outside this
+feature are recorded in §6.
 
 ### 2.1 Templates and starting a run
 
@@ -233,14 +233,14 @@ product boundaries deliberately outside this feature are recorded in §6.
   AgentDeck retains only the newest proposals and prunes older ones. Approving an edited payload
   creates no consumption, since the edit already invalidated that approval (R27).
 
-### 4.3 Split pipelines surface (planned)
+### 4.3 Split pipelines surface
 
-- **R35** (planned) — Pipelines is one shell destination with two addressable
+- **R35** — Pipelines is one shell destination with two addressable
   sub-destinations, **Runs** and **Templates**, and Runs is where the destination opens. Supervising
   a run and authoring a template never share a screen. Every run and every template has its own
   addressable page that can be linked to, bookmarked, and reloaded directly. The surface still does
   not present a graph canvas (carried forward from R25).
-- **R36** (planned) — The Runs sub-destination lists pipeline runs with each run's
+- **R36** — The Runs sub-destination lists pipeline runs with each run's
   display name, project, state, final outcome when it has one, and the current stage's human title
   from that run's frozen template snapshot rather than only its stage id. Rows are newest first and
   load in bounded pages through an explicit **More runs** action until the retained history is
@@ -251,18 +251,18 @@ product boundaries deliberately outside this feature are recorded in §6.
   the shared-workspace warning of R21 — in a dialog rather than a permanently mounted form. A
   successful start opens that run's own page; a rejected start keeps the entered values visible with
   its named field errors.
-- **R37** (planned) — A run's page shows its goal, project, state and final outcome, the
+- **R37** — A run's page shows its goal, project, state and final outcome, the
   attention reason when one is set, its frozen setup including each stage's effective
   backend/model/effort, and its named values with the run input or stage attempt that produced each.
   It carries the **Open agent**, **Continue**, **Retry stage**, **Stop run**, and **Delete run
   record** actions under exactly the validity gating R11, R12, R13, and R20 already define, and a
   refused action stays visible and retryable.
-- **R38** (planned) — A run's page presents its attempts as an **execution timeline** in
+- **R38** — A run's page presents its attempts as an **execution timeline** in
   the order they actually ran, so a bounded repair loop appears as repeated entries for the same
   stage rather than being collapsed into one. Each entry names its stage, visit number, effective
   runtime, reported outcome or attempt state, result summary, and its result details and checks. An
   attempt that produced no result says so rather than appearing complete.
-- **R39** (planned) — Each timeline entry also shows compact agent cards: the stage agent
+- **R39** — Each timeline entry also shows compact agent cards: the stage agent
   for that attempt, plus one card for every agent assigned to a task that this stage agent created
   directly during that attempt. Delegation is followed exactly one hop; an agent a delegated agent
   creates in turn is ordinary dependent work visible on the Tasks surface and does not appear here.
@@ -273,24 +273,24 @@ product boundaries deliberately outside this feature are recorded in §6.
   card named from its task and agent id rather than disappearing or failing the run page. Cards
   perform no lifecycle action: stopping, renaming, cloning, and every other agent mutation stay on
   the surfaces FS-01 and FS-02 own.
-- **R40** (planned) — When a run has advanced past, or finished after, a stage whose
+- **R40** — When a run has advanced past, or finished after, a stage whose
   delegated agents are still running, the run's page states how many remain running. This is
   disclosure only: it does not delay a transition, change R7's advance rule, add an attention
   reason, or stop any agent.
-- **R41** (planned) — The Templates sub-destination lists saved templates with each
+- **R41** — The Templates sub-destination lists saved templates with each
   template's title, id, stage count, and validation state, and offers **Create manually** and
   **Create with AgentDecker** under the rules R26, R27, R30, and R33 already define. A template
   opens in its own full-width editor page carrying the stage-list editing surface R1 and R17
   define. Templates remain hand-editable as versioned AgentDeck JSON through the same validation
   contract (carried forward from R25).
-- **R42** (planned) — A pending AgentDecker proposal appears on the sub-destination that
+- **R42** — A pending AgentDecker proposal appears on the sub-destination that
   can act on it: a `save_template` proposal on Templates and a `start_run` proposal on Runs. The
   other sub-destination shows a count of the proposals waiting on it so neither is hidden. Proposal
   approval, one-time consumption, and edit invalidation are unchanged from R27 and R33.
-- **R43** (planned) — A previously shared link to the combined page's selected run opens
+- **R43** — A previously shared link to the combined page's selected run opens
   that run's page instead of failing. A link naming a run or template that no longer exists explains
   that it is gone and returns the person to the corresponding list rather than showing an empty page.
-- **R44** (planned) — The split is a purpose-built supervision and authoring experience,
+- **R44** — The split is a purpose-built supervision and authoring experience,
   not the existing panels rearranged. The Pipelines heading and Runs/Templates switcher remain
   spatially stable across its routes. Runs is a compact operational ledger rather than a card grid.
   A run page gives its live state, current stage, attention, and valid actions the primary position;
@@ -307,7 +307,7 @@ product boundaries deliberately outside this feature are recorded in §6.
   returns to and focuses the owning step/field without losing the rest of the setup. These layouts
   use the available width without horizontal page overflow at the existing desktop floor and stack
   their secondary rail before reducing the primary timeline/editor to an unreadable measure.
-- **R45** (planned) — Pipelines motion communicates continuity and state, never decorates
+- **R45** — Pipelines motion communicates continuity and state, never decorates
   waiting. Sub-destination/page changes, dialog open/close, disclosures, and a newly appended
   timeline entry use brief, restrained transitions consistent with the existing core controls; the
   persistent shell, Pipelines heading, and already rendered content do not jump or remount. First
@@ -477,7 +477,7 @@ The shipped first version deliberately keeps these product boundaries:
 - Existing agent-to-agent messaging and token-bound identity: FS-06.
 - Shared project-directory boundary: FS-00 and FS-11.
 - Native pipeline state machine, persistence, tools, API, and restart contracts: TS-09.
-- Planned split surface: TS-02 (targeted task-read index), TS-09 (attempt-window delegated-agent
+- Split surface: TS-02 (targeted task-read index), TS-09 (attempt-window delegated-agent
   projection), TS-03 (run-list pagination and run-detail response), and TS-08.R7/R8 (presentation
   hooks for the new pipeline surfaces); R44–R45 are exercised through J14 and deterministic visual
   fixtures.

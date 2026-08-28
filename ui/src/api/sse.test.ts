@@ -183,7 +183,7 @@ describe("SseClient watchdog reconnect", () => {
     const { sseClient } = await import("./sse");
     const { queryClient } = await import("./config");
     const spy = vi.spyOn(queryClient, "invalidateQueries");
-    queryClient.setQueryData(["pipelines", "runs", "pr_1"], { run: { revision: 4 } });
+    queryClient.setQueryData(["pipelines", "run-detail", "pr_1"], { run: { revision: 4 } });
     sseClient.connect();
     FakeEventSource.instances[0].onopen?.();
     spy.mockClear();
@@ -193,11 +193,25 @@ describe("SseClient watchdog reconnect", () => {
     });
 
     FakeEventSource.instances[0].emit("pipeline_update", update(4));
-    expect(spy).not.toHaveBeenCalledWith({ queryKey: ["pipelines", "runs", "pr_1"] });
+    expect(spy).not.toHaveBeenCalledWith({ queryKey: ["pipelines", "run-detail", "pr_1"] });
 
     FakeEventSource.instances[0].emit("pipeline_update", update(5));
-    expect(spy).toHaveBeenCalledWith({ queryKey: ["pipelines", "runs", "pr_1"] });
-    expect(spy).toHaveBeenCalledWith({ queryKey: ["pipelines", "runs"] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ["pipelines", "run-detail", "pr_1"] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ["pipelines", "run-list"] });
+  });
+
+  it("refetches open pipeline details but keeps run-list pagination on task updates", async () => {
+    const { sseClient } = await import("./sse");
+    const { queryClient } = await import("./config");
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+    sseClient.connect();
+    FakeEventSource.instances[0].onopen?.();
+    spy.mockClear();
+
+    FakeEventSource.instances[0].emit("task_update", JSON.stringify({ type: "task_update", data: { task_id: "task_1" } }));
+
+    expect(spy).toHaveBeenCalledWith({ queryKey: ["pipelines", "run-detail"] });
+    expect(spy).not.toHaveBeenCalledWith({ queryKey: ["pipelines", "run-list"] });
   });
 
   it("drops muted notification types", async () => {

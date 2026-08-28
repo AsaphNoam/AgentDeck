@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   useDeletePipelineRun,
@@ -5,66 +6,68 @@ import {
   usePipelineRun,
   usePipelineRuns,
 } from "../../api/pipelines";
-import { useState } from "react";
+import type { PipelineAttemptAgents, PipelineRunDetail } from "../../schemas/pipeline";
 import { useAgentStore } from "../../store/agentStore";
 
 export function attemptTranscriptPath(agentID: string, live: boolean) {
   return `/${live ? "agent" : "archive"}/${agentID}`;
 }
 
-export function RunBrowser({ selectedID, onSelect }: { selectedID: string | null; onSelect: (id: string | null) => void }) {
-  const runs = usePipelineRuns();
+export function RunsLedger() {
+  const query = usePipelineRuns();
+  const pages = query.data?.pages ?? [];
+  const runs = useMemo(() => {
+    const byID = new Map(pages.flatMap((page) => page.runs).map((run) => [run.run_id, run]));
+    return [...byID.values()].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  }, [pages]);
+  const total = pages[0]?.total ?? runs.length;
+
+  if (query.isLoading) return <RunsSkeleton />;
+  if (query.error) return <p className="form-error">{query.error.message}</p>;
+  if (runs.length === 0) return <section className="pipeline-empty pipeline-empty-ledger"><strong>No runs yet</strong><p>Start a run to turn a reusable template into supervised work.</p></section>;
 
   return (
-    <section className="pipeline-panel pipeline-runs">
-      <div className="pipeline-panel-header">
-        <div>
-          <p className="pipeline-eyebrow">Durable history</p>
-          <h2>Runs</h2>
-        </div>
-        <button type="button" onClick={() => void runs.refetch()}>Refresh</button>
-      </div>
-      {runs.isLoading && <p className="pipeline-empty">Loading runs…</p>}
-      {runs.error && <p className="form-error">{runs.error.message}</p>}
-      {!runs.isLoading && (runs.data?.length ?? 0) === 0 && <p className="pipeline-empty">No pipeline runs yet.</p>}
-      {(runs.data?.length ?? 0) > 0 && <div className="pipeline-run-layout">
-        <ul className="pipeline-run-list">
-          {(runs.data ?? []).map((run) => <li key={run.run_id}>
-            <button type="button" disabled={run.diagnostics.length > 0} className={selectedID === run.run_id ? "pipeline-run-button pipeline-run-button-selected" : "pipeline-run-button"} onClick={() => onSelect(run.run_id)}>
-              <span><strong>{run.display_name || run.template_id}</strong><small>{run.project} · {run.current_stage_id || "finished"}</small></span>
-              <span className={`pipeline-state pipeline-state-${run.state}`}>{run.state}</span>
-            </button>
-            {run.diagnostics.map((diagnostic) => <small className="form-error" key={diagnostic.code}>{diagnostic.message}</small>)}
-          </li>)}
-        </ul>
-        <RunDetail selectedID={selectedID} onDeleted={() => onSelect(null)} />
-      </div>}
+    <section className={query.isFetching ? "pipeline-ledger pipeline-updating" : "pipeline-ledger"} data-ui="pipeline-run-list" data-slot="list">
+      <div className="pipeline-ledger-head" aria-hidden="true"><span>Run</span><span>Stage</span><span>Project</span><span>State</span><span>Updated</span><span /></div>
+      {runs.map((run) => (
+        <Link className="pipeline-ledger-row" key={run.run_id} to={`/pipelines/runs/${encodeURIComponent(run.run_id)}`} data-slot="item">
+          <span className="pipeline-ledger-identity"><strong>{run.display_name || run.template_id}</strong><small><code>{run.run_id}</code></small></span>
+          <span><small>Current stage</small>{run.current_stage_title || run.current_stage_id || "Complete"}</span>
+          <span><small>Project</small>{run.project}</span>
+          <span className={`pipeline-state pipeline-state-${run.state}`}>{run.final_outcome || run.state}</span>
+          <time dateTime={run.updated_at}>{formatRelative(run.updated_at)}</time>
+          <span className="pipeline-row-arrow" aria-hidden="true">→</span>
+          {run.diagnostics.map((diagnostic) => <small className="form-error pipeline-ledger-diagnostic" key={diagnostic.code}>{diagnostic.message}</small>)}
+        </Link>
+      ))}
+      <footer className="pipeline-ledger-footer">
+        <span>{runs.length} of {total} retained runs</span>
+        {query.hasNextPage
+          ? <button type="button" disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()}>{query.isFetchingNextPage ? "Loading…" : "More runs"}</button>
+          : <span className="pipeline-history-complete">Complete history loaded</span>}
+      </footer>
     </section>
   );
 }
 
-function RunDetail({ selectedID, onDeleted }: { selectedID: string | null; onDeleted: () => void }) {
-  const detail = usePipelineRun(selectedID);
+export function RunDetail({ runID, onDeleted }: { runID: string; onDeleted: () => void }) {
+  const detail = usePipelineRun(runID);
   const continueRun = usePipelineControl("continue");
   const retryRun = usePipelineControl("retry");
   const stopRun = usePipelineControl("stop");
   const deleteRun = useDeletePipelineRun();
-  // Hydration retains a stopped agent's identity row with running:false, so mere
-  // presence in the store is not liveness — a completed attempt must reach its
-  // Archive transcript, not the live agent route (FS-14.R8/R11).
-  const liveAgents = useAgentStore((state) => state.agents);
   const [continuation, setContinuation] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  if (!selectedID) return <div className="pipeline-run-detail pipeline-empty">Select a run to inspect its frozen setup and attempt history.</div>;
-  if (detail.isLoading) return <div className="pipeline-run-detail pipeline-empty">Loading run…</div>;
-  if (!detail.data) return <div className="pipeline-run-detail"><p className="form-error">{detail.error?.message ?? "Run unavailable."}</p></div>;
+  if (detail.isLoading) return <RunDetailSkeleton />;
+  if (!detail.data) {
+    return <section className="pipeline-missing"><p className="pipeline-eyebrow">Run unavailable</p><h2>This run is gone.</h2><p>{detail.error?.message ?? "It may have been deleted in another tab."}</p><Link to="/pipelines/runs">Return to Runs</Link></section>;
+  }
 
   const data = detail.data;
   const run = data.run;
   const stage = data.template.stages.find((item) => item.id === run.current_stage_id);
   const attempt = data.attempts.find((item) => item.attempt_id === run.current_attempt_id);
-  const effortFor = (stageID: string) => data.assignments[stageID]?.effort;
   const paused = run.state === "paused";
   const blocked = paused && run.attention_reason === "blocked" && attempt?.report_outcome === "blocked";
   const approval = paused && run.pending_action === "await_approval";
@@ -78,61 +81,104 @@ function RunDetail({ selectedID, onDeleted }: { selectedID: string | null; onDel
     const mutation = action === "continue" ? continueRun : action === "retry" ? retryRun : stopRun;
     mutation.mutate(
       { id: run.run_id, revision: run.revision, input: action === "continue" ? continuation : "" },
-      {
-        onSuccess: () => setContinuation(""),
-        onError: (reason) => setError(reason instanceof Error ? reason.message : String(reason)),
-      },
+      { onSuccess: () => setContinuation(""), onError: (reason) => setError(messageOf(reason)) },
     );
   };
 
-  return <article className="pipeline-run-detail">
-    <div className="pipeline-run-title">
-      <div><p className="pipeline-eyebrow"><code>{run.run_id}</code></p><h3>{run.display_name || data.template.title}</h3></div>
-      <span className={`pipeline-state pipeline-state-${run.state}`}>{run.state}{run.final_outcome ? ` · ${run.final_outcome}` : ""}</span>
-    </div>
-    <p className="pipeline-goal">{run.goal}</p>
-    <dl className="pipeline-facts">
-      <div><dt>Project</dt><dd>{run.project}</dd></div>
-      <div><dt>Current stage</dt><dd>{stage?.title ?? (run.current_stage_id || "—")}</dd></div>
-      <div><dt>Agent</dt><dd>{run.current_agent_id || "—"}</dd></div>
-      <div><dt>Runtime</dt><dd>{attempt ? [attempt.backend, attempt.model, effortFor(attempt.stage_id)].filter(Boolean).join(" · ") : "—"}</dd></div>
-      <div><dt>Attempt / visit</dt><dd>{attempt ? `${attempt.attempt_no} / ${attempt.visit_no}` : "—"}</dd></div>
-      <div><dt>Revision</dt><dd>{run.revision}</dd></div>
-    </dl>
-    {run.attention_reason && <div className="pipeline-warning"><strong>Needs attention</strong><p>{run.attention_reason.replace(/_/g, " ")}</p></div>}
+  return (
+    <article className={detail.isFetching ? "pipeline-run-page pipeline-updating" : "pipeline-run-page"} data-ui="pipeline-run">
+      <Link className="pipeline-back-link" to="/pipelines/runs">← All runs</Link>
+      <section className="pipeline-run-hero" data-slot="live">
+        <div className="pipeline-run-kicker"><code>{run.run_id}</code><span className={`pipeline-state pipeline-state-${run.state}`}>{run.final_outcome || run.state}</span></div>
+        <div className="pipeline-run-title"><div><h2>{run.display_name || data.template.title}</h2><p>{run.goal}</p></div><div className="pipeline-live-stage"><small>{terminal ? "Final position" : "Current stage"}</small><strong>{stage?.title ?? (run.current_stage_id || "Complete")}</strong>{attempt && <span>Visit {attempt.visit_no} · attempt {attempt.attempt_no}</span>}</div></div>
+        {run.attention_reason && <div className="pipeline-warning"><strong>Needs attention</strong><p>{humanize(run.attention_reason)}</p></div>}
+        <div className="pipeline-run-actions" data-slot="actions">
+          {run.current_agent_id && <Link className="pipeline-link-button" to={`/agent/${run.current_agent_id}`}>Open agent</Link>}
+          {canContinue && <button type="button" disabled={busy || (blocked && !continuation.trim())} onClick={() => control("continue")}>{approval ? "Approve and continue" : "Continue"}</button>}
+          {canRetry && <button type="button" disabled={busy} onClick={() => control("retry")}>Retry stage</button>}
+          {!terminal && <button type="button" className="btn-danger" disabled={busy} onClick={() => control("stop")}>Stop run</button>}
+          {terminal && <button type="button" className="btn-danger" disabled={busy} onClick={() => deleteRun.mutate(run.run_id, { onSuccess: onDeleted, onError: (reason) => setError(messageOf(reason)) })}>Delete run record</button>}
+        </div>
+        {blocked && <label className="form-field pipeline-continuation"><span>New input for the blocked stage</span><textarea rows={3} value={continuation} onChange={(event) => setContinuation(event.target.value)} /></label>}
+        {error && <p className="form-error">{error}</p>}
+      </section>
 
-    <div className="pipeline-run-actions">
-      {run.current_agent_id && <Link className="pipeline-link-button" to={`/agent/${run.current_agent_id}`}>Open agent</Link>}
-      {canContinue && <button type="button" disabled={busy || (blocked && !continuation.trim())} onClick={() => control("continue")}>{approval ? "Approve and continue" : "Continue"}</button>}
-      {canRetry && <button type="button" disabled={busy} onClick={() => control("retry")}>Retry stage</button>}
-      {!terminal && <button type="button" className="btn-danger" disabled={busy} onClick={() => control("stop")}>Stop run</button>}
-      {terminal && <button type="button" className="btn-danger" disabled={busy} onClick={() => deleteRun.mutate(run.run_id, { onSuccess: onDeleted, onError: (reason) => setError(reason instanceof Error ? reason.message : String(reason)) })}>Delete run record</button>}
-    </div>
-    {blocked && <label className="form-field"><span>New input for the blocked stage</span><textarea rows={3} value={continuation} onChange={(event) => setContinuation(event.target.value)} /></label>}
-    {error && <p className="form-error">{error}</p>}
+      <div className="pipeline-run-workspace">
+        <section className="pipeline-timeline" data-slot="timeline">
+          <div className="pipeline-timeline-heading"><div><p className="pipeline-eyebrow">Execution timeline</p><h3>{data.attempts.length} attempt{data.attempts.length === 1 ? "" : "s"}</h3></div><span>Oldest → newest</span></div>
+          <ol>
+            {data.attempts.map((item) => <TimelineAttempt key={item.attempt_id} data={data} attemptID={item.attempt_id} current={item.attempt_id === run.current_attempt_id} attention={item.attempt_id === run.current_attempt_id && Boolean(run.attention_reason)} />)}
+          </ol>
+        </section>
+        <aside className="pipeline-run-rail">
+          <details className="pipeline-disclosure" open data-slot="setup"><summary>Frozen setup <span>{data.template.stages.length} stages</span></summary><div className="pipeline-disclosure-body">
+            <dl className="pipeline-rail-facts"><div><dt>Project</dt><dd>{run.project}</dd></div><div><dt>Template</dt><dd>{data.template.title}</dd></div><div><dt>Started</dt><dd>{formatDate(run.created_at)}</dd></div><div><dt>Revision</dt><dd>{run.revision}</dd></div></dl>
+            <ol className="pipeline-setup-list">{data.template.stages.map((item, index) => { const runtime = data.assignments[item.id]; return <li key={item.id}><span>{index + 1}</span><div><strong>{item.title}</strong><small>{[runtime?.backend, runtime?.model, runtime?.effort].filter(Boolean).join(" · ") || "No runtime"}</small></div></li>; })}</ol>
+          </div></details>
+          <details className="pipeline-disclosure" data-slot="values"><summary>Named values <span>{data.values.length}</span></summary><div className="pipeline-disclosure-body">{data.values.length === 0 ? <p className="pipeline-empty">No values recorded.</p> : <dl className="pipeline-value-list">{data.values.map((value) => <div key={value.name}><dt>{value.name}<small>{value.source_kind}{value.source_attempt_id ? ` · ${value.source_attempt_id}` : ""}</small></dt><dd>{value.value}</dd></div>)}</dl>}</div></details>
+        </aside>
+      </div>
+    </article>
+  );
+}
 
-    <div className="pipeline-subsection">
-      <h4>Named values</h4>
-      {data.values.length === 0 ? <p className="pipeline-empty">No values recorded.</p> : <dl className="pipeline-value-list">
-        {data.values.map((value) => <div key={value.name}><dt>{value.name}<small>{value.source_kind}{value.source_attempt_id ? ` · ${value.source_attempt_id}` : ""}</small></dt><dd>{value.value}</dd></div>)}
-      </dl>}
-    </div>
+function TimelineAttempt({ data, attemptID, current, attention }: { data: PipelineRunDetail; attemptID: string; current: boolean; attention: boolean }) {
+  const item = data.attempts.find((attempt) => attempt.attempt_id === attemptID)!;
+  const stage = data.template.stages.find((candidate) => candidate.id === item.stage_id);
+  const effort = data.assignments[item.stage_id]?.effort;
+  const agents = data.agents_by_attempt[item.attempt_id];
+  const outcome = item.report_outcome || (item.state === "completed" ? "unreported" : item.state);
+  const [expanded, setExpanded] = useState(current || attention);
 
-    <div className="pipeline-subsection">
-      <h4>Attempt history</h4>
-      <ol className="pipeline-attempt-list">
-        {data.attempts.map((item) => <li key={item.attempt_id}>
-          <div className="pipeline-attempt-heading">
-            <span className="pipeline-stage-number">{item.attempt_no}</span>
-            <div><strong>{data.template.stages.find((candidate) => candidate.id === item.stage_id)?.title ?? item.stage_id}</strong><small>{["visit " + item.visit_no, item.backend, item.model, effortFor(item.stage_id)].filter(Boolean).join(" · ")}</small></div>
-            <span className="pipeline-state">{item.report_outcome || item.state}</span>
-          </div>
-          {item.report_summary && <p>{item.report_summary}</p>}
-          {item.report_details && <details><summary>Details</summary><pre>{item.report_details}</pre></details>}
-          {item.report_checks && <details><summary>Checks</summary><pre>{item.report_checks}</pre></details>}
-          {item.agent_id && <Link to={attemptTranscriptPath(item.agent_id, liveAgents[item.agent_id]?.running === true)}>Open transcript</Link>}
-        </li>)}
-      </ol>
-    </div>
-  </article>;
+  useEffect(() => {
+    if (current || attention) setExpanded(true);
+  }, [attention, current]);
+
+  return <li className={current ? "pipeline-timeline-item pipeline-timeline-current" : "pipeline-timeline-item"} data-slot="attempt">
+    <span className="pipeline-timeline-line" aria-hidden="true" />
+    <details open={expanded} onToggle={(event) => setExpanded(event.currentTarget.open)}>
+      <summary>
+        <span className="pipeline-stage-number">{item.attempt_no}</span>
+        <span className="pipeline-attempt-identity"><strong>{stage?.title ?? item.stage_id}</strong><small>Visit {item.visit_no} · {[item.backend, item.model, effort].filter(Boolean).join(" · ")}</small></span>
+        <span className={`pipeline-state pipeline-state-${outcome}`}>{humanize(outcome)}</span>
+        <span className="pipeline-disclosure-chevron" aria-hidden="true">⌄</span>
+      </summary>
+      <div className="pipeline-attempt-body">
+        {item.report_summary ? <p className="pipeline-result-summary">{item.report_summary}</p> : <p className="pipeline-unreported">No stage result was reported for this attempt.</p>}
+        {item.report_details && <section><h4>Result details</h4><pre>{item.report_details}</pre></section>}
+        {item.report_checks && <section><h4>Checks</h4><pre>{item.report_checks}</pre></section>}
+        {agents && <AttemptAgents agents={agents} />}
+      </div>
+    </details>
+  </li>;
+}
+
+function AttemptAgents({ agents }: { agents: PipelineAttemptAgents }) {
+  const summaries = agents.stage_agent ? [agents.stage_agent, ...agents.delegated_agents] : agents.delegated_agents;
+  if (summaries.length === 0) return null;
+  return <section className="pipeline-attempt-agents" data-slot="agents"><div className="pipeline-agent-heading"><h4>Agents</h4><span>{agents.delegated_running_count > 0 && `${agents.delegated_running_count} delegated still running`}{agents.delegated_running_count > 0 && agents.delegated_total > agents.delegated_agents.length && " · "}{agents.delegated_total > agents.delegated_agents.length && `Showing ${agents.delegated_agents.length} of ${agents.delegated_total} delegated`}</span></div><div className="pipeline-agent-grid">{summaries.map((summary, index) => <AttemptAgentCard key={`${summary.agent_id}-${index}`} summary={summary} stage={index === 0 && Boolean(agents.stage_agent)} />)}</div></section>;
+}
+
+function AttemptAgentCard({ summary, stage }: { summary: PipelineAttemptAgents["delegated_agents"][number] | NonNullable<PipelineAttemptAgents["stage_agent"]>; stage: boolean }) {
+  const live = useAgentStore((state) => state.agents[summary.agent_id]);
+  const available = live ? true : summary.available;
+  const running = live?.running ?? summary.running;
+  const state = live?.state ?? summary.state;
+  const name = live?.name || summary.name;
+  const preview = live?.detail || summary.preview;
+  const href = available ? attemptTranscriptPath(summary.agent_id, running) : null;
+  const content = <><span className={`pipeline-agent-dot pipeline-agent-dot-${state}`} /><span><strong>{name}</strong><small>{stage ? "Stage agent" : "Delegated work"} · {humanize(state)}</small><em>{preview || "No recent activity"}</em></span><span aria-hidden="true">{href ? "↗" : "—"}</span></>;
+  return href ? <Link className="pipeline-agent-card" to={href}>{content}</Link> : <div className="pipeline-agent-card pipeline-agent-unavailable">{content}</div>;
+}
+
+function RunsSkeleton() { return <div className="pipeline-ledger pipeline-skeleton" aria-label="Loading runs"><span /><span /><span /><span /></div>; }
+function RunDetailSkeleton() { return <div className="pipeline-run-page pipeline-skeleton" aria-label="Loading run"><span /><span /><span /><span /></div>; }
+function messageOf(reason: unknown) { return reason instanceof Error ? reason.message : String(reason); }
+function humanize(value: string) { return value.replace(/_/g, " "); }
+function formatDate(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date); }
+function formatRelative(value: string) { const date = new Date(value); if (Number.isNaN(date.getTime())) return value; const delta = Date.now() - date.getTime(); if (delta < 60_000) return "just now"; if (delta < 3_600_000) return `${Math.floor(delta / 60_000)}m ago`; if (delta < 86_400_000) return `${Math.floor(delta / 3_600_000)}h ago`; return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date); }
+
+// Compatibility wrapper for older focused tests and embedders.
+export function RunBrowser({ selectedID }: { selectedID: string | null; onSelect?: (id: string | null) => void }) {
+  return selectedID ? <RunDetail runID={selectedID} onDeleted={() => undefined} /> : <RunsLedger />;
 }

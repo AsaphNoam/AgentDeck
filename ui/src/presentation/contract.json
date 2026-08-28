@@ -479,6 +479,63 @@
         "dependency_failed"
       ],
       "variants": []
+    },
+    "pipelines": {
+      "slots": [
+        "header",
+        "navigation",
+        "content"
+      ],
+      "states": [],
+      "variants": []
+    },
+    "pipeline-run-list": {
+      "slots": [
+        "list",
+        "item"
+      ],
+      "states": [],
+      "variants": []
+    },
+    "pipeline-run": {
+      "slots": [
+        "live",
+        "actions",
+        "timeline",
+        "attempt",
+        "agents",
+        "setup",
+        "values"
+      ],
+      "states": [],
+      "variants": []
+    },
+    "pipeline-template-library": {
+      "slots": [
+        "list",
+        "item"
+      ],
+      "states": [],
+      "variants": []
+    },
+    "pipeline-template-editor": {
+      "slots": [
+        "navigator",
+        "stage",
+        "inputs",
+        "actions"
+      ],
+      "states": [],
+      "variants": []
+    },
+    "pipeline-start-dialog": {
+      "slots": [
+        "steps",
+        "content",
+        "actions"
+      ],
+      "states": [],
+      "variants": []
     }
   },
   "decorative_slots": [

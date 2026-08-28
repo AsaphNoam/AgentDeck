@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import {
   pipelineRunDetailSchema,
@@ -14,8 +14,9 @@ import {
 
 export const PIPELINE_QUERY_KEYS = {
   templates: ["pipelines", "templates"] as const,
-  runs: ["pipelines", "runs"] as const,
-  run: (id: string) => ["pipelines", "runs", id] as const,
+  runs: ["pipelines", "run-list"] as const,
+  runDetails: ["pipelines", "run-detail"] as const,
+  run: (id: string) => ["pipelines", "run-detail", id] as const,
   proposals: ["pipelines", "proposals"] as const,
 };
 
@@ -92,8 +93,16 @@ export function deletePipelineTemplate(id: string) {
   return emptyRequest(`/api/pipelines/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
-export function listPipelineRuns() {
-  return request("/api/pipeline-runs?limit=100", z.array(pipelineRunSummarySchema));
+export async function listPipelineRuns(limit = 50, offset = 0) {
+  const response = await fetch(`/api/pipeline-runs?limit=${limit}&offset=${offset}`);
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({})) as PipelineErrorBody;
+    throw new PipelineAPIError(response.status, body, `${response.status} ${response.statusText}`);
+  }
+  const runs = z.array(pipelineRunSummarySchema).parse(await response.json());
+  const rawTotal = response.headers.get("X-Total-Count");
+  const parsedTotal = rawTotal === null ? runs.length : Number(rawTotal);
+  return { runs, total: Number.isSafeInteger(parsedTotal) && parsedTotal >= 0 ? parsedTotal : runs.length };
 }
 
 export function listPipelineProposals() {
@@ -145,7 +154,15 @@ export function usePipelineTemplates() {
 }
 
 export function usePipelineRuns() {
-  return useQuery({ queryKey: PIPELINE_QUERY_KEYS.runs, queryFn: listPipelineRuns });
+  return useInfiniteQuery({
+    queryKey: PIPELINE_QUERY_KEYS.runs,
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) => listPipelineRuns(50, pageParam),
+    getNextPageParam: (page, pages) => {
+      const loaded = pages.reduce((total, item) => total + item.runs.length, 0);
+      return loaded < page.total ? loaded : undefined;
+    },
+  });
 }
 
 export function usePipelineProposals() {
@@ -179,6 +196,7 @@ export function useDeletePipelineTemplate() {
 
 function updateRunCaches(qc: ReturnType<typeof useQueryClient>, detail: PipelineRunDetail) {
   qc.setQueryData(PIPELINE_QUERY_KEYS.run(detail.run.run_id), detail);
+  void qc.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.run(detail.run.run_id) });
   void qc.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.runs });
 }
 
@@ -207,7 +225,7 @@ export function useDeletePipelineRun() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: deletePipelineRun,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["pipelines", "runs"] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.runs }),
   });
 }
 

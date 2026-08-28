@@ -5,6 +5,30 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-28 — Implementation: Pipelines redesign
+
+Pipelines is now two focused experiences instead of one dense page. Runs opens as a compact
+operational ledger with complete retained history, human stage names, and a start dialog that keeps
+setup, runtime choices, and review separate. Every run has a reloadable page with its live state and
+controls first, a true execution timeline—including repeated repair attempts—plus frozen setup,
+named values, stage agents, and one-hop delegated work. Agent cards honestly distinguish live,
+archived, and unavailable work, and disclose delegated agents still running after a stage finishes.
+
+Templates now has its own library and full-width editor. The editor keeps one selected stage in
+focus, preserves unsaved work while moving between stages, points validation back to the affected
+field, and scales to the maximum stage count. AgentDecker proposals live where they can be acted on,
+legacy run links still resolve, missing records explain themselves, background refreshes keep
+content in place, and reduced-motion users get the same complete flow without decorative movement.
+
+The redesign was exercised in a real browser at the supported desktop floor across empty and
+populated Runs, the full three-step start flow, looping run history, delegated-agent disclosure, the
+template library, and focused editing. The layout defect found during that pass—runtime rows hiding
+the dialog footer—was fixed and rechecked.
+
+**Needs attention:** None.
+
+**Next:** Run an independent review of the redesigned Pipelines surface.
+
 ### 2026-08-27 — Fix: active-first Ordering design
 
 The Ordering design now uses the same running-first card sequence for what the person sees and what

@@ -138,6 +138,32 @@ export const pipelineRunDetailSchema = z.object({
   attempts: z.array(pipelineAttemptSchema),
   values: z.array(pipelineValueSchema),
   diagnostics: z.array(pipelineDiagnosticSchema),
+  agents_by_attempt: z.record(z.object({
+    stage_agent: z.object({
+      agent_id: z.string(),
+      name: z.string(),
+      running: z.boolean(),
+      state: z.string(),
+      preview: z.string(),
+      route: z.enum(["live", "archive", "unavailable"]),
+      available: z.boolean(),
+    }).nullable(),
+    delegated_agents: z.array(z.object({
+      agent_id: z.string(),
+      name: z.string(),
+      running: z.boolean(),
+      state: z.string(),
+      preview: z.string(),
+      route: z.enum(["live", "archive", "unavailable"]),
+      available: z.boolean(),
+      task_id: z.string(),
+      display_name: z.string(),
+      task_state: z.string().optional().default(""),
+      outcome: z.string(),
+    })),
+    delegated_total: z.number().int(),
+    delegated_running_count: z.number().int(),
+  })).optional().default({}),
 });
 
 export const pipelineRunSummarySchema = z.object({
@@ -149,6 +175,7 @@ export const pipelineRunSummarySchema = z.object({
   revision: z.number().int(),
   pending_action: z.string(),
   current_stage_id: z.string(),
+  current_stage_title: z.string().optional().default(""),
   current_agent_id: z.string(),
   attention_reason: z.string(),
   final_outcome: z.string(),
@@ -208,6 +235,7 @@ export type PipelineAttempt = z.infer<typeof pipelineAttemptSchema>;
 export type PipelineValue = z.infer<typeof pipelineValueSchema>;
 export type PipelineRunDetail = z.infer<typeof pipelineRunDetailSchema>;
 export type PipelineRunSummary = z.infer<typeof pipelineRunSummarySchema>;
+export type PipelineAttemptAgents = PipelineRunDetail["agents_by_attempt"][string];
 export type PipelineWorkspaceConflict = z.infer<typeof pipelineWorkspaceConflictSchema>;
 export type PipelineStartResponse = z.infer<typeof pipelineStartResponseSchema>;
 export type PipelineUpdate = z.infer<typeof pipelineUpdateSchema>;

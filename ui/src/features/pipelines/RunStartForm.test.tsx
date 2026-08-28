@@ -64,5 +64,27 @@ describe("RunStartForm", () => {
 
     expect(await screen.findByText("assignments.work")).toBeInTheDocument();
     expect(screen.getByText(/unknown model "gpt-5.6-sol"/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Backend")).toHaveFocus();
+  });
+
+  // FS-14.A20/A21: the dialog sequence preserves the draft while moving
+  // through one stable Setup → Runtimes → Review flow.
+  it("preserves setup values across the three start steps", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    render(<QueryClientProvider client={client}><RunStartForm stepMode onCancel={() => {}} onStarted={() => {}} /></QueryClientProvider>);
+
+    await screen.findByRole("option", { name: "Delivery (delivery)" });
+    fireEvent.change(screen.getByLabelText("Template"), { target: { value: "delivery" } });
+    fireEvent.change(screen.getByLabelText("Run display name"), { target: { value: "Release train" } });
+    fireEvent.change(screen.getByLabelText("Run goal"), { target: { value: "Ship it" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Next" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("Stage runtimes")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByRole("heading", { name: "Release train" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByLabelText("Run display name")).toHaveValue("Release train");
+    expect(screen.getByLabelText("Run goal")).toHaveValue("Ship it");
   });
 });

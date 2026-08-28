@@ -12,8 +12,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   paths are bounded as described in the changelog.
 - **Review state:** Every review and usability finding through 2026-08-27 is closed in code, tests,
   or an explicit specification boundary. No open review finding remains.
-- **Active change:** None. Mermaid diagram rendering in the chat transcript is shipped; FS-03 and
-  TS-08 are Current.
+- **Active change:** None. The Pipelines surface split is finished and ready for an independent
+  review; see `../ready-changes/split-pipelines-surface.md`.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
   remain owed before claiming those adapters accept structured results.
 - **Usability state:** The v0.2.2 → v0.2.3 user-facing delta was driven through a real browser on
@@ -24,9 +24,22 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Active change
 
-**State:** none in progress.
+**Change:** None.
+
+**State:** Ready for the next human-selected change.
+
+**Next:** Run an independent review of the finished Pipelines redesign.
 
 ## Changelog
+
+- **2026-08-28 — work:** Shipped the Pipelines redesign. Runs and Templates now have separate,
+  addressable list/detail experiences; run supervision is timeline-first with frozen setup, named
+  values, complete paginated history, and reload-safe stage/delegate agent summaries; template
+  authoring is a focused one-stage workspace; and start-run uses a stable three-step dialog. The
+  additive run projections use one indexed, bounded task read and preserve the existing pipeline
+  control plane. The full UI and Go suites, spec checks, release build, and real-browser checks at
+  the supported desktop floor are green; browser QA also found and closed a runtime-dialog footer
+  overflow before completion.
 
 - **2026-08-27 — fix:** Closed the active-first Ordering design finding (INV §10). FS-02.R45/A28
   now require the rendered running-first id order to drive drag geometry, same-block drops to map

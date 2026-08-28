@@ -1,6 +1,6 @@
 # TS-03 — HTTP, SSE & WebSocket API
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/server`, `ui/src/api`
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) API sections and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -286,13 +286,13 @@ stop-and-registration-cleanup operation.
   and reconnect hydrates the Tasks view through REST rather than replaying an event log, as R17
   established for `pipeline_update`. Shapes are specified in TS-10.
 
-- **R29** (planned) — **The run detail response gains one additive, bounded agent-summary
+- **R29** — **The run detail response gains one additive, bounded agent-summary
   block; no route is added, removed, or renamed.** `GET /api/pipeline-runs/{id}` keeps every field it
   returns today and adds `agents_by_attempt`, one entry per attempt keyed by `attempt_id`
   (FS-14.R39, TS-09.R28). Each entry carries one `stage_agent` summary and `delegated_agents` plus
   `delegated_total`, and `delegated_running_count`. An agent summary contains `agent_id`, `name`,
   `running`, `state`, `preview`, `route`, and `available`; a delegated item contains that summary
-  plus the originating task's `task_id`, `display_name`, `state`, and `outcome`. `preview` is human
+  plus the originating task's `task_id`, `display_name`, `task_state`, and `outcome`. `preview` is human
   text capped at the existing agent-card preview bound. No instruction text, task arm, or attachment
   is included.
 
@@ -312,7 +312,7 @@ stop-and-registration-cleanup operation.
   since `task_update`'s bounded payload deliberately carries no creator identity to filter on. That
   keeps R8's publish-after-commit rule and R17's refetch-over-replay boundary intact.
 
-- **R30** (planned) — **Run-list pagination and human stage titles extend the existing
+- **R30** — **Run-list pagination and human stage titles extend the existing
   route additively.** Each `GET /api/pipeline-runs` summary adds `current_stage_title`, resolved from
   that run's frozen template snapshot and falling back to `current_stage_id` only when the snapshot
   cannot supply a title; the existing per-run diagnostic states that fallback. The response remains the

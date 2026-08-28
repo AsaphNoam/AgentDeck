@@ -1,6 +1,6 @@
 # TS-09 — Pipeline control plane
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/pipeline`, `internal/config`, `internal/state`, `internal/server`, `internal/messaging`, `internal/cli`, `ui/src/features/pipelines`
 **Absorbed:** —
 
@@ -232,7 +232,7 @@ user-facing dismissal action: unapproved proposals are bounded by the same centr
   hard-coded turn-end consumer becomes a shared generation-scoped fan-out serving both domains rather
   than a second dispatch path (TS-10.R19). See TS-10.
 
-- **R28** (planned) — **The delegated-agent view is a derived read, not control-plane
+- **R28** — **The delegated-agent view is a derived read, not control-plane
   state.** A stage agent may create dependent work (FS-16), and the run page shows those agents
   under the attempt that spawned them (FS-14.R39). The projection is computed per request by
   joining each attempt's non-empty `agent_id`/`agent_generation` and creation-time window against

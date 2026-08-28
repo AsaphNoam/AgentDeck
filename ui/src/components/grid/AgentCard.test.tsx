@@ -78,7 +78,7 @@ describe("AgentCard", () => {
                 detail: "working", running: true, context_pct: 0,
                 pipeline: { run_id: "pr_1", run_name: "Delivery", stage_id: "work", attempt_id: "pa_1", attempt_no: 2 },
               }} />} />
-              <Route path="/pipelines" element={<div>Pipeline run</div>} />
+              <Route path="/pipelines/runs/:runID" element={<div>Pipeline run</div>} />
             </Routes>
           </SortableContext>
         </DndContext>

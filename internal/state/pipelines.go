@@ -253,23 +253,29 @@ type pipelineRunQueryer interface {
 	QueryRow(query string, args ...any) *sql.Row
 }
 
+const pipelineRunColumns = `
+run_id, template_id, template_snapshot_json, display_name, project, goal,
+inputs_json, assignments_json, state, revision, pending_action,
+current_stage_id, current_attempt_id, current_agent_id, attention_reason,
+final_outcome, created_at, updated_at`
+
 func readPipelineRunQuery(q pipelineRunQueryer, runID string) (PipelineRunRecord, error) {
+	run, err := scanPipelineRun(q.QueryRow(`SELECT `+pipelineRunColumns+` FROM pipeline_runs WHERE run_id = ?`, runID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return PipelineRunRecord{}, ErrNotFound
+	}
+	return run, err
+}
+
+func scanPipelineRun(row rowScanner) (PipelineRunRecord, error) {
 	var run PipelineRunRecord
 	var snapshot, inputs, assignments, createdAt, updatedAt string
-	err := q.QueryRow(`
-SELECT run_id, template_id, template_snapshot_json, display_name, project, goal,
-       inputs_json, assignments_json, state, revision, pending_action,
-       current_stage_id, current_attempt_id, current_agent_id, attention_reason,
-       final_outcome, created_at, updated_at
-FROM pipeline_runs WHERE run_id = ?`, runID).Scan(
+	err := row.Scan(
 		&run.RunID, &run.TemplateID, &snapshot, &run.DisplayName, &run.Project, &run.Goal,
 		&inputs, &assignments, &run.State, &run.Revision, &run.PendingAction,
 		&run.CurrentStageID, &run.CurrentAttemptID, &run.CurrentAgentID, &run.AttentionReason,
 		&run.FinalOutcome, &createdAt, &updatedAt,
 	)
-	if errors.Is(err, sql.ErrNoRows) {
-		return PipelineRunRecord{}, ErrNotFound
-	}
 	if err != nil {
 		return PipelineRunRecord{}, fmt.Errorf("state: read pipeline run: %w", err)
 	}
@@ -286,41 +292,63 @@ FROM pipeline_runs WHERE run_id = ?`, runID).Scan(
 }
 
 func (s *Store) ListPipelineRuns(limit, offset int) ([]PipelineRunRecord, error) {
+	page, err := s.ListPipelineRunPage(limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	return page.Runs, nil
+}
+
+// PipelineRunPage is one retained-history page and its exact total from the
+// same read transaction. It keeps list pagination independent of full details.
+type PipelineRunPage struct {
+	Runs  []PipelineRunRecord
+	Total int
+}
+
+// ListPipelineRunPage returns retained runs newest first with the exact total.
+// Count and page share one transaction so a response cannot advertise an end
+// state from a different database snapshot than its rows (TS-03.R30).
+func (s *Store) ListPipelineRunPage(limit, offset int) (PipelineRunPage, error) {
 	if limit <= 0 {
 		limit = 100
 	}
 	if offset < 0 {
 		offset = 0
 	}
-	rows, err := s.db.Query(`
-SELECT run_id FROM pipeline_runs ORDER BY updated_at DESC, run_id LIMIT ? OFFSET ?`, limit, offset)
+	tx, err := s.db.Begin()
 	if err != nil {
-		return nil, fmt.Errorf("state: list pipeline runs: %w", err)
+		return PipelineRunPage{}, fmt.Errorf("state: begin pipeline run page: %w", err)
+	}
+	defer tx.Rollback()
+	var total int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM pipeline_runs`).Scan(&total); err != nil {
+		return PipelineRunPage{}, fmt.Errorf("state: count pipeline runs: %w", err)
+	}
+	rows, err := tx.Query(`SELECT `+pipelineRunColumns+`
+FROM pipeline_runs ORDER BY updated_at DESC, run_id LIMIT ? OFFSET ?`, limit, offset)
+	if err != nil {
+		return PipelineRunPage{}, fmt.Errorf("state: list pipeline runs: %w", err)
 	}
 	defer rows.Close()
-	ids := []string{}
+	out := make([]PipelineRunRecord, 0, limit)
 	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, fmt.Errorf("state: scan pipeline run: %w", err)
-		}
-		ids = append(ids, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("state: iterate pipeline runs: %w", err)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, fmt.Errorf("state: close pipeline runs: %w", err)
-	}
-	out := make([]PipelineRunRecord, 0, len(ids))
-	for _, id := range ids {
-		run, err := s.ReadPipelineRun(id)
+		run, err := scanPipelineRun(rows)
 		if err != nil {
-			return nil, err
+			return PipelineRunPage{}, err
 		}
 		out = append(out, run)
 	}
-	return out, nil
+	if err := rows.Err(); err != nil {
+		return PipelineRunPage{}, fmt.Errorf("state: iterate pipeline runs: %w", err)
+	}
+	if err := rows.Close(); err != nil {
+		return PipelineRunPage{}, fmt.Errorf("state: close pipeline runs: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return PipelineRunPage{}, fmt.Errorf("state: commit pipeline run page: %w", err)
+	}
+	return PipelineRunPage{Runs: out, Total: total}, nil
 }
 
 // ListActivePipelineRuns returns every non-terminal run for startup recovery

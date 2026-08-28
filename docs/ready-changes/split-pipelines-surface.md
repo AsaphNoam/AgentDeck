@@ -1,6 +1,6 @@
 # Split the Pipelines surface into runs and templates
 
-**State:** Waiting to start
+**State:** Finished
 **Why:** Direct human request on 2026-08-27 — "the pipeline view is terrible; the template editor
 should be separate from run history or existing runs; running pipelines should be their own page
 with a better UI showing which stage it's on, and results". Captured as the "Pipelines surface

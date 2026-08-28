@@ -50,6 +50,15 @@ describe("VisualMatrix", () => {
     expect(menu.querySelectorAll(".project-color-preset")).toHaveLength(6);
   });
 
+  it("renders the timeline-first Pipelines contract fixture", () => {
+    const { container } = render(<MemoryRouter><VisualMatrix /></MemoryRouter>);
+    const run = container.querySelector('[data-ui="pipeline-run"]')!;
+    expect(run.querySelector('[data-slot="live"]')).toBeTruthy();
+    expect(run.querySelector('[data-slot="timeline"]')).toBeTruthy();
+    expect(run.querySelectorAll('[data-slot="attempt"]')).toHaveLength(1);
+    expect(run.querySelector('[data-slot="agents"]')).toBeTruthy();
+  });
+
   it("switches between Core and Sky & Grove without changing product structure", () => {
     const { container, unmount } = render(<MemoryRouter><VisualMatrix /></MemoryRouter>);
     const root = container.querySelector(".visual-matrix")!;

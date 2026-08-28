@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -187,5 +188,105 @@ func TestPipelineRoutesRejectCrossOrigin(t *testing.T) {
 	srv.routes().ServeHTTP(rec, req)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("cross-origin pipeline request = %d, want 403", rec.Code)
+	}
+}
+
+func TestPipelineRunDetailProjectsOneHopAgentsAndFallbacks(t *testing.T) {
+	srv := testServer(t, true)
+	base := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
+	for _, agent := range []state.Agent{
+		{AgentID: "a_stage", Name: "Stage", Role: "implementer", Project: "my-app", Interface: "chat", CreatedAt: base},
+		{AgentID: "a_delegate", Name: "Delegate", Role: "implementer", Project: "my-app", Interface: "chat", CreatedAt: base},
+	} {
+		if err := srv.stateStore.WriteAgent(agent); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := srv.stateStore.WriteStatus(state.Status{AgentID: "a_stage", State: "busy", Detail: "stage status"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.stateStore.WriteStatus(state.Status{AgentID: "a_delegate", State: "idle"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.stateStore.WriteRunning(state.RunningEntry{AgentID: "a_delegate", PID: 1, Interface: "chat", StartedAt: base}); err != nil {
+		t.Fatal(err)
+	}
+	insertTask := func(id, assignee, creator string, at time.Time) {
+		t.Helper()
+		if _, err := srv.stateStore.DB().Exec(`
+INSERT INTO tasks(task_id, project, display_name, instruction, target_kind, state,
+  created_by_kind, created_by_agent_id, created_by_generation, assigned_agent_id,
+  outcome, outcome_summary, created_at, updated_at)
+VALUES (?, 'my-app', ?, '', 'agent', 'finished', 'agent', ?, 'g1', ?, 'success', ?, ?, ?)`,
+			id, id, creator, assignee, id+" outcome", at.Format(time.RFC3339Nano), at.Format(time.RFC3339Nano)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	insertTask("first", "a_delegate", "a_stage", base.Add(time.Second))
+	insertTask("missing", "a_missing", "a_stage", base.Add(2*time.Second))
+	insertTask("second", "a_delegate", "a_stage", base.Add(11*time.Second))
+	insertTask("second-hop", "a_stage", "a_delegate", base.Add(12*time.Second))
+	next := base.Add(10 * time.Second)
+	detail := pipeline.RunDetail{
+		Run: state.PipelineRunRecord{Project: "my-app"},
+		Attempts: []state.PipelineAttemptRecord{
+			{AttemptID: "pa_1", AgentID: "a_stage", AgentGeneration: "g1", CreatedAt: base, ReportSummary: "first report"},
+			{AttemptID: "pa_2", AgentID: "a_stage", AgentGeneration: "g1", CreatedAt: next, ReportSummary: "second report"},
+			{AttemptID: "pa_empty", CreatedAt: next.Add(time.Second)},
+		},
+	}
+	agents, err := srv.pipelineAttemptAgents(detail)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := agents["pa_1"]
+	if first.StageAgent == nil || !first.StageAgent.Available || first.StageAgent.Route != "archive" || first.StageAgent.Preview != "stage status" {
+		t.Fatalf("stage agent = %+v", first.StageAgent)
+	}
+	if len(first.DelegatedAgents) != 2 || first.DelegatedTotal != 2 || first.DelegatedRunningCount != 1 {
+		t.Fatalf("first delegated agents = %+v", first)
+	}
+	if first.DelegatedAgents[1].AgentID != "a_delegate" || first.DelegatedAgents[1].Route != "live" || first.DelegatedAgents[1].Preview != "first outcome" {
+		t.Fatalf("newest direct delegate = %+v", first.DelegatedAgents[1])
+	}
+	if first.DelegatedAgents[0].AgentID != "a_missing" || first.DelegatedAgents[0].Available || first.DelegatedAgents[0].Route != "unavailable" || first.DelegatedAgents[0].State != "unknown" {
+		t.Fatalf("missing delegate fallback = %+v", first.DelegatedAgents[0])
+	}
+	second := agents["pa_2"]
+	if len(second.DelegatedAgents) != 1 || second.DelegatedAgents[0].TaskID != "second" {
+		t.Fatalf("second delegated agents = %+v", second)
+	}
+	encoded, err := json.Marshal(pipelineRunDetailResponse{RunDetail: detail, AgentsByAttempt: agents})
+	if err != nil || !bytes.Contains(encoded, []byte(`"delegated_agents":[]`)) {
+		t.Fatalf("empty delegated collection JSON = %s err=%v", encoded, err)
+	}
+}
+
+func TestPipelineRunsAddFrozenTitleAndExactTotalHeader(t *testing.T) {
+	srv := testServer(t, true)
+	now := time.Now().UTC()
+	snapshot, err := json.Marshal(pipeline.Template{Version: 1, Stages: []pipeline.Stage{{ID: "work", Title: "Frozen work"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"pr_old", "pr_new"} {
+		if _, _, err := srv.stateStore.CreatePipelineRun(state.CreatePipelineRunParams{Run: state.PipelineRunRecord{
+			RunID: id, TemplateID: "template", TemplateSnapshot: snapshot, DisplayName: id, Project: "my-app",
+			Goal: "goal", State: "completed", CurrentStageID: "work", CreatedAt: now, UpdatedAt: now,
+		}, RequestID: id}); err != nil {
+			t.Fatal(err)
+		}
+		now = now.Add(time.Second)
+	}
+	rec := doGET(t, srv.routes(), "/api/pipeline-runs?limit=1&offset=0")
+	if rec.Code != http.StatusOK || rec.Header().Get("X-Total-Count") != "2" {
+		t.Fatalf("run list = %d total=%q body=%s", rec.Code, rec.Header().Get("X-Total-Count"), rec.Body.String())
+	}
+	var runs []pipeline.RunSummary
+	if err := json.Unmarshal(rec.Body.Bytes(), &runs); err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 1 || runs[0].CurrentStageTitle != "Frozen work" {
+		t.Fatalf("run summaries = %+v", runs)
 	}
 }

@@ -216,6 +216,47 @@ type PipelineAttemptRecord struct {
 	UpdatedAt         time.Time       `json:"updated_at"`
 }
 
+// PipelineAttemptWindow identifies one execution interval for the read-only
+// delegated-agent projection. It deliberately carries no pipeline authority:
+// callers derive it from a run detail and state uses it only to target tasks.
+type PipelineAttemptWindow struct {
+	AttemptID       string
+	AgentID         string
+	AgentGeneration string
+	CreatedAt       time.Time
+	NextCreatedAt   *time.Time
+}
+
+// PipelineAgentSnapshot is the reload-safe identity/running/status join used
+// by pipeline supervision. Identity or status can be absent after retention or
+// manual repair, so the booleans preserve that distinction for an honest UI
+// fallback rather than making the whole read fail.
+type PipelineAgentSnapshot struct {
+	AgentID       string
+	Name          string
+	IdentityFound bool
+	StatusFound   bool
+	Running       bool
+	State         string
+	Detail        string
+}
+
+// PipelineDelegatedTask is the narrow task projection for pipeline run detail.
+// It intentionally excludes instructions, arms, attachments, and all task
+// control-plane fields.
+type PipelineDelegatedTask struct {
+	AttemptID             string
+	TaskID                string
+	DisplayName           string
+	State                 string
+	Outcome               string
+	OutcomeSummary        string
+	AssignedAgentID       string
+	Agent                 PipelineAgentSnapshot
+	DelegatedTotal        int
+	DelegatedRunningCount int
+}
+
 type PipelineValueRecord struct {
 	RunID           string    `json:"run_id"`
 	Name            string    `json:"name"`

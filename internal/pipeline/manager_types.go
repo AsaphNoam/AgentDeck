@@ -99,19 +99,20 @@ type RunDetail struct {
 // attempt history is malformed. Detail reads remain strict so controls cannot
 // operate on a partially decoded state machine.
 type RunSummary struct {
-	RunID           string       `json:"run_id"`
-	TemplateID      string       `json:"template_id"`
-	DisplayName     string       `json:"display_name"`
-	Project         string       `json:"project"`
-	State           string       `json:"state"`
-	Revision        int64        `json:"revision"`
-	PendingAction   string       `json:"pending_action"`
-	CurrentStageID  string       `json:"current_stage_id"`
-	CurrentAgentID  string       `json:"current_agent_id"`
-	AttentionReason string       `json:"attention_reason"`
-	FinalOutcome    string       `json:"final_outcome"`
-	UpdatedAt       string       `json:"updated_at"`
-	Diagnostics     []Diagnostic `json:"diagnostics"`
+	RunID             string       `json:"run_id"`
+	TemplateID        string       `json:"template_id"`
+	DisplayName       string       `json:"display_name"`
+	Project           string       `json:"project"`
+	State             string       `json:"state"`
+	Revision          int64        `json:"revision"`
+	PendingAction     string       `json:"pending_action"`
+	CurrentStageID    string       `json:"current_stage_id"`
+	CurrentStageTitle string       `json:"current_stage_title"`
+	CurrentAgentID    string       `json:"current_agent_id"`
+	AttentionReason   string       `json:"attention_reason"`
+	FinalOutcome      string       `json:"final_outcome"`
+	UpdatedAt         string       `json:"updated_at"`
+	Diagnostics       []Diagnostic `json:"diagnostics"`
 }
 
 type StageReport struct {
