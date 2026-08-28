@@ -37,6 +37,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Changelog
 
+- **2026-08-28 — fix:** No open review findings. `## Review findings` was empty and the
+  working tree was clean, so no code, test, or specification changed. The committed Pipelines
+  redesign and its six usability fixes are still waiting for their independent code review.
+
 - **2026-08-28 — fix:** Closed all six Pipelines usability findings. The attempt badge sits on the
   timeline rule instead of off the left window edge and the run rail no longer hoists itself above
   the timeline at the desktop floor (INV §13). The start path explains every gate it applies: with

@@ -5,6 +5,17 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-28 — Fix: nothing left to fix
+
+There are no open problems on the list. Everything found by the last code review and the last
+usability pass is already closed, and the working copy is clean, so I changed no code, no tests, and
+no specifications this session.
+
+**Needs attention:** None.
+
+**Next:** Run the independent code review of the Pipelines redesign and its fixes, which is the work
+that is actually waiting.
+
 ### 2026-08-28 — Fix: the six Pipelines review findings
 
 All six problems the usability review found on the redesigned Pipelines surface are fixed, and the
