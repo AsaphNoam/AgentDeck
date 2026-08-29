@@ -370,8 +370,13 @@ cards). — `agentStore.test.ts` "removes stale agents after hydration completes
 "resets the hydration generation on auto-reconnect so deleted agents are pruned".
 
 **A27.** Six same-origin dashboard tabs share one underlying SSE connection and can load and refetch
-REST data concurrently without waiting for another tab to close. — shared-stream transport tests and
-the production-browser six-tab regression.
+REST data concurrently without waiting for another tab to close. — `ui/src/api/sse.test.ts` proves
+the transport half: one shared stream across ports, a joining port replayed on its own without
+restarting the stream or re-hydrating the other tabs, a departing port removed and the stream
+dropped with the last one, and all three fallback routes. The six-tab claim itself is a
+real-browser check against a `make dist` build and is **owed**, not met: it has never been run
+against a build carrying the shared stream. `scripts/stress-fixture` (TS-06 §6) is the fixture for
+it.
 
 **A4.** Reorder, density, and group-collapse persist across page reload and server restart. — J5;
 `TestPutLayoutValidatesAndPersists`, `TestLayoutDefault`.

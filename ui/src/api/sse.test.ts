@@ -37,11 +37,17 @@ class FakeMessagePort {
   onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
   started = false;
   closed = false;
+  // Messages the client sent INTO the worker. Deliberately recorded even after
+  // close(), so a test can prove the goodbye precedes the close.
+  sent: unknown[] = [];
   start() {
     this.started = true;
   }
   close() {
     this.closed = true;
+  }
+  postMessage(message: unknown) {
+    this.sent.push(message);
   }
   deliver(message: unknown) {
     this.onmessage?.({ data: message } as MessageEvent<unknown>);
@@ -329,6 +335,24 @@ describe("SseClient watchdog reconnect", () => {
     expect(FakeEventSource.instances).toHaveLength(0);
   });
 
+  // Regression (review fix, INV §4 / FS-02.A27): the watchdog closes the
+  // transport and connect() mints a NEW port, so without a goodbye the worker
+  // accumulates a dead port per reconnect for the life of the tab.
+  it("says goodbye on the port before closing it", async () => {
+    FakeSharedWorker.instances = [];
+    vi.stubGlobal("SharedWorker", FakeSharedWorker as unknown as typeof SharedWorker);
+    const { sseClient } = await import("./sse");
+    sseClient.connect();
+    const first = FakeSharedWorker.instances[0].port;
+    first.deliver({ kind: "open" });
+
+    // No pings → the watchdog reaps and reconnects onto a fresh port.
+    vi.advanceTimersByTime(30_000);
+    expect(first.sent).toEqual([{ kind: "bye" }]);
+    expect(first.closed).toBe(true);
+    expect(FakeSharedWorker.instances).toHaveLength(2);
+  });
+
   // Regression (review fix, Must fix): SharedWorker EXISTING is not proof it
   // works. A browser that exposes it but refuses a module worker threw out of
   // connect(), so `es` was never assigned and the watchdog never even started:
@@ -417,5 +441,147 @@ describe("SseClient watchdog reconnect", () => {
     }));
     expect(calls).toEqual([{ title: "Atlas finished", body: "done", tag: "a_1" }]);
     expect(useUiStore.getState().toasts).toEqual([]);
+  });
+});
+
+// The shared worker is the thing that makes six tabs cost one connection, so
+// its port bookkeeping is tested directly: the client only ever sees one port.
+class FakeWorkerPort {
+  onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
+  started = false;
+  closed = false;
+  // Broadcasts are NOT dropped when closed: a test asserting "no longer
+  // receives broadcasts" must fail if the worker still holds the port.
+  received: unknown[] = [];
+  postMessage(message: unknown) {
+    this.received.push(message);
+  }
+  start() {
+    this.started = true;
+  }
+  close() {
+    this.closed = true;
+  }
+  say(message: unknown) {
+    this.onmessage?.({ data: message } as MessageEvent<unknown>);
+  }
+}
+
+// TS-03.R7 / FS-02.A27: one shared stream, one hydration generation per tab,
+// and no tab's arrival or departure disturbing the tabs already attached.
+describe("SSE shared worker", () => {
+  type ConnectEvent = { ports: FakeWorkerPort[] };
+  let attach: (event: ConnectEvent) => void;
+
+  const row = (id: string, extra: Record<string, unknown> = {}) =>
+    JSON.stringify({ type: "state_update", seq: 1, ts: 1, agent_id: id, data: { agent_id: id, ...extra } });
+  const hydrated = JSON.stringify({ type: "state_update", seq: 9, ts: 9, agent_id: "", data: { hydrated: true } });
+
+  beforeEach(async () => {
+    FakeEventSource.instances = [];
+    vi.stubGlobal("EventSource", FakeEventSource as unknown as typeof EventSource);
+    vi.resetModules();
+    await import("./sse-shared-worker");
+    attach = (self as unknown as { onconnect: (event: ConnectEvent) => void }).onconnect;
+  });
+
+  afterEach(() => {
+    delete (self as unknown as { onconnect?: unknown }).onconnect;
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  // Attach a port and drive the shared stream through a full hydration burst.
+  function attachHydrated() {
+    const port = new FakeWorkerPort();
+    attach({ ports: [port] });
+    const source = FakeEventSource.instances[0];
+    source.onopen?.();
+    source.emit("state_update", row("a_one"));
+    source.emit("state_update", row("a_two"));
+    source.emit("state_update", hydrated);
+    return { port, source };
+  }
+
+  it("stops broadcasting to a port that says goodbye", () => {
+    const first = new FakeWorkerPort();
+    const second = new FakeWorkerPort();
+    attach({ ports: [first] });
+    attach({ ports: [second] });
+    const source = FakeEventSource.instances[0];
+
+    first.say({ kind: "bye" });
+    expect(first.closed).toBe(true);
+    first.received = [];
+    second.received = [];
+    source.emit("new_message", "{}");
+
+    expect(first.received).toEqual([]);
+    expect(second.received).toEqual([{ kind: "event", type: "new_message", data: "{}" }]);
+  });
+
+  it("drops the shared stream when the last port leaves and reopens for the next one", () => {
+    const port = new FakeWorkerPort();
+    attach({ ports: [port] });
+    expect(FakeEventSource.instances).toHaveLength(1);
+
+    port.say({ kind: "bye" });
+    expect(FakeEventSource.instances[0].closed).toBe(true);
+
+    attach({ ports: [new FakeWorkerPort()] });
+    expect(FakeEventSource.instances).toHaveLength(2);
+    expect(FakeEventSource.instances[1].closed).toBe(false);
+  });
+
+  it("leaves the live stream and the attached tabs untouched when a tab joins", () => {
+    const { port: first, source } = attachHydrated();
+    first.received = [];
+
+    attach({ ports: [new FakeWorkerPort()] });
+
+    // One stream, still open, and the sitting tab gets no second `open` — which
+    // would restart its hydration and refetch every open transcript.
+    expect(FakeEventSource.instances).toHaveLength(1);
+    expect(source.closed).toBe(false);
+    expect(first.received).toEqual([]);
+
+    // Live deltas keep flowing to the tab that was already attached.
+    source.emit("new_message", "{}");
+    expect(first.received).toEqual([{ kind: "event", type: "new_message", data: "{}" }]);
+  });
+
+  it("replays the retained snapshot and hydrated boundary to the joining port alone", () => {
+    const { source } = attachHydrated();
+    // A later live update replaces the retained row for that agent rather than
+    // appending: the snapshot is one row per agent, not a growing log.
+    source.emit("state_update", row("a_one", { title: "renamed" }));
+    source.emit("state_update", row("a_gone"));
+    source.emit("state_update", row("a_gone", { removed: true }));
+
+    const joining = new FakeWorkerPort();
+    attach({ ports: [joining] });
+
+    expect(joining.started).toBe(true);
+    expect(joining.received).toEqual([
+      { kind: "open" },
+      { kind: "event", type: "state_update", data: row("a_one", { title: "renamed" }) },
+      { kind: "event", type: "state_update", data: row("a_two") },
+      { kind: "event", type: "state_update", data: hydrated },
+    ]);
+  });
+
+  it("re-broadcasts a fresh generation and discards the stale snapshot when the stream reopens", () => {
+    const { port: first, source } = attachHydrated();
+    first.received = [];
+
+    // The browser's automatic EventSource reconnect: every tab is told, and the
+    // retained snapshot from the dead generation must not be replayed after it.
+    source.onerror?.();
+    source.onopen?.();
+    expect(first.received).toEqual([{ kind: "error" }, { kind: "open" }]);
+
+    const joining = new FakeWorkerPort();
+    attach({ ports: [joining] });
+    expect(joining.received).toEqual([{ kind: "open" }]);
   });
 });

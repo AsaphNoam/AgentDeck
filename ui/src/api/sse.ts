@@ -252,6 +252,13 @@ class SharedWorkerEventSource implements EventSourceLike {
   onerror: ((event: Event) => unknown) | null = null;
   private readonly listeners = new Map<string, Set<(event: MessageEvent<string>) => void>>();
   private readonly port: MessagePort;
+  private closed = false;
+  // A closed tab never reaches close(), and the worker cannot detect a dead
+  // port, so the unload path is wired too. `persisted` restores keep the port:
+  // that page is still live and the watchdog owns its recovery.
+  private readonly onPageHide = (event: PageTransitionEvent) => {
+    if (!event.persisted) this.close();
+  };
 
   constructor(onTransportFailure: () => void) {
     const worker = new SharedWorker(new URL("./sse-shared-worker.ts", import.meta.url), {
@@ -265,6 +272,7 @@ class SharedWorkerEventSource implements EventSourceLike {
     this.port = worker.port;
     this.port.onmessage = (event: MessageEvent<SharedWorkerMessage>) => this.receive(event.data);
     this.port.start();
+    window.addEventListener("pagehide", this.onPageHide);
   }
 
   addEventListener(type: string, callback: (event: MessageEvent<string>) => void) {
@@ -273,7 +281,15 @@ class SharedWorkerEventSource implements EventSourceLike {
     listeners.add(callback);
   }
 
+  // Every reconnect mints a new port (the watchdog closes this object and
+  // connect() builds another), so the worker only stops accumulating ports —
+  // and only ever drops the shared stream — if each one says goodbye on the way
+  // out (INV §4).
   close() {
+    if (this.closed) return;
+    this.closed = true;
+    window.removeEventListener("pagehide", this.onPageHide);
+    this.port.postMessage({ kind: "bye" });
     this.port.close();
   }
 

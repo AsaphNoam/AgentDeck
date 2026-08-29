@@ -55,8 +55,18 @@ events, tracked files/commands, messages, bindings, candidates, and validation e
 burst, then live events. A `hydrated` boundary lets the client prune absent agents. Periodic `ping`
 supports liveness; reconnect starts a new hydration generation. Dashboard tabs from one browser
 origin share one underlying stream so long-lived SSE requests cannot consume the origin's HTTP/1.x
-connection pool and block REST requests. Attaching a tab restarts that shared stream so the newcomer
-and existing tabs receive a complete hydration generation. Sharing is best-effort: a tab whose
+connection pool and block REST requests. Attaching a tab does not restart that shared stream: the
+worker retains the latest `state_update` row per agent plus the `hydrated` boundary and replays them
+to the joining tab alone, so the newcomer gets a complete hydration generation while every other tab
+keeps its own uninterrupted. Restarting the stream instead made the cost of opening the dashboard
+grow with the square of the tab count — each reopen gave every tab a fresh hydration, a transcript
+refetch, and a full round of query invalidation, and dropped live deltas for all of them during the
+reopen window — on exactly the multi-tab workload sharing exists to make fast. The retained snapshot
+is one row per live agent, overwritten in place and deleted on removal, so it is bounded by the
+agent set rather than by stream traffic, and it is discarded on every new stream open because it is
+derived from the generation that produced it (INV §1). A tab that leaves says so, and the worker
+drops its port; the shared stream is closed when the last port leaves (INV §4). Sharing is
+best-effort: a tab whose
 browser cannot construct the shared stream, whose worker script does not load, or whose shared
 stream never opens within the liveness window falls back to its own direct `/api/events` connection
 for the rest of the session, so live updates are never silently lost. That tab counts against the
