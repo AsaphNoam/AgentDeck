@@ -17,6 +17,9 @@ afterEach(() => {
 });
 
 describe("DashboardChatPane", () => {
+  // FS-03.A23 — the pane composes the shared transcript and composer and exposes
+  // no Files, Commands, Terminal, or runtime picker. A23's multi-open delivery and
+  // stale-response clauses are pinned in sse.test.ts and transcriptStore.test.ts.
   it("composes only the shared transcript and composer and releases registration", () => {
     const view = render(<DashboardChatPane agent={{
       agent_id: "a_1", name: "Atlas", role: "implementer", project: "my-app",

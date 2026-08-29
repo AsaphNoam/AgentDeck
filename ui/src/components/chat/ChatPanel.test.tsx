@@ -131,6 +131,25 @@ describe("ChatPanel missing-agent recovery", () => {
     expect(screen.queryByRole("button", { name: "Discard pending annotations" })).not.toBeInTheDocument();
     expect(useAnnotationStore.getState().bySource.a_live).toHaveLength(1);
   });
+
+  // FS-12.A14 (R38) — the pane work added a focus-cycling binding to the card
+  // grid only. On /agent/:id there is nothing to cycle to, and the agent screen's
+  // composer must keep every key it had: Ctrl+Alt+Arrow reaches no handler here
+  // and moves focus nowhere.
+  it("leaves the agent screen composer untouched by the pane focus-cycling keys", () => {
+    useAgentStore.setState({ agents: { a_live: liveAgent("a_live") }, order: ["a_live"], hydrated: true, hydrating: false });
+
+    renderPanel("a_live");
+
+    const composer = document.querySelector(".composer textarea") as HTMLTextAreaElement;
+    expect(composer).not.toBeNull();
+    composer.focus();
+    for (const key of ["ArrowDown", "ArrowUp"]) {
+      fireEvent.keyDown(composer, { key, ctrlKey: true, altKey: true });
+      expect(composer).toHaveFocus();
+    }
+    expect(document.querySelectorAll("[data-agent-pane]")).toHaveLength(0);
+  });
 });
 
 // FS-03.A12 (R27) — the chat header Back link targets the agent's project

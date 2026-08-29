@@ -107,6 +107,7 @@ describe("SseClient watchdog reconnect", () => {
     expect(second.closed).toBe(false);
   });
 
+  // FS-03.A23 — a sequence gap for one pane refetches only that pane's transcript.
   it("only refetches on a seq gap for a registered agent", async () => {
     const { sseClient } = await import("./sse");
     const client = await import("./client");
@@ -140,6 +141,8 @@ describe("SseClient watchdog reconnect", () => {
     await vi.waitFor(() => expect(client.getTranscript).toHaveBeenCalledWith("a_gone"));
   });
 
+  // FS-03.A23 — with two panes open, each agent's deltas append to that agent's
+  // transcript and to no other.
   it("delivers each registered agent to its own transcript and teardown stops delivery", async () => {
     const { sseClient } = await import("./sse");
     const { useTranscriptStore } = await import("../store/transcriptStore");
@@ -163,6 +166,8 @@ describe("SseClient watchdog reconnect", () => {
     expect(useTranscriptStore.getState().byAgent.a_one).toBeUndefined();
   });
 
+  // FS-03.A23 — a stale response resolving after a newer one leaves the displayed
+  // transcript carrying every delivered event.
   it("ignores a stale transcript response after a newer per-agent request", async () => {
     const { sseClient } = await import("./sse");
     const client = await import("./client");

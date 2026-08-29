@@ -14,6 +14,11 @@ import type { AgentState } from "../../api/types";
 // whose active/over pair we choose. Both providers are replaced by pass-throughs that
 // record what CardGrid passes them; everything else in either package stays real.
 const dnd = vi.hoisted(() => ({
+  // One entry per SortableContext, in render order. The grid gives each
+  // running/stopped block its own context (FS-02.R45/A28), and the items array is
+  // exactly what rectSortingStrategy derives every card's preview transform from,
+  // so the split itself is the thing worth pinning here.
+  itemLists: [] as string[][],
   items: [] as string[],
   onDragEnd: undefined as ((event: { active: { id: string }; over: { id: string } | null }) => void) | undefined,
 }));
@@ -22,6 +27,10 @@ vi.mock("@dnd-kit/core", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@dnd-kit/core")>()),
   DndContext: ({ children, onDragEnd }: { children: React.ReactNode; onDragEnd: typeof dnd.onDragEnd }) => {
     dnd.onDragEnd = onDragEnd;
+    // DndContext renders before its children on every pass, so this is where the
+    // per-pass record starts.
+    dnd.itemLists = [];
+    dnd.items = [];
     return <>{children}</>;
   },
 }));
@@ -29,7 +38,8 @@ vi.mock("@dnd-kit/core", async (importOriginal) => ({
 vi.mock("@dnd-kit/sortable", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@dnd-kit/sortable")>()),
   SortableContext: ({ children, items }: { children: React.ReactNode; items: string[] }) => {
-    dnd.items = items;
+    dnd.itemLists.push(items);
+    dnd.items = dnd.itemLists.flat();
     return <>{children}</>;
   },
 }));
@@ -92,6 +102,11 @@ function renderWithQuery(ui: React.ReactElement) {
 
 describe("CardGrid", () => {
 
+  // FS-02.A29 — the render and interaction half only: click-to-expand, header
+  // click to collapse, the rendered column span, and a terminal card still
+  // navigating. A29's geometry clauses (fixed pane height, internal transcript
+  // scrolling, neighbours keeping their own height) are J5's, because jsdom
+  // evaluates no grid track sizing, stretch, overflow, or scroll position (INV §13).
   it("toggles chat cards in place, spans the configured tracks, and leaves terminal navigation intact", async () => {
     seedGrid(["a_chat", "a_terminal"], {
       a_chat: agent("a_chat"),
@@ -105,7 +120,13 @@ describe("CardGrid", () => {
     expect(expandedCard).toHaveAttribute("data-variant", "expanded");
     expect(expandedCard).toHaveStyle({ gridColumn: "span 2" });
     expect(screen.getByLabelText("Composer a_chat")).toBeInTheDocument();
-    expect(dnd.items).toEqual(["a_terminal"]);
+    // FS-02.R47 withholds the drag grip, which is what makes an expanded card
+    // undraggable. It stays in its block's sortable items: it still mounts a
+    // sortable node and still occupies min(2, perRow) grid columns, so dropping it
+    // from the list made every neighbour's preview transform compute over a layout
+    // that is not on screen (INV §1).
+    expect(expandedCard!.querySelector(".drag-handle")).toBeNull();
+    expect(dnd.items).toEqual(["a_chat", "a_terminal"]);
 
     fireEvent.click(expandedCard!.querySelector('[data-slot="header"]')!);
     expect(screen.queryByLabelText("Composer a_chat")).not.toBeInTheDocument();
@@ -114,6 +135,10 @@ describe("CardGrid", () => {
     expect(screen.queryByLabelText("Composer a_terminal")).not.toBeInTheDocument();
   });
 
+  // FS-02.A31 — the fifth expansion collapses exactly the least-recently-used
+  // pane, with no confirmation, and each of R48's three recency events is
+  // exercised as the thing that saves a pane. The retained composer text is
+  // FS-03.R36's, covered by drafts.test.ts.
   it("evicts the least-recently-used fifth pane and persists recency order", async () => {
     const agents = Object.fromEntries([1, 2, 3, 4, 5].map((n) => [`a_${n}`, agent(`a_${n}`)]));
     seedGrid(Object.keys(agents), agents);
@@ -135,6 +160,9 @@ describe("CardGrid", () => {
     await waitFor(() => expect(saved.at(-1)).toEqual(["a_3", "a_4", "a_1", "a_5"]));
   });
 
+  // FS-02.A32 — the load and payload half: a persisted set is restored, an
+  // unknown or archived id expands nothing and leaves the next PUT, and another
+  // project's id expands nothing yet is written back unchanged.
   it("restores persisted panes, prunes unknown ids, and retains another project's id", async () => {
     server.use(http.get("/api/layout", () => HttpResponse.json({
       order: ["a_here", "a_elsewhere"], density: { perRow: 1, gap: 16 }, groups: {},
@@ -157,6 +185,9 @@ describe("CardGrid", () => {
     await waitFor(() => expect(saved.at(-1)).toEqual(["a_elsewhere", "a_here"]));
   });
 
+  // FS-02.A33 — the keyboard half: forward, backward, wrap at both ends, and no
+  // interception while the composer picker is open. The real-browser focus and
+  // scroll-into-view behaviour is J5's.
   it("cycles composer focus in displayed order and wraps", async () => {
     seedGrid(["a_1", "a_2", "a_3"], { a_1: agent("a_1"), a_2: agent("a_2"), a_3: agent("a_3") });
     Element.prototype.scrollIntoView = vi.fn();
@@ -181,6 +212,32 @@ describe("CardGrid", () => {
     expect(first).toHaveFocus();
   });
 
+  // FS-02.R50/A33: the cap of four panes (R48) is a whole-grid cap and the cycle
+  // order is "the panes as displayed", so a pane in each of two task groups (R18)
+  // must still cycle. Bound per section, both bindings saw one pane and did nothing.
+  it("cycles composer focus across group sections", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    seedGrid(["a_1", "a_2"], {
+      a_1: agent("a_1", { group: "alpha" }),
+      a_2: agent("a_2", { group: "beta" }),
+    });
+    renderWithQuery(<CardGrid />);
+    for (const id of ["a_1", "a_2"]) fireEvent.click(await screen.findByText(id));
+    expect(document.querySelectorAll('[data-ui="agent-group"]')).toHaveLength(2);
+
+    const first = screen.getByLabelText("Composer a_1");
+    const second = screen.getByLabelText("Composer a_2");
+    first.focus();
+    fireEvent.keyDown(first, { key: "ArrowDown", ctrlKey: true, altKey: true });
+    expect(second).toHaveFocus();
+    fireEvent.keyDown(second, { key: "ArrowDown", ctrlKey: true, altKey: true });
+    expect(first).toHaveFocus();
+  });
+
+  // FS-02.A30 — pane membership is not keyed to `running`: an agent that stops
+  // with its pane open keeps it, no state_update expands anything, and a removal
+  // tombstone takes the pane with the card. FS-03.A23 covers the same boundary from
+  // the pane's side — the durable transcript and composer survive the stop.
   it("keeps a stopped pane open, never auto-expands waiting input, and removes a pane with its card", async () => {
     seedGrid(["a_1", "a_2"], { a_1: agent("a_1"), a_2: agent("a_2") });
     renderWithQuery(<CardGrid />);
@@ -455,6 +512,27 @@ describe("CardGrid", () => {
 
     await waitFor(() => expect(orders.at(-1)).toEqual(["a_2", "a_3", "a_1", "a_4"]));
     await waitFor(() => expect(renderedIDs()).toEqual(["a_2", "a_4", "a_3", "a_1"]));
+  });
+
+  // FS-02.A28's "cards in the other block hold their positions" clause. dnd-kit
+  // derives every card's in-drag preview transform from the items of the
+  // SortableContext it sits in, so one shared list across both blocks moved cards
+  // on the far side of the boundary while the drag was still in flight — the
+  // cross-block drop below is refused, but only after that preview had happened.
+  // Splitting the contexts is what makes the clause true; jsdom cannot evaluate the
+  // resulting transforms, so J5 still owns the visual half.
+  it("gives each running/stopped block its own sortable context", async () => {
+    seedGrid(["a_1", "a_2", "a_3", "a_4"], {
+      a_1: agent("a_1", { group: "alpha", running: false }),
+      a_2: agent("a_2", { group: "alpha" }),
+      a_3: agent("a_3", { running: false }),
+      a_4: agent("a_4"),
+    });
+    renderWithQuery(<CardGrid />);
+
+    await waitFor(() => expect(renderedIDs()).toEqual(["a_2", "a_1", "a_4", "a_3"]));
+    // Two sections, two blocks each: no list ever mixes a running and a stopped id.
+    expect(dnd.itemLists).toEqual([["a_2"], ["a_1"], ["a_4"], ["a_3"]]);
   });
 
   it("neither reorders nor saves a layout for a drop onto the other block", async () => {

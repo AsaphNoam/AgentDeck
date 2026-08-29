@@ -92,6 +92,9 @@ describe("AgentCard", () => {
     expect(screen.getByText("Pipeline run")).toBeInTheDocument();
   });
 
+  // FS-02.A34 — the boundary is the region, not a list of exempted controls: a
+  // click and a right-click inside the pane's content reach neither the toggle nor
+  // the card menu, the drag grip is withheld, and the header still collapses.
   it("narrows expanded activation and context menu handling to the header", () => {
     const toggle = vi.fn();
     render(

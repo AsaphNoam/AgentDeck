@@ -99,17 +99,18 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
 
   const grouped = useMemo(() => groupAgents(ids.map((id) => agents[id]).filter(Boolean)), [agents, ids]);
 
-  // dnd-kit derives sortable indices and measured-rect transforms from the order it
-  // is handed, so this must be the order the cards actually render in: running-first
-  // within each section, sections in their R18 order, and nothing from a collapsed
-  // section (whose cards mount no sortable node at all) (FS-02.R45/A28).
-  const sortableIDs = useMemo(
-    () =>
-      grouped
-        .filter((group) => !(groupLayout[group.key]?.collapsed ?? false))
-        .flatMap((group) => group.agents.map((agent) => agent.agent_id).filter((id) => !expanded.includes(id))),
-    [expanded, grouped, groupLayout],
-  );
+  // dnd-kit derives sortable indices and measured-rect transforms from the items
+  // each SortableContext is handed, so a drag's live preview is only as correct as
+  // that list. One list spanning both blocks let a drag near the running/stopped
+  // boundary shift cards on the other side of it, which FS-02.R45/A28 forbid — the
+  // cross-block drop was refused at drop time, after the preview had already moved
+  // them. Each block therefore gets its own context, in the order its cards render.
+  // Expanded ids stay in their block's list: they are already `disabled` through
+  // useSortable, but an expanded pane still mounts a sortable node and still spans
+  // min(2, perRow) columns, so omitting it made every neighbour's preview transform
+  // compute over a layout that is not on screen (FS-02.R47, INV §1).
+  const blockIDs = (agents: AgentState[], running: boolean) =>
+    agents.filter((agent) => agent.running === running).map((agent) => agent.agent_id);
 
   const toggleExpanded = (agentId: string) => {
     setExpanded((current) => current.includes(agentId)
@@ -126,6 +127,9 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
   const cyclePaneFocus = (event: KeyboardEvent<HTMLDivElement>) => {
     if (!event.ctrlKey || !event.altKey || (event.key !== "ArrowDown" && event.key !== "ArrowUp")) return;
     if ((event.target as Element).closest(".composer")?.querySelector(".composer-picker")) return;
+    // Bound at the grid container, not at one group section: FS-02.R48's cap of
+    // four is a whole-grid cap and R50 orders "the panes as displayed", so one
+    // pane in each of two task groups (R18) must still cycle between them.
     const grid = event.currentTarget;
     const panes = [...grid.querySelectorAll<HTMLElement>("[data-agent-pane]")];
     if (panes.length < 2) return;
@@ -175,8 +179,7 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
         data-slot="header"
       />
       <DndContext onDragEnd={onDragEnd}>
-        <SortableContext items={sortableIDs} strategy={rectSortingStrategy}>
-          <div className="group-stack" data-slot="groups">
+          <div className="group-stack" data-slot="groups" onKeyDown={cyclePaneFocus}>
             {grouped.map((group) => {
               const collapsed = groupLayout[group.key]?.collapsed ?? false;
               return (
@@ -199,19 +202,25 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
                     )}
                   </header>
                   {!collapsed && (
-                    <div className="card-grid" data-slot="grid" onKeyDown={cyclePaneFocus} style={{ gridTemplateColumns: `repeat(${density.perRow}, minmax(0, 1fr))`, gap: density.gap }}>
-                      {group.agents.map((agent) => (
-                        <LiveAgentCard
-                          key={agent.agent_id}
-                          agent={agent}
-                          projectColor={projects.data?.[agent.project]?.color}
-                          projectTitle={projects.data?.[agent.project]?.title}
-                          showProject={!projectID}
-                          expanded={expanded.includes(agent.agent_id)}
-                          expandedColumns={Math.min(2, density.perRow)}
-                          onToggle={() => toggleExpanded(agent.agent_id)}
-                          onUse={() => markExpandedUsed(agent.agent_id)}
-                        />
+                    <div className="card-grid" data-slot="grid" style={{ gridTemplateColumns: `repeat(${density.perRow}, minmax(0, 1fr))`, gap: density.gap }}>
+                      {[true, false].map((running) => (
+                        // SortableContext renders no element of its own, so the cards
+                        // below stay direct children of the grid track.
+                        <SortableContext key={running ? "running" : "stopped"} items={blockIDs(group.agents, running)} strategy={rectSortingStrategy}>
+                          {group.agents.filter((agent) => agent.running === running).map((agent) => (
+                            <LiveAgentCard
+                              key={agent.agent_id}
+                              agent={agent}
+                              projectColor={projects.data?.[agent.project]?.color}
+                              projectTitle={projects.data?.[agent.project]?.title}
+                              showProject={!projectID}
+                              expanded={expanded.includes(agent.agent_id)}
+                              expandedColumns={Math.min(2, density.perRow)}
+                              onToggle={() => toggleExpanded(agent.agent_id)}
+                              onUse={() => markExpandedUsed(agent.agent_id)}
+                            />
+                          ))}
+                        </SortableContext>
                       ))}
                     </div>
                   )}
@@ -219,7 +228,6 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
               );
             })}
           </div>
-        </SortableContext>
       </DndContext>
       <CardContextMenu />
     </section>

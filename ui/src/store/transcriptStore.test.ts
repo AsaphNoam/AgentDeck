@@ -132,6 +132,8 @@ describe("transcriptStore", () => {
     expect(event.text ?? event.delta).toBe("hi");
   });
 
+  // FS-03.A23 — a transcript request held open while newer deltas arrive still
+  // leaves every delivered event and every resolved permission chip on screen.
   it("retains delivered events newer than a transcript response", () => {
     useTranscriptStore.getState().beginReconciliation("a_6");
     useTranscriptStore.getState().appendMessage("a_6", {

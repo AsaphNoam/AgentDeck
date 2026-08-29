@@ -308,7 +308,11 @@ behavior.
   in its running/stopped block (R45), so expanding or collapsing a card never changes card order or
   grouping and never changes what its context menu offers. An expanded card is not draggable: its
   drag grip is withheld while expanded and returns on collapse, so reordering it means collapsing it
-  first. Collapsing returns the card to its ordinary size in the position R45 gives it.
+  first. It remains a member of its block's sortable set for the purpose of *other* cards' drags,
+  though — a collapsed card dragged past a pane must see the pane's two-column footprint, or every
+  neighbour's in-drag preview is computed over a layout that is not on screen. Withholding the grip,
+  not removing the card from the set, is what makes it undraggable. Collapsing returns the card to
+  its ordinary size in the position R45 gives it.
 
 - **R48** — At most four panes are expanded at once. Expanding a fifth
   collapses the least-recently-used expanded pane, without a prompt and without losing work: unsent
