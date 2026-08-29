@@ -17,8 +17,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   changelog.
 - **Review state:** Every review and usability finding through 2026-08-28 is closed in code, tests,
   or an explicit specification boundary, including the six recorded against the split Pipelines
-  surface. The 2026-08-29 design review of expandable dashboard chat panes found three Must-fix and
-  three Worth-fixing design findings plus two consistency notes; the change remains waiting and
+  surface. The corrected 2026-08-29 design review of expandable dashboard chat panes has two Must-fix
+  and three Worth-fixing design findings plus three consistency notes; the change remains waiting and
   must return to `/design-feature` before implementation. The four bug-investigation findings below
   are open, joined by six
   from the 2026-08-28 review of `790c01c` — its Must fix and the Tasks Retry gate are closed. Separately, three commits have never had their shipped
@@ -28,7 +28,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 - **Active change:** None in progress. One change is specified and waiting to start:
   `docs/ready-changes/expandable-chat-panes-on-the-dashboard.md` (expandable chat panes on the card
   grid — FS-02.R46–R51/A29–A33, FS-03.R39/A23, TS-03.R31, TS-08.R41–R43). Its design review found
-  three Must-fix findings, so it is not ready for implementation and stays waiting until a
+  two Must-fix findings, so it is not ready for implementation and stays waiting until a
   follow-up `/design-feature` resolves them. Running-first card placement shipped on 2026-08-28 (FS-02.R45/A28,
   FS-12.R37/A13); its change file is removed, and FS-12 stays Current while FS-02 moves to Partial
   for the planned pane items above. The Pipelines surface
@@ -57,15 +57,21 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 **Change:** None.
 
 **State:** No change is in progress. `docs/ready-changes/expandable-chat-panes-on-the-dashboard.md`
-stays waiting to start, but its 2026-08-29 design review has three open Must-fix findings and it is
-not ready for `/work`.
+stays waiting to start, but its corrected 2026-08-29 design review has two open Must-fix findings
+and it is not ready for `/work`.
 
-**Next:** Run `/design-feature expandable-chat-panes-on-the-dashboard` to resolve the six design
-findings and two consistency notes below, including the product choice between dropping the
-projects-home promise and adding a real home-hosted agent-card surface. The unrelated `/fix` and
-independent code-review work named above remains owed.
+**Next:** Run `/design-feature expandable-chat-panes-on-the-dashboard` to resolve the five design
+findings and three consistency notes below. The unrelated `/fix` and independent code-review work
+named above remains owed.
 
 ## Changelog
+
+- **2026-08-29 — design review correction:** Removed the projects-home Must-fix finding after the
+  user clarified that "projects page" means the agent-card dashboard reached after selecting a
+  project (`/project/:project-id`), not the root project-card catalog. That intended host is the
+  existing `CardGrid` mount and is buildable. The misleading "projects-home and scoped project
+  grid" wording remains a consistency note for follow-up design cleanup. Two Must-fix and three
+  Worth-fixing findings remain; no product code, specification, or change file was edited.
 
 - **2026-08-29 — design review:** Reviewed the waiting expandable-chat-pane change against FS-02,
   FS-03, FS-12, TS-03, TS-08, every invariant class, the affected grid/chat/SSE/layout code, and the
@@ -480,16 +486,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 From the 2026-08-29 design review of
 `docs/ready-changes/expandable-chat-panes-on-the-dashboard.md`:
 
-- **Must fix** — An operator on the projects home cannot open the pane FS-02.R46 and the change
-  outcome promise there, because `/` contains only project cards. FS-02.R29 replaced the agent-card
-  home with the project-card grid, `ui/src/routes.tsx:36-38` mounts `ProjectDashboard` at `/`, and
-  `ui/src/features/dashboard/ProjectDashboard.tsx:95-109` renders only `.project-card-grid`; the
-  sole production `CardGrid` mount is the scoped `/project/:project-id` route at lines 179-192.
-  Implementation therefore has no agent card to expand on one of its two named surfaces. Resolve
-  the product scope before building: either remove projects home from FS-02.R46 and the change, or
-  deliberately design a new home-hosted agent-card surface and its relationship to R29-R31; cover
-  the actual chosen route in acceptance evidence (FS-02.R29/R31/R46, **INV §10**).
-
 - **Must fix** — An operator who clicks Send/Cancel, Approve/Deny, autocomplete, a transcript
   disclosure, the pane-name link, or an annotation target can also collapse the pane or open the
   card context menu. `AgentCard` owns `onClick` and `onContextMenu` on its outer article
@@ -689,6 +685,10 @@ From the 2026-08-28 review of `790c01c` (the thirteen dashboard/SSE and usabilit
 
 From the 2026-08-29 expandable-chat-pane design review:
 
+- FS-02.R46 and the ready change say expansion works on both the "projects-home grid" and a
+  "scoped project grid", but the user clarified that "projects page" means the existing agent-card
+  dashboard at `/project/:project-id`, not the root project-card catalog. Use one unambiguous route/
+  surface name and remove the apparent two-surface promise.
 - TS-08.R42 says the transcript is the pane's "only scroll region", but the reused chat surface also
   contains bounded scrolling in `.annotation-tray-body` and `.composer-picker`
   (`ui/src/styles/features/agent.css:442-445,548-559`). Narrow this to the primary persistent reading

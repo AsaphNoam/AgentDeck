@@ -5,6 +5,23 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-29 — Design review correction: project dashboard scope
+
+The projects-home finding was based on a terminology misunderstanding and has been removed.
+“Projects page” means the agent-card dashboard reached after selecting a project, not the root page
+that lists project cards. That existing dashboard is the intended and buildable host for expandable
+chat panes.
+
+The wording that suggested two separate grid surfaces is now recorded as a consistency note for the
+next design pass. Two blocking findings remain: pane controls need an interaction boundary so card
+click handling does not collapse the pane, and transcript recovery needs ordering protection so an
+older refetch cannot replace newer streamed events. The three lower-severity coverage gaps remain.
+
+**Needs attention:** No additional product decision is needed for project scope.
+
+**Next:** Run `/design-feature expandable-chat-panes-on-the-dashboard` to resolve the remaining
+findings and wording notes, then repeat the design review before implementation.
+
 ### 2026-08-29 — Design review: expandable dashboard chat panes
 
 The expandable-chat-pane design is not ready to build yet. The review found three blocking defects.
