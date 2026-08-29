@@ -355,3 +355,46 @@ describe("run page lifecycle boundary", () => {
     expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("");
   });
 });
+
+// FS-14.R48: a restart pause stopped the stage agent, Continue rejects that
+// state, and an ordinary chat resume mints an unrelated generation whose report
+// is refused forever — so Retry is the only route that moves the run. The run
+// page used to offer Open agent there anyway, inviting the operator into a chat
+// that leads nowhere.
+describe("restart-recovery pause", () => {
+  const recovered = {
+    ...detail,
+    run: { ...run, state: "paused", pending_action: "", attention_reason: "restart_recovery" },
+  };
+
+  function renderRun() {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    return render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter><RunBrowser selectedID="run_1" /></MemoryRouter>
+      </QueryClientProvider>,
+    );
+  }
+
+  it("withholds Open agent and names Retry as the route", async () => {
+    server.use(http.get("/api/pipeline-runs/run_1", () => HttpResponse.json(recovered)));
+    renderRun();
+
+    await screen.findByRole("heading", { name: "Ship", level: 2 });
+    expect(screen.queryByRole("link", { name: "Open agent" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry stage" })).toBeInTheDocument();
+    expect(screen.getByText(/its chat can no longer report against this run/)).toBeInTheDocument();
+  });
+
+  it("still offers Open agent on an ordinary blocked pause", async () => {
+    server.use(http.get("/api/pipeline-runs/run_1", () => HttpResponse.json({
+      ...detail,
+      run: { ...run, state: "paused", attention_reason: "blocked" },
+      attempts: [{ ...attempt("at_2", "a_live", 2, "completed"), report_outcome: "blocked", report_summary: "Which fallback?" }],
+    })));
+    renderRun();
+
+    await screen.findByRole("heading", { name: "Ship", level: 2 });
+    expect(screen.getByRole("link", { name: "Open agent" })).toHaveAttribute("href", "/agent/a_live");
+  });
+});

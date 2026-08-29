@@ -34,7 +34,19 @@ func (s *Server) handleReportPipelineStageResult(_ context.Context, req *mcp.Cal
 	if err != nil {
 		return pipelineToolError(err)
 	}
-	return jsonResult(map[string]any{"ok": true, "run_id": detail.Run.RunID, "attempt_id": detail.Run.CurrentAttemptID, "revision": detail.Run.Revision, "awaiting": "quiescence"})
+	return jsonResult(map[string]any{"ok": true, "run_id": detail.Run.RunID, "attempt_id": detail.Run.CurrentAttemptID, "revision": detail.Run.Revision, "awaiting": "quiescence", "next": reportNextGuidance(input.Outcome)})
+}
+
+// reportNextGuidance states what an accepted stage result means for the caller.
+// The assignment says the same thing (FS-14.R47), but a blocked report leaves the
+// agent live and idle beside the run's Open agent action, so the boundary is
+// repeated at the moment it starts to apply: without it an operator's chat answer
+// produces stage work the run can never accept.
+func reportNextGuidance(outcome string) string {
+	if outcome == "blocked" {
+		return "This attempt is finished and the run is now paused for a person. Anything said in this chat during the pause is out of band and cannot be recorded against the run. Their answer arrives as a new assignment; wait for it before doing more stage work."
+	}
+	return "This attempt is finished. Do not report again for it; the run continues from your result."
 }
 
 type proposeTemplateArgs struct {

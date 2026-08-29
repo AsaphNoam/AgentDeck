@@ -200,7 +200,7 @@ func (m *Manager) Report(agentID, generation string, report StageReport) (RunDet
 	}
 	if run.PendingAction != "await_result" {
 		if attempt.ReportOutcome != "" {
-			return refuseReport(run, attempt, agentID, generation, controlError("already_reported", "this attempt already reported a result; wait for the run's human Continue action before doing more stage work"))
+			return refuseReport(run, attempt, agentID, generation, controlError("already_reported", "this attempt already reported a result and its participation has ended; work done since then cannot be recorded against the run. Wait for the run's human Continue action, which arrives as a new assignment"))
 		}
 		return refuseReport(run, attempt, agentID, generation, controlError("stale_assignment", "the current stage attempt is no longer awaiting a result"))
 	}

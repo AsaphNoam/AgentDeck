@@ -323,6 +323,27 @@ feature are recorded in §6.
   empty required named input, so the client-side gate explains itself exactly as the server-side
   rejection of R36 does.
 
+- **R47** — A stage agent is told where its participation ends. The assignment
+  states that the one `report_pipeline_stage_result` call ends the agent's part in that assignment,
+  that a `blocked` result pauses the run for a person, that anything said in the agent's chat during
+  that pause is out of band and cannot be recorded against the run, and that the person's answer
+  arrives as a new assignment in the same shape. The accepted result repeats the boundary at the
+  moment it starts to apply, with the pause wording for a `blocked` outcome, and a refusal of a
+  further report from the same attempt says that its participation has ended and that work done
+  since cannot be recorded. This states R20's existing recovery boundary rather than moving it:
+  Continue remains the route by which a person's answer reaches the stage. It is stated because a
+  `blocked` pause leaves the stage agent live and idle beside the run's **Open agent** action, so an
+  operator who answers there instead of in Continue otherwise gets work the run can never accept,
+  with nothing in the agent's own instructions having warned either of them.
+
+- **R48** — A pause that no chat can resolve does not offer a chat. When a
+  restart pauses a run that was awaiting a result or quiescence, its stage agent has been stopped,
+  Continue rejects that state, and an ordinary chat resume of that agent mints an unrelated launch
+  generation whose report is refused for the life of the run — so **Retry**, with a fresh agent, is
+  the only action that moves it. The run page therefore withholds **Open agent** on such a pause and
+  says that the stage agent can no longer report against the run and that Retry runs the stage
+  again. Every other pause keeps **Open agent** unchanged.
+
 ## 5. Acceptance criteria
 
 - **A1** — A person creates and edits one model-neutral four-stage template, starts it
@@ -438,6 +459,19 @@ feature are recorded in §6.
   input marked; filling it enables **Next** and clears both. *Verify:*
   `ui/src/features/pipelines/PipelinesPage.test.tsx` and
   `ui/src/features/pipelines/RunStartForm.test.tsx`.
+
+- **A25** (R47) — A rendered stage assignment states that the one result call ends
+  the agent's part, that chat input during a blocked pause is out of band and cannot be recorded,
+  and that the person's answer arrives as a new assignment; an accepted `blocked` result repeats the
+  pause wording while an accepted `success`/`failure` result does not; and a second report from the
+  same attempt is refused with a message saying its participation has ended and that work done since
+  cannot be recorded. *Verify:* `internal/pipeline/blocked_chat_answer_test.go` and
+  `internal/messaging/pipeline_tools_test.go`.
+
+- **A26** (R48) — A run paused by restart recovery shows no **Open agent** action,
+  keeps **Retry stage**, and states that the stage agent can no longer report against the run; a run
+  paused as `blocked` still links to its live stage agent. *Verify:*
+  `ui/src/features/pipelines/RunBrowser.test.tsx`.
 
 ## 6. Deviations & open decisions
 

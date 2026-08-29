@@ -1,6 +1,7 @@
 package messaging
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -105,5 +106,29 @@ func TestPipelineProposalToolFailsCleanlyWithoutManager(t *testing.T) {
 	result, isErr := call(t, builder, "propose_pipeline_template", proposalTemplateArgs())
 	if !isErr || result["error"] != "pipeline_unavailable" {
 		t.Fatalf("proposal without manager = %v isErr=%v", result, isErr)
+	}
+}
+
+// FS-14.A25 (R47) — an accepted stage result tells the caller that its
+// participation in that attempt has ended, and a blocked result says what the
+// pause means. The response used to carry only `awaiting: quiescence`, which
+// reads as "keep going": nothing told a blocked stage agent that the chat it is
+// still sitting in is out of band, so a person's answer there produced work the
+// run could never accept.
+func TestAcceptedStageResultStatesTheBoundary(t *testing.T) {
+	blocked := reportNextGuidance("blocked")
+	for _, phrase := range []string{"out of band", "cannot be recorded", "new assignment"} {
+		if !strings.Contains(blocked, phrase) {
+			t.Fatalf("blocked guidance is missing %q: %s", phrase, blocked)
+		}
+	}
+	for _, outcome := range []string{"success", "failure"} {
+		guidance := reportNextGuidance(outcome)
+		if guidance == blocked {
+			t.Fatalf("%s reuses the blocked pause guidance", outcome)
+		}
+		if !strings.Contains(guidance, "This attempt is finished") {
+			t.Fatalf("%s guidance does not end the attempt: %s", outcome, guidance)
+		}
 	}
 }

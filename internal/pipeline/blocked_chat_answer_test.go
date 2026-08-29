@@ -74,3 +74,42 @@ func TestBlockedStageAgentAnsweredInChatIsNotCalledStale(t *testing.T) {
 		t.Fatalf("refusal message denies the caller's own assignment: %q", controlled.Message)
 	}
 }
+
+// FS-14.R47 — nothing told a stage agent that a blocked report ends its
+// participation until a new assignment arrives. The assignment said only "call
+// report_pipeline_stage_result exactly once" and the accepted report answered
+// `awaiting: quiescence`, so an agent whose person answered in its own chat had
+// no way to know the work it then did could never be recorded. The boundary is
+// now stated in all three places the agent can read: the assignment, the accepted
+// result, and the refusal.
+func TestBlockedBoundaryIsStatedToTheStageAgent(t *testing.T) {
+	manager, _, _ := pipelineManagerFixture(t)
+	detail := startPipeline(t, manager, "request-blocked-boundary")
+	work := detail.Attempts[0]
+
+	for _, phrase := range []string{
+		"ends your part in this assignment",
+		"out of band",
+		"arrives as a new assignment",
+	} {
+		if !strings.Contains(work.AssignmentText, phrase) {
+			t.Fatalf("assignment does not state the boundary (%q):\n%s", phrase, work.AssignmentText)
+		}
+	}
+
+	if _, err := manager.Report(work.AgentID, work.AgentGeneration, StageReport{
+		Outcome: "blocked", Summary: "Which fallback should I use?",
+	}); err != nil {
+		t.Fatalf("blocked report: %v", err)
+	}
+	_, err := manager.Report(work.AgentID, work.AgentGeneration, StageReport{
+		Outcome: "success", Summary: "answered in chat",
+	})
+	var controlled *ControlError
+	if !errors.As(err, &controlled) {
+		t.Fatalf("refusal = %v, want a control error", err)
+	}
+	if !strings.Contains(controlled.Message, "cannot be recorded") || !strings.Contains(controlled.Message, "new assignment") {
+		t.Fatalf("refusal does not state the boundary: %q", controlled.Message)
+	}
+}
