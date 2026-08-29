@@ -64,6 +64,60 @@ const templateProposal = {
   payload: { id: "review", template: { version: 1, title: "Review", inputs: [], stages: [] } },
 };
 
+const runProposal = {
+  proposal_id: "pp_456",
+  kind: "start_run",
+  digest: "digest-456",
+  payload: {
+    request_id: "req_1", template_id: "delivery", display_name: "Ship", project: "app",
+    goal: "Ship it", inputs: {}, assignments: {},
+  },
+};
+
+// FS-14.R42/A18: Runs only acts on `start_run` proposals and Templates only on
+// `save_template` proposals, so each surface's `proposalKind` prop must filter
+// the other kind out rather than offering an approval action it cannot own.
+describe("AgentDeckerBuilder proposal filtering", () => {
+  it("shows only the start_run proposal and its action for proposalKind=start_run", async () => {
+    server.use(http.get("/api/pipeline-proposals", () => HttpResponse.json([templateProposal, runProposal])));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter><AgentDeckerBuilder proposalKind="start_run" showLauncher={false} onRunProposal={() => {}} /></MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByRole("button", { name: "Review exact Start proposal" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Review exact Save proposal" })).not.toBeInTheDocument();
+  });
+
+  it("shows only the save_template proposal and its action for proposalKind=save_template", async () => {
+    server.use(http.get("/api/pipeline-proposals", () => HttpResponse.json([templateProposal, runProposal])));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter><AgentDeckerBuilder proposalKind="save_template" showLauncher onTemplateProposal={() => {}} /></MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByRole("button", { name: "Review exact Save proposal" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Review exact Start proposal" })).not.toBeInTheDocument();
+  });
+
+  it("shows every proposal when no proposalKind is given", async () => {
+    server.use(http.get("/api/pipeline-proposals", () => HttpResponse.json([templateProposal, runProposal])));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter><AgentDeckerBuilder onTemplateProposal={() => {}} onRunProposal={() => {}} /></MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByRole("button", { name: "Review exact Start proposal" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Review exact Save proposal" })).toBeInTheDocument();
+  });
+});
+
 // INV §1: a stopped builder cannot keep a dead chat link, but a durable
 // transcript proposal must remain reachable for the required human approval.
 describe("AgentDeckerBuilder persisted session", () => {

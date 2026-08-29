@@ -74,6 +74,11 @@ export async function renderDiagram(source: string, colors: PresentationColors, 
       theme: "base",
       themeVariables: mermaidTheme(colors),
       fontFamily: colors.fontFamily,
+      // A draw-stage failure inside mermaid.render still throws (caught below), but without this
+      // flag Mermaid also draws its own error SVG into the scratch node it appends to
+      // document.body and leaves that node behind — a leak outside React's tree on every such
+      // failure (FS-03.R38, INV §4).
+      suppressErrorRendering: true,
     });
     if (!(await mermaid.parse(source, { suppressErrors: true }))) return { note: DIAGRAM_UNRENDERABLE };
     const { svg } = await mermaid.render(id, source);

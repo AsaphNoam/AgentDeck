@@ -1,6 +1,6 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
@@ -66,6 +66,26 @@ describe("Pipelines routing", () => {
   it("redirects a legacy selected-run link to the run page", async () => {
     renderPipelines("/pipelines?run=run_legacy");
     expect(await screen.findByText("Run route")).toBeInTheDocument();
+  });
+
+  // FS-14.A18 (R42): while Runs is open, the switcher carries a count for each
+  // kind, so the save_template proposal waiting on Templates is never hidden by
+  // whichever sub-destination happens to be open.
+  it("counts each pending proposal kind on the switcher while one destination is open", async () => {
+    server.use(http.get("/api/pipeline-proposals", () => HttpResponse.json([
+      { proposal_id: "pp_save", kind: "save_template", digest: "d1", payload: { id: "delivery", template } },
+      {
+        proposal_id: "pp_start", kind: "start_run", digest: "d2",
+        payload: { request_id: "r1", template_id: "delivery", display_name: "Ship", project: "app", goal: "Ship it", inputs: {}, assignments: {} },
+      },
+    ])));
+    // This file configures no global afterEach cleanup, so earlier cases leave
+    // their trees mounted; every query below is scoped to this render's own nav.
+    const { container } = renderPipelines("/pipelines/runs");
+    const nav = within(container).getByRole("navigation", { name: "Pipeline destinations" });
+
+    await waitFor(() => expect(within(nav).getByRole("link", { name: /^Runs/ }).textContent).toBe("Runs1"));
+    expect(within(nav).getByRole("link", { name: /^Templates/ }).textContent).toBe("Templates1");
   });
 
   // FS-14.A19: a transport failure on a template deep link must not be

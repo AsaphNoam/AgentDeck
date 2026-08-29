@@ -1,13 +1,14 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { AgentState } from "../../api/types";
 import { useAgentStore } from "../../store/agentStore";
 import { RunBrowser, RunsLedger } from "./RunBrowser";
+import { PipelineRunPage } from "./PipelinesPage";
 
 const template = {
   version: 1,
@@ -172,5 +173,185 @@ describe("RunDetail continuity and absence", () => {
     expect(await screen.findByText("This run is gone.")).toBeInTheDocument();
     expect(screen.queryByText("pipeline resource not found")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Return to Runs" })).toHaveAttribute("href", "/pipelines/runs");
+  });
+});
+
+// FS-14.A17/A23: the delegated-agent cards shipped with no frontend test at all —
+// every fixture here set `delegated_agents: []` — so a regression in card
+// rendering, live/archive routing, the unavailable fallback, or the capped
+// remaining-count line would have shipped silently.
+describe("attempt agent cards", () => {
+  const delegated = {
+    ...detail,
+    agents_by_attempt: {
+      ...detail.agents_by_attempt,
+      at_2: {
+        stage_agent: { agent_id: "a_live", name: "Live", running: true, state: "busy", preview: "Working", route: "live", available: true },
+        delegated_agents: [
+          { agent_id: "a_task1", name: "Task one", running: true, state: "busy", preview: "Reviewing", route: "live", available: true, task_id: "tk_1", display_name: "Review the change", task_state: "running", outcome: "" },
+          { agent_id: "a_task2", name: "Task two", running: false, state: "idle", preview: "Done", route: "archive", available: true, task_id: "tk_2", display_name: "Write the note", task_state: "finished", outcome: "success" },
+          { agent_id: "a_gone", name: "a_gone", running: false, state: "unknown", preview: "", route: "unavailable", available: false, task_id: "tk_3", display_name: "Deleted work", task_state: "finished", outcome: "success" },
+        ],
+        delegated_total: 5,
+        delegated_running_count: 2,
+      },
+    },
+  };
+
+  function renderDelegated() {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    return render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter><RunBrowser selectedID="run_1" /></MemoryRouter>
+      </QueryClientProvider>,
+    );
+  }
+
+  it("shows the stage agent beside its delegated agents and routes each by liveness", async () => {
+    server.use(http.get("/api/pipeline-runs/run_1", () => HttpResponse.json(delegated)));
+    const { container } = renderDelegated();
+
+    await screen.findByText("Task one");
+    // The first attempt carries its own agents section, so scope to the attempt
+    // under test rather than to every card on the page.
+    const cards = [...container.querySelectorAll('[data-slot="attempt"]')[1]
+      .querySelectorAll(".pipeline-agent-card")];
+    expect(cards).toHaveLength(4);
+    expect(cards[0].textContent).toContain("Stage agent");
+    expect(cards.slice(1).every((card) => card.textContent?.includes("Delegated work"))).toBe(true);
+    expect(cards.slice(0, 3).map((card) => card.getAttribute("href")))
+      .toEqual(["/agent/a_live", "/agent/a_task1", "/archive/a_task2"]);
+  });
+
+  it("renders one honest non-linking card for a delegated agent that is gone", async () => {
+    server.use(http.get("/api/pipeline-runs/run_1", () => HttpResponse.json(delegated)));
+    const { container } = renderDelegated();
+
+    await screen.findByText("a_gone");
+    const fallback = container.querySelector(".pipeline-agent-unavailable");
+    expect(fallback).not.toBeNull();
+    expect(fallback?.tagName).toBe("DIV");
+    expect(fallback?.textContent).toContain("No recent activity");
+  });
+
+  it("states the distinct remaining count when the visible delegated cards are capped", async () => {
+    server.use(http.get("/api/pipeline-runs/run_1", () => HttpResponse.json(delegated)));
+    renderDelegated();
+
+    await screen.findByText("Task one");
+    expect(screen.getByText("2 delegated still running", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("Showing 3 of 5 delegated", { exact: false })).toBeInTheDocument();
+  });
+
+  // A23's live-refresh half: a later state_update refreshes an available card in
+  // place and moves it between the live and archive routes.
+  it("refreshes a card in place from a later state_update", async () => {
+    server.use(http.get("/api/pipeline-runs/run_1", () => HttpResponse.json(delegated)));
+    const { container } = renderDelegated();
+
+    await screen.findByText("Task two");
+    const cardAt = (index: number) => container.querySelectorAll('[data-slot="attempt"]')[1]
+      .querySelectorAll(".pipeline-agent-card")[index];
+    expect(cardAt(2).getAttribute("href")).toBe("/archive/a_task2");
+
+    useAgentStore.setState({
+      agents: { a_task2: { ...agent("a_task2", true), name: "Task two renamed", detail: "Back at work" } },
+      order: ["a_task2"], hydrated: true, hydrating: false,
+    });
+
+    await waitFor(() => {
+      const card = cardAt(2);
+      expect(card.getAttribute("href")).toBe("/agent/a_task2");
+      expect(card.textContent).toContain("Task two renamed");
+      expect(card.textContent).toContain("Back at work");
+    });
+  });
+});
+
+// FS-14.A16: a run that looped through its stages shows every visit as its own
+// timeline entry in execution order, and an attempt that never reported says so.
+describe("looping timeline", () => {
+  it("shows each visit as its own entry and marks an unreported attempt", async () => {
+    const stages = [
+      ...template.stages,
+      { id: "review", title: "Review", role: "reviewer", instruction: "Review it.", inputs: [], outputs: [], max_visits: 2, transitions: { success: { final: "success", approval: "automatic" }, failure: { final: "failure", approval: "required" } } },
+    ];
+    const looped = {
+      ...detail,
+      template: { ...template, stages },
+      run: { ...run, template_snapshot: { ...template, stages } },
+      attempts: [
+        { ...attempt("at_1", "a_1", 1, "completed"), stage_id: "work", visit_no: 1, report_outcome: "success", report_summary: "Built it" },
+        { ...attempt("at_2", "a_2", 2, "completed"), stage_id: "review", visit_no: 1, report_outcome: "failure", report_summary: "Needs a fix" },
+        { ...attempt("at_3", "a_3", 3, "completed"), stage_id: "work", visit_no: 2, report_outcome: "success", report_summary: "Fixed it" },
+        // Interrupted with no report: the entry must say no result was reported
+        // rather than presenting the attempt as if it had finished cleanly.
+        { ...attempt("at_4", "a_4", 4, "completed"), stage_id: "review", visit_no: 2 },
+      ],
+      agents_by_attempt: {},
+    };
+    server.use(http.get("/api/pipeline-runs/run_1", () => HttpResponse.json(looped)));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    const { container } = render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter><RunBrowser selectedID="run_1" /></MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await screen.findByText("4 attempts");
+    const entries = [...container.querySelectorAll('[data-slot="attempt"]')];
+    expect(entries).toHaveLength(4);
+    expect(entries.map((entry) => entry.querySelector("strong")?.textContent))
+      .toEqual(["Work", "Review", "Work", "Review"]);
+    expect(entries.map((entry) => entry.querySelector("small")?.textContent))
+      .toEqual([
+        "Visit 1 · codex · gpt-5.6-sol",
+        "Visit 1 · codex · gpt-5.6-sol",
+        "Visit 2 · codex · gpt-5.6-sol",
+        "Visit 2 · codex · gpt-5.6-sol",
+      ]);
+    expect(entries.slice(0, 3).map((entry) => entry.querySelector(".pipeline-state")?.textContent))
+      .toEqual(["success", "failure", "success"]);
+    expect(entries[3].querySelector(".pipeline-state")?.textContent).toBe("unreported");
+    expect(entries[3].textContent).toContain("No stage result was reported for this attempt.");
+  });
+});
+
+// INV §1: RunDetail holds a continuation draft, a mutation error, and the
+// appended-attempts "seen" ref, none scoped to the run. Browser back/forward
+// across two visited run pages reuses the route element, so without a key the
+// previous run's unsent input stayed on screen against the new run.
+describe("run page lifecycle boundary", () => {
+  it("drops the previous run's unsent continuation when the route changes run", async () => {
+    const blockedRun = {
+      ...detail,
+      run: { ...run, state: "paused", attention_reason: "blocked" },
+      attempts: [{ ...attempt("at_2", "a_live", 2, "completed"), report_outcome: "blocked", report_summary: "Which fallback?" }],
+    };
+    server.use(
+      http.get("/api/pipeline-runs/run_1", () => HttpResponse.json(blockedRun)),
+      http.get("/api/pipeline-runs/run_2", () => HttpResponse.json({
+        ...blockedRun,
+        run: { ...blockedRun.run, run_id: "run_2", display_name: "Second" },
+      })),
+    );
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={["/pipelines/runs/run_1"]}>
+          <Link to="/pipelines/runs/run_2">Go to the second run</Link>
+          <Routes><Route path="/pipelines/runs/:runID" element={<PipelineRunPage />} /></Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const box = await screen.findByRole("textbox");
+    fireEvent.change(box, { target: { value: "use the cached copy" } });
+    expect((box as HTMLTextAreaElement).value).toBe("use the cached copy");
+
+    fireEvent.click(screen.getByRole("link", { name: "Go to the second run" }));
+
+    await screen.findByRole("heading", { name: "Second", level: 2 });
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("");
   });
 });

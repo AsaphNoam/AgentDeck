@@ -184,6 +184,36 @@ describe("assistant diagram safety", () => {
     expect(container.querySelector(".mermaid-diagram-figure")).toBeNull();
   });
 
+  // FS-03.R38, INV §4: a draw-stage failure must not leak Mermaid's scratch node onto
+  // document.body. Real Mermaid appends that node itself (outside React's tree) and only tears
+  // it down on a thrown draw failure when `suppressErrorRendering` was set at initialize time;
+  // this mock mirrors that documented contract so the assertion exercises AgentDeck's own wiring.
+  it("leaves no stray node on document.body after a draw-stage failure", async () => {
+    let initializedWithSuppression = false;
+    mermaid.initialize.mockImplementation((opts: { suppressErrorRendering?: boolean }) => {
+      initializedWithSuppression = !!opts.suppressErrorRendering;
+    });
+    mermaid.render.mockImplementation(async (id: string) => {
+      const scratch = document.createElement("div");
+      scratch.id = id;
+      document.body.appendChild(scratch);
+      if (initializedWithSuppression) document.body.removeChild(scratch);
+      throw new Error("draw failed");
+    });
+
+    const before = document.body.childElementCount;
+    const { container } = renderAssistant(CLOSED);
+    // Testing Library mounts its own container directly on document.body; account for that one
+    // expected child so this assertion only catches a genuine scratch-node leak from Mermaid.
+    const afterMount = document.body.childElementCount;
+
+    await screen.findByText(DIAGRAM_UNRENDERABLE);
+    expect(container.textContent).toContain("Start-->Finish;");
+    expect(mermaid.initialize).toHaveBeenCalledWith(expect.objectContaining({ suppressErrorRendering: true }));
+    expect(document.body.childElementCount).toBe(afterMount);
+    expect(afterMount).toBe(before + 1);
+  });
+
   it("keeps renderer-produced markup behind a single insertion seam", () => {
     const root = path.resolve(__dirname, "../../..");
     const seams: string[] = [];

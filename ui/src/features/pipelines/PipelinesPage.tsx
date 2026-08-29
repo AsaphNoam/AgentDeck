@@ -88,7 +88,10 @@ export function RunsPage() {
 export function PipelineRunPage() {
   const { runID = "" } = useParams();
   const navigate = useNavigate();
-  return <RunDetail runID={runID} onDeleted={() => navigate("/pipelines/runs")} />;
+  // INV §1: RunDetail holds per-run state (continuation draft, mutation error, the appended-
+  // attempts "seen" set) with nothing scoped to runID. Without a key, browser back/forward across
+  // two visited run pages reuses this element and that state leaks across the lifecycle boundary.
+  return <RunDetail key={runID} runID={runID} onDeleted={() => navigate("/pipelines/runs")} />;
 }
 
 export function TemplatesPage() {
