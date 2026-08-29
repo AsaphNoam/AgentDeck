@@ -15,12 +15,16 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   browser's HTTP/1.x pool available for REST queries; the related config-source,
   transcript-reconciliation, and card-preview amplification paths are bounded as described in the
   changelog.
-- **Review state:** Every review and usability finding through 2026-08-28 is closed in code, tests,
-  or an explicit specification boundary, including the six recorded against the split Pipelines
-  surface. The 2026-08-29 design review of expandable dashboard chat panes is closed: all five
-  findings and all three consistency notes are resolved in the specifications, and no finding from
-  it remains open. The four bug-investigation findings below are open, joined by six
-  from the 2026-08-28 review of `790c01c` — its Must fix and the Tasks Retry gate are closed.
+- **Review state:** The 2026-08-29 code review read `6a16126..43e5feb` — the whole unreviewed
+  range, including the three commits that had never had their shipped diff read (Mermaid rendering,
+  the Pipelines split and its fixes) and the expandable panes that landed during the session. It
+  recorded fifteen findings below, three of them **Must fix**: unsanitized `style=""` attributes in
+  diagram markup, a failed template fetch reported as a deletion, and the panes' unbounded
+  second transcript copy. The 2026-08-29 design review of expandable dashboard chat panes is closed:
+  all five findings and all three consistency notes are resolved in the specifications. The four
+  bug-investigation findings are open, joined by the residue of the 2026-08-28 review of `790c01c`
+  — its Must fix and the Tasks Retry gate are closed, and two of its open items were re-confirmed
+  against the current tree by this review.
 - **Active change:** None. Expandable dashboard chat panes are finished and verified
   (FS-02.R46–R52/A29–A34, FS-03.R39/A23, FS-12.R38/A14, TS-03.R31, TS-08.R41–R43).
   Running-first card placement shipped on 2026-08-28 (FS-02.R45/A28, FS-12.R37/A13). The Pipelines
@@ -42,21 +46,44 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   drop have unit coverage but no real-browser run — this session had no browser available.
   The earlier v0.2.2 → v0.2.3 delta remains closed: FS-02.A24 is closed and FS-04.A22 remains
   narrowed to the native panel.
-- **Last reviewed code:** `6a16126` (2026-08-26). Corrected on 2026-08-28: `f97cc89` set this to
-  `895348e`, then `bbbdc90` verified `6a16126`'s fixes against the tree without advancing the
-  pointer, so it under-reported the reviewed range by one code commit and made every commit
-  behind it look unreviewed.
+- **Last reviewed code:** `43e5feb` (2026-08-29). Advanced across the continuous range
+  `6a16126..43e5feb`, which was read end to end in one pass; the backlog of three never-reviewed
+  commits named in earlier handoffs is now cleared.
 - **Branch:** `main`.
 
 ## Active change
 
 **Change:** None.
 
-**State:** Expandable dashboard chat panes are finished and verified.
+**State:** Expandable dashboard chat panes are finished and verified, and the whole
+unreviewed range now has a code review behind it.
 
-**Next:** Run an independent review of the expandable-pane implementation.
+**Next:** Run `/fix` on the three **Must fix** review findings, starting with the diagram
+`style=""` sanitizing gap, then the remaining Worth-fixing items and the four bug-investigation
+findings (un-skip `internal/pipeline/blocked_chat_answer_test.go` first). The second
+bug-investigation finding still needs the user's product decision before it can close.
 
 ## Changelog
+
+- **2026-08-29 — review:** Read the whole unreviewed range `6a16126..43e5feb` against the
+  specifications and every invariant class, clearing the backlog of three commits that had only
+  ever had design and usability reviews. Fifteen findings, three of them Must fix. The diagram
+  sanitizer forbids URL attributes but not `style=""`, and DOMPurify treats `style` as URI-safe by
+  default, so an author `classDef` carrying `url(https://…)` defeats FS-03.R38's no-network
+  guarantee at the configuration level. A failed `/api/pipelines` fetch makes the template page
+  claim the template was deleted, where its own twin `RunDetail` distinguishes 404 from any other
+  read failure — the two paths drifted inside one commit series. The new pane store keeps a second,
+  unfolded copy of every transcript event with no cleanup on any lifecycle boundary and a full array
+  copy per streamed delta, on exactly the four-pane streaming workload the feature creates. The
+  remainder are smaller: pane keyboard cycling cannot leave a group section, expanded and
+  cross-block drags compute in-drag geometry over a list that does not match what is rendered,
+  a draw-stage diagram failure leaks a node onto `document.body`, the delegated-agent and
+  proposal-count UI has no frontend test behind the acceptance items that name one, and several
+  traceability and tracked-artifact gaps. Both Go test variants, the 289-case UI suite,
+  `make check-specs`, `git diff --check` and all nine skill twins are green at `43e5feb`; every new
+  `rows.Next()` loop in the range checks `rows.Err()`. One earlier finding is corrected: the tracked
+  `internal/server/ui/dist/index.html` is covered by a `.gitignore` negation that has existed since
+  the first commit, so only the emitted worker chunk is genuinely tracked outside the rule.
 
 - **2026-08-29 — work:** Shipped expandable chat panes on project dashboards. Up to four chat cards
   can expand in place, persist across reloads, retain per-agent drafts, cycle by keyboard, and keep
@@ -521,6 +548,186 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 `claude-agent-acp`, OpenCode, and OpenHands are not installed globally.
 
 ## Review findings
+
+From the 2026-08-29 review of `6a16126..43e5feb` — the first read of the shipped diff for Mermaid
+rendering (`c35ff8c`), the Pipelines split (`9114df7` + `69c2f99`), the four small fixes, and the
+expandable dashboard chat panes (`43e5feb`). Both Go test variants, the 289-case UI suite,
+`make check-specs`, `git diff --check` and all nine skill twins are green at `43e5feb`; every new
+`rows.Next()` loop in the range checks `rows.Err()` (INV §7 clean).
+
+- **Must fix** (confirmed) Diagram sanitizing leaves `style=""` attribute values untouched, so a
+  diagram can still make a network request. `sanitizeDiagram`
+  (`ui/src/components/chat/renderers/mermaid.ts:40-46`) forbids `href`/`xlink:href`/`src`/`srcset`
+  but not `style`, and DOMPurify carries `style` in its `DEFAULT_URI_SAFE_ATTRIBUTES`
+  (`ui/node_modules/dompurify/dist/purify.cjs.js:740`), which short-circuits its URI check for that
+  attribute (`:2016`). The custom `stripRemoteStyleReferences` hook (`mermaid.ts:27-30`) only
+  rewrites `<style>` *element* text, never `style=""` attribute values, so an author `style`/
+  `classDef` directive carrying `url(https://…)` — which Mermaid writes into the node's `style`
+  attribute — survives both layers. FS-03.R38 and TS-08.R40 state without qualification that
+  rendering makes no network request and that URL attributes are removed before insertion; TS-08.R40
+  specifically names runtime-generated markup as the reason the sanitizing seam must be complete.
+  The `<style>`-element hook shows the authors knew about the CSS `url()` class and did not extend
+  it to attributes. Verified at the sanitizer-configuration level by reading both files; not
+  reproduced end-to-end in a browser. Fix: add an `afterSanitizeAttributes` hook that strips
+  `url(...)`/`@import` from any `style` attribute value, or pass `ADD_URI_SAFE_ATTR` so DOMPurify's
+  own URI check runs on `style`. Test: extend the sanitizer case in `AssistantText.test.tsx` with an
+  SVG carrying `style="fill:url(https://example.invalid/x)"` and assert both the scrub and a
+  `fetch`/network spy (FS-03.R38, TS-08.R40, **INV §8**).
+
+- **Must fix** (confirmed) A failed template fetch tells the operator the template was deleted.
+  `PipelineTemplatePage` (`ui/src/features/pipelines/PipelinesPage.tsx:131-143`) derives `seed` from
+  `templates.data`, then renders "This template is gone. It may have been deleted in another tab."
+  whenever `seed` is null and loading has ended. A transient 500 or network blip on `/api/pipelines`
+  leaves `data` undefined and hits that same branch, so a reload of a bookmarked
+  `/pipelines/templates/{id}` — exactly the deep link FS-14.R43 exists for — reports a deletion that
+  did not happen, offers no retry, and never surfaces `templates.error`. Its twin got this right in
+  the same commit series: `RunDetail` (`ui/src/features/pipelines/RunBrowser.tsx:89-101`) checks
+  `detail.error instanceof PipelineAPIError && detail.error.status === 404` and shows the transport
+  message for anything else. Two paths deriving "this resource is unavailable", already drifted.
+  FS-14.A19's template half is therefore both wrong and untested — no case in
+  `PipelinesPage.test.tsx` drives a `/api/pipelines` error. Fix: mirror `RunDetail`'s 404 check;
+  test by mocking `/api/pipelines` to 500 and asserting the copy differs from "This template is
+  gone." (FS-14.R43/A19, **INV §2/§8**).
+
+- **Must fix** (confirmed) The pane transcript store keeps a second, unfolded copy of every event
+  forever, and appends to it quadratically. `43e5feb` added `rawByAgent`
+  (`ui/src/store/transcriptStore.ts:6,102`) to answer "which events are newer than this refetch".
+  Unlike `byAgent`, it is never folded — `appendRenderedEvent` coalesces consecutive assistant
+  deltas into one bubble, while `rawEvents.push(event)` (`:141`) retains every single delta — and
+  every append copies the whole growing array first (`:110`). A 2,000-delta response therefore costs
+  ~2,000,000 element copies and 2,000 retained objects per open agent. Nothing ever clears it: there
+  is no delete path in the store, `registerOpenAgent`'s teardown (`ui/src/api/sse.ts:79-89`) only
+  decrements the open count, and the removal branch (`sse.ts:96-105`) clears the agent, annotation
+  and draft stores but not the transcript store. This lands on the exact workload the feature
+  creates — up to four panes plus the agent screen streaming at once on a dashboard left open for
+  days — and on the surface that already produced a freeze incident (`0a817f9`). INV §1 names this
+  shape for `annotationStore`: browser-local state needs boundary handling plus its own retention
+  bound. Fix: bound `rawByAgent` to the tail actually needed for seq reconciliation, and drop the
+  agent's entry on removal and when the last consumer unregisters (FS-03.R39, TS-03.R31,
+  **INV §1/§4**).
+
+- **Worth fixing** (confirmed) `Ctrl+Alt+Arrow` pane cycling cannot leave a group section.
+  `cyclePaneFocus` is bound to the per-group grid — `grouped.map(...)` renders one
+  `<div className="card-grid" onKeyDown={cyclePaneFocus}>` per section
+  (`ui/src/components/grid/CardGrid.tsx:202`) — and it collects panes with
+  `grid.querySelectorAll("[data-agent-pane]")` on that one element, returning early when
+  `panes.length < 2`. FS-02.R50 says the bindings move to "the next expanded pane" with order
+  following "the panes as displayed" and do nothing only with "fewer than two panes expanded", and
+  FS-02.R48's limit of four is a whole-grid limit. With one pane expanded in each of two task
+  groups (FS-02.R18), both bindings silently do nothing. The keyboard tests
+  (`CardGrid.test.tsx:169-182`) only ever render one section, so nothing catches it. Fix: bind the
+  handler once at the grid container and collect panes across sections; test with two groups
+  (FS-02.R50, **INV §10**).
+
+- **Worth fixing** (confirmed) An expanded card is dropped from `SortableContext` while still
+  mounting a sortable node, so in-drag geometry is computed over a list that omits it. `sortableIDs`
+  now filters expanded ids out (`ui/src/components/grid/CardGrid.tsx:107-112`), but `AgentCard`
+  still calls `useSortable({ id, disabled: expanded })` unconditionally
+  (`ui/src/components/grid/AgentCard.tsx:16`) and the expanded card still occupies
+  `min(2, perRow)` grid columns. `rectSortingStrategy` derives every other card's preview transform
+  from the `items` array, so dragging any collapsed card near a pane shifts neighbours as though the
+  two-column pane were not there. The committed order is unaffected — `onDragEnd` uses the full
+  `ids` list and `disabled` keeps the pane from being `over` — so this is in-drag feedback only.
+  FS-02.R47 specifies that an expanded card is not draggable but says nothing about dragging past
+  one, so this is a specification gap as well. No test covers a drag with a pane expanded. Fix:
+  keep expanded ids in `items` (they are already `disabled`), or account for the pane's rect
+  (FS-02.R47, **INV §1**).
+
+- **Worth fixing** (confirmed) The live drag preview crosses the running/stopped boundary that
+  FS-02.A28 promises it will not. One `SortableContext` spans both blocks
+  (`ui/src/components/grid/CardGrid.tsx:177-178`) with no `collisionDetection` or modifier limiting
+  candidates to the active card's block; `onDragEnd:149` refuses the cross-block drop, but only at
+  drop time, after `rectSortingStrategy` has already computed preview transforms from
+  `arrayMove` over the whole shared list. FS-02.R45 and A28 state that "during that drag, only cards
+  in the same running/stopped block shift to show the possible drop; cards in the other block hold
+  their positions". A28 cites `CardGrid.test.tsx` as proof, but jsdom with a mocked dnd-kit cannot
+  exercise transforms — the file's own header comment says so — so the clause is unverified as well
+  as probably unmet. Not reproduced in a real browser. Fix: give each block its own
+  `SortableContext`, or filter `over` candidates by block; verify under J5 (FS-02.R45/A28,
+  **INV §10**).
+
+- **Worth fixing** (confirmed) A diagram that parses but fails while drawing leaks a DOM node onto
+  `document.body`. `renderDiagram` calls `mermaid.render(id, source)` without a containing element
+  (`ui/src/components/chat/renderers/mermaid.ts:73`), so Mermaid appends its own scratch node to
+  `<body>`. On a draw-stage exception Mermaid removes that node only when `suppressErrorRendering`
+  is set; `mermaid.initialize` here never sets it (`:64-72`), so the library draws its own
+  "Syntax error" SVG into the scratch node and rethrows without removing it. The visible transcript
+  is correct — the `catch` returns `DIAGRAM_UNRENDERABLE` and the code block stands, as FS-03.R38
+  requires — but a node accumulates outside React's tree once per such failure for the life of the
+  page. Fix: pass `suppressErrorRendering: true` so every failure path tears the scratch node down
+  (FS-03.R38, **INV §4**).
+
+- **Worth fixing** (confirmed) No test cites any acceptance item of the expandable-pane change.
+  Nothing in the repository references `FS-02.A29`–`A34`, `FS-03.A23` or `FS-12.A14`, though the
+  behavior is covered by uncited cases in `CardGrid.test.tsx`, `AgentCard.test.tsx` and
+  `DashboardChatPane.test.tsx`, and the neighbouring `FS-02.A28` case is cited properly
+  (`CardGrid.test.tsx:12`). The specification lifecycle asks tests that pin an acceptance criterion
+  to name it, and `check-specs` does not enforce the direction. This is the same shape as the open
+  `FS-02.A27` finding. Fix: add the citations, or narrow the A-items to what is actually proven
+  (**INV §10**).
+
+- **Worth fixing** (confirmed) Delegated-agent and proposal-count UI shipped with no frontend test.
+  No UI case renders `AttemptAgents`/`AttemptAgentCard` with a populated `delegated_agents` — every
+  `RunBrowser.test.tsx` fixture sets it to `[]` — and nothing exercises `proposalKind` in
+  `AgentDeckerBuilder.tsx` or the cross-surface counts in `PipelinesPage.tsx:22-23,34-39`. Only the
+  Go projections are covered (`TestPipelineRunDetailProjectsOneHopAgentsAndFallbacks`). FS-14.A17,
+  A18 and A23 each name a UI test as their verification, and A16's looping-timeline and "unreported
+  attempt" cases are likewise undriven. The implementations read correctly on inspection, so this is
+  a coverage finding, not a defect report: a regression in delegated-card rendering, live/archive
+  routing, or proposal filtering would ship silently today (FS-14.A16/A17/A18/A23, **INV §10**).
+
+- **Worth fixing** (confirmed) `RunDetail` keeps per-run state across a `runID` change.
+  `PipelineRunPage` renders `<RunDetail runID={runID} …>` with no `key`
+  (`ui/src/features/pipelines/PipelinesPage.tsx:88-92`), while `RunDetail` holds `continuation`
+  text, a mutation `error`, and `useAppendedAttempts`' `seen` ref
+  (`ui/src/features/pipelines/RunBrowser.tsx:57-86`), none scoped to the run. When the route element
+  is reused for a different run rather than remounted — browser back/forward across two visited run
+  pages is the plausible route today, since in-app navigation goes through the ledger — unsent
+  "New input for the blocked stage" text or a stale error from the previous run stays on screen, and
+  every timeline entry of the new run plays the just-appended entrance. Not reproduced. Fix:
+  `key={runID}`, INV §1's ordinary remedy for a lifecycle boundary (**INV §1**).
+
+- **Worth fixing** (confirmed) The Retry gate is hand-duplicated across the language boundary.
+  `ui/src/features/tasks/TasksPage.tsx:114-116` reimplements the eligibility switch in
+  `RetryTask` (`internal/state/tasks.go:1557-1569`), and `8c9fa68`'s own message says so. That
+  commit exists because the two had already drifted — the UI had narrowed Retry to `interrupted`
+  and silently dropped work parked by exhausted start attempts. The copies are byte-equivalent
+  today and nothing prevents the next FS-16.R23/R25 change from separating them again. Fix: return
+  the eligibility (or a `park_reason`) on the task JSON and let the view read it
+  (FS-16.R23/R25, **INV §2**).
+
+- **Worth fixing** (confirmed) `ui/tsconfig.app.tsbuildinfo` is a tracked TypeScript incremental
+  build cache with no ignore rule; seven commits in this range carry a churn-only diff to it, and
+  running the UI suite dirties the tree. Same class as the tracked embed artifact already recorded
+  below. Fix: `git rm --cached` it and add it to `.gitignore` (**INV §10**).
+
+- **Worth fixing** (confirmed) `go.mod` marks `github.com/coder/websocket` and
+  `github.com/creack/pty` `// indirect` although both are imported directly, so any `go test ./...`
+  rewrites the file and dirties the tree mid-session. Fix: commit the promotion `go` already makes
+  (no invariant class).
+
+- **Worth fixing** (confirmed) `ListPage`'s snapshot-decode diagnostic reports the wrong failure.
+  `internal/pipeline/manager.go:283-284` emits `run_read_failed` / "run detail could not be
+  decoded" when only the frozen `TemplateSnapshot` JSON failed to unmarshal — the function's own
+  doc comment and TS-03.R30 state it does not read full run detail. The following
+  `frozen_stage_title_unavailable` diagnostic already describes the real condition. Fix: reword or
+  drop the first diagnostic (TS-03.R30, **INV §2/§8**).
+
+- **Worth fixing** (confirmed) TS-06 does not name the stress fixture it now owns. `d3b4400` added
+  `scripts/stress-fixture/` and the `stress_stream` scenario with `FAKEACP_STRESS_CHUNKS`,
+  `FAKEACP_STRESS_CHUNK_BYTES` and `FAKEACP_STRESS_DELAY_MS`
+  (`internal/runtime/testdata/fakeacp/main.go:181-192`), but TS-06 §6 names neither, and no `make`
+  target reaches it. TS-06's header claims `scripts/`. Fix: one line in TS-06 §6 naming the fixture
+  and the connection-pool exhaustion it reproduces (TS-06, **INV §10**).
+
+Two already-recorded findings below were re-confirmed against the current tree rather than
+re-filed: the shared worker still never deletes a port (`ui/src/api/sse-shared-worker.ts:8,42`),
+and `742e50e`'s new demotion path is a second trigger for it; and `ui/src/features/tasks/TasksPage.tsx:147`
+still renders the stray leading `·` for an agent-target task. One correction: that finding's claim
+that `790c01c` force-tracked `internal/server/ui/dist/index.html` against `.gitignore` is wrong —
+`.gitignore:11` has carried an explicit `!internal/server/ui/dist/index.html` negation since the
+first commit. Only `assets/sse-shared-worker-DxpB4Ebi.js` is genuinely tracked outside the ignore
+rule; that half stands, and its content does still match the current source.
 
 From the 2026-08-28 bug investigation of the field report: *"An AgentDecker session blocked the
 progression of a pipeline because it needed an answer from me, then when it tried to continue it got

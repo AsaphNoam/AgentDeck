@@ -5,6 +5,18 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-29 — review: Everything built since the last review
+
+I read every code change since the last review in one pass, including three that had only ever had design and usability reviews before — the diagrams in chat, the Pipelines split into Runs and Templates, and the new expandable chat panes that landed while I was working. Fifteen problems are written up; three matter now.
+
+The first is a privacy one. Diagrams are drawn from text the model writes, and we strip out anything that could make the page fetch from the internet — except we missed one place. A diagram can still smuggle a web address into a styling instruction, and the browser will fetch it, which quietly tells whoever owns that address that you opened the diagram. The second: if the request for your pipeline templates fails for a moment, the template page tells you the template was deleted and offers no way to retry. The run page next to it already handles this correctly, so the two drifted apart. The third is about the new chat panes — they keep a full second copy of every message that arrives and never let it go, and the copying gets slower as a conversation grows. That lands squarely on what the panes are for: four agents streaming at once on a dashboard left open all day, which is the same surface that froze on us before.
+
+The rest are smaller: keyboard jumping between panes stops working once your cards are split into groups, dragging a card next to an expanded pane makes its neighbours jump to the wrong places, and some of the pipeline screens have no test behind them at all. All the tests and checks pass, so none of this is currently visible as a failure.
+
+**Needs attention:** The diagram fetch problem is the one I would fix first — it is a small change and it is the only finding with a privacy consequence.
+
+**Next:** Run `/fix` on the three main findings, starting with the diagram one.
+
 ### 2026-08-29 — implementation: Expandable dashboard chat panes
 
 Chat cards on a project dashboard now expand in place, letting you read, reply, resolve permissions, and supervise up to four agents without leaving the grid. Open panes persist across reloads, cycle by keyboard, keep drafts safe, and recover concurrent live transcripts without stale responses erasing newer events. The final interaction and layout were verified in a real browser under both AgentDeck Core and Sky & Grove.
