@@ -5,6 +5,43 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-29 — Design review: shared AgentDeck skill
+
+The design is not ready to implement. Its delivery overlay is described as process-local, but the
+existing fields it plans to use are written into the durable session snapshot; after a later failed
+installation, a resumed agent could still receive the stale skill directory and prompt pointer. The
+thin AgentDecker prompt also tells the role to use the bundled skill even when installation failed,
+and the proposed migration can remove its old product manual during that same failed startup.
+
+The PM and teammate roles are a third maintained source of coordination behavior: they still embed
+tool names, wake rules, recipient addressing, and the numeric message budget that the new
+coordination reference is supposed to own. That would leave ordinary roles following stale guidance
+after a future release. The native-discovery assumption itself was checked against the pinned Claude
+and Codex adapters and is supported.
+
+**Needs attention:** Revise the transient delivery seam, install-failure/migration ordering, and
+ownership or migration of the PM and teammate coordination prompts.
+
+**Next:** Run `/design-feature agentdeck-shared-skill` to resolve the three findings, then repeat the
+design review.
+
+### 2026-08-29 — Feature design revision: operator-skill boundaries and safe degradation
+
+FS-18 and TS-11 now keep the shared skill strictly about operating AgentDeck. The core contains
+only cross-capability choices and authority/result mental models; messaging budgets moved to the
+coordination reference, while blocked attempts, Continue, and proposal behavior moved to the
+pipeline reference. The shipped package now has exactly three references, with release-maintenance
+knowledge excluded for a future repository release workflow.
+
+Skill installation remains atomic, owner-only, and verified, but it is no longer an AgentDeck
+availability dependency. A failed installation logs a clear warning, starts AgentDeck normally, and
+suppresses the skill directory, environment variable, and prompt pointer for that dashboard process.
+
+**Needs attention:** None.
+
+**Next:** Run `/review-design` on `agentdeck-shared-skill`, then `/work` after the design review is
+clear.
+
 ### 2026-08-29 — fix: Everything on the open list is now closed
 
 Every problem on the list is fixed — the twelve from the last code review, the three from the
