@@ -173,6 +173,10 @@ shared target guarantees.
   `TestAuthCommandIsPresentForEveryProvider`.
 - Spec lint: `scripts/check-specs.sh`.
 - CI: `.github/workflows/ci.yml`.
-- Fake integration peer: `internal/runtime/testdata/fakeacp`, server integration tests.
+- Fake integration peer: `internal/runtime/testdata/fakeacp`, server integration tests. Its
+  `stress_stream` scenario (`FAKEACP_STRESS_CHUNKS`, `FAKEACP_STRESS_CHUNK_BYTES`,
+  `FAKEACP_STRESS_DELAY_MS`) drives `scripts/stress-fixture`, the manual multi-tab fixture that
+  reproduces browser connection-pool starvation on a same-origin dashboard; it is run by hand
+  (`go run ./scripts/stress-fixture`) and has no `make` target because it needs a real browser.
 - Generated UI guard: `.claude/hooks/guard-edit.sh`; twin-skill/spec feedback in
   `.claude/hooks/post-edit.sh`.
