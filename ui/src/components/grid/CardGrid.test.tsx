@@ -34,6 +34,12 @@ vi.mock("@dnd-kit/sortable", async (importOriginal) => ({
   },
 }));
 
+vi.mock("./DashboardChatPane", () => ({
+  DashboardChatPane: ({ agent }: { agent: AgentState }) => (
+    <div data-agent-pane={agent.agent_id}><div className="composer"><textarea aria-label={`Composer ${agent.name}`} /></div></div>
+  ),
+}));
+
 const server = setupServer(
   http.get("/api/layout", () => HttpResponse.json({ order: [], density: { perRow: 3, gap: 16 }, groups: {} })),
   http.get("/api/roles", () => HttpResponse.json({ implementer: { title: "Implementer", system_prompt: "" } })),
@@ -58,7 +64,7 @@ afterEach(() => {
   server.resetHandlers();
   dnd.items = [];
   dnd.onDragEnd = undefined;
-  act(() => useAgentStore.setState({ agents: {}, order: [] }));
+  act(() => useAgentStore.setState({ agents: {}, order: [], hydrated: false, hydrating: false }));
 });
 afterAll(() => server.close());
 
@@ -85,6 +91,112 @@ function renderWithQuery(ui: React.ReactElement) {
 }
 
 describe("CardGrid", () => {
+
+  it("toggles chat cards in place, spans the configured tracks, and leaves terminal navigation intact", async () => {
+    seedGrid(["a_chat", "a_terminal"], {
+      a_chat: agent("a_chat"),
+      a_terminal: agent("a_terminal", { interface: "terminal" }),
+    });
+    renderWithQuery(<CardGrid />);
+
+    const chat = await screen.findByText("a_chat");
+    fireEvent.click(chat);
+    const expandedCard = screen.getByLabelText("Composer a_chat").closest('[data-ui="agent-card"]');
+    expect(expandedCard).toHaveAttribute("data-variant", "expanded");
+    expect(expandedCard).toHaveStyle({ gridColumn: "span 2" });
+    expect(screen.getByLabelText("Composer a_chat")).toBeInTheDocument();
+    expect(dnd.items).toEqual(["a_terminal"]);
+
+    fireEvent.click(expandedCard!.querySelector('[data-slot="header"]')!);
+    expect(screen.queryByLabelText("Composer a_chat")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("a_terminal"));
+    expect(screen.queryByLabelText("Composer a_terminal")).not.toBeInTheDocument();
+  });
+
+  it("evicts the least-recently-used fifth pane and persists recency order", async () => {
+    const agents = Object.fromEntries([1, 2, 3, 4, 5].map((n) => [`a_${n}`, agent(`a_${n}`)]));
+    seedGrid(Object.keys(agents), agents);
+    const saved: string[][] = [];
+    server.use(http.put("/api/layout", async ({ request }) => {
+      const body = await request.json() as { expanded: string[] };
+      saved.push(body.expanded);
+      return HttpResponse.json(body);
+    }));
+    renderWithQuery(<CardGrid />);
+
+    for (const id of ["a_1", "a_2", "a_3", "a_4"]) fireEvent.click(await screen.findByText(id));
+    fireEvent.pointerDown(screen.getByLabelText("Composer a_1"));
+    fireEvent.click(screen.getByText("a_5"));
+
+    expect(screen.getByLabelText("Composer a_1")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Composer a_2")).not.toBeInTheDocument();
+    expect(screen.getAllByLabelText(/Composer a_/)).toHaveLength(4);
+    await waitFor(() => expect(saved.at(-1)).toEqual(["a_3", "a_4", "a_1", "a_5"]));
+  });
+
+  it("restores persisted panes, prunes unknown ids, and retains another project's id", async () => {
+    server.use(http.get("/api/layout", () => HttpResponse.json({
+      order: ["a_here", "a_elsewhere"], density: { perRow: 1, gap: 16 }, groups: {},
+      expanded: ["a_unknown", "a_elsewhere", "a_here"],
+    })));
+    const saved: string[][] = [];
+    server.use(http.put("/api/layout", async ({ request }) => {
+      const body = await request.json() as { expanded: string[] };
+      saved.push(body.expanded);
+      return HttpResponse.json(body);
+    }));
+    act(() => useAgentStore.setState({
+      agents: { a_here: agent("a_here"), a_elsewhere: agent("a_elsewhere", { project: "other" }) },
+      order: ["a_here", "a_elsewhere"], hydrated: true, hydrating: false,
+    }));
+    renderWithQuery(<CardGrid projectID="my-app" />);
+
+    expect(await screen.findByLabelText("Composer a_here")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Composer a_elsewhere")).not.toBeInTheDocument();
+    await waitFor(() => expect(saved.at(-1)).toEqual(["a_elsewhere", "a_here"]));
+  });
+
+  it("cycles composer focus in displayed order and wraps", async () => {
+    seedGrid(["a_1", "a_2", "a_3"], { a_1: agent("a_1"), a_2: agent("a_2"), a_3: agent("a_3") });
+    Element.prototype.scrollIntoView = vi.fn();
+    renderWithQuery(<CardGrid />);
+    for (const id of ["a_1", "a_2", "a_3"]) fireEvent.click(await screen.findByText(id));
+    const first = screen.getByLabelText("Composer a_1");
+    const second = screen.getByLabelText("Composer a_2");
+    const third = screen.getByLabelText("Composer a_3");
+    first.focus();
+    fireEvent.keyDown(first, { key: "ArrowDown", ctrlKey: true, altKey: true });
+    expect(second).toHaveFocus();
+    fireEvent.keyDown(second, { key: "ArrowUp", ctrlKey: true, altKey: true });
+    expect(first).toHaveFocus();
+    fireEvent.keyDown(first, { key: "ArrowUp", ctrlKey: true, altKey: true });
+    expect(third).toHaveFocus();
+
+    first.focus();
+    const picker = document.createElement("ul");
+    picker.className = "composer-picker";
+    first.closest(".composer")!.appendChild(picker);
+    fireEvent.keyDown(first, { key: "ArrowDown", ctrlKey: true, altKey: true });
+    expect(first).toHaveFocus();
+  });
+
+  it("keeps a stopped pane open, never auto-expands waiting input, and removes a pane with its card", async () => {
+    seedGrid(["a_1", "a_2"], { a_1: agent("a_1"), a_2: agent("a_2") });
+    renderWithQuery(<CardGrid />);
+    fireEvent.click(await screen.findByText("a_1"));
+    expect(screen.getByLabelText("Composer a_1")).toBeInTheDocument();
+
+    act(() => useAgentStore.getState().applyStateUpdate(agent("a_1", { running: false, state: "done" })));
+    expect(screen.getByLabelText("Composer a_1")).toBeInTheDocument();
+
+    act(() => useAgentStore.getState().applyStateUpdate(agent("a_2", { state: "waiting_input" })));
+    expect(screen.queryByLabelText("Composer a_2")).not.toBeInTheDocument();
+
+    act(() => useAgentStore.getState().removeAgent("a_1"));
+    expect(screen.queryByLabelText("Composer a_1")).not.toBeInTheDocument();
+    expect(screen.queryByText("a_1")).not.toBeInTheDocument();
+  });
 
   // FS-02.R44 / A26: the dashboard's only task-shaped element is how many tasks
   // in view need a person — parked work and work whose agent went away — and it

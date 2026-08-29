@@ -101,11 +101,7 @@ describe("SseClient watchdog reconnect", () => {
     expect(second.closed).toBe(false);
   });
 
-  // Regression (review fix): a seq-gap transcript refetch must only fire for the
-  // OPEN agent (others aren't displayed and ChatPanel refetches on open), and the
-  // gap event must not also be appended (the async setTranscript would clobber /
-  // duplicate it).
-  it("only refetches on a seq gap for the open agent", async () => {
+  it("only refetches on a seq gap for a registered agent", async () => {
     const { sseClient } = await import("./sse");
     const client = await import("./client");
     sseClient.connect();
@@ -113,7 +109,7 @@ describe("SseClient watchdog reconnect", () => {
     const msg = (agent: string, seq: number) =>
       JSON.stringify({ type: "new_message", seq, ts: 1, agent_id: agent, data: { kind: "assistant_text", seq, ts: "t", delta: "x" } });
 
-    sseClient.setOpenAgent("a_open");
+    sseClient.registerOpenAgent("a_open");
     // Seed lastSeq=1 for both agents (no gap yet).
     es.emit("new_message", msg("a_open", 1));
     es.emit("new_message", msg("a_bg", 1));
@@ -131,11 +127,54 @@ describe("SseClient watchdog reconnect", () => {
     const { sseClient } = await import("./sse");
     const client = await import("./client");
     (client.getTranscript as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("no such agent"));
-    sseClient.setOpenAgent("a_gone");
+    sseClient.registerOpenAgent("a_gone");
     sseClient.connect();
 
     FakeEventSource.instances[0].onopen?.();
     await vi.waitFor(() => expect(client.getTranscript).toHaveBeenCalledWith("a_gone"));
+  });
+
+  it("delivers each registered agent to its own transcript and teardown stops delivery", async () => {
+    const { sseClient } = await import("./sse");
+    const { useTranscriptStore } = await import("../store/transcriptStore");
+    sseClient.connect();
+    const es = FakeEventSource.instances[0];
+    const closeA = sseClient.registerOpenAgent("a_one");
+    sseClient.registerOpenAgent("a_two");
+    const msg = (agent: string, seq: number, delta: string) => JSON.stringify({
+      type: "new_message", seq, ts: 1, agent_id: agent,
+      data: { kind: "assistant_text", seq, ts: "t", delta },
+    });
+
+    es.emit("new_message", msg("a_one", 1, "one"));
+    es.emit("new_message", msg("a_two", 1, "two"));
+    expect(useTranscriptStore.getState().byAgent.a_one[0].text ?? useTranscriptStore.getState().byAgent.a_one[0].delta).toBe("one");
+    expect(useTranscriptStore.getState().byAgent.a_two[0].text ?? useTranscriptStore.getState().byAgent.a_two[0].delta).toBe("two");
+
+    closeA();
+    closeA();
+    es.emit("new_message", msg("a_one", 2, " ignored"));
+    expect(useTranscriptStore.getState().byAgent.a_one[0].text ?? useTranscriptStore.getState().byAgent.a_one[0].delta).toBe("one");
+  });
+
+  it("ignores a stale transcript response after a newer per-agent request", async () => {
+    const { sseClient } = await import("./sse");
+    const client = await import("./client");
+    const { useTranscriptStore } = await import("../store/transcriptStore");
+    let resolveFirst!: (value: unknown) => void;
+    let resolveSecond!: (value: unknown) => void;
+    (client.getTranscript as ReturnType<typeof vi.fn>)
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveSecond = resolve; }));
+
+    sseClient.registerOpenAgent("a_ordered");
+    sseClient.connect();
+    FakeEventSource.instances[0].onopen?.();
+    resolveSecond({ agent_id: "a_ordered", events: [{ seq: 2, kind: "assistant_text", text: "new" }] });
+    await vi.waitFor(() => expect(useTranscriptStore.getState().byAgent.a_ordered?.[0]?.text).toBe("new"));
+    resolveFirst({ agent_id: "a_ordered", events: [{ seq: 1, kind: "assistant_text", text: "old" }] });
+    await Promise.resolve();
+    expect(useTranscriptStore.getState().byAgent.a_ordered[0].text).toBe("new");
   });
 
   // Regression (review fix, BLOCKING): a drop mid-hydration triggers the

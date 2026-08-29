@@ -332,6 +332,45 @@ stop-and-registration-cleanup operation.
   reconnect invalidate the paginated list as one query family, while `task_update` invalidates open
   run details only and never resets Runs pagination.
 
+- **R31** — **The layout document gains one additive `expanded` list, and
+  browser transcript delivery addresses a set of open surfaces instead of one.** `config.Layout` and
+  the `/api/layout` request/response shape gain `expanded`, an ordered list of `agent_id` strings
+  (FS-02.R49). The response always serializes it as an array (R6); the on-disk document omits it
+  when empty, so a `layout.json` written before this change is read unchanged and needs no
+  migration. `PUT` validates it exactly as it validates `order` and `density` — no empty id, at most
+  four entries (FS-02.R48) — and rejects a violation with the existing structured envelope (R3)
+  rather than silently truncating. As with `order`, the server does not check that an id names a
+  live agent: pruning an unknown, archived, or out-of-scope id is the client's load-time
+  responsibility (FS-02.R49) — and that pruning covers only an unknown or archived agent, never an
+  agent belonging to another project, whose id the client reads, leaves unrendered, and writes back
+  unchanged. The decoder stays non-strict, so a body omitting `expanded` clears it, which is the
+  behavior `groups` already has.
+
+  On the browser side the SSE client's single open-agent id becomes a reference-counted set of open
+  agent ids, and registration returns its own teardown so every exit path — collapse, unmount, route
+  change, removal tombstone — releases exactly what it took (INV §4). `new_message` appends to each
+  registered agent's own transcript slice and continues to update previews for every agent as it
+  does today, so a delta for one pane cannot enter another's events. A sequence gap refetches only
+  the affected registered agent. The registered set is deliberately not connection-scoped: it
+  survives reconnect while `lastPing`, `hydrationIds`, and `lastAgentSeq` continue to reset on every
+  `onopen` (INV §1). Each `onopen` therefore fans the authoritative transcript refetch out across
+  the registered agents, bounded to four by FS-02.R48 so a reconnect cannot re-create the origin
+  connection-pool exhaustion R7 exists to prevent; the fan-out settles every request independently,
+  so one failing refetch neither aborts nor silently discards the others (INV §7).
+
+  Fanning those refetches out multiplies an ordering hazard the single-surface client already has and
+  FS-03 §6 already records: `setTranscript` replaces an agent's whole event slice, so a response that
+  resolves after newer deltas were appended drops them and can revert a resolved permission chip.
+  Two rules, both named by that deviation, make recovery ordered (FS-03.R39, INV §1/§5). First, each
+  transcript request carries a per-agent monotonic token and a response is applied only if its token
+  is still the newest issued for that agent, which is the per-agent request-token pattern INV §1
+  already makes canonical and `FilesTab`/`CommandsTab` already use. Second, applying a transcript
+  reconciles rather than replaces: events the store already holds whose `seq` exceeds the response's
+  maximum `seq` are retained after it, so a delta that arrived while the request was in flight
+  survives. Together these bound the hazard to what it can actually be — the fetched prefix plus any
+  strictly newer delivered events — instead of letting a slow response win. No new route, SSE event
+  type, or event payload field is added.
+
 ## 3. Interfaces & data shapes
 
 Feature-owned request/response fields are specified in the owning FS, including FS-14 for pipeline

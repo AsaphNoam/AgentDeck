@@ -195,13 +195,16 @@ func TestLayoutDefault(t *testing.T) {
 	if l.Order == nil {
 		t.Fatalf("default layout order = nil, want empty slice")
 	}
+	if l.Expanded == nil {
+		t.Fatalf("default layout expanded = nil, want empty slice")
+	}
 }
 
 // FS-02.A5: layout bounds are validated and accepted values persist.
 func TestPutLayoutValidatesAndPersists(t *testing.T) {
 	srv := testServer(t, false)
 	h := srv.routes()
-	body := bytes.NewBufferString(`{"order":["a_1","a_2"],"density":{"perRow":4,"gap":20}}`)
+	body := bytes.NewBufferString(`{"order":["a_1","a_2"],"expanded":["a_2","a_1"],"density":{"perRow":4,"gap":20}}`)
 	req := newLocalRequest(http.MethodPut, "/api/layout", body)
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
@@ -213,8 +216,24 @@ func TestPutLayoutValidatesAndPersists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadLayout: %v", err)
 	}
-	if got.Density.CardsPerRow != 4 || got.Density.Gap != 20 || len(got.Order) != 2 {
+	if got.Density.CardsPerRow != 4 || got.Density.Gap != 20 || len(got.Order) != 2 || len(got.Expanded) != 2 || got.Expanded[0] != "a_2" || got.Expanded[1] != "a_1" {
 		t.Fatalf("persisted layout = %+v", got)
+	}
+
+	// Omitting expanded is backwards-compatible and clears the stored list.
+	req = newLocalRequest(http.MethodPut, "/api/layout", bytes.NewBufferString(`{"order":[],"density":{"perRow":4,"gap":20}}`))
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("omitted expanded status = %d body=%s, want 200", rec.Code, rec.Body.String())
+	}
+	var response layoutResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil || response.Expanded == nil {
+		t.Fatalf("omitted expanded response = %s, err=%v; want empty array", rec.Body.String(), err)
+	}
+	got, err = srv.configStore.ReadLayout()
+	if err != nil || len(got.Expanded) != 0 {
+		t.Fatalf("omitted expanded persisted = %+v, err=%v; want empty", got, err)
 	}
 
 	req = newLocalRequest(http.MethodPut, "/api/layout", bytes.NewBufferString(`{"order":[],"density":{"perRow":9,"gap":20}}`))
@@ -222,6 +241,15 @@ func TestPutLayoutValidatesAndPersists(t *testing.T) {
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("bad layout status = %d, want 400", rec.Code)
+	}
+
+	for _, expanded := range []string{`[""]`, `["a_1","a_2","a_3","a_4","a_5"]`} {
+		req = newLocalRequest(http.MethodPut, "/api/layout", bytes.NewBufferString(`{"order":[],"expanded":`+expanded+`,"density":{"perRow":4,"gap":20}}`))
+		rec = httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("bad expanded %s status = %d, want 400", expanded, rec.Code)
+		}
 	}
 }
 

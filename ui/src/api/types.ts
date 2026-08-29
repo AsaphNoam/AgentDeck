@@ -115,6 +115,7 @@ export interface Layout {
   order: string[];
   density: { perRow: number; gap: number };
   groups?: Record<string, { collapsed: boolean }>;
+  expanded?: string[];
 }
 
 export interface Capabilities {

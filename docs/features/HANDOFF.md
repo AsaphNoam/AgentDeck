@@ -17,21 +17,14 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   changelog.
 - **Review state:** Every review and usability finding through 2026-08-28 is closed in code, tests,
   or an explicit specification boundary, including the six recorded against the split Pipelines
-  surface. The corrected 2026-08-29 design review of expandable dashboard chat panes has two Must-fix
-  and three Worth-fixing design findings plus three consistency notes; the change remains waiting and
-  must return to `/design-feature` before implementation. The four bug-investigation findings below
-  are open, joined by six
-  from the 2026-08-28 review of `790c01c` — its Must fix and the Tasks Retry gate are closed. Separately, three commits have never had their shipped
-  diff read against the specs: `c35ff8c` (Mermaid rendering) and `9114df7` + `69c2f99` (the
-  Pipelines split and its fixes). Each had a design review before implementation and a usability
-  review after; neither substitutes for the §7 code review.
-- **Active change:** None in progress. One change is specified and waiting to start:
-  `docs/ready-changes/expandable-chat-panes-on-the-dashboard.md` (expandable chat panes on the card
-  grid — FS-02.R46–R51/A29–A33, FS-03.R39/A23, TS-03.R31, TS-08.R41–R43). Its design review found
-  two Must-fix findings, so it is not ready for implementation and stays waiting until a
-  follow-up `/design-feature` resolves them. Running-first card placement shipped on 2026-08-28 (FS-02.R45/A28,
-  FS-12.R37/A13); its change file is removed, and FS-12 stays Current while FS-02 moves to Partial
-  for the planned pane items above. The Pipelines surface
+  surface. The 2026-08-29 design review of expandable dashboard chat panes is closed: all five
+  findings and all three consistency notes are resolved in the specifications, and no finding from
+  it remains open. The four bug-investigation findings below are open, joined by six
+  from the 2026-08-28 review of `790c01c` — its Must fix and the Tasks Retry gate are closed.
+- **Active change:** None. Expandable dashboard chat panes are finished and verified
+  (FS-02.R46–R52/A29–A34, FS-03.R39/A23, FS-12.R38/A14, TS-03.R31, TS-08.R41–R43).
+  Running-first card placement shipped on 2026-08-28 (FS-02.R45/A28, FS-12.R37/A13). The Pipelines
+  surface
   split is finished and committed (`9114df7`, with its usability fixes in `69c2f99`) and is ready
   for an independent review; its change file is removed, and FS-14 is the authority on what
   shipped.
@@ -41,7 +34,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   2026-08-28 against the working tree's own release build. Every FS-14.A14–A23 item was exercised;
   A14, A16–A20, A22 and A23 passed outright, and the A15 and A21 gaps are now fixed in code and
   tests. The badge, rail-order and append-motion fixes are unverified in a real browser: no browser
-  run has been made since them. J5 is likewise owed for running-first card placement: the live
+  run has been made since them. Expandable dashboard panes passed their J5 real-browser charter at
+  1280×800 under both Core and Sky & Grove, including fixed geometry, internal transcript scrolling,
+  stable page position during streaming, keyboard cycling, persistence, and four-pane composition.
+  J5 is still owed for running-first card placement: the live
   start/stop boundary crossing, the in-drag geometry inside one block, and the refused cross-block
   drop have unit coverage but no real-browser run — this session had no browser available.
   The earlier v0.2.2 → v0.2.3 delta remains closed: FS-02.A24 is closed and FS-04.A22 remains
@@ -56,15 +52,58 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 **Change:** None.
 
-**State:** No change is in progress. `docs/ready-changes/expandable-chat-panes-on-the-dashboard.md`
-stays waiting to start, but its corrected 2026-08-29 design review has two open Must-fix findings
-and it is not ready for `/work`.
+**State:** Expandable dashboard chat panes are finished and verified.
 
-**Next:** Run `/design-feature expandable-chat-panes-on-the-dashboard` to resolve the five design
-findings and three consistency notes below. The unrelated `/fix` and independent code-review work
-named above remains owed.
+**Next:** Run an independent review of the expandable-pane implementation.
 
 ## Changelog
+
+- **2026-08-29 — work:** Shipped expandable chat panes on project dashboards. Up to four chat cards
+  can expand in place, persist across reloads, retain per-agent drafts, cycle by keyboard, and keep
+  their transcript scrolling isolated from the page. The shared SSE client now registers multiple
+  open agents with reference-counted teardown, reconnect and gap recovery fan out only to registered
+  agents, and stale transcript responses cannot erase newer streamed events or resolved permissions.
+  Expanded cards leave dnd-kit sorting, keep activation on the header rather than pane controls, and
+  silently evict the least-recently-used pane at the cap. Server layout validation and round-trip
+  coverage, 300 UI tests, `make check-specs`, `make build`, `make test`, `make dist`, and whitespace
+  checks are green. A real Chromium pass at 1280×800 verified fixed 640px pane geometry, two-column
+  span, stable neighboring cards and page position during streaming, internal long-transcript
+  scrolling, focus cycling, persistence after reload, and rendering under Core and Sky & Grove.
+
+- **2026-08-29 — design-feature:** Resolved the 2026-08-29 design review of the expandable chat
+  pane change. All five findings and all three consistency notes are closed in the specifications;
+  none was rejected, because each named a real consequence that survived checking against the tree.
+  Two changed the design rather than its wording. `AgentCard` carries `onClick`/`onContextMenu` on
+  its outer `<article>` and the pane composes inside it, so an ordinary Send, permission decision,
+  or autocomplete accept would have collapsed the pane or opened the card menu; new FS-02.R52 and
+  A34 move both handlers to the card header for an expanded card, and TS-08.R43 records why that
+  structural boundary was chosen over per-control `stopPropagation` — an opt-out list is the INV
+  §2/§10 drift shape, since every control added later must remember to join it and a miss fails
+  silently. And `setTranscript` replaces an agent's whole slice, so a refetch resolving after newer
+  deltas drops them or reverts a resolved permission chip; TS-03.R31 now specifies the two repairs
+  FS-03's own §6 deviation already named — a per-agent request token (INV §1's canonical pattern,
+  already used by `FilesTab`/`CommandsTab`) and seq reconciliation that retains events newer than
+  the response's maximum — so the four-fold fan-out closes that advisory instead of multiplying it,
+  for the agent screen as well as the panes. The three lower-severity findings tightened evidence
+  and definitions: FS-02.A29's geometry claims moved to J5 because jsdom evaluates no grid sizing,
+  stretch, overflow, or scroll position (INV §13); R48 now names the three events that mark a pane
+  as used, including a pointer press, because the transcript's scroll region is not focusable and a
+  reader would otherwise lose the pane they were reading; and A30 gained the running→stopped
+  transition, which every previously named case would have passed while closing the pane. The
+  consistency notes closed as FS-02.R46's corrected host, TS-08.R42's narrowed scroll-region claim
+  (`.annotation-tray-body` and `.composer-picker` also scroll), and new FS-12.R38/A14 scoping
+  R15's no-new-shortcut clause to the presentation change it was written for.
+
+  One defect the review did not raise is also fixed, and it was the more damaging one. R49 said an
+  expanded id outside the grid's current scope is dropped from the next save — but `CardGrid` mounts
+  only at `/project/:project`, so *every* id belongs to some other project the moment the operator
+  opens a different one, and the debounced `PUT` would have wiped the first project's arrangement on
+  arrival at the second. R49 and A32 now retain an out-of-scope id unrendered and write it back
+  unchanged; only an unknown or archived agent is pruned. That same correction disposes of the
+  original wrong claim that the projects home hosts an agent grid: it renders project cards, and
+  after FS-02.R29's project-first split the project dashboard is the only agent-card surface.
+  FS-12 joins FS-02, FS-03, TS-03, and TS-08 as Partial. No product code changed. `make
+  check-specs`, the skill-twin comparison, and `git diff --check` are green.
 
 - **2026-08-29 — design review correction:** Removed the projects-home Must-fix finding after the
   user clarified that "projects page" means the agent-card dashboard reached after selecting a
@@ -483,54 +522,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-From the 2026-08-29 design review of
-`docs/ready-changes/expandable-chat-panes-on-the-dashboard.md`:
-
-- **Must fix** — An operator who clicks Send/Cancel, Approve/Deny, autocomplete, a transcript
-  disclosure, the pane-name link, or an annotation target can also collapse the pane or open the
-  card context menu. `AgentCard` owns `onClick` and `onContextMenu` on its outer article
-  (`ui/src/components/grid/AgentCard.tsx:23-34`), while the reused `Composer`, `TranscriptView`, and
-  permission controls do not establish a common propagation boundary; today only isolated card
-  children stop the root click. TS-08.R41 composes those controls inside that article, but
-  FS-02.R46 says only that card-body click toggles and never separates the expanded pane's
-  interactive surface from the collapsed activation target. Specify one event boundary for all pane
-  interaction and add cases proving chat controls, links, selection/right-click annotation, and
-  autocomplete neither toggle the pane nor open its card menu (FS-02.R46, FS-03.R39/A23,
-  **INV §2/§10**).
-
-- **Must fix** — An operator reading any open pane can lose newer streamed text or see a resolved
-  permission revert when an open/reconnect/gap transcript request resolves after a later SSE delta.
-  TS-03.R31 expands the number of asynchronous refetches but preserves the current unguarded replace:
-  `ui/src/api/sse.ts:45-51,103-127` starts a fetch and continues appending live messages, then
-  `ui/src/store/transcriptStore.ts:154-168` lets the older response replace the whole per-agent
-  slice. FS-03 already records this ordering gap as a shipped deviation, but planned R39 promises
-  that each pane recovers authoritatively without disturbing live delivery. Specify a per-agent
-  sequence/generation reconciliation rule and delay a refetch response in a regression while a newer
-  delta arrives, proving both survive (FS-03.R12/R39, TS-03.R31, **INV §1/§5**).
-
-- **Worth fixing** — An operator can receive a pane that grows the page or stretches neighboring
-  cards even while all named automated checks pass. The fixed-height/internal-scroll behavior is
-  assigned only to jsdom component tests in FS-02.A29 and the ready change, but jsdom does not
-  evaluate grid stretch, computed overflow, or real scroll position; the only planned J5 browser
-  check in A33 is keyboard focus. Add the geometry claims to J5: computed fixed pane height,
-  transcript scrolling without page/grid movement, and unchanged neighboring-card height and
-  position while content streams (FS-02.R47/A29, TS-08.R42, **INV §13**).
-
-- **Worth fixing** — When a fifth pane opens, the operator may lose the pane they were just reading
-  because "least-recently-focused" has no defined event. FS-02.R48/A31 does not say whether
-  expansion, composer focus, transcript pointer/scroll interaction, permission action, or keyboard
-  cycling refreshes recency; `TranscriptView`'s scroll container is not itself focusable
-  (`ui/src/components/chat/TranscriptView.tsx:16-58`). Define the minimal recency events and ordered
-  list direction, then test the fifth-pane victim after transcript/permission interaction as well as
-  composer focus (FS-02.R48/A31) (no invariant class).
-
-- **Worth fixing** — An operator who stops an agent while reading its expanded pane has no
-  acceptance proof that the pane and durable transcript remain in place. FS-02.R51 requires that
-  behavior, but A30 covers `waiting_input` and removal only; an implementation that keys pane
-  membership to `running` could close it and still satisfy every named case. Add the running-to-
-  stopped transition, retained transcript/composer, and wake-on-send path to A30's evidence
-  (FS-02.R51, FS-03.R35/R39, **INV §10**).
-
 From the 2026-08-28 bug investigation of the field report: *"An AgentDecker session blocked the
 progression of a pipeline because it needed an answer from me, then when it tried to continue it got
 `stale_assignment` from AgentDeck."* No AgentDeck version, environment, or log was supplied, and this
@@ -683,16 +674,4 @@ From the 2026-08-28 review of `790c01c` (the thirteen dashboard/SSE and usabilit
 
 ## Design consistency notes
 
-From the 2026-08-29 expandable-chat-pane design review:
-
-- FS-02.R46 and the ready change say expansion works on both the "projects-home grid" and a
-  "scoped project grid", but the user clarified that "projects page" means the existing agent-card
-  dashboard at `/project/:project-id`, not the root project-card catalog. Use one unambiguous route/
-  surface name and remove the apparent two-surface promise.
-- TS-08.R42 says the transcript is the pane's "only scroll region", but the reused chat surface also
-  contains bounded scrolling in `.annotation-tray-body` and `.composer-picker`
-  (`ui/src/styles/features/agent.css:442-445,548-559`). Narrow this to the primary persistent reading
-  region or explicitly exempt the transient picker and bounded annotation tray.
-- FS-12.R15 still says the composer surface adds no shortcut or interaction flow, while planned
-  FS-02.R50 adds focus cycling between composers. Scope R15 to the earlier presentation-only change
-  or supersede that clause for this feature.
+None.

@@ -3,6 +3,7 @@ import type { PermissionResolution, TranscriptEvent } from "../api/types";
 
 interface TranscriptStoreState {
   byAgent: Record<string, TranscriptEvent[]>;
+  rawByAgent: Record<string, TranscriptEvent[]>;
   pending: Record<string, TranscriptEvent | null>;
   previewByAgent: Record<string, string>;
   previewKindByAgent: Record<string, string | undefined>;
@@ -98,6 +99,7 @@ export function foldTranscript(raw: TranscriptEvent[] | null | undefined): Trans
 
 export const useTranscriptStore = create<TranscriptStoreState>((set) => ({
   byAgent: {},
+  rawByAgent: {},
   pending: {},
   previewByAgent: {},
   previewKindByAgent: {},
@@ -105,14 +107,17 @@ export const useTranscriptStore = create<TranscriptStoreState>((set) => ({
     set((state) => {
       const event = normalizeEvent(raw);
       const kind = kindOf(event);
+      const rawEvents = [...(state.rawByAgent[agentId] ?? [])];
 
       // permission_resolved is not rendered on its own; it updates the matching
       // prior permission_request (covers replay of archived/resumed sessions).
       if (kind === "permission_resolved") {
+        rawEvents.push(event);
         const toolCallId = String(event.tool_call_id ?? "");
         const events = markResolved(state.byAgent[agentId] ?? [], toolCallId, decisionToResolved(event.decision));
         return {
           byAgent: { ...state.byAgent, [agentId]: events },
+          rawByAgent: { ...state.rawByAgent, [agentId]: rawEvents },
           pending: { ...state.pending, [agentId]: null },
         };
       }
@@ -125,15 +130,20 @@ export const useTranscriptStore = create<TranscriptStoreState>((set) => ({
         for (let i = events.length - 1; i >= 0; i--) {
           if (kindOf(events[i]) === "user_text" && events[i].seq == null && textOf(events[i]) === textOf(event)) {
             events[i] = event;
-            return { byAgent: { ...state.byAgent, [agentId]: events }, pending: state.pending };
+            const rawIndex = rawEvents.findIndex((item) => kindOf(item) === "user_text" && item.seq == null && textOf(item) === textOf(event));
+            if (rawIndex >= 0) rawEvents[rawIndex] = event;
+            else rawEvents.push(event);
+            return { byAgent: { ...state.byAgent, [agentId]: events }, rawByAgent: { ...state.rawByAgent, [agentId]: rawEvents }, pending: state.pending };
           }
         }
       }
       // Streamed assistant deltas carry no message_id; merge consecutive
       // assistant_text events into a single bubble on the shared replay/live path.
       appendRenderedEvent(events, event);
+      rawEvents.push(event);
       return {
         byAgent: { ...state.byAgent, [agentId]: events },
+        rawByAgent: { ...state.rawByAgent, [agentId]: rawEvents },
         pending: kind === "permission_request" ? { ...state.pending, [agentId]: event } : state.pending,
       };
     }),
@@ -153,7 +163,16 @@ export const useTranscriptStore = create<TranscriptStoreState>((set) => ({
     }),
   setTranscript: (agentId, events) =>
     set((state) => {
-      const folded = foldTranscript(events);
+      const responseMaxSeq = events.reduce((max, event) => Math.max(max, Number(event.seq ?? 0)), 0);
+      const newerDelivered = (state.rawByAgent[agentId] ?? []).filter(
+        (event) => event.seq == null || Number(event.seq) > responseMaxSeq,
+      );
+      const reconciledRaw = [...events.map(normalizeEvent), ...newerDelivered];
+      let folded = foldTranscript(reconciledRaw);
+      for (const current of state.byAgent[agentId] ?? []) {
+        if (kindOf(current) !== "permission_request" || !current.resolved) continue;
+        folded = markResolved(folded, String(current.tool_call_id ?? ""), current.resolved as PermissionResolution);
+      }
       let preview = "";
       for (let i = folded.length - 1; i >= 0; i--) {
         if (kindOf(folded[i]) === "assistant_text") {
@@ -163,6 +182,7 @@ export const useTranscriptStore = create<TranscriptStoreState>((set) => ({
       }
       return {
         byAgent: { ...state.byAgent, [agentId]: folded },
+        rawByAgent: { ...state.rawByAgent, [agentId]: reconciledRaw },
         previewByAgent: { ...state.previewByAgent, [agentId]: preview },
         previewKindByAgent: { ...state.previewKindByAgent, [agentId]: kindOf(folded[folded.length - 1] ?? {}) },
       };
@@ -170,6 +190,7 @@ export const useTranscriptStore = create<TranscriptStoreState>((set) => ({
   resolvePermission: (agentId, toolCallId, decision) =>
     set((state) => ({
       byAgent: { ...state.byAgent, [agentId]: markResolved(state.byAgent[agentId] ?? [], toolCallId, decision) },
+      rawByAgent: { ...state.rawByAgent, [agentId]: markResolved(state.rawByAgent[agentId] ?? [], toolCallId, decision) },
       pending: { ...state.pending, [agentId]: null },
     })),
 }));

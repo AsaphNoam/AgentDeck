@@ -1,10 +1,12 @@
 import React from "react";
-import { describe, it, expect } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, it, expect, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { DndContext } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { AgentCard } from "./AgentCard";
+
+afterEach(cleanup);
 
 describe("AgentCard", () => {
   it("navigates to the agent chat when the card is clicked", () => {
@@ -88,5 +90,30 @@ describe("AgentCard", () => {
     fireEvent.click(screen.getByText("Delivery · work · attempt 2"));
 
     expect(screen.getByText("Pipeline run")).toBeInTheDocument();
+  });
+
+  it("narrows expanded activation and context menu handling to the header", () => {
+    const toggle = vi.fn();
+    render(
+      <MemoryRouter>
+        <DndContext>
+          <SortableContext items={[]} strategy={rectSortingStrategy}>
+            <AgentCard expanded onToggle={toggle} agent={{
+              agent_id: "a_1", name: "Atlas", role: "implementer", project: "my-app",
+              backend: "claude", model: "sonnet", interface: "chat", state: "idle",
+              detail: "ready", running: true, context_pct: 0,
+            }}><button type="button">Send</button></AgentCard>
+          </SortableContext>
+        </DndContext>
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByLabelText("Reorder Atlas")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Send"));
+    expect(toggle).not.toHaveBeenCalled();
+    fireEvent.contextMenu(screen.getByText("Send"));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("idle").closest('[data-slot="header"]')!);
+    expect(toggle).toHaveBeenCalledOnce();
   });
 });

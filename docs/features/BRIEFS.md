@@ -5,6 +5,14 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-29 — implementation: Expandable dashboard chat panes
+
+Chat cards on a project dashboard now expand in place, letting you read, reply, resolve permissions, and supervise up to four agents without leaving the grid. Open panes persist across reloads, cycle by keyboard, keep drafts safe, and recover concurrent live transcripts without stale responses erasing newer events. The final interaction and layout were verified in a real browser under both AgentDeck Core and Sky & Grove.
+
+**Needs attention:** None.
+
+**Next:** Run an independent review of the expandable-pane implementation.
+
 ### 2026-08-29 — Design review correction: project dashboard scope
 
 The projects-home finding was based on a terminology misunderstanding and has been removed.
@@ -43,6 +51,59 @@ projects home should gain a new agent-card surface; the latter is a materially l
 
 **Next:** Run `/design-feature expandable-chat-panes-on-the-dashboard` to resolve the findings,
 then repeat the design review before implementation.
+
+### 2026-08-29 — Design review resolved; the pane change is ready to build
+
+I did not push back on any finding. All five, and all three consistency notes, held up when I checked
+them against the actual code, and each one named something an operator would really hit. Two of them
+changed the design rather than its wording.
+
+The first is the one that would have hurt most. An agent card owns the click and right-click handlers
+on its outer element, and the chat pane sits inside that element — so clicking Send, deciding a
+permission request, or picking an autocomplete entry would have collapsed the pane out from under
+you, or opened the card menu. Fixed: once a card is expanded, only its header row responds to clicks
+and right-clicks. The pane's body is not an activation target at all.
+
+Here I did diverge from the review on *how* to fix it. The obvious repair is to have each control in
+the pane stop the click from bubbling. I rejected that shape: it is a list of exemptions, so every
+control anyone adds to the pane later has to remember to join the list, and forgetting fails silently
+in a way no test would catch. One structural boundary is a rule; an opt-out list is a future bug.
+
+The second is that the transcript refetch can lose messages. When a pane reloads its history, the
+response replaces everything — so if new text streams in while that request is in flight, the reload
+can erase it or turn an answered permission prompt back into an unanswered one. This already exists
+today and the chat specification already records it as a known gap, but four panes make it four times
+as likely. I scoped the fix to exactly the two repairs that recorded gap already named, rather than
+building a general merge: ignore a response that has been overtaken, and keep any messages newer than
+the ones the response carried. The agent page gets the same fix for free, so a long-standing known
+gap closes with this work rather than being multiplied by it.
+
+The other three were about evidence and definitions, and were cheap: the pane's height and scrolling
+now have to be checked in a real browser, because the test environment cannot see layout at all and
+would pass a pane that stretched its neighbours; "least recently used" now names the three things
+that count as using a pane, including simply pressing the mouse in it, because reading a transcript
+does not move focus and you could have lost the pane you were reading; and an agent that stops while
+you are reading it now has to keep its pane, which nothing previously tested.
+
+I also fixed a worse defect the review did not catch, and it came out of its own first note. I had
+written that a pane belonging to a different project gets dropped when the arrangement is saved. But
+the agent grid only ever exists inside a project, so *every* saved pane belongs to "a different
+project" the moment you open another one — opening a second project would have quietly wiped the
+first one's panes. Panes for other projects are now kept and simply not drawn.
+
+That same correction settles the review's first note: I told you earlier that the card grid appears
+on both the projects home and inside a project. That was wrong. The projects home shows project
+cards; the agent grid exists only inside a project, which is what you meant by "the project page"
+anyway. The specifications and the change file now say so.
+
+No product code changed. The change is ready for `/work`.
+
+**Needs attention:** Nothing from the review is open. The two reversible choices I flagged before
+still stand — the `Ctrl+Alt+↑/↓` binding, and panes always spanning exactly two columns even at the
+densest grid settings.
+
+**Next:** Run `/work` on `docs/ready-changes/expandable-chat-panes-on-the-dashboard.md` when you want
+it built.
 
 ### 2026-08-29 — Expandable chat panes on the dashboard are specified and ready to build
 

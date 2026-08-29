@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import * as Tabs from "@radix-ui/react-tabs";
-import { getTranscript, switchRuntime } from "../../api/client";
+import { switchRuntime } from "../../api/client";
 import { useBackends, useProjects } from "../../api/config";
 import type { AgentState } from "../../api/types";
 import { sseClient } from "../../api/sse";
@@ -44,7 +44,6 @@ export function ChatPanel() {
   const pendingAnnotations = useAnnotationStore((state) => state.bySource[id]?.length ?? 0);
   const discardAnnotations = useAnnotationStore((state) => state.discard);
   const events = useTranscriptStore((state) => state.byAgent[id] ?? []);
-  const setTranscript = useTranscriptStore((state) => state.setTranscript);
   const { data: backends } = useBackends();
   const { data: projects } = useProjects();
   const [tab, setTab] = useState(() => initialTab(params.get("tab"), agent?.interface));
@@ -74,10 +73,8 @@ export function ChatPanel() {
   }, [agent?.backend, agent?.model, agent?.effort]);
 
   useEffect(() => {
-    sseClient.setOpenAgent(id);
-    void getTranscript(id).then((result) => setTranscript(result.agent_id, result.events)).catch(() => {});
-    return () => sseClient.setOpenAgent(null);
-  }, [id, setTranscript]);
+    return sseClient.registerOpenAgent(id);
+  }, [id]);
 
   // Reveal a transcript event from the Files tab's "Diff" action: switch to the
   // transcript tab (its content is unmounted while another tab is active), then

@@ -18,7 +18,8 @@ class SseClient {
   private opened = false;
   private sharedStreamUnavailable = false;
   private hydrationIds: string[] = [];
-  private openAgentId: string | null = null;
+  private openAgents = new Map<string, number>();
+  private transcriptRequestToken: Record<string, number> = {};
   private lastAgentSeq: Record<string, number> = {};
 
   connect() {
@@ -48,7 +49,9 @@ class SseClient {
       this.lastAgentSeq = {};
       // The open route can outlive its agent. Missing transcripts are represented
       // by ChatPanel's recovery view, not an unhandled reconnect rejection.
-      void this.refetchOpenTranscript().catch(() => undefined);
+      for (const agentId of this.openAgents.keys()) {
+        void this.refetchTranscript(agentId).catch(() => undefined);
+      }
       queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.runs });
       queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.proposals });
       queryClient.invalidateQueries({ queryKey: TASK_QUERY_KEYS.all });
@@ -72,8 +75,18 @@ class SseClient {
     this.startWatchdog();
   }
 
-  setOpenAgent(agentId: string | null) {
-    this.openAgentId = agentId;
+  registerOpenAgent(agentId: string) {
+    const count = this.openAgents.get(agentId) ?? 0;
+    this.openAgents.set(agentId, count + 1);
+    if (count === 0) void this.refetchTranscript(agentId).catch(() => undefined);
+    let active = true;
+    return () => {
+      if (!active) return;
+      active = false;
+      const next = (this.openAgents.get(agentId) ?? 1) - 1;
+      if (next > 0) this.openAgents.set(agentId, next);
+      else this.openAgents.delete(agentId);
+    };
   }
 
   private onStateUpdate(event: MessageEvent<string>) {
@@ -108,21 +121,12 @@ class SseClient {
     if (seq > 0) {
       const last = this.lastAgentSeq[agentId] ?? 0;
       this.lastAgentSeq[agentId] = seq;
-      // Only the open agent's transcript is displayed; a gap refetch for any
-      // other agent is wasted work (ChatPanel refetches on open anyway). On a
-      // gap we refetch the authoritative transcript — which already includes
-      // this event — and return WITHOUT also appending it, so the async
-      // setTranscript can't clobber (or duplicate, since appendMessage doesn't
-      // dedupe) a concurrent optimistic append.
-      if (last > 0 && seq > last + 1 && agentId === this.openAgentId) {
-        getTranscript(agentId)
-          .then((t) => useTranscriptStore.getState().setTranscript(t.agent_id, t.events))
-          .catch(() => undefined);
-        return;
+      if (last > 0 && seq > last + 1 && this.openAgents.has(agentId)) {
+        void this.refetchTranscript(agentId).catch(() => undefined);
       }
     }
     useTranscriptStore.getState().updatePreview(agentId, envelope.data);
-    if (agentId === this.openAgentId) {
+    if (this.openAgents.has(agentId)) {
       useTranscriptStore.getState().appendMessage(agentId, envelope.data);
     }
   }
@@ -211,9 +215,11 @@ class SseClient {
     }, 5_000);
   }
 
-  private async refetchOpenTranscript() {
-    if (!this.openAgentId) return;
-    const transcript = await getTranscript(this.openAgentId);
+  private async refetchTranscript(agentId: string) {
+    const token = (this.transcriptRequestToken[agentId] ?? 0) + 1;
+    this.transcriptRequestToken[agentId] = token;
+    const transcript = await getTranscript(agentId);
+    if (this.transcriptRequestToken[agentId] !== token || !this.openAgents.has(agentId)) return;
     useTranscriptStore.getState().setTranscript(transcript.agent_id, transcript.events);
   }
 }

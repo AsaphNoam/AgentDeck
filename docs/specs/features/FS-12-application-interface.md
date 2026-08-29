@@ -191,6 +191,14 @@ Requirements are user-observable.
   than coloured or enclosed surfaces. Disclosure, indentation, and semantic error text remain
   available without adding a tinted background or box. This refines R35.
 
+- **R38** — R15's closing clause — that the chat surface adds no new
+  action, shortcut, error behavior, or interaction flow — is scoped to the presentation change R15
+  was written for, which restyled the shipped chat controls without altering them. It is not a
+  standing ban on the chat surface ever gaining an interaction. FS-02.R50's focus cycling between
+  expanded panes and FS-02.R52's activation boundary are additions to the dashboard card grid that
+  reuse the composer and transcript; they are governed by FS-02 and FS-03 and do not contradict R15,
+  whose components keep the shared component language R15 actually requires.
+
 ## 3. States & transitions
 
 - **Route change:** the persistent shell remains visually stable while the current-route
@@ -277,6 +285,11 @@ Requirements are user-observable.
   higher-salience treatment while holding its position, and a card's position changes only when its
   `running` value changes. *Verify by* the FS-02.A28 grid cases together with the existing card
   salience fixtures in the visual matrix.
+
+- **A14** (R38) — The agent screen's composer, send/cancel control, and
+  permission actions expose the same actions and shortcuts after the pane work as before it: the
+  focus-cycling binding does nothing on `/agent/:id`, and no chat control gains or loses an
+  interaction there. — `ChatPanel.test.tsx` and `Composer.test.tsx`.
 
 ## 6. Deviations & open decisions
 

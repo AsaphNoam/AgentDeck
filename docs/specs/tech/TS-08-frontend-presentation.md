@@ -253,6 +253,57 @@ primitive seam; the rejected alternatives are recorded in §5.
   adding an isolation runtime without evidence that the fixed input bound is insufficient would be
   disproportionate machinery.
 
+### 2.3 Expanded chat panes on the card grid
+
+- **R41** — **The dashboard chat pane composes the shipped chat surface;
+  it does not become a second one.** The pane renders the existing `TranscriptView` and `Composer`
+  components, which are already fully `agent_id`-parameterized and already own a per-instance scroll
+  container and per-agent draft, autocomplete, and annotation state. Folding, follow-scroll,
+  optimistic prompts, permission decisions, and diagram rendering are therefore the same code paths
+  the agent screen uses, through the already-registered `foldTranscript` / `appendRenderedEvent`
+  projection (INV §2). The pane adds no parallel transcript projection, draft store, or permission
+  client, and `/agent/:id` keeps composing the same two components alongside the tabs, context
+  meter, and runtime picker the pane omits (FS-03.R39).
+
+- **R42** — **Pane geometry is grid-native and order-preserving.** An
+  expanded card is a grid item spanning `min(2, perRow)` tracks of the existing
+  `repeat(perRow, minmax(0, 1fr))` template (FS-02.R13/R47). `.card-grid` must set
+  `align-items: start`: it currently declares only `display: grid`, so the default `stretch` would
+  inflate every collapsed card sharing the pane's row to the pane's height. `grid-auto-flow` stays
+  `row` and must never become `dense`, because dense packing reorders items visually and FS-02.R47
+  requires that expanding never changes card order. A span that does not fit the row's remaining
+  tracks wraps to the next row and leaves a gap; that gap is the accepted cost of preserving order.
+  The pane has a fixed height, and its transcript is the only region that scrolls the conversation:
+  streamed output moves the transcript, never the card, the grid, or the page, and the card's
+  existing `overflow: hidden` continues to clip. The reused chat surface also brings two bounded,
+  transient scrollers of its own — `.annotation-tray-body` and the `.composer-picker` popover
+  (`ui/src/styles/features/agent.css`) — which are unaffected by this rule and keep their own
+  behavior. An expanded card
+  drops `.agent-card`'s `cursor: pointer` and hover-lift transform, which read as "this whole thing
+  is a button" on what is now a reading and typing surface.
+
+- **R43** — **Expansion joins the existing sortable and hook contracts
+  rather than adding new ones.** An expanded agent id is removed from the list handed to
+  `SortableContext`, reusing the same filter that already omits a collapsed section's cards, so
+  dnd-kit's indices and measured-rect transforms keep matching the list the grid actually renders —
+  the constraint FS-02.R45 already established. The expanded form is exposed through the curated
+  contract as a `data-variant` on the existing `agent-card` component plus one named pane
+  `data-slot`, added to `contract.json` in the same change; arbitrary pane descendants are not skin
+  hooks (R14, §3.3/§3.4). Every className the pane ships has a defined selector in
+  `ui/src/styles/features/dashboard.css` in the same change, because the build and Testing Library
+  are both blind to CSS (INV §13). The pane's focus-cycling shortcut (FS-02.R50) is one keydown
+  handler bound to the grid container rather than `window`, so it is scoped to focus inside the grid
+  and cannot intercept keys for a dialog, context menu, or any other route.
+
+  FS-02.R52's activation boundary is structural, not a set of exemptions. `AgentCard` today puts
+  `onClick` and `onContextMenu` on its outer `<article>`, and the pane is composed inside that
+  element, so every chat control the pane reuses would otherwise bubble a collapse and a card context
+  menu out of an ordinary Send, permission decision, or autocomplete accept. The handlers therefore
+  move to the card's header region for an expanded card rather than each pane control calling
+  `stopPropagation` — an opt-out list is exactly the drift INV §2/§10 describe, because every control
+  added to the pane later would have to remember to join it, and a missed one fails silently in a way
+  no existing test would catch.
+
 ## 3. Interfaces & data shapes
 
 ### 3.1 Cascade and file contract

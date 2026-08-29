@@ -289,6 +289,73 @@ behavior.
   reorder and does not save the layout, because manual drag order cannot override the running-first
   boundary. The existing separate cross-group drag behavior is unchanged.
 
+### Expanded chat panes
+
+- **R46** — An agent card whose agent has the `chat` interface can be
+  expanded in place into a chat pane. The host is the agent card grid on a project dashboard
+  (`/project/:project`), which after the R29 project-first split is the only surface that renders
+  agent cards; the projects home renders project cards and gains nothing here. Clicking a collapsed
+  card toggles that expansion. This supersedes
+  R8's clause that a card-body click navigates to `/agent/:id`; R8's right-click behavior, the
+  context menu's **Open chat** (R15), and the route itself are unchanged. A card whose agent has the
+  `terminal` interface does not expand and keeps R8's navigation, because the pane deliberately
+  carries no terminal (FS-03.R39) and a terminal agent takes no composer input (FS-07).
+
+- **R47** — An expanded pane occupies `min(2, perRow)` columns of the card
+  grid (R13) at a fixed height, and its transcript scrolls inside the pane rather than growing the
+  page, so streamed output in one pane never moves the reader's position in another. Collapsed cards
+  continue to flow through the remaining grid tracks. A pane stays in its own group section (R18) and
+  in its running/stopped block (R45), so expanding or collapsing a card never changes card order or
+  grouping and never changes what its context menu offers. An expanded card is not draggable: its
+  drag grip is withheld while expanded and returns on collapse, so reordering it means collapsing it
+  first. Collapsing returns the card to its ordinary size in the position R45 gives it.
+
+- **R48** — At most four panes are expanded at once. Expanding a fifth
+  collapses the least-recently-used expanded pane, without a prompt and without losing work: unsent
+  composer text is already retained per agent by the browser (FS-03.R36) and is restored when that
+  pane is expanded again. Three events, and only these, mark a pane as used: expanding it, focus
+  entering anywhere inside it, and a pointer press inside it. The pointer press is required because
+  the transcript's scroll region is not focusable, so an operator who spends minutes reading a pane
+  without touching its composer would otherwise still be holding the least-recently-used pane and
+  would lose the one they were reading. Panes are ordered least-recently-used first, and the first
+  entry is the one a fifth expansion collapses.
+
+- **R49** — The set of expanded panes is an ordered list of agent ids
+  persisted in `layout.json` beside order, density, and per-group collapse, loaded by the same
+  `GET /api/layout` and saved by the same debounced `PUT /api/layout` (R14). A reload or server
+  restart restores the same panes. A layout file that records no expanded panes — including every
+  file written before this feature — loads with every card collapsed. An id naming an agent that no
+  longer exists or is archived expands nothing and is dropped from the next save. An id naming an
+  agent outside the grid's current project is **retained**: it renders no pane and is written back
+  unchanged. Pruning it instead would destroy one project's arrangement every time the operator
+  opened another project, because R29 gives every agent grid a project scope and only one is ever
+  mounted. Like order and density (R36), the list is one shared preference rather than a per-project
+  one, so R48's limit of four is a limit on the whole list; a list that somehow exceeds it keeps its
+  first four entries.
+
+- **R50** — While focus is inside a card grid, `Ctrl+Alt+ArrowDown` moves
+  focus to the next expanded pane's composer and `Ctrl+Alt+ArrowUp` to the previous one, wrapping at
+  each end and scrolling the target pane into view. Order follows the panes as displayed. With fewer
+  than two panes expanded, both do nothing. Neither binding reaches the composer's own keys (FS-03.R6)
+  or its `@`/`#` picker keys (FS-03.R31), so typing and completion are unaffected.
+
+- **R51** — A pane is opened only by a person. No notification, state
+  change, permission request, or `waiting_input` transition expands a card by itself, so the grid
+  never reflows while it is being read; R3's badge and salience treatment remain the attention
+  signal. A pane whose agent is removed (R21) closes with its card. A pane whose agent stops stays
+  open and keeps showing the durable transcript, matching R6's rule that stopping is not removal.
+
+
+- **R52** — Expanding a card moves its activation target. While a card is
+  collapsed, its whole body toggles expansion (R46) and its whole body opens the card context menu
+  (R8). While it is expanded, both targets narrow to the card's header region — the row carrying the
+  name, state, and collapse control. The pane's content region activates neither: a click on Send,
+  Cancel, Approve, Deny, a transcript disclosure, an autocomplete entry, the pane's name link, or a
+  text selection does not collapse the pane, and a right-click inside the transcript reaches the
+  annotation flow (FS-13) rather than the card menu. The boundary is the region, not a list of
+  exempted controls, so a control added to the pane later inherits it and cannot silently reintroduce
+  the collapse-on-Send defect.
+
 ## 5. Acceptance criteria
 
 **A1.** Launching an agent adds its card within ~1s with no manual refresh; a status change flips the
@@ -421,6 +488,63 @@ picker and launches with the route project's id; the general modal continues to 
   new render, drag-geometry, payload, and no-request cases in
   `ui/src/components/grid/CardGrid.test.tsx` beside the existing scoped-reorder case, and by **J5** in
   `docs/features/USABILITY-REVIEW.md` for the live start/stop and drag behavior in a real browser.
+
+- **A29** (R46, R47) — Clicking a collapsed chat-agent card expands it in place
+  instead of navigating; clicking its header again collapses it; the expanded card carries the
+  column span R47 requires for `perRow` 4 and for `perRow` 1; and a terminal-agent card still
+  navigates to `/agent/:id`. *Verify by* new render and interaction cases in
+  `ui/src/components/grid/CardGrid.test.tsx` and `AgentCard.test.tsx` — these assert the rendered
+  span and component tree, which is all jsdom can see.
+
+  The geometry itself is verified only in a real browser, by **J5** in
+  `docs/features/USABILITY-REVIEW.md`: computed pane height is fixed, streaming a long assistant
+  response scrolls that pane's transcript while the page and grid scroll positions do not move, and
+  the collapsed cards sharing the pane's row keep their own height and position. jsdom evaluates no
+  grid track sizing, stretch, computed overflow, or scroll position, so a jsdom-only claim here would
+  pass against a pane that stretches its neighbours or grows the page (INV §13).
+
+- **A30** (R47, R51) — Expanding and collapsing a card changes no card's order,
+  group, or context-menu contents, including across the running/stopped boundary; an expanded card
+  exposes no drag grip and a collapsed one still does; a `state_update` moving an agent to
+  `waiting_input` expands nothing; and a removal tombstone for an expanded agent removes both the
+  pane and the card. An agent that goes from running to stopped while its pane is open keeps that
+  pane, its durable transcript, and its composer as a wake surface (FS-03.R35/R39) — pane membership
+  is not keyed to `running`, which every other case here would fail to catch. *Verify by*
+  `CardGrid.test.tsx` cases asserting order, grip presence, and pane membership before and after each
+  event, including the running→stopped `state_update`.
+
+- **A31** (R48) — With four panes expanded, expanding a fifth leaves exactly four
+  expanded, collapses the least-recently-used one and no other, shows no confirmation, and
+  re-expanding the collapsed agent restores the composer text that was unsent when it closed. Each
+  of R48's three recency events is exercised separately as the thing that saves a pane from
+  eviction: focusing its composer, pressing a pointer inside its transcript without focusing
+  anything, and expanding it. — `CardGrid.test.tsx` and `Composer.test.tsx`/`drafts.test.ts` for the
+  retained draft.
+
+- **A32** (R49) — A layout response with no expanded field renders every card
+  collapsed; expanding and collapsing panes issues the same debounced `PUT /api/layout` that order
+  and density issue, carrying the expanded ids; the persisted set is restored on reload; a persisted
+  id for an unknown or archived agent expands nothing and is absent from the next `PUT` body; and a
+  persisted id belonging to another project expands nothing yet still appears, unchanged, in that
+  `PUT` body, so opening a second project does not discard the first project's panes. —
+  `CardGrid.test.tsx` payload and load cases plus a Go handler test that round-trips the field and
+  accepts a body without it.
+
+- **A33** (R50) — With three panes expanded, `Ctrl+Alt+ArrowDown` from the first
+  pane's composer focuses the second, repeats to the third, and wraps to the first;
+  `Ctrl+Alt+ArrowUp` reverses it; with one pane expanded neither changes focus; and neither
+  intercepts a keystroke while the composer's `@` or `#` picker is open. — `CardGrid.test.tsx`
+  keyboard cases and **J5** in `docs/features/USABILITY-REVIEW.md` for the real-browser focus and
+  scroll-into-view behavior.
+
+- **A34** (R52) — With a pane expanded, none of the following collapses it or opens
+  the card context menu: clicking Send, clicking Cancel mid-turn, deciding a permission request,
+  expanding a tool-result disclosure, accepting an `@` or `#` autocomplete entry, dragging a text
+  selection across the transcript, or right-clicking inside the transcript — which instead reaches
+  the annotation flow. The pane's name link navigates to `/agent/:id` without first toggling the
+  pane. Clicking the card header still collapses it, and every one of these gestures on a *collapsed*
+  card behaves as it does today. — `CardGrid.test.tsx` and `AgentCard.test.tsx` interaction cases,
+  each asserting both that the pane stayed open and that no card context menu opened.
 
 ## 6. Deviations & open decisions
 

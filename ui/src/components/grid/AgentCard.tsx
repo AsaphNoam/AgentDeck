@@ -1,19 +1,20 @@
 import { CSS } from "@dnd-kit/utilities";
 import { useSortable } from "@dnd-kit/sortable";
 import { Link, useNavigate } from "react-router-dom";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { AgentState } from "../../api/types";
 import { ContextBar } from "./ContextBar";
 import { StateBadge } from "./StateBadge";
 import { useUiStore } from "../../store/uiStore";
 
-export function AgentCard({ agent, lastLine, projectColor, projectTitle, showProject = true }: { agent: AgentState; lastLine?: string; projectColor?: [number, number, number]; projectTitle?: string; showProject?: boolean }) {
+export function AgentCard({ agent, lastLine, projectColor, projectTitle, showProject = true, expanded = false, expandedColumns = 1, onToggle, onUse, children }: { agent: AgentState; lastLine?: string; projectColor?: [number, number, number]; projectTitle?: string; showProject?: boolean; expanded?: boolean; expandedColumns?: number; onToggle?: () => void; onUse?: () => void; children?: ReactNode }) {
   const navigate = useNavigate();
   const openContextMenu = useUiStore((state) => state.openContextMenu);
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: agent.agent_id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: agent.agent_id, disabled: expanded });
   const style: CSSProperties & { "--ad-project-accent"?: string } = {
     transform: CSS.Transform.toString(transform),
     transition,
+    ...(expanded ? { gridColumn: `span ${expandedColumns}` } : {}),
     ...(projectColor ? { "--ad-project-accent": `rgb(${projectColor.join(",")})` } : {}),
   };
   const preview = agent.detail || lastLine || "";
@@ -25,16 +26,26 @@ export function AgentCard({ agent, lastLine, projectColor, projectTitle, showPro
       className={`agent-card ${agent.running ? "" : "stopped"} ${isDragging ? "dragging" : ""}`}
       data-ui="agent-card"
       data-state={agent.running ? agent.state : "stopped"}
-      data-variant={isDragging ? "dragging" : "default"}
+      data-variant={expanded ? "expanded" : isDragging ? "dragging" : "default"}
       style={style}
-      onClick={() => navigate(`/agent/${agent.agent_id}`)}
-      onContextMenu={(event) => {
+      onClick={expanded ? undefined : () => agent.interface === "chat" && onToggle ? onToggle() : navigate(`/agent/${agent.agent_id}`)}
+      onContextMenu={expanded ? undefined : (event) => {
         event.preventDefault();
         openContextMenu(agent.agent_id, event.clientX, event.clientY);
       }}
+      onFocusCapture={expanded ? onUse : undefined}
+      onPointerDownCapture={expanded ? onUse : undefined}
     >
-      <div className="agent-card-top" data-slot="header">
-        <button
+      <div
+        className="agent-card-top"
+        data-slot="header"
+        onClick={expanded ? onToggle : undefined}
+        onContextMenu={expanded ? (event) => {
+          event.preventDefault();
+          openContextMenu(agent.agent_id, event.clientX, event.clientY);
+        } : undefined}
+      >
+        {!expanded && <button
           type="button"
           className="drag-handle"
           aria-label={`Reorder ${agent.name}`}
@@ -44,10 +55,15 @@ export function AgentCard({ agent, lastLine, projectColor, projectTitle, showPro
           {...listeners}
         >
           ::
-        </button>
-        <strong data-slot="identity">{agent.name}</strong>
+        </button>}
+        {expanded ? (
+          <Link className="agent-card-name-link" data-slot="identity" to={`/agent/${agent.agent_id}`} onClick={(event) => event.stopPropagation()}>
+            {agent.name}
+          </Link>
+        ) : <strong data-slot="identity">{agent.name}</strong>}
         <StateBadge state={agent.state} />
       </div>
+      {expanded ? children : <>
       <p className="agent-subtitle" data-slot="metadata">{showProject ? `${agent.role} · ${projectLabel}` : agent.role}</p>
       <span className="model-pill">
         {[agent.backend, agent.model, agent.effort].filter(Boolean).join(" · ")}
@@ -69,6 +85,7 @@ export function AgentCard({ agent, lastLine, projectColor, projectTitle, showPro
       <div data-slot="context"><ContextBar value={agent.context_pct} /></div>
       {preview && <p className="agent-preview" data-slot="preview">{preview}</p>}
       {!agent.running && <small className="stopped-label">stopped</small>}
+      </>}
     </article>
   );
 }

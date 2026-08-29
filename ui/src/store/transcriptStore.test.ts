@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { useTranscriptStore } from "./transcriptStore";
 
 beforeEach(() => {
-  useTranscriptStore.setState({ byAgent: {}, pending: {} });
+  useTranscriptStore.setState({ byAgent: {}, rawByAgent: {}, pending: {} });
 });
 
 describe("transcriptStore", () => {
@@ -87,6 +87,23 @@ describe("transcriptStore", () => {
     const event = useTranscriptStore.getState().byAgent.a_5[0];
     expect(event.kind).toBe("assistant_text");
     expect(event.text ?? event.delta).toBe("hi");
+  });
+
+  it("retains delivered events newer than a transcript response", () => {
+    useTranscriptStore.getState().appendMessage("a_6", {
+      agent_id: "a_6", seq: 2, type: "assistant_text", ts: "t2", data: { delta: "new" },
+    });
+    useTranscriptStore.getState().setTranscript("a_6", [
+      { agent_id: "a_6", seq: 1, type: "user_text", ts: "t1", data: { text: "old" } },
+    ]);
+    expect(useTranscriptStore.getState().byAgent.a_6.map((event) => event.seq)).toEqual([1, 2]);
+  });
+
+  it("retains the exact newer assistant delta without duplicating the fetched prefix", () => {
+    useTranscriptStore.getState().appendMessage("a_7", { seq: 1, kind: "assistant_text", text: "old" });
+    useTranscriptStore.getState().appendMessage("a_7", { seq: 2, kind: "assistant_text", text: "new" });
+    useTranscriptStore.getState().setTranscript("a_7", [{ seq: 1, kind: "assistant_text", text: "old" }]);
+    expect(useTranscriptStore.getState().byAgent.a_7).toMatchObject([{ text: "oldnew" }]);
   });
 
   it("merges consecutive assistant deltas on transcript replay", () => {

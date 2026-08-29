@@ -157,6 +157,7 @@ type layoutResponse struct {
 	Groups  map[string]struct {
 		Collapsed bool `json:"collapsed"`
 	} `json:"groups,omitempty"`
+	Expanded []string `json:"expanded"`
 }
 
 type layoutDensity struct {
@@ -174,10 +175,12 @@ func layoutFromConfig(l config.Layout) layoutResponse {
 		}{Collapsed: g.Collapsed}
 	}
 	order := append([]string{}, l.Order...)
+	expanded := append([]string{}, l.Expanded...)
 	return layoutResponse{
-		Order:   order,
-		Density: layoutDensity{PerRow: l.Density.CardsPerRow, Gap: l.Density.Gap},
-		Groups:  groups,
+		Order:    order,
+		Density:  layoutDensity{PerRow: l.Density.CardsPerRow, Gap: l.Density.Gap},
+		Groups:   groups,
+		Expanded: expanded,
 	}
 }
 
@@ -187,10 +190,12 @@ func (l layoutResponse) toConfig() config.Layout {
 		groups[name] = config.GroupLayout{Collapsed: g.Collapsed}
 	}
 	order := append([]string{}, l.Order...)
+	expanded := append([]string{}, l.Expanded...)
 	return config.Layout{
-		Order:   order,
-		Density: config.Density{CardsPerRow: l.Density.PerRow, Gap: l.Density.Gap},
-		Groups:  groups,
+		Order:    order,
+		Density:  config.Density{CardsPerRow: l.Density.PerRow, Gap: l.Density.Gap},
+		Groups:   groups,
+		Expanded: expanded,
 	}
 }
 
@@ -200,6 +205,11 @@ func (s *Server) handlePutLayout(w http.ResponseWriter, r *http.Request) {
 		writeHookError(w, http.StatusBadRequest, "bad_request", "malformed JSON")
 		return
 	}
+	// Keep the response shape stable for clients while allowing older request
+	// bodies to omit the additive field; omission means an empty preference.
+	if body.Expanded == nil {
+		body.Expanded = []string{}
+	}
 	if body.Density.PerRow < 1 || body.Density.PerRow > 8 || body.Density.Gap < 0 || body.Density.Gap > 48 {
 		writeHookError(w, http.StatusBadRequest, "bad_request", "density out of range")
 		return
@@ -207,6 +217,16 @@ func (s *Server) handlePutLayout(w http.ResponseWriter, r *http.Request) {
 	for _, id := range body.Order {
 		if id == "" {
 			writeHookError(w, http.StatusBadRequest, "bad_request", "order contains empty id")
+			return
+		}
+	}
+	if len(body.Expanded) > 4 {
+		writeHookError(w, http.StatusBadRequest, "bad_request", "expanded contains more than four ids")
+		return
+	}
+	for _, id := range body.Expanded {
+		if id == "" {
+			writeHookError(w, http.StatusBadRequest, "bad_request", "expanded contains empty id")
 			return
 		}
 	}

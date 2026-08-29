@@ -2,7 +2,7 @@
   {
     "file": "src/components/grid/AgentCard.tsx",
     "rule": "inline-style",
-    "reason": "Transform/transition are live drag state and the accent is persisted project RGB data"
+    "reason": "Transform/transition are live drag state, span is persisted dashboard density, and the accent is persisted project RGB data"
   },
   {
     "file": "src/components/grid/CardGrid.tsx",

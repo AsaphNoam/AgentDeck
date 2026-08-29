@@ -194,6 +194,28 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   Rendering applies only to assistant text. Tool calls, tool results, diffs, user prompts, and
   annotations are unchanged, and AgentDeck neither authors, edits, exports, nor downloads diagrams.
 
+### 2.8 Chat panes on the dashboard
+
+- **R39**. A chat-interface agent's dashboard card can hold a chat pane
+  expanded in place (FS-02.R46). Inside that pane the reading, prompting, cancellation, permission,
+  autocomplete, draft, and diagram behavior is exactly this spec's: R2–R5, R7–R9, R12, R14–R18,
+  R28–R33, R35–R38 all apply to a pane as written for the agent screen, with the pane's own
+  transcript scroll region satisfying R3. The pane deliberately carries less than the screen: it
+  presents the agent's name and live state, its transcript, and its composer, and it does not
+  present the Files, Commands, or Terminal tabs, the context meter, or the inline runtime picker
+  (R23). The agent's name in the pane header links to `/agent/:id`, whose behavior — including its
+  opening tab (`initialTab`) and its **Back** target (R27) — is unchanged. Live delivery is no
+  longer scoped to one agent: R10's stream feeds every open pane and the agent screen together, and
+  R12's open-time fetch, reconnect refetch, and sequence-gap refetch apply per open surface, so a
+  pane that missed events recovers its own authoritative transcript without disturbing the others.
+  Recovery is ordered, not merely issued: a transcript response never removes an event already
+  delivered and displayed, and never returns a resolved permission chip to an undecided prompt,
+  however long that response took to arrive relative to the live stream. This closes, for panes and
+  for the agent screen alike, the overlapping-refetch ordering gap this spec records in §6 — a gap
+  that today can only regress one surface but that four concurrent panes would make four times as
+  reachable (TS-03.R31).
+
+
 ## 3. States & transitions
 
 - **Open/reload:** panel fetches durable events → normalizes/folds them → subscribes to live SSE
@@ -367,12 +389,19 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   the two while the transcript remains mounted regenerates the diagram with the new palette:
   journey **J3** in `docs/features/USABILITY-REVIEW.md`.
 
+- **A23** (R39) — With two chat panes expanded on the dashboard and the
+  agent screen closed, an assistant delta for each agent appends to that agent's own pane and to no
+  other; a permission request raised in one pane is decidable there and folds to a resolved chip
+  (R4); a sequence gap for one pane refetches only that pane's transcript and leaves the other
+  pane's rendered events unchanged; and a pane exposes no Files, Commands, Terminal, or runtime
+  picker control while the agent screen still exposes all of them. A transcript request that is held
+  open while newer deltas arrive, and a stale response that resolves after a newer one, both leave
+  the displayed transcript carrying every delivered event and every resolved permission chip. — new
+  `sse.test.ts` multi-open and delayed-response cases, a `transcriptStore.test.ts` case applying an
+  out-of-order transcript, and a pane render test beside `ChatPanel.test.tsx`.
+
 ## 6. Deviations & open decisions
 
-- **Concurrent transcript refetches have no ordering token.** Open, reconnect, and gap-repair
-  fetches can overlap; the last promise to resolve replaces the store even if it contains an older
-  maximum seq. The next live event/refetch can self-heal, but a slow stale response can temporarily
-  regress the visible transcript. Tracked advisory; compare max seq or generation before applying.
 - **Transcript-load failure is silent in the panel.** The initial `getTranscript` rejection is
   swallowed, leaving an empty transcript until a later SSE event/refetch. Prompt, cancel, and
   permission mutation failures are surfaced as required above; initial history-load diagnostics are

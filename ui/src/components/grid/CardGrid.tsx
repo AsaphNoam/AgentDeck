@@ -1,6 +1,6 @@
 import { DndContext, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, rectSortingStrategy } from "@dnd-kit/sortable";
-import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentProps, type KeyboardEvent } from "react";
 import { Link } from "react-router-dom";
 import { getLayout, putLayout, releaseGroup } from "../../api/client";
 import type { AgentState } from "../../api/types";
@@ -10,6 +10,7 @@ import { useUiStore } from "../../store/uiStore";
 import { AgentCard } from "./AgentCard";
 import { CardContextMenu } from "./CardContextMenu";
 import { DensityControl } from "./DensityControl";
+import { DashboardChatPane } from "./DashboardChatPane";
 import { EmptyState } from "./EmptyState";
 import { NewAgentModal } from "../../features/launch/NewAgentModal";
 import { useProjects } from "../../api/config";
@@ -39,6 +40,7 @@ function TaskAttentionLink({ projectID }: { projectID?: string }) {
 
 export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?: string; projectTitle?: string; fixedProject?: string } = {}) {
   const agents = useAgentStore((state) => state.agents);
+  const agentsHydrated = useAgentStore((state) => state.hydrated);
   const order = useAgentStore((state) => state.order);
   const setOrder = useAgentStore((state) => state.setOrder);
   const density = useUiStore((state) => state.density);
@@ -50,6 +52,7 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
   const [showNewAgent, setShowNewAgent] = useState(false);
   const [releaseGroupLabel, setReleaseGroupLabel] = useState<string | null>(null);
   const [releaseGroupError, setReleaseGroupError] = useState("");
+  const [expanded, setExpanded] = useState<string[]>([]);
   const projects = useProjects();
 
   const loaded = useRef(false);
@@ -59,6 +62,7 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
       setOrder(layout.order ?? []);
       setDensity(layout.density);
       setGroupLayout(layout.groups ?? {});
+      setExpanded((layout.expanded ?? []).slice(0, 4));
       loaded.current = true;
     });
   }, [setDensity, setGroupLayout, setOrder]);
@@ -66,12 +70,20 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
   useEffect(() => {
     if (!loaded.current) return;
     const handle = window.setTimeout(() => {
-      putLayout({ order, density, groups: groupLayout }).catch((err: unknown) =>
+      putLayout({ order, density, groups: groupLayout, expanded }).catch((err: unknown) =>
         pushError("Saving layout failed", err instanceof Error ? err.message : String(err)),
       );
     }, 400);
     return () => window.clearTimeout(handle);
-  }, [density, groupLayout, order]);
+  }, [density, expanded, groupLayout, order, pushError]);
+
+  useEffect(() => {
+    if (!agentsHydrated) return;
+    setExpanded((current) => {
+      const next = current.filter((id) => agents[id] && !agents[id].archived);
+      return next.length === current.length ? current : next;
+    });
+  }, [agents, agentsHydrated, expanded]);
 
   const globalIds = useMemo(() => {
     const safeOrder = order ?? [];
@@ -95,9 +107,37 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
     () =>
       grouped
         .filter((group) => !(groupLayout[group.key]?.collapsed ?? false))
-        .flatMap((group) => group.agents.map((agent) => agent.agent_id)),
-    [grouped, groupLayout],
+        .flatMap((group) => group.agents.map((agent) => agent.agent_id).filter((id) => !expanded.includes(id))),
+    [expanded, grouped, groupLayout],
   );
+
+  const toggleExpanded = (agentId: string) => {
+    setExpanded((current) => current.includes(agentId)
+      ? current.filter((id) => id !== agentId)
+      : [...current, agentId].slice(-4));
+  };
+
+  const markExpandedUsed = (agentId: string) => {
+    setExpanded((current) => current.includes(agentId)
+      ? [...current.filter((id) => id !== agentId), agentId]
+      : current);
+  };
+
+  const cyclePaneFocus = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!event.ctrlKey || !event.altKey || (event.key !== "ArrowDown" && event.key !== "ArrowUp")) return;
+    if ((event.target as Element).closest(".composer")?.querySelector(".composer-picker")) return;
+    const grid = event.currentTarget;
+    const panes = [...grid.querySelectorAll<HTMLElement>("[data-agent-pane]")];
+    if (panes.length < 2) return;
+    const current = panes.findIndex((pane) => pane.contains(document.activeElement));
+    const direction = event.key === "ArrowDown" ? 1 : -1;
+    const target = panes[(current < 0 ? (direction > 0 ? 0 : panes.length - 1) : current + direction + panes.length) % panes.length];
+    const composer = target.querySelector<HTMLTextAreaElement>(".composer textarea");
+    if (!composer) return;
+    event.preventDefault();
+    composer.focus();
+    target.scrollIntoView({ block: "nearest" });
+  };
 
   const onDragEnd = (event: DragEndEvent) => {
     if (!event.over || event.active.id === event.over.id) return;
@@ -159,7 +199,7 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
                     )}
                   </header>
                   {!collapsed && (
-                    <div className="card-grid" data-slot="grid" style={{ gridTemplateColumns: `repeat(${density.perRow}, minmax(0, 1fr))`, gap: density.gap }}>
+                    <div className="card-grid" data-slot="grid" onKeyDown={cyclePaneFocus} style={{ gridTemplateColumns: `repeat(${density.perRow}, minmax(0, 1fr))`, gap: density.gap }}>
                       {group.agents.map((agent) => (
                         <LiveAgentCard
                           key={agent.agent_id}
@@ -167,6 +207,10 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
                           projectColor={projects.data?.[agent.project]?.color}
                           projectTitle={projects.data?.[agent.project]?.title}
                           showProject={!projectID}
+                          expanded={expanded.includes(agent.agent_id)}
+                          expandedColumns={Math.min(2, density.perRow)}
+                          onToggle={() => toggleExpanded(agent.agent_id)}
+                          onUse={() => markExpandedUsed(agent.agent_id)}
                         />
                       ))}
                     </div>
@@ -245,5 +289,5 @@ function summary(agents: AgentState[]) {
 
 function LiveAgentCard(props: Omit<ComponentProps<typeof AgentCard>, "lastLine">) {
   const lastLine = useTranscriptStore((state) => state.previewByAgent[props.agent.agent_id] ?? "");
-  return <AgentCard {...props} lastLine={lastLine} />;
+  return <AgentCard {...props} lastLine={lastLine}>{props.expanded ? <DashboardChatPane agent={props.agent} /> : null}</AgentCard>;
 }

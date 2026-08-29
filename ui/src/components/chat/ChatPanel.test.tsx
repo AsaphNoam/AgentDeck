@@ -26,7 +26,7 @@ vi.mock("../../api/config", async (importOriginal) => ({
 }));
 
 vi.mock("../../api/sse", () => ({
-  sseClient: { setOpenAgent: vi.fn() },
+  sseClient: { registerOpenAgent: vi.fn(() => vi.fn()) },
 }));
 
 beforeEach(() => {
