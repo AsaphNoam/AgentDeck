@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -179,7 +180,7 @@ func (m *Manager) Report(agentID, generation string, report StageReport) (RunDet
 	run, attempt, err := m.store.CurrentPipelineAttemptForAgent(agentID)
 	if err != nil {
 		if errors.Is(err, state.ErrNotFound) {
-			return RunDetail{}, controlError("assignment_unknown", "caller has no current pipeline assignment")
+			return refuseReport(run, attempt, agentID, generation, controlError("assignment_unknown", "caller has no current pipeline assignment"))
 		}
 		return RunDetail{}, err
 	}
@@ -195,21 +196,21 @@ func (m *Manager) Report(agentID, generation string, report StageReport) (RunDet
 		return RunDetail{}, err
 	}
 	if !state.OwnsReportedWork(agentID, generation, attempt.AgentID, attempt.AgentGeneration) {
-		return RunDetail{}, controlError("stale_assignment", "caller is not the current stage attempt")
+		return refuseReport(run, attempt, agentID, generation, controlError("stale_assignment", "caller is not the current stage attempt"))
 	}
 	if run.PendingAction != "await_result" {
 		if attempt.ReportOutcome != "" {
-			return RunDetail{}, controlError("already_reported", "this attempt already reported a result; wait for the run's human Continue action before doing more stage work")
+			return refuseReport(run, attempt, agentID, generation, controlError("already_reported", "this attempt already reported a result; wait for the run's human Continue action before doing more stage work"))
 		}
-		return RunDetail{}, controlError("stale_assignment", "the current stage attempt is no longer awaiting a result")
+		return refuseReport(run, attempt, agentID, generation, controlError("stale_assignment", "the current stage attempt is no longer awaiting a result"))
 	}
 	// The vocabulary and the field bounds are the shared work-result rules, so a
 	// stage report and a task report can never drift apart (TS-10.R7).
 	switch err := state.ValidateAgentReport(report.Outcome, report.Summary, report.Details, report.Checks); {
 	case errors.Is(err, state.ErrInvalidOutcome):
-		return RunDetail{}, validationError("invalid stage result", []Diagnostic{{Field: "outcome", Code: "invalid", Message: "outcome must be success, failure, or blocked"}})
+		return refuseReport(run, attempt, agentID, generation, validationError("invalid stage result", []Diagnostic{{Field: "outcome", Code: "invalid", Message: "outcome must be success, failure, or blocked"}}))
 	case err != nil:
-		return RunDetail{}, validationError("invalid stage result", []Diagnostic{{Field: "summary", Code: "invalid", Message: "summary is required and report fields must fit their documented limits"}})
+		return refuseReport(run, attempt, agentID, generation, validationError("invalid stage result", []Diagnostic{{Field: "summary", Code: "invalid", Message: "summary is required and report fields must fit their documented limits"}}))
 	}
 	if report.Outputs == nil {
 		report.Outputs = map[string]string{}
@@ -220,7 +221,7 @@ func (m *Manager) Report(agentID, generation string, report StageReport) (RunDet
 	}
 	stage, ok := stageByID(detail.Template, attempt.StageID)
 	if !ok {
-		return RunDetail{}, controlError("invalid_state", "current stage is missing")
+		return refuseReport(run, attempt, agentID, generation, controlError("invalid_state", "current stage is missing"))
 	}
 	declared := map[string]StageOutput{}
 	for _, output := range stage.Outputs {
@@ -234,10 +235,10 @@ func (m *Manager) Report(agentID, generation string, report StageReport) (RunDet
 	for localName, value := range report.Outputs {
 		output, exists := declared[localName]
 		if !exists {
-			return RunDetail{}, validationError("invalid stage result", []Diagnostic{{Field: "outputs." + localName, Code: "undeclared", Message: "output is not declared by the current stage"}})
+			return refuseReport(run, attempt, agentID, generation, validationError("invalid stage result", []Diagnostic{{Field: "outputs." + localName, Code: "undeclared", Message: "output is not declared by the current stage"}}))
 		}
 		if utf8.RuneCountInString(value) > MaxValueRunes {
-			return RunDetail{}, validationError("invalid stage result", []Diagnostic{{Field: "outputs." + localName, Code: "too_long", Message: "output exceeds the pipeline value limit"}})
+			return refuseReport(run, attempt, agentID, generation, validationError("invalid stage result", []Diagnostic{{Field: "outputs." + localName, Code: "too_long", Message: "output exceeds the pipeline value limit"}}))
 		}
 		available[output.Value] = value
 		outputValues = append(outputValues, state.PipelineValueRecord{RunID: run.RunID, Name: output.Value, Value: value, SourceAttemptID: attempt.AttemptID})
@@ -250,7 +251,7 @@ func (m *Manager) Report(agentID, generation string, report StageReport) (RunDet
 		if transition.Stage != "" {
 			destination, found := stageByID(detail.Template, transition.Stage)
 			if !found {
-				return RunDetail{}, controlError("invalid_state", "transition destination is missing")
+				return refuseReport(run, attempt, agentID, generation, controlError("invalid_state", "transition destination is missing"))
 			}
 			missing := []Diagnostic{}
 			for _, input := range destination.Inputs {
@@ -259,7 +260,7 @@ func (m *Manager) Report(agentID, generation string, report StageReport) (RunDet
 				}
 			}
 			if len(missing) > 0 {
-				return RunDetail{}, validationError("destination inputs are unresolved", missing)
+				return refuseReport(run, attempt, agentID, generation, validationError("destination inputs are unresolved", missing))
 			}
 		}
 	}
@@ -270,12 +271,26 @@ func (m *Manager) Report(agentID, generation string, report StageReport) (RunDet
 	})
 	if err != nil {
 		if errors.Is(err, state.ErrPipelineConflict) {
-			return RunDetail{}, controlError("stale_assignment", "stage result was already accepted or the run changed")
+			return refuseReport(run, attempt, agentID, generation, controlError("stale_assignment", "stage result was already accepted or the run changed"))
 		}
 		return RunDetail{}, err
 	}
 	m.publish(updated)
 	return m.Detail(run.RunID)
+}
+
+// refuseReport logs every refused stage result at Warn before returning it. The
+// server log is otherwise silent about control-plane refusals, so a field report
+// of a refused report could only be corroborated from the agent's own
+// transcript. The fields carried here are exactly what separates the refusal
+// conditions from one another (stale_assignment vs already_reported vs the rest).
+func refuseReport(run state.PipelineRunRecord, attempt state.PipelineAttemptRecord, agentID, generation string, refusal *ControlError) (RunDetail, error) {
+	slog.Warn("pipeline: stage result refused",
+		"code", refusal.Code, "run", run.RunID, "attempt", attempt.AttemptID,
+		"caller_agent", agentID, "caller_generation", generation,
+		"attempt_agent", attempt.AgentID, "attempt_generation", attempt.AgentGeneration,
+		"pending_action", run.PendingAction)
+	return RunDetail{}, refusal
 }
 
 func (m *Manager) OnTurnEnd(agentID, generation string) error {
@@ -291,6 +306,22 @@ func (m *Manager) OnTurnEnd(agentID, generation string) error {
 	}
 	lock := m.runLock(run.RunID)
 	lock.Lock()
+	// The pre-lock read only filters; the quiescence claim must use the state
+	// this critical section observed, exactly as Report re-reads it. A revision
+	// bump inside that window otherwise fails the CAS and parks the run at
+	// await_quiescence with no further turn boundary coming (INV §5).
+	run, attempt, err = m.currentUnderLock(run.RunID, agentID, generation)
+	if err != nil {
+		lock.Unlock()
+		return err
+	}
+	if attempt.AttemptID == "" || attempt.ReportOutcome == "" || run.PendingAction != "await_quiescence" {
+		lock.Unlock()
+		slog.Warn("pipeline: turn end skipped; run changed before the quiescence claim",
+			"run", run.RunID, "attempt", run.CurrentAttemptID, "caller_agent", agentID,
+			"caller_generation", generation, "pending_action", run.PendingAction)
+		return nil
+	}
 	updated, err := m.store.MarkPipelineQuiescent(run.RunID, attempt.AttemptID, agentID, generation, run.Revision, time.Now().UTC())
 	if err == nil {
 		m.publish(updated)
@@ -301,11 +332,36 @@ func (m *Manager) OnTurnEnd(agentID, generation string) error {
 	lock.Unlock()
 	if err != nil {
 		if errors.Is(err, state.ErrPipelineConflict) {
+			slog.Warn("pipeline: quiescence claim conflicted",
+				"run", run.RunID, "attempt", attempt.AttemptID, "caller_agent", agentID,
+				"caller_generation", generation, "revision", run.Revision)
 			return nil
 		}
 		return err
 	}
 	return m.Reconcile(context.Background(), run.RunID)
+}
+
+// currentUnderLock re-reads the run and its current attempt while the run lock
+// is held, and reports whether that attempt is still the caller's. Callers that
+// resolved an attempt before taking the lock must refresh through it so a CAS
+// never carries a revision from outside the critical section (INV §5).
+func (m *Manager) currentUnderLock(runID, agentID, generation string) (state.PipelineRunRecord, state.PipelineAttemptRecord, error) {
+	run, err := m.store.ReadPipelineRun(runID)
+	if err != nil {
+		return state.PipelineRunRecord{}, state.PipelineAttemptRecord{}, err
+	}
+	attempt, err := m.store.ReadPipelineAttempt(run.CurrentAttemptID)
+	if errors.Is(err, state.ErrNotFound) {
+		return run, state.PipelineAttemptRecord{}, nil
+	}
+	if err != nil {
+		return state.PipelineRunRecord{}, state.PipelineAttemptRecord{}, err
+	}
+	if attempt.AgentID != agentID || attempt.AgentGeneration != generation {
+		return run, state.PipelineAttemptRecord{}, nil
+	}
+	return run, attempt, nil
 }
 
 func (m *Manager) OnExit(agentID, generation, cause string) error {
@@ -319,11 +375,30 @@ func (m *Manager) OnExit(agentID, generation, cause string) error {
 	if attempt.AgentGeneration != generation {
 		return nil
 	}
-	if run.State == "stopped" || run.PendingAction == "stopping_agent" || run.PendingAction == "stop_run_agent" || run.PendingAction == "retry_stopping_agent" {
+	if stoppingAgent(run) {
 		return m.Reconcile(context.Background(), run.RunID)
 	}
 	lock := m.runLock(run.RunID)
 	lock.Lock()
+	// Same INV §5 refresh as OnTurnEnd: the crash pause CAS must not carry the
+	// revision read before the lock, or a run whose revision moved inside the
+	// window stays running with no attention reason and no notification.
+	run, attempt, err = m.currentUnderLock(run.RunID, agentID, generation)
+	if err != nil {
+		lock.Unlock()
+		return err
+	}
+	if attempt.AttemptID == "" {
+		lock.Unlock()
+		slog.Warn("pipeline: exit skipped; run changed before the crash pause",
+			"run", run.RunID, "attempt", run.CurrentAttemptID, "caller_agent", agentID,
+			"caller_generation", generation, "pending_action", run.PendingAction)
+		return nil
+	}
+	if stoppingAgent(run) {
+		lock.Unlock()
+		return m.Reconcile(context.Background(), run.RunID)
+	}
 	attemptState := "crashed"
 	attentionReason := "agent_crash"
 	if cause == "requested_stop" {
@@ -340,7 +415,17 @@ func (m *Manager) OnExit(agentID, generation, cause string) error {
 	}
 	lock.Unlock()
 	if errors.Is(err, state.ErrPipelineConflict) {
+		slog.Warn("pipeline: crash pause conflicted",
+			"run", run.RunID, "attempt", attempt.AttemptID, "caller_agent", agentID,
+			"caller_generation", generation, "revision", run.Revision)
 		return nil
 	}
 	return err
+}
+
+// stoppingAgent reports the pending actions that already own stopping the run's
+// agent, so an exit callback reconciles instead of raising a crash pause.
+func stoppingAgent(run state.PipelineRunRecord) bool {
+	return run.State == "stopped" || run.PendingAction == "stopping_agent" ||
+		run.PendingAction == "stop_run_agent" || run.PendingAction == "retry_stopping_agent"
 }

@@ -280,7 +280,8 @@ func (m *Manager) ListPage(limit, offset int) ([]RunSummary, int, error) {
 		stageTitle := run.CurrentStageID
 		var snapshot Template
 		if err := json.Unmarshal(run.TemplateSnapshot, &snapshot); err != nil {
-			diagnostics = appendBounded(diagnostics, Diagnostic{Field: "", Code: "run_read_failed", Message: "run detail could not be decoded"})
+			// Only the frozen snapshot failed to decode: this projection never
+			// reads full run detail, so it must not claim it did (INV §8).
 			diagnostics = appendBounded(diagnostics, Diagnostic{Field: "current_stage_title", Code: "frozen_stage_title_unavailable", Message: "frozen template snapshot could not be decoded"})
 		} else {
 			foundTitle := false

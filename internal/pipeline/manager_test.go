@@ -244,7 +244,9 @@ func TestRunListAndStartupIsolateMalformedRunDetail(t *testing.T) {
 		t.Fatal(err)
 	}
 	runs, err := manager.List(10, 0)
-	if err != nil || len(runs) != 1 || !hasDiagnostic(runs[0].Diagnostics, "run_read_failed") {
+	// The list projection decodes only the frozen snapshot (TS-03.R30), so the
+	// diagnostic it shows names that failure and never claims a run-detail read.
+	if err != nil || len(runs) != 1 || len(runs[0].Diagnostics) != 1 || !hasDiagnostic(runs[0].Diagnostics, "frozen_stage_title_unavailable") {
 		t.Fatalf("List = %+v err=%v", runs, err)
 	}
 	if err := manager.Startup(context.Background()); err != nil {
