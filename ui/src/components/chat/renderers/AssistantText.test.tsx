@@ -93,12 +93,14 @@ describe("assistant diagram rendering", () => {
 // FS-03.A21
 describe("assistant diagram safety", () => {
   it("strips scripts, HTML labels, handlers, and links from the rendered markup", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("no request expected"));
     mermaid.render.mockResolvedValue({
       svg:
         '<svg id="d"><script>window.__diagramScript = true;</script>' +
         '<foreignObject><div onmouseover="window.__diagramHandler = true">label</div></foreignObject>' +
         '<g onclick="window.__diagramHandler = true"><a href="javascript:window.__diagramHandler = true"><text>Finish</text></a></g>' +
         '<image href="https://example.invalid/pixel.png"></image>' +
+        '<g style="fill:url(https://example.invalid/fill.svg);stroke: red"><text>Styled</text></g>' +
         '<style>@import url(https://example.invalid/a.css); #d { background: url("https://example.invalid/b.png"); }</style>' +
         "</svg>",
     });
@@ -116,9 +118,12 @@ describe("assistant diagram safety", () => {
     expect(figure.innerHTML).not.toContain("onclick");
     expect(figure.innerHTML).not.toContain("onmouseover");
     expect(figure.innerHTML).not.toContain("javascript:");
+    expect(figure.innerHTML).not.toContain("example.invalid/fill.svg");
     expect(figure.querySelector("style")?.textContent).not.toContain("example.invalid");
+    expect(fetchSpy).not.toHaveBeenCalled();
     expect((window as unknown as Record<string, unknown>).__diagramScript).toBeUndefined();
     expect((window as unknown as Record<string, unknown>).__diagramHandler).toBeUndefined();
+    fetchSpy.mockRestore();
   });
 
   it("refuses an external-image node before the renderer runs and makes no request", async () => {

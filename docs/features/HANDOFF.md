@@ -65,6 +65,12 @@ bug-investigation finding still needs the user's product decision before it can 
 
 ## Changelog
 
+- **2026-08-29 — fix (INV §8):** Closed the diagram sanitizer Must-fix finding. Renderer-produced
+  inline `style` attributes now have remote `url(...)` and `@import` references removed at the same
+  DOMPurify seam that already scrubs style-element text. The safety regression covers both the
+  generated attribute and a zero-request assertion; both Go test variants, the 300-case UI suite,
+  the product build, and the UI production build are green.
+
 - **2026-08-29 — review:** Read the whole unreviewed range `6a16126..43e5feb` against the
   specifications and every invariant class, clearing the backlog of three commits that had only
   ever had design and usability reviews. Fifteen findings, three of them Must fix. The diagram
@@ -554,25 +560,6 @@ rendering (`c35ff8c`), the Pipelines split (`9114df7` + `69c2f99`), the four sma
 expandable dashboard chat panes (`43e5feb`). Both Go test variants, the 289-case UI suite,
 `make check-specs`, `git diff --check` and all nine skill twins are green at `43e5feb`; every new
 `rows.Next()` loop in the range checks `rows.Err()` (INV §7 clean).
-
-- **Must fix** (confirmed) Diagram sanitizing leaves `style=""` attribute values untouched, so a
-  diagram can still make a network request. `sanitizeDiagram`
-  (`ui/src/components/chat/renderers/mermaid.ts:40-46`) forbids `href`/`xlink:href`/`src`/`srcset`
-  but not `style`, and DOMPurify carries `style` in its `DEFAULT_URI_SAFE_ATTRIBUTES`
-  (`ui/node_modules/dompurify/dist/purify.cjs.js:740`), which short-circuits its URI check for that
-  attribute (`:2016`). The custom `stripRemoteStyleReferences` hook (`mermaid.ts:27-30`) only
-  rewrites `<style>` *element* text, never `style=""` attribute values, so an author `style`/
-  `classDef` directive carrying `url(https://…)` — which Mermaid writes into the node's `style`
-  attribute — survives both layers. FS-03.R38 and TS-08.R40 state without qualification that
-  rendering makes no network request and that URL attributes are removed before insertion; TS-08.R40
-  specifically names runtime-generated markup as the reason the sanitizing seam must be complete.
-  The `<style>`-element hook shows the authors knew about the CSS `url()` class and did not extend
-  it to attributes. Verified at the sanitizer-configuration level by reading both files; not
-  reproduced end-to-end in a browser. Fix: add an `afterSanitizeAttributes` hook that strips
-  `url(...)`/`@import` from any `style` attribute value, or pass `ADD_URI_SAFE_ATTR` so DOMPurify's
-  own URI check runs on `style`. Test: extend the sanitizer case in `AssistantText.test.tsx` with an
-  SVG carrying `style="fill:url(https://example.invalid/x)"` and assert both the scrub and a
-  `fetch`/network spy (FS-03.R38, TS-08.R40, **INV §8**).
 
 - **Must fix** (confirmed) A failed template fetch tells the operator the template was deleted.
   `PipelineTemplatePage` (`ui/src/features/pipelines/PipelinesPage.tsx:131-143`) derives `seed` from

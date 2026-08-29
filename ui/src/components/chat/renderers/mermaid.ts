@@ -29,10 +29,16 @@ function stripRemoteStyleReferences(node: Node) {
   node.textContent = (node.textContent ?? "").replace(/@import[^;]*;?|url\([^)]*\)?/gi, "");
 }
 
+function stripRemoteInlineStyleReferences(node: Node) {
+  if (!(node instanceof Element) || !node.hasAttribute("style")) return;
+  node.setAttribute("style", (node.getAttribute("style") ?? "").replace(/@import[^;]*;?|url\([^)]*\)?/gi, ""));
+}
+
 async function loadPurify(): Promise<Purify> {
   if (!purify) {
     const module = await import("dompurify");
     module.default.addHook("afterSanitizeElements", stripRemoteStyleReferences);
+    module.default.addHook("afterSanitizeAttributes", stripRemoteInlineStyleReferences);
     purify = module.default;
   }
   return purify;
