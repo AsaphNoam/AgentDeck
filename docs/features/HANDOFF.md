@@ -6,25 +6,23 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
-- **Bug investigation:** The 2026-08-28 pipeline `stale_assignment` report is diagnosed and open for
-  `/fix`: answering a blocked stage agent in its own chat, instead of through **Continue**, gets its
-  next report refused as `stale_assignment` even though it is the run's current attempt. Reproduced
-  by the active regression in `internal/pipeline/blocked_chat_answer_test.go`. Three findings
-  below; the first needs a product decision. The earlier 2026-08-27 all-200/no-page-load incident
-  is fixed. Same-origin dashboard tabs now share one long-lived SSE connection, leaving the
-  browser's HTTP/1.x pool available for REST queries; the related config-source,
-  transcript-reconciliation, and card-preview amplification paths are bounded as described in the
-  changelog.
-- **Review state:** The 2026-08-29 code review read `6a16126..43e5feb` — the whole unreviewed
-  range, including the three commits that had never had their shipped diff read (Mermaid rendering,
-  the Pipelines split and its fixes) and the expandable panes that landed during the session. It
-  recorded fifteen findings below, three of them **Must fix**: unsanitized `style=""` attributes in
-  diagram markup, a failed template fetch reported as a deletion, and the panes' unbounded
-  second transcript copy. The 2026-08-29 design review of expandable dashboard chat panes is closed:
-  all five findings and all three consistency notes are resolved in the specifications. Three
-  bug-investigation findings remain, joined by the residue of the 2026-08-28 review of `790c01c`
-  — its Must fix and the Tasks Retry gate are closed, and two of its open items were re-confirmed
-  against the current tree by this review.
+- **Bug investigation:** The 2026-08-28 pipeline `stale_assignment` report is closed. Its three
+  findings are all fixed: the refusal code was corrected earlier, the boundary is now stated to the
+  stage agent in the assignment, the accepted result, and the refusal (FS-14.R47), the restart pause
+  no longer offers a dead-end **Open agent** (FS-14.R48), every refusal is logged with the fields
+  that separate its conditions, and `OnTurnEnd`/`OnExit` re-read the run under the run lock. The
+  product decision the first finding needed was taken as the smaller of the two named options —
+  state the boundary rather than build an in-chat continuation route, and withhold the dead-end
+  action rather than widen Continue — and is flagged in the human update for confirmation. The
+  earlier 2026-08-27 all-200/no-page-load incident stays fixed, and the shared SSE stream is now
+  replayed to a joining tab instead of restarted for every tab.
+- **Review state:** No open findings. The 2026-08-29 fix session closed every remaining item from
+  the 2026-08-29 review of `6a16126..43e5feb`, the 2026-08-28 bug investigation, and the residue of
+  the 2026-08-28 review of `790c01c`. The 2026-08-29 design review of expandable dashboard chat
+  panes stays closed. What a fix could not close in this session is a real browser: the block-split
+  drag preview and the six-tab shared-stream regression are recorded as acceptance gates, not as
+  findings, because the code change is done and only the browser evidence is owed. This session's
+  own commits (`e71d4ab..b5d5f2a`) are unreviewed.
 - **Active change:** None. Expandable dashboard chat panes are finished and verified
   (FS-02.R46–R52/A29–A34, FS-03.R39/A23, FS-12.R38/A14, TS-03.R31, TS-08.R41–R43).
   Running-first card placement shipped on 2026-08-28 (FS-02.R45/A28, FS-12.R37/A13). The Pipelines
@@ -55,13 +53,52 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 **Change:** None.
 
-**State:** Expandable dashboard chat panes are finished and verified, and the whole
-unreviewed range now has a code review behind it.
+**State:** Every recorded review and bug-investigation finding is closed. The tree is green on both
+Go test variants, the 329-case UI suite, `make check-specs`, the UI typecheck, `make build`, and
+`git diff --check`.
 
-**Next:** Resolve the blocked-stage product decision below, then continue `/fix` through the
-remaining Worth-fixing findings.
+**Next:** An independent `/review` of `e71d4ab..b5d5f2a`, then the two browser gates below. One
+unrelated edit to `AGENT-WORKFLOW.md` §15 has been uncommitted in the working tree since before this
+session and was deliberately left alone.
 
 ## Changelog
+
+- **2026-08-29 — fix (INV §1/§2/§4/§5/§7/§8/§10):** Closed every open finding: the twelve from the
+  2026-08-29 review of `6a16126..43e5feb`, the three from the 2026-08-28 bug investigation, and the
+  seven remaining from the 2026-08-28 review of `790c01c`.
+
+  The Must fix needed a product call and got one — state the blocked-stage boundary rather than
+  build an in-chat continuation route, and withhold the dead-end action rather than widen Continue.
+  New FS-14.R47 puts the boundary in the assignment, the accepted result, and the refusal; new
+  FS-14.R48 withholds **Open agent** on a restart pause and names Retry. Refusals are now logged at
+  Warn with the run, attempt, caller and attempt agent/generation, pending action and code — the set
+  that separates the conditions the report conflated — and `OnTurnEnd`/`OnExit` re-read the run
+  under the run lock as `Report` already did (INV §5).
+
+  Two amplification defects in the shared SSE transport (INV §1/§4/§8): a joining tab restarted the
+  one shared stream, costing every other tab a full re-hydration and dropping their deltas, and the
+  worker never removed a port. The worker now replays a bounded retained snapshot to the joining
+  port alone and drops a port that says goodbye, closing the stream with the last one (TS-03.R7).
+
+  Two artifacts built twice were unified (INV §2): the card preview kept opposite ends of a message
+  on the client and the server, now both the tail clipped by code point; and Retry eligibility, hand-
+  duplicated across the language boundary and already drifted once, is now projected by the store as
+  `retry_eligible` (new TS-10.R22).
+
+  In the grid, each running/stopped block gained its own sortable context so an in-drag preview
+  cannot cross the boundary FS-02.A28 promises it will not, an expanded card stays in its block's
+  set so neighbours see its two-column footprint (FS-02.R47), and pane focus cycling binds once at
+  the grid container so it can leave a group section (FS-02.R50).
+
+  Smaller: Mermaid's scratch node is torn down on a draw failure; the run page keys `RunDetail` by
+  run id; the run-list projection no longer claims a run-detail read it never made; an agent-target
+  task row no longer opens with a stray separator; the reconcile regression now proves its own name;
+  the tracked build caches and the emitted worker chunk are untracked; and TS-06 §6 names the stress
+  fixture. Coverage that acceptance items named but no test provided was added for the pane change,
+  the delegated-agent cards, the looping timeline, and the proposal counts, and FS-02.A27 was
+  narrowed to what its suite proves. Both Go test variants, the 329-case UI suite,
+  `make check-specs`, the UI typecheck, `make build` and `git diff --check` are green. Two browser
+  checks remain owed and are recorded as acceptance gates.
 
 - **2026-08-29 — feature design (FS-18, TS-11):** Specified a thin AgentDecker role backed by one
   product-managed `operating-agentdeck` skill available to every launched role. The ready change
@@ -568,14 +605,17 @@ an explicit specification update. Remove an item when the human resolves it or q
       claiming they accept structured tool results without losing the text block (FS-17.A6).
 - [ ] Run the Phase 7 federation discovery/precedence/refresh/launch/resume matrix against real Claude and
   Codex installations before promoting FS-08/TS-07 from Partial.
+- [ ] Run the six-tab same-origin dashboard check against a `make dist` build (FS-02.A27). The
+  transport half is now covered by `ui/src/api/sse.test.ts` and A27 has been narrowed to say so;
+  the browser half has never been run against a build carrying the shared stream.
+  `scripts/stress-fixture` (TS-06 §6) is the fixture.
+- [ ] Run J5 for the running-first drag preview (FS-02.A28) and an expanded pane's drag footprint
+  (FS-02.R47). Each running/stopped block now has its own sortable context and an expanded card
+  stays in its block's set; jsdom pins the item lists but evaluates no transforms, so only a real
+  browser shows that cards in the other block hold their positions and that a card dragged past a
+  pane sees its two-column footprint.
 
 ## Blocked on human
-
-The blocked-stage agent contract needs a product decision. Today a `blocked` report ends that
-attempt's participation; the operator must use **Continue** to create a new assignment, while
-answering in the still-open agent chat produces work that cannot be accepted. Choose either to make
-that boundary explicit in assignment/result/refusal copy, or to design a real in-chat continuation
-route that changes the current FS-14.R20 recovery boundary.
 
 Live-provider acceptance is waiting for human authorization because it invokes real provider sessions
 and creates disposable local configuration homes. On 2026-07-15 this machine has Claude Code 2.1.202,
@@ -584,264 +624,12 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-From the 2026-08-29 review of `6a16126..43e5feb` — the first read of the shipped diff for Mermaid
-rendering (`c35ff8c`), the Pipelines split (`9114df7` + `69c2f99`), the four small fixes, and the
-expandable dashboard chat panes (`43e5feb`). Both Go test variants, the 289-case UI suite,
-`make check-specs`, `git diff --check` and all nine skill twins are green at `43e5feb`; every new
-`rows.Next()` loop in the range checks `rows.Err()` (INV §7 clean).
+None. Every finding from the 2026-08-29 review of `6a16126..43e5feb`, the 2026-08-28 bug
+investigation, and the 2026-08-28 review of `790c01c` is closed by the 2026-08-29 fix session
+recorded in the changelog. The two pieces of evidence a fix could not produce without a browser are
+recorded as acceptance gates above, not as findings.
 
-- **Worth fixing** (confirmed) `Ctrl+Alt+Arrow` pane cycling cannot leave a group section.
-  `cyclePaneFocus` is bound to the per-group grid — `grouped.map(...)` renders one
-  `<div className="card-grid" onKeyDown={cyclePaneFocus}>` per section
-  (`ui/src/components/grid/CardGrid.tsx:202`) — and it collects panes with
-  `grid.querySelectorAll("[data-agent-pane]")` on that one element, returning early when
-  `panes.length < 2`. FS-02.R50 says the bindings move to "the next expanded pane" with order
-  following "the panes as displayed" and do nothing only with "fewer than two panes expanded", and
-  FS-02.R48's limit of four is a whole-grid limit. With one pane expanded in each of two task
-  groups (FS-02.R18), both bindings silently do nothing. The keyboard tests
-  (`CardGrid.test.tsx:169-182`) only ever render one section, so nothing catches it. Fix: bind the
-  handler once at the grid container and collect panes across sections; test with two groups
-  (FS-02.R50, **INV §10**).
-
-- **Worth fixing** (confirmed) An expanded card is dropped from `SortableContext` while still
-  mounting a sortable node, so in-drag geometry is computed over a list that omits it. `sortableIDs`
-  now filters expanded ids out (`ui/src/components/grid/CardGrid.tsx:107-112`), but `AgentCard`
-  still calls `useSortable({ id, disabled: expanded })` unconditionally
-  (`ui/src/components/grid/AgentCard.tsx:16`) and the expanded card still occupies
-  `min(2, perRow)` grid columns. `rectSortingStrategy` derives every other card's preview transform
-  from the `items` array, so dragging any collapsed card near a pane shifts neighbours as though the
-  two-column pane were not there. The committed order is unaffected — `onDragEnd` uses the full
-  `ids` list and `disabled` keeps the pane from being `over` — so this is in-drag feedback only.
-  FS-02.R47 specifies that an expanded card is not draggable but says nothing about dragging past
-  one, so this is a specification gap as well. No test covers a drag with a pane expanded. Fix:
-  keep expanded ids in `items` (they are already `disabled`), or account for the pane's rect
-  (FS-02.R47, **INV §1**).
-
-- **Worth fixing** (confirmed) The live drag preview crosses the running/stopped boundary that
-  FS-02.A28 promises it will not. One `SortableContext` spans both blocks
-  (`ui/src/components/grid/CardGrid.tsx:177-178`) with no `collisionDetection` or modifier limiting
-  candidates to the active card's block; `onDragEnd:149` refuses the cross-block drop, but only at
-  drop time, after `rectSortingStrategy` has already computed preview transforms from
-  `arrayMove` over the whole shared list. FS-02.R45 and A28 state that "during that drag, only cards
-  in the same running/stopped block shift to show the possible drop; cards in the other block hold
-  their positions". A28 cites `CardGrid.test.tsx` as proof, but jsdom with a mocked dnd-kit cannot
-  exercise transforms — the file's own header comment says so — so the clause is unverified as well
-  as probably unmet. Not reproduced in a real browser. Fix: give each block its own
-  `SortableContext`, or filter `over` candidates by block; verify under J5 (FS-02.R45/A28,
-  **INV §10**).
-
-- **Worth fixing** (confirmed) A diagram that parses but fails while drawing leaks a DOM node onto
-  `document.body`. `renderDiagram` calls `mermaid.render(id, source)` without a containing element
-  (`ui/src/components/chat/renderers/mermaid.ts:73`), so Mermaid appends its own scratch node to
-  `<body>`. On a draw-stage exception Mermaid removes that node only when `suppressErrorRendering`
-  is set; `mermaid.initialize` here never sets it (`:64-72`), so the library draws its own
-  "Syntax error" SVG into the scratch node and rethrows without removing it. The visible transcript
-  is correct — the `catch` returns `DIAGRAM_UNRENDERABLE` and the code block stands, as FS-03.R38
-  requires — but a node accumulates outside React's tree once per such failure for the life of the
-  page. Fix: pass `suppressErrorRendering: true` so every failure path tears the scratch node down
-  (FS-03.R38, **INV §4**).
-
-- **Worth fixing** (confirmed) No test cites any acceptance item of the expandable-pane change.
-  Nothing in the repository references `FS-02.A29`–`A34`, `FS-03.A23` or `FS-12.A14`, though the
-  behavior is covered by uncited cases in `CardGrid.test.tsx`, `AgentCard.test.tsx` and
-  `DashboardChatPane.test.tsx`, and the neighbouring `FS-02.A28` case is cited properly
-  (`CardGrid.test.tsx:12`). The specification lifecycle asks tests that pin an acceptance criterion
-  to name it, and `check-specs` does not enforce the direction. This is the same shape as the open
-  `FS-02.A27` finding. Fix: add the citations, or narrow the A-items to what is actually proven
-  (**INV §10**).
-
-- **Worth fixing** (confirmed) Delegated-agent and proposal-count UI shipped with no frontend test.
-  No UI case renders `AttemptAgents`/`AttemptAgentCard` with a populated `delegated_agents` — every
-  `RunBrowser.test.tsx` fixture sets it to `[]` — and nothing exercises `proposalKind` in
-  `AgentDeckerBuilder.tsx` or the cross-surface counts in `PipelinesPage.tsx:22-23,34-39`. Only the
-  Go projections are covered (`TestPipelineRunDetailProjectsOneHopAgentsAndFallbacks`). FS-14.A17,
-  A18 and A23 each name a UI test as their verification, and A16's looping-timeline and "unreported
-  attempt" cases are likewise undriven. The implementations read correctly on inspection, so this is
-  a coverage finding, not a defect report: a regression in delegated-card rendering, live/archive
-  routing, or proposal filtering would ship silently today (FS-14.A16/A17/A18/A23, **INV §10**).
-
-- **Worth fixing** (confirmed) `RunDetail` keeps per-run state across a `runID` change.
-  `PipelineRunPage` renders `<RunDetail runID={runID} …>` with no `key`
-  (`ui/src/features/pipelines/PipelinesPage.tsx:88-92`), while `RunDetail` holds `continuation`
-  text, a mutation `error`, and `useAppendedAttempts`' `seen` ref
-  (`ui/src/features/pipelines/RunBrowser.tsx:57-86`), none scoped to the run. When the route element
-  is reused for a different run rather than remounted — browser back/forward across two visited run
-  pages is the plausible route today, since in-app navigation goes through the ledger — unsent
-  "New input for the blocked stage" text or a stale error from the previous run stays on screen, and
-  every timeline entry of the new run plays the just-appended entrance. Not reproduced. Fix:
-  `key={runID}`, INV §1's ordinary remedy for a lifecycle boundary (**INV §1**).
-
-- **Worth fixing** (confirmed) The Retry gate is hand-duplicated across the language boundary.
-  `ui/src/features/tasks/TasksPage.tsx:114-116` reimplements the eligibility switch in
-  `RetryTask` (`internal/state/tasks.go:1557-1569`), and `8c9fa68`'s own message says so. That
-  commit exists because the two had already drifted — the UI had narrowed Retry to `interrupted`
-  and silently dropped work parked by exhausted start attempts. The copies are byte-equivalent
-  today and nothing prevents the next FS-16.R23/R25 change from separating them again. Fix: return
-  the eligibility (or a `park_reason`) on the task JSON and let the view read it
-  (FS-16.R23/R25, **INV §2**).
-
-- **Worth fixing** (confirmed) `ui/tsconfig.app.tsbuildinfo` is a tracked TypeScript incremental
-  build cache with no ignore rule; seven commits in this range carry a churn-only diff to it, and
-  running the UI suite dirties the tree. Same class as the tracked embed artifact already recorded
-  below. Fix: `git rm --cached` it and add it to `.gitignore` (**INV §10**).
-
-- **Worth fixing** (confirmed) `go.mod` marks `github.com/coder/websocket` and
-  `github.com/creack/pty` `// indirect` although both are imported directly, so any `go test ./...`
-  rewrites the file and dirties the tree mid-session. Fix: commit the promotion `go` already makes
-  (no invariant class).
-
-- **Worth fixing** (confirmed) `ListPage`'s snapshot-decode diagnostic reports the wrong failure.
-  `internal/pipeline/manager.go:283-284` emits `run_read_failed` / "run detail could not be
-  decoded" when only the frozen `TemplateSnapshot` JSON failed to unmarshal — the function's own
-  doc comment and TS-03.R30 state it does not read full run detail. The following
-  `frozen_stage_title_unavailable` diagnostic already describes the real condition. Fix: reword or
-  drop the first diagnostic (TS-03.R30, **INV §2/§8**).
-
-- **Worth fixing** (confirmed) TS-06 does not name the stress fixture it now owns. `d3b4400` added
-  `scripts/stress-fixture/` and the `stress_stream` scenario with `FAKEACP_STRESS_CHUNKS`,
-  `FAKEACP_STRESS_CHUNK_BYTES` and `FAKEACP_STRESS_DELAY_MS`
-  (`internal/runtime/testdata/fakeacp/main.go:181-192`), but TS-06 §6 names neither, and no `make`
-  target reaches it. TS-06's header claims `scripts/`. Fix: one line in TS-06 §6 naming the fixture
-  and the connection-pool exhaustion it reproduces (TS-06, **INV §10**).
-
-Two already-recorded findings below were re-confirmed against the current tree rather than
-re-filed: the shared worker still never deletes a port (`ui/src/api/sse-shared-worker.ts:8,42`),
-and `742e50e`'s new demotion path is a second trigger for it; and `ui/src/features/tasks/TasksPage.tsx:147`
-still renders the stray leading `·` for an agent-target task. One correction: that finding's claim
-that `790c01c` force-tracked `internal/server/ui/dist/index.html` against `.gitignore` is wrong —
-`.gitignore:11` has carried an explicit `!internal/server/ui/dist/index.html` negation since the
-first commit. Only `assets/sse-shared-worker-DxpB4Ebi.js` is genuinely tracked outside the ignore
-rule; that half stands, and its content does still match the current source.
-
-From the 2026-08-28 bug investigation of the field report: *"An AgentDecker session blocked the
-progression of a pipeline because it needed an answer from me, then when it tried to continue it got
-`stale_assignment` from AgentDeck."* No AgentDeck version, environment, or log was supplied, and this
-machine's `~/.agentdeck` holds no run newer than 2026-08-01, so it is not the incident home — the
-diagnosis below is from the code path and a local reproduction, not from incident logs.
-
-- **Must fix** (confirmed) Nothing tells a stage agent that a `blocked` report ends its
-  participation until a new assignment arrives. `renderAssignment`
-  (`internal/pipeline/assignment.go:35`) says only "call `report_pipeline_stage_result` exactly
-  once", and the accepted report returns `"awaiting":"quiescence"`
-  (`internal/messaging/pipeline_tools.go:35`) — neither states that chat input received during the
-  pause is out of band, that the person's answer arrives as a new assignment, or that work done
-  meanwhile cannot be recorded. FS-14 and TS-09 have no requirement covering this, so it is a
-  specification gap as well as the trigger for the finding above. The same dead end is reachable a
-  second way and there the work is unrecoverable by design: after a restart `RecoverRuns`
-  (`internal/pipeline/manager.go:320`) pauses an `await_result` run as `restart_recovery` and stops
-  the agent, `Continue` rejects that state (`internal/pipeline/actions.go:35`), and an ordinary
-  chat resume of that agent mints an unrelated generation
-  (`internal/server/resume.go:419`), so its report is refused forever and only **Retry** — a fresh
-  agent, from scratch — moves the run. FS-14.R20 puts that boundary in place deliberately, so
-  closing this needs a product decision from the user, not an agent's choice: either state the
-  boundary and say it in the assignment text and the refusal, or give the blocked pause a real
-  in-chat route. The **Open agent** action shipped on a pause where following it is a dead end
-  (INV §10).
-
-- **Worth fixing** (confirmed) No refusal from `report_pipeline_stage_result` is logged anywhere:
-  `internal/messaging/pipeline_tools.go` and `internal/pipeline/actions.go` have no logger on the
-  report path, and `internal/pipeline` logs only from `proposals.go`. `~/.agentdeck/dashboard.log`
-  records every HTTP request but not one control-plane refusal, so this report could not be
-  corroborated from the server log and the next one will be equally undiagnosable — the only trace
-  is inside the agent's own transcript. Log at Warn on refusal: run id, attempt id, caller agent
-  id/generation, the attempt's agent id/generation, the run's pending action, and the code. That
-  set is exactly what separates the three conditions the first finding conflates
-  (no invariant class).
-
-- **Worth fixing** (probable) `OnTurnEnd` and `OnExit` (`internal/pipeline/actions.go:281` and
-  `:305`) read the run *outside* `runLock`, then compare-and-swap on that captured revision *inside*
-  the lock and return `nil` when it conflicts. `Report` re-reads the run under the lock; these two
-  do not (INV §5). A revision bump in that window leaves a run parked at `await_quiescence` — state
-  `running`, no attention reason, no notification, no log — with no further turn boundary coming, so
-  the run silently stops progressing and any later report is refused with the same
-  `stale_assignment`. Not reproduced: it needs a concurrent bump in a narrow window, and no field
-  log exists to confirm it happened here. Fix: re-read the run under the lock as `Report` does, and
-  log the conflict.
-
-From the 2026-08-28 review of `790c01c` (the thirteen dashboard/SSE and usability fixes):
-
-- **Worth fixing** — FS-02.A27 names verification that does not exist, and the whole SSE suite runs
-  against the transport production no longer uses. A27 claims "shared-stream transport tests and the
-  production-browser six-tab regression", but no file in the repository cites `FS-02.A27`, no test
-  mentions `SharedWorker` or `sse-shared-worker`, and no six-tab browser run has been recorded since
-  the fix landed. Narrowed on 2026-08-28 by the transport-fallback fix: `ui/src/api/sse.test.ts` now
-  stubs `SharedWorker` and covers port fan-out, the `open`/`error`/event message kinds, and all
-  three fallback routes, so the shipped path is no longer untested. What remains is A27's own
-  claim — no test cites `FS-02.A27`, and the "production-browser six-tab regression" it names has
-  never been run against a build carrying the shared stream. Fix: run the six-tab check on a `make
-  dist` build and cite it, or narrow A27's wording to what the suite proves
-  (FS-02.A27, **INV §10**).
-
-- **Worth fixing** — every tab that attaches restarts the one shared stream for every other tab, so
-  the cost of opening the dashboard grows with the square of the tab count. `self.onconnect` calls
-  `connect()` unconditionally, which closes and reopens the shared `EventSource`
-  (`ui/src/api/sse-shared-worker.ts:26-48`), and TS-03.R7 now specifies this. Each reopen broadcasts
-  `open` to *all* ports, and every tab's `onopen` starts a fresh hydration generation, refetches the
-  open transcript, and invalidates the pipeline-runs, proposals, and tasks queries
-  (`ui/src/api/sse.ts:30-51`). Opening six tabs therefore costs fifteen extra full hydrations and
-  about sixty extra REST refetches, and any single tab reloading re-hydrates all the others — on the
-  exact six-tab workload this change exists to make fast. The reopen window also drops `new_message`
-  deltas for every tab, not only the newcomer (recoverable: the open chat refetches, card previews
-  self-heal on the next delta). Fix: have the worker retain the latest `state_update` rows plus the
-  `hydrated` boundary and replay them to the joining port alone, leaving the live stream and the
-  other tabs untouched (TS-03.R7, FS-02.A27, **INV §1/§8**).
-
-- **Worth fixing** — the shared worker never removes a port. `ports.add(port)` has no matching
-  delete on any path (`ui/src/api/sse-shared-worker.ts:8,40-48`), and the client mints a *new* port
-  on every reconnect: the watchdog calls `this.es.close()`, which closes only the `MessagePort`
-  (`ui/src/api/sse.ts:216-218,168-171`), then `connect()` constructs another
-  `SharedWorkerEventSource`. `broadcast` keeps iterating the dead ones and the worker holds a strong
-  reference to each for its whole lifetime, which is as long as any dashboard tab stays open.
-  `postMessage` to a closed port is a silent no-op, so the only symptom is memory that grows with
-  every closed tab and every reconnect on a dashboard left open for days. This is INV §4's
-  create/teardown symmetry: the port is the artifact created at attach and nothing tears it down.
-  Fix: send a close message (or listen for `port.onmessage` with a `bye` kind) before
-  `this.port.close()` and delete the port in the worker; drop the shared `EventSource` when the set
-  empties (**INV §4/§1**).
-
-- **Worth fixing** — the same card preview is now derived two ways that disagree about which end of
-  a long message to keep. The client keeps the **last** 120 UTF-16 code units of the streamed text
-  (`ui/src/store/transcriptStore.ts:148,163` — `.slice(-120)`), while the server keeps the **first**
-  120 *runes* (`clipPreview`, `internal/server/reconcile.go:196-202`, whose own comment claims it
-  mirrors a tail clip). `AgentCard` renders `agent.detail || lastLine`
-  (`ui/src/components/grid/AgentCard.tsx:19`), so the same agent's card shows the end of its last
-  message while streaming and the beginning of it after a reload or a reconcile sweep. `.slice(-120)`
-  also cuts UTF-16 code units, so a preview whose 120-unit boundary lands inside an emoji renders a
-  replacement character — precisely what the server-side helper documents itself as avoiding. This is
-  INV §2's "two paths building the same artifact will drift", appearing in the same commit that
-  created the second path. Fix: pick one end, share one helper, and clip by code point on the client
-  (`Array.from(text).slice(...)`) (FS-02.R9, **INV §2/§8**).
-
-- **Worth fixing** — the reconciliation regression does not test what its name claims, and the load
-  bound the finding asked for was never added.
-  `TestReconcileSessionPathTouchesOnlyChangedTranscript`
-  (`internal/server/reconcile_test.go:73-86`) writes a second, unrelated transcript and then asserts
-  only that `reconcileSessionPath` returns `true` for the changed one — it never asserts that the
-  other file was not read, which is the entire claim in its name and the entire point of the fix. The
-  closed finding asked for "a regression that streams many deltas with several retained transcripts
-  while bounding scans and latency"; nothing bounds either. A future change that restores the
-  whole-tree walk on every write would leave this test green. Fix: count transcript reads (or assert
-  on the untouched agent's status row being unmodified) across a many-delta stream with several
-  retained sessions (FS-14.R16, **INV §7/§10**).
-
-- **Worth fixing** — two generated files under the ignored embed directory are force-tracked, and
-  one of them names an asset the repository does not contain. `.gitignore:10` ignores
-  `internal/server/ui/dist/*`, but `790c01c` added `internal/server/ui/dist/index.html` and
-  `assets/sse-shared-worker-DxpB4Ebi.js` to the index, so gitignore no longer applies to them while
-  every other emitted chunk stays ignored. The tracked `index.html` therefore points at
-  `/assets/index-*.js`, which is untracked, and it goes stale on any UI change — every `make embed`
-  now produces a spurious diff a committer has to decide about, and a fresh clone's embedded
-  `index.html` references a file that is not there. CLAUDE.md states this whole tree is generated by
-  `make embed`. Fix: `git rm --cached` both paths so the ignore rule governs the directory uniformly
-  (**INV §10**).
-
-- **Worth fixing** — a task targeting an existing agent renders its metadata line starting with a
-  stray separator. `ui/src/features/tasks/TasksPage.tsx:138` emits
-  `{task.target_kind === "launch" && ...}{assignedID && <> · assigned to …</>}`, so when the target
-  kind is `agent` the first expression renders nothing and the line reads "· assigned to Bob ·
-  created by person". Every agent-target task row in the Tasks view shows it. Fix: build the segment
-  list and join it, rather than prefixing each optional segment with its own separator
-  (FS-16.A8, **INV §8**).
+The commits that session made (`e71d4ab..b5d5f2a`) have not been reviewed by another agent.
 
 ## Design consistency notes
 

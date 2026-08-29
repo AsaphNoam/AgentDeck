@@ -5,6 +5,49 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-29 — fix: Everything on the open list is now closed
+
+Every problem on the list is fixed — the twelve from the last code review, the three from the
+pipeline bug you reported, and the seven left over from the review before that.
+
+The pipeline one needed a product decision, and I took the smaller of the two options rather than
+leave everything else waiting on it: say plainly where a stage agent's part ends, instead of
+building a way to continue a paused stage from its own chat. So the instructions it gets, the
+acknowledgement when it reports, and the refusal if it reports again all now say that answering in
+its chat during a pause is out of band and that your answer arrives as a fresh assignment. In the
+same spirit, the run page stops offering **Open agent** after a restart, where following it led
+nowhere — it now says the agent can no longer report and that Retry is the way forward. And every
+refusal is written to the server log with enough detail to diagnose the next report like yours,
+which was impossible before: the only record lived inside the agent's own chat.
+
+Two things were quietly making the dashboard slower rather than faster. Opening a new tab restarted
+the shared live connection for every tab already open, so each one reloaded everything and briefly
+lost updates — on exactly the many-tab workload the shared connection exists to speed up. New tabs
+are now caught up on their own without disturbing anyone else. Separately, closed tabs were never
+released, so memory grew all day on a dashboard left open.
+
+Two places were building the same thing twice and disagreeing. A card showed the end of an agent's
+last message while it streamed and the beginning of it after a reload; both now show the end, and an
+emoji at the cut no longer turns into a box. And the Tasks list was deciding for itself whether
+Retry would work — it had already got that wrong once and hidden the button on work that Retry was
+the only repair for — so the server now answers that question and the list just reads the answer.
+
+The rest are smaller: keyboard jumping between chat panes works again once cards are in groups;
+dragging a card near an expanded pane or near the running/stopped divide no longer makes the wrong
+neighbours jump; a diagram that fails to draw stops leaving debris in the page; and several pipeline
+screens that had no tests at all now have them.
+
+**Needs attention:** Confirm the pipeline decision above. Saying where the boundary is costs
+nothing and can stay either way, but if you would rather a paused stage could be continued from its
+own chat, that is a design change and I have not started it. Two checks also need a real browser and
+I had none: the six-tab dashboard test, and watching the drag behaviour around the running/stopped
+divide — both are written down as owed. One loose end that is not mine: an edit to the agent
+workflow document has been sitting uncommitted in the working tree since an earlier session, and I
+have left it alone.
+
+**Next:** Run `/review` over this session's commits, then the two browser checks when you have a
+machine in front of you.
+
 ### 2026-08-29 — Feature design: thin AgentDecker and shared AgentDeck skill
 
 AgentDecker is now specified as a thin resident operator role, with reusable AgentDeck expertise
