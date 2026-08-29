@@ -5,6 +5,70 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-29 — Design review: expandable dashboard chat panes
+
+The expandable-chat-pane design is not ready to build yet. The review found three blocking defects.
+The projects home contains project cards, not agent cards, so one of the two promised expansion
+surfaces does not exist. The current agent card also owns click and right-click handling at its outer
+edge; without an explicit interaction boundary, using Send, permission controls, autocomplete,
+links, transcript disclosures, or annotations inside a pane can collapse it or open the card menu.
+Finally, a transcript refetch can currently replace newer streamed events that arrive while the
+request is in flight, so reconnect recovery can make live text or a resolved permission disappear.
+
+Three lower-severity gaps also need tightening: real-browser evidence must cover pane height and
+scroll isolation, the exact events that make a pane “recently focused” need definition, and stopping
+an agent must have an acceptance case proving its open pane and transcript remain. The incumbent
+Core surfaces were inspected in a real browser; the review changed no product code, specifications,
+or change file.
+
+**Needs attention:** Choose whether expansion is scoped to project dashboards or whether the
+projects home should gain a new agent-card surface; the latter is a materially larger product change.
+
+**Next:** Run `/design-feature expandable-chat-panes-on-the-dashboard` to resolve the findings,
+then repeat the design review before implementation.
+
+### 2026-08-29 — Expandable chat panes on the dashboard are specified and ready to build
+
+Clicking an agent card will expand it in place into a chat pane instead of navigating away. The pane
+spans two grid columns, its transcript scrolls inside itself, and up to four can be open at once, so
+you can read one agent, answer a blocked one, and still see the rest of the grid's state. Opening a
+fifth silently collapses the pane you touched least recently — nothing is lost, because unsent
+composer text is already kept per agent by the browser. `Ctrl+Alt+↓` and `Ctrl+Alt+↑` move focus
+between open composers. The set of open panes is saved in `layout.json` beside card order and
+density, so a reload or a server restart brings your arrangement back.
+
+A pane carries the agent's name, live state, transcript, and composer — everything needed to read a
+turn, decide a permission request, and reply. It deliberately does not carry the Files, Commands, or
+Terminal tabs, the context meter, or the runtime picker. Those stay on the full agent page, which is
+completely unchanged and is still reachable from the pane's name. Terminal agents keep opening that
+page directly, since a pane with no terminal would be useless to them.
+
+Two things in the shipped code changed the design. Cards live in an equal-width grid, so a card that
+simply expanded in place would have been *one column* wide — narrower than the chat page it was
+meant to improve on. That is why the pane spans two columns and why the transcript, not the page,
+does the scrolling: otherwise one agent's streaming output would shove the page under you while you
+read another. Separately, the browser's event client tracks a single "open agent" and appends live
+messages only for that one, so several live chats at once is exactly what it cannot do today. The
+technical spec turns that into a small registered set that survives reconnects and refetches at most
+four transcripts, which keeps it inside the connection limits that caused an earlier load failure.
+
+Four calls were yours: click expands rather than a separate chevron; four panes; saved in
+`layout.json`; and that keyboard shortcut. Two exclusions you accepted: nothing ever auto-expands
+itself, so the grid never rearranges while you are reading it, and expansion works on the projects
+home as well as inside a project.
+
+No product code changed. The specifications, the ready-change file, and the handoff are updated, and
+the documentation checks are green. One unrelated edit appeared in the tree: a Go toolchain run
+during this session moved `coder/websocket` and `creack/pty` out of the indirect block in `go.mod`.
+Both are imported directly by the terminal and server packages, so the markers were stale and the
+correction is right; I left it rather than reverting something the next build would redo.
+
+**Needs attention:** Two choices I made that are easy to reverse before anyone builds this — the
+`Ctrl+Alt+↑/↓` binding, and the decision that a pane always spans exactly two columns even at the
+densest grid settings, where two columns is a narrow chat.
+
+**Next:** The change is waiting in `docs/ready-changes/`; run `/work` on it when you want it built.
+
 ### 2026-08-28 — Workflow correction: `/ux` now optimizes for expert operators
 
 `/ux` no longer runs a full process for every meaningful user-facing design. It first makes a cheap
