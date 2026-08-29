@@ -5,6 +5,21 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-29 — Feature design: thin AgentDecker and shared AgentDeck skill
+
+AgentDecker is now specified as a thin resident operator role, with reusable AgentDeck expertise
+moving into a product-owned `operating-agentdeck` skill available to every launched role. FS-18
+defines the role/skill/tool/reference boundary, progressive disclosure, exact-only legacy prompt
+migration, and requested-only orchestration. TS-11 defines one embedded package, owner-only managed
+provider views, one launch/resume/switch delivery seam, direct-path fallback, and a release-
+maintenance rubric distinguishing tool, core-skill, reference, and no-documentation changes. The
+change is specified and waiting to start; no product code changed.
+
+**Needs attention:** None.
+
+**Next:** Run `/review-design` on `agentdeck-shared-skill`, then `/work` after the design review is
+clear.
+
 ### 2026-08-29 — review: Everything built since the last review
 
 I read every code change since the last review in one pass, including three that had only ever had design and usability reviews before — the diagrams in chat, the Pipelines split into Runs and Templates, and the new expandable chat panes that landed while I was working. Fifteen problems are written up; three matter now.

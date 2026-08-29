@@ -8,7 +8,8 @@
 
 This spec owns durable data boundaries, file formats, SQLite ownership and migrations, transcript
 storage, context-reference/grant state, and rebuildable indexes. Product-visible archive behavior
-is in FS-05; federation-specific source bindings and cache rules are in TS-07.
+is in FS-05; federation-specific source bindings and cache rules are in TS-07. TS-11 owns the
+planned disposable agent-knowledge cache and explicitly adds no JSON or SQLite authority.
 
 ## 2. Design & constraints
 
@@ -385,3 +386,4 @@ R1–R26 and must be reflected here when its contract changes.
   `TestTranscriptIsOwnerOnly`, `TestReindexPreservesFinalPartialTurn`,
   `TestEmptyArchiveMarshalsResultsArray`, `TestSearchFallbackFiltersMetadata`,
   `TestArchiveProjectReportsCompensationFailureAndPublishesDurableFallback`.
+- Planned agent-knowledge cache ownership and atomic projection: TS-11.R1–R3.

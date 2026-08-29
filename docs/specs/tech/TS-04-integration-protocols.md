@@ -8,7 +8,8 @@
 
 This spec owns protocol boundaries between AgentDeck and agent CLIs: Agent Client Protocol (ACP),
 lifecycle hooks, Model Context Protocol (MCP) messaging and context tools, terminal PTY/WebSocket
-framing, and external CLI compatibility policy.
+framing, and external CLI compatibility policy. TS-11 owns the planned provider-native skill views
+and direct-path prompt fallback; those add no MCP tool or protocol schema.
 
 ## 2. Design & constraints
 
@@ -444,3 +445,5 @@ global resource list.
 - Regression anchors: `TestLaunchPromptPermissionFlow`, `TestTakePendingSingleWinner`,
   `TestCrashTearsDownAgentRegistration`, `TestLaunchArgvHonorsComposedSpec`,
   `TestTerminalDriverUnavailableRejected`.
+- Planned shared-skill discovery and provider-neutral path delivery: TS-11.R1–R5; planned local
+  tool-description cleanup with unchanged schemas/results: TS-11.R7.

@@ -6,7 +6,7 @@
 
 ## 1. Scope
 
-The system boundaries: which processes exist, which packages own which responsibility, how the two runtimes are abstracted, where the source of truth for each kind of data lives, and how live state flows from producer to browser. It is the authoritative statement of the seams the review history keeps stress-testing (launch/resume/switch composition, sole-writer state, stable identity). It does **not** cover wire formats (TS-03/TS-04), schema/migrations (TS-02), the security boundary (TS-05), or build/test (TS-06).
+The system boundaries: which processes exist, which packages own which responsibility, how the two runtimes are abstracted, where the source of truth for each kind of data lives, and how live state flows from producer to browser. It is the authoritative statement of the seams the review history keeps stress-testing (launch/resume/switch composition, sole-writer state, stable identity). It does **not** cover wire formats (TS-03/TS-04), schema/migrations (TS-02), the security boundary (TS-05), build/test (TS-06), or the planned product-managed agent-knowledge package and overlay (TS-11).
 
 Relationship to sibling docs: `docs/architecture-decisions.md` (D1–D5) is the **rationale record** — why each choice was made and what was rejected; it is not overridden here. `architecture-flow.md` is descriptive orientation and has known drift (§5). Where either disagrees with this spec on a binding architectural contract, this spec wins.
 
@@ -394,3 +394,5 @@ lost.
 - Dashboard process logging: `newDashboardLogger` and the scoped process-default logger in
   `internal/cli/dashboard.go` (R15), with mode/append/sink regressions in `internal/cli/cli_test.go`.
 - Regression anchors: `TestSwitchRuntimeKeepsTargetRegistration`, `TestCrashTearsDownAgentRegistration`, `TestSessionParamsOmitModelWhenInherited`.
+- Planned agent-facing knowledge package and lifecycle overlay: TS-11, which extends the R6/R9
+  composition seam without changing frozen user configuration.

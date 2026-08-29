@@ -63,6 +63,12 @@ remaining Worth-fixing findings.
 
 ## Changelog
 
+- **2026-08-29 — feature design (FS-18, TS-11):** Specified a thin AgentDecker role backed by one
+  product-managed `operating-agentdeck` skill available to every launched role. The ready change
+  covers exact-only migration of the historical prompt, job-oriented progressive references,
+  native and direct-path discovery, one lifecycle composition seam, and a four-way release
+  maintenance classification. It remains waiting to start; no product code changed.
+
 - **2026-08-29 — fix (INV §8):** Closed the false `stale_assignment` Must-fix finding. A report from
   the run's own current attempt after its prior result was accepted now returns the shared
   `already_reported` code and points to the human Continue boundary; genuine caller or generation
