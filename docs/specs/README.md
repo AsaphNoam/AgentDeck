@@ -60,7 +60,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | TS-08 | [tech/TS-08-frontend-presentation.md](tech/TS-08-frontend-presentation.md) | Current | Core visual architecture, presentation contracts, maintenance safeguards, local assets, renderer styling, and built-in skin selection |
 | TS-09 | [tech/TS-09-pipeline-control-plane.md](tech/TS-09-pipeline-control-plane.md) | Current | Native sequential pipeline templates, durable run state machine, stage-result tools, recovery, and AgentDecker proposals |
 | TS-10 | [tech/TS-10-work-dependency-control-plane.md](tech/TS-10-work-dependency-control-plane.md) | Current | Durable task/arm/attachment records, arm evaluation, the `dependency` activation kind, the shared result layer, and task recovery |
-| TS-11 | [tech/TS-11-agent-knowledge-delivery.md](tech/TS-11-agent-knowledge-delivery.md) | Partial | Embedded operator-skill package, managed provider views, lifecycle delivery, prompt migration, and release-maintenance classification |
+| TS-11 | [tech/TS-11-agent-knowledge-delivery.md](tech/TS-11-agent-knowledge-delivery.md) | Partial | Embedded operator-skill package, managed provider views, conditional lifecycle delivery, safe installation degradation, and prompt migration |
 | INV | [../features/INVARIANTS.md](../features/INVARIANTS.md) | Current | Bug-class constraint catalog (path kept stable for hooks/history) |
 
 Related, non-spec: [`../ideas.md`](../ideas.md) (new ideas and known things to improve — not

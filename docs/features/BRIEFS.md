@@ -5,6 +5,23 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-29 — Feature design follow-up: shared AgentDeck skill
+
+The shared-skill design is ready to implement. Skill installation must now succeed before AgentDeck
+migrates the old AgentDecker prompt, so a failed installation leaves the existing product knowledge
+intact for a later retry. The new thin prompt also refers to current operating guidance without
+claiming that the bundled skill is available when it is not.
+
+The other two review items are retained as alignment cleanups: skill directories and prompt text
+must stay runtime-only rather than entering saved session configuration, and fresh PM and teammate
+prompts will stop repeating coordination mechanics and the numeric message budget. Existing
+user-owned PM and teammate role files will not be migrated. The irrelevant invariant citation and
+impossible comparison-error test were removed.
+
+**Needs attention:** None.
+
+**Next:** Run `/work agentdeck-shared-skill` to implement the waiting change.
+
 ### 2026-08-29 — Design review: shared AgentDeck skill
 
 The design is not ready to implement. Its delivery overlay is described as process-local, but the

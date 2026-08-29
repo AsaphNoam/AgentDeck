@@ -166,11 +166,13 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   file is owner-only (`0600`), an existing broader mode is tightened before startup continues, and
   failure to establish the persistent log prevents the dashboard from starting.
 - **R44 `(planned)` — The historical AgentDecker prompt has one exact compatibility exception to
-  R14.** After ordinary absent-only seeding, startup may replace only the `system_prompt` field of
-  an existing `agentdecker` role whose prompt bytes match the single code-owned digest of the
-  immediately preceding shipped seed prompt. The replacement is FS-18.R2's thin prompt; every
-  other field and every non-exact or unreadable role remains untouched. This does not make the role
-  managed or create recurring seed synchronization; TS-11.R6 owns the comparison and atomic write.
+  R14.** After ordinary absent-only seeding and successful shared-skill package verification,
+  startup may replace only the `system_prompt` field of an existing `agentdecker` role whose prompt
+  bytes match the single code-owned digest of the immediately preceding shipped seed prompt. The
+  replacement is FS-18.R2's thin prompt; every other field and every non-exact, unreadable, or
+  install-failed role remains untouched. A later verified startup retries normally. This does not
+  make the role managed or create recurring seed synchronization; TS-11.R6 owns the comparison and
+  atomic write.
 
 ### 2.7 Onboarding wizard
 
@@ -338,7 +340,9 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   dispatcher: settings UI and API tests.
 - **A24 `(planned)`** (R44) — The exact legacy AgentDecker prompt migrates once while preserving
   every non-prompt field; a one-byte edit, custom/empty prompt, another or missing role, and any
-  read/comparison failure leave configuration unchanged. — config seeding/migration regressions.
+  read/write failure leave configuration unchanged. Package verification failure also leaves the
+  exact prompt unchanged, and a later verified startup migrates it once. — config
+  seeding/migration regressions.
 
 ## 6. Deviations & open decisions
 

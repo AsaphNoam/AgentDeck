@@ -16,14 +16,14 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   action rather than widen Continue — and is flagged in the human update for confirmation. The
   earlier 2026-08-27 all-200/no-page-load incident stays fixed, and the shared SSE stream is now
   replayed to a joining tab instead of restarted for every tab.
-- **Review state:** Three Must-fix design findings block `agentdeck-shared-skill`: its process-local
-  overlay would be persisted into frozen session fields, its thin AgentDecker prompt and migration
-  contradict the install-failure fallback, and the PM/teammate prompts retain coordination guidance
-  the skill is supposed to own. Code review findings remain closed: the 2026-08-29 fix session
-  closed every item from the 2026-08-29 review of `6a16126..43e5feb`, the 2026-08-28 bug
-  investigation, and the residue of the 2026-08-28 review of `790c01c`. The block-split drag preview
-  and six-tab shared-stream regression remain acceptance gates, not findings. This session's own
-  commits (`e71d4ab..b5d5f2a`) are unreviewed.
+- **Review state:** No open design findings. The user classified only the install-failure/migration
+  conflict as a defect; the specifications now make verified installation precede migration and
+  remove the thin prompt's unconditional skill claim. Runtime-only overlay fields and fresh
+  PM/teammate prompt cleanup remain included alignment work, not blockers. Code review findings
+  remain closed: the 2026-08-29 fix session closed every item from the 2026-08-29 review of
+  `6a16126..43e5feb`, the 2026-08-28 bug investigation, and the residue of the 2026-08-28 review of
+  `790c01c`. The block-split drag preview and six-tab shared-stream regression remain acceptance
+  gates, not findings. This session's own commits (`e71d4ab..b5d5f2a`) are unreviewed.
 - **Active change:** None. Expandable dashboard chat panes are finished and verified
   (FS-02.R46–R52/A29–A34, FS-03.R39/A23, FS-12.R38/A14, TS-03.R31, TS-08.R41–R43).
   Running-first card placement shipped on 2026-08-28 (FS-02.R45/A28, FS-12.R37/A13). The Pipelines
@@ -63,6 +63,17 @@ unrelated edit to `AGENT-WORKFLOW.md` §15 has been uncommitted in the working t
 session and was deliberately left alone.
 
 ## Changelog
+
+- **2026-08-29 — feature design follow-up (FS-18.R2/R7/R11, FS-04.R44, TS-11.R4–R6/R8/R10):**
+  Closed the shared-skill design review on the user's classification. Package verification now
+  precedes exact AgentDecker migration; an unavailable package leaves the legacy prompt untouched
+  for a later retry, and the thin seed prompt refers only to current operating guidance rather than
+  claiming the bundled skill exists. The other two review items remain small required alignment
+  cleanups: overlay directory/prompt additions use runtime-only fields that session persistence
+  cannot see, and fresh PM/teammate seeds drop duplicated coordination mechanics and the numeric
+  budget without migrating user-owned roles. Acceptance coverage now joins install failure to the
+  exact-role fixture and later successful retry. The impossible comparison-error case and unrelated
+  INV §11 citation were removed. The change is Waiting to start and ready for implementation.
 
 - **2026-08-29 — design review (FS-18, FS-04, TS-11, INV §1/§2/§6/§8/§10/§15):** Three Must-fix
   findings block the waiting shared-skill change. The proposed helper adds the overlay to
@@ -647,57 +658,15 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-Code review findings remain closed. The waiting `agentdeck-shared-skill` design has these findings:
-
-- **Must fix** — A resumed agent can receive an unverified skill after a later startup reports the
-  package unavailable (INV §1/§2/§15). TS-11.R4 adds the managed root to `LaunchSpec.AddDirs` and
-  appends its pointer to the launch prompt, while R5/R10 require both additions to stay process-local and vanish
-  whenever installation is unavailable. The shipped `runtime.LaunchSpec` has only one `AddDirs` and
-  one frozen `SystemPrompt` field (`internal/runtime/runtime.go`), and `runtimeMeta` persists both on
-  every launch/resume (`internal/runtime/chat.go`). After a successful overlay launch, composing
-  through those named fields writes the cache root/pointer into the session snapshot; a later
-  dashboard whose verification fails then loads them before the no-op helper runs. The agent can
-  natively discover or follow stale, explicitly unverified content despite FS-18.R11/TS-11.R10.
-  Specify a transient runtime-only directory/prompt layer (or an equivalent existing process-param
-  seam) that persistence cannot see, and add a success-start → persisted-snapshot → failed-start
-  resume regression proving all three availability signals disappear.
-
-- **Must fix** — AgentDecker can be stripped to a prompt that tells it to use a skill the same
-  startup refused to advertise. FS-18.R2's exact thin prompt unconditionally says to use the
-  bundled skill, while R11 says an install-failed process makes no availability claim and otherwise
-  preserves launch behavior. TS-11.R6 migrates the exact historical prompt independently of the
-  installer result, and TS-11.R10 only suppresses the three overlay additions. On an upgrade where
-  installation fails, the operator loses the legacy embedded manual and is then instructed to use
-  unavailable knowledge; a fresh seeded role carries the same false instruction. Define the
-  availability ordering and fallback explicitly — including whether exact migration waits for a
-  verified package and how the thin role avoids an unconditional availability claim — then extend
-  FS-18.A8/FS-04.A24 with the combined install-failure plus exact-role case and its later successful
-  retry.
-
-- **Must fix** — Standard PM and teammate roles keep release-stale coordination rules after the
-  skill becomes their declared owner (INV §2/§10). FS-18.R3 assigns roles only identity, purpose,
-  priorities, and stance; R5 and TS-11.R8 assign messaging budgets, wake, authorization, and recovery to
-  `coordinate-work.md`; A2 says the numeric budget appears only there. Yet `teammatePrompt` and
-  `pmPrompt` still embed `list_agents`/`send_message`/`check_messages`, recipient rules, wake
-  behavior, and the 15-message budget (`internal/config/seed.go`), and the ready change migrates only
-  AgentDecker. A PM or teammate therefore may follow an old role prompt instead of the
-  release-matched skill whenever coordination behavior changes. Decide whether those exact default
-  prompts also receive compatibility migration (and what role-only reminder remains), or narrow the
-  single-owner requirement; add fresh-seed and existing-exact/custom-role fixtures for the chosen
-  boundary.
-
-Every finding from the 2026-08-29 code review of `6a16126..43e5feb`, the 2026-08-28 bug
-investigation, and the 2026-08-28 review of `790c01c` remains closed. Browser-only evidence is
-recorded as acceptance gates above, not as findings.
+None. The user resolved the `agentdeck-shared-skill` design review: verified installation now
+precedes exact AgentDecker migration and the thin prompt no longer claims an unavailable skill.
+Runtime-only overlay fields and fresh PM/teammate prompt cleanup remain included implementation
+alignment, not review findings. Every finding from the 2026-08-29 code review of
+`6a16126..43e5feb`, the 2026-08-28 bug investigation, and the 2026-08-28 review of `790c01c`
+remains closed. Browser-only evidence is recorded as acceptance gates above, not as findings.
 
 The commits that session made (`e71d4ab..b5d5f2a`) have not been reviewed by another agent.
 
 ## Design consistency notes
 
-- FS-18.A5 and TS-11.R6 ask for a "comparison error" path, but the specified comparison is ordinary
-  equality between a computed SHA-256 value and a code-owned constant and has no error result. Keep
-  read/decode/write failures, or name a real fallible comparison seam.
-- TS-11 §4 and the ready change cite INV §11 for embedded/projection byte drift, but INV §11 governs
-  nil JSON collections and truthful cross-boundary mocks. INV §10 already owns source/projection
-  wiring; remove the unrelated citation unless the design introduces a collection serialization
-  contract.
+None.
