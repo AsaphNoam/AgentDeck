@@ -7,6 +7,10 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { TasksPage, needsAttention, waitingOn } from "./TasksPage";
 
+// `retry_eligible` mirrors exactly what the real server computes
+// (state.retryEligible in internal/state/tasks.go), per INV §11: a mock that
+// idealizes the field instead of mirroring the server's own switch would let
+// a UI regression pass against a server that doesn't exist.
 const baseTask = {
   task_id: "tk_1",
   project: "my-app",
@@ -18,6 +22,7 @@ const baseTask = {
   created_by_kind: "person",
   revision: 1,
   created_at: "2026-08-24T10:00:00Z",
+  retry_eligible: false,
   arms: [{
     arm_id: "tk_1_arm00", task_id: "tk_1", kind: "work_result" as const,
     source_kind: "task", source_id: "tk_0", satisfying_outcomes: ["success"],
@@ -32,6 +37,7 @@ const parked = {
   display_name: "parked work",
   state: "dependency_failed" as const,
   attention_reason: "a prerequisite can no longer be satisfied",
+  retry_eligible: false,
   arms: [{ ...baseTask.arms[0], arm_id: "tk_2_arm00", task_id: "tk_2", state: "unsatisfiable" as const }],
 };
 
@@ -43,6 +49,7 @@ const exhausted = {
   display_name: "exhausted work",
   state: "dependency_failed" as const,
   attention_reason: "the last start attempt failed",
+  retry_eligible: true,
   arms: [{ ...baseTask.arms[0], arm_id: "tk_3_arm00", task_id: "tk_3", state: "satisfied" as const }],
 };
 
@@ -153,6 +160,44 @@ describe("Tasks view", () => {
 
     fireEvent.click(within(rows[0]).getByRole("button", { name: "Retry" }));
     await waitFor(() => expect(lastRequest?.url).toBe("retry:tk_3"));
+  });
+
+  // INV §2: the server is the one authority for retry eligibility. This fixture
+  // makes the field disagree with the arm shape the view used to reason from, so
+  // a reintroduced local condition fails here instead of drifting silently until
+  // the next FS-16.R23/R25 change separates the two copies again.
+  it("follows the server's retry_eligible rather than the arm shape", async () => {
+    server.use(http.get("/api/tasks", () => HttpResponse.json({
+      tasks: [
+        // Arms all satisfied, but the server says no.
+        { ...exhausted, task_id: "tk_9", display_name: "server says no", retry_eligible: false },
+        // An unsatisfiable arm, but the server says yes.
+        { ...parked, task_id: "tk_10", display_name: "server says yes", retry_eligible: true },
+      ],
+    })));
+    renderPage();
+    // Earlier cases in this file leave their trees mounted, so each row is
+    // reached from its own unique name rather than by list position.
+    const noRow = (await screen.findByText("server says no")).closest("li") as HTMLElement;
+    const yesRow = screen.getByText("server says yes").closest("li") as HTMLElement;
+    expect(within(noRow).queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+    expect(within(yesRow).getByRole("button", { name: "Retry" })).toBeInTheDocument();
+  });
+
+  // FS-16.A8 / INV §8: a task targeting an existing agent has no "launches …"
+  // segment, and each optional segment used to carry its own leading separator,
+  // so every agent-target row read "· assigned to Bob".
+  it("renders an agent-target row without a leading separator", async () => {
+    server.use(http.get("/api/tasks", () => HttpResponse.json({
+      tasks: [{
+        ...baseTask, state: "running", arms: [],
+        target_kind: "agent", target_agent_id: "a_bob", role: "",
+      }],
+    })));
+    renderPage();
+    const link = await screen.findByRole("link", { name: "a_bob" });
+    const meta = link.closest('[data-slot="metadata"]');
+    expect(meta?.querySelector("span")?.textContent).toBe("assigned to a_bob");
   });
 
   it("uses the configured default role for a new launch task", async () => {

@@ -119,6 +119,12 @@ type Task struct {
 	FinishedAt     *time.Time `json:"finished_at,omitempty"`
 
 	Arms []TaskArm `json:"arms"`
+
+	// RetryEligible projects the same eligibility RetryTask enforces (FS-16.R23,
+	// R25) onto the task JSON, computed by ReadTask/ListTasks once Arms are
+	// loaded. It is the single authority for whether Retry can succeed; nothing
+	// else may restate this condition (INV §2).
+	RetryEligible bool `json:"retry_eligible"`
 }
 
 // TaskArm is one prerequisite. Every arm of a task must be satisfied before it
@@ -554,6 +560,7 @@ func (s *Store) ReadTask(taskID string) (Task, error) {
 		return Task{}, err
 	}
 	task.Arms = arms
+	task.RetryEligible = retryEligible(task)
 	return task, nil
 }
 
@@ -581,6 +588,7 @@ func (s *Store) ListTasks(project string) ([]Task, error) {
 			return nil, err
 		}
 		tasks[i].Arms = arms
+		tasks[i].RetryEligible = retryEligible(tasks[i])
 	}
 	return tasks, nil
 }
@@ -1545,6 +1553,29 @@ WHERE task_id = ? AND state = ?`,
 	return s.ReadTask(taskID)
 }
 
+// retryEligible reports whether a task's current state and arms qualify for
+// Retry (FS-16.R23, R25): an `interrupted` task, or one `dependency_failed`
+// task parked by exhausted start attempts or an ineligible target rather than
+// an arm that can never be satisfied. RetryTask enforces this exact switch,
+// and ReadTask/ListTasks project its answer as `retry_eligible` on the task
+// JSON so the UI reads the server's answer instead of restating the condition
+// (INV §2).
+func retryEligible(task Task) bool {
+	switch task.State {
+	case TaskInterrupted:
+		return true
+	case TaskDependencyFailed:
+		for _, arm := range task.Arms {
+			if arm.State == ArmUnsatisfiable {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
+}
+
 // RetryTask re-attempts execution without touching arms. It restores the full
 // start-attempt allowance and returns the task to ready, keeping the assignee it
 // already confirmed so its transcript and its attached-context membership stay
@@ -1554,17 +1585,12 @@ func (s *Store) RetryTask(taskID string) (Task, error) {
 	if err != nil {
 		return Task{}, err
 	}
-	switch task.State {
-	case TaskInterrupted:
-	case TaskDependencyFailed:
-		// The two parked reasons need different repairs, and the arms say which
-		// one this is without a second column to keep honest.
-		for _, arm := range task.Arms {
-			if arm.State == ArmUnsatisfiable {
-				return Task{}, ErrRetryRequiresRearm
-			}
+	if !retryEligible(task) {
+		if task.State == TaskDependencyFailed {
+			// The two parked reasons need different repairs; retryEligible already
+			// checked the arms to tell them apart.
+			return Task{}, ErrRetryRequiresRearm
 		}
-	default:
 		return Task{}, ErrTaskNotRetryable
 	}
 	now := timeNow()

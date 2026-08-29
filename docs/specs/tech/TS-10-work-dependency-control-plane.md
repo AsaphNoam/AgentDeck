@@ -204,6 +204,15 @@ parallel copy of them.
   stable id, so a stopped-and-resumed agent retains it and a new generation is not a new principal;
   no tool argument may supply or override it (TS-05.R17, FS-16.R24).
 
+- **R22** — **Retry eligibility is projected, never restated.** The store decides
+  whether Retry can succeed on a task (FS-16.R23/R25) in exactly one place, and read and list
+  project that same decision onto the task JSON as `retry_eligible`. It is derived, not stored: no
+  column holds it, and it is recomputed from the task's state and its arms on every read. Any
+  surface that offers or withholds Retry reads the field rather than re-deriving the condition,
+  because a second copy of the switch across the language boundary had already drifted once —
+  narrowing Retry to `interrupted` and silently stranding work parked by exhausted start
+  attempts (INV §2).
+
 ## 3. Interfaces & data shapes
 
 **Durable rows** (`internal/state`, one forward-only migration):
@@ -241,7 +250,8 @@ parallel copy of them.
 unauthorized task and an unknown task are indistinguishable.
 
 **HTTP** (added to the TS-03 route inventory): create, list, and read tasks; record a person result
-(FS-16.R22); cancel, retry, re-arm, and delete a task; and fire a project-scoped signal.
+(FS-16.R22); cancel, retry, re-arm, and delete a task; and fire a project-scoped signal. Every task
+object carries the derived boolean `retry_eligible` (R22) beside its stored fields.
 
 **SSE**: `task_update` with `{task_id, revision, state, outcome, attention_reason}`.
 
@@ -302,3 +312,7 @@ Anchors: `internal/state/tasks.go` (rows, migration 18, admission, settlement, e
 result-acceptance path with `internal/pipeline`; scoped tools on the existing MCP server in
 `internal/messaging`; attached-reference reads through `internal/contextref`; the Tasks view in
 `ui/src/features/tasks`.
+
+Projected retry eligibility (R22): `retryEligible` in `internal/state/tasks.go`, pinned against the
+verb it describes by `TestRetryEligibleProjectionAgreesWithRetryTask`, and read by the Tasks view in
+`ui/src/features/tasks/TasksPage.test.tsx`.

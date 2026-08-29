@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Badge, Button, PageHeader, Surface } from "../../components/ui";
 import { useConfig, useProjects, useRoles } from "../../api/config";
@@ -105,17 +105,21 @@ function TaskRow({ task, project, taskNames }: { task: Task; project: string; ta
 
   const arms = task.arms ?? [];
   const waiting = waitingOn(arms, taskNames);
-  // `dependency_failed` is reached three ways and only one of them — an arm that
-  // can never be satisfied — is repaired by re-arming. A task parked because its
-  // start attempts were spent, or because its target became ineligible, is
-  // repaired by Retry, which restores the full allowance (FS-16.R23/R25). Gate on
-  // the same predicate the server uses so the view never offers a refusal and
-  // never withholds the repair that works.
-  const retryable =
-    task.state === "interrupted" ||
-    (task.state === "dependency_failed" && !arms.some((arm) => arm.state === "unsatisfiable"));
+  // The server is the one authority for retry eligibility (FS-16.R23/R25,
+  // INV §2): `retry_eligible` is computed by RetryTask's own switch and
+  // projected onto the task JSON, so the view never restates the condition.
+  const retryable = task.retry_eligible;
   const assignedID = task.assigned_agent_id || (task.target_kind === "agent" ? task.target_agent_id : "");
   const assignedName = useAgentStore((state) => assignedID ? state.agents[assignedID]?.name : undefined);
+  // Present segments only, joined rather than each prefixed with its own
+  // separator: a task targeting an existing agent has no "launches …" segment,
+  // and prefixing it unconditionally left a stray leading " · " (FS-16.A8, INV §8).
+  const metaSegments = [
+    task.target_kind === "launch" ? `launches ${task.role}` : null,
+    assignedID ? (
+      <>assigned to <Link to={`/agent/${assignedID}`}>{assignedName || assignedID}</Link></>
+    ) : null,
+  ].filter((segment) => segment !== null);
   const act = (run: () => Promise<unknown>) => {
     setError("");
     run().catch((err: unknown) => {
@@ -144,7 +148,14 @@ function TaskRow({ task, project, taskNames }: { task: Task; project: string; ta
         <p className="task-attention" data-slot="attention">{task.attention_reason}</p>
       )}
       <div className="task-row-meta" data-slot="metadata">
-        <span>{task.target_kind === "launch" && `launches ${task.role}`}{assignedID && <> · assigned to <Link to={`/agent/${assignedID}`}>{assignedName || assignedID}</Link></>}</span>
+        <span>
+          {metaSegments.map((segment, index) => (
+            <Fragment key={index}>
+              {index > 0 && " · "}
+              {segment}
+            </Fragment>
+          ))}
+        </span>
         <span>created by {task.created_by_kind}</span>
       </div>
       <div className="task-row-actions" data-slot="actions">

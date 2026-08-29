@@ -54,6 +54,7 @@ export const taskSchema = z.object({
   created_by_agent_id: z.string().optional().default(""),
   assigned_agent_id: z.string().optional().default(""),
   start_attempt_count: z.number().optional().default(0),
+  retry_eligible: z.boolean().optional().default(false),
   revision: z.number(),
   created_at: z.string(),
   arms: z.array(taskArmSchema).nullable().optional().default([]),
