@@ -916,3 +916,78 @@ VALUES(?, 'quality', 'Quality run', 'my-app', 'ship', 'running', 1, 'work', ?, ?
 		t.Fatalf("evaluation released %+v, want the dependent ready", changed)
 	}
 }
+
+// FS-16.R23/R25 — retry eligibility has exactly one authority. RetryTask decides
+// it, ReadTask/ListTasks project that same decision as `retry_eligible`, and the
+// Tasks view reads the projection instead of restating the condition. The UI had
+// already drifted from this switch once, narrowing Retry to `interrupted` and
+// silently dropping work parked by exhausted start attempts (INV §2), so what is
+// pinned here is the agreement itself: across every task state, the projected
+// field says yes exactly when RetryTask succeeds.
+func TestRetryEligibleProjectionAgreesWithRetryTask(t *testing.T) {
+	st, _ := newTestStore(t)
+	cases := []struct {
+		name      string
+		taskState string
+		armState  string
+		want      bool
+	}{
+		{name: "armed", taskState: TaskArmed, want: false},
+		{name: "ready", taskState: TaskReady, want: false},
+		{name: "starting", taskState: TaskStarting, want: false},
+		{name: "running", taskState: TaskRunning, want: false},
+		{name: "finished", taskState: TaskFinished, want: false},
+		{name: "interrupted", taskState: TaskInterrupted, want: true},
+		// The two ways to reach dependency_failed need different repairs: an arm
+		// that can never be satisfied needs re-arming, while spent start attempts
+		// or an ineligible target are exactly what Retry restores.
+		{name: "parked by an unsatisfiable arm", taskState: TaskDependencyFailed, armState: ArmUnsatisfiable, want: false},
+		{name: "parked by exhausted start attempts", taskState: TaskDependencyFailed, armState: ArmSatisfied, want: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			source := newTask(t, st, "my-app", "source-"+tc.name)
+			task := newTask(t, st, "my-app", "task-"+tc.name, taskArm(source.TaskID, OutcomeSuccess))
+			// Put the task in the state under test directly: what matters is what
+			// eligibility says about that state, not how the task reached it.
+			if _, err := st.DB().Exec(`UPDATE tasks SET state = ? WHERE task_id = ?`, tc.taskState, task.TaskID); err != nil {
+				t.Fatalf("set task state: %v", err)
+			}
+			if tc.armState != "" {
+				if _, err := st.DB().Exec(`UPDATE task_arms SET state = ? WHERE task_id = ?`, tc.armState, task.TaskID); err != nil {
+					t.Fatalf("set arm state: %v", err)
+				}
+			}
+
+			read, err := st.ReadTask(task.TaskID)
+			if err != nil {
+				t.Fatalf("ReadTask: %v", err)
+			}
+			if read.RetryEligible != tc.want {
+				t.Fatalf("ReadTask retry_eligible = %v, want %v", read.RetryEligible, tc.want)
+			}
+			listed, err := st.ListTasks("my-app")
+			if err != nil {
+				t.Fatalf("ListTasks: %v", err)
+			}
+			found := false
+			for _, item := range listed {
+				if item.TaskID != task.TaskID {
+					continue
+				}
+				found = true
+				if item.RetryEligible != tc.want {
+					t.Fatalf("ListTasks retry_eligible = %v, want %v", item.RetryEligible, tc.want)
+				}
+			}
+			if !found {
+				t.Fatal("the task was not listed")
+			}
+
+			// The projection is only worth anything if it matches the verb.
+			if _, err := st.RetryTask(task.TaskID); (err == nil) != tc.want {
+				t.Fatalf("RetryTask err = %v, but retry_eligible said %v", err, tc.want)
+			}
+		})
+	}
+}
