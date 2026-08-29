@@ -65,6 +65,13 @@ bug-investigation finding still needs the user's product decision before it can 
 
 ## Changelog
 
+- **2026-08-29 — fix (INV §1/§4):** Closed the pane transcript-retention Must-fix finding. Raw
+  events now live only in a constant-time append tail while an authoritative transcript request is
+  in flight; the tail is cleared when the newest request settles, the last surface unregisters, or
+  the agent is removed. The permanent folded transcript still preserves streamed deltas and resolved
+  permissions across refetches. Both Go test variants, the 302-case UI suite, specification checks,
+  and production builds are green.
+
 - **2026-08-29 — fix (INV §2/§8):** Closed the template deep-link Must-fix finding. A failed
   template-library request now renders a load failure and the transport message instead of claiming
   the template was deleted; a missing record after a successful read keeps the deletion guidance.
@@ -566,23 +573,6 @@ rendering (`c35ff8c`), the Pipelines split (`9114df7` + `69c2f99`), the four sma
 expandable dashboard chat panes (`43e5feb`). Both Go test variants, the 289-case UI suite,
 `make check-specs`, `git diff --check` and all nine skill twins are green at `43e5feb`; every new
 `rows.Next()` loop in the range checks `rows.Err()` (INV §7 clean).
-
-- **Must fix** (confirmed) The pane transcript store keeps a second, unfolded copy of every event
-  forever, and appends to it quadratically. `43e5feb` added `rawByAgent`
-  (`ui/src/store/transcriptStore.ts:6,102`) to answer "which events are newer than this refetch".
-  Unlike `byAgent`, it is never folded — `appendRenderedEvent` coalesces consecutive assistant
-  deltas into one bubble, while `rawEvents.push(event)` (`:141`) retains every single delta — and
-  every append copies the whole growing array first (`:110`). A 2,000-delta response therefore costs
-  ~2,000,000 element copies and 2,000 retained objects per open agent. Nothing ever clears it: there
-  is no delete path in the store, `registerOpenAgent`'s teardown (`ui/src/api/sse.ts:79-89`) only
-  decrements the open count, and the removal branch (`sse.ts:96-105`) clears the agent, annotation
-  and draft stores but not the transcript store. This lands on the exact workload the feature
-  creates — up to four panes plus the agent screen streaming at once on a dashboard left open for
-  days — and on the surface that already produced a freeze incident (`0a817f9`). INV §1 names this
-  shape for `annotationStore`: browser-local state needs boundary handling plus its own retention
-  bound. Fix: bound `rawByAgent` to the tail actually needed for seq reconciliation, and drop the
-  agent's entry on removal and when the last consumer unregisters (FS-03.R39, TS-03.R31,
-  **INV §1/§4**).
 
 - **Worth fixing** (confirmed) `Ctrl+Alt+Arrow` pane cycling cannot leave a group section.
   `cyclePaneFocus` is bound to the per-group grid — `grouped.map(...)` renders one

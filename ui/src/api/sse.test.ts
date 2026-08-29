@@ -154,7 +154,7 @@ describe("SseClient watchdog reconnect", () => {
     closeA();
     closeA();
     es.emit("new_message", msg("a_one", 2, " ignored"));
-    expect(useTranscriptStore.getState().byAgent.a_one[0].text ?? useTranscriptStore.getState().byAgent.a_one[0].delta).toBe("one");
+    expect(useTranscriptStore.getState().byAgent.a_one).toBeUndefined();
   });
 
   it("ignores a stale transcript response after a newer per-agent request", async () => {
@@ -214,11 +214,14 @@ describe("SseClient watchdog reconnect", () => {
   it("drops a deleted agent's annotation tray and chat draft", async () => {
     const { sseClient } = await import("./sse");
     const { useAnnotationStore } = await import("../store/annotationStore");
+    const { useTranscriptStore } = await import("../store/transcriptStore");
     const { getChatDraft, setChatDraft } = await import("../components/chat/drafts");
     useAnnotationStore.getState().add("a_gone", { seq: 3, excerpt: "line", instruction: "look" });
     useAnnotationStore.getState().add("a_keep", { seq: 4, excerpt: "line", instruction: "look" });
     setChatDraft("a_gone", "gone draft");
     setChatDraft("a_keep", "keep draft");
+    useTranscriptStore.getState().appendMessage("a_gone", { seq: 1, kind: "assistant_text", text: "gone" });
+    useTranscriptStore.getState().appendMessage("a_keep", { seq: 1, kind: "assistant_text", text: "keep" });
     sseClient.connect();
     const es = FakeEventSource.instances[0];
     es.onopen?.();
@@ -227,6 +230,8 @@ describe("SseClient watchdog reconnect", () => {
 
     expect(useAnnotationStore.getState().bySource["a_gone"]).toBeUndefined();
     expect(useAnnotationStore.getState().bySource["a_keep"]).toHaveLength(1);
+    expect(useTranscriptStore.getState().byAgent.a_gone).toBeUndefined();
+    expect(useTranscriptStore.getState().byAgent.a_keep).toHaveLength(1);
     expect(getChatDraft("a_gone")).toBe("");
     expect(getChatDraft("a_keep")).toBe("keep draft");
   });

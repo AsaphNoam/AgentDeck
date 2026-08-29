@@ -85,7 +85,10 @@ class SseClient {
       active = false;
       const next = (this.openAgents.get(agentId) ?? 1) - 1;
       if (next > 0) this.openAgents.set(agentId, next);
-      else this.openAgents.delete(agentId);
+      else {
+        this.openAgents.delete(agentId);
+        useTranscriptStore.getState().discardAgent(agentId);
+      }
     };
   }
 
@@ -102,6 +105,7 @@ class SseClient {
       // 404s on it — so its pending tray is dropped with the rest of the state
       // derived from that agent (FS-13.R16). Nothing else ever clears it.
       useAnnotationStore.getState().discard(envelope.agent_id);
+      useTranscriptStore.getState().discardAgent(envelope.agent_id);
       discardChatDraft(envelope.agent_id);
       return;
     }
@@ -218,9 +222,16 @@ class SseClient {
   private async refetchTranscript(agentId: string) {
     const token = (this.transcriptRequestToken[agentId] ?? 0) + 1;
     this.transcriptRequestToken[agentId] = token;
-    const transcript = await getTranscript(agentId);
-    if (this.transcriptRequestToken[agentId] !== token || !this.openAgents.has(agentId)) return;
-    useTranscriptStore.getState().setTranscript(transcript.agent_id, transcript.events);
+    useTranscriptStore.getState().beginReconciliation(agentId);
+    try {
+      const transcript = await getTranscript(agentId);
+      if (this.transcriptRequestToken[agentId] !== token || !this.openAgents.has(agentId)) return;
+      useTranscriptStore.getState().setTranscript(transcript.agent_id, transcript.events);
+    } finally {
+      if (this.transcriptRequestToken[agentId] === token) {
+        useTranscriptStore.getState().endReconciliation(agentId);
+      }
+    }
   }
 }
 

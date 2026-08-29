@@ -90,6 +90,7 @@ describe("transcriptStore", () => {
   });
 
   it("retains delivered events newer than a transcript response", () => {
+    useTranscriptStore.getState().beginReconciliation("a_6");
     useTranscriptStore.getState().appendMessage("a_6", {
       agent_id: "a_6", seq: 2, type: "assistant_text", ts: "t2", data: { delta: "new" },
     });
@@ -100,10 +101,24 @@ describe("transcriptStore", () => {
   });
 
   it("retains the exact newer assistant delta without duplicating the fetched prefix", () => {
+    useTranscriptStore.getState().beginReconciliation("a_7");
     useTranscriptStore.getState().appendMessage("a_7", { seq: 1, kind: "assistant_text", text: "old" });
     useTranscriptStore.getState().appendMessage("a_7", { seq: 2, kind: "assistant_text", text: "new" });
     useTranscriptStore.getState().setTranscript("a_7", [{ seq: 1, kind: "assistant_text", text: "old" }]);
     expect(useTranscriptStore.getState().byAgent.a_7).toMatchObject([{ text: "oldnew" }]);
+  });
+
+  it("retains raw deltas only while a reconciliation is in flight", () => {
+    for (let seq = 1; seq <= 2_000; seq++) {
+      useTranscriptStore.getState().appendMessage("a_stream", { seq, kind: "assistant_text", text: "x" });
+    }
+    expect(useTranscriptStore.getState().rawByAgent.a_stream).toBeUndefined();
+
+    useTranscriptStore.getState().beginReconciliation("a_stream");
+    useTranscriptStore.getState().appendMessage("a_stream", { seq: 2_001, kind: "assistant_text", text: "y" });
+    expect(useTranscriptStore.getState().rawByAgent.a_stream).toHaveLength(1);
+    useTranscriptStore.getState().endReconciliation("a_stream");
+    expect(useTranscriptStore.getState().rawByAgent.a_stream).toBeUndefined();
   });
 
   it("merges consecutive assistant deltas on transcript replay", () => {

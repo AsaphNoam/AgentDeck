@@ -369,7 +369,10 @@ stop-and-registration-cleanup operation.
   maximum `seq` are retained after it, so a delta that arrived while the request was in flight
   survives. Together these bound the hazard to what it can actually be — the fetched prefix plus any
   strictly newer delivered events — instead of letting a slow response win. No new route, SSE event
-  type, or event payload field is added.
+  type, or event payload field is added. The raw events needed for that merge are an append-only
+  reconciliation tail scoped to the in-flight request, not a permanent second transcript: the
+  client creates the tail when fetching starts and drops it when the newest request settles, the
+  last surface unregisters, or the agent is removed (INV §1/§4).
 
 ## 3. Interfaces & data shapes
 
