@@ -194,8 +194,14 @@ func (m *Manager) Report(agentID, generation string, report StageReport) (RunDet
 	if err != nil {
 		return RunDetail{}, err
 	}
-	if !state.OwnsReportedWork(agentID, generation, attempt.AgentID, attempt.AgentGeneration) || run.PendingAction != "await_result" {
+	if !state.OwnsReportedWork(agentID, generation, attempt.AgentID, attempt.AgentGeneration) {
 		return RunDetail{}, controlError("stale_assignment", "caller is not the current stage attempt")
+	}
+	if run.PendingAction != "await_result" {
+		if attempt.ReportOutcome != "" {
+			return RunDetail{}, controlError("already_reported", "this attempt already reported a result; wait for the run's human Continue action before doing more stage work")
+		}
+		return RunDetail{}, controlError("stale_assignment", "the current stage attempt is no longer awaiting a result")
 	}
 	// The vocabulary and the field bounds are the shared work-result rules, so a
 	// stage report and a task report can never drift apart (TS-10.R7).

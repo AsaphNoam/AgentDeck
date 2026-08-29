@@ -9,8 +9,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 - **Bug investigation:** The 2026-08-28 pipeline `stale_assignment` report is diagnosed and open for
   `/fix`: answering a blocked stage agent in its own chat, instead of through **Continue**, gets its
   next report refused as `stale_assignment` even though it is the run's current attempt. Reproduced
-  by the committed skipped test in `internal/pipeline/blocked_chat_answer_test.go`. Four findings
-  below; the second needs a product decision. The earlier 2026-08-27 all-200/no-page-load incident
+  by the active regression in `internal/pipeline/blocked_chat_answer_test.go`. Three findings
+  below; the first needs a product decision. The earlier 2026-08-27 all-200/no-page-load incident
   is fixed. Same-origin dashboard tabs now share one long-lived SSE connection, leaving the
   browser's HTTP/1.x pool available for REST queries; the related config-source,
   transcript-reconciliation, and card-preview amplification paths are bounded as described in the
@@ -21,8 +21,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   recorded fifteen findings below, three of them **Must fix**: unsanitized `style=""` attributes in
   diagram markup, a failed template fetch reported as a deletion, and the panes' unbounded
   second transcript copy. The 2026-08-29 design review of expandable dashboard chat panes is closed:
-  all five findings and all three consistency notes are resolved in the specifications. The four
-  bug-investigation findings are open, joined by the residue of the 2026-08-28 review of `790c01c`
+  all five findings and all three consistency notes are resolved in the specifications. Three
+  bug-investigation findings remain, joined by the residue of the 2026-08-28 review of `790c01c`
   — its Must fix and the Tasks Retry gate are closed, and two of its open items were re-confirmed
   against the current tree by this review.
 - **Active change:** None. Expandable dashboard chat panes are finished and verified
@@ -58,12 +58,16 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 **State:** Expandable dashboard chat panes are finished and verified, and the whole
 unreviewed range now has a code review behind it.
 
-**Next:** Run `/fix` on the three **Must fix** review findings, starting with the diagram
-`style=""` sanitizing gap, then the remaining Worth-fixing items and the four bug-investigation
-findings (un-skip `internal/pipeline/blocked_chat_answer_test.go` first). The second
-bug-investigation finding still needs the user's product decision before it can close.
+**Next:** Resolve the blocked-stage product decision below, then continue `/fix` through the
+remaining Worth-fixing findings.
 
 ## Changelog
+
+- **2026-08-29 — fix (INV §8):** Closed the false `stale_assignment` Must-fix finding. A report from
+  the run's own current attempt after its prior result was accepted now returns the shared
+  `already_reported` code and points to the human Continue boundary; genuine caller or generation
+  mismatches still return `stale_assignment`. The previously skipped field-bug reproduction is now
+  an active regression, and both Go test variants plus the product build are green.
 
 - **2026-08-29 — fix (INV §1/§4):** Closed the pane transcript-retention Must-fix finding. Raw
   events now live only in a constant-time append tail while an authoritative transcript request is
@@ -561,6 +565,12 @@ an explicit specification update. Remove an item when the human resolves it or q
 
 ## Blocked on human
 
+The blocked-stage agent contract needs a product decision. Today a `blocked` report ends that
+attempt's participation; the operator must use **Continue** to create a new assignment, while
+answering in the still-open agent chat produces work that cannot be accepted. Choose either to make
+that boundary explicit in assignment/result/refusal copy, or to design a real in-chat continuation
+route that changes the current FS-14.R20 recovery boundary.
+
 Live-provider acceptance is waiting for human authorization because it invokes real provider sessions
 and creates disposable local configuration homes. On 2026-07-15 this machine has Claude Code 2.1.202,
 the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installed; the new
@@ -702,26 +712,6 @@ progression of a pipeline because it needed an answer from me, then when it trie
 `stale_assignment` from AgentDeck."* No AgentDeck version, environment, or log was supplied, and this
 machine's `~/.agentdeck` holds no run newer than 2026-08-01, so it is not the incident home — the
 diagnosis below is from the code path and a local reproduction, not from incident logs.
-
-- **Must fix** (confirmed) `internal/pipeline/actions.go:198` refuses with
-  `stale_assignment` / "caller is not the current stage attempt" for three different conditions,
-  including one where the caller *is* the current stage attempt under the current generation. A
-  `blocked` report pauses the run with its stage agent still live and idle (FS-14.R11) and the run
-  detail offers **Open agent** beside **Continue** (`ui/src/features/pipelines/RunBrowser.tsx:132`),
-  so the ordinary human move — answering the question in the chat that is showing it — leads
-  straight here: the agent finishes the stage, calls `report_pipeline_stage_result`, and is told it
-  is not the current attempt. Refusing is right (FS-14.R19 forbids a second accepted result), but
-  the code and message are wrong: the real reason is that this attempt's report was already
-  accepted and the run is paused waiting for a human Continue, and FS-17 classifies
-  `stale_assignment` as retry `never`, so the agent abandons the stage on a false reason and a full
-  turn of work is silently discarded. `already_reported` is the shared vocabulary's name for this
-  condition and the task path already returns it
-  (`internal/messaging/task_tools.go:114`), so the second meaning here is also INV §2 drift.
-  Reproduced by the committed skipped test
-  `internal/pipeline/blocked_chat_answer_test.go` (`TestBlockedStageAgentAnsweredInChatIsNotCalledStale`);
-  un-skip it to start the fix. Fix: split the predicate — keep `stale_assignment` for a genuine
-  agent/generation mismatch, return `already_reported` naming the human Continue for the run's own
-  current attempt (INV §8).
 
 - **Must fix** (confirmed) Nothing tells a stage agent that a `blocked` report ends its
   participation until a new assignment arrives. `renderAssignment`

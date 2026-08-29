@@ -8,9 +8,8 @@ import (
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
-// Reproduction for the 2026-08-28 bug investigation finding "blocked stage agent
-// answered in chat is refused with a false stale_assignment". Committed skipped;
-// the /fix session un-skips it as the regression test.
+// Regression for the 2026-08-28 bug investigation finding "blocked stage agent
+// answered in chat is refused with a false stale_assignment".
 //
 // A blocked report pauses the run with its stage agent still live and idle
 // (FS-14.R11), and the run detail offers Open agent beside Continue. When the
@@ -27,8 +26,6 @@ import (
 // meaning for stale_assignment here is also INV §2 drift. The fix session owns
 // the final code choice; adjust the expectation with it if it picks another.
 func TestBlockedStageAgentAnsweredInChatIsNotCalledStale(t *testing.T) {
-	t.Skip("reproduces an open bug-investigation finding; un-skip in the fix session")
-
 	manager, _, _ := pipelineManagerFixture(t)
 	detail := startPipeline(t, manager, "request-blocked-chat-answer")
 	work := detail.Attempts[0]
