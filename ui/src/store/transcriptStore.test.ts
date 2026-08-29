@@ -5,6 +5,49 @@ beforeEach(() => {
   useTranscriptStore.setState({ byAgent: {}, rawByAgent: {}, pending: {} });
 });
 
+describe("card preview clipping", () => {
+  // FS-02.R9 / INV §2: the live preview and the server's reconcile sweep build
+  // the same card artifact, so they must keep the same end of a long message.
+  // The server keeps the last 120 runes (clipPreview, internal/server/reconcile.go);
+  // if this path kept the head, one agent's card would show the start of its last
+  // message after a reload and the end of it while streaming.
+  it("keeps the end of a long streamed message", () => {
+    const long = "h".repeat(200) + "the tail the reader wants";
+    useTranscriptStore.getState().updatePreview("a_clip", {
+      agent_id: "a_clip", seq: 1, type: "assistant_text", ts: "t1", data: { delta: long },
+    });
+    const preview = useTranscriptStore.getState().previewByAgent.a_clip;
+    expect(preview.endsWith("the tail the reader wants")).toBe(true);
+    expect([...preview].length).toBe(120);
+  });
+
+  // A plain `.slice(-120)` cuts UTF-16 code units, so a boundary landing inside a
+  // surrogate pair rendered a replacement character on the card — exactly what the
+  // server helper documents itself as avoiding.
+  it("clips by code point so a surrogate pair is never split", () => {
+    const long = "😀".repeat(200);
+    useTranscriptStore.getState().updatePreview("a_emoji", {
+      agent_id: "a_emoji", seq: 1, type: "assistant_text", ts: "t1", data: { delta: long },
+    });
+    const preview = useTranscriptStore.getState().previewByAgent.a_emoji;
+    expect([...preview].length).toBe(120);
+    expect(preview).toBe("😀".repeat(120));
+    expect(preview).not.toContain("\uFFFD");
+  });
+
+  // The replay path folds the same events and must land on the same preview, or a
+  // refetch would flip the card between the two ends (INV §2).
+  it("derives the same preview from a replayed transcript", () => {
+    const long = "h".repeat(200) + "the tail the reader wants";
+    useTranscriptStore.getState().setTranscript("a_replay", [
+      { agent_id: "a_replay", seq: 1, type: "assistant_text", ts: "t1", data: { delta: long } },
+    ]);
+    const preview = useTranscriptStore.getState().previewByAgent.a_replay;
+    expect(preview.endsWith("the tail the reader wants")).toBe(true);
+    expect([...preview].length).toBe(120);
+  });
+});
+
 describe("transcriptStore", () => {
   it("concatenates assistant text deltas with the same message_id", () => {
     useTranscriptStore.getState().appendMessage("a_1", {

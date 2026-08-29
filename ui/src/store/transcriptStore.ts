@@ -39,6 +39,18 @@ function textOf(event: TranscriptEvent) {
   return event.text ?? event.delta ?? "";
 }
 
+// clipPreview keeps the last `n` Unicode code points of `s` — the same end and
+// the same code-point-safe boundary as the server's lastAssistantPreview
+// (internal/server/reconcile.go), so a card shows the same tail whether it
+// arrived live or through a reload/reconcile sweep (INV §2). A plain
+// `.slice(-n)` operates on UTF-16 code units and can split a surrogate pair at
+// the boundary, rendering a replacement character.
+function clipPreview(s: string, n: number): string {
+  const codePoints = Array.from(s);
+  if (codePoints.length <= n) return s;
+  return codePoints.slice(-n).join("");
+}
+
 // Preserve every user-visible outcome while grouping automatic approval with
 // explicit approval. Unknown legacy values retain the conservative Denied state.
 function decisionToResolved(decision: unknown): PermissionResolution {
@@ -159,7 +171,7 @@ export const useTranscriptStore = create<TranscriptStoreState>((set) => ({
       if (kind !== "assistant_text") return { previewKindByAgent: nextKinds };
       const delta = String(textOf(event));
       const prior = state.previewKindByAgent[agentId] === "assistant_text" ? state.previewByAgent[agentId] ?? "" : "";
-      const preview = `${prior}${delta}`.trim().slice(-120);
+      const preview = clipPreview(`${prior}${delta}`.trim(), 120);
       return {
         previewByAgent: { ...state.previewByAgent, [agentId]: preview },
         previewKindByAgent: nextKinds,
@@ -203,7 +215,7 @@ export const useTranscriptStore = create<TranscriptStoreState>((set) => ({
       let preview = "";
       for (let i = folded.length - 1; i >= 0; i--) {
         if (kindOf(folded[i]) === "assistant_text") {
-          preview = String(textOf(folded[i])).trim().slice(-120);
+          preview = clipPreview(String(textOf(folded[i])).trim(), 120);
           break;
         }
       }

@@ -147,8 +147,12 @@ func agentIDFromSessionPath(root, path string) string {
 // assistant's text in the last turn of the NDJSON transcript. Each line is a
 // normalized runtime.Event; assistant_text deltas are concatenated and reset at
 // each turn boundary, so the result is the final assistant message (clipped to
-// detailPreviewLimit chars) rather than a raw event envelope (§6.4/§13 "last
-// output line"). Returns "" when the transcript carries no assistant text, which
+// the last detailPreviewLimit runes) rather than a raw event envelope (§6.4/§13
+// "last output line"). The tail is kept, not the head, so a card preview shows
+// the most recently produced text of a long or still-streaming message — the
+// same end the live client-side preview (`ui/src/store/transcriptStore.ts`)
+// keeps, so a reload or reconcile sweep never flips which end of the message a
+// card shows (INV §2). Returns "" when the transcript carries no assistant text, which
 // leaves the existing status detail untouched (a non-text envelope is never a
 // meaningful preview and must not clobber a healthy card — the BLOCKING fix).
 func lastAssistantPreview(path string) string {
@@ -190,15 +194,17 @@ func lastAssistantPreview(path string) string {
 // chat runtime's clip(tail, 120) crash-path convention).
 const detailPreviewLimit = 120
 
-// clipPreview truncates s to at most n runes, so a status detail written from a
-// transcript never grows unbounded and never splits a multi-byte rune (which
-// would produce invalid UTF-8 in the status JSON).
+// clipPreview keeps at most the last n runes of s, so a status detail written
+// from a transcript never grows unbounded, never splits a multi-byte rune
+// (which would produce invalid UTF-8 in the status JSON), and shows the most
+// recently produced text rather than a fixed prefix that never advances while
+// a message is still streaming.
 func clipPreview(s string, n int) string {
 	r := []rune(s)
 	if len(r) <= n {
 		return s
 	}
-	return string(r[:n])
+	return string(r[len(r)-n:])
 }
 
 func (s *Server) pruneStaleRunning() int {

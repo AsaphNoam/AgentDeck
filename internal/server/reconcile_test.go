@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
@@ -70,17 +72,138 @@ func TestReconcileSessionsOnceAppliesStaleCorrection(t *testing.T) {
 	}
 }
 
+// seedRetainedAgent seeds one more running agent with a stale status row, so a
+// reconcile bound can be measured against several retained sessions rather than
+// the single agent seedHookAgent provides.
+func seedRetainedAgent(t *testing.T, srv *Server, agentID, detail string) {
+	t.Helper()
+	if err := srv.stateStore.WriteAgent(state.Agent{
+		AgentID: agentID, Name: agentID, Role: "implementer", Project: "my-app",
+		Backend: "claude", Model: "sonnet-4-6", Interface: "chat",
+		CreatedAt: time.Date(2026, 6, 22, 10, 0, 0, 0, time.UTC),
+	}); err != nil {
+		t.Fatalf("WriteAgent %s: %v", agentID, err)
+	}
+	if err := srv.stateStore.WriteRunning(state.RunningEntry{
+		AgentID: agentID, PID: 1, SessionID: "sess-" + agentID, Interface: "chat",
+		HookToken: "tok_" + agentID, StartedAt: time.Date(2026, 6, 22, 10, 0, 1, 0, time.UTC),
+	}); err != nil {
+		t.Fatalf("WriteRunning %s: %v", agentID, err)
+	}
+	if err := srv.stateStore.WriteStatus(state.Status{
+		AgentID: agentID, State: "idle", Detail: detail, LastTrace: "Stop",
+		UpdatedAt: time.Now().Add(-time.Hour).UnixMilli(),
+	}); err != nil {
+		t.Fatalf("WriteStatus %s: %v", agentID, err)
+	}
+}
+
+// The debounced per-path reconcile exists so a write to one transcript does not
+// re-read every retained session. This pins that claim rather than only asserting
+// the changed agent was corrected: several retained sessions are seeded stale,
+// many deltas are streamed into one of them, and every other agent's status row
+// must come back byte-identical afterwards. The contrast at the end is what makes
+// the bound load-bearing — the whole-tree sweep corrects all of them from the same
+// state, so a change that restored the walk inside reconcileSessionPath would be
+// caught here instead of leaving a green test behind (FS-14.R16, INV §7/§10).
 func TestReconcileSessionPathTouchesOnlyChangedTranscript(t *testing.T) {
 	srv := testServer(t, true)
 	changedID := seedHookAgent(t, srv)
-	otherID := "a_other"
-	writeSessionTranscript(t, srv, changedID,
-		transcriptEvent(t, changedID, 1, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "changed preview"}))
-	writeSessionTranscript(t, srv, otherID,
-		transcriptEvent(t, otherID, 1, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "large unrelated transcript"}))
+	if err := srv.stateStore.WriteStatus(state.Status{
+		AgentID: changedID, State: "idle", Detail: "stale changed detail", LastTrace: "Stop",
+		UpdatedAt: time.Now().Add(-time.Hour).UnixMilli(),
+	}); err != nil {
+		t.Fatalf("WriteStatus: %v", err)
+	}
+	retained := []string{"a_other1", "a_other2", "a_other3"}
+	for _, id := range retained {
+		seedRetainedAgent(t, srv, id, "untouched detail "+id)
+		writeSessionTranscript(t, srv, id,
+			transcriptEvent(t, id, 1, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "unrelated " + id}))
+	}
+	before := map[string]state.Status{}
+	for _, id := range retained {
+		status, err := srv.stateStore.ReadStatus(id)
+		if err != nil {
+			t.Fatalf("ReadStatus %s: %v", id, err)
+		}
+		before[id] = status
+	}
+
 	path := filepath.Join(srv.configStore.Home(), "sessions", changedID, "transcript.jsonl")
-	if !srv.reconcileSessionPath(path, time.Now()) {
-		t.Fatal("changed transcript was not reconciled")
+	body := ""
+	for seq := 1; seq <= 200; seq++ {
+		body += transcriptEvent(t, changedID, seq, runtime.EvAssistantText, runtime.AssistantTextData{Delta: "d"})
+		writeSessionTranscript(t, srv, changedID, body)
+		srv.reconcileSessionPath(path, time.Now())
+	}
+
+	changed, err := srv.stateStore.ReadStatus(changedID)
+	if err != nil {
+		t.Fatalf("ReadStatus changed: %v", err)
+	}
+	if changed.Detail == "stale changed detail" {
+		t.Fatal("the changed agent was never corrected")
+	}
+	for _, id := range retained {
+		after, err := srv.stateStore.ReadStatus(id)
+		if err != nil {
+			t.Fatalf("ReadStatus %s: %v", id, err)
+		}
+		if after != before[id] {
+			t.Fatalf("reconcileSessionPath touched %s: before=%+v after=%+v", id, before[id], after)
+		}
+	}
+
+	// Same tree, same staleness: the whole-tree sweep does reach every retained
+	// session, so the assertions above are measuring a real bound.
+	if applied := srv.reconcileSessionsOnce(time.Now()); applied < len(retained) {
+		t.Fatalf("whole-tree sweep applied = %d, want at least %d", applied, len(retained))
+	}
+}
+
+// The card preview keeps the END of a long assistant message on both paths that
+// build it (INV §2). The client's live preview keeps the tail, so a reload or a
+// reconcile sweep must not flip the card to the head of the same message. Rune
+// safety is asserted at the same boundary: a clip that cut bytes or UTF-16 code
+// units would split the emoji and render a replacement character (FS-02.R9).
+func TestReconcilePreviewKeepsMessageTailByCodePoint(t *testing.T) {
+	if got := clipPreview("abcdef", 3); got != "def" {
+		t.Fatalf("clipPreview kept %q, want the tail %q", got, "def")
+	}
+	// The 3-code-point tail of a string whose boundary falls inside an emoji.
+	if got := clipPreview("ab😀cd", 3); got != "😀cd" {
+		t.Fatalf("clipPreview kept %q, want %q", got, "😀cd")
+	}
+	if got := clipPreview("short", 10); got != "short" {
+		t.Fatalf("clipPreview altered a string under the limit: %q", got)
+	}
+
+	srv := testServer(t, true)
+	agentID := seedHookAgent(t, srv)
+	if err := srv.stateStore.WriteStatus(state.Status{
+		AgentID: agentID, State: "idle", Detail: "old detail", LastTrace: "Stop",
+		UpdatedAt: time.Now().Add(-time.Hour).UnixMilli(),
+	}); err != nil {
+		t.Fatalf("WriteStatus: %v", err)
+	}
+	long := strings.Repeat("h", 200) + "the tail the reader wants"
+	writeSessionTranscript(t, srv, agentID,
+		transcriptEvent(t, agentID, 1, runtime.EvAssistantText, runtime.AssistantTextData{Delta: long})+
+			transcriptEvent(t, agentID, 2, runtime.EvTurnEnd, runtime.TurnEndData{StopReason: "end_turn"}))
+
+	if got := srv.reconcileSessionsOnce(time.Now()); got != 1 {
+		t.Fatalf("reconcile applied = %d, want 1", got)
+	}
+	status, err := srv.stateStore.ReadStatus(agentID)
+	if err != nil {
+		t.Fatalf("ReadStatus: %v", err)
+	}
+	if !strings.HasSuffix(status.Detail, "the tail the reader wants") {
+		t.Fatalf("detail = %q, want the end of the message", status.Detail)
+	}
+	if utf8.RuneCountInString(status.Detail) != detailPreviewLimit {
+		t.Fatalf("detail is %d runes, want the %d-rune bound", utf8.RuneCountInString(status.Detail), detailPreviewLimit)
 	}
 }
 
