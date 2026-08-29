@@ -1521,3 +1521,18 @@ changed. The repository remains ready for the next change once one has been desi
 **Needs attention:** None.
 
 **Next:** Define and queue the next change with `/design-feature`, then run `/work` again.
+
+### 2026-08-29 — Fix: critical review and blocked-pipeline findings
+
+Closed all four critical defects. Diagrams can no longer retain remote URLs in inline styles;
+template deep links distinguish a temporary read failure from deletion; live chat panes no longer
+keep an unbounded second transcript; and a blocked stage agent's second report no longer falsely
+claims it came from a stale assignment. The full automated test suites and production builds pass.
+
+**Needs attention:** Choose the blocked-stage contract. Option 1 keeps the current Continue-only
+flow and makes it explicit that a blocked report ends the attempt, so replies in the agent chat are
+out of band. Option 2 adds a real in-chat continuation route, allowing an answer there to resume the
+pipeline; this is a larger behavior and recovery change.
+
+**Next:** Choose option 1 or option 2; then `/fix` can implement that decision and continue through
+the remaining lower-priority findings.
