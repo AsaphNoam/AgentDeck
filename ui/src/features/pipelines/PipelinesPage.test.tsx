@@ -67,4 +67,18 @@ describe("Pipelines routing", () => {
     renderPipelines("/pipelines?run=run_legacy");
     expect(await screen.findByText("Run route")).toBeInTheDocument();
   });
+
+  // FS-14.A19: a transport failure on a template deep link must not be
+  // presented as confirmation that the template was deleted.
+  it("distinguishes a failed template read from a deleted template", async () => {
+    server.use(http.get("/api/pipelines", () => HttpResponse.json(
+      { error: { code: "read_failed", message: "Template storage is unavailable" } },
+      { status: 500 },
+    )));
+    renderPipelines("/pipelines/templates/delivery");
+
+    expect(await screen.findByRole("heading", { name: "This template could not be loaded." })).toBeInTheDocument();
+    expect(screen.getByText("Template storage is unavailable")).toBeInTheDocument();
+    expect(screen.queryByText("This template is gone.")).not.toBeInTheDocument();
+  });
 });

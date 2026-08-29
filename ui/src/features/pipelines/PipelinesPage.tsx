@@ -9,7 +9,7 @@ import {
   useParams,
   useSearchParams,
 } from "react-router-dom";
-import { usePipelineProposals, usePipelineTemplates } from "../../api/pipelines";
+import { PipelineAPIError, usePipelineProposals, usePipelineTemplates } from "../../api/pipelines";
 import { Button, PageHeader } from "../../components/ui";
 import type { PipelineProposal } from "../../schemas/pipeline";
 import { AgentDeckerBuilder } from "./AgentDeckerBuilder";
@@ -139,7 +139,14 @@ export function PipelineTemplatePage() {
 
   if (templates.isLoading && !seed) return <TemplateEditorSkeleton />;
   if (templateID !== "new" && !seed) {
-    return <section className="pipeline-missing"><p className="pipeline-eyebrow">Template unavailable</p><h2>This template is gone.</h2><p>It may have been deleted in another tab. Existing runs still retain their frozen setup.</p><Link to="/pipelines/templates">Return to Templates</Link></section>;
+    const deleted = !templates.error || (templates.error instanceof PipelineAPIError && templates.error.status === 404);
+    return <section className="pipeline-missing">
+      <p className="pipeline-eyebrow">Template unavailable</p>
+      <h2>{deleted ? "This template is gone." : "This template could not be loaded."}</h2>
+      <p>{deleted ? "It may have been deleted in another tab. Existing runs still retain their frozen setup." : "The template library could not be read just now. Return to Templates and open it again."}</p>
+      {!deleted && <p className="form-error">{templates.error.message}</p>}
+      <Link to="/pipelines/templates">Return to Templates</Link>
+    </section>;
   }
 
   return (

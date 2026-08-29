@@ -65,6 +65,12 @@ bug-investigation finding still needs the user's product decision before it can 
 
 ## Changelog
 
+- **2026-08-29 — fix (INV §2/§8):** Closed the template deep-link Must-fix finding. A failed
+  template-library request now renders a load failure and the transport message instead of claiming
+  the template was deleted; a missing record after a successful read keeps the deletion guidance.
+  The new acceptance regression and the full 301-case UI suite are green with both Go test variants
+  and production builds.
+
 - **2026-08-29 — fix (INV §8):** Closed the diagram sanitizer Must-fix finding. Renderer-produced
   inline `style` attributes now have remote `url(...)` and `@import` references removed at the same
   DOMPurify seam that already scrubs style-element text. The safety regression covers both the
@@ -560,21 +566,6 @@ rendering (`c35ff8c`), the Pipelines split (`9114df7` + `69c2f99`), the four sma
 expandable dashboard chat panes (`43e5feb`). Both Go test variants, the 289-case UI suite,
 `make check-specs`, `git diff --check` and all nine skill twins are green at `43e5feb`; every new
 `rows.Next()` loop in the range checks `rows.Err()` (INV §7 clean).
-
-- **Must fix** (confirmed) A failed template fetch tells the operator the template was deleted.
-  `PipelineTemplatePage` (`ui/src/features/pipelines/PipelinesPage.tsx:131-143`) derives `seed` from
-  `templates.data`, then renders "This template is gone. It may have been deleted in another tab."
-  whenever `seed` is null and loading has ended. A transient 500 or network blip on `/api/pipelines`
-  leaves `data` undefined and hits that same branch, so a reload of a bookmarked
-  `/pipelines/templates/{id}` — exactly the deep link FS-14.R43 exists for — reports a deletion that
-  did not happen, offers no retry, and never surfaces `templates.error`. Its twin got this right in
-  the same commit series: `RunDetail` (`ui/src/features/pipelines/RunBrowser.tsx:89-101`) checks
-  `detail.error instanceof PipelineAPIError && detail.error.status === 404` and shows the transport
-  message for anything else. Two paths deriving "this resource is unavailable", already drifted.
-  FS-14.A19's template half is therefore both wrong and untested — no case in
-  `PipelinesPage.test.tsx` drives a `/api/pipelines` error. Fix: mirror `RunDetail`'s 404 check;
-  test by mocking `/api/pipelines` to 500 and asserting the copy differs from "This template is
-  gone." (FS-14.R43/A19, **INV §2/§8**).
 
 - **Must fix** (confirmed) The pane transcript store keeps a second, unfolded copy of every event
   forever, and appends to it quadratically. `43e5feb` added `rawByAgent`
