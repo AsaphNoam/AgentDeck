@@ -42,4 +42,5 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-None.
+- [`active-project-navigation-tabs.md`](active-project-navigation-tabs.md) — compact project-colored
+  shell navigation for configured projects with running agents.

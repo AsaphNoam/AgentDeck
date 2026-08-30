@@ -5,6 +5,28 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-30 — Feature design: active-project navigation tabs
+
+Active-project navigation tabs are fully specified and waiting to start.
+
+The shell will show smaller, slightly rounded project-colored tabs immediately after the primary
+navigation. A configured project appears while it has a running agent; the current project stays
+visible and selected while its project or agent route remains open, even if its last agent stops.
+Projects are alphabetical, five tabs are shown directly, and the selected project displaces the
+fifth when necessary while the remaining projects stay under `+n`.
+
+The design uses the existing project query, hydrated agent state, routes, and project-color seam.
+It adds no server or API change, persistence, recency tracking, layout measurement, dependency,
+second header row, or product code. Core and Sky & Grove, keyboard navigation, long titles, live
+hydration changes, and the 1024px desktop floor are covered by the acceptance criteria.
+
+`make check-specs`, the twin-skill comparison, and `git diff --check` pass.
+
+**Needs attention:** None.
+
+**Next:** Run `/review-design active-project-navigation-tabs`, then `/work` once the design review
+is clear.
+
 ### 2026-08-30 — Fix: all seven open problems closed, two of them needing your confirmation
 
 Everything the last code review and browser run found is fixed.

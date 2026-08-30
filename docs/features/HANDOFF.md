@@ -78,6 +78,19 @@ logged-in Claude/Codex discovery gate when credentials are available.
 
 ## Changelog
 
+- **2026-08-30 — feature design (FS-02.R54/A36, FS-12.R39/A15, TS-08.R44; INV §1, §2,
+  §8, §10, §13):** Specified compact active-project navigation immediately after the shell's
+  primary tabs. Configured non-archived projects qualify only while they have a non-archived
+  `running` agent, except that the current project remains visible across its last agent stopping
+  until the operator leaves its project or agent route. Title/id alphabetical order supplies five
+  direct links; when the selected project falls later it replaces the fifth, and `+n` contains the
+  alphabetized remainder. The visual contract uses smaller restrained rounded tabs, project accent
+  plus a non-color selection cue, full accessible names for truncated labels, no motion, and a
+  four-region header that holds at the 1024px floor in Core and Sky & Grove. The design reuses
+  `useProjects`, the hydrated agent store, current route matching, and `--ad-project-accent`; it adds
+  no measurement, recency state, persistence, API/server shape, dependency, token, public hook, or
+  second row. `active-project-navigation-tabs.md` is Waiting to start.
+
 - **2026-08-30 — fix (FS-03.R38/A21, FS-02.R45/R53/A28/A35, FS-14.R48/A26, FS-12.R37/A13,
   FS-18.A1/A5, FS-04.A24; INV §6, §7, §8, §10, §13):** Closed all seven open findings from the
   2026-08-30 code review and usability run. **INV §8** — the diagram sanitizer judged CSS before

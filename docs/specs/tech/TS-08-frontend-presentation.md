@@ -1,6 +1,6 @@
 # TS-08 — Frontend presentation architecture
 
-**Status:** Current
+**Status:** Partial
 **Code:** `ui/src`, `ui/package.json`, `ui/vite.config.ts`
 **Absorbed:** —
 
@@ -303,6 +303,38 @@ primitive seam; the rejected alternatives are recorded in §5.
   `stopPropagation` — an opt-out list is exactly the drift INV §2/§10 describe, because every control
   added to the pane later would have to remember to join it, and a missed one fails silently in a way
   no existing test would catch.
+
+### 2.4 Active-project shell navigation
+
+- **R44 (planned)** — The active-project navigation required by FS-02.R54 and FS-12.R39 is one
+  feature-owned `ActiveProjectNav` composed by `Header`. It consumes the existing `useProjects`
+  React Query projection, the complete `useAgentStore` projection, and the current React Router
+  match; it issues no request of its own and adds no Zustand field, layout/config value, browser
+  storage, server shape, or persistence. A pure derivation sorts eligible configured projects by
+  displayed title with project id as tie-breaker, adds the current configured non-archived project
+  derived from `/project/:id` or the `/agent/:id` store row, and returns at most five visible entries
+  plus the alphabetized remainder. If the current project is outside the first five, it replaces the
+  fifth entry and both returned sets are re-sorted. Derivation runs from the current projections on
+  every relevant change, so hydration pruning, route changes, stop events, and project archival
+  cannot leave a retained navigation copy (INV §1/§2).
+
+  `Header` keeps the primary links as primary navigation and appends this compact secondary group
+  before the connection indicator. `shell.css` owns a four-region, non-wrapping header composition
+  that fits the mark, five primary links, five compact project links, an overflow trigger, and the
+  connection indicator at the 1024px desktop floor. Compact project links have a bounded width,
+  ellipsized visible title, full accessible title, restrained `--ad-project-accent` tint/edge, and a
+  structural selected marker independent of color. The accent is the existing project RGB custom
+  property and receives one exact `ActiveProjectNav.tsx` inline-style exception under R14; no new
+  token, public hook, skin selector, or presentation contract version is introduced. Core and Sky &
+  Grove therefore use the same semantic construction.
+
+  More than five entries render a locally controlled `+n` disclosure button and an absolutely
+  positioned list of ordinary project route links. The disclosure closes on selection, Escape, and
+  outside pointer press, preserves normal Tab/Enter link navigation, and has no new menu or motion
+  dependency. A project-query initial load or failure with no cached catalog renders no secondary
+  group and leaves every primary link and the connection indicator operational. The fixed cap is
+  the complete overflow algorithm: no `ResizeObserver`, element measurement, recency state,
+  breakpoint-specific item count, or second navigation row is added.
 
 ## 3. Interfaces & data shapes
 

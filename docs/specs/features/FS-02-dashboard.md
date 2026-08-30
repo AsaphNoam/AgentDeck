@@ -1,6 +1,6 @@
 # FS-02 — Dashboard (card grid home view)
 
-**Status:** Current
+**Status:** Partial
 **Code:** `ui/src/components/grid/`, `ui/src/store/`, `ui/src/components/shell/NotificationCenter.tsx`, `ui/src/features/settings/NotificationsEditor.tsx`, `ui/src/api/sse.ts` · `internal/bus/`, `internal/state/`, `internal/server/handlers.go` (layout, reconcile) · **Journeys:** J5 (grid & layout), J11 (failure & recovery), J12 (restart durability)
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) F1/F2/F11 and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -368,6 +368,21 @@ behavior.
   exempted controls, so a control added to the pane later inherits it and cannot silently reintroduce
   the collapse-on-Send defect.
 
+- **R54 (planned)** — The persistent application shell offers a compact project-navigation link
+  for each configured, non-archived project that has at least one non-archived agent whose
+  `running` value is true. Membership updates from the existing project catalog and hydrated
+  `state_update` projection without a manual refresh. Selecting a link opens the existing
+  `/project/:project-id` dashboard. A project remains represented and selected while the person is
+  viewing that project dashboard or an `/agent/:id` route belonging to it, even after its last
+  running agent stops; it leaves the shell after the person navigates elsewhere. A deleted or
+  otherwise unavailable project configuration receives no shell link, even when a running agent
+  still references its id; it remains reachable through the unavailable-project card required by
+  R29–R32. Eligible projects are ordered alphabetically by displayed title, with durable project id
+  as the deterministic tie-breaker. At most five project links are directly visible. When the
+  current project would fall outside the first five, it replaces the fifth visible project; both
+  the resulting visible set and the remaining overflow set retain alphabetical order. FS-12.R39
+  presents every remaining project under `+n`.
+
 ## 5. Acceptance criteria
 
 **A1.** Launching an agent adds its card within ~1s with no manual refresh; a status change flips the
@@ -568,6 +583,18 @@ picker and launches with the route project's id; the general modal continues to 
   card behaves as it does today. — `CardGrid.test.tsx` and `AgentCard.test.tsx` interaction cases,
   each asserting both that the pane stayed open and that no card context menu opened.
 
+- **A36 (planned)** (R54) — With running agents in two configured projects, both project links
+  appear from every primary route and each opens the matching scoped dashboard. Stopping the last
+  running agent removes its project's link without a reload when another route is open, but keeps
+  that link selected while the person remains on the project's dashboard or one of its agent
+  routes; leaving that context then removes it. A configured project containing only stopped or
+  archived agents and an unavailable project id referenced by a running agent produce no link. A
+  completed hydration that omits a formerly running agent removes the corresponding stale link.
+  With six alphabetically distinct eligible projects, the first five are directly visible and the
+  sixth is under `+1`; selecting that sixth project makes it directly visible, displaces the prior
+  fifth project into `+1`, and leaves each set alphabetized. — shell/component and hydration
+  regressions; J5.
+
 ## 6. Deviations & open decisions
 
 - **Immediate clone UI.** Clone launches immediately with no confirmation, and a disappeared process
@@ -588,6 +615,10 @@ picker and launches with the route project's id; the general modal continues to 
   layout preferences. Independent per-project order, density, and collapsed-group preferences are
   excluded from this change. Archive is project-based; project archival is warning-confirmed, while
   individual agent archive stops and archives immediately without confirmation.
+- **Confirmed active-project shell boundary.** R54 uses `running` as the sole activity test,
+  excludes unavailable project configurations, retains the current project only across its last
+  agent stopping, and uses title/id alphabetical order with a `+n` overflow. It adds no pinning,
+  recency tracking, activity ranking, count badge, or project-specific persistence.
 
 ## 7. Traceability
 

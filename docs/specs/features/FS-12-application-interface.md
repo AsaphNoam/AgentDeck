@@ -1,6 +1,6 @@
 # FS-12 — Core interface design
 
-**Status:** Current
+**Status:** Partial
 **Code:** `ui/src` · **Journeys:** J2–J9, J11, J14
 **Absorbed:** —
 
@@ -199,6 +199,21 @@ Requirements are user-observable.
   reuse the composer and transcript; they are governed by FS-02 and FS-03 and do not contradict R15,
   whose components keep the shared component language R15 actually requires.
 
+### 2.9 Active-project navigation
+
+- **R39 (planned)** — The shell places FS-02.R54's active-project links immediately to the right
+  of the existing primary route tabs in one stable header row. Project links are visibly smaller
+  than the primary tabs, use restrained rounded corners and a bounded tint/edge from the project's
+  configured accent, and retain a non-color current-route indicator. It shows at most five project
+  links, keeps the current project among them, and groups every remaining link under a compact `+n`
+  overflow control that names the hidden count and opens keyboard-accessible navigation to each
+  hidden project. Long project titles truncate visually while retaining their full accessible name.
+  The project area is absent when no link is eligible, never wraps the header, and fits five links
+  plus overflow without overlapping or hiding the primary tabs, AgentDeck mark, connection state,
+  or current-project indicator at the supported desktop floor. Link membership and routing remain
+  feature-owned; presentation does not measure available width, persist state, fetch independently,
+  or reinterpret project activity.
+
 ## 3. States & transitions
 
 - **Route change:** the persistent shell remains visually stable while the current-route
@@ -291,6 +306,14 @@ Requirements are user-observable.
   focus-cycling binding does nothing on `/agent/:id`, and no chat control gains or loses an
   interaction there. — `ChatPanel.test.tsx` and `Composer.test.tsx`.
 
+- **A15 (planned)** (R39) — Core and Sky & Grove fixtures render zero, one, and overflowing sets
+  of active-project links in the shipped header at the supported desktop floor and a wider desktop
+  viewport. The current project remains directly visible and has a text-independent selected state;
+  every visible and overflowed project is reachable by keyboard and exposes its project title;
+  project accents remain distinguishable without becoming the selected-state signal; and no case
+  wraps, clips, overlaps, or displaces the primary navigation, mark, or connection state. *Verify:*
+  shell/component tests, the paired visual matrix, and a real-browser J5 pass.
+
 ## 6. Deviations & open decisions
 
 - The previous Field Atlas proposal was rejected because it made the default design a conceptual
@@ -307,6 +330,9 @@ Requirements are user-observable.
   the Sky & Grove name, Core default/fallback, global server-stored preference, Settings-only
   selection, unchanged product vocabulary, and explicit exclusions on 2026-07-30. TS-02.R21,
   TS-03.R21, and TS-08.R30–R36 define the matching technical boundary.
+- R39 and A15 specify the confirmed same-row compact active-project navigation and `+n` overflow.
+  FS-02.R54 fixes title/id alphabetical ordering and keeps the current project directly visible;
+  no product decision remains open before technical design.
 
 ## 7. Traceability
 
