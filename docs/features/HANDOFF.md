@@ -40,18 +40,21 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   shipped.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
   remain owed before claiming those adapters accept structured results.
-- **Usability state:** The split Pipelines surface was driven through a real Chromium on
-  2026-08-28 against the working tree's own release build. Every FS-14.A14–A23 item was exercised;
-  A14, A16–A20, A22 and A23 passed outright, and the A15 and A21 gaps are now fixed in code and
-  tests. The badge, rail-order and append-motion fixes are unverified in a real browser: no browser
-  run has been made since them. Expandable dashboard panes passed their J5 real-browser charter at
-  1280×800 under both Core and Sky & Grove, including fixed geometry, internal transcript scrolling,
-  stable page position during streaming, keyboard cycling, persistence, and four-pane composition.
-  J5 is still owed for running-first card placement: the live
-  start/stop boundary crossing, the in-drag geometry inside one block, and the refused cross-block
-  drop have unit coverage but no real-browser run — this session had no browser available.
-  The earlier v0.2.2 → v0.2.3 delta remains closed: FS-02.A24 is closed and FS-04.A22 remains
-  narrowed to the native panel.
+- **Usability state:** The new Pipelines pages and the changed dashboard grid were driven through a
+  real Chromium on 2026-08-30 against a `make dist` build of the shipped tree (no product code
+  differs between that build point and `v0.3.0`). The three fixes that had never been in a browser —
+  attempt badge on the timeline rule, run rail stacking after the timeline at the 1024 floor, and
+  the one-shot entrance on an appended timeline entry with reduced motion removing it — all pass.
+  So do A14, A18's cross-destination counts, A19, A20 on the 32-stage template, A22, A24 and A26.
+  J5's owed items are now closed: running-first placement, the live start/stop boundary crossing in
+  both directions, in-drag geometry inside one block, and the refused cross-block drop were all
+  driven, along with the pane cap, its least-recently-used eviction, the evicted pane's draft, pane
+  persistence, the terminal-card exemption, and the pane name link. Four findings are open below.
+  Still owed: A25's stage-boundary wording (needs a live report cycle `fakeacp` cannot drive),
+  A18's consumption on approval, and A32's unknown-agent and cross-project id cases. The earlier
+  v0.2.2 → v0.2.3 delta remains closed: FS-02.A24 is closed and FS-04.A22 remains narrowed to the
+  native panel. Full run:
+  [`usability-review-run-2026-08-30-new-pages.md`](../archive/reviews/usability-review-run-2026-08-30-new-pages.md).
 - **Last reviewed code:** `43e5feb` (2026-08-29). Advanced across the continuous range
   `6a16126..43e5feb`, which was read end to end in one pass; the backlog of three never-reviewed
   commits named in earlier handoffs is now cleared.
@@ -75,6 +78,18 @@ Claude/Codex discovery gate when credentials are available. The unrelated edits 
 separately as `b11fc5f`.
 
 ## Changelog
+
+- **2026-08-30 — usability review (FS-14.R43/R45/R46/R48, A14/A18–A22/A24/A26; FS-02.R45–R52,
+  A28–A34; FS-12.A13):** Drove the new Pipelines pages and the changed dashboard grid through a real
+  Chromium against a `make dist` build of the shipped tree. Twenty-nine steps passed, including all
+  three fixes that had never been in a browser (attempt badge on the timeline rule, run rail
+  stacking after the timeline at the 1024 floor, one-shot entrance on an appended entry with
+  reduced motion removing it) and every J5 item that was owed for running-first placement and the
+  chat panes. Four findings are open: two Must fix (a failed layout read silently disables layout
+  persistence for the session; a launch- or resume-failed pause still offers a dead-end **Open
+  agent**) and two Worth fixing (failure states render in the neutral badge; a refused cross-block
+  drag gives no reason). No product code, specification, or journey matrix changed. Coverage gaps
+  between the J5/J14 charters and FS-02/FS-14 acceptance items are recorded in the run file.
 
 - **2026-08-30 — release (FS-10, TS-06.R13–R22, TS-11.R1/R8):** Cut `v0.3.0` for the 55-commit
   `v0.2.3..HEAD` range under the new §16 role. No open findings blocked it; the user accepted the
@@ -711,7 +726,43 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-None. The user resolved the `agentdeck-shared-skill` design review: verified installation now
+From the 2026-08-30 usability run (repro steps and evidence in
+[`usability-review-run-2026-08-30-new-pages.md`](../archive/reviews/usability-review-run-2026-08-30-new-pages.md)):
+
+- **Must fix** (INV §7/§8) — one failed layout read silently disables layout persistence for the session.
+  `ui/src/components/grid/CardGrid.tsx:61` loads the layout with `void getLayout().then(...)` and no
+  `.catch`, so a failed `GET /api/layout` leaves `loaded.current` false forever. Normal-use trigger:
+  the dashboard is opened while the server is briefly unhealthy. Observed in Chromium against one
+  injected 500: an uncaught page error, no message to the user, the saved manual order and the open
+  chat panes absent from the grid, and every later layout change — expand, reorder, density, group
+  collapse — issuing no `PUT` at all for the rest of the session, while a control run with a healthy
+  read persisted normally. The user has no way to tell their arrangement is no longer being saved.
+  Fix: surface the read failure through the existing `pushError` path and let a failed read still
+  arm saving (or retry it) rather than disabling it permanently. Test: a `CardGrid` case where the
+  first `getLayout` rejects and a later reorder still issues its `PUT`.
+- **Must fix** (INV §10) — a run paused by a launch or resume failure still offers a chat that cannot resolve
+  it. `ui/src/features/pipelines/RunBrowser.tsx:116` withholds **Open agent** only when
+  `attention_reason` starts with `restart_`, but `internal/pipeline/reconcile.go:156,185` pause
+  attempts with `launch_failed` and `resume_failed`, where the stage agent likewise is not running
+  and an ordinary chat resume mints a generation whose report the run refuses. Normal-use trigger:
+  the stage adapter is missing or the provider errors on launch, or Continue fails to resume a
+  blocked stage. Observed: the run page offered **Open agent** and it landed on the stopped stage
+  agent's chat and composer. FS-14.R48 states the principle ("a pause that no chat can resolve does
+  not offer a chat") but scopes the withholding to restart pauses, so the fix decides whether R48
+  widens to every pause whose stage agent is gone or the behavior is intentional. Test: extend the
+  `RunBrowser` action-gating cases to `launch_failed` and `resume_failed`.
+- **Worth fixing** (INV §13) — failure states render in the neutral badge. No `.pipeline-state-launch_failed`,
+  `-resume_failed`, `-restart_recovery`, or `-restart_awaiting_quiescence` rule exists in
+  `ui/src/styles/features/pipelines.css`, so those attempts fall back to the grey base badge while
+  paused and blocked render in the accent colour (measured `rgb(105,126,123)` versus
+  `rgb(40,122,155)`). FS-12.A13 expects a failure to read at higher salience than an ordinary state.
+- **Worth fixing** (no invariant class) — a refused cross-block drag gives no reason. Dragging a running card toward the
+  stopped block is correctly refused (FS-02.A28), but the card follows the pointer and then snaps
+  back to its home slot mid-drag with nothing said. No requirement covers in-drag feedback for the
+  refusal, so the fix decides whether to state it (cursor, boundary treatment, or a brief message)
+  or to specify the snap-back as the intended signal.
+
+No design findings. The user resolved the `agentdeck-shared-skill` design review: verified installation now
 precedes exact AgentDecker migration and the thin prompt no longer claims an unavailable skill.
 Runtime-only overlay fields and fresh PM/teammate prompt cleanup remain included implementation
 alignment, not review findings. Every finding from the 2026-08-29 code review of

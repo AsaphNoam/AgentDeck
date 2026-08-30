@@ -5,6 +5,37 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-30 — Usability review: the new Pipelines pages and the changed dashboard hold up; two real problems
+
+I drove the new pages in a real browser against a build of exactly what v0.3.0 ships: the split
+Runs and Templates pages, a run's own page with its execution timeline, the focused template
+editor, and the dashboard grid with its expanding chat panes and running-first card order.
+
+Twenty-nine checks passed. That includes the three fixes made after the last review that had never
+actually been looked at in a browser, and everything that was still owed on the dashboard: running
+agents really do sort ahead of stopped ones, a card really does move across that line the moment you
+start or stop it, dragging a card inside one block leaves the other block alone, and dragging one
+across the line changes nothing. Expanding a fifth chat pane quietly closes the one you have
+touched least, and the text you had half-typed in it comes back when you reopen it.
+
+Two problems worth fixing, neither of them cosmetic. First: if the dashboard fails to load your
+saved layout even once — a brief server hiccup on page load is enough — your card arrangement and
+open panes silently disappear from the screen, nothing tells you anything went wrong, and from then
+on nothing you do to the layout is saved for the rest of that session. Second: when a pipeline stage
+fails to start or fails to resume, the run page still offers to open that stage's chat. That chat
+cannot report back to the run, so anything you do there is lost work — the same dead end we removed
+last week for runs paused by a restart, just reached by a different route.
+
+Two smaller ones: failed pipeline stages render in the same neutral grey as ordinary states, so a
+failure does not stand out; and when you drag a card across the running/stopped line, the card
+snaps back mid-drag without saying why the move was refused.
+
+**Needs attention:** The second problem needs a product call, and it is the same one you answered
+last week: should any pause whose stage agent is gone hide the chat link, or only a restart pause?
+The rule we wrote says the principle broadly and then applies it narrowly.
+
+**Next:** Run `/fix` on the two must-fix items; I did not touch product code.
+
 ### 2026-08-30 — Release: v0.3.0 is tagged and waiting for your go-ahead
 
 AgentDeck v0.3.0 is built, verified, and tagged on this machine. It is not published: pushing is
