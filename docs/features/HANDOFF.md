@@ -25,12 +25,13 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   action rather than widen Continue — and is flagged in the human update for confirmation. The
   earlier 2026-08-27 all-200/no-page-load incident stays fixed, and the shared SSE stream is now
   replayed to a joining tab instead of restarted for every tab.
-- **Review state:** No open design findings. The continuous `43e5feb..52d01c4` range is reviewed.
-  The 2026-08-30 code review added one **Must fix** diagram-sanitizer bypass and two **Worth
-  fixing** acceptance-coverage gaps for lifecycle composition and migration I/O failures. The four
-  usability findings from 2026-08-30 also remain open below. Every earlier code-review and bug-
-  investigation finding remains closed. The six-tab shared-stream check remains an acceptance gate;
-  the block-split drag preview and expanded-pane footprint browser gate closed in the usability run.
+- **Review state:** No open findings of any kind. The continuous `43e5feb..52d01c4` range is
+  reviewed, and the 2026-08-30 fix run closed its three findings together with the four from the
+  same day's usability run. Two of those fixes changed specified behavior: FS-14.R48 now withholds
+  **Open agent** on a failed stage launch or resume as well as on restart recovery, and FS-02.R53
+  is new — a cross-block drag states its refusal in flight. The six-tab shared-stream check remains
+  an acceptance gate; the block-split drag preview and expanded-pane footprint browser gate closed
+  in the usability run. The new pointer treatment for a refused drag has not been in a browser.
 - **Active change:** None. Thin AgentDecker and the shared AgentDeck operating skill are finished
   and verified (FS-18, FS-04.R44/A24, TS-11). Expandable dashboard chat panes are finished and verified
   (FS-02.R46–R52/A29–A34, FS-03.R39/A23, FS-12.R38/A14, TS-03.R31, TS-08.R41–R43).
@@ -50,7 +51,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   J5's owed items are now closed: running-first placement, the live start/stop boundary crossing in
   both directions, in-drag geometry inside one block, and the refused cross-block drop were all
   driven, along with the pane cap, its least-recently-used eviction, the evicted pane's draft, pane
-  persistence, the terminal-card exemption, and the pane name link. Four findings are open below.
+  persistence, the terminal-card exemption, and the pane name link. Its four findings are all fixed;
+  the refused cross-block drag now states the refusal through the pointer while the drag is in
+  flight (FS-02.R53), which no browser has seen yet.
   Still owed: A25's stage-boundary wording (needs a live report cycle `fakeacp` cannot drive),
   A18's consumption on approval, and A32's unknown-agent and cross-project id cases. The earlier
   v0.2.2 → v0.2.3 delta remains closed: FS-02.A24 is closed and FS-04.A22 remains narrowed to the
@@ -64,19 +67,38 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 **Change:** None.
 
-**State:** The shared operating skill is shipped. AgentDeck installs and verifies byte-identical
-owner-only Claude/Codex views at startup, conditionally composes one runtime-only directory, prompt,
-and environment overlay through all three lifecycle composers, migrates only the exact historical
-AgentDecker prompt after verification, and leaves startup and user configuration intact on failure.
-The core automated suites are green, but the review found that the required lifecycle-composition
-matrix and migration read/write-error fixtures are incomplete. Credentialed pinned-provider
+**State:** The shared operating skill is shipped, and the 2026-08-30 fix run closed every open
+finding. FS-18.A1's lifecycle-composition matrix and FS-18.A5's migration read/write-error fixtures
+now exist, so the two acceptance gaps the review recorded are covered. Credentialed pinned-provider
 discovery remains the existing manual gate because the available Claude session is logged out and
 Codex authentication could not be confirmed.
 
-**Next:** Run `/fix` for the open findings, starting with the diagram-sanitizer bypass, then complete
-the pinned logged-in Claude/Codex discovery gate when credentials are available.
+**Next:** Confirm the two product calls recorded under Review findings, then complete the pinned
+logged-in Claude/Codex discovery gate when credentials are available.
 
 ## Changelog
+
+- **2026-08-30 — fix (FS-03.R38/A21, FS-02.R45/R53/A28/A35, FS-14.R48/A26, FS-12.R37/A13,
+  FS-18.A1/A5, FS-04.A24; INV §6, §7, §8, §10, §13):** Closed all seven open findings from the
+  2026-08-30 code review and usability run. **INV §8** — the diagram sanitizer judged CSS before
+  decoding it, so `u\72 l(...)`/`@\69 mport` survived the literal-text strip; style elements and
+  style attributes are now decoded first and dropped whole when a URL-bearing token remains, with a
+  renderer case that fails against the old regex. **INV §7/§8** — a failed `GET /api/layout` left
+  `loaded` false forever, silently disabling layout persistence for the session; the failure now
+  surfaces through `pushError` and still arms saving. **INV §10** — `launch_failed` and
+  `resume_failed` pauses also leave no running stage agent, so R48's withholding of **Open agent**
+  widened to them with wording that names the failure; the spec item and A26 widened with it.
+  **INV §13** — `.pipeline-state-launch_failed`, `-resume_failed`, `-restart_recovery`, and
+  `-restart_awaiting_quiescence` had no selector, so interrupted attempts fell back to the neutral
+  badge; failures now read at error salience and interruptions at waiting salience. The refused
+  cross-block drag now states the refusal in flight through the pointer instead of an unexplained
+  snap-back, specified as new FS-02.R53/A35. **INV §6/§10** — FS-18.A1's lifecycle-composition
+  matrix now covers all three composers across seven lifecycles with the package available and
+  unavailable, asserting the effective process parameters once and their absence from frozen session
+  metadata; removing the overlay call from `resume.go` fails it. **INV §10** — the exact migration
+  gained corrupt-read and read-only-directory write-failure fixtures that compare the role bytes
+  before and after. `make check-specs`, `make build`, both Go test variants, the UI suite, and the
+  UI build pass.
 
 - **2026-08-30 — review (FS-18, FS-04.R44/A24, FS-03.R38/A21, TS-11, INV
   §1–§15):** Reviewed the continuous `43e5feb..52d01c4` range end to end. The package installer,
@@ -714,6 +736,9 @@ an explicit specification update. Remove an item when the human resolves it or q
   every edge and corner, while a card right-click still opens the card menu, and the menu opens a
   styled create modal. Evidence in the J16 section of
   [`../archive/reviews/usability-review-run-2026-08-27-release-delta.md`](../archive/reviews/usability-review-run-2026-08-27-release-delta.md).
+- [ ] Drag a running card over the stopped block in a real browser and confirm the pointer states the
+      refusal, clears when the pointer returns to its own block, and clears when the drag ends
+      (FS-02.A35, J5). jsdom evaluates no CSS, so the unit case covers only the marked state.
 - [ ] Run a task start, an assignment turn, and a reported result against the pinned Claude and Codex
       adapters before claiming dependent work works with real providers (FS-16 §6).
 - [ ] Run one successful and one refused MCP tool call through pinned Claude and Codex adapters before
@@ -739,75 +764,21 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-From the 2026-08-30 code review of `43e5feb..52d01c4`:
-
-- **Must fix** (INV §8) — CSS identifier escapes bypass the diagram renderer's no-network
-  sanitizer. `ui/src/components/chat/renderers/mermaid.ts:27-35` removes only literal `url(...)`
-  and `@import` text from renderer-produced style elements and inline style attributes. Normal-use
-  trigger: an assistant reproduces an untrusted Mermaid `classDef` from a repository using an
-  escaped identifier such as `u\72l(https://example.invalid/fill.svg)`. DOMPurify preserves that
-  CSS, the regex does not match it, and browser CSS tokenization resolves the escape back to
-  `url(...)`, violating FS-03.R38's requirement that rendering make no network request. Fix: use a
-  CSS-aware sanitizer or conservatively reject style declarations/elements containing URL-bearing
-  tokens after CSS escape decoding. Test: extend the FS-03.A21 renderer/request-spy case with escaped
-  `url` and `@import` spellings and assert both the sanitized markup and network observer stay clean.
-- **Worth fixing** (INV §6/§10) — the shared knowledge overlay's required lifecycle composition
-  matrix is not tested. `internal/server/knowledge_overlay_test.go:25-76` invokes
-  `applyKnowledgeOverlay` directly; the only downstream contract test covers terminal argument
-  delivery. FS-18.A1 explicitly requires composition tests for fresh launch, ordinary and wake
-  resume, runtime switch, pipeline-started work, chat, and terminal. Normal-use risk: a future
-  composer or pipeline path can stop calling the shared seam while the helper tests remain green.
-  Add table-driven composer/lifecycle tests with the package available and unavailable, asserting
-  the effective process parameters once and their absence from frozen session metadata.
-- **Worth fixing** (INV §10) — the exact migration's specified read/write-error fixtures are absent.
-  `internal/config/config_test.go:444-527` covers exact, one-byte, empty/custom, production, and
-  missing-role cases, but FS-18.A5 and FS-04.A24 also require read and write errors to leave the role
-  unchanged. Normal-use risk: a corrupt role file or failed atomic replacement could regress the
-  startup retry guarantee without failing the suite. Add explicit read-failure and injected atomic-
-  write-failure cases that compare the role bytes before and after the attempted migration.
-
-From the 2026-08-30 usability run (repro steps and evidence in
-[`usability-review-run-2026-08-30-new-pages.md`](../archive/reviews/usability-review-run-2026-08-30-new-pages.md)):
-
-- **Must fix** (INV §7/§8) — one failed layout read silently disables layout persistence for the session.
-  `ui/src/components/grid/CardGrid.tsx:61` loads the layout with `void getLayout().then(...)` and no
-  `.catch`, so a failed `GET /api/layout` leaves `loaded.current` false forever. Normal-use trigger:
-  the dashboard is opened while the server is briefly unhealthy. Observed in Chromium against one
-  injected 500: an uncaught page error, no message to the user, the saved manual order and the open
-  chat panes absent from the grid, and every later layout change — expand, reorder, density, group
-  collapse — issuing no `PUT` at all for the rest of the session, while a control run with a healthy
-  read persisted normally. The user has no way to tell their arrangement is no longer being saved.
-  Fix: surface the read failure through the existing `pushError` path and let a failed read still
-  arm saving (or retry it) rather than disabling it permanently. Test: a `CardGrid` case where the
-  first `getLayout` rejects and a later reorder still issues its `PUT`.
-- **Must fix** (INV §10) — a run paused by a launch or resume failure still offers a chat that cannot resolve
-  it. `ui/src/features/pipelines/RunBrowser.tsx:116` withholds **Open agent** only when
-  `attention_reason` starts with `restart_`, but `internal/pipeline/reconcile.go:156,185` pause
-  attempts with `launch_failed` and `resume_failed`, where the stage agent likewise is not running
-  and an ordinary chat resume mints a generation whose report the run refuses. Normal-use trigger:
-  the stage adapter is missing or the provider errors on launch, or Continue fails to resume a
-  blocked stage. Observed: the run page offered **Open agent** and it landed on the stopped stage
-  agent's chat and composer. FS-14.R48 states the principle ("a pause that no chat can resolve does
-  not offer a chat") but scopes the withholding to restart pauses, so the fix decides whether R48
-  widens to every pause whose stage agent is gone or the behavior is intentional. Test: extend the
-  `RunBrowser` action-gating cases to `launch_failed` and `resume_failed`.
-- **Worth fixing** (INV §13) — failure states render in the neutral badge. No `.pipeline-state-launch_failed`,
-  `-resume_failed`, `-restart_recovery`, or `-restart_awaiting_quiescence` rule exists in
-  `ui/src/styles/features/pipelines.css`, so those attempts fall back to the grey base badge while
-  paused and blocked render in the accent colour (measured `rgb(105,126,123)` versus
-  `rgb(40,122,155)`). FS-12.A13 expects a failure to read at higher salience than an ordinary state.
-- **Worth fixing** (no invariant class) — a refused cross-block drag gives no reason. Dragging a running card toward the
-  stopped block is correctly refused (FS-02.A28), but the card follows the pointer and then snaps
-  back to its home slot mid-drag with nothing said. No requirement covers in-drag feedback for the
-  refusal, so the fix decides whether to state it (cursor, boundary treatment, or a brief message)
-  or to specify the snap-back as the intended signal.
+None open. Every finding from the 2026-08-30 code review of `43e5feb..52d01c4`, the 2026-08-30
+usability run, the 2026-08-29 code review of `6a16126..43e5feb`, the 2026-08-28 bug investigation,
+and the 2026-08-28 review of `790c01c` is closed. Two of the closed findings needed a product call,
+and each was taken as the smaller of the two options the finding named, so both are worth
+confirming: a pause whose stage agent is gone now withholds **Open agent** for a failed launch or
+resume as well as for restart recovery (FS-14.R48 widened, rather than the old behavior being
+declared intentional), and a refused cross-block card drag now states the refusal through the
+pointer while the drag is in flight (FS-02.R53), rather than the snap-back being specified as the
+intended signal.
 
 No design findings. The user resolved the `agentdeck-shared-skill` design review: verified installation now
 precedes exact AgentDecker migration and the thin prompt no longer claims an unavailable skill.
 Runtime-only overlay fields and fresh PM/teammate prompt cleanup remain included implementation
-alignment, not review findings. Every finding from the 2026-08-29 code review of
-`6a16126..43e5feb`, the 2026-08-28 bug investigation, and the 2026-08-28 review of `790c01c`
-remains closed. Browser-only evidence is recorded as acceptance gates above, not as findings.
+alignment, not review findings. Browser-only evidence is recorded as acceptance gates above, not as
+findings.
 
 ## Design consistency notes
 

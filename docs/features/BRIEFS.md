@@ -5,6 +5,34 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-30 — Fix: all seven open problems closed, two of them needing your confirmation
+
+Everything the last code review and browser run found is fixed.
+
+The three that could bite a person during ordinary use: a diagram in a reply could still reach out to
+the network by spelling its web address in a way the safety check did not recognise — diagram styles
+are now decoded before they are judged and thrown away whole if anything still points outward. If the
+dashboard failed to load your saved layout even once, nothing was said and nothing you rearranged was
+saved for the rest of that session — the failure now tells you, and saving keeps working. And a
+pipeline run paused because its stage failed to start or failed to resume no longer offers to open a
+chat that cannot report back; it points you at Retry, which is the only thing that moves the run.
+
+Two smaller ones: a failed or interrupted pipeline stage now stands out in its own colour instead of
+the same grey as an ordinary state, and dragging a card across the running/stopped line now shows you
+the drop will not land while you are still dragging, rather than letting the card snap back with no
+explanation. Two test gaps the review flagged are also filled: every way an agent can be started or
+restarted is now checked to still deliver the shared operating knowledge, and the one-time AgentDecker
+prompt migration is now checked to leave the role untouched when the file cannot be read or written.
+
+**Needs attention:** Two of these needed a product call and I took the smaller option in each, so
+please confirm. A run paused by a failed stage launch or resume now hides **Open agent** — the same
+rule already used for restart-paused runs — rather than keeping the chat and widening what it can do.
+And a refused card drag now signals the refusal through the cursor rather than showing a written
+message. The cursor treatment has only been tested in code, not in a real browser yet.
+
+**Next:** You confirm those two choices; the browser check of the drag cursor rides along with the
+next usability run.
+
 ### 2026-08-30 — Usability review: the new Pipelines pages and the changed dashboard hold up; two real problems
 
 I drove the new pages in a real browser against a build of exactly what v0.3.0 ships: the split

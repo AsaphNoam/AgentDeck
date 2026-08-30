@@ -206,6 +206,18 @@
   opacity: 0.7;
 }
 
+/* A drop across the running/stopped boundary is refused (FS-02.R45), so the drag says
+   so while it is still in flight rather than only snapping back (FS-02.R53). The
+   handle keeps its own cursor while held, so it is named here too. */
+.group-stack[data-drop="refused"],
+.group-stack[data-drop="refused"] .drag-handle:active {
+  cursor: not-allowed;
+}
+
+.group-stack[data-drop="refused"] .agent-card.dragging {
+  opacity: 0.4;
+}
+
 .agent-card.stopped {
   filter: grayscale(0.55);
   opacity: 0.68;

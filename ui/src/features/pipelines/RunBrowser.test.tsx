@@ -356,12 +356,12 @@ describe("run page lifecycle boundary", () => {
   });
 });
 
-// FS-14.R48: a restart pause stopped the stage agent, Continue rejects that
-// state, and an ordinary chat resume mints an unrelated generation whose report
-// is refused forever — so Retry is the only route that moves the run. The run
-// page used to offer Open agent there anyway, inviting the operator into a chat
-// that leads nowhere.
-describe("restart-recovery pause", () => {
+// FS-14.R48/A26: a restart pause stopped the stage agent, a failed launch or
+// resume never started one, Continue rejects that state, and an ordinary chat
+// resume mints an unrelated generation whose report is refused forever — so Retry
+// is the only route that moves the run. The run page used to offer Open agent
+// there anyway, inviting the operator into a chat that leads nowhere.
+describe("pauses whose stage agent is not running", () => {
   const recovered = {
     ...detail,
     run: { ...run, state: "paused", pending_action: "", attention_reason: "restart_recovery" },
@@ -384,6 +384,19 @@ describe("restart-recovery pause", () => {
     expect(screen.queryByRole("link", { name: "Open agent" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry stage" })).toBeInTheDocument();
     expect(screen.getByText(/its chat can no longer report against this run/)).toBeInTheDocument();
+  });
+
+  it.each(["launch_failed", "resume_failed"])("withholds Open agent on a %s pause", async (reason) => {
+    server.use(http.get("/api/pipeline-runs/run_1", () => HttpResponse.json({
+      ...detail,
+      run: { ...run, state: "paused", pending_action: "", attention_reason: reason },
+    })));
+    renderRun();
+
+    await screen.findByRole("heading", { name: "Ship", level: 2 });
+    expect(screen.queryByRole("link", { name: "Open agent" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry stage" })).toBeInTheDocument();
+    expect(screen.getByText(/is not running after this failure/)).toBeInTheDocument();
   });
 
   it("still offers Open agent on an ordinary blocked pause", async () => {

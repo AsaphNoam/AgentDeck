@@ -22,16 +22,38 @@ type Purify = (typeof import("dompurify"))["default"];
 let purify: Purify | null = null;
 
 // Mermaid emits one `<style>` element carrying the theme CSS. `classDef` puts author-controlled
-// declarations into it, so any remote reference is stripped to keep rendering request-free
-// (FS-03.R38); the core theme never emits one.
+// declarations into it, and the same author text can reach a `style` attribute, so any remote
+// reference must be gone before the markup is inserted (FS-03.R38).
+//
+// CSS tokenization resolves identifier escapes, so `u\72 l(…)` is the same declaration as
+// `url(…)`: the text is decoded before it is judged, never after. A carrier that still names a
+// URL-bearing token once decoded is dropped whole rather than patched — patching a value the
+// browser re-tokenizes is how the escape got through in the first place, and the core theme emits
+// no such token, so nothing the product renders is lost (INV §8).
+const URL_BEARING = /url\(|@import|image-set\(|src\(/i;
+
+function decodeCSSEscapes(css: string): string {
+  return css.replace(/\\(?:([0-9a-fA-F]{1,6})[ \t\n\r\f]?|([\s\S]))/g, (_match, hex: string | undefined, literal: string | undefined) => {
+    if (hex === undefined) return literal ?? "";
+    const code = parseInt(hex, 16);
+    // CSS maps null, out-of-range, and surrogate escapes to U+FFFD, which carries
+    // no token meaning — decoding them to anything else would be inventing text.
+    return code === 0 || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff) ? "\ufffd" : String.fromCodePoint(code);
+  });
+}
+
+function namesRemoteReference(css: string): boolean {
+  return URL_BEARING.test(decodeCSSEscapes(css));
+}
+
 function stripRemoteStyleReferences(node: Node) {
   if (node.nodeName.toLowerCase() !== "style") return;
-  node.textContent = (node.textContent ?? "").replace(/@import[^;]*;?|url\([^)]*\)?/gi, "");
+  if (namesRemoteReference(node.textContent ?? "")) node.textContent = "";
 }
 
 function stripRemoteInlineStyleReferences(node: Node) {
   if (!(node instanceof Element) || !node.hasAttribute("style")) return;
-  node.setAttribute("style", (node.getAttribute("style") ?? "").replace(/@import[^;]*;?|url\([^)]*\)?/gi, ""));
+  if (namesRemoteReference(node.getAttribute("style") ?? "")) node.removeAttribute("style");
 }
 
 async function loadPurify(): Promise<Purify> {

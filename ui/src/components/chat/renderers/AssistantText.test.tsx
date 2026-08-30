@@ -126,6 +126,28 @@ describe("assistant diagram safety", () => {
     fetchSpy.mockRestore();
   });
 
+  // The regex that once stripped `url(`/`@import` matched literal text only, so an escaped
+  // spelling the browser tokenizes back to a URL survived it (FS-03.R38, INV §8).
+  it("drops style carriers whose URL token is written with CSS escapes", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("no request expected"));
+    mermaid.render.mockResolvedValue({
+      svg:
+        '<svg id="d">' +
+        '<g style="fill:u\\72 l(https://example.invalid/fill.svg);stroke:red"><text>Styled</text></g>' +
+        '<style>@\\69 mport "https://example.invalid/a.css"; #d { background: U\\52 L(https://example.invalid/b.png); }</style>' +
+        "</svg>",
+    });
+
+    const { container } = renderAssistant(CLOSED);
+
+    await waitFor(() => expect(container.querySelector(".mermaid-diagram-figure svg")).not.toBeNull());
+    const figure = container.querySelector(".mermaid-diagram-figure") as Element;
+    expect(figure.innerHTML).not.toContain("example.invalid");
+    expect(figure.querySelector("style")?.textContent).not.toContain("example.invalid");
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
   it("refuses an external-image node before the renderer runs and makes no request", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("no request expected"));
     const { container } = renderAssistant(

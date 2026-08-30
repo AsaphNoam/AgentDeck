@@ -336,13 +336,15 @@ feature are recorded in §6.
   operator who answers there instead of in Continue otherwise gets work the run can never accept,
   with nothing in the agent's own instructions having warned either of them.
 
-- **R48** — A pause that no chat can resolve does not offer a chat. When a
-  restart pauses a run that was awaiting a result or quiescence, its stage agent has been stopped,
-  Continue rejects that state, and an ordinary chat resume of that agent mints an unrelated launch
-  generation whose report is refused for the life of the run — so **Retry**, with a fresh agent, is
-  the only action that moves it. The run page therefore withholds **Open agent** on such a pause and
-  says that the stage agent can no longer report against the run and that Retry runs the stage
-  again. Every other pause keeps **Open agent** unchanged.
+- **R48** — A pause that no chat can resolve does not offer a chat. A restart that
+  pauses a run awaiting a result or quiescence stops its stage agent; a failed stage launch and a
+  failed stage resume likewise leave no running stage agent. In all three, Continue rejects that
+  state and an ordinary chat resume of that agent mints an unrelated launch generation whose report
+  is refused for the life of the run — so **Retry**, with a fresh agent, is the only action that
+  moves it. The run page therefore withholds **Open agent** on such a pause and says that the stage
+  agent can no longer report against the run and that Retry runs the stage again, naming whether the
+  agent was stopped by the restart or left unstarted by the failure. Every other pause, including a
+  `blocked` pause whose stage agent stays live, keeps **Open agent** unchanged.
 
 ## 5. Acceptance criteria
 
@@ -468,10 +470,10 @@ feature are recorded in §6.
   cannot be recorded. *Verify:* `internal/pipeline/blocked_chat_answer_test.go` and
   `internal/messaging/pipeline_tools_test.go`.
 
-- **A26** (R48) — A run paused by restart recovery shows no **Open agent** action,
-  keeps **Retry stage**, and states that the stage agent can no longer report against the run; a run
-  paused as `blocked` still links to its live stage agent. *Verify:*
-  `ui/src/features/pipelines/RunBrowser.test.tsx`.
+- **A26** (R48) — A run paused by restart recovery, by a failed stage launch, or by a
+  failed stage resume shows no **Open agent** action, keeps **Retry stage**, and states that the
+  stage agent can no longer report against the run; a run paused as `blocked` still links to its
+  live stage agent. *Verify:* `ui/src/features/pipelines/RunBrowser.test.tsx`.
 
 ## 6. Deviations & open decisions
 

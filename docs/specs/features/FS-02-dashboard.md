@@ -289,6 +289,14 @@ behavior.
   reorder and does not save the layout, because manual drag order cannot override the running-first
   boundary. The existing separate cross-group drag behavior is unchanged.
 
+- **R53** — A drag that cannot be dropped says so while it is still in flight.
+  While a dragged card is over a card in the other running/stopped block, the grid marks the drag
+  refused and the pointer states it, so the person learns the drop will not land before releasing
+  it rather than only from an unexplained snap-back (R45). The mark clears when the pointer returns
+  to the card's own block and when the drag ends or is cancelled. Nothing else about the drag
+  changes: no card moves that would not otherwise move, no request is made, and no message
+  interrupts the drag.
+
 ### Expanded chat panes
 
 - **R46** — An agent card whose agent has the `chat` interface can be
@@ -497,6 +505,11 @@ picker and launches with the route project's id; the general modal continues to 
   new render, drag-geometry, payload, and no-request cases in
   `ui/src/components/grid/CardGrid.test.tsx` beside the existing scoped-reorder case, and by **J5** in
   `docs/features/USABILITY-REVIEW.md` for the live start/stop and drag behavior in a real browser.
+
+- **A35** (R53) — Dragging a running card over a stopped card marks the grid refused;
+  moving back over a card in its own block clears the mark, and ending or cancelling the drag clears
+  it. *Verify by* a drag-over case in `ui/src/components/grid/CardGrid.test.tsx`, and by **J5** in
+  `docs/features/USABILITY-REVIEW.md` for the pointer treatment itself, which jsdom cannot evaluate.
 
 - **A29** (R46, R47) — Clicking a collapsed chat-agent card expands it in place
   instead of navigating; clicking its header again collapses it; the expanded card carries the

@@ -7,6 +7,7 @@ import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
 import { CardGrid, mergeScopedOrder } from "./CardGrid";
 import { useAgentStore } from "../../store/agentStore";
+import { useUiStore } from "../../store/uiStore";
 import type { AgentState } from "../../api/types";
 
 // FS-02.A28 needs two things a real drag in jsdom cannot give: the id order handed to
@@ -21,12 +22,14 @@ const dnd = vi.hoisted(() => ({
   itemLists: [] as string[][],
   items: [] as string[],
   onDragEnd: undefined as ((event: { active: { id: string }; over: { id: string } | null }) => void) | undefined,
+  onDragOver: undefined as ((event: { active: { id: string }; over: { id: string } | null }) => void) | undefined,
 }));
 
 vi.mock("@dnd-kit/core", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@dnd-kit/core")>()),
-  DndContext: ({ children, onDragEnd }: { children: React.ReactNode; onDragEnd: typeof dnd.onDragEnd }) => {
+  DndContext: ({ children, onDragEnd, onDragOver }: { children: React.ReactNode; onDragEnd: typeof dnd.onDragEnd; onDragOver: typeof dnd.onDragOver }) => {
     dnd.onDragEnd = onDragEnd;
+    dnd.onDragOver = onDragOver;
     // DndContext renders before its children on every pass, so this is where the
     // per-pass record starts.
     dnd.itemLists = [];
@@ -74,6 +77,7 @@ afterEach(() => {
   server.resetHandlers();
   dnd.items = [];
   dnd.onDragEnd = undefined;
+  dnd.onDragOver = undefined;
   act(() => useAgentStore.setState({ agents: {}, order: [], hydrated: false, hydrating: false }));
 });
 afterAll(() => server.close());
@@ -553,5 +557,44 @@ describe("CardGrid", () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     expect(orders).toHaveLength(1);
     expect(renderedIDs()).toEqual(["a_2", "a_4", "a_1", "a_3"]);
+  });
+
+  // FS-02.A35 — the state half. The pointer treatment itself is J5's, because jsdom
+  // evaluates no CSS (INV §13).
+  it("marks a drag over the other block refused and clears the mark", async () => {
+    seedGrid(["a_1", "a_2"], { a_1: agent("a_1"), a_2: agent("a_2", { running: false }) });
+    renderWithQuery(<CardGrid />);
+    await waitFor(() => expect(renderedIDs()).toEqual(["a_1", "a_2"]));
+    const stack = document.querySelector(".group-stack") as HTMLElement;
+    expect(stack).not.toHaveAttribute("data-drop");
+
+    act(() => dnd.onDragOver?.({ active: { id: "a_1" }, over: { id: "a_2" } }));
+    expect(document.querySelector(".group-stack")).toHaveAttribute("data-drop", "refused");
+
+    act(() => dnd.onDragOver?.({ active: { id: "a_1" }, over: { id: "a_1" } }));
+    expect(document.querySelector(".group-stack")).not.toHaveAttribute("data-drop");
+
+    act(() => dnd.onDragOver?.({ active: { id: "a_1" }, over: { id: "a_2" } }));
+    act(() => dnd.onDragEnd?.({ active: { id: "a_1" }, over: { id: "a_2" } }));
+    expect(document.querySelector(".group-stack")).not.toHaveAttribute("data-drop");
+  });
+
+  // A failed layout read once left saving disarmed for the rest of the session with
+  // nothing said, so the person's later arrangement was silently never stored
+  // (INV §7/§8).
+  it("reports a failed layout read and still saves a later reorder", async () => {
+    const orders = capturedLayoutOrders();
+    act(() => useUiStore.setState({ toasts: [] }));
+    seedGrid(["a_1", "a_2"], { a_1: agent("a_1"), a_2: agent("a_2") });
+    // After seedGrid, whose own handler would otherwise answer this read.
+    server.use(http.get("/api/layout", () => new HttpResponse(null, { status: 500 })));
+    renderWithQuery(<CardGrid />);
+
+    await waitFor(() => expect(useUiStore.getState().toasts.at(-1)?.title).toBe("Loading layout failed"));
+    expect(useUiStore.getState().toasts.at(-1)?.type).toBe("error");
+
+    act(() => dnd.onDragEnd?.({ active: { id: "a_1" }, over: { id: "a_2" } }));
+
+    await waitFor(() => expect(orders.at(-1)).toEqual(["a_2", "a_1"]));
   });
 });

@@ -1,4 +1,4 @@
-import { DndContext, type DragEndEvent } from "@dnd-kit/core";
+import { DndContext, type DragEndEvent, type DragOverEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, rectSortingStrategy } from "@dnd-kit/sortable";
 import { useEffect, useMemo, useRef, useState, type ComponentProps, type KeyboardEvent } from "react";
 import { Link } from "react-router-dom";
@@ -53,19 +53,30 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
   const [releaseGroupLabel, setReleaseGroupLabel] = useState<string | null>(null);
   const [releaseGroupError, setReleaseGroupError] = useState("");
   const [expanded, setExpanded] = useState<string[]>([]);
+  const [refusedDrop, setRefusedDrop] = useState(false);
   const projects = useProjects();
 
   const loaded = useRef(false);
 
+  // A failed read is reported and still arms saving: leaving `loaded` false swallowed
+  // the error and silently disabled layout persistence for the whole session, so every
+  // later expand, reorder, density, or collapse was lost with nothing on screen saying
+  // so (INV §7/§8). Saving what the person now sees keeps the screen and the stored
+  // layout in agreement.
   useEffect(() => {
-    void getLayout().then((layout) => {
-      setOrder(layout.order ?? []);
-      setDensity(layout.density);
-      setGroupLayout(layout.groups ?? {});
-      setExpanded((layout.expanded ?? []).slice(0, 4));
-      loaded.current = true;
-    });
-  }, [setDensity, setGroupLayout, setOrder]);
+    void getLayout()
+      .then((layout) => {
+        setOrder(layout.order ?? []);
+        setDensity(layout.density);
+        setGroupLayout(layout.groups ?? {});
+        setExpanded((layout.expanded ?? []).slice(0, 4));
+        loaded.current = true;
+      })
+      .catch((err: unknown) => {
+        loaded.current = true;
+        pushError("Loading layout failed", err instanceof Error ? err.message : String(err));
+      });
+  }, [pushError, setDensity, setGroupLayout, setOrder]);
 
   useEffect(() => {
     if (!loaded.current) return;
@@ -143,7 +154,16 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
     target.scrollIntoView({ block: "nearest" });
   };
 
+  // dnd-kit refuses a cross-block drop only when the pointer is released, so the card
+  // followed the pointer into the other block and then snapped home with nothing said.
+  // Marking the refusal while the drag is still in flight states it before the release
+  // without interrupting the drag (FS-02.R53).
+  const onDragOver = ({ active, over }: DragOverEvent) => {
+    setRefusedDrop(!!over && agents[String(active.id)]?.running !== agents[String(over.id)]?.running);
+  };
+
   const onDragEnd = (event: DragEndEvent) => {
+    setRefusedDrop(false);
     if (!event.over || event.active.id === event.over.id) return;
     const activeID = String(event.active.id);
     const overID = String(event.over.id);
@@ -178,8 +198,8 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
         actions={<><TaskAttentionLink projectID={projectID} /><Button variant="primary" type="button" onClick={() => setShowNewAgent(true)}>New agent</Button><DensityControl /></>}
         data-slot="header"
       />
-      <DndContext onDragEnd={onDragEnd}>
-          <div className="group-stack" data-slot="groups" onKeyDown={cyclePaneFocus}>
+      <DndContext onDragEnd={onDragEnd} onDragOver={onDragOver} onDragCancel={() => setRefusedDrop(false)}>
+          <div className="group-stack" data-slot="groups" data-drop={refusedDrop ? "refused" : undefined} onKeyDown={cyclePaneFocus}>
             {grouped.map((group) => {
               const collapsed = groupLayout[group.key]?.collapsed ?? false;
               return (

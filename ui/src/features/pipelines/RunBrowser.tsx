@@ -109,11 +109,13 @@ export function RunDetail({ runID, onDeleted }: { runID: string; onDeleted: () =
   const approval = paused && run.pending_action === "await_approval";
   const canContinue = blocked || approval;
   const canRetry = paused && !approval && run.attention_reason !== "loop_limit_reached";
-  // A restart pause stopped the stage agent, Continue rejects the state, and an
-  // ordinary chat resume of that agent mints an unrelated generation whose report
-  // is refused forever — so Open agent here is a dead end. Withhold it and name
+  // A pause whose stage agent is no longer running — a restart stopped it, its launch
+  // failed, or its resume failed — is a pause no chat can resolve: Continue rejects the
+  // state, and an ordinary chat resume of that agent mints an unrelated generation whose
+  // report is refused forever, so Open agent there is a dead end. Withhold it and name
   // the route that works (FS-14.R48).
-  const recovered = paused && run.attention_reason.startsWith("restart_");
+  const restarted = run.attention_reason.startsWith("restart_");
+  const recovered = paused && (restarted || run.attention_reason === "launch_failed" || run.attention_reason === "resume_failed");
   const terminal = run.state === "completed" || run.state === "stopped";
   const busy = continueRun.isPending || retryRun.isPending || stopRun.isPending || deleteRun.isPending;
 
@@ -132,7 +134,7 @@ export function RunDetail({ runID, onDeleted }: { runID: string; onDeleted: () =
       <section className="pipeline-run-hero" data-slot="live">
         <div className="pipeline-run-kicker"><code>{run.run_id}</code><span className={`pipeline-state pipeline-state-${run.state}`}>{run.final_outcome || run.state}</span></div>
         <div className="pipeline-run-title"><div><h2>{run.display_name || data.template.title}</h2><p>{run.goal}</p></div><div className="pipeline-live-stage"><small>{terminal ? "Final position" : "Current stage"}</small><strong>{stage?.title ?? (run.current_stage_id || "Complete")}</strong>{attempt && <span>Visit {attempt.visit_no} · attempt {attempt.attempt_no}</span>}</div></div>
-        {run.attention_reason && <div className="pipeline-warning"><strong>Needs attention</strong><p>{humanize(run.attention_reason)}</p>{recovered && <p>The stage agent was stopped when AgentDeck restarted, so its chat can no longer report against this run. Retry the stage to run it again with a fresh agent.</p>}</div>}
+        {run.attention_reason && <div className="pipeline-warning"><strong>Needs attention</strong><p>{humanize(run.attention_reason)}</p>{recovered && <p>{restarted ? "The stage agent was stopped when AgentDeck restarted" : "The stage agent is not running after this failure"}, so its chat can no longer report against this run. Retry the stage to run it again with a fresh agent.</p>}</div>}
         <div className="pipeline-run-actions" data-slot="actions">
           {run.current_agent_id && !recovered && <Link className="pipeline-link-button" to={`/agent/${run.current_agent_id}`}>Open agent</Link>}
           {canContinue && <button type="button" disabled={busy || (blocked && !continuation.trim())} onClick={() => control("continue")}>{approval ? "Approve and continue" : "Continue"}</button>}

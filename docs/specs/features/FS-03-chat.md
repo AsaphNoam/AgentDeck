@@ -379,8 +379,10 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 - **A21** (R38, R20) — Diagram source carrying a script element, an HTML label, an
   event-handler attribute, and a click/interaction directive produces rendered output containing
   none of them and executes nothing; Mermaid external-image node syntax is rejected without invoking
-  `parse` or `render` and makes no request; a 50,001-code-unit or unparseable source leaves a visible
-  code block with its note and the following events still render; and the reviewed injection seam is
+  `parse` or `render` and makes no request; a returned style element or style attribute whose
+  URL-bearing token is spelled with CSS identifier escapes is dropped and makes no request;
+  a 50,001-code-unit or unparseable source leaves a visible code block with its note and the
+  following events still render; and the reviewed injection seam is
   the only place in `ui/src` that inserts renderer-produced markup. *Verify by* injection,
   renderer-spy, request-spy, size-bound, and failure cases in the same renderer test, plus a
   repository check that asserts the single seam.

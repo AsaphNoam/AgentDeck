@@ -222,14 +222,21 @@
 .pipeline-state-running,
 .pipeline-state-queued,
 .pipeline-state-launching { border-color: var(--ad-state-busy); color: var(--ad-state-busy); }
+/* An interrupted attempt carries the pause reason as its own state, so the badge needs
+   a rule for each one; without them those attempts fell back to the neutral base badge
+   and read quieter than an ordinary state (FS-12.R37/A13, INV §13). */
 .pipeline-state-paused,
-.pipeline-state-blocked { border-color: var(--ad-state-waiting); color: var(--ad-state-waiting); }
+.pipeline-state-blocked,
+.pipeline-state-restart_recovery,
+.pipeline-state-restart_awaiting_quiescence { border-color: var(--ad-state-waiting); color: var(--ad-state-waiting); }
 .pipeline-state-completed,
 .pipeline-state-success,
 .pipeline-validation-valid { border-color: var(--ad-state-done); color: var(--ad-state-done); }
 .pipeline-state-stopped,
 .pipeline-state-failure,
 .pipeline-state-crashed,
+.pipeline-state-launch_failed,
+.pipeline-state-resume_failed,
 .pipeline-validation-invalid { border-color: var(--ad-state-error); color: var(--ad-state-error); }
 
 .pipeline-empty,
