@@ -24,7 +24,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   `6a16126..43e5feb`, the 2026-08-28 bug investigation, and the residue of the 2026-08-28 review of
   `790c01c`. The block-split drag preview and six-tab shared-stream regression remain acceptance
   gates, not findings. This session's own commits (`e71d4ab..b5d5f2a`) are unreviewed.
-- **Active change:** None. Expandable dashboard chat panes are finished and verified
+- **Active change:** None. Thin AgentDecker and the shared AgentDeck operating skill are finished
+  and verified (FS-18, FS-04.R44/A24, TS-11). Expandable dashboard chat panes are finished and verified
   (FS-02.R46–R52/A29–A34, FS-03.R39/A23, FS-12.R38/A14, TS-03.R31, TS-08.R41–R43).
   Running-first card placement shipped on 2026-08-28 (FS-02.R45/A28, FS-12.R37/A13). The Pipelines
   surface
@@ -54,15 +55,36 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 **Change:** None.
 
-**State:** Every recorded review and bug-investigation finding is closed. The tree is green on both
-Go test variants, the 329-case UI suite, `make check-specs`, the UI typecheck, `make build`, and
-`git diff --check`.
+**State:** The shared operating skill is shipped. AgentDeck installs and verifies byte-identical
+owner-only Claude/Codex views at startup, conditionally composes one runtime-only directory, prompt,
+and environment overlay through all three lifecycle composers, migrates only the exact historical
+AgentDecker prompt after verification, and leaves startup and user configuration intact on failure.
+The full required automated matrix is green. Credentialed pinned-provider discovery remains the
+existing manual gate because the available Claude session is logged out and Codex authentication
+could not be confirmed.
 
-**Next:** An independent `/review` of `e71d4ab..b5d5f2a`, then the two browser gates below. One
-unrelated edit to `AGENT-WORKFLOW.md` §15 has been uncommitted in the working tree since before this
-session and was deliberately left alone.
+**Next:** Run an independent `/review` of this implementation, then complete the pinned logged-in
+Claude/Codex discovery gate when credentials are available. The unrelated edits to
+`AGENT-WORKFLOW.md` and both design-feature skill twins predate this session and remain untouched.
 
 ## Changelog
+
+- **2026-08-30 — work (FS-18, FS-04.R44/A24, TS-11, INV §1/§2/§4/§6/§8/§10/§15):** Shipped the
+  release-matched `operating-agentdeck` package and thin AgentDecker role. Startup stages, syncs,
+  verifies, and atomically publishes owner-only `.agents` and `.claude` views; a failure logs a
+  warning, suppresses every availability signal, and leaves exact migration for a later retry.
+  `applyKnowledgeOverlay` is the one fresh/resume/switch seam, using runtime-only add-dir, prompt
+  suffix, and environment fields so no managed value enters the frozen session snapshot. Chat and
+  every terminal driver consume the same effective parameters; iTerm transfers secret environment
+  values through a bounded owner-only FIFO so its visible command and filesystem carry no secret
+  data. Only the production SHA-256 of the immediately preceding AgentDecker seed migrates, with all
+  other role fields preserved; fresh PM/teammate prompts and tool descriptions no longer duplicate
+  cross-workflow guidance. Package, exact-fixture, failed-install retry, persistence, primer, and
+  terminal regressions are green with both Go test variants, specification checks, production and
+  distributable builds, and `git diff --check`. An independent audit closed its iTerm secret and
+  migration-fixture findings; its old-cache note was rejected because FS-18 requires verified
+  replacement of an older cache. Pinned adapters 0.59.0/1.1.2 are installed, but logged-in live
+  provider discovery remains a manual gate.
 
 - **2026-08-29 — feature design follow-up (FS-18.R2/R7/R11, FS-04.R44, TS-11.R4–R6/R8/R10):**
   Closed the shared-skill design review on the user's classification. Package verification now

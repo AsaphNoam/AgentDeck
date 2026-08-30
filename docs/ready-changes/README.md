@@ -42,5 +42,4 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-- [`agentdeck-shared-skill.md`](agentdeck-shared-skill.md) — thin AgentDecker and shared AgentDeck
-  operating skill.
+None.

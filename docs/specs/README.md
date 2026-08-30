@@ -30,7 +30,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-01 | [features/FS-01-agent-lifecycle.md](features/FS-01-agent-lifecycle.md) | Current | Launch, stop, cancel, resume, clone, rename, switch runtime, crash handling, identity, wake on message |
 | FS-02 | [features/FS-02-dashboard.md](features/FS-02-dashboard.md) | Current | Card grid, live status, layout/density, task groups, notifications, project creation |
 | FS-03 | [features/FS-03-chat.md](features/FS-03-chat.md) | Current | Streaming chat panel, tool calls/diffs, permission prompts, transcript view, header runtime picker, composer file/skill mentions, browser-local drafts |
-| FS-04 | [features/FS-04-configuration-onboarding.md](features/FS-04-configuration-onboarding.md) | Partial | Roles/projects/backends CRUD, backend creation, settings UI, onboarding wizard, appearance preference, directory browsing, and planned exact AgentDecker prompt migration |
+| FS-04 | [features/FS-04-configuration-onboarding.md](features/FS-04-configuration-onboarding.md) | Current | Roles/projects/backends CRUD, backend creation, settings UI, onboarding wizard, appearance preference, directory browsing, and exact AgentDecker prompt migration |
 | FS-05 | [features/FS-05-archive-tracking.md](features/FS-05-archive-tracking.md) | Current | Session archive, full-text search, resume from archive, file/command tracking |
 | FS-06 | [features/FS-06-coordination.md](features/FS-06-coordination.md) | Current | Agent-to-agent messaging, explicit mail activation, budgets, unread indicators, stopped-agent wake |
 | FS-07 | [features/FS-07-terminal.md](features/FS-07-terminal.md) | Partial | Terminal interface, drivers (xterm/tmux/iTerm2), terminal-agent boundaries |
@@ -44,7 +44,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-15 | [features/FS-15-context-links.md](features/FS-15-context-links.md) | Current | Target-neutral durable context references, direct grants, personal discovery state, and bounded pull retrieval |
 | FS-16 | [features/FS-16-dependent-work.md](features/FS-16-dependent-work.md) | Current | Durable tasks with explicit outcomes, prerequisite arms, host-started armed work, and task context attachments |
 | FS-17 | [features/FS-17-agent-tool-results.md](features/FS-17-agent-tool-results.md) | Current | Cross-cutting agent-facing MCP tool result contract: retry classification and structured result delivery |
-| FS-18 | [features/FS-18-agent-facing-knowledge.md](features/FS-18-agent-facing-knowledge.md) | Partial | Thin AgentDecker role, shared operating skill, progressive references, discovery fallback, and exact legacy-prompt migration |
+| FS-18 | [features/FS-18-agent-facing-knowledge.md](features/FS-18-agent-facing-knowledge.md) | Current | Thin AgentDecker role, shared operating skill, progressive references, discovery fallback, and exact legacy-prompt migration |
 
 ### Technical specs
 
@@ -60,7 +60,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | TS-08 | [tech/TS-08-frontend-presentation.md](tech/TS-08-frontend-presentation.md) | Current | Core visual architecture, presentation contracts, maintenance safeguards, local assets, renderer styling, and built-in skin selection |
 | TS-09 | [tech/TS-09-pipeline-control-plane.md](tech/TS-09-pipeline-control-plane.md) | Current | Native sequential pipeline templates, durable run state machine, stage-result tools, recovery, and AgentDecker proposals |
 | TS-10 | [tech/TS-10-work-dependency-control-plane.md](tech/TS-10-work-dependency-control-plane.md) | Current | Durable task/arm/attachment records, arm evaluation, the `dependency` activation kind, the shared result layer, and task recovery |
-| TS-11 | [tech/TS-11-agent-knowledge-delivery.md](tech/TS-11-agent-knowledge-delivery.md) | Partial | Embedded operator-skill package, managed provider views, conditional lifecycle delivery, safe installation degradation, and prompt migration |
+| TS-11 | [tech/TS-11-agent-knowledge-delivery.md](tech/TS-11-agent-knowledge-delivery.md) | Current | Embedded operator-skill package, managed provider views, conditional lifecycle delivery, safe installation degradation, and prompt migration |
 | INV | [../features/INVARIANTS.md](../features/INVARIANTS.md) | Current | Bug-class constraint catalog (path kept stable for hooks/history) |
 
 Related, non-spec: [`../ideas.md`](../ideas.md) (new ideas and known things to improve — not
@@ -86,7 +86,7 @@ Potential work that has not reached an FS/TS update belongs only in `docs/ideas.
 | Configurable pipelines | FS-14 templates, sequential runs, recovery, and supervision | Shipped |
 | Dependent work | FS-16 durable tasks, prerequisite arms, host-started work, task context | Shipped |
 | Extension boundaries | FS-07 terminal; FS-08 federation | Shipped core with explicitly tagged planned work; Partial |
-| Agent-facing contracts and knowledge | FS-17 tool result contract; FS-18 operator knowledge | Tool results shipped; shared operator knowledge planned |
+| Agent-facing contracts and knowledge | FS-17 tool result contract; FS-18 operator knowledge | Tool results and shared operator knowledge shipped |
 
 ---
 

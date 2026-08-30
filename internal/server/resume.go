@@ -432,7 +432,7 @@ func (s *Server) composeResumeSpecWithGeneration(agent state.Agent, snap state.S
 		s.cleanupMessagingMCP(agent.AgentID)
 		return runtime.LaunchSpec{}, apiError(runtime.CodeInternal, err.Error())
 	}
-	return runtime.LaunchSpec{
+	spec := runtime.LaunchSpec{
 		Agent:          agent,
 		Generation:     generation,
 		Cwd:            snap.Cwd,
@@ -451,7 +451,8 @@ func (s *Server) composeResumeSpecWithGeneration(agent state.Agent, snap state.S
 		// Resume reproduces the frozen federation launch object by default
 		// (techspec §2.5); "Resume with latest setup" re-resolves it (handleResume).
 		LaunchConfig: snap.LaunchConfig,
-	}, nil
+	}
+	return s.applyKnowledgeOverlay(spec), nil
 }
 
 // resumeStartError maps a Resume failure to the right API error code.

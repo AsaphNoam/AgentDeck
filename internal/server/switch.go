@@ -404,7 +404,7 @@ func (s *Server) composeSwitchSpec(target state.Agent, resumeID string) (runtime
 		return runtime.LaunchSpec{}, apiError(runtime.CodeInternal, err.Error())
 	}
 
-	return runtime.LaunchSpec{
+	spec := runtime.LaunchSpec{
 		Agent:          target,
 		Generation:     token,
 		Cwd:            snap.Cwd,
@@ -423,7 +423,8 @@ func (s *Server) composeSwitchSpec(target state.Agent, resumeID string) (runtime
 		// Switch continues the same logical session, so the frozen federation launch
 		// object carries over unchanged — switch never re-resolves the source (§2.5).
 		LaunchConfig: snap.LaunchConfig,
-	}, nil
+	}
+	return s.applyKnowledgeOverlay(spec), nil
 }
 
 // cancelAndWait cancels the in-flight turn and waits up to timeout for the agent

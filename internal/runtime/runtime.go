@@ -23,6 +23,10 @@ type LaunchSpec struct {
 	Cwd          string   // resolved absolute working dir (project.cwd, ~-expanded)
 	AddDirs      []string // project.add_dirs, ~-expanded
 	SystemPrompt string   // composed: context_prompt + role.system_prompt — the FROZEN, persisted snapshot
+	// RuntimeAddDirs are product-managed directories exposed to this process only.
+	// Persistence snapshots AddDirs, never this overlay, so an unavailable later
+	// dashboard start cannot recover a stale managed path from session metadata.
+	RuntimeAddDirs []string
 	// RuntimeSystemPrompt, when non-empty, is the system prompt fed to the backend
 	// process for THIS launch only (session/new + session/load). It is deliberately
 	// NOT persisted: runtimeMeta/UpsertSessionMeta always snapshot SystemPrompt, so
@@ -30,15 +34,20 @@ type LaunchSpec struct {
 	// primer path sets this so the one-time history primer reaches the new backend
 	// without baking into (or stacking onto) the durable snapshot.
 	RuntimeSystemPrompt string
-	BackendType         string // "claude-acp" | "codex-acp"
-	ModelID             string // provider model id, e.g. "claude-sonnet-4-6"
-	Effort              string // resolved provider level; empty means omit
+	// RuntimeSystemPromptSuffix is appended only to the process-start prompt. It
+	// composes with RuntimeSystemPrompt so a switch primer and managed guidance do
+	// not overwrite each other, while neither enters the frozen snapshot.
+	RuntimeSystemPromptSuffix string
+	BackendType               string // "claude-acp" | "codex-acp"
+	ModelID                   string // provider model id, e.g. "claude-sonnet-4-6"
+	Effort                    string // resolved provider level; empty means omit
 	// Driver selects the terminal TerminalDriver ("" | "xterm" | "tmux" | "iterm2");
 	// ignored by the chat runtime. Empty defaults to the cross-platform xterm/PTY
 	// driver. The server validates availability against the capability probe before
 	// launch (§3.5), so an unavailable driver never reaches the runtime.
 	Driver         string
 	Env            []string        // composed env layering (backend then per-model override), "K=V"
+	RuntimeEnv     []string        // process-only final env; empty means use the frozen Env
 	SkipPerms      bool            // effective skip_permissions after role/global resolution
 	HookToken      string          // per-launch one-time token passed to the agent's hooks
 	MCPServers     []MCPServerSpec // messaging MCP server registration; one entry this phase
@@ -61,10 +70,47 @@ type LaunchSpec struct {
 // pristine SystemPrompt so the frozen sessions.system_prompt never absorbs the
 // primer.
 func (s LaunchSpec) StartSystemPrompt() string {
+	prompt := s.SystemPrompt
 	if s.RuntimeSystemPrompt != "" {
-		return s.RuntimeSystemPrompt
+		prompt = s.RuntimeSystemPrompt
 	}
-	return s.SystemPrompt
+	if s.RuntimeSystemPromptSuffix == "" {
+		return prompt
+	}
+	if prompt == "" {
+		return s.RuntimeSystemPromptSuffix
+	}
+	return prompt + "\n\n" + s.RuntimeSystemPromptSuffix
+}
+
+// StartAddDirs returns the effective directories handed to the backend process.
+// The returned slice is detached from both stored fields so callers cannot
+// mutate the frozen snapshot by appending to it.
+func (s LaunchSpec) StartAddDirs() []string {
+	out := append([]string{}, s.AddDirs...)
+	for _, candidate := range s.RuntimeAddDirs {
+		seen := false
+		for _, existing := range out {
+			if existing == candidate {
+				seen = true
+				break
+			}
+		}
+		if !seen {
+			out = append(out, candidate)
+		}
+	}
+	return out
+}
+
+// StartEnv returns the environment handed to the process. RuntimeEnv is a
+// complete, final-layer view rather than a delta so provider spawning remains
+// ignorant of server-owned overlay semantics.
+func (s LaunchSpec) StartEnv() []string {
+	if len(s.RuntimeEnv) > 0 {
+		return s.RuntimeEnv
+	}
+	return s.Env
 }
 
 // MCPServerSpec is one MCP server the agent should connect to. Phase 5 prefers

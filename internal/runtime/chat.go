@@ -108,7 +108,7 @@ func (c *ChatRuntime) spawnCmd(ad backend.BackendAdapter, spec LaunchSpec) (*exe
 	args = append(append([]string{}, args...), spec.ExtraArgs...)
 	cmd := exec.Command(bin, args...)
 	cmd.Dir = spec.Cwd
-	env := spec.Env
+	env := spec.StartEnv()
 	if len(env) == 0 {
 		env = os.Environ()
 	}
@@ -1453,7 +1453,7 @@ func sessionNewParams(spec LaunchSpec) map[string]any {
 		mcp = append(mcp, mcpServerParam(m))
 	}
 	if spec.BackendType == "claude-acp" {
-		options := map[string]any{"additionalDirectories": spec.AddDirs}
+		options := map[string]any{"additionalDirectories": spec.StartAddDirs()}
 		// An empty ModelID means "inherit native resolution" (federation §2.3):
 		// omit the model flag so the CLI resolves its own configured model rather
 		// than being overridden by an AgentDeck default. A non-empty id is either an
@@ -1473,7 +1473,7 @@ func sessionNewParams(spec LaunchSpec) map[string]any {
 	params := map[string]any{
 		"cwd":                   spec.Cwd,
 		"mcpServers":            mcp,
-		"additionalDirectories": spec.AddDirs,
+		"additionalDirectories": spec.StartAddDirs(),
 	}
 	// codex-acp ignores generic ACP systemPrompt. Its prompt is supplied via the
 	// CODEX_CONFIG developer_instructions overlay in spawnCmd.
@@ -1498,7 +1498,7 @@ func sessionLoadParams(spec LaunchSpec, sessionID string) map[string]any {
 		mcp = append(mcp, mcpServerParam(m))
 	}
 	if spec.BackendType == "claude-acp" {
-		options := map[string]any{"resume": sessionID, "additionalDirectories": spec.AddDirs}
+		options := map[string]any{"resume": sessionID, "additionalDirectories": spec.StartAddDirs()}
 		if spec.ModelID != "" { // inherit native model when empty (§2.3); see sessionNewParams.
 			options["model"] = spec.ModelID
 		}
@@ -1516,7 +1516,7 @@ func sessionLoadParams(spec LaunchSpec, sessionID string) map[string]any {
 		"sessionId":             sessionID,
 		"cwd":                   spec.Cwd,
 		"mcpServers":            mcp,
-		"additionalDirectories": spec.AddDirs,
+		"additionalDirectories": spec.StartAddDirs(),
 	}
 	if spec.BackendType != "codex-acp" {
 		params["systemPrompt"] = spec.StartSystemPrompt()

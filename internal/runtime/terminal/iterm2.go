@@ -3,8 +3,10 @@ package terminal
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -33,7 +35,16 @@ func (d iterm2Driver) StartTab(spec TabSpec) (*Tab, error) {
 		return nil, fmt.Errorf("terminal: empty launch command")
 	}
 	// Two quoting layers (§3.6): argv → shell-quoted command line → AppleScript-escaped.
-	launchCmd := shellJoin(spec.Command)
+	launchCmd, envPath, err := itermLaunchCommand(spec)
+	if err != nil {
+		return nil, err
+	}
+	cleanupEnv := true
+	defer func() {
+		if cleanupEnv && envPath != "" {
+			_ = os.Remove(envPath)
+		}
+	}()
 	if spec.Cwd != "" {
 		launchCmd = "cd " + shellQuote(spec.Cwd) + " && " + launchCmd
 	}
@@ -57,14 +68,80 @@ func (d iterm2Driver) StartTab(spec TabSpec) (*Tab, error) {
 		TTY:            strings.TrimSpace(fields[0]),
 		itermWindowID:  strings.TrimSpace(fields[1]),
 		itermSessionID: strings.TrimSpace(fields[2]),
+		itermEnvPath:   envPath,
 		IDs: map[string]string{
 			"iterm_window":  strings.TrimSpace(fields[1]),
 			"iterm_session": strings.TrimSpace(fields[2]),
 		},
 	}
+	cleanupEnv = false
 	// Title/color are cosmetic; a failure here must not fail the launch.
 	_ = d.applyAppearance(tab, spec)
 	return tab, nil
+}
+
+func itermLaunchCommand(spec TabSpec) (string, string, error) {
+	command := shellJoin(spec.Command)
+	if len(spec.Env) == 0 {
+		return command, "", nil
+	}
+	tmp, err := os.CreateTemp("", "agentdeck-iterm-env-*")
+	if err != nil {
+		return "", "", fmt.Errorf("terminal: reserve iTerm environment path: %w", err)
+	}
+	path := tmp.Name()
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(path)
+		return "", "", fmt.Errorf("terminal: close iTerm environment reservation: %w", err)
+	}
+	if err := os.Remove(path); err != nil {
+		return "", "", fmt.Errorf("terminal: prepare iTerm environment path: %w", err)
+	}
+	if err := syscall.Mkfifo(path, 0o600); err != nil {
+		return "", "", fmt.Errorf("terminal: create iTerm environment pipe: %w", err)
+	}
+	var script strings.Builder
+	for _, entry := range spec.Env {
+		fmt.Fprintf(&script, "export %s\n", shellQuote(entry))
+	}
+	go func() {
+		defer os.Remove(path)
+		deadline := time.Now().Add(osascriptTimeout + time.Second)
+		var pipe *os.File
+		for time.Now().Before(deadline) {
+			pipe, err = os.OpenFile(path, os.O_WRONLY|syscall.O_NONBLOCK, 0)
+			if err == nil {
+				break
+			}
+			if os.IsNotExist(err) {
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+		if pipe == nil {
+			return
+		}
+		defer pipe.Close()
+		data := []byte(script.String())
+		for len(data) > 0 && time.Now().Before(deadline) {
+			n, writeErr := syscall.Write(int(pipe.Fd()), data)
+			if n > 0 {
+				data = data[n:]
+			}
+			if writeErr == nil {
+				continue
+			}
+			if writeErr != syscall.EAGAIN && writeErr != syscall.EWOULDBLOCK {
+				return
+			}
+			if _, statErr := os.Lstat(path); os.IsNotExist(statErr) {
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
+	quoted := shellQuote(path)
+	return ". " + quoted + " && rm -f " + quoted + " && exec " + command, path, nil
 }
 
 // applyAppearance sets the session title and (when the project accent is set) its
@@ -106,7 +183,13 @@ func (iterm2Driver) WriteText(tab *Tab, text string) error {
 // CloseTab closes the iTerm2 window hosting the session. Best-effort: the runtime
 // already SIGTERM/SIGKILL'd the process group by Tab.PGID before calling this.
 func (iterm2Driver) CloseTab(tab *Tab) error {
-	if tab == nil || tab.itermWindowID == "" {
+	if tab == nil {
+		return nil
+	}
+	if tab.itermEnvPath != "" {
+		_ = os.Remove(tab.itermEnvPath)
+	}
+	if tab.itermWindowID == "" {
 		return nil
 	}
 	// window id is a numeric literal from iTerm2's own output — addressed unquoted.

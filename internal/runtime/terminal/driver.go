@@ -40,6 +40,7 @@ type Tab struct {
 	// the tab for CloseTab; the session id addresses it for write-text.
 	itermWindowID  string
 	itermSessionID string
+	itermEnvPath   string
 }
 
 // TerminalDriver is the seam (§2.1). The xterm/PTY and tmux drivers are

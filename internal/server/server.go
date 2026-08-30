@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/agentdeck/agentdeck/internal/agentknowledge"
 	"github.com/agentdeck/agentdeck/internal/backend/credcheck"
 	"github.com/agentdeck/agentdeck/internal/bus"
 	"github.com/agentdeck/agentdeck/internal/config"
@@ -51,6 +52,7 @@ type Server struct {
 	terminal       *terminal.Runtime
 	cfg            config.Config
 	log            *slog.Logger
+	knowledge      agentknowledge.Installation
 
 	indexer           *persistindex.Indexer
 	messaging         *messaging.Server
@@ -157,7 +159,7 @@ type taskStartLock struct {
 
 // New constructs a Server. The config supplies the port; the stores back the data
 // handlers; the registry drives agent runtimes; the logger is used by middleware.
-func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Registry, cfg config.Config, log *slog.Logger) *Server {
+func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Registry, cfg config.Config, log *slog.Logger, knowledge ...agentknowledge.Installation) *Server {
 	if log == nil {
 		log = slog.Default()
 	}
@@ -215,6 +217,10 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	// (agent_name/address) like every other notification type.
 	msg.SetBudgetExceededSink(eventBus.PublishBudgetExceeded)
 	sourceMgr := newConfigSourceManager(cfgStore, eventBus)
+	installedKnowledge := agentknowledge.Installation{}
+	if len(knowledge) > 0 {
+		installedKnowledge = knowledge[0]
+	}
 	s := &Server{
 		configStore:               cfgStore,
 		stateStore:                stateStore,
@@ -232,6 +238,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		taskStartLocks:            map[string]*taskStartLock{},
 		cfg:                       cfg,
 		log:                       log,
+		knowledge:                 installedKnowledge,
 		hookTokens:                map[string]string{},
 		mcpCleanups:               map[string]func(){},
 		switching:                 map[string]bool{},

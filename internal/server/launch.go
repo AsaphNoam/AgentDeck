@@ -339,7 +339,46 @@ func (s *Server) composeLaunchWithOptions(ctx context.Context, req launchRequest
 		ExtraArgs:    extraArgs,
 		LaunchConfig: launchConfig,
 	}
-	return spec, agent, nil
+	return s.applyKnowledgeOverlay(spec), agent, nil
+}
+
+const knowledgePrompt = "AgentDeck operator knowledge is in the bundled operating-agentdeck skill at %s/SKILL.md; read it when AgentDeck-specific behavior matters."
+
+// applyKnowledgeOverlay is the one process-parameter seam for fresh launch,
+// resume, switch, wake, terminal, and pipeline work (TS-11.R4-R5). Its fields
+// are deliberately invisible to runtimeMeta's frozen session snapshot.
+func (s *Server) applyKnowledgeOverlay(spec runtime.LaunchSpec) runtime.LaunchSpec {
+	spec.Env = removeEnvKey(spec.Env, "AGENTDECK_SKILL_DIR")
+	if !s.knowledge.Available {
+		return spec
+	}
+	spec.RuntimeAddDirs = appendUnique(spec.RuntimeAddDirs, s.knowledge.Root)
+	pointer := fmt.Sprintf(knowledgePrompt, s.knowledge.SkillDir)
+	if !strings.Contains(spec.RuntimeSystemPromptSuffix, pointer) {
+		spec.RuntimeSystemPromptSuffix = joinSystemPrompt(spec.RuntimeSystemPromptSuffix, pointer)
+	}
+	spec.RuntimeEnv = composeEnv(spec.Env, map[string]string{"AGENTDECK_SKILL_DIR": s.knowledge.SkillDir})
+	return spec
+}
+
+func removeEnvKey(values []string, key string) []string {
+	prefix := key + "="
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if !strings.HasPrefix(value, prefix) {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+func appendUnique(values []string, candidate string) []string {
+	for _, value := range values {
+		if value == candidate {
+			return values
+		}
+	}
+	return append(values, candidate)
 }
 
 // resolveEffort is the single launch-composition precedence seam: an explicit

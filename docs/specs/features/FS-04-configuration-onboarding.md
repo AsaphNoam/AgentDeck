@@ -1,6 +1,6 @@
 # FS-04 — Configuration & Onboarding
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/config/`, `internal/server/config_handlers.go`, `internal/server/directory_picker.go`, `ui/src/features/settings/`, `ui/src/features/onboarding/` · **Journeys:** J2, J9
 **Absorbed:** [`phase-3-config-onboarding.md`](../../archive/phases/phase-3-config-onboarding.md)
 
@@ -165,7 +165,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   foreground or with `--detach`. Foreground starts also mirror the same records to stderr. The log
   file is owner-only (`0600`), an existing broader mode is tightened before startup continues, and
   failure to establish the persistent log prevents the dashboard from starting.
-- **R44 `(planned)` — The historical AgentDecker prompt has one exact compatibility exception to
+- **R44 — The historical AgentDecker prompt has one exact compatibility exception to
   R14.** After ordinary absent-only seeding and successful shared-skill package verification,
   startup may replace only the `system_prompt` field of an existing `agentdecker` role whose prompt
   bytes match the single code-owned digest of the immediately preceding shipped seed prompt. The
@@ -338,7 +338,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
 - **A23** (R43) — The task concurrency budget round-trips through settings with its
   default of ten, rejects a non-positive value without persisting it, and is read back by the
   dispatcher: settings UI and API tests.
-- **A24 `(planned)`** (R44) — The exact legacy AgentDecker prompt migrates once while preserving
+- **A24** (R44) — The exact legacy AgentDecker prompt migrates once while preserving
   every non-prompt field; a one-byte edit, custom/empty prompt, another or missing role, and any
   read/write failure leave configuration unchanged. Package verification failure also leaves the
   exact prompt unchanged, and a later verified startup migrates it once. — config
@@ -362,7 +362,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
 
 - **Config types & seeding:** `internal/config/types.go`, `internal/config/seed.go`
   (`SeedIfAbsent`, `seedRoles`, `seedProject`, `DefaultConfig`).
-- **Planned AgentDecker compatibility:** FS-18.R7/A5 and TS-11.R6 define R44/A24's exact-only
+- **AgentDecker compatibility:** FS-18.R7/A5 and TS-11.R6 define R44/A24's exact-only
   migration without weakening absent-only seeding for any other role or file.
 - **Validation & id derivation:** `internal/config/validate.go` (`ValidSlug`, `ValidateRole`,
   `ValidateProject`, `GenerateProjectID`); `handlePostProject` in

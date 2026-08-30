@@ -564,7 +564,7 @@ func (r *Runtime) touchState(agentID string) {
 }
 
 func (r *Runtime) tabSpec(spec rt.LaunchSpec, resume bool, sessionID string) TabSpec {
-	env := spec.Env
+	env := spec.StartEnv()
 	if len(env) == 0 {
 		env = os.Environ()
 	}
@@ -600,7 +600,7 @@ func (r *Runtime) launchArgv(spec rt.LaunchSpec, resume bool, sessionID string) 
 		if spec.Effort != "" {
 			argv = append(argv, "--effort", spec.Effort)
 		}
-		for _, d := range spec.AddDirs {
+		for _, d := range spec.StartAddDirs() {
 			argv = append(argv, "--add-dir", d)
 		}
 		if sp := spec.StartSystemPrompt(); sp != "" {

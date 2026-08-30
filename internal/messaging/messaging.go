@@ -1,12 +1,5 @@
-// Package messaging hosts the in-process MCP messaging server (techspec §3).
-//
-// Phase 5.1 (this file) is the go-sdk handshake spike: it constructs one
-// mcp.Server, registers a trivial `ping` tool, and exposes it over the go-sdk
-// streamable HTTP transport on the dashboard's existing localhost listener at
-// /mcp (techspec §2.2 (A)). The token→agent_id session registry that binds a
-// caller's identity to its registered MCP session is stubbed here and filled in
-// by RegisterMessagingMCP in 5.3. The three real tools (list_agents,
-// send_message, check_messages) land in 5.2.
+// Package messaging hosts AgentDeck's in-process, token-bound MCP tools for
+// coordination, tasks, pipelines, and context links.
 package messaging
 
 import (
@@ -178,7 +171,7 @@ func New(store *state.Store, log *slog.Logger) *Server {
 	}, s.handleCheckMessages)
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "report_pipeline_stage_result",
-		Description: "Report the authoritative success, failure, or blocked result for your current pipeline stage attempt.",
+		Description: "Report the authoritative success, failure, or blocked result for your current pipeline stage attempt. An accepted result is final for that attempt.",
 	}, s.handleReportPipelineStageResult)
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "propose_pipeline_template",
@@ -194,7 +187,7 @@ func New(store *state.Store, log *slog.Logger) *Server {
 	}, s.handleGetAssignedTask)
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "create_task",
-		Description: "Create durable work that AgentDeck starts when its prerequisites are satisfied. Assign it to an existing agent by role@project, name, or agent_id, or omit the target to have a new agent launched. Never poll or wait for other work: arm this task on it instead.",
+		Description: "Create durable work that AgentDeck starts when its prerequisites are satisfied. Assign it to an existing agent by role@project, name, or agent_id, or omit the target to have a new agent launched.",
 	}, s.handleCreateTask)
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "cancel_task",

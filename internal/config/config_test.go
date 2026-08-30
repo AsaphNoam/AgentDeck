@@ -2,6 +2,8 @@ package config
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
@@ -405,8 +407,8 @@ func TestSeedIfAbsentNoClobber(t *testing.T) {
 		t.Fatalf("seeded roles = %d, want 6", len(roles))
 	}
 	agentdecker, err := s.ReadRole("agentdecker")
-	if err != nil || !strings.Contains(agentdecker.SystemPrompt, "propose_pipeline_template") || !strings.Contains(agentdecker.SystemPrompt, "propose_pipeline_run") {
-		t.Fatalf("seeded AgentDecker pipeline guidance missing: role=%+v err=%v", agentdecker, err)
+	if err != nil || agentdecker.SystemPrompt != agentDeckerPrompt || strings.Contains(agentdecker.SystemPrompt, "propose_pipeline") {
+		t.Fatalf("seeded AgentDecker prompt is not the thin role: role=%+v err=%v", agentdecker, err)
 	}
 	if _, err := s.ReadProject("my-app"); err != nil {
 		t.Fatalf("seeded project: %v", err)
@@ -434,6 +436,93 @@ func TestSeedIfAbsentNoClobber(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, mutated) {
 		t.Fatalf("reviewer clobbered by re-seed: got %+v, want %+v", got, mutated)
+	}
+}
+
+// FS-18.A5, FS-04.A24: only an exact historical prompt migrates, and every
+// non-prompt field survives the ordinary atomic role write.
+func TestMigrateLegacyAgentDeckerExactOnly(t *testing.T) {
+	s := newTestStore(t)
+	if err := s.EnsureLayout(); err != nil {
+		t.Fatal(err)
+	}
+	legacy := "legacy AgentDecker prompt"
+	sum := sha256.Sum256([]byte(legacy))
+	legacyDigest := hex.EncodeToString(sum[:])
+
+	for _, tc := range []struct {
+		name    string
+		prompt  string
+		migrate bool
+	}{
+		{name: "exact", prompt: legacy, migrate: true},
+		{name: "one byte edit", prompt: legacy + "!"},
+		{name: "empty", prompt: ""},
+		{name: "custom", prompt: "my prompt"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			originalSkip := boolPtr(true)
+			original := Role{Title: "Custom title", SystemPrompt: tc.prompt, SkipPermissions: originalSkip}
+			if err := s.WriteRole("agentdecker", original); err != nil {
+				t.Fatal(err)
+			}
+			migrated, err := s.migrateLegacyAgentDecker(legacyDigest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if migrated != tc.migrate {
+				t.Fatalf("migrated = %v, want %v", migrated, tc.migrate)
+			}
+			got, err := s.ReadRole("agentdecker")
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantPrompt := tc.prompt
+			if tc.migrate {
+				wantPrompt = agentDeckerPrompt
+			}
+			if got.Title != original.Title || got.SystemPrompt != wantPrompt || got.SkipPermissions == nil || !*got.SkipPermissions {
+				t.Fatalf("role fields after migration = %+v", got)
+			}
+		})
+	}
+}
+
+func TestProductionLegacyAgentDeckerDigestMigratesExactFixture(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("testdata", "legacy_agentdecker_prompt.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy := strings.TrimSuffix(string(data), "\n")
+	sum := sha256.Sum256([]byte(legacy))
+	if got := hex.EncodeToString(sum[:]); got != legacyAgentDeckerPromptSHA256 {
+		t.Fatalf("production legacy digest = %s, fixture digest = %s", legacyAgentDeckerPromptSHA256, got)
+	}
+	s := newTestStore(t)
+	original := Role{Title: "Customized title", SystemPrompt: legacy, SkipPermissions: boolPtr(true)}
+	if err := s.WriteRole("agentdecker", original); err != nil {
+		t.Fatal(err)
+	}
+	migrated, err := s.MigrateLegacyAgentDecker()
+	if err != nil || !migrated {
+		t.Fatalf("production migration = %v, %v", migrated, err)
+	}
+	got, err := s.ReadRole("agentdecker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Title != original.Title || got.SystemPrompt != agentDeckerPrompt || got.SkipPermissions == nil || !*got.SkipPermissions {
+		t.Fatalf("migrated production fixture = %+v", got)
+	}
+}
+
+func TestMigrateLegacyAgentDeckerMissingRoleIsNoOp(t *testing.T) {
+	s := newTestStore(t)
+	if err := s.EnsureLayout(); err != nil {
+		t.Fatal(err)
+	}
+	if migrated, err := s.MigrateLegacyAgentDecker(); err != nil || migrated {
+		t.Fatalf("missing role migration = %v, %v", migrated, err)
 	}
 }
 

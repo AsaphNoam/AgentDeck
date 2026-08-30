@@ -1648,3 +1648,11 @@ pipeline; this is a larger behavior and recovery change.
 
 **Next:** Choose option 1 or option 2; then `/fix` can implement that decision and continue through
 the remaining lower-priority findings.
+
+### 2026-08-30 — Implementation: shared AgentDeck operating guidance
+
+AgentDecker now has a concise resident-operator role, while every AgentDeck-launched role can use one release-matched operating skill with focused guidance for agents, coordination, and pipelines. AgentDeck installs verified owner-only Claude and Codex views at startup, keeps the overlay out of durable session configuration, migrates only the exact historical AgentDecker prompt, and continues safely without advertising the skill if installation fails. The full automated test suites, production build, and distributable build pass.
+
+**Needs attention:** Logged-in Claude and Codex discovery still needs the existing credentialed provider check before those adapters are claimed as live-verified.
+
+**Next:** An independent reviewer should review this implementation, then run the credentialed provider check when access is available.

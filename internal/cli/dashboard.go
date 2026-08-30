@@ -16,6 +16,7 @@ import (
 	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
 
+	"github.com/agentdeck/agentdeck/internal/agentknowledge"
 	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/hooks"
 	"github.com/agentdeck/agentdeck/internal/runtime"
@@ -118,6 +119,18 @@ func resolvePreparedConfig(cfgStore *config.Store, log *slog.Logger) (config.Con
 	return cfg, nil
 }
 
+func prepareAgentKnowledge(cfgStore *config.Store, log *slog.Logger) agentknowledge.Installation {
+	knowledge, err := agentknowledge.Install(cfgStore.Home())
+	if err != nil {
+		log.Warn("install AgentDeck operator skill; continuing without it", "err", err)
+		return knowledge
+	}
+	if _, err := cfgStore.MigrateLegacyAgentDecker(); err != nil {
+		log.Warn("migrate legacy AgentDecker prompt", "err", err)
+	}
+	return knowledge
+}
+
 func newDashboardStartCmd() *cobra.Command {
 	var port int
 	var detach bool
@@ -169,6 +182,8 @@ func newDashboardStartCmd() *cobra.Command {
 				}
 			}
 
+			knowledge := prepareAgentKnowledge(cfgStore, log)
+
 			stateStore, err := state.Open(cfgStore.Home())
 			if err != nil {
 				return err
@@ -189,7 +204,7 @@ func newDashboardStartCmd() *cobra.Command {
 			}
 			defer removePidfile(cfgStore.Home())
 
-			srv := server.New(cfgStore, stateStore, registry, cfg, log)
+			srv := server.New(cfgStore, stateStore, registry, cfg, log, knowledge)
 			return srv.Start(ctx)
 		},
 	}

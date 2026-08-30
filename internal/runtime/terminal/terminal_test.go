@@ -2,6 +2,7 @@ package terminal
 
 import (
 	"context"
+	"os"
 	"runtime"
 	"strings"
 	"testing"
@@ -10,6 +11,36 @@ import (
 	rt "github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
+
+func TestITermLaunchCommandKeepsEnvironmentSecretsOutOfVisibleCommand(t *testing.T) {
+	command, envPath, err := itermLaunchCommand(TabSpec{
+		Command: []string{"claude", "--model", "sonnet"},
+		Env:     []string{"API_KEY=secret value", "AGENTDECK_HOOK_TOKEN=hook-secret"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Remove(envPath) })
+	for _, secret := range []string{"secret value", "hook-secret"} {
+		if strings.Contains(command, secret) {
+			t.Fatalf("visible iTerm command contains secret %q: %s", secret, command)
+		}
+	}
+	if !strings.Contains(command, envPath) || !strings.Contains(command, "rm -f") {
+		t.Fatalf("iTerm command does not source and remove env file: %s", command)
+	}
+	info, err := os.Stat(envPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeNamedPipe == 0 || info.Mode().Perm() != 0o600 {
+		t.Fatalf("env file mode = %v", info.Mode())
+	}
+	data, err := os.ReadFile(envPath)
+	if err != nil || !strings.Contains(string(data), "hook-secret") {
+		t.Fatalf("env file content missing: %q, err=%v", data, err)
+	}
+}
 
 func TestProbeXtermAlwaysAvailable(t *testing.T) {
 	caps := Probe()
@@ -51,14 +82,16 @@ func TestProbeXtermAlwaysAvailable(t *testing.T) {
 func TestLaunchArgvHonorsComposedSpec(t *testing.T) {
 	r := New(nil) // no store needed: launchArgv touches only the spec
 	spec := rt.LaunchSpec{
-		Agent:               state.Agent{Backend: "claude", Interface: "terminal"},
-		BackendType:         "claude-acp",
-		ModelID:             "claude-sonnet-4-6",
-		Effort:              "high",
-		AddDirs:             []string{"/work/extra-a", "/work/extra-b"},
-		SystemPrompt:        "be a careful engineer",
-		RuntimeSystemPrompt: "PRIMER: prior context summary",
-		ExtraArgs:           []string{"--settings", "/tmp/settings.json"},
+		Agent:                     state.Agent{Backend: "claude", Interface: "terminal"},
+		BackendType:               "claude-acp",
+		ModelID:                   "claude-sonnet-4-6",
+		Effort:                    "high",
+		AddDirs:                   []string{"/work/extra-a", "/work/extra-b"},
+		RuntimeAddDirs:            []string{"/managed/agent-skills", "/work/extra-a"},
+		SystemPrompt:              "be a careful engineer",
+		RuntimeSystemPrompt:       "PRIMER: prior context summary",
+		RuntimeSystemPromptSuffix: "bundled operating guidance",
+		ExtraArgs:                 []string{"--settings", "/tmp/settings.json"},
 	}
 	argv := r.launchArgv(spec, true, "sess-42")
 	joined := strings.Join(argv, " ")
@@ -68,8 +101,9 @@ func TestLaunchArgvHonorsComposedSpec(t *testing.T) {
 		{"--effort", "high"},
 		{"--add-dir", "/work/extra-a"},
 		{"--add-dir", "/work/extra-b"},
+		{"--add-dir", "/managed/agent-skills"},
 		// StartSystemPrompt prefers the one-shot RuntimeSystemPrompt (the primer).
-		{"--append-system-prompt", "PRIMER: prior context summary"},
+		{"--append-system-prompt", "PRIMER: prior context summary\n\nbundled operating guidance"},
 		{"--settings", "/tmp/settings.json"},
 		{"--resume", "sess-42"},
 	}

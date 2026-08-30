@@ -1,6 +1,6 @@
 # TS-11 — Agent Knowledge Packaging and Delivery
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/agentknowledge`, `internal/config`, `internal/server`, `internal/runtime`, `internal/messaging`, `internal/cli`
 **Absorbed:** the AgentDeck knowledgebase idea in [`../../ideas.md`](../../ideas.md)
 
@@ -17,7 +17,7 @@ operating guidance.
 
 ## 2. Design & constraints
 
-**R1 `(planned)` — One embedded source owns the complete skill package.** A new
+**R1 — One embedded source owns the complete skill package.** A new
 `internal/agentknowledge` package embeds one canonical `operating-agentdeck` source tree:
 
 ```text
@@ -33,7 +33,7 @@ triggers when an agent answers AgentDeck product questions or operates, coordina
 AgentDeck work. It links references one level deep. There is no independently maintained
 Claude/Codex source twin and no generated copy committed outside this package.
 
-**R2 `(planned)` — Startup atomically publishes two byte-identical managed views when verification
+**R2 — Startup atomically publishes two byte-identical managed views when verification
 succeeds.** On every dashboard start, AgentDeck attempts to install the embedded package beneath the
 owner-only root `$AGENTDECK_HOME/cache/agent-skills/` at:
 
@@ -53,7 +53,7 @@ Codex profile.
 **R3 — retired 2026-08-29:** Startup-fatal package installation was replaced before implementation
 by R10's warning-only, no-advertisement degradation contract.
 
-**R4 `(planned)` — One helper composes the knowledge overlay for every process path.** A single
+**R4 — One helper composes the knowledge overlay for every process path.** A single
 server-owned helper receives the startup process's verified package availability and augments the
 already-composed base `LaunchSpec` for fresh launch, ordinary and wake resume, runtime switch,
 pipeline launch/resume, chat, and terminal only when that availability is true. It:
@@ -71,7 +71,7 @@ unavailable package state, the helper is a no-op for all three additions. The di
 additions use runtime-only effective fields (or the equivalent final process-parameter seam), never
 the persisted `LaunchSpec.AddDirs` or `LaunchSpec.SystemPrompt` values.
 
-**R5 `(planned)` — The overlay changes no frozen user configuration.** The helper runs after launch,
+**R5 — The overlay changes no frozen user configuration.** The helper runs after launch,
 resume, or switch has selected its base role/project/backend configuration. It may add the stable
 managed root, reserved environment entry, and prompt pointer to a pre-feature snapshot, but it never
 re-resolves or rewrites that snapshot's role prompt, project prompt, user `add_dirs`, backend/model,
@@ -82,7 +82,7 @@ helper deduplicates its three additions, including across repeated resume/switch
 one-shot switch primer. Session metadata and snapshots always persist the unmodified frozen base
 fields, so a later unavailable startup cannot recover an overlay from durable state.
 
-**R6 `(planned)` — Legacy role migration uses one exact code-owned digest after package
+**R6 — Legacy role migration uses one exact code-owned digest after package
 verification.** After ordinary `SeedIfAbsent` handling, startup attempts and verifies package
 installation first. Only `Available=true` permits reading the `agentdecker` role, computing SHA-256
 over its stored system-prompt bytes, and replacing that field when it equals the single digest of
@@ -92,7 +92,7 @@ decode, or write failure likewise leaves the role unchanged, emits a bounded war
 block startup. This one-time convenience never broadens normal configuration readiness. The legacy
 prompt text is not retained as a second knowledge source, parsed, normalized, or fuzzy-matched.
 
-**R7 `(planned)` — Tool definitions retain local mechanics; the skill owns cross-tool judgment.**
+**R7 — Tool definitions retain local mechanics; the skill owns cross-tool judgment.**
 All existing agent-facing tool names, argument and result shapes, validation, authority, effects,
 `isError`, text blocks, `structuredContent`, and retry classifications remain unchanged. The
 `create_task` description no longer owns the cross-workflow instruction to avoid polling; that rule
@@ -102,7 +102,7 @@ meaning of `blocked`, human Continue, and proposals. The stale messaging package
 advertises only three tools and superseded wake behavior is corrected. No skill file carries an
 argument schema or duplicates the full registration inventory.
 
-**R8 `(planned)` — Core and reference content are bounded by ownership.** The main `SKILL.md`
+**R8 — Core and reference content are bounded by ownership.** The main `SKILL.md`
 contains only the AgentDeck-wide choices in FS-18.R3–R4: message versus task versus context link
 versus pipeline, durable dependencies instead of polling, pull-only/non-waking context, AgentDeck-
 derived authority, structured-result behavior, and routing to tool definitions for exact mechanics.
@@ -119,7 +119,7 @@ untouched.
 operator package before implementation. It belongs directly in `/release` or the repository
 development/release skill that workflow uses.
 
-**R10 `(planned)` — Installation failure is warning-only and suppresses every availability
+**R10 — Installation failure is warning-only and suppresses every availability
 signal.** The installer returns one immutable process-local availability result to server
 construction. Secure-path, publication, or verification failure returns `Available=false`, emits a
 bounded warning to the ordinary startup log/stderr sinks, and permits dashboard startup. The shared
@@ -175,9 +175,10 @@ SQLite state, REST/SSE data, or MCP arguments.
 
 ## 6. Traceability
 
-Planned anchors: embedded assets, verification, and installation in `internal/agentknowledge`;
-prompt migration in `internal/config`; the shared overlay helper in `internal/server`; ACP and
-terminal consumption in `internal/runtime`; local tool definitions in `internal/messaging`; and
-startup ordering in `internal/cli`. Governing seams: FS-18; FS-04.R13–R15; TS-01.R5–R6/R9;
+Anchors: embedded assets and verified publication in `internal/agentknowledge`; exact digest
+migration in `internal/config/seed.go`; `server.applyKnowledgeOverlay`; the runtime-only effective
+launch fields consumed by ACP and terminal runtimes; local tool definitions in
+`internal/messaging/messaging.go`; and `cli.prepareAgentKnowledge`. Governing seams: FS-18;
+FS-04.R13–R15; TS-01.R5–R6/R9;
 TS-02.R3–R5; TS-04.R6–R7/R14/R17/R28–R31; TS-06.R3–R7/R11; TS-09; TS-10; FS-17; and INV §1, §2,
 §4, §6, §8, §10, and §15.
