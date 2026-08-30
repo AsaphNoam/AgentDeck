@@ -1761,3 +1761,20 @@ AgentDecker now has a concise resident-operator role, while every AgentDeck-laun
 **Needs attention:** Logged-in Claude and Codex discovery still needs the existing credentialed provider check before those adapters are claimed as live-verified.
 
 **Next:** An independent reviewer should review this implementation, then run the credentialed provider check when access is available.
+
+### 2026-08-30 — Review: shared operating guidance and release follow-ups
+
+The continuous unreviewed work is now reviewed. The package installation, runtime-only delivery,
+exact legacy-role migration, and lifecycle wiring are structurally sound. The review found one
+security defect: diagram styling can hide an external URL with CSS escaping, bypass the literal
+sanitizer, and allow an untrusted diagram to make a network request. It also found two lower-priority
+verification gaps: the shared knowledge overlay is not exercised across every launch, resume,
+switch, and pipeline path, and migration failures are missing read/write regression fixtures. All
+required automated checks and the distributable build pass.
+
+**Needs attention:** Fix the diagram sanitizer before treating untrusted diagrams as request-free.
+Two earlier usability defects also remain Must fix: a failed layout read disables persistence for
+the session, and some failed pipeline pauses still offer a dead-end agent chat.
+
+**Next:** Run `/fix`, starting with the three Must-fix defects, then add the missing lifecycle and
+migration regressions.

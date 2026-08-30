@@ -25,14 +25,12 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   action rather than widen Continue — and is flagged in the human update for confirmation. The
   earlier 2026-08-27 all-200/no-page-load incident stays fixed, and the shared SSE stream is now
   replayed to a joining tab instead of restarted for every tab.
-- **Review state:** No open design findings. The user classified only the install-failure/migration
-  conflict as a defect; the specifications now make verified installation precede migration and
-  remove the thin prompt's unconditional skill claim. Runtime-only overlay fields and fresh
-  PM/teammate prompt cleanup remain included alignment work, not blockers. Code review findings
-  remain closed: the 2026-08-29 fix session closed every item from the 2026-08-29 review of
-  `6a16126..43e5feb`, the 2026-08-28 bug investigation, and the residue of the 2026-08-28 review of
-  `790c01c`. The block-split drag preview and six-tab shared-stream regression remain acceptance
-  gates, not findings. This session's own commits (`e71d4ab..b5d5f2a`) are unreviewed.
+- **Review state:** No open design findings. The continuous `43e5feb..52d01c4` range is reviewed.
+  The 2026-08-30 code review added one **Must fix** diagram-sanitizer bypass and two **Worth
+  fixing** acceptance-coverage gaps for lifecycle composition and migration I/O failures. The four
+  usability findings from 2026-08-30 also remain open below. Every earlier code-review and bug-
+  investigation finding remains closed. The six-tab shared-stream check remains an acceptance gate;
+  the block-split drag preview and expanded-pane footprint browser gate closed in the usability run.
 - **Active change:** None. Thin AgentDecker and the shared AgentDeck operating skill are finished
   and verified (FS-18, FS-04.R44/A24, TS-11). Expandable dashboard chat panes are finished and verified
   (FS-02.R46–R52/A29–A34, FS-03.R39/A23, FS-12.R38/A14, TS-03.R31, TS-08.R41–R43).
@@ -58,9 +56,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   v0.2.2 → v0.2.3 delta remains closed: FS-02.A24 is closed and FS-04.A22 remains narrowed to the
   native panel. Full run:
   [`usability-review-run-2026-08-30-new-pages.md`](../archive/reviews/usability-review-run-2026-08-30-new-pages.md).
-- **Last reviewed code:** `43e5feb` (2026-08-29). Advanced across the continuous range
-  `6a16126..43e5feb`, which was read end to end in one pass; the backlog of three never-reviewed
-  commits named in earlier handoffs is now cleared.
+- **Last reviewed code:** `52d01c4` (2026-08-30). Advanced across the continuous range
+  `43e5feb..52d01c4`, which was read end to end against its requirements and every invariant class.
 - **Branch:** `main`.
 
 ## Active change
@@ -71,16 +68,28 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 owner-only Claude/Codex views at startup, conditionally composes one runtime-only directory, prompt,
 and environment overlay through all three lifecycle composers, migrates only the exact historical
 AgentDecker prompt after verification, and leaves startup and user configuration intact on failure.
-The full required automated matrix is green. Credentialed pinned-provider discovery remains the
-existing manual gate because the available Claude session is logged out and Codex authentication
-could not be confirmed.
+The core automated suites are green, but the review found that the required lifecycle-composition
+matrix and migration read/write-error fixtures are incomplete. Credentialed pinned-provider
+discovery remains the existing manual gate because the available Claude session is logged out and
+Codex authentication could not be confirmed.
 
-**Next:** Run an independent `/review` of this implementation, then complete the pinned logged-in
-Claude/Codex discovery gate when credentials are available. The unrelated edits to
-`AGENT-WORKFLOW.md` and both design-feature skill twins predated that session and were committed
-separately as `b11fc5f`.
+**Next:** Run `/fix` for the open findings, starting with the diagram-sanitizer bypass, then complete
+the pinned logged-in Claude/Codex discovery gate when credentials are available.
 
 ## Changelog
+
+- **2026-08-30 — review (FS-18, FS-04.R44/A24, FS-03.R38/A21, TS-11, INV
+  §1–§15):** Reviewed the continuous `43e5feb..52d01c4` range end to end. The package installer,
+  conditional runtime-only overlay, exact migration, lifecycle wiring, and release/workflow state
+  match their specifications, but three findings are open below. One **Must fix**: Mermaid CSS is
+  scrubbed with a literal `url`/`@import` regex, so a CSS-escaped identifier survives sanitization
+  and can still resolve as a remote request in the browser. Two **Worth fixing** acceptance gaps:
+  FS-18.A1's lifecycle matrix is tested only at the overlay helper and terminal argument layer, and
+  FS-18.A5's read/write-error migration fixtures are absent. Every invariant class was swept:
+  §§6, 8 and 10 produced these findings; applicable surfaces under §§1–5, 7, 9 and 11–15 produced no
+  new finding. `make check-specs`, `make build`, the full default and `sqlite_fts5` test variants,
+  and `make dist` pass; the first sandboxed test attempt could not use the Go cache or bind a
+  loopback test port, then passed unchanged with those required permissions.
 
 - **2026-08-30 — usability review (FS-14.R43/R45/R46/R48, A14/A18–A22/A24/A26; FS-02.R45–R52,
   A28–A34; FS-12.A13):** Drove the new Pipelines pages and the changed dashboard grid through a real
@@ -715,11 +724,11 @@ an explicit specification update. Remove an item when the human resolves it or q
   transport half is now covered by `ui/src/api/sse.test.ts` and A27 has been narrowed to say so;
   the browser half has never been run against a build carrying the shared stream.
   `scripts/stress-fixture` (TS-06 §6) is the fixture.
-- [ ] Run J5 for the running-first drag preview (FS-02.A28) and an expanded pane's drag footprint
-  (FS-02.R47). Each running/stopped block now has its own sortable context and an expanded card
-  stays in its block's set; jsdom pins the item lists but evaluates no transforms, so only a real
-  browser shows that cards in the other block hold their positions and that a card dragged past a
-  pane sees its two-column footprint.
+- [x] **Closed 2026-08-30.** A real Chromium run covered J5's running-first placement, live
+  running/stopped boundary crossings in both directions, in-drag geometry within one block, refused
+  cross-block drop, and the expanded pane's two-column drag footprint (FS-02.A28, FS-02.R47).
+  Evidence is in the J5 section of
+  [`../archive/reviews/usability-review-run-2026-08-30-new-pages.md`](../archive/reviews/usability-review-run-2026-08-30-new-pages.md).
 
 ## Blocked on human
 
@@ -729,6 +738,33 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 `claude-agent-acp`, OpenCode, and OpenHands are not installed globally.
 
 ## Review findings
+
+From the 2026-08-30 code review of `43e5feb..52d01c4`:
+
+- **Must fix** (INV §8) — CSS identifier escapes bypass the diagram renderer's no-network
+  sanitizer. `ui/src/components/chat/renderers/mermaid.ts:27-35` removes only literal `url(...)`
+  and `@import` text from renderer-produced style elements and inline style attributes. Normal-use
+  trigger: an assistant reproduces an untrusted Mermaid `classDef` from a repository using an
+  escaped identifier such as `u\72l(https://example.invalid/fill.svg)`. DOMPurify preserves that
+  CSS, the regex does not match it, and browser CSS tokenization resolves the escape back to
+  `url(...)`, violating FS-03.R38's requirement that rendering make no network request. Fix: use a
+  CSS-aware sanitizer or conservatively reject style declarations/elements containing URL-bearing
+  tokens after CSS escape decoding. Test: extend the FS-03.A21 renderer/request-spy case with escaped
+  `url` and `@import` spellings and assert both the sanitized markup and network observer stay clean.
+- **Worth fixing** (INV §6/§10) — the shared knowledge overlay's required lifecycle composition
+  matrix is not tested. `internal/server/knowledge_overlay_test.go:25-76` invokes
+  `applyKnowledgeOverlay` directly; the only downstream contract test covers terminal argument
+  delivery. FS-18.A1 explicitly requires composition tests for fresh launch, ordinary and wake
+  resume, runtime switch, pipeline-started work, chat, and terminal. Normal-use risk: a future
+  composer or pipeline path can stop calling the shared seam while the helper tests remain green.
+  Add table-driven composer/lifecycle tests with the package available and unavailable, asserting
+  the effective process parameters once and their absence from frozen session metadata.
+- **Worth fixing** (INV §10) — the exact migration's specified read/write-error fixtures are absent.
+  `internal/config/config_test.go:444-527` covers exact, one-byte, empty/custom, production, and
+  missing-role cases, but FS-18.A5 and FS-04.A24 also require read and write errors to leave the role
+  unchanged. Normal-use risk: a corrupt role file or failed atomic replacement could regress the
+  startup retry guarantee without failing the suite. Add explicit read-failure and injected atomic-
+  write-failure cases that compare the role bytes before and after the attempted migration.
 
 From the 2026-08-30 usability run (repro steps and evidence in
 [`usability-review-run-2026-08-30-new-pages.md`](../archive/reviews/usability-review-run-2026-08-30-new-pages.md)):
@@ -772,8 +808,6 @@ Runtime-only overlay fields and fresh PM/teammate prompt cleanup remain included
 alignment, not review findings. Every finding from the 2026-08-29 code review of
 `6a16126..43e5feb`, the 2026-08-28 bug investigation, and the 2026-08-28 review of `790c01c`
 remains closed. Browser-only evidence is recorded as acceptance gates above, not as findings.
-
-The commits that session made (`e71d4ab..b5d5f2a`) have not been reviewed by another agent.
 
 ## Design consistency notes
 
