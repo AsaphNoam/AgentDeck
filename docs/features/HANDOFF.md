@@ -6,6 +6,12 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Current position
 
+- **Release:** `v0.3.0` is tagged locally on `b8f6697` and **not pushed**. Pushing `main` and the
+  tag is what triggers assembly and publication, and that authorization has not been given, so no
+  GitHub Release exists for it yet. The `v0.2.3..v0.3.0` range was read for agent-facing change: the
+  embedded `operating-agentdeck` package needed none, because it shipped in that range's last commit
+  and already states FS-14.R47's stage boundary. The README layout block was corrected to name
+  `cache/agent-skills/`. Release CI (`.github/workflows/release.yml`) has never run for this tag.
 - **Bug investigation:** The 2026-08-28 pipeline `stale_assignment` report is closed. Its three
   findings are all fixed: the refusal code was corrected earlier, the boundary is now stated to the
   stage agent in the assignment, the accepted result, and the refusal (FS-14.R47), the restart pause
@@ -69,6 +75,18 @@ Claude/Codex discovery gate when credentials are available. The unrelated edits 
 separately as `b11fc5f`.
 
 ## Changelog
+
+- **2026-08-30 — release (FS-10, TS-06.R13–R22, TS-11.R1/R8):** Cut `v0.3.0` for the 55-commit
+  `v0.2.3..HEAD` range under the new §16 role. No open findings blocked it; the user accepted the
+  20-commit unreviewed range (`43e5feb..HEAD`) and chose a minor version for the bundled operating
+  skill, split Pipelines surface, expandable chat panes, Mermaid chat rendering, and running-first
+  card placement. Step 2 found the embedded package already correct for the range and recorded that
+  as a result: the one agent-facing change after the design froze, FS-14.R47's stage participation
+  boundary, is already stated in `build-and-run-pipelines.md`, and the mail budget of 15 and CLI
+  launch forms still match the code. The README `~/.agentdeck/` layout was missing the
+  `cache/agent-skills/` root TS-11.R2 introduced and is fixed. Both Go variants, 50 UI test files,
+  `make dist VERSION=0.3.0`, and `git diff --check` pass; the binary reports `0.3.0` built with
+  `sqlite_fts5`. The annotated tag is local and unpushed pending authorization.
 
 - **2026-08-30 — workflow (TS-11 §5, FS-10, TS-06.R13–R22):** Added the release role the shared
   operating skill was waiting on. Workflow §16 fixes the release range at the previous `vX.Y.Z` tag,
@@ -655,6 +673,7 @@ an explicit specification update. Remove an item when the human resolves it or q
 ## Acceptance gates
 
 - [ ] Run pinned, credentialed Claude and Codex chat/MCP/resume checks before claiming those combinations.
+- [ ] Confirm the v0.3.0 release CI run and its published archive, checksum, and manifest once the tag is pushed; the credentialed provider gates above are not covered by that run (TS-06.R21).
 - [ ] Run pinned Claude terminal flags/hooks and live xterm journeys before claiming full terminal support.
 - [ ] Run pinned OpenCode/OpenHands launch/credential checks before claiming those backends beyond fakes.
 - [ ] Run J2/J9/J16 in a real macOS browser to confirm the native folder panel opens in front,

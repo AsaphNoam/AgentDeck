@@ -5,6 +5,33 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-30 — Release: v0.3.0 is tagged and waiting for your go-ahead
+
+AgentDeck v0.3.0 is built, verified, and tagged on this machine. It is not published: pushing is
+what publishes, and I have not done that.
+
+What people get in this version. Pipelines are now two separate surfaces, Runs and Templates,
+instead of one crowded page. Chat panes on the dashboard expand in place, so you can follow several
+agents at once without leaving the grid, and running agents sort ahead of stopped ones in every
+section. Diagrams written in chat render as diagrams. Agents launched by AgentDeck now receive a
+bundled operating guide, so they stop guessing at how messages, tasks, pipelines, and agent
+lifecycle actually work here, and a stage agent is now told plainly where its part of a pipeline
+run ends — previously it could keep working on something the run could never accept.
+
+The release check found one thing out of date: the README's description of the `~/.agentdeck/`
+folder never mentioned the new folder this version creates for that bundled guide. Fixed. The
+bundled guide itself needed no changes, because it shipped at the end of this same range and
+already matches the behavior it describes.
+
+**Needs attention:** Publishing needs your explicit go-ahead. Pushing the branch sends 16 local
+commits, not just the release, and the tag needs them because it has to point at a commit GitHub
+has. Two things are worth knowing before you say yes: 20 of those commits have never been read by a
+second agent — you accepted that — and the Claude and Codex sign-in checks are still manual, so
+this release is not evidence they work.
+
+**Next:** Tell me to push, and I will push `main` and `v0.3.0` and then confirm the release job
+produced its archive, checksum, and manifest.
+
 ### 2026-08-30 — Workflow: a repeatable way to cut a release
 
 AgentDeck now has a release procedure, which is what the bundled operating skill has been waiting
