@@ -36,6 +36,32 @@ The rule we wrote says the principle broadly and then applies it narrowly.
 
 **Next:** Run `/fix` on the two must-fix items; I did not touch product code.
 
+### 2026-08-30 — Release: v0.3.0 is published
+
+AgentDeck v0.3.0 is live. The build job passed in three and a half minutes, and the download page now
+carries the Mac archive, the installer script, and a manifest whose checksum matches the archive
+GitHub actually stored. Installing with no version selected now gets 0.3.0.
+
+This version splits Pipelines into separate Runs and Templates pages, lets dashboard chat panes
+expand in place so several agents can be followed without leaving the grid, sorts running agents
+ahead of stopped ones, renders diagrams written in chat, and gives every agent AgentDeck launches a
+bundled operating guide instead of leaving it to guess how messages, tasks, pipelines, and agent
+lifecycle work here. A pipeline stage agent is now told where its part of a run ends, which closes a
+case where it could keep working on something the run could never accept.
+
+Two things you should know. Pushing the release also pushed a usability-review commit another
+session had left on the branch, so it is now public too — it changes no product code. And anyone who
+edited their AgentDecker role keeps their old copy of the built-in product manual: AgentDeck will not
+overwrite an edited role, so that stale text now sits beside the new operating guide and can
+contradict it. They get the new guide either way; removing the old text from their role prompt is a
+manual edit. Nothing in the product tells them this.
+
+**Needs attention:** The Claude and Codex sign-in checks are still manual and were not part of this
+release's verification, so 0.3.0 is not evidence that those provider paths work.
+
+**Next:** Decide whether the AgentDecker upgrade note belongs in the README now rather than waiting
+for someone to hit it.
+
 ### 2026-08-30 — Release: v0.3.0 is tagged and waiting for your go-ahead
 
 AgentDeck v0.3.0 is built, verified, and tagged on this machine. It is not published: pushing is
