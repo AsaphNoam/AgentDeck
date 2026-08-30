@@ -67,6 +67,8 @@ When delegation is available, use it for bounded independent work such as a repo
 
 Commit each completed, verified piece directly to `main`; this repository does not use per-change branches or pull requests. The message should say what changed and, where useful, cite the requirement IDs. Push only when the user or environment authorizes it.
 
+Every role ends in a commit, including the roles that write no product code. Their **state files** are `HANDOFF.md` and `BRIEFS.md`; where a section below says to commit only the state files, it means those two plus whatever that section explicitly allows.
+
 At the end of a session, either leave a verified commit or clearly describe unfinished work in the handoff. Never pretend interrupted work is complete.
 
 ## 6. Human update
@@ -98,7 +100,7 @@ Check both directions:
 
 Also look for normal-use bugs: missing error handling at boundaries, realistic races, unsafe writes, dead code, and incomplete wiring. Unrequired complexity is likewise a finding: a new parallel mechanism or abstraction where an existing seam could extend, or code serving a case no requirement names. Ignore style preferences, demands for speculative edge-case handling, and micro-optimizations.
 
-Record each real finding in `## Review findings` in `HANDOFF.md` with its location, normal-use trigger, why it matters, relevant requirement ID when one exists, and a suggested test or fix. Start the bullet with either **Must fix** (a likely normal-use failure, data-loss risk, or requirement violation) or **Worth fixing** (useful but not urgent). Update the last reviewed commit only across a continuous range actually reviewed. Commit only the review-state files.
+Record each real finding in `## Review findings` in `HANDOFF.md` with its location, normal-use trigger, why it matters, relevant requirement ID when one exists, and a suggested test or fix. Start the bullet with either **Must fix** (a likely normal-use failure, data-loss risk, or requirement violation) or **Worth fixing** (useful but not urgent). Update the last reviewed commit only across a continuous range actually reviewed. Commit only the state files (§5).
 
 ## 8. Fix review findings
 
@@ -113,7 +115,7 @@ If the correct fix needs a user decision or cannot pass the required checks, lea
 
 ## 9. Usability reviews
 
-Usability reviews do not change product code or specifications. Exercise the real user journeys in [`USABILITY-REVIEW.md`](USABILITY-REVIEW.md) against the feature acceptance criteria. Record problems a person is likely to meet, with reproduction evidence, using the same **Must fix** / **Worth fixing** format as §7. If a browser or credentialed journey cannot run, say so plainly rather than treating it as passed.
+Usability reviews do not change product code or specifications. Exercise the real user journeys in [`USABILITY-REVIEW.md`](USABILITY-REVIEW.md) against the feature acceptance criteria. Record problems a person is likely to meet, with reproduction evidence, using the same **Must fix** / **Worth fixing** format as §7. If a browser or credentialed journey cannot run, say so plainly rather than treating it as passed. Commit only the state files (§5) and finish with the §6 human update.
 
 ## 10. Keep specifications accurate
 
@@ -152,7 +154,8 @@ the trigger does not pass, continue without recording a UX ceremony or rationale
    boundaries.
 6. When both specifications are complete, create a descriptive file in `docs/ready-changes/` with
    the exact requirements and acceptance evidence, remove the source idea, and run the documentation
-   checks. Do not make the change active in `HANDOFF.md`; implementation has not started.
+   checks. Do not make the change active in `HANDOFF.md`; implementation has not started. Commit the
+   specifications, the ready change, the removed idea, and the state files (§5) together.
 
 If a material decision remains unresolved, leave the idea under `Ideas being defined` and do not
 call it ready. Keep partial specifications honest and record what is needed from the user.
@@ -404,8 +407,9 @@ When the trigger rests on a changed learned workflow, an unfamiliar decision, or
 consequential task, walk each critical step with two questions: given this operator's actual
 knowledge and habits, will the intended action remain obvious and efficient; after acting, will the
 response explain what changed, whether they progressed, and what to do next? State the likely
-failure story before proposing a repair. An expert walkthrough identifies risk; it is not evidence
-that other users will succeed.
+failure story before proposing a repair. A walkthrough is a prediction, not proof; its checks are
+§15.3's rendered pass and, for an assumption about the operator's actual habits or frequency, the
+operator's own confirmation at the existing checkpoints.
 
 Use judgment, not a heuristic inventory. The strongest recurring decisions are:
 
@@ -414,10 +418,9 @@ Use judgment, not a heuristic inventory. The strongest recurring decisions are:
 - keep the essential path visible and reveal advanced or rare choices in a clear next layer without
   hiding frequent, risky, or prerequisite decisions; learned shortcuts and dense expert controls
   are preferable when they make repeated work faster without obscuring state or consequence;
-- make empty states explain what belongs there and offer the natural start, success say what
-  happened and what is next, and errors preserve work while naming a practical repair;
-- make every available, unavailable, in-progress, completed, and failed action explain its state,
-  consequence, and next recovery step in product language;
+- make state legible for resuming work: every available, unavailable, in-progress, completed, and
+  failed action explains its state, consequence, and next step in product language; success says
+  what changed and what is next; errors preserve work while naming a practical repair;
 - acknowledge long work promptly; show stage, progress, or time only when trustworthy; preserve
   context and offer safe leave, cancel, retry, resume, or history behavior as the task warrants;
 - prevent consequential errors with clear labels, scope, and previews; interrupt with confirmation
@@ -441,9 +444,10 @@ should exercise the actual task and its material state or recovery branch, not a
 heuristic or component exists. Keep transient task framing in the working plan or conversation;
 keep durable behavior only in the governing FS and ready change.
 
-Ask the human only for decisions the normal workflow reserves for them. When evidence about real
-people, frequency, comprehension, or model quality is absent, name the assumption and the validation
-still needed instead of manufacturing research.
+Ask the human only for decisions the normal workflow reserves for them. When an assumption about
+the operator's habits, frequency, or comprehension materially shapes the behavior, confirm it at
+the existing confirmation step rather than recording abstract validation debt. Do not manufacture
+research or model quality evidence.
 
 ### 15.3 Exercise the task in the real product
 
@@ -452,10 +456,9 @@ recovery behavior, or the unresolved design-time risk could change the judgment.
 fully established by acceptance tests does not earn a browser pass; an explicit standalone `/ux`
 critique does. When validation is warranted, run the working tree's real product and complete the
 framed task from the operator's normal entry state. Reuse `USABILITY-REVIEW.md` §§2 and 5 for an
-isolated `AGENTDECK_HOME`, the built binary,
-`fakeacp` when deterministic live behavior is needed, and the browser fallback ladder. Exercise the
-primary task plus only the state, consequence, interruption, or recovery branch likely to change
-the judgment. Source inspection and static rendering may identify risks but cannot prove an
+isolated `AGENTDECK_HOME`, the built binary, `fakeacp` when deterministic live behavior is
+needed, and the browser fallback ladder. Exercise the primary task plus only the state,
+consequence, interruption, or recovery branch likely to change the judgment. Source inspection and static rendering may identify risks but cannot prove an
 experienced finding.
 
 Every finding must name:

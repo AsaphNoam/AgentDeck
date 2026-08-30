@@ -88,6 +88,7 @@ When both specification sides are complete:
 4. Do not make it active in `HANDOFF.md` and do not write product code.
 5. Run `make check-specs`, the twin-skill comparison, and `git diff --check`.
 6. Update the handoff changelog and add the exact plain-language final update to `BRIEFS.md`.
+7. Commit the specifications, the ready change, the removed idea, and the state files together.
 
 If a material product or technical decision remains unresolved, do not create a ready change. Keep
 the entry under `Ideas being defined`, record what is needed, and tell the user plainly.
