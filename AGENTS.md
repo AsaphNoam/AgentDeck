@@ -4,7 +4,8 @@ Guidance for coding agents working in this repository.
 
 ## Read order
 
-Before feature design, implementation, review, fix-review, usability-review, or UX work, read:
+Before feature design, implementation, review, fix-review, usability-review, UX, or release work,
+read:
 
 1. [`docs/features/HANDOFF.md`](docs/features/HANDOFF.md) — current state and relevant requirement IDs.
 2. The change file named by the handoff, if a change is in progress.
@@ -38,6 +39,9 @@ rationale, history, or sequencing but do not override an FS/TS requirement.
 - **Shape and test UX:** §15. `/ux` is explicit or automatically accompanies feature design and
   implementation only when an established task changes or material consequence, state, recovery,
   long-running, or AI uncertainty needs judgment; it optimizes the experienced operator's task.
+- **Release:** §16. `/release` tags a new version, refreshes the shipped `operating-agentdeck`
+  package for what the release range changed, and publishes only with explicit authorization; it
+  adds no feature and fixes no finding.
 
 `docs/ideas.md` holds new ideas and known product improvements. `docs/ready-changes/` holds changes
 that are specified and ready to start. `HANDOFF.md` records only the change already in progress.

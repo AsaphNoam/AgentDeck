@@ -118,6 +118,7 @@ config.json           port, defaults (version 1)
 state.db              agent identity, running registry, status, messages
 sessions/{id}/        normalized transcript + session artifacts
 cache/config-sources/ redacted, regenerable federation mirror data
+cache/agent-skills/   product-managed operating skill, republished and verified at each start
 ```
 
 `AGENTDECK_HOME` overrides `~/.agentdeck/` (used by tests/CI).

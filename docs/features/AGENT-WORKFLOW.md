@@ -492,3 +492,57 @@ once: `/ux` establishes what the experience must communicate or enable, and `/de
 need perceptible and coherent in AgentDeck's visual system. Do not bounce a finding between the two,
 duplicate evidence, or let visual polish stand in for a missing step, unsafe action, or absent
 recovery path.
+
+## 16. Cut a release
+
+`/release` tags a new version and keeps the shipped `operating-agentdeck` skill package matched to
+what that version actually ships. It does not add features, fix findings, or change product
+behavior; when the release range needs one of those, that work happens first under §2 or §8.
+
+1. **Fix the range and check readiness.** The previous release is the highest `vX.Y.Z` tag; the
+   release range is that tag to `main`. Do not release from a dirty tree. Before proposing a version,
+   report the commits in range, the part of the range the handoff still lists as unreviewed, and
+   every open review finding. An open **Must fix** finding blocks the release and goes back to §8. An
+   unreviewed range is a user decision under §3, not something to wave through.
+
+2. **Refresh the shipped operator skill.** Read the range for anything that changes what an agent
+   operating AgentDeck must know: agent-facing tool behavior and results, coordination and task
+   semantics, pipeline stage and supervision behavior, agent lifecycle, configuration, interfaces,
+   and project resources. For each such change, decide whether the embedded package is now wrong,
+   incomplete, or stale, and correct it in `internal/agentknowledge/operating-agentdeck/**` — the
+   single source (TS-11.R1). Never edit an installed cache view, which is a disposable projection,
+   and never confuse the shipped package with this repository's own `.claude/skills` and
+   `.agents/skills` launchers. TS-11.R8 decides which file owns a correction, and its exclusions
+   still hold: no argument schemas, no registration inventory, no planned, experimental,
+   unverifiable, or credential-specific claims, and no development or release-maintenance guidance.
+   A range that changes nothing agent-facing is a result to state, not a step to skip.
+
+   Apply the same test to the other release-matched claims the range may have falsified: the README
+   install and command text, and the pinned component versions in `install.sh` and
+   `scripts/release/assemble.sh`.
+
+3. **Choose the version with the user.** Patch for fixes and internal work, minor for new or changed
+   user-visible capability. Say which number you propose and why, and wait for confirmation:
+   publishing is outward-facing and cannot be cleanly withdrawn.
+
+4. **Verify the release build.** Run the §2 product-code checks plus `make dist VERSION=<version>`.
+   Every shipped binary carries `sqlite_fts5` (TS-06.R2, TS-06.R13). Assembling the darwin/arm64
+   archive with its private Node runtime belongs to release CI, not to a local step.
+
+5. **Cut it.** Commit the package refresh, any documentation the range falsified, and the state
+   files together, then create the annotated tag `vX.Y.Z` with the message `Release vX.Y.Z`. Pushing
+   `main` and that tag is what triggers assembly and publication, so it needs the explicit
+   authorization §5 requires. Ask for it in the terms it actually has: pushing the branch publishes
+   every unpushed commit on `main`, not only the release commit, and the tag needs them because it
+   must point at a commit the remote has. Say how many commits that is and stop at the unpushed tag
+   if the authorization is not given.
+
+6. **Confirm what actually published.** Release CI verifies archive contents, FTS5 tagging, pinned
+   components, checksum rejection, and a fresh installation (TS-06.R21). Check that its run succeeded
+   and that the archive, checksum, and manifest are attached to the GitHub Release. The credentialed
+   Claude and Codex checks remain manual gates: name them as owed rather than implying this release
+   passed them.
+
+7. **Close.** Record the released version and the gates still owed in `HANDOFF.md`, commit the state
+   files (§5), and finish with the §6 human update. Write that update as release notes a person can
+   read — what this version gives them — drawing on the `BRIEFS.md` entries in the range.

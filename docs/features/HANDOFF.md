@@ -65,9 +65,21 @@ could not be confirmed.
 
 **Next:** Run an independent `/review` of this implementation, then complete the pinned logged-in
 Claude/Codex discovery gate when credentials are available. The unrelated edits to
-`AGENT-WORKFLOW.md` and both design-feature skill twins predate this session and remain untouched.
+`AGENT-WORKFLOW.md` and both design-feature skill twins predated that session and were committed
+separately as `b11fc5f`.
 
 ## Changelog
+
+- **2026-08-30 — workflow (TS-11 §5, FS-10, TS-06.R13–R22):** Added the release role the shared
+  operating skill was waiting on. Workflow §16 fixes the release range at the previous `vX.Y.Z` tag,
+  blocks on open **Must fix** findings, requires the range to be read for agent-facing change and
+  the embedded `internal/agentknowledge/operating-agentdeck/**` source to be refreshed under
+  TS-11.R1/R8 ownership and exclusions, extends the same test to the README and the pinned
+  `install.sh`/`assemble.sh` component versions, confirms the version with the user, verifies with
+  the §2 checks plus `make dist`, and leaves assembly and publication to release CI behind explicit
+  push authorization with the credentialed provider gates named as owed. Byte-identical `/release`
+  launchers were added to `.claude/skills` and `.agents/skills`, and AGENTS.md now routes the role.
+  Documentation-only: `make check-specs`, the twin comparison, and `git diff --check` pass.
 
 - **2026-08-30 — work (FS-18, FS-04.R44/A24, TS-11, INV §1/§2/§4/§6/§8/§10/§15):** Shipped the
   release-matched `operating-agentdeck` package and thin AgentDecker role. Startup stages, syncs,

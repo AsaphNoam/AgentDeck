@@ -5,6 +5,27 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-30 — Workflow: a repeatable way to cut a release
+
+AgentDeck now has a release procedure, which is what the bundled operating skill has been waiting
+for. Running `/release` starts from the previous released version, lists everything that has landed
+since, and refuses to go further while a must-fix problem is open or the tree is dirty. It then
+reads that range specifically for changes to what an agent needs to know to operate AgentDeck, and
+updates the operating guidance that ships inside the binary so a release never hands people advice
+that its own version has already made wrong. The same check covers the README and the pinned
+installer component versions.
+
+The version number is proposed with a reason and confirmed by you before anything is tagged, the
+full build and test set runs first, and publishing still requires your explicit go-ahead. The
+credentialed Claude and Codex sign-in checks stay manual and are reported as owed rather than
+quietly counted as passed. The final word of a release session is readable release notes, not a
+requirement list.
+
+**Needs attention:** None.
+
+**Next:** Someone should run `/release` for the 55 commits since v0.2.3 — that range includes the
+new operating skill itself, so it is the first real test of the procedure.
+
 ### 2026-08-29 — Feature design follow-up: shared AgentDeck skill
 
 The shared-skill design is ready to implement. Skill installation must now succeed before AgentDeck
