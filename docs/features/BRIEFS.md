@@ -5,6 +5,27 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-31 — Review: active project tabs and the preceding fixes
+
+The reviewed range has five open problems. Two affect behavior: pressing Escape does not close the
+project overflow after keyboard focus moves into its links, and a refused running-to-stopped card
+drag still shows the normal pointer because the card overrides the refusal cursor. Three smaller
+gaps remain: the waiting-work index links to the deleted finished change, the AgentDecker migration
+test does not exercise a real file-read failure and skips too broadly under a privileged test user,
+and terminal resume/switch are missing from the shared operating-knowledge lifecycle matrix.
+
+Everything else in the range matches the specifications, including active-project membership and
+ordering, current-project retention, header presentation, failed pipeline actions, layout-error
+recovery, diagram sanitization, and the shared knowledge overlay. The full automated and
+distributable checks pass.
+
+**Needs attention:** Please confirm two earlier behavior choices: failed pipeline launch/resume
+pauses hide **Open agent**, and a refused cross-block card drag should signal through the pointer
+rather than rely on snap-back alone.
+
+**Next:** Run `/fix`, starting with the Escape and drag-cursor defects, then close the three coverage
+and state gaps.
+
 ### 2026-08-31 — Implementation: active project tabs
 
 The header now shows compact links for projects with running agents, so switching active work no
