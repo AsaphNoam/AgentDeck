@@ -1,6 +1,6 @@
 # TS-05 — Security & trust boundaries
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/server`, `internal/config`, `internal/configsource`, `internal/runtime`, `internal/messaging`, `internal/backend`, `internal/contextref`
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md), the [phase archive manifest](../../archive/phases/README.md), and [`INVARIANTS.md`](../../features/INVARIANTS.md) §14
 
@@ -118,9 +118,24 @@ sensitive-context sharing is a practical problem.
   assignee a work-derived read route without synthesizing a direct grant. This adds no authentication
   boundary and does not change the same-machine trust model. See TS-10.
 
+- **R18 (planned) — Hooks and direct actions reuse one launch secret, not one authority path.**
+  The existing cryptographically random per-launch token is registered once with server-derived
+  `{agent_id,generation}` and delivered to chat processes as both the hook credential and reserved
+  action environment credential. It is accepted only in the authorization header, never argv,
+  query, action input, prompt, or frozen session configuration. Action dispatch rechecks the current
+  running row and chat interface; terminal processes receive no action variables. Exact-generation
+  teardown on failed start, stop, crash, switch, and shutdown revokes both uses. Hook bodies cannot
+  select actions and action bodies cannot submit hook events (INV §4/§5/§12).
+
+- **R19 (planned) — Action transport is content-free outside explicit bounded results.** Credentials,
+  action inputs, context bytes, and private envelopes are redacted from logs, metrics, transcripts,
+  prompts, and errors. Authentication, schema, oversize, and unknown-action failures reveal no
+  caller or domain data. Context source bytes remain available only in the authorized
+  `read_context_link` result, preserving R15's disclosure boundary (INV §8/§13/§14).
+
 ## 3. Interfaces & data shapes
 
-Security-relevant interfaces are the single listener, Host/Origin middleware, hook/MCP token
+Security-relevant interfaces are the single listener, Host/Origin middleware, launch token
 registries, config/file-store mode helpers, federation approved-root sets, and backend env composer.
 Their concrete payloads are owned by TS-03, TS-04, and TS-07.
 

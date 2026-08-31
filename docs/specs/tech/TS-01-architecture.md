@@ -1,6 +1,6 @@
 # TS-01 — Architecture
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/server`, `internal/runtime`, `internal/state`, `internal/index`, `internal/bus`, `internal/config`, `internal/configsource`, `internal/messaging`, `internal/contextref`, `internal/pipeline`, `internal/backend`, `internal/archive`, `internal/transcript`, `internal/cli`, `ui/src`
 **Absorbed:** architecture contract from [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md); rationale remains in [`architecture-decisions.md`](../../architecture-decisions.md) D1–D5
 
@@ -305,6 +305,16 @@ domain's authorization transition.
   dispatch invokes one hard-coded consumer; it becomes a generation-scoped subscriber fan-out shared
   by the pipeline and task domains rather than gaining a second dispatch path (INV §2, TS-10.R19).
   See TS-10.
+
+- **R25 (planned) — Internal actions are one in-process server capability with a thin packaged
+  client.** The server remains the sole domain writer and owns one provider-neutral action registry;
+  a private loopback adapter exposes it only to generation-authenticated chat launches, and the
+  running `agentdeck` executable is the client. Runtime composition adds the client path, private
+  URL, credential, and short discovery prompt once for every chat lifecycle, alongside the optional
+  knowledge overlay but outside frozen session configuration. No daemon, provider-specific action
+  implementation, second domain service, or data migration is introduced. When this ships,
+  `LaunchSpec` and runtime adapters stop carrying AgentDeck's internal MCP registration while
+  provider-owned MCP configuration remains outside this boundary (FS-17.R13–R19, TS-04.R32–R39).
 
 ## 3. Interfaces & data shapes
 

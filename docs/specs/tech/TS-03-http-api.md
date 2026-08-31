@@ -1,6 +1,6 @@
 # TS-03 — HTTP, SSE & WebSocket API
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/server`, `ui/src/api`
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) API sections and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -383,6 +383,15 @@ stop-and-registration-cleanup operation.
   reconciliation tail scoped to the in-flight request, not a permanent second transcript: the
   client creates the tail when fetching starts and drops it when the newest request settles, the
   last surface unregisters, or the agent is removed (INV §1/§4).
+
+- **R32 (planned) — Agent actions use a separate credentialed local route family.**
+  `GET /api/agent-actions/{action}` returns the registry-derived name, description, and input schema;
+  `POST /api/agent-actions/{action}` accepts one size-bounded JSON object and returns
+  `{result:<object>,is_error:<boolean>}`. Both inherit `localOnly`, require the launch credential,
+  reject unknown actions or invalid bodies before dispatch, and are private runtime transport—not
+  the dashboard's unauthenticated same-user REST contract. The shipped internal `/mcp` route is
+  removed in the completed cutover; no UI client or public API compatibility promise is added
+  (FS-17.R13–R19, TS-04.R32–R39, TS-05.R18).
 
 ## 3. Interfaces & data shapes
 

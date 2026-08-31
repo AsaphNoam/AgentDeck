@@ -1,6 +1,6 @@
 # TS-06 — Build, test & delivery
 
-**Status:** Current
+**Status:** Partial
 **Code:** `Makefile`, `go.mod`, `ui`, `internal/server/ui`, `install.sh`, `scripts/`, `internal/cli/`, `.github/workflows`
 **Absorbed:** build/test sections in the [phase archive manifest](../../archive/phases/README.md) and contributor guidance formerly duplicated in [`CLAUDE.md`](../../../CLAUDE.md)
 
@@ -124,6 +124,13 @@ release command-tree tests prove `agentdeck auth claude|codex` is present; relea
 the private Codex readiness command resolves without a globally installed Codex CLI. Existing
 installed release directories remain immutable: a command absent from an older version requires an
 explicit reinstall/update to a newer release.
+
+**R23 (planned) — The action client is the exact running AgentDeck binary.** Source and release
+launches resolve `os.Executable()` to an absolute path and inject that immutable/current-version
+path for chat actions; they do not depend on `PATH`, a global install, or a second artifact. Source,
+archive, installed-version, retained-rollback, and update tests invoke representative action help and
+transport behavior through that path. Release remains blocked until pinned credentialed Claude,
+Codex, OpenCode, and OpenHands sessions pass FS-17.A9; fake providers cannot satisfy that gate.
 
 ## 3. Interfaces & data shapes
 

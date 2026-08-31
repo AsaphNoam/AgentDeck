@@ -80,6 +80,17 @@ the three coverage/state findings.
 
 ## Changelog
 
+- **2026-08-31 — feature design (FS-17.R13–R19/A7–A11; TS-01.R25; TS-03.R32;
+  TS-04.R32–R40; TS-05.R18–R19; TS-06.R23; TS-11.R11–R12; INV §§1–6, 8–15):** Validated that
+  AgentDeck's in-process internal MCP adds model-visible schema and protocol coupling without an
+  interoperability benefit, while MCP remains appropriate as a supported provider/user extension
+  protocol. Specified one packaged `agentdeck action` CLI over a private loopback action adapter and
+  provider-neutral typed registry, reusing the existing generation-scoped launch credential. The
+  fifteen actions, structured results, authority, domain behavior, and external MCP federation stay
+  unchanged. The implementation freezes parity first, validates Claude/Codex/OpenCode/OpenHands,
+  and removes the internal MCP path before release with no shipped fallback. The ready change is
+  `migrate-internal-actions-from-mcp.md`; its phased implementation plan is under `docs/plans/`.
+
 - **2026-08-31 — review (FS-02.R53/R54/A35/A36, FS-12.R39/A15, FS-18.A1/A5,
   FS-04.A24, TS-08.R44, TS-11.R4/R6; INV §1–§15):** Reviewed the continuous
   `52d01c4..da2db77` range in both directions. Five findings are open: Escape closes the project

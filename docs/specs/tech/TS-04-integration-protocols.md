@@ -1,7 +1,7 @@
 # TS-04 — Integration protocols
 
 **Status:** Partial
-**Code:** `internal/runtime`, `internal/hooks`, `internal/messaging`, `internal/server`, `internal/backend`, `internal/contextref`
+**Code:** `internal/runtime`, `internal/hooks`, `internal/messaging`, `internal/server`, `internal/backend`, `internal/contextref`, `internal/cli`
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
 ## 1. Scope
@@ -347,6 +347,83 @@ global resource list.
   pinned Claude and Codex adapters' handling of them is verified (FS-17.A6). Values that cannot
   marshal to a JSON object omit the field rather than fail the call (FS-17.R12).
 
+### Direct AgentDeck action transport
+
+- **R32 (planned) — One typed action registry replaces the internal MCP authority.**
+  `internal/messaging` retains one registration for each FS-17.R13 action identifier, its bounded
+  description, typed input, and handler. The registry derives and resolves one JSON Schema from the
+  handler's Go input type, decodes with unknown-field rejection, validates before invoking the
+  handler, and returns one provider-neutral `{result,is_error}` value. The result/refusal helpers and
+  retry classifier remain shared by every handler; no HTTP route, CLI command, domain package, or
+  knowledge file owns a second action list, schema, result formatter, or retry table (INV §2).
+  `github.com/google/jsonschema-go` becomes the direct schema dependency; the MCP SDK is removed.
+
+- **R33 (planned) — The private action transport is a thin loopback adapter.** A credentialed
+  `POST /api/agent-actions/{action}` accepts the action's JSON input and returns the R32 transport
+  envelope only after the handler has completed. `GET /api/agent-actions/{action}` returns that same
+  registry entry's name, description, and resolved input schema for on-demand discovery. Both routes
+  inherit the whole-mux local Host/Origin guard and require the runtime credential TS-05.R18 defines;
+  they are not part of the unauthenticated same-user dashboard API. Unknown actions, malformed
+  transport bodies, and authentication failures use bounded transport errors and never enter a
+  domain handler. The POST body has an explicit fixed maximum at least as large as the largest
+  permitted action input; exceeding it is rejected before decode.
+
+- **R34 (planned) — `agentdeck action` is the only agent client.** The packaged command
+  `agentdeck action <action> --input -` reads exactly one JSON object from standard input and invokes
+  R33 with the runtime URL and credential supplied only through process environment. An action whose
+  input type is empty may omit `--input -`; every other action rejects missing input. The command
+  unwraps the private transport envelope, writes only its `result` object plus one newline to standard
+  output, and exits zero exactly when `is_error` is false. A transport failure that has no server
+  result is converted to one bounded FS-17-shaped refusal on standard output and a non-zero exit.
+  Diagnostics go only to standard error. `agentdeck action describe <action>` projects R33's
+  description/schema as JSON; neither command reads SQLite, calls a domain service directly, retries
+  an action automatically, accepts a token argument, or falls back to an unauthenticated route.
+
+- **R35 (planned) — One launch identity serves hooks and actions without merging their handlers.**
+  Launch, resume, switch, wake, task, and pipeline composition register the existing random launch
+  token once with `{agent_id,generation}` in the server's generation-scoped runtime registry. Hook
+  handling retains its current payload and state validation; action lookup uses the same token to
+  recover caller and generation, then rechecks the authoritative running row and chat interface
+  before dispatch. Sharing the credential does not let a hook payload select an action or an action
+  body select a hook event. Teardown removes the exact registration on every stop, crash, failed
+  start/resume/switch, and shutdown before a later generation becomes authoritative (INV §4/§5).
+
+- **R36 (planned) — Action availability is a runtime-only overlay.** Every chat process receives
+  reserved final-layer `AGENTDECK_ACTION_CLI`, `AGENTDECK_ACTION_URL`, and
+  `AGENTDECK_ACTION_TOKEN` values. The CLI path is the absolute executable of the dashboard version
+  that launched the process, the URL is its loopback action root, and the token is R35's launch
+  credential. One shared overlay helper adds them plus a short command-discovery prompt to fresh,
+  resume, switch, wake, task, and pipeline chat composition. The overlay is structurally invisible
+  to frozen session configuration and composes once with TS-11's optional knowledge overlay; terminal
+  processes receive none of it. A chat launch fails before process start if the current executable
+  cannot be resolved, because starting without the promised action client would strand autonomous
+  mail, task, and pipeline work (INV §3/§6/§11).
+
+- **R37 (planned) — Activation and assignment prompts name the direct action.** The mail activation
+  bridge directs the agent to `$AGENTDECK_ACTION_CLI action check_messages`; the dependency bridge
+  directs it to `get_assigned_task`; pipeline assignment/result-boundary text names
+  `report_pipeline_stage_result`. They carry no action payload or credential. All source-fact,
+  claim, attempt, quiescence, response-before-release, and commit-before-effect ordering remains
+  owned by TS-01, TS-09, and TS-10; a shell process boundary is not treated as evidence that an
+  action committed or a turn ended.
+
+- **R38 (planned) — Provider MCP remains provider-owned.** Removing `/mcp`, the
+  `agentdeck-messaging` registration, generated AgentDeck MCP configuration, and `LaunchSpec`'s
+  internal MCP field does not filter, rename, copy, or reinterpret MCP servers discovered through
+  Claude/Codex native configuration or another provider's own setup. The former reserved-name
+  collision check is removed because AgentDeck no longer injects that name. Configuration federation
+  continues to inventory provider MCP metadata under TS-07, and provider launch behavior remains
+  native/provider-owned rather than flowing through R32.
+
+- **R39 (planned) — Direct actions are one release-gated provider contract.** The completed build
+  exposes no internal MCP fallback, selector, or provider branch. Pinned credentialed Claude, Codex,
+  OpenCode, and OpenHands sessions must each invoke structured success and refusal results through
+  R34 on fresh launch and resume before release; switch, mail wake, task activation, and pipeline
+  reporting use the applicable provider combinations. Fake ACP proves composed parameters and action
+  semantics but cannot satisfy this gate. If any supported chat adapter cannot execute the packaged
+  client or consume its output, the migration does not ship rather than retaining MCP for that
+  provider (INV §6/§12).
+
 ## 3. Interfaces & data shapes
 
 - ACP: JSON-RPC messages over newline-delimited child stdin/stdout; adapter determines exact
@@ -363,7 +440,11 @@ global resource list.
   set plus tracking events.
 - MCP: streamable HTTP at `/mcp`; tools accept only their documented arguments and return
   product-safe text/structured content. Pipeline tools use the same transport/token and add
-  no agent-callable start operation.
+  no agent-callable start operation. **Planned replacement:** R32–R39 supersede this internal-only
+  interface with `agentdeck action`; provider-owned MCP remains unchanged.
+- Direct actions (planned): private credentialed loopback JSON transport behind the packaged
+  `agentdeck action <action> --input -` client; exact schemas are projected from the action registry
+  by `agentdeck action describe <action>`.
 - Terminal WebSocket: binary/text terminal bytes plus JSON resize control frames.
 - Effort delivery: no new ACP method. The model-suffix mechanism reuses the existing `model` key in
   `session/new`/`session/load`; the post-session mechanism uses the adapter's documented session
@@ -398,6 +479,9 @@ global resource list.
   credentialed acceptance (R21).
 - **R12 — Boundary redaction.** Raw provider errors, stderr, tool inputs, and hook/MCP payloads are
   sanitized before logging or returning over HTTP; diagnostic value must not expose secrets.
+- **R40 (planned) — Direct-action boundaries inherit R12.** Raw action input, credential, private
+  envelope, HTTP diagnostics, and client stderr are sanitized before logging or returning; stdout
+  remains the single structured result channel.
 - **R16 — Auth probes cannot become command execution.** Provider id and argv are selected
   exclusively from the shared fixed metadata; request fields, backend names, models, environment
   values, and provider output cannot add an executable or argument. Probe processes receive no
@@ -410,6 +494,9 @@ global resource list.
 
 - HTTP-only MCP registration is shipped; a stdio proxy exists only as a possible compatibility
   response if a pinned CLI rejects HTTP. It must proxy to the same in-process authority.
+- **Planned supersession:** R32–R39 replace the preceding internal-MCP transport clauses when the
+  migration ships. The unreleased comparison period is test scaffolding, not a product mode; no
+  stdio proxy or released fallback survives the cutover.
 - Terminal agents are intentionally non-messageable until an interactive-CLI MCP path is verified.
 - OpenCode/OpenHands executable overrides are honored by credential checks but not consistently by
   launch; missing/old CLI diagnostics are also incomplete. These are tracked product gaps.
@@ -438,6 +525,9 @@ global resource list.
   `internal/server/config_sources.go` and `internal/config/codexmodels.go`.
 - Hooks: `internal/hooks`, `internal/server/hook.go`, registration in `launch.go`.
 - MCP: `internal/messaging/messaging.go`, `tools.go`, `internal/server/messaging_registration.go`.
+- Direct actions (planned): the provider-neutral registry in `internal/messaging`, private adapter
+  and generation registration in `internal/server`, packaged client in `internal/cli`, and shared
+  lifecycle composition in launch/resume/switch/activation paths.
 - Context tools (R28): registration/handlers in `internal/messaging`, the shared service in
   `internal/contextref`, the `internal/transcript` event projection/skipped-record diagnostic, and
   token-bound fake-ACP coverage named by FS-15.A2–A7.

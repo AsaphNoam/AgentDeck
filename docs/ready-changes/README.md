@@ -44,3 +44,6 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 - [`active-project-navigation-tabs.md`](active-project-navigation-tabs.md) — compact project-colored
   shell navigation for configured projects with running agents.
+- [`migrate-internal-actions-from-mcp.md`](migrate-internal-actions-from-mcp.md) — replace only
+  AgentDeck's internal MCP action delivery with the packaged direct-action command, preserving
+  provider/user MCP support.

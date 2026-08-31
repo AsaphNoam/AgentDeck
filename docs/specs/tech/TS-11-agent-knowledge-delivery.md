@@ -1,6 +1,6 @@
 # TS-11 — Agent Knowledge Packaging and Delivery
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/agentknowledge`, `internal/config`, `internal/server`, `internal/runtime`, `internal/messaging`, `internal/cli`
 **Absorbed:** the AgentDeck knowledgebase idea in [`../../ideas.md`](../../ideas.md)
 
@@ -128,6 +128,19 @@ any launch path, even if a prior cache remains on disk. AgentDeck neither claims
 advertises the package for that dashboard process, and R6's migration does not run. The next
 dashboard start retries installation and then migration; there is no background repair, network
 fetch, telemetry, or hot-reload loop.
+
+**R11 (planned) — Operating guidance chooses actions without duplicating their protocol.** The
+embedded skill replaces internal-MCP/tool wording with the FS-17.R13 action names and directs agents
+to `agentdeck action describe <action>` for exact fields and results. It retains cross-action
+judgment, budgets, authority, recovery, and pipeline/task boundaries, but does not copy schemas,
+credentials, URLs, or the full action catalog into resident guidance.
+
+**R12 (planned) — Basic action discovery does not depend on skill installation.** Every chat runtime
+overlay carries one short stable pointer to `$AGENTDECK_ACTION_CLI action ...`; mail activation names
+`check_messages`, task activation names `get_assigned_task`, and pipeline assignment names
+`report_pipeline_stage_result`. If managed-skill installation degrades under R10, these exact next
+steps remain available without claiming the broader knowledge package is installed. Terminal
+launches receive neither signal (FS-17.R15/R18, TS-04.R36–R37).
 
 ## 3. Interfaces & data shapes
 

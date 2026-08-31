@@ -5,6 +5,41 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-31 — Feature design: migrate internal actions from MCP
+
+Validated: migrating AgentDeck’s internal actions away from MCP is the correct move. The precise
+reason is not that MCP is obsolete—current Codex guidance supports both MCP servers and CLIs as
+agent integration surfaces ([OpenAI developer docs](https://developers.openai.com/),
+[Codex use cases](https://developers.openai.com/codex/use-cases))—but that AgentDeck controls both
+sides of this particular boundary. Its current in-process MCP adds fifteen model-visible schemas
+and provider/protocol coupling without buying interoperability. The replacement is one packaged
+`agentdeck action` CLI backed by a private local Action API and the existing domain handlers.
+
+The credentials and command contract are settled. Chat launches reuse the existing per-launch,
+generation-scoped credential; it stays in the environment and never appears in command arguments.
+`agentdeck action <name> --input -` reads one JSON object from stdin, emits one JSON result on
+stdout, and uses stderr only for diagnostics. `agentdeck action describe <name>` provides the exact
+schema on demand. Terminal agents remain excluded, while provider- and user-configured MCP support
+is explicitly unchanged.
+
+The migration is planned as a guarded cutover: freeze all fifteen current contracts, extract one
+transport-neutral registry, add the private adapter and CLI, compare domain effects and results,
+exercise lifecycle and adversarial cases, validate Claude, Codex, OpenCode, and OpenHands, then
+delete the internal MCP route/configuration/dependency before release. There is no shipped fallback
+or dual-transport mode. The UX work ensures autonomous mail, task, and pipeline activations name the
+exact next action even if the optional operating skill is unavailable.
+
+The ready change is
+[`migrate-internal-actions-from-mcp.md`](/Users/mcnoam/Projects/AgentDeck/docs/ready-changes/migrate-internal-actions-from-mcp.md),
+with sequencing in
+[`migrate-internal-actions-from-mcp.md`](/Users/mcnoam/Projects/AgentDeck/docs/plans/migrate-internal-actions-from-mcp.md).
+Specification checks, twin-skill comparison, and whitespace validation pass.
+
+**Needs attention:** The four live-provider checks are release gates during implementation; they
+are not claimed complete by this design.
+
+**Next:** Run `/review-design` on the waiting change, then `/work` if the review finds no blocker.
+
 ### 2026-08-31 — Review: active project tabs and the preceding fixes
 
 The reviewed range has five open problems. Two affect behavior: pressing Escape does not close the
