@@ -1,6 +1,7 @@
 import { Link, NavLink } from "react-router-dom";
 import { ConnectionDot } from "./ConnectionDot";
 import { AgentDeckMark } from "./AgentDeckMark";
+import { ActiveProjectNav } from "./ActiveProjectNav";
 
 export function Header() {
   return (
@@ -15,6 +16,7 @@ export function Header() {
         <NavLink to="/archive">Archive</NavLink>
         <NavLink to="/settings">Settings</NavLink>
       </nav>
+      <ActiveProjectNav />
       <div className="app-connection" data-slot="connection">
         <ConnectionDot />
       </div>

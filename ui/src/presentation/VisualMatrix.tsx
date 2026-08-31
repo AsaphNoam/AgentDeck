@@ -11,6 +11,7 @@ import { ToolResult } from "../components/chat/renderers/ToolResult";
 import type { AgentStatus } from "../api/types";
 import { applyAppearance } from "../features/appearance/appearance";
 import { PROJECT_COLOR_PRESETS } from "../lib/projectColors";
+import { ProjectNav } from "../components/shell/ActiveProjectNav";
 import "./contract-fixture.css";
 
 const agentStates: AgentStatus[] = ["busy", "idle", "waiting_input", "done", "error", "unknown"];
@@ -66,6 +67,15 @@ export function VisualMatrix() {
         <Link to="/archive">Archive</Link>
         <Link to="/settings">Settings</Link>
       </nav>
+
+      <section className="visual-matrix-section">
+        <h2>Active-project shell navigation</h2>
+        <div className="visual-matrix-shell-row">
+          <ShellNavFixture visible={[]} overflow={[]} />
+          <ShellNavFixture visible={fixtureProjects.slice(0, 1)} overflow={[]} currentProjectID="alpha" />
+          <ShellNavFixture visible={[...fixtureProjects.slice(0, 4), fixtureProjects[5]]} overflow={[fixtureProjects[4]]} currentProjectID="foxtrot" />
+        </div>
+      </section>
 
       <section className="visual-matrix-section">
         <h2>Shared construction</h2>
@@ -235,6 +245,23 @@ export function VisualMatrix() {
           </button>
         </div>
       </section>
+    </div>
+  );
+}
+
+const fixtureProjects = ["Alpha", "Bravo workspace", "Charlie", "Delta", "Echo", "Foxtrot"].map((title, index) => ({
+  id: title.split(" ")[0].toLowerCase(),
+  title,
+  color: PROJECT_COLOR_PRESETS[index].color,
+}));
+
+function ShellNavFixture({ visible, overflow, currentProjectID }: Parameters<typeof ProjectNav>[0]) {
+  return (
+    <div className="app-header visual-matrix-shell">
+      <div className="app-logo">AgentDeck</div>
+      <nav className="app-nav" aria-label="Fixture primary navigation"><a href="#dashboard">Dashboard</a><a href="#tasks">Tasks</a><a href="#pipelines">Pipelines</a><a href="#archive">Archive</a><a href="#settings">Settings</a></nav>
+      <ProjectNav visible={visible} overflow={overflow} currentProjectID={currentProjectID} />
+      <div className="app-connection"><span className="connection-status">Connected</span></div>
     </div>
   );
 }

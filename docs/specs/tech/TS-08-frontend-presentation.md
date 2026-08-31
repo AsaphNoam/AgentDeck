@@ -1,6 +1,6 @@
 # TS-08 — Frontend presentation architecture
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src`, `ui/package.json`, `ui/vite.config.ts`
 **Absorbed:** —
 
@@ -306,7 +306,7 @@ primitive seam; the rejected alternatives are recorded in §5.
 
 ### 2.4 Active-project shell navigation
 
-- **R44 (planned)** — The active-project navigation required by FS-02.R54 and FS-12.R39 is one
+- **R44** — The active-project navigation required by FS-02.R54 and FS-12.R39 is one
   feature-owned `ActiveProjectNav` composed by `Header`. It consumes the existing `useProjects`
   React Query projection, the complete `useAgentStore` projection, and the current React Router
   match; it issues no request of its own and adds no Zustand field, layout/config value, browser

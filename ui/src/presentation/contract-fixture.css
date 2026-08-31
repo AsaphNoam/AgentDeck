@@ -139,4 +139,14 @@
     border-left: 7px solid var(--ad-action-primary);
     padding-left: var(--ad-space-4);
   }
+
+  .visual-matrix-shell-row {
+    display: grid;
+    gap: var(--ad-space-3);
+    overflow: visible;
+  }
+
+  .visual-matrix-shell {
+    width: 100%;
+  }
 }

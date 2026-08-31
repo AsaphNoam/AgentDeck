@@ -40,6 +40,11 @@
     "reason": "Project RGB accent and live pointer coordinates drive the portal menu"
   },
   {
+    "file": "src/components/shell/ActiveProjectNav.tsx",
+    "rule": "inline-style",
+    "reason": "Project RGB accent is persisted project data"
+  },
+  {
     "file": "src/presentation/VisualMatrix.tsx",
     "rule": "inline-style",
     "reason": "Fixture cards render the fixed declared project-accent palette"

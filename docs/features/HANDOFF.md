@@ -32,7 +32,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   is new — a cross-block drag states its refusal in flight. The six-tab shared-stream check remains
   an acceptance gate; the block-split drag preview and expanded-pane footprint browser gate closed
   in the usability run. The new pointer treatment for a refused drag has not been in a browser.
-- **Active change:** None. Thin AgentDecker and the shared AgentDeck operating skill are finished
+- **Active change:** None. Active-project navigation tabs are finished and verified
+  (FS-02.R54/A36, FS-12.R39/A15, TS-08.R44). Thin AgentDecker and the shared AgentDeck operating skill are finished
   and verified (FS-18, FS-04.R44/A24, TS-11). Expandable dashboard chat panes are finished and verified
   (FS-02.R46–R52/A29–A34, FS-03.R39/A23, FS-12.R38/A14, TS-03.R31, TS-08.R41–R43).
   Running-first card placement shipped on 2026-08-28 (FS-02.R45/A28, FS-12.R37/A13). The Pipelines
@@ -67,16 +68,24 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 **Change:** None.
 
-**State:** The shared operating skill is shipped, and the 2026-08-30 fix run closed every open
-finding. FS-18.A1's lifecycle-composition matrix and FS-18.A5's migration read/write-error fixtures
-now exist, so the two acceptance gaps the review recorded are covered. Credentialed pinned-provider
-discovery remains the existing manual gate because the available Claude session is logged out and
-Codex authentication could not be confirmed.
+**State:** Active-project navigation is shipped. The shell derives compact project links directly
+from configured projects, live agent state, and the current route; keeps the current project visible;
+and places overflow beyond five links under `+n`.
 
-**Next:** Confirm the two product calls recorded under Review findings, then complete the pinned
-logged-in Claude/Codex discovery gate when credentials are available.
+**Next:** Run an independent review of the active-project navigation implementation.
 
 ## Changelog
+
+- **2026-08-31 — work (FS-02.R54/A36, FS-12.R39/A15, TS-08.R44; INV §1/§2/§8/§10/§13):**
+  Added compact active-project navigation to the persistent header. One pure derivation combines
+  the project catalog, hydrated agent projection, and current project/agent route; it filters
+  stopped, archived, and unavailable entries, retains current context, alphabetizes with the id
+  tie-breaker, and produces the five-link visible/overflow split without retained state. The
+  feature-owned component supplies full accessible titles, accent identity, a structural selected
+  marker, and an Escape/outside/selection-closing `+n` disclosure. The shell now uses a four-region
+  non-wrapping grid. Focused regressions, the zero/one/overflow visual matrix, all UI tests, both Go
+  variants, production and distributable builds, specification/style checks, and `git diff --check`
+  pass. Real-browser inspection at 1024 and 1440 confirmed no shell overflow in Core or Sky & Grove.
 
 - **2026-08-30 — feature design (FS-02.R54/A36, FS-12.R39/A15, TS-08.R44; INV §1, §2,
   §8, §10, §13):** Specified compact active-project navigation immediately after the shell's

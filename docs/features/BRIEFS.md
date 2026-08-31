@@ -5,6 +5,18 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-31 — Implementation: active project tabs
+
+The header now shows compact links for projects with running agents, so switching active work no
+longer requires returning to the projects home. The current project stays visible while you remain
+in its dashboard or agent, project colors make links easy to recognize, and additional projects sit
+under a keyboard-accessible `+n` menu. The layout was verified at the supported desktop floor and
+wide desktop widths in both appearances, and the full automated and distributable checks pass.
+
+**Needs attention:** None.
+
+**Next:** An independent reviewer should review the active-project navigation implementation.
+
 ### 2026-08-30 — Feature design: active-project navigation tabs
 
 Active-project navigation tabs are fully specified and waiting to start.

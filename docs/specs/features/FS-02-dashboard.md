@@ -1,6 +1,6 @@
 # FS-02 — Dashboard (card grid home view)
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src/components/grid/`, `ui/src/store/`, `ui/src/components/shell/NotificationCenter.tsx`, `ui/src/features/settings/NotificationsEditor.tsx`, `ui/src/api/sse.ts` · `internal/bus/`, `internal/state/`, `internal/server/handlers.go` (layout, reconcile) · **Journeys:** J5 (grid & layout), J11 (failure & recovery), J12 (restart durability)
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) F1/F2/F11 and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -368,7 +368,7 @@ behavior.
   exempted controls, so a control added to the pane later inherits it and cannot silently reintroduce
   the collapse-on-Send defect.
 
-- **R54 (planned)** — The persistent application shell offers a compact project-navigation link
+- **R54** — The persistent application shell offers a compact project-navigation link
   for each configured, non-archived project that has at least one non-archived agent whose
   `running` value is true. Membership updates from the existing project catalog and hydrated
   `state_update` projection without a manual refresh. Selecting a link opens the existing
@@ -583,7 +583,7 @@ picker and launches with the route project's id; the general modal continues to 
   card behaves as it does today. — `CardGrid.test.tsx` and `AgentCard.test.tsx` interaction cases,
   each asserting both that the pane stayed open and that no card context menu opened.
 
-- **A36 (planned)** (R54) — With running agents in two configured projects, both project links
+- **A36** (R54) — With running agents in two configured projects, both project links
   appear from every primary route and each opens the matching scoped dashboard. Stopping the last
   running agent removes its project's link without a reload when another route is open, but keeps
   that link selected while the person remains on the project's dashboard or one of its agent

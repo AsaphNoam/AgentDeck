@@ -1,6 +1,6 @@
 # FS-12 — Core interface design
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src` · **Journeys:** J2–J9, J11, J14
 **Absorbed:** —
 
@@ -201,7 +201,7 @@ Requirements are user-observable.
 
 ### 2.9 Active-project navigation
 
-- **R39 (planned)** — The shell places FS-02.R54's active-project links immediately to the right
+- **R39** — The shell places FS-02.R54's active-project links immediately to the right
   of the existing primary route tabs in one stable header row. Project links are visibly smaller
   than the primary tabs, use restrained rounded corners and a bounded tint/edge from the project's
   configured accent, and retain a non-color current-route indicator. It shows at most five project
@@ -306,7 +306,7 @@ Requirements are user-observable.
   focus-cycling binding does nothing on `/agent/:id`, and no chat control gains or loses an
   interaction there. — `ChatPanel.test.tsx` and `Composer.test.tsx`.
 
-- **A15 (planned)** (R39) — Core and Sky & Grove fixtures render zero, one, and overflowing sets
+- **A15** (R39) — Core and Sky & Grove fixtures render zero, one, and overflowing sets
   of active-project links in the shipped header at the supported desktop floor and a wider desktop
   viewport. The current project remains directly visible and has a text-independent selected state;
   every visible and overflowed project is reachable by keyboard and exposes its project title;
