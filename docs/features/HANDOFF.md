@@ -67,18 +67,36 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Active change
 
-**Change:** None.
+**Change:** `migrate-internal-actions-from-mcp.md` — design reviewed 2026-08-31, still
+**Waiting to start**. Implementation must not begin: two Must-fix design findings are open.
 
 **State:** Active-project navigation is shipped and the continuous range through its implementation
-is reviewed. Five findings are open below: two behavior/wiring defects and three acceptance/state
-gaps. The pre-implementation design review named by the design handoff was skipped; this review
-applied its simplicity, extension, and assumption checks after the fact and found no resulting
-design finding.
+is reviewed; five findings from that review are open below. The MCP-migration design review added
+four more. Its two Must-fix items are the private loopback transport being unreachable from a Codex
+agent's own sandboxed shell, and the launch credential the design promotes to the action token
+already being published as `agent_generation` over the dashboard API. Two Worth-fixing items cover
+the unowned supersession of FS-06/FS-15/FS-16 and the authenticated round trip for `describe`.
 
-**Next:** Run `/fix`, starting with the overflow Escape behavior and refused-drag cursor, then close
-the three coverage/state findings.
+**Next:** Resolve the two Must-fix design findings with the human through `/design-feature` before
+any migration code is written; separately run `/fix` on the shipped-code findings, starting with the
+overflow Escape behavior and refused-drag cursor.
 
 ## Changelog
+
+- **2026-08-31 — design review (`migrate-internal-actions-from-mcp.md`; FS-06.R1/R2/A1/A3, FS-15,
+  FS-16, FS-17.R13–R19/A7–A11, TS-01.R25, TS-03.R32, TS-04.R32–R40, TS-05.R18–R19, TS-06.R23,
+  TS-11.R11–R12; INV §2/§4/§10/§12/§14):** Reviewed the waiting MCP-migration design through the
+  over-engineering, extension, and research lenses. Four findings recorded, two of them Must fix. The
+  transport assumption fails a real check: Codex 0.142.5 under the default `workspace-write` sandbox
+  cannot open a loopback TCP connection from a spawned command, and AgentDeck mirrors the user's
+  `config.toml` into its private `CODEX_HOME` unchanged, so `agentdeck action` would be unreachable
+  for every Codex agent — while today's MCP path works because the unsandboxed CLI process makes the
+  call. Separately, `generation` defaults to the launch token and is persisted and served as
+  `agent_generation`, so merging hooks and actions onto that one secret publishes full action
+  authority. The remaining two cover FS-06/FS-15/FS-16 still mandating the internal MCP with no
+  supersession note, and `describe` routing compiled-in registry data through an authenticated HTTP
+  round trip. Two consistency notes recorded. The change stays Waiting to start; no specification,
+  change file, or product code was modified.
 
 - **2026-08-31 — feature design (FS-17.R13–R19/A7–A11; TS-01.R25; TS-03.R32;
   TS-04.R32–R40; TS-05.R18–R19; TS-06.R23; TS-11.R11–R12; INV §§1–6, 8–15):** Validated that
@@ -856,7 +874,69 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
   resume or switch regression can remain green. Add terminal agent/snapshot rows for available and
   unavailable resume and switch composition.
 
-No design findings. The user resolved the `agentdeck-shared-skill` design review: verified installation now
+- **Must fix** (FS-17.R18/A9, TS-04.R33/R34/R36/R39, TS-06.R23; INV §12) — the design's private
+  loopback transport is unreachable from a Codex agent's own shell. Normal-use trigger: a Codex chat
+  agent is woken for mail, or launched for a pipeline stage, and runs
+  `$AGENTDECK_ACTION_CLI action check_messages`. That command executes inside Codex's sandbox, which
+  cannot open a TCP connection to the dashboard's loopback port, so the agent gets a provider-owned
+  "couldn't connect" instead of its mail — and every Codex agent silently loses messaging, tasks,
+  context links, and pipeline reporting. Verified on this machine with Codex 0.142.5:
+  `codex sandbox -- curl http://127.0.0.1:<port>/` returns `curl: (7) Failed to connect`, the same URL
+  outside the sandbox returns 200, `-c 'sandbox_mode="danger-full-access"'` returns 200, and
+  `-c 'sandbox_workspace_write.network_access=true'` does **not** lift it. `~/.codex/config.toml` here
+  carries the default `sandbox_mode = "workspace-write"`, and `internal/config/codexprofile.go:46`
+  mirrors that `config.toml` verbatim into AgentDeck's private `CODEX_HOME` without writing any
+  sandbox key, so launched `codex-acp` agents inherit it. The shipped MCP path is not affected because
+  the token rides in the `mcpServers` session param (`internal/server/messaging_registration.go:36`,
+  `internal/runtime/chat.go:1450`) and the unsandboxed CLI process makes the HTTP call; the migration
+  moves that call into a sandboxed shell child. Because TS-04.R39 and FS-17.R19 forbid a per-provider
+  fallback and forbid shipping if any adapter cannot run the client, this is the difference between
+  the migration shipping and being abandoned after the registry, routes, CLI, and overlay are built.
+  Prove the loopback-shell-exec path for all four adapters before phase 3 and record the evidence in
+  the change file; if it does not hold, own the mitigation in the design — a transport the sandbox
+  permits, or an AgentDeck-owned sandbox/escalation policy in the managed `CODEX_HOME` — rather than
+  leaving it to R39's release gate.
+- **Must fix** (TS-05.R18/R19, FS-17.R16/A8; INV §4/§14) — the launch secret the design promotes to
+  the action credential is already published as `agent_generation`. On a fresh launch,
+  `internal/server/launch.go:305` sets `generation = token`, the minted launch token itself
+  (`internal/server/switch.go:409` does the same). That generation is persisted to
+  `pipeline_attempts.agent_generation` (`internal/state/schema.go:243`, `internal/state/pipelines.go:515`),
+  marshalled as `agent_generation` (`internal/state/types.go:200`), and parsed by the dashboard client
+  (`ui/src/schemas/pipeline.ts:106`), so it is served over the unauthenticated same-user API. Today
+  that leak only enables forged hook events. Normal-use trigger after the change: any AgentDeck agent
+  or local process reads a pipeline run's attempts, recovers another agent's action token, and sends
+  mail, creates or cancels tasks, reads context links, and reports stage results as that agent —
+  precisely what FS-17.R16 promises cannot happen. A8 as written checks captured process parameters,
+  frozen session rows, generated provider configuration, logs, and transcripts; it never names the
+  pipeline attempt row or an API payload, so the acceptance passes while the credential is public.
+  Require the generation identifier to be derived independently of the credential — the pipeline and
+  task paths already pass an explicit `Generation` — and extend A8 to the attempt row and every
+  API/SSE payload carrying `agent_generation`.
+- **Worth fixing** (FS-06.R1/R2/A1/A3, FS-15, FS-16, FS-17.R13/R19; INV §10) — the specifications that
+  own the actions still mandate the mechanism the change removes, and nothing supersedes them.
+  FS-06.R1 requires every launched or resumed chat agent to receive the reserved `agentdeck-messaging`
+  MCP server, FS-06.R2 states the MCP server exposes exactly three coordination tools, FS-06.A1/A3
+  verify HTTP MCP registration through a named registration test, FS-15 derives caller identity "from
+  the live MCP session", and FS-16 calls the task surface "scoped MCP tools". TS-04 §5 carries an
+  explicit planned-supersession note; FS-06, FS-15, and FS-16 carry none, and the change file's
+  relevant-requirements list omits all three. Normal-use trigger: the agent implementing phase 5 must
+  delete FS-06.A3's shipped, passing registration coverage and contradict FS-06.R1/R2 with no
+  requirement authorising it, so the change either stalls on a shipped-requirement conflict or
+  silently drops verified acceptance. Add the supersession note to each owning spec and cite FS-06,
+  FS-15, and FS-16 in the change file.
+- **Worth fixing** (TS-04.R33/R34, TS-06.R23; INV §2) — `describe` routes compiled-in data through an
+  authenticated HTTP round trip. TS-06.R23 makes the action client the exact running AgentDeck binary
+  and TS-04.R32 puts the registry — name, description, resolved schema — in that same binary, so
+  `GET /api/agent-actions/{action}` and R34's projection of it add a route, an authentication path,
+  and a live-server dependency for data the client already holds. Normal-use trigger: an agent told by
+  the runtime overlay to run `agentdeck action describe check_messages` receives a transport or
+  authentication refusal instead of the contract whenever the dashboard is restarting or its
+  generation has just ended, and the contract it was pointed at is the one thing it cannot read.
+  Resolve `describe` from the in-process registry and drop the GET route, or record in the design why
+  the round trip is required.
+
+Design findings from the 2026-08-31 review of `migrate-internal-actions-from-mcp.md` are the four
+items above. The user resolved the `agentdeck-shared-skill` design review: verified installation now
 precedes exact AgentDecker migration and the thin prompt no longer claims an unavailable skill.
 Runtime-only overlay fields and fresh PM/teammate prompt cleanup remain included implementation
 alignment, not review findings. Browser-only evidence is recorded as acceptance gates above, not as
@@ -864,4 +944,8 @@ findings.
 
 ## Design consistency notes
 
-None.
+- The change file cites `TS-04.R32–R40`, while TS-01.R25 and TS-03.R32 both cite `TS-04.R32–R39` and
+  omit R40, the direct-action redaction clause. One range is wrong; the three should agree.
+- FS-17 §6 opens with "The contract is shipped. Live-provider compatibility remains tracked as
+  acceptance gate A6," which reads as covering the whole section, but §6 now also carries the planned
+  direct-cutover boundary for R13–R19. Scope the opening sentence to R1–R12.

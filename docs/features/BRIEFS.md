@@ -5,6 +5,46 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-31 — Design review: migrating internal actions off MCP
+
+I reviewed the waiting design that moves AgentDeck's own agent actions off MCP onto a packaged
+`agentdeck action` command, before any code is written. The direction is right and the design is
+mostly tight, but two problems have to be settled first, so the change stays waiting.
+
+The first is the one that would sink the migration. The design has each agent reach AgentDeck by
+running a small command that calls the dashboard over a local network connection. Codex runs the
+commands its agents issue inside a sandbox, and I confirmed on this machine that a command in that
+sandbox cannot open a local network connection at all — it works outside the sandbox and fails
+inside it, under the setting Codex ships as its default and that AgentDeck copies over verbatim when
+it launches a Codex agent. Today's MCP setup is unaffected, because the Codex program itself makes
+that call rather than a sandboxed command it spawned. Since the design deliberately allows no
+per-provider fallback, this would be discovered late — after the registry, the routes, the command,
+and the launch plumbing were all built — and the whole migration would have to be abandoned. It
+needs a real check against all four agent programs now, and a stated fallback plan if the check
+fails.
+
+The second is a security problem the design would widen. AgentDeck currently reuses one launch
+secret as an agent's "generation" marker, and that marker is stored with pipeline attempts and sent
+to the dashboard over the local interface. Right now that only lets someone forge status events. The
+design makes that same secret the key to every agent action, so anything that can read a pipeline
+run could then send mail, create or cancel work, read shared context, and report results while
+pretending to be another agent. The generation marker needs to stop being the secret, and the
+acceptance check needs to look at the pipeline records and the interface responses, not just the
+places it currently looks.
+
+Two smaller items: the feature documents that own messaging, tasks, and context links still require
+the MCP mechanism this change removes, with nothing recording that they are superseded, so whoever
+implements the cutover will hit a contradiction with no authority to resolve it. And the command's
+built-in help asks the dashboard over the network for information that is already compiled into the
+same program the agent just ran, which adds a route and a failure mode for nothing.
+
+**Needs attention:** The Codex sandbox result is a genuine feasibility risk to the whole migration,
+and the shared-secret problem is a real privilege leak between agents. Both need your decision
+before implementation starts.
+
+**Next:** Take the two must-fix items back through feature design with me, then re-run this review
+on the revised design.
+
 ### 2026-08-31 — Feature design: migrate internal actions from MCP
 
 Validated: migrating AgentDeck’s internal actions away from MCP is the correct move. The precise
