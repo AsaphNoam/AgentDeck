@@ -5,6 +5,37 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-08-31 — Fix: the five open problems in the shipped dashboard code
+
+I closed all five problems the last code review left open. I left the MCP-migration design findings
+alone, as you asked.
+
+Two were things you would have hit while using AgentDeck. The overflow list of active projects in
+the header could not be closed with Escape once you had tabbed into it — Escape only worked while
+the "+2" button itself still had focus, which is not where your focus is after you start looking
+through the list. And when you drag a running agent card over the stopped ones, AgentDeck is
+supposed to change the pointer to say the drop will be refused before you let go; it never did,
+because the card under the pointer set its own pointer shape and won. Both now behave as intended,
+and the pointer change now applies to everything inside a card, so a button added to a card later
+cannot quietly reintroduce the same gap.
+
+The other three were gaps in what the tests actually prove. The list of work waiting to start still
+linked to a change file that had already been finished and deleted, so a reader would follow a dead
+link into finished work presented as available. The test that claims AgentDeck leaves your
+AgentDecker prompt untouched when it cannot read the file was not actually testing an unreadable
+file, and it skipped itself entirely on machines running as root — it now tests a real unreadable
+file and always runs. And the test that proves every way of starting an agent hands it the shared
+operating knowledge only ever resumed and switched chat agents, so a terminal-only break could have
+gone unnoticed; terminal agents are now covered too.
+
+**Needs attention:** A task-cancel test failed once under load and passed everywhere else; it
+expects the runtime released by the time the cancel answers, but the design leaves a failed stop to
+recovery. Recorded, not fixed. The refused-drag pointer needs one real-browser check. Someone's
+uncommitted pipeline-proposal design work is in the working copy, untouched.
+
+**Next:** You still need to settle the two blocking questions on the MCP-migration design before any
+of that work starts. Everything here is committed and green.
+
 ### 2026-08-31 — Design review: migrating internal actions off MCP
 
 I reviewed the waiting design that moves AgentDeck's own agent actions off MCP onto a packaged

@@ -1,4 +1,6 @@
 import React from "react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -577,6 +579,18 @@ describe("CardGrid", () => {
     act(() => dnd.onDragOver?.({ active: { id: "a_1" }, over: { id: "a_2" } }));
     act(() => dnd.onDragEnd?.({ active: { id: "a_1" }, over: { id: "a_2" } }));
     expect(document.querySelector(".group-stack")).not.toHaveAttribute("data-drop");
+  });
+
+  // The mark above is worthless if the cursor never changes, and the card under the
+  // pointer sets `cursor: pointer` for itself while its controls set theirs, so the
+  // refused rule only wins if it reaches descendants. jsdom evaluates no CSS, so the
+  // stylesheet is the only witness (FS-02.R53/A35, INV §13).
+  it("scopes the refused cursor to everything under the pointer, not the stack alone", () => {
+    const css = readFileSync(join(process.cwd(), "src/styles/features/dashboard.css"), "utf8");
+    expect(css).toMatch(/\.agent-card \{[^}]*cursor: pointer/);
+    const refused = css.match(/([^{}]*)\{\s*cursor: not-allowed;\s*\}/)![1];
+    expect(refused).toMatch(/\.group-stack\[data-drop="refused"\]\s*,/);
+    expect(refused).toMatch(/\.group-stack\[data-drop="refused"\]\[data-slot="groups"\] \*/);
   });
 
   // A failed layout read once left saving disarmed for the rest of the session with

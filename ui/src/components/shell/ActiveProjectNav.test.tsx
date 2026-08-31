@@ -73,8 +73,10 @@ describe("ActiveProjectNav", () => {
     expect(screen.getByRole("link", { name: "Foxtrot" })).toHaveClass("active");
     expect(screen.queryByRole("link", { name: "Echo" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "1 more active project" }));
-    expect(screen.getByRole("menuitem", { name: "Echo" })).toHaveAttribute("href", "/project/echo");
-    fireEvent.keyDown(screen.getByRole("button", { name: "1 more active project" }), { key: "Escape" });
+    const overflowLink = screen.getByRole("menuitem", { name: "Echo" });
+    expect(overflowLink).toHaveAttribute("href", "/project/echo");
+    overflowLink.focus();
+    fireEvent.keyDown(overflowLink, { key: "Escape" });
     expect(screen.queryByRole("menuitem", { name: "Echo" })).not.toBeInTheDocument();
   });
 

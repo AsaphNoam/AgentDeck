@@ -207,10 +207,15 @@
 }
 
 /* A drop across the running/stopped boundary is refused (FS-02.R45), so the drag says
-   so while it is still in flight rather than only snapping back (FS-02.R53). The
-   handle keeps its own cursor while held, so it is named here too. */
+   so while it is still in flight rather than only snapping back (FS-02.R53). The card
+   under the pointer wins hit testing and sets its own `cursor: pointer`, as the drag
+   handle sets `grab`/`grabbing` and every button inherits one, so the refused state has
+   to reach every descendant rather than the stack alone. `*` is used instead of naming
+   those surfaces because an opt-out list drifts the moment a control is added
+   (INV §2/§10); the repeated `[data-slot="groups"]` raises the selector above the
+   expanded card's own `.agent-card-top` cursor, which is the most specific competitor. */
 .group-stack[data-drop="refused"],
-.group-stack[data-drop="refused"] .drag-handle:active {
+.group-stack[data-drop="refused"][data-slot="groups"] * {
   cursor: not-allowed;
 }
 

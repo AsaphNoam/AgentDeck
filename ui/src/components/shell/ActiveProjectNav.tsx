@@ -87,14 +87,17 @@ export function ProjectNav({ visible, overflow, currentProjectID }: {
     <nav className="project-nav" aria-label="Active projects">
       {visible.map((project) => <ProjectLink key={project.id} project={project} selected={project.id === currentProjectID} />)}
       {overflow.length > 0 && (
-        <div className="project-nav-overflow" ref={disclosureRef}>
+        <div
+          className="project-nav-overflow"
+          ref={disclosureRef}
+          onKeyDown={(event) => { if (event.key === "Escape") setOpen(false); }}
+        >
           <button
             type="button"
             aria-expanded={open}
             aria-haspopup="menu"
             aria-label={`${overflow.length} more active ${overflow.length === 1 ? "project" : "projects"}`}
             onClick={() => setOpen((value) => !value)}
-            onKeyDown={(event) => { if (event.key === "Escape") setOpen(false); }}
           >+{overflow.length}</button>
           {open && (
             <div className="project-nav-menu" role="menu">

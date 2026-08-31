@@ -155,9 +155,9 @@ wholesale. No development/release-maintenance reference ships in the package.
 
 **A5** (R7, R10) — The exact legacy-prompt fixture migrates once, including when its
 non-prompt fields were customized; successful migration preserves those fields byte-for-byte.
-Fixtures with a one-byte prompt edit, empty/custom prompt, another role, a missing role, and a
-read or write error remain unchanged. An unavailable package also leaves the exact fixture unchanged;
-a later verified startup migrates it once.
+Fixtures with a one-byte prompt edit, empty/custom prompt, another role, a missing role, a role
+file that cannot be decoded, and a read or write I/O error remain unchanged. An unavailable
+package also leaves the exact fixture unchanged; a later verified startup migrates it once.
 
 **A6 — retired 2026-08-29:** The startup-fatal installation check was replaced by A8 before
 implementation.

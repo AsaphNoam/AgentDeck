@@ -100,6 +100,10 @@ func TestKnowledgeOverlayReachesEveryLifecycleComposer(t *testing.T) {
 	}
 	be := backends.Backends[agent.Backend]
 	model := be.Models[agent.Model]
+	terminalAgent := agent
+	terminalAgent.Interface = "terminal"
+	terminalSnap := snap
+	terminalSnap.Interface = "terminal"
 
 	// Wake resume and the pipeline's continuation both run the ordinary resume flow
 	// (resume.go), so they are listed by the generation each one supplies rather than
@@ -124,6 +128,10 @@ func TestKnowledgeOverlayReachesEveryLifecycleComposer(t *testing.T) {
 			spec, ae := srv.composeResumeSpec(agent, snap, be, model)
 			return mustCompose(t, spec, ae)
 		}},
+		{"terminal resume", func(t *testing.T) runtime.LaunchSpec {
+			spec, ae := srv.composeResumeSpec(terminalAgent, terminalSnap, be, model)
+			return mustCompose(t, spec, ae)
+		}},
 		{"wake resume", func(t *testing.T) runtime.LaunchSpec {
 			spec, ae := srv.composeResumeSpecWithGeneration(agent, snap, be, model, "")
 			return mustCompose(t, spec, ae)
@@ -134,6 +142,10 @@ func TestKnowledgeOverlayReachesEveryLifecycleComposer(t *testing.T) {
 		}},
 		{"runtime switch", func(t *testing.T) runtime.LaunchSpec {
 			spec, ae := srv.composeSwitchSpec(agent, "")
+			return mustCompose(t, spec, ae)
+		}},
+		{"terminal runtime switch", func(t *testing.T) runtime.LaunchSpec {
+			spec, ae := srv.composeSwitchSpec(terminalAgent, "")
 			return mustCompose(t, spec, ae)
 		}},
 	}

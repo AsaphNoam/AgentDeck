@@ -488,66 +488,89 @@ func TestMigrateLegacyAgentDeckerExactOnly(t *testing.T) {
 	}
 }
 
-// FS-18.A5, FS-04.A24: a role file the migration cannot read or cannot rewrite
-// leaves the role exactly as it was, so the startup retry still has the original
-// bytes to migrate (INV §10).
+// FS-18.A5, FS-04.A24: a corrupt role or a role the migration cannot read or
+// rewrite remains unchanged, so startup can report the failure without damaging
+// user configuration (INV §8/§10).
 func TestMigrateLegacyAgentDeckerLeavesRoleUnchangedOnIOFailure(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("the write-failure case needs an unprivileged user: root ignores directory permissions")
-	}
 	legacy := "legacy AgentDecker prompt"
 	sum := sha256.Sum256([]byte(legacy))
 	legacyDigest := hex.EncodeToString(sum[:])
 
-	for _, tc := range []struct {
-		name   string
-		break_ func(t *testing.T, s *Store)
-	}{
-		{name: "read failure", break_: func(t *testing.T, s *Store) {
-			// A corrupt role file: readJSON reports ErrCorrupt rather than the
-			// legacy prompt, and nothing may be written on top of it.
-			if err := os.WriteFile(s.rolePath("agentdecker"), []byte("{not json"), 0o600); err != nil {
-				t.Fatal(err)
-			}
-		}},
-		{name: "write failure", break_: func(t *testing.T, s *Store) {
-			// A read-only roles directory: the read succeeds and the atomic write
-			// fails at its temp file, which is the failure mode a full or
-			// permission-changed config home produces.
-			dir := filepath.Dir(s.rolePath("agentdecker"))
-			if err := os.Chmod(dir, 0o500); err != nil {
-				t.Fatal(err)
-			}
-			t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
-		}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			s := newTestStore(t)
-			if err := s.EnsureLayout(); err != nil {
-				t.Fatal(err)
-			}
-			if err := s.WriteRole("agentdecker", Role{Title: "Custom title", SystemPrompt: legacy, SkipPermissions: boolPtr(true)}); err != nil {
-				t.Fatal(err)
-			}
-			tc.break_(t, s)
-			before, err := os.ReadFile(s.rolePath("agentdecker"))
-			if err != nil {
-				t.Fatal(err)
-			}
+	t.Run("corrupt role", func(t *testing.T) {
+		s := newTestStore(t)
+		if err := s.EnsureLayout(); err != nil {
+			t.Fatal(err)
+		}
+		path := s.rolePath("agentdecker")
+		before := []byte("{not json")
+		if err := os.WriteFile(path, before, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		migrated, err := s.migrateLegacyAgentDecker(legacyDigest)
+		if migrated || err == nil {
+			t.Fatalf("migration = %v, %v; want false and a reported error", migrated, err)
+		}
+		after, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(before, after) {
+			t.Fatalf("role bytes changed by a failed migration:\nbefore %s\nafter  %s", before, after)
+		}
+	})
 
-			migrated, err := s.migrateLegacyAgentDecker(legacyDigest)
-			if migrated || err == nil {
-				t.Fatalf("migration = %v, %v; want false and a reported error", migrated, err)
-			}
-			after, err := os.ReadFile(s.rolePath("agentdecker"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !bytes.Equal(before, after) {
-				t.Fatalf("role bytes changed by a failed migration:\nbefore %s\nafter  %s", before, after)
-			}
-		})
-	}
+	t.Run("read failure", func(t *testing.T) {
+		s := newTestStore(t)
+		if err := s.EnsureLayout(); err != nil {
+			t.Fatal(err)
+		}
+		path := s.rolePath("agentdecker")
+		if err := os.Mkdir(path, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		migrated, err := s.migrateLegacyAgentDecker(legacyDigest)
+		if migrated || err == nil {
+			t.Fatalf("migration = %v, %v; want false and a reported read error", migrated, err)
+		}
+		info, err := os.Stat(path)
+		if err != nil || !info.IsDir() {
+			t.Fatalf("unreadable role path changed: info=%v err=%v", info, err)
+		}
+	})
+
+	t.Run("write failure", func(t *testing.T) {
+		if os.Geteuid() == 0 {
+			t.Skip("needs an unprivileged user: root ignores directory permissions")
+		}
+		s := newTestStore(t)
+		if err := s.EnsureLayout(); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.WriteRole("agentdecker", Role{Title: "Custom title", SystemPrompt: legacy, SkipPermissions: boolPtr(true)}); err != nil {
+			t.Fatal(err)
+		}
+		dir := filepath.Dir(s.rolePath("agentdecker"))
+		if err := os.Chmod(dir, 0o500); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+		before, err := os.ReadFile(s.rolePath("agentdecker"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		migrated, err := s.migrateLegacyAgentDecker(legacyDigest)
+		if migrated || err == nil {
+			t.Fatalf("migration = %v, %v; want false and a reported error", migrated, err)
+		}
+		after, err := os.ReadFile(s.rolePath("agentdecker"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(before, after) {
+			t.Fatalf("role bytes changed by a failed migration:\nbefore %s\nafter  %s", before, after)
+		}
+	})
 }
 
 func TestProductionLegacyAgentDeckerDigestMigratesExactFixture(t *testing.T) {

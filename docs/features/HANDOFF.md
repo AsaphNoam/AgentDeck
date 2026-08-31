@@ -26,15 +26,14 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   earlier 2026-08-27 all-200/no-page-load incident stays fixed, and the shared SSE stream is now
   replayed to a joining tab instead of restarted for every tab.
 - **Review state:** The continuous `52d01c4..da2db77` range is reviewed against its requirements and
-  every invariant class. Two **Must fix** findings are open: Escape does not close the active-project
-  overflow after focus enters its links, and the refused cross-block drag's card cursor overrides
-  its `not-allowed` ancestor. Three **Worth fixing** coverage/state findings are also open: the
-  ready-change index still links the deleted finished change, the migration test does not exercise
-  a real read I/O failure and skips every case as root, and terminal resume/switch are absent from
-  the operating-knowledge lifecycle matrix. The six-tab shared-stream check remains an acceptance
-  gate. Two behavior choices made by the prior fix still need human confirmation below.
-- **Active change:** None. Active-project navigation tabs are shipped, with the review findings
-  below open against FS-02.R54/A36, FS-12.R39/A15, and TS-08.R44. Thin AgentDecker and the shared AgentDeck operating skill are finished
+  every invariant class, and all five of its findings are closed. Open findings are now the four
+  from the MCP-migration design review, which no code change may act on until the human resolves
+  its two **Must fix** items, plus one **Worth fixing** load-dependent flake in the task-cancel
+  release assertion found while verifying that fix. The refused-drag pointer needs a real-browser
+  computed-cursor pass and the six-tab shared-stream check remains an acceptance gate. Two behavior
+  choices made by an earlier fix still need human confirmation below.
+- **Active change:** None. Active-project navigation tabs are shipped and their review findings are
+  closed (FS-02.R53/A35, FS-12.R39/A15, TS-08.R44). Thin AgentDecker and the shared AgentDeck operating skill are finished
   and verified (FS-18, FS-04.R44/A24, TS-11). Expandable dashboard chat panes are finished and verified
   (FS-02.R46–R52/A29–A34, FS-03.R39/A23, FS-12.R38/A14, TS-03.R31, TS-08.R41–R43).
   Running-first card placement shipped on 2026-08-28 (FS-02.R45/A28, FS-12.R37/A13). The Pipelines
@@ -70,18 +69,43 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 **Change:** `migrate-internal-actions-from-mcp.md` — design reviewed 2026-08-31, still
 **Waiting to start**. Implementation must not begin: two Must-fix design findings are open.
 
-**State:** Active-project navigation is shipped and the continuous range through its implementation
-is reviewed; five findings from that review are open below. The MCP-migration design review added
-four more. Its two Must-fix items are the private loopback transport being unreachable from a Codex
+**State:** Active-project navigation is shipped, the continuous range through its implementation is
+reviewed, and all five findings from that review are fixed. The four MCP-migration design findings
+remain open. Its two Must-fix items are the private loopback transport being unreachable from a Codex
 agent's own sandboxed shell, and the launch credential the design promotes to the action token
 already being published as `agent_generation` over the dashboard API. Two Worth-fixing items cover
 the unowned supersession of FS-06/FS-15/FS-16 and the authenticated round trip for `describe`.
 
 **Next:** Resolve the two Must-fix design findings with the human through `/design-feature` before
-any migration code is written; separately run `/fix` on the shipped-code findings, starting with the
-overflow Escape behavior and refused-drag cursor.
+any migration code is written. The refused-drag pointer now needs its real-browser computed-cursor
+pass under the acceptance gates below.
 
 ## Changelog
+
+- **2026-08-31 — fix (FS-02.R53/A35, FS-12.R39/A15, TS-08.R44, FS-18.A1/A5, FS-04.A24,
+  TS-11.R4/R6; INV §6, §8, §10, §13):** Closed all five shipped-code findings from the
+  `52d01c4..da2db77` review. **INV §10/§13** — the refused cross-block drag marked only the group
+  stack, so the card under the pointer kept its own `cursor: pointer` and the promised in-flight
+  refusal never reached the pointer; the refused state now covers every descendant of the stack with
+  one wildcard rule rather than an opt-out list that would drift as card controls are added, and it
+  outranks the expanded card's own header cursor. jsdom evaluates no CSS, so the new case reads the
+  stylesheet the way `ProjectDashboard.test.tsx` already does and the browser half stays an
+  acceptance gate. **INV §10** — the active-project overflow handled Escape only on its `+n` button,
+  so the normal keyboard path (Tab into a project link, press Escape) left the disclosure open; the
+  handler moved to the disclosure container and the regression now focuses a menu item first.
+  **INV §10** — the ready-change index still linked the change file the implementation commit
+  deleted, presenting finished work as selectable; the waiting list is corrected. **INV §8/§10** —
+  the migration's "read failure" fixture exercised JSON decode corruption, not an `os.ReadFile`
+  error, and one root guard skipped that independent case along with the permission-based write
+  case; the three cases are now separate, corruption and a genuine read-I/O failure (a directory at
+  the role path) always run, and only the write fixture skips as root. FS-18.A5 names the decode and
+  I/O cases separately to match. **INV §6/§10** — the operating-knowledge lifecycle matrix resumed
+  and switched only a chat agent, so a terminal-specific regression in either composer could stay
+  green; terminal resume and terminal runtime switch rows joined it for both the available and
+  unavailable package. One new finding is recorded below rather than fixed: the task-cancel case
+  asserts a completed release the specification only guarantees through recovery, and it failed once
+  under full-package load. `make check-specs`, both Go test variants, `make build`, the 340-case UI
+  suite, the UI production build, and `git diff --check` pass.
 
 - **2026-08-31 — design review (`migrate-internal-actions-from-mcp.md`; FS-06.R1/R2/A1/A3, FS-15,
   FS-16, FS-17.R13–R19/A7–A11, TS-01.R25, TS-03.R32, TS-04.R32–R40, TS-05.R18–R19, TS-06.R23,
@@ -815,9 +839,10 @@ an explicit specification update. Remove an item when the human resolves it or q
   every edge and corner, while a card right-click still opens the card menu, and the menu opens a
   styled create modal. Evidence in the J16 section of
   [`../archive/reviews/usability-review-run-2026-08-27-release-delta.md`](../archive/reviews/usability-review-run-2026-08-27-release-delta.md).
-- [ ] Drag a running card over the stopped block in a real browser and confirm the pointer states the
-      refusal, clears when the pointer returns to its own block, and clears when the drag ends
-      (FS-02.A35, J5). jsdom evaluates no CSS, so the unit case covers only the marked state.
+- [ ] Drag a running card over the stopped block in a real browser and confirm the computed cursor
+      on the card under the pointer states the refusal, clears when the pointer returns to its own
+      block, and clears when the drag ends (FS-02.A35, J5). jsdom evaluates no CSS, so the unit
+      cases cover only the marked state and the stylesheet rule.
 - [ ] Run a task start, an assignment turn, and a reported result against the pinned Claude and Codex
       adapters before claiming dependent work works with real providers (FS-16 §6).
 - [ ] Run one successful and one refused MCP tool call through pinned Claude and Codex adapters before
@@ -843,36 +868,16 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-- **Must fix** (TS-08.R44, FS-12.R39/A15; INV §10) — `ui/src/components/shell/ActiveProjectNav.tsx:97`
-  handles Escape only on the `+n` disclosure button. Normal keyboard trigger: open the overflow,
-  Tab to one of its project links, and press Escape. The event never reaches the button, so the
-  disclosure stays open despite the specified Escape-close behavior. Handle Escape on the
-  disclosure container or document while open, and add a case that moves focus to a menu item
-  before pressing Escape.
-- **Must fix** (FS-02.R53/A35; INV §10) — `ui/src/styles/features/dashboard.css:212` sets
-  `cursor: not-allowed` on the refused group ancestor and active drag handle, but every agent card
-  directly sets `cursor: pointer` at line 103. Normal-use trigger: drag a running card over the
-  later-rendered stopped card. The card under the pointer wins hit testing and its specified cursor
-  overrides inherited cursor state, so the promised in-flight refusal still reads as allowed.
-  Target the refused card/drag surface with the cursor rule and prove the computed cursor in J5.
-- **Worth fixing** (INV §10) — `docs/ready-changes/README.md:45` still lists
-  `active-project-navigation-tabs.md` as waiting even though the implementation commit deleted it.
-  A workflow reader follows a dead link and sees finished work presented as selectable future work.
-  Restore the waiting list to `None.` when closing the change and include the index in the completion
-  regression/checklist.
-- **Worth fixing** (FS-18.A5, FS-04.A24, TS-11.R6; INV §8/§10) —
-  `internal/config/config_test.go:494` calls its malformed-JSON case a read failure, but it exercises
-  decode corruption rather than an `os.ReadFile` error; the root-user guard at line 495 also skips
-  that independent case together with the permission-based write case. A real unreadable role-file
-  regression can therefore miss the acceptance gate, and privileged CI runs prove neither path.
-  Split the cases, always run corruption, add a genuine read-I/O failure, and isolate any
-  privilege-dependent write fixture.
-- **Worth fixing** (FS-18.A1, TS-11.R4; INV §6/§10) —
-  `internal/server/knowledge_overlay_test.go:107` uses one chat agent and snapshot for every resume
-  and switch row; only fresh launch gets a terminal case. The acceptance contract promises the
-  overlay to chat and terminal processes across lifecycle composition, so a terminal-specific
-  resume or switch regression can remain green. Add terminal agent/snapshot rows for available and
-  unavailable resume and switch composition.
+- **Worth fixing** (FS-16.R3/R4, TS-10.R15/R19; INV §15) — `internal/server/task_http_test.go:244`
+  asserts the cancel response already carries `pending_release=false` and an empty runtime claim,
+  but `finishInterruptedRelease` only clears them when its `StopStage` succeeds; a failed stop is
+  specified to log and leave the release for recovery (TS-10.R19/R15). Observed once on 2026-08-31
+  during a full `internal/server` run under load: the response carried `RuntimeClaim:created
+  PendingRelease:true` and the case failed. It passes alone, twenty times under `-race`, and on a
+  repeat full-package run, so it is a load-dependent flake rather than a new regression. Decide
+  which side is wrong — either the cancel path owes a completed release before it answers, or the
+  case should assert the recovery-completed state instead of the synchronous one — and record it in
+  FS-16/TS-10 rather than loosening the assertion.
 
 - **Must fix** (FS-17.R18/A9, TS-04.R33/R34/R36/R39, TS-06.R23; INV §12) — the design's private
   loopback transport is unreachable from a Codex agent's own shell. Normal-use trigger: a Codex chat
