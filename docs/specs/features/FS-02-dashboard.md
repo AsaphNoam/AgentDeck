@@ -1,6 +1,6 @@
 # FS-02 — Dashboard (card grid home view)
 
-**Status:** Current
+**Status:** Partial
 **Code:** `ui/src/components/grid/`, `ui/src/store/`, `ui/src/components/shell/NotificationCenter.tsx`, `ui/src/features/settings/NotificationsEditor.tsx`, `ui/src/api/sse.ts` · `internal/bus/`, `internal/state/`, `internal/server/handlers.go` (layout, reconcile) · **Journeys:** J5 (grid & layout), J11 (failure & recovery), J12 (restart durability)
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) F1/F2/F11 and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -383,6 +383,60 @@ behavior.
   the resulting visible set and the remaining overflow set retain alphabetical order. FS-12.R39
   presents every remaining project under `+n`.
 
+### Pane stability, collapse, and card legibility
+
+- **R55 (planned)** — An expanded pane occupies exactly one column track of the
+  card grid, superseding R47's `min(2, perRow)` span; every other clause of R47 stands. Expanding or
+  collapsing a card therefore changes no card's column or row index and moves no card sideways: the
+  card grows taller in the cell it already occupies, its collapsed neighbours in the same grid row
+  keep their positions and their own heights, and only the rows below that row move. The card the
+  person clicked stays under the pointer, so the same click collapses it again. This removes the
+  wrap-and-gap the two-track span produced, in which a pane that did not fit a row's remaining
+  tracks jumped to the next row and left a hole behind it. The pane's fixed height, its internally
+  scrolling transcript, and the rule that streamed output never moves the grid or the page are
+  unchanged.
+
+- **R56 (planned)** — An expanded card carries a visible, labelled collapse
+  control in its header region. It states that it collapses the pane, is reachable and operable from
+  the keyboard, and gives hover and focus feedback, so collapsing no longer depends on finding
+  unoccupied pixels between the name link and the state badge. R52's rule that the whole header
+  region collapses the pane is unchanged and remains the larger secondary target; the header's name
+  link keeps navigating to `/agent/:id` rather than collapsing. Collapsing through the control and
+  collapsing through the header region have exactly the same effect, including the retention of
+  unsent composer text (R48).
+
+- **R57 (planned)** — The card grid's toolbar offers **Collapse all**, which
+  collapses every pane expanded on that grid in one action. It is present only while at least one
+  pane on the grid is expanded, so the toolbar never shows a control that would do nothing. It
+  spans every group section of the grid rather than one section, matching R48's whole-grid cap and
+  R50's whole-grid cycling. It collapses panes and nothing else: group-section collapse (R18), card
+  order, density, grouping, and each agent's retained unsent composer text (R48) are untouched, and
+  a re-expanded pane restores its draft as it does after any other collapse. Because the expanded
+  list is one shared preference (R49), **Collapse all** removes only the ids the current grid is
+  showing; an id retained for an agent outside this grid's project stays in the list and is written
+  back unchanged, for the same reason R49 retains it. The result persists through the same debounced
+  layout save as any other collapse, and a save that fails reports the failure exactly as R49's save
+  path already does, leaving the panes collapsed on screen.
+
+- **R58 (planned)** — An agent's name on a card is legible rather than clipped
+  to one line. On both a collapsed and an expanded card the name renders at a smaller type size than
+  the shipped card title and wraps onto as many as three lines instead of ending in an ellipsis, so
+  the long generated names agents actually carry are readable without opening anything. A name too
+  long for three lines is still clipped there, and a single unbroken token wider than the card is
+  broken rather than allowed to overlap the state badge, the drag grip, or the card's edge. A
+  wrapped name makes its own card taller and changes nothing else: card minimum height, column
+  count, gap, and the density control (R13) keep their shipped values and behavior, and no other
+  card's geometry changes because one name is long. R2's list of what a card displays is otherwise
+  unchanged.
+
+- **R59 (planned)** — The context-usage meter leaves the collapsed card and
+  appears on the expanded card instead, narrowing R2's card-content list and R26 to that placement.
+  A collapsed card shows no context usage. An expanded card states the same live value as a compact
+  figure in its header region, keeping R26's rounded percentage, its live mid-turn tracking, and its
+  rule that zero and absent values are visibly labelled rather than left as an unexplained empty
+  track; the proportional bar itself is not required at that size. The agent screen's own context
+  meter (FS-12.R12) is unchanged, and no context data is fetched or retained differently.
+
 ## 5. Acceptance criteria
 
 **A1.** Launching an agent adds its card within ~1s with no manual refresh; a status change flips the
@@ -595,6 +649,45 @@ picker and launches with the route project's id; the general modal continues to 
   fifth project into `+1`, and leaves each set alphabetized. — shell/component and hydration
   regressions; J5.
 
+- **A37 (planned)** (R55) — In a three-column grid, expanding the first card of a
+  six-card section leaves every other card in the column and row index it held before the
+  expansion, and collapsing it restores the same layout; no card wraps to a different row and no
+  empty track appears. The same holds for expanding a middle card and for a `perRow` of 1. An
+  expanded card occupies one track, not two. — `ui/src/components/grid/CardGrid.test.tsx`; a
+  real-browser check at the supported desktop floor and at a wide viewport, in Core and Sky & Grove,
+  confirming that nothing but the rows below the pane moves.
+
+- **A38 (planned)** (R56) — An expanded card exposes a collapse control with an
+  accessible name that says it collapses; activating it by pointer and by keyboard collapses the
+  pane, and the control shows hover and focus feedback. Clicking the header region outside the name
+  link still collapses, clicking the name link navigates to `/agent/:id` without collapsing, and
+  A34's list of pane interactions still collapses nothing. Composer text typed into the pane is
+  present again after re-expanding, whichever of the two collapse routes was used. —
+  `ui/src/components/grid/AgentCard.test.tsx`; J5.
+
+- **A39 (planned)** (R57) — With no pane expanded the toolbar shows no **Collapse
+  all**; with panes expanded in two different group sections it appears and one press collapses
+  both, leaves both group sections' collapse state, the card order, and the density unchanged, and
+  survives a reload. An expanded id belonging to an agent outside the current grid's project is
+  still in the saved layout afterwards, and expanding a pane again restores its retained draft. A
+  refused layout save reports the failure and leaves the panes collapsed on screen. —
+  `ui/src/components/grid/CardGrid.test.tsx`.
+
+- **A40 (planned)** (R58) — A card whose agent name needs three lines renders all
+  three, at a smaller size than the shipped card title and with no ellipsis, without overlapping the
+  state badge or the drag grip and without escaping the card; a name longer still is clipped at the
+  third line, and a single unbroken token wider than the card is broken rather than overflowing. The
+  same name in an expanded card's header behaves the same way. Cards whose names are short keep the
+  shipped card height, and the column count and gap the density control produces are unchanged. —
+  `ui/src/components/grid/AgentCard.test.tsx`; a real-browser check with a long generated agent name
+  in Core and Sky & Grove.
+
+- **A41 (planned)** (R59) — A collapsed card renders no context meter. An expanded
+  card states the live context percentage in its header, updates it mid-turn as further usage
+  reports arrive, and labels a zero or absent value rather than showing an unexplained blank. The
+  agent screen's context meter is unchanged. — `ui/src/components/grid/AgentCard.test.tsx` and the
+  existing context-meter regressions; J5.
+
 ## 6. Deviations & open decisions
 
 - **Immediate clone UI.** Clone launches immediately with no confirmation, and a disappeared process
@@ -620,6 +713,16 @@ picker and launches with the route project's id; the general modal continues to 
   agent stopping, and uses title/id alphabetical order with a `+n` overflow. It adds no pinning,
   recency tracking, activity ranking, count badge, or project-specific persistence.
 
+- **Confirmed grid-stability and legibility boundary.** R55–R59 keep expansion in place and change
+  only what the reported experience named: the pane's track span, an explicit collapse control, one
+  **Collapse all**, a wrapped smaller card name, and the context meter's move onto the expanded
+  card. Card minimum height, column count, gap, and the density control keep their shipped values —
+  making cards larger was considered and declined. Panes are not moved out of the grid into a
+  separate region, expansion gains no keyboard collapse binding beyond the control's own focus,
+  **Collapse all** gains no expand-all counterpart and no confirmation, and nothing here changes
+  grouping, running-first placement, drag behavior, the four-pane cap, pane persistence, or any
+  server surface.
+
 ## 7. Traceability
 
 - **Grid & cards:** `ui/src/components/grid/CardGrid.tsx`, `AgentCard.tsx`, `StateBadge.tsx`,
@@ -642,3 +745,5 @@ picker and launches with the route project's id; the general modal continues to 
   `NotificationCenter.test.tsx`, `ProjectDashboard.test.tsx` (project cards, context menus, and the
   New project create modal — A22/A24), `CardGrid.test.tsx` (running-first placement, the sortable
   registry order, and same-block/cross-block drop behavior — A28).
+- **Planned grid stability and legibility:** R55–R59 and A37–A41 are unshipped; their evidence is
+  named there and in TS-08.R45–R48 and FS-12.R40.

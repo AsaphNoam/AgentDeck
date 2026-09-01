@@ -1,6 +1,6 @@
 # TS-08 — Frontend presentation architecture
 
-**Status:** Current
+**Status:** Partial
 **Code:** `ui/src`, `ui/package.json`, `ui/vite.config.ts`
 **Absorbed:** —
 
@@ -283,10 +283,15 @@ primitive seam; the rejected alternatives are recorded in §5.
   is a button" on what is now a reading and typing surface.
 
 - **R43** — **Expansion joins the existing sortable and hook contracts
-  rather than adding new ones.** An expanded agent id is removed from the list handed to
-  `SortableContext`, reusing the same filter that already omits a collapsed section's cards, so
-  dnd-kit's indices and measured-rect transforms keep matching the list the grid actually renders —
-  the constraint FS-02.R45 already established. The expanded form is exposed through the curated
+  rather than adding new ones.** An expanded agent id **stays** in the list handed to its block's
+  `SortableContext`. This corrects the requirement as first written, which said the id was removed
+  by the same filter that omits a collapsed section's cards: the shipped grid keeps it, because an
+  expanded pane still mounts a sortable node and still occupies a wider-or-taller footprint than a
+  collapsed card, so omitting it made every neighbour's measured-rect transform compute over a
+  layout that is not on screen (FS-02.R47). Undraggability comes from `useSortable({ disabled })`
+  and from withholding the drag grip, not from leaving the list. Each running/stopped block still
+  gets its own `SortableContext` in render order, so dnd-kit's indices and measured-rect transforms
+  keep matching the list the grid actually renders — the constraint FS-02.R45 already established. The expanded form is exposed through the curated
   contract as a `data-variant` on the existing `agent-card` component plus one named pane
   `data-slot`, added to `contract.json` in the same change; arbitrary pane descendants are not skin
   hooks (R14, §3.3/§3.4). Every className the pane ships has a defined selector in
@@ -335,6 +340,62 @@ primitive seam; the rejected alternatives are recorded in §5.
   group and leaves every primary link and the connection indicator operational. The fixed cap is
   the complete overflow algorithm: no `ResizeObserver`, element measurement, recency state,
   breakpoint-specific item count, or second navigation row is added.
+
+### 2.5 Grid stability, collapse controls, and card name legibility
+
+- **R45 (planned)** — **The pane occupies one track, and the grid template is
+  what guarantees it.** FS-02.R55 is implemented by spanning a single column of the existing
+  `repeat(perRow, minmax(0, 1fr))` template instead of `min(2, perRow)`, which makes an expanded
+  card's grid area identical to a collapsed card's. Auto-placement then assigns every other card the
+  same cell it held before the expansion, so no card can wrap to another row and the wrap-and-gap
+  R42 accepted disappears with the two-track span; R42's remaining rules stand — `align-items: start`
+  stays, `grid-auto-flow` stays `row` and never becomes `dense`, the pane keeps its fixed height and
+  its internally scrolling transcript, and the card keeps `overflow: hidden`. The accepted cost
+  moves: the pane's grid row is as tall as the pane, so collapsed cards sharing that row sit at its
+  top with empty space below them. Packing them into that space requires either `dense` or a fixed
+  `grid-auto-rows` with a multi-row span, and both reassign the cells of the cards after the pane,
+  which is exactly the movement FS-02.R55 exists to remove; the empty space is therefore chosen
+  deliberately over reintroducing it. No JavaScript measures, tracks, or compensates for layout
+  here — the guarantee is the template, not a computed position (INV §1).
+
+- **R46 (planned)** — **Both collapse affordances are feature-owned composition
+  over the existing expansion state.** The per-card control required by FS-02.R56 is a
+  `components/ui` `Button` rendered inside the expanded card's header region, so it inherits the
+  core and Sky & Grove button construction, focus ring, and hover feedback rather than defining its
+  own; it calls the same `onToggle` the header region already calls and stops propagation so the
+  header does not receive a second toggle. **Collapse all** (FS-02.R57) is a `Button` in the
+  existing `PageHeader` actions beside `DensityControl`, rendered only when the grid's own rendered
+  ids intersect the `expanded` list. It sets `expanded` to that list minus the ids the grid is
+  currently showing, which is what preserves the out-of-project ids FS-02.R49 retains, and it flows
+  through the one debounced `putLayout` effect that already saves order, density, groups, and
+  expansion. Neither control adds a store field, a query, an endpoint, a confirmation dialog, or a
+  second source of expansion state, and neither reaches the per-agent composer drafts, which stay
+  owned by the chat surface (R41). Both are exposed through the curated contract: one named
+  `agent-card` slot for the per-card control, added to `contract.json` in the same change; the
+  toolbar control needs no new hook because `page-header` already exposes its actions region.
+
+- **R47 (planned)** — **The card name's wrap is a CSS-only change on the two
+  existing name selectors.** FS-02.R58 is implemented in
+  `ui/src/styles/features/dashboard.css` on `.agent-card-top strong` and `.agent-card-name-link` by
+  replacing `white-space: nowrap` and `text-overflow: ellipsis` with a three-line clamp plus
+  `overflow-wrap: anywhere`, and by lowering `font-size` from the shipped `1.45rem`. Sizes in this
+  file are already literal `rem` values and no font-size scale token exists, so the smaller size is
+  expressed the same way rather than inventing a scale; the `--ad-font-display` family, spacing,
+  radii, and color continue to come from tokens, and no clamp, measurement, or size is applied from
+  JavaScript or an inline style.
+  `.agent-card-top`'s `auto minmax(0, 1fr) auto` template already gives the name a shrinkable track,
+  so the grip and state badge keep their intrinsic widths while the name wraps inside its own track
+  and cannot overlap them. Both skins inherit the change through the same selectors, and the
+  deterministic visual matrix gains the long-name card FS-12.A16 checks.
+
+- **R48 (planned)** — **The expanded card's context figure reuses the shipped
+  meter's derivation.** FS-02.R59 moves, and does not duplicate, the context reading: `ContextBar`
+  keeps sole ownership of clamping `context_pct`, rounding it, choosing the low/medium/high ramp,
+  and producing the visible `n% context used` label, and gains a compact form selected by a
+  `context-meter` variant added to `contract.json` in the same change. `AgentCard` renders the
+  existing `context` slot only while expanded, in the header region, and renders no context element
+  while collapsed. A second rounding or threshold expression anywhere else is the drift INV §2
+  describes, so the compact form differs from the full meter in presentation only.
 
 ## 3. Interfaces & data shapes
 
@@ -523,6 +584,15 @@ boundary; the manifest remains the visual contract and arbitrary ids never becom
   browser screenshots, the contract fixture, style lint, and existing behavior tests provide the
   acceptance evidence; adopting stored pixel baselines can be designed separately if manual visual
   comparison becomes unreliable.
+
+- **Corrected, not extended: the sortable clause in R43.** As first written it said an expanded id
+  leaves its `SortableContext`; the shipped grid keeps it, for the reason FS-02.R47 states. The
+  requirement now records the shipped truth so a later reader does not "restore" the removal and
+  reintroduce neighbour previews computed over a layout that is not on screen.
+- **Empty space beside a pane is chosen over card movement.** R45 accepts that collapsed cards
+  sharing an expanded pane's grid row sit at the top of a tall row. `dense` packing and a fixed
+  `grid-auto-rows` with a multi-row span would both fill that space, and both were rejected because
+  they reassign the cells of the cards after the pane. A masonry-style layout is not available.
 
 ## 6. Traceability
 

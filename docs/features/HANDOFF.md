@@ -84,6 +84,25 @@ real-browser computed-cursor pass under the acceptance gates below.
 
 ## Changelog
 
+- **2026-09-01 — feature design (FS-02.R55–R59/A37–A41, FS-12.R40/A16, TS-08.R45–R48 and the
+  corrected TS-08.R43; INV §1/§2):** Designed the fix for the reported dashboard card-grid
+  experience and queued
+  [`stabilize-and-declutter-agent-cards.md`](../ready-changes/stabilize-and-declutter-agent-cards.md).
+  The rearranging on expand/collapse is the two-track span in an auto-placed grid, which TS-08.R42
+  accepted as a wrap-and-gap cost; the pane now spans one track, so every other card keeps its cell
+  and only the rows below move. The rejected alternatives are recorded: moving panes out of the grid
+  into a separate region, and filling the empty space beside a pane with `dense` or a fixed
+  `grid-auto-rows` row span, which both reassign cells and reintroduce the movement. The empty space
+  beside a pane's row is the deliberate accepted cost. Also specified a visible labelled collapse
+  control (an open card previously had none — the header holds only a navigating name link and the
+  state badge), **Collapse all** scoped to the grid's own ids so FS-02.R49's retained out-of-project
+  ids survive, a smaller three-line-wrapping card name, and the context meter moving off the
+  collapsed card onto the expanded one. The user declined enlarging cards, so minimum height, column
+  count, gap, and the density control are unchanged. Reading the area found TS-08.R43 asserting that
+  an expanded id leaves its `SortableContext` while FS-02.R47 and the shipped grid keep it; R43 is
+  corrected to the shipped truth. FS-02, FS-12, and TS-08 move to **Partial**. No product code
+  changed, and the unrelated pipeline-proposal design already dirty in the tree was left untouched.
+
 - **2026-09-01 — bug investigation (FS-03.R3/R37/A20/A22, TS-08.R40; INV §2/§10/§13):**
   Recorded the field report verbatim: "Mermaid looks like garbage, it's tiny and keeps spazzing out
   between display and source when scrolling." The report named no logs, environment, version, or

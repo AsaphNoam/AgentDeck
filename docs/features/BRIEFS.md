@@ -5,6 +5,37 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-09-01 — Feature design: stop the card grid moving, and make cards readable
+
+The rearranging is a real defect with one cause: an expanded pane spans two columns of an
+auto-placed grid, so every card after it lands in a different cell, and TS-08.R42 accepted the
+resulting wrap and gap in writing. A pane now spans one column, which makes its grid area identical
+to a collapsed card's, so no card can change column or row and only the rows below the pane move.
+
+An open card also had no collapse control at all: FS-02.R52 makes the header the target, but the
+header holds only a name link that navigates instead and the state badge, so the only collapsing
+pixels were the gaps between them. It gains a visible labelled control, and the toolbar gains
+**Collapse all**, shown only while a pane is open and scoped to that grid's own cards so another
+project's remembered panes survive. Card names drop to a smaller size and wrap onto up to three
+lines instead of ending in an ellipsis, and the context meter leaves the collapsed card for the
+expanded one. You declined making cards larger, so minimum height, column count, gap, and the
+density control are unchanged.
+
+One tradeoff is deliberate: collapsed cards sharing an open pane's row sit at the top of a tall row
+with space below them. Filling that space needs either dense packing or fixed row heights with a
+multi-row span, and both reassign cells for every card after the pane — the exact movement being
+removed.
+
+Reading the area also found TS-08.R43 claiming an expanded id leaves its `SortableContext` while
+FS-02.R47 and the shipped grid keep it; R43 is corrected to the shipped truth. No product code
+changed, and the unrelated pipeline-proposal design already in the tree was left untouched.
+
+**Needs attention:** Empty space beside an open pane replaces the movement; nothing fills it. FS-02,
+FS-12, and TS-08 are now Partial.
+
+**Next:** Run `/work` on `stabilize-and-declutter-agent-cards.md`. A37 and A40 need a real-browser
+check at the 1024px desktop floor in both skins.
+
 ### 2026-09-01 — Bug investigation: unstable, tiny Mermaid diagrams
 
 Both reported Mermaid problems are confirmed. Scrolling across the transcript's bottom boundary
