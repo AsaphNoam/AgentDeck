@@ -189,6 +189,11 @@ Each names the verification that demonstrates it.
 
 ## 6. Deviations & open decisions
 
+- **Planned transport supersession.** If and only if FS-17.R20 passes and the direct-action
+  migration ships, FS-17.R13–R19 replace only this specification's internal-MCP transport wording.
+  Reference identity, grants, authorization, bounded reads, source handling, outcomes, and retention
+  remain authoritative. Until then the shipped MCP requirements and acceptance criteria are current.
+
 - No deviations.
 - **Direct grants deliberately have no owner UI or automatic expiry.** A direct grant remains active
   until its grantor revokes it or its recipient identity is removed. This accepts the narrow risk of

@@ -2,7 +2,17 @@
 
 This is sequencing guidance for the ready change. The linked specifications remain authoritative.
 
-## 1. Freeze the behavioral baseline
+## 0. Pass the transport gate
+
+- Keep the released internal MCP registration and behavior unchanged while this change is paused.
+- Resume design only when the packaged Codex/ACP path exposes a narrowly scoped direct transport
+  reachable from a managed Codex command under the default sandbox.
+- Prove the candidate with the exact packaged runtime and Claude, Codex, OpenCode, and OpenHands
+  before implementation starts. Do not satisfy the gate with broad shell network access, filesystem
+  IPC, a provider-specific fallback, or an externally launched client's credentials.
+- Return the transport contract for design review before writing product code.
+
+## 1. Freeze the behavioral baseline after the gate passes
 
 - Capture the fifteen-action manifest, resolved input schemas, serialized MCP catalog size, result
   fixtures, retry classifications, state effects, and lifecycle/authorization matrix.
@@ -17,8 +27,10 @@ This is sequencing guidance for the ready change. The linked specifications rema
 
 ## 3. Add the direct transport and client
 
-- Generalize the launch-token registry to resolve `{agent_id,generation}` for hooks and actions.
-- Add the bounded authenticated private GET/POST action routes and packaged CLI.
+- Keep generation as non-secret lifecycle identity. Mint independent hook and action credentials;
+  register the action credential only in memory against `{agent_id,generation}`.
+- Add the reviewed bounded private transport adapter and packaged CLI. `action describe` reads the
+  compiled registry locally and does not require transport or credentials.
 - Add the runtime-only chat overlay and exact activation/assignment pointers; exclude terminals.
 - Prove teardown, failed composition, restart, switch, stale generation, redaction, oversize input,
   malformed JSON, and unknown-field behavior before switching providers.

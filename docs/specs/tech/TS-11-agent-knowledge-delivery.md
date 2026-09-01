@@ -134,6 +134,8 @@ embedded skill replaces internal-MCP/tool wording with the FS-17.R13 action name
 to `agentdeck action describe <action>` for exact fields and results. It retains cross-action
 judgment, budgets, authority, recovery, and pipeline/task boundaries, but does not copy schemas,
 credentials, URLs, or the full action catalog into resident guidance.
+This replacement ships atomically with the eventual direct-action cutover; internal-MCP wording
+remains correct and unchanged while FS-17.R20 is unmet.
 
 **R12 (planned) — Basic action discovery does not depend on skill installation.** Every chat runtime
 overlay carries one short stable pointer to `$AGENTDECK_ACTION_CLI action ...`; mail activation names
@@ -141,6 +143,7 @@ overlay carries one short stable pointer to `$AGENTDECK_ACTION_CLI action ...`; 
 `report_pipeline_stage_result`. If managed-skill installation degrades under R10, these exact next
 steps remain available without claiming the broader knowledge package is installed. Terminal
 launches receive neither signal (FS-17.R15/R18, TS-04.R36–R37).
+No direct-action pointer is injected while the migration is paused.
 
 ## 3. Interfaces & data shapes
 

@@ -306,15 +306,17 @@ domain's authorization transition.
   by the pipeline and task domains rather than gaining a second dispatch path (INV §2, TS-10.R19).
   See TS-10.
 
-- **R25 (planned) — Internal actions are one in-process server capability with a thin packaged
-  client.** The server remains the sole domain writer and owns one provider-neutral action registry;
-  a private loopback adapter exposes it only to generation-authenticated chat launches, and the
-  running `agentdeck` executable is the client. Runtime composition adds the client path, private
-  URL, credential, and short discovery prompt once for every chat lifecycle, alongside the optional
+- **R25 (planned) — Internal actions become one in-process server capability with a thin packaged
+  client only after FS-17.R20 passes.** The server remains the sole domain writer and owns one
+  provider-neutral action registry; a reviewed narrowly scoped adapter exposes it only to
+  generation-authenticated chat launches, and the
+  running `agentdeck` executable is the client. Runtime composition adds the client path, reviewed
+  transport parameters, credential, and short discovery prompt once for every chat lifecycle, alongside the optional
   knowledge overlay but outside frozen session configuration. No daemon, provider-specific action
   implementation, second domain service, or data migration is introduced. When this ships,
   `LaunchSpec` and runtime adapters stop carrying AgentDeck's internal MCP registration while
-  provider-owned MCP configuration remains outside this boundary (FS-17.R13–R19, TS-04.R32–R39).
+  provider-owned MCP configuration remains outside this boundary (FS-17.R13–R20, TS-04.R32–R40).
+  Until the gate passes, the shipped internal MCP composition remains unchanged.
 
 ## 3. Interfaces & data shapes
 

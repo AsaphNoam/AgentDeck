@@ -280,6 +280,11 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
 
 ## 6. Deviations & open decisions
 
+- **Planned transport supersession.** If and only if FS-17.R20 passes and the direct-action
+  migration ships, FS-17.R13–R19 replace only this specification's internal-MCP transport wording.
+  Recipient resolution, budgets, wake behavior, ordering, authorization, outcomes, and retention
+  remain authoritative. Until then the shipped MCP requirements and acceptance criteria are current.
+
 - **HTTP-only agent messaging.** The shipped registration
   always supplies a streamable HTTP `/mcp` entry. The legacy plan's `agentdeck mcp` stdio proxy was
   never implemented. A CLI that rejects HTTP MCP registration cannot use coordination until a

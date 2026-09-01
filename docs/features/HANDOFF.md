@@ -26,9 +26,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   earlier 2026-08-27 all-200/no-page-load incident stays fixed, and the shared SSE stream is now
   replayed to a joining tab instead of restarted for every tab.
 - **Review state:** The continuous `52d01c4..da2db77` range is reviewed against its requirements and
-  every invariant class, and all five of its findings are closed. Open findings are now the four
-  from the MCP-migration design review, which no code change may act on until the human resolves
-  its two **Must fix** items, plus one **Worth fixing** load-dependent flake in the task-cancel
+  every invariant class, and all five of its findings are closed. The four MCP-migration design
+  findings are resolved in the planned specifications; the change is paused rather than ready for
+  implementation. One **Worth fixing** load-dependent flake in the task-cancel
   release assertion found while verifying that fix. The refused-drag pointer needs a real-browser
   computed-cursor pass and the six-tab shared-stream check remains an acceptance gate. Two behavior
   choices made by an earlier fix still need human confirmation below.
@@ -66,21 +66,34 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Active change
 
-**Change:** `migrate-internal-actions-from-mcp.md` — design reviewed 2026-08-31, still
-**Waiting to start**. Implementation must not begin: two Must-fix design findings are open.
+**Change:** `migrate-internal-actions-from-mcp.md` — **Paused**. Implementation must not begin until
+packaged Codex/ACP supports and AgentDeck proves a narrowly scoped direct transport under the
+default sandbox.
 
 **State:** Active-project navigation is shipped, the continuous range through its implementation is
-reviewed, and all five findings from that review are fixed. The four MCP-migration design findings
-remain open. Its two Must-fix items are the private loopback transport being unreachable from a Codex
-agent's own sandboxed shell, and the launch credential the design promotes to the action token
-already being published as `agent_generation` over the dashboard API. Two Worth-fixing items cover
-the unowned supersession of FS-06/FS-15/FS-16 and the authenticated round trip for `describe`.
+reviewed, and all five findings from that review are fixed. The MCP design now keeps generation,
+hook credentials, and future action credentials separate; makes `action describe` local; records
+the owning-spec supersession boundary; and rejects the unreachable loopback proposal. Internal MCP
+remains the released action path while the migration is paused. Broad shell networking, filesystem
+IPC, and a provider-specific internal-MCP fallback are not approved substitutes.
 
-**Next:** Resolve the two Must-fix design findings with the human through `/design-feature` before
-any migration code is written. The refused-drag pointer now needs its real-browser computed-cursor
-pass under the acceptance gates below.
+**Next:** Revisit the migration only when packaged Codex/ACP exposes a safe narrow direct transport;
+prove it under the release runtime and all four chat providers, then return the transport contract
+to design review before writing migration code. The refused-drag pointer still needs its
+real-browser computed-cursor pass under the acceptance gates below.
 
 ## Changelog
+
+- **2026-09-01 — feature design (FS-06 §6, FS-15 §6, FS-16 §6, FS-17.R13–R20/A7–A11;
+  TS-01.R25, TS-03.R32, TS-04.R32–R40, TS-05.R18–R19, TS-06.R23, TS-11.R11–R12):** Resolved
+  the MCP-migration design findings and paused the change at a new safe-transport gate. The current
+  packaged Codex/ACP path cannot reach the proposed loopback action route under its default sandbox
+  without enabling shell networking more broadly than the feature needs. Broad networking,
+  filesystem IPC, and a provider-specific MCP fallback are rejected; the shipped internal MCP path
+  remains authoritative until Codex supports a narrow direct channel and all four chat providers
+  prove it. The future contract now separates non-secret generation, hook credentials, and action
+  credentials; makes `action describe` a local compiled-registry operation; and records exactly how
+  FS-06, FS-15, and FS-16 transport wording is superseded after cutover. No product code changed.
 
 - **2026-08-31 — fix (FS-02.R53/A35, FS-12.R39/A15, TS-08.R44, FS-18.A1/A5, FS-04.A24,
   TS-11.R4/R6; INV §6, §8, §10, §13):** Closed all five shipped-code findings from the

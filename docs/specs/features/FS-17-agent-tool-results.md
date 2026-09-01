@@ -20,9 +20,11 @@ This spec owns the cross-cutting shape shared by every agent-facing tool result.
 tools remain owned by FS-06 (messaging), FS-14 (pipeline reporting), FS-15 (context links), and
 FS-16 (tasks); this spec adds no tool and changes no tool's arguments, authority, or effect.
 
-The planned replacement in R13–R19 removes MCP only as AgentDeck's internal action-delivery
+The planned replacement in R13–R20 removes MCP only as AgentDeck's internal action-delivery
 mechanism. It preserves the action vocabulary and domain behavior while moving exact invocation
-detail to an on-demand AgentDeck command. User- and provider-configured MCP servers remain supported.
+detail to an on-demand AgentDeck command. It is paused until R20's safe-transport gate passes; the
+released internal MCP remains authoritative meanwhile. User- and provider-configured MCP servers
+remain supported.
 
 ## 2. Behavior
 
@@ -96,7 +98,9 @@ detail to an on-demand AgentDeck command. User- and provider-configured MCP serv
 - **R14 (planned) — Invocation and results are machine-composable.**
   `agentdeck action <action-name> --input -` accepts exactly one JSON object from standard input and
   writes exactly one JSON object to standard output; no-input actions may omit `--input -`, and
-  `agentdeck action describe <action-name>` returns that action's exact contract on demand. A
+  `agentdeck action describe <action-name>` reads the compiled registry locally and returns the
+  action's name, description, and resolved input schema without a running dashboard, transport, or
+  credential. A
   successful action exits successfully; a refused, invalid, unauthenticated, or unavailable action
   exits non-zero while still returning its structured result when AgentDeck can form one. Progress,
   diagnostics, provider output, and logs never mix into standard output. Empty collections remain
@@ -112,7 +116,8 @@ detail to an on-demand AgentDeck command. User- and provider-configured MCP serv
   definitions.
 
 - **R16 (planned) — Caller authority remains runtime-derived.** AgentDeck derives the stable agent
-  id and current launch generation from a fresh runtime credential, never from an action name,
+  id and current launch generation from a fresh action credential that is independent of both the
+  hook credential and the non-secret generation identifier, never from an action name,
   input field, environment claim, working directory, role text, or provider session id. Stop,
   crash, switch, and dashboard shutdown revoke that generation's authority. An earlier generation
   cannot send mail, create or cancel work, read context, propose a pipeline, or report a task or
@@ -143,6 +148,15 @@ detail to an on-demand AgentDeck command. User- and provider-configured MCP serv
   no migration and keep their current retention. User- and provider-configured MCP servers,
   provider MCP configuration federation and inventory, and MCPs unrelated to AgentDeck's internal
   actions are explicitly unchanged.
+
+- **R20 (planned) — Migration waits for a safe direct transport.** AgentDeck keeps its released
+  internal MCP path until the exact packaged Codex/ACP runtime can reach a narrowly scoped direct
+  transport from a managed command under the default sandbox, and the same transport is proven for
+  Claude, OpenCode, and OpenHands. Enabling broad shell networking, using a filesystem mailbox,
+  retaining MCP for one provider, or granting separately launched clients a managed runtime
+  credential does not satisfy this gate. The chosen transport returns to design review before
+  implementation; no direct-action product code ships from this specification while the gate is
+  unmet.
 
 ## 3. States & transitions
 
@@ -207,15 +221,19 @@ Each names the verification that demonstrates it.
   working current-generation action identity. An old, missing, malformed, or revoked identity is
   rejected without mutation; every failed composition and every stop/crash/switch cleanup leaves no
   usable authority behind. Captured process parameters, frozen session rows, generated provider
-  configuration, logs, and transcripts contain no credential. *Verify:* lifecycle composition,
+  configuration, persisted pipeline/task generations, API/SSE responses, logs, and transcripts
+  contain neither hook nor action credential; generation remains safe to expose as non-secret
+  lifecycle data. *Verify:* lifecycle composition,
   teardown, restart, and adversarial authorization matrix.
 
-- **A9 (planned)** (R13–R15, R18) — Credentialed pinned Claude, Codex, OpenCode, and OpenHands chat
+- **A9 (planned)** (R13–R15, R18, R20) — Credentialed pinned Claude, Codex, OpenCode, and OpenHands chat
   sessions each discover and invoke one success and one refusal through the packaged command after a
   fresh launch and resume; Claude↔Codex switching retains the same stable agent identity with a fresh
   generation. Mail and task activations follow their named action without human repair, and a
   pipeline agent reports its result once. No provider receives an internal AgentDeck MCP
-  registration. *Verify:* release-blocking live-provider gate plus the fake-ACP lifecycle matrix.
+  registration. Codex runs under the default packaged sandbox and reaches only the reviewed narrow
+  transport; broad network access is off. *Verify:* release-blocking live-provider gate plus the
+  fake-ACP lifecycle matrix.
 
 - **A10 (planned)** (R18–R19) — The completed build has no internal `/mcp` route, generated
   AgentDeck MCP registration/config artifact, `agentdeck-messaging` reserved-name collision, or MCP
@@ -233,7 +251,8 @@ Each names the verification that demonstrates it.
 
 ## 6. Deviations & open decisions
 
-The contract is shipped. Live-provider compatibility remains tracked as acceptance gate A6.
+R1–R12 are shipped. Live-provider compatibility remains tracked as acceptance gate A6. R13–R20
+are planned and the migration is paused behind R20.
 
 - The idea that prompted this work asked for a structured `retry_when` condition an agent could
   wait on. Tracing every refusal the MCP layer emits found none that a durable wait would repair:
@@ -253,11 +272,15 @@ The contract is shipped. Live-provider compatibility remains tracked as acceptan
   `structuredContent`. Handler-produced validation refusals remain fully covered by this contract.
 - No HTTP surface changes. The REST error envelope and its mixed legacy forms (TS-03.R3) are
   untouched; this contract is the MCP tool surface only.
-- **Confirmed direct-cutover boundary (planned).** R13–R19 replace only AgentDeck's internal action
-  MCP with the packaged command and its private local transport. There is no released dual-transport
+- **Confirmed direct-cutover boundary (planned).** R13–R20 replace only AgentDeck's internal action
+  MCP with the packaged command and a future reviewed private transport. There is no released dual-transport
   window because AgentDeck currently has one active operator who can validate the cutover directly;
   parity and rollback exist during implementation instead. General MCP support, provider-native MCP
   configuration, terminal capability, domain data, and the public local API remain unchanged.
+- **Confirmed pause (2026-09-01).** The loopback HTTP proposal is not safe for managed Codex under
+  the current packaged sandbox: reaching it requires shell network access broader than this feature
+  needs. Filesystem IPC and a Codex-specific MCP fallback are rejected. Internal MCP therefore stays
+  released until Codex/ACP supports a narrowly scoped direct transport and R20 passes.
 
 ## 7. Traceability
 

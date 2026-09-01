@@ -358,41 +358,40 @@ global resource list.
   knowledge file owns a second action list, schema, result formatter, or retry table (INV §2).
   `github.com/google/jsonschema-go` becomes the direct schema dependency; the MCP SDK is removed.
 
-- **R33 (planned) — The private action transport is a thin loopback adapter.** A credentialed
-  `POST /api/agent-actions/{action}` accepts the action's JSON input and returns the R32 transport
-  envelope only after the handler has completed. `GET /api/agent-actions/{action}` returns that same
-  registry entry's name, description, and resolved input schema for on-demand discovery. Both routes
-  inherit the whole-mux local Host/Origin guard and require the runtime credential TS-05.R18 defines;
-  they are not part of the unauthenticated same-user dashboard API. Unknown actions, malformed
-  transport bodies, and authentication failures use bounded transport errors and never enter a
-  domain handler. The POST body has an explicit fixed maximum at least as large as the largest
-  permitted action input; exceeding it is rejected before decode.
+- **R33 (planned) — Direct transport is blocked on the Codex sandbox gate.** No transport is
+  selected while FS-17.R20 is unmet. A candidate must be narrowly scoped to the managed chat
+  process, require the action credential from R35, bound and validate input before dispatch, and
+  work in the exact packaged Codex/ACP runtime under its default sandbox. Broad shell network
+  access, filesystem IPC, an unauthenticated route, and a provider-specific fallback are excluded.
+  The transport contract returns to design review before implementation.
 
 - **R34 (planned) — `agentdeck action` is the only agent client.** The packaged command
   `agentdeck action <action> --input -` reads exactly one JSON object from standard input and invokes
-  R33 with the runtime URL and credential supplied only through process environment. An action whose
+  the reviewed R33 transport with its credential supplied only through process environment. An action whose
   input type is empty may omit `--input -`; every other action rejects missing input. The command
   unwraps the private transport envelope, writes only its `result` object plus one newline to standard
   output, and exits zero exactly when `is_error` is false. A transport failure that has no server
   result is converted to one bounded FS-17-shaped refusal on standard output and a non-zero exit.
-  Diagnostics go only to standard error. `agentdeck action describe <action>` projects R33's
-  description/schema as JSON; neither command reads SQLite, calls a domain service directly, retries
+  Diagnostics go only to standard error. `agentdeck action describe <action>` projects R32's
+  compiled description/schema locally as JSON without transport or authentication; neither command
+  reads SQLite, calls a domain service directly, retries
   an action automatically, accepts a token argument, or falls back to an unauthenticated route.
 
-- **R35 (planned) — One launch identity serves hooks and actions without merging their handlers.**
-  Launch, resume, switch, wake, task, and pipeline composition register the existing random launch
-  token once with `{agent_id,generation}` in the server's generation-scoped runtime registry. Hook
-  handling retains its current payload and state validation; action lookup uses the same token to
+- **R35 (planned) — Generation, hooks, and actions use independent identities.** Generation remains
+  a non-secret lifecycle/attempt identifier safe to persist and project. Launch, resume, switch,
+  wake, task, and pipeline composition mint separate random hook and action credentials; only the
+  action credential is registered in memory with `{agent_id,generation}`. Hook handling retains its
+  current credential, payload, and state validation; action lookup uses its own credential to
   recover caller and generation, then rechecks the authoritative running row and chat interface
-  before dispatch. Sharing the credential does not let a hook payload select an action or an action
-  body select a hook event. Teardown removes the exact registration on every stop, crash, failed
+  before dispatch. A hook payload cannot select an action and an action body cannot submit a hook
+  event. Teardown removes the exact action registration on every stop, crash, failed
   start/resume/switch, and shutdown before a later generation becomes authoritative (INV §4/§5).
 
 - **R36 (planned) — Action availability is a runtime-only overlay.** Every chat process receives
-  reserved final-layer `AGENTDECK_ACTION_CLI`, `AGENTDECK_ACTION_URL`, and
-  `AGENTDECK_ACTION_TOKEN` values. The CLI path is the absolute executable of the dashboard version
-  that launched the process, the URL is its loopback action root, and the token is R35's launch
-  credential. One shared overlay helper adds them plus a short command-discovery prompt to fresh,
+  reserved final-layer action client parameters defined by the reviewed R33 transport. The CLI path
+  is the absolute executable of the dashboard version that launched the process and the action
+  credential is R35's independent secret. One shared overlay helper adds them plus a short
+  command-discovery prompt to fresh,
   resume, switch, wake, task, and pipeline chat composition. The overlay is structurally invisible
   to frozen session configuration and composes once with TS-11's optional knowledge overlay; terminal
   processes receive none of it. A chat launch fails before process start if the current executable
@@ -424,6 +423,9 @@ global resource list.
   client or consume its output, the migration does not ship rather than retaining MCP for that
   provider (INV §6/§12).
 
+  This release gate is subordinate to FS-17.R20: implementation does not start until packaged Codex
+  can reach the reviewed narrow transport under its default sandbox.
+
 ## 3. Interfaces & data shapes
 
 - ACP: JSON-RPC messages over newline-delimited child stdin/stdout; adapter determines exact
@@ -440,11 +442,11 @@ global resource list.
   set plus tracking events.
 - MCP: streamable HTTP at `/mcp`; tools accept only their documented arguments and return
   product-safe text/structured content. Pipeline tools use the same transport/token and add
-  no agent-callable start operation. **Planned replacement:** R32–R39 supersede this internal-only
-  interface with `agentdeck action`; provider-owned MCP remains unchanged.
-- Direct actions (planned): private credentialed loopback JSON transport behind the packaged
-  `agentdeck action <action> --input -` client; exact schemas are projected from the action registry
-  by `agentdeck action describe <action>`.
+  no agent-callable start operation. **Paused replacement:** R32–R40 may supersede this internal-only
+  interface only after FS-17.R20 passes; provider-owned MCP remains unchanged.
+- Direct actions (planned; blocked): a reviewed narrowly scoped transport behind the packaged
+  `agentdeck action <action> --input -` client; exact schemas are projected locally from the action
+  registry by `agentdeck action describe <action>`.
 - Terminal WebSocket: binary/text terminal bytes plus JSON resize control frames.
 - Effort delivery: no new ACP method. The model-suffix mechanism reuses the existing `model` key in
   `session/new`/`session/load`; the post-session mechanism uses the adapter's documented session
@@ -480,7 +482,7 @@ global resource list.
 - **R12 — Boundary redaction.** Raw provider errors, stderr, tool inputs, and hook/MCP payloads are
   sanitized before logging or returning over HTTP; diagnostic value must not expose secrets.
 - **R40 (planned) — Direct-action boundaries inherit R12.** Raw action input, credential, private
-  envelope, HTTP diagnostics, and client stderr are sanitized before logging or returning; stdout
+  envelope, transport diagnostics, and client stderr are sanitized before logging or returning; stdout
   remains the single structured result channel.
 - **R16 — Auth probes cannot become command execution.** Provider id and argv are selected
   exclusively from the shared fixed metadata; request fields, backend names, models, environment
@@ -494,9 +496,10 @@ global resource list.
 
 - HTTP-only MCP registration is shipped; a stdio proxy exists only as a possible compatibility
   response if a pinned CLI rejects HTTP. It must proxy to the same in-process authority.
-- **Planned supersession:** R32–R39 replace the preceding internal-MCP transport clauses when the
-  migration ships. The unreleased comparison period is test scaffolding, not a product mode; no
-  stdio proxy or released fallback survives the cutover.
+- **Planned supersession:** R32–R40 replace the preceding internal-MCP transport clauses only after
+  FS-17.R20 passes and the migration ships. Until then internal MCP remains the released path. The
+  unreleased comparison period is test scaffolding, not a product mode; no stdio proxy or released
+  fallback survives the cutover.
 - Terminal agents are intentionally non-messageable until an interactive-CLI MCP path is verified.
 - OpenCode/OpenHands executable overrides are honored by credential checks but not consistently by
   launch; missing/old CLI diagnostics are also incomplete. These are tracked product gaps.

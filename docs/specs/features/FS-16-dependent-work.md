@@ -394,6 +394,12 @@ Each names the verification that demonstrates it.
 
 ## 6. Deviations & open decisions
 
+- **Planned transport supersession.** If and only if FS-17.R20 passes and the direct-action
+  migration ships, FS-17.R13–R19 replace only this specification's internal-MCP transport wording.
+  Task authority, prerequisite arms, activation, lifecycle, outcomes, cancellation, recovery, and
+  retention remain authoritative. Until then the shipped MCP requirements and acceptance criteria
+  are current.
+
 - **No live-provider pass yet.** Every behavior here is proven against the fake ACP adapter and the
   durable rows. The pinned Claude and Codex adapters have not been driven through a task start, an
   assignment turn, or a reported result.

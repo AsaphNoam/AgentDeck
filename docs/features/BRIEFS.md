@@ -5,6 +5,25 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-09-01 — Feature design: pause the internal MCP migration
+
+Paused the internal MCP migration and kept AgentDeck's existing internal MCP path as the released
+behavior. The migration can resume only after packaged Codex/ACP supports a narrowly scoped direct
+transport that works under the default sandbox and AgentDeck proves it with all four chat providers.
+
+The docs explicitly reject broad shell networking, filesystem mailbox IPC, and a Codex-specific MCP
+fallback. They also preserve the resolved review decisions for the eventual migration: generation,
+hook credentials, and action credentials stay separate; `agentdeck action describe` reads the
+compiled registry locally; and FS-06, FS-15, and FS-16 state exactly which MCP transport wording the
+future cutover may supersede. Separately launched Codex clients remain outside this managed runtime
+credential boundary. No product code changed.
+
+**Needs attention:** The migration now depends on a future Codex/ACP transport capability and is not
+ready to implement.
+
+**Next:** When that capability exists, prove it with the packaged runtime under the default sandbox,
+validate all four providers, and return the transport contract to design review before implementation.
+
 ### 2026-08-31 — Fix: the five open problems in the shipped dashboard code
 
 I closed all five problems the last code review left open. I left the MCP-migration design findings

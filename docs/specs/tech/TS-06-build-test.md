@@ -131,6 +131,9 @@ path for chat actions; they do not depend on `PATH`, a global install, or a seco
 archive, installed-version, retained-rollback, and update tests invoke representative action help and
 transport behavior through that path. Release remains blocked until pinned credentialed Claude,
 Codex, OpenCode, and OpenHands sessions pass FS-17.A9; fake providers cannot satisfy that gate.
+Implementation is also blocked until the exact packaged Codex and ACP adapter prove FS-17.R20 under
+the default sandbox. Enabling broad network access or substituting a filesystem transport does not
+pass this build gate.
 
 ## 3. Interfaces & data shapes
 

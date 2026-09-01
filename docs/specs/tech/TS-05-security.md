@@ -118,20 +118,25 @@ sensitive-context sharing is a practical problem.
   assignee a work-derived read route without synthesizing a direct grant. This adds no authentication
   boundary and does not change the same-machine trust model. See TS-10.
 
-- **R18 (planned) — Hooks and direct actions reuse one launch secret, not one authority path.**
-  The existing cryptographically random per-launch token is registered once with server-derived
-  `{agent_id,generation}` and delivered to chat processes as both the hook credential and reserved
-  action environment credential. It is accepted only in the authorization header, never argv,
+- **R18 (planned) — Generation, hooks, and direct actions remain separate security values.**
+  Generation is an opaque non-secret lifecycle identifier and remains safe to persist and return.
+  Hooks retain an independent cryptographically random credential, while each concrete chat launch
+  receives a separate random action credential registered only in memory with server-derived
+  `{agent_id,generation}`. The action credential is accepted only by the reviewed narrow transport,
+  never argv,
   query, action input, prompt, or frozen session configuration. Action dispatch rechecks the current
   running row and chat interface; terminal processes receive no action variables. Exact-generation
-  teardown on failed start, stop, crash, switch, and shutdown revokes both uses. Hook bodies cannot
-  select actions and action bodies cannot submit hook events (INV §4/§5/§12).
+  teardown on failed start, stop, crash, switch, and shutdown revokes action authority. Hook bodies
+  cannot select actions and action bodies cannot submit hook events (INV §4/§5/§12).
 
 - **R19 (planned) — Action transport is content-free outside explicit bounded results.** Credentials,
   action inputs, context bytes, and private envelopes are redacted from logs, metrics, transcripts,
   prompts, and errors. Authentication, schema, oversize, and unknown-action failures reveal no
   caller or domain data. Context source bytes remain available only in the authorized
   `read_context_link` result, preserving R15's disclosure boundary (INV §8/§13/§14).
+
+  R18–R19 remain blocked by FS-17.R20; internal MCP keeps its shipped security contract until the
+  narrow direct transport is reviewed and proven.
 
 ## 3. Interfaces & data shapes
 

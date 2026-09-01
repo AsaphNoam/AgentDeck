@@ -42,6 +42,10 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
+None.
+
+## Paused changes
+
 - [`migrate-internal-actions-from-mcp.md`](migrate-internal-actions-from-mcp.md) — replace only
   AgentDeck's internal MCP action delivery with the packaged direct-action command, preserving
-  provider/user MCP support.
+  provider/user MCP support; waiting for a safe direct transport supported by packaged Codex/ACP.
