@@ -5,6 +5,24 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-09-01 — Bug investigation: unstable, tiny Mermaid diagrams
+
+Both reported Mermaid problems are confirmed. Scrolling across the transcript's bottom boundary
+remounts every diagram, briefly replacing it with raw source while Mermaid renders the same SVG
+again. Separately, the diagram container shrink-wraps Mermaid's percentage-width SVG: in the real
+product the test graph was only 124 pixels wide inside a 761-pixel transcript.
+
+I reproduced both on the current production UI with an isolated deterministic chat, traced them to
+the original Mermaid rendering change, and committed a skipped regression that fails on the scroll
+flash. No product code or specification changed, and the unrelated work already in the tree was
+left untouched.
+
+**Needs attention:** Both are normal-use display defects and should be fixed before Mermaid is
+treated as a reliable transcript surface.
+
+**Next:** Run `/fix` to stabilize the Markdown renderer identity, activate the regression, and
+replace the shrink-to-fit sizing with browser-verified readable sizing for compact and wide graphs.
+
 ### 2026-09-01 — Feature design: pause the internal MCP migration
 
 Paused the internal MCP migration and kept AgentDeck's existing internal MCP path as the released

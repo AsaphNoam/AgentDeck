@@ -42,6 +42,29 @@ describe("assistant diagram rendering", () => {
     expect(container.querySelector(".mermaid-diagram-figure")?.textContent).toContain("Finish");
   });
 
+  // Field-bug reproduction, 2026-09-01: TranscriptView's at-bottom scroll state rerenders its
+  // children. AssistantText currently replaces react-markdown's inline `code` component on that
+  // rerender, remounting MermaidDiagram and exposing the source until another render completes.
+  it.skip("keeps a settled diagram mounted across a parent-only rerender", async () => {
+    function RerenderHarness() {
+      const [, rerenderParent] = React.useState(0);
+      return (
+        <>
+          <button type="button" onClick={() => rerenderParent((value) => value + 1)}>Rerender parent</button>
+          <AssistantText event={{ kind: "assistant_text", seq: 3, text: CLOSED }} />
+        </>
+      );
+    }
+
+    const { container } = render(<RerenderHarness />);
+    await waitFor(() => expect(container.querySelector(".mermaid-diagram-figure svg")).not.toBeNull());
+
+    fireEvent.click(screen.getByRole("button", { name: "Rerender parent" }));
+
+    expect(container.querySelector(".mermaid-diagram-figure svg")).not.toBeNull();
+    expect(mermaid.render).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps an open fence a code block and promotes it when the closing delta arrives", async () => {
     const { container, rerender } = renderAssistant(OPEN);
 
