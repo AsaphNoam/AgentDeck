@@ -25,14 +25,17 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   action rather than widen Continue — and is flagged in the human update for confirmation. The
   earlier 2026-08-27 all-200/no-page-load incident stays fixed, and the shared SSE stream is now
   replayed to a joining tab instead of restarted for every tab.
-- **Review state:** The continuous `52d01c4..da2db77` range is reviewed against its requirements and
-  every invariant class, and all five of its findings are closed. The four MCP-migration design
-  findings are resolved in the planned specifications; the change is paused rather than ready for
-  implementation. One **Worth fixing** load-dependent flake in the task-cancel
-  release assertion found while verifying that fix. The refused-drag pointer needs a real-browser
-  computed-cursor pass and the six-tab shared-stream check remains an acceptance gate. Two behavior
-  choices made by an earlier fix still need human confirmation below.
-- **Active change:** None. Active-project navigation tabs are shipped and their review findings are
+- **Review state:** The continuous `57b7154..180ea89` range plus the uncommitted card-grid working
+  tree is reviewed against its requirements and every invariant class. Six findings are open below,
+  three of them **Must fix**: the Mermaid remount fix does not cover the streaming path, the
+  delivered tree fails `make check-specs` on a dead ready-change link that also still advertises the
+  finished card work as waiting to start, and the whole card-grid change is uncommitted. The four
+  MCP-migration design findings from the 2026-08-31 review are closed by `3863e8b` and removed from
+  the list; the change is paused rather than ready for implementation. The task-cancel release flake
+  stays open. The refused-drag pointer needs a real-browser computed-cursor pass and the six-tab
+  shared-stream check remains an acceptance gate. Two behavior choices made by an earlier fix still
+  need human confirmation below.
+- **Active change:** None. Stable, decluttered agent cards are shipped and verified (FS-02.R55–R59/A37–A41, FS-12.R40/A16, TS-08.R45–R48). Active-project navigation tabs are shipped and their review findings are
   closed (FS-02.R53/A35, FS-12.R39/A15, TS-08.R44). Thin AgentDecker and the shared AgentDeck operating skill are finished
   and verified (FS-18, FS-04.R44/A24, TS-11). Expandable dashboard chat panes are finished and verified
   (FS-02.R46–R52/A29–A34, FS-03.R39/A23, FS-12.R38/A14, TS-03.R31, TS-08.R41–R43).
@@ -60,29 +63,58 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   v0.2.2 → v0.2.3 delta remains closed: FS-02.A24 is closed and FS-04.A22 remains narrowed to the
   native panel. Full run:
   [`usability-review-run-2026-08-30-new-pages.md`](../archive/reviews/usability-review-run-2026-08-30-new-pages.md).
-- **Last reviewed code:** `da2db77` (2026-08-31). Advanced across the continuous range
-  `52d01c4..da2db77`, which was read end to end against its requirements and every invariant class.
+- **Last reviewed code:** `180ea89` (2026-09-01). Advanced across the continuous range
+  `57b7154..180ea89`, which was read end to end against its requirements and every invariant class.
+  The previous marker `da2db77` is a pre-rehash hash that is no longer an ancestor of `main`;
+  `57b7154` is its tree-identical current-history equivalent, so the range stays continuous. The
+  uncommitted card-grid working tree was reviewed in the same pass but cannot advance the marker,
+  because there is no commit for it.
 - **Branch:** `main`.
 
 ## Active change
 
-**Change:** `migrate-internal-actions-from-mcp.md` — **Paused**. Implementation must not begin until
-packaged Codex/ACP supports and AgentDeck proves a narrowly scoped direct transport under the
-default sandbox.
+**Change:** None.
 
-**State:** Active-project navigation is shipped, the continuous range through its implementation is
-reviewed, and all five findings from that review are fixed. The MCP design now keeps generation,
-hook credentials, and future action credentials separate; makes `action describe` local; records
-the owning-spec supersession boundary; and rejects the unreachable loopback proposal. Internal MCP
-remains the released action path while the migration is paused. Broad shell networking, filesystem
-IPC, and a provider-specific internal-MCP fallback are not approved substitutes.
+**State:** Stable, decluttered agent cards are finished. The paused MCP migration remains unavailable
+until packaged Codex/ACP provides a narrow direct transport under the default sandbox; unrelated
+Mermaid and pipeline-proposal work already dirty in the tree remains preserved.
 
-**Next:** Revisit the migration only when packaged Codex/ACP exposes a safe narrow direct transport;
-prove it under the release runtime and all four chat providers, then return the transport contract
-to design review before writing migration code. The refused-drag pointer still needs its
-real-browser computed-cursor pass under the acceptance gates below.
+**Next:** An independent review should cover the completed card change. Revisit the MCP migration
+only when its transport gate can be proved under all four chat providers.
 
 ## Changelog
+
+- **2026-09-01 — review (`57b7154..180ea89` plus the uncommitted card-grid tree; FS-02.R55–R59/
+  A37–A41, FS-12.R40/A16, TS-08.R45–R48, FS-03.R37/A20/A22, TS-08.R40, FS-18.A5, FS-04.A24; every
+  INV class):** Reviewed the card-grid change, the Mermaid fix, the active-project fix, and the
+  paused MCP design against their requirements in both directions. Six findings recorded, three
+  **Must fix**: the react-markdown component map is memoized on `[text]`, so a settled diagram is
+  still remounted on every streamed delta (reproduced against the shipped component — the SVG drops
+  to source and `mermaid.render` runs again with a new id); the delivered tree fails
+  `make check-specs` on a dead link to the deleted ready-change file, which the ready-change index
+  also still lists as waiting to start; and the whole card-grid change, its spec updates, and its
+  state entries are uncommitted. Three **Worth fixing**: FS-02.R47's two-column-footprint clause is
+  now false but still normative, `ContextBar` collapses tone and density into one `data-variant` so
+  the compact meter has no tone hook in the presentation contract, and an unattributed FS-14
+  proposal-decline design sits in the same uncommitted tree with no ready-change file. The four
+  MCP-migration design findings are closed by `3863e8b` and removed from the open list. Everything
+  else in the range holds: `collapseAll` merge-preserves out-of-project ids and surfaces save
+  failure, `ContextBar` remains the single context derivation, the refused-drag wildcard is the
+  right shape for INV §2, and the embedded UI artifact matches a fresh build of this tree. All
+  checks except `make check-specs` pass. No product code or specifications were changed.
+
+- **2026-09-01 — work (FS-02.R55–R59/A37–A41, FS-12.R40/A16, TS-08.R45–R48; INV
+  §1/§2/§8/§10/§13):** Stabilized and decluttered dashboard agent cards. Expanded panes now retain
+  their original one-track grid cell, remain in their sortable block, and leave every other card's
+  placement unchanged. A labelled per-card **Collapse** button and conditional whole-grid
+  **Collapse all** share the existing expansion state and debounced layout save; the latter removes
+  only current-grid ids and preserves retained ids from other projects. Names use a smaller
+  three-line clamp with unbroken-token wrapping. `ContextBar` remains the sole context derivation
+  and appears only as a compact expanded-header figure. The presentation contract and deterministic
+  matrix cover the new hooks and long-name/context states. A real-browser pass caught and fixed an
+  initial expanded-header overflow; Core and Sky & Grove then held at 1024px and 1440px. The 346-case
+  UI suite, both Go variants, style/spec checks, UI/product/distributable builds, and `git diff
+  --check` pass. The ready change is removed and FS-02, FS-12, and TS-08 return to Current.
 
 - **2026-09-01 — fix (FS-03.R3/R37/A20/A22, TS-08.R40; INV §2/§10/§13):** Fixed both
   confirmed Mermaid display defects. `AssistantText` now keeps its react-markdown component map
@@ -940,69 +972,91 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
   case should assert the recovery-completed state instead of the synchronous one — and record it in
   FS-16/TS-10 rather than loosening the assertion.
 
-- **Must fix** (FS-17.R18/A9, TS-04.R33/R34/R36/R39, TS-06.R23; INV §12) — the design's private
-  loopback transport is unreachable from a Codex agent's own shell. Normal-use trigger: a Codex chat
-  agent is woken for mail, or launched for a pipeline stage, and runs
-  `$AGENTDECK_ACTION_CLI action check_messages`. That command executes inside Codex's sandbox, which
-  cannot open a TCP connection to the dashboard's loopback port, so the agent gets a provider-owned
-  "couldn't connect" instead of its mail — and every Codex agent silently loses messaging, tasks,
-  context links, and pipeline reporting. Verified on this machine with Codex 0.142.5:
-  `codex sandbox -- curl http://127.0.0.1:<port>/` returns `curl: (7) Failed to connect`, the same URL
-  outside the sandbox returns 200, `-c 'sandbox_mode="danger-full-access"'` returns 200, and
-  `-c 'sandbox_workspace_write.network_access=true'` does **not** lift it. `~/.codex/config.toml` here
-  carries the default `sandbox_mode = "workspace-write"`, and `internal/config/codexprofile.go:46`
-  mirrors that `config.toml` verbatim into AgentDeck's private `CODEX_HOME` without writing any
-  sandbox key, so launched `codex-acp` agents inherit it. The shipped MCP path is not affected because
-  the token rides in the `mcpServers` session param (`internal/server/messaging_registration.go:36`,
-  `internal/runtime/chat.go:1450`) and the unsandboxed CLI process makes the HTTP call; the migration
-  moves that call into a sandboxed shell child. Because TS-04.R39 and FS-17.R19 forbid a per-provider
-  fallback and forbid shipping if any adapter cannot run the client, this is the difference between
-  the migration shipping and being abandoned after the registry, routes, CLI, and overlay are built.
-  Prove the loopback-shell-exec path for all four adapters before phase 3 and record the evidence in
-  the change file; if it does not hold, own the mitigation in the design — a transport the sandbox
-  permits, or an AgentDeck-owned sandbox/escalation policy in the managed `CODEX_HOME` — rather than
-  leaving it to R39's release gate.
-- **Must fix** (TS-05.R18/R19, FS-17.R16/A8; INV §4/§14) — the launch secret the design promotes to
-  the action credential is already published as `agent_generation`. On a fresh launch,
-  `internal/server/launch.go:305` sets `generation = token`, the minted launch token itself
-  (`internal/server/switch.go:409` does the same). That generation is persisted to
-  `pipeline_attempts.agent_generation` (`internal/state/schema.go:243`, `internal/state/pipelines.go:515`),
-  marshalled as `agent_generation` (`internal/state/types.go:200`), and parsed by the dashboard client
-  (`ui/src/schemas/pipeline.ts:106`), so it is served over the unauthenticated same-user API. Today
-  that leak only enables forged hook events. Normal-use trigger after the change: any AgentDeck agent
-  or local process reads a pipeline run's attempts, recovers another agent's action token, and sends
-  mail, creates or cancels tasks, reads context links, and reports stage results as that agent —
-  precisely what FS-17.R16 promises cannot happen. A8 as written checks captured process parameters,
-  frozen session rows, generated provider configuration, logs, and transcripts; it never names the
-  pipeline attempt row or an API payload, so the acceptance passes while the credential is public.
-  Require the generation identifier to be derived independently of the credential — the pipeline and
-  task paths already pass an explicit `Generation` — and extend A8 to the attempt row and every
-  API/SSE payload carrying `agent_generation`.
-- **Worth fixing** (FS-06.R1/R2/A1/A3, FS-15, FS-16, FS-17.R13/R19; INV §10) — the specifications that
-  own the actions still mandate the mechanism the change removes, and nothing supersedes them.
-  FS-06.R1 requires every launched or resumed chat agent to receive the reserved `agentdeck-messaging`
-  MCP server, FS-06.R2 states the MCP server exposes exactly three coordination tools, FS-06.A1/A3
-  verify HTTP MCP registration through a named registration test, FS-15 derives caller identity "from
-  the live MCP session", and FS-16 calls the task surface "scoped MCP tools". TS-04 §5 carries an
-  explicit planned-supersession note; FS-06, FS-15, and FS-16 carry none, and the change file's
-  relevant-requirements list omits all three. Normal-use trigger: the agent implementing phase 5 must
-  delete FS-06.A3's shipped, passing registration coverage and contradict FS-06.R1/R2 with no
-  requirement authorising it, so the change either stalls on a shipped-requirement conflict or
-  silently drops verified acceptance. Add the supersession note to each owning spec and cite FS-06,
-  FS-15, and FS-16 in the change file.
-- **Worth fixing** (TS-04.R33/R34, TS-06.R23; INV §2) — `describe` routes compiled-in data through an
-  authenticated HTTP round trip. TS-06.R23 makes the action client the exact running AgentDeck binary
-  and TS-04.R32 puts the registry — name, description, resolved schema — in that same binary, so
-  `GET /api/agent-actions/{action}` and R34's projection of it add a route, an authentication path,
-  and a live-server dependency for data the client already holds. Normal-use trigger: an agent told by
-  the runtime overlay to run `agentdeck action describe check_messages` receives a transport or
-  authentication refusal instead of the contract whenever the dashboard is restarting or its
-  generation has just ended, and the contract it was pointed at is the one thing it cannot read.
-  Resolve `describe` from the in-process registry and drop the GET route, or record in the design why
-  the round trip is required.
+- **Must fix** (FS-03.R37/A20/A22, TS-08.R40; INV §10) —
+  `ui/src/components/chat/renderers/AssistantText.tsx:25` memoizes the react-markdown component map
+  on `[text]`, so the map is rebuilt on every streamed delta and React remounts the `MermaidDiagram`
+  under it. The scroll case the fix targeted is closed; the live-stream case is not. Normal-use
+  trigger: an assistant writes a closed ```mermaid fence and then keeps streaming explanatory prose,
+  which is the ordinary shape of a diagram reply. Reproduced here against the shipped component —
+  after the diagram settles, one appended delta drops the `<svg>` back to the source code block and
+  re-invokes `mermaid.render` with a fresh id (`ad-diagram-1` then `ad-diagram-2`). That is exactly
+  the reported "spazzing between display and source", and it contradicts R37's "the reader therefore
+  never sees a diagram flicker or error mid-stream"; it also repeats uninterruptible main-thread
+  Mermaid work per delta, which is the cost TS-08.R40 bounds the input to avoid. Note TS-08.R40's
+  new sentence is scoped to "while message text is unchanged", so the technical spec currently
+  ratifies the gap rather than closing it. Fix: hold `text` in a ref updated each render, read
+  `textRef.current` inside the `code` component, and memoize with `[]`; then widen R40. Test: in
+  `AssistantText.test.tsx`, rerender with `CLOSED + "\ntrailing prose"` after the diagram settles
+  and assert the SVG is still mounted and `mermaid.render` was called once.
 
-Design findings from the 2026-08-31 review of `migrate-internal-actions-from-mcp.md` are the four
-items above. The user resolved the `agentdeck-shared-skill` design review: verified installation now
+- **Must fix** (INV §10) — the delivered working tree fails `make check-specs`:
+  `docs/features/HANDOFF.md` still links `../ready-changes/stabilize-and-declutter-agent-cards.md`,
+  which the same tree deletes, and `docs/ready-changes/README.md` still lists that file under
+  **Changes waiting to start**. Normal-use trigger: the next agent reads the waiting list and picks
+  up finished work behind a dead link, and the required check the work session reported as passing
+  is red. This is the identical class `51b638e` closed one commit earlier for the previous change,
+  which is why it is Must fix rather than a tidy-up. Fix: drop the ready-change bullet from the
+  index and delink the file name in the handoff changelog entry, then re-run `make check-specs`.
+
+- **Must fix** (INV §10; workflow §5) — the entire card-grid change is uncommitted. The
+  implementation (`AgentCard.tsx`, `CardGrid.tsx`, `ContextBar.tsx`, `VisualMatrix.tsx`,
+  `contract.json`, `dashboard.css`, their tests), the FS-02/FS-12/TS-08 updates, the spec-index
+  status flips back to Current, the brief, and the handoff changelog entry all sit in the working
+  tree with no commit, so `git checkout` or any branch operation destroys verified work and the
+  last-reviewed marker cannot advance past `180ea89`. Fix: close the two findings above, then commit
+  the change with its `Spec:` trailer naming FS-02.R55–R59, FS-12.R40, TS-08.R45–R48.
+
+- **Worth fixing** (FS-02.R47/R55; INV §10) — `docs/specs/features/FS-02-dashboard.md:319` still
+  requires that a collapsed card dragged past a pane "must see the pane's **two-column** footprint",
+  and R55 supersedes only "R47's `min(2, perRow)` span" while asserting "every other clause of R47
+  stands", which makes the stale clause normative. The shipped pane spans one track. TS-08.R43 was
+  corrected in the same change to "a wider-or-taller footprint" and `CardGrid.tsx:121` to "one
+  column"; FS-02.R47 was not. Normal-use trigger: a later reader trusts R47, concludes the grid is
+  wrong, and reintroduces the two-track span R55 exists to remove. Fix: correct R47's footprint
+  clause in place the way TS-08.R43 was corrected — the reason to keep the expanded id in its
+  `SortableContext` still holds, because the pane is taller than its neighbours.
+
+- **Worth fixing** (TS-08.R14/R48, FS-02.R59; INV §2) — `ui/src/components/grid/ContextBar.tsx:6`
+  now emits `data-variant={compact ? "compact" : tone}`, so one attribute carries two orthogonal
+  dimensions and the compact meter exposes no low/medium/high tone through the presentation
+  contract. The tone survives only on the `context-bar high` className, which TS-08 §3.3 excludes
+  from the skin surface. Normal-use trigger: a skin styles `[data-ui="context-meter"]
+  [data-variant="high"]` red, and the expanded card's meter — the only context reading FS-02.R59
+  leaves on the dashboard — silently keeps the default ramp. Nothing is visibly wrong today because
+  no shipped skin reads this hook, which is why it is Worth fixing. TS-08.R48 says the compact form
+  "differs from the full meter in presentation only", yet it drops a contract hook. Fix: keep
+  `data-variant` as the tone and express density separately (a second `data-*` dimension registered
+  in `contract.json`), and extend `ContextBar.test.tsx` to assert a compact meter still reports its
+  tone through the contract attribute.
+
+- **Worth fixing** (INV §10; `docs/specs/README.md` lifecycle) — an unrelated, unattributed FS-14
+  design also sits uncommitted in the same tree: R49–R51 and A27/A28 are added as `(planned)`,
+  FS-14 is flipped to **Partial**, and `docs/ideas.md` gains the proposal-collapse idea, but there
+  is no `docs/ready-changes/` file, no brief, and no handoff changelog entry for it. Normal-use
+  trigger: nothing in the approved-work list points at these requirements, so either they are lost
+  with the tree or an agent later finds planned requirements with no owner. Fix: either finish that
+  design session — ready-change file, brief, commit — or revert the FS-14 and `ideas.md` edits; do
+  not leave planned requirements alive only in an uncommitted tree.
+
+Invariant sweep of the range: §1 (expansion state and the Mermaid remount) produced the first
+finding above; `collapseAll` correctly republishes only the current grid's ids. §2 holds —
+`ContextBar` stays the single context derivation and the refused-drag rule replaces an opt-out list
+with a wildcard, which is the class's own preferred shape — except for the contract split recorded
+above. §3 holds: `collapseAll` merge-preserves the retained out-of-project ids rather than writing
+back its on-screen view. §8 holds: the collapse path flows through the one debounced `putLayout`
+whose failure already reaches `pushError` (`CardGrid.tsx:84`), leaving panes collapsed on screen as
+FS-02.A39 requires. §13 holds: `agent-card-header-actions` is defined, stylelint, the presentation
+contract audit, and the new stylesheet-reading `CardGrid` case all pass. §§4–7, §9, §11, §12, §14
+and §15 have no applicable surface — the range changes no Go product code, no route, no response
+shape, no `exec.Command`, and no persistence path; its only Go edits are test cases.
+
+Checks run on the delivered tree: `make check-specs` **fails** on the dead ready-change link above.
+`go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, `npm test` (346 cases, 51
+files), `npm run check:styles` including the presentation-contract audit, `npm run build`, and
+`git diff --check` all pass, and `ui/dist/index.html` rebuilt from this tree is byte-identical to
+the tracked `internal/server/ui/dist/index.html`.
+
+The user resolved the `agentdeck-shared-skill` design review: verified installation now
 precedes exact AgentDecker migration and the thin prompt no longer claims an unavailable skill.
 Runtime-only overlay fields and fresh PM/teammate prompt cleanup remain included implementation
 alignment, not review findings. Browser-only evidence is recorded as acceptance gates above, not as

@@ -5,6 +5,45 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-09-01 — Review: agent cards, Mermaid diagrams, and the paused action redesign
+
+Reviewed the stable-card work, the Mermaid display fix, the active-project fix, and the paused
+internal-action redesign. The card work itself is sound: opening a pane leaves every other card in
+place, Collapse and Collapse all behave as designed, long names wrap, and a save that fails still
+tells you. Six problems came out of the review, three of which should be dealt with before this is
+called done.
+
+The Mermaid fix is incomplete. Scrolling no longer flips a diagram back to its source, but the same
+flip still happens whenever an agent keeps writing after a diagram — which is the ordinary shape of
+a diagram reply. I reproduced it against the shipped component. Separately, the card work was never
+committed: the code, the specification updates, and the session notes are all sitting loose in the
+working tree, where an ordinary Git operation would destroy them, and one required check fails on a
+stale link that also leaves finished work advertised as still waiting to be picked up. The three
+smaller items are two documentation statements that no longer match the shipped grid and a small
+loss of theming information on the new compact context meter.
+
+An unrelated, unfinished piece of design about declining pipeline proposals is loose in the same
+uncommitted tree, with nothing recording it as approved work.
+
+**Needs attention:** The card work and an unrelated pipeline-proposal design are uncommitted and one
+required check fails; a diagram still flips to source while an agent is writing.
+
+**Next:** A fix session should close the three must-fix items, then commit the card work.
+
+### 2026-09-01 — Implementation: stable, readable agent cards
+
+Opening a dashboard chat pane now leaves every other agent card in place. Expanded cards have a
+clear Collapse button, the toolbar gains Collapse all whenever panes are open, and long agent names
+wrap to three lines instead of disappearing behind an ellipsis. Context usage is removed from the
+collapsed card and shown compactly in the expanded header.
+
+The behavior and layout passed the full automated suites and were checked in both AgentDeck Core
+and Sky & Grove at the desktop floor and a wide viewport.
+
+**Needs attention:** None.
+
+**Next:** An independent reviewer should review this implementation.
+
 ### 2026-09-01 — Fix: readable, stable Mermaid diagrams
 
 Mermaid diagrams now stay rendered while you scroll instead of flashing back to source and
