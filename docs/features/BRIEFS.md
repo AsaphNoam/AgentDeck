@@ -5,6 +5,24 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-09-01 — Feature design: worktree projects
+
+Designed first-class Git worktree support around the decision that fits AgentDeck's existing model:
+the project is the workspace. A worktree project is an ordinary project whose working directory is
+a Git worktree AgentDeck created from a chosen base branch, bootstrapped with an optional
+per-project setup command, and tracks as its own. Spinning up an isolated stream of parallel work
+becomes forking a repo-backed project — one action that creates the branch, the checkout, and the
+project together; agents, tasks, and pipeline stages need no changes because everything in a
+project already shares its directory. Checkouts are disposable: a missing one is recreated from its
+branch at the next start, and deletion happens only by explicit consent when archiving or deleting
+the project, with uncommitted work disclosed first. Checkouts AgentDeck did not create are never
+deleted. The new FS-19 and TS-12, small planned additions to five existing specifications, and the
+ready change are committed together; no product code changed. Only this design's files were
+committed — the card-grid work stays uncommitted in the working tree.
+
+**Needs attention:** Nothing new; the uncommitted card-grid tree and its failing check remain from
+the prior review.
+
 ### 2026-09-01 — Review: agent cards, Mermaid diagrams, and the paused action redesign
 
 Reviewed the stable-card work, the Mermaid display fix, the active-project fix, and the paused

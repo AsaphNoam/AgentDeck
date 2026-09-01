@@ -265,6 +265,14 @@ render a project picker, and its submission always sends that project id. The un
 modal and prefilled launches outside a scoped dashboard retain their existing project selection
 behavior.
 
+**R60 (planned).** A project card whose project is active and repo-backed (its expanded `cwd`
+resolves inside a Git working tree) offers **New worktree project** in its context menu (R34/R38),
+and the scoped project dashboard offers the same action from its header. Both open FS-19.R1's
+creation form; on success the new project's card appears in the live project grid without manual
+refresh, exactly like R42's create. A worktree project's card and its scoped project header show
+the project's branch name so parallel streams stay distinguishable at a glance (FS-19.R6). A
+project that is not repo-backed, or is archived, shows no such action.
+
 - **R44** — The dashboard shows how many tasks in view need attention, covering parked
   `dependency_failed` work and `interrupted` work whose agent went away without a result (FS-16.R8,
   R16).
@@ -687,6 +695,11 @@ picker and launches with the route project's id; the general modal continues to 
   reports arrive, and labels a zero or absent value rather than showing an unexplained blank. The
   agent screen's context meter is unchanged. — `ui/src/components/grid/AgentCard.test.tsx` and the
   existing context-meter regressions; J5.
+
+- **A42 (planned)** (R60) — On a repo-backed active project, the card context menu and the scoped
+  header both open the worktree creation form, and a completed fork's card appears in the grid
+  without manual refresh showing its branch name; a non-repo project and an archived project offer
+  no entry point. — component tests plus the FS-19.A1 journey.
 
 ## 6. Deviations & open decisions
 

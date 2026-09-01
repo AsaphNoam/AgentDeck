@@ -30,7 +30,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-01 | [features/FS-01-agent-lifecycle.md](features/FS-01-agent-lifecycle.md) | Current | Launch, stop, cancel, resume, clone, rename, switch runtime, crash handling, identity, wake on message |
 | FS-02 | [features/FS-02-dashboard.md](features/FS-02-dashboard.md) | Partial | Card grid, live status, layout/density, task groups, notifications, project creation |
 | FS-03 | [features/FS-03-chat.md](features/FS-03-chat.md) | Current | Streaming chat panel, tool calls/diffs, permission prompts, transcript view, header runtime picker, composer file/skill mentions, browser-local drafts |
-| FS-04 | [features/FS-04-configuration-onboarding.md](features/FS-04-configuration-onboarding.md) | Current | Roles/projects/backends CRUD, backend creation, settings UI, onboarding wizard, appearance preference, directory browsing, and exact AgentDecker prompt migration |
+| FS-04 | [features/FS-04-configuration-onboarding.md](features/FS-04-configuration-onboarding.md) | Partial | Roles/projects/backends CRUD, backend creation, settings UI, onboarding wizard, appearance preference, directory browsing, and exact AgentDecker prompt migration |
 | FS-05 | [features/FS-05-archive-tracking.md](features/FS-05-archive-tracking.md) | Current | Session archive, full-text search, resume from archive, file/command tracking |
 | FS-06 | [features/FS-06-coordination.md](features/FS-06-coordination.md) | Current | Agent-to-agent messaging, explicit mail activation, budgets, unread indicators, stopped-agent wake |
 | FS-07 | [features/FS-07-terminal.md](features/FS-07-terminal.md) | Partial | Terminal interface, drivers (xterm/tmux/iTerm2), terminal-agent boundaries |
@@ -45,13 +45,14 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-16 | [features/FS-16-dependent-work.md](features/FS-16-dependent-work.md) | Current | Durable tasks with explicit outcomes, prerequisite arms, host-started armed work, and task context attachments |
 | FS-17 | [features/FS-17-agent-tool-results.md](features/FS-17-agent-tool-results.md) | Partial | Agent-facing action contract: shipped MCP retry/result behavior and planned direct command delivery |
 | FS-18 | [features/FS-18-agent-facing-knowledge.md](features/FS-18-agent-facing-knowledge.md) | Current | Thin AgentDecker role, shared operating skill, progressive references, discovery fallback, and exact legacy-prompt migration |
+| FS-19 | [features/FS-19-worktree-projects.md](features/FS-19-worktree-projects.md) | Partial | Worktree projects: fork a repo-backed project into an isolated owned Git worktree, base-branch and setup-command settings, disposable-checkout recovery, conservative cleanup |
 
 ### Technical specs
 
 | ID | Spec | Status | Covers |
 |----|------|--------|--------|
 | TS-01 | [tech/TS-01-architecture.md](tech/TS-01-architecture.md) | Partial | Process model, package boundaries, runtime abstraction, source-of-truth rules, planned direct action gateway |
-| TS-02 | [tech/TS-02-data-persistence.md](tech/TS-02-data-persistence.md) | Current | SQLite schema & migrations, activations, context references/grants, config files, transcripts, FTS index |
+| TS-02 | [tech/TS-02-data-persistence.md](tech/TS-02-data-persistence.md) | Partial | SQLite schema & migrations, activations, context references/grants, config files, transcripts, FTS index |
 | TS-03 | [tech/TS-03-http-api.md](tech/TS-03-http-api.md) | Partial | REST surface, error envelope, SSE contract, status codes, and planned private action transport |
 | TS-04 | [tech/TS-04-integration-protocols.md](tech/TS-04-integration-protocols.md) | Partial | ACP, hooks, MCP messaging, PTY/WebSocket, external-CLI tolerance |
 | TS-05 | [tech/TS-05-security.md](tech/TS-05-security.md) | Partial | Loopback boundary, tokens, context authorization, and planned shared launch credential for direct actions |
@@ -61,6 +62,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | TS-09 | [tech/TS-09-pipeline-control-plane.md](tech/TS-09-pipeline-control-plane.md) | Current | Native sequential pipeline templates, durable run state machine, stage-result tools, recovery, and AgentDecker proposals |
 | TS-10 | [tech/TS-10-work-dependency-control-plane.md](tech/TS-10-work-dependency-control-plane.md) | Current | Durable task/arm/attachment records, arm evaluation, the `dependency` activation kind, the shared result layer, and task recovery |
 | TS-11 | [tech/TS-11-agent-knowledge-delivery.md](tech/TS-11-agent-knowledge-delivery.md) | Partial | Embedded operating knowledge, conditional delivery, and planned direct-action discovery |
+| TS-12 | [tech/TS-12-worktree-lifecycle.md](tech/TS-12-worktree-lifecycle.md) | Partial | Git execution boundary, worktree ownership persistence, fork orchestration, checkout recreation and consented deletion, worktree API surface |
 | INV | [../features/INVARIANTS.md](../features/INVARIANTS.md) | Current | Bug-class constraint catalog (path kept stable for hooks/history) |
 
 Related, non-spec: [`../ideas.md`](../ideas.md) (new ideas and known things to improve — not

@@ -84,6 +84,25 @@ only when its transport gate can be proved under all four chat providers.
 
 ## Changelog
 
+- **2026-09-01 — design-feature (FS-19.R1–R11/A1–A7, FS-04.R45/A25, FS-02.R60/A42, TS-12.R1–R10,
+  TS-01.R26, TS-02.R27, TS-03.R33; INV §2/§4/§5/§7/§12/§14/§15):** Specified worktree projects
+  around the confirmed product decision that the project is the workspace. New FS-19 defines the
+  fork action (branch off the effective base + owned worktree under
+  `$AGENTDECK_HOME/worktrees/{project-id}/` + copied project, all-or-nothing before setup),
+  optional per-project `base_branch`/`setup_command` (failure is a warning, never a block),
+  disposable-checkout recreation reported on every start path, and explicit-consent-only deletion
+  at project archive/delete with dirty state disclosed and the branch always kept; external
+  checkouts are never deletable. New TS-12 pins the architecture: one argv-only Git boundary, a
+  `project_worktrees` SQLite ownership row written after the checkout exists and removed after the
+  checkout is gone (crash residue is always inert/external), one shared `ensureWorktreeCheckout`
+  step replacing the two duplicated cwd stat checks across launch/resume/switch/ValidateStage,
+  deletion gated inside `beginProjectArchive`, branch-ref creation as the fork's atomic claim, and
+  a subprocess-free projects-list path. Ready change `worktree-projects.md` created; the idea was
+  captured and removed in the same change. Documentation-only checks pass on the committed tree;
+  the working-tree `make check-specs` failure on the card-grid change's dead link predates and
+  survives this change. Only this design's files were committed; the uncommitted card-grid tree was
+  left untouched.
+
 - **2026-09-01 — review (`57b7154..180ea89` plus the uncommitted card-grid tree; FS-02.R55–R59/
   A37–A41, FS-12.R40/A16, TS-08.R45–R48, FS-03.R37/A20/A22, TS-08.R40, FS-18.A5, FS-04.A24; every
   INV class):** Reviewed the card-grid change, the Mermaid fix, the active-project fix, and the

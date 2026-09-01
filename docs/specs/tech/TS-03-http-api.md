@@ -392,6 +392,15 @@ stop-and-registration-cleanup operation.
   internal action route and no `/api/agent-actions` compatibility promise exists
   (TS-04.R33–R40, TS-05.R18).
 
+
+- **R33 (planned) — Worktree project surface.** FS-19 adds
+  `POST /api/projects/{project}/worktree-fork` (201 on success; Git and validation failures are 422
+  with the specific reason; archived sources rejected), on-demand
+  `GET /api/projects/{project}/worktree` status, an optional `delete_checkout` boolean on the
+  existing project archive and delete requests (honored only for AgentDeck-owned checkouts, never
+  defaulted on), and per-project `worktree`/`repo_backed` enrichment on `GET /api/projects`. All use
+  the standard error envelope; shapes and semantics live in TS-12 §3.
+
 ## 3. Interfaces & data shapes
 
 Feature-owned request/response fields are specified in the owning FS, including FS-14 for pipeline

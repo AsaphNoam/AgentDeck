@@ -42,6 +42,10 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
+- [`worktree-projects.md`](worktree-projects.md) — fork a repo-backed project into a new project
+  whose cwd is a fresh AgentDeck-owned Git worktree branched from the project's base branch, with
+  setup bootstrap, recreation of missing checkouts, and consented conservative deletion.
+
 - [`stabilize-and-declutter-agent-cards.md`](stabilize-and-declutter-agent-cards.md) — stop the card
   grid rearranging when a chat pane opens or closes, add a per-card collapse control and
   **Collapse all**, wrap long agent names at a smaller size, and move the context meter off the

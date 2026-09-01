@@ -1,6 +1,6 @@
 # FS-04 — Configuration & Onboarding
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/config/`, `internal/server/config_handlers.go`, `internal/server/directory_picker.go`, `ui/src/features/settings/`, `ui/src/features/onboarding/` · **Journeys:** J2, J9
 **Absorbed:** [`phase-3-config-onboarding.md`](../../archive/phases/phase-3-config-onboarding.md)
 
@@ -89,6 +89,15 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   the current field values and project configuration unchanged. Path fields remain directly
   editable, including support for the existing leading `~` form, so browsing is a convenience
   rather than a new requirement or storage format.
+
+- **R45 (planned).** A project additionally has an optional `base_branch` and an optional
+  `setup_command`, both absent by default; existing project files without them stay valid and read
+  as empty. Both round-trip through the project CRUD surface (R6) and the Settings → Projects form
+  like every other field. `base_branch` names the branch new independent work derives from in
+  FS-19.R2; empty means the repository's default branch is auto-detected at use time.
+  `setup_command` is the non-interactive bootstrap AgentDeck itself runs inside a freshly created
+  or recreated checkout (FS-19.R3/R7); it never runs at agent launch, so R13's composition timing
+  is unchanged.
 
 ### 2.3 Backends & models editing surface
 
@@ -343,6 +352,12 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   read/write failure leave configuration unchanged. Package verification failure also leaves the
   exact prompt unchanged, and a later verified startup migrates it once. — config
   seeding/migration regressions.
+
+
+- **A25 (planned)** (R45) — `base_branch` and `setup_command` round-trip through the project API
+  and the Settings project form, a legacy project file without them reads as empty and saves
+  untouched fields unchanged, and neither field alters a launch snapshot. — project-form component
+  tests and config API tests.
 
 ## 6. Deviations & open decisions
 

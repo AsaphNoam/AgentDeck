@@ -318,6 +318,14 @@ domain's authorization transition.
   provider-owned MCP configuration remains outside this boundary (FS-17.R13–R20, TS-04.R32–R40).
   Until the gate passes, the shipped internal MCP composition remains unchanged.
 
+
+- **R26 (planned) — Worktree checkout resolution joins the composition seam as one shared step.**
+  When FS-19 ships, the launch, resume, switch, and pipeline stage-validation paths all call the
+  single `ensureWorktreeCheckout` helper (TS-12.R4) before any process start, replacing today's two
+  inline cwd stat checks. The frozen-snapshot rule is unchanged: resume/switch keep `snap.Cwd`; the
+  helper only re-materializes a missing owned checkout at that recorded path. No path grows a
+  private variant of this step (R9, INV §2).
+
 ## 3. Interfaces & data shapes
 
 **Runtime interface** (`internal/runtime/runtime.go`, minimum surface):
