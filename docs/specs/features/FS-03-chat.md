@@ -187,7 +187,10 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   transcript stays open. Because a partially streamed block is not valid
   diagram source, the block renders as the ordinary syntax-highlighted code block (R2) until its
   fence closes, and only then becomes a diagram; the reader therefore never sees a diagram flicker
-  or error mid-stream. Each rendered diagram offers a control that shows its original source and
+  or error mid-stream. Once rendered, unrelated transcript state changes such as scrolling do not
+  remount or regenerate it. The diagram uses the available transcript width with a bounded height,
+  so compact source does not collapse to a tiny intrinsic canvas and wide source remains contained
+  by the chat surface. Each rendered diagram offers a control that shows its original source and
   returns to the diagram. Diagram rendering is presentation only: it changes no durable event, no
   sequence, no fold boundary (R4), and no archived or searched content, so the same message replays
   identically after a reload and renders identically in an archived transcript (FS-05.R14).
@@ -371,7 +374,8 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 
 - **A20** (R37) — A closed ```mermaid fence in an assistant message renders a diagram;
   the same block renders as a code block while its fence is still open, and becomes the diagram once
-  the closing fence arrives; the source toggle returns the original text; a ```mermaid fence in a
+  the closing fence arrives; a parent-only rerender after it settles neither replaces it with source
+  nor invokes Mermaid again; the source toggle returns the original text; a ```mermaid fence in a
   tool result, a diff, or a user prompt renders exactly as it does today. Replaying the identical
   durable events produces the identical rendered output. *Verify by* a new
   `ui/src/components/chat/renderers/AssistantText.test.tsx` covering the streaming, closed-fence,
@@ -388,7 +392,9 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   repository check that asserts the single seam.
 - **A22** (R37) — A real browser renders a diagram in a live streamed reply and in the
   archived transcript of the same session, correct under Core and Sky & Grove; switching between
-  the two while the transcript remains mounted regenerates the diagram with the new palette:
+  the two while the transcript remains mounted regenerates the diagram with the new palette. A
+  compact graph uses the available transcript canvas at a readable scale, a wide graph stays within
+  it, and scrolling away from and back to the bottom never exposes source or regenerates either:
   journey **J3** in `docs/features/USABILITY-REVIEW.md`.
 
 - **A23** (R39) — With two chat panes expanded on the dashboard and the

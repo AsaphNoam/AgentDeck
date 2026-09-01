@@ -249,7 +249,12 @@ primitive seam; the rejected alternatives are recorded in §5.
   renderer-produced markup, and it is recorded in the presentation exception manifest with its
   path, rule, and reason (R14, R17–R20). Markup the library generates at runtime is outside the
   static audit's reach, which is why the preflight and sanitizing seam, not the audit, are the
-  controls. No elapsed-time timeout is claimed: main-thread Mermaid work is not interruptible, and
+  controls. The same seam removes Mermaid's intrinsic root-SVG width cap after sanitization, while
+  the integration stylesheet gives the figure the transcript's available width and bounds the SVG
+  height; this keeps compact diagrams readable without letting wide or tall diagrams escape the
+  chat surface. The react-markdown component map stays referentially stable while message text is
+  unchanged, so a transcript scroll-state rerender preserves the mounted SVG and does not repeat
+  main-thread Mermaid work. No elapsed-time timeout is claimed: main-thread Mermaid work is not interruptible, and
   adding an isolation runtime without evidence that the fixed input bound is insufficient would be
   disproportionate machinery.
 

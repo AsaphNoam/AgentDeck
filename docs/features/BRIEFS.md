@@ -5,6 +5,22 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-09-01 — Fix: readable, stable Mermaid diagrams
+
+Mermaid diagrams now stay rendered while you scroll instead of flashing back to source and
+redrawing. They also use the available chat width rather than collapsing to their tiny intrinsic
+size, with a height bound that keeps tall diagrams manageable and wide diagrams contained.
+
+In the real product, the compact test diagram grew from 124 pixels to 735 pixels in the dashboard
+pane and to 768 pixels in the full chat. A wide graph stayed within both surfaces without horizontal
+overflow. Scrolling preserved the same rendered SVGs, and the result was checked under both
+AgentDeck Core and Sky & Grove.
+
+**Needs attention:** None.
+
+**Next:** An independent code review can verify the fix with the rest of the current unreviewed
+range.
+
 ### 2026-09-01 — Feature design: stop the card grid moving, and make cards readable
 
 The rearranging is a real defect with one cause: an expanded pane spans two columns of an

@@ -84,6 +84,19 @@ real-browser computed-cursor pass under the acceptance gates below.
 
 ## Changelog
 
+- **2026-09-01 — fix (FS-03.R3/R37/A20/A22, TS-08.R40; INV §2/§10/§13):** Fixed both
+  confirmed Mermaid display defects. `AssistantText` now keeps its react-markdown component map
+  stable across parent-only transcript rerenders, so crossing the at-bottom scroll threshold no
+  longer unmounts settled diagrams or reruns Mermaid. The sanitizer removes Mermaid's root-SVG
+  intrinsic `max-width` cap, while the presentation stylesheet gives the figure its available
+  message width and bounds tall diagrams to the viewport. The activated regression covers stable
+  markup and render count, and sanitizer coverage prevents the intrinsic cap from returning. In the
+  production browser the compact SVG grew from 124px to 735px in the dashboard pane and 768px in
+  full chat; a wide graph stayed contained without horizontal overflow. Scrolling preserved all
+  four SVG ids with no source fallback. Both AgentDeck Core and Sky & Grove passed the dashboard
+  geometry check. `make check-specs`, `make build`, `make test`, `npm test`, `npm run build`, and
+  `make dist` pass; the two Mermaid findings are closed.
+
 - **2026-09-01 — feature design (FS-02.R55–R59/A37–A41, FS-12.R40/A16, TS-08.R45–R48 and the
   corrected TS-08.R43; INV §1/§2):** Designed the fix for the reported dashboard card-grid
   experience and queued
@@ -915,32 +928,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 `claude-agent-acp`, OpenCode, and OpenHands are not installed globally.
 
 ## Review findings
-
-- **Must fix** — **confirmed** (FS-03.R3/R37/A20/A22, TS-08.R40; INV §2/§10) — scrolling a transcript
-  across the at-bottom threshold remounts every rendered Mermaid block and flashes its source while
-  Mermaid runs again. `ui/src/components/chat/TranscriptView.tsx:38` updates `atBottom` for the
-  scroll contract; that rerenders each `AssistantText`, whose inline react-markdown `code` component
-  at `ui/src/components/chat/renderers/AssistantText.tsx:28` has a new React type on every render.
-  React unmounts `MermaidDiagram`, so its null initial markup at
-  `ui/src/components/chat/renderers/MermaidDiagram.tsx:15` exposes `CodeBlock` until the effect at
-  line 28 resolves. Normal-use trigger: scroll away from the bottom or jump back while any closed
-  Mermaid diagram is mounted. In a production-browser reproduction, four figures changed to zero
-  figures plus four raw sources immediately after one scroll, then returned with SVG ids
-  `ad-diagram-982` through `-985` instead of `-978` through `-981`. Keep the Markdown component
-  identity stable across parent-only rerenders, unskip the reproduction at
-  `ui/src/components/chat/renderers/AssistantText.test.tsx:46`, and assert both uninterrupted markup
-  and no redundant Mermaid render.
-
-- **Must fix** — **confirmed** (FS-03.R37/A22, TS-08.R40; INV §10/§13) — every Mermaid figure is
-  shrink-wrapped to a tiny intrinsic SVG instead of using the readable transcript width.
-  `ui/src/styles/integrations.css:40` gives the figure `width: fit-content` around an SVG Mermaid
-  emits with `width="100%"`; on the deterministic three-node flow, Chromium measured the transcript
-  at 761px, the padded figure at 150px, and the SVG at 124px. Normal-use trigger: render the ordinary
-  `graph TD; Deck-->Agent; Agent-->Task;` diagram in either the agent screen or dashboard pane. The
-  result is technically present but visually tiny, contradicting the requirement that it read under
-  the presentation system. Replace the shrink-to-fit cycle with a bounded readable-width rule and
-  add real-browser checks for compact and wide graphs in both chat hosts; jsdom cannot validate this
-  geometry.
 
 - **Worth fixing** (FS-16.R3/R4, TS-10.R15/R19; INV §15) — `internal/server/task_http_test.go:244`
   asserts the cancel response already carries `pending_release=false` and an empty runtime claim,

@@ -45,7 +45,7 @@ describe("assistant diagram rendering", () => {
   // Field-bug reproduction, 2026-09-01: TranscriptView's at-bottom scroll state rerenders its
   // children. AssistantText currently replaces react-markdown's inline `code` component on that
   // rerender, remounting MermaidDiagram and exposing the source until another render completes.
-  it.skip("keeps a settled diagram mounted across a parent-only rerender", async () => {
+  it("keeps a settled diagram mounted across a parent-only rerender", async () => {
     function RerenderHarness() {
       const [, rerenderParent] = React.useState(0);
       return (
@@ -63,6 +63,18 @@ describe("assistant diagram rendering", () => {
 
     expect(container.querySelector(".mermaid-diagram-figure svg")).not.toBeNull();
     expect(mermaid.render).toHaveBeenCalledTimes(1);
+  });
+
+  it("removes Mermaid's intrinsic root width cap for host-owned responsive sizing", async () => {
+    mermaid.render.mockImplementation(async (id: string) => ({
+      svg: `<svg id="${id}" width="100%" style="max-width: 124px;"><g /></svg>`,
+    }));
+    const { container } = renderAssistant(CLOSED);
+
+    await waitFor(() => expect(container.querySelector(".mermaid-diagram-figure svg")).not.toBeNull());
+    const svg = container.querySelector(".mermaid-diagram-figure svg") as SVGSVGElement;
+    expect(svg.style.maxWidth).toBe("");
+    expect(svg.getAttribute("style")).toBeNull();
   });
 
   it("keeps an open fence a code block and promotes it when the closing delta arrives", async () => {

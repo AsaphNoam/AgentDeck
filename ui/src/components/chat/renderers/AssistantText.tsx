@@ -1,4 +1,6 @@
+import { useMemo } from "react";
 import ReactMarkdown from "react-markdown";
+import type { Components } from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import type { Element } from "hast";
@@ -20,20 +22,21 @@ function fenceIsClosed(source: string, node: Element | undefined): boolean {
 
 export function AssistantText({ event }: { event: TranscriptEvent }) {
   const text = String(event.text ?? event.delta ?? "");
+  const components = useMemo<Components>(() => ({
+    code({ className, children, node }) {
+      const match = /language-(\w+)/.exec(className ?? "");
+      if (!match) return <code className={className}>{children}</code>;
+      const value = String(children).replace(/\n$/, "");
+      if (match[1] === "mermaid" && fenceIsClosed(text, node)) return <MermaidDiagram source={value} />;
+      return <CodeBlock language={match[1]}>{value}</CodeBlock>;
+    },
+  }), [text]);
   return (
     <article className="message assistant-message" data-ui="transcript" data-variant="assistant">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeSanitize]}
-        components={{
-          code({ className, children, node }) {
-            const match = /language-(\w+)/.exec(className ?? "");
-            if (!match) return <code className={className}>{children}</code>;
-            const value = String(children).replace(/\n$/, "");
-            if (match[1] === "mermaid" && fenceIsClosed(text, node)) return <MermaidDiagram source={value} />;
-            return <CodeBlock language={match[1]}>{value}</CodeBlock>;
-          },
-        }}
+        components={components}
       >
         {text}
       </ReactMarkdown>

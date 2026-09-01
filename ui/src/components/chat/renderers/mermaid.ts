@@ -56,11 +56,21 @@ function stripRemoteInlineStyleReferences(node: Node) {
   if (namesRemoteReference(node.getAttribute("style") ?? "")) node.removeAttribute("style");
 }
 
+// Mermaid shrink-wraps the root SVG through an inline `max-width` equal to its intrinsic width.
+// The host owns responsive sizing, so remove only that generated cap after sanitization and leave
+// every other safe renderer style intact (TS-08.R40).
+function removeDiagramRootWidthCap(node: Node) {
+  if (!(node instanceof SVGSVGElement) || !node.id.startsWith("ad-diagram-")) return;
+  node.style.removeProperty("max-width");
+  if (!node.getAttribute("style")?.trim()) node.removeAttribute("style");
+}
+
 async function loadPurify(): Promise<Purify> {
   if (!purify) {
     const module = await import("dompurify");
     module.default.addHook("afterSanitizeElements", stripRemoteStyleReferences);
     module.default.addHook("afterSanitizeAttributes", stripRemoteInlineStyleReferences);
+    module.default.addHook("afterSanitizeAttributes", removeDiagramRootWidthCap);
     purify = module.default;
   }
   return purify;
