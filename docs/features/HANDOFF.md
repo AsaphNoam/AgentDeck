@@ -34,7 +34,11 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   every invariant class. The worktree-project implementation (`1b2a8c3..bd797bd`) had a dedicated
   implementation review plus an independent Terra/high pass, and all ten findings from that review
   were fixed in `3e1726b`; the post-fix code is still awaiting independent review, so the last
-  reviewed-code marker remains `bd797bd`. The 2026-09-02 bug investigation retains one open
+  reviewed-code marker remains `bd797bd`. The unattended-pipeline implementation commit `a0b9e13`
+  has now had its dedicated implementation review plus an independent Terra/high pass; five
+  Must-fix and two Worth-fixing findings are recorded below. Because that review named one commit
+  and did not cover the intervening worktree-fix range, it does not advance the continuous marker.
+  The 2026-09-02 bug investigation retains one open
   **Must fix** against general silent-stage detection; the other five findings are closed. The
   FS-14 proposal-decline design, now committed in `e83c937`, also had a
   dedicated worktree-only review plus an independent Terra/high pass. The earlier design review did
@@ -94,10 +98,41 @@ ordinary permissions wait without a default deadline and derive pipeline attenti
 default to 50 and are configurable per turn. Retryable report refusals, stopped pipeline-agent
 recipient errors, pause choices, attempt outputs, and finished named values now explain themselves.
 
-**Next:** Independently review the unattended-pipeline implementation. Keep the credentialed
-Claude/Codex browser journey as an acceptance gate until a human authorizes real provider sessions.
+**Next:** Fix the unattended-pipeline implementation findings, starting with live permission
+attention and pending-permission teardown. Keep the credentialed Claude/Codex browser journey as an
+acceptance gate until a human authorizes real provider sessions.
 
 ## Changelog
+
+- **2026-09-02 — review (unattended pipeline implementation only; FS-03.R40–R44/A24–A27,
+  FS-04.R46/A26, FS-06.R28–R29/A18–A19, FS-14.R52–R56/A29–A32, TS-01.R27, TS-02.R28,
+  TS-03.R34–R35, TS-04.R41–R44, TS-05.R20, TS-08.R50–R52, TS-09.R29–R31; INV §1–§15):**
+  Reviewed commit `a0b9e13` in both directions, with an independent Terra/high pass and without
+  advancing the continuous reviewed-code marker past the intervening worktree-fix range. Seven
+  findings are recorded below: five Must fix and two Worth fixing. The Must-fix set is a
+  same-revision `pipeline_update` that the open run
+  page deliberately ignores, Stop abandoning a pending permission and leaving its timer live,
+  one run-level slot losing concurrent pending approvals, and tolerant message-budget config
+  specified as a plain `int` so one non-numeric field makes the whole config unreadable, plus
+  auto-approval releasing the provider before recording its resolution. The lower-priority set is
+  transient stage-report refusals bypassing the new retry guidance and stopped pipeline-recipient
+  wording that falsely promises Resume when the project is archived.
+
+  Invariant sweep: §1 produced the live-attention and Stop findings; §2 produced the report-guidance
+  finding while the registered-tool and assignment/refusal composition otherwise holds; §3's
+  valid-config partial merge holds; §4 produced the pending-permission teardown finding; §5
+  produced the concurrent-approval finding; §7's existing iteration and repair paths have no new
+  surface; §8
+  produced the report and recipient wording findings while permission logging, pause copy, and
+  output bounds hold; §9's process-lifetime attention state is implicated by the Stop finding but
+  produces no separate one; §10 produced the same-revision UI and whole-config fallback findings;
+  §15 produced the Stop and auto-approval ordering findings. §11's new collection/string shapes and
+  §13's new class names hold. §6 has no new interface/runtime, §12's live-provider identity shape
+  remains the explicit acceptance gate, and §14 has no new route or widened authorization boundary. `make check-specs`, `make build`, both Go
+  test variants, the focused runtime/pipeline/messaging race run, the 366-case UI suite with style
+  and presentation checks, `make dist`, and `git diff --check` pass. The first sandboxed server test
+  attempt could not bind a loopback port; the unchanged authorized rerun passed. No product code or
+  specification changed.
 
 - **2026-09-02 — work (unattended pipeline runs; FS-03.R40–R44/A24–A27, FS-04.R46/A26,
   FS-06.R28–R29/A18–A19, FS-14.R52–R56/A29–A32, TS-01.R27, TS-02.R28, TS-03.R34–R35,
@@ -1453,6 +1488,86 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 `claude-agent-acp`, OpenCode, and OpenHands are not installed globally.
 
 ## Review findings
+
+- **Must fix** (FS-14.R54/A30, TS-03.R35, TS-08.R50, TS-09.R29–R30; INV §1/§10) —
+  `ui/src/api/sse.ts:165-173` invalidates an open run-detail query only when the incoming
+  `pipeline_update` has a larger run revision. Permission attention is deliberately derived and
+  does not change that revision (`internal/pipeline/manager.go:360-365`), so the request and its
+  clearing update both arrive with the revision already cached by the open page and are ignored.
+  Normal-use trigger: keep a running run detail open while its stage agent requests permission for
+  a file edit. The notification may toast, but the page does not refetch and therefore never shows
+  the promised **Needs attention** reason; resolving the request can likewise leave a previously
+  fetched reason stale until focus/reload or an unrelated durable transition. This preserves the
+  silent-run failure R54 exists to remove. Fix: make a same-revision attention change update or
+  invalidate the detail cache while retaining the stale-revision guard, and add the missing A30 SSE
+  test for request and clear at one revision plus a run-page render assertion.
+
+- **Must fix** (FS-03.R43–R44/A25, TS-04.R44; INV §1/§4/§15) —
+  `internal/runtime/chat.go:426-458` stops a live agent without claiming or resolving its pending
+  permissions, and `onTransportClosed` returns immediately for that initiated stop at `:865-873`
+  before clearing them or stopping their timers. With the new default of no timer, the durable
+  transcript keeps an unresolved approval after the agent is stopped and the server's
+  `permissionTools` bookkeeping retains it. With an explicitly configured deadline, the timer
+  armed at `internal/runtime/permission.go:60-61` can still fire after Stop, emit a late timeout,
+  and overwrite the stopped agent's `done` status back to `busy`. Normal-use trigger: press Stop
+  while an ordinary tool approval is waiting. That contradicts A25's explicit stop-resolution case
+  and makes the retained timeout mode unsafe. Fix: atomically take every pending request, emit and
+  persist its cancelled resolution (and resulting withheld-tool log) before releasing/stopping the
+  peer, stop every timer, and test Stop with both no deadline and a short explicit deadline,
+  including transcript order and a status that remains done after the old deadline.
+
+- **Must fix** (FS-14.R54/A30, TS-09.R29–R30; INV §5) —
+  `internal/pipeline/manager.go:24-32` and `:324-355` keep exactly one
+  `pendingPermission` per run even though the runtime holds pending requests by tool-call id. If a
+  stage agent raises two approvals, the second overwrites the first; resolving the second deletes
+  the run entry and clears its attention while the first request is still unanswered. Resolving the
+  forgotten first request then matches nothing and cannot restore or clear the truth. Parallel tool
+  calls are an ordinary provider behavior, so the run can return to the same silent wait R54 was
+  added to prevent. Fix: retain a generation-scoped set keyed by tool-call id and publish only on
+  the empty→non-empty and non-empty→empty edges. Extend A30's manager test with two requests resolved
+  in both orders and assert one entering notification, no early clear, and one final clear.
+
+- **Must fix** (FS-04.R46/A26, FS-06.R28, TS-02.R28, TS-03.R34; INV §10) —
+  `internal/config/types.go:121-122` decodes `message_budget_per_turn` directly into an `int`, while
+  the shared `readJSON` turns any type error into whole-document `ErrCorrupt`
+  (`internal/config/atomic.go:67-80`). A syntactically valid hand edit such as
+  `"message_budget_per_turn":"bad"` therefore does not preserve the rest of the config and default
+  only this field as the requirements promise: `GET /api/config` serves the entire default config,
+  and the next unrelated partial PUT starts from that default at
+  `internal/server/config_handlers.go:866-875` and overwrites the person's other stored settings.
+  The A26 test covers only zero submitted through PUT, not absent/negative/non-numeric on-disk
+  values. Fix: decode this additive field tolerantly while keeping the rest of version-1 config
+  authoritative, and add on-disk fixtures proving all invalid forms yield budget 50 while unrelated
+  fields survive GET and a later partial PUT.
+
+- **Must fix** (FS-03.R41/A24, TS-04.R43; INV §15) — the new auto-approval path in
+  `internal/runtime/permission.go:35-47` sends the selected allow response to the provider at line
+  46 and only then emits/persists `permission_resolved`. This is the exact side-effect ordering INV
+  §15 forbids: a fast provider can emit tool output or finish the turn before the local transcript
+  records why it was released, and a transport exit in that window can leave the auto-approved
+  request unresolved. The manual approve/deny path already uses the correct reverse order. Fix:
+  record the resolution before `Respond`, and use a fake provider that reacts immediately to assert
+  resolution precedes subsequent tool/turn events in the durable transcript.
+
+- **Worth fixing** (FS-14.R53/A29, TS-09.R31; INV §2/§8) — retry guidance is appended only by
+  `refuseReport` for a `ControlError` (`internal/pipeline/actions.go:289-292`). The MCP handler's
+  manager-unavailable branch (`internal/messaging/pipeline_tools.go:28-29`) and its generic-error
+  fallback at `:108-113` still return `pipeline_unavailable` with a `transient` retry class but only
+  “could not be completed” wording. R53 says every refused stage-result call must say whether the
+  attempt still owes a result and what the agent should do; a temporary store/control-plane failure
+  can therefore still make the agent stop with no accepted report. Fix: apply the shared
+  `StageReportGuidance` at the stage-report MCP result boundary for every refusal code, and inject a
+  transient manager/store failure in a regression that expects the retry instruction.
+
+- **Worth fixing** (FS-06.R29/A19; INV §8) — `pipelineRecipientRefusal` diagnoses against
+  `ContextRecipients` alone (`internal/messaging/tools.go:215-233`), a directory that deliberately
+  does not know the configuration-owned archived-project gate. A stopped pipeline agent in an
+  archived project is therefore refused with “resume the agent, then try again,” even though Resume
+  is itself refused until the project is restored. Normal-use trigger: archive a project retaining
+  an old pipeline-stage agent, then address that agent by id from another project. The new wording
+  again names the wrong condition and wrong repair. Fix: emit the pipeline-specific diagnosis only
+  after the same project gate proves pipeline association is the sole exclusion (or return all
+  active gates), and add the archived-project case beside A19's stopped/resumed coverage.
 
 
 - **Worth fixing** (FS-16.R3/R4, TS-10.R15/R19; INV §15) — `internal/server/task_http_test.go:244`

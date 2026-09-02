@@ -5,6 +5,22 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-09-02 — Review: unattended pipeline runs
+
+The automated checks are green, but the review found five important defects. An already-open run
+page ignores live permission-attention changes; stopping an agent at an approval leaves the request
+and any timeout behind; parallel approvals can make a run clear its warning too early; and one bad
+message-budget value makes the whole configuration look corrupt instead of defaulting only that
+field. Auto-approval also releases the provider before its resolution is durably recorded. Two
+smaller issues affect retry guidance during a temporary pipeline failure and the recovery advice
+shown for a stopped pipeline agent in an archived project.
+
+**Needs attention:** Fix the five important defects before relying on unattended runs. The
+credentialed real-provider browser journey remains unverified and still needs human authorization.
+
+**Next:** Run `/fix` for these review findings, then repeat the real-provider journey when a human
+can authorize it.
+
 ### 2026-09-02 — Implementation: unattended pipeline runs
 
 Pipeline runs no longer need a person to approve AgentDeck's own control actions. Those actions are
