@@ -5,6 +5,47 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-09-02 — Review: the agent cards, the worktree design, and a stale embedded UI
+
+The dashboard card work is finished and correct. Panes now stay in one grid column, so opening or
+closing a conversation moves only the rows underneath it; the labelled **Collapse** button and
+**Collapse all** both work through the same saved layout; long agent names wrap onto three lines
+instead of being cut off; and the context meter has moved off the collapsed card onto the expanded
+one. The two blocking problems from the last review are gone — the specification check passes and
+the whole change is committed.
+
+One new blocking problem replaced them, and it is invisible unless you look for it. The change
+updated the app's source but not the built copy of the UI that ships inside the server. On a machine
+that already has a build, pulling this and running the normal `make build` starts a dashboard
+serving the *previous* interface, with no error and nothing on screen to explain it. Every earlier
+UI change in this repository updated both together; the rebuilt file is sitting in the working tree
+uncommitted. It is a one-command fix.
+
+The Mermaid diagram problem is still only half fixed. Scrolling no longer disturbs a settled
+diagram, but a diagram still flips back to raw source and re-renders each time the agent keeps
+typing after it — which is the ordinary shape of a reply that contains a diagram, and is what was
+originally reported.
+
+The new worktree-projects design is strong where it matters most — how it calls Git, and how
+carefully it verifies a checkout before deleting one — but three things should be corrected before
+anyone builds it. It runs the checkout-creating, setup-running step inside the pipeline's *pre-flight
+check*, which runs once per stage and is supposed to only look, never act; a 32-stage run would
+trigger it 32 times and report failures as if a model were unavailable. Its crash-safety argument
+does not hold for one of its own steps, which can leak a branch, a directory, and a database row
+that nothing can ever clean up. And it never says what happens when you archive a worktree project,
+agree to delete its checkout, and then change your mind and bring the project back — the two paths
+in the design answer that opposite ways.
+
+Two smaller worktree notes and two carried-over specification inconsistencies are recorded for
+whoever picks this up.
+
+**Needs attention:** The pipelines proposal work from another session is still sitting uncommitted
+with no owner and no technical design behind it. It is either finished or reverted; leaving it is
+the one thing that loses work.
+
+**Next:** Commit the rebuilt UI file and fix the Mermaid streaming case, then correct the three
+worktree-design points before that change starts.
+
 ### 2026-09-01 — Feature design: open a conversation waiting for approval
 
 A chat agent that newly enters `waiting_input` now expands its own pane on the dashboard. That

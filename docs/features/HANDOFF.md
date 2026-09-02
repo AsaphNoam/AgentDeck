@@ -25,16 +25,16 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   action rather than widen Continue — and is flagged in the human update for confirmation. The
   earlier 2026-08-27 all-200/no-page-load incident stays fixed, and the shared SSE stream is now
   replayed to a joining tab instead of restarted for every tab.
-- **Review state:** The continuous `57b7154..180ea89` range plus the uncommitted card-grid working
-  tree is reviewed against its requirements and every invariant class. Six findings are open below,
-  three of them **Must fix**: the Mermaid remount fix does not cover the streaming path, the
-  delivered tree fails `make check-specs` on a dead ready-change link that also still advertises the
-  finished card work as waiting to start, and the whole card-grid change is uncommitted. The four
-  MCP-migration design findings from the 2026-08-31 review are closed by `3863e8b` and removed from
-  the list; the change is paused rather than ready for implementation. The task-cancel release flake
-  stays open. The refused-drag pointer needs a real-browser computed-cursor pass and the six-tab
-  shared-stream check remains an acceptance gate. Two behavior choices made by an earlier fix still
-  need human confirmation below.
+- **Review state:** The continuous `57b7154..e46e66b` range is reviewed against its requirements and
+  every invariant class, together with the uncommitted FS-14 proposal-decline design still in the
+  tree. The previous review's two **Must fix** findings are closed: `make check-specs` passes and
+  the card-grid change is committed as `e46e66b`. Six findings are open below, two of them
+  **Must fix**: the Mermaid remount fix still does not cover the streaming path, and `e46e66b`
+  shipped `ui/src` changes without committing the regenerated embedded `index.html`, so `make build`
+  on a checkout of `main` serves the previous bundle. Four of the six are new, three of them against
+  the FS-19/TS-12 worktree design. The task-cancel release flake stays open. The refused-drag
+  pointer needs a real-browser computed-cursor pass and the six-tab shared-stream check remains an
+  acceptance gate. Two behavior choices made by an earlier fix still need human confirmation below.
 - **Active change:** None. Stable, decluttered agent cards are shipped and verified (FS-02.R55–R59/A37–A41, FS-12.R40/A16, TS-08.R45–R48). Active-project navigation tabs are shipped and their review findings are
   closed (FS-02.R53/A35, FS-12.R39/A15, TS-08.R44). Thin AgentDecker and the shared AgentDeck operating skill are finished
   and verified (FS-18, FS-04.R44/A24, TS-11). Expandable dashboard chat panes are finished and verified
@@ -63,12 +63,11 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   v0.2.2 → v0.2.3 delta remains closed: FS-02.A24 is closed and FS-04.A22 remains narrowed to the
   native panel. Full run:
   [`usability-review-run-2026-08-30-new-pages.md`](../archive/reviews/usability-review-run-2026-08-30-new-pages.md).
-- **Last reviewed code:** `180ea89` (2026-09-01). Advanced across the continuous range
-  `57b7154..180ea89`, which was read end to end against its requirements and every invariant class.
-  The previous marker `da2db77` is a pre-rehash hash that is no longer an ancestor of `main`;
-  `57b7154` is its tree-identical current-history equivalent, so the range stays continuous. The
-  uncommitted card-grid working tree was reviewed in the same pass but cannot advance the marker,
-  because there is no commit for it.
+- **Last reviewed code:** `e46e66b` (2026-09-02). Advanced across the continuous range
+  `180ea89..e46e66b`, which was read end to end against its requirements and every invariant class:
+  the previous review's state commit, the FS-19/TS-12 worktree design, and the card-grid
+  implementation. The uncommitted FS-14 proposal-decline design was reviewed in the same pass but
+  cannot advance the marker, because there is no commit for it.
 - **Branch:** `main`.
 
 ## Active change
@@ -79,10 +78,35 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 until packaged Codex/ACP provides a narrow direct transport under the default sandbox; unrelated
 Mermaid and pipeline-proposal work already dirty in the tree remains preserved.
 
-**Next:** An independent review should cover the completed card change. Revisit the MCP migration
-only when its transport gate can be proved under all four chat providers.
+**Next:** Close the two **Must fix** findings — commit the regenerated embedded `index.html` and
+fix the Mermaid streaming remount — then correct the three worktree-design findings before that
+change is started. Revisit the MCP migration only when its transport gate can be proved under all
+four chat providers.
 
 ## Changelog
+
+- **2026-09-02 — review (`180ea89..e46e66b`; FS-19.R3/R7/R8, TS-12.R3/R4/R5/R7/R10, TS-01.R26,
+  FS-02.R47/R55–R59, FS-12.R40, TS-08.R45–R48, FS-14.R49–R51; INV §1–§15):** Reviewed the previous
+  review's state commit, the FS-19/TS-12 worktree design, the shipped card-grid change, and the
+  uncommitted FS-14 proposal-decline design against their requirements and every invariant class.
+  Closed the previous cycle's two **Must fix** findings on evidence: `make check-specs` reports
+  `spec check: ok`, and the card-grid change is fully committed. Recorded four new findings. One is
+  **Must fix**: `e46e66b` changed `ui/src` but left the regenerated
+  `internal/server/ui/dist/index.html` uncommitted, so `make build` on a checkout of `main` with a
+  populated embed directory serves the previous bundle with nothing on screen saying so — every
+  earlier UI-changing commit updated that file in the same commit. Three are against the worktree
+  design, before it is built: TS-12.R4 routes the mutating `ensureWorktreeCheckout` through pipeline
+  `ValidateStage`, which the manager calls once per stage inside a read-only pre-flight that turns
+  errors into per-assignment diagnostics; TS-12.R3's crash-safety claim is false for the window
+  between its own ownership-row insert and project-file write, leaking a branch, directory, and row
+  with no reclaim path; and FS-19 never says what a reactivated worktree project does after a
+  consented checkout deletion, where TS-12.R7's normal and crash paths answer in opposite ways. Two
+  smaller ones: concurrent checkout recreation has no atomic claim, and the 64 KiB setup-output tail
+  reaches a human warning surface with no display bound. The design's INV §12 and §9 handling is its
+  strongest part. The card-grid implementation matches FS-02.R55–R59 and TS-08.R45–R48; its two
+  carried findings (FS-02.R47's stale two-column clause and `ContextBar`'s overloaded `data-variant`)
+  are confirmed still open. All other required checks pass. No product code or specifications
+  changed.
 
 - **2026-09-01 — feature design (FS-02.R61/A43 and the narrowed FS-02.R51, TS-08.R49; INV §1/§2):**
   Designed automatic pane opening and queued `open-waiting-approval-panes.md`. A chat agent newly
@@ -154,7 +178,8 @@ only when its transport gate can be proved under all four chat providers.
   matrix cover the new hooks and long-name/context states. A real-browser pass caught and fixed an
   initial expanded-header overflow; Core and Sky & Grove then held at 1024px and 1440px. The 346-case
   UI suite, both Go variants, style/spec checks, UI/product/distributable builds, and `git diff
-  --check` pass. The ready change is removed and FS-02, FS-12, and TS-08 return to Current.
+  --check` pass. The ready change is removed and FS-12 returns to Current; FS-02 and TS-08 stay
+  Partial for their planned items. (Status sentence corrected by the 2026-09-02 review.)
 
 - **2026-09-01 — fix (FS-03.R3/R37/A20/A22, TS-08.R40; INV §2/§10/§13):** Fixed both
   confirmed Mermaid display defects. `AssistantText` now keeps its react-markdown component map
@@ -770,236 +795,7 @@ only when its transport gate can be proved under all four chat providers.
   ideas were checked against the tree and kept: drag listeners are still bound to the handle button
   alone and no CSP exists in the server, the UI shell, or the specs.
 
-- **2026-08-28 — fix:** No open review findings. `## Review findings` was empty and the
-  working tree was clean, so no code, test, or specification changed. The committed Pipelines
-  redesign and its six usability fixes are still waiting for their independent code review.
-
-- **2026-08-28 — fix:** Closed all six Pipelines usability findings. The attempt badge sits on the
-  timeline rule instead of off the left window edge and the run rail no longer hoists itself above
-  the timeline at the desktop floor (INV §13). The start path explains every gate it applies: with
-  no valid template **Start run** is refused with a link to Templates, and a disabled step control
-  names the missing value and marks the empty required input (INV §8/§10) — new behavior, specified
-  as FS-14.R46/A24. A newly appended timeline entry now plays the one brief entrance FS-14.R45/A21
-  already promised, tracked from the ids present at first render so neither the initial list nor a
-  background refetch replays it (INV §10). A deleted run explains itself in product language, while
-  any other read failure says so honestly and keeps its transport detail (INV §8).
-
-- **2026-08-28 — usability review:** Drove the split Pipelines surface through a real Chromium
-  against a `make dist` build of the working tree, on three isolated fixtures: an empty home, a home
-  where one run was started end to end through the dialog, and a seeded home carrying a seven-attempt
-  repair loop, the approval/blocked/crashed pause branches, 121 retained runs, 26 delegated tasks on
-  one attempt, a second-hop task, a task whose agent record is gone, a 32-stage template, and one
-  pending proposal of each kind. Zero blockers; five **Worth fixing** findings and one polish item
-  recorded below. Routing, the execution timeline, attempt agent cards and their live/archive routes,
-  the delegated cap and true counts, bounded run history to an exact end, frozen stage titles after
-  template deletion, the focused editor, action gating, legacy links, background-refetch stability,
-  reduced motion and the Sky & Grove appearance all behaved as specified with no console error.
-  Full run:
-  [`../archive/reviews/usability-review-run-2026-08-28-pipelines.md`](../archive/reviews/usability-review-run-2026-08-28-pipelines.md).
-
-- **2026-08-28 — work:** Shipped the Pipelines redesign. Runs and Templates now have separate,
-  addressable list/detail experiences; run supervision is timeline-first with frozen setup, named
-  values, complete paginated history, and reload-safe stage/delegate agent summaries; template
-  authoring is a focused one-stage workspace; and start-run uses a stable three-step dialog. The
-  additive run projections use one indexed, bounded task read and preserve the existing pipeline
-  control plane. The full UI and Go suites, spec checks, release build, and real-browser checks at
-  the supported desktop floor are green; browser QA also found and closed a runtime-dialog footer
-  overflow before completion.
-
-- **2026-08-27 — fix:** Closed the active-first Ordering design finding (INV §10). FS-02.R45/A28
-  now require the rendered running-first id order to drive drag geometry, same-block drops to map
-  back to the unchanged flat manual order, and cross-block drops to perform no reorder or layout
-  write. J5 and the ready change cover the visible in-drag boundary and persistence behavior. The
-  ready change now names all six `AgentStatus` values, including `unknown`; the broader cross-group
-  and whole-card drag problems remain separately out of scope.
-
-- **2026-08-27 — design review:** Reviewed the waiting active-first Ordering change against FS-02,
-  FS-12, the shipped card-grid/layout/SSE seams, dnd-kit's pinned sortable implementation, and every
-  invariant class. The render-time `running` partition cleanly extends the existing group projection
-  and needs no server or persistence change, but the design leaves `SortableContext` keyed to the
-  differently ordered flat manual list. One implementation-gating drag finding and one consistency
-  note remain. No product code, specification, or change file was edited.
-
-- **2026-08-27 — work:** Shipped Mermaid rendering in assistant messages (FS-03.R37–R38,
-  TS-08.R40). A closed ```mermaid fence becomes a themed diagram; an open one stays a code block
-  until its closing delta arrives, decided from react-markdown's source span. `renderers/mermaid.ts`
-  owns the 50,000-code-unit bound, the refused external-image grammar, strict initialization, and a
-  directly declared DOMPurify pass that also strips remote references from the generated `<style>`;
-  `MermaidDiagram.tsx` is the only markup-insertion seam, now enforced by a new `renderer-markup`
-  rule in the presentation audit plus its manifest entry and a repository check. Mermaid and
-  DOMPurify load on demand, so the initial bundle grows only by the host code (1,813.87 → 1,818.43
-  kB). J3's diagram steps were driven through a real Chromium against the production server and
-  embedded UI on the deterministic `diagram_stream`/`diagram_injection` fake-ACP scenarios: open
-  fence stayed a code block, the closing delta promoted it, the source toggle round-tripped, a live
-  skin change regenerated the mounted diagram, reload and the archived transcript matched, and the
-  injected script/HTML-label case rendered inert with no console error and no external request.
-
-- **2026-08-27 — fix:** Closed all three Mermaid design-review findings (INV §8/§10). The design
-  now rejects Mermaid's pinned external-image grammar before rendering, directly owns DOMPurify,
-  replaces the unenforceable main-thread timeout with an exact 50,000-code-unit source bound, and
-  reuses the existing presentation observer to regenerate mounted diagrams after a skin change.
-  It explicitly avoids a worker, iframe renderer, or custom parser; acceptance tests cover the
-  no-request preflight, size fallback, and live palette change.
-
-- **2026-08-27 — design review:** Reviewed the waiting Mermaid chat-rendering change against FS-03,
-  TS-08, the shipped Markdown/presentation/archive seams, Mermaid 11.17.2, and every invariant
-  class. The existing `AssistantText` and presentation adapters are the right extension points, and
-  the closed-fence state is recoverable from react-markdown's source-position metadata. Three
-  implementation-gating findings remain: Mermaid image nodes can make an attacker-chosen request
-  before returned SVG can be sanitized, a main-thread render cannot be interrupted by the promised
-  elapsed-time budget, and an already-rendered SVG does not observe a later skin change. No product
-  code, specification, or change file was edited.
-
-- **2026-08-27 — design:** Defined two small UI changes and held a third. FS-03.R37–R38 and
-  A20–A22 specify Mermaid rendering in assistant messages, gated on the closed fence because every
-  delta re-renders the whole message, with a code-block fallback and one sanitizing injection seam;
-  TS-08.R40 puts the renderer on the existing R13 adapter seam as a dynamically imported chunk
-  pinned at or above the release fixing the known diagram HTML-injection defect. FS-02.R45 and A28
-  order running agents before stopped ones inside each group while preserving the manual order, and
-  FS-12.R37 narrows R10's ordering clause, which forbade it. FS-02, FS-03, FS-12 and TS-08 are now
-  Partial; J3 and J5 cover the new evidence. Queued `mermaid-diagrams-in-chat.md` and
-  `active-agents-before-stopped.md`. Edit-a-sent-message was **not** specified: ACP v1 as
-  implemented has no rewind method, the transcript and FTS documents are append-only, and the only
-  rewind-shaped seam is the lossy switch primer, so the user chose to hold it with those findings
-  recorded in `../ideas.md`. The absent Content-Security-Policy is recorded there too.
-  `make check-specs`, the twin-skill comparison and `git diff --check` are green.
-
-- **2026-08-27 — fix:** Closed all four Pipelines design-review findings (INV §7/§8/§10).
-  FS-14.R36/R39 now require frozen human stage titles, complete attempt-agent cards, correct
-  same-agent continuation attribution, and retained-history pagination; R44–R45 and A20–A23 make
-  the focused hierarchy, progressive disclosure, stable refetch state, restrained motion, and
-  reduced-motion result observable. TS-03.R29–R30 define the additive detail/list contracts,
-  TS-09.R28 replaces the project-wide task read with the capped attempt-window projection, and
-  TS-02.R26 owns its one composite read index. J14 and the ready change cover the dense, paginated,
-  live-update, fallback, and reduced-motion evidence. The stale effort note is removed.
-
-- **2026-08-27 — design review:** Reviewed the waiting Pipelines split against FS-12, FS-14,
-  TS-03, TS-08, TS-09, the shipped frontend/server seams, and every invariant class. The separation
-  into Runs and Templates is sound, but four implementation-gating findings remain: the requested
-  high-end interaction outcome has no observable contract, the list/card data shapes cannot render
-  all promised human-facing content, retained run history silently stops at the first page, and the
-  delegated-work response cap does not bound the work used to build it. One stale effort sentence
-  is recorded separately as a consistency note. No product code, specification, or change file was
-  edited.
-
-- **2026-08-27 — design:** Defined the Pipelines surface split. FS-14.R25 is superseded by R35–R43
-  and A14–A19; TS-09.R28 specifies the derived one-hop delegated-agent projection composed at the
-  HTTP boundary with no new schema; TS-03.R29 specifies the additive capped run-detail block and its
-  `task_update` refetch rule. FS-14, TS-09 and TS-03 are now Partial and J14 covers the split
-  surface. Queued `docs/ready-changes/split-pipelines-surface.md`; the source idea is removed.
-  `make check-specs`, the twin-skill comparison and `git diff --check` are green.
-
-- **2026-08-27 — fix:** Closed all thirteen open findings. Browser tabs share one SSE stream and
-  six-tab REST capacity is specified (INV §1/§8); unchanged config generations no longer publish,
-  session writes reconcile incrementally after a debounce, and background streams retain bounded
-  card previews (INV §7/§8). Project warnings stay visible, task supervision names and links real
-  work, defaults/actions/copy match the shipped contracts, the lifecycle flake waits for ownership
-  to settle (INV §5/§8), and FS-16/FS-17 now state their verified boundaries accurately (INV §4/§10/§15).
-
-- **2026-08-27 — bug investigation correction and reproduction:** Built a deterministic production-UI
-  stress fixture with one Claude Haiku-labelled orchestrator, six workers, and 7,000 streamed ACP
-  deltas. A real Chromium reproduced the field symptom at the sixth same-origin tab: the shell and
-  SSE opened, REST queries never reached the server, and the page remained on `Loading project…`.
-  Closing one existing tab released an SSE connection and the stalled tab completed in 127 ms. This
-  confirms browser HTTP/1.x connection starvation as the root cause. The earlier default-home
-  analysis inspected a different computer and is not incident evidence; its config-source and
-  transcript findings remain independent scaling defects only.
-- **2026-08-27 — usability review:** Drove the user-facing changes released between `v0.2.2` and
-  `v0.2.3` through a real Chromium against the release binary on isolated fixtures: dependent work
-  end to end, the dashboard attention count, the task-concurrency budget, browser-local chat drafts,
-  the directory-browse control, and the projects-canvas context menu. One **Must fix** and five
-  **Worth fixing** findings recorded below; no blocker. The FS-02.A24 right-click gate is closed and
-  the FS-04.A22 gate is narrowed to the native panel alone. J15–J17 were added to the journey matrix
-  because FS-15, FS-16 and FS-17 shipped citing no journey at all. Full run:
-  [`../archive/reviews/usability-review-run-2026-08-27-release-delta.md`](../archive/reviews/usability-review-run-2026-08-27-release-delta.md).
-- **2026-08-26 — review:** Verified the fixes for the nine findings against the tree. Seven are
-  closed with real regression coverage, including a three-level chain test that also exposed the
-  restart re-evaluation having been a no-op because `TasksInStates` never populated `Arms`. Three
-  residual items are recorded below. `make test`, `make build`, `make check-specs`,
-  `git diff --check`, `npm test` (251 passing), and `npm run build` are green;
-  `TestRetryRunsAgainOnTheSameAssignee` failed once in three full-suite runs and did not reproduce.
-- **2026-08-26 — work:** `/work` found no active change and no waiting ready change, so no
-  implementation started. The repository remains clean and ready for the next designed change.
-- **2026-08-26 — fix:** Closed all nine review findings. Source evaluation now publishes and
-  recursively propagates across pipeline and restart boundaries (INV §1/§10/§15); task start
-  generations are confirmed at effect time and failed wake confirmation settles the attempt (INV
-  §4/§5); context authorization has one transaction-safe predicate (INV §2); task and dashboard
-  errors surface accurately (INV §8); and agent-tool retry coverage and its SDK boundary now match
-  FS-17 (INV §10). The two review-named pipeline conflict codes are HTTP-only, not MCP refusals.
-- **2026-08-26 — review:** Reviewed `e1e827b`, `b121fd0`, and `895348e` against FS-02, FS-16, FS-17,
-  TS-03, TS-04, TS-05, TS-10, and every invariant class. Two **Must fix** and seven **Worth fixing**
-  findings recorded below; `make check-specs`, the Go suite for the touched packages, `tsc --noEmit`,
-  and `npm test` all pass, while `git diff --check` reports one trailing-whitespace line.
-- **2026-08-26 — implementation:** Shipped the agent-facing tool result contract. Every MCP refusal
-  now carries a centralized four-class retry hint, successful and refused JSON objects are mirrored
-  into structured content without changing the text block, and registration-derived tests cover the
-  complete tool surface and deferred output-schema boundary.
-- **2026-08-25 — fix:** Closed all thirteen dependent-work review findings. Task starts now retain
-  the runtime's true generation, cancellation and start serialize per task, failed dependencies
-  propagate fully, dispatcher transitions publish after commit, failed cleanup retains ownership,
-  attachment creation is atomic and bounded, and the Tasks UI and API cover their specified paths.
-- **2026-08-25 — design:** Defined FS-17 (agent-facing tool result contract) and TS-04.R30–R31, and
-  queued `docs/ready-changes/agent-tool-retry-classification.md`. Investigation of the "richer
-  agent-facing orchestration API" idea found most of it already shipped; the remainder is trimmed in
-  `../ideas.md`. The task-graph query exclusion (FS-16 §6, TS-04.R29) was reaffirmed by the user.
-
-## Decisions needing your input
-
-These are product decisions needed for a future change or shipped boundaries whose reversal needs
-an explicit specification update. Remove an item when the human resolves it or queues that update.
-
-- **API/model compatibility:** TS-03.R3–R4 preserve mixed legacy error envelopes; TS-04.R3 records
-  provider model-ID ownership. Standardizing either is a compatibility change.
-- **Failed pipeline-stage chat:** Confirm whether a pause after a failed launch or resume should
-  keep withholding **Open agent**, matching restart recovery (FS-14.R48), or whether the chat should
-  remain reachable with a wider continuation contract.
-- **Refused card drag feedback:** Confirm whether the cross-block refusal should remain an in-flight
-  pointer signal (FS-02.R53) or whether snap-back alone is the intended behavior. The shipped pointer
-  implementation currently has an open wiring finding below.
-
-## Acceptance gates
-
-- [ ] Run pinned, credentialed Claude and Codex chat/MCP/resume checks before claiming those combinations.
-- [ ] Run pinned Claude terminal flags/hooks and live xterm journeys before claiming full terminal support.
-- [ ] Run pinned OpenCode/OpenHands launch/credential checks before claiming those backends beyond fakes.
-- [ ] Run J2/J9/J16 in a real macOS browser to confirm the native folder panel opens in front,
-  selects, and cancels (FS-04.A22). Narrowed on 2026-08-27: a real browser confirmed the **Browse…**
-  controls are present and enabled for `cwd` and the pending `add_dirs` entry in both the Settings
-  project form and the New project modal, and that the onboarding wizard renders styled. Only the
-  native `osascript` panel itself is still unverified, and it needs a human at the machine.
-- [x] **Closed 2026-08-27.** A real Chromium confirmed a right-click anywhere on the projects
-  canvas opens **New project** (FS-02.A24): eight background points including the padding frame on
-  every edge and corner, while a card right-click still opens the card menu, and the menu opens a
-  styled create modal. Evidence in the J16 section of
-  [`../archive/reviews/usability-review-run-2026-08-27-release-delta.md`](../archive/reviews/usability-review-run-2026-08-27-release-delta.md).
-- [ ] Drag a running card over the stopped block in a real browser and confirm the computed cursor
-      on the card under the pointer states the refusal, clears when the pointer returns to its own
-      block, and clears when the drag ends (FS-02.A35, J5). jsdom evaluates no CSS, so the unit
-      cases cover only the marked state and the stylesheet rule.
-- [ ] Run a task start, an assignment turn, and a reported result against the pinned Claude and Codex
-      adapters before claiming dependent work works with real providers (FS-16 §6).
-- [ ] Run one successful and one refused MCP tool call through pinned Claude and Codex adapters before
-      claiming they accept structured tool results without losing the text block (FS-17.A6).
-- [ ] Run the Phase 7 federation discovery/precedence/refresh/launch/resume matrix against real Claude and
-  Codex installations before promoting FS-08/TS-07 from Partial.
-- [ ] Run the six-tab same-origin dashboard check against a `make dist` build (FS-02.A27). The
-  transport half is now covered by `ui/src/api/sse.test.ts` and A27 has been narrowed to say so;
-  the browser half has never been run against a build carrying the shared stream.
-  `scripts/stress-fixture` (TS-06 §6) is the fixture.
-- [x] **Closed 2026-08-30.** A real Chromium run covered J5's running-first placement, live
-  running/stopped boundary crossings in both directions, in-drag geometry within one block, refused
-  cross-block drop, and the expanded pane's two-column drag footprint (FS-02.A28, FS-02.R47).
-  Evidence is in the J5 section of
-  [`../archive/reviews/usability-review-run-2026-08-30-new-pages.md`](../archive/reviews/usability-review-run-2026-08-30-new-pages.md).
-
-## Blocked on human
-
-Live-provider acceptance is waiting for human authorization because it invokes real provider sessions
-and creates disposable local configuration homes. On 2026-07-15 this machine has Claude Code 2.1.202,
-the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installed; the new
-`claude-agent-acp`, OpenCode, and OpenHands are not installed globally.
-
-## Review findings
+- **2026-08-28 — fix:** No open review findings. `## Review findings
 
 - **Worth fixing** (FS-16.R3/R4, TS-10.R15/R19; INV §15) — `internal/server/task_http_test.go:244`
   asserts the cancel response already carries `pending_release=false` and an empty runtime claim,
@@ -1017,7 +813,7 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
   on `[text]`, so the map is rebuilt on every streamed delta and React remounts the `MermaidDiagram`
   under it. The scroll case the fix targeted is closed; the live-stream case is not. Normal-use
   trigger: an assistant writes a closed ```mermaid fence and then keeps streaming explanatory prose,
-  which is the ordinary shape of a diagram reply. Reproduced here against the shipped component —
+  which is the ordinary shape of a diagram reply. Reproduced against the shipped component —
   after the diagram settles, one appended delta drops the `<svg>` back to the source code block and
   re-invokes `mermaid.render` with a fresh id (`ad-diagram-1` then `ad-diagram-2`). That is exactly
   the reported "spazzing between display and source", and it contradicts R37's "the reader therefore
@@ -1027,26 +823,96 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
   ratifies the gap rather than closing it. Fix: hold `text` in a ref updated each render, read
   `textRef.current` inside the `code` component, and memoize with `[]`; then widen R40. Test: in
   `AssistantText.test.tsx`, rerender with `CLOSED + "\ntrailing prose"` after the diagram settles
-  and assert the SVG is still mounted and `mermaid.render` was called once.
+  and assert the SVG is still mounted and `mermaid.render` was called once. Confirmed still open at
+  `e46e66b`.
 
-- **Must fix** (INV §10) — the delivered working tree fails `make check-specs`:
-  `docs/features/HANDOFF.md` still links `../ready-changes/stabilize-and-declutter-agent-cards.md`,
-  which the same tree deletes, and `docs/ready-changes/README.md` still lists that file under
-  **Changes waiting to start**. Normal-use trigger: the next agent reads the waiting list and picks
-  up finished work behind a dead link, and the required check the work session reported as passing
-  is red. This is the identical class `51b638e` closed one commit earlier for the previous change,
-  which is why it is Must fix rather than a tidy-up. Fix: drop the ready-change bullet from the
-  index and delink the file name in the handoff changelog entry, then re-run `make check-specs`.
+- **Must fix** (TS-06 §2, workflow §2/§5; INV §10) — `e46e66b` changed `ui/src`
+  (`AgentCard.tsx`, `CardGrid.tsx`, `ContextBar.tsx`, `VisualMatrix.tsx`, `dashboard.css`) but did
+  not commit the regenerated `internal/server/ui/dist/index.html`; the rebuilt file naming
+  `index-MJrIrA5t.js` / `index-Ccp6fmj4.css` is sitting uncommitted in the working tree while `main`
+  still carries the pre-change `index-DoXOpwRi.js` / `index-DYVxYPFB.css`. That file is the one
+  tracked artifact of the generated embed directory (`.gitignore:10-11`), and every earlier
+  UI-changing commit back through `180ea89`, `57b7154`, `82d1717` and `34348c8` updated it in the
+  same commit. Normal-use trigger: `git pull` onto a working copy that already has a populated
+  `internal/server/ui/dist/assets/`, then `make build` — which the Makefile documents as "assumes
+  the embed dir is populated" — embeds an `index.html` pointing at the previous bundle, so the
+  dashboard silently serves the pre-card-change UI with no error anywhere. Because the assets are
+  gitignored, nothing in the tree reveals the mismatch. Fix: run `make embed` (or `make dist`) and
+  commit the refreshed `internal/server/ui/dist/index.html` alongside the UI change; re-check that a
+  fresh `ui/dist/index.html` is byte-identical to the tracked copy before closing any UI change.
 
-- **Must fix** (INV §10; workflow §5) — the entire card-grid change is uncommitted. The
-  implementation (`AgentCard.tsx`, `CardGrid.tsx`, `ContextBar.tsx`, `VisualMatrix.tsx`,
-  `contract.json`, `dashboard.css`, their tests), the FS-02/FS-12/TS-08 updates, the spec-index
-  status flips back to Current, the brief, and the handoff changelog entry all sit in the working
-  tree with no commit, so `git checkout` or any branch operation destroys verified work and the
-  last-reviewed marker cannot advance past `180ea89`. Fix: close the two findings above, then commit
-  the change with its `Spec:` trailer naming FS-02.R55–R59, FS-12.R40, TS-08.R45–R48.
+- **Must fix** (FS-19.R7, TS-12.R4/R5, TS-01.R26; INV §2) — TS-12.R4 routes
+  `ensureWorktreeCheckout` — a helper that creates a directory, runs `git worktree add`, and
+  re-runs `setup_command` for up to ten minutes (TS-12.R5) — through pipeline `ValidateStage`
+  as one of its four call sites, "replacing the two currently duplicated cwd stat checks
+  (`internal/server/launch.go`, `internal/server/pipeline_lifecycle.go`)". `ValidateStage`
+  (`internal/server/pipeline_lifecycle.go:31`) is documented as checking "without registering or
+  starting a process", and `internal/pipeline/manager.go:215` calls it **once per stage** inside the
+  run-start validation loop, folding any error into a per-assignment `"unavailable"` diagnostic
+  rather than an operation error. Normal-use trigger: starting a run in a worktree project whose
+  checkout was cleaned up — a 32-stage template calls the mutating helper 32 times inside one
+  validation pass, the pre-flight blocks on a checkout recreation plus a setup command (the server
+  sets no `WriteTimeout`, `internal/server/server.go:337`), and a recreation failure surfaces as a
+  bogus "this stage's backend/model assignment is unavailable" diagnostic. FS-19.R7 itself scopes
+  recreation to "a launch", so FS-19 and TS-12 also disagree on the call sites. Fix before
+  implementation: keep `ValidateStage` read-only (an ownership-aware *check* that the checkout is
+  present or recreatable), place the mutating recreation on the stage's actual start path with the
+  other three call sites, and state in TS-12.R4/R5 what a start request does while a ten-minute
+  setup runs.
 
-- **Worth fixing** (FS-02.R47/R55; INV §10) — `docs/specs/features/FS-02-dashboard.md:319` still
+- **Worth fixing** (TS-12.R3; INV §15) — TS-12.R3 fixes fork ordering as "create branch and
+  worktree → insert the ownership row → write the new project file → run setup" and then claims "a
+  crash inside the window can only leave a checkout that is *not* recorded as owned ... so every
+  crash residue is inert and conservatively treated as external". That is false for the window its
+  own ordering opens: a crash after the ownership row is inserted and before the project file is
+  written leaves a checkout that **is** recorded as owned, belonging to a project that does not
+  exist. Normal-use trigger: the server is stopped or killed during a fork. Because TS-12.R7 gates
+  every deletion inside `beginProjectArchive` for an existing project, no path ever reaches that
+  row, so the branch, the directory under `$AGENTDECK_HOME/worktrees/`, and the row leak with no
+  reclaim path, and the safety argument the requirement rests on does not hold as written. Fix:
+  insert the ownership row **last** (worktree → project file → row), which makes the residue an
+  unowned checkout exactly as R3 claims and leaves a visible project the person can act on; or keep
+  the ordering and specify a startup reconciliation that drops `project_worktrees` rows with no
+  project. Test: inject a failure between the row insert and the project write and assert what
+  survives.
+
+- **Worth fixing** (FS-19.R7, TS-12.R4/R10; INV §5) — TS-12.R10 names branch-ref creation as the
+  atomic claim for concurrent **forks**, but nothing claims the concurrent **recreation** R4
+  performs. Normal-use trigger: a worktree project's checkout is gone and the person launches two
+  agents in it, or a pipeline starts two stages, within the same moment — both callers stat the
+  missing directory, both run `git worktree add` for the same branch and path, and the loser fails
+  with a raw Git error ("already exists" / "already checked out") on a path AgentDeck owns and
+  intended to recreate. This is the check-then-act shape INV §5 names, and the design says nothing
+  about serializing it. Fix: give `ensureWorktreeCheckout` a per-project claim (take-and-hold under
+  one critical section, re-stat after acquiring) and state it in TS-12.R4 the way R10 states the
+  fork claim.
+
+- **Worth fixing** (FS-19.R8/§3, TS-12.R7, FS-04.R35; INV §10) — FS-19 never says what a worktree
+  project does after its owned checkout is deleted by consent and the project is then reactivated,
+  and TS-12.R7's two paths answer it in opposite ways. FS-04.R35 makes reactivation ordinary —
+  "either state can be changed without re-creating the project", and an archived project keeps every
+  agent/session record for restore. Normal-use trigger: archive a finished worktree project,
+  accept the checkout deletion, then change your mind and reactivate it to resume an agent. On the
+  normal path R7 deletes the ownership row, so the project is no longer owned, `ensureWorktreeCheckout`
+  does nothing, and the resume fails on a missing `cwd` with the ordinary error — even though the
+  branch it needs still exists and FS-19's whole model is "the checkout is disposable, the branch is
+  durable". On R7's own stated crash path the row survives, so the same action silently recreates
+  the checkout instead. Fix: decide the behavior once and state it in FS-19 §3 — either keep the
+  ownership row through a consented deletion so reactivation recreates from the recorded branch, or
+  state plainly that consented deletion is one-way and offer the person a way back.
+
+- **Worth fixing** (FS-19.R3/A2, TS-12.R5; INV §8) — TS-12.R5 captures the setup command's combined
+  output with "a bounded tail (64 KiB)", stores it on the ownership row, and returns it on the fork
+  and start responses; FS-19.R3 then says the failure "surfaces as a visible warning carrying the
+  captured output". 64 KiB is a storage bound, not a display bound, and nothing states what the
+  warning renders. Normal-use trigger: a `setup_command` such as `npm install` fails after tens of
+  kilobytes of progress output, and the fork's warning surface receives the whole tail. INV §8
+  requires human-facing text to be parsed, human-meaningful and length-clamped at the write
+  boundary — this is the same shape as the raw-payload surface the FS-14 idea below exists to fix.
+  Fix: state a display clamp and the full-output route (an expandable region or a log link) in
+  FS-19.R3, keeping 64 KiB as the storage bound only.
+
+- **Worth fixing** (FS-02.R47/R55; INV §10) — `docs/specs/features/FS-02-dashboard.md:329` still
   requires that a collapsed card dragged past a pane "must see the pane's **two-column** footprint",
   and R55 supersedes only "R47's `min(2, perRow)` span" while asserting "every other clause of R47
   stands", which makes the stale clause normative. The shipped pane spans one track. TS-08.R43 was
@@ -1054,10 +920,11 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
   column"; FS-02.R47 was not. Normal-use trigger: a later reader trusts R47, concludes the grid is
   wrong, and reintroduces the two-track span R55 exists to remove. Fix: correct R47's footprint
   clause in place the way TS-08.R43 was corrected — the reason to keep the expanded id in its
-  `SortableContext` still holds, because the pane is taller than its neighbours.
+  `SortableContext` still holds, because the pane is taller than its neighbours. Confirmed still
+  open at `e46e66b`.
 
 - **Worth fixing** (TS-08.R14/R48, FS-02.R59; INV §2) — `ui/src/components/grid/ContextBar.tsx:6`
-  now emits `data-variant={compact ? "compact" : tone}`, so one attribute carries two orthogonal
+  emits `data-variant={compact ? "compact" : tone}`, so one attribute carries two orthogonal
   dimensions and the compact meter exposes no low/medium/high tone through the presentation
   contract. The tone survives only on the `context-bar high` className, which TS-08 §3.3 excludes
   from the skin surface. Normal-use trigger: a skin styles `[data-ui="context-meter"]
@@ -1067,40 +934,67 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
   "differs from the full meter in presentation only", yet it drops a contract hook. Fix: keep
   `data-variant` as the tone and express density separately (a second `data-*` dimension registered
   in `contract.json`), and extend `ContextBar.test.tsx` to assert a compact meter still reports its
-  tone through the contract attribute.
+  tone through the contract attribute. Confirmed still open at `e46e66b`.
 
 - **Worth fixing** (INV §10; `docs/specs/README.md` lifecycle) — an unrelated, unattributed FS-14
-  design also sits uncommitted in the same tree: R49–R51 and A27/A28 are added as `(planned)`,
-  FS-14 is flipped to **Partial**, and `docs/ideas.md` gains the proposal-collapse idea, but there
-  is no `docs/ready-changes/` file, no brief, and no handoff changelog entry for it. Normal-use
-  trigger: nothing in the approved-work list points at these requirements, so either they are lost
-  with the tree or an agent later finds planned requirements with no owner. Fix: either finish that
-  design session — ready-change file, brief, commit — or revert the FS-14 and `ideas.md` edits; do
-  not leave planned requirements alive only in an uncommitted tree.
+  design still sits uncommitted in the tree, unchanged since the last review: R49–R51 and A27/A28
+  are added as `(planned)`, FS-14 is flipped to **Partial**, and `docs/ideas.md` gains the
+  proposal-collapse idea, but there is no `docs/ready-changes/` file, no brief, and no handoff
+  changelog entry for it. It is also incomplete in its own terms: A27 names
+  `internal/state/pipeline_proposals_test.go` and `internal/server/pipeline_handlers_test.go`, so
+  R49 needs a durable declined state and new endpoints, yet TS-09, TS-02 and TS-03 carry no planned
+  requirement for either and FS-14 §7 gains no traceability entry. Normal-use trigger: nothing in
+  the approved-work list points at these requirements, so either they are lost with the tree or an
+  agent later finds planned product requirements with no owner and no architecture. Fix: either
+  finish that design session — technical-spec coverage, ready-change file, brief, commit — or revert
+  the FS-14 and `ideas.md` edits; do not leave planned requirements alive only in an uncommitted
+  tree.
 
-Invariant sweep of the range: §1 (expansion state and the Mermaid remount) produced the first
-finding above; `collapseAll` correctly republishes only the current grid's ids. §2 holds —
-`ContextBar` stays the single context derivation and the refused-drag rule replaces an opt-out list
-with a wildcard, which is the class's own preferred shape — except for the contract split recorded
-above. §3 holds: `collapseAll` merge-preserves the retained out-of-project ids rather than writing
-back its on-screen view. §8 holds: the collapse path flows through the one debounced `putLayout`
-whose failure already reaches `pushError` (`CardGrid.tsx:84`), leaving panes collapsed on screen as
-FS-02.A39 requires. §13 holds: `agent-card-header-actions` is defined, stylelint, the presentation
-contract audit, and the new stylesheet-reading `CardGrid` case all pass. §§4–7, §9, §11, §12, §14
-and §15 have no applicable surface — the range changes no Go product code, no route, no response
-shape, no `exec.Command`, and no persistence path; its only Go edits are test cases.
+Closed by this review: the previous cycle's two **Must fix** findings are gone. `make check-specs`
+now reports `spec check: ok` on the delivered tree, and `e46e66b` commits the whole card-grid change
+— implementation, tests, the FS-02/FS-12/TS-08 updates, the spec-index status flips, the brief, and
+the changelog entry — with `docs/ready-changes/README.md` and the handoff changelog delinked from
+the deleted ready change.
 
-Checks run on the delivered tree: `make check-specs` **fails** on the dead ready-change link above.
-`go build ./...`, `go test ./...`, `go test -tags sqlite_fts5 ./...`, `npm test` (346 cases, 51
-files), `npm run check:styles` including the presentation-contract audit, `npm run build`, and
-`git diff --check` all pass, and `ui/dist/index.html` rebuilt from this tree is byte-identical to
-the tracked `internal/server/ui/dist/index.html`.
+Invariant sweep of the `180ea89..e46e66b` range and the uncommitted FS-14 design: §1 holds —
+`collapseAll` republishes only the current grid's ids and merge-preserves the retained
+out-of-project ones, and TS-08.R49 resets its last-observed-state record on hydration and
+reconnection rather than trusting it across the boundary, which is this class handled correctly at
+design time. §2 produced two findings (TS-12.R4's misapplied seam and the carried `ContextBar`
+contract split); `ContextBar` otherwise stays the single context derivation and TS-12.R4 correctly
+collapses two duplicated cwd checks into one helper. §3 holds: `collapseAll` writes a filtered list,
+never its on-screen view. §4 has no shipped surface; TS-12 §4 declares an explicit opt-out for the
+checkout with the FS-11 project-resources precedent and confines teardown to the consented deletion
+flow, which is a stated deviation rather than a silent one. §5 produced the concurrent-recreation
+finding; the fork's branch-ref claim (TS-12.R10) is right. §6 has no new runtime or driver. §7 holds
+— TS-12.R6 isolates per-project Git failures so one unreadable repo degrades that project's fields
+and not the list. §8 produced the setup-output finding; the collapse path flows through the one
+debounced `putLayout` whose failure already reaches `pushError` (`CardGrid.tsx:84`), leaving panes
+collapsed on screen as FS-02.A39 requires. §9 holds — TS-12.R7 verifies the canonical path, rejects
+symlinks, and confirms the checkout is still registered to the recorded repository before any
+`git worktree remove --force`. §10 produced the embedded-`index.html`, FS-02.R47 and FS-14 findings.
+§11: TS-12 §3 adds a per-project `worktree: {owned, branch}` object to `GET /api/projects` that is
+absent for ordinary projects — the null shape and the UI's `?? {}` are the implementation's to get
+right, and the class binds them. §12 holds and is the design's strongest section: TS-12.R1 pins
+argv-only invocation, plumbing commands over porcelain scraping, bounded timeouts, and
+`GIT_TERMINAL_PROMPT=0`. §13 holds: `agent-card-header-actions` and
+`.context-bar[data-variant="compact"]` are both defined, and stylelint, the presentation-contract
+audit, and the stylesheet-reading `CardGrid` case all pass. §14 holds — the new routes inherit
+`localOnly` with the whole mux and TS-12.R8 keeps the owned root slug-validated, 0700, and
+symlink-rejecting; noted for implementation, not as a finding: FS-19.R7 makes `setup_command` a
+project config field that executes `/bin/sh -c` on a *launch*, so the existing project-CRUD
+authorization is what stands behind it. §15 produced the fork-ordering finding; TS-12.R7's
+remove-then-delete-row ordering is correct.
 
-The user resolved the `agentdeck-shared-skill` design review: verified installation now
-precedes exact AgentDecker migration and the thin prompt no longer claims an unavailable skill.
-Runtime-only overlay fields and fresh PM/teammate prompt cleanup remain included implementation
-alignment, not review findings. Browser-only evidence is recorded as acceptance gates above, not as
-findings.
+Checks run on the delivered tree: `make check-specs` (`spec check: ok`), `go build ./...`,
+`go test ./...`, `go test -tags sqlite_fts5 ./...`, `npm test` (346 cases, 51 files),
+`npm run check:styles` including the presentation-contract audit, `npm run build`, and
+`git diff --check` all pass. `ui/dist/index.html` rebuilt from this tree is **not** byte-identical
+to the tracked `internal/server/ui/dist/index.html`; that is the third finding above.
+
+Browser-only evidence stays recorded as acceptance gates above, not as findings. The card change's
+own real-browser pass at 1024px and 1440px in Core and Sky & Grove is recorded in its changelog
+entry and is taken as the evidence for FS-02.A37/A38/A40/A41's browser halves.
 
 ## Design consistency notes
 
