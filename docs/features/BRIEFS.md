@@ -5,6 +5,18 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-09-02 — State cleanup: review queue
+
+The handoff now distinguishes the fixed worktree implementation findings from the independent review
+still owed for that fix, and no longer calls the proposal-decline design uncommitted. The current
+findings and queued pipeline work were left unchanged because commit history confirms they remain
+open.
+
+**Needs attention:** An independent reviewer should review the worktree fix; the pipeline and
+proposal items remain queued separately.
+
+**Next:** Review the worktree fix, then choose one waiting change to implement.
+
 ### 2026-09-02 — Feature design: a pipeline that runs without you
 
 The change is designed and queued to build. No code changed yet.

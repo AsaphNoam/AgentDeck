@@ -36,13 +36,14 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   earlier 2026-08-27 all-200/no-page-load incident stays fixed, and the shared SSE stream is now
   replayed to a joining tab instead of restarted for every tab.
 - **Review state:** The continuous `57b7154..bd797bd` range is reviewed against its requirements and
-  every invariant class. The worktree-project implementation (`1b2a8c3..bd797bd`) has now had a
-  dedicated implementation review plus an independent Terra/high pass, and all ten findings from
-  that worktree review are fixed. The 2026-09-02 bug investigation adds six open findings,
+  every invariant class. The worktree-project implementation (`1b2a8c3..bd797bd`) had a dedicated
+  implementation review plus an independent Terra/high pass, and all ten findings from that review
+  were fixed in `3e1726b`; the post-fix code is still awaiting independent review, so the last
+  reviewed-code marker remains `bd797bd`. The 2026-09-02 bug investigation adds six open findings,
   three of them **Must fix**, against the pipeline reporting contract, stall detection, and the task
-  recipient vocabulary. The uncommitted FS-14 proposal-decline design also had
-  a dedicated worktree-only review plus an independent Terra/high pass. The earlier design review
-  did improve this implementation: ownership is recorded last, pipeline validation stays read-only,
+  recipient vocabulary. The FS-14 proposal-decline design, now committed in `e83c937`, also had a
+  dedicated worktree-only review plus an independent Terra/high pass. The earlier design review did
+  improve this implementation: ownership is recorded last, pipeline validation stays read-only,
   base fallback uses the main worktree, recreation is serialized, and human-facing setup output is
   clamped. `1b2a8c3` deleted four
   whole sections of this file — decisions, acceptance gates, blocked-on-human, and review findings —
