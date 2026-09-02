@@ -348,7 +348,7 @@ primitive seam; the rejected alternatives are recorded in §5.
 
 ### 2.5 Grid stability, collapse controls, and card name legibility
 
-- **R45 (planned)** — **The pane occupies one track, and the grid template is
+- **R45** — **The pane occupies one track, and the grid template is
   what guarantees it.** FS-02.R55 is implemented by spanning a single column of the existing
   `repeat(perRow, minmax(0, 1fr))` template instead of `min(2, perRow)`, which makes an expanded
   card's grid area identical to a collapsed card's. Auto-placement then assigns every other card the
@@ -363,7 +363,7 @@ primitive seam; the rejected alternatives are recorded in §5.
   deliberately over reintroducing it. No JavaScript measures, tracks, or compensates for layout
   here — the guarantee is the template, not a computed position (INV §1).
 
-- **R46 (planned)** — **Both collapse affordances are feature-owned composition
+- **R46** — **Both collapse affordances are feature-owned composition
   over the existing expansion state.** The per-card control required by FS-02.R56 is a
   `components/ui` `Button` rendered inside the expanded card's header region, so it inherits the
   core and Sky & Grove button construction, focus ring, and hover feedback rather than defining its
@@ -379,7 +379,7 @@ primitive seam; the rejected alternatives are recorded in §5.
   `agent-card` slot for the per-card control, added to `contract.json` in the same change; the
   toolbar control needs no new hook because `page-header` already exposes its actions region.
 
-- **R47 (planned)** — **The card name's wrap is a CSS-only change on the two
+- **R47** — **The card name's wrap is a CSS-only change on the two
   existing name selectors.** FS-02.R58 is implemented in
   `ui/src/styles/features/dashboard.css` on `.agent-card-top strong` and `.agent-card-name-link` by
   replacing `white-space: nowrap` and `text-overflow: ellipsis` with a three-line clamp plus
@@ -393,7 +393,7 @@ primitive seam; the rejected alternatives are recorded in §5.
   and cannot overlap them. Both skins inherit the change through the same selectors, and the
   deterministic visual matrix gains the long-name card FS-12.A16 checks.
 
-- **R48 (planned)** — **The expanded card's context figure reuses the shipped
+- **R48** — **The expanded card's context figure reuses the shipped
   meter's derivation.** FS-02.R59 moves, and does not duplicate, the context reading: `ContextBar`
   keeps sole ownership of clamping `context_pct`, rounding it, choosing the low/medium/high ramp,
   and producing the visible `n% context used` label, and gains a compact form selected by a
@@ -401,6 +401,39 @@ primitive seam; the rejected alternatives are recorded in §5.
   existing `context` slot only while expanded, in the header region, and renders no context element
   while collapsed. A second rounding or threshold expression anywhere else is the drift INV §2
   describes, so the compact form differs from the full meter in presentation only.
+
+### 2.6 Automatic pane opening on a waiting transition
+
+- **R49 (planned)** — **The transition is observed from `state_update` in the
+  grid, not from the notification stream.** FS-02.R61 keys on the durable `state` field every
+  `state_update` carries, which is self-correcting on a dropped frame (FS-02.R9), rather than on the
+  `notification` event `internal/bus/bus.go` emits for the same transition. The notification is the
+  wrong source twice over: `NotificationsEditor`'s per-type mute list filters it, so muting a toast
+  would silently disable an unrelated layout behavior, and the server emits it once and never
+  replays it, so a reconnecting tab would see nothing. No server, SSE, or endpoint change is part of
+  this requirement.
+
+  `CardGrid` owns the detection because it already owns the `expanded` list, the four-pane cap, and
+  the set of ids the grid actually renders. It keeps one ref of the last observed `state` per agent
+  id, written by the same effect that reads it, so the previous value exists in exactly one place
+  (INV §2); nothing else in the client stores a shadow copy of agent state, and `agentStore` keeps
+  its single-writer role.
+
+  The record is a derived cache across a connection boundary, so it is reset there (INV §1). While
+  `useAgentStore`'s `hydrating` flag is set and until `hydrated` is true, the effect only reseeds
+  the record and expands nothing, and ids that `hydrateComplete` prunes are dropped from it. A
+  reload, a reconnect, and a re-hydration therefore reseed rather than fire, which is what makes
+  FS-02.R61's "newly observed" rule true instead of aspirational. Because the record lives in
+  `CardGrid`, it is created and discarded with the mounted grid, which is the mechanism behind
+  FS-02.R61's stated limit that a pane opens only while a grid is on screen.
+
+  An eligible transition expands through the same code path a person's click uses — the existing
+  expansion branch that appends the id and applies R48's cap and recency — rather than a second
+  expansion routine, so the cap, the least-recently-used eviction, and the persisted list cannot
+  drift apart from the manual path (INV §2, §10). Eligibility reuses the grid's already-computed
+  grouped/rendered set and the agent's `interface` field; it derives no second copy of which cards
+  are on screen. Several eligible transitions arriving together are applied in observation order
+  inside one state update, so React commits one layout change rather than one per agent.
 
 ## 3. Interfaces & data shapes
 
@@ -598,6 +631,12 @@ boundary; the manifest remains the visual contract and arbitrary ids never becom
   sharing an expanded pane's grid row sit at the top of a tall row. `dense` packing and a fixed
   `grid-auto-rows` with a multi-row span would both fill that space, and both were rejected because
   they reassign the cells of the cards after the pane. A masonry-style layout is not available.
+
+- **Automatic expansion is deliberately not driven by notifications.** R49 rejects reusing the
+  `notification` stream that already computes the same transition on the server, because that stream
+  is mute-filtered and is never replayed to a reconnecting tab. The cost is one client-side
+  comparison against a per-grid record of last observed states; the benefit is that a person
+  silencing a toast does not silently change what the dashboard opens.
 
 ## 6. Traceability
 

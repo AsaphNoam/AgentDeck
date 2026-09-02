@@ -1,6 +1,6 @@
 # FS-12 — Core interface design
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src` · **Journeys:** J2–J9, J11, J14
 **Absorbed:** —
 
@@ -83,7 +83,7 @@ Requirements are user-observable.
   behavior. The empty Dashboard receives a complete composition with the existing New Agent action,
   not a near-empty page containing a default full-width button.
 
-- **R40 (planned)** — R9's visual priority for agent cards is narrowed by
+- **R40** — R9's visual priority for agent cards is narrowed by
   FS-02.R58 and R59. The agent name keeps its first position but is set at a smaller size and wraps
   onto as many as three lines, so a long name reads in full instead of ending in an ellipsis; it
   therefore no longer competes with the state badge for the header's single line. Context usage
@@ -325,7 +325,7 @@ Requirements are user-observable.
   wraps, clips, overlaps, or displaces the primary navigation, mark, or connection state. *Verify:*
   shell/component tests, the paired visual matrix, and a real-browser J5 pass.
 
-- **A16 (planned)** (R40) — Core and Sky & Grove fixtures render an agent card with a
+- **A16** (R40) — Core and Sky & Grove fixtures render an agent card with a
   short name and with a name long enough to need three lines: the long name wraps and is not
   truncated to one line, does not overlap the state badge or drag grip, and does not escape the
   card; neither card shows a context meter while collapsed, and an expanded card shows the compact
@@ -371,6 +371,6 @@ Requirements are user-observable.
   `ui/stylelint.config.mjs`, `ui/scripts/stylelint-config.test.mjs`.
 - Salience-versus-order separation: `ui/src/components/grid/CardGrid.test.tsx` (a raised-salience
   card holds its position; only `running` moves one — A13).
-- R40 and A16 (planned) narrow R9's card priority: the name wraps at a smaller size and context
+- R40 and A16 narrow R9's card priority: the name wraps at a smaller size and context
   usage moves onto the expanded card (FS-02.R58/R59).
 - Cross-cutting UI bug classes: INV §8, §10, §11, and §13.

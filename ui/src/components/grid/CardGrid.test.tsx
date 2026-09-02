@@ -108,12 +108,12 @@ function renderWithQuery(ui: React.ReactElement) {
 
 describe("CardGrid", () => {
 
-  // FS-02.A29 — the render and interaction half only: click-to-expand, header
-  // click to collapse, the rendered column span, and a terminal card still
+  // FS-02.A29/A37 — the render and interaction half only: click-to-expand, header
+  // click to collapse, the one-track footprint, and a terminal card still
   // navigating. A29's geometry clauses (fixed pane height, internal transcript
   // scrolling, neighbours keeping their own height) are J5's, because jsdom
   // evaluates no grid track sizing, stretch, overflow, or scroll position (INV §13).
-  it("toggles chat cards in place, spans the configured tracks, and leaves terminal navigation intact", async () => {
+  it("toggles chat cards in one track and leaves terminal navigation intact", async () => {
     seedGrid(["a_chat", "a_terminal"], {
       a_chat: agent("a_chat"),
       a_terminal: agent("a_terminal", { interface: "terminal" }),
@@ -124,11 +124,11 @@ describe("CardGrid", () => {
     fireEvent.click(chat);
     const expandedCard = screen.getByLabelText("Composer a_chat").closest('[data-ui="agent-card"]');
     expect(expandedCard).toHaveAttribute("data-variant", "expanded");
-    expect(expandedCard).toHaveStyle({ gridColumn: "span 2" });
+    expect(expandedCard?.getAttribute("style") ?? "").not.toContain("grid-column");
     expect(screen.getByLabelText("Composer a_chat")).toBeInTheDocument();
     // FS-02.R47 withholds the drag grip, which is what makes an expanded card
     // undraggable. It stays in its block's sortable items: it still mounts a
-    // sortable node and still occupies min(2, perRow) grid columns, so dropping it
+    // sortable node and still occupies a taller grid cell, so dropping it
     // from the list made every neighbour's preview transform compute over a layout
     // that is not on screen (INV §1).
     expect(expandedCard!.querySelector(".drag-handle")).toBeNull();
@@ -139,6 +139,37 @@ describe("CardGrid", () => {
 
     fireEvent.click(screen.getByText("a_terminal"));
     expect(screen.queryByLabelText("Composer a_terminal")).not.toBeInTheDocument();
+  });
+
+  // FS-02.A39 — the whole-grid action appears only when useful, closes panes
+  // across group sections, and preserves retained ids outside this project.
+  it("collapses every pane on this grid while retaining out-of-project ids", async () => {
+    server.use(http.get("/api/layout", () => HttpResponse.json({
+      order: ["a_alpha", "a_beta", "a_elsewhere"], density: { perRow: 3, gap: 16 }, groups: {},
+      expanded: ["a_alpha", "a_beta", "a_elsewhere"],
+    })));
+    const saved: string[][] = [];
+    server.use(http.put("/api/layout", async ({ request }) => {
+      const body = await request.json() as { expanded: string[] };
+      saved.push(body.expanded);
+      return HttpResponse.json(body);
+    }));
+    act(() => useAgentStore.setState({
+      agents: {
+        a_alpha: agent("a_alpha", { group: "alpha" }),
+        a_beta: agent("a_beta", { group: "beta" }),
+        a_elsewhere: agent("a_elsewhere", { project: "other" }),
+      },
+      order: ["a_alpha", "a_beta", "a_elsewhere"], hydrated: true, hydrating: false,
+    }));
+    renderWithQuery(<CardGrid projectID="my-app" />);
+
+    expect(await screen.findAllByLabelText(/Composer a_/)).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "Collapse all" }));
+
+    expect(screen.queryByLabelText(/Composer a_/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Collapse all" })).not.toBeInTheDocument();
+    await waitFor(() => expect(saved.at(-1)).toEqual(["a_elsewhere"]));
   });
 
   // FS-02.A31 — the fifth expansion collapses exactly the least-recently-used

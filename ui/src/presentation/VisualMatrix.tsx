@@ -118,7 +118,7 @@ export function VisualMatrix() {
             >
               <div className="agent-card-top" data-slot="header">
                 <button className="drag-handle" aria-label={`Reorder ${state}`} type="button">::</button>
-                <strong data-slot="identity">{state === "waiting_input" ? "Needs a decision" : `${state} agent`}</strong>
+                <strong data-slot="identity">{state === "waiting_input" ? "Needs a decision from the orchestration and delivery reviewer" : state === "error" ? "unbroken-agent-name-that-must-not-escape-the-card-boundary" : `${state} agent`}</strong>
                 <StateBadge state={state} />
               </div>
               <p className="agent-subtitle" data-slot="metadata">builder · AgentDeck demo</p>
@@ -127,7 +127,6 @@ export function VisualMatrix() {
                 {index === 2 && <span className="mail-badge">Mail 3</span>}
                 {index === 3 && <span className="sent-pulse">Sent</span>}
               </div>
-              <div data-slot="context"><ContextBar value={index / 5} /></div>
               <p className="agent-preview" data-slot="preview">Long operational detail remains bounded inside the card surface.</p>
             </article>
           ))}
@@ -140,6 +139,17 @@ export function VisualMatrix() {
             <p className="agent-subtitle" data-slot="metadata">reviewer · AgentDeck demo</p>
             <span className="terminal-pill">terminal · xterm</span>
             <small className="stopped-label">stopped</small>
+          </article>
+          <article className="agent-card" data-ui="agent-card" data-state="busy" data-variant="expanded" style={{ "--ad-project-accent": `rgb(${PROJECT_COLOR_PRESETS[1].color.join(",")})` } as React.CSSProperties}>
+            <div className="agent-card-top" data-slot="header">
+              <a className="agent-card-name-link" data-slot="identity" href="/agent/expanded-fixture">Expanded long-name agent fixture</a>
+              <div className="agent-card-header-actions">
+                <div data-slot="context"><ContextBar value={0.74} compact /></div>
+                <StateBadge state="busy" />
+                <Button data-slot="collapse-control" size="small">Collapse</Button>
+              </div>
+            </div>
+            <div className="dashboard-chat-pane" data-slot="chat-pane">Expanded pane fixture</div>
           </article>
         </div>
         <EmptyState onNewAgent={() => undefined} />

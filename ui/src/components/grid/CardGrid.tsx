@@ -118,7 +118,7 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
   // them. Each block therefore gets its own context, in the order its cards render.
   // Expanded ids stay in their block's list: they are already `disabled` through
   // useSortable, but an expanded pane still mounts a sortable node and still spans
-  // min(2, perRow) columns, so omitting it made every neighbour's preview transform
+  // one column, so omitting it would make every neighbour's preview transform
   // compute over a layout that is not on screen (FS-02.R47, INV §1).
   const blockIDs = (agents: AgentState[], running: boolean) =>
     agents.filter((agent) => agent.running === running).map((agent) => agent.agent_id);
@@ -127,6 +127,12 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
     setExpanded((current) => current.includes(agentId)
       ? current.filter((id) => id !== agentId)
       : [...current, agentId].slice(-4));
+  };
+
+  const hasExpandedOnGrid = expanded.some((id) => ids.includes(id));
+  const collapseAll = () => {
+    const gridIDs = new Set(ids);
+    setExpanded((current) => current.filter((id) => !gridIDs.has(id)));
   };
 
   const markExpandedUsed = (agentId: string) => {
@@ -195,7 +201,7 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
         className="grid-toolbar"
         eyebrow="Live operations"
         title={projectTitle ?? "Agents"}
-        actions={<><TaskAttentionLink projectID={projectID} /><Button variant="primary" type="button" onClick={() => setShowNewAgent(true)}>New agent</Button><DensityControl /></>}
+        actions={<><TaskAttentionLink projectID={projectID} />{hasExpandedOnGrid && <Button type="button" onClick={collapseAll}>Collapse all</Button>}<Button variant="primary" type="button" onClick={() => setShowNewAgent(true)}>New agent</Button><DensityControl /></>}
         data-slot="header"
       />
       <DndContext onDragEnd={onDragEnd} onDragOver={onDragOver} onDragCancel={() => setRefusedDrop(false)}>
@@ -235,7 +241,6 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
                               projectTitle={projects.data?.[agent.project]?.title}
                               showProject={!projectID}
                               expanded={expanded.includes(agent.agent_id)}
-                              expandedColumns={Math.min(2, density.perRow)}
                               onToggle={() => toggleExpanded(agent.agent_id)}
                               onUse={() => markExpandedUsed(agent.agent_id)}
                             />

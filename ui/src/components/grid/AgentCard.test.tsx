@@ -92,10 +92,10 @@ describe("AgentCard", () => {
     expect(screen.getByText("Pipeline run")).toBeInTheDocument();
   });
 
-  // FS-02.A34 — the boundary is the region, not a list of exempted controls: a
+  // FS-02.A34/A38/A41 — the boundary is the region, not a list of exempted controls: a
   // click and a right-click inside the pane's content reach neither the toggle nor
   // the card menu, the drag grip is withheld, and the header still collapses.
-  it("narrows expanded activation and context menu handling to the header", () => {
+  it("narrows expanded activation to the header and exposes one labelled collapse control", () => {
     const toggle = vi.fn();
     render(
       <MemoryRouter>
@@ -104,7 +104,7 @@ describe("AgentCard", () => {
             <AgentCard expanded onToggle={toggle} agent={{
               agent_id: "a_1", name: "Atlas", role: "implementer", project: "my-app",
               backend: "claude", model: "sonnet", interface: "chat", state: "idle",
-              detail: "ready", running: true, context_pct: 0,
+              detail: "ready", running: true, context_pct: 0.72,
             }}><button type="button">Send</button></AgentCard>
           </SortableContext>
         </DndContext>
@@ -112,11 +112,31 @@ describe("AgentCard", () => {
     );
 
     expect(screen.queryByLabelText("Reorder Atlas")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("72% context used")).toHaveAttribute("data-variant", "compact");
     fireEvent.click(screen.getByText("Send"));
     expect(toggle).not.toHaveBeenCalled();
     fireEvent.contextMenu(screen.getByText("Send"));
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText("idle").closest('[data-slot="header"]')!);
+    const collapse = screen.getByRole("button", { name: "Collapse" });
+    fireEvent.click(collapse);
     expect(toggle).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByText("idle").closest('[data-slot="header"]')!);
+    expect(toggle).toHaveBeenCalledTimes(2);
+  });
+
+  // FS-02.A41 — collapsed cards carry no context figure; the same shared
+  // ContextBar appears in compact form only after expansion.
+  it("omits context usage while collapsed", () => {
+    render(
+      <MemoryRouter><DndContext><SortableContext items={["a_1"]} strategy={rectSortingStrategy}>
+        <AgentCard agent={{
+          agent_id: "a_1", name: "Atlas", role: "implementer", project: "my-app",
+          backend: "claude", model: "sonnet", interface: "chat", state: "idle",
+          detail: "ready", running: true, context_pct: 0,
+        }} />
+      </SortableContext></DndContext></MemoryRouter>,
+    );
+
+    expect(screen.queryByLabelText("0% context used")).not.toBeInTheDocument();
   });
 });

@@ -15,4 +15,10 @@ describe("ContextBar", () => {
     render(<ContextBar value={0.9} />);
     expect(screen.getByLabelText("90% context used")).toHaveClass("high");
   });
+
+  it("keeps the shared value derivation in compact form", () => {
+    render(<ContextBar value={2} compact />);
+    expect(screen.getByLabelText("100% context used")).toHaveClass("high");
+    expect(screen.getByLabelText("100% context used")).toHaveAttribute("data-variant", "compact");
+  });
 });

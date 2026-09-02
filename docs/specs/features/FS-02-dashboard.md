@@ -265,6 +265,7 @@ render a project picker, and its submission always sends that project id. The un
 modal and prefilled launches outside a scoped dashboard retain their existing project selection
 behavior.
 
+
 **R60 (planned).** A project card whose project is active and repo-backed (its expanded `cwd`
 resolves inside a Git working tree) offers **New worktree project** in its context menu (R34/R38),
 and the scoped project dashboard offers the same action from its header. Both open FS-19.R1's
@@ -362,8 +363,11 @@ project that is not repo-backed, or is archived, shows no such action.
 - **R51** — A pane is opened only by a person. No notification, state
   change, permission request, or `waiting_input` transition expands a card by itself, so the grid
   never reflows while it is being read; R3's badge and salience treatment remain the attention
-  signal. A pane whose agent is removed (R21) closes with its card. A pane whose agent stops stays
-  open and keeps showing the durable transcript, matching R6's rule that stopping is not removal.
+  signal. That clause alone is superseded by R61 (planned), which opens a pane on one named
+  transition; every other kind of event still opens nothing, and R3's badge remains the signal for
+  all of them. A pane whose agent is removed (R21) closes with its card. A pane whose agent stops
+  stays open and keeps showing the durable transcript, matching R6's rule that stopping is not
+  removal.
 
 
 - **R52** — Expanding a card moves its activation target. While a card is
@@ -391,9 +395,42 @@ project that is not repo-backed, or is archived, shows no such action.
   the resulting visible set and the remaining overflow set retain alphabetical order. FS-12.R39
   presents every remaining project under `+n`.
 
+- **R61 (planned)** — A chat agent that newly enters `waiting_input` opens
+  its own pane on the grid the person is looking at, so a conversation that has stopped for an
+  approval is in front of them instead of behind a badge. This reverses R51's blanket rule for this
+  one transition and nothing else: a notification, a `done` or `error` transition, a mail arrival,
+  a pipeline event, and every other state change still open no pane. `waiting_input` is the state a
+  permission request sets, and it is also what a hook-driven prompt sets, so both open the pane;
+  R3's badge, the highlighted card treatment, and the `permission_required` notification are
+  unchanged and remain the signal wherever no pane opens. The notification mute list does not gate
+  this: muting a toast silences the toast, it does not decide what the dashboard shows.
+
+  Only a **newly observed** transition opens a pane. An agent already waiting when the grid loads,
+  reloads, reconnects, or re-hydrates opens nothing, and an agent seen for the first time already in
+  `waiting_input` opens nothing, because otherwise every reload and every dropped connection would
+  reopen panes the person had deliberately collapsed. The consequence is deliberate and stated
+  plainly: a pane opens only while a card grid is on screen to observe the transition. Arriving at
+  or returning to a dashboard where an agent is already waiting shows R3's badge and highlighted
+  card, not an opened pane. Collapsing an auto-opened pane while its agent
+  is still waiting keeps it collapsed; the next new transition into `waiting_input` opens it again.
+  The pane stays open after the request is answered — nothing closes a pane automatically — so
+  **Collapse all** (R57) is how a person clears an accumulation.
+
+  The opened card must be one the grid is rendering: a terminal-interface agent never expands
+  (R46), an agent outside this grid's project never expands, and an agent inside a collapsed group
+  section (R18) does not expand and does not expand its section, because a pane nobody can see would
+  spend one of R48's four slots and evict a visible one. Otherwise the expansion is an ordinary one
+  in every respect: it counts as a use for R48's recency order, and when four panes are already open
+  it evicts the least-recently-used pane exactly as a fifth manual expansion does, without a prompt
+  and without losing that pane's unsent composer text. Several agents entering `waiting_input`
+  together each open in the order observed, so more than four at once leaves the last four open. The
+  result joins the same persisted expanded list as any other expansion (R49). The reflow R51 was
+  written to prevent is accepted here and is bounded by R55: an opening pane moves only the rows
+  below it, never a card's column or row index.
+
 ### Pane stability, collapse, and card legibility
 
-- **R55 (planned)** — An expanded pane occupies exactly one column track of the
+- **R55** — An expanded pane occupies exactly one column track of the
   card grid, superseding R47's `min(2, perRow)` span; every other clause of R47 stands. Expanding or
   collapsing a card therefore changes no card's column or row index and moves no card sideways: the
   card grows taller in the cell it already occupies, its collapsed neighbours in the same grid row
@@ -404,7 +441,7 @@ project that is not repo-backed, or is archived, shows no such action.
   scrolling transcript, and the rule that streamed output never moves the grid or the page are
   unchanged.
 
-- **R56 (planned)** — An expanded card carries a visible, labelled collapse
+- **R56** — An expanded card carries a visible, labelled collapse
   control in its header region. It states that it collapses the pane, is reachable and operable from
   the keyboard, and gives hover and focus feedback, so collapsing no longer depends on finding
   unoccupied pixels between the name link and the state badge. R52's rule that the whole header
@@ -413,7 +450,7 @@ project that is not repo-backed, or is archived, shows no such action.
   collapsing through the header region have exactly the same effect, including the retention of
   unsent composer text (R48).
 
-- **R57 (planned)** — The card grid's toolbar offers **Collapse all**, which
+- **R57** — The card grid's toolbar offers **Collapse all**, which
   collapses every pane expanded on that grid in one action. It is present only while at least one
   pane on the grid is expanded, so the toolbar never shows a control that would do nothing. It
   spans every group section of the grid rather than one section, matching R48's whole-grid cap and
@@ -426,7 +463,7 @@ project that is not repo-backed, or is archived, shows no such action.
   layout save as any other collapse, and a save that fails reports the failure exactly as R49's save
   path already does, leaving the panes collapsed on screen.
 
-- **R58 (planned)** — An agent's name on a card is legible rather than clipped
+- **R58** — An agent's name on a card is legible rather than clipped
   to one line. On both a collapsed and an expanded card the name renders at a smaller type size than
   the shipped card title and wraps onto as many as three lines instead of ending in an ellipsis, so
   the long generated names agents actually carry are readable without opening anything. A name too
@@ -437,7 +474,7 @@ project that is not repo-backed, or is archived, shows no such action.
   card's geometry changes because one name is long. R2's list of what a card displays is otherwise
   unchanged.
 
-- **R59 (planned)** — The context-usage meter leaves the collapsed card and
+- **R59** — The context-usage meter leaves the collapsed card and
   appears on the expanded card instead, narrowing R2's card-content list and R26 to that placement.
   A collapsed card shows no context usage. An expanded card states the same live value as a compact
   figure in its header region, keeping R26's rounded percentage, its live mid-turn tracking, and its
@@ -657,7 +694,7 @@ picker and launches with the route project's id; the general modal continues to 
   fifth project into `+1`, and leaves each set alphabetized. — shell/component and hydration
   regressions; J5.
 
-- **A37 (planned)** (R55) — In a three-column grid, expanding the first card of a
+- **A37** (R55) — In a three-column grid, expanding the first card of a
   six-card section leaves every other card in the column and row index it held before the
   expansion, and collapsing it restores the same layout; no card wraps to a different row and no
   empty track appears. The same holds for expanding a middle card and for a `perRow` of 1. An
@@ -665,7 +702,7 @@ picker and launches with the route project's id; the general modal continues to 
   real-browser check at the supported desktop floor and at a wide viewport, in Core and Sky & Grove,
   confirming that nothing but the rows below the pane moves.
 
-- **A38 (planned)** (R56) — An expanded card exposes a collapse control with an
+- **A38** (R56) — An expanded card exposes a collapse control with an
   accessible name that says it collapses; activating it by pointer and by keyboard collapses the
   pane, and the control shows hover and focus feedback. Clicking the header region outside the name
   link still collapses, clicking the name link navigates to `/agent/:id` without collapsing, and
@@ -673,7 +710,7 @@ picker and launches with the route project's id; the general modal continues to 
   present again after re-expanding, whichever of the two collapse routes was used. —
   `ui/src/components/grid/AgentCard.test.tsx`; J5.
 
-- **A39 (planned)** (R57) — With no pane expanded the toolbar shows no **Collapse
+- **A39** (R57) — With no pane expanded the toolbar shows no **Collapse
   all**; with panes expanded in two different group sections it appears and one press collapses
   both, leaves both group sections' collapse state, the card order, and the density unchanged, and
   survives a reload. An expanded id belonging to an agent outside the current grid's project is
@@ -681,7 +718,7 @@ picker and launches with the route project's id; the general modal continues to 
   refused layout save reports the failure and leaves the panes collapsed on screen. —
   `ui/src/components/grid/CardGrid.test.tsx`.
 
-- **A40 (planned)** (R58) — A card whose agent name needs three lines renders all
+- **A40** (R58) — A card whose agent name needs three lines renders all
   three, at a smaller size than the shipped card title and with no ellipsis, without overlapping the
   state badge or the drag grip and without escaping the card; a name longer still is clipped at the
   third line, and a single unbroken token wider than the card is broken rather than overflowing. The
@@ -690,16 +727,29 @@ picker and launches with the route project's id; the general modal continues to 
   `ui/src/components/grid/AgentCard.test.tsx`; a real-browser check with a long generated agent name
   in Core and Sky & Grove.
 
-- **A41 (planned)** (R59) — A collapsed card renders no context meter. An expanded
+- **A41** (R59) — A collapsed card renders no context meter. An expanded
   card states the live context percentage in its header, updates it mid-turn as further usage
   reports arrive, and labels a zero or absent value rather than showing an unexplained blank. The
   agent screen's context meter is unchanged. — `ui/src/components/grid/AgentCard.test.tsx` and the
   existing context-meter regressions; J5.
 
+
 - **A42 (planned)** (R60) — On a repo-backed active project, the card context menu and the scoped
   header both open the worktree creation form, and a completed fork's card appears in the grid
   without manual refresh showing its branch name; a non-repo project and an archived project offer
   no entry point. — component tests plus the FS-19.A1 journey.
+
+- **A43 (planned)** (R61) — A running chat agent transitioning from `busy` to
+  `waiting_input` expands its pane on the grid; the same agent already in `waiting_input` across a
+  reload, a completed hydration burst, and a reconnect expands nothing, and an agent whose first
+  observed state is `waiting_input` expands nothing. Collapsing an auto-opened pane while the agent
+  is still waiting leaves it collapsed, and a later new transition into `waiting_input` opens it
+  again. Answering the request leaves the pane open. With four panes open, a fifth agent entering
+  `waiting_input` evicts the least-recently-used pane and that pane's unsent draft is restored when
+  it is reopened; five agents entering together leave exactly four open. A terminal-interface agent,
+  an agent outside the grid's project, and an agent in a collapsed group section each expand nothing
+  and leave the section collapsed. A muted `waiting_input` notification does not suppress the
+  expansion. — `ui/src/components/grid/CardGrid.test.tsx` and `ui/src/store/agentStore.test.ts`; J5.
 
 ## 6. Deviations & open decisions
 
@@ -736,6 +786,14 @@ picker and launches with the route project's id; the general modal continues to 
   grouping, running-first placement, drag behavior, the four-pane cap, pane persistence, or any
   server surface.
 
+- **Confirmed automatic-open boundary.** R61 opens a pane on exactly one transition — a chat
+  agent newly entering `waiting_input` — and adds nothing else. It has no preference to disable it,
+  no automatic close after the request is answered, no automatic expansion of a collapsed group
+  section, no sound or focus change, and no automatic open for `done`, `error`, mail, budget, or
+  pipeline events. Eviction of the least-recently-used pane was chosen over skipping the expansion
+  when four panes are already open, so an automatic open can close a pane the person had open;
+  R48's draft retention is what makes that recoverable.
+
 ## 7. Traceability
 
 - **Grid & cards:** `ui/src/components/grid/CardGrid.tsx`, `AgentCard.tsx`, `StateBadge.tsx`,
@@ -758,5 +816,7 @@ picker and launches with the route project's id; the general modal continues to 
   `NotificationCenter.test.tsx`, `ProjectDashboard.test.tsx` (project cards, context menus, and the
   New project create modal — A22/A24), `CardGrid.test.tsx` (running-first placement, the sortable
   registry order, and same-block/cross-block drop behavior — A28).
-- **Planned grid stability and legibility:** R55–R59 and A37–A41 are unshipped; their evidence is
+- **Grid stability and legibility:** R55–R59 and A37–A41 are shipped; their evidence is
   named there and in TS-08.R45–R48 and FS-12.R40.
+- **Planned automatic pane opening:** R61 and A43 are unshipped; their architecture is TS-08.R49,
+  and R51 records the one clause they supersede.

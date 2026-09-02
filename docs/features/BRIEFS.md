@@ -5,6 +5,35 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-09-01 — Feature design: open a conversation waiting for approval
+
+A chat agent that newly enters `waiting_input` now expands its own pane on the dashboard. That
+reverses one clause of FS-02.R51, which had forbidden any automatic expansion so the grid would
+never reflow while it was being read; every other event — a notification, `done`, `error`, mail, a
+pipeline change — still opens nothing.
+
+Only a newly observed transition opens a pane. A reload, a reconnect, a re-hydration, an agent first
+seen already waiting, and returning to the dashboard with an agent already waiting all open nothing,
+because otherwise every dropped connection would reopen panes you had deliberately collapsed. The
+cost of that rule is stated plainly in the spec: a pane opens only while a card grid is on screen.
+Collapsing an auto-opened pane keeps it collapsed until the agent asks again, and answering the
+request leaves the pane open.
+
+The trigger is the durable state on `state_update`, not the `permission_required`/`waiting_input`
+notification the server already emits, because that stream is filtered by the notification mute list
+and is never replayed to a reconnecting tab — muting a toast must not silently change what the
+dashboard opens.
+
+You chose least-recently-used eviction, so with four panes already open an automatic open closes the
+least-recently-used one. Unsent composer text survives and returns when that pane is reopened.
+
+**Needs attention:** An automatic open can close a pane you had open. Another session's work was
+live in this tree, so these requirements are R61/A43 rather than R60/A42. The card-grid
+implementation beside them is still uncommitted, so this design is uncommitted too.
+
+**Next:** Run `/work` on `open-waiting-approval-panes.md` after the concurrent card-grid and
+worktree work is committed.
+
 ### 2026-09-01 — Feature design: worktree projects
 
 Designed first-class Git worktree support around the decision that fits AgentDeck's existing model:
@@ -48,7 +77,7 @@ required check fails; a diagram still flips to source while an agent is writing.
 
 **Next:** A fix session should close the three must-fix items, then commit the card work.
 
-### 2026-09-01 — Implementation: stable, readable agent cards
+### 2026-09-02 — Implementation: stable, readable agent cards
 
 Opening a dashboard chat pane now leaves every other agent card in place. Expanded cards have a
 clear Collapse button, the toolbar gains Collapse all whenever panes are open, and long agent names

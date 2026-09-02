@@ -84,6 +84,27 @@ only when its transport gate can be proved under all four chat providers.
 
 ## Changelog
 
+- **2026-09-01 — feature design (FS-02.R61/A43 and the narrowed FS-02.R51, TS-08.R49; INV §1/§2):**
+  Designed automatic pane opening and queued `open-waiting-approval-panes.md`. A chat agent newly
+  entering `waiting_input` expands its own pane; this reverses one clause of R51, which had
+  forbidden any automatic expansion, and every other event still opens nothing. The trigger is the
+  durable `state` on `state_update`, not the `notification` event `bus.go` already emits for the
+  same transition, because that stream is mute-filtered and is never replayed to a reconnecting
+  tab — muting a toast must not silently change what the dashboard opens. Only a newly observed
+  transition fires: `CardGrid` keeps one record of last observed states, reseeds it while
+  `hydrating` is set, and drops ids `hydrateComplete` prunes, so reloads and reconnects cannot
+  reopen panes a person collapsed. The stated cost is that a pane opens only while a grid is on
+  screen. The user chose least-recently-used eviction over skipping the open when four panes are
+  already up, so an automatic open can close a pane they had open; R48's draft retention makes that
+  recoverable. Terminal agents, cross-project agents, and agents in a collapsed group section are
+  excluded. TS-08 returns to **Partial**. This design was written while another session's card-grid
+  implementation and FS-19 worktree design were live in the same tree: FS-02.R60/A42 were taken by
+  the worktree design (since committed as `f25a2ba`), so these requirements are R61/A43. The
+  review's broken-link **Must fix** was closed here — the handoff changelog entry is delinked and
+  the finished change is off the waiting list. This design is left uncommitted because the card-grid
+  implementation it sits beside is still uncommitted and unverified by this session; both need one
+  commit from the session that finishes that work. No product code changed here.
+
 - **2026-09-01 — design-feature (FS-19.R1–R11/A1–A7, FS-04.R45/A25, FS-02.R60/A42, TS-12.R1–R10,
   TS-01.R26, TS-02.R27, TS-03.R33; INV §2/§4/§5/§7/§12/§14/§15):** Specified worktree projects
   around the confirmed product decision that the project is the workspace. New FS-19 defines the
@@ -122,7 +143,7 @@ only when its transport gate can be proved under all four chat providers.
   right shape for INV §2, and the embedded UI artifact matches a fresh build of this tree. All
   checks except `make check-specs` pass. No product code or specifications were changed.
 
-- **2026-09-01 — work (FS-02.R55–R59/A37–A41, FS-12.R40/A16, TS-08.R45–R48; INV
+- **2026-09-02 — work (FS-02.R55–R59/A37–A41, FS-12.R40/A16, TS-08.R45–R48; INV
   §1/§2/§8/§10/§13):** Stabilized and decluttered dashboard agent cards. Expanded panes now retain
   their original one-track grid cell, remain in their sortable block, and leave every other card's
   placement unchanged. A labelled per-card **Collapse** button and conditional whole-grid
@@ -151,7 +172,7 @@ only when its transport gate can be proved under all four chat providers.
 - **2026-09-01 — feature design (FS-02.R55–R59/A37–A41, FS-12.R40/A16, TS-08.R45–R48 and the
   corrected TS-08.R43; INV §1/§2):** Designed the fix for the reported dashboard card-grid
   experience and queued
-  [`stabilize-and-declutter-agent-cards.md`](../ready-changes/stabilize-and-declutter-agent-cards.md).
+  `stabilize-and-declutter-agent-cards.md`, which has since been implemented and removed.
   The rearranging on expand/collapse is the two-track span in an auto-placed grid, which TS-08.R42
   accepted as a wrap-and-gap cost; the pane now spans one track, so every other card keeps its cell
   and only the rows below move. The rejected alternatives are recorded: moving panes out of the grid

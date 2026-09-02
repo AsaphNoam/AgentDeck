@@ -13,7 +13,7 @@ describe("VisualMatrix", () => {
   it("changes only presentation when the high-variance contract fixture is enabled", () => {
     const { container } = render(<MemoryRouter><VisualMatrix /></MemoryRouter>);
     const root = container.querySelector(".visual-matrix")!;
-    expect(screen.getByText("0% context used")).toBeInTheDocument();
+    expect(screen.getByText("74% context used")).toBeInTheDocument();
     const copyBefore = root.textContent;
     const routesBefore = [...root.querySelectorAll("a")].map((link) => link.getAttribute("href"));
     const actionsBefore = [...root.querySelectorAll("button")].map((button) => button.textContent);
@@ -33,7 +33,7 @@ describe("VisualMatrix", () => {
   it("renders all six project accents on dashboard cards", () => {
     const { container } = render(<MemoryRouter><VisualMatrix /></MemoryRouter>);
     const cards = [...container.querySelectorAll('[data-ui="agent-card"]')];
-    expect(cards).toHaveLength(7);
+    expect(cards).toHaveLength(8);
     expect(cards.slice(0, 6).map((card) => card.getAttribute("style"))).toEqual([
       expect.stringContaining("rgb(100,116,139)"),
       expect.stringContaining("rgb(59,130,246)"),
@@ -42,6 +42,17 @@ describe("VisualMatrix", () => {
       expect.stringContaining("rgb(244,63,94)"),
       expect.stringContaining("rgb(139,92,246)"),
     ]);
+  });
+
+  // FS-02.A40/A41 and FS-12.A16: the deterministic dashboard fixture carries
+  // wrapped, unbroken, collapsed-without-context, and expanded-context cases.
+  it("renders the card legibility and context-placement matrix", () => {
+    const { container } = render(<MemoryRouter><VisualMatrix /></MemoryRouter>);
+    expect(screen.getByText("Needs a decision from the orchestration and delivery reviewer")).toBeInTheDocument();
+    expect(screen.getByText("unbroken-agent-name-that-must-not-escape-the-card-boundary")).toBeInTheDocument();
+    const collapsed = [...container.querySelectorAll('[data-ui="agent-card"][data-variant="default"]')];
+    expect(collapsed.every((card) => !card.querySelector('[data-ui="context-meter"]'))).toBe(true);
+    expect(container.querySelector('[data-ui="agent-card"][data-variant="expanded"] [data-ui="context-meter"][data-variant="compact"]')).toBeTruthy();
   });
 
   it("renders the project color picker inside its context menu fixture", () => {

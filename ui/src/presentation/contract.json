@@ -170,6 +170,7 @@
         "metadata",
         "indicators",
         "context",
+        "collapse-control",
         "preview",
         "chat-pane"
       ],
@@ -198,7 +199,8 @@
       "variants": [
         "low",
         "medium",
-        "high"
+        "high",
+        "compact"
       ]
     },
     "context-menu": {
