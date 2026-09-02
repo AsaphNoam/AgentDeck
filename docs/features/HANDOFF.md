@@ -26,9 +26,11 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   earlier 2026-08-27 all-200/no-page-load incident stays fixed, and the shared SSE stream is now
   replayed to a joining tab instead of restarted for every tab.
 - **Review state:** The continuous `57b7154..e46e66b` range is reviewed against its requirements and
-  every invariant class, together with the uncommitted FS-14 proposal-decline design still in the
-  tree. Five findings are open below, one of them **Must fix**: the Mermaid remount fix still does
-  not cover the streaming path. Two of that review's findings are closed by the 2026-09-02 worktree
+  every invariant class. The uncommitted FS-14 proposal-decline design has now had a dedicated
+  worktree-only review plus an independent Terra/high pass. Eight findings are open below, two of
+  them **Must fix**: the Mermaid remount fix still does not cover the streaming path, and the
+  proposal design has no enforceable winner or recovery contract when Reject races approval. Two of
+  the earlier review's findings are closed by the 2026-09-02 worktree
   work — the regenerated embedded `index.html` is committed, and its five findings against the
   FS-19/TS-12 worktree design are resolved inside the implementation (three as in-place TS-12
   corrections, two as implementation). None of those five was Must fix, so workflow §13 did not gate
@@ -92,6 +94,30 @@ behavior needs the human's confirmation. Revisit the MCP migration only when its
 be proved under all four chat providers.
 
 ## Changelog
+
+- **2026-09-02 — review (worktree only; FS-14.R49–R51/A27–A28, TS-02.R22,
+  TS-03.R16–R17, TS-09.R15–R16/R23/R26; INV §1–§15):** Reviewed only the three unstaged
+  proposal-decline design files; there were no staged or untracked files, and the last-reviewed-code
+  marker does not move. An independent Terra/high reviewer ran the same workflow, and its findings
+  were checked against the current proposal state/API/UI paths before consolidation. Four findings
+  are recorded below. The Must-fix one is the missing approval-versus-Reject linearization: the
+  existing Save/Start path commits its real effect before proposal consumption, while R49 describes
+  only the case where approval has already won, so a stale approval can still act after Reject unless
+  the design adds a durable claim and crash/retry rules. The remaining findings cover absent and
+  contradictory persistence/API/control-plane specifications and change ownership, the feature
+  introduction falsely claiming every requirement is shipped, and acceptance/summary coverage that
+  tests only a pending Save proposal and leaves Start-title provenance undefined.
+
+  Invariant sweep: §1 holds because R51 resets browser-local expansion on reload. §2 has no new
+  parallel construction path in the documentation. §§3–4 and §6 have no applicable changed surface.
+  §5 and §15 produced the action-race finding. §§7–11 produced the missing durable read/error/bound/
+  wiring/collection contracts and incomplete summary matrix; §9 has no separate primitive to assess
+  until that durable design exists. §12 has no external-CLI invocation, and §13 no class-name
+  surface. §14's whole-mux guard remains the inherited route boundary, but the missing route contract
+  is included in the technical-coverage finding. `make check-specs`, `make build`, both Go test
+  variants, the 360-case UI suite with style/presentation checks, `make dist`, and `git diff --check`
+  pass; the first sandboxed Go run failed only because it could not bind loopback test ports, then
+  passed unchanged with those permissions. No product code or specifications were changed.
 
 - **2026-09-02 — work (FS-19.R1–R11/A1–A7, FS-04.R45/A25, FS-02.R60/A42, TS-01.R26, TS-02.R27,
   TS-03.R33, TS-12.R1–R10; INV §2/§5/§7/§8/§10/§12/§14/§15):** Shipped **worktree projects** across
@@ -1175,14 +1201,48 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
   in `contract.json`), and extend `ContextBar.test.tsx` to assert a compact meter still reports its
   tone through the contract attribute.
 
-- **Worth fixing** (INV §10; `docs/specs/README.md` lifecycle) — an unrelated, unattributed FS-14
-  design also sits uncommitted in the same tree: R49–R51 and A27/A28 are added as `(planned)`,
-  FS-14 is flipped to **Partial**, and `docs/ideas.md` gains the proposal-collapse idea, but there
-  is no `docs/ready-changes/` file, no brief, and no handoff changelog entry for it. Normal-use
-  trigger: nothing in the approved-work list points at these requirements, so either they are lost
-  with the tree or an agent later finds planned requirements with no owner. Fix: either finish that
-  design session — ready-change file, brief, commit — or revert the FS-14 and `ideas.md` edits; do
-  not leave planned requirements alive only in an uncommitted tree.
+- **Must fix** (FS-14.R49/R50/A27, TS-09.R15/R16/R26; INV §5/§15) —
+  `docs/specs/features/FS-14-configurable-pipelines.md:353` adds Reject and says that an approval
+  which already consumed the proposal wins, but it never defines the opposite ordering. The shipped
+  approval path commits the template file or run before it marks the proposal consumed
+  (`internal/server/pipeline_handlers.go:58`, `internal/pipeline/manager.go:94`), and template
+  approval deliberately carries no proposal id (TS-09.R26). Normal-use trigger: two tabs show the
+  same pending offer; one rejects it, then the other's already-visible review flow saves or starts
+  it anyway. The offer the person rejected still takes effect, and no simple post-mutation status
+  update can undo that external effect safely. Fix the design before implementation: choose the
+  Reject-versus-approval winner, specify a durable atomic claim plus crash/failure recovery across
+  SQLite and the template/run mutation, define stale action behavior, and make A27 run the real
+  interleavings and failure boundaries rather than only act on an already-consumed row.
+
+- **Worth fixing** (FS-14.R49–R51, TS-02.R22, TS-03.R16/R17, TS-09.R23/R26;
+  INV §7/§8/§9/§10/§11) — the product spec adds durable declined/deleted state, new mutations,
+  proposal-update behavior, error/retry outcomes, timestamps, and fallback rows, but every governing
+  technical spec still describes the shipped pending/consumed-only design. TS-02.R22 has only
+  `consumed_at` and pending-only reads, TS-03.R16 exposes only `GET /api/pipeline-proposals`, and
+  TS-09.R26 still says there is no dismissal action. No planned successor defines the schema and
+  retention ordering, mutation routes/status codes, list shape, update publication, invalid-row
+  isolation, non-null collections, or bounds; FS-14 §7 has no new traceability, and no ready-change
+  file or design brief owns the implementation. Normal-use trigger: an implementer must invent these
+  incompatible contracts, so persistence, server, and UI can each choose a different state model.
+  Fix by completing TS-02/TS-03/TS-09 first, adding the ready change and traceability, and only then
+  moving the design out of `docs/ideas.md`'s “being defined” section.
+
+- **Worth fixing** (FS-14 status contract; INV §10) —
+  `docs/specs/features/FS-14-configurable-pipelines.md:23` still says every requirement in the
+  feature reflects shipped behavior, while this same diff makes the spec Partial and adds R49–R51
+  and A27–A28 as planned. Normal-use trigger: a reader follows the feature's own scope statement and
+  treats Reject/Delete/collapse as available now. Fix the introduction to distinguish shipped and
+  explicitly planned requirements, as the status header already does.
+
+- **Worth fixing** (FS-14.R51/A28; INV §8/§10) —
+  `docs/specs/features/FS-14-configurable-pipelines.md:530` verifies collapse and bounded summaries
+  only for one pending `save_template` proposal, although R51 governs both pending and declined
+  records of both kinds. It also requires a `start_run` summary to name the template title, but that
+  proposal's durable payload contains only `template_id` (`internal/pipeline/manager_types.go:16`),
+  with no rule for whether a current, renamed, or deleted template supplies the title. Normal-use
+  trigger: a declined or Start proposal regresses to the full-height payload, or shows a drifting/
+  missing title, while A28 remains green. Fix R51's title provenance and fallback, then cover the
+  pending/declined × Save/Start matrix (including a maximum-size record) in A28.
 
 The five findings this review recorded against the FS-19/TS-12 worktree design are closed by the
 2026-09-02 implementation rather than left open here: three became in-place TS-12 corrections —

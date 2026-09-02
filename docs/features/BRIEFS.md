@@ -5,6 +5,32 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-09-02 — Review: declining pending pipeline proposals
+
+The worktree-only design is not ready to implement. Its critical gap is concurrent action: today's
+Save or Start commits the real work before the proposal is consumed, while the new Reject action
+promises a clean result when approval races it. The design says what happens only when approval has
+already won. It does not say whether Reject prevents a stale approval in another tab, or provide an
+atomic, crash-safe claim that could enforce that choice, so a rejected offer could still save a
+template or start a run.
+
+The persistence, API, update-publication, response-shape, retention, and failure contracts for
+declined proposals are also absent; the current technical specifications still say proposals can
+only be consumed or age out. Three smaller gaps remain: the feature introduction still says every
+requirement is shipped despite adding planned behavior; collapse coverage tests only a pending Save
+proposal rather than pending and declined Save and Start proposals; and a Start proposal summary
+requires a template title that the durable proposal does not contain, with no rule for a template
+that was renamed or deleted. The independent Terra review reached the same conclusion and caught
+the shipped-status contradiction and incomplete acceptance matrix. All automated checks and the
+distributable build pass.
+
+**Needs attention:** Decide which action wins an approval-versus-rejection race and specify its
+atomic recovery path, then complete the persistence, API, publication, summary, and acceptance
+contracts before implementation.
+
+**Next:** Return this change to feature design, queue it only after those contracts are complete,
+and review the finished design before building it.
+
 ### 2026-09-02 — Implementation: worktree projects
 
 You can now spin up an isolated parallel stream of work as one action. Right-click a project that
