@@ -119,7 +119,7 @@ feature are recorded in §6.
   selected backend's ordinary credential/capability checks. A pipeline never silently enables
   permission skipping, changes credentials, substitutes a model, or treats a permission prompt as a
   failed/completed stage.
-- **R52 (planned)** — R15's guarantee is scoped, not withdrawn. A pipeline still never
+- **R52** — R15's guarantee is scoped, not withdrawn. A pipeline still never
   enables permission skipping for the work a stage agent does in a person's workspace: file reads and
   edits, shell commands, network fetches, and every provider- or user-configured MCP server keep the
   selected role's ordinary permission policy, and a pipeline still never changes credentials,
@@ -340,7 +340,7 @@ feature are recorded in §6.
 
 - **R47** — A stage agent is told where its participation ends. The assignment
   states that the one `report_pipeline_stage_result` call ends the agent's part in that assignment —
-  that clause alone is superseded by R53 (planned), which restates the boundary in terms of the
+  that clause alone is superseded by R53, which restates the boundary in terms of the
   result AgentDeck accepted rather than the call the agent made, leaving every other obligation in
   R47 unchanged — that a `blocked` result pauses the run for a person, that anything said in the
   agent's chat during that pause is out of band and cannot be recorded against the run, and that the
@@ -405,7 +405,7 @@ feature are recorded in §6.
 
 ### 4.5 Running a stage without a person in the loop
 
-- **R53 (planned)** — The boundary is the result AgentDeck accepted, not the call the
+- **R53** — The boundary is the result AgentDeck accepted, not the call the
   agent made. The assignment states that the agent's part in an assignment ends when AgentDeck
   **accepts** a result; that a refused call records nothing, leaves the attempt still owing a
   result, and leaves that agent as the only one who can supply it; and that a refusal AgentDeck
@@ -418,7 +418,7 @@ feature are recorded in §6.
   reachably, otherwise meets an instruction that tells the agent its part is over: the agent stops,
   the attempt still owes a result, and only a person noticing can restart it.
 
-- **R54 (planned)** — A run waiting on an undecided permission request says so. When the
+- **R54** — A run waiting on an undecided permission request says so. When the
   current attempt's stage agent is holding an unanswered approval (FS-03.R43), the run carries an
   attention reason naming that wait, and it joins R29's needs-attention notification category
   alongside blocked, approval gate, launch failure, and crash. The reason clears when the request is
@@ -428,7 +428,7 @@ feature are recorded in §6.
   unresolved product decision recorded in the handoff. Without this, removing the approval deadline
   would trade a stage that fails in three minutes for a run that waits in silence indefinitely.
 
-- **R55 (planned)** — A pause states what each action does before a person picks one.
+- **R55** — A pause states what each action does before a person picks one.
   While **Continue** is disabled it names the continuation input it is waiting for, beside that
   control, exactly as R46 already requires of the start dialog. Wherever **Continue** and **Retry
   stage** are both offered, each states its consequence: Continue delivers the person's answer to
@@ -437,7 +437,7 @@ feature are recorded in §6.
   the choice, not only at the recovered pause R48 added, because the ordinary `blocked` pause is the
   one a person meets most.
 
-- **R56 (planned)** — A stage's declared outputs reach a surface. Each execution-timeline
+- **R56** — A stage's declared outputs reach a surface. Each execution-timeline
   attempt (R38) renders the outputs that attempt declared, beside its summary, details, and checks,
   so an output is read where the work that produced it is read. A finished run presents its named
   values expanded rather than collapsed. Output text is bounded on the surface exactly as the other
@@ -592,7 +592,7 @@ feature are recorded in §6.
   every proposal to collapsed. A proposal whose payload cannot be summarized still lists with its
   kind and proposal id. — `ui/src/features/pipelines/AgentDeckerBuilder.test.tsx`; J14.
 
-- **A29 (planned)** (R53) — A rendered assignment states that the boundary is the
+- **A29** (R53) — A rendered assignment states that the boundary is the
   accepted result, that a refused call records nothing and leaves the attempt still owing one, and
   that a retryable refusal means correct and call again. A `validation_failed` refusal of
   `report_pipeline_stage_result` says the attempt still owes a result and names what to change,
@@ -602,19 +602,19 @@ feature are recorded in §6.
   skipped reproduction, unskipped by the implementation) and
   `internal/messaging/pipeline_tools_test.go`.
 
-- **A30 (planned)** (R54) — A run whose stage agent holds an unanswered approval carries
+- **A30** (R54) — A run whose stage agent holds an unanswered approval carries
   an attention reason naming that wait and emits the needs-attention notification; resolving the
   request clears the reason and the notification is not repeated; a run whose stage agent is busy
   with no pending request carries neither. — `internal/pipeline` manager tests,
   `internal/server/pipeline_handlers_test.go`, and
   `ui/src/features/pipelines/RunBrowser.test.tsx`.
 
-- **A31 (planned)** (R55) — At an ordinary `blocked` pause, the disabled **Continue**
+- **A31** (R55) — At an ordinary `blocked` pause, the disabled **Continue**
   control names the continuation input it is waiting for, and both **Continue** and **Retry stage**
   state their consequence including that Retry uses a fresh agent; the recovered pause R48 defines
   still withholds Continue. — `ui/src/features/pipelines/RunBrowser.test.tsx`.
 
-- **A32 (planned)** (R56) — A completed run's timeline renders each attempt's declared
+- **A32** (R56) — A completed run's timeline renders each attempt's declared
   outputs within that attempt's entry, and the run's named values are expanded without a click. An
   attempt that declared no output renders unchanged. — `ui/src/features/pipelines/RunBrowser.test.tsx`.
 

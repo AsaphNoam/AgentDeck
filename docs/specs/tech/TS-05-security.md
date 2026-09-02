@@ -138,7 +138,7 @@ sensitive-context sharing is a practical problem.
   R18–R19 remain blocked by FS-17.R20; internal MCP keeps its shipped security contract until the
   narrow direct transport is reviewed and proven.
 
-- **R20 (planned) — The approval exemption widens no boundary it did not already sit
+- **R20 — The approval exemption widens no boundary it did not already sit
   inside.** Exempting AgentDeck's own actions from the human approval gate (FS-03.R40) changes who
   is asked, never what is permitted. Every exempt call still crosses the same loopback-only `/mcp`
   route behind the existing `localOnly` wrapper, still carries the per-agent token minted for that

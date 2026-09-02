@@ -1,6 +1,6 @@
 # FS-03 — Live chat & permission flow
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/runtime/` (`chat.go`, `permission.go`, `event.go`), `internal/server/sessions.go`, `internal/transcript/`, `ui/src/components/chat/`, `ui/src/store/transcriptStore.ts`, `ui/src/api/sse.ts` · **Journeys:** J3, J4, J7
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -124,7 +124,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   as auto-approved, the agent never enters `waiting_input`, and the tool proceeds without a user
   click. Resume and switch retain that frozen policy under FS-01.
 
-- **R40 (planned)** — AgentDeck's own actions never require a human approval. When a
+- **R40** — AgentDeck's own actions never require a human approval. When a
   tool call names one of the actions AgentDeck itself exposes to its agents — `list_agents`,
   `send_message`, `check_messages`, `report_pipeline_stage_result`, `propose_pipeline_template`,
   `propose_pipeline_run`, `get_assigned_task`, `create_task`, `cancel_task`, `report_task_result`,
@@ -143,28 +143,28 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   a new agent to be launched: that agent appears on the dashboard, stays inside the existing
   delegation bound, and every tool it runs is gated normally.
 
-- **R41 (planned)** — An auto-allowed action is recorded, never hidden. It appears on the
+- **R41** — An auto-allowed action is recorded, never hidden. It appears on the
   live stream and in the durable transcript with the same auto-approved shape a skip-permissions
   launch already produces (R18), so a reader can always tell which tool calls ran without a human
   decision and a run's history stays complete across reload, archive, and resume. Nothing reaches
   the agent differently: the same tool names, arguments, results, and refusal/retry classification
   apply (FS-17), and no agent-facing surface is added, removed, or renamed.
 
-- **R42 (planned)** — Identification fails closed. A tool call AgentDeck cannot
+- **R42** — Identification fails closed. A tool call AgentDeck cannot
   positively identify as one of its own actions is gated under R14, exactly as today. An
   unrecognized name, a backend whose approval request does not name the tool, an identically named
   tool belonging to a different MCP server, and a malformed request all prompt rather than proceed.
   AgentDeck never infers the exemption from the fact that an agent belongs to a pipeline or a task,
   from the tool's declared category, or from the absence of arguments.
 
-- **R44 (planned)** — A permission outcome that did not execute its tool is written to
+- **R44** — A permission outcome that did not execute its tool is written to
   the server log with the agent id, the tool name, and the decision. Denial, timeout where a
   deadline is configured, and cancellation each produce one entry. Today the only trace that a tool
   never ran is a generic error event inside that one agent's transcript, so a run stalled by a
   withheld tool cannot be diagnosed from the server log at all — the log records every HTTP request
   and every pipeline refusal, but not the decision that stopped the work.
 
-- **R43 (planned)** — A permission request that does need a human decision is held until
+- **R43** — A permission request that does need a human decision is held until
   one is made. By default it no longer auto-denies on a deadline: the agent stays `waiting_input`
   with the request pending and the tool unexecuted, and leaves that state only when a person
   approves or denies it, cancellation claims the turn, or the agent is stopped. Waiting executes
@@ -460,7 +460,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `sse.test.ts` multi-open and delayed-response cases, a `transcriptStore.test.ts` case applying an
   out-of-order transcript, and a pane render test beside `ChatPanel.test.tsx`.
 
-- **A24 (planned)** (R40–R42) — Each of the fifteen AgentDeck actions raised as an
+- **A24** (R40–R42) — Each of the fifteen AgentDeck actions raised as an
   approval request executes with no `waiting_input` transition and no pending request, under a
   launch policy with `skip_permissions` false. A same-named tool advertised by a different MCP
   server, an unnamed approval request, and an ordinary file-edit, shell, and fetch request each
@@ -469,7 +469,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   and it is present again after the transcript is re-read. — `internal/runtime/permission_test.go`
   and `internal/server/integration_test.go`.
 
-- **A25 (planned)** (R43) — With no approval deadline configured, an undecided
+- **A25** (R43) — With no approval deadline configured, an undecided
   permission request is still pending, still `waiting_input`, and its tool still unexecuted well
   past the previous 180-second deadline; a decision made after that point resolves it normally and
   the turn continues. Cancelling the turn and stopping the agent each resolve it without executing
@@ -477,12 +477,12 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   rendering are unchanged. — `internal/runtime/permission_test.go` and
   `internal/server/integration_test.go`.
 
-- **A27 (planned)** (R44) — A denied permission, a cancelled one, and a timed-out one
+- **A27** (R44) — A denied permission, a cancelled one, and a timed-out one
   under a configured deadline each write one server-log entry carrying the agent id, tool name, and
   decision; an approved one does not claim the tool was withheld. —
   `internal/runtime/permission_test.go`.
 
-- **A26 (planned)** (R40, R43) — In a browser, a pipeline run whose stage agent reports
+- **A26** (R40, R43) — In a browser, a pipeline run whose stage agent reports
   its result advances with no approval prompt shown to the person, while a file edit the same stage
   agent attempts still raises a prompt that waits for them; leaving that prompt undecided for longer
   than three minutes and then approving it lets the stage continue rather than failing it.

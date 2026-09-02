@@ -15,16 +15,11 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   `cache/agent-skills/`. The credentialed Claude and Codex checks are not covered by that run and
   remain owed (TS-06.R21). A customized `agentdecker` role is deliberately not migrated (FS-04.R44),
   so it keeps the superseded product manual beside the current skill; nothing user-facing says so.
-- **Bug investigation:** The 2026-09-02 unattended-pipeline-run report is diagnosed and open for
-  `/fix`. Six findings are recorded below, three of them **Must fix**. The two multi-hour stalls
-  that cost about nineteen of the run's twenty-three hours have one confirmed mechanism: the stage
-  assignment tells every agent to report "exactly once", so a refusal FS-17 itself classifies as
-  retryable is read as terminal, and nothing in the run ever notices that its attempt is waiting on
-  a result no one will send. Two reproductions are committed skipped
-  (`internal/pipeline/refused_report_retry_test.go`,
-  `internal/messaging/pipeline_agent_task_target_test.go`). Most of the rest of that report is the
-  product working as FS-14/TS-09 specify; those items are listed with the findings so `/fix` does
-  not chase them. Two of the findings need a product decision below.
+- **Bug investigation:** Five of the six 2026-09-02 unattended-pipeline-run findings are closed by
+  the unattended-runs implementation. Retryable report refusals, stopped pipeline-agent recipient
+  wording, permission waits/logging, pause guidance, and declared-output presentation now have
+  active regressions. The remaining **Must fix** is the separate product decision below: what
+  qualifies a stage agent that can no longer advance when no permission request is pending.
   The 2026-08-28 pipeline `stale_assignment` report is closed. Its three
   findings are all fixed: the refusal code was corrected earlier, the boundary is now stated to the
   stage agent in the assignment, the accepted result, and the refusal (FS-14.R47), the restart pause
@@ -39,9 +34,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   every invariant class. The worktree-project implementation (`1b2a8c3..bd797bd`) had a dedicated
   implementation review plus an independent Terra/high pass, and all ten findings from that review
   were fixed in `3e1726b`; the post-fix code is still awaiting independent review, so the last
-  reviewed-code marker remains `bd797bd`. The 2026-09-02 bug investigation adds six open findings,
-  three of them **Must fix**, against the pipeline reporting contract, stall detection, and the task
-  recipient vocabulary. The FS-14 proposal-decline design, now committed in `e83c937`, also had a
+  reviewed-code marker remains `bd797bd`. The 2026-09-02 bug investigation retains one open
+  **Must fix** against general silent-stage detection; the other five findings are closed. The
+  FS-14 proposal-decline design, now committed in `e83c937`, also had a
   dedicated worktree-only review plus an independent Terra/high pass. The earlier design review did
   improve this implementation: ownership is recorded last, pipeline validation stays read-only,
   base fallback uses the main worktree, recreation is serialized, and human-facing setup output is
@@ -52,7 +47,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   needs a real-browser computed-cursor pass and both the six-tab shared-stream check and FS-19's two
   browser halves remain acceptance gates. Three behavior choices — two from an earlier fix, one from
   the worktree implementation — still need human confirmation below.
-- **Active change:** None. Worktree projects are shipped and verified (FS-19, TS-12, FS-04.R45/A25, FS-02.R60/A42, TS-01.R26, TS-02.R27, TS-03.R33). Stable, decluttered agent cards are shipped and verified (FS-02.R55–R59/A37–A41, FS-12.R40/A16, TS-08.R45–R48). Active-project navigation tabs are shipped and their review findings are
+- **Active change:** None. Unattended pipeline runs is finished and verified (FS-03.R40–R44/A24–A27,
+  FS-04.R46/A26, FS-06.R28–R29/A18–A19, FS-14.R52–R56/A29–A32, TS-01.R27, TS-02.R28,
+  TS-03.R34–R35, TS-04.R41–R44, TS-05.R20, TS-08.R50–R52, TS-09.R29–R31). Worktree projects are shipped and verified (FS-19, TS-12, FS-04.R45/A25, FS-02.R60/A42, TS-01.R26, TS-02.R27, TS-03.R33). Stable, decluttered agent cards are shipped and verified (FS-02.R55–R59/A37–A41, FS-12.R40/A16, TS-08.R45–R48). Active-project navigation tabs are shipped and their review findings are
   closed (FS-02.R53/A35, FS-12.R39/A15, TS-08.R44). Thin AgentDecker and the shared AgentDeck operating skill are finished
   and verified (FS-18, FS-04.R44/A24, TS-11). Expandable dashboard chat panes are finished and verified
   (FS-02.R46–R52/A29–A34, FS-03.R39/A23, FS-12.R38/A14, TS-03.R31, TS-08.R41–R43).
@@ -89,30 +86,40 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
 
 ## Active change
 
-**Change:** None. Worktree projects are finished and verified (FS-19, TS-12, FS-04.R45/A25,
-FS-02.R60/A42, TS-01.R26, TS-02.R27, TS-03.R33); the change file is removed and FS-19 is the
-authority on what shipped.
+**Change:** None. Unattended pipeline runs is finished; the change file is removed and the named
+FS/TS requirements are the authority on what shipped.
 
-**State:** Forking a repo-backed project creates a branch, an AgentDeck-owned checkout, and a copied
-project in one action, bootstrapped by the project's setup command. Checkouts are recreated on any
-start that finds one missing, and deleted only by explicit consent at archive or delete with the
-uncommitted state disclosed first. FS-19 and TS-12 are **Current**; so are FS-04 and TS-02, which
-had no other planned items left.
+**State:** AgentDeck-owned MCP actions are exact-match auto-approved through a runtime-only overlay;
+ordinary permissions wait without a default deadline and derive pipeline attention. Message budgets
+default to 50 and are configurable per turn. Retryable report refusals, stopped pipeline-agent
+recipient errors, pause choices, attempt outputs, and finished named values now explain themselves.
 
-**Next:** Run `/fix` on the open findings below. Take the three bug-investigation Must-fix items
-first, because a person is hitting them in real runs today; the two that carry a reproduction start
-by un-skipping it. Two browser gates are still owed below (J16's worktree steps and the archive
-dialog's manual gate), and the reactivation-after-deletion behavior still needs the human's
-confirmation. Revisit the MCP migration only when its transport gate can be proved under all four
-chat providers.
+**Next:** Independently review the unattended-pipeline implementation. Keep the credentialed
+Claude/Codex browser journey as an acceptance gate until a human authorizes real provider sessions.
 
 ## Changelog
+
+- **2026-09-02 — work (unattended pipeline runs; FS-03.R40–R44/A24–A27, FS-04.R46/A26,
+  FS-06.R28–R29/A18–A19, FS-14.R52–R56/A29–A32, TS-01.R27, TS-02.R28, TS-03.R34–R35,
+  TS-04.R41–R44, TS-05.R20, TS-08.R50–R52, TS-09.R29–R31; INV §1/§2/§5/§8/§9/§10/§11/§13/§14):**
+  Shipped unattended pipeline control. The fifteen AgentDeck MCP identities are derived from the
+  actual tool registrations, carried on the shared non-persisted lifecycle overlay, exact-matched
+  against the adapter title, and answered only with `allow_once`; all other tools fail closed into
+  the ordinary gate. The default permission deadline is off, denied/cancelled/timed-out decisions
+  are logged, and generation-scoped permission events derive one edge-triggered pipeline attention
+  notification without changing run state or persistence. Messaging defaults to 50 combined actions
+  and freezes the configured limit per turn; stopped pipeline-agent refusals name resume. One shared
+  refusal vocabulary now ties retry class to report guidance, assignments use the accepted-result
+  boundary, and both field reproductions are active. The run page explains Continue versus Retry,
+  renders attempt outputs, and opens named values for finished runs. Specs are current, the packaged
+  operating guidance matches, focused race tests pass, and the complete Go/UI/spec/build/dist checks
+  are green. The credentialed real-provider browser journey remains an explicit acceptance gate.
 
 - **2026-09-02 — feature design (unattended pipeline runs; FS-03.R40–R44/A24–A27, FS-04.R46/A26,
   FS-06.R28–R29/A18–A19, FS-14.R52–R56/A29–A32, TS-01.R27, TS-02.R28, TS-03.R34–R35, TS-04.R41–R44,
   TS-05.R20, TS-08.R50–R52, TS-09.R29–R31; INV §1/§2/§5/§8/§9/§10/§11/§13/§14):** Designed the
-  change that stops a pipeline run from needing a person as its control plane, and queued it as
-  [`../ready-changes/unattended-pipeline-runs.md`](../ready-changes/unattended-pipeline-runs.md).
+  change that stops a pipeline run from needing a person as its control plane, originally queued as
+  `unattended-pipeline-runs.md` and now finished.
   Started from the user's own idea (too many MCP action approvals) and absorbed four of the six
   `806bcb7` bug-investigation findings; the source idea is removed from `docs/ideas.md`.
 
@@ -1392,6 +1399,10 @@ an explicit specification update. Remove an item when the human resolves it or q
 
 ## Acceptance gates
 
+- [ ] Run FS-03.A26/J14 with a pinned real chat provider: an AgentDeck stage-result action proceeds
+  without a prompt, a file edit still prompts, and approval after more than three minutes continues
+  the same stage. Automated exact-identity, fail-closed, no-default-deadline, and attention checks
+  pass; this rendered provider boundary needs human authorization.
 - [ ] Run pinned, credentialed Claude and Codex chat/MCP/resume checks before claiming those combinations.
 - [ ] Run pinned Claude terminal flags/hooks and live xterm journeys before claiming full terminal support.
 - [ ] Run pinned OpenCode/OpenHands launch/credential checks before claiming those backends beyond fakes.

@@ -118,7 +118,8 @@ type Config struct {
 	// TaskConcurrency is how many agent runtimes dependent work may bring up at
 	// once, install-wide. It never counts agents a person launched or resumed
 	// (FS-04.R43, FS-16.R21).
-	TaskConcurrency int `json:"task_concurrency"`
+	TaskConcurrency      int `json:"task_concurrency"`
+	MessageBudgetPerTurn int `json:"message_budget_per_turn,omitempty"`
 }
 
 type NotificationsConfig struct {

@@ -31,7 +31,6 @@ import (
 // corrected call is both permitted and the only way to finish the stage.
 // The fix session owns the final wording; adjust the expectation with it.
 func TestRefusedStageReportMustBeRetryable(t *testing.T) {
-	t.Skip("reproduction for an open bug-investigation finding; the /fix session un-skips it")
 	manager, _, _ := pipelineManagerFixture(t)
 	detail := startPipeline(t, manager, "request-refused-report-retry")
 	work := detail.Attempts[0]
@@ -45,6 +44,9 @@ func TestRefusedStageReportMustBeRetryable(t *testing.T) {
 	var controlled *ControlError
 	if !errors.As(err, &controlled) || controlled.Code != "validation_failed" {
 		t.Fatalf("refusal = %v, want validation_failed", err)
+	}
+	if !strings.Contains(controlled.Message, "still owes a result") || !strings.Contains(controlled.Message, "call report_pipeline_stage_result again") {
+		t.Fatalf("refusal does not explain the retryable boundary: %q", controlled.Message)
 	}
 
 	// FS-14.R19: the refusal changed nothing, so the attempt is still the run's
@@ -69,11 +71,10 @@ func TestRefusedStageReportMustBeRetryable(t *testing.T) {
 
 	// So the assignment must not present the one call as unconditional. It has
 	// to separate "AgentDeck accepted your result" from "you invoked the tool".
-	if !strings.Contains(work.AssignmentText, "exactly once") {
-		t.Skip("assignment no longer says exactly once; re-read the finding before changing this")
-	}
 	lowered := strings.ToLower(work.AssignmentText)
-	if !strings.Contains(lowered, "refus") && !strings.Contains(lowered, "reject") && !strings.Contains(lowered, "accepted result") {
-		t.Fatalf("assignment tells the agent to report exactly once without saying that a refused call is not a report:\n%s", work.AssignmentText)
+	for _, required := range []string{"agentdeck accepts the result", "refused call records nothing", "still owing a result", "send it again"} {
+		if !strings.Contains(lowered, required) {
+			t.Fatalf("assignment omits %q from the accepted-result boundary:\n%s", required, work.AssignmentText)
+		}
 	}
 }

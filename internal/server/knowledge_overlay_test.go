@@ -154,6 +154,12 @@ func TestKnowledgeOverlayReachesEveryLifecycleComposer(t *testing.T) {
 		t.Run(tc.lifecycle+" with the package available", func(t *testing.T) {
 			srv.knowledge = agentknowledge.Installation{Available: true, Root: root, SkillDir: skillDir}
 			spec := tc.compose(t)
+			if len(spec.AutoApproveTools) != 15 {
+				t.Fatalf("AgentDeck auto-approve identities = %d, want 15", len(spec.AutoApproveTools))
+			}
+			if _, ok := spec.AutoApproveTools["mcp__agentdeck-messaging__report_pipeline_stage_result"]; !ok {
+				t.Fatal("pipeline result action missing from runtime overlay")
+			}
 			if got := countStr(spec.StartAddDirs(), root); got != 1 {
 				t.Errorf("managed dir appears %d times in %v", got, spec.StartAddDirs())
 			}
@@ -177,6 +183,9 @@ func TestKnowledgeOverlayReachesEveryLifecycleComposer(t *testing.T) {
 		t.Run(tc.lifecycle+" with the package unavailable", func(t *testing.T) {
 			srv.knowledge = agentknowledge.Installation{}
 			spec := tc.compose(t)
+			if len(spec.AutoApproveTools) != 15 {
+				t.Fatalf("AgentDeck auto-approve identities = %d, want 15", len(spec.AutoApproveTools))
+			}
 			if countStr(spec.StartAddDirs(), root) != 0 ||
 				strings.Contains(spec.StartSystemPrompt(), skillDir) ||
 				envValue(spec.StartEnv(), "AGENTDECK_SKILL_DIR") != "" {

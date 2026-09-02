@@ -40,6 +40,12 @@ func startPermAgent(t *testing.T, skip bool, timeout string) (*ChatRuntime, *Han
 		"FAKEACP_SENTINEL=" + sentinel,
 		"HOME=" + os.Getenv("HOME"),
 	}
+	if title := os.Getenv("FAKEACP_PERMISSION_TITLE"); title != "" {
+		env = append(env, "FAKEACP_PERMISSION_TITLE="+title)
+	}
+	if os.Getenv("FAKEACP_PERMISSION_ALLOW_ALWAYS_ONLY") == "1" {
+		env = append(env, "FAKEACP_PERMISSION_ALLOW_ALWAYS_ONLY=1")
+	}
 	if timeout != "" {
 		env = append(env, "PERMISSION_TIMEOUT="+timeout)
 		t.Setenv("PERMISSION_TIMEOUT", timeout) // read by the runtime side
@@ -50,6 +56,9 @@ func startPermAgent(t *testing.T, skip bool, timeout string) (*ChatRuntime, *Han
 	spec := LaunchSpec{
 		Agent: agent, Cwd: t.TempDir(), BackendType: "claude-acp",
 		ModelID: "claude-sonnet-4-6", SkipPerms: skip, Env: env,
+	}
+	if tool := os.Getenv("TEST_AUTO_APPROVE_TOOL"); tool != "" {
+		spec.AutoApproveTools = map[string]struct{}{tool: {}}
 	}
 	h, err := c.Start(context.Background(), spec)
 	if err != nil {
@@ -178,6 +187,65 @@ func TestPermissionSkip(t *testing.T) {
 	// Never entered waiting_input.
 	if st, _ := c.store.ReadStatus(h.AgentID); st.State == "waiting_input" {
 		t.Fatal("skip_permissions must not enter waiting_input")
+	}
+}
+
+func TestAgentDeckToolPermissionAutoApprovesExactIdentity(t *testing.T) {
+	const identity = "mcp__agentdeck-messaging__send_message"
+	t.Setenv("FAKEACP_PERMISSION_TITLE", identity)
+	t.Setenv("TEST_AUTO_APPROVE_TOOL", identity)
+	c, h, sentinel, ch := startPermAgent(t, false, "")
+	if err := c.SendPrompt(context.Background(), h.AgentID, "send"); err != nil {
+		t.Fatal(err)
+	}
+	pr := waitForEvent(t, ch, EvPermissionRequest)
+	var data PermissionRequestData
+	_ = json.Unmarshal(pr.Data, &data)
+	if !data.AutoApproved {
+		t.Fatal("AgentDeck tool request was not recorded as auto-approved")
+	}
+	waitForEvent(t, ch, EvTurnEnd)
+	if !fileExists(sentinel) {
+		t.Fatal("AgentDeck tool did not execute")
+	}
+}
+
+func TestAgentDeckToolPermissionFailsClosedOnDifferentServer(t *testing.T) {
+	t.Setenv("FAKEACP_PERMISSION_TITLE", "mcp__other__send_message")
+	t.Setenv("TEST_AUTO_APPROVE_TOOL", "mcp__agentdeck-messaging__send_message")
+	c, h, sentinel, ch := startPermAgent(t, false, "")
+	if err := c.SendPrompt(context.Background(), h.AgentID, "send"); err != nil {
+		t.Fatal(err)
+	}
+	pr := waitForEvent(t, ch, EvPermissionRequest)
+	var data PermissionRequestData
+	_ = json.Unmarshal(pr.Data, &data)
+	if data.AutoApproved || fileExists(sentinel) {
+		t.Fatal("same-named tool from another server bypassed the gate")
+	}
+}
+
+func TestAgentDeckToolDoesNotChooseAlwaysAllow(t *testing.T) {
+	const identity = "mcp__agentdeck-messaging__send_message"
+	t.Setenv("FAKEACP_PERMISSION_TITLE", identity)
+	t.Setenv("FAKEACP_PERMISSION_ALLOW_ALWAYS_ONLY", "1")
+	t.Setenv("TEST_AUTO_APPROVE_TOOL", identity)
+	c, h, sentinel, ch := startPermAgent(t, false, "")
+	if err := c.SendPrompt(context.Background(), h.AgentID, "send"); err != nil {
+		t.Fatal(err)
+	}
+	pr := waitForEvent(t, ch, EvPermissionRequest)
+	var data PermissionRequestData
+	_ = json.Unmarshal(pr.Data, &data)
+	if data.AutoApproved || fileExists(sentinel) {
+		t.Fatal("AgentDeck selected an always-allow provider option")
+	}
+}
+
+func TestPermissionDeadlineIsOffByDefault(t *testing.T) {
+	t.Setenv("PERMISSION_TIMEOUT", "")
+	if got := permissionTimeout(); got != 0 {
+		t.Fatalf("default permission timeout = %s, want disabled", got)
 	}
 }
 

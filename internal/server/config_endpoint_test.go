@@ -247,6 +247,32 @@ func TestTaskConcurrencySettingRoundTripsAndRejectsNonPositive(t *testing.T) {
 	}
 }
 
+// FS-04.A26 — the messaging budget is an additive effective config value.
+func TestMessageBudgetSettingRoundTripsAndRejectsNonPositive(t *testing.T) {
+	srv := testServerWithOkCreds(t)
+	h := srv.routes()
+	rec := doGET(t, h, "/api/config")
+	var initial configResponse
+	if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &initial) != nil {
+		t.Fatalf("GET /api/config = %d %s", rec.Code, rec.Body.String())
+	}
+	if initial.MessageBudgetPerTurn != 50 {
+		t.Fatalf("default message budget = %d, want 50", initial.MessageBudgetPerTurn)
+	}
+	rec = doRequest(t, h, http.MethodPut, "/api/config", map[string]any{"message_budget_per_turn": 7})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT message budget = %d %s", rec.Code, rec.Body.String())
+	}
+	got, err := srv.configStore.ReadConfig()
+	if err != nil || got.MessageBudgetPerTurn != 7 {
+		t.Fatalf("saved message budget = %d, %v", got.MessageBudgetPerTurn, err)
+	}
+	rec = doRequest(t, h, http.MethodPut, "/api/config", map[string]any{"message_budget_per_turn": 0})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("PUT zero message budget = %d, want 400", rec.Code)
+	}
+}
+
 func TestPutConfigRejectsImmutableFields(t *testing.T) {
 	srv := testServerWithOkCreds(t)
 	h := srv.routes()

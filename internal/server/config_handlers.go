@@ -779,6 +779,7 @@ func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	normalizeNotifications(&cfg)
 	normalizeTaskConcurrency(&cfg)
+	normalizeMessageBudget(&cfg)
 
 	writeJSON(w, http.StatusOK, configResponse{
 		Config:                cfg,
@@ -808,15 +809,22 @@ func normalizeTaskConcurrency(cfg *config.Config) {
 	}
 }
 
+func normalizeMessageBudget(cfg *config.Config) {
+	if cfg.MessageBudgetPerTurn <= 0 {
+		cfg.MessageBudgetPerTurn = config.DefaultConfig().MessageBudgetPerTurn
+	}
+}
+
 // configPutBody is the request body for PUT /api/config (§5.5).
 // Only the user-editable subset; version and port are rejected.
 type configPutBody struct {
-	OnboardingComplete *bool                       `json:"onboarding_complete"`
-	DefaultProject     *string                     `json:"default_project"`
-	DefaultRole        *string                     `json:"default_role"`
-	AppearanceSkin     *string                     `json:"appearance_skin"`
-	Notifications      *config.NotificationsConfig `json:"notifications"`
-	TaskConcurrency    *int                        `json:"task_concurrency"`
+	OnboardingComplete   *bool                       `json:"onboarding_complete"`
+	DefaultProject       *string                     `json:"default_project"`
+	DefaultRole          *string                     `json:"default_role"`
+	AppearanceSkin       *string                     `json:"appearance_skin"`
+	Notifications        *config.NotificationsConfig `json:"notifications"`
+	TaskConcurrency      *int                        `json:"task_concurrency"`
+	MessageBudgetPerTurn *int                        `json:"message_budget_per_turn"`
 	// Sentinel fields: reject if present.
 	Version *int `json:"version"`
 	Port    *int `json:"port"`
@@ -850,6 +858,10 @@ func (s *Server) handlePutConfig(w http.ResponseWriter, r *http.Request) {
 		}})
 		return
 	}
+	if body.MessageBudgetPerTurn != nil && *body.MessageBudgetPerTurn <= 0 {
+		writeValidationError(w, &config.ValidationErrors{Errors: []config.FieldError{{Field: "message_budget_per_turn", Code: "invalid", Message: "message budget per turn must be a positive integer"}}})
+		return
+	}
 
 	cfg, err := s.configStore.ReadConfig()
 	if err != nil {
@@ -861,6 +873,7 @@ func (s *Server) handlePutConfig(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	normalizeMessageBudget(&cfg)
 
 	// Validate that referenced defaults exist (a dangling default would surface as
 	// a broken pre-selection in the launch modal / onboarding).
@@ -911,6 +924,9 @@ func (s *Server) handlePutConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.TaskConcurrency != nil {
 		cfg.TaskConcurrency = *body.TaskConcurrency
+	}
+	if body.MessageBudgetPerTurn != nil {
+		cfg.MessageBudgetPerTurn = *body.MessageBudgetPerTurn
 	}
 
 	if err := s.writeConfig(cfg); err != nil {

@@ -1,6 +1,6 @@
 # FS-06 — Agent coordination & notifications
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/messaging/`, `internal/state/messages.go`, `internal/server/` (`messaging_registration.go`, `messaging_loops.go`, `sessions.go`), `internal/bus/`, `ui/src/api/sse.ts`, `ui/src/components/grid/AgentCard.tsx`, `ui/src/components/shell/NotificationCenter.tsx`, `ui/src/features/settings/NotificationsEditor.tsx` · **Journeys:** J10, J11, J12
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) F8/F11 and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -78,7 +78,7 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   also resets cleanly and retains only one current budget row per agent, so a stale higher turn id
   cannot make the first post-restart turn appear exhausted.
 
-- **R29 (planned)** — A refusal names the real condition and the change that resolves
+- **R29** — A refusal names the real condition and the change that resolves
   it. When `create_task` or `send_message` cannot reach a stopped agent because R22 holds
   pipeline-associated agents out of the addressable set, the refusal says that — that the agent
   exists but is held out while it is associated with a pipeline stage, and that resuming it makes
@@ -89,7 +89,7 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   How long the exclusion should last after a run ends is a separate, unresolved product decision
   recorded in the handoff; this requirement does not change it.
 
-- **R28 (planned)** — The per-turn messaging budget is a configured value that defaults
+- **R28** — The per-turn messaging budget is a configured value that defaults
   to 50, not the fixed 15 of R11. This supersedes only R11's number; every other obligation in R11
   and R12 is unchanged — consumption is still transactional with the message mutation, the action
   that would exceed the budget still does not occur, responses still expose remaining and exhausted
@@ -302,14 +302,14 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   `internal/state/messages_test.go::TestPendingMailActivationsReadsABoundedOldestFirstBatch` and
   `internal/server/activation_test.go::TestMailActivationDefersWhenNoAdmissionSlotIsFree`.
 
-- **A19 (planned)** (R29) — A `create_task` and a `send_message` aimed at a stopped
+- **A19** (R29) — A `create_task` and a `send_message` aimed at a stopped
   pipeline-associated agent are each refused with a message naming the pipeline association and the
   resume that resolves it, keep the `after_change` class, and are accepted once that agent is
   resumed; an ordinary unknown recipient still reports that no agent matches. —
   `internal/messaging/pipeline_agent_task_target_test.go` (the committed skipped reproduction,
   unskipped by the implementation) and `internal/messaging/task_tools_test.go`.
 
-- **A18 (planned)** (R28) — With no configured value, an agent's turn admits 50 combined
+- **A18** (R28) — With no configured value, an agent's turn admits 50 combined
   sends and reads and refuses the 51st with the existing breach outcome, warning, and notification;
   with a configured value the same boundary holds at that value; and an absent, non-numeric, zero,
   and negative value each behave exactly as the default. A value changed between turns applies to

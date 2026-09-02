@@ -5,6 +5,26 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-09-02 — Implementation: unattended pipeline runs
+
+Pipeline runs no longer need a person to approve AgentDeck's own control actions. Those actions are
+matched exactly from the registered tool set and allowed for one call only; file edits, commands,
+network access, and other tools still follow the normal permission policy. Real approvals now wait
+without expiring by default, make the run visibly need attention, and log withheld actions.
+
+Retryable stage-result refusals now tell the agent to correct and resend the result. Messaging allows
+50 combined sends and reads per turn by default, supports a configurable limit, and explains when a
+stopped pipeline agent must be resumed. The run page explains Continue versus Retry, displays each
+attempt's declared outputs, and opens named values when a run finishes. The full automated test,
+race, specification, UI, production-build, and distributable-build checks pass.
+
+**Needs attention:** The final real-provider browser journey still needs authorization: confirm an
+AgentDeck action proceeds without a prompt, an ordinary file edit still prompts, and approving it
+after more than three minutes continues the stage.
+
+**Next:** Have an independent agent review this implementation, then run the credentialed browser
+journey when a human is available to authorize provider sessions.
+
 ### 2026-09-02 — State cleanup: review queue
 
 The handoff now distinguishes the fixed worktree implementation findings from the independent review

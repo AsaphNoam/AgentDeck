@@ -173,6 +173,14 @@ type acpPermissionOpt struct {
 	Kind     string `json:"kind"` // allow_once | allow_always | reject_once | reject_always
 }
 
+func permissionToolIdentity(params json.RawMessage) string {
+	var pr acpPermissionRequest
+	if json.Unmarshal(params, &pr) != nil {
+		return ""
+	}
+	return pr.ToolCall.Title
+}
+
 // mapPermissionRequest converts the ACP permission request into normalized
 // PermissionRequestData plus a kind→optionId table for choosing the reply option
 // (techspec §5.3). expiresAt is RFC3339; autoApproved reflects skip_permissions.
@@ -180,7 +188,7 @@ func mapPermissionRequest(params json.RawMessage, expiresAt string, autoApproved
 	var pr acpPermissionRequest
 	_ = json.Unmarshal(params, &pr)
 
-	name := strutil.FirstNonEmpty(pr.ToolCall.Kind, pr.ToolCall.Title, "tool")
+	name := strutil.FirstNonEmpty(pr.ToolCall.Title, pr.ToolCall.Kind, "tool")
 	opts := make([]PermOption, 0, len(pr.Options))
 	byKind := make(map[string]string, len(pr.Options))
 	for _, o := range pr.Options {

@@ -316,6 +316,38 @@ func TestSendMessageBudgetExceeded(t *testing.T) {
 	}
 }
 
+func TestConfiguredBudgetFreezesForTheCurrentTurn(t *testing.T) {
+	st := newStore(t)
+	liveAgent(t, st, "a_impl", "Atlas", "implementer", "my-app")
+	liveAgent(t, st, "a_rev", "Nova", "reviewer", "my-app")
+	if err := st.ResetTurnBudget("a_impl", "turn-1"); err != nil {
+		t.Fatal(err)
+	}
+	configured := 2
+	srv := New(st, nil)
+	srv.SetBudgetProvider(func() int { return configured })
+	srv.Register("tok-impl", "a_impl")
+	cs := connect(t, srv, "tok-impl")
+	if result, failed := call(t, cs, "send_message", map[string]any{"to": "a_rev", "body": "one"}); failed {
+		t.Fatalf("first send: %v", result)
+	}
+	configured = 3
+	if result, failed := call(t, cs, "send_message", map[string]any{"to": "a_rev", "body": "two"}); failed {
+		t.Fatalf("second send: %v", result)
+	}
+	if result, failed := call(t, cs, "send_message", map[string]any{"to": "a_rev", "body": "three"}); !failed || result["error"] != "message_budget_exceeded" {
+		t.Fatalf("third send = %v failed=%v", result, failed)
+	}
+	if err := st.ResetTurnBudget("a_impl", "turn-2"); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		if result, failed := call(t, cs, "send_message", map[string]any{"to": "a_rev", "body": "next"}); failed {
+			t.Fatalf("turn 2 send %d: %v", i+1, result)
+		}
+	}
+}
+
 func TestCheckMessagesCapsAtRemainingBudget(t *testing.T) {
 	st := newStore(t)
 	liveAgent(t, st, "a_impl", "Atlas", "implementer", "my-app")

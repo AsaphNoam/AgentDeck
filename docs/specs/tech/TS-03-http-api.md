@@ -407,7 +407,7 @@ stop-and-registration-cleanup operation.
   its session response (FS-19.R7). All use the standard error envelope; shapes and semantics live
   in TS-12 §3.
 
-**R34 (planned) — The turn budget extends the existing config route only.** `GET
+**R34 — The turn budget extends the existing config route only.** `GET
 /api/config` adds optional integer `message_budget_per_turn`; `PUT /api/config` accepts it in the
 existing partial-merge body (FS-04.R46). Omission preserves the stored value, and a non-numeric,
 zero, or negative submitted value returns the existing field-validation envelope naming the field
@@ -415,7 +415,7 @@ and writes nothing, rather than persisting a value that would remove the bound. 
 effective value so a client never has to know the default, and the existing corrupt-config fallback
 returns the default like every other field. No new route, no new envelope shape.
 
-**R35 (planned) — The awaiting-approval attention value ships on the paths that already
+**R35 — The awaiting-approval attention value ships on the paths that already
 carry attention.** The run detail response and the `pipeline_update` SSE event both carry the
 derived awaiting-approval state (TS-09.R29) alongside the attention reason they already carry; no
 new route, event type, or subscription is added. It is derived on read, so a reconnecting or

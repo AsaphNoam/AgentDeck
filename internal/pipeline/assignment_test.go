@@ -25,7 +25,9 @@ func TestRenderAssignmentPreservesReportingProtocolAtMaximumInput(t *testing.T) 
 		t.Fatalf("assignment has %d runes, max %d", utf8.RuneCountInString(text), maxAssignmentRunes)
 	}
 	for _, required := range []string{
-		"call report_pipeline_stage_result exactly once",
+		"call report_pipeline_stage_result",
+		"Your part ends only when AgentDeck accepts the result",
+		"A refused call records nothing",
 		"outcome success, failure, or blocked",
 		"Declared outputs (use these local names):\n- implementation",
 	} {

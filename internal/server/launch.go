@@ -375,6 +375,10 @@ const knowledgePrompt = "AgentDeck operator knowledge is in the bundled operatin
 // resume, switch, wake, terminal, and pipeline work (TS-11.R4-R5). Its fields
 // are deliberately invisible to runtimeMeta's frozen session snapshot.
 func (s *Server) applyKnowledgeOverlay(spec runtime.LaunchSpec) runtime.LaunchSpec {
+	spec.AutoApproveTools = make(map[string]struct{}, len(s.messaging.ToolNames()))
+	for _, tool := range s.messaging.ToolNames() {
+		spec.AutoApproveTools["mcp__"+messagingMCPName+"__"+tool] = struct{}{}
+	}
 	spec.Env = removeEnvKey(spec.Env, "AGENTDECK_SKILL_DIR")
 	if !s.knowledge.Available {
 		return spec

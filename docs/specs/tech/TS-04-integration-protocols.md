@@ -349,7 +349,7 @@ global resource list.
 
 ### Approval exemption for AgentDeck's own actions
 
-- **R41 (planned) — One composed AgentDeck-tool identity, derived not duplicated.** The set
+- **R41 — One composed AgentDeck-tool identity, derived not duplicated.** The set
   of tool identities exempt from the approval gate (FS-03.R40) is composed once, at the same place
   that registers the in-process MCP server, from that server's registered name and its registered
   tool names — not from a second hand-maintained list that could drift as tools are added or renamed
@@ -358,7 +358,7 @@ global resource list.
   parameters (TS-01.R27), so launch, resume, switch, wake, and pipeline stage start all receive the
   current set through one helper and no agent carries a stale set from a frozen session snapshot.
 
-- **R42 (planned) — Identification is an exact match on composed identity, and fails
+- **R42 — Identification is an exact match on composed identity, and fails
   closed.** A pending `session/request_permission` is exempt only when the tool identity the adapter
   supplies matches a composed identity exactly, on both server name and tool name. The runtime reads
   that identity from the adapter-supplied tool name — `toolCall.title` for adapters that carry the
@@ -372,7 +372,7 @@ global resource list.
   form. Each supported backend's actual shape is confirmed under the credentialed gate before that
   backend is claimed (FS-09.A7, INV §12); an unconfirmed backend prompts rather than exempting.
 
-- **R43 (planned) — The exemption answers with a single-use allow and creates no
+- **R43 — The exemption answers with a single-use allow and creates no
   provider-side rule.** The exemption responds by selecting the adapter's single-use allow option,
   not its always-allow option, so the decision is AgentDeck's on every call and no persistent
   permission rule is written into a provider's configuration. The always-allow route was examined
@@ -383,7 +383,7 @@ global resource list.
   more path that atomically claims a request, and it emits exactly one ACP response and one
   normalized resolution like every other.
 
-- **R44 (planned) — The approval deadline is optional and off by default.** The runtime's
+- **R44 — The approval deadline is optional and off by default.** The runtime's
   auto-deny timer is armed only when an explicit deadline is configured (FS-03.R43). With none, a
   gated request has no timer and remains pending until a decision, cancellation, or agent stop
   claims it under R4. Removing the timer removes a resolver, never a claimant: cancel, stop, and

@@ -45,15 +45,18 @@ type LaunchSpec struct {
 	// ignored by the chat runtime. Empty defaults to the cross-platform xterm/PTY
 	// driver. The server validates availability against the capability probe before
 	// launch (§3.5), so an unavailable driver never reaches the runtime.
-	Driver         string
-	Env            []string        // composed env layering (backend then per-model override), "K=V"
-	RuntimeEnv     []string        // process-only final env; empty means use the frozen Env
-	SkipPerms      bool            // effective skip_permissions after role/global resolution
-	HookToken      string          // per-launch one-time token passed to the agent's hooks
-	MCPServers     []MCPServerSpec // messaging MCP server registration; one entry this phase
-	ExtraArgs      []string        // reserved (e.g. extra adapter flags) — empty this phase
-	LastSessionID  string          // prior CLI session id; Resume tries session/load with this
-	LastContextPct float64         // last-known context pct; Resume restores it to the status row
+	Driver     string
+	Env        []string // composed env layering (backend then per-model override), "K=V"
+	RuntimeEnv []string // process-only final env; empty means use the frozen Env
+	SkipPerms  bool     // effective skip_permissions after role/global resolution
+	// AutoApproveTools is the current code-derived set of AgentDeck MCP tool
+	// identities allowed once without entering the human permission gate.
+	AutoApproveTools map[string]struct{}
+	HookToken        string          // per-launch one-time token passed to the agent's hooks
+	MCPServers       []MCPServerSpec // messaging MCP server registration; one entry this phase
+	ExtraArgs        []string        // reserved (e.g. extra adapter flags) — empty this phase
+	LastSessionID    string          // prior CLI session id; Resume tries session/load with this
+	LastContextPct   float64         // last-known context pct; Resume restores it to the status row
 	// LaunchConfig is the frozen configuration-federation launch object (Phase 7
 	// techspec §2.5): redacted requested-vs-resolved model/effort/provider, binding
 	// backend/provider/profile, source generation + fingerprints, native-inherit

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
@@ -48,11 +49,13 @@ type Server struct {
 	registry    *runtime.Registry
 	// taskGeneration is the task dispatcher's generation lookup. Tests replace
 	// it to cover a runtime disappearing between wake and durable confirmation.
-	taskGeneration func(string) string
-	terminal       *terminal.Runtime
-	cfg            config.Config
-	log            *slog.Logger
-	knowledge      agentknowledge.Installation
+	taskGeneration  func(string) string
+	terminal        *terminal.Runtime
+	cfg             config.Config
+	log             *slog.Logger
+	knowledge       agentknowledge.Installation
+	permissionMu    sync.Mutex
+	permissionTools map[string]string
 
 	indexer           *persistindex.Indexer
 	messaging         *messaging.Server
@@ -182,6 +185,13 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	stateMgr := state.NewManager(stateStore, eventBus)
 	ix := persistindex.New(stateStore.DB())
 	msg := messaging.New(stateStore, log)
+	msg.SetBudgetProvider(func() int {
+		current, err := cfgStore.ReadConfig()
+		if err != nil || current.MessageBudgetPerTurn <= 0 {
+			return config.DefaultConfig().MessageBudgetPerTurn
+		}
+		return current.MessageBudgetPerTurn
+	})
 	activationCh := make(chan string, 32)
 	touch := func(agentID string) {
 		if _, err := stateMgr.Touch(agentID); err != nil {
@@ -254,6 +264,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		cfg:                       cfg,
 		log:                       log,
 		knowledge:                 installedKnowledge,
+		permissionTools:           map[string]string{},
 		hookTokens:                map[string]string{},
 		mcpCleanups:               map[string]func(){},
 		switching:                 map[string]bool{},
@@ -296,6 +307,9 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	if registry != nil {
 		registry.SetEventSink(func(ev runtime.Event) {
 			eventBus.PublishRuntimeEvent(ev)
+			if ev.Type == runtime.EvPermissionRequest || ev.Type == runtime.EvPermissionResolved {
+				s.handlePermissionEvent(ev)
+			}
 			if ev.Type == runtime.EvTurnEnd {
 				generation := registry.Generation(ev.AgentID)
 				go s.dispatchTurnEnd(ev.AgentID, generation)
@@ -310,6 +324,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 			s.teardownAgentRegistration(agentID)
 			s.interruptTaskOnExit(agentID, generation, cause)
 			if s.pipelineMgr != nil {
+				s.pipelineMgr.ClearPermissionAttention(agentID, generation)
 				go func() {
 					if err := s.pipelineMgr.OnExit(agentID, generation, cause); err != nil {
 						s.log.Warn("pipeline agent exit", "agent_id", agentID, "err", err)
@@ -319,6 +334,40 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		})
 	}
 	return s
+}
+
+func (s *Server) handlePermissionEvent(ev runtime.Event) {
+	if s.pipelineMgr == nil {
+		return
+	}
+	keyPrefix := ev.AgentID + "\x00" + ev.Generation + "\x00"
+	if ev.Type == runtime.EvPermissionRequest {
+		var data runtime.PermissionRequestData
+		if json.Unmarshal(ev.Data, &data) != nil || data.AutoApproved {
+			return
+		}
+		s.permissionMu.Lock()
+		s.permissionTools[keyPrefix+data.ToolCallID] = data.Name
+		s.permissionMu.Unlock()
+		if err := s.pipelineMgr.OnPermissionEvent(ev.AgentID, ev.Generation, data.ToolCallID, true); err != nil {
+			s.log.Warn("pipeline permission attention", "agent_id", ev.AgentID, "err", err)
+		}
+		return
+	}
+	var data runtime.PermissionResolvedData
+	if json.Unmarshal(ev.Data, &data) != nil {
+		return
+	}
+	s.permissionMu.Lock()
+	name := s.permissionTools[keyPrefix+data.ToolCallID]
+	delete(s.permissionTools, keyPrefix+data.ToolCallID)
+	s.permissionMu.Unlock()
+	if data.Decision == "deny" || data.Decision == "timeout" || data.Decision == "cancelled" {
+		s.log.Warn("permission withheld tool", "agent_id", ev.AgentID, "tool", name, "decision", data.Decision)
+	}
+	if err := s.pipelineMgr.OnPermissionEvent(ev.AgentID, ev.Generation, data.ToolCallID, false); err != nil {
+		s.log.Warn("pipeline permission attention", "agent_id", ev.AgentID, "err", err)
+	}
 }
 
 // Start binds 127.0.0.1:{cfg.Port}, asserts the listener is loopback, serves

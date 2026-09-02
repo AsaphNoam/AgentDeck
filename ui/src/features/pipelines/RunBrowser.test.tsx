@@ -409,5 +409,26 @@ describe("pauses whose stage agent is not running", () => {
 
     await screen.findByRole("heading", { name: "Ship", level: 2 });
     expect(screen.getByRole("link", { name: "Open agent" })).toHaveAttribute("href", "/agent/a_live");
+    expect(screen.getByText("Continue needs new input for the blocked stage.")).toBeInTheDocument();
+    expect(screen.getByText("Retry starts a fresh agent with bounded summaries of prior attempts.")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "use the cache" } });
+    expect(screen.getByText("Continue sends this input to the same stage agent.")).toBeInTheDocument();
   });
+});
+
+// FS-14.A32: declared outputs are read beside the attempt that produced them,
+// and a finished run exposes its named values without another click.
+it("renders attempt outputs and opens named values for a finished run", async () => {
+  server.use(http.get("/api/pipeline-runs/run_1", () => HttpResponse.json({
+    ...detail,
+    run: { ...run, state: "completed", current_agent_id: "", final_outcome: "success" },
+    attempts: [{ ...attempt("at_1", "a_stopped", 1, "completed"), report_outcome: "success", report_summary: "Done", report_outputs: { report: "Full review" } }],
+    values: [{ run_id: "run_1", name: "final_report", value: "Full review", source_kind: "stage", source_attempt_id: "at_1", updated_at: "2026-07-26T00:00:00Z" }],
+  })));
+  const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+  const { container } = render(<QueryClientProvider client={client}><MemoryRouter><RunBrowser selectedID="run_1" /></MemoryRouter></QueryClientProvider>);
+
+  await screen.findByText("Output · report");
+  expect(screen.getAllByText("Full review")).toHaveLength(2);
+  expect(container.querySelector('[data-slot="values"]')).toHaveAttribute("open");
 });

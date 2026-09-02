@@ -9,7 +9,21 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/agentdeck/agentdeck/internal/toolresult"
 )
+
+type retryClass = toolresult.RetryClass
+
+const (
+	retryNever       = toolresult.RetryNever
+	retryAfterChange = toolresult.RetryAfterChange
+	retryNextTurn    = toolresult.RetryNextTurn
+	retryTransient   = toolresult.RetryTransient
+)
+
+var refusalRetryClasses = toolresult.Classes()
+
+func classifyRetry(code string) retryClass { return toolresult.Classify(code) }
 
 // caller resolves the calling agent_id from the per-request session token
 // (techspec §3.1). Identity is bound to the registered session, never to a tool
@@ -19,56 +33,6 @@ func (s *Server) caller(req *mcp.CallToolRequest) (SessionIdentity, bool) {
 		return SessionIdentity{}, false
 	}
 	return s.LookupSession(req.Extra.Header.Get(TokenHeader))
-}
-
-type retryClass string
-
-const (
-	retryNever       retryClass = "never"
-	retryAfterChange retryClass = "after_change"
-	retryNextTurn    retryClass = "next_turn"
-	retryTransient   retryClass = "transient"
-)
-
-var refusalRetryClasses = map[string]retryClass{
-	"validation":                 retryNever,
-	"invalid_body":               retryNever,
-	"invalid_subject":            retryNever,
-	"invalid_outcome":            retryNever,
-	"invalid_state":              retryNever,
-	"invalid_cursor":             retryNever,
-	"dependency_cycle":           retryNever,
-	"target_ineligible":          retryNever,
-	"already_reported":           retryNever,
-	"not_assigned":               retryNever,
-	"not_creator":                retryNever,
-	"retry_requires_rearm":       retryNever,
-	"task_not_found":             retryNever,
-	"context_not_found":          retryNever,
-	"context_source_unavailable": retryNever,
-	"proposal_forbidden":         retryNever,
-	"session_unknown":            retryNever,
-	"assignment_unknown":         retryNever,
-	"stale_assignment":           retryNever,
-
-	"ambiguous_recipient": retryAfterChange,
-	"recipient_not_found": retryAfterChange,
-	"source_unavailable":  retryAfterChange,
-	"validation_failed":   retryAfterChange,
-
-	"message_budget_exceeded": retryNextTurn,
-
-	"internal":             retryTransient,
-	"store_unavailable":    retryTransient,
-	"context_unavailable":  retryTransient,
-	"pipeline_unavailable": retryTransient,
-}
-
-func classifyRetry(code string) retryClass {
-	if class, ok := refusalRetryClasses[code]; ok {
-		return class
-	}
-	return retryTransient
 }
 
 // jsonResult marshals v into a single text-content tool result and mirrors JSON
@@ -89,7 +53,7 @@ func errResult(v any) (*mcp.CallToolResult, any, error) {
 	if payload, ok := v.(map[string]any); ok {
 		payload = cloneMap(payload)
 		if code, ok := payload["error"].(string); ok {
-			payload["retry"] = map[string]any{"class": classifyRetry(code)}
+			payload["retry"] = map[string]any{"class": toolresult.Classify(code)}
 		}
 		v = payload
 	}
@@ -195,6 +159,9 @@ func (s *Server) handleSendMessage(_ context.Context, req *mcp.CallToolRequest, 
 				"message":    fmt.Sprintf("Multiple live agents match %q; address by agent_id.", in.To),
 				"candidates": amb.Candidates})
 		case errors.Is(err, state.ErrRecipientNotFound):
+			if message, diagnosed := s.pipelineRecipientRefusal(in.To); diagnosed {
+				return errResult(map[string]any{"ok": false, "error": "recipient_not_found", "message": message, "candidates": candidates})
+			}
 			return errResult(map[string]any{"ok": false, "error": "recipient_not_found",
 				"message":    fmt.Sprintf("No live agent matches %q.", in.To),
 				"candidates": candidates})
@@ -213,6 +180,7 @@ func (s *Server) handleSendMessage(_ context.Context, req *mcp.CallToolRequest, 
 		return storeUnavailable(err)
 	}
 
+	budgetLimit := s.budgetLimit(self)
 	msgID, budget, breached, err := s.store.InsertMessageWithBudget(state.Message{
 		FromAgent:   self,
 		FromAddress: sender.Role + "@" + sender.Project,
@@ -221,18 +189,18 @@ func (s *Server) handleSendMessage(_ context.Context, req *mcp.CallToolRequest, 
 		Subject:     in.Subject,
 		Body:        in.Body,
 		InReplyTo:   in.InReplyTo,
-	}, MessageBudgetPerTurn)
+	}, budgetLimit)
 	if err != nil {
 		return storeUnavailable(err)
 	}
 	if breached {
-		s.budgetExceeded(self, budget.TurnID, MessageBudgetPerTurn-budget.Remaining)
+		s.budgetExceeded(self, budget.TurnID, budgetLimit-budget.Remaining)
 		return errResult(map[string]any{
 			"ok":      false,
 			"error":   "message_budget_exceeded",
-			"message": fmt.Sprintf("Per-turn message budget (%d) reached. This message was not sent.", MessageBudgetPerTurn),
-			"budget":  MessageBudgetPerTurn,
-			"used":    MessageBudgetPerTurn,
+			"message": fmt.Sprintf("Per-turn message budget (%d) reached. This message was not sent.", budgetLimit),
+			"budget":  budgetLimit,
+			"used":    budgetLimit,
 		})
 	}
 	s.messageInserted(self, toID)
@@ -242,6 +210,27 @@ func (s *Server) handleSendMessage(_ context.Context, req *mcp.CallToolRequest, 
 		"to":         toID,
 		"to_address": recipient.Role + "@" + recipient.Project,
 	})
+}
+
+func (s *Server) pipelineRecipientRefusal(selector string) (string, bool) {
+	recipients, err := s.store.ContextRecipients()
+	if err != nil {
+		return "", false
+	}
+	agentID, _, err := state.ResolveRecipient(recipients, selector)
+	if err != nil {
+		return "", false
+	}
+	for _, recipient := range recipients {
+		if recipient.AgentID != agentID || recipient.Availability != state.AvailabilityStopped {
+			continue
+		}
+		association, err := s.store.PipelineAssociationForAgent(agentID)
+		if err == nil && association != nil {
+			return fmt.Sprintf("Agent %q is stopped and held out while associated with pipeline stage %q; resume the agent, then try again.", selector, association.StageID), true
+		}
+	}
+	return "", false
 }
 
 // --- check_messages (techspec §3.5) ---
@@ -281,12 +270,13 @@ func (s *Server) handleCheckMessages(_ context.Context, req *mcp.CallToolRequest
 		limit = maxCheckLimit
 	}
 	self := identity.AgentID
-	msgs, budget, breached, err := s.store.TakeMessagesWithBudget(self, unreadOnly, limit, MessageBudgetPerTurn, markRead, deleteAfter)
+	budgetLimit := s.budgetLimit(self)
+	msgs, budget, breached, err := s.store.TakeMessagesWithBudget(self, unreadOnly, limit, budgetLimit, markRead, deleteAfter)
 	if err != nil {
 		return storeUnavailable(err)
 	}
 	if breached {
-		s.budgetExceeded(self, budget.TurnID, MessageBudgetPerTurn-budget.Remaining)
+		s.budgetExceeded(self, budget.TurnID, budgetLimit-budget.Remaining)
 	}
 
 	out := make([]outMessage, len(msgs))
@@ -319,15 +309,15 @@ func (s *Server) handleCheckMessages(_ context.Context, req *mcp.CallToolRequest
 		"budget_remaining":   budget.Remaining,
 		"budget_exhausted":   budget.Remaining == 0,
 		"budget_exceeded":    breached,
-		"budget_explanation": budgetExplanation(budget.Remaining),
+		"budget_explanation": budgetExplanation(budget.Remaining, budgetLimit),
 	})
 }
 
-func budgetExplanation(remaining int) string {
+func budgetExplanation(remaining, limit int) string {
 	if remaining > 0 {
 		return ""
 	}
-	return fmt.Sprintf("Per-turn message budget (%d) reached; no more messages can be processed this turn.", MessageBudgetPerTurn)
+	return fmt.Sprintf("Per-turn message budget (%d) reached; no more messages can be processed this turn.", limit)
 }
 
 func storeUnavailable(err error) (*mcp.CallToolResult, any, error) {

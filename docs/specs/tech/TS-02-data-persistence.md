@@ -1,6 +1,6 @@
 # TS-02 — Data & persistence
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/config`, `internal/state`, `internal/transcript`, `internal/index`, `internal/archive`, `internal/configsource`, `internal/contextref`
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -321,7 +321,7 @@ canonicalize-plus-grant operations are atomic (INV §5/§15). No backfill is nee
   optional `base_branch` and `setup_command` fields (FS-04.R45); absent fields read as empty and
   legacy files stay valid unchanged.
 
-**R28 (planned) — The turn budget is an additive version-1 config value, and nothing else
+**R28 — The turn budget is an additive version-1 config value, and nothing else
 in this change persists.** `config.json` gains optional integer `message_budget_per_turn`
 (FS-04.R46); an absent, zero, negative, or non-numeric value means the shipped default, so an older
 file decodes without rewrite and a hand edit that is syntactically valid but out of range remains

@@ -31,7 +31,7 @@ VALUES (?,?,?,?,'claude','sonnet','chat','/tmp','prompt','2026-09-01T10:00:00Z',
 	}
 	if _, err := st.DB().Exec(`
 INSERT INTO pipeline_runs(run_id, template_id, display_name, project, goal, state, created_at, updated_at)
-VALUES ('pr_1','t_1','Ship','`+project+`','ship','running','2026-09-01T10:00:00Z','2026-09-01T10:00:00Z')`); err != nil {
+VALUES ('pr_1','t_1','Ship','` + project + `','ship','running','2026-09-01T10:00:00Z','2026-09-01T10:00:00Z')`); err != nil {
 		t.Fatalf("insert pipeline run: %v", err)
 	}
 	if err := st.InsertPipelineAttempt(state.PipelineAttemptRecord{
@@ -63,7 +63,6 @@ VALUES ('pr_1','t_1','Ship','`+project+`','ship','running','2026-09-01T10:00:00Z
 // The fix session owns the final wording, and may instead decide the recipient
 // set is wrong; adjust this expectation with whichever it picks.
 func TestTaskAimedAtAStoppedPipelineAgentNamesTheRealCondition(t *testing.T) {
-	t.Skip("reproduction for an open bug-investigation finding; the /fix session un-skips it")
 	f := newContextFixture(t)
 	liveAgent(t, f.store, "a_coord", "Atlas", "agentdecker", "my-app")
 	f.srv.RegisterSession("tok-coord", "a_coord", "gen-a_coord")
@@ -105,5 +104,16 @@ func TestTaskAimedAtAStoppedPipelineAgentNamesTheRealCondition(t *testing.T) {
 	}
 	if !strings.Contains(message, "resum") {
 		t.Fatalf("refusal does not name the change that would let the call succeed: %q", message)
+	}
+
+	res, isErr = call(t, coord, "send_message", map[string]any{
+		"to": "a_stage", "subject": "status", "body": "report when ready",
+	})
+	if !isErr {
+		t.Fatalf("send_message accepted a stopped pipeline agent = %v", res)
+	}
+	message, _ = res["message"].(string)
+	if !strings.Contains(message, "stopped") || !strings.Contains(message, "resum") {
+		t.Fatalf("send_message refusal does not explain the pipeline exclusion: %q", message)
 	}
 }

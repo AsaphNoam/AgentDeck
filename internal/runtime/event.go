@@ -30,11 +30,12 @@ const (
 // Phase 2 wraps the identical object as a multiplexed new_message payload — so
 // agent_id, seq, type, ts, and data are permanent fields (techspec §11).
 type Event struct {
-	AgentID string          `json:"agent_id"`
-	Seq     int64           `json:"seq"`  // monotonic per agent, starts at 1
-	Type    string          `json:"type"` // one of the EventType constants
-	Data    json.RawMessage `json:"data"` // type-specific payload (below)
-	Ts      string          `json:"ts"`   // RFC3339 UTC
+	AgentID    string          `json:"agent_id"`
+	Generation string          `json:"-"`
+	Seq        int64           `json:"seq"`  // monotonic per agent, starts at 1
+	Type       string          `json:"type"` // one of the EventType constants
+	Data       json.RawMessage `json:"data"` // type-specific payload (below)
+	Ts         string          `json:"ts"`   // RFC3339 UTC
 }
 
 // AssistantTextData — a streamed markdown delta. NOT cumulative; the client

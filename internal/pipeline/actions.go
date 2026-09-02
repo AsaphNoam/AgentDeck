@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/agentdeck/agentdeck/internal/toolresult"
 )
 
 func (m *Manager) Continue(ctx context.Context, runID string, expectedRevision int64, input string) (RunDetail, error) {
@@ -285,6 +286,9 @@ func (m *Manager) Report(agentID, generation string, report StageReport) (RunDet
 // transcript. The fields carried here are exactly what separates the refusal
 // conditions from one another (stale_assignment vs already_reported vs the rest).
 func refuseReport(run state.PipelineRunRecord, attempt state.PipelineAttemptRecord, agentID, generation string, refusal *ControlError) (RunDetail, error) {
+	if guidance := toolresult.StageReportGuidance(refusal.Code); guidance != "" {
+		refusal.Message += " " + guidance
+	}
 	slog.Warn("pipeline: stage result refused",
 		"code", refusal.Code, "run", run.RunID, "attempt", attempt.AttemptID,
 		"caller_agent", agentID, "caller_generation", generation,

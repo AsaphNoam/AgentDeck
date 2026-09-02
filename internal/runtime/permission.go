@@ -8,17 +8,13 @@ import (
 	"time"
 )
 
-// defaultPermissionTimeout is the auto-deny deadline for a pending permission
-// (techspec §5.4). Overridable via PERMISSION_TIMEOUT (a Go duration string).
-const defaultPermissionTimeout = 180 * time.Second
-
 func permissionTimeout() time.Duration {
 	if v := os.Getenv("PERMISSION_TIMEOUT"); v != "" {
 		if d, err := time.ParseDuration(v); err == nil && d > 0 {
 			return d
 		}
 	}
-	return defaultPermissionTimeout
+	return 0
 }
 
 // onRequest handles a server→client JSON-RPC request. Only
@@ -30,28 +26,40 @@ func (c *ChatRuntime) onRequest(as *agentState, req *IncomingRequest) {
 		return
 	}
 
-	// skip_permissions: auto-approve without entering waiting_input (§5.2).
-	if as.skipPerms {
-		data, byKind := mapPermissionRequest(req.Params, "", true)
-		c.emit(as, EvPermissionRequest, data)
-		optID, ok := selectOption(byKind, "approve")
+	identity := permissionToolIdentity(req.Params)
+	_, agentDeckTool := as.autoApproveTools[identity]
+	autoData, autoKinds := mapPermissionRequest(req.Params, "", true)
+	_, hasAllowOnce := autoKinds["allow_once"]
+	// skip_permissions auto-approves any tool. AgentDeck-owned actions use the
+	// same recorded shape, but only when an allow-once option is available.
+	if as.skipPerms || (agentDeckTool && hasAllowOnce) {
+		c.emit(as, EvPermissionRequest, autoData)
+		optID, ok := selectOption(autoKinds, "approve")
+		if agentDeckTool && !as.skipPerms {
+			optID, ok = autoKinds["allow_once"]
+		}
 		if !ok {
 			_ = req.Respond(cancelledOutcome())
 			c.emit(as, EvError, ErrorData{Scope: "tool", Message: "no allow option offered"})
 			return
 		}
 		_ = req.Respond(selectedOutcome(optID))
-		c.emit(as, EvPermissionResolved, PermissionResolvedData{ToolCallID: data.ToolCallID, Decision: "auto_approve"})
+		c.emit(as, EvPermissionResolved, PermissionResolvedData{ToolCallID: autoData.ToolCallID, Decision: "auto_approve"})
 		return
 	}
 
 	timeout := permissionTimeout()
-	expiresAt := time.Now().UTC().Add(timeout).Format(time.RFC3339)
+	expiresAt := ""
+	if timeout > 0 {
+		expiresAt = time.Now().UTC().Add(timeout).Format(time.RFC3339)
+	}
 	data, byKind := mapPermissionRequest(req.Params, expiresAt, false)
 
 	p := &pendingPerm{req: req, name: data.Name, optByKind: byKind}
 	toolCallID := data.ToolCallID
-	p.timer = time.AfterFunc(timeout, func() { c.onPermissionTimeout(as, toolCallID) })
+	if timeout > 0 {
+		p.timer = time.AfterFunc(timeout, func() { c.onPermissionTimeout(as, toolCallID) })
+	}
 
 	as.mu.Lock()
 	as.pending[toolCallID] = p

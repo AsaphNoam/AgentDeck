@@ -294,17 +294,28 @@ func envInt(key string, fallback, min, max int) int {
 func permissionScenario() string {
 	id := reqSeq.Add(1)
 	ch := registerPending(id)
+	title := os.Getenv("FAKEACP_PERMISSION_TITLE")
+	if title == "" {
+		title = "Run ls"
+	}
+	options := []any{
+		map[string]any{"optionId": "opt_allow", "name": "Allow", "kind": "allow_once"},
+		map[string]any{"optionId": "opt_reject", "name": "Reject", "kind": "reject_once"},
+	}
+	if os.Getenv("FAKEACP_PERMISSION_ALLOW_ALWAYS_ONLY") == "1" {
+		options = []any{
+			map[string]any{"optionId": "opt_allow", "name": "Always", "kind": "allow_always"},
+			map[string]any{"optionId": "opt_reject", "name": "Reject", "kind": "reject_once"},
+		}
+	}
 	sendRequest(id, "session/request_permission", map[string]any{
 		"sessionId": sessionID,
 		"reason":    "run a shell command",
 		"toolCall": map[string]any{
-			"toolCallId": "tc_p", "title": "Run ls", "kind": "execute",
+			"toolCallId": "tc_p", "title": title, "kind": "execute",
 			"rawInput": map[string]any{"command": "ls"},
 		},
-		"options": []any{
-			map[string]any{"optionId": "opt_allow", "name": "Allow", "kind": "allow_once"},
-			map[string]any{"optionId": "opt_reject", "name": "Reject", "kind": "reject_once"},
-		},
+		"options": options,
 	})
 
 	select {

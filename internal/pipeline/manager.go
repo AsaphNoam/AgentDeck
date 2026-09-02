@@ -22,12 +22,18 @@ type Manager struct {
 	lifecycle Lifecycle
 	publisher Publisher
 
-	locksMu sync.Mutex
-	locks   map[string]*sync.Mutex
+	locksMu            sync.Mutex
+	locks              map[string]*sync.Mutex
+	attentionMu        sync.Mutex
+	pendingPermissions map[string]pendingPermission
+}
+
+type pendingPermission struct {
+	agentID, generation, toolCallID string
 }
 
 func NewManager(store *state.Store, templates *TemplateStore, lifecycle Lifecycle, publisher Publisher) *Manager {
-	return &Manager{store: store, templates: templates, lifecycle: lifecycle, publisher: publisher, locks: map[string]*sync.Mutex{}}
+	return &Manager{store: store, templates: templates, lifecycle: lifecycle, publisher: publisher, locks: map[string]*sync.Mutex{}, pendingPermissions: map[string]pendingPermission{}}
 }
 
 func (m *Manager) Start(ctx context.Context, request StartRequest) (RunDetail, bool, error) {
@@ -255,6 +261,9 @@ func (m *Manager) Detail(runID string) (RunDetail, error) {
 		return RunDetail{}, err
 	}
 	detail.Values, err = m.store.ListPipelineValues(runID)
+	if err == nil && m.hasPendingPermission(runID, run.CurrentAgentID) {
+		detail.Run.AttentionReason = "awaiting permission approval"
+	}
 	return detail, err
 }
 
@@ -276,6 +285,9 @@ func (m *Manager) ListPage(limit, offset int) ([]RunSummary, int, error) {
 	}
 	out := make([]RunSummary, 0, len(page.Runs))
 	for _, run := range page.Runs {
+		if m.hasPendingPermission(run.RunID, run.CurrentAgentID) {
+			run.AttentionReason = "awaiting permission approval"
+		}
 		diagnostics := []Diagnostic{}
 		stageTitle := run.CurrentStageID
 		var snapshot Template
@@ -307,6 +319,64 @@ func (m *Manager) ListPage(limit, offset int) ([]RunSummary, int, error) {
 		})
 	}
 	return out, page.Total, nil
+}
+
+func (m *Manager) hasPendingPermission(runID, agentID string) bool {
+	m.attentionMu.Lock()
+	defer m.attentionMu.Unlock()
+	pending, ok := m.pendingPermissions[runID]
+	return ok && pending.agentID == agentID
+}
+
+// OnPermissionEvent derives pipeline attention from the current stage agent's
+// process-lifetime permission state. It changes no durable run state.
+func (m *Manager) OnPermissionEvent(agentID, generation, toolCallID string, pending bool) error {
+	run, attempt, err := m.store.CurrentPipelineAttemptForAgent(agentID)
+	if errors.Is(err, state.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if attempt.AgentGeneration != generation || run.CurrentAgentID != agentID || run.CurrentAttemptID != attempt.AttemptID || run.PendingAction != "await_result" {
+		return nil
+	}
+	m.attentionMu.Lock()
+	current, exists := m.pendingPermissions[run.RunID]
+	changed := false
+	if pending {
+		if !exists || current.toolCallID != toolCallID || current.generation != generation {
+			m.pendingPermissions[run.RunID] = pendingPermission{agentID: agentID, generation: generation, toolCallID: toolCallID}
+			changed = true
+		}
+	} else if exists && current.agentID == agentID && current.generation == generation && current.toolCallID == toolCallID {
+		delete(m.pendingPermissions, run.RunID)
+		changed = true
+	}
+	m.attentionMu.Unlock()
+	if !changed || m.publisher == nil {
+		return nil
+	}
+	reason := ""
+	if pending {
+		reason = "awaiting permission approval"
+	}
+	update := PipelineUpdate{RunID: run.RunID, DisplayName: run.DisplayName, Revision: run.Revision, State: run.State, CurrentStageID: run.CurrentStageID, CurrentAgentID: run.CurrentAgentID, AttentionReason: reason, FinalOutcome: run.FinalOutcome}
+	m.publisher.PublishPipelineUpdate(update)
+	if pending {
+		m.publisher.PublishPipelineNotification(update, "needs_attention")
+	}
+	return nil
+}
+
+func (m *Manager) ClearPermissionAttention(agentID, generation string) {
+	m.attentionMu.Lock()
+	for runID, pending := range m.pendingPermissions {
+		if pending.agentID == agentID && pending.generation == generation {
+			delete(m.pendingPermissions, runID)
+		}
+	}
+	m.attentionMu.Unlock()
 }
 
 func (m *Manager) Startup(ctx context.Context) error {

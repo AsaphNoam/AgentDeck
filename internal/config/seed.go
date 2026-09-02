@@ -39,8 +39,9 @@ func DefaultConfig() Config {
 				"budget_exceeded":     false,
 			},
 		},
-		Switch:          SwitchConfig{PrimerTokenBudget: 8000},
-		TaskConcurrency: DefaultTaskConcurrency,
+		Switch:               SwitchConfig{PrimerTokenBudget: 8000},
+		TaskConcurrency:      DefaultTaskConcurrency,
+		MessageBudgetPerTurn: 50,
 	}
 }
 

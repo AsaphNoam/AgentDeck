@@ -292,6 +292,8 @@
 .pipeline-live-stage span { color: var(--ad-technical-muted); font-family: var(--ad-font-mono); font-size: 0.64rem; text-transform: uppercase; }
 .pipeline-live-stage strong { font-size: 1.25rem; }
 .pipeline-run-actions { align-items: center; display: flex; flex-wrap: wrap; gap: var(--ad-space-2); }
+.pipeline-action-choice { align-items: flex-start; display: flex; flex-direction: column; gap: var(--ad-space-1); max-width: 24rem; }
+.pipeline-action-choice small { color: var(--ad-text-muted); line-height: 1.35; }
 .pipeline-link-button { align-items: center; background: var(--ad-surface-raised); border: var(--ad-border-thin) solid var(--ad-border-strong); border-radius: var(--ad-radius-medium); color: var(--ad-text-primary); display: inline-flex; font-weight: 650; min-height: 36px; padding: var(--ad-space-2) var(--ad-space-3); text-decoration: none; }
 .pipeline-continuation { max-width: 720px; }
 .pipeline-continuation textarea { width: 100%; }

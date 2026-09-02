@@ -249,6 +249,9 @@ func (s *Server) handleCreateTask(_ context.Context, req *mcp.CallToolRequest, i
 					"message":    fmt.Sprintf("Multiple agents match %q; name an agent_id.", input.To),
 					"candidates": ambiguous.Candidates})
 			case errors.Is(err, state.ErrRecipientNotFound):
+				if message, diagnosed := s.pipelineRecipientRefusal(input.To); diagnosed {
+					return errResult(map[string]any{"ok": false, "error": "recipient_not_found", "message": message, "candidates": candidates})
+				}
 				return errResult(map[string]any{"ok": false, "error": "recipient_not_found",
 					"message":    fmt.Sprintf("No agent matches %q.", input.To),
 					"candidates": candidates})

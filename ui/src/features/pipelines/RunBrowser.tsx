@@ -137,8 +137,8 @@ export function RunDetail({ runID, onDeleted }: { runID: string; onDeleted: () =
         {run.attention_reason && <div className="pipeline-warning"><strong>Needs attention</strong><p>{humanize(run.attention_reason)}</p>{recovered && <p>{restarted ? "The stage agent was stopped when AgentDeck restarted" : "The stage agent is not running after this failure"}, so its chat can no longer report against this run. Retry the stage to run it again with a fresh agent.</p>}</div>}
         <div className="pipeline-run-actions" data-slot="actions">
           {run.current_agent_id && !recovered && <Link className="pipeline-link-button" to={`/agent/${run.current_agent_id}`}>Open agent</Link>}
-          {canContinue && <button type="button" disabled={busy || (blocked && !continuation.trim())} onClick={() => control("continue")}>{approval ? "Approve and continue" : "Continue"}</button>}
-          {canRetry && <button type="button" disabled={busy} onClick={() => control("retry")}>Retry stage</button>}
+          {canContinue && <div className="pipeline-action-choice"><button type="button" disabled={busy || (blocked && !continuation.trim())} onClick={() => control("continue")}>{approval ? "Approve and continue" : "Continue"}</button>{blocked && <small>{continuation.trim() ? "Continue sends this input to the same stage agent." : "Continue needs new input for the blocked stage."}</small>}</div>}
+          {canRetry && <div className="pipeline-action-choice"><button type="button" disabled={busy} onClick={() => control("retry")}>Retry stage</button><small>Retry starts a fresh agent with bounded summaries of prior attempts.</small></div>}
           {!terminal && <button type="button" className="btn-danger" disabled={busy} onClick={() => control("stop")}>Stop run</button>}
           {terminal && <button type="button" className="btn-danger" disabled={busy} onClick={() => deleteRun.mutate(run.run_id, { onSuccess: onDeleted, onError: (reason) => setError(messageOf(reason)) })}>Delete run record</button>}
         </div>
@@ -158,7 +158,7 @@ export function RunDetail({ runID, onDeleted }: { runID: string; onDeleted: () =
             <dl className="pipeline-rail-facts"><div><dt>Project</dt><dd>{run.project}</dd></div><div><dt>Template</dt><dd>{data.template.title}</dd></div><div><dt>Started</dt><dd>{formatDate(run.created_at)}</dd></div><div><dt>Revision</dt><dd>{run.revision}</dd></div></dl>
             <ol className="pipeline-setup-list">{data.template.stages.map((item, index) => { const runtime = data.assignments[item.id]; return <li key={item.id}><span>{index + 1}</span><div><strong>{item.title}</strong><small>{[runtime?.backend, runtime?.model, runtime?.effort].filter(Boolean).join(" · ") || "No runtime"}</small></div></li>; })}</ol>
           </div></details>
-          <details className="pipeline-disclosure" data-slot="values"><summary>Named values <span>{data.values.length}</span></summary><div className="pipeline-disclosure-body">{data.values.length === 0 ? <p className="pipeline-empty">No values recorded.</p> : <dl className="pipeline-value-list">{data.values.map((value) => <div key={value.name}><dt>{value.name}<small>{value.source_kind}{value.source_attempt_id ? ` · ${value.source_attempt_id}` : ""}</small></dt><dd>{value.value}</dd></div>)}</dl>}</div></details>
+          <details className="pipeline-disclosure" open={terminal} data-slot="values"><summary>Named values <span>{data.values.length}</span></summary><div className="pipeline-disclosure-body">{data.values.length === 0 ? <p className="pipeline-empty">No values recorded.</p> : <dl className="pipeline-value-list">{data.values.map((value) => <div key={value.name}><dt>{value.name}<small>{value.source_kind}{value.source_attempt_id ? ` · ${value.source_attempt_id}` : ""}</small></dt><dd>{value.value}</dd></div>)}</dl>}</div></details>
         </aside>
       </div>
     </article>
@@ -190,6 +190,7 @@ function TimelineAttempt({ data, attemptID, appended, current, attention }: { da
         {item.report_summary ? <p className="pipeline-result-summary">{item.report_summary}</p> : <p className="pipeline-unreported">No stage result was reported for this attempt.</p>}
         {item.report_details && <section><h4>Result details</h4><pre>{item.report_details}</pre></section>}
         {item.report_checks && <section><h4>Checks</h4><pre>{item.report_checks}</pre></section>}
+        {Object.entries(item.report_outputs).sort(([left], [right]) => left.localeCompare(right)).map(([name, value]) => <section key={name}><h4>Output · {name}</h4><pre>{value}</pre></section>)}
         {agents && <AttemptAgents agents={agents} />}
       </div>
     </details>

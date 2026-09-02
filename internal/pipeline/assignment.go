@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	assignmentVersion  = 2
+	assignmentVersion  = 3
 	maxAssignmentRunes = 48000
 )
 
@@ -32,12 +32,12 @@ func renderAssignment(run state.PipelineRunRecord, template Template, stage Stag
 	fmt.Fprintf(&fixed, "# Pipeline stage assignment\n\nRun: %s (%s)\nStage: %s (%s)\n",
 		clipText(run.DisplayName, MaxTitleRunes), run.RunID, stage.Title, stage.ID)
 	fixed.WriteString("\nScope: perform only this stage's responsibility in the shared project workspace. Do not claim that runtime status alone completes the stage.\n")
-	fixed.WriteString("\nBefore finishing, call report_pipeline_stage_result exactly once with outcome success, failure, or blocked, plus a bounded summary, details/checks, and declared outputs.\n")
+	fixed.WriteString("\nBefore finishing, call report_pipeline_stage_result with outcome success, failure, or blocked, plus a bounded summary, details/checks, and declared outputs. Your part ends only when AgentDeck accepts the result. A refused call records nothing and leaves this attempt still owing a result from you; when the refusal is retryable, correct the call as directed and send it again.\n")
 	// The boundary the agent cannot otherwise see: reporting ends this attempt's
 	// participation, and a blocked report leaves the agent live and idle beside an
 	// Open agent action, so without this an operator's chat answer produces work
 	// that the run can never accept (FS-14.R47).
-	fixed.WriteString("\nThat one call ends your part in this assignment. If you report blocked, the run pauses for a person: anything said in this chat during the pause is out of band, cannot be recorded against the run, and does not resume the stage. Their answer arrives as a new assignment in this same shape, and only then is another report accepted. Do not do further stage work until it arrives.\n")
+	fixed.WriteString("\nAn accepted result ends your part in this assignment. If AgentDeck accepts a blocked result, the run pauses for a person: anything said in this chat during the pause is out of band, cannot be recorded against the run, and does not resume the stage. Their answer arrives as a new assignment in this same shape, and only then is another result accepted. Do not do further stage work until it arrives.\n")
 	if len(outputs) > 0 {
 		fixed.WriteString("Declared outputs (use these local names):\n")
 		for _, output := range outputs {

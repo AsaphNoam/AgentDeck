@@ -189,7 +189,8 @@ type agentState struct {
 	ctx    context.Context // turn-scoped base context, cancelled on Stop
 	cancel context.CancelFunc
 
-	skipPerms bool // auto-approve every permission request (techspec §5.2)
+	skipPerms        bool // auto-approve every permission request (techspec §5.2)
+	autoApproveTools map[string]struct{}
 
 	mu         sync.Mutex
 	seq        int64
@@ -254,20 +255,21 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 
 	actx, acancel := context.WithCancel(context.Background())
 	as := &agentState{
-		agentID:    spec.Agent.AgentID,
-		generation: spec.Generation,
-		cmd:        cmd,
-		pgid:       pgid,
-		hub:        NewHub(),
-		stdin:      stdin,
-		stderr:     newRingBuffer(16 * 1024),
-		stderrDone: make(chan struct{}),
-		ctx:        actx,
-		cancel:     acancel,
-		skipPerms:  spec.SkipPerms,
-		toolNames:  map[string]string{},
-		pending:    map[string]*pendingPerm{},
-		resolved:   map[string]struct{}{},
+		agentID:          spec.Agent.AgentID,
+		generation:       spec.Generation,
+		cmd:              cmd,
+		pgid:             pgid,
+		hub:              NewHub(),
+		stdin:            stdin,
+		stderr:           newRingBuffer(16 * 1024),
+		stderrDone:       make(chan struct{}),
+		ctx:              actx,
+		cancel:           acancel,
+		skipPerms:        spec.SkipPerms,
+		autoApproveTools: copyStringSet(spec.AutoApproveTools),
+		toolNames:        map[string]string{},
+		pending:          map[string]*pendingPerm{},
+		resolved:         map[string]struct{}{},
 	}
 	as.transport = NewTransport(stdin,
 		func(method string, params json.RawMessage) { c.onNotification(as, method, params) },
@@ -553,20 +555,21 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 		// terminal paths (INV §4): the crash callback is matched against the
 		// registry's generation, so an empty value is rejected as stale and the
 		// unsolicited exit would skip ownership and registration teardown.
-		generation: spec.Generation,
-		cmd:        cmd,
-		pgid:       pgid,
-		hub:        NewHub(),
-		stdin:      stdin,
-		stderr:     newRingBuffer(16 * 1024),
-		stderrDone: make(chan struct{}),
-		ctx:        actx,
-		cancel:     acancel,
-		skipPerms:  spec.SkipPerms,
-		toolNames:  map[string]string{},
-		pending:    map[string]*pendingPerm{},
-		resolved:   map[string]struct{}{},
-		contextPct: spec.LastContextPct,
+		generation:       spec.Generation,
+		cmd:              cmd,
+		pgid:             pgid,
+		hub:              NewHub(),
+		stdin:            stdin,
+		stderr:           newRingBuffer(16 * 1024),
+		stderrDone:       make(chan struct{}),
+		ctx:              actx,
+		cancel:           acancel,
+		skipPerms:        spec.SkipPerms,
+		autoApproveTools: copyStringSet(spec.AutoApproveTools),
+		toolNames:        map[string]string{},
+		pending:          map[string]*pendingPerm{},
+		resolved:         map[string]struct{}{},
+		contextPct:       spec.LastContextPct,
 	}
 	as.transport = NewTransport(stdin,
 		func(method string, params json.RawMessage) { c.onNotification(as, method, params) },
@@ -687,6 +690,14 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 	c.mu.Unlock()
 
 	return &Handle{AgentID: as.agentID, Pid: pgid, SessionID: resolvedSessionID}, nil
+}
+
+func copyStringSet(source map[string]struct{}) map[string]struct{} {
+	copy := make(map[string]struct{}, len(source))
+	for value := range source {
+		copy[value] = struct{}{}
+	}
+	return copy
 }
 
 // StartActivation starts a server-owned, payload-free turn. Its callback runs
@@ -931,11 +942,11 @@ func (c *ChatRuntime) emit(as *agentState, typ string, data any) Event {
 	as.mu.Lock()
 	as.seq++
 	ev := Event{
-		AgentID: as.agentID,
-		Seq:     as.seq,
-		Type:    typ,
-		Data:    raw,
-		Ts:      time.Now().UTC().Format(time.RFC3339),
+		AgentID: as.agentID, Generation: as.generation,
+		Seq:  as.seq,
+		Type: typ,
+		Data: raw,
+		Ts:   time.Now().UTC().Format(time.RFC3339),
 	}
 	as.transcript = append(as.transcript, ev)
 	as.mu.Unlock()

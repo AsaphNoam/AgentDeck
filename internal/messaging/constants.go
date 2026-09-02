@@ -6,7 +6,7 @@ import "time"
 // requirements that govern their use.
 const (
 	// MessageBudgetPerTurn caps combined inbound+outbound messaging per turn.
-	MessageBudgetPerTurn = 15
+	MessageBudgetPerTurn = 50
 
 	// ActivationSweepInterval is the mail activation executor's ticker period.
 	ActivationSweepInterval = 2 * time.Second

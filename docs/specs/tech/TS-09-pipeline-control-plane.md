@@ -1,6 +1,6 @@
 # TS-09 — Pipeline control plane
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/pipeline`, `internal/config`, `internal/state`, `internal/server`, `internal/messaging`, `internal/cli`, `ui/src/features/pipelines`
 **Absorbed:** —
 
@@ -268,7 +268,7 @@ user-facing dismissal action: unapproved proposals are bounded by the same centr
   missing projection can never corrupt run state — at worst a card carries the explicit unavailable
   fallback until a later read or state event can enrich it.
 
-- **R29 (planned)** — **The awaiting-approval attention state is a derived read on the
+- **R29** — **The awaiting-approval attention state is a derived read on the
   existing fan-out, not a new durable field.** A run whose current stage agent holds an unanswered
   approval (FS-14.R54) is recognized through the same direct server→manager fan-out that already
   carries `turn_end` (R10): the persisted normalized permission-request and permission-resolution
@@ -283,7 +283,7 @@ user-facing dismissal action: unapproved proposals are bounded by the same centr
   recomputed on detail read and on reconnect hydration, so a joining or reloading tab sees the
   current state rather than a missed edge (INV §1).
 
-- **R30 (planned)** — **The needs-attention notification for that state is edge-triggered
+- **R30** — **The needs-attention notification for that state is edge-triggered
   and idempotent per request.** Entering the waiting state publishes one bounded `pipeline_update`
   through R17's single publication path and builds one needs-attention notification through the
   existing notification builder and mute pipeline; resolution publishes the clearing update and
@@ -292,7 +292,7 @@ user-facing dismissal action: unapproved proposals are bounded by the same centr
   does not survive a process end, restart hydration finds no waiting state to restore and re-derives
   from live runtime ownership rather than resurrecting a stale one (INV §9).
 
-- **R31 (planned)** — **Report refusals draw their wording from one vocabulary beside the
+- **R31** — **Report refusals draw their wording from one vocabulary beside the
   retry classification.** The statement a refusal makes about what the attempt still owes
   (FS-14.R53) is produced in the same module that owns the refusal code and its FS-17 retry class,
   so a code cannot exist with a class but no statement, or gain a statement that contradicts its

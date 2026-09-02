@@ -129,6 +129,40 @@ func startPipeline(t *testing.T, manager *Manager, requestID string) RunDetail {
 	return detail
 }
 
+// FS-14.A30: permission attention is derived, edge-triggered, and clears
+// without mutating the durable run revision or transition state.
+func TestPermissionAttentionIsDerivedAndIdempotent(t *testing.T) {
+	manager, _, publisher := pipelineManagerFixture(t)
+	detail := startPipeline(t, manager, "permission-attention")
+	attempt := detail.Attempts[0]
+	if err := manager.OnPermissionEvent(attempt.AgentID, attempt.AgentGeneration, "tc_1", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.OnPermissionEvent(attempt.AgentID, attempt.AgentGeneration, "tc_1", true); err != nil {
+		t.Fatal(err)
+	}
+	derived, err := manager.Detail(detail.Run.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if derived.Run.AttentionReason != "awaiting permission approval" || derived.Run.Revision != detail.Run.Revision {
+		t.Fatalf("derived run = %+v", derived.Run)
+	}
+	if len(publisher.notifications) != 1 || publisher.notifications[0] != "needs_attention" {
+		t.Fatalf("notifications = %v", publisher.notifications)
+	}
+	if err := manager.OnPermissionEvent(attempt.AgentID, attempt.AgentGeneration, "tc_1", false); err != nil {
+		t.Fatal(err)
+	}
+	cleared, err := manager.Detail(detail.Run.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleared.Run.AttentionReason != "" || cleared.Run.PendingAction != "await_result" {
+		t.Fatalf("cleared run = %+v", cleared.Run)
+	}
+}
+
 // FS-14.A1 / INV §2: run assignments use configured catalog ids rather than
 // the role/project filename slug rule. The seeded Codex id contains dots.
 func TestStartAcceptsSeededCodexModelID(t *testing.T) {

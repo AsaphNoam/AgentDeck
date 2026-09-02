@@ -328,7 +328,7 @@ domain's authorization transition.
   a missing owned checkout at that recorded path. No path grows a private variant of this step
   (R9, INV §2).
 
-- **R27 (planned) — The approval-exemption set is a runtime parameter, not frozen launch
+- **R27 — The approval-exemption set is a runtime parameter, not frozen launch
   config.** The composed set of AgentDeck-owned tool identities (TS-04.R41) travels on the same
   process-parameter overlay the embedded-knowledge parameters use (TS-11.R4–R5): it is applied by
   the one shared overlay helper that launch, resume, switch, wake, terminal, and pipeline stage

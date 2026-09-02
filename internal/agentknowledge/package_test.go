@@ -112,7 +112,7 @@ func TestEmbeddedSkillUsesBoundedProgressiveReferences(t *testing.T) {
 			t.Errorf("SKILL.md contains reference-owned detail %q", forbidden)
 		}
 	}
-	if !strings.Contains(string(files["references/coordinate-work.md"]), "budget of 15") {
+	if !strings.Contains(string(files["references/coordinate-work.md"]), "budget of 50 combined sends and reads") {
 		t.Error("coordination reference is missing the messaging budget")
 	}
 	pipeline := string(files["references/build-and-run-pipelines.md"])
