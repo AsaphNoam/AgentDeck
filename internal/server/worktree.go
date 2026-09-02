@@ -491,12 +491,15 @@ func (s *Server) worktreeStatus(ctx context.Context, projectID string, project c
 	out.Owned = owned
 	if owned {
 		out.Branch = row.Branch
-		out.Setup = &setupStatus{OK: row.SetupOK, Output: clipSetupOutput(row.SetupOutput)}
+		out.Setup = &setupStatus{OK: row.SetupOK}
 		if row.SetupAt != nil {
 			out.Setup.At = row.SetupAt.Format(time.RFC3339)
 		}
-		if row.SetupOK == nil {
-			out.Setup.Output = ""
+		// The captured output is carried only when it explains something: a run
+		// that succeeded has nothing to report, and a run that never happened has
+		// nothing to report either.
+		if row.SetupOK != nil && !*row.SetupOK {
+			out.Setup.Output = clipSetupOutput(row.SetupOutput)
 		}
 	} else if out.RepoBacked {
 		if branch, err := git.CurrentBranch(ctx, cwd); err == nil {

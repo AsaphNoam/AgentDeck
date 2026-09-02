@@ -5,11 +5,12 @@ import { createPortal } from "react-dom";
 import { configErrorMessage, QUERY_KEYS, useCreateProject, useProjects, useUpdateProject } from "../../api/config";
 import { useAgentStore } from "../../store/agentStore";
 import { CardGrid } from "../../components/grid/CardGrid";
-import { archiveProject } from "../../api/client";
+import { archiveProject, getWorktreeStatus } from "../../api/client";
 import { useUiStore } from "../../store/uiStore";
 import { ConfirmDialog, ProjectColorPicker } from "../../components/ui";
 import { ProjectForm } from "../settings/ProjectForm";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { WorktreeForkDialog } from "./WorktreeForkDialog";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ProjectResponse } from "../../schemas/project";
 import type { MouseEvent } from "react";
 
@@ -32,13 +33,17 @@ export function ProjectDashboard() {
   const [edit, setEdit] = useState<ProjectEdit | null>(null);
   const [archiveID, setArchiveID] = useState<string | null>(null);
   const [archiveError, setArchiveError] = useState("");
+  const [forkSource, setForkSource] = useState<string | null>(null);
   const archive = useMutation({
-    mutationFn: archiveProject,
-    onSuccess: ({ project }) => {
+    mutationFn: ({ id, deleteCheckout }: { id: string; deleteCheckout: boolean }) => archiveProject(id, deleteCheckout),
+    onSuccess: ({ project, checkout_warning: checkoutWarning }) => {
       queryClient.setQueryData<Record<string, Omit<ProjectResponse, "project">>>(QUERY_KEYS.projects, (current) => (
         current ? { ...current, [project.project]: { ...current[project.project], ...project, archived: true } } : current
       ));
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.projects });
+      // The archive succeeded either way; a refused checkout deletion is
+      // reported rather than swallowed (FS-19.R8, INV §8).
+      if (checkoutWarning) pushError("Checkout not deleted", checkoutWarning);
       setArchiveID(null);
     },
     onError: (err) => { const message = err instanceof Error ? err.message : String(err); setArchiveError(message); pushError("Archive project failed", message); },
@@ -102,7 +107,9 @@ export function ProjectDashboard() {
           const stateSummary = Object.entries(projectAgents.reduce<Record<string, number>>((counts, agent) => ({ ...counts, [agent.state]: (counts[agent.state] ?? 0) + 1 }), {})).map(([state, count]) => `${count} ${state}`).join(" · ") || "No agents";
           return <article className="project-card" key={id} style={{ "--ad-project-accent": `rgb(${project.color.join(",")})` } as React.CSSProperties} onClick={() => navigate(`/project/${id}`)} onContextMenu={(event: MouseEvent) => { event.preventDefault(); setBgMenu(null); setContextMenu({ id, x: event.clientX, y: event.clientY }); }}>
             <span className="project-card-color" style={{ background: `rgb(${project.color[0]}, ${project.color[1]}, ${project.color[2]})` }} aria-label="Project color" />
-            <strong>{project.title}</strong><span>{projectAgents.length} agents</span><small>{stateSummary}</small>
+            <strong>{project.title}</strong>
+            {project.worktree?.owned && <span className="project-card-branch" title={`Worktree on ${project.worktree.branch}`}>⑂ {project.worktree.branch}</span>}
+            <span>{projectAgents.length} agents</span><small>{stateSummary}</small>
           </article>;
         })}
         {unavailable.map((id) => <article className="project-card unavailable" key={id} onClick={() => navigate(`/project/${id}`)}><strong>{id}</strong><span>Project unavailable</span></article>)}
@@ -114,6 +121,9 @@ export function ProjectDashboard() {
             <span>Change color</span>
             <ProjectColorPicker value={projects.data[contextMenu.id].color} onChange={(color) => updateColor(contextMenu.id, projects.data![contextMenu.id], color)} />
           </div>
+          {projects.data[contextMenu.id].repo_backed && (
+            <button type="button" data-slot="item" onClick={() => { setForkSource(contextMenu.id); setContextMenu(null); }}>New worktree project</button>
+          )}
           <button type="button" data-slot="item" onClick={() => { setArchiveError(""); setArchiveID(contextMenu.id); setContextMenu(null); }}>Archive</button>
         </div>,
         document.body,
@@ -142,12 +152,70 @@ export function ProjectDashboard() {
       )}
       {edit && <ProjectEditDialog key={edit.id} edit={edit} onCancel={() => setEdit(null)} onSave={(data, setError) => updateProject.mutate({ id: edit.id, data }, { onSuccess: () => setEdit(null), onError: (err) => { const message = configErrorMessage(err); setError(message); pushError("Rename project failed", message); } })} />}
       {archiveProjectEntry && (
-        <ConfirmDialog open title={`Archive ${archiveProjectEntry.title}?`} confirmLabel="Archive project" destructive onCancel={() => { setArchiveError(""); setArchiveID(null); }} onConfirm={() => archive.mutate(archiveID!)} pending={archive.isPending}>
-          <p>Running agents will be stopped and every agent in this project will be archived.</p>
-          {archiveError && <p className="form-error">{archiveError}</p>}
-        </ConfirmDialog>
+        <ProjectArchiveDialog
+          id={archiveID!}
+          title={archiveProjectEntry.title}
+          ownsCheckout={archiveProjectEntry.worktree?.owned ?? false}
+          error={archiveError}
+          pending={archive.isPending}
+          onCancel={() => { setArchiveError(""); setArchiveID(null); }}
+          onConfirm={(deleteCheckout) => archive.mutate({ id: archiveID!, deleteCheckout })}
+        />
+      )}
+      {forkSource && projects.data?.[forkSource] && (
+        <WorktreeForkDialog
+          sourceID={forkSource}
+          sourceTitle={projects.data[forkSource].title}
+          onClose={() => setForkSource(null)}
+        />
       )}
     </section>
+  );
+}
+
+// FS-19.R8: archiving a project that owns a checkout offers — never forces —
+// deleting it. The offer defaults to keeping, says the branch and commits
+// survive either way, and discloses whether the checkout holds uncommitted
+// work. An undeterminable answer says so rather than claiming it is clean.
+function ProjectArchiveDialog({ id, title, ownsCheckout, error, pending, onCancel, onConfirm }: {
+  id: string;
+  title: string;
+  ownsCheckout: boolean;
+  error: string;
+  pending: boolean;
+  onCancel: () => void;
+  onConfirm: (deleteCheckout: boolean) => void;
+}) {
+  const [deleteCheckout, setDeleteCheckout] = useState(false);
+  const status = useQuery({
+    queryKey: ["worktree", id],
+    queryFn: () => getWorktreeStatus(id),
+    enabled: ownsCheckout,
+    staleTime: 0,
+  });
+  const dirtyLine = !status.data
+    ? "Checking for uncommitted changes…"
+    : !status.data.dirty_known
+      ? "AgentDeck could not read this checkout, so it cannot tell whether it holds uncommitted changes."
+      : status.data.dirty
+        ? "This checkout holds uncommitted changes, which deleting it would lose."
+        : "This checkout has no uncommitted changes.";
+  return (
+    <ConfirmDialog open title={`Archive ${title}?`} confirmLabel="Archive project" destructive onCancel={onCancel} onConfirm={() => onConfirm(deleteCheckout)} pending={pending}>
+      <p>Running agents will be stopped and every agent in this project will be archived.</p>
+      {ownsCheckout && (
+        <div className="form-field">
+          <label>
+            <input type="checkbox" checked={deleteCheckout} onChange={(event) => setDeleteCheckout(event.target.checked)} />
+            {" "}Also delete this project&apos;s worktree checkout
+          </label>
+          <span className="form-hint">
+            The branch and its commits are kept either way. {dirtyLine}
+          </span>
+        </div>
+      )}
+      {error && <p className="form-error">{error}</p>}
+    </ConfirmDialog>
   );
 }
 
@@ -189,5 +257,26 @@ export function ScopedProjectDashboard() {
   // member. On the `!project && hasAgents` fall-through (a live agent naming a
   // removed project) the New Agent picker must stay available so a launch can
   // target a real project instead of the rejected route id (INV §10).
-  return <section><Link to="/">Back to projects</Link><CardGrid projectID={id} fixedProject={project ? id : undefined} projectTitle={project?.title ?? id} /></section>;
+  return <ScopedProjectView id={id} project={project} />;
+}
+
+function ScopedProjectView({ id, project }: { id: string; project?: Omit<ProjectResponse, "project"> }) {
+  const [forkOpen, setForkOpen] = useState(false);
+  return (
+    <section>
+      <div className="scoped-project-header">
+        <Link to="/">Back to projects</Link>
+        {project?.worktree?.owned && (
+          <span className="project-card-branch" title={`Worktree on ${project.worktree.branch}`}>⑂ {project.worktree.branch}</span>
+        )}
+        {project?.repo_backed && !project.archived && (
+          <button type="button" onClick={() => setForkOpen(true)}>New worktree project</button>
+        )}
+      </div>
+      <CardGrid projectID={id} fixedProject={project ? id : undefined} projectTitle={project?.title ?? id} />
+      {forkOpen && project && (
+        <WorktreeForkDialog sourceID={id} sourceTitle={project.title} onClose={() => setForkOpen(false)} />
+      )}
+    </section>
+  );
 }

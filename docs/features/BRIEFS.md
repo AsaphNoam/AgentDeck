@@ -5,6 +5,51 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-09-02 — Implementation: worktree projects
+
+You can now spin up an isolated parallel stream of work as one action. Right-click a project that
+lives in a Git repository — or use the button on its own dashboard — and pick **New worktree
+project**. AgentDeck creates a new branch off the project's base branch, checks it out into a fresh
+directory it owns, runs the project's setup command inside it, and gives you a new project pointing
+at that checkout with the original's colour, context prompt, extra directories, base branch, and
+setup command already copied over. The form asks only for a title, the branch to create, and the
+base to branch from; the branch is suggested from the title until you edit it, and the base is
+detected from the repository rather than guessed. The new project appears on the dashboard
+immediately, with its branch name on the card and on its own page.
+
+Two new project settings back this: a **base branch** (empty means the repository's default,
+detected when you fork) and a **setup command** AgentDeck runs itself when it makes a checkout, so
+the first agent you launch there is never the one doing the bootstrapping. A setup command that
+fails does not undo anything — the project is created and launchable, and the failure is reported
+with the end of its output.
+
+Everything inside a project shares its checkout; isolation is between projects. Two agents in one
+worktree project work in the same directory, and two forks off the same base get two separate ones.
+
+The checkout is treated as disposable and the branch as the real thing. Delete a checkout by hand
+and the next launch rebuilds it from the recorded branch, re-runs setup, and says it did so. If the
+branch itself is gone, the launch stops with an error naming it rather than quietly starting you on
+some other branch. Nothing else ever deletes a checkout: not stopping an agent, not archiving one,
+not a crash, not a restart. Archiving or deleting a worktree project offers to remove its checkout,
+defaults to keeping it, tells you whether it holds uncommitted work, and says plainly when it cannot
+tell instead of claiming it is clean. The branch and its commits survive either way. A worktree you
+made yourself is never offered for deletion at all.
+
+I drove the real built app against a real repository end to end — create, fork, setup, uncommitted
+disclosure, declining, accepting, and the branch surviving — and it all behaved.
+
+**Needs attention:** Confirm one behaviour I had to choose. After you consent to deleting a worktree
+project's checkout, restoring that project later does **not** rebuild the checkout; you get an
+ordinary missing-directory error, and the way back is to fork a new project from the branch, which is
+still there. Recreating something you just chose to delete seemed wrong, but the specification had
+never said either way. Separately: a previous session's commit deleted four whole sections of the
+working notes — the open review findings, the acceptance gates, the outstanding decisions, and the
+blocked-on-human note. I restored them. Nothing was lost that its own commit message did not carry,
+but that message is now the only record of part of it.
+
+**Next:** Someone should review this work independently. Two checks still need a real browser: the
+fork journey on screen, and the archive dialog on a checkout holding uncommitted work.
+
 ### 2026-09-02 — Review: the agent cards, the worktree design, and a stale embedded UI
 
 The dashboard card work is finished and correct. Panes now stay in one grid column, so opening or

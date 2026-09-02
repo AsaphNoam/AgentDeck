@@ -481,5 +481,24 @@
 .context-menu-color { display: grid; gap: var(--ad-space-2); padding: var(--ad-space-2); }
 .context-menu-color > span { color: var(--ad-text-muted); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
 .project-card.unavailable { opacity: .75; }
+/* A worktree project names its branch on the card so parallel streams stay
+   distinguishable at a glance (FS-19.R6). It is quiet by design: the branch
+   identifies the stream, it does not compete with the project title. */
+.project-card-branch {
+  color: var(--ad-text-muted);
+  font-family: var(--ad-font-mono);
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.scoped-project-header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-3);
+  justify-content: flex-start;
+}
+.scoped-project-header > button { margin-inline-start: auto; }
 .project-route-state { display: grid; gap: var(--ad-space-4); }
 }

@@ -25,7 +25,7 @@ export function ProjectsEditor() {
   const pushError = useUiStore((state) => state.pushError);
   const queryClient = useQueryClient();
   const archive = useMutation({
-    mutationFn: archiveProject,
+    mutationFn: (project: string) => archiveProject(project),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.projects }),
     onError: (err) => { const message = configErrorMessage(err); setArchiveError(message); pushError("Archive project failed", message); },
   });

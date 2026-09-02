@@ -213,4 +213,201 @@ describe("ProjectDashboard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(archives).toBe(0);
   });
+
+  // ---- Worktree projects (FS-02.R60/A42, FS-19) ----
+
+  // FS-02.A42: the card menu offers the fork only on a repo-backed active
+  // project, and a project that is not repo-backed offers nothing.
+  it("offers New worktree project only on a repo-backed project", async () => {
+    renderDashboard();
+    let card = (await screen.findByText("App")).closest("article")!;
+    fireEvent.contextMenu(card);
+    expect(screen.queryByRole("button", { name: "New worktree project" })).toBeNull();
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    server.use(http.get("/api/projects", () => HttpResponse.json({
+      app: { title: "App", color: [100, 116, 139], cwd: "/tmp/app", add_dirs: [], context_prompt: "", archived: false, repo_backed: true },
+    })));
+    cleanup();
+    renderDashboard();
+    card = (await screen.findByText("App")).closest("article")!;
+    fireEvent.contextMenu(card);
+    expect(await screen.findByRole("button", { name: "New worktree project" })).toBeInTheDocument();
+  });
+
+  // An archived project is not in the active grid at all, so it can offer no
+  // fork entry point (FS-02.R60).
+  it("shows no card, and therefore no fork action, for an archived project", async () => {
+    server.use(http.get("/api/projects", () => HttpResponse.json({
+      app: { title: "App", color: [100, 116, 139], cwd: "/tmp/app", add_dirs: [], context_prompt: "", archived: true, repo_backed: true },
+    })));
+    renderDashboard();
+    await waitFor(() => expect(screen.queryByText("App")).toBeNull());
+    expect(screen.queryByRole("button", { name: "New worktree project" })).toBeNull();
+  });
+
+  // FS-19.R1 + FS-02.R60: the form pre-fills title, branch, and the effective
+  // base, and a completed fork's card appears in the grid with its branch
+  // without a manual refresh.
+  it("forks a project and shows the new card with its branch", async () => {
+    let forked: Record<string, unknown> | null = null;
+    let listCalls = 0;
+    server.use(
+      http.get("/api/projects", () => {
+        listCalls += 1;
+        const base: Record<string, unknown> = {
+          app: { title: "App", color: [100, 116, 139], cwd: "/tmp/app", add_dirs: [], context_prompt: "", archived: false, repo_backed: true },
+        };
+        if (forked) {
+          base["app-fork"] = {
+            title: "App fork", color: [100, 116, 139], cwd: "/home/wt/app-fork", add_dirs: [],
+            context_prompt: "", archived: false, repo_backed: true,
+            worktree: { owned: true, branch: "agentdeck/app-fork" },
+          };
+        }
+        return HttpResponse.json(base);
+      }),
+      http.get("/api/projects/app/worktree", () => HttpResponse.json({
+        owned: false, repo_backed: true, branch: "", base: "develop", dirty: false, dirty_known: true,
+      })),
+      http.post("/api/projects/app/worktree-fork", async ({ request }) => {
+        forked = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ project: { project: "app-fork" }, branch: "agentdeck/app-fork", base: "develop" }, { status: 201 });
+      }),
+    );
+
+    renderDashboard();
+    const card = (await screen.findByText("App")).closest("article")!;
+    fireEvent.contextMenu(card);
+    fireEvent.click(await screen.findByRole("button", { name: "New worktree project" }));
+
+    // Title comes from the source, the branch is derived from it, and the base
+    // is the server's effective base — never guessed on the client.
+    expect((await screen.findByLabelText("Title")) as HTMLInputElement).toHaveValue("App");
+    expect(screen.getByLabelText("Branch")).toHaveValue("agentdeck/app");
+    await waitFor(() => expect(screen.getByLabelText("Base")).toHaveValue("develop"));
+
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "App fork" } });
+    // The branch follows the title until it is edited by hand.
+    expect(screen.getByLabelText("Branch")).toHaveValue("agentdeck/app-fork");
+
+    const before = listCalls;
+    fireEvent.click(screen.getByRole("button", { name: "Create worktree project" }));
+    await waitFor(() => expect(forked).not.toBeNull());
+    expect(forked).toMatchObject({ title: "App fork", branch: "agentdeck/app-fork", base: "develop" });
+    // The grid refetches by itself: no manual refresh (FS-02.R60).
+    await waitFor(() => expect(listCalls).toBeGreaterThan(before));
+    expect(await screen.findByText("⑂ agentdeck/app-fork")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  // An edited branch is the person's; retyping the title must not overwrite it.
+  it("stops deriving the branch once it is edited by hand", async () => {
+    server.use(
+      http.get("/api/projects", () => HttpResponse.json({
+        app: { title: "App", color: [100, 116, 139], cwd: "/tmp/app", add_dirs: [], context_prompt: "", archived: false, repo_backed: true },
+      })),
+      http.get("/api/projects/app/worktree", () => HttpResponse.json({
+        owned: false, repo_backed: true, branch: "", base: "main", dirty: false, dirty_known: true,
+      })),
+    );
+    renderDashboard();
+    fireEvent.contextMenu((await screen.findByText("App")).closest("article")!);
+    fireEvent.click(await screen.findByRole("button", { name: "New worktree project" }));
+    fireEvent.change(await screen.findByLabelText("Branch"), { target: { value: "wip/mine" } });
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Something else" } });
+    expect(screen.getByLabelText("Branch")).toHaveValue("wip/mine");
+  });
+
+  // FS-19.R3 / A2: a failing setup command still creates the project, and the
+  // dialog stays open to report the warning rather than closing over it.
+  it("reports a setup warning and keeps the created project", async () => {
+    server.use(
+      http.get("/api/projects", () => HttpResponse.json({
+        app: { title: "App", color: [100, 116, 139], cwd: "/tmp/app", add_dirs: [], context_prompt: "", archived: false, repo_backed: true },
+      })),
+      http.get("/api/projects/app/worktree", () => HttpResponse.json({
+        owned: false, repo_backed: true, branch: "", base: "main", dirty: false, dirty_known: true,
+      })),
+      http.post("/api/projects/app/worktree-fork", () => HttpResponse.json(
+        { project: { project: "app-fork" }, branch: "agentdeck/app", base: "main", warning: "setup command failed: npm ci exploded" },
+        { status: 201 },
+      )),
+    );
+    renderDashboard();
+    fireEvent.contextMenu((await screen.findByText("App")).closest("article")!);
+    fireEvent.click(await screen.findByRole("button", { name: "New worktree project" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Create worktree project" }));
+
+    expect(await screen.findByText(/npm ci exploded/)).toBeInTheDocument();
+    expect(await screen.findByText(/ready to launch/i)).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  // FS-19.R8: the archive dialog offers deletion only for an owned checkout,
+  // defaults to keeping, discloses uncommitted work, and never sends consent
+  // that was not given.
+  it("offers checkout deletion on an owned checkout, defaulting to keep", async () => {
+    let body: Record<string, unknown> | null = null;
+    server.use(
+      http.get("/api/projects", () => HttpResponse.json({
+        fork: {
+          title: "Fork", color: [100, 116, 139], cwd: "/home/wt/fork", add_dirs: [], context_prompt: "",
+          archived: false, repo_backed: true, worktree: { owned: true, branch: "agentdeck/fork" },
+        },
+      })),
+      http.get("/api/projects/fork/worktree", () => HttpResponse.json({
+        owned: true, repo_backed: true, branch: "agentdeck/fork", base: "main", dirty: true, dirty_known: true,
+      })),
+      http.post("/api/projects/fork/archive", async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ project: { project: "fork", title: "Fork" }, stopped_agent_ids: [], archived_agent_ids: [] });
+      }),
+    );
+    renderDashboard();
+    fireEvent.contextMenu((await screen.findByText("Fork")).closest("article")!);
+    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+
+    const consent = await screen.findByLabelText(/delete this project's worktree checkout/i);
+    expect((consent as HTMLInputElement).checked).toBe(false);
+    expect(await screen.findByText(/holds uncommitted changes/i)).toBeInTheDocument();
+    expect(screen.getByText(/branch and its commits are kept either way/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Archive project" }));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body).toMatchObject({ delete_checkout: false });
+  });
+
+  // An undeterminable dirty check must say so, never claim the checkout is
+  // clean (FS-19.R8, INV §8).
+  it("says the uncommitted state is unknown rather than claiming clean", async () => {
+    server.use(
+      http.get("/api/projects", () => HttpResponse.json({
+        fork: {
+          title: "Fork", color: [100, 116, 139], cwd: "/home/wt/fork", add_dirs: [], context_prompt: "",
+          archived: false, repo_backed: true, worktree: { owned: true, branch: "agentdeck/fork" },
+        },
+      })),
+      http.get("/api/projects/fork/worktree", () => HttpResponse.json({
+        owned: true, repo_backed: true, branch: "agentdeck/fork", base: "main", dirty: false, dirty_known: false,
+      })),
+    );
+    renderDashboard();
+    fireEvent.contextMenu((await screen.findByText("Fork")).closest("article")!);
+    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+    expect(await screen.findByText(/could not read this checkout/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no uncommitted changes/i)).toBeNull();
+  });
+
+  // A project that owns no checkout gets no offer at all (FS-19.R4/A5).
+  it("offers no checkout deletion for a project that owns none", async () => {
+    server.use(http.post("/api/projects/app/archive", () => HttpResponse.json({
+      project: { project: "app", title: "App" }, stopped_agent_ids: [], archived_agent_ids: [],
+    })));
+    renderDashboard();
+    fireEvent.contextMenu((await screen.findByText("App")).closest("article")!);
+    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+    expect(await screen.findByText(/Running agents will be stopped/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/delete this project's worktree checkout/i)).toBeNull();
+  });
 });

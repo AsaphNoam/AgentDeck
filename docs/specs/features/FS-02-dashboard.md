@@ -266,7 +266,7 @@ modal and prefilled launches outside a scoped dashboard retain their existing pr
 behavior.
 
 
-**R60 (planned).** A project card whose project is active and repo-backed (its expanded `cwd`
+**R60.** A project card whose project is active and repo-backed (its expanded `cwd`
 resolves inside a Git working tree) offers **New worktree project** in its context menu (R34/R38),
 and the scoped project dashboard offers the same action from its header. Both open FS-19.R1's
 creation form; on success the new project's card appears in the live project grid without manual
@@ -734,7 +734,7 @@ picker and launches with the route project's id; the general modal continues to 
   existing context-meter regressions; J5.
 
 
-- **A42 (planned)** (R60) — On a repo-backed active project, the card context menu and the scoped
+- **A42** (R60) — On a repo-backed active project, the card context menu and the scoped
   header both open the worktree creation form, and a completed fork's card appears in the grid
   without manual refresh showing its branch name; a non-repo project and an archived project offer
   no entry point. — component tests plus the FS-19.A1 journey.

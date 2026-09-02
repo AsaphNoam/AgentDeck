@@ -1,5 +1,5 @@
 import type { AnnotationBatch, ArchiveProjectGroup, ArchiveResult, AvailableCommand, Capabilities, Layout, TrackedCommand, TrackedFile, TranscriptEvent } from "./types";
-import type { ProjectResponse } from "../schemas/project";
+import type { ProjectResponse, WorktreeStatus } from "../schemas/project";
 
 async function json<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init);
@@ -139,8 +139,33 @@ export function searchArchiveProject(project: string, q: string, limit = 50, off
 
 export function archiveAgent(agentId: string) { return json<unknown>(`/api/sessions/${agentId}/archive`, { method: "POST" }); }
 export function restoreAgent(agentId: string) { return json<unknown>(`/api/sessions/${agentId}/restore`, { method: "POST" }); }
-export function archiveProject(project: string) {
-  return json<{ project: ProjectResponse; stopped_agent_ids: string[]; archived_agent_ids: string[] }>(`/api/projects/${encodeURIComponent(project)}/archive`, { method: "POST" });
+// deleteCheckout is sent only when the person consented in the archive dialog;
+// its absence never deletes an AgentDeck-owned checkout (FS-19.R8).
+export function archiveProject(project: string, deleteCheckout = false) {
+  return json<{
+    project: ProjectResponse;
+    stopped_agent_ids: string[];
+    archived_agent_ids: string[];
+    checkout_deleted?: boolean;
+    checkout_warning?: string;
+  }>(`/api/projects/${encodeURIComponent(project)}/archive`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ delete_checkout: deleteCheckout }),
+  });
+}
+
+// ---- Worktree projects (FS-19 / TS-12 §3) ----
+
+export function getWorktreeStatus(project: string) {
+  return json<WorktreeStatus>(`/api/projects/${encodeURIComponent(project)}/worktree`);
+}
+
+export function forkWorktreeProject(project: string, body: { title: string; branch: string; base: string }) {
+  return json<{ project: ProjectResponse; branch: string; base: string; warning?: string }>(
+    `/api/projects/${encodeURIComponent(project)}/worktree-fork`,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
+  );
 }
 export function restoreProject(project: string) { return json<ProjectResponse>(`/api/projects/${encodeURIComponent(project)}/restore`, { method: "POST" }); }
 

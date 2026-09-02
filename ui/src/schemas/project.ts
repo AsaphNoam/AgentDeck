@@ -39,7 +39,27 @@ export const projectResponseSchema = z.object({
   archived: z.boolean().optional(),
   base_branch: z.string().default(""),
   setup_command: z.string().default(""),
+  // Read-only worktree enrichment (TS-12.R6). `worktree` is absent for a project
+  // that owns no checkout; `repo_backed` gates the fork entry points (FS-02.R60).
+  worktree: z.object({ owned: z.boolean(), branch: z.string() }).optional(),
+  repo_backed: z.boolean().optional(),
 });
+
+export const worktreeStatusSchema = z.object({
+  owned: z.boolean(),
+  repo_backed: z.boolean(),
+  branch: z.string().default(""),
+  base: z.string().default(""),
+  dirty: z.boolean(),
+  // dirty_known distinguishes "clean" from "could not be determined". The dialog
+  // must never present the second as the first (FS-19.R8, INV §8).
+  dirty_known: z.boolean(),
+  setup: z
+    .object({ ok: z.boolean().nullable(), at: z.string().default(""), output: z.string().default("") })
+    .optional(),
+});
+
+export type WorktreeStatus = z.infer<typeof worktreeStatusSchema>;
 
 export type ProjectResponse = z.infer<typeof projectResponseSchema>;
 export type FieldWarning = z.infer<typeof fieldWarningSchema>;
