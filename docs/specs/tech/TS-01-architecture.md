@@ -319,12 +319,14 @@ domain's authorization transition.
   Until the gate passes, the shipped internal MCP composition remains unchanged.
 
 
-- **R26 (planned) — Worktree checkout resolution joins the composition seam as one shared step.**
-  When FS-19 ships, the launch, resume, switch, and pipeline stage-validation paths all call the
-  single `ensureWorktreeCheckout` helper (TS-12.R4) before any process start, replacing today's two
-  inline cwd stat checks. The frozen-snapshot rule is unchanged: resume/switch keep `snap.Cwd`; the
-  helper only re-materializes a missing owned checkout at that recorded path. No path grows a
-  private variant of this step (R9, INV §2).
+- **R26 — Worktree checkout resolution joins the composition seam as one shared step.**
+  The launch, resume, and switch composers all call the single `ensureWorktreeCheckout` helper
+  (TS-12.R4) before any process start, replacing the two inline cwd stat checks. Both pipeline
+  start paths inherit it through those composers; pipeline stage *validation* keeps its own
+  read-only check and never calls the mutating helper (TS-12.R4's 2026-09-02 correction). The
+  frozen-snapshot rule is unchanged: resume/switch keep `snap.Cwd`; the helper only re-materializes
+  a missing owned checkout at that recorded path. No path grows a private variant of this step
+  (R9, INV §2).
 
 ## 3. Interfaces & data shapes
 

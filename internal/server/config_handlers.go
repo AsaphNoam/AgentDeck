@@ -320,6 +320,20 @@ type projectResponse struct {
 	// undefined for a legacy file that never had them.
 	BaseBranch   string `json:"base_branch"`
 	SetupCommand string `json:"setup_command"`
+	// Worktree and RepoBacked are the read-only dashboard enrichment (TS-12.R6).
+	// Both are computed without a Git subprocess on the list path: ownership
+	// comes from the database, repo-backedness from a memoized probe. Worktree is
+	// absent for a project that owns no checkout.
+	Worktree   *worktreeSummary `json:"worktree,omitempty"`
+	RepoBacked bool             `json:"repo_backed"`
+}
+
+// worktreeSummary is the cheap per-project ownership projection: enough for the
+// dashboard to show a branch and offer deletion, nothing that costs a
+// subprocess (TS-12.R6).
+type worktreeSummary struct {
+	Owned  bool   `json:"owned"`
+	Branch string `json:"branch"`
 }
 
 func (s *Server) toProjectResponse(id string, p config.Project, warnings []config.FieldError) projectResponse {
@@ -391,7 +405,8 @@ func (s *Server) handlePostProject(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
-	writeJSON(w, http.StatusCreated, s.toProjectResponse(id, proj, warnings))
+	s.invalidateProjectRepoBacked(proj.Cwd)
+	writeJSON(w, http.StatusCreated, s.enrichProjectResponse(r.Context(), s.toProjectResponse(id, proj, warnings), nil))
 }
 
 // handlePutProject implements PUT /api/projects/{p} (§5.2).
@@ -441,7 +456,9 @@ func (s *Server) handlePutProject(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
-	writeJSON(w, http.StatusOK, s.toProjectResponse(id, proj, warnings))
+	s.invalidateProjectRepoBacked(existing.Cwd)
+	s.invalidateProjectRepoBacked(proj.Cwd)
+	writeJSON(w, http.StatusOK, s.enrichProjectResponse(r.Context(), s.toProjectResponse(id, proj, warnings), nil))
 }
 
 // handleDeleteProject implements DELETE /api/projects/{p} (§5.2).
@@ -454,6 +471,9 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	force := r.URL.Query().Get("force") == "true"
+	// delete_checkout is honored only for an AgentDeck-owned checkout and is
+	// never defaulted on (FS-19.R8, TS-03.R33).
+	deleteCheckout := r.URL.Query().Get("delete_checkout") == "true"
 	// 404 if absent.
 	if _, err := s.configStore.ReadProject(id); err != nil {
 		if errors.Is(err, config.ErrNotFound) {
@@ -478,6 +498,22 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 				Agents:  agents,
 				Hint:    "retry with ?force=true to delete the definition; running agents are unaffected",
 			})
+			return
+		}
+	}
+	if deleteCheckout {
+		// Deletion takes the same exclusive claim an archive does, so no start can
+		// land in the project while its checkout is being removed (TS-12.R7). The
+		// checkout goes before the definition: the reverse order would leave an
+		// owned checkout whose project no longer exists, which nothing can reclaim.
+		if ae := s.beginProjectArchive(r.Context(), id); ae != nil {
+			writeAPIError(w, ae)
+			return
+		}
+		defer s.endProjectArchive(id)
+		if _, err := s.deleteOwnedCheckout(r.Context(), id); err != nil {
+			s.log.Error("worktree: delete checkout on project delete", "project", id, "err", err)
+			writeAPIError(w, apiError(runtime.CodeInternal, "delete checkout: "+err.Error()))
 			return
 		}
 	}

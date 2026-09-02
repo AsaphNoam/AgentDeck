@@ -382,6 +382,12 @@ func (s *Server) composeSwitchSpec(target state.Agent, resumeID string) (runtime
 		return runtime.LaunchSpec{}, apiError(runtime.CodeInvalidField, "unknown model: "+target.Model)
 	}
 
+	// Resolve the working directory through the one shared step before any
+	// registration side effect (TS-01.R26, TS-12.R4). Switch keeps the frozen
+	// snapshot cwd for the same reason resume does.
+	if _, _, wae := s.ensureWorktreeCheckout(context.Background(), target.Project, snap.Cwd); wae != nil {
+		return runtime.LaunchSpec{}, wae
+	}
 	// Ensure the shared-resources directory before any registration side effect
 	// (FS-11.R6/R9). add_dirs/prompt carry over from the frozen snapshot; the env
 	// var is recomposed here (INV §2).

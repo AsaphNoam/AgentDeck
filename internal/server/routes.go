@@ -39,6 +39,9 @@ func (s *Server) routes() http.Handler {
 	api("GET /api/archive/projects/{project}", s.handleArchiveProject)
 	api("POST /api/projects/{project}/archive", s.handleArchiveProjectAction)
 	api("POST /api/projects/{project}/restore", s.handleRestoreProjectAction)
+	// Worktree projects (FS-19 / TS-12).
+	api("POST /api/projects/{project}/worktree-fork", s.handleWorktreeFork)
+	api("GET /api/projects/{project}/worktree", s.handleWorktreeStatus)
 
 	// Native sequential pipeline templates and durable runs (FS-14 / TS-09).
 	api("GET /api/pipelines", s.handlePipelineTemplates)

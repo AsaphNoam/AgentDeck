@@ -111,8 +111,15 @@ func (g Git) CommonDir(ctx context.Context, dir string) (string, error) {
 }
 
 // DefaultBase resolves the repository's default branch: origin/HEAD's target
-// when the remote publishes one, else the current branch. A detached HEAD with
-// no origin/HEAD returns ErrDetachedHead (TS-12.R9).
+// when the remote publishes one, else the branch checked out in the
+// repository's main worktree. A detached HEAD with no origin/HEAD returns
+// ErrDetachedHead (TS-12.R9).
+//
+// The fallback deliberately reads the MAIN worktree's branch rather than dir's
+// own HEAD. Called from inside a linked worktree — which is exactly what
+// forking a fork does — dir's HEAD is that fork's branch, and using it would
+// stack the new branch on the source's work. FS-19.R11 requires the opposite:
+// nothing ever stacks implicitly.
 func (g Git) DefaultBase(ctx context.Context, dir string) (string, error) {
 	if out, err := g.run(ctx, queryTimeout, dir, "symbolic-ref", "--short", "refs/remotes/origin/HEAD"); err == nil {
 		if branch := strings.TrimPrefix(out, "origin/"); branch != "" && branch != out {
@@ -120,6 +127,11 @@ func (g Git) DefaultBase(ctx context.Context, dir string) (string, error) {
 		}
 	} else if errors.Is(err, ErrGitMissing) {
 		return "", err
+	}
+	// `worktree list` reports the main worktree first, in every version that
+	// supports the porcelain format.
+	if entries, err := g.ListWorktrees(ctx, dir); err == nil && len(entries) > 0 && entries[0].Branch != "" {
+		return entries[0].Branch, nil
 	}
 	branch, err := g.CurrentBranch(ctx, dir)
 	if err != nil {

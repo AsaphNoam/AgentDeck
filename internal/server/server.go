@@ -145,6 +145,21 @@ type Server struct {
 	onboardingCacheMu sync.Mutex
 	onboardingCache   *onboardingCacheEntry
 
+	// worktreeMu guards worktreeLocks: the per-project claim on recreating a
+	// missing owned checkout. Two starts into the same project can observe the
+	// absence together, and only one may run `git worktree add` at that path
+	// (TS-12.R4, INV §5). The locks are per project so unrelated projects still
+	// recreate in parallel.
+	worktreeMu    sync.Mutex
+	worktreeLocks map[string]*worktreeLock
+
+	// repoBackedMu guards repoBackedCache: the memoized "is this cwd inside a Git
+	// working tree" answer that keeps the projects list free of subprocesses
+	// (TS-12.R6). Entries expire on a short TTL and are dropped when a project
+	// definition is written.
+	repoBackedMu    sync.Mutex
+	repoBackedCache map[string]repoBackedEntry
+
 	// catalogMu serializes every read-modify-write of backends.json: the
 	// whole-document PUT, the item-scoped POST create, and an enabled source
 	// bind's target-scoped model merge (TS-07.R17/R18). Without it a create and
@@ -256,6 +271,8 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		restoreAgentArchiveStates: stateStore.RestoreAgentArchiveStates,
 		pickDirectory:             pickDirectoryViaOSAScript,
 		primerSummarizer:          defaultPrimerSummarizer,
+		worktreeLocks:             map[string]*worktreeLock{},
+		repoBackedCache:           map[string]repoBackedEntry{},
 	}
 	s.pipelineTemplates = pipeline.NewTemplateStore(cfgStore)
 	s.pipelineMgr = pipeline.NewManager(stateStore, s.pipelineTemplates, s, s)

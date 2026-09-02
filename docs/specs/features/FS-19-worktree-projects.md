@@ -35,8 +35,10 @@ branch, commits, project, agent identities, and conversations are the durable th
   non-interactively inside the fresh worktree immediately after creation, before reporting the
   project ready. A failing or timed-out setup command does **not** undo or block creation: the
   project exists and is launchable, and the failure surfaces as a visible warning carrying the
-  captured output. Setup is AgentDeck's job at checkout creation; it is never delegated to the
-  first coding agent.
+  **tail** of the captured output — the last 2,000 runes, not the whole build log, so a verbose
+  failure cannot flood the surface it appears on. The full stored tail stays on the ownership
+  record for anyone who needs it (TS-12.R5). Setup is AgentDeck's job at checkout creation; it is
+  never delegated to the first coding agent.
 - **R4 (planned).** AgentDeck-owned worktrees live under `$AGENTDECK_HOME/worktrees/{project-id}/`,
   keyed by the new project's immutable id. For each worktree it creates, AgentDeck durably records
   ownership: the checkout path, the branch, and the source repository. A project whose `cwd` merely
@@ -77,6 +79,15 @@ and deletes under FS-04.R35/R36. Its extra state is the owned checkout, which is
 **missing** (recreated on next launch, R7), or **removed by explicit choice** (R8, after which the
 project is archived or deleted; the branch remains in the repository). Ownership never changes:
 a checkout is owned from creation, and external checkouts never become owned.
+
+**Consented deletion ends ownership.** Accepting R8's offer removes the checkout *and* AgentDeck's
+ownership of it, so a project restored afterwards is an ordinary project pointing at a directory
+that no longer exists: launching it fails with the same missing-directory error any misconfigured
+project gets, and R7's recreation does not apply. This is deliberate — recreating a checkout the
+person just chose to delete would undo their decision — and it is why the R8 dialog states that the
+branch and commits survive: recreating the work means making a new worktree project from that
+branch, not restoring this one. The **missing** state above is reached only by an out-of-band
+deletion, which leaves ownership intact.
 
 ## 4. Edge cases & errors
 

@@ -41,6 +41,17 @@ type sessionResponse struct {
 	Running  *state.RunningEntry        `json:"running,omitempty"`
 	Status   *state.Status              `json:"status,omitempty"`
 	Pipeline *state.PipelineAssociation `json:"pipeline,omitempty"`
+	// Worktree reports that this start had to re-materialize the project's owned
+	// checkout before it could run (FS-19.R7). Absent on every ordinary start.
+	Worktree *worktreeStartNotice `json:"worktree,omitempty"`
+}
+
+// worktreeStartNotice is what a start path says about a recreated checkout: it
+// happened, on which branch, and whether the project's setup command warned.
+type worktreeStartNotice struct {
+	Recreated bool   `json:"recreated"`
+	Branch    string `json:"branch,omitempty"`
+	Warning   string `json:"warning,omitempty"`
 }
 
 // handleLaunch implements POST /api/sessions (techspec §6.1, §7.1).
@@ -62,6 +73,11 @@ func (s *Server) handleLaunch(w http.ResponseWriter, r *http.Request) {
 type launchOptions struct {
 	AgentID    string
 	Generation string
+	// Notice, when non-nil, receives the checkout-recreation report so the start
+	// response can carry it (FS-19.R7). Callers that do not report it — the
+	// composition tests, and every path whose response has no place for it —
+	// leave it nil.
+	Notice *worktreeStartNotice
 }
 
 const maxAgentNameRunes = 256
@@ -93,6 +109,8 @@ func (s *Server) launchAgent(ctx context.Context, req launchRequest, options lau
 		return sessionResponse{}, ae
 	}
 	defer s.releaseProjectStart(req.Project)
+	var notice worktreeStartNotice
+	options.Notice = &notice
 	// Resolve config + defaults; validate (§6.1 step 1, §6.5).
 	spec, agent, ae := s.composeLaunchWithOptions(ctx, req, options)
 	if ae != nil {
@@ -119,7 +137,11 @@ func (s *Server) launchAgent(ctx context.Context, req launchRequest, options lau
 	}
 
 	// Runtime inserted running + status rows during Start.
-	return s.readSession(agent.AgentID), nil
+	resp := s.readSession(agent.AgentID)
+	if notice.Recreated {
+		resp.Worktree = &notice
+	}
+	return resp, nil
 }
 
 // handleSessionDetail implements GET /api/sessions/{id} (techspec §7.2).
@@ -232,13 +254,18 @@ func (s *Server) composeLaunchWithOptions(ctx context.Context, req launchRequest
 	if err != nil {
 		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeValidation, "bad project cwd: "+err.Error())
 	}
-	// Pre-check the resolved cwd exists. Without this the process launch fails
-	// deep in the runtime with a fork/exec ENOENT that names the adapter binary,
-	// not the missing directory, so the user cannot self-diagnose (e.g. the
-	// shipped my-app project points at ~/Projects/my-app, absent on a fresh box).
-	if info, statErr := os.Stat(cwd); statErr != nil || !info.IsDir() {
-		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeValidation,
-			fmt.Sprintf("project directory %q does not exist — set project %q to an existing path", cwd, req.Project))
+	// Resolve the working directory through the one shared step (TS-01.R26,
+	// TS-12.R4). For an ordinary project this is the pre-check that keeps a
+	// missing directory from failing deep in the runtime with a fork/exec ENOENT
+	// naming the adapter binary; for a worktree project it also re-materializes a
+	// missing owned checkout before anything starts (FS-19.R7).
+	recreated, warning, ae := s.ensureWorktreeCheckout(ctx, req.Project, cwd)
+	if ae != nil {
+		return runtime.LaunchSpec{}, state.Agent{}, ae
+	}
+	if recreated && options.Notice != nil {
+		row, _ := s.ownedWorktree(req.Project)
+		*options.Notice = worktreeStartNotice{Recreated: true, Branch: row.Branch, Warning: warning}
 	}
 	addDirs := expandAddDirs(project.AddDirs)
 

@@ -101,16 +101,25 @@ func (s *Server) handleRoles(w http.ResponseWriter, _ *http.Request) {
 
 // handleProjects returns the project map, each value enriched with the
 // server-computed read-only resource_dir path (TS-03.R12).
-func (s *Server) handleProjects(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleProjects(w http.ResponseWriter, r *http.Request) {
 	projects, err := s.configStore.ListProjects()
 	if err != nil {
 		s.log.Error("projects: list", "err", err)
 		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
+	// One ownership read for the whole list, and a memoized repo-backed probe per
+	// cwd: the list path spawns no Git subprocess (TS-12.R6). An unreadable
+	// ownership table degrades the enrichment for every project rather than
+	// failing the list (INV §7).
+	owned, err := s.stateStore.ListProjectWorktrees()
+	if err != nil {
+		s.log.Error("projects: list worktree ownership", "err", err)
+		owned = map[string]state.ProjectWorktree{}
+	}
 	out := make(map[string]projectResponse, len(projects))
 	for id, p := range projects {
-		out[id] = s.toProjectResponse(id, p, nil)
+		out[id] = s.enrichProjectResponse(r.Context(), s.toProjectResponse(id, p, nil), owned)
 	}
 	writeJSON(w, http.StatusOK, out)
 }

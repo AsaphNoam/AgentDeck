@@ -1,7 +1,7 @@
 # TS-12 — Worktree lifecycle
 
-**Status:** Partial
-**Code:** `internal/worktree/` (planned), `internal/server/`, `internal/config/`, `internal/state/`
+**Status:** Current
+**Code:** `internal/worktree/`, `internal/server/worktree.go`, `internal/server/worktree_handlers.go`, `internal/config/worktrees.go`, `internal/state/worktrees.go`
 **Absorbed:** —
 
 ## 1. Scope
@@ -14,49 +14,72 @@ branch automation beyond creating the fork branch.
 
 ## 2. Design & constraints
 
-- **R1 (planned) — One Git execution boundary.** All Git operations live in one package
+- **R1 — One Git execution boundary.** All Git operations live in one package
   (`internal/worktree`), invoked argv-only via `exec.Command` (never a shell), rooted with
   `git -C <path>`, with bounded per-command timeouts, `stdin` closed, and `GIT_TERMINAL_PROMPT=0`
   so no operation can hang on a prompt. A missing `git` binary or an unparseable output is an
   actionable error, and parsing tolerates version variance (INV §12) by using plumbing commands
   (`rev-parse`, `symbolic-ref`, `status --porcelain`, `worktree list --porcelain`) rather than
   scraping porcelain UI output.
-- **R2 (planned) — Ownership is a SQLite record.** Machine-created worktree ownership lives in
+- **R2 — Ownership is a SQLite record.** Machine-created worktree ownership lives in
   `state.db` (TS-02.R1's writer split; a hand-editable JSON field could forge ownership and widen
   the deletion surface). A `project_worktrees` row — see §3 — exists exactly for checkouts
   AgentDeck created; its presence is the sole ownership test (FS-19.R4). The `project` column is a
   logical, non-cascading reference like TS-02.R25's task references: deleting a project never
   cascades here, and the deletion flow removes the row explicitly.
-- **R3 (planned) — Fork ordering is crash-safe toward under-ownership.** Fork executes: validate
+- **R3 — Fork ordering is crash-safe toward under-ownership.** Fork executes: validate
   (source project, repo, branch/base, target path) → create branch and worktree (the external
-  effect) → insert the ownership row → write the new project file → run setup (FS-19.R3). Any
-  failure before setup rolls back in reverse: remove the project file, delete the row, remove the
-  worktree, delete the still-commitless branch — satisfying FS-19.R10's all-or-nothing rule. A
-  crash inside the window can only leave a checkout that is *not* recorded as owned; per INV §15
-  the record that authorizes a future deletion is never written ahead of the artifact it describes,
-  so every crash residue is inert and conservatively treated as external.
-- **R4 (planned) — Checkout resolution is one shared helper on every start path.** A single
-  `ensureWorktreeCheckout(project)` helper consults the ownership record and recreates a missing
-  owned checkout from its recorded branch (FS-19.R7) before any process starts. It is called from
-  `composeLaunch`, `composeResumeSpec`, `composeSwitchSpec`, and pipeline `ValidateStage` —
-  replacing the two currently duplicated cwd stat checks (`internal/server/launch.go`,
-  `internal/server/pipeline_lifecycle.go`) with one seam, per INV §2 and TS-01.R6/R9. Resume and
-  switch keep the frozen `snap.Cwd`; the helper only re-materializes the directory the frozen path
-  names, never re-derives a different path. Recreation reports itself in the start response and
-  status detail; a recorded branch that no longer exists fails the start with an actionable error.
-- **R5 (planned) — Setup runs non-interactively with launch-equivalent env.** `setup_command` runs
+  effect) → write the new project file → insert the ownership row → run setup (FS-19.R3). Any
+  failure before setup rolls back in reverse: delete the row, remove the project file, remove the
+  worktree, delete the still-commitless branch — satisfying FS-19.R10's all-or-nothing rule. The
+  ownership row is written **last**, after both the checkout and the project that owns it exist.
+  Per INV §15 the record that authorizes a future deletion is never written ahead of the artifact
+  it describes, so a crash anywhere in the window can only leave a checkout that is *not* recorded
+  as owned — inert, conservatively treated as external, and reclaimable by hand.
+
+  *Correction (2026-09-02, implementation):* the original ordering inserted the row before the
+  project file. A crash in that window left a branch, a directory, and a row belonging to a project
+  that did not exist, which no surface listed and no flow could reclaim, so the crash-safety claim
+  was false for the design's own window. The row now goes last.
+- **R4 — Checkout resolution is one shared helper on every start path.** A single
+  `ensureWorktreeCheckout(project, cwd)` helper consults the ownership record and recreates a
+  missing owned checkout from its recorded branch (FS-19.R7) before any process starts. It is
+  called from `composeLaunch`, `composeResumeSpec`, and `composeSwitchSpec` — replacing the two
+  currently duplicated cwd stat checks (`internal/server/launch.go`,
+  `internal/server/pipeline_lifecycle.go`) with one seam, per INV §2 and TS-01.R6/R9. Both pipeline
+  start paths inherit it: `LaunchStage` runs through `launchAgent`/`composeLaunch` and
+  `ContinueStage` through `composeResumeSpec`. Resume and switch keep the frozen `snap.Cwd`; the
+  helper only re-materializes the directory the frozen path names, never re-derives a different
+  path. Two starts that observe the same absence are serialized by a per-project recreation claim,
+  so exactly one runs `git worktree add` and the other finds the directory already there (INV §5).
+  Recreation reports itself in the start response; a recorded branch that no longer exists fails
+  the start with an actionable error.
+
+  *Correction (2026-09-02, implementation):* the original text also called the helper from pipeline
+  `ValidateStage`. That is the manager's read-only per-stage pre-flight, run before a run snapshot
+  is committed and possibly for stages that never execute, so calling a mutating helper there would
+  materialize checkouts and run setup commands for work that may not happen, and would report a
+  recreation failure as a stage diagnostic instead of a start error. `ValidateStage` stays
+  read-only and instead *tolerates* a currently-missing owned checkout at the project's recorded
+  path, leaving the decision to the start path. The original text also promised a `status.detail`
+  report; that field is the runtime's own bounded vocabulary surface (INV §8) and a start-path
+  write into it would race the runtime's, so the recreation is reported in the start response only.
+- **R5 — Setup runs non-interactively with launch-equivalent env.** `setup_command` runs
   as `/bin/sh -c` in the checkout with the same inherited server environment agents get, `stdin`
   closed, combined output captured with a bounded tail (64 KiB), and a 10-minute timeout. Result,
   timestamp, and captured tail are stored on the ownership row so the warning (FS-19.R3/A2)
-  survives the creating request; the fork and start responses carry it too.
-- **R6 (planned) — Status queries are cheap where they are frequent.** The projects list enriches
+  survives the creating request; the fork and start responses carry it too. The 64 KiB tail is a
+  **storage** bound: everything crossing into a human-facing warning is clamped again at the
+  presentation boundary to the last 2,000 runes, so a verbose failing build cannot push a log into
+  a banner (INV §8).
+- **R6 — Status queries are cheap where they are frequent.** The projects list enriches
   each project from the DB only (`worktree: {owned, branch}` — no Git subprocesses on the list
   path). `repo_backed`, needed for action visibility (FS-02.R60), comes from a bounded
   `rev-parse --is-inside-work-tree` check memoized per expanded cwd with a short TTL and
   invalidation on project edit. Expensive facts (dirty state for the archive dialog, FS-19.R8) are
   computed only on the on-demand per-project endpoint (§3); a failed or timed-out check reports
   "undeterminable", never a fabricated clean state (INV §8).
-- **R7 (planned) — Deletion is gated, verified, and ordered.** Checkout deletion runs only inside
+- **R7 — Deletion is gated, verified, and ordered.** Checkout deletion runs only inside
   the existing project-archive claim window (`beginProjectArchive`, TS-01.R13) or the
   project-delete path after the same claim, with all processes stopped. Before removing anything,
   the flow verifies the recorded path is the canonical `$AGENTDECK_HOME/worktrees/{project-id}`
@@ -66,16 +89,20 @@ branch automation beyond creating the fork branch.
   FS-19.R8) and only then deletes the ownership row, so a crash between the two leaves a row whose
   checkout is missing — the R4 recreation case — rather than an unrecorded owned checkout. External
   checkouts have no row and therefore no deletion path at all.
-- **R8 (planned) — Owned paths follow the established filesystem rules.** The `worktrees/` root
+- **R8 — Owned paths follow the established filesystem rules.** The `worktrees/` root
   and `{project-id}` construction follow the project-resources pattern: slug-validated id before
   path construction, owner-only (0700) root, symlink rejection on root and leaf
   (FS-11.R8/R9, TS-02.R13). No AgentDeck code path ever removes a directory outside the owned
   `worktrees/` root.
-- **R9 (planned) — Base detection order is fixed.** Effective base = project `base_branch` when
-  set; else `origin/HEAD`'s target (via `symbolic-ref`); else the source repository's current
-  branch; a detached HEAD with no `origin/HEAD` is an actionable fork error. Detection runs at use
-  time (fork, FS-19.R2), never cached durably.
-- **R10 (planned) — Git refs are the atomic claim.** Concurrent forks are not serialized by
+- **R9 — Base detection order is fixed.** Effective base = project `base_branch` when
+  set; else `origin/HEAD`'s target (via `symbolic-ref`); else the branch checked out in the
+  repository's **main** worktree (the first entry of `worktree list --porcelain`); a detached HEAD
+  with no `origin/HEAD` is an actionable fork error. Detection runs at use time (fork, FS-19.R2),
+  never cached durably. The fallback reads the main worktree rather than the calling directory's
+  own HEAD because forking a fork calls it from inside a linked worktree, where that HEAD is the
+  source fork's branch — using it would stack the new branch on the source's work, which FS-19.R11
+  forbids.
+- **R10 — Git refs are the atomic claim.** Concurrent forks are not serialized by
   AgentDeck; branch-ref creation is the atomic claim (INV §5), so the second identical fork fails
   on the existing branch and rolls back per R3. Server-derived project ids make checkout-path
   collisions unreachable; the path is still pre-checked and fails closed.
@@ -119,7 +146,8 @@ TS-02's config authority; both are optional and absent-tolerant.
 - **INV §4** — the checkout deliberately opts out of create/teardown symmetry, like FS-11 project
   resources: creation has no automatic teardown on any exit path; the only teardown is the
   explicit, consented deletion flow (R7). This deviation is the FS-19.R8 product decision.
-- **INV §5** — branch-ref creation is the fork's atomic claim (R10).
+- **INV §5** — branch-ref creation is the fork's atomic claim (R10); a per-project claim
+  serializes concurrent recreation of one missing checkout (R4).
 - **INV §7** — status enrichment isolates per-project Git failures; one unreadable repo degrades
   that project's fields, never the list.
 - **INV §12** — plumbing-only Git parsing with timeout and prompt suppression (R1).
@@ -137,4 +165,20 @@ TS-02's config authority; both are optional and absent-tolerant.
 
 ## 6. Traceability
 
-To be recorded at implementation.
+- Git boundary: `internal/worktree/git.go`, `internal/worktree/git_test.go` (cases run against the
+  installed Git, not a stub).
+- Ownership: migration 20 in `internal/state/schema.go`, `internal/state/worktrees.go`,
+  `internal/state/worktrees_test.go`.
+- Owned paths: `internal/config/worktrees.go`, `internal/config/worktrees_test.go`.
+- Fork, checkout resolution, setup, status, and deletion: `internal/server/worktree.go`;
+  HTTP surface in `internal/server/worktree_handlers.go` and `internal/server/routes.go`.
+- Start-path wiring: `composeLaunchWithOptions` (`internal/server/launch.go`),
+  `composeResumeSpecWithGeneration` (`internal/server/resume.go`), `composeSwitchSpec`
+  (`internal/server/switch.go`), and the read-only tolerance in `ValidateStage`
+  (`internal/server/pipeline_lifecycle.go`).
+- Consented deletion: `handleArchiveProjectAction` (`internal/server/archive_actions.go`) and
+  `handleDeleteProject` (`internal/server/config_handlers.go`).
+- Regression anchors: `TestWorktreeForkCreatesBranchCheckoutAndProject`,
+  `TestWorktreeForkOfAForkUsesTheEffectiveBase`, `TestWorktreeCheckoutRecreationAndMissingBranch`,
+  `TestConcurrentCheckoutRecreationClaimsOnce`, `TestArchiveDeletesCheckoutOnlyWithConsent`,
+  `TestExternalCheckoutIsNeverDeleted`, `TestWorktreeStatusAndListEnrichment`.

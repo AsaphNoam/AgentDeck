@@ -408,6 +408,13 @@ func (s *Server) composeResumeSpecWithGeneration(agent state.Agent, snap state.S
 	if agent.Interface == "terminal" && !terminalSupported(be.Type) {
 		return runtime.LaunchSpec{}, apiError(runtime.CodeTerminalUnavailable, terminalUnsupportedReason(be.Type))
 	}
+	// Resolve the working directory through the one shared step before any
+	// registration side effect (TS-01.R26, TS-12.R4). Resume keeps the frozen
+	// snapshot cwd: the helper only re-materializes a missing owned checkout at
+	// that exact recorded path, and never re-derives a different one.
+	if _, _, ae := s.ensureWorktreeCheckout(context.Background(), agent.Project, snap.Cwd); ae != nil {
+		return runtime.LaunchSpec{}, ae
+	}
 	// Ensure the shared-resources directory before any registration side effect
 	// (FS-11.R6/R9). The frozen snapshot already carries the path in add_dirs and
 	// the prompt for agents launched after the feature shipped; the env var is

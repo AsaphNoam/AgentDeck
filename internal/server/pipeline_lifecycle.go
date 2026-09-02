@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/pipeline"
@@ -43,8 +42,16 @@ func (s *Server) ValidateStage(_ context.Context, execution pipeline.StageExecut
 	if err != nil {
 		return fmt.Errorf("invalid project directory")
 	}
-	if info, err := os.Stat(cwd); err != nil || !info.IsDir() {
-		return fmt.Errorf("project directory does not exist")
+	// ValidateStage is the manager's read-only per-stage pre-flight, run before a
+	// run snapshot is committed and possibly for stages that never execute, so it
+	// must not create anything. A worktree project whose owned checkout is
+	// currently missing still validates: the start path re-materializes it
+	// through ensureWorktreeCheckout, or fails there with an actionable error
+	// (FS-19.R7, TS-12.R4).
+	if !isExistingDir(cwd) {
+		if row, owned := s.ownedWorktree(execution.Project); !owned || !sameCheckoutPath(row.CheckoutPath, cwd) {
+			return fmt.Errorf("project directory does not exist")
+		}
 	}
 	backends, err := s.configStore.ReadBackends()
 	if err != nil {

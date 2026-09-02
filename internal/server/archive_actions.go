@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -102,6 +103,12 @@ func (s *Server) handleArchiveProjectAction(w http.ResponseWriter, r *http.Reque
 		writeAPIError(w, apiError(runtime.CodeValidation, "invalid project"))
 		return
 	}
+	// The body is optional: archiving has never required one, and its absence
+	// never deletes a checkout (FS-19.R8, TS-03.R33).
+	var body archiveProjectRequest
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&body)
+	}
 	if ae := s.beginProjectArchive(r.Context(), id); ae != nil {
 		writeAPIError(w, ae)
 		return
@@ -169,11 +176,30 @@ func (s *Server) handleArchiveProjectAction(w http.ResponseWriter, r *http.Reque
 	for _, agentID := range ids {
 		_, _ = s.stateMgr.Touch(agentID)
 	}
-	writeJSON(w, http.StatusOK, archiveProjectActionResponse{
+	// Checkout deletion runs last, inside this same claim and after every process
+	// is stopped and the archive is durably committed (TS-12.R7). A failure here
+	// is reported beside a successful archive rather than undoing it: the archive
+	// already happened, and the checkout is still there to try again.
+	resp := archiveProjectActionResponse{
 		Project:          s.toProjectResponse(id, project, nil),
 		StoppedAgentIDs:  append([]string{}, ids...),
 		ArchivedAgentIDs: append([]string{}, ids...),
-	})
+	}
+	if body.DeleteCheckout {
+		deleted, err := s.deleteOwnedCheckout(r.Context(), id)
+		if err != nil {
+			s.log.Error("worktree: delete checkout on archive", "project", id, "err", err)
+			resp.CheckoutWarning = "the checkout could not be deleted: " + err.Error()
+		}
+		resp.CheckoutDeleted = deleted
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// archiveProjectRequest is the optional archive body. delete_checkout is
+// honored only for an AgentDeck-owned checkout and is never defaulted on.
+type archiveProjectRequest struct {
+	DeleteCheckout bool `json:"delete_checkout"`
 }
 
 func (s *Server) handleRestoreProjectAction(w http.ResponseWriter, r *http.Request) {
@@ -208,4 +234,8 @@ type archiveProjectActionResponse struct {
 	Project          projectResponse `json:"project"`
 	StoppedAgentIDs  []string        `json:"stopped_agent_ids"`
 	ArchivedAgentIDs []string        `json:"archived_agent_ids"`
+	// CheckoutDeleted reports that the consented deletion actually happened;
+	// CheckoutWarning carries the reason when it was requested and refused.
+	CheckoutDeleted bool   `json:"checkout_deleted,omitempty"`
+	CheckoutWarning string `json:"checkout_warning,omitempty"`
 }

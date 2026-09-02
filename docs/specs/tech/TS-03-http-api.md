@@ -393,13 +393,16 @@ stop-and-registration-cleanup operation.
   (TS-04.R33–R40, TS-05.R18).
 
 
-- **R33 (planned) — Worktree project surface.** FS-19 adds
+- **R33 — Worktree project surface.** FS-19 adds
   `POST /api/projects/{project}/worktree-fork` (201 on success; Git and validation failures are 422
   with the specific reason; archived sources rejected), on-demand
   `GET /api/projects/{project}/worktree` status, an optional `delete_checkout` boolean on the
   existing project archive and delete requests (honored only for AgentDeck-owned checkouts, never
-  defaulted on), and per-project `worktree`/`repo_backed` enrichment on `GET /api/projects`. All use
-  the standard error envelope; shapes and semantics live in TS-12 §3.
+  defaulted on — as a body field on `POST .../archive`, whose body remains optional, and as a
+  `?delete_checkout=true` query parameter on `DELETE /api/projects/{project}`, which carries no
+  body), and per-project `worktree`/`repo_backed` enrichment on `GET /api/projects`. A start whose
+  path had to re-materialize an owned checkout carries a `worktree` notice on its session response
+  (FS-19.R7). All use the standard error envelope; shapes and semantics live in TS-12 §3.
 
 ## 3. Interfaces & data shapes
 
