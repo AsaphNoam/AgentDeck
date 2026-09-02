@@ -5,6 +5,53 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-09-02 — Bug investigation: the pipeline run that needed you the whole way
+
+I diagnosed the 23-hour run. Most of what went wrong is real, and the biggest part of it is ours,
+not your template's.
+
+The two long stalls — about nine hours and about ten hours, roughly nineteen of the twenty-three
+together — have one cause. Every stage agent is told to report its result "exactly once" and that
+the one call ends its part. But some refusals of that call are ones we expect the agent to fix and
+send again. A refused call changes nothing: the stage still owes a result and only that agent can
+send it. Nothing tells the agent that, so it stopped. Both times, the same result was accepted the
+moment you told it to try again.
+
+Nothing noticed. A run waiting for a result it will never get looks exactly like a run being
+worked on: no attention state, no notification, not even a log line. That is why you had to find
+the stalled coordinator yourself, twice.
+
+The manual session resume has its own cause. When a later stage tried to give work back to the
+coordinator an earlier stage had used, we told it "No agent matches" — about an agent that exists,
+that you could see, and that the same coordinator had just shared context with. The real reason is
+that we hold stopped pipeline agents out of the addressable list, and we never say so.
+
+Three more, smaller: a control-plane approval that times out after three minutes silently cancels
+the call and is never logged, so ten of your prompts quietly cost the run progress; Continue sits
+disabled until you type continuation text without saying that is what it wants, and nothing says
+Retry starts a fresh agent; and the final report your run declared is delivered to the API but
+drawn on no screen, which is why you had to ask an agent to read it back to you.
+
+Some of what you hit is the product working as written, and I have listed those separately so the
+fix session does not chase them: a blocked result really is final even while delegated agents keep
+working, Retry really is a fresh agent, a run really does not isolate a workspace, and a run's
+outcome really is the last agent's own word. Four of those are worth wanting anyway — carrying
+partial success across a retry, isolated workspaces for delegated work, a durable stage handoff,
+and an outcome that separates "finished" from "passed". None are written down anywhere yet. I left
+them for you to place, because your ideas file has uncommitted work in it.
+
+Six findings are recorded, three of them must-fix. Two carry reproductions, committed skipped. No
+product code or specification changed.
+
+**Needs attention:** Two decisions before the stall fix can land. First, what counts as a stage
+that can no longer advance — a stage agent legitimately goes quiet while its delegated agents work,
+so this needs a rule, and it needs to say whether the result is a real attention state or a quieter
+note on the run page. Second, whether a stopped pipeline agent should stay unreachable forever;
+today it does, long after its run has finished.
+
+**Next:** Run `/fix` on the three must-fix findings, starting with the report-retry one, which needs
+no decision from you.
+
 ### 2026-09-02 — Review: worktree-project implementation
 
 The worktree-project implementation is not ready to move on from. The consolidated review found

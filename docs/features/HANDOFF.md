@@ -15,7 +15,17 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   `cache/agent-skills/`. The credentialed Claude and Codex checks are not covered by that run and
   remain owed (TS-06.R21). A customized `agentdecker` role is deliberately not migrated (FS-04.R44),
   so it keeps the superseded product manual beside the current skill; nothing user-facing says so.
-- **Bug investigation:** The 2026-08-28 pipeline `stale_assignment` report is closed. Its three
+- **Bug investigation:** The 2026-09-02 unattended-pipeline-run report is diagnosed and open for
+  `/fix`. Six findings are recorded below, three of them **Must fix**. The two multi-hour stalls
+  that cost about nineteen of the run's twenty-three hours have one confirmed mechanism: the stage
+  assignment tells every agent to report "exactly once", so a refusal FS-17 itself classifies as
+  retryable is read as terminal, and nothing in the run ever notices that its attempt is waiting on
+  a result no one will send. Two reproductions are committed skipped
+  (`internal/pipeline/refused_report_retry_test.go`,
+  `internal/messaging/pipeline_agent_task_target_test.go`). Most of the rest of that report is the
+  product working as FS-14/TS-09 specify; those items are listed with the findings so `/fix` does
+  not chase them. Two of the findings need a product decision below.
+  The 2026-08-28 pipeline `stale_assignment` report is closed. Its three
   findings are all fixed: the refusal code was corrected earlier, the boundary is now stated to the
   stage agent in the assignment, the accepted result, and the refusal (FS-14.R47), the restart pause
   no longer offers a dead-end **Open agent** (FS-14.R48), every refusal is logged with the fields
@@ -29,7 +39,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   every invariant class. The worktree-project implementation (`1b2a8c3..bd797bd`) has now had a
   dedicated implementation review plus an independent Terra/high pass. Eighteen findings are open
   below, ten of them **Must fix**: the two earlier Must-fix findings remain, and the worktree review
-  adds eight Must-fix and two Worth-fixing findings. The most serious worktree defects allow a
+  adds eight Must-fix and two Worth-fixing findings. The 2026-09-02 bug investigation adds six more,
+  three of them **Must fix**, against the pipeline reporting contract, stall detection, and the task
+  recipient vocabulary. The most serious worktree defects allow a
   force-delete to remove a running agent's checkout, make a fork-of-a-fork depend durably on its
   disposable parent checkout, capture setup output without a memory bound, and leave deletion and
   rollback short of their safety contracts. The uncommitted FS-14 proposal-decline design also had
@@ -90,13 +102,45 @@ start that finds one missing, and deleted only by explicit consent at archive or
 uncommitted state disclosed first. FS-19 and TS-12 are **Current**; so are FS-04 and TS-02, which
 had no other planned items left.
 
-**Next:** Run `/fix` on the ten worktree implementation findings below, starting with the eight
+**Next:** Run `/fix` on the open findings below. Take the three bug-investigation Must-fix items
+first, because a person is hitting them in real runs today; the two that carry a reproduction start
+by un-skipping it. Then take the ten worktree implementation findings, starting with their eight
 Must-fix items. Two browser gates are still owed below (J16's worktree steps and the archive
 dialog's manual gate), and the reactivation-after-deletion behavior still needs the human's
 confirmation. Revisit the MCP migration only when its transport gate can be proved under all four
 chat providers.
 
 ## Changelog
+
+- **2026-09-02 — bug investigation (unattended pipeline run; FS-14.R6/R7/R15/R19/R29/R37/R40/R47,
+  TS-09.R8/R17/R28, FS-03.R17, FS-06.R4/R11/R22, FS-15.R17, FS-16.R12/R20, FS-17.R1–R3;
+  INV §2/§8/§10):** Diagnosed a 23h24m pipeline run that finished with outcome `success` but needed
+  continuous human supervision: 8 stage attempts, 4 of them reported blocked, 27 delegated tasks of
+  which 24 succeeded, 1 Retry, 3 Continues, 1 manual session resume, at least 14 out-of-band user
+  messages, and 87 permission prompts across three coordinator sessions of which 10 timed out.
+  About 19 of the 23 hours were two stalls that began after the work was already done.
+
+  Those two stalls have one confirmed mechanism, and it is a product defect rather than a template
+  one: `renderAssignment` tells every stage agent to call `report_pipeline_stage_result` "exactly
+  once" and that "that one call ends your part", while FS-17's shipped retry vocabulary classifies
+  several of that same tool's refusals as retryable. A refused call is not a report — the attempt is
+  untouched and still owes a result — but nothing tells the agent that, so it stopped, and nothing
+  in the run noticed. `OnTurnEnd` is a no-op for an attempt with no accepted report, there is no
+  timer anywhere in `internal/pipeline`, and FS-14.R29's two notification categories exclude the
+  state by enumeration, so a run parked at `await_result` with a silent agent is indistinguishable
+  from one being actively worked, indefinitely. A third defect explains the manual session resume:
+  a task aimed at the earlier stage's coordinator is refused as "No agent matches", for an agent the
+  same caller can and did share context with.
+
+  Six findings are recorded below, three **Must fix**. Much of the report is the product working as
+  written — an accepted `blocked` result is terminal while delegated children run (FS-14.R40 says
+  so in terms), Retry means a fresh agent with only bounded prior summaries (FS-14.R12/R20), a run
+  claims no filesystem isolation (FS-14.R21), and the run outcome is the reporting agent's own word
+  (FS-14.R34) — and those are listed with the findings so the fix session does not chase them. The
+  permission-prompt volume is already the user's own 2026-09-02 idea entry; what is new is that the
+  180s auto-deny (FS-03.R17) makes it a correctness problem for control-plane calls, not only
+  friction. No product code or specification changed; the only tree changes are the two skipped
+  reproduction tests.
 
 - **2026-09-02 — review (worktree implementation only; FS-19.R1–R11/A1–A7, FS-04.R45/A25,
   FS-02.R60/A42, TS-01.R26, TS-02.R27, TS-03.R33, TS-12.R1–R10; INV §1–§15):** Reviewed only the
@@ -914,6 +958,136 @@ chat providers.
 
 - **2026-08-28 — fix:** No open review findings. `## Review findings
 
+From the 2026-09-02 bug investigation of a field report on one 23h24m pipeline run: it completed
+with outcome `success`, but the person had to act as the orchestration control plane throughout —
+approving control-plane calls, choosing between Continue and Retry, preserving partial work across
+attempts, authorizing isolated workspaces, resuming an earlier session, waking a coordinator,
+relaying an already-completed result, and finally asking where the run's declared report was
+stored. No AgentDeck version, environment, or server log came with it, and this machine's
+`~/.agentdeck` holds nothing newer than 2026-08-27, so it is not the incident home: the diagnosis
+below is from the code path and two local reproductions, not from incident logs. Confidence is
+labeled on each finding.
+
+- **Must fix** (confirmed) (FS-14.R19/R47, FS-17.R1–R3, TS-09.R8; INV §2/§8) —
+  `internal/pipeline/assignment.go:35-40` tells every stage agent to "call
+  `report_pipeline_stage_result` exactly once", that "that one call ends your part in this
+  assignment", and that "only then is another report accepted". None of it distinguishes a call
+  AgentDeck **accepted** from a call it **refused**, while `internal/messaging/tools.go:50-61`
+  classifies `validation_failed` as `after_change` and `pipeline_unavailable` as `transient` —
+  refusals FS-17 exists to invite a second call for. Normal-use trigger: any retryable refusal of a
+  stage report, of which the most reachable is `validation_failed` for a destination stage whose
+  required inputs are not yet resolved (`internal/pipeline/actions.go:263`) — precisely the shape of
+  a fan-out stage reporting while some children are still producing values. The attempt is untouched
+  by the refusal, so it still owes a result and only that agent can supply it; the agent has been
+  told not to. In the reported run this happened twice and cost about nine and about ten hours, and
+  both times the same preserved result was accepted as soon as a person told the agent to try again.
+  Neither the tool description (`internal/messaging/messaging.go:174`) nor any refusal message
+  explains what a `retry` class means, so the instruction the agent re-reads every turn wins.
+  Reproduced by the committed skipped test `internal/pipeline/refused_report_retry_test.go`
+  (`TestRefusedStageReportMustBeRetryable`), which shows the refused report leaving the run at
+  `await_result` and the corrected retry being accepted. Fix: state the boundary in terms of the
+  accepted result rather than the tool call, in the assignment and in the refusal, the way R47
+  already states the blocked boundary in all three places.
+
+- **Must fix** (confirmed) (FS-14.R7/R29/R37, TS-09.R17; INV §8/§10) — nothing detects a stage
+  attempt whose agent can no longer advance it. `Manager.OnTurnEnd`
+  (`internal/pipeline/actions.go:304`) returns `nil` unless the attempt already has an accepted
+  report, so a turn boundary reached with nothing reported is silently ignored; there is no ticker,
+  timer, or sweep anywhere in `internal/pipeline`; `internal/server/reconcile.go`'s 30s sweep never
+  touches pipelines; and `Manager.Startup` (`manager.go:312-361`) re-pauses an interrupted
+  `await_result` only at process boot. FS-14.R29's two notification categories — blocked, approval
+  gate, launch failure, crash, and completion — exclude this state by enumeration. Normal-use
+  trigger: the finding above, a permission timeout on the report call, or any turn that ends without
+  one. A run sits at `state=running, pending_action=await_result` producing no publish, no
+  notification, and no log entry, and R37's attention reason stays empty, so the run page renders it
+  identically to a run being actively worked — which is what left this run idle for about nineteen
+  hours in total. This needs a product decision before it can be fixed, because a stage agent
+  legitimately ends many turns while waiting on delegated children: the choice is what signal
+  qualifies (an idle agent with no running delegated tasks, an elapsed-time threshold, or an
+  explicit heartbeat) and whether it becomes an attention reason under R29 or a weaker disclosure
+  under R40. Recorded under *Decisions needing your input* below.
+
+- **Must fix** (confirmed) (FS-06.R4/R22, FS-15.R17, FS-16.R12/R20, TS-10.R13; INV §8) —
+  `internal/messaging/task_tools.go:252` refuses a task aimed at a stopped pipeline agent with
+  `"No agent matches %q."`, naming an agent that exists, is not archived, has a resumable session
+  snapshot, and that the same caller can share context with in the same turn. The exclusion itself
+  is specified and shared correctly with messaging through one resolver (`stoppedWakeGates`,
+  `internal/state/messages.go:40`, FS-06.R22), and the context plane's looser set is deliberate
+  (FS-15.R17), so the divergence is by design — the message is not. Normal-use trigger: a later
+  pipeline stage delegates work back to the coordinator an earlier stage used, which is what the
+  reported run did. `recipient_not_found` is classified `after_change`, which is the right class
+  because resuming the agent does make the call succeed, but nothing names that change, so the
+  person had to diagnose it and resume the session by hand. This is the same defect class as the
+  2026-08-28 `stale_assignment` report. Reproduced by the committed skipped test
+  `internal/messaging/pipeline_agent_task_target_test.go`
+  (`TestTaskAimedAtAStoppedPipelineAgentNamesTheRealCondition`), which shares context with the agent
+  and then gets told it does not exist. Fix: name the condition and the change in the refusal for
+  both `create_task` and `send_message`. A second, product-level question rides on it: a
+  `pipeline_attempts` row lives as long as its run record (`ON DELETE CASCADE`,
+  `internal/state/schema.go:237`), so **any** agent that ever ran one stage is unaddressable while
+  stopped, forever, long after that run ends — recorded below.
+
+- **Worth fixing** (confirmed) (FS-03.R17, FS-14.R15; INV §8) — a permission prompt on a
+  control-plane call auto-denies after 180s (`internal/runtime/permission.go:13`) and finishes the
+  turn without executing the tool, and the pipeline never learns. The reported run recorded 10 such
+  timeouts across its three coordinator sessions. FS-14.R15 correctly forbids a pipeline from
+  treating a permission prompt as a failed or completed stage, and nothing does — but nothing
+  records the converse either: the only trace that `report_pipeline_stage_result` never ran is a
+  generic `permission timed out` error event inside that agent's own transcript. `dashboard.log`
+  carries every HTTP request and every pipeline refusal (`refuseReport`, `actions.go:287`) but not
+  one denied or timed-out control-plane call, so a run stalled this way is undiagnosable from the
+  server log — this report could only be reconstructed because the person watched it happen. Log the
+  denial and the timeout with the tool name, agent id, and decision, and treat a denied control-plane
+  call as an input to whatever signal the finding above grows. The volume of these prompts is
+  already the user's own 2026-09-02 entry in `docs/ideas.md`; what that entry does not yet say is
+  that the 180s auto-deny turns the friction into lost pipeline progress.
+
+- **Worth fixing** (confirmed) (FS-14.R20/R37/R46; INV §10) —
+  `ui/src/features/pipelines/RunBrowser.tsx:140` disables **Continue** until the continuation
+  textarea holds non-whitespace text, with no `title`, no adjacent message, and no required marker,
+  and `:108-111` leaves **Continue** and **Retry stage** both valid at an ordinary `blocked` pause
+  with nothing distinguishing them. The one piece of copy that explains Retry — "Retry the stage to
+  run it again with a fresh agent" at `:137` — renders only on the `recovered` branch R48 added,
+  where Continue is withheld and there is no choice to make. Normal-use trigger: the ordinary
+  blocked pause, which is the pause a person meets most. R46 already requires exactly this pattern
+  ("names the value it is still waiting for beside that control") for the start dialog, so the
+  product has the answer and does not apply it where the user actually got stuck: in the reported
+  run the person asked which action was correct, was advised Continue, then Retry, and had no
+  statement anywhere that Retry means a fresh agent carrying only bounded prior summaries
+  (FS-14.R12/R20). Fix: name the missing continuation input beside the disabled control, and state
+  each action's consequence where both are offered. Test both in `RunBrowser.test.tsx`.
+
+- **Worth fixing** (confirmed) (FS-14.R23/R38; INV §10) — a stage's declared outputs are shipped in
+  the run-detail payload as `report_outputs` (`ui/src/schemas/pipeline.ts:117`) and rendered
+  nowhere: `TimelineAttempt` (`RunBrowser.tsx:189-193`) draws only the summary, details, checks, and
+  agent cards, and the only place an output's text appears is the **Named values** `<details>` at
+  `:161`, which has no `open` attribute while **Frozen setup** beside it does. Normal-use trigger:
+  any run whose last stage declares a substantial text output — the reported run's final review
+  report. R23 is satisfied by the named-value list, and §6 is right that AgentDeck delivers an
+  output nowhere, but the value is closed by default and decoupled from the attempt that produced
+  it, so the person ended the run not knowing where their report was and had to ask the stage agent
+  to reproduce it. A field that ships in the API and reaches no surface is INV §10's own case. Fix:
+  render an attempt's declared outputs in its timeline entry, and open the named values disclosure
+  on a completed run.
+
+**Read as specified, not findings.** Recorded so the fix session does not chase them: an accepted
+`blocked` result is terminal while delegated children keep running, and the run page's count of them
+is disclosure only (FS-14.R40, TS-09.R28 — implemented, `pipeline_projection.go:66-80`); Retry
+creates a fresh agent and carries forward only one bounded summary line per prior reported attempt
+(FS-14.R12/R20, `assignment.go:57-68`), and no work-unit, checkpoint, or resumable-task-identity
+concept exists in the template schema at all; a run claims no filesystem isolation and provisions no
+workspace, and nothing wires FS-19's worktree fork to a stage or a task (FS-14.R21, TS-09.R18,
+FS-19.R5); the coordinator's permission mode comes from its role and the global default with no
+pipeline-level override, by FS-14.R15's explicit intent; attaching a context reference requires the
+**creator** to be able to read it, never the assignee (FS-16.R20); the 15-message per-turn budget
+refused the wake-up message exactly as FS-06.R11/R18 describe; and the run's outcome is the
+reporting agent's own word against a template-authored success condition, so a review stage that
+reports `success` with unresolved findings produces a `success` run (FS-14.R6/R34). Four of these —
+partial-success checkpoints across a Retry, isolated workspace provisioning for delegated work, a
+durable stage handoff artifact, and an honest terminal outcome for a completed-but-unclean review —
+are real product wishes that no requirement covers and that `docs/ideas.md` does not yet record.
+They are left for the user to place, because that file carries uncommitted work of theirs.
+
 - **Worth fixing** (FS-16.R3/R4, TS-10.R15/R19; INV §15) — `internal/server/task_http_test.go:244`
   asserts the cancel response already carries `pending_release=false` and an empty runtime claim,
   but `finishInterruptedRelease` only clears them when its `StopStage` succeeds; a failed stop is
@@ -1127,6 +1301,21 @@ an explicit specification update. Remove an item when the human resolves it or q
 - **Refused card drag feedback:** Confirm whether the cross-block refusal should remain an in-flight
   pointer signal (FS-02.R53) or whether snap-back alone is the intended behavior. The shipped pointer
   implementation currently has an open wiring finding below.
+- **Detecting a pipeline stage that can no longer advance:** A run parked at `await_result` with a
+  silent stage agent is invisible today, and that cost the 2026-09-02 report about nineteen hours.
+  Fixing it needs your call on what qualifies, because a stage agent legitimately ends many turns
+  while its delegated children work: an idle stage agent with no running delegated tasks, an elapsed
+  time threshold, or an explicit heartbeat from the stage. Also say whether the result is a new
+  attention reason under FS-14.R29 — which puts it in the same notification category as blocked and
+  crash — or a weaker run-page disclosure like FS-14.R40's delegated-agent count.
+- **How long a stopped agent stays unaddressable after its pipeline stage:** FS-06.R22 excludes
+  pipeline-associated agents from the addressable set while stopped, and the association is a
+  `pipeline_attempts` row that lives as long as its run record. So an agent that ran one stage of a
+  run that finished weeks ago can never be sent a message or a task again unless someone resumes it
+  or deletes the run. The rule's stated reason — a pipeline stage agent was deliberately stopped by
+  its state machine, so no message may revive it — only applies while that state machine still owns
+  it. Confirm that the permanent version is intended, or scope the exclusion to a run that is still
+  active, which changes FS-06.R22 and `stoppedWakeGates`.
 - **Reactivating a worktree project after a consented checkout deletion:** FS-19 did not say what
   happens, and the review found its two paths answered in opposite ways. The smaller reading shipped
   on 2026-09-02 and is now stated in FS-19 §3: accepting the deletion ends AgentDeck's ownership, so
