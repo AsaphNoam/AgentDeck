@@ -137,6 +137,83 @@ describe("ProjectsEditor", () => {
     expect(deletes).toBe(0);
   });
 
+  // FS-19.R8 / TS-03.R33: Settings is a second canonical project-management
+  // surface, so archive gives the same owned-checkout disclosure and consent.
+  it("archives an owned dirty checkout only after the Settings consent", async () => {
+    let body: Record<string, unknown> | null = null;
+    server.use(
+      http.get("/api/projects", () => HttpResponse.json({
+        fork: {
+          title: "Fork", color: [100, 180, 255], cwd: "/tmp/fork", add_dirs: [], context_prompt: "",
+          worktree: { owned: true, branch: "agentdeck/fork" },
+        },
+      })),
+      http.get("/api/projects/fork/worktree", () => HttpResponse.json({
+        owned: true, repo_backed: true, branch: "agentdeck/fork", base: "main", dirty: true, dirty_known: true,
+      })),
+      http.post("/api/projects/fork/archive", async ({ request }) => {
+        body = await request.json() as Record<string, unknown>;
+        return HttpResponse.json({ project: { project: "fork", title: "Fork" }, stopped_agent_ids: [], archived_agent_ids: [] });
+      }),
+    );
+
+    renderWithQuery(<ProjectsEditor />);
+    fireEvent.click(await screen.findByRole("button", { name: "Archive" }));
+    expect(await screen.findByText(/holds uncommitted changes/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText(/delete this project's worktree checkout/i));
+    fireEvent.click(screen.getByRole("button", { name: "Archive project" }));
+    await waitFor(() => expect(body).toMatchObject({ delete_checkout: true, dirty_known: true, dirty: true }));
+  });
+
+  // FS-19.R8: delete has the same offer, and an unknown result is never
+  // represented as clean before the destructive query parameter is sent.
+  it("deletes an owned checkout with an unknown state only after consent", async () => {
+    let deletedURL: URL | null = null;
+    server.use(
+      http.get("/api/projects", () => HttpResponse.json({
+        fork: {
+          title: "Fork", color: [100, 180, 255], cwd: "/tmp/fork", add_dirs: [], context_prompt: "",
+          worktree: { owned: true, branch: "agentdeck/fork" },
+        },
+      })),
+      http.get("/api/projects/fork/worktree", () => HttpResponse.json({
+        owned: true, repo_backed: true, branch: "agentdeck/fork", base: "main", dirty: false, dirty_known: false,
+      })),
+      http.delete("/api/projects/fork", ({ request }) => {
+        deletedURL = new URL(request.url);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    renderWithQuery(<ProjectsEditor />);
+    fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+    expect(await screen.findByText(/could not read this checkout/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText(/delete this project's worktree checkout/i));
+    fireEvent.click(screen.getByRole("button", { name: "Delete project" }));
+    await waitFor(() => {
+      expect(deletedURL?.searchParams.get("delete_checkout")).toBe("true");
+      expect(deletedURL?.searchParams.get("dirty_known")).toBe("false");
+      expect(deletedURL?.searchParams.get("dirty")).toBe("false");
+    });
+  });
+
+  it("does not offer checkout deletion for an external project in either Settings dialog", async () => {
+    let statusCalls = 0;
+    server.use(
+      http.get("/api/projects/my-app/worktree", () => { statusCalls += 1; return HttpResponse.json({}); }),
+    );
+    renderWithQuery(<ProjectsEditor />);
+    await screen.findByText("My App");
+
+    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+    expect(screen.queryByLabelText(/delete this project's worktree checkout/i)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    expect(screen.queryByLabelText(/delete this project's worktree checkout/i)).toBeNull();
+    expect(statusCalls).toBe(0);
+  });
+
   // FS-04.A22: Browse fills cwd from the host folder panel, a dismissed panel
   // leaves the typed value alone, and neither one saves the project.
   it("browses for cwd, keeps the value on cancel, and never saves by itself", async () => {

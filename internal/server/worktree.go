@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/runtime"
@@ -28,6 +30,11 @@ const (
 	// surface. The 64 KiB stored tail is a storage bound; a warning banner needs
 	// a display bound too (INV §8).
 	setupWarningLimit = 2000
+	// setupOutputLimit is the bounded stored tail described by TS-12.R5. The
+	// setup writer applies it while the command is streaming, rather than after
+	// its process has already accumulated an unbounded CombinedOutput buffer.
+	setupOutputLimit     = 64 * 1024
+	mutateCleanupTimeout = 30 * time.Second
 	// repoBackedTTL bounds how long a cwd's repo-backed answer is reused. It
 	// keeps the projects list subprocess-free (TS-12.R6) at the cost of a short
 	// staleness window after a directory becomes (or stops being) a repository.
@@ -58,6 +65,17 @@ func (s *Server) ownedWorktree(projectID string) (state.ProjectWorktree, bool) {
 		return state.ProjectWorktree{}, false
 	}
 	return row, true
+}
+
+func (s *Server) readOwnedWorktree(projectID string) (state.ProjectWorktree, bool, error) {
+	row, err := s.stateStore.ReadProjectWorktree(projectID)
+	if errors.Is(err, state.ErrNotFound) {
+		return state.ProjectWorktree{}, false, nil
+	}
+	if err != nil {
+		return state.ProjectWorktree{}, false, err
+	}
+	return row, true, nil
 }
 
 // repoBacked reports whether an expanded cwd resolves inside a Git working
@@ -139,10 +157,18 @@ func (s *Server) invalidateProjectRepoBacked(cwd string) {
 // never re-derives a different path — resume and switch pass their frozen
 // snapshot cwd, and the helper only rebuilds the directory that path names.
 func (s *Server) ensureWorktreeCheckout(ctx context.Context, projectID, cwd string) (recreated bool, warning string, ae *runtime.APIError) {
+	row, owned, err := s.readOwnedWorktree(projectID)
+	if err != nil {
+		return false, "", apiError(runtime.CodeInternal, "read worktree ownership: "+err.Error())
+	}
 	if isExistingDir(cwd) {
+		if owned && sameCheckoutPath(row.CheckoutPath, cwd) {
+			if err := s.configStore.ValidateOwnedWorktreePath(projectID, row.CheckoutPath); err != nil {
+				return false, "", apiError(runtime.CodeValidation, "unsafe owned worktree path: "+err.Error())
+			}
+		}
 		return false, "", nil
 	}
-	row, owned := s.ownedWorktree(projectID)
 	if !owned || !sameCheckoutPath(row.CheckoutPath, cwd) {
 		return false, "", apiError(runtime.CodeValidation,
 			fmt.Sprintf("project directory %q does not exist — set project %q to an existing path", cwd, projectID))
@@ -219,7 +245,10 @@ func (s *Server) claimWorktreeRecreate(projectID string) func() {
 // (FS-19.R3).
 func (s *Server) runProjectSetup(ctx context.Context, projectID, checkout string) string {
 	project, err := s.configStore.ReadProject(projectID)
-	if err != nil || strings.TrimSpace(project.SetupCommand) == "" {
+	if err != nil {
+		return "setup status could not be determined: " + err.Error()
+	}
+	if strings.TrimSpace(project.SetupCommand) == "" {
 		return ""
 	}
 	runCtx, cancel := context.WithTimeout(ctx, setupTimeout)
@@ -231,19 +260,67 @@ func (s *Server) runProjectSetup(ctx context.Context, projectID, checkout string
 	cmd := exec.CommandContext(runCtx, "/bin/sh", "-c", project.SetupCommand)
 	cmd.Dir = checkout
 	cmd.Stdin = nil
-	out, runErr := cmd.CombinedOutput()
-	output := string(out)
+	outputTail := newSetupOutputTail(setupOutputLimit)
+	cmd.Stdout = outputTail
+	cmd.Stderr = outputTail
+	runErr := cmd.Run()
 	if runCtx.Err() != nil {
-		output += fmt.Sprintf("\nsetup command timed out after %s", setupTimeout)
+		_, _ = io.WriteString(outputTail, fmt.Sprintf("\nsetup command timed out after %s", setupTimeout))
 		runErr = runCtx.Err()
 	}
+	output := outputTail.String()
 	if err := s.stateStore.RecordProjectWorktreeSetup(projectID, runErr == nil, output); err != nil {
 		s.log.Error("worktree: record setup result", "project", projectID, "err", err)
+		if runErr == nil {
+			return "setup completed, but its result could not be recorded: " + err.Error()
+		}
+		return fmt.Sprintf("setup command failed: %s; its result could not be recorded: %v", clipSetupOutput(output), err)
 	}
 	if runErr == nil {
 		return ""
 	}
 	return fmt.Sprintf("setup command failed: %s", clipSetupOutput(output))
+}
+
+// setupOutputTail keeps the last n bytes written by a setup command. Stdout
+// and stderr may be copied concurrently by os/exec, so writes are serialized.
+// String drops an incomplete UTF-8 boundary instead of exposing invalid text
+// to the database or a warning surface.
+type setupOutputTail struct {
+	mu    sync.Mutex
+	limit int
+	buf   []byte
+}
+
+func newSetupOutputTail(limit int) *setupOutputTail {
+	return &setupOutputTail{limit: limit, buf: make([]byte, 0, limit)}
+}
+
+func (t *setupOutputTail) Write(p []byte) (int, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if len(p) >= t.limit {
+		t.buf = append(t.buf[:0], p[len(p)-t.limit:]...)
+		return len(p), nil
+	}
+	if overflow := len(t.buf) + len(p) - t.limit; overflow > 0 {
+		copy(t.buf, t.buf[overflow:])
+		t.buf = t.buf[:len(t.buf)-overflow]
+	}
+	t.buf = append(t.buf, p...)
+	return len(p), nil
+}
+
+func (t *setupOutputTail) String() string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	// A writer can start or end in the middle of a multi-byte rune after the
+	// byte-tail cut. Dropping invalid sequences retains the complete textual
+	// tail and guarantees valid UTF-8 for SQLite and human-facing warnings.
+	if utf8.Valid(t.buf) {
+		return string(t.buf)
+	}
+	return strings.ToValidUTF8(string(t.buf), "")
 }
 
 // clipSetupOutput bounds what reaches a person. The stored tail is 64 KiB; a
@@ -320,9 +397,9 @@ func (s *Server) worktreeFork(ctx context.Context, sourceID string, req forkRequ
 		return forkResult{}, apiError(runtime.CodeValidation,
 			fmt.Sprintf("project %q is not inside a Git working tree", sourceID))
 	}
-	repo, err := git.RepoRoot(ctx, sourceCwd)
+	repo, err := git.CommonDir(ctx, sourceCwd)
 	if err != nil {
-		return forkResult{}, apiError(runtime.CodeValidation, "cannot read the repository: "+err.Error())
+		return forkResult{}, apiError(runtime.CodeValidation, "cannot read the repository anchor: "+err.Error())
 	}
 
 	base := strings.TrimSpace(req.Base)
@@ -336,6 +413,11 @@ func (s *Server) worktreeFork(ctx context.Context, sourceID string, req forkRequ
 	if ok, err := git.RevExists(ctx, repo, base); err != nil || !ok {
 		return forkResult{}, apiError(runtime.CodeValidation,
 			fmt.Sprintf("base %q does not resolve to a commit in %s", base, repo))
+	}
+	if exists, err := git.BranchExists(ctx, repo, branch); err != nil {
+		return forkResult{}, apiError(runtime.CodeValidation, "cannot check branch: "+err.Error())
+	} else if exists {
+		return forkResult{}, apiError(runtime.CodeValidation, fmt.Sprintf("branch %q already exists", branch))
 	}
 
 	// Server-derived ids make checkout-path collisions unreachable; the path is
@@ -352,16 +434,34 @@ func (s *Server) worktreeFork(ctx context.Context, sourceID string, req forkRequ
 		return forkResult{}, apiError(runtime.CodeConflict, "worktree path "+checkout+" already exists")
 	}
 
-	// The project's shared-resources directory is ensured before any external
-	// effect, matching handlePostProject (FS-11.R6).
-	if _, err := s.configStore.EnsureProjectResources(newID); err != nil {
-		return forkResult{}, apiError(runtime.CodeValidation, "cannot create project resources: "+err.Error())
+	// First external effect and atomic claim. Once CreateBranch succeeds this
+	// attempt owns the ref and may safely compensate it; a concurrent loser never
+	// deletes the winner's branch (TS-12.R10, INV §5/§15).
+	if err := git.CreateBranch(ctx, repo, branch, base); err != nil {
+		return forkResult{}, apiError(runtime.CodeValidation, "cannot create branch: "+err.Error())
+	}
+	if err := git.AddWorktreeExisting(ctx, repo, checkout, branch); err != nil {
+		if cleanupErr := s.rollbackFork(repo, checkout, branch, ""); cleanupErr != nil {
+			return forkResult{}, apiError(runtime.CodeInternal, "cannot create the worktree: "+err.Error()+"; cleanup incomplete: "+cleanupErr.Error())
+		}
+		return forkResult{}, apiError(runtime.CodeValidation, "cannot create the worktree: "+err.Error())
 	}
 
-	// First external effect. Branch-ref creation is the atomic claim: a second
-	// identical fork fails here rather than being serialized (TS-12.R10, INV §5).
-	if err := git.AddWorktree(ctx, repo, checkout, branch, base); err != nil {
-		return forkResult{}, apiError(runtime.CodeValidation, "cannot create the worktree: "+err.Error())
+	resourcePath, err := s.configStore.ProjectResourcesPath(newID)
+	if err != nil {
+		return forkResult{}, apiError(runtime.CodeInternal, err.Error())
+	}
+	_, resourceStatErr := os.Lstat(resourcePath)
+	resourceCreated := os.IsNotExist(resourceStatErr)
+	if _, err := s.configStore.EnsureProjectResources(newID); err != nil {
+		cleanupErr := s.rollbackFork(repo, checkout, branch, "")
+		if cleanupErr != nil {
+			return forkResult{}, apiError(runtime.CodeInternal, "cannot create project resources: "+err.Error()+"; cleanup incomplete: "+cleanupErr.Error())
+		}
+		return forkResult{}, apiError(runtime.CodeValidation, "cannot create project resources: "+err.Error())
+	}
+	if !resourceCreated {
+		resourcePath = ""
 	}
 
 	fork := config.Project{
@@ -374,7 +474,10 @@ func (s *Server) worktreeFork(ctx context.Context, sourceID string, req forkRequ
 		SetupCommand:  source.SetupCommand,
 	}
 	if err := s.writeProject(newID, fork); err != nil {
-		s.rollbackFork(ctx, repo, checkout, branch)
+		cleanupErr := s.rollbackFork(repo, checkout, branch, resourcePath)
+		if cleanupErr != nil {
+			return forkResult{}, apiError(runtime.CodeInternal, "write project: "+err.Error()+"; cleanup incomplete: "+cleanupErr.Error())
+		}
 		return forkResult{}, apiError(runtime.CodeInternal, "write project: "+err.Error())
 	}
 	if err := s.stateStore.InsertProjectWorktree(state.ProjectWorktree{
@@ -386,7 +489,10 @@ func (s *Server) worktreeFork(ctx context.Context, sourceID string, req forkRequ
 		if delErr := s.configStore.DeleteProject(newID); delErr != nil {
 			s.log.Error("worktree: rollback delete project", "project", newID, "err", delErr)
 		}
-		s.rollbackFork(ctx, repo, checkout, branch)
+		cleanupErr := s.rollbackFork(repo, checkout, branch, resourcePath)
+		if cleanupErr != nil {
+			return forkResult{}, apiError(runtime.CodeInternal, "record worktree ownership: "+err.Error()+"; cleanup incomplete: "+cleanupErr.Error())
+		}
 		return forkResult{}, apiError(runtime.CodeInternal, "record worktree ownership: "+err.Error())
 	}
 
@@ -405,14 +511,31 @@ func (s *Server) worktreeFork(ctx context.Context, sourceID string, req forkRequ
 // rollbackFork unwinds the fork's external effects in reverse. The branch is
 // force-deleted because it was created moments ago at the base commit and
 // carries no work.
-func (s *Server) rollbackFork(ctx context.Context, repo, checkout, branch string) {
+func (s *Server) rollbackFork(repo, checkout, branch, resourcePath string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), mutateCleanupTimeout)
+	defer cancel()
 	git := s.worktreeGit()
-	if err := git.RemoveWorktree(ctx, repo, checkout); err != nil {
-		s.log.Error("worktree: rollback remove checkout", "checkout", checkout, "err", err)
+	var errs []error
+	if _, err := os.Lstat(checkout); err == nil {
+		if err := git.RemoveWorktree(ctx, repo, checkout); err != nil {
+			s.log.Error("worktree: rollback remove checkout", "checkout", checkout, "err", err)
+			errs = append(errs, err)
+		}
 	}
-	if err := git.DeleteBranch(ctx, repo, branch); err != nil {
-		s.log.Error("worktree: rollback delete branch", "branch", branch, "err", err)
+	if exists, err := git.BranchExists(ctx, repo, branch); err != nil {
+		errs = append(errs, err)
+	} else if exists {
+		if err := git.DeleteBranch(ctx, repo, branch); err != nil {
+			s.log.Error("worktree: rollback delete branch", "branch", branch, "err", err)
+			errs = append(errs, err)
+		}
 	}
+	if resourcePath != "" {
+		if err := os.Remove(resourcePath); err != nil && !os.IsNotExist(err) {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // effectiveBase resolves the base a fork branches from: the project's
@@ -477,17 +600,20 @@ type setupStatus struct {
 	Output string `json:"output,omitempty"`
 }
 
-func (s *Server) worktreeStatus(ctx context.Context, projectID string, project config.Project) worktreeStatusResponse {
+func (s *Server) worktreeStatus(ctx context.Context, projectID string, project config.Project) (worktreeStatusResponse, error) {
 	out := worktreeStatusResponse{}
 	cwd, err := config.ExpandTilde(project.Cwd)
 	if err != nil {
-		return out
+		return out, err
 	}
 	git := s.worktreeGit()
 	inside, err := git.IsInsideWorkTree(ctx, cwd)
 	out.RepoBacked = err == nil && inside
 
-	row, owned := s.ownedWorktree(projectID)
+	row, owned, err := s.readOwnedWorktree(projectID)
+	if err != nil {
+		return out, err
+	}
 	out.Owned = owned
 	if owned {
 		out.Branch = row.Branch
@@ -522,7 +648,7 @@ func (s *Server) worktreeStatus(ctx context.Context, projectID string, project c
 		// A missing checkout holds nothing to lose; that much is known.
 		out.DirtyKnown = true
 	}
-	return out
+	return out, nil
 }
 
 // ---- Consented deletion (FS-19.R8, TS-12.R7) ----
@@ -534,8 +660,11 @@ func (s *Server) worktreeStatus(ctx context.Context, projectID string, project c
 // to the recorded repository; any mismatch aborts rather than deletes. The row
 // is dropped only after the checkout is gone, so a crash between the two leaves
 // the recreation case, never an unrecorded owned checkout (INV §15).
-func (s *Server) deleteOwnedCheckout(ctx context.Context, projectID string) (bool, error) {
-	row, owned := s.ownedWorktree(projectID)
+func (s *Server) deleteOwnedCheckout(ctx context.Context, projectID string, expectedDirty *bool) (bool, error) {
+	row, owned, err := s.readOwnedWorktree(projectID)
+	if err != nil {
+		return false, err
+	}
 	if !owned {
 		// External checkouts have no row and therefore no deletion path at all.
 		// Reporting "not deleted" is what keeps consent on an external project
@@ -549,9 +678,9 @@ func (s *Server) deleteOwnedCheckout(ctx context.Context, projectID string) (boo
 	if !sameCheckoutPath(row.CheckoutPath, canonical) {
 		return false, fmt.Errorf("worktree: recorded checkout %q is not the owned location %q", row.CheckoutPath, canonical)
 	}
-	if fi, err := os.Lstat(row.CheckoutPath); err == nil {
-		if fi.Mode()&os.ModeSymlink != 0 {
-			return false, fmt.Errorf("worktree: %q is a symlink; refusing to delete", row.CheckoutPath)
+	if _, err := os.Lstat(row.CheckoutPath); err == nil {
+		if err := s.configStore.ValidateOwnedWorktreePath(projectID, row.CheckoutPath); err != nil {
+			return false, fmt.Errorf("worktree: %w", err)
 		}
 		git := s.worktreeGit()
 		entries, err := git.ListWorktrees(ctx, row.RepoPath)
@@ -567,6 +696,15 @@ func (s *Server) deleteOwnedCheckout(ctx context.Context, projectID string) (boo
 		}
 		if !registered {
 			return false, fmt.Errorf("worktree: %q is not registered to %q", row.CheckoutPath, row.RepoPath)
+		}
+		if expectedDirty != nil && !*expectedDirty {
+			dirty, err := git.IsDirty(ctx, row.CheckoutPath)
+			if err != nil {
+				return false, fmt.Errorf("worktree: recheck uncommitted changes: %w", err)
+			}
+			if dirty {
+				return false, fmt.Errorf("worktree: checkout gained uncommitted changes after confirmation; review them and confirm again")
+			}
 		}
 		// --force is deliberate: the dialog already disclosed dirty state and the
 		// person consented (FS-19.R8).

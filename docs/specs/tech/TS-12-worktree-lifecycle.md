@@ -20,7 +20,10 @@ branch automation beyond creating the fork branch.
   so no operation can hang on a prompt. A missing `git` binary or an unparseable output is an
   actionable error, and parsing tolerates version variance (INV §12) by using plumbing commands
   (`rev-parse`, `symbolic-ref`, `status --porcelain`, `worktree list --porcelain`) rather than
-  scraping porcelain UI output.
+  scraping porcelain UI output. Query helpers recognize only their documented no-answer exits
+  (a plain non-repository directory, detached HEAD, or a missing ref); unreadable, missing, and
+  corrupt repository paths preserve Git's actionable error instead of becoming an ordinary false
+  or empty answer.
 - **R2 — Ownership is a SQLite record.** Machine-created worktree ownership lives in
   `state.db` (TS-02.R1's writer split; a hand-editable JSON field could forge ownership and widen
   the deletion surface). A `project_worktrees` row — see §3 — exists exactly for checkouts
@@ -53,7 +56,9 @@ branch automation beyond creating the fork branch.
   path. Two starts that observe the same absence are serialized by a per-project recreation claim,
   so exactly one runs `git worktree add` and the other finds the directory already there (INV §5).
   Recreation reports itself in the start response; a recorded branch that no longer exists fails
-  the start with an actionable error.
+  the start with an actionable error. Resume and switch thread caller cancellation through this
+  work and expose the same recreation/setup warning notice as launch; pipeline continuation uses
+  the same context-aware composer even though its control-plane response has no session envelope.
 
   *Correction (2026-09-02, implementation):* the original text also called the helper from pipeline
   `ValidateStage`. That is the manager's read-only per-stage pre-flight, run before a run snapshot
@@ -85,8 +90,9 @@ branch automation beyond creating the fork branch.
   the flow verifies the recorded path is the canonical `$AGENTDECK_HOME/worktrees/{project-id}`
   location, symlink-free, and currently registered to the recorded repository via
   `git worktree list`; any mismatch aborts with an error instead of deleting. Removal uses
-  `git worktree remove --force` (the dialog already disclosed dirty state and the person consented,
-  FS-19.R8) and only then deletes the ownership row, so a crash between the two leaves a row whose
+  `git worktree remove --force`. The request carries the dirty-state snapshot the dialog disclosed;
+  immediately before removal the server rechecks a checkout disclosed as clean and refuses if it
+  gained uncommitted changes (FS-19.R8). Only then does it delete the ownership row, so a crash between the two leaves a row whose
   checkout is missing — the R4 recreation case — rather than an unrecorded owned checkout. External
   checkouts have no row and therefore no deletion path at all.
 - **R8 — Owned paths follow the established filesystem rules.** The `worktrees/` root
@@ -114,7 +120,7 @@ Migration (next version, forward-only, TS-02.R6):
 ```sql
 CREATE TABLE project_worktrees (
   project        TEXT PRIMARY KEY,   -- immutable project id; logical reference, no cascade
-  repo_path      TEXT NOT NULL,      -- expanded absolute path of the source repository
+  repo_path      TEXT NOT NULL,      -- expanded absolute Git common directory; stable after a source worktree is removed
   branch         TEXT NOT NULL,
   checkout_path  TEXT NOT NULL,      -- canonical $AGENTDECK_HOME/worktrees/{project}
   created_at     TEXT NOT NULL,
@@ -133,7 +139,8 @@ Endpoints (error envelope and status codes per TS-03):
   dirty_known, setup: {ok, at, output}}`; computed on demand (R6), feeds the fork form and the
   archive dialog.
 - The archive and delete endpoints accept an optional `delete_checkout` boolean, honored only for
-  owned checkouts (R7); its absence never deletes.
+  owned checkouts (R7); its absence never deletes. When deletion is requested they also carry the
+  disclosed `dirty_known` and `dirty` snapshot so R7 can detect a clean-to-dirty race.
 - `GET /api/projects` gains per-project `worktree: {owned, branch}` and `repo_backed` (R6).
 
 Project config file additions (`base_branch`, `setup_command`) are owned by FS-04.R45 and

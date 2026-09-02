@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/agentdeck/agentdeck/internal/config"
 )
@@ -247,6 +248,63 @@ func TestWorktreeForkOfAForkUsesTheEffectiveBase(t *testing.T) {
 	}
 }
 
+// FS-19.R7/R8/R11: a nested fork records the shared Git directory, not its
+// disposable parent checkout, so it can still recreate and delete itself after
+// the parent has been removed.
+func TestWorktreeNestedForkSurvivesParentCheckoutDeletion(t *testing.T) {
+	repo := newWorktreeTestRepo(t)
+	srv := testServer(t, false)
+	seedWorktreeSource(t, srv, "app", repo, config.Project{Title: "App"})
+
+	rec := forkProject(t, srv, "app", map[string]any{"title": "First", "branch": "agentdeck/first"})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("first fork status = %d body=%s", rec.Code, rec.Body)
+	}
+	var first forkResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &first); err != nil {
+		t.Fatalf("decode first fork: %v", err)
+	}
+
+	rec = forkProject(t, srv, first.Project.ProjectID, map[string]any{"title": "Second", "branch": "agentdeck/second"})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("nested fork status = %d body=%s", rec.Code, rec.Body)
+	}
+	var second forkResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &second); err != nil {
+		t.Fatalf("decode nested fork: %v", err)
+	}
+	row, owned := srv.ownedWorktree(second.Project.ProjectID)
+	if !owned || !sameCheckoutPath(row.RepoPath, filepath.Join(repo, ".git")) {
+		t.Fatalf("nested ownership row = %+v, want the shared Git directory", row)
+	}
+
+	// This is the explicit, consented parent-checkout deletion from FS-19.R8.
+	rec = doRequest(t, srv.routes(), http.MethodPost, "/api/projects/"+first.Project.ProjectID+"/archive",
+		map[string]any{"delete_checkout": true})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("archive parent status = %d body=%s", rec.Code, rec.Body)
+	}
+	if isExistingDir(first.Project.Cwd) {
+		t.Fatal("consented parent archive left its checkout in place")
+	}
+
+	if err := os.RemoveAll(second.Project.Cwd); err != nil {
+		t.Fatalf("remove nested checkout out of band: %v", err)
+	}
+	recreated, _, ae := srv.ensureWorktreeCheckout(t.Context(), second.Project.ProjectID, second.Project.Cwd)
+	if ae != nil || !recreated {
+		t.Fatalf("recreate nested checkout recreated=%v error=%v", recreated, ae)
+	}
+	rec = doRequest(t, srv.routes(), http.MethodPost, "/api/projects/"+second.Project.ProjectID+"/archive",
+		map[string]any{"delete_checkout": true})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("archive nested project status = %d body=%s", rec.Code, rec.Body)
+	}
+	if isExistingDir(second.Project.Cwd) {
+		t.Fatal("consented nested archive left its checkout in place")
+	}
+}
+
 // FS-19.A2 / R3: a failing setup command still yields a launchable project and
 // a visible warning carrying the captured output.
 func TestWorktreeForkFailingSetupStillCreatesTheProject(t *testing.T) {
@@ -277,6 +335,38 @@ func TestWorktreeForkFailingSetupStillCreatesTheProject(t *testing.T) {
 	row, _ := srv.ownedWorktree(result.Project.ProjectID)
 	if row.SetupOK == nil || *row.SetupOK {
 		t.Fatalf("setup_ok = %v, want false", row.SetupOK)
+	}
+}
+
+// TS-12.R5: setup output is streamed into a 64 KiB UTF-8 tail while the
+// command runs, so a verbose bootstrap cannot first accumulate in memory.
+func TestWorktreeSetupOutputKeepsBoundedUTF8Tail(t *testing.T) {
+	repo := newWorktreeTestRepo(t)
+	srv := testServer(t, false)
+	seedWorktreeSource(t, srv, "app", repo, config.Project{
+		Title: "App", SetupCommand: "printf '%070000d' 0; printf ' €tail'; exit 3",
+	})
+
+	rec := forkProject(t, srv, "app", map[string]any{"title": "Fork", "branch": "agentdeck/large-setup-output"})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("fork status = %d body=%s", rec.Code, rec.Body)
+	}
+	var result forkResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatalf("decode fork: %v", err)
+	}
+	row, owned := srv.ownedWorktree(result.Project.ProjectID)
+	if !owned {
+		t.Fatal("setup result has no ownership row")
+	}
+	if len(row.SetupOutput) != setupOutputLimit {
+		t.Fatalf("stored setup output is %d bytes, want %d-byte tail", len(row.SetupOutput), setupOutputLimit)
+	}
+	if !utf8.ValidString(row.SetupOutput) {
+		t.Fatalf("stored setup output is not valid UTF-8: %q", row.SetupOutput[:32])
+	}
+	if !strings.HasSuffix(row.SetupOutput, " €tail") {
+		t.Fatalf("stored setup tail = %q, want final UTF-8 marker", row.SetupOutput[len(row.SetupOutput)-32:])
 	}
 }
 
@@ -512,6 +602,67 @@ func TestExternalCheckoutIsNeverDeleted(t *testing.T) {
 	}
 	if !isExistingDir(external) {
 		t.Fatal("deleting the project removed the external checkout")
+	}
+}
+
+func TestForceDeleteRefusesOwnedCheckoutWhileAgentRuns(t *testing.T) {
+	repo := newWorktreeTestRepo(t)
+	srv := testServer(t, false)
+	seedWorktreeSource(t, srv, "app", repo, config.Project{Title: "App"})
+	rec := forkProject(t, srv, "app", map[string]any{"title": "Busy fork", "branch": "agentdeck/busy"})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("fork status = %d body=%s", rec.Code, rec.Body)
+	}
+	var result forkResult
+	_ = json.Unmarshal(rec.Body.Bytes(), &result)
+	seedRunningAgentWithProject(t, srv, result.Project.ProjectID)
+	rec = doRequest(t, srv.routes(), http.MethodDelete, "/api/projects/"+result.Project.ProjectID+"?force=true&delete_checkout=true", nil)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("delete status = %d body=%s, want 409", rec.Code, rec.Body)
+	}
+	if !isExistingDir(result.Project.Cwd) {
+		t.Fatal("force delete removed a running agent's checkout")
+	}
+}
+
+func TestArchiveRechecksCleanCheckoutBeforeDeletion(t *testing.T) {
+	repo := newWorktreeTestRepo(t)
+	srv := testServer(t, false)
+	seedWorktreeSource(t, srv, "app", repo, config.Project{Title: "App"})
+	rec := forkProject(t, srv, "app", map[string]any{"title": "Race fork", "branch": "agentdeck/race"})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("fork status = %d body=%s", rec.Code, rec.Body)
+	}
+	var result forkResult
+	_ = json.Unmarshal(rec.Body.Bytes(), &result)
+	if err := os.WriteFile(filepath.Join(result.Project.Cwd, "late.txt"), []byte("late\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	rec = doRequest(t, srv.routes(), http.MethodPost, "/api/projects/"+result.Project.ProjectID+"/archive", map[string]any{
+		"delete_checkout": true, "dirty_known": true, "dirty": false,
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("archive status = %d body=%s", rec.Code, rec.Body)
+	}
+	var archived archiveProjectActionResponse
+	_ = json.Unmarshal(rec.Body.Bytes(), &archived)
+	if archived.CheckoutDeleted || !strings.Contains(archived.CheckoutWarning, "gained uncommitted changes") {
+		t.Fatalf("archive response = %+v, want freshness refusal", archived)
+	}
+	if !isExistingDir(result.Project.Cwd) {
+		t.Fatal("freshness refusal removed checkout")
+	}
+}
+
+func TestWorktreeStatusSurfacesOwnershipStoreFailure(t *testing.T) {
+	srv := testServer(t, false)
+	seedWorktreeSource(t, srv, "app", t.TempDir(), config.Project{Title: "App"})
+	if err := srv.stateStore.Close(); err != nil {
+		t.Fatal(err)
+	}
+	rec := doRequest(t, srv.routes(), http.MethodGet, "/api/projects/app/worktree", nil)
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d body=%s, want 500", rec.Code, rec.Body)
 	}
 }
 

@@ -6,6 +6,7 @@ import { configErrorMessage, QUERY_KEYS, useCreateProject, useProjects, useUpdat
 import { useAgentStore } from "../../store/agentStore";
 import { CardGrid } from "../../components/grid/CardGrid";
 import { archiveProject, getWorktreeStatus } from "../../api/client";
+import type { CheckoutConsent } from "../../api/client";
 import { useUiStore } from "../../store/uiStore";
 import { ConfirmDialog, ProjectColorPicker } from "../../components/ui";
 import { ProjectForm } from "../settings/ProjectForm";
@@ -35,7 +36,7 @@ export function ProjectDashboard() {
   const [archiveError, setArchiveError] = useState("");
   const [forkSource, setForkSource] = useState<string | null>(null);
   const archive = useMutation({
-    mutationFn: ({ id, deleteCheckout }: { id: string; deleteCheckout: boolean }) => archiveProject(id, deleteCheckout),
+    mutationFn: ({ id, consent }: { id: string; consent: CheckoutConsent }) => archiveProject(id, consent),
     onSuccess: ({ project, checkout_warning: checkoutWarning }) => {
       queryClient.setQueryData<Record<string, Omit<ProjectResponse, "project">>>(QUERY_KEYS.projects, (current) => (
         current ? { ...current, [project.project]: { ...current[project.project], ...project, archived: true } } : current
@@ -154,13 +155,15 @@ export function ProjectDashboard() {
       {archiveProjectEntry && (
         <ProjectArchiveDialog
           id={archiveID!}
-          title={archiveProjectEntry.title}
+          title={`Archive ${archiveProjectEntry.title}?`}
           ownsCheckout={archiveProjectEntry.worktree?.owned ?? false}
           error={archiveError}
           pending={archive.isPending}
           onCancel={() => { setArchiveError(""); setArchiveID(null); }}
-          onConfirm={(deleteCheckout) => archive.mutate({ id: archiveID!, deleteCheckout })}
-        />
+          onConfirm={(consent) => archive.mutate({ id: archiveID!, consent })}
+        >
+          <p>Running agents will be stopped and every agent in this project will be archived.</p>
+        </ProjectArchiveDialog>
       )}
       {forkSource && projects.data?.[forkSource] && (
         <WorktreeForkDialog
@@ -177,14 +180,16 @@ export function ProjectDashboard() {
 // deleting it. The offer defaults to keeping, says the branch and commits
 // survive either way, and discloses whether the checkout holds uncommitted
 // work. An undeterminable answer says so rather than claiming it is clean.
-function ProjectArchiveDialog({ id, title, ownsCheckout, error, pending, onCancel, onConfirm }: {
+export function ProjectArchiveDialog({ id, title, ownsCheckout, error, pending, onCancel, onConfirm, confirmLabel = "Archive project", children }: {
   id: string;
   title: string;
   ownsCheckout: boolean;
   error: string;
   pending: boolean;
   onCancel: () => void;
-  onConfirm: (deleteCheckout: boolean) => void;
+  onConfirm: (consent: CheckoutConsent) => void;
+  confirmLabel?: string;
+  children: React.ReactNode;
 }) {
   const [deleteCheckout, setDeleteCheckout] = useState(false);
   const status = useQuery({
@@ -193,20 +198,32 @@ function ProjectArchiveDialog({ id, title, ownsCheckout, error, pending, onCance
     enabled: ownsCheckout,
     staleTime: 0,
   });
-  const dirtyLine = !status.data
+  const checkingStatus = ownsCheckout && status.isLoading;
+  const dirtyLine = checkingStatus
     ? "Checking for uncommitted changes…"
-    : !status.data.dirty_known
+    : status.isError || !status.data || !status.data.dirty_known
       ? "AgentDeck could not read this checkout, so it cannot tell whether it holds uncommitted changes."
       : status.data.dirty
         ? "This checkout holds uncommitted changes, which deleting it would lose."
         : "This checkout has no uncommitted changes.";
   return (
-    <ConfirmDialog open title={`Archive ${title}?`} confirmLabel="Archive project" destructive onCancel={onCancel} onConfirm={() => onConfirm(deleteCheckout)} pending={pending}>
-      <p>Running agents will be stopped and every agent in this project will be archived.</p>
+    <ConfirmDialog
+      open
+      title={title}
+      confirmLabel={confirmLabel}
+      destructive
+      onCancel={onCancel}
+      onConfirm={() => onConfirm(deleteCheckout
+        ? { deleteCheckout: true, dirtyKnown: status.data?.dirty_known ?? false, dirty: status.data?.dirty ?? false }
+        : { deleteCheckout: false })}
+      pending={pending}
+      confirmDisabled={checkingStatus}
+    >
+      {children}
       {ownsCheckout && (
         <div className="form-field">
           <label>
-            <input type="checkbox" checked={deleteCheckout} onChange={(event) => setDeleteCheckout(event.target.checked)} />
+            <input type="checkbox" checked={deleteCheckout} disabled={checkingStatus || pending} onChange={(event) => setDeleteCheckout(event.target.checked)} />
             {" "}Also delete this project&apos;s worktree checkout
           </label>
           <span className="form-hint">

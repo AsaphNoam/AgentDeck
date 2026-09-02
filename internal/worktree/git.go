@@ -64,6 +64,10 @@ func (g Git) run(ctx context.Context, timeout time.Duration, dir string, args ..
 		"GIT_TERMINAL_PROMPT=0",
 		"GIT_ASKPASS=",
 		"SSH_ASKPASS=",
+		// The expected Git failure messages below are classified deliberately.
+		// Pin their language so a localized Git installation does not turn an
+		// ordinary non-repository answer into an unexpected server error.
+		"LC_ALL=C",
 	)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -77,9 +81,51 @@ func (g Git) run(ctx context.Context, timeout time.Duration, dir string, args ..
 		if detail == "" {
 			detail = err.Error()
 		}
-		return strings.TrimSpace(stdout.String()), fmt.Errorf("worktree: git %s: %s", strings.Join(args, " "), detail)
+		return strings.TrimSpace(stdout.String()), &commandError{
+			args:   append([]string{}, args...),
+			detail: detail,
+			err:    err,
+		}
 	}
 	return strings.TrimSpace(stdout.String()), nil
+}
+
+// commandError preserves Git's process result for the small set of plumbing
+// commands whose non-zero status is an ordinary answer. Callers must classify
+// only their documented expected status; every other failure stays actionable.
+type commandError struct {
+	args   []string
+	detail string
+	err    error
+}
+
+func (e *commandError) Error() string {
+	return fmt.Sprintf("worktree: git %s: %s", strings.Join(e.args, " "), e.detail)
+}
+
+func (e *commandError) Unwrap() error { return e.err }
+
+func gitExitCode(err error, code int) bool {
+	var commandErr *commandError
+	if !errors.As(err, &commandErr) {
+		return false
+	}
+	var exitErr *exec.ExitError
+	return errors.As(commandErr.err, &exitErr) && exitErr.ExitCode() == code
+}
+
+func isNotRepository(err error) bool {
+	var commandErr *commandError
+	return errors.As(err, &commandErr) &&
+		gitExitCode(err, 128) &&
+		strings.Contains(commandErr.detail, "not a git repository")
+}
+
+func isMissingSymbolicRef(err error) bool {
+	var commandErr *commandError
+	return errors.As(err, &commandErr) &&
+		(gitExitCode(err, 1) || gitExitCode(err, 128)) &&
+		strings.Contains(commandErr.detail, "is not a symbolic ref")
 }
 
 // IsInsideWorkTree reports whether dir resolves inside a Git working tree. A
@@ -92,7 +138,10 @@ func (g Git) IsInsideWorkTree(ctx context.Context, dir string) (bool, error) {
 			return false, err
 		}
 		// "not a git repository" is the ordinary answer for a plain directory.
-		return false, nil
+		if isNotRepository(err) {
+			return false, nil
+		}
+		return false, err
 	}
 	return out == "true", nil
 }
@@ -127,10 +176,16 @@ func (g Git) DefaultBase(ctx context.Context, dir string) (string, error) {
 		}
 	} else if errors.Is(err, ErrGitMissing) {
 		return "", err
+	} else if !isMissingSymbolicRef(err) {
+		return "", err
 	}
 	// `worktree list` reports the main worktree first, in every version that
 	// supports the porcelain format.
-	if entries, err := g.ListWorktrees(ctx, dir); err == nil && len(entries) > 0 && entries[0].Branch != "" {
+	entries, err := g.ListWorktrees(ctx, dir)
+	if err != nil {
+		return "", err
+	}
+	if len(entries) > 0 && entries[0].Branch != "" {
 		return entries[0].Branch, nil
 	}
 	branch, err := g.CurrentBranch(ctx, dir)
@@ -151,7 +206,10 @@ func (g Git) CurrentBranch(ctx context.Context, dir string) (string, error) {
 			return "", err
 		}
 		// --quiet makes a detached HEAD an empty, non-fatal answer.
-		return "", nil
+		if gitExitCode(err, 1) {
+			return "", nil
+		}
+		return "", err
 	}
 	return out, nil
 }
@@ -162,7 +220,10 @@ func (g Git) BranchExists(ctx context.Context, dir, branch string) (bool, error)
 		if errors.Is(err, ErrGitMissing) {
 			return false, err
 		}
-		return false, nil
+		if gitExitCode(err, 1) {
+			return false, nil
+		}
+		return false, err
 	}
 	return true, nil
 }
@@ -174,7 +235,10 @@ func (g Git) RevExists(ctx context.Context, dir, rev string) (bool, error) {
 		if errors.Is(err, ErrGitMissing) {
 			return false, err
 		}
-		return false, nil
+		if gitExitCode(err, 1) {
+			return false, nil
+		}
+		return false, err
 	}
 	return true, nil
 }
@@ -183,6 +247,13 @@ func (g Git) RevExists(ctx context.Context, dir, rev string) (bool, error) {
 // linked worktree of repo.
 func (g Git) AddWorktree(ctx context.Context, repo, path, branch, base string) error {
 	_, err := g.run(ctx, mutateTimeout, repo, "worktree", "add", "-b", branch, path, base)
+	return err
+}
+
+// CreateBranch claims a new local branch at base. Git's ref lock makes this
+// atomic: an existing or concurrently-created branch is never overwritten.
+func (g Git) CreateBranch(ctx context.Context, repo, branch, base string) error {
+	_, err := g.run(ctx, mutateTimeout, repo, "branch", branch, base)
 	return err
 }
 

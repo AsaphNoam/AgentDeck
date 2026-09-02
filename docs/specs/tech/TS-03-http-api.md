@@ -400,9 +400,12 @@ stop-and-registration-cleanup operation.
   existing project archive and delete requests (honored only for AgentDeck-owned checkouts, never
   defaulted on — as a body field on `POST .../archive`, whose body remains optional, and as a
   `?delete_checkout=true` query parameter on `DELETE /api/projects/{project}`, which carries no
-  body), and per-project `worktree`/`repo_backed` enrichment on `GET /api/projects`. A start whose
-  path had to re-materialize an owned checkout carries a `worktree` notice on its session response
-  (FS-19.R7). All use the standard error envelope; shapes and semantics live in TS-12 §3.
+  body). A consented deletion also echoes the status snapshot as `dirty_known` and `dirty` body
+  fields or query parameters so the server can reject a clean-to-dirty change before removal.
+  `GET /api/projects` carries per-project `worktree`/`repo_backed` enrichment. A launch, resume, or
+  runtime switch whose start had to re-materialize an owned checkout carries a `worktree` notice on
+  its session response (FS-19.R7). All use the standard error envelope; shapes and semantics live
+  in TS-12 §3.
 
 ## 3. Interfaces & data shapes
 

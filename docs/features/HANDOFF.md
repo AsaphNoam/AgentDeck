@@ -37,14 +37,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md) and keep this file limited to re
   replayed to a joining tab instead of restarted for every tab.
 - **Review state:** The continuous `57b7154..bd797bd` range is reviewed against its requirements and
   every invariant class. The worktree-project implementation (`1b2a8c3..bd797bd`) has now had a
-  dedicated implementation review plus an independent Terra/high pass. Eighteen findings are open
-  below, ten of them **Must fix**: the two earlier Must-fix findings remain, and the worktree review
-  adds eight Must-fix and two Worth-fixing findings. The 2026-09-02 bug investigation adds six more,
+  dedicated implementation review plus an independent Terra/high pass, and all ten findings from
+  that worktree review are fixed. The 2026-09-02 bug investigation adds six open findings,
   three of them **Must fix**, against the pipeline reporting contract, stall detection, and the task
-  recipient vocabulary. The most serious worktree defects allow a
-  force-delete to remove a running agent's checkout, make a fork-of-a-fork depend durably on its
-  disposable parent checkout, capture setup output without a memory bound, and leave deletion and
-  rollback short of their safety contracts. The uncommitted FS-14 proposal-decline design also had
+  recipient vocabulary. The uncommitted FS-14 proposal-decline design also had
   a dedicated worktree-only review plus an independent Terra/high pass. The earlier design review
   did improve this implementation: ownership is recorded last, pipeline validation stays read-only,
   base fallback uses the main worktree, recreation is serialized, and human-facing setup output is
@@ -104,13 +100,25 @@ had no other planned items left.
 
 **Next:** Run `/fix` on the open findings below. Take the three bug-investigation Must-fix items
 first, because a person is hitting them in real runs today; the two that carry a reproduction start
-by un-skipping it. Then take the ten worktree implementation findings, starting with their eight
-Must-fix items. Two browser gates are still owed below (J16's worktree steps and the archive
+by un-skipping it. Two browser gates are still owed below (J16's worktree steps and the archive
 dialog's manual gate), and the reactivation-after-deletion behavior still needs the human's
 confirmation. Revisit the MCP migration only when its transport gate can be proved under all four
 chat providers.
 
 ## Changelog
+
+- **2026-09-02 — fix (worktree implementation findings; FS-19.R2–R11/A2/A4–A6,
+  FS-04.R28/A6, TS-03.R33, TS-12.R1–R10; INV §2/§4/§5/§7/§8/§10/§12/§14/§15):** Closed only the
+  ten findings from the worktree implementation review. Force deletion can no longer remove a
+  running agent's checkout; nested forks keep a stable repository anchor; setup capture is bounded
+  while streaming; Settings exposes the same checkout disclosure and consent as the dashboard;
+  clean-to-dirty changes are rechecked before removal; owned root and leaf symlinks are refused;
+  resume, switch, and pipeline continuation carry caller cancellation through recreation while the
+  HTTP responses expose setup warnings; fork compensation uses an independent bounded context and
+  removes only effects it claimed; lifecycle storage errors stay errors; and Git query helpers
+  preserve unexpected failures. Targeted worktree, configuration, server, and UI regressions pass,
+  as do the full required verification commands. Unrelated pipeline, task, Mermaid, dashboard,
+  proposal-design, and browser-gate findings were left open and untouched.
 
 - **2026-09-02 — bug investigation (unattended pipeline run; FS-14.R6/R7/R15/R19/R29/R37/R40/R47,
   TS-09.R8/R17/R28, FS-03.R17, FS-06.R4/R11/R22, FS-15.R17, FS-16.R12/R20, FS-17.R1–R3;
@@ -1377,113 +1385,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-- **Must fix** (FS-19.R8, TS-12.R7, FS-04.R28/A6; INV §15) —
-  `internal/server/config_handlers.go:487-518` skips the running-agent check whenever `force=true`,
-  then honors `delete_checkout=true` under the archive claim without stopping the agents already
-  using that checkout. Normal-use trigger: Settings receives the documented `409 in_use`, the
-  person confirms its documented force retry, and the required worktree-delete option is selected
-  on that retry. The definition disappears as before, but the new code also runs
-  `git worktree remove --force` against the live agents' cwd, contradicting R28's “running agents
-  are unaffected” and R7's “with all processes stopped.” Keep force-delete-definition semantics,
-  but reject `delete_checkout` while agents run or route that combination through the full
-  archive/stop transaction. Add a regression with a running project agent and both query flags.
-
-- **Must fix** (FS-19.R7/R8/R11, TS-12.R2/R4/R7; INV §15) —
-  `internal/server/worktree.go:323-325,380-384` stores `git rev-parse --show-toplevel` as the durable
-  `repo_path`. When the source is itself a linked worktree, that value is the source fork's
-  disposable checkout, not a stable repository anchor, even though `internal/worktree/git.go:106`
-  already exposes `CommonDir`. Normal-use trigger: fork project B from worktree project A, then
-  archive A and consent to deleting A's checkout. B still launches while its checkout exists, but
-  deleting B fails because `git -C <deleted-A>` cannot list registrations, and recreating B falsely
-  reports its branch missing. Reproduced directly: `--show-toplevel` named the parent checkout;
-  after removing it, Git commands through that path failed while `--git-common-dir` still listed
-  the child. Persist a stable common/main-repository anchor and add a nested-fork test that removes
-  the parent before recreating and deleting the child.
-
-- **Must fix** (FS-19.R3/A2, TS-12.R5; INV §8) —
-  `internal/server/worktree.go:231-240` uses `cmd.CombinedOutput()`, so the setup process's entire
-  stdout/stderr is accumulated in memory; only afterward does
-  `internal/state/worktrees.go:104-107` retain the last 64 KiB. A verbose or runaway normal setup
-  command can therefore grow the server until it is killed during the allowed ten-minute window,
-  directly defeating R5's bounded-tail contract. Stream stdout and stderr into one bounded ring or
-  tail writer during execution, preserve valid UTF-8 at the boundary, and test a payload well above
-  64 KiB while asserting that only its tail is retained. The earlier design finding's 2,000-rune
-  human clamp is correctly implemented, but it does not bound capture memory.
-
-- **Must fix** (FS-19.R8/A4, TS-03.R33; INV §10) —
-  `ui/src/features/settings/ProjectsEditor.tsx:27-30,182-218` always archives with
-  `delete_checkout:false` and gives neither its archive nor delete dialog an ownership/status
-  query or consent control; `ui/src/api/config.ts:179-187` cannot send the delete query parameter
-  at all. Normal-use trigger: manage an owned worktree from Settings, the existing canonical CRUD
-  surface. The person cannot choose the checkout cleanup FS-19 requires for either archive or
-  definition deletion, leaving the API capability unreachable on that surface. Reuse the
-  dashboard disclosure/consent component for Settings, extend the delete mutation shape, and cover
-  archive and delete for owned/external plus dirty/unknown states.
-
-- **Must fix** (FS-19.R8, TS-12.R6/R7; INV §5/§8/§15) —
-  `ui/src/features/dashboard/ProjectDashboard.tsx:190-214` enables both the checkout checkbox and
-  archive confirmation while status still says “Checking”; a failed query says “Checking” forever
-  rather than “undeterminable.” Even after a clean result arrives, `internal/server/worktree.go:537-579`
-  deletes without rechecking dirty state after the archive transaction stops running agents.
-  Normal-use trigger: open the dialog on a slow repository and confirm immediately, or let an
-  agent write after the dialog reported clean but before confirmation. The only local work deletion
-  can lose was never disclosed or changed after disclosure, yet the checkout is force-removed.
-  Disable consent until the query resolves to known/unknown, render query failure as unknown, and
-  add a server-side freshness/confirmation contract for changes that appear after disclosure; test
-  both the loading/error UI and the running-agent check/act race.
-
-- **Must fix** (TS-12.R8; INV §14/§15) — `internal/server/worktree.go:141-144` accepts any existing
-  directory before reading ownership and uses `os.Stat`, which follows a symlinked leaf or root;
-  `deleteOwnedCheckout` at `537-555` derives the canonical string and `Lstat`s only the leaf, so it
-  never validates a replaced `$AGENTDECK_HOME/worktrees` root. Normal-use trigger: move the owned
-  root and replace it with a symlink (or replace a missing leaf with a symlink). Launch then runs an
-  agent through that link, and consented deletion can follow the root link and remove a checkout
-  physically outside the owned root, despite R8's root-and-leaf rejection guarantee. Centralize a
-  non-mutating owned-path validator and call it on present-checkout launch and immediately before
-  removal; add root- and leaf-symlink launch/archive/delete regressions.
-
-- **Must fix** (FS-19.R3/R7, TS-12.R4/R5, TS-03.R33; INV §4/§8) —
-  `internal/server/resume.go:415` and `internal/server/switch.go:388` call checkout recreation with
-  `context.Background()` and discard both `recreated` and `warning`. Normal-use trigger: resume or
-  switch an agent after its checkout was cleaned up, with a setup command that is slow or fails,
-  then cancel the HTTP request. The work keeps the lifecycle/archive leases for up to ten minutes
-  after cancellation; a switch has already stopped the old runtime, and its later rollback receives
-  the canceled request context. If setup fails but the start succeeds, neither response carries the
-  required visible warning. Thread the caller context and a worktree notice through resume/switch
-  composition and response types (and define the pipeline reporting seam); cover cancellation and
-  failing-setup recreation on both paths.
-
-- **Must fix** (FS-19.R10, TS-12.R3/R10; INV §15) —
-  `internal/server/worktree.go:355-365` creates the project-resources leaf before Git, but an
-  `AddWorktree` error returns without any rollback; later compensation at `376-414` reuses the
-  possibly canceled request context and only logs cleanup failures. Normal-use triggers include a
-  duplicate branch (which always leaks the new resource leaf) and canceling a large checkout after
-  Git has created the branch/registration but before it finishes (which can leave branch and
-  checkout residue with no project). These are exactly the pre-setup failures R10 says leave no
-  branch or directory. Track which effects this attempt created, compensate them with an independent
-  bounded cleanup context without deleting a pre-existing branch, surface incomplete cleanup, and
-  assert every artifact after branch collision, cancellation, project-write failure, and ownership-
-  insert failure.
-
-- **Worth fixing** (FS-19.R2/R3/R4/R7/R8, TS-12.R2/R5/R7; INV §7) —
-  `internal/server/worktree.go:52-59` maps every ownership-table read failure to `owned=false`, while
-  `runProjectSetup` at `220-241` maps a project read failure to “no setup” and logs a failed setup-
-  result write without changing the successful response. Normal-use trigger: a transient SQLite or
-  config I/O failure during status, recreation, archive, or delete. A consented archive silently
-  skips deletion, a definition delete can report 204 while orphaning the owned row/checkout, a
-  recreation reports an ordinary missing-directory error, and setup can look complete without its
-  required durable result. Keep best-effort helpers only for list enrichment; lifecycle mutations
-  and starts need error-returning reads/writes and an explicit nonblocking warning where setup state
-  could not be persisted. Add closed/failing-store regressions for each destructive/start path.
-
-- **Worth fixing** (FS-19.R2/R7/R9, TS-12.R1/R9; INV §7/§12) —
-  `internal/worktree/git.go:88-95,147-165` (and the adjacent `RevExists`) treats every nonzero Git
-  exit except a missing binary as the ordinary false/empty answer. Normal-use trigger: a project
-  points to an unreadable, corrupt, removed, or permission-denied repository. The UI/API then says
-  “not a repository,” “branch no longer exists,” or “detached HEAD” instead of preserving the real
-  actionable Git error R1 requires; the nested-fork defect above is one concrete instance. Preserve
-  the process exit classification needed to recognize only the expected not-repo, detached, and
-  missing-ref cases, return all other failures, and test unreadable/missing/corrupt repository paths.
 
 - **Worth fixing** (FS-16.R3/R4, TS-10.R15/R19; INV §15) — `internal/server/task_http_test.go:244`
   asserts the cancel response already carries `pending_release=false` and an empty runtime claim,

@@ -179,10 +179,19 @@ export function useUpdateProject() {
 export function useDeleteProject() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, force }: { id: string; force?: boolean }) =>
-      fetch(`/api/projects/${id}${force ? "?force=true" : ""}`, { method: "DELETE" }).then(async (r) => {
+    mutationFn: ({ id, force, deleteCheckout, dirtyKnown, dirty }: { id: string; force?: boolean; deleteCheckout?: boolean; dirtyKnown?: boolean; dirty?: boolean }) => {
+      const params = new URLSearchParams();
+      if (force) params.set("force", "true");
+      if (deleteCheckout) {
+        params.set("delete_checkout", "true");
+        params.set("dirty_known", String(dirtyKnown ?? false));
+        params.set("dirty", String(dirty ?? false));
+      }
+      const suffix = params.size > 0 ? `?${params}` : "";
+      return fetch(`/api/projects/${id}${suffix}`, { method: "DELETE" }).then(async (r) => {
         if (!r.ok && r.status !== 204) throw await httpError(r);
-      }),
+      });
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: QUERY_KEYS.projects }),
   });
 }

@@ -62,6 +62,52 @@ func TestIsInsideWorkTree(t *testing.T) {
 	}
 }
 
+// Only Git's documented not-a-repository answer is ordinary. A missing,
+// unreadable, or corrupt repository must stay actionable instead of being
+// flattened into false/empty query results (TS-12.R1, INV §7/§12).
+func TestGitQueriesPreserveRepositoryErrors(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+
+	missing := filepath.Join(t.TempDir(), "missing")
+	corrupt := initRepo(t)
+	if err := os.WriteFile(filepath.Join(corrupt, ".git", "config"), []byte("[core\n"), 0o600); err != nil {
+		t.Fatalf("corrupt config: %v", err)
+	}
+	unreadable := t.TempDir()
+	if err := os.Chmod(unreadable, 0o000); err != nil {
+		t.Fatalf("chmod unreadable directory: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(unreadable, 0o700) })
+
+	paths := map[string]string{
+		"missing":    missing,
+		"corrupt":    corrupt,
+		"unreadable": unreadable,
+	}
+	g := Git{}
+	for name, path := range paths {
+		t.Run(name, func(t *testing.T) {
+			if _, err := g.IsInsideWorkTree(context.Background(), path); err == nil {
+				t.Fatal("IsInsideWorkTree returned an ordinary non-repository answer")
+			}
+			if _, err := g.CurrentBranch(context.Background(), path); err == nil {
+				t.Fatal("CurrentBranch returned an ordinary detached answer")
+			}
+			if _, err := g.BranchExists(context.Background(), path, "main"); err == nil {
+				t.Fatal("BranchExists returned an ordinary missing-ref answer")
+			}
+			if _, err := g.RevExists(context.Background(), path, "main"); err == nil {
+				t.Fatal("RevExists returned an ordinary missing-ref answer")
+			}
+			if _, err := g.DefaultBase(context.Background(), path); err == nil {
+				t.Fatal("DefaultBase returned an ordinary branch answer")
+			}
+		})
+	}
+}
+
 func TestDefaultBaseFallsBackToCurrentBranch(t *testing.T) {
 	repo := initRepo(t)
 	base, err := Git{}.DefaultBase(context.Background(), repo)

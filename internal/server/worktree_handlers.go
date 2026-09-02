@@ -61,5 +61,10 @@ func (s *Server) handleWorktreeStatus(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
 		return
 	}
-	writeJSON(w, http.StatusOK, s.worktreeStatus(r.Context(), id, project))
+	status, err := s.worktreeStatus(r.Context(), id, project)
+	if err != nil {
+		writeAPIError(w, apiError(runtime.CodeInternal, "read worktree status: "+err.Error()))
+		return
+	}
+	writeJSON(w, http.StatusOK, status)
 }

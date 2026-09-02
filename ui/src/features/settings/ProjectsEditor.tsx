@@ -10,12 +10,13 @@ import {
 } from "../../api/config";
 import { QUERY_KEYS } from "../../api/config";
 import { archiveProject, restoreProject } from "../../api/client";
+import type { CheckoutConsent } from "../../api/client";
 import { useUiStore } from "../../store/uiStore";
 import type { ProjectResponse, FieldWarning } from "../../schemas/project";
-import { ConfirmDialog } from "../../components/ui";
 import { ProjectForm } from "./ProjectForm";
+import { ProjectArchiveDialog } from "../dashboard/ProjectDashboard";
 
-type DeleteDialog = { id: string; resourceDir?: string; force?: boolean; agents?: string[]; error?: string };
+type DeleteDialog = { id: string; ownsCheckout: boolean; resourceDir?: string; force?: boolean; agents?: string[]; error?: string };
 
 export function ProjectsEditor() {
   const { data: projects, isLoading } = useProjects();
@@ -25,7 +26,7 @@ export function ProjectsEditor() {
   const pushError = useUiStore((state) => state.pushError);
   const queryClient = useQueryClient();
   const archive = useMutation({
-    mutationFn: (project: string) => archiveProject(project),
+    mutationFn: ({ project, consent }: { project: string; consent: CheckoutConsent }) => archiveProject(project, consent),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.projects }),
     onError: (err) => { const message = configErrorMessage(err); setArchiveError(message); pushError("Archive project failed", message); },
   });
@@ -93,10 +94,10 @@ export function ProjectsEditor() {
     }
   }
 
-  function confirmDelete() {
+  function confirmDelete(consent: CheckoutConsent) {
     if (!deleting) return;
     deleteProject.mutate(
-      { id: deleting.id, force: deleting.force },
+      { id: deleting.id, force: deleting.force, ...consent },
       {
         onSuccess: () => setDeleting(null),
         onError: (err) => {
@@ -155,7 +156,7 @@ export function ProjectsEditor() {
                   setArchiveID(id);
                 }} disabled={archive.isPending}>Archive</button>
               )}
-              <button onClick={() => setDeleting({ id, resourceDir: proj.resource_dir })} className="btn-danger">
+              <button onClick={() => setDeleting({ id, ownsCheckout: proj.worktree?.owned ?? false, resourceDir: proj.resource_dir })} className="btn-danger">
                 Delete
               </button>
             </div>
@@ -180,25 +181,25 @@ export function ProjectsEditor() {
         </Dialog.Portal>
       </Dialog.Root>
       {archiveID && projects?.[archiveID] && (
-        <ConfirmDialog
-          open
+        <ProjectArchiveDialog
+          id={archiveID}
           title={`Archive project "${projects[archiveID].title}"?`}
-          confirmLabel="Archive project"
-          destructive
+          ownsCheckout={projects[archiveID].worktree?.owned ?? false}
+          error={archiveError}
           pending={archive.isPending}
           onCancel={() => { setArchiveError(""); setArchiveID(null); }}
-          onConfirm={() => archive.mutate(archiveID, { onSuccess: () => setArchiveID(null) })}
+          onConfirm={(consent) => archive.mutate({ project: archiveID, consent }, { onSuccess: () => setArchiveID(null) })}
         >
           <p>Running agents will be stopped and every agent in this project will be archived.</p>
-          {archiveError && <p className="form-error">{archiveError}</p>}
-        </ConfirmDialog>
+        </ProjectArchiveDialog>
       )}
       {deleting && (
-        <ConfirmDialog
-          open
+        <ProjectArchiveDialog
+          id={deleting.id}
           title={deleting.force ? `Delete project "${deleting.id}" anyway?` : `Delete project "${deleting.id}"?`}
           confirmLabel={deleting.force ? "Delete anyway" : "Delete project"}
-          destructive
+          ownsCheckout={deleting.ownsCheckout}
+          error={deleting.error ?? ""}
           pending={deleteProject.isPending}
           onCancel={() => setDeleting(null)}
           onConfirm={confirmDelete}
@@ -214,8 +215,7 @@ export function ProjectsEditor() {
               {deleting.resourceDir && <p>Its shared resources directory is kept: {deleting.resourceDir}</p>}
             </>
           )}
-          {deleting.error && <p className="form-error">{deleting.error}</p>}
-        </ConfirmDialog>
+        </ProjectArchiveDialog>
       )}
     </div>
   );

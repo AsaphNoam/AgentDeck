@@ -186,7 +186,11 @@ func (s *Server) handleArchiveProjectAction(w http.ResponseWriter, r *http.Reque
 		ArchivedAgentIDs: append([]string{}, ids...),
 	}
 	if body.DeleteCheckout {
-		deleted, err := s.deleteOwnedCheckout(r.Context(), id)
+		var expectedDirty *bool
+		if body.DirtyKnown {
+			expectedDirty = &body.Dirty
+		}
+		deleted, err := s.deleteOwnedCheckout(r.Context(), id, expectedDirty)
 		if err != nil {
 			s.log.Error("worktree: delete checkout on archive", "project", id, "err", err)
 			resp.CheckoutWarning = "the checkout could not be deleted: " + err.Error()
@@ -200,6 +204,8 @@ func (s *Server) handleArchiveProjectAction(w http.ResponseWriter, r *http.Reque
 // honored only for an AgentDeck-owned checkout and is never defaulted on.
 type archiveProjectRequest struct {
 	DeleteCheckout bool `json:"delete_checkout"`
+	DirtyKnown     bool `json:"dirty_known,omitempty"`
+	Dirty          bool `json:"dirty,omitempty"`
 }
 
 func (s *Server) handleRestoreProjectAction(w http.ResponseWriter, r *http.Request) {

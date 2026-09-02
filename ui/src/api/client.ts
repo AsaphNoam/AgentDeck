@@ -141,7 +141,18 @@ export function archiveAgent(agentId: string) { return json<unknown>(`/api/sessi
 export function restoreAgent(agentId: string) { return json<unknown>(`/api/sessions/${agentId}/restore`, { method: "POST" }); }
 // deleteCheckout is sent only when the person consented in the archive dialog;
 // its absence never deletes an AgentDeck-owned checkout (FS-19.R8).
-export function archiveProject(project: string, deleteCheckout = false) {
+export type CheckoutConsent = {
+  deleteCheckout: boolean;
+  dirtyKnown?: boolean;
+  dirty?: boolean;
+};
+
+export function archiveProject(project: string, consent: CheckoutConsent = { deleteCheckout: false }) {
+  const body: Record<string, boolean> = { delete_checkout: consent.deleteCheckout };
+  if (consent.deleteCheckout) {
+    body.dirty_known = consent.dirtyKnown ?? false;
+    body.dirty = consent.dirty ?? false;
+  }
   return json<{
     project: ProjectResponse;
     stopped_agent_ids: string[];
@@ -151,7 +162,7 @@ export function archiveProject(project: string, deleteCheckout = false) {
   }>(`/api/projects/${encodeURIComponent(project)}/archive`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ delete_checkout: deleteCheckout }),
+    body: JSON.stringify(body),
   });
 }
 

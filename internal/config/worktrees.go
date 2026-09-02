@@ -51,6 +51,31 @@ func (s *Store) EnsureWorktreeRoot(projectID string) (string, error) {
 	return leaf, nil
 }
 
+// ValidateOwnedWorktreePath verifies an existing owned checkout without
+// creating or following either the owned root or its project leaf.
+func (s *Store) ValidateOwnedWorktreePath(projectID, recorded string) error {
+	leaf, err := s.WorktreePath(projectID)
+	if err != nil {
+		return err
+	}
+	if filepath.Clean(recorded) != filepath.Clean(leaf) {
+		return fmt.Errorf("config: recorded checkout %q is not the owned location %q", recorded, leaf)
+	}
+	for _, path := range []string{s.WorktreesRoot(), leaf} {
+		fi, err := os.Lstat(path)
+		if err != nil {
+			return fmt.Errorf("config: stat %q: %w", path, err)
+		}
+		if fi.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("config: %q is a symlink; refusing to follow", path)
+		}
+		if !fi.IsDir() {
+			return fmt.Errorf("config: %q is not a directory", path)
+		}
+	}
+	return nil
+}
+
 // rejectSymlink refuses a path that exists as a symlink. A path that does not
 // exist is fine — that is the ordinary case before a checkout is created.
 func rejectSymlink(path string) error {

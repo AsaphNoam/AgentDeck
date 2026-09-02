@@ -2353,3 +2353,10 @@ the session, and some failed pipeline pauses still offer a dead-end agent chat.
 
 **Next:** Run `/fix`, starting with the three Must-fix defects, then add the missing lifecycle and
 migration regressions.
+### 2026-09-02 — fix: worktree implementation findings
+
+All ten worktree implementation findings are fixed. Worktree deletion now protects running agents and newly changed files, nested forks survive deletion of their parent checkout, setup output stays memory-bounded, failed creation cleans up safely, repository and storage failures remain actionable, and both Settings and the dashboard provide the same safe checkout-deletion consent. Resume and runtime switching also report checkout recreation and setup warnings while honoring cancellation.
+
+**Needs attention:** None.
+
+**Next:** Run an independent review of this fix; the unrelated queued fixes remain untouched.

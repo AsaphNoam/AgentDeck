@@ -17,6 +17,7 @@ import (
 // switchCancelTimeout bounds the wait for an in-flight turn to settle before the
 // switch stops the old runtime (techspec §9; config plumbing deferred).
 const switchCancelTimeout = 5 * time.Second
+const switchRollbackTimeout = 30 * time.Second
 
 // switchRuntimeRequest is the POST body (techspec §8.1); any subset, ≥1 field
 // must differ from current.
@@ -30,13 +31,14 @@ type switchRuntimeRequest struct {
 
 // switchRuntimeResponse is the 200 body (techspec §8.1).
 type switchRuntimeResponse struct {
-	AgentID        string              `json:"agent_id"`
-	Interface      string              `json:"interface"`
-	Backend        string              `json:"backend"`
-	Model          string              `json:"model"`
-	Effort         string              `json:"effort"`
-	Running        *state.RunningEntry `json:"running,omitempty"`
-	HistoryHandoff string              `json:"history_handoff"` // "native_resume" | "primer"
+	AgentID        string               `json:"agent_id"`
+	Interface      string               `json:"interface"`
+	Backend        string               `json:"backend"`
+	Model          string               `json:"model"`
+	Effort         string               `json:"effort"`
+	Running        *state.RunningEntry  `json:"running,omitempty"`
+	HistoryHandoff string               `json:"history_handoff"` // "native_resume" | "primer"
+	Worktree       *worktreeStartNotice `json:"worktree,omitempty"`
 }
 
 // handleSwitchRuntime implements POST /api/sessions/{id}/switch-runtime
@@ -212,7 +214,8 @@ func (s *Server) handleSwitchRuntime(w http.ResponseWriter, r *http.Request) {
 	// Any failure from here on happens AFTER the old runtime was stopped + cleaned,
 	// so it must roll back to the previous identity (re-register + re-resume) rather
 	// than leave the agent dead with no running row — the same recovery step 5 uses.
-	spec, ae := s.composeSwitchSpec(target, resumeID)
+	var worktreeNotice worktreeStartNotice
+	spec, ae := s.composeSwitchSpecContext(r.Context(), target, resumeID, &worktreeNotice)
 	if ae != nil {
 		s.rollbackSwitch(r.Context(), w, agent, prev.SessionID, errors.New(ae.Message))
 		return
@@ -266,14 +269,21 @@ func (s *Server) handleSwitchRuntime(w http.ResponseWriter, r *http.Request) {
 	running, _ := s.stateStore.ReadRunning(id)
 	writeJSON(w, http.StatusOK, switchRuntimeResponse{
 		AgentID: id, Interface: target.Interface, Backend: target.Backend, Model: target.Model, Effort: target.Effort,
-		Running: ptrRunning(running), HistoryHandoff: handoff,
+		Running: ptrRunning(running), HistoryHandoff: handoff, Worktree: func() *worktreeStartNotice {
+			if worktreeNotice.Recreated {
+				return &worktreeNotice
+			}
+			return nil
+		}(),
 	})
 }
 
 // rollbackSwitch re-launches the previous identity after a failed Resume (§5.4).
 // If rollback also fails, it leaves the status row at error and returns 500
 // switch_failed.
-func (s *Server) rollbackSwitch(ctx context.Context, w http.ResponseWriter, prevAgent state.Agent, prevSessionID string, cause error) {
+func (s *Server) rollbackSwitch(_ context.Context, w http.ResponseWriter, prevAgent state.Agent, prevSessionID string, cause error) {
+	rollbackCtx, cancel := context.WithTimeout(context.Background(), switchRollbackTimeout)
+	defer cancel()
 	s.cleanupMessagingMCP(prevAgent.AgentID)
 	s.cleanupHookSettings(prevAgent.AgentID)
 	if err := s.stateStore.WriteAgent(prevAgent); err != nil {
@@ -289,7 +299,7 @@ func (s *Server) rollbackSwitch(ctx context.Context, w http.ResponseWriter, prev
 		s.failSwitch(w, prevAgent.AgentID, "recompose previous: "+ae.Message)
 		return
 	}
-	if _, err := s.registry.Resume(ctx, spec); err != nil {
+	if _, err := s.registry.Resume(rollbackCtx, spec); err != nil {
 		s.teardownAgentRegistration(prevAgent.AgentID)
 		s.failSwitch(w, prevAgent.AgentID, err.Error())
 		return
@@ -357,6 +367,10 @@ func (s *Server) validateSwitchTarget(target state.Agent) *runtime.APIError {
 // (mirrors handleResume). Switch overrides only backend/model/interface; the
 // permission policy and add_dirs stay frozen to the original launch (§12.4).
 func (s *Server) composeSwitchSpec(target state.Agent, resumeID string) (runtime.LaunchSpec, *runtime.APIError) {
+	return s.composeSwitchSpecContext(context.Background(), target, resumeID, nil)
+}
+
+func (s *Server) composeSwitchSpecContext(ctx context.Context, target state.Agent, resumeID string, notice *worktreeStartNotice) (runtime.LaunchSpec, *runtime.APIError) {
 	snap, err := s.stateStore.ReadSession(target.AgentID)
 	if errors.Is(err, state.ErrNotFound) {
 		return runtime.LaunchSpec{}, apiError(runtime.CodeValidation, "no persisted session to switch")
@@ -385,8 +399,13 @@ func (s *Server) composeSwitchSpec(target state.Agent, resumeID string) (runtime
 	// Resolve the working directory through the one shared step before any
 	// registration side effect (TS-01.R26, TS-12.R4). Switch keeps the frozen
 	// snapshot cwd for the same reason resume does.
-	if _, _, wae := s.ensureWorktreeCheckout(context.Background(), target.Project, snap.Cwd); wae != nil {
+	recreated, warning, wae := s.ensureWorktreeCheckout(ctx, target.Project, snap.Cwd)
+	if wae != nil {
 		return runtime.LaunchSpec{}, wae
+	}
+	if recreated && notice != nil {
+		row, _ := s.ownedWorktree(target.Project)
+		*notice = worktreeStartNotice{Recreated: true, Branch: row.Branch, Warning: warning}
 	}
 	// Ensure the shared-resources directory before any registration side effect
 	// (FS-11.R6/R9). add_dirs/prompt carry over from the frozen snapshot; the env

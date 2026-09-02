@@ -14,7 +14,8 @@ import (
 // resumeResponse extends the standard session envelope with a `resumed` flag.
 type resumeResponse struct {
 	sessionResponse
-	Resumed bool `json:"resumed"`
+	Resumed  bool                 `json:"resumed"`
+	Worktree *worktreeStartNotice `json:"worktree,omitempty"`
 }
 
 // resumeOverride carries the optional resume body (Phase 4: only the empty body
@@ -107,11 +108,16 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if ae := s.resumeSession(r.Context(), id, override); ae != nil {
+	var notice worktreeStartNotice
+	if ae := s.resumeSessionWithNotice(r.Context(), id, override, &notice); ae != nil {
 		writeAPIError(w, ae)
 		return
 	}
-	writeJSON(w, http.StatusOK, resumeResponse{sessionResponse: s.readSession(id), Resumed: true})
+	resp := resumeResponse{sessionResponse: s.readSession(id), Resumed: true}
+	if notice.Recreated {
+		resp.Worktree = &notice
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // resumeSession is the one resume seam (TS-01.R16): the explicit resume route,
@@ -119,13 +125,21 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 // same gates, same composition, same failure teardown — under one exclusive
 // per-agent claim. It returns nil once the agent is running again.
 func (s *Server) resumeSession(ctx context.Context, id string, override resumeOverride) *runtime.APIError {
-	return s.resumeSessionWithHooks(ctx, id, override, nil, nil)
+	return s.resumeSessionWithNotice(ctx, id, override, nil)
+}
+
+func (s *Server) resumeSessionWithNotice(ctx context.Context, id string, override resumeOverride, notice *worktreeStartNotice) *runtime.APIError {
+	return s.resumeSessionWithHooksAndNotice(ctx, id, override, nil, nil, notice)
 }
 
 // resumeSessionWithHooks keeps the lifecycle claim over the optional activation
 // boundaries. Mail uses before immediately before the first resume side effect
 // and after before the lifecycle claim is released.
 func (s *Server) resumeSessionWithHooks(ctx context.Context, id string, override resumeOverride, before, after func() error) *runtime.APIError {
+	return s.resumeSessionWithHooksAndNotice(ctx, id, override, before, after, nil)
+}
+
+func (s *Server) resumeSessionWithHooksAndNotice(ctx context.Context, id string, override resumeOverride, before, after func() error, notice *worktreeStartNotice) *runtime.APIError {
 	if !s.claimLifecycle(id) {
 		return apiError(runtime.CodeConflict, "a resume is already in progress")
 	}
@@ -262,7 +276,7 @@ func (s *Server) resumeSessionWithHooks(ctx context.Context, id string, override
 			return apiError(runtime.CodeInternal, err.Error())
 		}
 	}
-	spec, ae := s.composeResumeSpec(resumeAgent, snap, backend, model)
+	spec, ae := s.composeResumeSpecContext(ctx, resumeAgent, snap, backend, model, "", notice)
 	if ae != nil {
 		return ae
 	}
@@ -397,10 +411,14 @@ func (s *Server) addressableAgents() ([]state.LiveAgent, error) {
 // composeSwitchSpec. On registration failure it rolls back its own side effects
 // and returns an APIError.
 func (s *Server) composeResumeSpec(agent state.Agent, snap state.SessionSnapshot, be config.Backend, model config.Model) (runtime.LaunchSpec, *runtime.APIError) {
-	return s.composeResumeSpecWithGeneration(agent, snap, be, model, "")
+	return s.composeResumeSpecContext(context.Background(), agent, snap, be, model, "", nil)
 }
 
 func (s *Server) composeResumeSpecWithGeneration(agent state.Agent, snap state.SessionSnapshot, be config.Backend, model config.Model, generation string) (runtime.LaunchSpec, *runtime.APIError) {
+	return s.composeResumeSpecContext(context.Background(), agent, snap, be, model, generation, nil)
+}
+
+func (s *Server) composeResumeSpecContext(ctx context.Context, agent state.Agent, snap state.SessionSnapshot, be config.Backend, model config.Model, generation string, notice *worktreeStartNotice) (runtime.LaunchSpec, *runtime.APIError) {
 	// Only claude-acp supports the terminal interface; a resume that lands (or is
 	// overridden to) terminal on any other backend would produce a statusless
 	// agent, so reject it here — the third of the three composers that gate on
@@ -412,8 +430,13 @@ func (s *Server) composeResumeSpecWithGeneration(agent state.Agent, snap state.S
 	// registration side effect (TS-01.R26, TS-12.R4). Resume keeps the frozen
 	// snapshot cwd: the helper only re-materializes a missing owned checkout at
 	// that exact recorded path, and never re-derives a different one.
-	if _, _, ae := s.ensureWorktreeCheckout(context.Background(), agent.Project, snap.Cwd); ae != nil {
+	recreated, warning, ae := s.ensureWorktreeCheckout(ctx, agent.Project, snap.Cwd)
+	if ae != nil {
 		return runtime.LaunchSpec{}, ae
+	}
+	if recreated && notice != nil {
+		row, _ := s.ownedWorktree(agent.Project)
+		*notice = worktreeStartNotice{Recreated: true, Branch: row.Branch, Warning: warning}
 	}
 	// Ensure the shared-resources directory before any registration side effect
 	// (FS-11.R6/R9). The frozen snapshot already carries the path in add_dirs and

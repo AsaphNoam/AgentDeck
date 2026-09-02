@@ -167,7 +167,7 @@ func (s *Server) ContinueStage(ctx context.Context, execution pipeline.StageExec
 	agent.Model = execution.Model
 	agent.Effort = execution.Effort
 	agent.Interface = "chat"
-	spec, ae := s.composeResumeSpecWithGeneration(agent, snapshot, backend, model, execution.Generation)
+	spec, ae := s.composeResumeSpecContext(ctx, agent, snapshot, backend, model, execution.Generation, nil)
 	if ae != nil {
 		return errors.New(ae.Message)
 	}

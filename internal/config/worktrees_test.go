@@ -63,3 +63,40 @@ func TestEnsureWorktreeRootRejectsSymlinkLeaf(t *testing.T) {
 		t.Fatalf("err = %v, want a symlink refusal", err)
 	}
 }
+
+func TestValidateOwnedWorktreePathRejectsRootAndLeafSymlinks(t *testing.T) {
+	for _, which := range []string{"root", "leaf"} {
+		t.Run(which, func(t *testing.T) {
+			home := t.TempDir()
+			s := NewWithHome(home)
+			leaf, err := s.EnsureWorktreeRoot("myproj")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Mkdir(leaf, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if which == "root" {
+				root := s.WorktreesRoot()
+				real := root + "-real"
+				if err := os.Rename(root, real); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(real, root); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				target := t.TempDir()
+				if err := os.Remove(leaf); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(target, leaf); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := s.ValidateOwnedWorktreePath("myproj", leaf); err == nil || !strings.Contains(err.Error(), "symlink") {
+				t.Fatalf("ValidateOwnedWorktreePath error = %v, want symlink refusal", err)
+			}
+		})
+	}
+}

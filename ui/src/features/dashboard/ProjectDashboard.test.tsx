@@ -399,6 +399,49 @@ describe("ProjectDashboard", () => {
     expect(screen.queryByText(/no uncommitted changes/i)).toBeNull();
   });
 
+  it("disables checkout consent and archive confirmation while status is loading", async () => {
+    let resolveStatus: ((response: HttpResponse) => void) | undefined;
+    server.use(
+      http.get("/api/projects", () => HttpResponse.json({
+        fork: {
+          title: "Fork", color: [100, 116, 139], cwd: "/home/wt/fork", add_dirs: [], context_prompt: "",
+          archived: false, repo_backed: true, worktree: { owned: true, branch: "agentdeck/fork" },
+        },
+      })),
+      http.get("/api/projects/fork/worktree", () => new Promise<HttpResponse>((resolve) => { resolveStatus = resolve; })),
+    );
+    renderDashboard();
+    fireEvent.contextMenu((await screen.findByText("Fork")).closest("article")!);
+    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+
+    expect(await screen.findByText(/checking for uncommitted changes/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/delete this project's worktree checkout/i)).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Archive project" })).toBeDisabled();
+
+    resolveStatus?.(HttpResponse.json({
+      owned: true, repo_backed: true, branch: "agentdeck/fork", base: "main", dirty: false, dirty_known: true,
+    }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Archive project" })).toBeEnabled());
+  });
+
+  it("renders a failed checkout-status query as unknown", async () => {
+    server.use(
+      http.get("/api/projects", () => HttpResponse.json({
+        fork: {
+          title: "Fork", color: [100, 116, 139], cwd: "/home/wt/fork", add_dirs: [], context_prompt: "",
+          archived: false, repo_backed: true, worktree: { owned: true, branch: "agentdeck/fork" },
+        },
+      })),
+      http.get("/api/projects/fork/worktree", () => HttpResponse.json({ error: { message: "Git unavailable" } }, { status: 500 })),
+    );
+    renderDashboard();
+    fireEvent.contextMenu((await screen.findByText("Fork")).closest("article")!);
+    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+
+    expect(await screen.findByText(/could not read this checkout/i)).toBeInTheDocument();
+    expect(screen.queryByText(/checking for uncommitted changes/i)).toBeNull();
+  });
+
   // A project that owns no checkout gets no offer at all (FS-19.R4/A5).
   it("offers no checkout deletion for a project that owns none", async () => {
     server.use(http.post("/api/projects/app/archive", () => HttpResponse.json({

@@ -474,6 +474,11 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 	// delete_checkout is honored only for an AgentDeck-owned checkout and is
 	// never defaulted on (FS-19.R8, TS-03.R33).
 	deleteCheckout := r.URL.Query().Get("delete_checkout") == "true"
+	var expectedDirty *bool
+	if r.URL.Query().Get("dirty_known") == "true" {
+		dirty := r.URL.Query().Get("dirty") == "true"
+		expectedDirty = &dirty
+	}
 	// 404 if absent.
 	if _, err := s.configStore.ReadProject(id); err != nil {
 		if errors.Is(err, config.ErrNotFound) {
@@ -484,7 +489,7 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError("internal", "internal error"))
 		return
 	}
-	if !force {
+	if !force || deleteCheckout {
 		agents, err := s.runningAgentsForProject(id)
 		if err != nil {
 			s.log.Error("projects: in-use check", "err", err)
@@ -492,11 +497,15 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if len(agents) > 0 {
+			hint := "retry with ?force=true to delete the definition; running agents are unaffected"
+			if deleteCheckout {
+				hint = "stop the running agents before deleting their checkout"
+			}
 			writeJSON(w, http.StatusConflict, inUseBody{
 				Error:   "in_use",
 				Message: fmt.Sprintf("project '%s' is used by %d running agent(s)", id, len(agents)),
 				Agents:  agents,
-				Hint:    "retry with ?force=true to delete the definition; running agents are unaffected",
+				Hint:    hint,
 			})
 			return
 		}
@@ -511,7 +520,7 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer s.endProjectArchive(id)
-		if _, err := s.deleteOwnedCheckout(r.Context(), id); err != nil {
+		if _, err := s.deleteOwnedCheckout(r.Context(), id, expectedDirty); err != nil {
 			s.log.Error("worktree: delete checkout on project delete", "project", id, "err", err)
 			writeAPIError(w, apiError(runtime.CodeInternal, "delete checkout: "+err.Error()))
 			return
