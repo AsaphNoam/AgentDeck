@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/agentdeck/agentdeck/internal/backend/credcheck"
@@ -248,6 +249,8 @@ type projectCreateBody struct {
 	AddDirs       []string `json:"add_dirs"`
 	ContextPrompt string   `json:"context_prompt"`
 	Archived      bool     `json:"archived"`
+	BaseBranch    string   `json:"base_branch"`
+	SetupCommand  string   `json:"setup_command"`
 }
 
 func (b projectCreateBody) toProject() config.Project {
@@ -265,6 +268,8 @@ func (b projectCreateBody) toProject() config.Project {
 		AddDirs:       addDirs,
 		ContextPrompt: b.ContextPrompt,
 		Archived:      b.Archived,
+		BaseBranch:    strings.TrimSpace(b.BaseBranch),
+		SetupCommand:  strings.TrimSpace(b.SetupCommand),
 	}
 }
 
@@ -276,6 +281,8 @@ type projectPutBody struct {
 	AddDirs       []string `json:"add_dirs"`
 	ContextPrompt string   `json:"context_prompt"`
 	Archived      bool     `json:"archived"`
+	BaseBranch    string   `json:"base_branch"`
+	SetupCommand  string   `json:"setup_command"`
 }
 
 func (b projectPutBody) toProject() config.Project {
@@ -290,6 +297,8 @@ func (b projectPutBody) toProject() config.Project {
 		AddDirs:       addDirs,
 		ContextPrompt: b.ContextPrompt,
 		Archived:      b.Archived,
+		BaseBranch:    strings.TrimSpace(b.BaseBranch),
+		SetupCommand:  strings.TrimSpace(b.SetupCommand),
 	}
 }
 
@@ -306,6 +315,11 @@ type projectResponse struct {
 	ResourceDir string              `json:"resource_dir"`
 	Warnings    []config.FieldError `json:"warnings,omitempty"`
 	Archived    bool                `json:"archived"`
+	// BaseBranch and SetupCommand round-trip like every other project field
+	// (FS-04.R45); both are always present so the form reads "" rather than
+	// undefined for a legacy file that never had them.
+	BaseBranch   string `json:"base_branch"`
+	SetupCommand string `json:"setup_command"`
 }
 
 func (s *Server) toProjectResponse(id string, p config.Project, warnings []config.FieldError) projectResponse {
@@ -323,6 +337,8 @@ func (s *Server) toProjectResponse(id string, p config.Project, warnings []confi
 		ResourceDir:   s.projectResourceDir(id),
 		Warnings:      warnings,
 		Archived:      p.Archived,
+		BaseBranch:    p.BaseBranch,
+		SetupCommand:  p.SetupCommand,
 	}
 }
 

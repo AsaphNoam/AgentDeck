@@ -11,6 +11,10 @@ export const projectSchema = z.object({
   add_dirs: z.array(z.string()).default([]),
   context_prompt: z.string().default(""),
   archived: z.boolean().optional(),
+  // Optional worktree settings (FS-04.R45). Absent on a legacy project file and
+  // read as empty; base_branch empty means "auto-detect the default branch".
+  base_branch: z.string().default(""),
+  setup_command: z.string().default(""),
 });
 
 export type ProjectInput = z.infer<typeof projectSchema>;
@@ -33,6 +37,8 @@ export const projectResponseSchema = z.object({
   resource_dir: z.string().default(""),
   warnings: z.array(fieldWarningSchema).optional(),
   archived: z.boolean().optional(),
+  base_branch: z.string().default(""),
+  setup_command: z.string().default(""),
 });
 
 export type ProjectResponse = z.infer<typeof projectResponseSchema>;

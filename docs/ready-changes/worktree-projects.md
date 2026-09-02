@@ -1,6 +1,6 @@
 # Worktree projects
 
-**State:** Waiting to start
+**State:** In progress
 **Why:** Direct request on 2026-09-01 — make isolated parallel coding work essentially effortless
 (the "First-class Git worktree workspaces" idea, defined and removed from `docs/ideas.md` in this
 change).

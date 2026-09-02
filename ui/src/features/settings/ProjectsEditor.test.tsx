@@ -281,4 +281,55 @@ describe("ProjectsEditor", () => {
     expect(await screen.findByText(/edited directory does not exist yet/i)).toBeInTheDocument();
     expect(screen.getByText("Edit project")).toBeInTheDocument();
   });
+
+  // FS-04.A25 / R45: both worktree fields round-trip through the form. A legacy
+  // project payload that carries neither reads as empty rather than undefined.
+  it("edits base_branch and setup_command, and reads a legacy project as empty", async () => {
+    let saved: Record<string, unknown> | null = null;
+    server.use(
+      http.put("/api/projects/my-app", async ({ request }) => {
+        saved = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...saved, project: "my-app" });
+      }),
+    );
+
+    renderWithQuery(<ProjectsEditor />);
+    await screen.findByText("My App");
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    const base = screen.getByPlaceholderText(
+      "Leave empty to use the default branch",
+    ) as HTMLInputElement;
+    const setup = screen.getByPlaceholderText("e.g. npm ci") as HTMLInputElement;
+    expect(base.value).toBe("");
+    expect(setup.value).toBe("");
+
+    fireEvent.change(base, { target: { value: "develop" } });
+    fireEvent.change(setup, { target: { value: "npm ci" } });
+    fireEvent.click(screen.getByText("Update"));
+
+    await waitFor(() => expect(saved).not.toBeNull());
+    expect(saved).toMatchObject({ base_branch: "develop", setup_command: "npm ci" });
+  });
+
+  it("prefills both worktree fields when the project already has them", async () => {
+    server.use(
+      http.get("/api/projects", () =>
+        HttpResponse.json({
+          "my-app": {
+            title: "My App", color: [100, 180, 255], cwd: "/tmp/my-app", add_dirs: [],
+            context_prompt: "", resource_dir: RESOURCE_DIR,
+            base_branch: "release", setup_command: "make deps",
+          },
+        }),
+      ),
+    );
+
+    renderWithQuery(<ProjectsEditor />);
+    await screen.findByText("My App");
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    expect(await screen.findByDisplayValue("release")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("make deps")).toBeInTheDocument();
+  });
 });

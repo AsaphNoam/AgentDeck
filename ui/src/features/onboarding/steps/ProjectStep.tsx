@@ -37,6 +37,10 @@ export function ProjectStep({ onDone, claimMutation, releaseMutation }: ProjectS
         cwd: cwd.trim(),
         add_dirs: [],
         context_prompt: context.trim(),
+        // The wizard does not collect the worktree settings; both are optional
+        // and editable later in Settings → Projects (FS-04.R45).
+        base_branch: "",
+        setup_command: "",
         // Server-computed and read-only; ignored on create (TS-03.R12).
         resource_dir: "",
       },

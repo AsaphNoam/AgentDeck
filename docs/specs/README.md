@@ -30,7 +30,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-01 | [features/FS-01-agent-lifecycle.md](features/FS-01-agent-lifecycle.md) | Current | Launch, stop, cancel, resume, clone, rename, switch runtime, crash handling, identity, wake on message |
 | FS-02 | [features/FS-02-dashboard.md](features/FS-02-dashboard.md) | Partial | Card grid, live status, layout/density, task groups, notifications, project creation |
 | FS-03 | [features/FS-03-chat.md](features/FS-03-chat.md) | Current | Streaming chat panel, tool calls/diffs, permission prompts, transcript view, header runtime picker, composer file/skill mentions, browser-local drafts |
-| FS-04 | [features/FS-04-configuration-onboarding.md](features/FS-04-configuration-onboarding.md) | Partial | Roles/projects/backends CRUD, backend creation, settings UI, onboarding wizard, appearance preference, directory browsing, and exact AgentDecker prompt migration |
+| FS-04 | [features/FS-04-configuration-onboarding.md](features/FS-04-configuration-onboarding.md) | Current | Roles/projects/backends CRUD, backend creation, settings UI, onboarding wizard, appearance preference, directory browsing, and exact AgentDecker prompt migration |
 | FS-05 | [features/FS-05-archive-tracking.md](features/FS-05-archive-tracking.md) | Current | Session archive, full-text search, resume from archive, file/command tracking |
 | FS-06 | [features/FS-06-coordination.md](features/FS-06-coordination.md) | Current | Agent-to-agent messaging, explicit mail activation, budgets, unread indicators, stopped-agent wake |
 | FS-07 | [features/FS-07-terminal.md](features/FS-07-terminal.md) | Partial | Terminal interface, drivers (xterm/tmux/iTerm2), terminal-agent boundaries |
@@ -52,7 +52,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | ID | Spec | Status | Covers |
 |----|------|--------|--------|
 | TS-01 | [tech/TS-01-architecture.md](tech/TS-01-architecture.md) | Partial | Process model, package boundaries, runtime abstraction, source-of-truth rules, planned direct action gateway |
-| TS-02 | [tech/TS-02-data-persistence.md](tech/TS-02-data-persistence.md) | Partial | SQLite schema & migrations, activations, context references/grants, config files, transcripts, FTS index |
+| TS-02 | [tech/TS-02-data-persistence.md](tech/TS-02-data-persistence.md) | Current | SQLite schema & migrations, activations, context references/grants, config files, transcripts, FTS index |
 | TS-03 | [tech/TS-03-http-api.md](tech/TS-03-http-api.md) | Partial | REST surface, error envelope, SSE contract, status codes, and planned private action transport |
 | TS-04 | [tech/TS-04-integration-protocols.md](tech/TS-04-integration-protocols.md) | Partial | ACP, hooks, MCP messaging, PTY/WebSocket, external-CLI tolerance |
 | TS-05 | [tech/TS-05-security.md](tech/TS-05-security.md) | Partial | Loopback boundary, tokens, context authorization, and planned shared launch credential for direct actions |

@@ -1,6 +1,6 @@
 # FS-04 — Configuration & Onboarding
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/config/`, `internal/server/config_handlers.go`, `internal/server/directory_picker.go`, `ui/src/features/settings/`, `ui/src/features/onboarding/` · **Journeys:** J2, J9
 **Absorbed:** [`phase-3-config-onboarding.md`](../../archive/phases/phase-3-config-onboarding.md)
 
@@ -90,7 +90,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   editable, including support for the existing leading `~` form, so browsing is a convenience
   rather than a new requirement or storage format.
 
-- **R45 (planned).** A project additionally has an optional `base_branch` and an optional
+- **R45.** A project additionally has an optional `base_branch` and an optional
   `setup_command`, both absent by default; existing project files without them stay valid and read
   as empty. Both round-trip through the project CRUD surface (R6) and the Settings → Projects form
   like every other field. `base_branch` names the branch new independent work derives from in
@@ -354,7 +354,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   seeding/migration regressions.
 
 
-- **A25 (planned)** (R45) — `base_branch` and `setup_command` round-trip through the project API
+- **A25** (R45) — `base_branch` and `setup_command` round-trip through the project API
   and the Settings project form, a legacy project file without them reads as empty and saves
   untouched fields unchanged, and neither field alters a launch snapshot. — project-form component
   tests and config API tests.
@@ -397,6 +397,10 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
 - **Dashboard logging (R41/A21):** `internal/cli/dashboard.go` establishes the shared persistent
   logger; `internal/cli/cli_test.go` covers foreground mirroring, append/permission behavior,
   unavailable paths, and the detached child's single redirected sink.
+- **Worktree project fields (R45/A25):** `internal/config/types.go` (`Project.BaseBranch`,
+  `Project.SetupCommand`), the project bodies in `internal/server/config_handlers.go`,
+  `ui/src/schemas/project.ts`, and `ui/src/features/settings/ProjectForm.tsx`; regressions in
+  `internal/server/worktree_projects_test.go` and `ui/src/features/settings/ProjectsEditor.test.tsx`.
 - **Key regression tests:** `internal/server/config_handlers_test.go`,
   `internal/server/config_endpoint_test.go`, `internal/config/config_test.go`
   (`TestSeedIfAbsentNoClobber`), `ui/src/features/onboarding/OnboardingGate.test.tsx` (A12, A13),

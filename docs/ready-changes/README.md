@@ -46,10 +46,6 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
   dashboard pane by itself when it newly enters `waiting_input`, on a newly observed transition
   only, reusing the existing four-pane cap and eviction.
 
-- [`worktree-projects.md`](worktree-projects.md) — fork a repo-backed project into a new project
-  whose cwd is a fresh AgentDeck-owned Git worktree branched from the project's base branch, with
-  setup bootstrap, recreation of missing checkouts, and consented conservative deletion.
-
 ## Paused changes
 
 - [`migrate-internal-actions-from-mcp.md`](migrate-internal-actions-from-mcp.md) — replace only

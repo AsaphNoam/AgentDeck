@@ -367,4 +367,25 @@ CREATE INDEX idx_tasks_project_creator_created
   WHERE created_by_kind = 'agent' AND assigned_agent_id IS NOT NULL;
 `,
 	},
+	{
+		// AgentDeck-owned Git worktree ownership (TS-02.R27, TS-12.R2). The row's
+		// presence is the sole test of whether a checkout may ever be deleted, so
+		// it lives in state.db rather than a hand-editable config file. `project`
+		// is a logical, non-cascading reference like R25's task references:
+		// archiving or deleting a project never removes it, only the explicit
+		// consented deletion flow does.
+		version: 20,
+		sql: `
+CREATE TABLE project_worktrees (
+  project        TEXT PRIMARY KEY,
+  repo_path      TEXT NOT NULL,
+  branch         TEXT NOT NULL,
+  checkout_path  TEXT NOT NULL,
+  created_at     TEXT NOT NULL,
+  setup_ok       INTEGER,
+  setup_at       TEXT,
+  setup_output   TEXT
+);
+`,
+	},
 }

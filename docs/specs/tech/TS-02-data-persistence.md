@@ -1,6 +1,6 @@
 # TS-02 — Data & persistence
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/config`, `internal/state`, `internal/transcript`, `internal/index`, `internal/archive`, `internal/configsource`, `internal/contextref`
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -314,7 +314,7 @@ canonicalize-plus-grant operations are atomic (INV §5/§15). No backfill is nee
   never produce a delegated-agent card. Migration and query-plan tests prove that the targeted read
   uses this index and does not regress to scanning every task retained by the project.
 
-- **R27 (planned)** — One forward-only migration adds the `project_worktrees` ownership table
+- **R27** — One forward-only migration adds the `project_worktrees` ownership table
   (shape and rules in TS-12.R2/§3). The `project` column is a logical, non-cascading reference
   exactly like R25's task references: deleting or archiving a project never cascades here, and only
   the explicit consented deletion flow removes a row. The project config files additionally accept
@@ -389,6 +389,9 @@ R1–R26 and must be reflected here when its contract changes.
   grant, and personal-preference regressions named by FS-15.A1–A5/A7.
 - Pipeline supervision read index (R26): task migration/query-plan regressions named by
   FS-14.A17/A23 and TS-09.R28.
+- Worktree ownership (R27): migration 20 in `internal/state/schema.go`, typed methods in
+  `internal/state/worktrees.go`, path rules in `internal/config/worktrees.go`; regressions in
+  `internal/state/worktrees_test.go` and `internal/config/worktrees_test.go`.
 - Regression anchors: `TestHomeTreeIsOwnerOnly`, `TestStateDBIsOwnerOnly`,
   `TestTranscriptIsOwnerOnly`, `TestReindexPreservesFinalPartialTurn`,
   `TestEmptyArchiveMarshalsResultsArray`, `TestSearchFallbackFiltersMetadata`,

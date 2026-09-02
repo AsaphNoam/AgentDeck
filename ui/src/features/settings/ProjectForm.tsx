@@ -12,6 +12,10 @@ const schema = z.object({
   title: z.string().min(1, "title is required").max(120),
   cwd: z.string().min(1, "cwd is required"),
   context_prompt: z.string(),
+  // Both optional (FS-04.R45): empty base_branch means "auto-detect the
+  // repository's default branch at use time", empty setup_command means none.
+  base_branch: z.string(),
+  setup_command: z.string(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -51,6 +55,8 @@ export function ProjectForm({
       title: initial?.title ?? "",
       cwd: initial?.cwd ?? "",
       context_prompt: initial?.context_prompt ?? "",
+      base_branch: initial?.base_branch ?? "",
+      setup_command: initial?.setup_command ?? "",
     },
   });
 
@@ -63,6 +69,8 @@ export function ProjectForm({
       cwd: vals.cwd,
       add_dirs: addDirs,
       context_prompt: vals.context_prompt,
+      base_branch: vals.base_branch,
+      setup_command: vals.setup_command,
       // resource_dir is server-computed and read-only; the server ignores any value
       // the client sends (FS-11.R4, TS-03.R12). Carried through only to satisfy the type.
       resource_dir: initial?.resource_dir ?? "",
@@ -161,6 +169,22 @@ export function ProjectForm({
       <div className="form-field">
         <label>Context prompt</label>
         <textarea {...register("context_prompt")} rows={3} placeholder="Optional project context…" />
+      </div>
+      <div className="form-field">
+        <label>Base branch</label>
+        <input {...register("base_branch")} placeholder="Leave empty to use the default branch" />
+        <span className="form-hint">
+          New worktree projects forked from here branch off this branch. Empty detects the
+          repository&apos;s default branch when the fork runs.
+        </span>
+      </div>
+      <div className="form-field">
+        <label>Setup command</label>
+        <input {...register("setup_command")} placeholder="e.g. npm ci" />
+        <span className="form-hint">
+          AgentDeck runs this inside a new worktree checkout before the project is ready. It never
+          runs at agent launch.
+        </span>
       </div>
       {isEdit && initial?.resource_dir && (
         <div className="form-field">

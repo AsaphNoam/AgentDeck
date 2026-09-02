@@ -25,6 +25,14 @@ type Project struct {
 	AddDirs       []string `json:"add_dirs"` // extra accessible directories
 	ContextPrompt string   `json:"context_prompt"`
 	Archived      bool     `json:"archived"`
+	// BaseBranch names the branch new independent work derives from (FS-04.R45,
+	// FS-19.R2). Empty means the repository's default branch, auto-detected at
+	// use time — it is never resolved and frozen here.
+	BaseBranch string `json:"base_branch,omitempty"`
+	// SetupCommand is the non-interactive bootstrap AgentDeck runs inside a
+	// freshly created or recreated worktree checkout (FS-19.R3/R7). It never runs
+	// at agent launch, so launch composition timing is unchanged.
+	SetupCommand string `json:"setup_command,omitempty"`
 }
 
 // ---- Backend config: backends.json (PRD §3.4), version 2 ----
