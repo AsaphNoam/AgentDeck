@@ -138,6 +138,19 @@ sensitive-context sharing is a practical problem.
   R18–R19 remain blocked by FS-17.R20; internal MCP keeps its shipped security contract until the
   narrow direct transport is reviewed and proven.
 
+- **R20 (planned) — The approval exemption widens no boundary it did not already sit
+  inside.** Exempting AgentDeck's own actions from the human approval gate (FS-03.R40) changes who
+  is asked, never what is permitted. Every exempt call still crosses the same loopback-only `/mcp`
+  route behind the existing `localOnly` wrapper, still carries the per-agent token minted for that
+  agent's current generation, and is still authorized server-side against that agent's own identity
+  before it does anything — an exempted call that fails authorization fails exactly as it does
+  today. The exemption grants no filesystem path, no command execution, and no network reach,
+  because none of the exempt actions has any. It is not a security control being removed: the
+  approval prompt was never the thing authorizing these calls, and INV §14's rule that a loopback
+  bind is not a browser or filesystem boundary is the reason the server-side authorization exists
+  and is unchanged. Provider- and user-configured MCP servers gain nothing from this requirement;
+  their tools keep the gate.
+
 ## 3. Interfaces & data shapes
 
 Security-relevant interfaces are the single listener, Host/Origin middleware, launch token

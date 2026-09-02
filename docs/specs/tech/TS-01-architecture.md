@@ -328,6 +328,17 @@ domain's authorization transition.
   a missing owned checkout at that recorded path. No path grows a private variant of this step
   (R9, INV §2).
 
+- **R27 (planned) — The approval-exemption set is a runtime parameter, not frozen launch
+  config.** The composed set of AgentDeck-owned tool identities (TS-04.R41) travels on the same
+  process-parameter overlay the embedded-knowledge parameters use (TS-11.R4–R5): it is applied by
+  the one shared overlay helper that launch, resume, switch, wake, terminal, and pipeline stage
+  start all pass through, and it is deliberately invisible to `runtimeMeta`'s frozen `sessions`
+  snapshot. R6's frozen-composition rule is unaffected and is the reason for this placement — the
+  set is derived from AgentDeck's own code rather than from a person's configuration, so freezing it
+  would make an agent launched before an upgrade keep prompting for actions the current build
+  exempts, with no way to correct it short of a new agent. No path composes its own variant of the
+  set (R9, INV §2).
+
 ## 3. Interfaces & data shapes
 
 **Runtime interface** (`internal/runtime/runtime.go`, minimum surface):

@@ -1,6 +1,6 @@
 # FS-06 — Agent coordination & notifications
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/messaging/`, `internal/state/messages.go`, `internal/server/` (`messaging_registration.go`, `messaging_loops.go`, `sessions.go`), `internal/bus/`, `ui/src/api/sse.ts`, `ui/src/components/grid/AgentCard.tsx`, `ui/src/components/shell/NotificationCenter.tsx`, `ui/src/features/settings/NotificationsEditor.tsx` · **Journeys:** J10, J11, J12
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) F8/F11 and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -77,6 +77,30 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
 - **R12.** A fresh user-prompt or activation turn resets the budget under a new turn id. Restart/resume
   also resets cleanly and retains only one current budget row per agent, so a stale higher turn id
   cannot make the first post-restart turn appear exhausted.
+
+- **R29 (planned)** — A refusal names the real condition and the change that resolves
+  it. When `create_task` or `send_message` cannot reach a stopped agent because R22 holds
+  pipeline-associated agents out of the addressable set, the refusal says that — that the agent
+  exists but is held out while it is associated with a pipeline stage, and that resuming it makes
+  the same call succeed — instead of reporting that no agent matches. The exclusion itself, its
+  shared resolver, and the `after_change` retry class are unchanged; only the message is. The
+  current wording denies the existence of an agent the same caller can share context with in the
+  same turn (FS-15.R17), so a person has to diagnose the divergence and resume the session by hand.
+  How long the exclusion should last after a run ends is a separate, unresolved product decision
+  recorded in the handoff; this requirement does not change it.
+
+- **R28 (planned)** — The per-turn messaging budget is a configured value that defaults
+  to 50, not the fixed 15 of R11. This supersedes only R11's number; every other obligation in R11
+  and R12 is unchanged — consumption is still transactional with the message mutation, the action
+  that would exceed the budget still does not occur, responses still expose remaining and exhausted
+  state, and a breach still produces `message_budget_exceeded`, a warning, and a `budget_exceeded`
+  notification. A higher default gives one agent room to coordinate with several delegates inside a
+  single turn while keeping a bound on a tight in-turn message loop; it does not add a cross-turn
+  loop detector, which §6 still records as absent. An absent, non-numeric, zero, or negative
+  configured value falls back to the default rather than removing the bound. The budget is a
+  server-side value read when a turn's budget is reset, not part of an agent's frozen launch
+  snapshot, so a change takes effect on the next turn any agent starts and never rewrites a turn
+  already in flight.
 
 ### 2.4 Dashboard indicators and budget notification
 
@@ -278,6 +302,20 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   `internal/state/messages_test.go::TestPendingMailActivationsReadsABoundedOldestFirstBatch` and
   `internal/server/activation_test.go::TestMailActivationDefersWhenNoAdmissionSlotIsFree`.
 
+- **A19 (planned)** (R29) — A `create_task` and a `send_message` aimed at a stopped
+  pipeline-associated agent are each refused with a message naming the pipeline association and the
+  resume that resolves it, keep the `after_change` class, and are accepted once that agent is
+  resumed; an ordinary unknown recipient still reports that no agent matches. —
+  `internal/messaging/pipeline_agent_task_target_test.go` (the committed skipped reproduction,
+  unskipped by the implementation) and `internal/messaging/task_tools_test.go`.
+
+- **A18 (planned)** (R28) — With no configured value, an agent's turn admits 50 combined
+  sends and reads and refuses the 51st with the existing breach outcome, warning, and notification;
+  with a configured value the same boundary holds at that value; and an absent, non-numeric, zero,
+  and negative value each behave exactly as the default. A value changed between turns applies to
+  the next turn and does not alter a turn already counting. — `internal/messaging/messaging_test.go`
+  and `internal/state` budget tests.
+
 ## 6. Deviations & open decisions
 
 - **Planned transport supersession.** If and only if FS-17.R20 passes and the direct-action
@@ -293,6 +331,14 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   MCP client and fake ACP sessions, but real Claude Code and Codex acceptance of the generated
   per-session HTTP registration and a live `ping`/tool call remains a manual gate. Do not claim
   compatibility for a CLI until that gate passes; implement a stdio proxy if either rejects HTTP.
+- **Confirmed refusal-wording boundary.** R29 changes what a refusal says and nothing about who is
+  addressable: no change to R22's exclusion, its resolver, retry classification, wake behavior, or
+  the context plane's deliberately looser set.
+
+- **Confirmed budget boundary.** R28 raises and exposes the per-turn number and changes nothing
+  else about coordination: no new tool, no change to recipient resolution, wake, retention,
+  indicators, or notification behavior, and no per-agent or per-role budget.
+
 - **No cross-turn loop detector.** R11 caps a tight loop within a turn, and R24's coalescing keeps a
   burst of mail to one activation per recipient, but two agents can continue a slow
   one-message-per-turn ping-pong indefinitely — each reply is new mail and therefore a legitimate new

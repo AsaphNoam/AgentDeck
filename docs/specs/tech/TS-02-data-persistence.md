@@ -1,6 +1,6 @@
 # TS-02 — Data & persistence
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/config`, `internal/state`, `internal/transcript`, `internal/index`, `internal/archive`, `internal/configsource`, `internal/contextref`
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -320,6 +320,20 @@ canonicalize-plus-grant operations are atomic (INV §5/§15). No backfill is nee
   the explicit consented deletion flow removes a row. The project config files additionally accept
   optional `base_branch` and `setup_command` fields (FS-04.R45); absent fields read as empty and
   legacy files stay valid unchanged.
+
+**R28 (planned) — The turn budget is an additive version-1 config value, and nothing else
+in this change persists.** `config.json` gains optional integer `message_budget_per_turn`
+(FS-04.R46); an absent, zero, negative, or non-numeric value means the shipped default, so an older
+file decodes without rewrite and a hand edit that is syntactically valid but out of range remains
+readable rather than classifying the whole version-1 document as corrupt. `internal/config` owns
+that write-time validation set, and R3's owner-only atomic rewrite applies unchanged. No SQLite row,
+migration, cache file, project/session field, seed rewrite, or config-version bump is introduced.
+
+The rest of this change deliberately persists nothing: the approval exemption is derived from code
+and applied as a runtime parameter (TS-01.R27), a pending permission request stays process-lifetime
+state as it already is, and the awaiting-approval attention value is derived rather than stored
+(TS-09.R29). The `pipeline_attempts` and run tables are untouched, so no migration is written and
+no existing durable field changes meaning.
 
 ## 3. Interfaces & data shapes
 

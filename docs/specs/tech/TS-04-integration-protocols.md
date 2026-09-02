@@ -347,6 +347,49 @@ global resource list.
   pinned Claude and Codex adapters' handling of them is verified (FS-17.A6). Values that cannot
   marshal to a JSON object omit the field rather than fail the call (FS-17.R12).
 
+### Approval exemption for AgentDeck's own actions
+
+- **R41 (planned) — One composed AgentDeck-tool identity, derived not duplicated.** The set
+  of tool identities exempt from the approval gate (FS-03.R40) is composed once, at the same place
+  that registers the in-process MCP server, from that server's registered name and its registered
+  tool names — not from a second hand-maintained list that could drift as tools are added or renamed
+  (INV §2, INV §10). Each identity is the canonical `mcp__<server>__<tool>` form the ACP adapters
+  use. The set reaches the runtime as a launch parameter on the same overlay seam as the knowledge
+  parameters (TS-01.R27), so launch, resume, switch, wake, and pipeline stage start all receive the
+  current set through one helper and no agent carries a stale set from a frozen session snapshot.
+
+- **R42 (planned) — Identification is an exact match on composed identity, and fails
+  closed.** A pending `session/request_permission` is exempt only when the tool identity the adapter
+  supplies matches a composed identity exactly, on both server name and tool name. The runtime reads
+  that identity from the adapter-supplied tool name — `toolCall.title` for adapters that carry the
+  raw name there, and `_meta` fields that carry it explicitly where present — and from nowhere else:
+  not from `toolCall.kind`, not from `rawInput`, not from the reason text, and never from whether the
+  agent belongs to a pipeline or a task. A request whose identity is absent, unparseable, or matches
+  a tool of the same name on a **different** MCP server takes the ordinary gate. Evidence for the
+  supplied shape, recorded because the design depends on it: pinned `claude-agent-acp` 0.59.0 falls
+  to the default branch of `toolInfoFromToolUse` for any non-built-in tool and sets `title` to the
+  raw tool name (`dist/tools.js`), and pinned `codex-acp` builds the same `mcp__<server>__<tool>`
+  form. Each supported backend's actual shape is confirmed under the credentialed gate before that
+  backend is claimed (FS-09.A7, INV §12); an unconfirmed backend prompts rather than exempting.
+
+- **R43 (planned) — The exemption answers with a single-use allow and creates no
+  provider-side rule.** The exemption responds by selecting the adapter's single-use allow option,
+  not its always-allow option, so the decision is AgentDeck's on every call and no persistent
+  permission rule is written into a provider's configuration. The always-allow route was examined
+  and rejected on evidence: `codex-acp` offers both "Allow for This Session" and "Allow and Don't Ask
+  Again" under the identical ACP option kind `allow_always`, so a client choosing by kind cannot tell
+  a session-scoped rule from a persisted one, and AgentDeck will not write a durable provider
+  permission a person never chose. Single-winner resolution (R4) is unchanged: the exemption is one
+  more path that atomically claims a request, and it emits exactly one ACP response and one
+  normalized resolution like every other.
+
+- **R44 (planned) — The approval deadline is optional and off by default.** The runtime's
+  auto-deny timer is armed only when an explicit deadline is configured (FS-03.R43). With none, a
+  gated request has no timer and remains pending until a decision, cancellation, or agent stop
+  claims it under R4. Removing the timer removes a resolver, never a claimant: cancel, stop, and
+  crash teardown already resolve pending requests and are unchanged. A pending request is process-
+  lifetime state, as it is today; nothing about holding it longer makes it durable across a restart.
+
 ### Direct AgentDeck action transport
 
 - **R32 (planned) — One typed action registry replaces the internal MCP authority.**

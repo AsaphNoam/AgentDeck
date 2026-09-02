@@ -5,6 +5,38 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-09-02 — Feature design: a pipeline that runs without you
+
+The change is designed and queued to build. No code changed yet.
+
+AgentDeck's own actions stop asking your permission. There are fifteen of them — reporting a stage
+result, reading an assignment, messaging another agent, delegating work, sharing context — and none
+of them touches a file, runs a command, or reaches the network. Each already arrives over a private
+local connection with a key we issued to that one agent, and we check it before anything happens. The
+prompt was never what made those calls safe, so approving one told you nothing. Everything else still
+asks exactly as it does today: file edits, shell commands, anything a provider or you configured.
+
+A permission that does need you now waits for you. Today it cancels itself after three minutes and
+the work dies with it; your run recorded ten of those. It will wait instead, and the run will say
+it is waiting and notify you, so waiting longer never means finding out later.
+
+Three things from the investigation are folded in. A stage agent that gets a refusal it is meant to
+fix and resend is now told that, instead of being told its part is over — that is what caused both
+of your multi-hour stalls. A task aimed at a stopped pipeline agent will say the agent is being held
+back and that resuming it works, instead of claiming no such agent exists. And the pause will say
+what Continue and Retry each do, and your run's final report will be readable on the run's own page
+instead of only in the API.
+
+The per-turn message limit goes from 15 to 50 and becomes something you can change.
+
+**Needs attention:** Two decisions are still open and are deliberately not in this design: what
+counts as a stage agent that can no longer make progress, and how long a stopped agent stays
+unreachable after its stage. One check needs a real browser and a real provider before this can be
+called done. This commit also carries the earlier proposal-decline design, which was already in the
+working tree and shares the same files.
+
+**Next:** Implement it. The change file is `unattended-pipeline-runs.md`.
+
 ### 2026-09-02 — Bug investigation: the pipeline run that needed you the whole way
 
 I diagnosed the 23-hour run. Most of what went wrong is real, and the biggest part of it is ours,

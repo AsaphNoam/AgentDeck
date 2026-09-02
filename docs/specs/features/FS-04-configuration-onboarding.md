@@ -1,6 +1,6 @@
 # FS-04 — Configuration & Onboarding
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/config/`, `internal/server/config_handlers.go`, `internal/server/directory_picker.go`, `ui/src/features/settings/`, `ui/src/features/onboarding/` · **Journeys:** J2, J9
 **Absorbed:** [`phase-3-config-onboarding.md`](../../archive/phases/phase-3-config-onboarding.md)
 
@@ -144,6 +144,14 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   this keeps the New Agent modal and onboarding from pre-selecting a dangling default.
 - **R12.** `layout.json` (card order, density, group collapse) is owned by FS-02; this spec only
   notes it is one of the seeded config files (R14) governed by the same JSON-file model.
+- **R46 (planned)** — The user-editable global configuration adds an optional
+  `message_budget_per_turn` integer, joining R10's fields, owned by FS-06.R28. `GET /api/config`
+  returns it and `PUT /api/config` merges it under R11's existing rules; an absent, non-numeric,
+  zero, or negative value means the default. No Settings control is added for it in this change: it
+  is edited in `config.json` or through the configuration API, exactly as R10's global
+  `skip_permissions` already is. The value changes messaging behavior only and alters no launch
+  snapshot, project, agent, pipeline, role, or onboarding readiness.
+
 - **R38** — The user-editable global configuration adds an optional
   `appearance_skin` preference owned by FS-12. The Settings → Appearance control reads and writes it
   through the existing configuration surface. Supported values are the unskinned Core and installed
@@ -358,6 +366,11 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   and the Settings project form, a legacy project file without them reads as empty and saves
   untouched fields unchanged, and neither field alters a launch snapshot. — project-form component
   tests and config API tests.
+
+- **A26 (planned)** (R46) — `message_budget_per_turn` round-trips through `GET`/`PUT
+  /api/config`; a config file without it reads as the default and a partial merge leaves the other
+  global fields untouched; a non-numeric, zero, or negative submitted value is treated as the
+  default rather than persisting a budget that removes the bound. — config API tests.
 
 ## 6. Deviations & open decisions
 

@@ -107,6 +107,63 @@ chat providers.
 
 ## Changelog
 
+- **2026-09-02 — feature design (unattended pipeline runs; FS-03.R40–R44/A24–A27, FS-04.R46/A26,
+  FS-06.R28–R29/A18–A19, FS-14.R52–R56/A29–A32, TS-01.R27, TS-02.R28, TS-03.R34–R35, TS-04.R41–R44,
+  TS-05.R20, TS-08.R50–R52, TS-09.R29–R31; INV §1/§2/§5/§8/§9/§10/§11/§13/§14):** Designed the
+  change that stops a pipeline run from needing a person as its control plane, and queued it as
+  [`../ready-changes/unattended-pipeline-runs.md`](../ready-changes/unattended-pipeline-runs.md).
+  Started from the user's own idea (too many MCP action approvals) and absorbed four of the six
+  `806bcb7` bug-investigation findings; the source idea is removed from `docs/ideas.md`.
+
+  The core is FS-03.R40: AgentDeck's own fifteen MCP actions are exempt from the approval gate for
+  every agent, whatever `skip_permissions` was frozen at launch, because the prompt was never what
+  authorized them — each already crosses the loopback boundary with a per-agent generation token and
+  is authorized server-side against that agent's identity (TS-05.R20). `create_task` is included by
+  explicit user decision. Identification is an exact match on a `mcp__<server>__<tool>` identity
+  composed once from the registered MCP server itself (TS-04.R41, never a second hand-kept list) and
+  fails closed (R42). Two verifications the design rests on, both read out of the pinned adapters
+  rather than assumed: `claude-agent-acp` 0.59.0's `toolInfoFromToolUse` default branch sets
+  `title` to the raw tool name, and its ACP mode accepts no `--settings` file, so a provider-side
+  allowlist is unavailable and the gate must live in AgentDeck's runtime. The adapters'
+  always-allow option was examined and **rejected**: `codex-acp` offers "Allow for This Session" and
+  "Allow and Don't Ask Again" under one ACP kind, so a client choosing by kind cannot tell a session
+  rule from a persisted one (TS-04.R43); the exemption answers single-use.
+
+  FS-03.R43 removes the 180s auto-deny by default. That alone would trade a stage that fails in
+  three minutes for a run that waits in silence, which is the 2026-09-02 report's own failure mode,
+  so it ships with FS-14.R54: a run whose stage agent holds an unanswered approval carries an
+  attention reason and joins R29's needs-attention category. The user chose that over a
+  disclosure-only treatment. Architecturally it is a **derived** read on the fan-out that already
+  carries `turn_end` (TS-09.R29–R30) — no new column, no migration, no run revision or transition
+  affected, edge-triggered once so a reconnect cannot restage a toast, and nothing to resurrect on
+  restart because a pending request dies with the process. FS-03.R44 logs every permission outcome
+  that withheld a tool, which is the half of the auto-deny finding R43 does not close: the reported
+  run was only reconstructible because the person watched it happen.
+
+  Of the four folded-in findings, all four were judged to specify **new** behavior rather than
+  restore specified behavior, and each says so: FS-14.R53 (the assignment implements R47 faithfully,
+  so R47's "one call" clause is the defect and is marked superseded in place), FS-06.R29 (R22's
+  exclusion is specified, its message is not), FS-14.R55 (R46 requires the explain-yourself pattern
+  for the start dialog only), and FS-14.R56 (R23 is already satisfied by the named-value list). The
+  two committed skipped reproductions are named as the verification for A29 and A19, to be unskipped
+  rather than rewritten. FS-06.R28 makes the per-turn budget configurable at a default of 50, by
+  user decision.
+
+  Deliberately **not** designed and left open: no per-template, per-run, per-stage, or per-role
+  autonomy setting (the user considered and declined one); no general detector of a stage agent gone
+  quiet for reasons other than a held approval; no change to how long a stopped agent stays
+  unaddressable. The last two remain under *Decisions needing your input*, and R54 is scoped in
+  terms to the wait AgentDeck is itself holding so it does not pre-empt either. The four unrecorded
+  product wishes the investigation left for the user are still unplaced in `docs/ideas.md`.
+
+  Judged as one change rather than split: eight of nine items are small and independent, and only
+  R54's fan-out seam is architecturally real, so splitting would defer the same seam against a moved
+  tree and buy a second review and a second browser pass. FS-03.A26 is a real-browser gate; the
+  per-backend tool-name shape rides the existing credentialed gate (FS-09.A7), and an unconfirmed
+  backend prompts rather than exempting. No product code changed. This commit also carries the
+  earlier uncommitted proposal-decline design (FS-14.R49–R51/A27–A28 and its `docs/ideas.md` entry),
+  which was already in the working tree and interleaves with these edits in the same files.
+
 - **2026-09-02 — fix (worktree implementation findings; FS-19.R2–R11/A2/A4–A6,
   FS-04.R28/A6, TS-03.R33, TS-12.R1–R10; INV §2/§4/§5/§7/§8/§10/§12/§14/§15):** Closed only the
   ten findings from the worktree implementation review. Force deletion can no longer remove a

@@ -1,6 +1,6 @@
 # TS-09 — Pipeline control plane
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/pipeline`, `internal/config`, `internal/state`, `internal/server`, `internal/messaging`, `internal/cli`, `ui/src/features/pipelines`
 **Absorbed:** —
 
@@ -268,6 +268,40 @@ user-facing dismissal action: unapproved proposals are bounded by the same centr
   missing projection can never corrupt run state — at worst a card carries the explicit unavailable
   fallback until a later read or state event can enrich it.
 
+- **R29 (planned)** — **The awaiting-approval attention state is a derived read on the
+  existing fan-out, not a new durable field.** A run whose current stage agent holds an unanswered
+  approval (FS-14.R54) is recognized through the same direct server→manager fan-out that already
+  carries `turn_end` (R10): the persisted normalized permission-request and permission-resolution
+  events for an agent that owns a current attempt are fanned to the manager alongside it, so one
+  seam carries every runtime fact the control plane acts on rather than a second parallel channel
+  (INV §2). The resulting attention value is **derived**, in the same sense R28's delegated-agent
+  view is derived: the run's durable `attention_reason` continues to hold pause reasons only, no
+  migration or new column is added, and no run revision, pending action, transition, or agent
+  lifecycle is affected by a request being raised or resolved. Run monotonicity (R20) and the
+  advance rule are untouched, so a lost or stale permission signal can never corrupt run state — at
+  worst the run renders without the wait until the next read re-derives it. The derived value is
+  recomputed on detail read and on reconnect hydration, so a joining or reloading tab sees the
+  current state rather than a missed edge (INV §1).
+
+- **R30 (planned)** — **The needs-attention notification for that state is edge-triggered
+  and idempotent per request.** Entering the waiting state publishes one bounded `pipeline_update`
+  through R17's single publication path and builds one needs-attention notification through the
+  existing notification builder and mute pipeline; resolution publishes the clearing update and
+  builds none. A repeated or replayed signal for a request already known to be pending produces no
+  second notification, so a reconnect cannot restage a toast (INV §5). Because a pending request
+  does not survive a process end, restart hydration finds no waiting state to restore and re-derives
+  from live runtime ownership rather than resurrecting a stale one (INV §9).
+
+- **R31 (planned)** — **Report refusals draw their wording from one vocabulary beside the
+  retry classification.** The statement a refusal makes about what the attempt still owes
+  (FS-14.R53) is produced in the same module that owns the refusal code and its FS-17 retry class,
+  so a code cannot exist with a class but no statement, or gain a statement that contradicts its
+  class (INV §2, INV §8). The assignment renderer (R7) states the same boundary in the same terms
+  from that one source, so the instruction an agent re-reads every turn and the refusal it receives
+  cannot disagree — the disagreement between them is the defect this closes. Acceptance remains one
+  transaction (R9) and a refusal remains a non-mutation: it changes no attempt, no run revision, and
+  no pending action, exactly as today.
+
 ## 3. Interfaces & data shapes
 
 **Template JSON (logical version-1 shape):**
@@ -333,6 +367,8 @@ new durable run revision or a structured validation/conflict result.
 - **INV §7:** template/run/proposal list reads and startup reconciliation isolate malformed
   rows/files and surface iteration errors without deleting unrelated state; one unreadable timestamp
   or payload never empties an approval or supervision list.
+- **INV §1:** the derived awaiting-approval attention value is recomputed on detail read and
+  reconnect hydration rather than carried across a boundary as stale state.
 - **INV §8:** errors and attention reasons use bounded stable vocabulary; every mutation failure is
   visible in the Pipelines UI.
 - **INV §9:** restart recovery corroborates process ownership and all sweeps/shutdown paths are

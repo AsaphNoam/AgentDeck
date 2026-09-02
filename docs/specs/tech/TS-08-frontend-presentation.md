@@ -435,6 +435,38 @@ primitive seam; the rejected alternatives are recorded in §5.
   are on screen. Several eligible transitions arriving together are applied in observation order
   inside one state update, so React commits one layout change rather than one per agent.
 
+### 2.7 Run-page attention, pause actions, and declared outputs
+
+- **R50 (planned)** — **The run page renders the awaiting-approval state from the run's
+  own data, and derives no second copy of it.** FS-14.R54's waiting state arrives on the run detail
+  and `pipeline_update` shapes TS-03.R35 defines, and the run page reads it exactly as it already
+  reads the attention reason — through the existing pipeline store, which stays the single state
+  authority for the surface (TS-09.R23). The page does not inspect agent status, subscribe to the
+  permission stream, or keep its own map of which agents are waiting; a run that is waiting says so
+  because its own payload says so, so a reload and a reconnect render it identically to a live edge
+  (INV §1). The waiting state uses the same attention presentation the page already gives a paused
+  run rather than a second visual language for "needs you", and it is rendered from parsed,
+  in-vocabulary data with an explicit fallback rather than an unlabeled blank (INV §8).
+
+- **R51 (planned)** — **Pause action copy is rendered where the action is, not in a
+  branch that only sometimes shows.** FS-14.R55's explanations attach to the controls themselves —
+  the reason beside the disabled **Continue**, the consequence beside each of **Continue** and
+  **Retry stage** — so they render on every branch that offers the action, including the ordinary
+  `blocked` pause. The current wiring places the one explanatory line inside the recovered-pause
+  branch, where the choice does not exist; a person meeting the ordinary pause sees neither. The
+  disabled control names its missing input through the same mechanism the start dialog already uses
+  for this exact pattern (FS-14.R46) rather than a second one (INV §2), and the copy is an ordinary
+  rendered element rather than a `title` attribute, so a test can see it and a pointer is not
+  required to read it (INV §10, INV §13).
+
+- **R52 (planned)** — **A shipped payload field reaches a surface.** `report_outputs`
+  already ships on the run detail shape and is drawn nowhere; FS-14.R56 renders it inside the
+  timeline attempt that produced it, beside the summary, details, and checks that entry already
+  draws, using the same bounded-text presentation those fields use rather than a new one. The
+  named-values disclosure on a finished run is open by default, matching the frozen-setup disclosure
+  beside it. No API, schema, or store change is needed — the data is present and parsed today, which
+  is why this is INV §10's own case rather than a feature addition.
+
 ## 3. Interfaces & data shapes
 
 ### 3.1 Cascade and file contract

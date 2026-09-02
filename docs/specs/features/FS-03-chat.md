@@ -1,6 +1,6 @@
 # FS-03 — Live chat & permission flow
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/runtime/` (`chat.go`, `permission.go`, `event.go`), `internal/server/sessions.go`, `internal/transcript/`, `ui/src/components/chat/`, `ui/src/store/transcriptStore.ts`, `ui/src/api/sse.ts` · **Journeys:** J3, J4, J7
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -123,6 +123,58 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 - **R18.** When the frozen launch policy enables skip-permissions, a permission request is recorded
   as auto-approved, the agent never enters `waiting_input`, and the tool proceeds without a user
   click. Resume and switch retain that frozen policy under FS-01.
+
+- **R40 (planned)** — AgentDeck's own actions never require a human approval. When a
+  tool call names one of the actions AgentDeck itself exposes to its agents — `list_agents`,
+  `send_message`, `check_messages`, `report_pipeline_stage_result`, `propose_pipeline_template`,
+  `propose_pipeline_run`, `get_assigned_task`, `create_task`, `cancel_task`, `report_task_result`,
+  `share_context`, `list_context_links`, `read_context_link`, `set_context_link_visibility`, or
+  `revoke_context_grant` — the call proceeds immediately. The agent does not enter `waiting_input`
+  for it, no approval is asked for, and no approval deadline can apply to it. This holds for every
+  chat agent, whatever role or global `skip_permissions` policy was frozen at its launch, and it is
+  the only category of tool that gains the treatment. Every other tool keeps R14's gate exactly as
+  it is today — file reads and edits, shell commands, network fetches, and every provider- or
+  user-configured MCP server — so the permission policy a person chose for their workspace is
+  unchanged. The reason these actions are different is that they are AgentDeck's own control plane
+  and carry no decision a person could make differently: each is reachable only across the loopback
+  boundary with a per-agent credential AgentDeck minted for that agent's current generation, each is
+  already authorized server-side against that agent's own identity, and none of them reads or writes
+  a file, runs a command, or reaches the network. `create_task` is included even though it can cause
+  a new agent to be launched: that agent appears on the dashboard, stays inside the existing
+  delegation bound, and every tool it runs is gated normally.
+
+- **R41 (planned)** — An auto-allowed action is recorded, never hidden. It appears on the
+  live stream and in the durable transcript with the same auto-approved shape a skip-permissions
+  launch already produces (R18), so a reader can always tell which tool calls ran without a human
+  decision and a run's history stays complete across reload, archive, and resume. Nothing reaches
+  the agent differently: the same tool names, arguments, results, and refusal/retry classification
+  apply (FS-17), and no agent-facing surface is added, removed, or renamed.
+
+- **R42 (planned)** — Identification fails closed. A tool call AgentDeck cannot
+  positively identify as one of its own actions is gated under R14, exactly as today. An
+  unrecognized name, a backend whose approval request does not name the tool, an identically named
+  tool belonging to a different MCP server, and a malformed request all prompt rather than proceed.
+  AgentDeck never infers the exemption from the fact that an agent belongs to a pipeline or a task,
+  from the tool's declared category, or from the absence of arguments.
+
+- **R44 (planned)** — A permission outcome that did not execute its tool is written to
+  the server log with the agent id, the tool name, and the decision. Denial, timeout where a
+  deadline is configured, and cancellation each produce one entry. Today the only trace that a tool
+  never ran is a generic error event inside that one agent's transcript, so a run stalled by a
+  withheld tool cannot be diagnosed from the server log at all — the log records every HTTP request
+  and every pipeline refusal, but not the decision that stopped the work.
+
+- **R43 (planned)** — A permission request that does need a human decision is held until
+  one is made. By default it no longer auto-denies on a deadline: the agent stays `waiting_input`
+  with the request pending and the tool unexecuted, and leaves that state only when a person
+  approves or denies it, cancellation claims the turn, or the agent is stopped. Waiting executes
+  nothing, so a person who steps away returns to a decision to make rather than to work that failed
+  while they were gone. This supersedes R17's always-on deadline. An explicit approval deadline
+  remains available for a deployment that wants the previous behavior, and when one is configured
+  R17's timed-out resolution, `permission timed out` error, **Timed out** rendering, and turn
+  completion are unchanged. A pending request survives a browser reload — reopening the chat shows
+  it still pending with Approve and Deny live — and ends on server restart or agent stop exactly as
+  it does today; holding it longer does not make it durable across a process end.
 
 ### 2.5 Switching runtime from the chat header
 
@@ -408,12 +460,48 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `sse.test.ts` multi-open and delayed-response cases, a `transcriptStore.test.ts` case applying an
   out-of-order transcript, and a pane render test beside `ChatPanel.test.tsx`.
 
+- **A24 (planned)** (R40–R42) — Each of the fifteen AgentDeck actions raised as an
+  approval request executes with no `waiting_input` transition and no pending request, under a
+  launch policy with `skip_permissions` false. A same-named tool advertised by a different MCP
+  server, an unnamed approval request, and an ordinary file-edit, shell, and fetch request each
+  still enter `waiting_input` and wait for a decision. The auto-allowed call is present in the live
+  stream and the durable transcript with the auto-approved shape and an `auto_approve` resolution,
+  and it is present again after the transcript is re-read. — `internal/runtime/permission_test.go`
+  and `internal/server/integration_test.go`.
+
+- **A25 (planned)** (R43) — With no approval deadline configured, an undecided
+  permission request is still pending, still `waiting_input`, and its tool still unexecuted well
+  past the previous 180-second deadline; a decision made after that point resolves it normally and
+  the turn continues. Cancelling the turn and stopping the agent each resolve it without executing
+  the tool. With a deadline explicitly configured, the previous timed-out resolution, error, and
+  rendering are unchanged. — `internal/runtime/permission_test.go` and
+  `internal/server/integration_test.go`.
+
+- **A27 (planned)** (R44) — A denied permission, a cancelled one, and a timed-out one
+  under a configured deadline each write one server-log entry carrying the agent id, tool name, and
+  decision; an approved one does not claim the tool was withheld. —
+  `internal/runtime/permission_test.go`.
+
+- **A26 (planned)** (R40, R43) — In a browser, a pipeline run whose stage agent reports
+  its result advances with no approval prompt shown to the person, while a file edit the same stage
+  agent attempts still raises a prompt that waits for them; leaving that prompt undecided for longer
+  than three minutes and then approving it lets the stage continue rather than failing it.
+  *Verify:* journey **J14** in `docs/features/USABILITY-REVIEW.md`.
+
 ## 6. Deviations & open decisions
 
 - **Transcript-load failure is silent in the panel.** The initial `getTranscript` rejection is
   swallowed, leaving an empty transcript until a later SSE event/refetch. Prompt, cancel, and
   permission mutation failures are surfaced as required above; initial history-load diagnostics are
   an open UX gap.
+
+- **Confirmed AgentDeck-action approval boundary.** R40–R44 exempt AgentDeck's own fifteen actions
+  from the approval gate and stop the default auto-deny. They add no per-tool, per-role, per-stage,
+  or per-template autonomy setting, do not change what `skip_permissions` means for any other tool,
+  do not pre-authorize anything at the provider CLI, and add no agent-facing tool, argument, result,
+  or knowledge change. An approval request AgentDeck cannot identify keeps prompting. R43's
+  indefinite hold is safe only because FS-14.R54 makes a run waiting on an undecided request say so;
+  the two ship together.
 
 ## 7. Traceability
 

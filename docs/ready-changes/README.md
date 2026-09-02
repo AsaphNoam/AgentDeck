@@ -42,6 +42,10 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
+- [`unattended-pipeline-runs.md`](unattended-pipeline-runs.md) — stop asking a person to approve
+  AgentDeck's own actions, hold a real approval instead of auto-denying it, say on the run when one
+  is waiting, tell a refused stage agent to report again, and render a run's declared output.
+
 - [`open-waiting-approval-panes.md`](open-waiting-approval-panes.md) — expand a chat agent's
   dashboard pane by itself when it newly enters `waiting_input`, on a newly observed transition
   only, reusing the existing four-pane cap and eviction.

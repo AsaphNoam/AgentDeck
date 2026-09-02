@@ -38,6 +38,17 @@ Example:
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
 
+- **Collapse, reject, and delete pending pipeline proposals.** Direct request on 2026-08-31 after
+  using the Pipelines Templates page. A pending AgentDecker proposal renders its whole canonical
+  payload as an always-expanded raw JSON block (`AgentDeckerBuilder.tsx`), so one 32-stage template
+  draft pushes the template library off the screen, and the only control is **Review exact Save
+  proposal**. FS-14.R33 and TS-09.R26 deliberately ship no dismissal action: an offer the person
+  never approves is expected to age out under the 100-record retention bound
+  (`MaxProposalRecords`). Wants a collapsed-by-default payload plus an explicit way to decline an
+  offer instead of leaving it pending forever. The load-bearing constraint is that a proposal id is
+  content-derived and a re-proposal **re-arms** the same record, so declining has to say what
+  happens when the builder proposes identical content again.
+
 - **Edit a sent chat message.** From the 2026-08-10 play session: like Codex, editing the most
   recent message edits it in place, and editing an older one forks the conversation from that point.
   Designing this on 2026-08-27 established that AgentDeck cannot give it the meaning Codex does, and

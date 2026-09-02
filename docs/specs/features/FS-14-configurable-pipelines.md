@@ -1,6 +1,6 @@
 # FS-14 — Configurable pipeline runs
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/pipeline`, `internal/config`, `internal/state`, `internal/server`, `internal/messaging`, `internal/cli`, `ui/src/features/pipelines` · **Journeys:** J14
 **Absorbed:** —
 
@@ -119,6 +119,19 @@ feature are recorded in §6.
   selected backend's ordinary credential/capability checks. A pipeline never silently enables
   permission skipping, changes credentials, substitutes a model, or treats a permission prompt as a
   failed/completed stage.
+- **R52 (planned)** — R15's guarantee is scoped, not withdrawn. A pipeline still never
+  enables permission skipping for the work a stage agent does in a person's workspace: file reads and
+  edits, shell commands, network fetches, and every provider- or user-configured MCP server keep the
+  selected role's ordinary permission policy, and a pipeline still never changes credentials,
+  substitutes a model, or treats a permission prompt as a failed or completed stage. What R15 no
+  longer implies is that a stage agent must ask a person for permission to use AgentDeck's own
+  actions — reporting its stage result, reading its assignment, messaging, delegating, or sharing
+  context. Those are exempt for every agent under FS-03.R40–R42, pipeline or not, so a stage that
+  reports its result advances without a human click and can no longer be failed by an unanswered
+  approval. This adds no pipeline-specific permission setting: a template, a run, and a stage carry
+  no autonomy field, and nothing about a run changes which tools a person is asked about. *Verified
+  through* FS-03.A24 and FS-03.A26.
+
 - **R16.** Agents from a run remain normal AgentDeck agents: they have stable agent ids,
   cards, transcripts, archive entries, notifications, and messaging. The run adds an immutable run
   and stage association but does not replace those existing surfaces or use display names/group
@@ -230,8 +243,10 @@ feature are recorded in §6.
   the exact Save or Start it asked for has succeeded, including after a reload, so the same approval
   cannot be performed twice or replay an older run. A failed or refused approval leaves the proposal
   pending. There is no Dismiss control: a proposal the person never approves simply ages out, because
-  AgentDeck retains only the newest proposals and prunes older ones. Approving an edited payload
-  creates no consumption, since the edit already invalidated that approval (R27).
+  AgentDeck retains only the newest proposals and prunes older ones — that clause alone is
+  superseded by R49 (planned), which adds an explicit decline; every other obligation in R33 is
+  unchanged. Approving an edited payload creates no consumption, since the edit already invalidated
+  that approval (R27).
 
 ### 4.3 Split pipelines surface
 
@@ -324,9 +339,12 @@ feature are recorded in §6.
   rejection of R36 does.
 
 - **R47** — A stage agent is told where its participation ends. The assignment
-  states that the one `report_pipeline_stage_result` call ends the agent's part in that assignment,
-  that a `blocked` result pauses the run for a person, that anything said in the agent's chat during
-  that pause is out of band and cannot be recorded against the run, and that the person's answer
+  states that the one `report_pipeline_stage_result` call ends the agent's part in that assignment —
+  that clause alone is superseded by R53 (planned), which restates the boundary in terms of the
+  result AgentDeck accepted rather than the call the agent made, leaving every other obligation in
+  R47 unchanged — that a `blocked` result pauses the run for a person, that anything said in the
+  agent's chat during that pause is out of band and cannot be recorded against the run, and that the
+  person's answer
   arrives as a new assignment in the same shape. The accepted result repeats the boundary at the
   moment it starts to apply, with the pause wording for a `blocked` outcome, and a refusal of a
   further report from the same attempt says that its participation has ended and that work done
@@ -345,6 +363,87 @@ feature are recorded in §6.
   agent can no longer report against the run and that Retry runs the stage again, naming whether the
   agent was stopped by the restart or left unstarted by the failure. Every other pause, including a
   `blocked` pause whose stage agent stays live, keeps **Open agent** unchanged.
+
+### 4.4 Reviewing and declining pending proposals
+
+- **R49 (planned)** — Every pending proposal on the sub-destination that can act on it
+  (R42) carries an explicit **Reject** action beside its review action. Rejecting removes the offer
+  from the pending list and moves it, unchanged, into a **Declined** list on that same
+  sub-destination, which appears only when it holds an entry and states when each offer was
+  declined. A declined entry carries **Delete**, which removes that record permanently; a pending
+  entry offers no Delete, because rejecting first is what makes the removal deliberate. Neither
+  action opens a confirmation, because a proposal is only an offer: declining or deleting one
+  writes no template, starts no run, changes no existing run, and stops no agent. Both actions are
+  silent to the agent — they send no message, change no already-returned tool result, and add no
+  agent-facing surface; the person redirects the builder in its chat as they do today. Rejecting a
+  proposal that a concurrent approval already consumed does not produce a declined entry: the
+  refusal is explained and the entry disappears as consumed, and deleting a record another tab
+  already deleted reports it as gone rather than failing silently. A refused Reject or Delete leaves
+  the entry visible and its action retryable, as R37 already requires of run actions. The pending
+  count each sub-destination shows for the other (R42) counts pending offers only; a declined entry
+  never contributes to it.
+
+- **R50 (planned)** — A later re-proposal outranks an earlier decline. Because a
+  proposal id is derived from its content, an agent proposing content byte-identical to a declined
+  or deleted record returns exactly one pending offer to the approval surface, timed by that newest
+  proposal, in the same way R33's re-arm already returns one after an approved Save. Declining
+  refuses one offer; it is not a standing block on that content, and AgentDeck therefore holds no
+  per-content refusal list. Suppressing the re-proposal instead would let an agent receive tool
+  success with nothing on any human surface, which is the discoverability defect the durable
+  proposal record exists to remove.
+
+- **R51 (planned)** — Every pending and declined proposal is collapsed by default.
+  Collapsed, it states whether it asks to save a template or start a run, the template's title and
+  stage count for a save proposal or the template title, run display name, and run goal for a start
+  proposal, and how long it has been pending. Those values are bounded so that no single draft can
+  push the template library or run ledger off the surface. Expanding one proposal reveals its exact
+  canonical payload unchanged, which remains the payload a person reviews before approving; the
+  summary is a way to find the right offer, never a substitute for the exact payload an approval
+  acts on. Expansion is per proposal and browser-local, and it resets on reload rather than
+  persisting. A proposal whose payload cannot be summarized still lists honestly with its kind and
+  proposal id instead of disappearing or failing the surface.
+
+### 4.5 Running a stage without a person in the loop
+
+- **R53 (planned)** — The boundary is the result AgentDeck accepted, not the call the
+  agent made. The assignment states that the agent's part in an assignment ends when AgentDeck
+  **accepts** a result; that a refused call records nothing, leaves the attempt still owing a
+  result, and leaves that agent as the only one who can supply it; and that a refusal AgentDeck
+  classes as retryable is an instruction to correct the call and send it again rather than a signal
+  to stop. Every refusal of `report_pipeline_stage_result` states which of the two it is: either the
+  attempt still owes a result and this agent must send one, naming what to change, or its
+  participation has already ended and work done since cannot be recorded — R47's existing terminal
+  case, whose wording is unchanged. R47's `blocked` pause wording is likewise unchanged. This
+  matters because a refusal FS-17.R1–R3 already class as retryable, `validation_failed` most
+  reachably, otherwise meets an instruction that tells the agent its part is over: the agent stops,
+  the attempt still owes a result, and only a person noticing can restart it.
+
+- **R54 (planned)** — A run waiting on an undecided permission request says so. When the
+  current attempt's stage agent is holding an unanswered approval (FS-03.R43), the run carries an
+  attention reason naming that wait, and it joins R29's needs-attention notification category
+  alongside blocked, approval gate, launch failure, and crash. The reason clears when the request is
+  approved, denied, or otherwise resolved, and the run returns to its ordinary presentation. This
+  covers only the state AgentDeck can prove, because it is holding the request itself; it is not a
+  general detector of a stage agent that has gone quiet for some other reason, which remains an
+  unresolved product decision recorded in the handoff. Without this, removing the approval deadline
+  would trade a stage that fails in three minutes for a run that waits in silence indefinitely.
+
+- **R55 (planned)** — A pause states what each action does before a person picks one.
+  While **Continue** is disabled it names the continuation input it is waiting for, beside that
+  control, exactly as R46 already requires of the start dialog. Wherever **Continue** and **Retry
+  stage** are both offered, each states its consequence: Continue delivers the person's answer to
+  the same stage agent as a new assignment, and Retry starts a fresh agent that carries only the
+  bounded prior-attempt summaries R12 and R20 define. That statement appears at every pause offering
+  the choice, not only at the recovered pause R48 added, because the ordinary `blocked` pause is the
+  one a person meets most.
+
+- **R56 (planned)** — A stage's declared outputs reach a surface. Each execution-timeline
+  attempt (R38) renders the outputs that attempt declared, beside its summary, details, and checks,
+  so an output is read where the work that produced it is read. A finished run presents its named
+  values expanded rather than collapsed. Output text is bounded on the surface exactly as the other
+  reported fields are, and a long output remains inspectable rather than being silently truncated
+  away. This adds no new field to the run payload: `report_outputs` already ships and is currently
+  drawn nowhere, so a person whose run declares a final report has no place to read it.
 
 ## 5. Acceptance criteria
 
@@ -475,6 +574,50 @@ feature are recorded in §6.
   stage agent can no longer report against the run; a run paused as `blocked` still links to its
   live stage agent. *Verify:* `ui/src/features/pipelines/RunBrowser.test.tsx`.
 
+- **A27 (planned)** (R49/R50) — Rejecting a pending proposal removes it from the pending
+  list, lists it as declined with its decline time, and survives a reload; the pending count the
+  other sub-destination shows drops by one. Deleting that declined entry removes the record, and it
+  is still absent after a reload. Re-proposing byte-identical content after a reject, and again
+  after a delete, each leaves exactly one pending offer rather than zero or two. Rejecting a
+  proposal that a concurrent approval already consumed produces no declined entry, explains the
+  refusal, and leaves the entry gone as consumed; a Reject or Delete the server refuses leaves the
+  entry visible with its action retryable. — `internal/state/pipeline_proposals_test.go`,
+  `internal/server/pipeline_handlers_test.go`, and
+  `ui/src/features/pipelines/AgentDeckerBuilder.test.tsx`.
+
+- **A28 (planned)** (R51) — A pending 32-stage `save_template` proposal renders collapsed:
+  its kind, template title, stage count, and pending age are present and its exact payload is not
+  rendered until it is expanded, so the template library remains the surface's first content.
+  Expanding renders the canonical payload unchanged, collapsing hides it again, and a reload returns
+  every proposal to collapsed. A proposal whose payload cannot be summarized still lists with its
+  kind and proposal id. — `ui/src/features/pipelines/AgentDeckerBuilder.test.tsx`; J14.
+
+- **A29 (planned)** (R53) — A rendered assignment states that the boundary is the
+  accepted result, that a refused call records nothing and leaves the attempt still owing one, and
+  that a retryable refusal means correct and call again. A `validation_failed` refusal of
+  `report_pipeline_stage_result` says the attempt still owes a result and names what to change,
+  leaves the run at `await_result` with the attempt untouched, and a corrected second call from the
+  same agent is accepted. A report from an attempt whose participation has ended is still refused
+  with R47's terminal wording. — `internal/pipeline/refused_report_retry_test.go` (the committed
+  skipped reproduction, unskipped by the implementation) and
+  `internal/messaging/pipeline_tools_test.go`.
+
+- **A30 (planned)** (R54) — A run whose stage agent holds an unanswered approval carries
+  an attention reason naming that wait and emits the needs-attention notification; resolving the
+  request clears the reason and the notification is not repeated; a run whose stage agent is busy
+  with no pending request carries neither. — `internal/pipeline` manager tests,
+  `internal/server/pipeline_handlers_test.go`, and
+  `ui/src/features/pipelines/RunBrowser.test.tsx`.
+
+- **A31 (planned)** (R55) — At an ordinary `blocked` pause, the disabled **Continue**
+  control names the continuation input it is waiting for, and both **Continue** and **Retry stage**
+  state their consequence including that Retry uses a fresh agent; the recovered pause R48 defines
+  still withholds Continue. — `ui/src/features/pipelines/RunBrowser.test.tsx`.
+
+- **A32 (planned)** (R56) — A completed run's timeline renders each attempt's declared
+  outputs within that attempt's entry, and the run's named values are expanded without a click. An
+  attempt that declared no output renders unchanged. — `ui/src/features/pipelines/RunBrowser.test.tsx`.
+
 ## 6. Deviations & open decisions
 
 The shipped first version deliberately keeps these product boundaries:
@@ -516,6 +659,25 @@ The shipped first version deliberately keeps these product boundaries:
   after a user request; there is no start-run MCP tool or child pipeline in v1.
 - Only needs-attention and completed pipeline notifications join the existing notification/mute
   surface.
+- **Confirmed unattended-run boundary.** R53–R56 remove the four ways a run made a person do the
+  control plane's work: an agent told to stop after a retryable refusal, a run that waits in
+  silence, a pause that does not say what its two actions do, and a declared output that reaches no
+  screen. They add no work-unit, checkpoint, or resumable-task concept, no partial-success carry
+  across a Retry, no workspace isolation for a stage or its delegates, and no change to how a run's
+  outcome is decided — those remain as §6 already records them. R54 covers only a wait AgentDeck is
+  itself holding; detecting a stage agent that has gone quiet for any other reason stays an open
+  product decision, as does how long a stopped agent remains unaddressable after its stage
+  (FS-06.R29).
+
+- **Confirmed stage-permission boundary.** R52 states the FS-03.R40 carve-out in pipeline terms and
+  adds nothing else: no per-template, per-run, or per-stage autonomy setting, no change to what a
+  stage agent's role policy means for workspace tools, and no agent-facing tool or payload change.
+
+- **Confirmed proposal-decline boundary.** R49–R51 add a two-step decline (Reject, then Delete on
+  the declined entry), a collapsed-by-default proposal summary, and nothing else. A decline is a
+  human surface action only: it never reaches the proposing agent, never blocks content from being
+  proposed again, and adds no per-content refusal list, no decline reason, no confirmation dialog,
+  no separate retention bound for declined records, and no agent-facing tool or payload change.
 
 ## 7. Traceability
 
