@@ -5,6 +5,63 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-09-02 — Review: worktree-project implementation
+
+The worktree-project implementation is not ready to move on from. The consolidated review found
+ten issues: eight **Must fix** and two **Worth fixing**.
+
+1. **Must fix — [config_handlers.go](/Users/mcnoam/Projects/AgentDeck/internal/server/config_handlers.go:487):** A forced project delete with `delete_checkout=true` bypasses the running-agent
+   guard and removes the live agents' cwd. This contradicts both “running agents are unaffected”
+   and the worktree rule that every process is stopped before deletion.
+2. **Must fix — [worktree.go](/Users/mcnoam/Projects/AgentDeck/internal/server/worktree.go:323):** A fork made from another worktree stores that disposable parent checkout as its
+   repository path. Once the parent checkout is consent-deleted, the child can no longer be
+   recreated or deleted. I reproduced the Git behavior directly: `--show-toplevel` disappears with
+   the parent while the common Git directory remains usable.
+3. **Must fix — [worktree.go](/Users/mcnoam/Projects/AgentDeck/internal/server/worktree.go:231):** Setup uses `CombinedOutput`, buffering all output in memory before the state layer
+   trims it to 64 KiB. A verbose setup can exhaust the server during the ten-minute window; the
+   required bounded tail is not implemented at capture time.
+4. **Must fix — [ProjectsEditor.tsx](/Users/mcnoam/Projects/AgentDeck/ui/src/features/settings/ProjectsEditor.tsx:182):** Settings exposes neither required checkout-deletion offer. Its archive path always
+   sends false, and its delete client cannot send `delete_checkout` at all.
+5. **Must fix — [ProjectDashboard.tsx](/Users/mcnoam/Projects/AgentDeck/ui/src/features/dashboard/ProjectDashboard.tsx:190):** The dashboard allows consented deletion while dirty status still says “Checking,”
+   renders a failed query as “Checking” forever, and the server does not recheck after stopping
+   agents. A checkout can therefore be deleted before its uncommitted state is disclosed or after
+   that disclosed state becomes stale.
+6. **Must fix — [worktree.go](/Users/mcnoam/Projects/AgentDeck/internal/server/worktree.go:141):** Present-checkout launch follows symlinks before consulting ownership, while deletion
+   checks only the leaf and not a replaced `worktrees/` root. This can launch through, or delete
+   through, a symlink outside the physically owned root.
+7. **Must fix — [resume.go](/Users/mcnoam/Projects/AgentDeck/internal/server/resume.go:415), [switch.go](/Users/mcnoam/Projects/AgentDeck/internal/server/switch.go:388):** Resume and switch recreate with `context.Background()` and discard the recreation
+   warning. Cancellation can leave lifecycle claims occupied for up to ten minutes—after switch has
+   already stopped the old runtime—and a failed setup is invisible even when the start succeeds.
+8. **Must fix — [worktree.go](/Users/mcnoam/Projects/AgentDeck/internal/server/worktree.go:355):** Pre-setup rollback is incomplete. A duplicate branch leaks the newly created
+   project-resources leaf; cancellation during `git worktree add` can leave branch/checkout residue;
+   later rollback reuses the canceled context and only logs compensation failures.
+9. **Worth fixing — [worktree.go](/Users/mcnoam/Projects/AgentDeck/internal/server/worktree.go:52):** Ownership/config/state-store failures are flattened into “unowned,” “no setup,”
+   or apparent success. Destructive operations can silently skip requested cleanup or orphan state,
+   and setup can appear complete without its required durable result.
+10. **Worth fixing — [git.go](/Users/mcnoam/Projects/AgentDeck/internal/worktree/git.go:88):** Git query wrappers flatten unreadable, corrupt, missing, and permission-denied
+    repositories into ordinary non-repo, missing-branch, or detached-HEAD answers, losing the
+    actionable errors the technical contract requires.
+
+The earlier design review mattered. It correctly drove ownership-row-last ordering, read-only
+pipeline validation, main-worktree base fallback, a per-project recreation claim, and a rune-safe
+2,000-character warning clamp. The implementation closes those points. The clamp does not solve
+the unbounded capture behind it, and the fork-of-a-fork test verifies only base selection, not what
+happens to the child after its parent checkout is removed.
+
+The independent Terra/high pass caught the forced-delete race, missing Settings wiring, root
+symlink gap, resource-directory leak, and dropped resume/switch warnings. I revalidated those and
+combined them with the backend lifecycle and error-boundary findings above. `make check-specs`,
+`make build`, both Go test variants, the targeted race suite, all 360 UI tests with style and
+presentation checks, `make dist`, and `git diff --check` pass. The unrelated dirty FS-14 proposal
+files and two untracked pipeline/messaging tests that appeared during the final audit were untouched;
+review state alone was committed.
+
+**Needs attention:** Fix the eight Must-fix worktree findings before release, then address the two
+error-preservation findings while the lifecycle boundary is already being changed.
+
+**Next:** Run `/fix` against the worktree implementation findings, starting with live-checkout
+deletion, the stable repository anchor, bounded setup capture, and deletion safety.
+
 ### 2026-09-02 — Review: declining pending pipeline proposals
 
 The worktree-only design is not ready to implement. Its critical gap is concurrent action: today's
