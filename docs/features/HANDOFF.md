@@ -24,9 +24,9 @@ back to that at every release (§16.7). Injected Current position plus Active ch
   (TS-06.R21). A customized
   `agentdecker` role is deliberately not migrated (FS-04.R44), so it keeps the superseded product
   manual beside the current skill; nothing user-facing says so.
-- **Last reviewed code:** `3c1dc96` (2026-09-03), across the continuous range `e46e66b..3c1dc96`.
-  **Next review unit:** handoff-only commit `a6a8c0f`; the later commits through `4eebf31` remain
-  unreviewed too.
+- **Last reviewed code:** `a6a8c0f` (2026-09-03), across the continuous range `e46e66b..a6a8c0f`.
+  **Next review unit:** release commit `5485cd7`; the remaining unreviewed range is
+  `5485cd7..50c242e`.
 - **Open findings:** None. The generation race in crash registration teardown and the contradiction
   in FS-02.A43's acceptance evidence from the review of `3c1dc96` are fixed. The four
   workflow-efficiency findings from the review of `7c9ee44` and the earlier product-code review's
@@ -46,7 +46,7 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 
 **Change:** None.
 
-**Next:** Independently review the next unreviewed unit beginning at `a6a8c0f`. The proposal
+**Next:** Independently review the next unreviewed unit beginning at `5485cd7`. The proposal
 Reject/Delete design is fully specified and
 waiting to start as [`decline-pipeline-proposals.md`](../ready-changes/decline-pipeline-proposals.md);
 its ordering question is answered and must not be reopened during implementation. Keep the
@@ -56,6 +56,23 @@ provider sessions.
 ## Changelog
 
 Earlier entries are in the [archived handoff](../archive/state/HANDOFF-through-2026-09-03.md).
+
+- **2026-09-03 — review: handoff-only commit `a6a8c0f` (INV §1–§15):** Reviewed the review-marker
+  correction in both directions. No finding: the commit's claims all hold. `7c9ee44` is the
+  workflow-efficiency commit and `3c1dc96` the product fix, the stated order matches commit order so
+  the reviewed range stays continuous, the marker was correctly left at `636781b` because a fix run
+  does not advance it, and the statement it replaced was genuinely stale — it called `7c9ee44`'s work
+  uncommitted one minute after that commit landed. Skipping the intervening `67651f6` is correct;
+  that commit is state-only (`BRIEFS.md`, `HANDOFF.md`), not code. Later history followed the plan:
+  `67df26d` reviewed `7c9ee44` and `82c94b5` reviewed `3c1dc96`. INV §10 was the only class with an
+  applicable surface, and it shows one residual drift the commit left and later commits already
+  resolved: at `a6a8c0f` the injected header simultaneously named `636781b` as last reviewed and, in
+  **Active change**, called that same commit's code unreviewed and the next thing to review; HEAD
+  carries neither statement, so it is recorded here rather than as an open finding. INV §1–§9 and
+  §11–§15 had no applicable surface in a docs-only diff. No local-choice notes were outstanding. As
+  a state correction, the previous "later commits through `4eebf31`" wording omitted `82c94b5` and
+  `50c242e`; the remaining unreviewed range is now named as `5485cd7..50c242e`. `make check-specs`
+  and `git diff --check` pass.
 
 - **2026-09-03 — fix: crash/resume registration race and dashboard acceptance evidence (TS-01.R16,
   TS-04.R7, FS-02.A43, TS-08.R49; INV §4/§5/§10):** Unsolicited exit teardown now waits for the
