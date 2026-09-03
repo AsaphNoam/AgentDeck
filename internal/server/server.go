@@ -292,6 +292,13 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	// addressable set, which adds the stopped chat agents a message can wake
 	// (FS-06.R22) to the running registry.
 	msg.SetAddressableAgents(s.addressableAgents)
+	msg.SetProjectAvailable(func(projectID string) (bool, error) {
+		project, err := cfgStore.ReadProject(projectID)
+		if err != nil {
+			return false, err
+		}
+		return !project.Archived, nil
+	})
 	// Context links are their own plane: one in-process service over the same
 	// state store and transcript home, supplied to the existing MCP server. It
 	// gets no runtime, bus, or lifecycle handle, so no context operation can

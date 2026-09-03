@@ -34,6 +34,7 @@ type Server struct {
 	budgetByAgent     map[string]turnBudgetLimit
 	tasks             TaskControl
 	addressable       func() ([]state.LiveAgent, error)
+	projectAvailable  func(project string) (bool, error)
 	pipelines         *pipeline.Manager
 	context           *contextref.Service
 
@@ -120,6 +121,14 @@ func (s *Server) messageInserted(fromAgentID, toAgentID string) {
 func (s *Server) SetAddressableAgents(fn func() ([]state.LiveAgent, error)) {
 	s.mu.Lock()
 	s.addressable = fn
+	s.mu.Unlock()
+}
+
+// SetProjectAvailable supplies the configuration-owned project archive gate
+// used when explaining why a stopped pipeline agent is not addressable.
+func (s *Server) SetProjectAvailable(fn func(project string) (bool, error)) {
+	s.mu.Lock()
+	s.projectAvailable = fn
 	s.mu.Unlock()
 }
 

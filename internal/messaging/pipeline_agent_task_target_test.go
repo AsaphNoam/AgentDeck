@@ -117,3 +117,23 @@ func TestTaskAimedAtAStoppedPipelineAgentNamesTheRealCondition(t *testing.T) {
 		t.Fatalf("send_message refusal does not explain the pipeline exclusion: %q", message)
 	}
 }
+
+// FS-06.A19: do not promise Resume when the configuration-owned project gate
+// means Resume cannot succeed until the project is restored.
+func TestArchivedProjectDoesNotOfferPipelineResume(t *testing.T) {
+	f := newContextFixture(t)
+	liveAgent(t, f.store, "a_coord", "Atlas", "agentdecker", "my-app")
+	f.srv.RegisterSession("tok-coord", "a_coord", "gen-a_coord")
+	f.srv.SetAddressableAgents(func() ([]state.LiveAgent, error) { return f.store.LiveAgents() })
+	f.srv.SetProjectAvailable(func(project string) (bool, error) { return false, nil })
+	f.srv.SetTaskControl(&stubTaskControl{})
+	stoppedPipelineAgent(t, f.store, "a_stage", "Nova", "implementer", "archived")
+	coord := connect(t, f.srv, "tok-coord")
+	result, isErr := call(t, coord, "create_task", map[string]any{
+		"display_name": "validate", "instruction": "run checks", "to": "a_stage",
+	})
+	message, _ := result["message"].(string)
+	if !isErr || strings.Contains(message, "resume") {
+		t.Fatalf("archived-project refusal = %v isErr=%v", result, isErr)
+	}
+}

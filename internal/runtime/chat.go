@@ -442,6 +442,19 @@ func (c *ChatRuntime) Stop(ctx context.Context, agentID string) error {
 		return nil
 	}
 
+	// Stop owns pending-permission teardown. Record every cancellation before
+	// shutting down the peer so no timer survives the lifecycle boundary and the
+	// durable transcript explains why the tool did not run.
+	as.mu.Lock()
+	pendingIDs := make([]string, 0, len(as.pending))
+	for id := range as.pending {
+		pendingIDs = append(pendingIDs, id)
+	}
+	as.mu.Unlock()
+	for _, id := range pendingIDs {
+		c.resolvePending(as, id, "cancelled", "")
+	}
+
 	as.shutdown()
 	// closePersistence is called in onTransportClosed's early-return path after
 	// the transport goroutine exits, so all in-flight emit() calls complete first.

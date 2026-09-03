@@ -132,3 +132,18 @@ func TestAcceptedStageResultStatesTheBoundary(t *testing.T) {
 		}
 	}
 }
+
+// FS-14.A29: every refused report states that no result was accepted and what
+// the stage agent must do next, including control-plane unavailability.
+func TestStageReportUnavailableIncludesRetryGuidance(t *testing.T) {
+	server, _, _ := pipelineProposalFixture(t)
+	server.SetPipelineManager(nil)
+	builder := connect(t, server, "builder-token")
+	result, isErr := call(t, builder, "report_pipeline_stage_result", map[string]any{
+		"outcome": "success", "summary": "done",
+	})
+	message, _ := result["message"].(string)
+	if !isErr || result["error"] != "pipeline_unavailable" || !strings.Contains(message, "still owes a result") || !strings.Contains(message, "retry") {
+		t.Fatalf("report refusal = %v isErr=%v", result, isErr)
+	}
+}

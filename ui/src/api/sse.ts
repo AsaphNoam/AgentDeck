@@ -167,7 +167,10 @@ class SseClient {
     const update = pipelineUpdateSchema.parse(envelope.data);
     const key = PIPELINE_QUERY_KEYS.run(update.run_id);
     const cached = queryClient.getQueryData<PipelineRunDetail>(key);
-    if (!cached || cached.run.revision < update.revision) {
+    const attentionChanged = cached?.run.revision === update.revision
+      && cached.run.attention_reason !== undefined
+      && cached.run.attention_reason !== update.attention_reason;
+    if (!cached || cached.run.revision < update.revision || attentionChanged) {
       queryClient.invalidateQueries({ queryKey: key });
     }
     queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.runs });

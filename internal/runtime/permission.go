@@ -43,8 +43,8 @@ func (c *ChatRuntime) onRequest(as *agentState, req *IncomingRequest) {
 			c.emit(as, EvError, ErrorData{Scope: "tool", Message: "no allow option offered"})
 			return
 		}
-		_ = req.Respond(selectedOutcome(optID))
 		c.emit(as, EvPermissionResolved, PermissionResolvedData{ToolCallID: autoData.ToolCallID, Decision: "auto_approve"})
+		_ = req.Respond(selectedOutcome(optID))
 		return
 	}
 

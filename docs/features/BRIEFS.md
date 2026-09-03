@@ -5,6 +5,21 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-09-03 — Fix: unattended pipeline reliability
+
+All seven review findings are fixed. Open run pages now show permission attention immediately,
+parallel approvals cannot clear it early, and stopping an agent cancels held approvals and their
+timers before teardown. Invalid message-budget edits default only that field, auto-approval records
+its reason before the provider continues, every refused stage report explains how to retry, and an
+archived project no longer offers a dead-end Resume instruction. The full automated test, race, UI,
+production-build, and distributable-build checks pass.
+
+**Needs attention:** The separate decision about detecting a silent stage agent remains open, and
+the credentialed real-provider browser journey still needs human authorization.
+
+**Next:** Have an independent agent review this fix, then run the credentialed browser journey when
+a human can authorize provider sessions.
+
 ### 2026-09-02 — Review: unattended pipeline runs
 
 The automated checks are green, but the review found five important defects. An already-open run

@@ -416,6 +416,18 @@ describe("pauses whose stage agent is not running", () => {
   });
 });
 
+it("renders a same-revision permission attention reason on the run page", async () => {
+  server.use(http.get("/api/pipeline-runs/run_1", () => HttpResponse.json({
+    ...detail,
+    run: { ...run, attention_reason: "awaiting permission approval" },
+  })));
+  const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+  render(<QueryClientProvider client={client}><MemoryRouter><RunBrowser selectedID="run_1" /></MemoryRouter></QueryClientProvider>);
+
+  expect(await screen.findByText("Needs attention")).toBeInTheDocument();
+  expect(screen.getByText("awaiting permission approval")).toBeInTheDocument();
+});
+
 // FS-14.A32: declared outputs are read beside the attempt that produced them,
 // and a finished run exposes its named values without another click.
 it("renders attempt outputs and opens named values for a finished run", async () => {

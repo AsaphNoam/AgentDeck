@@ -25,7 +25,7 @@ type Manager struct {
 	locksMu            sync.Mutex
 	locks              map[string]*sync.Mutex
 	attentionMu        sync.Mutex
-	pendingPermissions map[string]pendingPermission
+	pendingPermissions map[string]map[string]pendingPermission
 }
 
 type pendingPermission struct {
@@ -33,7 +33,7 @@ type pendingPermission struct {
 }
 
 func NewManager(store *state.Store, templates *TemplateStore, lifecycle Lifecycle, publisher Publisher) *Manager {
-	return &Manager{store: store, templates: templates, lifecycle: lifecycle, publisher: publisher, locks: map[string]*sync.Mutex{}, pendingPermissions: map[string]pendingPermission{}}
+	return &Manager{store: store, templates: templates, lifecycle: lifecycle, publisher: publisher, locks: map[string]*sync.Mutex{}, pendingPermissions: map[string]map[string]pendingPermission{}}
 }
 
 func (m *Manager) Start(ctx context.Context, request StartRequest) (RunDetail, bool, error) {
@@ -324,8 +324,12 @@ func (m *Manager) ListPage(limit, offset int) ([]RunSummary, int, error) {
 func (m *Manager) hasPendingPermission(runID, agentID string) bool {
 	m.attentionMu.Lock()
 	defer m.attentionMu.Unlock()
-	pending, ok := m.pendingPermissions[runID]
-	return ok && pending.agentID == agentID
+	for _, pending := range m.pendingPermissions[runID] {
+		if pending.agentID == agentID {
+			return true
+		}
+	}
+	return false
 }
 
 // OnPermissionEvent derives pipeline attention from the current stage agent's
@@ -342,28 +346,36 @@ func (m *Manager) OnPermissionEvent(agentID, generation, toolCallID string, pend
 		return nil
 	}
 	m.attentionMu.Lock()
-	current, exists := m.pendingPermissions[run.RunID]
+	requests := m.pendingPermissions[run.RunID]
+	wasPending := len(requests) > 0
 	changed := false
 	if pending {
-		if !exists || current.toolCallID != toolCallID || current.generation != generation {
-			m.pendingPermissions[run.RunID] = pendingPermission{agentID: agentID, generation: generation, toolCallID: toolCallID}
-			changed = true
+		if requests == nil {
+			requests = map[string]pendingPermission{}
+			m.pendingPermissions[run.RunID] = requests
 		}
-	} else if exists && current.agentID == agentID && current.generation == generation && current.toolCallID == toolCallID {
-		delete(m.pendingPermissions, run.RunID)
-		changed = true
+		if current, exists := requests[toolCallID]; !exists || current.agentID != agentID || current.generation != generation {
+			requests[toolCallID] = pendingPermission{agentID: agentID, generation: generation, toolCallID: toolCallID}
+		}
+	} else if current, exists := requests[toolCallID]; exists && current.agentID == agentID && current.generation == generation {
+		delete(requests, toolCallID)
+		if len(requests) == 0 {
+			delete(m.pendingPermissions, run.RunID)
+		}
 	}
+	isPending := len(requests) > 0
+	changed = wasPending != isPending
 	m.attentionMu.Unlock()
 	if !changed || m.publisher == nil {
 		return nil
 	}
 	reason := ""
-	if pending {
+	if isPending {
 		reason = "awaiting permission approval"
 	}
 	update := PipelineUpdate{RunID: run.RunID, DisplayName: run.DisplayName, Revision: run.Revision, State: run.State, CurrentStageID: run.CurrentStageID, CurrentAgentID: run.CurrentAgentID, AttentionReason: reason, FinalOutcome: run.FinalOutcome}
 	m.publisher.PublishPipelineUpdate(update)
-	if pending {
+	if isPending {
 		m.publisher.PublishPipelineNotification(update, "needs_attention")
 	}
 	return nil
@@ -371,8 +383,13 @@ func (m *Manager) OnPermissionEvent(agentID, generation, toolCallID string, pend
 
 func (m *Manager) ClearPermissionAttention(agentID, generation string) {
 	m.attentionMu.Lock()
-	for runID, pending := range m.pendingPermissions {
-		if pending.agentID == agentID && pending.generation == generation {
+	for runID, requests := range m.pendingPermissions {
+		for toolCallID, pending := range requests {
+			if pending.agentID == agentID && pending.generation == generation {
+				delete(requests, toolCallID)
+			}
+		}
+		if len(requests) == 0 {
 			delete(m.pendingPermissions, runID)
 		}
 	}

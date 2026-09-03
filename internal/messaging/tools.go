@@ -227,6 +227,15 @@ func (s *Server) pipelineRecipientRefusal(selector string) (string, bool) {
 		}
 		association, err := s.store.PipelineAssociationForAgent(agentID)
 		if err == nil && association != nil {
+			s.mu.RLock()
+			projectAvailable := s.projectAvailable
+			s.mu.RUnlock()
+			if projectAvailable != nil {
+				available, gateErr := projectAvailable(recipient.Project)
+				if gateErr != nil || !available {
+					return "", false
+				}
+			}
 			return fmt.Sprintf("Agent %q is stopped and held out while associated with pipeline stage %q; resume the agent, then try again.", selector, association.StageID), true
 		}
 	}

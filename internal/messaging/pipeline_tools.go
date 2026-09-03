@@ -7,6 +7,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/agentdeck/agentdeck/internal/pipeline"
+	"github.com/agentdeck/agentdeck/internal/toolresult"
 )
 
 type reportPipelineArgs struct {
@@ -26,13 +27,13 @@ func (s *Server) handleReportPipelineStageResult(_ context.Context, req *mcp.Cal
 	manager := s.pipelines
 	s.mu.RUnlock()
 	if manager == nil {
-		return errResult(map[string]any{"ok": false, "error": "pipeline_unavailable", "message": "Pipeline control plane is unavailable."})
+		return stageReportError("pipeline_unavailable", "Pipeline control plane is unavailable.")
 	}
 	detail, err := manager.Report(identity.AgentID, identity.Generation, pipeline.StageReport{
 		Outcome: input.Outcome, Summary: input.Summary, Details: input.Details, Checks: input.Checks, Outputs: input.Outputs,
 	})
 	if err != nil {
-		return pipelineToolError(err)
+		return stageReportToolError(err)
 	}
 	return jsonResult(map[string]any{"ok": true, "run_id": detail.Run.RunID, "attempt_id": detail.Run.CurrentAttemptID, "revision": detail.Run.Revision, "awaiting": "quiescence", "next": reportNextGuidance(input.Outcome)})
 }
@@ -111,4 +112,16 @@ func pipelineToolError(err error) (*mcp.CallToolResult, any, error) {
 		return errResult(map[string]any{"ok": false, "error": controlled.Code, "message": controlled.Message, "diagnostics": controlled.Diagnostics})
 	}
 	return errResult(map[string]any{"ok": false, "error": "pipeline_unavailable", "message": "Pipeline operation could not be completed."})
+}
+
+func stageReportToolError(err error) (*mcp.CallToolResult, any, error) {
+	var controlled *pipeline.ControlError
+	if errors.As(err, &controlled) {
+		return errResult(map[string]any{"ok": false, "error": controlled.Code, "message": controlled.Message + " " + toolresult.StageReportGuidance(controlled.Code), "diagnostics": controlled.Diagnostics})
+	}
+	return stageReportError("pipeline_unavailable", "Pipeline operation could not be completed.")
+}
+
+func stageReportError(code, message string) (*mcp.CallToolResult, any, error) {
+	return errResult(map[string]any{"ok": false, "error": code, "message": message + " " + toolresult.StageReportGuidance(code)})
 }

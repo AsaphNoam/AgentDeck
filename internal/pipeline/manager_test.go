@@ -151,7 +151,20 @@ func TestPermissionAttentionIsDerivedAndIdempotent(t *testing.T) {
 	if len(publisher.notifications) != 1 || publisher.notifications[0] != "needs_attention" {
 		t.Fatalf("notifications = %v", publisher.notifications)
 	}
+	if err := manager.OnPermissionEvent(attempt.AgentID, attempt.AgentGeneration, "tc_2", true); err != nil {
+		t.Fatal(err)
+	}
 	if err := manager.OnPermissionEvent(attempt.AgentID, attempt.AgentGeneration, "tc_1", false); err != nil {
+		t.Fatal(err)
+	}
+	stillWaiting, err := manager.Detail(detail.Run.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stillWaiting.Run.AttentionReason != "awaiting permission approval" {
+		t.Fatalf("first resolution cleared concurrent permission: %+v", stillWaiting.Run)
+	}
+	if err := manager.OnPermissionEvent(attempt.AgentID, attempt.AgentGeneration, "tc_2", false); err != nil {
 		t.Fatal(err)
 	}
 	cleared, err := manager.Detail(detail.Run.RunID)

@@ -273,6 +273,38 @@ func TestMessageBudgetSettingRoundTripsAndRejectsNonPositive(t *testing.T) {
 	}
 }
 
+// FS-04.A26: an invalid hand-edited additive budget defaults independently;
+// the rest of config remains authoritative through GET and a later partial PUT.
+func TestInvalidOnDiskMessageBudgetPreservesOtherConfig(t *testing.T) {
+	for _, invalid := range []string{`"bad"`, `0`, `-1`} {
+		t.Run(invalid, func(t *testing.T) {
+			srv := testServerWithOkCreds(t)
+			path := filepath.Join(srv.configStore.Home(), "config.json")
+			doc := `{"version":1,"port":4317,"default_project":"my-app","default_role":"reviewer","skip_permissions":true,"onboarding_complete":true,"notifications":{"desktop_enabled":false,"muted":{}},"switch":{"primer_token_budget":123},"task_concurrency":7,"message_budget_per_turn":` + invalid + `}`
+			if err := os.WriteFile(path, []byte(doc), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			h := srv.routes()
+			rec := doGET(t, h, "/api/config")
+			var got configResponse
+			if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &got) != nil {
+				t.Fatalf("GET = %d %s", rec.Code, rec.Body.String())
+			}
+			if got.MessageBudgetPerTurn != 50 || got.DefaultRole != "reviewer" || got.TaskConcurrency != 7 {
+				t.Fatalf("normalized config = %+v", got)
+			}
+			rec = doRequest(t, h, http.MethodPut, "/api/config", map[string]any{"onboarding_complete": false})
+			if rec.Code != http.StatusOK {
+				t.Fatalf("partial PUT = %d %s", rec.Code, rec.Body.String())
+			}
+			stored, err := srv.configStore.ReadConfig()
+			if err != nil || stored.DefaultRole != "reviewer" || stored.TaskConcurrency != 7 || stored.MessageBudgetPerTurn != 50 {
+				t.Fatalf("stored config = %+v err=%v", stored, err)
+			}
+		})
+	}
+}
+
 func TestPutConfigRejectsImmutableFields(t *testing.T) {
 	srv := testServerWithOkCreds(t)
 	h := srv.routes()

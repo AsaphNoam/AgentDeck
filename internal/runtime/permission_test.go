@@ -204,9 +204,44 @@ func TestAgentDeckToolPermissionAutoApprovesExactIdentity(t *testing.T) {
 	if !data.AutoApproved {
 		t.Fatal("AgentDeck tool request was not recorded as auto-approved")
 	}
+	// FS-03.A24 / INV §15: local truth precedes releasing a fast provider.
+	resolved := waitForEvent(t, ch, EvPermissionResolved)
+	var resolution PermissionResolvedData
+	_ = json.Unmarshal(resolved.Data, &resolution)
+	if resolution.Decision != "auto_approve" {
+		t.Fatalf("auto-approval resolution = %+v", resolution)
+	}
 	waitForEvent(t, ch, EvTurnEnd)
 	if !fileExists(sentinel) {
 		t.Fatal("AgentDeck tool did not execute")
+	}
+}
+
+// FS-03.A25: Stop resolves a held permission before teardown and cancels its
+// optional timer, so the stopped status cannot be overwritten later.
+func TestStopCancelsPendingPermissionAndTimer(t *testing.T) {
+	for _, timeout := range []string{"", "150ms"} {
+		t.Run("timeout="+timeout, func(t *testing.T) {
+			c, h, sentinel, ch := startPermAgent(t, false, timeout)
+			if err := c.SendPrompt(context.Background(), h.AgentID, "run ls"); err != nil {
+				t.Fatal(err)
+			}
+			waitForEvent(t, ch, EvPermissionRequest)
+			if err := c.Stop(context.Background(), h.AgentID); err != nil {
+				t.Fatal(err)
+			}
+			resolved := waitForEvent(t, ch, EvPermissionResolved)
+			var data PermissionResolvedData
+			_ = json.Unmarshal(resolved.Data, &data)
+			if data.Decision != "cancelled" || fileExists(sentinel) {
+				t.Fatalf("stop resolution = %+v sentinel=%v", data, fileExists(sentinel))
+			}
+			time.Sleep(250 * time.Millisecond)
+			status, err := c.store.ReadStatus(h.AgentID)
+			if err != nil || status.State != "done" {
+				t.Fatalf("status after old deadline = %+v err=%v", status, err)
+			}
+		})
 	}
 }
 

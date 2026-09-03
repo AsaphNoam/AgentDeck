@@ -282,6 +282,30 @@ describe("SseClient watchdog reconnect", () => {
     expect(spy).toHaveBeenCalledWith({ queryKey: ["pipelines", "run-list"] });
   });
 
+  it("invalidates same-revision run detail when permission attention changes", async () => {
+    const { sseClient } = await import("./sse");
+    const { queryClient } = await import("./config");
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+    queryClient.setQueryData(["pipelines", "run-detail", "pr_1"], { run: { revision: 4, attention_reason: "" } });
+    sseClient.connect();
+    FakeEventSource.instances[0].onopen?.();
+    spy.mockClear();
+    const update = (attention_reason: string) => JSON.stringify({
+      type: "pipeline_update", seq: 4, ts: 4, agent_id: null,
+      data: { run_id: "pr_1", display_name: "Run one", revision: 4, state: "running", current_stage_id: "work", current_agent_id: "a_1", attention_reason, final_outcome: "" },
+    });
+
+    FakeEventSource.instances[0].emit("pipeline_update", update("awaiting permission approval"));
+    expect(spy).toHaveBeenCalledWith({ queryKey: ["pipelines", "run-detail", "pr_1"] });
+
+    // The invalidation refetches the detail in a real client; mirror that cache
+    // transition before driving the clearing event.
+    queryClient.setQueryData(["pipelines", "run-detail", "pr_1"], { run: { revision: 4, attention_reason: "awaiting permission approval" } });
+    spy.mockClear();
+    FakeEventSource.instances[0].emit("pipeline_update", update(""));
+    expect(spy).toHaveBeenCalledWith({ queryKey: ["pipelines", "run-detail", "pr_1"] });
+  });
+
   it("refetches open pipeline details but keeps run-list pagination on task updates", async () => {
     const { sseClient } = await import("./sse");
     const { queryClient } = await import("./config");
