@@ -24,12 +24,12 @@ back to that at every release (§16.7). Injected Current position plus Active ch
   (TS-06.R21). A customized
   `agentdecker` role is deliberately not migrated (FS-04.R44), so it keeps the superseded product
   manual beside the current skill; nothing user-facing says so.
-- **Last reviewed code:** `636781b` (2026-09-03), across the continuous range `e46e66b..636781b`.
-  **Next review unit:** workflow-efficiency commit `7c9ee44`; product-fix commit `3c1dc96` follows
-  as a second unit. Both shipped in `v0.4.0` unreviewed.
-- **Open findings:** one, listed below — the **Worth fixing** completion of TS-02/TS-03/TS-09 for
-  FS-14's proposal Reject/Delete design, which is blocked on the Reject-versus-approval ordering
-  decision. The 2026-09-03 review's other seven findings were fixed on 2026-09-03; the
+- **Last reviewed code:** `7c9ee44` (2026-09-03), across the continuous range `e46e66b..7c9ee44`.
+  **Next review unit:** product-fix commit `3c1dc96`, which shipped in `v0.4.0` unreviewed.
+- **Open findings:** five, listed below — four **Worth fixing** findings from the workflow-efficiency
+  review, plus the **Worth fixing** completion of TS-02/TS-03/TS-09 for FS-14's proposal
+  Reject/Delete design, which is blocked on the Reject-versus-approval ordering decision. The
+  2026-09-03 product-code review's other seven findings were fixed on 2026-09-03; the
   Reject-versus-approval **Must fix** became a product decision and moved to *Decisions needing your
   input*, beside the 2026-09-02 investigation's silent-stage decision. Both of the **Must fix**
   items `v0.4.0` shipped with are now closed as code: the streamed Mermaid remount is fixed, and
@@ -49,8 +49,7 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 
 **Change:** None.
 
-**Next:** Independently review the automatic-pane-opening implementation and the unattended-pipeline
-fix — `7c9ee44` first, then `3c1dc96`. FS-14's proposal Reject/Delete design is the next design unit
+**Next:** Independently review product-fix commit `3c1dc96`. FS-14's proposal Reject/Delete design is the next design unit
 once the human answers the Reject-versus-approval ordering question under *Decisions needing your
 input*; nothing should implement R49–R51 before that answer and the TS-02/TS-03/TS-09 completion it
 gates. Keep the credentialed Claude/Codex browser journey as an acceptance gate until a human
@@ -59,6 +58,18 @@ authorizes real provider sessions.
 ## Changelog
 
 Earlier entries are in the [archived handoff](../archive/state/HANDOFF-through-2026-09-03.md).
+
+- **2026-09-03 — review: workflow-efficiency commit `7c9ee44` (INV §1–§15):** Reviewed the
+  documentation, mirrored launchers, Claude hooks, and transcript-audit utility in both directions
+  against the workflow contract. Four Worth-fixing findings are recorded: lexical paths bypass the
+  edit guard, a valid non-object JSONL record aborts the Codex audit, the documented UI closure
+  commands retain the changed directory across lines, and several role launchers omit the startup
+  dirty-tree check. INV §4, §7, §8, and §10 had applicable surfaces; the other indexed classes had
+  no matching surface. The hook and transcript fixtures, shell syntax, Python compilation,
+  twin-skill comparison, and `git diff --check` pass. `make check-specs` passed against the reviewed
+  tree; final reruns could not close while unrelated concurrent proposal-design edits were changing,
+  so those edits are preserved and excluded from this review commit. The continuous reviewed marker
+  advances only through `7c9ee44`; `3c1dc96` remains unreviewed as the next unit.
 
 - **2026-09-03 — fix: the 2026-09-03 review's findings (INV §2/§10/§15):** Seven of eight closed;
   the eighth is blocked on a product decision.
@@ -252,6 +263,38 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
   incompatible contracts, so persistence, server, and UI can each choose a different state model.
   Fix by completing TS-02/TS-03/TS-09 first, adding the ready change and traceability, and only then
   moving the design out of `docs/ideas.md`'s “being defined” section.
+
+- **Worth fixing** (`.claude/hooks/guard-edit.sh:8–28`; INV §10) — the new relative-path support
+  compares the lexical path without normalizing `..`, so an Edit or Write aimed at
+  `docs/features/../features/HANDOFF.md`, `internal/server/ui/../ui/dist/...`, or an equivalent
+  cache path bypasses the budget or protected-path decision. The normal-use trigger is an agent
+  supplying a valid non-canonical relative path; the hook silently allows the same file it denies
+  under its canonical spelling. Normalize the target while safely handling a not-yet-created Write
+  target, and add traversal-form cases beside the relative and absolute fixtures.
+
+- **Worth fixing** (`scripts/transcript-usage/audit.py:187–210`; INV §7) — `scan_codex` calls
+  `.get` on every successfully decoded JSON value and later assumes `session_meta.payload` is a
+  mapping. A valid JSONL record such as `null`, a list, or a null payload aborts the entire audit
+  instead of isolating that record, so one provider-format variation prevents all later sessions
+  from being measured. Validate the decoded record and metadata types, skip and report malformed
+  records, and add non-object and null-payload fixtures before valid later records.
+
+- **Worth fixing** (`docs/features/AGENT-WORKFLOW.md:49–55`; INV §10) — the documented closure
+  matrix runs `cd ui && npm test` and then `cd ui && npm run build` on separate lines. Executing the
+  block as one shell leaves the first command inside `ui`, so the next command tries to enter
+  `ui/ui`, and a following `make dist` also runs from the wrong directory. The required verification
+  sequence therefore fails for an ordinary UI change even when every check is green. Put UI checks
+  in subshells or restore the repository directory, and smoke-test the documented sequence from the
+  repository root.
+
+- **Worth fixing** (`docs/features/AGENT-WORKFLOW.md:7–30` and the `fix`, `investigate-bug`,
+  `release`, `review-design`, `review`, and `usability-review` launchers; INV §10) — the new
+  section-addressed read rule makes launchers authoritative about which workflow sections load, but
+  these launchers omit §1 and do not independently require `git status` and the existing diff before
+  their state edit. The normal-use trigger is resuming in a dirty tree: the role can overwrite or
+  mix user/interrupted handoff work without first seeing it, despite the repository's preservation
+  rule. Make the startup dirty-tree check universal or state it in every affected launcher, and add
+  a launcher-contract check that each state-writing role includes startup, commit, and close rules.
 
 ## Design consistency notes
 
