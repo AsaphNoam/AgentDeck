@@ -15,10 +15,13 @@ back to that at every release (§16.7). Injected Current position plus Active ch
   TS-01.R27, TS-02.R28, TS-03.R34–R35, TS-04.R41–R44, TS-05.R20, TS-08.R50–R52, TS-09.R29–R31).
   Earlier finished work is in the archived handoff; the named FS/TS requirements are the authority
   on what shipped.
-- **Release:** `v0.4.0` was cut on 2026-09-03 over the 35-commit range from `v0.3.0`, at the user's
-  explicit direction to release with two **Must fix** findings still open (workflow §16.1 otherwise
-  blocks on those). Publication state is recorded in the changelog entry below. The credentialed
-  Claude and Codex checks are not covered by release CI and remain owed (TS-06.R21). A customized
+- **Release:** `v0.4.0` is published and verified. The tag is on `5485cd7`, `main` is pushed through
+  the same commit, and release run `33722011193` succeeded in 3m56s: the archive, `install.sh`, and
+  `manifest.json` are attached, the manifest's `sha256` matches GitHub's asset digest, and `latest`
+  resolves to `v0.4.0`. It was cut over the 35-commit range from `v0.3.0` at the user's explicit
+  direction to release with two **Must fix** findings still open, which workflow §16.1 otherwise
+  blocks on. The credentialed Claude and Codex checks are not covered by release CI and remain owed
+  (TS-06.R21). A customized
   `agentdecker` role is deliberately not migrated (FS-04.R44), so it keeps the superseded product
   manual beside the current skill; nothing user-facing says so.
 - **Last reviewed code:** `636781b` (2026-09-03), across the continuous range `e46e66b..636781b`.
@@ -75,8 +78,10 @@ Earlier entries are in the [archived handoff](../archive/state/HANDOFF-through-2
   Nothing falsified the release-matched claims: `README.md`, `install.sh`, `scripts/release/`, and
   `.github/workflows/` are byte-identical across the range, and the pinned Node, ACP adapter, and
   Codex components are unchanged. `make test`, `make check-specs`, `make dist VERSION=0.4.0` (the
-  binary reports `0.4.0` and carries `sqlite_fts5`), and `git diff --check` pass. The credentialed
-  Claude and Codex checks are not covered by release CI and remain owed (TS-06.R21).
+  binary reports `0.4.0` and carries `sqlite_fts5`), and `git diff --check` pass. Release run
+  `33722011193` then verified archive contents, FTS5 tagging, pinned components, checksum
+  rejection, and a fresh installation on an Apple-silicon runner. The credentialed Claude and Codex
+  checks are not covered by that run and remain owed (TS-06.R21).
 
 ## Decisions needing your input
 
