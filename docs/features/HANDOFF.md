@@ -25,12 +25,15 @@ back to that at every release (§16.7). Injected Current position plus Active ch
   `agentdecker` role is deliberately not migrated (FS-04.R44), so it keeps the superseded product
   manual beside the current skill; nothing user-facing says so.
 - **Last reviewed code:** `a6a8c0f` (2026-09-03), across the continuous range `e46e66b..a6a8c0f`.
-  **Next review unit:** release commit `5485cd7`; the remaining unreviewed range is
-  `5485cd7..50c242e`.
-- **Open findings:** None. The generation race in crash registration teardown and the contradiction
-  in FS-02.A43's acceptance evidence from the review of `3c1dc96` are fixed. The four
-  workflow-efficiency findings from the review of `7c9ee44` and the earlier product-code review's
-  eight findings are also closed.
+  `3d474b3` was also reviewed on 2026-09-03, out of order and alongside a concurrent review of
+  `5485cd7`, so it does not advance the marker. **Next review unit:** release commit `5485cd7`
+  (concurrently under review); the remaining unreviewed range is `5485cd7..50c242e` less `3d474b3`.
+  Once `5485cd7`'s review lands, the marker moves through `3d474b3`.
+- **Open findings:** One **Worth fixing** item from the review of `3d474b3`: the injected **Release**
+  bullet carries settled publication evidence that the changelog already holds. The generation race
+  in crash registration teardown and the contradiction in FS-02.A43's acceptance evidence from the
+  review of `3c1dc96` are fixed. The four workflow-efficiency findings from the review of `7c9ee44`
+  and the earlier product-code review's eight findings are also closed.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
   remain owed before claiming those adapters accept structured results.
 - **Usability state:** The Pipelines pages and dashboard grid were driven through a real Chromium on
@@ -56,6 +59,25 @@ provider sessions.
 ## Changelog
 
 Earlier entries are in the [archived handoff](../archive/state/HANDOFF-through-2026-09-03.md).
+
+- **2026-09-03 — review: release-record commit `3d474b3` (TS-06.R21; INV §1–§15):** Reviewed the
+  handoff-only record of the published `v0.4.0` in both directions, against the live release rather
+  than against the commit's own prose. Every factual claim holds: the tag resolves to `5485cd7`,
+  release run `33722011193` succeeded on that head SHA, the archive, `install.sh`, and
+  `manifest.json` are attached, the published manifest's `sha256` and size match GitHub's archive
+  asset digest and size, `latest` resolves to `v0.4.0`, and the pre-release range `v0.3.0..a6a8c0f`
+  is 35 commits as stated. The changelog's CI claim mirrors TS-06.R21 and §16.6 word for word and
+  correctly names the credentialed Claude and Codex gates as owed rather than passed, which R21
+  requires; the release workflow does run the FTS5-tagged release/CLI suites, the pinned-component
+  and Apple-silicon checks, `TestVerifyArchiveRejectsCorrupt`, and the fresh-home install with an
+  `AGENTDECK_HOME` sentinel. No user-visible behavior or architectural rule is introduced, so no
+  FS/TS coverage is missing. One **Worth fixing** finding is recorded: the commit moved settled
+  publication evidence into the injected Current position slice that the changelog entry already
+  carries, contrary to §4 and §16.7, and states the run duration as 3m56s where GitHub reports 4m0s.
+  The INV trigger index has no applicable surface in a documentation-only diff — no code, UI markup,
+  runtime, persistence, HTTP, or external-CLI change — so §1–§15 are all stated as no-surface. No
+  local-choice notes were outstanding. `make check-specs` and `git diff --check` pass. The reviewed
+  marker does not advance: `5485cd7` sits between it and this unit and is under concurrent review.
 
 - **2026-09-03 — review: handoff-only commit `a6a8c0f` (INV §1–§15):** Reviewed the review-marker
   correction in both directions. No finding: the commit's claims all hold. `7c9ee44` is the
@@ -315,7 +337,18 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-None.
+- **Worth fixing** — `HANDOFF.md` *Current position*, the **Release** bullet (from `3d474b3`;
+  workflow §4 and §16.7; no INV class applies). The bullet restates the publication evidence — run id, "in
+  3m56s", the manifest/asset digest match, `latest` resolution — that the `v0.4.0` changelog entry
+  below already carries, and the text it replaced deliberately pointed at that entry instead
+  ("Publication state is recorded in the changelog entry below"). Normal-use trigger: every session
+  pays for the injected Current position slice, and evidence about a finished release is settled
+  history rather than state a cold agent needs for the next change; §16.7 names that slice as the
+  recurring cost. The duration is also slightly wrong — GitHub reports the run as 4m0s. Fix: cut the
+  bullet to the live facts (v0.4.0 published and verified on tag `5485cd7`, credentialed
+  Claude/Codex checks still owed under TS-06.R21, `agentdecker` deliberately unmigrated under
+  FS-04.R44) and leave the evidence in the changelog. No test applies; `make check-specs` covers the
+  file mechanically.
 
 ## Design consistency notes
 
