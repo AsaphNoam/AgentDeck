@@ -21,9 +21,8 @@ back to that at every release (§16.7). Injected Current position plus Active ch
   not migrated (FS-04.R44), so it keeps the superseded product manual beside the current skill;
   nothing user-facing says so.
 - **Last reviewed code:** `636781b` (2026-09-03), across the continuous range
-  `e46e66b..636781b`. **Next review unit:** the fix commit closing the 2026-09-03 review's three
-  findings; the uncommitted workflow-efficiency documentation and hook changes are a second unit
-  and remain awaiting independent review.
+  `e46e66b..636781b`. **Next review unit:** workflow-efficiency commit `7c9ee44`; product-fix commit
+  `3c1dc96` follows as a second unit.
 - **Open findings:** eight, listed below — two **Must fix** (streamed Mermaid remount; FS-14 Reject
   versus approval ordering) and six **Worth fixing**. The 2026-09-03 review's three findings are
   closed. The 2026-09-02 bug investigation's one
