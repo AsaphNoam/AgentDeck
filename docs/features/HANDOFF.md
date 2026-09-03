@@ -20,13 +20,11 @@ back to that at every release (§16.7). Budget: 300 lines.
   covered by release CI and remain owed (TS-06.R21). A customized `agentdecker` role is deliberately
   not migrated (FS-04.R44), so it keeps the superseded product manual beside the current skill;
   nothing user-facing says so.
-- **Last reviewed code:** `bd797bd` (2026-09-02), across the continuous range `e46e66b..bd797bd`.
-  Two later commits are reviewed but do not advance the continuous marker: the worktree fixes in
-  `3e1726b` (post-fix code still awaiting independent review) and the unattended-pipeline commit
-  `a0b9e13` (reviewed as a single commit, so it does not cover the intervening worktree-fix range).
-  **Next review unit:** the post-`bd797bd` range, as one unit (§1.4).
-- **Open findings:** eight, listed below — two **Must fix** (streamed Mermaid remount; FS-14 Reject
-  versus approval ordering) and six **Worth fixing**. The 2026-09-02 bug investigation's one
+- **Last reviewed code:** `636781b` (2026-09-03), across the continuous range
+  `e46e66b..636781b`. **Next review unit:** none committed; the uncommitted workflow-efficiency
+  documentation and hook changes remain awaiting independent review.
+- **Open findings:** eleven, listed below — two **Must fix** (streamed Mermaid remount; FS-14 Reject
+  versus approval ordering) and nine **Worth fixing**. The 2026-09-02 bug investigation's one
   remaining **Must fix** is the silent-stage product decision under *Decisions needing your input*.
   The task-cancel release flake is open as a **Worth fixing** finding.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
@@ -104,6 +102,15 @@ This file is currently above its own 300-line budget; closing this review return
 ## Changelog
 
 Earlier entries are in the [archived handoff](../archive/state/HANDOFF-through-2026-09-03.md).
+
+- **2026-09-03 — review (continuous post-`bd797bd` range through `636781b`; worktree fixes,
+  unattended pipelines and fixes, automatic waiting-pane opening; INV §1–§15):** Reviewed the
+  range in both directions against its FS/TS requirements. Three Worth-fixing findings are recorded
+  below: older supported Git versions cannot answer the worktree common-directory query; a crashed
+  agent can leave permission diagnostic entries behind for the process lifetime; and a batch of
+  waiting transitions with tied millisecond timestamps can evict by agent insertion order rather
+  than transition order. The focused 54-case CardGrid/SSE suite and presentation checks pass. The
+  uncommitted workflow-efficiency files were preserved and remain the next independent review unit.
 
 - **2026-09-03 — work (automatic pane opening on a waiting transition; FS-02.R61/A43, the narrowed
   FS-02.R51/A30, TS-08.R49; INV §1/§2/§10):** A chat agent that newly enters `waiting_input` now
@@ -254,6 +261,29 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 `claude-agent-acp`, OpenCode, and OpenHands are not installed globally.
 
 ## Review findings
+
+- **Worth fixing** (FS-19.R1, TS-12.R1; INV §12) — `internal/worktree/git.go:158` always invokes
+  `git rev-parse --path-format=absolute --git-common-dir`. Git versions before `--path-format`
+  reject that option, so an otherwise usable repository cannot be forked even though AgentDeck's
+  Git boundary specifies version tolerance and no minimum version. Retry with `--git-common-dir`
+  when the option is unsupported and normalize the returned path locally; cover both argv forms
+  with the Git command fixture.
+
+- **Worth fixing** (FS-03.R43–R44, FS-14.R54, TS-09.R29; INV §1/§4/§9) —
+  `internal/server/server.go:357` records every pending permission's tool name in
+  `permissionTools`, but `internal/runtime/chat.go:890` abandons pending requests on an unsolicited
+  transport close without emitting `permission_resolved`, the only path that deletes those keys.
+  Repeated agent crashes while approval is pending therefore retain generation-scoped diagnostic
+  entries for the server process lifetime. Clear the generation prefix from the runtime exit hook
+  (alongside `ClearPermissionAttention`) and add a crash-with-pending-permission regression.
+
+- **Worth fixing** (FS-02.R61/A43, TS-08.R49; INV §1/§10) —
+  `ui/src/components/grid/CardGrid.tsx:157` orders a batched set of waiting transitions only by
+  `AgentState.updated_at`, which is a millisecond wall-clock value. Five updates can share that
+  timestamp; JavaScript's stable sort then preserves `agents` insertion order, not the observation
+  order TS-08.R49 requires, so the wrong pane can be evicted under A43's five-at-once case. The test
+  assigns distinct timestamps and cannot expose the tie. Carry a client observation sequence (or
+  an equivalent deterministic event order) and add a tied-timestamp batch regression.
 
 - **Worth fixing** (FS-16.R3/R4, TS-10.R15/R19; INV §15) — `internal/server/task_http_test.go:244`
   asserts the cancel response already carries `pending_release=false` and an empty runtime claim,

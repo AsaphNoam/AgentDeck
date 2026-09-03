@@ -5,6 +5,19 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-09-03 — Review: worktrees, unattended pipelines, and automatic waiting panes
+
+The continuous unreviewed product range is now reviewed. The main behavior is structurally sound,
+and the focused dashboard and live-update tests pass. Three lower-priority defects remain: older Git
+versions can reject the worktree repository query, crashed approval requests can retain small
+diagnostic entries until restart, and simultaneous waiting transitions can evict the wrong pane when
+their timestamps tie.
+
+**Needs attention:** None.
+
+**Next:** Run `/fix` to close these three findings; independently review the still-uncommitted
+workflow-efficiency documentation and hook changes afterward.
+
 ### 2026-09-03 — Implementation: conversations that stop for approval open themselves
 
 A chat agent that stops for a permission decision now opens its own conversation pane on the
