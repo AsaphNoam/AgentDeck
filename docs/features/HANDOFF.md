@@ -26,11 +26,11 @@ back to that at every release (§16.7). Injected Current position plus Active ch
   manual beside the current skill; nothing user-facing says so.
 - **Last reviewed code:** `7c9ee44` (2026-09-03), across the continuous range `e46e66b..7c9ee44`.
   **Next review unit:** product-fix commit `3c1dc96`, which shipped in `v0.4.0` unreviewed.
-- **Open findings:** four, listed below — all **Worth fixing**, all from the workflow-efficiency
-  review of `7c9ee44`, and none in product code. The 2026-09-03 product-code review's eight findings
-  are closed: seven fixed, and the Reject-versus-approval ordering answered by the user with the
-  durable mutation winning, now specified as FS-14.R57 with TS-02.R29, TS-03.R36, and TS-09.R32.
-  Both **Must fix** items `v0.4.0` shipped with are closed.
+- **Open findings:** None. The four workflow-efficiency findings from the review of `7c9ee44` are
+  fixed. The 2026-09-03 product-code review's eight findings are also closed: seven fixed, and the
+  Reject-versus-approval ordering answered by the user with the durable mutation winning, now
+  specified as FS-14.R57 with TS-02.R29, TS-03.R36, and TS-09.R32. Both **Must fix** items `v0.4.0`
+  shipped with are closed.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
   remain owed before claiming those adapters accept structured results.
 - **Usability state:** The Pipelines pages and dashboard grid were driven through a real Chromium on
@@ -55,6 +55,20 @@ Claude/Codex browser journey as an acceptance gate until a human authorizes real
 ## Changelog
 
 Earlier entries are in the [archived handoff](../archive/state/HANDOFF-through-2026-09-03.md).
+
+- **2026-09-03 — fix: workflow-efficiency review findings (INV §7/§10):** Closed all four
+  Worth-fixing findings from the review of `7c9ee44`. The edit guard now normalizes lexical `.` and
+  `..` segments before checking generated, cache, and handoff paths, including Write targets that do
+  not exist yet; traversal-form fixtures cover relative and absolute paths. The Codex transcript
+  audit now reports and skips decoded non-object records and session metadata with non-object
+  payloads, then continues to valid later records. The UI closure commands run in subshells so the
+  repository working directory survives each line. Every state-writing Claude and Codex role
+  launcher now requires startup inspection of `git status` and the existing diff before an edit,
+  while a check wired into `make check-specs` enforces startup, commit, and close rules across both
+  launcher trees. No FS/TS change was needed: these fixes restore existing workflow and read-path
+  contracts. Hook and transcript fixtures, shell syntax, Python compilation, the launcher contract,
+  twin-skill comparison, `make check-specs`, the full UI suite and build from the documented root
+  sequence, and `git diff --check` pass.
 
 - **2026-09-03 — review: workflow-efficiency commit `7c9ee44` (INV §1–§15):** Reviewed the
   documentation, mirrored launchers, Claude hooks, and transcript-audit utility in both directions
@@ -260,37 +274,7 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-- **Worth fixing** (`.claude/hooks/guard-edit.sh:8–28`; INV §10) — the new relative-path support
-  compares the lexical path without normalizing `..`, so an Edit or Write aimed at
-  `docs/features/../features/HANDOFF.md`, `internal/server/ui/../ui/dist/...`, or an equivalent
-  cache path bypasses the budget or protected-path decision. The normal-use trigger is an agent
-  supplying a valid non-canonical relative path; the hook silently allows the same file it denies
-  under its canonical spelling. Normalize the target while safely handling a not-yet-created Write
-  target, and add traversal-form cases beside the relative and absolute fixtures.
-
-- **Worth fixing** (`scripts/transcript-usage/audit.py:187–210`; INV §7) — `scan_codex` calls
-  `.get` on every successfully decoded JSON value and later assumes `session_meta.payload` is a
-  mapping. A valid JSONL record such as `null`, a list, or a null payload aborts the entire audit
-  instead of isolating that record, so one provider-format variation prevents all later sessions
-  from being measured. Validate the decoded record and metadata types, skip and report malformed
-  records, and add non-object and null-payload fixtures before valid later records.
-
-- **Worth fixing** (`docs/features/AGENT-WORKFLOW.md:49–55`; INV §10) — the documented closure
-  matrix runs `cd ui && npm test` and then `cd ui && npm run build` on separate lines. Executing the
-  block as one shell leaves the first command inside `ui`, so the next command tries to enter
-  `ui/ui`, and a following `make dist` also runs from the wrong directory. The required verification
-  sequence therefore fails for an ordinary UI change even when every check is green. Put UI checks
-  in subshells or restore the repository directory, and smoke-test the documented sequence from the
-  repository root.
-
-- **Worth fixing** (`docs/features/AGENT-WORKFLOW.md:7–30` and the `fix`, `investigate-bug`,
-  `release`, `review-design`, `review`, and `usability-review` launchers; INV §10) — the new
-  section-addressed read rule makes launchers authoritative about which workflow sections load, but
-  these launchers omit §1 and do not independently require `git status` and the existing diff before
-  their state edit. The normal-use trigger is resuming in a dirty tree: the role can overwrite or
-  mix user/interrupted handoff work without first seeing it, despite the repository's preservation
-  rule. Make the startup dirty-tree check universal or state it in every affected launcher, and add
-  a launcher-contract check that each state-writing role includes startup, commit, and close rules.
+None.
 
 ## Design consistency notes
 

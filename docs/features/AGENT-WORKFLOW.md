@@ -49,8 +49,8 @@ Work in small, complete pieces. For each piece:
    ```bash
    make test
    make build                          # unless make dist follows
-   cd ui && npm test                   # when ui/ changed
-   cd ui && npm run build              # when ui/ changed and make dist does not follow
+   (cd ui && npm test)                 # when ui/ changed
+   (cd ui && npm run build)            # when ui/ changed and make dist does not follow
    make dist  # when producing a distributable or refreshing embedded UI output
    ```
 

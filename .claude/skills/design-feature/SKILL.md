@@ -10,8 +10,9 @@ technical design without confirming the product behavior with the user.
 
 ## 1. Choose and record the idea
 
-Use the injected handoff header when present; otherwise read only **Current position** and **Active
-change** in `docs/features/HANDOFF.md`. Inspect `git status` and the diff, then read the relevant
+At startup, inspect `git status` and the existing diff before any repository edit. Use the injected
+handoff header when present; otherwise read only **Current position** and **Active
+change** in `docs/features/HANDOFF.md`. Then read the relevant
 authoring sections of `docs/specs/README.md`, `docs/ideas.md`, `docs/ready-changes/README.md`, and
 `docs/features/AGENT-WORKFLOW.md` §11.
 
@@ -94,3 +95,5 @@ When both specification sides are complete:
 
 If a material product or technical decision remains unresolved, do not create a ready change. Keep
 the entry under `Ideas being defined`, record what is needed, and tell the user plainly.
+
+Close with the handoff update, commit, and concise human update.

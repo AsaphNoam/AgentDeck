@@ -52,6 +52,7 @@ run: build
 ## check-specs: validate the authoritative specification set
 check-specs:
 	@scripts/check-specs.sh
+	@scripts/check-launcher-contract.sh
 
 ## test: lint specs, then run the Go suite (no-tag fallback + sqlite_fts5 FTS)
 test: check-specs

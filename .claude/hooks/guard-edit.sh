@@ -9,6 +9,30 @@ case "$fp" in
 /*) target=$fp ;;
 *) target=$project_dir/$fp ;;
 esac
+
+# Resolve `.` and `..` textually so a non-canonical spelling such as
+# docs/features/../features/HANDOFF.md cannot bypass the decisions below. A Write
+# target need not exist yet, so this cannot go through realpath. A relative
+# result keeps a `./` prefix because the patterns below anchor on a slash.
+target=$(printf '%s\n' "$target" | awk '
+{
+  absolute = (substr($0, 1, 1) == "/")
+  n = split($0, seg, "/")
+  top = 0
+  for (i = 1; i <= n; i++) {
+    s = seg[i]
+    if (s == "" || s == ".") continue
+    if (s == "..") {
+      if (top > 0 && out[top] != "..") { top--; continue }
+      if (absolute) continue
+    }
+    out[++top] = s
+  }
+  res = ""
+  for (i = 1; i <= top; i++) res = res "/" out[i]
+  print (absolute ? (res == "" ? "/" : res) : ("." res))
+}')
+
 deny() {
   printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}\n' "$1"
   exit 0

@@ -5,6 +5,7 @@ import argparse
 import datetime as dt
 import json
 import os
+import sys
 from collections import defaultdict
 from pathlib import Path
 
@@ -189,8 +190,15 @@ def scan_codex(root, start, end, cwd=None):
                     record = json.loads(line)
                 except json.JSONDecodeError:
                     continue
+                if not isinstance(record, dict):
+                    print(f"transcript usage: skipped non-object Codex record {path}:{line_no}", file=sys.stderr)
+                    continue
                 if record.get("type") == "session_meta":
-                    meta = record.get("payload", {})
+                    payload = record.get("payload")
+                    if not isinstance(payload, dict):
+                        print(f"transcript usage: skipped Codex session metadata with non-object payload {path}:{line_no}", file=sys.stderr)
+                        continue
+                    meta = payload
                     if cwd is not None and normalized_path(meta.get("cwd", "")) != cwd:
                         meta["_excluded"] = True
                 payload = record.get("payload")

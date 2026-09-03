@@ -5,7 +5,8 @@ description: Explicit invocation only. Run only when the user sends `/release`; 
 
 # Cut a release
 
-Use the injected handoff header when present; otherwise read only **Current position** and **Active
+At startup, inspect `git status` and the existing diff before any repository edit. Use the injected
+handoff header when present; otherwise read only **Current position** and **Active
 change** in [`HANDOFF.md`](../../../docs/features/HANDOFF.md). Open its **Review findings**,
 **Acceptance gates**, and **Blocked on human** sections for readiness, then read FS-10 and
 TS-06.R13–R22 for the release contract,

@@ -5,7 +5,8 @@ description: Explicit invocation only. Run only when the user sends `/investigat
 
 # Investigate a reported bug
 
-Use the injected handoff header when present; otherwise read only **Current position** and **Active
+At startup, inspect `git status` and the existing diff before any repository edit. Use the injected
+handoff header when present; otherwise read only **Current position** and **Active
 change** in [`HANDOFF.md`](../../../docs/features/HANDOFF.md). Then read the FS/TS items governing
 the reported behavior,
 [`INVARIANTS.md`](../../../docs/features/INVARIANTS.md)'s trigger index and the classes the

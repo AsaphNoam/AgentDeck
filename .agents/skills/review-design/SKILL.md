@@ -5,7 +5,8 @@ description: Explicit invocation only. Run only when the user sends `/review-des
 
 # Review a waiting design
 
-Use the injected handoff header when present; otherwise read only **Current position** and **Active
+At startup, inspect `git status` and the existing diff before any repository edit. Use the injected
+handoff header when present; otherwise read only **Current position** and **Active
 change** in [`HANDOFF.md`](../../../docs/features/HANDOFF.md). Then read the ready change under
 review, every planned
 FS/TS item it cites plus the shipped requirements around them,
