@@ -76,12 +76,11 @@ the relevant feature and technical specifications; it does not change product co
   supersede that makes the visible history stop matching what the agent received. Each needs a
   product decision about what "edit" should promise.
 - **Richer agent-facing orchestration API (remainder).** The first slice — typed retry
-  classification on refused tool calls and structured result delivery — is specified in FS-17 and
-  queued as `docs/ready-changes/agent-tool-retry-classification.md`. Investigation of the original
-  idea found that most of what it asked for had already shipped: tools return typed JSON with stable
-  codes, `create_task` arms already register durable host-managed waiting instead of polling, and
-  `get_assigned_task` already returns a task's own context-reference ids with per-attachment
-  presentation. What remains unbuilt, each needing its own product decision:
+  classification on refused tool calls and structured result delivery — is shipped in FS-17.
+  Investigation of the original idea found that most of what it asked for had already shipped:
+  tools return typed JSON with stable codes, `create_task` arms already register durable host-managed
+  waiting instead of polling, and `get_assigned_task` already returns a task's own context-reference
+  ids with per-attachment presentation. What remains unbuilt, each needing its own product decision:
   - **Agent-side re-arm and retry.** `POST /api/tasks/{id}/rearm` and `/retry` exist for people but
     have no MCP counterpart, so an agent told `retry_requires_rearm` cannot act on it.
   - **Work inspection.** Reading work you created or are assigned to. FS-16 §6 and TS-04.R29
