@@ -1,6 +1,6 @@
 # TS-08 — Frontend presentation architecture
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src`, `ui/package.json`, `ui/vite.config.ts`
 **Absorbed:** —
 
@@ -404,7 +404,7 @@ primitive seam; the rejected alternatives are recorded in §5.
 
 ### 2.6 Automatic pane opening on a waiting transition
 
-- **R49 (planned)** — **The transition is observed from `state_update` in the
+- **R49** — **The transition is observed from `state_update` in the
   grid, not from the notification stream.** FS-02.R61 keys on the durable `state` field every
   `state_update` carries, which is self-correcting on a dropped frame (FS-02.R9), rather than on the
   `notification` event `internal/bus/bus.go` emits for the same transition. The notification is the

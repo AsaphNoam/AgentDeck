@@ -42,9 +42,7 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-- [`open-waiting-approval-panes.md`](open-waiting-approval-panes.md) — expand a chat agent's
-  dashboard pane by itself when it newly enters `waiting_input`, on a newly observed transition
-  only, reusing the existing four-pane cap and eviction.
+None.
 
 ## Paused changes
 

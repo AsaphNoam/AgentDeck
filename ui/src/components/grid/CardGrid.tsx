@@ -3,7 +3,7 @@ import { SortableContext, arrayMove, rectSortingStrategy } from "@dnd-kit/sortab
 import { useEffect, useMemo, useRef, useState, type ComponentProps, type KeyboardEvent } from "react";
 import { Link } from "react-router-dom";
 import { getLayout, putLayout, releaseGroup } from "../../api/client";
-import type { AgentState } from "../../api/types";
+import type { AgentState, AgentStatus } from "../../api/types";
 import { useAgentStore } from "../../store/agentStore";
 import { useTranscriptStore } from "../../store/transcriptStore";
 import { useUiStore } from "../../store/uiStore";
@@ -41,6 +41,7 @@ function TaskAttentionLink({ projectID }: { projectID?: string }) {
 export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?: string; projectTitle?: string; fixedProject?: string } = {}) {
   const agents = useAgentStore((state) => state.agents);
   const agentsHydrated = useAgentStore((state) => state.hydrated);
+  const agentsHydrating = useAgentStore((state) => state.hydrating);
   const order = useAgentStore((state) => state.order);
   const setOrder = useAgentStore((state) => state.setOrder);
   const density = useUiStore((state) => state.density);
@@ -110,6 +111,61 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
 
   const grouped = useMemo(() => groupAgents(ids.map((id) => agents[id]).filter(Boolean)), [agents, ids]);
 
+  // FS-02.R61 — a chat agent that newly enters `waiting_input` opens its own pane, so a
+  // conversation stopped for an approval is in front of the person instead of behind a
+  // badge. Eligibility reuses the set the grid already renders: `grouped` is scoped to
+  // this project, a collapsed section (R18) renders no cards and so opens none — a pane
+  // nobody can see would spend one of R48's four slots and evict a visible one — and a
+  // terminal agent has no pane to open (R46). No second copy of what is on screen.
+  const openableIDs = useMemo(
+    () => new Set(
+      grouped
+        .filter((group) => !(groupLayout[group.key]?.collapsed ?? false))
+        .flatMap((group) => group.agents)
+        .filter((agent) => agent.interface === "chat")
+        .map((agent) => agent.agent_id),
+    ),
+    [grouped, groupLayout],
+  );
+
+  // The transition is read from the durable `state` every `state_update` carries, not
+  // from the `notification` event the bus emits for the same moment: NotificationsEditor's
+  // per-type mute list filters that stream, so muting a toast would silently disable an
+  // unrelated layout behaviour, and the server emits it once and never replays it, so a
+  // reconnecting tab would see nothing (TS-08.R49).
+  //
+  // The record below is state derived from the connection, so it is reseeded rather than
+  // fired on every boundary crossing (INV §1): while the store is hydrating, and until it
+  // has hydrated once, the effect only writes what it observed. That is what makes R61's
+  // "newly observed" rule true instead of aspirational — a first load, a reload, a
+  // reconnect, and an agent first seen already waiting all open nothing. It lives here,
+  // beside `expanded`, so the previous state exists in exactly one place and `agentStore`
+  // keeps its single-writer role (INV §2); it is created and discarded with the mounted
+  // grid, which is the mechanism behind R61's limit that a pane opens only while a grid is
+  // on screen to observe the transition.
+  const lastObservedState = useRef(new Map<string, AgentStatus>());
+  useEffect(() => {
+    const observed = lastObservedState.current;
+    const settled = agentsHydrated && !agentsHydrating;
+    const opening: string[] = [];
+    for (const agent of Object.values(agents)) {
+      const previous = observed.get(agent.agent_id);
+      observed.set(agent.agent_id, agent.state);
+      if (!settled || previous === undefined || previous === "waiting_input") continue;
+      if (agent.state === "waiting_input" && openableIDs.has(agent.agent_id)) opening.push(agent.agent_id);
+    }
+    for (const id of [...observed.keys()]) if (!agents[id]) observed.delete(id);
+    if (opening.length === 0) return;
+    // Transitions React committed together are ordered by the server time they carry, so
+    // "the last four" is the four that happened last rather than whichever order the
+    // agent record happens to enumerate (R61).
+    opening.sort((a, b) => agents[a].updated_at - agents[b].updated_at);
+    // One state update for the whole batch, through the same append-and-cap a click
+    // takes, so the cap, its least-recently-used eviction, and the persisted list cannot
+    // drift from the manual path (INV §2, §10).
+    setExpanded((current) => opening.reduce(expandPane, current));
+  }, [agents, agentsHydrated, agentsHydrating, openableIDs]);
+
   // dnd-kit derives sortable indices and measured-rect transforms from the items
   // each SortableContext is handed, so a drag's live preview is only as correct as
   // that list. One list spanning both blocks let a drag near the running/stopped
@@ -126,7 +182,7 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
   const toggleExpanded = (agentId: string) => {
     setExpanded((current) => current.includes(agentId)
       ? current.filter((id) => id !== agentId)
-      : [...current, agentId].slice(-4));
+      : expandPane(current, agentId));
   };
 
   const hasExpandedOnGrid = expanded.some((id) => ids.includes(id));
@@ -282,6 +338,13 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
       )}
     </>
   );
+}
+
+/** expandPane appends an id under FS-02.R48's cap of four expanded panes, evicting the
+ *  least-recently-used entry at the head. A person's click and R61's automatic opening
+ *  both go through it, so neither can grow its own cap or recency rule (INV §2). */
+function expandPane(current: string[], agentId: string) {
+  return current.includes(agentId) ? current : [...current, agentId].slice(-4);
 }
 
 export function mergeScopedOrder(globalIDs: string[], scopedIDs: string[], reorderedScopedIDs: string[]) {

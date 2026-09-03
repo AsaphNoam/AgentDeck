@@ -272,11 +272,12 @@ describe("CardGrid", () => {
   });
 
   // FS-02.A30 — pane membership is not keyed to `running`: an agent that stops
-  // with its pane open keeps it, no state_update expands anything, and a removal
-  // tombstone takes the pane with the card. FS-03.A23 covers the same boundary from
-  // the pane's side — the durable transcript and composer survive the stop.
-  it("keeps a stopped pane open, never auto-expands waiting input, and removes a pane with its card", async () => {
-    seedGrid(["a_1", "a_2"], { a_1: agent("a_1"), a_2: agent("a_2") });
+  // with its pane open keeps it, and a removal tombstone takes the pane with the card.
+  // FS-03.A23 covers the same boundary from the pane's side — the durable transcript and
+  // composer survive the stop. R51 still opens nothing on every transition except the one
+  // R61 names, so `done` is what proves it here; `waiting_input` is A43's below.
+  it("keeps a stopped pane open, opens nothing on a done transition, and removes a pane with its card", async () => {
+    seedHydratedGrid(["a_1", "a_2"], { a_1: agent("a_1"), a_2: agent("a_2") });
     renderWithQuery(<CardGrid />);
     fireEvent.click(await screen.findByText("a_1"));
     expect(screen.getByLabelText("Composer a_1")).toBeInTheDocument();
@@ -284,12 +285,134 @@ describe("CardGrid", () => {
     act(() => useAgentStore.getState().applyStateUpdate(agent("a_1", { running: false, state: "done" })));
     expect(screen.getByLabelText("Composer a_1")).toBeInTheDocument();
 
-    act(() => useAgentStore.getState().applyStateUpdate(agent("a_2", { state: "waiting_input" })));
+    act(() => useAgentStore.getState().applyStateUpdate(agent("a_2", { running: false, state: "done" })));
     expect(screen.queryByLabelText("Composer a_2")).not.toBeInTheDocument();
 
     act(() => useAgentStore.getState().removeAgent("a_1"));
     expect(screen.queryByLabelText("Composer a_1")).not.toBeInTheDocument();
     expect(screen.queryByText("a_1")).not.toBeInTheDocument();
+  });
+
+  // FS-02.A43 — the transition itself opens the pane, answering it leaves the pane open,
+  // and a pane collapsed while its agent is still waiting stays collapsed until the agent
+  // asks again. Nothing here delivers a `notification`: the grid reads the durable state,
+  // which is why a muted `waiting_input` notification — dropped by sse.ts inside the
+  // notification handler, which never touches agent state — does not suppress the opening.
+  it("opens a pane on a new waiting-input transition and keeps a collapsed one collapsed", async () => {
+    seedHydratedGrid(["a_1", "a_2"], {
+      a_1: agent("a_1", { state: "busy" }), a_2: agent("a_2", { state: "busy" }),
+    });
+    renderWithQuery(<CardGrid projectID="my-app" />);
+    await screen.findByText("a_1");
+    expect(screen.queryByLabelText(/Composer a_/)).not.toBeInTheDocument();
+
+    act(() => useAgentStore.getState().applyStateUpdate(agent("a_1", { state: "waiting_input" })));
+    expect(await screen.findByLabelText("Composer a_1")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Composer a_2")).not.toBeInTheDocument();
+
+    // Answering the request closes nothing.
+    act(() => useAgentStore.getState().applyStateUpdate(agent("a_1", { state: "busy" })));
+    expect(screen.getByLabelText("Composer a_1")).toBeInTheDocument();
+
+    act(() => useAgentStore.getState().applyStateUpdate(agent("a_1", { state: "waiting_input" })));
+    const card = screen.getByLabelText("Composer a_1").closest('[data-ui="agent-card"]')!;
+    fireEvent.click(card.querySelector('[data-slot="header"]')!);
+    expect(screen.queryByLabelText("Composer a_1")).not.toBeInTheDocument();
+
+    // A repeat of the state it is already in is not a new transition.
+    act(() => useAgentStore.getState().applyStateUpdate(agent("a_1", { state: "waiting_input", detail: "still waiting" })));
+    expect(screen.queryByLabelText("Composer a_1")).not.toBeInTheDocument();
+
+    // The next one is.
+    act(() => useAgentStore.getState().applyStateUpdate(agent("a_1", { state: "busy" })));
+    act(() => useAgentStore.getState().applyStateUpdate(agent("a_1", { state: "waiting_input" })));
+    expect(screen.getByLabelText("Composer a_1")).toBeInTheDocument();
+  });
+
+  // FS-02.A43 — only a newly observed transition opens a pane. An agent already waiting
+  // when the grid mounts, a burst that arrives before hydration completes, and a
+  // reconnect's replay all reseed the record and open nothing; otherwise every reload and
+  // every dropped connection would reopen panes the person deliberately collapsed.
+  it("opens nothing for an agent already waiting across a load, a hydration burst, and a reconnect", async () => {
+    seedHydratedGrid(["a_1"], { a_1: agent("a_1", { state: "waiting_input" }) });
+    const first = renderWithQuery(<CardGrid projectID="my-app" />);
+    await screen.findByText("a_1");
+    expect(screen.queryByLabelText("Composer a_1")).not.toBeInTheDocument();
+
+    // A reload: the grid remounts with an empty record and the agent is still waiting.
+    first.unmount();
+    renderWithQuery(<CardGrid projectID="my-app" />);
+    await screen.findByText("a_1");
+    expect(screen.queryByLabelText("Composer a_1")).not.toBeInTheDocument();
+
+    // A reconnect: hydrateBegin re-arms the burst, so the transition inside it reseeds.
+    act(() => useAgentStore.getState().applyStateUpdate(agent("a_1", { state: "busy" })));
+    act(() => useAgentStore.getState().hydrateBegin());
+    act(() => useAgentStore.getState().applyStateUpdate(agent("a_1", { state: "waiting_input" })));
+    act(() => useAgentStore.getState().hydrateComplete(["a_1"]));
+    expect(screen.queryByLabelText("Composer a_1")).not.toBeInTheDocument();
+  });
+
+  // FS-02.A43 — the opened card must be one the grid is rendering. A pane nobody can see
+  // would spend one of R48's four slots and evict a visible one, so a collapsed section
+  // opens nothing and is not itself expanded.
+  it("opens nothing for terminal, cross-project, and collapsed-section agents", async () => {
+    seedHydratedGrid(["a_term", "a_elsewhere", "a_hidden"], {
+      a_term: agent("a_term", { interface: "terminal", state: "busy" }),
+      a_elsewhere: agent("a_elsewhere", { project: "other", state: "busy" }),
+      a_hidden: agent("a_hidden", { group: "alpha", state: "busy" }),
+    }, { alpha: { collapsed: true } });
+    renderWithQuery(<CardGrid projectID="my-app" />);
+    await screen.findByText("a_term");
+
+    act(() => {
+      for (const id of ["a_term", "a_elsewhere", "a_hidden"]) {
+        const before = useAgentStore.getState().agents[id];
+        useAgentStore.getState().applyStateUpdate({ ...before, state: "waiting_input" });
+      }
+    });
+
+    expect(screen.queryByLabelText(/Composer a_/)).not.toBeInTheDocument();
+    expect(document.querySelector('[data-ui="agent-group"][data-state="collapsed"]')).not.toBeNull();
+  });
+
+  // FS-02.A43 — an automatic opening is an ordinary expansion in every respect: it takes
+  // R48's cap and its least-recently-used eviction through the same path a click takes,
+  // and a batch that arrives together leaves the four that transitioned last.
+  it("evicts the least-recently-used pane for a waiting agent and keeps the last four of a batch", async () => {
+    const agents = Object.fromEntries([1, 2, 3, 4, 5].map((n) =>
+      [`a_${n}`, agent(`a_${n}`, { state: "busy", updated_at: n })]));
+    seedHydratedGrid(Object.keys(agents), agents);
+    const saved: string[][] = [];
+    server.use(http.put("/api/layout", async ({ request }) => {
+      const body = await request.json() as { expanded: string[] };
+      saved.push(body.expanded);
+      return HttpResponse.json(body);
+    }));
+    renderWithQuery(<CardGrid projectID="my-app" />);
+    for (const id of ["a_1", "a_2", "a_3", "a_4"]) fireEvent.click(await screen.findByText(id));
+
+    act(() => useAgentStore.getState().applyStateUpdate(agent("a_5", { state: "waiting_input", updated_at: 5 })));
+
+    expect(screen.queryByLabelText("Composer a_1")).not.toBeInTheDocument();
+    expect(screen.getAllByLabelText(/Composer a_/)).toHaveLength(4);
+    await waitFor(() => expect(saved.at(-1)).toEqual(["a_2", "a_3", "a_4", "a_5"]));
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse all" }));
+    act(() => {
+      for (const n of [1, 2, 3, 4, 5]) {
+        useAgentStore.getState().applyStateUpdate(agent(`a_${n}`, { state: "busy", updated_at: 10 + n }));
+      }
+    });
+    act(() => {
+      for (const n of [1, 2, 3, 4, 5]) {
+        useAgentStore.getState().applyStateUpdate(agent(`a_${n}`, { state: "waiting_input", updated_at: 20 + n }));
+      }
+    });
+
+    expect(screen.getAllByLabelText(/Composer a_/)).toHaveLength(4);
+    expect(screen.queryByLabelText("Composer a_1")).not.toBeInTheDocument();
+    await waitFor(() => expect(saved.at(-1)).toEqual(["a_2", "a_3", "a_4", "a_5"]));
   });
 
   // FS-02.R44 / A26: the dashboard's only task-shaped element is how many tasks
@@ -425,6 +548,18 @@ describe("CardGrid", () => {
     server.use(http.get("/api/layout", () =>
       HttpResponse.json({ order: manualOrder, density: { perRow: 3, gap: 16 }, groups })));
     act(() => useAgentStore.setState({ agents, order: manualOrder }));
+  }
+
+  /** seedHydratedGrid leaves the store the way a completed hydration burst leaves it.
+   *  FS-02.R61's detection reseeds and opens nothing until the store has hydrated once
+   *  (TS-08.R49), so every automatic-opening case has to start from a settled store. */
+  function seedHydratedGrid(
+    manualOrder: string[],
+    agents: Record<string, AgentState>,
+    groups: Record<string, { collapsed: boolean }> = {},
+  ) {
+    seedGrid(manualOrder, agents, groups);
+    act(() => useAgentStore.setState({ hydrated: true, hydrating: false }));
   }
 
   function capturedLayoutOrders() {

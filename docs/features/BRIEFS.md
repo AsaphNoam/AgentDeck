@@ -5,6 +5,25 @@ fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDO
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 
+### 2026-09-03 — Implementation: conversations that stop for approval open themselves
+
+A chat agent that stops for a permission decision now opens its own conversation pane on the
+dashboard you are looking at, instead of only raising a badge you have to notice and act on. Only a
+transition you are there to see opens anything: an agent that was already waiting when you load the
+page, reload it, come back to it, or reconnect shows the badge and nothing more, so a dropped
+connection never reopens panes you deliberately closed. Collapsing an opened pane keeps it closed
+until that agent asks again, answering the request leaves it open, and **Collapse all** clears a
+pile-up. Terminal agents, agents in another project, and agents inside a collapsed group are left
+alone — a pane you cannot see would take one of the four slots and push out one you can. When four
+are already open, a fifth waiting agent pushes out the pane you touched least recently and its
+unsent message comes back when you reopen it, exactly as it does today.
+
+**Needs attention:** A pane only opens while a dashboard is on screen. An agent that starts waiting
+while you are elsewhere in the app shows the badge when you arrive, not an opened pane.
+
+**Next:** Have an independent agent review this code, and run the browser check that an opening pane
+pushes only the rows beneath it and that the eviction of a fifth pane is visible rather than silent.
+
 ### 2026-09-03 — Fix: unattended pipeline reliability
 
 All seven review findings are fixed. Open run pages now show permission attention immediately,

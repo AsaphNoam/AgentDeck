@@ -1,6 +1,6 @@
 # FS-02 — Dashboard (card grid home view)
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src/components/grid/`, `ui/src/store/`, `ui/src/components/shell/NotificationCenter.tsx`, `ui/src/features/settings/NotificationsEditor.tsx`, `ui/src/api/sse.ts` · `internal/bus/`, `internal/state/`, `internal/server/handlers.go` (layout, reconcile) · **Journeys:** J5 (grid & layout), J11 (failure & recovery), J12 (restart durability)
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) F1/F2/F11 and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -363,7 +363,7 @@ project that is not repo-backed, or is archived, shows no such action.
 - **R51** — A pane is opened only by a person. No notification, state
   change, permission request, or `waiting_input` transition expands a card by itself, so the grid
   never reflows while it is being read; R3's badge and salience treatment remain the attention
-  signal. That clause alone is superseded by R61 (planned), which opens a pane on one named
+  signal. That clause alone is superseded by R61, which opens a pane on one named
   transition; every other kind of event still opens nothing, and R3's badge remains the signal for
   all of them. A pane whose agent is removed (R21) closes with its card. A pane whose agent stops
   stays open and keeps showing the durable transcript, matching R6's rule that stopping is not
@@ -395,7 +395,7 @@ project that is not repo-backed, or is archived, shows no such action.
   the resulting visible set and the remaining overflow set retain alphabetical order. FS-12.R39
   presents every remaining project under `+n`.
 
-- **R61 (planned)** — A chat agent that newly enters `waiting_input` opens
+- **R61** — A chat agent that newly enters `waiting_input` opens
   its own pane on the grid the person is looking at, so a conversation that has stopped for an
   approval is in front of them instead of behind a badge. This reverses R51's blanket rule for this
   one transition and nothing else: a notification, a `done` or `error` transition, a mail arrival,
@@ -641,9 +641,9 @@ picker and launches with the route project's id; the general modal continues to 
 
 - **A30** (R47, R51) — Expanding and collapsing a card changes no card's order,
   group, or context-menu contents, including across the running/stopped boundary; an expanded card
-  exposes no drag grip and a collapsed one still does; a `state_update` moving an agent to
-  `waiting_input` expands nothing; and a removal tombstone for an expanded agent removes both the
-  pane and the card. An agent that goes from running to stopped while its pane is open keeps that
+  exposes no drag grip and a collapsed one still does; a `state_update` moving an agent to `done`
+  expands nothing, R51's rule holding for every transition except the one R61 names; and a removal
+  tombstone for an expanded agent removes both the pane and the card. An agent that goes from running to stopped while its pane is open keeps that
   pane, its durable transcript, and its composer as a wake surface (FS-03.R35/R39) — pane membership
   is not keyed to `running`, which every other case here would fail to catch. *Verify by*
   `CardGrid.test.tsx` cases asserting order, grip presence, and pane membership before and after each
@@ -739,7 +739,7 @@ picker and launches with the route project's id; the general modal continues to 
   without manual refresh showing its branch name; a non-repo project and an archived project offer
   no entry point. — component tests plus the FS-19.A1 journey.
 
-- **A43 (planned)** (R61) — A running chat agent transitioning from `busy` to
+- **A43** (R61) — A running chat agent transitioning from `busy` to
   `waiting_input` expands its pane on the grid; the same agent already in `waiting_input` across a
   reload, a completed hydration burst, and a reconnect expands nothing, and an agent whose first
   observed state is `waiting_input` expands nothing. Collapsing an auto-opened pane while the agent
@@ -749,7 +749,10 @@ picker and launches with the route project's id; the general modal continues to 
   it is reopened; five agents entering together leave exactly four open. A terminal-interface agent,
   an agent outside the grid's project, and an agent in a collapsed group section each expand nothing
   and leave the section collapsed. A muted `waiting_input` notification does not suppress the
-  expansion. — `ui/src/components/grid/CardGrid.test.tsx` and `ui/src/store/agentStore.test.ts`; J5.
+  expansion. — `ui/src/components/grid/CardGrid.test.tsx`, which is the whole client evidence
+  because the detection and the expanded list both live in `CardGrid`; `agentStore` gains no field
+  and keeps its single-writer role (TS-08.R49). The reflow and the visibility of the eviction are
+  J5's, because jsdom evaluates no layout.
 
 ## 6. Deviations & open decisions
 
@@ -818,5 +821,7 @@ picker and launches with the route project's id; the general modal continues to 
   registry order, and same-block/cross-block drop behavior — A28).
 - **Grid stability and legibility:** R55–R59 and A37–A41 are shipped; their evidence is
   named there and in TS-08.R45–R48 and FS-12.R40.
-- **Planned automatic pane opening:** R61 and A43 are unshipped; their architecture is TS-08.R49,
-  and R51 records the one clause they supersede.
+- **Automatic pane opening:** R61 and A43 are shipped; their architecture is TS-08.R49, and R51
+  records the one clause they supersede. The stated limit stands: a pane opens only while a card
+  grid is mounted to observe the transition, so an agent that starts waiting while the person is on
+  another route shows R3's badge when they arrive, not an opened pane.
