@@ -240,8 +240,26 @@ func TestCancellingATaskFinishesItAndReleasesItsRuntime(t *testing.T) {
 	if cancelled.OutcomeSource != "" {
 		t.Fatalf("cancel recorded a reporter %q; it is host-written", cancelled.OutcomeSource)
 	}
-	if cancelled.PendingRelease || cancelled.RuntimeClaim != "" {
-		t.Fatalf("cancel left the release unfinished: %+v", cancelled)
+	if !cancelled.PendingRelease && cancelled.RuntimeClaim != "" {
+		t.Fatalf("cancel dropped the release intent while still holding a claim: %+v", cancelled)
+	}
+	// The stop follows the commit and cannot be part of it, so the response promises the
+	// terminal state and an intent that is either already discharged or standing for
+	// recovery to finish (FS-16.R4, TS-10.R19). A cancel that lands while the task's own
+	// launch still holds the lifecycle claim gets its stop refused, which is why this
+	// asserts the released state rather than reading it off the response: driving the
+	// recovery backstop is a no-op once the cancel's own stop has succeeded.
+	released := srv.rereadTask(state.Task{TaskID: task.TaskID})
+	for deadline := time.Now().Add(15 * time.Second); released.PendingRelease; {
+		if time.Now().After(deadline) {
+			t.Fatalf("cancel left the release unfinished: %+v", released)
+		}
+		srv.finishInterruptedRelease(context.Background(), released)
+		released = srv.rereadTask(state.Task{TaskID: task.TaskID})
+		time.Sleep(20 * time.Millisecond)
+	}
+	if released.RuntimeClaim != "" {
+		t.Fatalf("cancel completed the release but kept the claim: %+v", released)
 	}
 	waitRunning(t, srv, running.AssignedAgentID, false)
 

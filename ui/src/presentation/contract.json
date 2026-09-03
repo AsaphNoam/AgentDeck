@@ -195,12 +195,13 @@
         "fill",
         "label"
       ],
-      "states": [],
+      "states": [
+        "compact"
+      ],
       "variants": [
         "low",
         "medium",
-        "high",
-        "compact"
+        "high"
       ]
     },
     "context-menu": {

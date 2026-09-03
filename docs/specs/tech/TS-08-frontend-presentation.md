@@ -252,9 +252,11 @@ primitive seam; the rejected alternatives are recorded in §5.
   controls. The same seam removes Mermaid's intrinsic root-SVG width cap after sanitization, while
   the integration stylesheet gives the figure the transcript's available width and bounds the SVG
   height; this keeps compact diagrams readable without letting wide or tall diagrams escape the
-  chat surface. The react-markdown component map stays referentially stable while message text is
-  unchanged, so a transcript scroll-state rerender preserves the mounted SVG and does not repeat
-  main-thread Mermaid work. No elapsed-time timeout is claimed: main-thread Mermaid work is not interruptible, and
+  chat surface. The react-markdown component map stays referentially stable for as long as a
+  message stays mounted, including across the streamed deltas that extend its text, so neither a
+  transcript scroll-state rerender nor a later delta remounts a settled diagram or repeats
+  main-thread Mermaid work. The map therefore reads the current message text through a ref rather
+  than closing over it. No elapsed-time timeout is claimed: main-thread Mermaid work is not interruptible, and
   adding an isolation runtime without evidence that the fixed input bound is insufficient would be
   disproportionate machinery.
 
@@ -396,8 +398,11 @@ primitive seam; the rejected alternatives are recorded in §5.
 - **R48** — **The expanded card's context figure reuses the shipped
   meter's derivation.** FS-02.R59 moves, and does not duplicate, the context reading: `ContextBar`
   keeps sole ownership of clamping `context_pct`, rounding it, choosing the low/medium/high ramp,
-  and producing the visible `n% context used` label, and gains a compact form selected by a
-  `context-meter` variant added to `contract.json` in the same change. `AgentCard` renders the
+  and producing the visible `n% context used` label, and gains a compact form. Density and tone are
+  orthogonal, so they take separate curated dimensions: the meter's `data-variant` stays the
+  low/medium/high tone in both forms and the compact form is a `context-meter` state registered in
+  `contract.json`. Folding density into the variant would leave the compact meter — the only context
+  reading FS-02.R59 keeps on the dashboard — with no tone a skin could select on. `AgentCard` renders the
   existing `context` slot only while expanded, in the header region, and renders no context element
   while collapsed. A second rounding or threshold expression anywhere else is the drift INV §2
   describes, so the compact form differs from the full meter in presentation only.

@@ -400,11 +400,11 @@
   top: 14px;
 }
 
-.context-bar[data-variant="compact"] {
+.context-bar[data-state="compact"] {
   margin: 0;
 }
 
-.context-bar[data-variant="compact"] em {
+.context-bar[data-state="compact"] em {
   left: 0;
   right: auto;
   top: 14px;

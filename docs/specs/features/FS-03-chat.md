@@ -426,8 +426,9 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 
 - **A20** (R37) — A closed ```mermaid fence in an assistant message renders a diagram;
   the same block renders as a code block while its fence is still open, and becomes the diagram once
-  the closing fence arrives; a parent-only rerender after it settles neither replaces it with source
-  nor invokes Mermaid again; the source toggle returns the original text; a ```mermaid fence in a
+  the closing fence arrives; neither a parent-only rerender after it settles nor a later streamed
+  delta that appends prose after the closed fence replaces it with source or invokes Mermaid again;
+  the source toggle returns the original text; a ```mermaid fence in a
   tool result, a diff, or a user prompt renders exactly as it does today. Replaying the identical
   durable events produces the identical rendered output. *Verify by* a new
   `ui/src/components/chat/renderers/AssistantText.test.tsx` covering the streaming, closed-fence,

@@ -27,18 +27,21 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 - **Last reviewed code:** `636781b` (2026-09-03), across the continuous range `e46e66b..636781b`.
   **Next review unit:** workflow-efficiency commit `7c9ee44`; product-fix commit `3c1dc96` follows
   as a second unit. Both shipped in `v0.4.0` unreviewed.
-- **Open findings:** eight, listed below — two **Must fix** (streamed Mermaid remount; FS-14 Reject
-  versus approval ordering) and six **Worth fixing**. Both **Must fix** items shipped in `v0.4.0`.
-  The 2026-09-02 bug investigation's one remaining **Must fix** is the silent-stage product decision
-  under *Decisions needing your input*. The task-cancel release flake is open as a **Worth fixing**
-  finding.
+- **Open findings:** one, listed below — the **Worth fixing** completion of TS-02/TS-03/TS-09 for
+  FS-14's proposal Reject/Delete design, which is blocked on the Reject-versus-approval ordering
+  decision. The 2026-09-03 review's other seven findings were fixed on 2026-09-03; the
+  Reject-versus-approval **Must fix** became a product decision and moved to *Decisions needing your
+  input*, beside the 2026-09-02 investigation's silent-stage decision. Both of the **Must fix**
+  items `v0.4.0` shipped with are now closed as code: the streamed Mermaid remount is fixed, and
+  the FS-14 one governs `(planned)` behavior that nothing shipped.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
   remain owed before claiming those adapters accept structured results.
 - **Usability state:** The Pipelines pages and dashboard grid were driven through a real Chromium on
   2026-08-30 against a `make dist` build of the shipped tree; that run is closed except for the
   items still owed here. Owed: A25's stage-boundary wording (needs a live report cycle `fakeacp`
   cannot drive), A18's consumption on approval, A32's unknown-agent and cross-project id cases, and
-  the refused-drag pointer's computed-cursor pass (FS-02.R53, an open finding below). Full run:
+  the refused-drag pointer's computed-cursor pass (FS-02.R53), which is an acceptance gate below
+  rather than a finding. Full run:
   [`usability-review-run-2026-08-30-new-pages.md`](../archive/reviews/usability-review-run-2026-08-30-new-pages.md).
 - **Branch:** `main`.
 
@@ -47,13 +50,58 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 **Change:** None.
 
 **Next:** Independently review the automatic-pane-opening implementation and the unattended-pipeline
-fix — `7c9ee44` first, then `3c1dc96`. After that, the two open **Must fix** findings are the
-highest-value `/fix` unit, since `v0.4.0` shipped with both. Keep the credentialed Claude/Codex
-browser journey as an acceptance gate until a human authorizes real provider sessions.
+fix — `7c9ee44` first, then `3c1dc96`. FS-14's proposal Reject/Delete design is the next design unit
+once the human answers the Reject-versus-approval ordering question under *Decisions needing your
+input*; nothing should implement R49–R51 before that answer and the TS-02/TS-03/TS-09 completion it
+gates. Keep the credentialed Claude/Codex browser journey as an acceptance gate until a human
+authorizes real provider sessions.
 
 ## Changelog
 
 Earlier entries are in the [archived handoff](../archive/state/HANDOFF-through-2026-09-03.md).
+
+- **2026-09-03 — fix: the 2026-09-03 review's findings (INV §2/§10/§15):** Seven of eight closed;
+  the eighth is blocked on a product decision.
+
+  **Must fix, streamed Mermaid remount (FS-03.R37/A20, TS-08.R40; INV §10).** `AssistantText`
+  memoized react-markdown's component map on the message text, so every streamed delta after a
+  closed ```mermaid fence rebuilt the map, remounted `MermaidDiagram`, dropped the settled SVG back
+  to source, and re-ran main-thread Mermaid work. The map now reads the current text through a ref
+  and memoizes on `[]`, so it stays stable for the life of a mounted message. TS-08.R40's stability
+  clause was scoped to "while message text is unchanged" — which ratified the gap — and now covers
+  streamed deltas; FS-03.A20 gained the delta case, reproduced first as a failing test.
+
+  **Cancel-response release flake (FS-16.R3/R4, TS-10.R15/R19; INV §15).** The specifications
+  already decide this: the stop follows the terminal commit and cannot be transactional, so a
+  refused stop leaves the durable intent standing for recovery. `task_http_test.go` asserted the
+  synchronous cleared state off the cancel response, which is a guarantee no requirement makes —
+  the shipped race is a cancel landing while the task's own launch still holds the lifecycle claim,
+  so `StopStage` returns "a lifecycle transition is already in progress". The case now asserts the
+  terminal state and that no claim survives without its intent, then drives the recovery backstop to
+  the released state; twenty consecutive runs pass. No specification or product change: R4 and R19
+  already state it. Worth the human's attention separately — nothing but a restart currently retries
+  a release whose stop was refused.
+
+  **Meter tone versus density (TS-08.R14/R48, FS-02.R59; INV §2).** `ContextBar` carried two
+  orthogonal dimensions on one `data-variant`, so a compact meter exposed no low/medium/high tone
+  through the presentation contract. `data-variant` is the tone in both forms now and the compact
+  form is a `context-meter` state in `contract.json`, with the stylesheet, the visual-matrix case,
+  and the card case following; TS-08.R48 records why the dimensions stay separate.
+
+  **Specification corrections (INV §10).** FS-02.R47's drag clause still required a pane's
+  "two-column footprint" after R55 narrowed the span to one track, which would have invited someone
+  to reintroduce the span R55 removed; it now reads as TS-08.R43 was already corrected. FS-14 §2 no
+  longer claims every requirement is shipped, which contradicted its own Partial status and its
+  `(planned)` R49–R51. FS-14.R51 now says where a `start_run` summary's template title comes from —
+  the template as it stands now, naming the id and saying the template is gone once it is deleted —
+  because that proposal's durable payload carries only `template_id`, and A28 covers the
+  pending/declined × Save/Start matrix at maximum record size rather than one pending Save.
+
+  **Left open.** The FS-14 Reject-versus-approval **Must fix** is a product decision and moved to
+  *Decisions needing your input* with both readings and a recommendation; the **Worth fixing**
+  completion of TS-02/TS-03/TS-09 for that design stays a finding, because it cannot be written
+  before the answer. `make test`, `make build`, the UI suite, the UI build, the presentation-contract
+  check, and `git diff --check` pass.
 
 - **2026-09-03 — release `v0.4.0` (FS-18.R1/R4/R5, TS-11.R1/R8; FS-19, FS-03.R40/R43):** Cut the
   35-commit range `v0.3.0..main`. Minor rather than patch because the range adds user-visible
@@ -95,7 +143,25 @@ an explicit specification update. Remove an item when the human resolves it or q
   remain reachable with a wider continuation contract.
 - **Refused card drag feedback:** Confirm whether the cross-block refusal should remain an in-flight
   pointer signal (FS-02.R53) or whether snap-back alone is the intended behavior. The shipped pointer
-  implementation currently has an open wiring finding below.
+  implementation is still owed its real-browser computed-cursor pass, which is an acceptance gate below.
+- **Rejecting a proposal versus approving it (FS-14.R49/R50/A27, TS-09.R15/R16/R26; INV §5/§15):**
+  FS-14 §4.4 defines only one ordering — an approval that already consumed the proposal beats a
+  later Reject — and never says what happens the other way round. The case is two tabs on the same
+  pending offer: one rejects it, and the other's already-open review flow then saves the template or
+  starts the run. Today's approval path would let that through, because it commits the template file
+  or run before marking the proposal consumed and template approval deliberately carries no proposal
+  id (TS-09.R26), so the offer the person rejected still takes effect and no post-mutation status
+  update can undo an external effect safely. Your call, because both readings are defensible:
+  (a) **the mutation always wins** — Reject only withdraws the offer, a losing Reject reports the
+  proposal as consumed exactly as R49 already says for the other ordering, and this stays consistent
+  with R50's rule that declining is not a standing block on that content; or (b) **the first action
+  to claim the record wins** — the approval must durably claim the proposal before it commits, which
+  means routing a proposal id through the template and start APIs and reversing TS-09.R26's design.
+  Recommendation: (a), because it needs no new claim across two stores and keeps one meaning for a
+  person's deliberate save. Either answer then needs the durable claim or ordering rule written down
+  with its crash and failure recovery, the behavior of a stale action, and A27 exercising the real
+  interleavings rather than only an already-consumed row. Nothing is shipped: R49–R51 are
+  `(planned)`, and the open **Worth fixing** finding gates implementation on this answer.
 - **Detecting a pipeline stage that can no longer advance:** A run parked at `await_result` with a
   silent stage agent is invisible today, and that cost the 2026-09-02 report about nineteen hours.
   Fixing it needs your call on what qualifies, because a stage agent legitimately ends many turns
@@ -174,70 +240,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-- **Worth fixing** (FS-16.R3/R4, TS-10.R15/R19; INV §15) — `internal/server/task_http_test.go:244`
-  asserts the cancel response already carries `pending_release=false` and an empty runtime claim,
-  but `finishInterruptedRelease` only clears them when its `StopStage` succeeds; a failed stop is
-  specified to log and leave the release for recovery (TS-10.R19/R15). Observed once on 2026-08-31
-  during a full `internal/server` run under load: the response carried `RuntimeClaim:created
-  PendingRelease:true` and the case failed. It passes alone, twenty times under `-race`, and on a
-  repeat full-package run, so it is a load-dependent flake rather than a new regression. Decide
-  which side is wrong — either the cancel path owes a completed release before it answers, or the
-  case should assert the recovery-completed state instead of the synchronous one — and record it in
-  FS-16/TS-10 rather than loosening the assertion.
-
-- **Must fix** (FS-03.R37/A20/A22, TS-08.R40; INV §10) —
-  `ui/src/components/chat/renderers/AssistantText.tsx:25` memoizes the react-markdown component map
-  on `[text]`, so the map is rebuilt on every streamed delta and React remounts the `MermaidDiagram`
-  under it. The scroll case the fix targeted is closed; the live-stream case is not. Normal-use
-  trigger: an assistant writes a closed ```mermaid fence and then keeps streaming explanatory prose,
-  which is the ordinary shape of a diagram reply. Reproduced here against the shipped component —
-  after the diagram settles, one appended delta drops the `<svg>` back to the source code block and
-  re-invokes `mermaid.render` with a fresh id (`ad-diagram-1` then `ad-diagram-2`). That is exactly
-  the reported "spazzing between display and source", and it contradicts R37's "the reader therefore
-  never sees a diagram flicker or error mid-stream"; it also repeats uninterruptible main-thread
-  Mermaid work per delta, which is the cost TS-08.R40 bounds the input to avoid. Note TS-08.R40's
-  new sentence is scoped to "while message text is unchanged", so the technical spec currently
-  ratifies the gap rather than closing it. Fix: hold `text` in a ref updated each render, read
-  `textRef.current` inside the `code` component, and memoize with `[]`; then widen R40. Test: in
-  `AssistantText.test.tsx`, rerender with `CLOSED + "\ntrailing prose"` after the diagram settles
-  and assert the SVG is still mounted and `mermaid.render` was called once.
-
-- **Worth fixing** (FS-02.R47/R55; INV §10) — `docs/specs/features/FS-02-dashboard.md:319` still
-  requires that a collapsed card dragged past a pane "must see the pane's **two-column** footprint",
-  and R55 supersedes only "R47's `min(2, perRow)` span" while asserting "every other clause of R47
-  stands", which makes the stale clause normative. The shipped pane spans one track. TS-08.R43 was
-  corrected in the same change to "a wider-or-taller footprint" and `CardGrid.tsx:121` to "one
-  column"; FS-02.R47 was not. Normal-use trigger: a later reader trusts R47, concludes the grid is
-  wrong, and reintroduces the two-track span R55 exists to remove. Fix: correct R47's footprint
-  clause in place the way TS-08.R43 was corrected — the reason to keep the expanded id in its
-  `SortableContext` still holds, because the pane is taller than its neighbours.
-
-- **Worth fixing** (TS-08.R14/R48, FS-02.R59; INV §2) — `ui/src/components/grid/ContextBar.tsx:6`
-  now emits `data-variant={compact ? "compact" : tone}`, so one attribute carries two orthogonal
-  dimensions and the compact meter exposes no low/medium/high tone through the presentation
-  contract. The tone survives only on the `context-bar high` className, which TS-08 §3.3 excludes
-  from the skin surface. Normal-use trigger: a skin styles `[data-ui="context-meter"]
-  [data-variant="high"]` red, and the expanded card's meter — the only context reading FS-02.R59
-  leaves on the dashboard — silently keeps the default ramp. Nothing is visibly wrong today because
-  no shipped skin reads this hook, which is why it is Worth fixing. TS-08.R48 says the compact form
-  "differs from the full meter in presentation only", yet it drops a contract hook. Fix: keep
-  `data-variant` as the tone and express density separately (a second `data-*` dimension registered
-  in `contract.json`), and extend `ContextBar.test.tsx` to assert a compact meter still reports its
-  tone through the contract attribute.
-
-- **Must fix** (FS-14.R49/R50/A27, TS-09.R15/R16/R26; INV §5/§15) —
-  `docs/specs/features/FS-14-configurable-pipelines.md:353` adds Reject and says that an approval
-  which already consumed the proposal wins, but it never defines the opposite ordering. The shipped
-  approval path commits the template file or run before it marks the proposal consumed
-  (`internal/server/pipeline_handlers.go:58`, `internal/pipeline/manager.go:94`), and template
-  approval deliberately carries no proposal id (TS-09.R26). Normal-use trigger: two tabs show the
-  same pending offer; one rejects it, then the other's already-visible review flow saves or starts
-  it anyway. The offer the person rejected still takes effect, and no simple post-mutation status
-  update can undo that external effect safely. Fix the design before implementation: choose the
-  Reject-versus-approval winner, specify a durable atomic claim plus crash/failure recovery across
-  SQLite and the template/run mutation, define stale action behavior, and make A27 run the real
-  interleavings and failure boundaries rather than only act on an already-consumed row.
-
 - **Worth fixing** (FS-14.R49–R51, TS-02.R22, TS-03.R16/R17, TS-09.R23/R26;
   INV §7/§8/§9/§10/§11) — the product spec adds durable declined/deleted state, new mutations,
   proposal-update behavior, error/retry outcomes, timestamps, and fallback rows, but every governing
@@ -250,23 +252,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
   incompatible contracts, so persistence, server, and UI can each choose a different state model.
   Fix by completing TS-02/TS-03/TS-09 first, adding the ready change and traceability, and only then
   moving the design out of `docs/ideas.md`'s “being defined” section.
-
-- **Worth fixing** (FS-14 status contract; INV §10) —
-  `docs/specs/features/FS-14-configurable-pipelines.md:23` still says every requirement in the
-  feature reflects shipped behavior, while this same diff makes the spec Partial and adds R49–R51
-  and A27–A28 as planned. Normal-use trigger: a reader follows the feature's own scope statement and
-  treats Reject/Delete/collapse as available now. Fix the introduction to distinguish shipped and
-  explicitly planned requirements, as the status header already does.
-
-- **Worth fixing** (FS-14.R51/A28; INV §8/§10) —
-  `docs/specs/features/FS-14-configurable-pipelines.md:530` verifies collapse and bounded summaries
-  only for one pending `save_template` proposal, although R51 governs both pending and declined
-  records of both kinds. It also requires a `start_run` summary to name the template title, but that
-  proposal's durable payload contains only `template_id` (`internal/pipeline/manager_types.go:16`),
-  with no rule for whether a current, renamed, or deleted template supplies the title. Normal-use
-  trigger: a declined or Start proposal regresses to the full-height payload, or shows a drifting/
-  missing title, while A28 remains green. Fix R51's title provenance and fallback, then cover the
-  pending/declined × Save/Start matrix (including a maximum-size record) in A28.
 
 ## Design consistency notes
 

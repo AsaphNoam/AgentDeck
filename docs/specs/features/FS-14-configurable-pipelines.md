@@ -20,8 +20,9 @@ free-form agent messaging.
 
 ## 2. Behavior
 
-Every requirement here reflects shipped behavior; the product boundaries deliberately outside this
-feature are recorded in §6.
+Every requirement here reflects shipped behavior unless it is marked `(planned)`, which the feature's
+Partial status records; a `(planned)` requirement or acceptance item states behavior that is designed
+but not yet available. The product boundaries deliberately outside this feature are recorded in §6.
 
 ### 2.1 Templates and starting a run
 
@@ -395,7 +396,12 @@ feature are recorded in §6.
 - **R51 (planned)** — Every pending and declined proposal is collapsed by default.
   Collapsed, it states whether it asks to save a template or start a run, the template's title and
   stage count for a save proposal or the template title, run display name, and run goal for a start
-  proposal, and how long it has been pending. Those values are bounded so that no single draft can
+  proposal, and how long it has been pending — or, for a declined record, when it was declined.
+  A start proposal's durable payload names its template by id alone, so its summary resolves the
+  title from that template as it stands now: a renamed template summarizes under its current name,
+  and a proposal whose template has since been deleted summarizes with the template id and says the
+  template is gone rather than dropping the line or hiding the offer. The payload a person reviews on
+  expansion is unchanged either way. Those values are bounded so that no single draft can
   push the template library or run ledger off the surface. Expanding one proposal reveals its exact
   canonical payload unchanged, which remains the payload a person reviews before approving; the
   summary is a way to find the right offer, never a substitute for the exact payload an approval
@@ -589,7 +595,13 @@ feature are recorded in §6.
   its kind, template title, stage count, and pending age are present and its exact payload is not
   rendered until it is expanded, so the template library remains the surface's first content.
   Expanding renders the canonical payload unchanged, collapsing hides it again, and a reload returns
-  every proposal to collapsed. A proposal whose payload cannot be summarized still lists with its
+  every proposal to collapsed. The whole pending/declined × save/start matrix collapses the same way:
+  a declined `save_template` record and a pending and a declined `start_run` record each summarize
+  with their own fields, a declined record showing its decline time where a pending one shows its
+  age, and a record at the largest size the limits module admits still leaves the template library
+  and run ledger as the surface's first content. A `start_run` summary names its template's current
+  title, follows a rename, and names the template id and says the template is gone once that template
+  is deleted. A proposal whose payload cannot be summarized still lists with its
   kind and proposal id. — `ui/src/features/pipelines/AgentDeckerBuilder.test.tsx`; J14.
 
 - **A29** (R53) — A rendered assignment states that the boundary is the

@@ -326,8 +326,10 @@ project that is not repo-backed, or is archived, shows no such action.
   grouping and never changes what its context menu offers. An expanded card is not draggable: its
   drag grip is withheld while expanded and returns on collapse, so reordering it means collapsing it
   first. It remains a member of its block's sortable set for the purpose of *other* cards' drags,
-  though — a collapsed card dragged past a pane must see the pane's two-column footprint, or every
-  neighbour's in-drag preview is computed over a layout that is not on screen. Withholding the grip,
+  though — a collapsed card dragged past a pane must see the pane's larger footprint, or every
+  neighbour's in-drag preview is computed over a layout that is not on screen. That footprint is a
+  pane taller than its neighbours once R55 narrows the span to one track (TS-08.R43); the reason to
+  keep the expanded id in its sortable set is unchanged either way. Withholding the grip,
   not removing the card from the set, is what makes it undraggable. Collapsing returns the card to
   its ordinary size in the position R45 gives it.
 

@@ -65,6 +65,22 @@ describe("assistant diagram rendering", () => {
     expect(mermaid.render).toHaveBeenCalledTimes(1);
   });
 
+  // Field-bug reproduction, 2026-09-03: an assistant that closes a ```mermaid fence and keeps
+  // streaming prose changes `text` on every delta, so a map memoized on the text remounted the
+  // settled diagram and re-ran Mermaid per delta (FS-03.R37, TS-08.R40).
+  it("keeps a settled diagram mounted while later deltas append prose", async () => {
+    const { container, rerender } = renderAssistant(CLOSED);
+    await waitFor(() => expect(container.querySelector(".mermaid-diagram-figure svg")).not.toBeNull());
+
+    for (const suffix of ["\nThat diagram shows", "\nThat diagram shows the two stages."]) {
+      rerender(<AssistantText event={{ kind: "assistant_text", seq: 3, text: CLOSED + suffix }} />);
+      expect(container.querySelector(".mermaid-diagram-figure svg")).not.toBeNull();
+    }
+
+    expect(container.textContent).toContain("That diagram shows the two stages.");
+    expect(mermaid.render).toHaveBeenCalledTimes(1);
+  });
+
   it("removes Mermaid's intrinsic root width cap for host-owned responsive sizing", async () => {
     mermaid.render.mockImplementation(async (id: string) => ({
       svg: `<svg id="${id}" width="100%" style="max-width: 124px;"><g /></svg>`,

@@ -16,9 +16,21 @@ describe("ContextBar", () => {
     expect(screen.getByLabelText("90% context used")).toHaveClass("high");
   });
 
-  it("keeps the shared value derivation in compact form", () => {
+  // TS-08.R14/R48: the compact form differs in presentation only, so it must still report its
+  // low/medium/high tone through the contract attribute a skin can select on — density is a
+  // separate dimension, not a replacement for the tone.
+  it("keeps the shared value derivation and its tone in compact form", () => {
     render(<ContextBar value={2} compact />);
-    expect(screen.getByLabelText("100% context used")).toHaveClass("high");
-    expect(screen.getByLabelText("100% context used")).toHaveAttribute("data-variant", "compact");
+    const meter = screen.getByLabelText("100% context used");
+    expect(meter).toHaveClass("high");
+    expect(meter).toHaveAttribute("data-variant", "high");
+    expect(meter).toHaveAttribute("data-state", "compact");
+  });
+
+  it("marks only the compact form with the density state", () => {
+    render(<ContextBar value={0.7} />);
+    const meter = screen.getByLabelText("70% context used");
+    expect(meter).toHaveAttribute("data-variant", "medium");
+    expect(meter).not.toHaveAttribute("data-state");
   });
 });

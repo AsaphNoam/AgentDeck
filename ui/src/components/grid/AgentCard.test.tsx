@@ -112,7 +112,7 @@ describe("AgentCard", () => {
     );
 
     expect(screen.queryByLabelText("Reorder Atlas")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("72% context used")).toHaveAttribute("data-variant", "compact");
+    expect(screen.getByLabelText("72% context used")).toHaveAttribute("data-state", "compact");
     fireEvent.click(screen.getByText("Send"));
     expect(toggle).not.toHaveBeenCalled();
     fireEvent.contextMenu(screen.getByText("Send"));

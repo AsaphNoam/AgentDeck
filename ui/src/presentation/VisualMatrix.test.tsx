@@ -52,7 +52,7 @@ describe("VisualMatrix", () => {
     expect(screen.getByText("unbroken-agent-name-that-must-not-escape-the-card-boundary")).toBeInTheDocument();
     const collapsed = [...container.querySelectorAll('[data-ui="agent-card"][data-variant="default"]')];
     expect(collapsed.every((card) => !card.querySelector('[data-ui="context-meter"]'))).toBe(true);
-    expect(container.querySelector('[data-ui="agent-card"][data-variant="expanded"] [data-ui="context-meter"][data-variant="compact"]')).toBeTruthy();
+    expect(container.querySelector('[data-ui="agent-card"][data-variant="expanded"] [data-ui="context-meter"][data-state="compact"]')).toBeTruthy();
   });
 
   it("renders the project color picker inside its context menu fixture", () => {
