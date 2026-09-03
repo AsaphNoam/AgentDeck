@@ -1,8 +1,9 @@
 # AgentDeck — handoff state through 2026-09-03
 
-Archived at the `v0.3.0` epoch under AGENT-WORKFLOW §16.7. This is the full handoff as it stood on
-2026-09-03, before the live file was cut back to resumable state. Everything here is settled history:
-the live file is [`../../features/HANDOFF.md`](../../features/HANDOFF.md). Earlier phase state is in
+Two epochs closed on 2026-09-03, so both are archived here under AGENT-WORKFLOW §16.7. The first
+part is the full handoff as it stood at the `v0.3.0` cut; the second part, after the rule below,
+is what `v0.4.0` settled later the same day. Everything here is settled history: the live file is
+[`../../features/HANDOFF.md`](../../features/HANDOFF.md). Earlier phase state is in
 [`HANDOFF-pre-sdd.md`](HANDOFF-pre-sdd.md).
 
 ---
@@ -1623,3 +1624,134 @@ findings.
 - FS-17 §6 opens with "The contract is shipped. Live-provider compatibility remains tracked as
   acceptance gate A6," which reads as covering the whole section, but §6 now also carries the planned
   direct-cutover boundary for R13–R19. Scope the opening sentence to R1–R12.
+
+---
+
+# Settled at the `v0.4.0` epoch (2026-09-03)
+
+Archived under AGENT-WORKFLOW §16.7. Everything below stood in the live handoff when `v0.4.0` was
+cut, later the same day as the `v0.3.0` cut above, and is settled history. The live file is
+[`../../features/HANDOFF.md`](../../features/HANDOFF.md).
+
+## Workflow efficiency change
+
+**Finished; awaiting independent review.** The transcript evidence supports long-lived retained
+context and repeated document/tool output as usage contributors, but not the earlier quota shares,
+the 180× ratio, or delegation as a causal saving. The old headline mixed main and child transcript
+populations without preserving one reproducible date/filter definition. A new
+`scripts/transcript-usage/` audit reports event-date-filtered raw counters, separates main,
+subagent/sidechain, and guardian records, and makes no subscription-quota inference.
+
+The workflow now loads only Current position plus Active change at startup and only the requirements
+and workflow sections the active role needs. Invariants keep their trigger index. Broad discovery is
+delegated only when isolating substantial raw output earns the child's startup cost; bounded lookups
+stay local. Native edit tools replace transcript-heavy heredoc replacement scripts. Focused checks
+serve the edit loop, with the applicable full matrix run once after the final relevant edit. A run
+still owns one change, one review, or one review's findings, but does not split a large change; the
+user explicitly declined a checkpoint rule.
+
+`BRIEFS.md` is retired as a duplicated final-response log. Handoff archiving may happen whenever
+settled state obscures live work and remains mandatory at release. The Claude edit guard measures
+only the injected header slice, permits cleanup, handles relative paths, and holds that slice below
+8 KiB without treating BRIEFS or the rest of the handoff as a startup tax. The archived handoff's
+relocated links were repaired.
+
+## Changelog
+
+Earlier entries are in the [archived handoff](../archive/state/HANDOFF-through-2026-09-03.md).
+
+- **2026-09-03 — fix (2026-09-03 review findings; FS-19.R1, TS-12.R1/R2, FS-03.R43–R44, FS-14.R54,
+  TS-09.R29, FS-02.R61/A43, TS-08.R49; INV §1/§2/§4/§9/§10/§12):** Closed all three Worth-fixing
+  findings from the post-worktree product-range review; it had no Must-fix finding. **§12** — the
+  worktree common-directory query was worse than reported: `git rev-parse` does not reject an
+  unknown option, it echoes it on stdout and still exits zero, so a Git older than 2.31 returned
+  `"--path-format=absolute\n.git"` as the repository anchor instead of failing. `CommonDir` now
+  detects that echo, repeats the query without the flag, and makes the answer absolute locally,
+  resolving symlinks so one repository keeps reporting one common directory (TS-12.R2's ownership
+  match). A PATH-shimmed older Git that forwards every other argument to the installed binary
+  covers both argv forms. **§4** — the pending permission tool names behind FS-03.R44's log are
+  deleted only on `permission_resolved`, which a crash never sends; the registry exit hook is now a
+  named `handleAgentExit` that sweeps the generation's entries beside `ClearPermissionAttention`,
+  with one shared key builder. **§1/§10** — a batch of waiting transitions sharing one `updated_at`
+  was ordered by agent-record enumeration, evicting the wrong pane in A43's five-at-once case;
+  `agentStore` now stamps a client observation index, pruned wherever an agent is dropped, and
+  `CardGrid` orders the batch by it. TS-12.R1 and TS-08.R49 gained the two rules that were missing
+  rather than wrong. Each regression was confirmed to fail against the pre-fix code.
+  `make check-specs`, `make test`, `make build`, the 373-case UI suite, `npm run build`,
+  `npm run check:styles`, a focused `-race` run over the server permission paths, and
+  `git diff --check` pass.
+
+- **2026-09-03 — workflow efficiency (documentation, skills, hooks, measurement tooling):**
+  Corrected the investigation's unsupported quota and causal claims and implemented the accepted
+  context-efficiency changes without a large-change checkpoint rule. Startup reads and role
+  launchers are section-addressed; discovery delegation is conditional on context benefit; native
+  editing and one closure verification pass replace heredoc edits and repeated full suites; the
+  duplicate BRIEFS write is retired; the handoff guard measures the injected slice; and the new
+  transcript audit separates provider/session classes using event dates and raw counters.
+
+- **2026-09-03 — review (continuous post-`bd797bd` range through `636781b`; worktree fixes,
+  unattended pipelines and fixes, automatic waiting-pane opening; INV §1–§15):** Reviewed the
+  range in both directions against its FS/TS requirements. Three Worth-fixing findings are recorded
+  below: older supported Git versions cannot answer the worktree common-directory query; a crashed
+  agent can leave permission diagnostic entries behind for the process lifetime; and a batch of
+  waiting transitions with tied millisecond timestamps can evict by agent insertion order rather
+  than transition order. The focused 54-case CardGrid/SSE suite and presentation checks pass. The
+  uncommitted workflow-efficiency files were preserved and remain the next independent review unit.
+
+- **2026-09-03 — work (automatic pane opening on a waiting transition; FS-02.R61/A43, the narrowed
+  FS-02.R51/A30, TS-08.R49; INV §1/§2/§10):** A chat agent that newly enters `waiting_input` now
+  expands its own pane on the grid the person is looking at. Detection is one effect in `CardGrid`
+  over the durable `state` each `state_update` carries — not the `notification` stream, which the
+  per-type mute list filters and the server never replays — keyed against a per-grid ref of the last
+  observed state that the hydration flags reseed rather than fire on, so only a newly observed
+  transition opens anything. Eligibility reuses the grouped set the grid already renders, so a
+  terminal agent, an out-of-project agent, and an agent in a collapsed section open nothing and the
+  section is not expanded. Both the click path and the automatic opening now go through one
+  `expandPane` helper, so R48's cap of four and its least-recently-used eviction cannot drift apart.
+  A30's `waiting_input` clause moved to `done`, since R51 still holds for every other transition.
+  FS-02 and TS-08 lost their last `(planned)` items and moved to `Current` in the spec index.
+  `make test`, `make build`, the 372-case UI suite, `npm run build`, `npm run check:styles`, and
+  `make check-specs` all pass. J5 gained the rendered checks jsdom cannot make: that an opening pane
+  moves only the rows below it and that the eviction is visible rather than silent.
+
+- **2026-09-03 — fix (unattended pipeline implementation findings; FS-03.R41/R43–R44/A24–A25,
+  FS-04.R46/A26, FS-06.R28–R29/A19, FS-14.R53–R54/A29–A30, TS-02.R28, TS-03.R34–R35,
+  TS-04.R43–R44, TS-08.R50, TS-09.R29–R31; INV §1/§2/§4/§5/§8/§10/§15):** Closed all five
+  Must-fix and two Worth-fixing findings from the unattended-run implementation review. Same-revision
+  permission attention now refreshes an open run page; concurrent approvals retain attention until
+  all resolve; Stop cancels held approvals and timers before teardown; invalid on-disk message
+  budgets default independently; auto-approval records its resolution before releasing the provider;
+  every refused stage report carries shared retry guidance; and archived projects no longer receive
+  dead-end Resume advice. Added focused regressions, including the rendered run state. `make test`,
+  `make build`, the 368-case UI suite with presentation checks, focused race tests, `make dist`, and
+  `git diff --check` pass. No specification changed because every fix restores existing requirements.
+
+- **2026-09-02 — review (unattended pipeline implementation only; FS-03.R40–R44/A24–A27,
+  FS-04.R46/A26, FS-06.R28–R29/A18–A19, FS-14.R52–R56/A29–A32, TS-01.R27, TS-02.R28,
+  TS-03.R34–R35, TS-04.R41–R44, TS-05.R20, TS-08.R50–R52, TS-09.R29–R31; INV §1–§15):**
+  Reviewed commit `a0b9e13` in both directions, with an independent Terra/high pass and without
+  advancing the continuous reviewed-code marker past the intervening worktree-fix range. Seven
+  findings are recorded below: five Must fix and two Worth fixing. The Must-fix set is a
+  same-revision `pipeline_update` that the open run
+  page deliberately ignores, Stop abandoning a pending permission and leaving its timer live,
+  one run-level slot losing concurrent pending approvals, and tolerant message-budget config
+  specified as a plain `int` so one non-numeric field makes the whole config unreadable, plus
+  auto-approval releasing the provider before recording its resolution. The lower-priority set is
+  transient stage-report refusals bypassing the new retry guidance and stopped pipeline-recipient
+  wording that falsely promises Resume when the project is archived.
+
+  Invariant sweep: §1 produced the live-attention and Stop findings; §2 produced the report-guidance
+  finding while the registered-tool and assignment/refusal composition otherwise holds; §3's
+  valid-config partial merge holds; §4 produced the pending-permission teardown finding; §5
+  produced the concurrent-approval finding; §7's existing iteration and repair paths have no new
+  surface; §8
+  produced the report and recipient wording findings while permission logging, pause copy, and
+  output bounds hold; §9's process-lifetime attention state is implicated by the Stop finding but
+  produces no separate one; §10 produced the same-revision UI and whole-config fallback findings;
+  §15 produced the Stop and auto-approval ordering findings. §11's new collection/string shapes and
+  §13's new class names hold. §6 has no new interface/runtime, §12's live-provider identity shape
+  remains the explicit acceptance gate, and §14 has no new route or widened authorization boundary. `make check-specs`, `make build`, both Go
+  test variants, the focused runtime/pipeline/messaging race run, the 366-case UI suite with style
+  and presentation checks, `make dist`, and `git diff --check` pass. The first sandboxed server test
+  attempt could not bind a loopback port; the unchanged authorized rerun passed. No product code or
+  specification changed.
