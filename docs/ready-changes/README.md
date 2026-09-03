@@ -42,7 +42,9 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-None.
+- [`decline-pipeline-proposals.md`](decline-pipeline-proposals.md) — collapse pending pipeline
+  proposals and add Reject and Delete, with the durable mutation winning every race against a
+  Reject.
 
 ## Paused changes
 

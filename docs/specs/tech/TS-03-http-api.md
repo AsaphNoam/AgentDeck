@@ -424,6 +424,27 @@ having observed the edge (INV §1). The field is non-null in every response and 
 (INV §11), and the UI schema accepts it in lockstep with the server shape so a payload the server
 sends is never a field the client silently drops (INV §10).
 
+**R36 (planned) — Declining and deleting a proposal are two conventional routes on
+the existing family, and the list grows a second collection.** `GET /api/pipeline-proposals`
+(R16) returns an object with two collections, `pending` and `declined`, each always present and
+never `null` even when empty (INV §11), each already bounded by the durable retention limit, and
+each entry carrying its proposal id, kind, canonical payload, `created_at`, and — for a declined
+entry — `declined_at`. This replaces the pending-only body in the same change as its UI schema and
+mocks (R6/R11); there is no compatibility shim, because this API is local and ships in lockstep.
+The family gains `POST /api/pipeline-proposals/{id}/decline`, which returns `200` with the updated
+record, and `DELETE /api/pipeline-proposals/{id}`, which returns `204`. Both are decided by the
+durable conditional claim of TS-02.R29 rather than a read followed by a write, so each answers from
+the rows it actually affected: a decline of a record an approval already consumed is `409` with a
+typed `consumed` reason, a decline of an already-declined record is `409` with `already_declined`, a
+delete of a record that is gone is `404`, and a delete of a still-pending record is `409` with
+`not_declined` — Reject first is what makes a removal deliberate (FS-14.R49). An unknown id is `404`
+and no route invents a record. Every refusal is a typed R3 error whose reason names the state the
+record is actually in, so the surface can explain what happened and refresh rather than retry blind
+(FS-14.R57). A decline or a delete that changes a row publishes exactly one
+`pipeline_proposal_update` on the existing SSE vocabulary (R17), the same refetch signal an approved
+mutation already publishes; neither adds an event type, a payload, or a subscription, and a client
+reloads the collections through this route rather than reconstructing them from the event.
+
 ## 3. Interfaces & data shapes
 
 Feature-owned request/response fields are specified in the owning FS, including FS-14 for pipeline

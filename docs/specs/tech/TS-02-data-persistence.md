@@ -1,6 +1,6 @@
 # TS-02 — Data & persistence
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/config`, `internal/state`, `internal/transcript`, `internal/index`, `internal/archive`, `internal/configsource`, `internal/contextref`
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -328,6 +328,27 @@ file decodes without rewrite and a hand edit that is syntactically valid but out
 readable rather than classifying the whole version-1 document as corrupt. `internal/config` owns
 that write-time validation set, and R3's owner-only atomic rewrite applies unchanged. No SQLite row,
 migration, cache file, project/session field, seed rewrite, or config-version bump is introduced.
+
+**R29 (planned) — A proposal record is a claimed state machine over one row, and
+retention is blind to which state it is in.** A forward-only migration adds a nullable `declined_at`
+to `pipeline_proposals` (R22); existing rows adopt the empty value and stay exactly as pending as
+they are. The row's states are *pending* (`consumed_at` and `declined_at` both empty), *declined*
+(`declined_at` set), and *consumed* (`consumed_at` set); Delete is a hard row delete, not a fourth
+state, so a deleted record leaves no tombstone and a later identical proposal inserts a new row
+(FS-14.R49/R50). Every transition is a single conditional statement whose `WHERE` names the state it
+expects, and the caller decides from the rows it affected rather than by reading first and writing
+after (INV §5): a decline matches `consumed_at IS NULL AND declined_at IS NULL`, a delete matches
+`declined_at IS NOT NULL`, and consumption matches `consumed_at IS NULL` alone — which is what lets
+an approved mutation consume a record another tab already declined, the ordering FS-14.R57 chose.
+Zero affected rows is the loser of a race and is reported as the state the row is actually in, never
+as success and never as a failure to write. Consumption stays keyed by the content-addressed id
+(TS-09.R26), so no proposal id travels through the template or start API and the approval path is
+unchanged apart from the state its claim may overwrite. R22's newest-first retention bound is
+unchanged and deliberately state-blind: it orders by `created_at` and prunes the oldest records over
+the bound in the same write transaction whether they are pending, declined, or consumed, so a
+declined backlog cannot outlive the bound and no state can pin a row forever. Nothing else about
+R22 changes: the table still carries no foreign key, still cascades in neither direction, and TS-09
+still owns the payload shapes and the lifecycle's product meaning.
 
 The rest of this change deliberately persists nothing: the approval exemption is derived from code
 and applied as a runtime parameter (TS-01.R27), a pending permission request stays process-lifetime

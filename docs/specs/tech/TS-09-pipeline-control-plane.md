@@ -1,6 +1,6 @@
 # TS-09 — Pipeline control plane
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/pipeline`, `internal/config`, `internal/state`, `internal/server`, `internal/messaging`, `internal/cli`, `ui/src/features/pipelines`
 **Absorbed:** —
 
@@ -211,9 +211,11 @@ Pipelines page refetches. Proposing the same content again **re-arms** that one 
 adding a second or leaving it silently consumed: the id is content-derived, so a transport retry and
 a genuine re-proposal are indistinguishable, and both must leave exactly one pending offer. Without
 re-arming, an agent re-proposing something already approved would receive success with nothing on
-any human surface — the discoverability defect the durable record exists to remove. There is no
-user-facing dismissal action: unapproved proposals are bounded by the same centralized limits module
-(R19), which retains the newest records and prunes older ones at each write.
+any human surface — the discoverability defect the durable record exists to remove. Unapproved
+proposals are bounded by the same centralized limits module
+(R19), which retains the newest records and prunes older ones at each write; R32 adds the explicit
+decline and delete actions on top of that bound, and this requirement's consumption rule is
+unchanged by them.
 
 - **R27** — **The result layer converges with the task domain; the run layer does not.**
   The agent-reportable outcome vocabulary, its bounded summary/details/checks limits, and the
@@ -301,6 +303,25 @@ user-facing dismissal action: unapproved proposals are bounded by the same centr
   cannot disagree — the disagreement between them is the defect this closes. Acceptance remains one
   transaction (R9) and a refusal remains a non-mutation: it changes no attempt, no run revision, and
   no pending action, exactly as today.
+
+- **R32 (planned)** — **Declining and deleting are proposal-record actions;
+  the approval paths are untouched.** Reject and Delete (FS-14.R49) reach the same
+  `pipeline_proposals` authority the approval surface already reads, through the conditional claims
+  of TS-02.R29 and the routes of TS-03.R36. They are pure record operations: neither writes a
+  template, creates or changes a run, launches or stops an agent, touches `pipeline_attempts` or run
+  values, nor produces any agent-facing effect — no message, no tool result, and no change to a
+  result an agent already received. Because FS-14.R57 makes the durable mutation the winner of every
+  race, the template-save and run-start paths keep the shape R26 gives them: they still consume by
+  content-addressed id, still carry no proposal id through their API, still commit their mutation
+  before marking the record, and gain no pre-check against a decline — the consumption claim simply
+  may now overwrite a declined row as well as a pending one. Nothing in this design lets a proposal
+  record block, delay, or reverse a mutation a person confirmed, so the ordering needs no
+  cross-store transaction and no distributed claim, and the one accepted failure mode is a leftover
+  listed offer for content that already exists, which R26's re-arm already resolves on the next
+  identical proposal. Retention (R19) is unchanged and stays blind to which state a record is in.
+  The surface follows R23: it holds no second authority for declined records, re-reads both
+  collections after the server publishes the committed `pipeline_proposal_update`, and derives no
+  proposal state from transcript tool results or browser-local pointers.
 
 ## 3. Interfaces & data shapes
 

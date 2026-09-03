@@ -379,7 +379,8 @@ but not yet available. The product boundaries deliberately outside this feature 
   agent-facing surface; the person redirects the builder in its chat as they do today. Rejecting a
   proposal that a concurrent approval already consumed does not produce a declined entry: the
   refusal is explained and the entry disappears as consumed, and deleting a record another tab
-  already deleted reports it as gone rather than failing silently. A refused Reject or Delete leaves
+  already deleted reports it as gone rather than failing silently. R57 governs both orderings of
+  that race. A refused Reject or Delete leaves
   the entry visible and its action retryable, as R37 already requires of run actions. The pending
   count each sub-destination shows for the other (R42) counts pending offers only; a declined entry
   never contributes to it.
@@ -408,6 +409,31 @@ but not yet available. The product boundaries deliberately outside this feature 
   acts on. Expansion is per proposal and browser-local, and it resets on reload rather than
   persisting. A proposal whose payload cannot be summarized still lists honestly with its kind and
   proposal id instead of disappearing or failing the surface.
+
+- **R57 (planned)** — An approval that commits always beats a Reject; Reject
+  withdraws the offer, never the mutation. Declining is a claim on the offer, not on its content
+  (R50), so a save or a start a person deliberately confirms takes effect even when another tab
+  rejected the same offer moments earlier. That record then leaves both the pending and the declined
+  list as consumed rather than staying declined, because the thing it offered exists now, and the
+  Pipelines surface says so instead of showing a decline the product did not honour. The reverse
+  ordering is R49's already-stated case, and both are the same rule read from either side: the
+  durable mutation decides, and the proposal record only ever reports what became of the offer.
+  This is deliberate rather than incidental. An approval's effect is external — a template file
+  written, or a run started with agents launched — and no later status update can withdraw it
+  safely, so a design in which Reject blocked a committed approval could only ever pretend to. It
+  also keeps one meaning for a person's explicit save.
+  Each of Reject, Delete, and approval claims the record with one conditional durable write on the
+  state it expects (INV §5), so two tabs racing on the same offer produce exactly one effect and the
+  loser is told what actually happened — consumed, already declined, or already gone — rather than
+  failing silently or reporting a second success. Approval's claim is the only transition permitted
+  to overwrite a decline. Because consumption follows its mutation and can never undo it (TS-09.R26),
+  a crash between a committed mutation and its consumption mark leaves one offer still listed for
+  content that already exists; that is the accepted failure mode, since the next identical proposal
+  re-arms the same record (R50) and a person can reject the leftover offer. Nothing repairs it by
+  guessing, and no recovery pass invents a decline or a consumption that no action wrote.
+  A stale action — one sent from a view older than the record's current state — is refused with what
+  happened rather than applied, and the surface refreshes to the durable state instead of retrying
+  blind.
 
 ### 4.5 Running a stage without a person in the loop
 
@@ -580,14 +606,23 @@ but not yet available. The product boundaries deliberately outside this feature 
   stage agent can no longer report against the run; a run paused as `blocked` still links to its
   live stage agent. *Verify:* `ui/src/features/pipelines/RunBrowser.test.tsx`.
 
-- **A27 (planned)** (R49/R50) — Rejecting a pending proposal removes it from the pending
+- **A27 (planned)** (R49/R50/R57) — Rejecting a pending proposal removes it from the pending
   list, lists it as declined with its decline time, and survives a reload; the pending count the
   other sub-destination shows drops by one. Deleting that declined entry removes the record, and it
   is still absent after a reload. Re-proposing byte-identical content after a reject, and again
-  after a delete, each leaves exactly one pending offer rather than zero or two. Rejecting a
-  proposal that a concurrent approval already consumed produces no declined entry, explains the
-  refusal, and leaves the entry gone as consumed; a Reject or Delete the server refuses leaves the
-  entry visible with its action retryable. — `internal/state/pipeline_proposals_test.go`,
+  after a delete, each leaves exactly one pending offer rather than zero or two.
+  Both orderings of the Reject-versus-approval race run for both proposal kinds, against the durable
+  store rather than a mocked one: an approval that commits first leaves a later Reject with no
+  declined entry, the refusal explained and the entry gone as consumed; a Reject that lands first
+  does not prevent the approval, and the record ends listed as consumed in neither the pending nor
+  the declined list while the saved template or started run exists exactly once. Concurrent Rejects,
+  concurrent Deletes, and a Reject racing a Delete each produce one effect, with every loser told
+  what happened — consumed, already declined, or already gone — and never a second success or a
+  silent no-op. A mutation that commits while its consumption mark fails leaves exactly one listed
+  offer for content that already exists, and the next identical proposal re-arms that same record
+  rather than adding a second. A Reject or Delete the server refuses leaves the
+  entry visible with its action retryable, and a stale action from an out-of-date view is refused
+  with the durable state rather than applied. — `internal/state/pipeline_proposals_test.go`,
   `internal/server/pipeline_handlers_test.go`, and
   `ui/src/features/pipelines/AgentDeckerBuilder.test.tsx`.
 
@@ -703,6 +738,11 @@ The shipped first version deliberately keeps these product boundaries:
   projection), TS-03 (run-list pagination and run-detail response), and TS-08.R7/R8 (presentation
   hooks for the new pipeline surfaces); R44–R45 are exercised through J14 and deterministic visual
   fixtures.
+- Proposal review, decline, and delete (R49–R51, R57; A27–A28, all `(planned)`): TS-02.R29 owns the
+  record's states, its conditional claims, and retention; TS-03.R36 owns the two routes, the
+  two-collection list, and the typed refusals; TS-09.R32 owns the control-plane boundary and what
+  the approval paths keep. The change is
+  [`../../ready-changes/decline-pipeline-proposals.md`](../../ready-changes/decline-pipeline-proposals.md).
 - Primary regression anchors: `internal/pipeline/{templates,manager}_test.go`,
   `internal/state/pipelines_test.go`, `internal/messaging/pipeline_tools_test.go`,
   `internal/server/pipeline_handlers_test.go`, and `ui/src/api/{pipelines,sse}.test.ts`.

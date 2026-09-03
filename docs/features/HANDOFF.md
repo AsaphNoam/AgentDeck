@@ -26,14 +26,11 @@ back to that at every release (§16.7). Injected Current position plus Active ch
   manual beside the current skill; nothing user-facing says so.
 - **Last reviewed code:** `7c9ee44` (2026-09-03), across the continuous range `e46e66b..7c9ee44`.
   **Next review unit:** product-fix commit `3c1dc96`, which shipped in `v0.4.0` unreviewed.
-- **Open findings:** five, listed below — four **Worth fixing** findings from the workflow-efficiency
-  review, plus the **Worth fixing** completion of TS-02/TS-03/TS-09 for FS-14's proposal
-  Reject/Delete design, which is blocked on the Reject-versus-approval ordering decision. The
-  2026-09-03 product-code review's other seven findings were fixed on 2026-09-03; the
-  Reject-versus-approval **Must fix** became a product decision and moved to *Decisions needing your
-  input*, beside the 2026-09-02 investigation's silent-stage decision. Both of the **Must fix**
-  items `v0.4.0` shipped with are now closed as code: the streamed Mermaid remount is fixed, and
-  the FS-14 one governs `(planned)` behavior that nothing shipped.
+- **Open findings:** four, listed below — all **Worth fixing**, all from the workflow-efficiency
+  review of `7c9ee44`, and none in product code. The 2026-09-03 product-code review's eight findings
+  are closed: seven fixed, and the Reject-versus-approval ordering answered by the user with the
+  durable mutation winning, now specified as FS-14.R57 with TS-02.R29, TS-03.R36, and TS-09.R32.
+  Both **Must fix** items `v0.4.0` shipped with are closed.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
   remain owed before claiming those adapters accept structured results.
 - **Usability state:** The Pipelines pages and dashboard grid were driven through a real Chromium on
@@ -49,11 +46,11 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 
 **Change:** None.
 
-**Next:** Independently review product-fix commit `3c1dc96`. FS-14's proposal Reject/Delete design is the next design unit
-once the human answers the Reject-versus-approval ordering question under *Decisions needing your
-input*; nothing should implement R49–R51 before that answer and the TS-02/TS-03/TS-09 completion it
-gates. Keep the credentialed Claude/Codex browser journey as an acceptance gate until a human
-authorizes real provider sessions.
+**Next:** Independently review product-fix commit `3c1dc96`. The proposal Reject/Delete design is
+fully specified and waiting to start as
+[`decline-pipeline-proposals.md`](../ready-changes/decline-pipeline-proposals.md); its ordering
+question is answered and must not be reopened during implementation. Keep the credentialed
+Claude/Codex browser journey as an acceptance gate until a human authorizes real provider sessions.
 
 ## Changelog
 
@@ -66,13 +63,45 @@ Earlier entries are in the [archived handoff](../archive/state/HANDOFF-through-2
   commands retain the changed directory across lines, and several role launchers omit the startup
   dirty-tree check. INV §4, §7, §8, and §10 had applicable surfaces; the other indexed classes had
   no matching surface. The hook and transcript fixtures, shell syntax, Python compilation,
-  twin-skill comparison, and `git diff --check` pass. `make check-specs` passed against the reviewed
-  tree; final reruns could not close while unrelated concurrent proposal-design edits were changing,
-  so those edits are preserved and excluded from this review commit. The continuous reviewed marker
-  advances only through `7c9ee44`; `3c1dc96` remains unreviewed as the next unit.
+  twin-skill comparison, `make check-specs`, and `git diff --check` pass. Concurrent proposal-design
+  edits briefly interrupted the closure rerun; after they settled, the check passed, and those edits
+  remain preserved and excluded from this review commit. The continuous reviewed marker advances
+  only through `7c9ee44`; `3c1dc96` remains unreviewed as the next unit.
 
-- **2026-09-03 — fix: the 2026-09-03 review's findings (INV §2/§10/§15):** Seven of eight closed;
-  the eighth is blocked on a product decision.
+- **2026-09-03 — fix: the proposal Reject/Delete design, on the user's decision (FS-14.R57, A27;
+  TS-02.R29, TS-03.R36, TS-09.R32; INV §5/§10/§11):** The user chose the recommended ordering, which
+  closes the last two findings of the 2026-09-03 product-code review.
+
+  **The ordering.** FS-14.R57 states it in one place: an approval that commits always beats a
+  Reject, because an approval's effect is external — a template file written, a run started with
+  agents launched — and no later status update can withdraw it safely. Reject withdraws the offer,
+  never the mutation, which is the same rule R49 already stated from the other side and is
+  consistent with R50's rule that declining is not a standing block on that content. A record an
+  approval consumes leaves both the pending and the declined list as consumed. Each of Reject,
+  Delete, and approval claims the record with one conditional durable write (INV §5), so a race has
+  exactly one effect and every loser is told the state the row is actually in. The accepted failure
+  mode is stated rather than engineered around: a crash between a committed mutation and its
+  consumption mark leaves one listed offer for content that already exists, which R50's re-arm
+  resolves on the next identical proposal.
+
+  **The technical design the review found missing.** TS-02.R29 adds `declined_at`, the three record
+  states, the conditional claim each transition uses — consumption matching `consumed_at IS NULL`
+  alone is what lets an approval overwrite a decline — and keeps retention state-blind. TS-03.R36
+  adds the decline and delete routes, the two-collection non-null list shape that replaces the
+  pending-only body in UI lockstep, the typed refusals for each losing state, and reuses the existing
+  `pipeline_proposal_update` refetch signal. TS-09.R32 fixes the control-plane boundary: these are
+  pure record operations with no agent-facing effect, and the approval paths keep the shape R26 gives
+  them — no proposal id through their API, no pre-check against a decline, no cross-store
+  transaction. TS-02 and TS-09 are now Partial, since both carry planned items. A27 gained the real
+  interleavings, the concurrent-loser cases, and the leftover-offer failure mode.
+
+  **State.** FS-14 §7 carries the traceability, the idea left `docs/ideas.md` for the ready change
+  `decline-pipeline-proposals.md`, which records that the ordering must not be reopened during
+  implementation. Documentation-only: `make check-specs` and `git diff --check` pass. The four
+  workflow-efficiency findings from `7c9ee44` are a different review's unit and stay open.
+
+- **2026-09-03 — fix: the 2026-09-03 review's findings (INV §2/§10/§15):** Seven of eight closed
+  here; the eighth was answered by the user and closed in the entry above.
 
   **Must fix, streamed Mermaid remount (FS-03.R37/A20, TS-08.R40; INV §10).** `AssistantText`
   memoized react-markdown's component map on the message text, so every streamed delta after a
@@ -108,11 +137,9 @@ Earlier entries are in the [archived handoff](../archive/state/HANDOFF-through-2
   because that proposal's durable payload carries only `template_id`, and A28 covers the
   pending/declined × Save/Start matrix at maximum record size rather than one pending Save.
 
-  **Left open.** The FS-14 Reject-versus-approval **Must fix** is a product decision and moved to
-  *Decisions needing your input* with both readings and a recommendation; the **Worth fixing**
-  completion of TS-02/TS-03/TS-09 for that design stays a finding, because it cannot be written
-  before the answer. `make test`, `make build`, the UI suite, the UI build, the presentation-contract
-  check, and `git diff --check` pass.
+  **Raised for the user.** The FS-14 Reject-versus-approval **Must fix** was a product decision, put
+  to the user with both readings and a recommendation. `make test`, `make build`, the UI suite, the
+  UI build, the presentation-contract check, and `git diff --check` pass.
 
 - **2026-09-03 — release `v0.4.0` (FS-18.R1/R4/R5, TS-11.R1/R8; FS-19, FS-03.R40/R43):** Cut the
   35-commit range `v0.3.0..main`. Minor rather than patch because the range adds user-visible
@@ -155,24 +182,6 @@ an explicit specification update. Remove an item when the human resolves it or q
 - **Refused card drag feedback:** Confirm whether the cross-block refusal should remain an in-flight
   pointer signal (FS-02.R53) or whether snap-back alone is the intended behavior. The shipped pointer
   implementation is still owed its real-browser computed-cursor pass, which is an acceptance gate below.
-- **Rejecting a proposal versus approving it (FS-14.R49/R50/A27, TS-09.R15/R16/R26; INV §5/§15):**
-  FS-14 §4.4 defines only one ordering — an approval that already consumed the proposal beats a
-  later Reject — and never says what happens the other way round. The case is two tabs on the same
-  pending offer: one rejects it, and the other's already-open review flow then saves the template or
-  starts the run. Today's approval path would let that through, because it commits the template file
-  or run before marking the proposal consumed and template approval deliberately carries no proposal
-  id (TS-09.R26), so the offer the person rejected still takes effect and no post-mutation status
-  update can undo an external effect safely. Your call, because both readings are defensible:
-  (a) **the mutation always wins** — Reject only withdraws the offer, a losing Reject reports the
-  proposal as consumed exactly as R49 already says for the other ordering, and this stays consistent
-  with R50's rule that declining is not a standing block on that content; or (b) **the first action
-  to claim the record wins** — the approval must durably claim the proposal before it commits, which
-  means routing a proposal id through the template and start APIs and reversing TS-09.R26's design.
-  Recommendation: (a), because it needs no new claim across two stores and keeps one meaning for a
-  person's deliberate save. Either answer then needs the durable claim or ordering rule written down
-  with its crash and failure recovery, the behavior of a stale action, and A27 exercising the real
-  interleavings rather than only an already-consumed row. Nothing is shipped: R49–R51 are
-  `(planned)`, and the open **Worth fixing** finding gates implementation on this answer.
 - **Detecting a pipeline stage that can no longer advance:** A run parked at `await_result` with a
   silent stage agent is invisible today, and that cost the 2026-09-02 report about nineteen hours.
   Fixing it needs your call on what qualifies, because a stage agent legitimately ends many turns
@@ -250,19 +259,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 `claude-agent-acp`, OpenCode, and OpenHands are not installed globally.
 
 ## Review findings
-
-- **Worth fixing** (FS-14.R49–R51, TS-02.R22, TS-03.R16/R17, TS-09.R23/R26;
-  INV §7/§8/§9/§10/§11) — the product spec adds durable declined/deleted state, new mutations,
-  proposal-update behavior, error/retry outcomes, timestamps, and fallback rows, but every governing
-  technical spec still describes the shipped pending/consumed-only design. TS-02.R22 has only
-  `consumed_at` and pending-only reads, TS-03.R16 exposes only `GET /api/pipeline-proposals`, and
-  TS-09.R26 still says there is no dismissal action. No planned successor defines the schema and
-  retention ordering, mutation routes/status codes, list shape, update publication, invalid-row
-  isolation, non-null collections, or bounds; FS-14 §7 has no new traceability, and no ready-change
-  file or design brief owns the implementation. Normal-use trigger: an implementer must invent these
-  incompatible contracts, so persistence, server, and UI can each choose a different state model.
-  Fix by completing TS-02/TS-03/TS-09 first, adding the ready change and traceability, and only then
-  moving the design out of `docs/ideas.md`'s “being defined” section.
 
 - **Worth fixing** (`.claude/hooks/guard-edit.sh:8–28`; INV §10) — the new relative-path support
   compares the lexical path without normalizing `..`, so an Edit or Write aimed at
