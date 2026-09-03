@@ -40,6 +40,7 @@ function TaskAttentionLink({ projectID }: { projectID?: string }) {
 
 export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?: string; projectTitle?: string; fixedProject?: string } = {}) {
   const agents = useAgentStore((state) => state.agents);
+  const agentsObserved = useAgentStore((state) => state.observed);
   const agentsHydrated = useAgentStore((state) => state.hydrated);
   const agentsHydrating = useAgentStore((state) => state.hydrating);
   const order = useAgentStore((state) => state.order);
@@ -156,15 +157,17 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
     }
     for (const id of [...observed.keys()]) if (!agents[id]) observed.delete(id);
     if (opening.length === 0) return;
-    // Transitions React committed together are ordered by the server time they carry, so
-    // "the last four" is the four that happened last rather than whichever order the
-    // agent record happens to enumerate (R61).
-    opening.sort((a, b) => agents[a].updated_at - agents[b].updated_at);
+    // Transitions React committed together are ordered by when this client applied them,
+    // so "the last four" is the four that transitioned last rather than whichever order
+    // the agent record happens to enumerate (R61, TS-08.R49). The server time they carry
+    // cannot order them: `updated_at` is a millisecond wall clock, a burst shares one
+    // value, and a stable sort over a tie falls back to enumeration order.
+    opening.sort((a, b) => agentsObserved[a] - agentsObserved[b]);
     // One state update for the whole batch, through the same append-and-cap a click
     // takes, so the cap, its least-recently-used eviction, and the persisted list cannot
     // drift from the manual path (INV §2, §10).
     setExpanded((current) => opening.reduce(expandPane, current));
-  }, [agents, agentsHydrated, agentsHydrating, openableIDs]);
+  }, [agents, agentsObserved, agentsHydrated, agentsHydrating, openableIDs]);
 
   // dnd-kit derives sortable indices and measured-rect transforms from the items
   // each SortableContext is handed, so a drag's live preview is only as correct as

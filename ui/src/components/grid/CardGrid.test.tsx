@@ -415,6 +415,38 @@ describe("CardGrid", () => {
     await waitFor(() => expect(saved.at(-1)).toEqual(["a_2", "a_3", "a_4", "a_5"]));
   });
 
+  // FS-02.A43 / TS-08.R49 — the same five-at-once batch when every update carries the
+  // same `updated_at`. A millisecond wall clock is not an ordering: a burst shares one
+  // value, so what decides which pane is evicted has to be the order this client
+  // observed the transitions in. Here that order is the reverse of the order the agent
+  // record enumerates, so the two cannot be confused for one another.
+  it("keeps the last four observed when a batch of waiting transitions shares one timestamp", async () => {
+    const agents = Object.fromEntries([1, 2, 3, 4, 5].map((n) =>
+      [`a_${n}`, agent(`a_${n}`, { state: "busy", updated_at: 1 })]));
+    seedHydratedGrid(Object.keys(agents), agents);
+    const saved: string[][] = [];
+    server.use(http.put("/api/layout", async ({ request }) => {
+      const body = await request.json() as { expanded: string[] };
+      saved.push(body.expanded);
+      return HttpResponse.json(body);
+    }));
+    renderWithQuery(<CardGrid projectID="my-app" />);
+    await screen.findByText("a_1");
+
+    act(() => {
+      for (const n of [5, 4, 3, 2, 1]) {
+        useAgentStore.getState().applyStateUpdate(agent(`a_${n}`, { state: "waiting_input", updated_at: 7 }));
+      }
+    });
+
+    // a_5 transitioned first and is the one the cap drops; ordering by the tied
+    // timestamp would have dropped a_1 instead, because a stable sort over a tie
+    // falls back to the enumeration order a_1…a_5.
+    expect(screen.getAllByLabelText(/Composer a_/)).toHaveLength(4);
+    expect(screen.queryByLabelText("Composer a_5")).not.toBeInTheDocument();
+    await waitFor(() => expect(saved.at(-1)).toEqual(["a_4", "a_3", "a_2", "a_1"]));
+  });
+
   // FS-02.R44 / A26: the dashboard's only task-shaped element is how many tasks
   // in view need a person — parked work and work whose agent went away — and it
   // counts no ordinary armed, ready, starting, or running task.

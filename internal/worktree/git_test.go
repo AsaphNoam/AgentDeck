@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -246,5 +247,96 @@ func TestRecreateCheckoutFromExistingBranch(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(checkout, "README.md")); err != nil {
 		t.Fatalf("recreated checkout content missing: %v", err)
+	}
+}
+
+// olderGitOnPath puts a stand-in for a Git predating `--path-format` (2.31) at
+// the front of PATH. It reproduces the real behaviour that makes this fallback
+// necessary: `rev-parse` does not reject an option it does not know, it echoes
+// the option on stdout and answers anyway. Every other argument is forwarded to
+// the installed Git, so the case still runs against a real binary and a real
+// repository (INV §12). It returns the path of the argv log.
+func olderGitOnPath(t *testing.T) string {
+	t.Helper()
+	real, err := exec.LookPath("git")
+	if err != nil {
+		t.Skip("git is not installed")
+	}
+	dir := t.TempDir()
+	log := filepath.Join(dir, "argv.log")
+	script := "#!/bin/sh\n" +
+		"echo \"$@\" >> \"" + log + "\"\n" +
+		"n=$#\n" +
+		"i=0\n" +
+		"while [ $i -lt $n ]; do\n" +
+		"  arg=\"$1\"; shift\n" +
+		"  case \"$arg\" in\n" +
+		"    --path-format=*) printf '%s\\n' \"$arg\" ;;\n" +
+		"    *) set -- \"$@\" \"$arg\" ;;\n" +
+		"  esac\n" +
+		"  i=$((i + 1))\n" +
+		"done\n" +
+		"exec " + real + " \"$@\"\n"
+	if err := os.WriteFile(filepath.Join(dir, "git"), []byte(script), 0o700); err != nil {
+		t.Fatalf("write git shim: %v", err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	return log
+}
+
+// TestCommonDirToleratesGitWithoutPathFormat pins TS-12.R1's version tolerance
+// for the one query that carries an optional flag: an older Git must produce
+// the same repository anchor a current one does, from the repository root and
+// from a subdirectory whose answer comes back relative.
+func TestCommonDirToleratesGitWithoutPathFormat(t *testing.T) {
+	repo := initRepo(t)
+	ctx := context.Background()
+	want, err := Git{}.CommonDir(ctx, repo)
+	if err != nil {
+		t.Fatalf("CommonDir on the installed Git: %v", err)
+	}
+	sub := filepath.Join(repo, "nested")
+	if err := os.Mkdir(sub, 0o700); err != nil {
+		t.Fatalf("mkdir nested: %v", err)
+	}
+
+	log := olderGitOnPath(t)
+	for _, dir := range []string{repo, sub} {
+		got, err := Git{}.CommonDir(ctx, dir)
+		if err != nil {
+			t.Fatalf("CommonDir(%s) on an older Git: %v", dir, err)
+		}
+		if got != want {
+			t.Fatalf("CommonDir(%s) = %q, want %q", dir, got, want)
+		}
+	}
+
+	argv, err := os.ReadFile(log)
+	if err != nil {
+		t.Fatalf("read argv log: %v", err)
+	}
+	// Both forms must be on the wire: the preferred one, then the bare retry.
+	for _, want := range []string{
+		"-C " + repo + " rev-parse " + pathFormatAbsolute + " --git-common-dir",
+		"-C " + repo + " rev-parse --git-common-dir",
+	} {
+		if !strings.Contains(string(argv), want+"\n") {
+			t.Fatalf("argv log missing %q:\n%s", want, argv)
+		}
+	}
+}
+
+// TestCommonDirKeepsGitFailureActionable pins that the fallback does not turn a
+// real failure into a second attempt or a silent empty answer.
+func TestCommonDirKeepsGitFailureActionable(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	_, err := Git{}.CommonDir(context.Background(), t.TempDir())
+	if err == nil {
+		t.Fatal("CommonDir outside a repository: want an error")
+	}
+	if !isNotRepository(err) {
+		t.Fatalf("CommonDir outside a repository: want Git's own answer, got %v", err)
 	}
 }

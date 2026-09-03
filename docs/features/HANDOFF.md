@@ -21,10 +21,12 @@ back to that at every release (§16.7). Injected Current position plus Active ch
   not migrated (FS-04.R44), so it keeps the superseded product manual beside the current skill;
   nothing user-facing says so.
 - **Last reviewed code:** `636781b` (2026-09-03), across the continuous range
-  `e46e66b..636781b`. **Next review unit:** none committed; the uncommitted workflow-efficiency
-  documentation and hook changes remain awaiting independent review.
-- **Open findings:** eleven, listed below — two **Must fix** (streamed Mermaid remount; FS-14 Reject
-  versus approval ordering) and nine **Worth fixing**. The 2026-09-02 bug investigation's one
+  `e46e66b..636781b`. **Next review unit:** the fix commit closing the 2026-09-03 review's three
+  findings; the uncommitted workflow-efficiency documentation and hook changes are a second unit
+  and remain awaiting independent review.
+- **Open findings:** eight, listed below — two **Must fix** (streamed Mermaid remount; FS-14 Reject
+  versus approval ordering) and six **Worth fixing**. The 2026-09-03 review's three findings are
+  closed. The 2026-09-02 bug investigation's one
   remaining **Must fix** is the silent-stage product decision under *Decisions needing your input*.
   The task-cancel release flake is open as a **Worth fixing** finding.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
@@ -79,6 +81,27 @@ relocated links were repaired.
 ## Changelog
 
 Earlier entries are in the [archived handoff](../archive/state/HANDOFF-through-2026-09-03.md).
+
+- **2026-09-03 — fix (2026-09-03 review findings; FS-19.R1, TS-12.R1/R2, FS-03.R43–R44, FS-14.R54,
+  TS-09.R29, FS-02.R61/A43, TS-08.R49; INV §1/§2/§4/§9/§10/§12):** Closed all three Worth-fixing
+  findings from the post-worktree product-range review; it had no Must-fix finding. **§12** — the
+  worktree common-directory query was worse than reported: `git rev-parse` does not reject an
+  unknown option, it echoes it on stdout and still exits zero, so a Git older than 2.31 returned
+  `"--path-format=absolute\n.git"` as the repository anchor instead of failing. `CommonDir` now
+  detects that echo, repeats the query without the flag, and makes the answer absolute locally,
+  resolving symlinks so one repository keeps reporting one common directory (TS-12.R2's ownership
+  match). A PATH-shimmed older Git that forwards every other argument to the installed binary
+  covers both argv forms. **§4** — the pending permission tool names behind FS-03.R44's log are
+  deleted only on `permission_resolved`, which a crash never sends; the registry exit hook is now a
+  named `handleAgentExit` that sweeps the generation's entries beside `ClearPermissionAttention`,
+  with one shared key builder. **§1/§10** — a batch of waiting transitions sharing one `updated_at`
+  was ordered by agent-record enumeration, evicting the wrong pane in A43's five-at-once case;
+  `agentStore` now stamps a client observation index, pruned wherever an agent is dropped, and
+  `CardGrid` orders the batch by it. TS-12.R1 and TS-08.R49 gained the two rules that were missing
+  rather than wrong. Each regression was confirmed to fail against the pre-fix code.
+  `make check-specs`, `make test`, `make build`, the 373-case UI suite, `npm run build`,
+  `npm run check:styles`, a focused `-race` run over the server permission paths, and
+  `git diff --check` pass.
 
 - **2026-09-03 — workflow efficiency (documentation, skills, hooks, measurement tooling):**
   Corrected the investigation's unsupported quota and causal claims and implemented the accepted
@@ -246,29 +269,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 `claude-agent-acp`, OpenCode, and OpenHands are not installed globally.
 
 ## Review findings
-
-- **Worth fixing** (FS-19.R1, TS-12.R1; INV §12) — `internal/worktree/git.go:158` always invokes
-  `git rev-parse --path-format=absolute --git-common-dir`. Git versions before `--path-format`
-  reject that option, so an otherwise usable repository cannot be forked even though AgentDeck's
-  Git boundary specifies version tolerance and no minimum version. Retry with `--git-common-dir`
-  when the option is unsupported and normalize the returned path locally; cover both argv forms
-  with the Git command fixture.
-
-- **Worth fixing** (FS-03.R43–R44, FS-14.R54, TS-09.R29; INV §1/§4/§9) —
-  `internal/server/server.go:357` records every pending permission's tool name in
-  `permissionTools`, but `internal/runtime/chat.go:890` abandons pending requests on an unsolicited
-  transport close without emitting `permission_resolved`, the only path that deletes those keys.
-  Repeated agent crashes while approval is pending therefore retain generation-scoped diagnostic
-  entries for the server process lifetime. Clear the generation prefix from the runtime exit hook
-  (alongside `ClearPermissionAttention`) and add a crash-with-pending-permission regression.
-
-- **Worth fixing** (FS-02.R61/A43, TS-08.R49; INV §1/§10) —
-  `ui/src/components/grid/CardGrid.tsx:157` orders a batched set of waiting transitions only by
-  `AgentState.updated_at`, which is a millisecond wall-clock value. Five updates can share that
-  timestamp; JavaScript's stable sort then preserves `agents` insertion order, not the observation
-  order TS-08.R49 requires, so the wrong pane can be evicted under A43's five-at-once case. The test
-  assigns distinct timestamps and cannot expose the tie. Carry a client observation sequence (or
-  an equivalent deterministic event order) and add a tied-timestamp batch regression.
 
 - **Worth fixing** (FS-16.R3/R4, TS-10.R15/R19; INV §15) — `internal/server/task_http_test.go:244`
   asserts the cancel response already carries `pending_release=false` and an empty runtime claim,

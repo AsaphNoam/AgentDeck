@@ -435,6 +435,13 @@ primitive seam; the rejected alternatives are recorded in §5.
   are on screen. Several eligible transitions arriving together are applied in observation order
   inside one state update, so React commits one layout change rather than one per agent.
 
+  Observation order is a client index `agentStore` stamps on every update it applies, not the
+  `updated_at` the payload carries. That field is a millisecond wall clock: a burst of transitions
+  shares one value, and a stable sort over a tie falls back to whichever order the agent record
+  enumerates, which is insertion order rather than transition order — so the wrong pane is evicted
+  exactly in FS-02.A43's five-at-once case. The index lives beside `agents` in the store, which
+  keeps it a single-writer value and drops it on every path that drops an agent (INV §1).
+
 ### 2.7 Run-page attention, pause actions, and declared outputs
 
 - **R50** — **The run page renders the awaiting-approval state from the run's

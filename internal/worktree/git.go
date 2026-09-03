@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -155,8 +156,52 @@ func (g Git) RepoRoot(ctx context.Context, dir string) (string, error) {
 // CommonDir returns the repository's shared .git directory. Every linked
 // worktree of one repository reports the same value, which is how a checkout is
 // matched back to the repository that owns it.
+//
+// `--path-format` arrived in Git 2.31 and this package declares no minimum
+// version (TS-12.R1), so the answer cannot depend on it. `rev-parse` does not
+// reject an option it does not know: it echoes the option back on stdout and
+// still answers, exiting zero. An older Git therefore returns the flag text
+// followed by the path, which is why the flag's own echo — not an error — is
+// the detection here (INV §12).
 func (g Git) CommonDir(ctx context.Context, dir string) (string, error) {
-	return g.run(ctx, queryTimeout, dir, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	out, err := g.run(ctx, queryTimeout, dir, "rev-parse", pathFormatAbsolute, "--git-common-dir")
+	if err != nil {
+		// A real failure (not a repository, unreadable, missing binary) is the
+		// same failure without the flag, so it stays actionable as it is.
+		return "", err
+	}
+	if echoed, _, more := strings.Cut(out, "\n"); !more || echoed != pathFormatAbsolute {
+		return out, nil
+	}
+	out, err = g.run(ctx, queryTimeout, dir, "rev-parse", "--git-common-dir")
+	if err != nil {
+		return "", err
+	}
+	return absoluteRepoPath(dir, out), nil
+}
+
+// pathFormatAbsolute is named because it is both an argument and, on a Git that
+// predates it, the output that reveals it was not understood.
+const pathFormatAbsolute = "--path-format=absolute"
+
+// absoluteRepoPath makes a `rev-parse` answer absolute the way
+// --path-format=absolute would. Without the flag the path is relative to the
+// `-C` directory, and Git resolves that directory before printing, so symlinks
+// are resolved here too: one repository must report one common directory
+// however the caller's path reached it, or an owned checkout stops matching the
+// repository that owns it (TS-12.R2).
+func absoluteRepoPath(dir, out string) string {
+	path := out
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(dir, path)
+	}
+	if abs, err := filepath.Abs(path); err == nil {
+		path = abs
+	}
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		return resolved
+	}
+	return filepath.Clean(path)
 }
 
 // DefaultBase resolves the repository's default branch: origin/HEAD's target

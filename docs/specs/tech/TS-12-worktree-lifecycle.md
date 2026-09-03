@@ -20,7 +20,13 @@ branch automation beyond creating the fork branch.
   so no operation can hang on a prompt. A missing `git` binary or an unparseable output is an
   actionable error, and parsing tolerates version variance (INV §12) by using plumbing commands
   (`rev-parse`, `symbolic-ref`, `status --porcelain`, `worktree list --porcelain`) rather than
-  scraping porcelain UI output. Query helpers recognize only their documented no-answer exits
+  scraping porcelain UI output. No optional flag is load-bearing, and the fallback cannot be an
+  error check: `rev-parse` answers an option it does not know by echoing that option on stdout and
+  still exiting zero, so a query that prefers one (`--path-format=absolute`, added in Git 2.31)
+  detects the echo, repeats the query without the flag, and makes the answer absolute locally.
+  Because Git resolves the `-C` directory before printing an absolute path, the local form resolves
+  symlinks too, so one repository reports one common directory however the caller's path reached it
+  (R2's ownership match depends on that). Query helpers recognize only their documented no-answer exits
   (a plain non-repository directory, detached HEAD, or a missing ref); unreadable, missing, and
   corrupt repository paths preserve Git's actionable error instead of becoming an ordinary false
   or empty answer.

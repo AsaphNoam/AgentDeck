@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -327,34 +328,60 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	// not only on solicited stop/switch — otherwise a crashed agent leaves a live
 	// hook token + MCP session (a spoofable messaging identity) and leaked files.
 	if registry != nil {
-		registry.SetExitHook(func(agentID, generation, cause string) {
-			s.teardownAgentRegistration(agentID)
-			s.interruptTaskOnExit(agentID, generation, cause)
-			if s.pipelineMgr != nil {
-				s.pipelineMgr.ClearPermissionAttention(agentID, generation)
-				go func() {
-					if err := s.pipelineMgr.OnExit(agentID, generation, cause); err != nil {
-						s.log.Warn("pipeline agent exit", "agent_id", agentID, "err", err)
-					}
-				}()
-			}
-		})
+		registry.SetExitHook(s.handleAgentExit)
 	}
 	return s
+}
+
+// handleAgentExit is the one teardown every exit path runs, generation-scoped so
+// a late crash of launch N cannot clear launch N+1's state (INV §4).
+func (s *Server) handleAgentExit(agentID, generation, cause string) {
+	s.teardownAgentRegistration(agentID)
+	s.interruptTaskOnExit(agentID, generation, cause)
+	s.clearPermissionTools(agentID, generation)
+	if s.pipelineMgr != nil {
+		s.pipelineMgr.ClearPermissionAttention(agentID, generation)
+		go func() {
+			if err := s.pipelineMgr.OnExit(agentID, generation, cause); err != nil {
+				s.log.Warn("pipeline agent exit", "agent_id", agentID, "err", err)
+			}
+		}()
+	}
+}
+
+// clearPermissionTools drops the tool names held for a generation's still-pending
+// requests. They are written when a request is raised and deleted when it
+// resolves, but a crashed process abandons its pending requests without ever
+// resolving them, so this exit path is the only teardown they get (INV §4).
+func (s *Server) clearPermissionTools(agentID, generation string) {
+	prefix := permissionToolKey(agentID, generation, "")
+	s.permissionMu.Lock()
+	for key := range s.permissionTools {
+		if strings.HasPrefix(key, prefix) {
+			delete(s.permissionTools, key)
+		}
+	}
+	s.permissionMu.Unlock()
+}
+
+// permissionToolKey scopes a pending request's tool name to the launch that
+// raised it. Called with an empty toolCallID it is the generation's prefix, so
+// the write and its teardown cannot disagree about the key shape (INV §2).
+func permissionToolKey(agentID, generation, toolCallID string) string {
+	return agentID + "\x00" + generation + "\x00" + toolCallID
 }
 
 func (s *Server) handlePermissionEvent(ev runtime.Event) {
 	if s.pipelineMgr == nil {
 		return
 	}
-	keyPrefix := ev.AgentID + "\x00" + ev.Generation + "\x00"
 	if ev.Type == runtime.EvPermissionRequest {
 		var data runtime.PermissionRequestData
 		if json.Unmarshal(ev.Data, &data) != nil || data.AutoApproved {
 			return
 		}
 		s.permissionMu.Lock()
-		s.permissionTools[keyPrefix+data.ToolCallID] = data.Name
+		s.permissionTools[permissionToolKey(ev.AgentID, ev.Generation, data.ToolCallID)] = data.Name
 		s.permissionMu.Unlock()
 		if err := s.pipelineMgr.OnPermissionEvent(ev.AgentID, ev.Generation, data.ToolCallID, true); err != nil {
 			s.log.Warn("pipeline permission attention", "agent_id", ev.AgentID, "err", err)
@@ -365,9 +392,10 @@ func (s *Server) handlePermissionEvent(ev runtime.Event) {
 	if json.Unmarshal(ev.Data, &data) != nil {
 		return
 	}
+	key := permissionToolKey(ev.AgentID, ev.Generation, data.ToolCallID)
 	s.permissionMu.Lock()
-	name := s.permissionTools[keyPrefix+data.ToolCallID]
-	delete(s.permissionTools, keyPrefix+data.ToolCallID)
+	name := s.permissionTools[key]
+	delete(s.permissionTools, key)
 	s.permissionMu.Unlock()
 	if data.Decision == "deny" || data.Decision == "timeout" || data.Decision == "cancelled" {
 		s.log.Warn("permission withheld tool", "agent_id", ev.AgentID, "tool", name, "decision", data.Decision)
