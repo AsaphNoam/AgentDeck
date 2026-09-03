@@ -24,13 +24,13 @@ back to that at every release (§16.7). Injected Current position plus Active ch
   (TS-06.R21). A customized
   `agentdecker` role is deliberately not migrated (FS-04.R44), so it keeps the superseded product
   manual beside the current skill; nothing user-facing says so.
-- **Last reviewed code:** `7c9ee44` (2026-09-03), across the continuous range `e46e66b..7c9ee44`.
-  **Next review unit:** product-fix commit `3c1dc96`, which shipped in `v0.4.0` unreviewed.
-- **Open findings:** None. The four workflow-efficiency findings from the review of `7c9ee44` are
-  fixed. The 2026-09-03 product-code review's eight findings are also closed: seven fixed, and the
-  Reject-versus-approval ordering answered by the user with the durable mutation winning, now
-  specified as FS-14.R57 with TS-02.R29, TS-03.R36, and TS-09.R32. Both **Must fix** items `v0.4.0`
-  shipped with are closed.
+- **Last reviewed code:** `3c1dc96` (2026-09-03), across the continuous range `e46e66b..3c1dc96`.
+  **Next review unit:** handoff-only commit `a6a8c0f`; the later commits through `4eebf31` remain
+  unreviewed too.
+- **Open findings:** Two from the review of `3c1dc96`: one **Must fix** generation race in crash
+  registration teardown and one **Worth fixing** contradiction in FS-02.A43's acceptance evidence.
+  The four workflow-efficiency findings from the review of `7c9ee44` are fixed. The earlier
+  product-code review's eight findings are also closed.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
   remain owed before claiming those adapters accept structured results.
 - **Usability state:** The Pipelines pages and dashboard grid were driven through a real Chromium on
@@ -46,15 +46,29 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 
 **Change:** None.
 
-**Next:** Independently review product-fix commit `3c1dc96`. The proposal Reject/Delete design is
-fully specified and waiting to start as
-[`decline-pipeline-proposals.md`](../ready-changes/decline-pipeline-proposals.md); its ordering
-question is answered and must not be reopened during implementation. Keep the credentialed
-Claude/Codex browser journey as an acceptance gate until a human authorizes real provider sessions.
+**Next:** Fix the two findings from the review of `3c1dc96`, then independently review the next
+unreviewed unit beginning at `a6a8c0f`. The proposal Reject/Delete design is fully specified and
+waiting to start as [`decline-pipeline-proposals.md`](../ready-changes/decline-pipeline-proposals.md);
+its ordering question is answered and must not be reopened during implementation. Keep the
+credentialed Claude/Codex browser journey as an acceptance gate until a human authorizes real
+provider sessions.
 
 ## Changelog
 
 Earlier entries are in the [archived handoff](../archive/state/HANDOFF-through-2026-09-03.md).
+
+- **2026-09-03 — review: product-fix commit `3c1dc96` (TS-01.R16, TS-04.R7, FS-02.A43,
+  TS-08.R49; INV §1–§15):** Reviewed the Git-version fallback, pending-permission cleanup, and
+  tied-timestamp pane ordering in both directions against their requirements. Two findings are
+  recorded. The crash exit handler admits a generation under the registry lock, releases that lock,
+  then runs agent-id-only registration teardown; a resume can register the next generation in that
+  window and have its hook token, MCP identity/file, and hook settings deleted by the old exit.
+  Separately, FS-02.A43 still says `agentStore` gains no field even though this fix adds and TS-08.R49
+  requires its observation index. INV §1, §2, §4, §5, §9, §10, and §12 had applicable surfaces;
+  §3, §6, §7, §8, §11, §13, §14, and §15 had none. The full Go suite in both build modes, the
+  full UI build and presentation checks, focused CardGrid/store/worktree/server cases, and the
+  permission-teardown race case pass. The continuous reviewed marker advances through `3c1dc96`;
+  the remaining unreviewed range begins at `a6a8c0f`.
 
 - **2026-09-03 — fix: workflow-efficiency review findings (INV §7/§10):** Closed all four
   Worth-fixing findings from the review of `7c9ee44`. The edit guard now normalizes lexical `.` and
@@ -274,7 +288,25 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-None.
+- **Must fix** (TS-01.R16, TS-04.R7; INV §4/§5) — `internal/server/server.go:336` describes
+  `handleAgentExit` as generation-scoped, but after `runtime.Registry.handleAgentExit` admits the
+  old generation and releases its mutex, `server.go:339` calls `teardownAgentRegistration(agentID)`;
+  that helper and the hook-token, messaging-MCP, and hook-settings stores it clears are keyed only
+  by agent id (`internal/server/launch.go:681–704`). Normal-use trigger: an agent crashes and is
+  resumed manually or by orchestration while the old exit callback is between registry admission
+  and teardown. The resume can register generation N+1, then generation N deletes the new hook
+  token, MCP identity/file, and hook settings, leaving the live process unable to authenticate or
+  use its configured integrations. Make crash teardown participate in the per-agent lifecycle claim
+  or conditionally remove generation-tagged registration artifacts, and add an overlapping
+  crash/resume regression that proves the new registration survives.
+
+- **Worth fixing** (FS-02.A43, TS-08.R49; INV §10) —
+  `docs/specs/features/FS-02-dashboard.md:754` says the automatic-pane implementation leaves
+  `agentStore` without a new field, while this commit adds `observed`/`observedSeq` and TS-08.R49
+  now requires that observation index in the store. The tied-timestamp behavior is implemented and
+  tested correctly, but its normative acceptance evidence contradicts the architecture and can send
+  a future maintainer back toward the broken timestamp ordering. Update A43 to name the observation
+  index while retaining the store's single-writer role.
 
 ## Design consistency notes
 
