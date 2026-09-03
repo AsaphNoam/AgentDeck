@@ -236,9 +236,8 @@ and flagged as such — never silently reported as fact.
 - If a finding suggests a new systemic class, record it as a candidate finding. Usability review
   does not edit specs/INV; fix validates and updates the technical-spec appendix.
 - Save the full run summary (journey results, all findings, evidence paths) as a file, and report to
-  the human via the **human update** (AGENT-WORKFLOW §6): a focused, plain-language entry in
-  [`BRIEFS.md`](BRIEFS.md) — what was driven, severity counts, each blocker as one plain sentence,
-  link to the run summary file — pasted as the end-of-turn message. Do not list every lower-priority
+  the human via the **human update** (AGENT-WORKFLOW §6): what was driven, severity counts, each
+  blocker as one plain sentence, and a link to the run summary file. Do not list every lower-priority
   item in the update; those live in the handoff and the run file.
 - If a journey is all-PASS, say so in the matrix — an unexercised journey and a passing journey
   must be distinguishable.

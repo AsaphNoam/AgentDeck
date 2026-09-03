@@ -6,13 +6,28 @@ says how agents work with them.
 
 ## 1. Start with the current state
 
-1. Read [`HANDOFF.md`](HANDOFF.md) from top to bottom, then inspect `git status` and the diff. Treat
-   a dirty tree as user or interrupted work; do not discard it.
+1. Read the handoff's **Current position** and **Active change**, then inspect `git status` and the
+   diff. Treat a dirty tree as user or interrupted work; do not discard it. When a session-start hook
+   already injected that header, do not re-read it. Open the rest of [`HANDOFF.md`](HANDOFF.md) —
+   review findings, blocked-on-human, acceptance gates — only when the header points at it or the
+   task needs it, and read those sections by name rather than reading the file end to end.
 2. If a change is in progress, read its change file and the relevant feature, technical, and invariant
    requirements before reading code. A `/work` request with no active change may start the sole
    waiting ready change, or a ready change explicitly named in that request. If several ready changes
    are waiting, ask the user to choose; do not prioritize one yourself. Outside that explicit request,
    do not choose future work yourself.
+3. **Isolate broad discovery.** Delegate an uncertain multi-file search, subsystem survey, or commit-
+   range survey when its raw output would otherwise stay in the main context through substantial
+   follow-up work. Give the child the question, paths, and answer shape; use Sonnet on Claude Code or
+   Luna with `fork_turns: "none"` on Codex; take back a distilled result. Keep a known-path lookup,
+   bounded search, targeted edit, and conversation-dependent judgment in this thread: a child has
+   its own startup cost, so delegation is not automatically cheaper.
+4. **One unit per run.** A session handles one unit of work — one change, one review, one review's
+   findings — and finishes it. It does not continue into the next unit: not a second waiting change,
+   not a second unreviewed range, not a second review's findings. Finish the unit, record the state,
+   commit, name what is still waiting, and end the session. This prevents unrelated queued work from
+   accumulating in one context; it does not split a large change. A user who asks for more than one
+   unit in a run gets it; the limit is the default, not a refusal.
 
 Use plain status words: **waiting to start**, **in progress**, **paused**, and **finished**.
 Requirement IDs such as `FS-05.A2` and `TS-03.R4` are kept because they are stable links to a
@@ -26,19 +41,27 @@ Work in small, complete pieces. For each piece:
    first. Add or change its R/A items and mark unshipped behavior `(planned)`. A bug fix that restores
    already-specified behavior does not need a specification change.
 2. Implement the work and add or keep the test that demonstrates the requirement.
-3. Verify it. Product-code changes run:
+3. Run the narrow test, type check, or syntax check that gives useful feedback for that piece. Do
+   not run the full closure matrix after every edit.
+4. Before committing the completed request, run the applicable closure matrix once after the final
+   relevant edit. Product-code changes run:
 
    ```bash
    make test
-   make build
-   cd ui && npm test && npm run build  # when ui/ changed
+   make build                          # unless make dist follows
+   cd ui && npm test                   # when ui/ changed
+   cd ui && npm run build              # when ui/ changed and make dist does not follow
    make dist  # when producing a distributable or refreshing embedded UI output
    ```
 
-   Documentation-only work runs `make check-specs`, appropriate syntax or rendering checks, and `git diff --check`. Run an additional command when the documentation changes that command or makes a claim that needs executable evidence.
-4. Before committing, check that the specifications describe what shipped, the active work state is
+   `make test` already runs `make check-specs`; do not repeat it separately in the same closure pass.
+   `make dist` already rebuilds the UI and binary. Run it only when producing a distributable or
+   refreshing embedded UI output. Documentation-only work runs `make check-specs`, appropriate
+   syntax or rendering checks, and `git diff --check`. Re-run a closure check only after a relevant
+   edit or when diagnosing a failure.
+5. Before committing, check that the specifications describe what shipped, the active work state is
    accurate, and the diff has no unfinished or accidental changes.
-5. Commit the completed work, its specification update when needed, and the handoff update together
+6. Commit the completed work, its specification update when needed, and the handoff update together
    on `main`. Continue with the next piece until the request is complete or there is a real reason to stop.
 
 Implement the smallest change that satisfies the requirement. Extend an existing seam, pattern, or
@@ -46,6 +69,9 @@ interface before inventing a parallel one (INV §2 and its canonical-helpers reg
 add abstraction, configurability, or edge-case handling that no requirement or real report demands.
 When a requirement itself seems to force disproportionate machinery, question it under §3 rather
 than building around it.
+
+Use the harness's native patch/edit tool for source changes. Do not use Python, Perl, or shell
+heredoc replacement scripts that embed the old and new source in the conversation.
 
 Do not claim work is complete while required checks fail. Do not make tests pass by weakening useful coverage or by changing a requirement without recording that change in the relevant specification.
 
@@ -67,13 +93,17 @@ When delegation is available, use it for bounded independent work such as a repo
 
 Commit each completed, verified piece directly to `main`; this repository does not use per-change branches or pull requests. The message should say what changed and, where useful, cite the requirement IDs. Push only when the user or environment authorizes it.
 
-Every role ends in a commit, including the roles that write no product code. Their **state files** are `HANDOFF.md` and `BRIEFS.md`; where a section below says to commit only the state files, it means those two plus whatever that section explicitly allows.
+Every role ends in a commit, including roles that write no product code. Their state file is
+`HANDOFF.md`; where a section below says to commit only the state file, it means that file plus
+whatever that section explicitly allows.
 
 At the end of a session, either leave a verified commit or clearly describe unfinished work in the handoff. Never pretend interrupted work is complete.
 
 ## 6. Human update
 
-Every feature-design, implementation, review, fix, and usability-review session adds one short update to [`BRIEFS.md`](BRIEFS.md) and sends that exact text as the final response.
+Every feature-design, implementation, review, fix, and usability-review session sends one short
+human update as its final response. Do not duplicate that response into a repository history file;
+the handoff, specifications, and commit retain the durable project state.
 
 Write for the person who asked for the work, not for the next agent. Use plain language. Explain a project abbreviation the first time it matters, or leave it out. Do not use internal process labels, requirement-ID strings, commit hashes, command inventories, or changed-file lists unless the person needs one to act. The handoff holds the internal detail.
 
@@ -91,7 +121,7 @@ Use this shape:
 
 ## 7. Review work
 
-Review another agent's unreviewed code, not your own. Unless the user names a range, start after the last reviewed code commit and continue through `main`. Read the relevant requirements before the diff.
+Review another agent's unreviewed code, not your own. Unless the user names a range, start after the last reviewed code commit and review **one unit**: the next change's implementation range, or a single commit where the range has no change boundary. Do not sweep the whole unreviewed backlog in one run (§1.4) — advance the reviewed marker across what you actually read and name the range still unreviewed. Read the relevant requirements before the diff.
 
 Check both directions:
 
@@ -100,11 +130,13 @@ Check both directions:
 
 Also look for normal-use bugs: missing error handling at boundaries, realistic races, unsafe writes, dead code, and incomplete wiring. Unrequired complexity is likewise a finding: a new parallel mechanism or abstraction where an existing seam could extend, or code serving a case no requirement names. Ignore style preferences, demands for speculative edge-case handling, and micro-optimizations.
 
-Record each real finding in `## Review findings` in `HANDOFF.md` with its location, normal-use trigger, why it matters, relevant requirement ID when one exists, and a suggested test or fix. Start the bullet with either **Must fix** (a likely normal-use failure, data-loss risk, or requirement violation) or **Worth fixing** (useful but not urgent). Update the last reviewed commit only across a continuous range actually reviewed. Commit only the state files (§5).
+Record each real finding in `## Review findings` in `HANDOFF.md` with its location, normal-use trigger, why it matters, relevant requirement ID when one exists, and a suggested test or fix. Start the bullet with either **Must fix** (a likely normal-use failure, data-loss risk, or requirement violation) or **Worth fixing** (useful but not urgent). Update the last reviewed commit only across a continuous range actually reviewed. Commit only the state file (§5).
 
 ## 8. Fix review findings
 
-Handle one finding at a time, starting with **Must fix** items.
+Handle the findings from **one review** in a run, **Must fix** first, one finding at a time. That
+review's findings are the unit (§1.4): finish them, then stop rather than continuing into another
+review's findings or another waiting change.
 
 1. Confirm the report is true by reading the code, the cited requirement, and the real path. Reproduce it with a failing test when practical. A finding that cites a committed skipped reproduction test (§12) starts by un-skipping it and confirming it fails.
 2. If it is false or already fixed, remove the finding and record the short evidence in the changelog and human update; do not change code.
@@ -115,7 +147,7 @@ If the correct fix needs a user decision or cannot pass the required checks, lea
 
 ## 9. Usability reviews
 
-Usability reviews do not change product code or specifications. Exercise the real user journeys in [`USABILITY-REVIEW.md`](USABILITY-REVIEW.md) against the feature acceptance criteria. Record problems a person is likely to meet, with reproduction evidence, using the same **Must fix** / **Worth fixing** format as §7. If a browser or credentialed journey cannot run, say so plainly rather than treating it as passed. Commit only the state files (§5) and finish with the §6 human update.
+Usability reviews do not change product code or specifications. Exercise the real user journeys in [`USABILITY-REVIEW.md`](USABILITY-REVIEW.md) against the feature acceptance criteria. Record problems a person is likely to meet, with reproduction evidence, using the same **Must fix** / **Worth fixing** format as §7. If a browser or credentialed journey cannot run, say so plainly rather than treating it as passed. Commit only the state file (§5) and finish with the §6 human update.
 
 ## 10. Keep specifications accurate
 
@@ -155,7 +187,7 @@ the trigger does not pass, continue without recording a UX ceremony or rationale
 6. When both specifications are complete, create a descriptive file in `docs/ready-changes/` with
    the exact requirements and acceptance evidence, remove the source idea, and run the documentation
    checks. Do not make the change active in `HANDOFF.md`; implementation has not started. Commit the
-   specifications, the ready change, the removed idea, and the state files (§5) together.
+   specifications, the ready change, the removed idea, and the state file (§5) together.
 
 If a material decision remains unresolved, leave the idea under `Ideas being defined` and do not
 call it ready. Keep partial specifications honest and record what is needed from the user.
@@ -188,7 +220,7 @@ and no specifications, with one exception: it may commit a reproduction test mar
    logged nothing, record what diagnostic should exist, where, and what question it would have
    answered, as its own finding. An undiagnosable report must at least make the next one diagnosable.
 6. **Close.** Record findings in `## Review findings` in `HANDOFF.md` using the §7 format plus the
-   confidence label, so §8 consumes them unchanged. Commit only the state files and any skipped
+   confidence label, so §8 consumes them unchanged. Commit only the state file and any skipped
    reproduction test, then finish with the §6 human update.
 
 ## 13. Review a design
@@ -257,7 +289,7 @@ ready, not a reason to look harder.
 Record findings in `## Review findings` in `HANDOFF.md` using the §7 format. The change stays
 `Waiting to start` — implementation must not begin while a design has open Must-fix findings.
 Consistency notes never hold it. With no findings, say so plainly and leave the change untouched.
-Commit only the state files and finish with the §6 human update.
+Commit only the state file and finish with the §6 human update.
 
 ## 14. Design UI
 
@@ -544,5 +576,14 @@ behavior; when the release range needs one of those, that work happens first und
    passed them.
 
 7. **Close.** Record the released version and the gates still owed in `HANDOFF.md`, commit the state
-   files (§5), and finish with the §6 human update. Write that update as release notes a person can
-   read — what this version gives them — drawing on the `BRIEFS.md` entries in the range.
+   file (§5), and finish with the §6 human update.
+
+   A release is a mandatory epoch boundary for the handoff, and an earlier cut is warranted whenever
+   settled content obscures live state. Move everything the new
+   version settled — closed findings, finished changes, resolved decisions, superseded review state —
+   out of `HANDOFF.md` into `docs/archive/state/HANDOFF-through-YYYY-MM-DD.md`. What stays live is what an
+   agent starting cold on the *next* change needs: current position, active change, open findings,
+   open gates, blocked-on-human. Keep the injected Current position plus Active change slice under
+   8 KiB; that slice, not the whole file, is the recurring session-start cost. Write the final update
+   as release notes a person can read — what this version gives them — drawing on the release range,
+   specifications, and handoff rather than a duplicate response history.

@@ -5,8 +5,10 @@ description: Explicit invocation only. Run only when the user sends `/release`; 
 
 # Cut a release
 
-Read [`HANDOFF.md`](../../../docs/features/HANDOFF.md), the
-[`spec overview`](../../../docs/specs/README.md), FS-10 and TS-06.R13–R22 for the release contract,
+Use the injected handoff header when present; otherwise read only **Current position** and **Active
+change** in [`HANDOFF.md`](../../../docs/features/HANDOFF.md). Open its **Review findings**,
+**Acceptance gates**, and **Blocked on human** sections for readiness, then read FS-10 and
+TS-06.R13–R22 for the release contract,
 FS-18 and TS-11 for the shipped `operating-agentdeck` package, and
 [`AGENT-WORKFLOW.md`](../../../docs/features/AGENT-WORKFLOW.md) §§2–6 and §16 completely. Then
 follow the shared workflow; the workflow and specs take precedence over this launcher.
@@ -23,4 +25,8 @@ agent-facing. Do not add features or fix findings here; an open **Must fix** fin
 
 Publishing is outward-facing and irreversible. Verify with the full product checks plus `make dist`,
 and push `main` and the tag only with explicit authorization; stop at the unpushed tag otherwise.
-Close with the handoff update, commit, and exact human update written as readable release notes.
+Close with the handoff update, commit, and concise human update written as readable release notes.
+
+Archiving the handoff is part of closing a release (workflow §16.7): move what this version settled
+to `docs/archive/state/`, leave live only what the next change needs, and keep the injected Current
+position plus Active change slice under 8 KiB.

@@ -11,7 +11,8 @@ into an implementation, or make routine frontend work a design exercise. A desig
 request changes no product code; an implementation request follows the normal specification-first
 build workflow.
 
-Read [`HANDOFF.md`](../../../docs/features/HANDOFF.md), the governing feature requirements,
+Use the injected handoff header when present; otherwise read only **Current position** and **Active
+change** in [`HANDOFF.md`](../../../docs/features/HANDOFF.md). Then read the governing feature requirements,
 `FS-12`, `TS-08`, [`ui/AGENTS.md`](../../../ui/AGENTS.md), the affected UI, and
 [`AGENT-WORKFLOW.md`](../../../docs/features/AGENT-WORKFLOW.md) §14 completely. §14 is the single
 authority for direction, composition, motion, and rendered verification; follow it alongside the

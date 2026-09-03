@@ -1,7 +1,10 @@
-# AgentDeck — Session briefs
+# AgentDeck — Session briefs (retired)
 
-Newest first. Each entry is the exact final response from a feature-design, implementation, review,
-fix-review, or usability-review session. Agents resume from [`HANDOFF.md`](HANDOFF.md), not this history.
+This historical response log stopped accepting new entries on 2026-09-03. Agents resume from
+[`HANDOFF.md`](HANDOFF.md); specifications and commits retain durable results, and final responses
+remain in their conversations rather than being copied into this file.
+
+The retained entries below are unchanged history. Newest first.
 Briefs through 2026-08-21 are archived in
 [`../archive/state/BRIEFS-through-2026-08-21.md`](../archive/state/BRIEFS-through-2026-08-21.md).
 

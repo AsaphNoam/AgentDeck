@@ -9,7 +9,8 @@ This is a task-experience companion to the active role, not authority to choose 
 work. Automatic use does not select a feature, turn critique into implementation, or replace the
 specification, review, design, or usability-review rules.
 
-Read [`HANDOFF.md`](../../../docs/features/HANDOFF.md), the governing feature requirements and
+Use the injected handoff header when present; otherwise read only **Current position** and **Active
+change** in [`HANDOFF.md`](../../../docs/features/HANDOFF.md). Then read the governing feature requirements and
 acceptance items, the affected current experience, and
 [`AGENT-WORKFLOW.md`](../../../docs/features/AGENT-WORKFLOW.md) §15 completely. §15 is the single
 authority for task framing, walkthroughs, UX findings, and focused real-product validation. When

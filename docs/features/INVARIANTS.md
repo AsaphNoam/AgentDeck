@@ -13,10 +13,41 @@ The hot-spot areas: launch/resume/switch composition, `internal/runtime` concurr
 How the loop uses this file:
 - **/work** — before building in a hot-spot area, read the matching class; new interfaces
   must complete the §6 contract checklist.
-- **/review** — sweep the diff against every class; tag each finding with its class number.
+- **/review** — sweep the diff against every class **by the trigger index below**; tag each finding
+  with its class number.
 - **/fix** — note the class in the changelog line; if a fix reveals a genuinely new class
   (or a new canonical pattern), append it here. Keep this file curated — merge near-duplicates,
   don't let it become a graveyard.
+
+Read the trigger index first, then read in full only the classes your diff actually touches. Reading
+all fifteen classes for a diff that touches one is waste, not diligence. Read one class with:
+
+```bash
+awk '/^## 7\./{f=1} f&&/^## 8\./{exit} f' docs/features/INVARIANTS.md
+```
+
+## Trigger index
+
+| # | Class | Read it when the diff touches |
+|---|---|---|
+| 1 | Boundary crossing resets or republishes derived state | reconnect, relaunch, resume, switch, or any lifecycle transition that leaves derived state behind |
+| 2 | Parallel paths that build the same thing share one helper | a second code path constructing an artifact or projection that already has a builder (check the canonical-helpers registry below) |
+| 3 | Persisted fields never receive one-shot data | a field that is both sent to the runtime and persisted; any form that writes seeded config |
+| 4 | Create/teardown symmetry | anything created at registration — hook tokens, MCP sessions/files, hook-settings files, temp artifacts |
+| 5 | Check-then-act needs an atomic claim | "if pending then resolve" / "if active then fire" across goroutines; `internal/runtime` concurrency |
+| 6 | A new interface/runtime joins every contract | a new interface, runtime, driver, or adapter — walk the checklist line by line |
+| 7 | Read paths don't swallow errors or amplify damage | iteration, repair, migration, or recovery code over records |
+| 8 | User-facing surfaces get parsed, bounded, in-vocabulary data | card previews, `status.detail`, toasts, any rendered agent or CLI output |
+| 9 | Liveness & durability primitives are weaker than they look | SQLite, file locks, signals, process liveness, timeouts, fsync |
+| 10 | Ship the wiring; kill the drift | a feature reachable from some surfaces but not all; docs or defaults left behind |
+| 11 | Cross-boundary serialization contracts | Go structs crossing to the UI; nil slices/maps; test mocks standing in for real payloads |
+| 12 | External-CLI invocations tolerate version and environment variance | any `exec.Command` of a user-installed tool — agent CLIs, probers, git |
+| 13 | Every referenced className has a defined selector | `ui/src` markup or `ui/src/styles/**` |
+| 14 | Loopback is not a security boundary | HTTP handlers, CORS, file paths from requests, anything reachable from a browser |
+| 15 | Commit local truth before releasing external side effects | an operation that makes work externally observable or lets a peer proceed |
+
+A class with no applicable surface in the diff is a result to state, not a step to skip — the index
+is enough to state it. Open the class body only when the trigger matches.
 
 ---
 

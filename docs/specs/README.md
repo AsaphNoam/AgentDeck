@@ -13,8 +13,8 @@ Nothing ships "because the code already does it."
   (cited as `INV §n`): the paid-for bug-class catalog. Its rules are binding constraints, exactly
   like a TS requirement.
 
-Everything else is **not** spec: [`HANDOFF.md`](../features/HANDOFF.md) and
-[`BRIEFS.md`](../features/BRIEFS.md) are live state, plans are disposable sequencing,
+Everything else is **not** spec: [`HANDOFF.md`](../features/HANDOFF.md) is live state,
+[`BRIEFS.md`](../features/BRIEFS.md) is retained response history, plans are disposable sequencing,
 review-run reports are records, and [`../archive/`](../archive/) is history. The protocol that
 operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 

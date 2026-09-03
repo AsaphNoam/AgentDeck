@@ -5,12 +5,15 @@ description: Explicit invocation only. Run only when the user sends `/fix`; do n
 
 # Fix findings
 
-Read [`HANDOFF.md`](../../../docs/features/HANDOFF.md), the
-[`spec overview`](../../../docs/specs/README.md), the FS/TS items named by the findings,
-[`INVARIANTS.md`](../../../docs/features/INVARIANTS.md) in full, and workflow
+Use the injected handoff header when present; otherwise read only **Current position** and **Active
+change** in [`HANDOFF.md`](../../../docs/features/HANDOFF.md). Open its **Review findings** section
+for the review being fixed, then read the FS/TS items named by those findings,
+[`INVARIANTS.md`](../../../docs/features/INVARIANTS.md)'s trigger index and the classes the
+findings touch, and workflow
 §§2–6, §8, and §10 completely, then follow the fix process.
 
-`$ARGUMENTS` may scope the run to a finding priority or keyword; otherwise handle every open finding,
-starting with **Must fix**. Name the finding's invariant class in the changelog line. Update the
+`$ARGUMENTS` may scope the run to a finding priority or keyword; otherwise take the findings from
+one review, **Must fix** first, and stop when they are done (workflow §1.4 and §8) rather than
+continuing into another review's findings. Name what is still open when you close. Name the finding's invariant class in the changelog line. Update the
 relevant specification when a fix changes behavior or fills missing coverage. Close with the handoff
-update, commit, and exact human update.
+update, commit, and concise human update.

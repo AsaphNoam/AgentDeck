@@ -5,7 +5,7 @@ requirements they name. Open the other sections only when those point at them. S
 archived in [`../archive/state/HANDOFF-through-2026-09-03.md`](../archive/state/HANDOFF-through-2026-09-03.md)
 and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md). Follow
 [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md); this file holds resumable current state only and is cut
-back to that at every release (§16.7). Budget: 300 lines.
+back to that at every release (§16.7). Injected Current position plus Active change budget: 8 KiB.
 
 ## Current position
 
@@ -53,55 +53,40 @@ all open nothing. FS-02 and TS-08 now carry no `(planned)` item and are `Current
 fix. Keep the credentialed Claude/Codex browser journey as an acceptance gate until a human
 authorizes real provider sessions.
 
-## Workflow efficiency investigation
+## Workflow efficiency change
 
-**Awaiting independent review.** Documentation, skills, and hooks only — no product code. Reviewer:
-judge whether the diagnosis is supported and whether the changes are proportionate; the author's
-reasoning is stated here so it can be disagreed with.
+**Finished; awaiting independent review.** The transcript evidence supports long-lived retained
+context and repeated document/tool output as usage contributors, but not the earlier quota shares,
+the 180× ratio, or delegation as a causal saving. The old headline mixed main and child transcript
+populations without preserving one reproducible date/filter definition. A new
+`scripts/transcript-usage/` audit reports event-date-filtered raw counters, separates main,
+subagent/sidechain, and guardian records, and makes no subscription-quota inference.
 
-**Request.** The user reported that workflow runs consume a growing share of the 5-hour quota window
-and asked for an investigation of a month of Claude Code and Codex transcripts, then recommendations.
-Five Sonnet subagents read partitioned scopes; the author verified their claims before acting.
+The workflow now loads only Current position plus Active change at startup and only the requirements
+and workflow sections the active role needs. Invariants keep their trigger index. Broad discovery is
+delegated only when isolating substantial raw output earns the child's startup cost; bounded lookups
+stay local. Native edit tools replace transcript-heavy heredoc replacement scripts. Focused checks
+serve the edit loop, with the applicable full matrix run once after the final relevant edit. A run
+still owns one change, one review, or one review's findings, but does not split a large change; the
+user explicitly declined a checkpoint rule.
 
-**Findings (31 days, ~91 Claude main sessions).** 8,267 requests, 26.1M cache-creation and 1.02B
-cache-read tokens; Codex adds a separate ~913M. All content ever read into context totalled ~5.6M
-tokens, so context was re-sent roughly 180 times. Three drivers: (1) sessions never end — one ran
-16.5h/339 requests to 553k context for 110M cache-read tokens, and cost grows with the square of
-session length; (2) 62 of 84 sessions delegated nothing and account for 67% of main-chain tokens,
-because discovery sweeps run in the orchestrator and pin their output in context; (3) mandated
-reading is unconditional and unbounded — HANDOFF.md reached 138KB and was read up to 67 times in one
-session, INVARIANTS.md was loaded in full "always" but revisited in only 8 of 43 sessions.
-
-**Changes and why.** AGENT-WORKFLOW §1.1 makes the injected handoff header the read instead of a
-prelude to reading the file. §1.3 makes delegating discovery a numbered step, since the same rule
-already existed as a principle in CLAUDE.md/AGENTS.md and was not followed. §1.4 limits a run to one
-unit and §§7–8 apply it to reviews and findings. §16.7 archives the state files at each release.
-INVARIANTS.md gained a 15-row trigger index so a diff opens only the classes it touches; the file was
-not split because 1,895 references point at it. The eight skill launchers carry matching steps in
-both trees. `session-start.sh` now injects Current position and Active change and states that the
-injection is the read. `guard-edit.sh` holds HANDOFF.md to 300 lines and BRIEFS.md to 400. This
-handoff was cut 1,685 → ~300 lines, with the full prior file preserved in
-[`../archive/state/HANDOFF-through-2026-09-03.md`](../archive/state/HANDOFF-through-2026-09-03.md).
-AGENTS.md gained a Codex delegation section naming `spawn_agent` with `model: "gpt-5.6-luna"` and
-`fork_turns: "none"`, because Codex's own instructions accept AGENTS.md as a source for those
-overrides and reject them on a full-history fork.
-
-**Reverted during the session.** A sweep budget in `guard-bash.sh` returned `permissionDecision:
-"ask"` after 8 repository-wide searches. That overrides the permission mode, asked on every
-subsequent match with no decay, and would block an unattended run. It was removed, not retuned: the
-permission channel cannot nudge the model without interrupting the human. `guard-edit.sh`'s budget
-has the same property but fires only when a state file is over budget.
-
-**Open to challenge.** The 300-line budget is asserted, not derived. The one-unit-per-run limit is
-untested against real sessions and may trade token cost for more handoff churn. The token weighting
-uses API pricing (cache reads 0.1x, 1-hour writes 2x) as a proxy for subscription quota, which is not
-published. Two author claims were wrong mid-session and corrected: that Codex spawns cannot take a
-cheaper model, and that a fix run should stop after one finding rather than one review's findings.
-This file is currently above its own 300-line budget; closing this review returns it.
+`BRIEFS.md` is retired as a duplicated final-response log. Handoff archiving may happen whenever
+settled state obscures live work and remains mandatory at release. The Claude edit guard measures
+only the injected header slice, permits cleanup, handles relative paths, and holds that slice below
+8 KiB without treating BRIEFS or the rest of the handoff as a startup tax. The archived handoff's
+relocated links were repaired.
 
 ## Changelog
 
 Earlier entries are in the [archived handoff](../archive/state/HANDOFF-through-2026-09-03.md).
+
+- **2026-09-03 — workflow efficiency (documentation, skills, hooks, measurement tooling):**
+  Corrected the investigation's unsupported quota and causal claims and implemented the accepted
+  context-efficiency changes without a large-change checkpoint rule. Startup reads and role
+  launchers are section-addressed; discovery delegation is conditional on context benefit; native
+  editing and one closure verification pass replace heredoc edits and repeated full suites; the
+  duplicate BRIEFS write is retired; the handoff guard measures the injected slice; and the new
+  transcript audit separates provider/session classes using event dates and raw counters.
 
 - **2026-09-03 — review (continuous post-`bd797bd` range through `636781b`; worktree fixes,
   unattended pipelines and fixes, automatic waiting-pane opening; INV §1–§15):** Reviewed the

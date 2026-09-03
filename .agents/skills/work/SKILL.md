@@ -5,10 +5,11 @@ description: Explicit invocation only. Run only when the user sends `/work`; do 
 
 # Work a change
 
-Read [`HANDOFF.md`](../../../docs/features/HANDOFF.md), its named change in progress (if any), the
-[`spec overview`](../../../docs/specs/README.md), the FS/TS items named by the change or request,
-[`INVARIANTS.md`](../../../docs/features/INVARIANTS.md) — always, and the matching class in full
-before a hot-spot change — and
+Use the injected handoff header when present; otherwise read only **Current position** and **Active
+change** in [`HANDOFF.md`](../../../docs/features/HANDOFF.md). Then read the named change in progress
+(if any), the FS/TS items named by the change or request,
+[`INVARIANTS.md`](../../../docs/features/INVARIANTS.md)'s trigger index — always, then the classes
+the change actually touches, in full — and
 [`AGENT-WORKFLOW.md`](../../../docs/features/AGENT-WORKFLOW.md) §§1–6 and §10 completely. Then
 follow the shared workflow; the workflow and specs take precedence over this launcher.
 

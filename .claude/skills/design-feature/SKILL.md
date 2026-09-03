@@ -10,8 +10,10 @@ technical design without confirming the product behavior with the user.
 
 ## 1. Choose and record the idea
 
-Read `docs/features/HANDOFF.md`, inspect `git status` and the diff, then read `docs/specs/README.md`,
-`docs/ideas.md`, `docs/ready-changes/README.md`, and `docs/features/AGENT-WORKFLOW.md` §11.
+Use the injected handoff header when present; otherwise read only **Current position** and **Active
+change** in `docs/features/HANDOFF.md`. Inspect `git status` and the diff, then read the relevant
+authoring sections of `docs/specs/README.md`, `docs/ideas.md`, `docs/ready-changes/README.md`, and
+`docs/features/AGENT-WORKFLOW.md` §11.
 
 - If `$ARGUMENTS` names an entry in `docs/ideas.md`, use that entry.
 - If `$ARGUMENTS` describes a fresh idea, use the prompt as the source.
@@ -87,8 +89,8 @@ When both specification sides are complete:
    change file.
 4. Do not make it active in `HANDOFF.md` and do not write product code.
 5. Run `make check-specs`, the twin-skill comparison, and `git diff --check`.
-6. Update the handoff changelog and add the exact plain-language final update to `BRIEFS.md`.
-7. Commit the specifications, the ready change, the removed idea, and the state files together.
+6. Update the handoff changelog.
+7. Commit the specifications, the ready change, the removed idea, and the state file together.
 
 If a material product or technical decision remains unresolved, do not create a ready change. Keep
 the entry under `Ideas being defined`, record what is needed, and tell the user plainly.

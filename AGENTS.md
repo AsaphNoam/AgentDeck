@@ -5,14 +5,16 @@ Guidance for coding agents working in this repository.
 ## Read order
 
 Before feature design, implementation, review, fix-review, usability-review, UX, or release work,
-read:
+load only the state and rules that role needs:
 
-1. [`docs/features/HANDOFF.md`](docs/features/HANDOFF.md) — current state and relevant requirement IDs.
+1. [`docs/features/HANDOFF.md`](docs/features/HANDOFF.md) — its **Current position** and **Active
+   change**; other sections only when those point at them (AGENT-WORKFLOW §1.1).
 2. The change file named by the handoff, if a change is in progress.
-3. [`docs/specs/README.md`](docs/specs/README.md) — the specification constitution and index.
-4. The feature (`FS-*`) and technical (`TS-*` / `INV`) requirements named by the change file, handoff,
-   or request.
-5. [`docs/features/AGENT-WORKFLOW.md`](docs/features/AGENT-WORKFLOW.md) — the canonical role protocol.
+3. The feature (`FS-*`) and technical (`TS-*` / `INV`) requirements named by the change file, handoff,
+   or request. Open [`docs/specs/README.md`](docs/specs/README.md) only when the role needs its
+   constitution, index, or authoring rules.
+4. Only the [`AGENT-WORKFLOW.md`](docs/features/AGENT-WORKFLOW.md) sections named by the active role
+   or launcher; do not read unrelated role sections.
 
 The workflow explains the process; feature and technical specs define the product and architecture.
 `MAP.md`, ADRs, archive files, plans, handoffs, briefs, and review reports provide navigation,
@@ -47,16 +49,22 @@ rationale, history, or sequencing but do not override an FS/TS requirement.
 that are specified and ready to start. `HANDOFF.md` records only the change already in progress.
 Agents never choose future work for themselves.
 
-Every role keeps the live handoff accurate and stores a short, plain-language human update in
-[`docs/features/BRIEFS.md`](docs/features/BRIEFS.md). The stored update is the entire final response.
+Every role keeps the live handoff accurate and ends with a short, plain-language human update.
+`BRIEFS.md` is retained history, not a per-session write target or a resumption source.
 
 ## Repository rules
 
-- Read the matching [`INVARIANTS.md`](docs/features/INVARIANTS.md) class before a hot-spot change.
-- Shared verification is specified by TS-06 and workflow §2: `make check-specs`, `make build`,
-  `make test`, `make dist`; the server remains loopback-only.
+- Read the [`INVARIANTS.md`](docs/features/INVARIANTS.md) trigger index, then the matching class in
+  full before a hot-spot change. Reading all fifteen classes for a diff that touches one is waste.
+- Shared verification is specified by TS-06 and workflow §2. Use focused checks while iterating
+  and run the applicable closure matrix once after the final relevant edit; the server remains
+  loopback-only.
 - Never edit `internal/server/ui/dist/**`; generate it from `ui/src` with `make embed`.
+- Edit with the native patch/edit tool. Do not use Python, Perl, or shell heredoc replacement
+  scripts that repeat old and new source in the transcript.
 - Preserve dirty-tree work unless the user explicitly authorizes discarding it.
+- One unit per run: one change, one review, or one review's findings — then close and report what
+  is still waiting (AGENT-WORKFLOW §1.4).
 
 Response Format
 Answer first. No preamble, no restating my question, no "Great question."
@@ -79,6 +87,6 @@ When delegating:
 Decompose the work into independent, bounded subtasks and state the decomposition in the working plan.
 Run independent subtasks in parallel when possible.
 Give each subagent the relevant context, constraints, expected deliverable, and verification criteria without forwarding unrelated conversation history.
-Choose the least expensive model that can complete the subtask without sacrificing quality. Discovery and investigation must not use Sol unless the upside is required beyond a doubt; these token-heavy reading tasks should be delegated to Terra or Luna, then distilled before a stronger model sees the results. Prefer Terra or Luna for routine analysis and well-scoped implementation when the instructions and acceptance criteria are precise. Use Sol only for work that genuinely requires its deeper reasoning, ambiguity handling, or integration judgment.
+Choose the least expensive model that can complete the subtask without sacrificing quality. Broad, uncertain, multi-file discovery that would retain substantial raw output should use `spawn_agent` with `model: "gpt-5.6-luna"` and `fork_turns: "none"`, then return a distilled answer. Keep narrow, bounded lookups local because a child has its own startup cost. Leave `reasoning_effort` unset unless the task genuinely needs a floor. Use Sol only for work that genuinely requires its deeper reasoning, ambiguity handling, or integration judgment.
 Do not default to the orchestrator's model for delegated work.
 Review, integrate, and verify subagent output; delegation does not transfer responsibility for the final result.
