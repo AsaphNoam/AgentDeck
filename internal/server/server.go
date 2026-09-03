@@ -98,7 +98,7 @@ type Server struct {
 	// not be snapshotted and cleared while such a transition is mid-flight (INV
 	// §4/§9). Add happens only under lifecycleMu after the closed check.
 	lifecycleMu     sync.Mutex
-	lifecycleBusy   map[string]bool
+	lifecycleBusy   map[string]chan struct{}
 	lifecycleClosed bool
 	lifecycleWG     sync.WaitGroup
 
@@ -269,7 +269,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		hookTokens:                map[string]string{},
 		mcpCleanups:               map[string]func(){},
 		switching:                 map[string]bool{},
-		lifecycleBusy:             map[string]bool{},
+		lifecycleBusy:             map[string]chan struct{}{},
 		projectArchiving:          map[string]bool{},
 		projectStartLeases:        map[string]int{},
 		agentArchiving:            map[string]bool{},
@@ -336,7 +336,23 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 // handleAgentExit is the one teardown every exit path runs, generation-scoped so
 // a late crash of launch N cannot clear launch N+1's state (INV §4).
 func (s *Server) handleAgentExit(agentID, generation, cause string) {
-	s.teardownAgentRegistration(agentID)
+	if cause == "process_exit" {
+		// Registry.handleAgentExit has already admitted this generation and dropped
+		// its ownership before calling us. Join the same lifecycle claim as resume
+		// so teardown of N finishes before N+1 can register; after waiting, recheck
+		// the registry because N+1 may already have completed before this callback
+		// reached the claim (TS-01.R16, TS-04.R7, INV §4/§5).
+		if s.waitLifecycle(agentID) {
+			current := s.registry.Generation(agentID)
+			if current == "" || current == generation {
+				s.teardownAgentRegistration(agentID)
+			}
+			s.releaseLifecycle(agentID)
+		}
+	} else {
+		// Requested stops already run inside their caller's lifecycle claim.
+		s.teardownAgentRegistration(agentID)
+	}
 	s.interruptTaskOnExit(agentID, generation, cause)
 	s.clearPermissionTools(agentID, generation)
 	if s.pipelineMgr != nil {

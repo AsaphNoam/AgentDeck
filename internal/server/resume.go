@@ -47,12 +47,35 @@ type resumeOverride struct {
 func (s *Server) claimLifecycle(agentID string) bool {
 	s.lifecycleMu.Lock()
 	defer s.lifecycleMu.Unlock()
-	if s.lifecycleClosed || s.lifecycleBusy[agentID] {
+	if _, busy := s.lifecycleBusy[agentID]; s.lifecycleClosed || busy {
 		return false
 	}
-	s.lifecycleBusy[agentID] = true
+	s.lifecycleBusy[agentID] = make(chan struct{})
 	s.lifecycleWG.Add(1)
 	return true
+}
+
+// waitLifecycle takes the same per-agent claim as claimLifecycle, but waits for
+// its current owner. Unsolicited exit teardown uses this form because dropping
+// cleanup when a short-lived activation owns the claim would leak registration
+// artifacts, while racing a resume would delete the resumed generation's state.
+func (s *Server) waitLifecycle(agentID string) bool {
+	for {
+		s.lifecycleMu.Lock()
+		if s.lifecycleClosed {
+			s.lifecycleMu.Unlock()
+			return false
+		}
+		if done, busy := s.lifecycleBusy[agentID]; busy {
+			s.lifecycleMu.Unlock()
+			<-done
+			continue
+		}
+		s.lifecycleBusy[agentID] = make(chan struct{})
+		s.lifecycleWG.Add(1)
+		s.lifecycleMu.Unlock()
+		return true
+	}
 }
 
 // quiesceLifecycle closes the claim gate and waits for every in-flight lifecycle
@@ -87,12 +110,17 @@ func (s *Server) quiesceLifecycle(ctx context.Context) {
 func (s *Server) lifecycleInFlight(agentID string) bool {
 	s.lifecycleMu.Lock()
 	defer s.lifecycleMu.Unlock()
-	return s.lifecycleBusy[agentID]
+	_, busy := s.lifecycleBusy[agentID]
+	return busy
 }
 
 func (s *Server) releaseLifecycle(agentID string) {
 	s.lifecycleMu.Lock()
+	done := s.lifecycleBusy[agentID]
 	delete(s.lifecycleBusy, agentID)
+	if done != nil {
+		close(done)
+	}
 	s.lifecycleMu.Unlock()
 	s.lifecycleWG.Done()
 }

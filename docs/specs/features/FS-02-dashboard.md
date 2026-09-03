@@ -752,9 +752,10 @@ picker and launches with the route project's id; the general modal continues to 
   an agent outside the grid's project, and an agent in a collapsed group section each expand nothing
   and leave the section collapsed. A muted `waiting_input` notification does not suppress the
   expansion. — `ui/src/components/grid/CardGrid.test.tsx`, which is the whole client evidence
-  because the detection and the expanded list both live in `CardGrid`; `agentStore` gains no field
-  and keeps its single-writer role (TS-08.R49). The reflow and the visibility of the eviction are
-  J5's, because jsdom evaluates no layout.
+  because the detection and the expanded list both live in `CardGrid`; `agentStore` supplies the
+  `observed`/`observedSeq` update-order index beside `agents`, preserving the store's single-writer
+  role (TS-08.R49). The reflow and the visibility of the eviction are J5's, because jsdom evaluates
+  no layout.
 
 ## 6. Deviations & open decisions
 

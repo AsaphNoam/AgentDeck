@@ -429,6 +429,56 @@ func TestCrashTearsDownAgentRegistration(t *testing.T) {
 	t.Fatalf("registration not torn down after crash: tokenResolves=%v mcpStat=%v hookStat=%v", ok, mcpErr, hookErr)
 }
 
+// TS-01.R16 / TS-04.R7 (INV §4/§5) — a delayed crash callback for launch N
+// must not tear down the agent-keyed registration owned by live launch N+1.
+// The held claim models N+1's resume window; before the fix the old callback
+// ignored that claim and immediately removed N+1's hook token, MCP identity, and
+// hook-settings file.
+func TestStaleCrashKeepsResumedRegistration(t *testing.T) {
+	srv, ts := switchTestServer(t)
+	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+	currentGeneration := srv.registry.Generation(id)
+	if currentGeneration == "" {
+		t.Fatal("precondition: live launch has no generation")
+	}
+	token := readMessagingToken(t, srv, id)
+	mcpPath := filepath.Join(srv.configStore.Home(), "mcp", id+".mcp.json")
+	hookPath := filepath.Join(srv.configStore.Home(), "hooks", "agents", id+".json")
+
+	if !srv.claimLifecycle(id) {
+		t.Fatal("precondition: could not hold resume lifecycle claim")
+	}
+	exited := make(chan struct{})
+	go func() {
+		srv.handleAgentExit(id, "g_stale", "process_exit")
+		close(exited)
+	}()
+	select {
+	case <-exited:
+		t.Fatal("stale crash teardown did not wait for the resume lifecycle claim")
+	case <-time.After(50 * time.Millisecond):
+	}
+	srv.releaseLifecycle(id)
+	select {
+	case <-exited:
+	case <-time.After(5 * time.Second):
+		t.Fatal("stale crash teardown did not finish after lifecycle release")
+	}
+
+	if got := srv.registry.Generation(id); got != currentGeneration {
+		t.Fatalf("live generation changed: got %q, want %q", got, currentGeneration)
+	}
+	if got, ok := srv.messaging.Lookup(token); !ok || got != id {
+		t.Fatalf("resumed MCP token was revoked: lookup(%q) = (%q, %v)", token, got, ok)
+	}
+	if _, err := os.Stat(mcpPath); err != nil {
+		t.Fatalf("resumed MCP file removed: %v", err)
+	}
+	if _, err := os.Stat(hookPath); err != nil {
+		t.Fatalf("resumed hook settings removed: %v", err)
+	}
+}
+
 // readMessagingToken extracts the X-AgentDeck-Token from the agent's persisted
 // MCP config file.
 func readMessagingToken(t *testing.T, srv *Server, id string) string {
