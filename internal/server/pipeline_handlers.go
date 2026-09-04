@@ -29,6 +29,27 @@ func (s *Server) handlePipelineProposals(w http.ResponseWriter, _ *http.Request)
 	writeJSON(w, http.StatusOK, proposals)
 }
 
+// handleDeclinePipelineProposal and handleDeletePipelineProposal are the two
+// halves of a deliberate removal: Reject withdraws the offer, and Delete removes
+// the record it left behind (FS-14.R49). Neither takes a body, because a decline
+// carries no reason and neither action touches a template, a run, or an agent.
+func (s *Server) handleDeclinePipelineProposal(w http.ResponseWriter, r *http.Request) {
+	proposal, err := s.pipelineMgr.DeclineProposal(r.PathValue("id"))
+	if err != nil {
+		writePipelineError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, proposal)
+}
+
+func (s *Server) handleDeletePipelineProposal(w http.ResponseWriter, r *http.Request) {
+	if err := s.pipelineMgr.DeleteProposal(r.PathValue("id")); err != nil {
+		writePipelineError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Server) handlePipelineTemplate(w http.ResponseWriter, r *http.Request) {
 	record, err := s.pipelineTemplates.Read(r.PathValue("id"))
 	if err != nil {
@@ -261,6 +282,20 @@ func writePipelineValidation(w http.ResponseWriter, diagnostics []pipeline.Diagn
 	writeAPIError(w, ae)
 }
 
+// proposalClaimLoss keeps each refusal reason and the sentence that explains it
+// in one place, so a code cannot exist without a statement or gain one that
+// contradicts it (INV §2, INV §8).
+func proposalClaimLoss(err error) (code, message string) {
+	switch {
+	case errors.Is(err, state.ErrPipelineProposalConsumed):
+		return "consumed", "an approval already committed this proposal"
+	case errors.Is(err, state.ErrPipelineProposalDeclined):
+		return "already_declined", "this proposal was already rejected"
+	default:
+		return "not_declined", "reject this proposal before deleting it"
+	}
+}
+
 func writePipelineError(w http.ResponseWriter, err error) {
 	var controlled *pipeline.ControlError
 	var gate *pipeline.ProjectGateError
@@ -277,6 +312,16 @@ func writePipelineError(w http.ResponseWriter, err error) {
 		writeAPIError(w, ae)
 	case errors.Is(err, pipeline.ErrTemplateNotFound), errors.Is(err, state.ErrNotFound):
 		writeAPIError(w, apiError(runtime.CodeNotFound, "pipeline resource not found"))
+	case errors.Is(err, state.ErrPipelineProposalConsumed),
+		errors.Is(err, state.ErrPipelineProposalDeclined),
+		errors.Is(err, state.ErrPipelineProposalNotDeclined):
+		// A lost proposal claim reports the state the record is actually in, so
+		// the surface can explain what happened and refresh rather than retry
+		// blind (TS-03.R36, FS-14.R57).
+		code, message := proposalClaimLoss(err)
+		ae := apiError(runtime.CodeConflict, message)
+		ae.Details = map[string]any{"pipeline_code": code}
+		writeAPIError(w, ae)
 	case errors.Is(err, pipeline.ErrTemplateExists), errors.Is(err, state.ErrPipelineActive), errors.Is(err, state.ErrPipelineConflict), errors.Is(err, state.ErrPipelineRequestConflict):
 		writeAPIError(w, apiError(runtime.CodeConflict, "pipeline operation conflicts with current state"))
 	default:

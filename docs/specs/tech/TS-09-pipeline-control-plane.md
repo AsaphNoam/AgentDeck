@@ -304,7 +304,7 @@ unchanged by them.
   transaction (R9) and a refusal remains a non-mutation: it changes no attempt, no run revision, and
   no pending action, exactly as today.
 
-- **R32 (planned)** — **Declining and deleting are proposal-record actions;
+- **R32** — **Declining and deleting are proposal-record actions;
   the approval paths are untouched.** Reject and Delete (FS-14.R49) reach the same
   `pipeline_proposals` authority the approval surface already reads, through the conditional claims
   of TS-02.R29 and the routes of TS-03.R36. They are pure record operations: neither writes a

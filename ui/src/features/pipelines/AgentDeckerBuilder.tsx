@@ -2,9 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { launchAgent, sendPrompt } from "../../api/client";
 import { useBackends, useConfig, useProjects, useRoles } from "../../api/config";
-import { usePipelineProposals } from "../../api/pipelines";
-import type { PipelineProposal } from "../../schemas/pipeline";
+import {
+  useDeclinePipelineProposal,
+  useDeletePipelineProposal,
+  usePipelineProposals,
+  usePipelineTemplates,
+} from "../../api/pipelines";
+import type { PipelineListedProposal, PipelineProposal, PipelineTemplateRecord } from "../../schemas/pipeline";
 import { useAgentStore } from "../../store/agentStore";
+import { formatRelative } from "./RunBrowser";
+import { asPipelineProposal, proposalKindLabel, summarizeProposal } from "./proposalSummary";
 
 const BUILDER_KEY = "agentdeck.pipeline-builder-agent";
 
@@ -37,6 +44,9 @@ export function AgentDeckerBuilder({
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const proposals = usePipelineProposals();
+  // A start proposal names its template by id alone, so the library is what
+  // resolves that id to a title as it stands now (FS-14.R51).
+  const templates = usePipelineTemplates();
   // A stopped builder keeps its identity row in the agent store, so presence is
   // not liveness: classifying by presence never expires the persisted id and
   // leaves a dead "Open AgentDecker chat" link behind (INV §1).
@@ -117,9 +127,11 @@ export function AgentDeckerBuilder({
   // default naming a project that no longer exists) must hold the launch closed
   // rather than enabling a button whose only outcome is a rejected launch.
   const builderReady = Boolean(roles.data?.agentdecker && project && projects.data?.[project] && !projects.data[project].archived && backendID && modelID && description.trim());
-  const visibleProposals = (proposals.data ?? []).filter((proposal) => !proposalKind || proposal.kind === proposalKind);
+  const ofThisKind = (proposal: PipelineListedProposal) => !proposalKind || proposal.kind === proposalKind;
+  const pendingProposals = (proposals.data?.pending ?? []).filter(ofThisKind);
+  const declinedProposals = (proposals.data?.declined ?? []).filter(ofThisKind);
 
-  if (!showLauncher && visibleProposals.length === 0) return null;
+  if (!showLauncher && pendingProposals.length === 0 && declinedProposals.length === 0) return null;
 
   return <section className="pipeline-panel pipeline-builder">
     {showLauncher && <div className="pipeline-panel-header">
@@ -153,15 +165,81 @@ export function AgentDeckerBuilder({
       <p>{!agentsHydrated ? "Loading builder session…" : builderRunning ? <>Builder session: <code>{builderID}</code></> : "The builder session has stopped. Its pending proposals remain available below."}</p>
       {builderRunning && <Link to={`/agent/${builderID}`}>Open AgentDecker chat</Link>}
     </div>}
-    {visibleProposals.length > 0 && <div className="pipeline-proposal-list">
+    {pendingProposals.length > 0 && <div className="pipeline-proposal-list">
       <h3>Pending exact proposals</h3>
-      {visibleProposals.map((proposal) => <article className="pipeline-proposal" key={proposal.proposal_id}>
-        <div><strong>{proposal.kind === "save_template" ? "Save template" : "Start run"}</strong><code>{proposal.proposal_id}</code></div>
-        <pre className="pipeline-proposal-payload">{JSON.stringify(proposal.payload, null, 2)}</pre>
-        {proposal.kind === "save_template"
-          ? <button type="button" onClick={() => onTemplateProposal?.(proposal)}>Review exact Save proposal</button>
-          : <button type="button" onClick={() => onRunProposal?.(proposal)}>Review exact Start proposal</button>}
-      </article>)}
+      {pendingProposals.map((entry) => <ProposalCard
+        key={entry.proposal_id}
+        entry={entry}
+        templates={templates.data}
+        onTemplateProposal={onTemplateProposal}
+        onRunProposal={onRunProposal}
+      />)}
+    </div>}
+    {declinedProposals.length > 0 && <div className="pipeline-proposal-list pipeline-proposal-declined-list">
+      <h3>Declined</h3>
+      {declinedProposals.map((entry) => <ProposalCard key={entry.proposal_id} entry={entry} templates={templates.data} />)}
     </div>}
   </section>;
+}
+
+// ProposalCard collapses one offer to a summary a person can scan and expands to
+// the exact canonical payload an approval acts on. Expansion is per proposal and
+// browser-local: it is component state rather than a stored preference, so a
+// reload returns every proposal to collapsed (FS-14.R51).
+function ProposalCard({
+  entry,
+  templates,
+  onTemplateProposal,
+  onRunProposal,
+}: {
+  entry: PipelineListedProposal;
+  templates: PipelineTemplateRecord[] | undefined;
+  onTemplateProposal?: (proposal: Extract<PipelineProposal, { kind: "save_template" }>) => void;
+  onRunProposal?: (proposal: Extract<PipelineProposal, { kind: "start_run" }>) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  const decline = useDeclinePipelineProposal();
+  const remove = useDeletePipelineProposal();
+  const proposal = asPipelineProposal(entry);
+  const summary = proposal ? summarizeProposal(proposal, templates) : [];
+  const declined = Boolean(entry.declined_at);
+  const busy = decline.isPending || remove.isPending;
+
+  // Every mutation surfaces its failure and stays retryable: the entry remains
+  // visible and the refetch that follows shows the durable state (INV §8).
+  const act = async (run: () => Promise<unknown>) => {
+    setFailure(null);
+    try {
+      await run();
+    } catch (reason) {
+      setFailure(reason instanceof Error ? reason.message : String(reason));
+    }
+  };
+
+  return <article className="pipeline-proposal">
+    <div className="pipeline-proposal-summary">
+      <strong>{proposalKindLabel(entry.kind)}</strong>
+      <code>{entry.proposal_id}</code>
+      {summary.map((field) => <span key={field.label} className="pipeline-proposal-field">
+        <small>{field.label}</small>{field.value}
+      </span>)}
+      {!proposal && <span className="pipeline-proposal-field">This proposal cannot be summarized.</span>}
+      <span className="pipeline-proposal-age">{declined
+        ? `Declined ${formatRelative(entry.declined_at!)}`
+        : `Pending ${formatRelative(entry.created_at)}`}</span>
+    </div>
+    <button type="button" className="pipeline-proposal-toggle" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
+      {expanded ? "Hide exact payload" : "Show exact payload"}
+    </button>
+    {expanded && <pre className="pipeline-proposal-payload">{JSON.stringify(entry.payload, null, 2)}</pre>}
+    {failure && <p className="form-error">{failure}</p>}
+    <div className="pipeline-proposal-actions">
+      {!declined && proposal?.kind === "save_template" && <button type="button" onClick={() => onTemplateProposal?.(proposal)}>Review exact Save proposal</button>}
+      {!declined && proposal?.kind === "start_run" && <button type="button" onClick={() => onRunProposal?.(proposal)}>Review exact Start proposal</button>}
+      {!declined && !proposal && <button type="button" disabled title="This proposal's payload cannot be read, so there is nothing exact to approve.">Review exact proposal</button>}
+      {!declined && <button type="button" disabled={busy} onClick={() => void act(() => decline.mutateAsync(entry.proposal_id))}>Reject</button>}
+      {declined && <button type="button" disabled={busy} onClick={() => void act(() => remove.mutateAsync(entry.proposal_id))}>Delete</button>}
+    </div>
+  </article>;
 }

@@ -7,9 +7,10 @@ import {
   pipelineTemplateRecordSchema,
   type PipelineRunDetail,
   type PipelineStartRequest,
-  type PipelineProposal,
+  type PipelineProposalCollections,
   type PipelineTemplate,
-  pipelineProposalSchema,
+  pipelineListedProposalSchema,
+  pipelineProposalCollectionsSchema,
 } from "../schemas/pipeline";
 
 export const PIPELINE_QUERY_KEYS = {
@@ -106,7 +107,19 @@ export async function listPipelineRuns(limit = 50, offset = 0) {
 }
 
 export function listPipelineProposals() {
-  return request("/api/pipeline-proposals", z.array(pipelineProposalSchema));
+  return request("/api/pipeline-proposals", pipelineProposalCollectionsSchema);
+}
+
+// The updated record is parsed with the same permissive listed shape the
+// collections use: a decline of a record whose payload does not match its kind
+// still succeeded, and rejecting its response would report a write that happened
+// as a failure (FS-14.R51).
+export function declinePipelineProposal(id: string) {
+  return request(`/api/pipeline-proposals/${encodeURIComponent(id)}/decline`, pipelineListedProposalSchema, { method: "POST" });
+}
+
+export function deletePipelineProposal(id: string) {
+  return emptyRequest(`/api/pipeline-proposals/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 export function getPipelineRun(id: string) {
@@ -166,7 +179,27 @@ export function usePipelineRuns() {
 }
 
 export function usePipelineProposals() {
-  return useQuery<PipelineProposal[]>({ queryKey: PIPELINE_QUERY_KEYS.proposals, queryFn: listPipelineProposals });
+  return useQuery<PipelineProposalCollections>({ queryKey: PIPELINE_QUERY_KEYS.proposals, queryFn: listPipelineProposals });
+}
+
+// Reject and Delete both refetch the two collections rather than editing the
+// cache: the server's durable claim decides what became of the offer, so a
+// refused action refreshes to the real state instead of a guessed one
+// (TS-09.R23/R32, FS-14.R57).
+export function useDeclinePipelineProposal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: declinePipelineProposal,
+    onSettled: () => qc.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.proposals }),
+  });
+}
+
+export function useDeletePipelineProposal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: deletePipelineProposal,
+    onSettled: () => qc.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.proposals }),
+  });
 }
 
 export function usePipelineRun(id: string | null) {

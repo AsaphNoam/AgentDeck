@@ -1,6 +1,6 @@
 # TS-02 — Data & persistence
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/config`, `internal/state`, `internal/transcript`, `internal/index`, `internal/archive`, `internal/configsource`, `internal/contextref`
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -329,9 +329,10 @@ readable rather than classifying the whole version-1 document as corrupt. `inter
 that write-time validation set, and R3's owner-only atomic rewrite applies unchanged. No SQLite row,
 migration, cache file, project/session field, seed rewrite, or config-version bump is introduced.
 
-**R29 (planned) — A proposal record is a claimed state machine over one row, and
-retention is blind to which state it is in.** A forward-only migration adds a nullable `declined_at`
-to `pipeline_proposals` (R22); existing rows adopt the empty value and stay exactly as pending as
+**R29 — A proposal record is a claimed state machine over one row, and
+retention is blind to which state it is in.** Migration 22 adds `declined_at TEXT NOT NULL DEFAULT
+''` to `pipeline_proposals` (R22), the same empty-is-unset convention migration 15 gave
+`consumed_at`; existing rows adopt the empty value and stay exactly as pending as
 they are. The row's states are *pending* (`consumed_at` and `declined_at` both empty), *declined*
 (`declined_at` set), and *consumed* (`consumed_at` set); Delete is a hard row delete, not a fourth
 state, so a deleted record leaves no tombstone and a later identical proposal inserts a new row
@@ -424,6 +425,10 @@ R1–R26 and must be reflected here when its contract changes.
   grant, and personal-preference regressions named by FS-15.A1–A5/A7.
 - Pipeline supervision read index (R26): task migration/query-plan regressions named by
   FS-14.A17/A23 and TS-09.R28.
+- Proposal decline/delete claims (R29): migration 22 in `internal/state/schema.go`,
+  `DeclinePipelineProposal`/`DeletePipelineProposal`/`ListPipelineProposals` in
+  `internal/state/pipelines.go`, the claim-loss sentinels in `internal/state/errors.go`, and
+  `internal/state/pipeline_proposals_test.go`.
 - Worktree ownership (R27): migration 20 in `internal/state/schema.go`, typed methods in
   `internal/state/worktrees.go`, path rules in `internal/config/worktrees.go`; regressions in
   `internal/state/worktrees_test.go` and `internal/config/worktrees_test.go`.

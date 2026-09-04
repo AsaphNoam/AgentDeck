@@ -165,11 +165,14 @@ func (s *Store) SavePipelineProposal(proposal PipelineProposalRecord, retain int
 	// content-derived, so a transport retry and a genuine re-proposal are
 	// indistinguishable, and both must leave exactly one reviewable offer. Clearing
 	// consumed_at matters because an agent that re-proposes something already saved
-	// would otherwise get MCP success with nothing on the approval surface.
+	// would otherwise get MCP success with nothing on the approval surface, and
+	// clearing declined_at matters for the same reason: a decline refuses one
+	// offer, never the content, so a later re-proposal is pending again and is not
+	// silently held in the declined list (FS-14.R50).
 	if _, err := tx.Exec(`
 INSERT INTO pipeline_proposals(proposal_id, kind, digest, payload_json, created_at)
 VALUES (?, ?, ?, ?, ?)
-ON CONFLICT(proposal_id) DO UPDATE SET consumed_at = '', created_at = excluded.created_at`,
+ON CONFLICT(proposal_id) DO UPDATE SET consumed_at = '', declined_at = '', created_at = excluded.created_at`,
 		proposal.ProposalID, proposal.Kind, proposal.Digest, string(proposal.Payload), formatTime(proposal.CreatedAt)); err != nil {
 		return fmt.Errorf("state: save pipeline proposal: %w", err)
 	}
@@ -205,16 +208,134 @@ UPDATE pipeline_proposals SET consumed_at = ? WHERE proposal_id = ? AND consumed
 	return count == 1, nil
 }
 
-// ListPipelineProposals returns the pending approval surface. A record whose
-// durable columns cannot be read is isolated and skipped rather than aborting
-// the whole list, because one corrupt row must not hide every approvable
-// proposal (INV §7).
+// DeclinePipelineProposal claims one pending record for a person's Reject with
+// the same conditional-write shape consumption uses: the WHERE names the state
+// the caller expects, so two tabs racing the same offer produce exactly one
+// decline and the loser is told the state the row is actually in (INV §5,
+// TS-02.R29). Declining refuses the offer, never its content, so an approval
+// that commits later may still consume this row (FS-14.R57).
+func (s *Store) DeclinePipelineProposal(proposalID string, at time.Time) (PipelineProposalRecord, error) {
+	if at.IsZero() {
+		at = timeNow()
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return PipelineProposalRecord{}, fmt.Errorf("state: begin decline pipeline proposal: %w", err)
+	}
+	defer tx.Rollback()
+	result, err := tx.Exec(`
+UPDATE pipeline_proposals SET declined_at = ?
+WHERE proposal_id = ? AND consumed_at = '' AND declined_at = ''`, formatTime(at), proposalID)
+	if err != nil {
+		return PipelineProposalRecord{}, fmt.Errorf("state: decline pipeline proposal: %w", err)
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return PipelineProposalRecord{}, fmt.Errorf("state: decline pipeline proposal count: %w", err)
+	}
+	if count != 1 {
+		return PipelineProposalRecord{}, proposalClaimLoss(tx, proposalID)
+	}
+	// Read back inside the same transaction so the record the caller renders is
+	// the one this claim produced rather than a later tab's state.
+	proposal, err := readPipelineProposal(tx, proposalID)
+	if err != nil {
+		return PipelineProposalRecord{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return PipelineProposalRecord{}, fmt.Errorf("state: commit decline pipeline proposal: %w", err)
+	}
+	return proposal, nil
+}
+
+// DeletePipelineProposal removes a declined record permanently. Rejecting first
+// is what makes the removal deliberate, so the claim requires a decline rather
+// than accepting any row (FS-14.R49, TS-02.R29). Delete is a hard row delete and
+// leaves no tombstone, so a later identical proposal inserts a new record.
+func (s *Store) DeletePipelineProposal(proposalID string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("state: begin delete pipeline proposal: %w", err)
+	}
+	defer tx.Rollback()
+	result, err := tx.Exec(`DELETE FROM pipeline_proposals WHERE proposal_id = ? AND declined_at != ''`, proposalID)
+	if err != nil {
+		return fmt.Errorf("state: delete pipeline proposal: %w", err)
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("state: delete pipeline proposal count: %w", err)
+	}
+	if count != 1 {
+		return proposalClaimLoss(tx, proposalID)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("state: commit delete pipeline proposal: %w", err)
+	}
+	return nil
+}
+
+// proposalClaimLoss turns zero affected rows into the state the row is actually
+// in. Zero rows is never success and never a failure to write: it is the loser
+// of a race, and the surface needs the real state to explain what happened.
+func proposalClaimLoss(tx *sql.Tx, proposalID string) error {
+	var consumedAt, declinedAt string
+	err := tx.QueryRow(`SELECT consumed_at, declined_at FROM pipeline_proposals WHERE proposal_id = ?`, proposalID).
+		Scan(&consumedAt, &declinedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("state: read pipeline proposal state: %w", err)
+	}
+	switch {
+	case consumedAt != "":
+		return ErrPipelineProposalConsumed
+	case declinedAt != "":
+		return ErrPipelineProposalDeclined
+	default:
+		return ErrPipelineProposalNotDeclined
+	}
+}
+
+func readPipelineProposal(q pipelineRunQueryer, proposalID string) (PipelineProposalRecord, error) {
+	var proposal PipelineProposalRecord
+	var payload, createdAt, declinedAt string
+	err := q.QueryRow(`
+SELECT proposal_id, kind, digest, payload_json, created_at, declined_at
+FROM pipeline_proposals WHERE proposal_id = ?`, proposalID).
+		Scan(&proposal.ProposalID, &proposal.Kind, &proposal.Digest, &payload, &createdAt, &declinedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return PipelineProposalRecord{}, ErrNotFound
+	}
+	if err != nil {
+		return PipelineProposalRecord{}, fmt.Errorf("state: read pipeline proposal: %w", err)
+	}
+	proposal.Payload = nonEmptyJSON([]byte(payload), `{}`)
+	if proposal.CreatedAt, err = parseTime(createdAt); err != nil {
+		return PipelineProposalRecord{}, fmt.Errorf("state: read pipeline proposal created_at: %w", err)
+	}
+	if declinedAt != "" {
+		declined, err := parseTime(declinedAt)
+		if err != nil {
+			return PipelineProposalRecord{}, fmt.Errorf("state: read pipeline proposal declined_at: %w", err)
+		}
+		proposal.DeclinedAt = &declined
+	}
+	return proposal, nil
+}
+
+// ListPipelineProposals returns every record still on the approval surface:
+// pending records and the declined ones a person has not deleted yet. Callers
+// split the two by DeclinedAt. A record whose durable columns cannot be read is
+// isolated and skipped rather than aborting the whole list, because one corrupt
+// row must not hide every approvable proposal (INV §7).
 func (s *Store) ListPipelineProposals(limit int) ([]PipelineProposalRecord, error) {
 	if limit <= 0 {
 		limit = 100
 	}
 	rows, err := s.db.Query(`
-SELECT proposal_id, kind, digest, payload_json, created_at
+SELECT proposal_id, kind, digest, payload_json, created_at, declined_at
 FROM pipeline_proposals
 WHERE consumed_at = ''
 ORDER BY created_at DESC, proposal_id
@@ -226,8 +347,8 @@ LIMIT ?`, limit)
 	proposals := []PipelineProposalRecord{}
 	for rows.Next() {
 		var proposal PipelineProposalRecord
-		var payload, createdAt string
-		if err := rows.Scan(&proposal.ProposalID, &proposal.Kind, &proposal.Digest, &payload, &createdAt); err != nil {
+		var payload, createdAt, declinedAt string
+		if err := rows.Scan(&proposal.ProposalID, &proposal.Kind, &proposal.Digest, &payload, &createdAt, &declinedAt); err != nil {
 			return nil, fmt.Errorf("state: scan pipeline proposal: %w", err)
 		}
 		proposal.Payload = nonEmptyJSON([]byte(payload), `{}`)
@@ -237,6 +358,14 @@ LIMIT ?`, limit)
 			continue
 		}
 		proposal.CreatedAt = created
+		if declinedAt != "" {
+			declined, timeErr := parseTime(declinedAt)
+			if timeErr != nil {
+				slog.Warn("state: skip pipeline proposal with unreadable declined_at", "proposal", proposal.ProposalID, "err", timeErr)
+				continue
+			}
+			proposal.DeclinedAt = &declined
+		}
 		proposals = append(proposals, proposal)
 	}
 	if err := rows.Err(); err != nil {

@@ -206,17 +206,26 @@ export const pipelineUpdateSchema = z.object({
   final_outcome: z.string(),
 });
 
-export const pipelineTemplateProposalSchema = z.object({
+// created_at dates a pending offer; declined_at is present only on a record a
+// person rejected. A payload that does not match its kind's shape still has to
+// list with its kind and proposal id, so both payloads stay permissive here and
+// the surface summarizes what it can (FS-14.R51).
+const proposalRecordFields = {
   proposal_id: z.string(),
-  kind: z.literal("save_template"),
   digest: z.string(),
+  created_at: z.string(),
+  declined_at: z.string().optional(),
+};
+
+export const pipelineTemplateProposalSchema = z.object({
+  ...proposalRecordFields,
+  kind: z.literal("save_template"),
   payload: z.object({ id: z.string(), template: pipelineTemplateSchema }),
 });
 
 export const pipelineRunProposalSchema = z.object({
-  proposal_id: z.string(),
+  ...proposalRecordFields,
   kind: z.literal("start_run"),
-  digest: z.string(),
   payload: pipelineStartRequestSchema,
 });
 
@@ -224,6 +233,22 @@ export const pipelineProposalSchema = z.discriminatedUnion("kind", [
   pipelineTemplateProposalSchema,
   pipelineRunProposalSchema,
 ]);
+
+// The list keeps its payload opaque so one record whose payload does not match
+// its kind cannot fail the whole surface; the summary narrows each entry with
+// pipelineProposalSchema and falls back to the kind and proposal id it always
+// has (FS-14.R51). Both collections are always present and never null
+// (INV §11, TS-03.R36).
+export const pipelineListedProposalSchema = z.object({
+  ...proposalRecordFields,
+  kind: z.string(),
+  payload: z.unknown(),
+});
+
+export const pipelineProposalCollectionsSchema = z.object({
+  pending: z.array(pipelineListedProposalSchema),
+  declined: z.array(pipelineListedProposalSchema),
+});
 
 export type PipelineDiagnostic = z.infer<typeof pipelineDiagnosticSchema>;
 export type PipelineTemplate = z.infer<typeof pipelineTemplateSchema>;
@@ -240,3 +265,5 @@ export type PipelineWorkspaceConflict = z.infer<typeof pipelineWorkspaceConflict
 export type PipelineStartResponse = z.infer<typeof pipelineStartResponseSchema>;
 export type PipelineUpdate = z.infer<typeof pipelineUpdateSchema>;
 export type PipelineProposal = z.infer<typeof pipelineProposalSchema>;
+export type PipelineListedProposal = z.infer<typeof pipelineListedProposalSchema>;
+export type PipelineProposalCollections = z.infer<typeof pipelineProposalCollectionsSchema>;

@@ -17,6 +17,25 @@ type Proposal struct {
 	Payload    any    `json:"payload"`
 }
 
+// ListedProposal is the offer as the approval surface reads it. The proposing
+// tool result keeps the bare Proposal shape, because declining and deleting add
+// no agent-facing payload change (FS-14.R49). DeclinedAt is set only on a record
+// a person rejected; a pending offer omits it and states its age from CreatedAt
+// instead (FS-14.R51).
+type ListedProposal struct {
+	Proposal
+	CreatedAt  time.Time  `json:"created_at"`
+	DeclinedAt *time.Time `json:"declined_at,omitempty"`
+}
+
+// ProposalCollections is the whole approval surface: the offers still waiting on
+// a person and the ones they rejected but have not deleted. Both are always
+// present and never nil, because the page iterates each (INV §11).
+type ProposalCollections struct {
+	Pending  []ListedProposal `json:"pending"`
+	Declined []ListedProposal `json:"declined"`
+}
+
 type templateProposalPayload struct {
 	ID       string   `json:"id"`
 	Template Template `json:"template"`
@@ -99,20 +118,22 @@ func (m *Manager) consumeProposal(proposalID string) {
 		slog.Warn("pipeline: consume proposal", "proposal", proposalID, "err", err)
 		return
 	}
-	if consumed && m.publisher != nil {
-		m.publisher.PublishPipelineProposalUpdate()
+	if consumed {
+		m.publishProposalUpdate()
 	}
 }
 
 // ListProposals is the Pipelines page's server-owned authority. It deliberately
 // does not reconstruct proposals from runtime transcript events, because an ACP
-// adapter may omit terminal tool-result content.
-func (m *Manager) ListProposals() ([]Proposal, error) {
+// adapter may omit terminal tool-result content. Pending and declined records
+// come from the one durable read and are split here, so the surface holds no
+// second authority for declined offers (TS-09.R32).
+func (m *Manager) ListProposals() (ProposalCollections, error) {
+	collections := ProposalCollections{Pending: []ListedProposal{}, Declined: []ListedProposal{}}
 	records, err := m.store.ListPipelineProposals(MaxListPage)
 	if err != nil {
-		return nil, err
+		return ProposalCollections{}, err
 	}
-	proposals := make([]Proposal, 0, len(records))
 	for _, record := range records {
 		var payload any
 		if err := json.Unmarshal(record.Payload, &payload); err != nil {
@@ -121,9 +142,57 @@ func (m *Manager) ListProposals() ([]Proposal, error) {
 			slog.Warn("pipeline: skip proposal with undecodable payload", "proposal", record.ProposalID, "err", err)
 			continue
 		}
-		proposals = append(proposals, Proposal{ProposalID: record.ProposalID, Kind: record.Kind, Digest: record.Digest, Payload: payload})
+		listed := listedProposal(record, payload)
+		if record.DeclinedAt != nil {
+			collections.Declined = append(collections.Declined, listed)
+			continue
+		}
+		collections.Pending = append(collections.Pending, listed)
 	}
-	return proposals, nil
+	return collections, nil
+}
+
+// DeclineProposal withdraws one offer at the person's request. It is a pure
+// record action: it writes no template, creates or changes no run, launches or
+// stops no agent, and reaches no agent (TS-09.R32). The durable conditional
+// claim decides, so a refusal names the state the record is actually in.
+func (m *Manager) DeclineProposal(proposalID string) (ListedProposal, error) {
+	record, err := m.store.DeclinePipelineProposal(proposalID, time.Now().UTC())
+	if err != nil {
+		return ListedProposal{}, err
+	}
+	var payload any
+	if err := json.Unmarshal(record.Payload, &payload); err != nil {
+		// The claim already committed, so the decline stands; the caller refetches
+		// the collections, where this record lists with its undecodable payload.
+		slog.Warn("pipeline: declined proposal has an undecodable payload", "proposal", record.ProposalID, "err", err)
+	}
+	m.publishProposalUpdate()
+	return listedProposal(record, payload), nil
+}
+
+// DeleteProposal removes a declined record permanently. Like Reject it is a pure
+// record action with no agent-facing effect (TS-09.R32).
+func (m *Manager) DeleteProposal(proposalID string) error {
+	if err := m.store.DeletePipelineProposal(proposalID); err != nil {
+		return err
+	}
+	m.publishProposalUpdate()
+	return nil
+}
+
+func listedProposal(record state.PipelineProposalRecord, payload any) ListedProposal {
+	return ListedProposal{
+		Proposal:   Proposal{ProposalID: record.ProposalID, Kind: record.Kind, Digest: record.Digest, Payload: payload},
+		CreatedAt:  record.CreatedAt,
+		DeclinedAt: record.DeclinedAt,
+	}
+}
+
+func (m *Manager) publishProposalUpdate() {
+	if m.publisher != nil {
+		m.publisher.PublishPipelineProposalUpdate()
+	}
 }
 
 func (m *Manager) saveProposal(proposal Proposal) (Proposal, error) {
@@ -136,9 +205,7 @@ func (m *Manager) saveProposal(proposal Proposal) (Proposal, error) {
 	}, MaxProposalRecords); err != nil {
 		return Proposal{}, err
 	}
-	if m.publisher != nil {
-		m.publisher.PublishPipelineProposalUpdate()
-	}
+	m.publishProposalUpdate()
 	return proposal, nil
 }
 

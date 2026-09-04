@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -64,8 +65,23 @@ func TestPipelineTemplateAPICRUDAndValidation(t *testing.T) {
 	}
 }
 
+func listProposals(t *testing.T, srv *Server) pipeline.ProposalCollections {
+	t.Helper()
+	rec := doGET(t, srv.routes(), "/api/pipeline-proposals")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list proposals = %d %s", rec.Code, rec.Body.String())
+	}
+	var collections pipeline.ProposalCollections
+	if err := json.Unmarshal(rec.Body.Bytes(), &collections); err != nil {
+		t.Fatalf("decode proposals: %v", err)
+	}
+	return collections
+}
+
 // TS-03.R16 / TS-09.R15: pending proposals are a server-owned collection, so a
 // fresh Pipelines page can recover them without an ACP tool-result transcript.
+// TS-03.R36 adds the declined collection beside it; both are always present and
+// never null even when empty (INV §11).
 func TestPipelineProposalAPIListsDurableRecords(t *testing.T) {
 	srv := testServer(t, true)
 	proposal, err := srv.pipelineMgr.ProposeTemplate("one-stage", apiTemplate())
@@ -77,12 +93,115 @@ func TestPipelineProposalAPIListsDurableRecords(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("list proposals = %d %s", rec.Code, rec.Body.String())
 	}
-	var proposals []pipeline.Proposal
-	if err := json.Unmarshal(rec.Body.Bytes(), &proposals); err != nil {
+	if body := rec.Body.String(); !strings.Contains(body, `"declined":[]`) {
+		t.Fatalf("body = %s, want an empty declined array rather than null", body)
+	}
+	var collections pipeline.ProposalCollections
+	if err := json.Unmarshal(rec.Body.Bytes(), &collections); err != nil {
 		t.Fatalf("decode proposals: %v", err)
 	}
-	if len(proposals) != 1 || proposals[0].ProposalID != proposal.ProposalID || proposals[0].Kind != "save_template" {
-		t.Fatalf("proposals = %+v, want the durable proposal", proposals)
+	if len(collections.Pending) != 1 || collections.Pending[0].ProposalID != proposal.ProposalID || collections.Pending[0].Kind != "save_template" {
+		t.Fatalf("pending = %+v, want the durable proposal", collections.Pending)
+	}
+	if collections.Pending[0].CreatedAt.IsZero() || collections.Pending[0].DeclinedAt != nil {
+		t.Fatalf("pending entry = %+v, want a creation time and no decline time", collections.Pending[0])
+	}
+}
+
+// FS-14.R49 / TS-03.R36: Reject and Delete are two conventional routes on the
+// existing family. A decline returns the updated record and moves it into the
+// declined collection; the delete that follows returns 204 and removes it.
+func TestPipelineProposalDeclineAndDeleteRoutes(t *testing.T) {
+	srv := testServer(t, true)
+	proposal, err := srv.pipelineMgr.ProposeTemplate("one-stage", apiTemplate())
+	if err != nil {
+		t.Fatalf("ProposeTemplate: %v", err)
+	}
+
+	rec := doRequest(t, srv.routes(), http.MethodPost, "/api/pipeline-proposals/"+proposal.ProposalID+"/decline", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("decline = %d %s", rec.Code, rec.Body.String())
+	}
+	var declined pipeline.ListedProposal
+	if err := json.Unmarshal(rec.Body.Bytes(), &declined); err != nil {
+		t.Fatalf("decode declined: %v", err)
+	}
+	if declined.ProposalID != proposal.ProposalID || declined.DeclinedAt == nil {
+		t.Fatalf("declined = %+v, want the record with its decline time", declined)
+	}
+
+	collections := listProposals(t, srv)
+	if len(collections.Pending) != 0 || len(collections.Declined) != 1 {
+		t.Fatalf("collections after decline = %+v", collections)
+	}
+	if collections.Declined[0].DeclinedAt == nil {
+		t.Fatalf("declined entry = %+v, want its decline time on the list route too", collections.Declined[0])
+	}
+
+	rec = doRequest(t, srv.routes(), http.MethodDelete, "/api/pipeline-proposals/"+proposal.ProposalID, nil)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("delete = %d %s", rec.Code, rec.Body.String())
+	}
+	if collections = listProposals(t, srv); len(collections.Pending) != 0 || len(collections.Declined) != 0 {
+		t.Fatalf("collections after delete = %+v, want both empty", collections)
+	}
+}
+
+// TS-03.R36 / FS-14.R57: every refusal is a typed error whose reason names the
+// state the record is actually in, so the surface can explain what happened and
+// refresh rather than retry blind.
+func TestPipelineProposalRefusalsNameTheRealState(t *testing.T) {
+	srv := testServer(t, true)
+	pending, err := srv.pipelineMgr.ProposeTemplate("one-stage", apiTemplate())
+	if err != nil {
+		t.Fatalf("ProposeTemplate: %v", err)
+	}
+	rejected, err := srv.pipelineMgr.ProposeTemplate("other-stage", apiTemplate())
+	if err != nil {
+		t.Fatalf("ProposeTemplate: %v", err)
+	}
+	if _, err := srv.pipelineMgr.DeclineProposal(rejected.ProposalID); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range []struct {
+		name, method, path string
+		status             int
+		code               string
+	}{
+		{"decline an already rejected offer", http.MethodPost, "/api/pipeline-proposals/" + rejected.ProposalID + "/decline", http.StatusConflict, "already_declined"},
+		{"delete a still pending offer", http.MethodDelete, "/api/pipeline-proposals/" + pending.ProposalID, http.StatusConflict, "not_declined"},
+		{"decline an unknown offer", http.MethodPost, "/api/pipeline-proposals/pp_absent/decline", http.StatusNotFound, ""},
+		{"delete an unknown offer", http.MethodDelete, "/api/pipeline-proposals/pp_absent", http.StatusNotFound, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := doRequest(t, srv.routes(), tc.method, tc.path, nil)
+			if rec.Code != tc.status {
+				t.Fatalf("status = %d %s, want %d", rec.Code, rec.Body.String(), tc.status)
+			}
+			if tc.code == "" {
+				return
+			}
+			var body struct {
+				Error struct {
+					Details struct {
+						PipelineCode string `json:"pipeline_code"`
+					} `json:"details"`
+				} `json:"error"`
+			}
+			if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+				t.Fatalf("decode refusal: %v", err)
+			}
+			if body.Error.Details.PipelineCode != tc.code {
+				t.Fatalf("pipeline_code = %q, want %q (%s)", body.Error.Details.PipelineCode, tc.code, rec.Body.String())
+			}
+		})
+	}
+
+	// A refused action leaves the entry visible with its action retryable.
+	collections := listProposals(t, srv)
+	if len(collections.Pending) != 1 || len(collections.Declined) != 1 {
+		t.Fatalf("collections after refusals = %+v, want both entries still listed", collections)
 	}
 }
 

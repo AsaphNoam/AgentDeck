@@ -424,7 +424,7 @@ having observed the edge (INV §1). The field is non-null in every response and 
 (INV §11), and the UI schema accepts it in lockstep with the server shape so a payload the server
 sends is never a field the client silently drops (INV §10).
 
-**R36 (planned) — Declining and deleting a proposal are two conventional routes on
+**R36 — Declining and deleting a proposal are two conventional routes on
 the existing family, and the list grows a second collection.** `GET /api/pipeline-proposals`
 (R16) returns an object with two collections, `pending` and `declined`, each always present and
 never `null` even when empty (INV §11), each already bounded by the durable retention limit, and

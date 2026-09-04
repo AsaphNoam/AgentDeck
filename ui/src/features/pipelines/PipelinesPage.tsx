@@ -19,8 +19,10 @@ import { TemplateEditor, type TemplateEditorSeed } from "./TemplateEditor";
 
 export function PipelinesLayout() {
   const proposals = usePipelineProposals();
-  const saveCount = proposals.data?.filter((item) => item.kind === "save_template").length ?? 0;
-  const startCount = proposals.data?.filter((item) => item.kind === "start_run").length ?? 0;
+  // The count each destination shows for the other counts pending offers only; a
+  // declined entry is not waiting on anybody (FS-14.R49).
+  const saveCount = proposals.data?.pending.filter((item) => item.kind === "save_template").length ?? 0;
+  const startCount = proposals.data?.pending.filter((item) => item.kind === "start_run").length ?? 0;
 
   return (
     <div className="pipelines-page" data-ui="pipelines">

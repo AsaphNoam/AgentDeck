@@ -28,8 +28,14 @@ const server = setupServer(
     },
   })),
   http.get("/api/sessions/:id/transcript", ({ params }) => HttpResponse.json({ agent_id: params.id, events: [] })),
-  http.get("/api/pipeline-proposals", () => HttpResponse.json([])),
+  http.get("/api/pipelines", () => HttpResponse.json([])),
+  http.get("/api/pipeline-proposals", () => HttpResponse.json(collections())),
 );
+
+// The list route always returns both collections, never null (TS-03.R36).
+function collections(pending: unknown[] = [], declined: unknown[] = []) {
+  return { pending, declined };
+}
 
 function agent(id: string, running: boolean): AgentState {
   return {
@@ -61,6 +67,7 @@ const templateProposal = {
   proposal_id: "pp_123",
   kind: "save_template",
   digest: "digest-123",
+  created_at: "2026-09-04T09:00:00Z",
   payload: { id: "review", template: { version: 1, title: "Review", inputs: [], stages: [] } },
 };
 
@@ -68,6 +75,7 @@ const runProposal = {
   proposal_id: "pp_456",
   kind: "start_run",
   digest: "digest-456",
+  created_at: "2026-09-04T09:00:00Z",
   payload: {
     request_id: "req_1", template_id: "delivery", display_name: "Ship", project: "app",
     goal: "Ship it", inputs: {}, assignments: {},
@@ -79,7 +87,7 @@ const runProposal = {
 // the other kind out rather than offering an approval action it cannot own.
 describe("AgentDeckerBuilder proposal filtering", () => {
   it("shows only the start_run proposal and its action for proposalKind=start_run", async () => {
-    server.use(http.get("/api/pipeline-proposals", () => HttpResponse.json([templateProposal, runProposal])));
+    server.use(http.get("/api/pipeline-proposals", () => HttpResponse.json(collections([templateProposal, runProposal]))));
     const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
     render(
       <QueryClientProvider client={client}>
@@ -92,7 +100,7 @@ describe("AgentDeckerBuilder proposal filtering", () => {
   });
 
   it("shows only the save_template proposal and its action for proposalKind=save_template", async () => {
-    server.use(http.get("/api/pipeline-proposals", () => HttpResponse.json([templateProposal, runProposal])));
+    server.use(http.get("/api/pipeline-proposals", () => HttpResponse.json(collections([templateProposal, runProposal]))));
     const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
     render(
       <QueryClientProvider client={client}>
@@ -105,7 +113,7 @@ describe("AgentDeckerBuilder proposal filtering", () => {
   });
 
   it("shows every proposal when no proposalKind is given", async () => {
-    server.use(http.get("/api/pipeline-proposals", () => HttpResponse.json([templateProposal, runProposal])));
+    server.use(http.get("/api/pipeline-proposals", () => HttpResponse.json(collections([templateProposal, runProposal]))));
     const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
     render(
       <QueryClientProvider client={client}>
@@ -163,7 +171,7 @@ describe("AgentDeckerBuilder persisted session", () => {
     const reviewed: unknown[] = [];
     let saveCalls = 0;
     server.use(
-      http.get("/api/pipeline-proposals", () => HttpResponse.json([templateProposal])),
+      http.get("/api/pipeline-proposals", () => HttpResponse.json(collections([templateProposal]))),
       http.post("/api/pipelines", () => {
         saveCalls++;
         return HttpResponse.json({});
@@ -188,7 +196,7 @@ describe("AgentDeckerBuilder persisted session", () => {
   // offering the same approval instead of leaving it listed forever.
   it("drops an approved proposal once the server no longer lists it", async () => {
     let pending = [templateProposal];
-    server.use(http.get("/api/pipeline-proposals", () => HttpResponse.json(pending)));
+    server.use(http.get("/api/pipeline-proposals", () => HttpResponse.json(collections(pending))));
 
     const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
     render(<QueryClientProvider client={client}><MemoryRouter><AgentDeckerBuilder onTemplateProposal={() => {}} onRunProposal={() => {}} /></MemoryRouter></QueryClientProvider>);
@@ -201,6 +209,169 @@ describe("AgentDeckerBuilder persisted session", () => {
 
     await waitFor(() => expect(screen.queryByText("Pending exact proposals")).not.toBeInTheDocument());
     expect(screen.queryByRole("button", { name: "Review exact Save proposal" })).not.toBeInTheDocument();
+  });
+});
+
+function stagedTemplateProposal(stages: number) {
+  return {
+    ...templateProposal,
+    payload: {
+      id: "review",
+      template: {
+        version: 1, title: "Thirty-two stage review", inputs: [],
+        stages: Array.from({ length: stages }, (_, index) => ({
+          id: `s${index}`, title: `Stage ${index}`, role: "implementer", instruction: "Do the work.",
+          inputs: [], outputs: [], max_visits: 1,
+          transitions: { success: { final: "success", approval: "automatic" }, failure: { final: "failure", approval: "required" } },
+        })),
+      },
+    },
+  };
+}
+
+function proposalAges() {
+  return [...document.querySelectorAll(".pipeline-proposal-age")].map((node) => node.textContent ?? "");
+}
+
+function renderProposals(pending: unknown[], declined: unknown[] = []) {
+  server.use(http.get("/api/pipeline-proposals", () => HttpResponse.json(collections(pending, declined))));
+  const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+  render(<QueryClientProvider client={client}><MemoryRouter>
+    <AgentDeckerBuilder showLauncher={false} onTemplateProposal={() => {}} onRunProposal={() => {}} />
+  </MemoryRouter></QueryClientProvider>);
+  return client;
+}
+
+// FS-14.A28 / R51: one 32-stage draft previously rendered its whole canonical
+// payload and pushed the template library off the screen. Every proposal is now
+// collapsed to a scannable summary and only expands to the exact payload an
+// approval acts on.
+describe("AgentDeckerBuilder proposal collapse", () => {
+  it("collapses a 32-stage save proposal to its kind, title, stage count, and age", async () => {
+    renderProposals([stagedTemplateProposal(32)]);
+
+    expect(await screen.findByText("Save template")).toBeInTheDocument();
+    expect(screen.getByText("Thirty-two stage review")).toBeInTheDocument();
+    expect(screen.getByText("32 stages")).toBeInTheDocument();
+    expect(proposalAges()).toEqual([expect.stringMatching(/^Pending /)]);
+    expect(document.querySelector(".pipeline-proposal-payload")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show exact payload" }));
+    const payload = document.querySelector(".pipeline-proposal-payload");
+    expect(payload?.textContent).toContain("Stage 31");
+    expect(JSON.parse(payload!.textContent!)).toEqual(stagedTemplateProposal(32).payload);
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide exact payload" }));
+    expect(document.querySelector(".pipeline-proposal-payload")).toBeNull();
+  });
+
+  it("summarizes each of the pending and declined × save and start cases", async () => {
+    server.use(http.get("/api/pipelines", () => HttpResponse.json([
+      { id: "delivery", template: { version: 1, title: "Delivery loop", inputs: [], stages: [] }, valid: true, diagnostics: [] },
+    ])));
+    renderProposals(
+      [templateProposal, runProposal],
+      [
+        { ...templateProposal, proposal_id: "pp_d1", declined_at: "2026-09-04T10:00:00Z" },
+        { ...runProposal, proposal_id: "pp_d2", declined_at: "2026-09-04T10:00:00Z" },
+      ],
+    );
+
+    await screen.findByText("Pending exact proposals");
+    expect(screen.getByText("Declined")).toBeInTheDocument();
+    // A start proposal names its template by id alone, so the summary resolves
+    // the title from the library as it stands now.
+    expect(screen.getAllByText("Delivery loop")).toHaveLength(2);
+    expect(screen.getAllByText("Ship")).toHaveLength(2);
+    expect(screen.getAllByText("Ship it")).toHaveLength(2);
+    // A pending entry states how long it has been pending; a declined one states
+    // when it was declined.
+    expect(proposalAges().filter((text) => text.startsWith("Pending "))).toHaveLength(2);
+    expect(proposalAges().filter((text) => text.startsWith("Declined "))).toHaveLength(2);
+    // A declined entry offers Delete and no approval action; a pending one is the
+    // other way round.
+    expect(screen.getAllByRole("button", { name: "Delete" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Reject" })).toHaveLength(2);
+  });
+
+  it("names a start proposal's template as gone once that template is deleted", async () => {
+    renderProposals([runProposal]);
+    expect(await screen.findByText("delivery (template is gone)")).toBeInTheDocument();
+  });
+
+  it("lists a proposal whose payload cannot be summarized with its kind and id", async () => {
+    renderProposals([{ ...runProposal, payload: { unexpected: true } }]);
+
+    expect(await screen.findByText("Start run")).toBeInTheDocument();
+    expect(screen.getByText("pp_456")).toBeInTheDocument();
+    expect(screen.getByText("This proposal cannot be summarized.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Review exact proposal" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Reject" })).toBeEnabled();
+  });
+});
+
+// FS-14.A27 / R49: Reject withdraws one offer into the declined list, Delete
+// removes the record from there, and a refusal leaves the entry visible with its
+// action retryable rather than failing silently.
+describe("AgentDeckerBuilder reject and delete", () => {
+  it("rejects a pending offer and then deletes the declined record", async () => {
+    let pending: unknown[] = [templateProposal];
+    let declined: unknown[] = [];
+    const declineCalls: string[] = [];
+    const deleteCalls: string[] = [];
+    server.use(
+      http.get("/api/pipeline-proposals", () => HttpResponse.json(collections(pending, declined))),
+      http.post("/api/pipeline-proposals/:id/decline", ({ params }) => {
+        declineCalls.push(String(params.id));
+        pending = [];
+        declined = [{ ...templateProposal, declined_at: "2026-09-04T10:00:00Z" }];
+        return HttpResponse.json(declined[0]);
+      }),
+      http.delete("/api/pipeline-proposals/:id", ({ params }) => {
+        deleteCalls.push(String(params.id));
+        declined = [];
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    render(<QueryClientProvider client={client}><MemoryRouter>
+      <AgentDeckerBuilder showLauncher={false} onTemplateProposal={() => {}} onRunProposal={() => {}} />
+    </MemoryRouter></QueryClientProvider>);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Reject" }));
+    await waitFor(() => expect(screen.getByText("Declined")).toBeInTheDocument());
+    expect(declineCalls).toEqual(["pp_123"]);
+    expect(screen.queryByText("Pending exact proposals")).not.toBeInTheDocument();
+    expect(proposalAges()).toEqual([expect.stringMatching(/^Declined /)]);
+    // A pending entry offers no Delete; the declined one it became does.
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(screen.queryByText("Declined")).not.toBeInTheDocument());
+    expect(deleteCalls).toEqual(["pp_123"]);
+  });
+
+  it("keeps a refused Reject visible and retryable with the state the server reports", async () => {
+    let attempts = 0;
+    server.use(
+      http.get("/api/pipeline-proposals", () => HttpResponse.json(collections([templateProposal]))),
+      http.post("/api/pipeline-proposals/:id/decline", () => {
+        attempts++;
+        return HttpResponse.json(
+          { error: { code: "conflict", message: "an approval already committed this proposal", details: { pipeline_code: "consumed" } } },
+          { status: 409 },
+        );
+      }),
+    );
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    render(<QueryClientProvider client={client}><MemoryRouter>
+      <AgentDeckerBuilder showLauncher={false} onTemplateProposal={() => {}} onRunProposal={() => {}} />
+    </MemoryRouter></QueryClientProvider>);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Reject" }));
+    expect(await screen.findByText("an approval already committed this proposal")).toBeInTheDocument();
+    const retry = screen.getByRole("button", { name: "Reject" });
+    expect(retry).toBeEnabled();
+    fireEvent.click(retry);
+    await waitFor(() => expect(attempts).toBe(2));
   });
 });
 

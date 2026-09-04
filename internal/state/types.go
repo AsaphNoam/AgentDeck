@@ -269,12 +269,14 @@ type PipelineValueRecord struct {
 // PipelineProposalRecord is the durable, canonical result of an AgentDecker
 // proposal tool call. Its payload stays opaque here so state remains independent
 // of the pipeline package's template and run request types.
+// DeclinedAt is nil for a record nobody rejected.
 type PipelineProposalRecord struct {
 	ProposalID string          `json:"proposal_id"`
 	Kind       string          `json:"kind"`
 	Digest     string          `json:"digest"`
 	Payload    json.RawMessage `json:"payload"`
 	CreatedAt  time.Time       `json:"created_at"`
+	DeclinedAt *time.Time      `json:"declined_at,omitempty"`
 }
 
 type CreatePipelineRunParams struct {

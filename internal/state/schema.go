@@ -398,4 +398,14 @@ CREATE TABLE project_worktrees (
 ALTER TABLE tasks ADD COLUMN effort TEXT NOT NULL DEFAULT '';
 `,
 	},
+	{
+		// A person may reject an offer outright instead of waiting for retention to
+		// age it out (FS-14.R49, TS-02.R29). Empty is the not-declined value, the
+		// same convention consumed_at uses in migration 15, so existing rows adopt
+		// it and stay exactly as pending as they are.
+		version: 22,
+		sql: `
+ALTER TABLE pipeline_proposals ADD COLUMN declined_at TEXT NOT NULL DEFAULT '';
+`,
+	},
 }

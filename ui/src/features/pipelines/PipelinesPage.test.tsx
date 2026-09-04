@@ -12,7 +12,7 @@ const template = {
   stages: [{ id: "work", title: "Work", role: "implementer", instruction: "Do the work", inputs: [], outputs: [], max_visits: 1, transitions: { success: { final: "success", approval: "automatic" }, failure: { final: "failure", approval: "required" } } }],
 };
 const server = setupServer(
-  http.get("/api/pipeline-proposals", () => HttpResponse.json([])),
+  http.get("/api/pipeline-proposals", () => HttpResponse.json({ pending: [], declined: [] })),
   http.get("/api/pipeline-runs", () => HttpResponse.json([], { headers: { "X-Total-Count": "0" } })),
   http.get("/api/pipelines", () => HttpResponse.json([{ id: "delivery", template, valid: true, diagnostics: [] }])),
   http.get("/api/roles", () => HttpResponse.json({ implementer: { title: "Implementer", system_prompt: "", skip_permissions: false } })),
@@ -72,13 +72,20 @@ describe("Pipelines routing", () => {
   // kind, so the save_template proposal waiting on Templates is never hidden by
   // whichever sub-destination happens to be open.
   it("counts each pending proposal kind on the switcher while one destination is open", async () => {
-    server.use(http.get("/api/pipeline-proposals", () => HttpResponse.json([
-      { proposal_id: "pp_save", kind: "save_template", digest: "d1", payload: { id: "delivery", template } },
-      {
-        proposal_id: "pp_start", kind: "start_run", digest: "d2",
-        payload: { request_id: "r1", template_id: "delivery", display_name: "Ship", project: "app", goal: "Ship it", inputs: {}, assignments: {} },
-      },
-    ])));
+    // A declined offer waits on nobody, so it never contributes to either count
+    // (FS-14.R49).
+    server.use(http.get("/api/pipeline-proposals", () => HttpResponse.json({
+      pending: [
+        { proposal_id: "pp_save", kind: "save_template", digest: "d1", created_at: "2026-09-04T09:00:00Z", payload: { id: "delivery", template } },
+        {
+          proposal_id: "pp_start", kind: "start_run", digest: "d2", created_at: "2026-09-04T09:00:00Z",
+          payload: { request_id: "r1", template_id: "delivery", display_name: "Ship", project: "app", goal: "Ship it", inputs: {}, assignments: {} },
+        },
+      ],
+      declined: [
+        { proposal_id: "pp_old", kind: "save_template", digest: "d3", created_at: "2026-09-04T08:00:00Z", declined_at: "2026-09-04T09:30:00Z", payload: { id: "delivery", template } },
+      ],
+    })));
     // This file configures no global afterEach cleanup, so earlier cases leave
     // their trees mounted; every query below is scoped to this render's own nav.
     const { container } = renderPipelines("/pipelines/runs");

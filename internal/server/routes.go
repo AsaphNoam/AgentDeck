@@ -46,6 +46,8 @@ func (s *Server) routes() http.Handler {
 	// Native sequential pipeline templates and durable runs (FS-14 / TS-09).
 	api("GET /api/pipelines", s.handlePipelineTemplates)
 	api("GET /api/pipeline-proposals", s.handlePipelineProposals)
+	api("POST /api/pipeline-proposals/{id}/decline", s.handleDeclinePipelineProposal)
+	api("DELETE /api/pipeline-proposals/{id}", s.handleDeletePipelineProposal)
 	api("POST /api/pipelines", s.handleCreatePipelineTemplate)
 	api("POST /api/pipelines/validate", s.handleValidatePipelineTemplate)
 	api("GET /api/pipelines/{id}", s.handlePipelineTemplate)

@@ -220,7 +220,7 @@ function RunDetailSkeleton() { return <div className="pipeline-run-page pipeline
 function messageOf(reason: unknown) { return reason instanceof Error ? reason.message : String(reason); }
 function humanize(value: string) { return value.replace(/_/g, " "); }
 function formatDate(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date); }
-function formatRelative(value: string) { const date = new Date(value); if (Number.isNaN(date.getTime())) return value; const delta = Date.now() - date.getTime(); if (delta < 60_000) return "just now"; if (delta < 3_600_000) return `${Math.floor(delta / 60_000)}m ago`; if (delta < 86_400_000) return `${Math.floor(delta / 3_600_000)}h ago`; return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date); }
+export function formatRelative(value: string) { const date = new Date(value); if (Number.isNaN(date.getTime())) return value; const delta = Date.now() - date.getTime(); if (delta < 60_000) return "just now"; if (delta < 3_600_000) return `${Math.floor(delta / 60_000)}m ago`; if (delta < 86_400_000) return `${Math.floor(delta / 3_600_000)}h ago`; return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date); }
 
 // Compatibility wrapper for older focused tests and embedders.
 export function RunBrowser({ selectedID }: { selectedID: string | null; onSelect?: (id: string | null) => void }) {

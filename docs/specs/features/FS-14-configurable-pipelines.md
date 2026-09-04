@@ -261,7 +261,7 @@ but not yet available. The product boundaries deliberately outside this feature 
   cannot be performed twice or replay an older run. A failed or refused approval leaves the proposal
   pending. There is no Dismiss control: a proposal the person never approves simply ages out, because
   AgentDeck retains only the newest proposals and prunes older ones — that clause alone is
-  superseded by R49 (planned), which adds an explicit decline; every other obligation in R33 is
+  superseded by R49, which adds an explicit decline; every other obligation in R33 is
   unchanged. Approving an edited payload creates no consumption, since the edit already invalidated
   that approval (R27).
 
@@ -383,7 +383,7 @@ but not yet available. The product boundaries deliberately outside this feature 
 
 ### 4.4 Reviewing and declining pending proposals
 
-- **R49 (planned)** — Every pending proposal on the sub-destination that can act on it
+- **R49** — Every pending proposal on the sub-destination that can act on it
   (R42) carries an explicit **Reject** action beside its review action. Rejecting removes the offer
   from the pending list and moves it, unchanged, into a **Declined** list on that same
   sub-destination, which appears only when it holds an entry and states when each offer was
@@ -401,7 +401,7 @@ but not yet available. The product boundaries deliberately outside this feature 
   count each sub-destination shows for the other (R42) counts pending offers only; a declined entry
   never contributes to it.
 
-- **R50 (planned)** — A later re-proposal outranks an earlier decline. Because a
+- **R50** — A later re-proposal outranks an earlier decline. Because a
   proposal id is derived from its content, an agent proposing content byte-identical to a declined
   or deleted record returns exactly one pending offer to the approval surface, timed by that newest
   proposal, in the same way R33's re-arm already returns one after an approved Save. Declining
@@ -410,7 +410,7 @@ but not yet available. The product boundaries deliberately outside this feature 
   success with nothing on any human surface, which is the discoverability defect the durable
   proposal record exists to remove.
 
-- **R51 (planned)** — Every pending and declined proposal is collapsed by default.
+- **R51** — Every pending and declined proposal is collapsed by default.
   Collapsed, it states whether it asks to save a template or start a run, the template's title and
   stage count for a save proposal or the template title, run display name, and run goal for a start
   proposal, and how long it has been pending — or, for a declined record, when it was declined.
@@ -426,7 +426,7 @@ but not yet available. The product boundaries deliberately outside this feature 
   persisting. A proposal whose payload cannot be summarized still lists honestly with its kind and
   proposal id instead of disappearing or failing the surface.
 
-- **R57 (planned)** — An approval that commits always beats a Reject; Reject
+- **R57** — An approval that commits always beats a Reject; Reject
   withdraws the offer, never the mutation. Declining is a claim on the offer, not on its content
   (R50), so a save or a start a person deliberately confirms takes effect even when another tab
   rejected the same offer moments earlier. That record then leaves both the pending and the declined
@@ -622,7 +622,7 @@ but not yet available. The product boundaries deliberately outside this feature 
   stage agent can no longer report against the run; a run paused as `blocked` still links to its
   live stage agent. *Verify:* `ui/src/features/pipelines/RunBrowser.test.tsx`.
 
-- **A27 (planned)** (R49/R50/R57) — Rejecting a pending proposal removes it from the pending
+- **A27** (R49/R50/R57) — Rejecting a pending proposal removes it from the pending
   list, lists it as declined with its decline time, and survives a reload; the pending count the
   other sub-destination shows drops by one. Deleting that declined entry removes the record, and it
   is still absent after a reload. Re-proposing byte-identical content after a reject, and again
@@ -639,10 +639,11 @@ but not yet available. The product boundaries deliberately outside this feature 
   rather than adding a second. A Reject or Delete the server refuses leaves the
   entry visible with its action retryable, and a stale action from an out-of-date view is refused
   with the durable state rather than applied. — `internal/state/pipeline_proposals_test.go`,
-  `internal/server/pipeline_handlers_test.go`, and
+  `internal/pipeline/proposals_test.go` (both orderings for both kinds, and the leftover-offer
+  failure mode), `internal/server/pipeline_handlers_test.go`, and
   `ui/src/features/pipelines/AgentDeckerBuilder.test.tsx`.
 
-- **A28 (planned)** (R51) — A pending 32-stage `save_template` proposal renders collapsed:
+- **A28** (R51) — A pending 32-stage `save_template` proposal renders collapsed:
   its kind, template title, stage count, and pending age are present and its exact payload is not
   rendered until it is expanded, so the template library remains the surface's first content.
   Expanding renders the canonical payload unchanged, collapsing hides it again, and a reload returns
@@ -771,11 +772,10 @@ The shipped first version deliberately keeps these product boundaries:
   projection), TS-03 (run-list pagination and run-detail response), and TS-08.R7/R8 (presentation
   hooks for the new pipeline surfaces); R44–R45 are exercised through J14 and deterministic visual
   fixtures.
-- Proposal review, decline, and delete (R49–R51, R57; A27–A28, all `(planned)`): TS-02.R29 owns the
+- Proposal review, decline, and delete (R49–R51, R57; A27–A28): TS-02.R29 owns the
   record's states, its conditional claims, and retention; TS-03.R36 owns the two routes, the
   two-collection list, and the typed refusals; TS-09.R32 owns the control-plane boundary and what
-  the approval paths keep. The change is
-  [`../../ready-changes/decline-pipeline-proposals.md`](../../ready-changes/decline-pipeline-proposals.md).
+  the approval paths keep.
 - Primary regression anchors: `internal/pipeline/{templates,manager}_test.go`,
   `internal/state/pipelines_test.go`, `internal/messaging/pipeline_tools_test.go`,
   `internal/server/pipeline_handlers_test.go`, and `ui/src/api/{pipelines,sse}.test.ts`.

@@ -142,6 +142,21 @@
 .pipeline-proposal-list h3 { font-size: 1.2rem; }
 .pipeline-proposal { border: var(--ad-border-thin) solid var(--ad-action-secondary); display: grid; gap: var(--ad-space-3); padding: var(--ad-space-4); }
 .pipeline-proposal > div code { color: var(--ad-text-muted); }
+
+/* A collapsed proposal is a scannable row of labelled values, so it wraps
+   instead of spreading to the panel edges the way the panel headers do. */
+.pipeline-proposal > .pipeline-proposal-summary,
+.pipeline-proposal > .pipeline-proposal-actions {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+.pipeline-proposal-summary { row-gap: var(--ad-space-2); }
+.pipeline-proposal-field { display: grid; gap: var(--ad-space-1); min-width: 0; }
+.pipeline-proposal-field small { color: var(--ad-text-muted); font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.pipeline-proposal-age { color: var(--ad-text-muted); font-size: 0.72rem; margin-left: auto; white-space: nowrap; }
+.pipeline-proposal-toggle { background: none; border: none; color: var(--ad-action-secondary); font-size: 0.72rem; justify-self: start; padding: 0; text-decoration: underline; }
+.pipeline-proposal-declined-list .pipeline-proposal { border-color: var(--ad-border-default); }
+.pipeline-proposal-declined-list .pipeline-proposal-summary strong { color: var(--ad-text-muted); }
 .pipeline-builder-session { background: var(--ad-surface-subtle); padding: var(--ad-space-3); }
 
 .pipeline-ledger,

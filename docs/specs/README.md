@@ -52,7 +52,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | ID | Spec | Status | Covers |
 |----|------|--------|--------|
 | TS-01 | [tech/TS-01-architecture.md](tech/TS-01-architecture.md) | Partial | Process model, package boundaries, runtime abstraction, source-of-truth rules, planned direct action gateway |
-| TS-02 | [tech/TS-02-data-persistence.md](tech/TS-02-data-persistence.md) | Partial | SQLite schema & migrations, activations, context references/grants, config files, transcripts, FTS index |
+| TS-02 | [tech/TS-02-data-persistence.md](tech/TS-02-data-persistence.md) | Current | SQLite schema & migrations, activations, context references/grants, config files, transcripts, FTS index |
 | TS-03 | [tech/TS-03-http-api.md](tech/TS-03-http-api.md) | Partial | REST surface, error envelope, SSE contract, status codes, and planned private action transport |
 | TS-04 | [tech/TS-04-integration-protocols.md](tech/TS-04-integration-protocols.md) | Partial | ACP, hooks, MCP messaging, PTY/WebSocket, external-CLI tolerance |
 | TS-05 | [tech/TS-05-security.md](tech/TS-05-security.md) | Partial | Loopback boundary, tokens, context authorization, and planned shared launch credential for direct actions |
