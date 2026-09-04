@@ -18,14 +18,13 @@ back to that at every release (§16.7). Injected Current position plus Active ch
   records, and handoff/queue bookkeeping are administrative closure, not new review units.
   Two units are available independently: the 2026-09-04 task launch-specification effort change and
   the 2026-09-04 proposal Reject/Delete change. A review may take either; chronology and other role
-  queues do not constrain selection. The workflow/queue repair has been reviewed and remains open
-  in the fix queue with the findings below.
+  queues do not constrain selection. The workflow/queue repair unit is closed: its findings are
+  fixed, and that fix commit is not a new review unit.
 - **Work units:** `pipeline-run-agent-groups.md` is waiting to start. It may start regardless of the
   available review units.
 - **Design units:** Existing entries under `Ideas being defined` may resume, and entries under `New
   ideas` are available to start. Neither is gated by work, review, or fix state.
-- **Open findings:** Two **Must fix** findings from the review of the 2026-09-04 workflow/queue
-  repair.
+- **Open findings:** None.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
   remain owed before claiming those adapters accept structured results.
 - **Usability state:** The Pipelines pages and dashboard grid were driven through a real Chromium on
@@ -38,9 +37,9 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 **Change:** None. Proposal Reject/Delete is implemented and verified.
 
 **Available by role:** `/review` may choose either review unit above; `/work` may start
-`pipeline-run-agent-groups.md`; `/design-feature` may choose any available or resumable idea; `/fix`
-may close the workflow/queue-repair findings below. Selecting one role does not depend on clearing
-another role's queue.
+`pipeline-run-agent-groups.md`; `/design-feature` may choose any available or resumable idea, or any
+idea a person names from another `docs/ideas.md` section; `/fix` has no open findings. Selecting one
+role does not depend on clearing another role's queue.
 
 Local implementation choices for those reviewers to confirm or raise. In the effort change: launch
 composition calls `selectLaunchTarget` and `resolveTargetEffort` in place rather than the composed
@@ -65,6 +64,16 @@ Keep credentialed provider journeys as acceptance gates until a human authorizes
 Earlier entries are in the [archived handoff](../archive/state/HANDOFF-through-2026-09-03.md) and Git
 history.
 
+- **2026-09-04 — fix: workflow/queue repair findings (INV §10, INV §17):** `/design-feature` again
+  takes an idea a person names from any `docs/ideas.md` section, including `Known things to
+  improve`, and moves that recorded entry through design instead of duplicating it; automatic
+  selection with no argument stays limited to `New ideas` and `Ideas being defined` (INV §10, both
+  launchers and workflow §11). The launcher contract check now asserts the complete no-op rule
+  ("report that and do not make an empty commit.") and the positive any-unit review selection
+  instead of fragments an opposite instruction would satisfy, matching rules across line wraps, and
+  `scripts/check-launcher-contract-test.sh` proves each guarded rule fails on a mutated launcher or
+  workflow copy that states its opposite (INV §17). `make check-specs` runs that mutation test;
+  TS-06 records both scripts. The workflow/queue-repair unit is closed.
 - **2026-09-04 — review: workflow/queue repair (INV §§10, 17):** The independent role queues and
   mirrored Claude/Codex launchers are internally consistent, but the design launcher no longer
   recognizes an explicitly named entry under `Known things to improve`, and the launcher contract
@@ -205,24 +214,7 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-- **Must fix** — 2026-09-04 workflow/queue repair, `.agents/skills/design-feature/SKILL.md:19` and
-  `docs/features/AGENT-WORKFLOW.md:203` (INV §10): when a person explicitly invokes
-  `/design-feature` with an entry from `docs/ideas.md`'s `Known things to improve` section, the new
-  rules recognize only `New ideas` and `Ideas being defined`. That strands the repository's recorded
-  improvement as an unrecognized source or treats the prompt as a fresh idea, duplicating it instead
-  of moving the existing entry through design. Restore explicit named selection from any real
-  `docs/ideas.md` section while keeping no-argument automatic selection limited to available or
-  resumable ideas, mirror the Claude launcher, and cover the distinction in the launcher contract
-  check.
-- **Must fix** — 2026-09-04 workflow/queue repair,
-  `scripts/check-launcher-contract.sh:32` (INV §17): the changed review-launcher assertions do not
-  independently prove the rules they claim. The no-op check searches only for `make an empty
-  commit.`, so the opposite instruction passes; the selection check accepts any sentence containing
-  `Chronology does not` without requiring the launcher to choose any available review unit. A later
-  launcher regression can therefore reintroduce empty review commits or multi-unit prompting while
-  this gate stays green. Assert the complete negative no-op rule and the positive any-unit selection
-  rule, with contradiction fixtures or equivalent mutation evidence showing each assertion fails on
-  the old behavior.
+None open.
 
 ## Design consistency notes
 

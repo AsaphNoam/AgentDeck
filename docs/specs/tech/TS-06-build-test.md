@@ -182,6 +182,9 @@ shared target guarantees.
   `TestPrivateCodexResolvesWithoutGlobalInstall`, `TestRequiredLayoutAndManifestComponentsAgree`, and
   `TestAuthCommandIsPresentForEveryProvider`.
 - Spec lint: `scripts/check-specs.sh`.
+- Role-launcher contract: `scripts/check-launcher-contract.sh`, with
+  `scripts/check-launcher-contract-test.sh` proving each guarded rule fails on a launcher or
+  workflow copy that states its opposite. Both run under `make check-specs`.
 - CI: `.github/workflows/ci.yml`.
 - Fake integration peer: `internal/runtime/testdata/fakeacp`, server integration tests. Its
   `stress_stream` scenario (`FAKEACP_STRESS_CHUNKS`, `FAKEACP_STRESS_CHUNK_BYTES`,

@@ -4,6 +4,11 @@
 set -u
 
 ROOT=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
+# --root checks a fixture tree instead of this repository; the mutation test in
+# check-launcher-contract-test.sh uses it to prove each assertion can fail.
+if [ "${1-}" = "--root" ]; then
+  ROOT=$(CDPATH= cd "${2-}" && pwd) || exit 2
+fi
 workflow="$ROOT/docs/features/AGENT-WORKFLOW.md"
 errors=0
 roles='design-feature work review fix usability-review investigate-bug release review-design'
@@ -11,6 +16,12 @@ roles='design-feature work review fix usability-review investigate-bug release r
 fail() {
   printf 'launcher contract: %s\n' "$*" >&2
   errors=$((errors + 1))
+}
+
+# Rules wrap across lines, so match them against the file as one whitespace-normalized
+# line. A rule stated only in part, or stated in reverse, does not match.
+has_rule() {
+  tr '\n' ' ' < "$1" | tr -s ' ' | grep -Fq "$2"
 }
 
 for tree in .agents .claude; do
@@ -33,10 +44,13 @@ for tree in .agents .claude; do
       if ! grep -Fq 'Administrative commits never become' "$file"; then
         fail "$tree/$role: missing administrative-commit exclusion"
       fi
-      if ! grep -Fq 'Chronology does not' "$file"; then
-        fail "$tree/$role: review selection is chronologically gated"
+      if ! has_rule "$file" 'choose any available review unit named by the handoff'; then
+        fail "$tree/$role: review selection does not authorize any available unit"
       fi
-      if ! grep -Fq 'make an empty commit.' "$file"; then
+      if ! has_rule "$file" 'Chronology does not constrain selection, and other role queues do not block review.'; then
+        fail "$tree/$role: review selection is chronologically or cross-queue gated"
+      fi
+      if ! has_rule "$file" 'if no eligible unit is pending, report that and do not make an empty commit.'; then
         fail "$tree/$role: missing no-op review exit"
       fi
       if ! grep -Fq 'Findings keep that same unit open' "$file"; then
@@ -60,8 +74,16 @@ for tree in .agents .claude; do
       fail "$tree/$role: multiple work units require unnecessary ordering"
     fi
     if [ "$role" = design-feature ] &&
-       ! grep -Fq 'idea age do not constrain selection.' "$file"; then
+       ! has_rule "$file" 'Other role queues and idea age do not constrain selection.'; then
       fail "$tree/$role: design selection is ordered or cross-queue gated"
+    fi
+    if [ "$role" = design-feature ] &&
+       ! has_rule "$file" 'names an entry in any section of `docs/ideas.md`'; then
+      fail "$tree/$role: a named idea outside the queue sections is unrecognized"
+    fi
+    if [ "$role" = design-feature ] &&
+       ! has_rule "$file" 'automatic selection is limited to the available or resumable ideas'; then
+      fail "$tree/$role: unnamed design selection is not limited to available or resumable ideas"
     fi
     if [ "$role" = review-design ] &&
        ! grep -Fq 'Several waiting changes and other role queues do not' "$file"; then
@@ -88,8 +110,14 @@ fi
 if ! grep -Fq 'does not become a new default review unit.' "$workflow"; then
   fail 'workflow: finding fixes can re-enter the review queue'
 fi
-if ! grep -Fq 'make no empty state commit.' "$workflow"; then
+if ! has_rule "$workflow" 'If a review finds no eligible unit, report that and make no empty state commit.'; then
   fail 'workflow: no-op reviews can create review obligations'
+fi
+if ! has_rule "$workflow" 'Use the idea named by the user from any `docs/ideas.md` section'; then
+  fail 'workflow: a named idea outside the queue sections is unrecognized'
+fi
+if ! has_rule "$workflow" 'automatic selection is limited to the available or resumable ideas'; then
+  fail 'workflow: unnamed design selection is not limited to available or resumable ideas'
 fi
 if ! grep -Fq 'no queue or chronology blocks another.' "$workflow"; then
   fail 'workflow: role queues can block each other'

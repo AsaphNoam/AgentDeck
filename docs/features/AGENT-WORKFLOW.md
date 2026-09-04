@@ -200,10 +200,12 @@ When it runs, apply its task framing before presenting the proposed behavior in 
 results into the planned FS requirements and acceptance items, not into a separate UX artifact. If
 the trigger does not pass, continue without recording a UX ceremony or rationale.
 
-1. Use the idea named by the user from either `New ideas` or `Ideas being defined`. If none is named,
-   choose any resumable entry under `Ideas being defined` or available entry under `New ideas`; the
-   explicit role invocation authorizes that selection. Idea age and other role queues do not
-   constrain the choice.
+1. Use the idea named by the user from any `docs/ideas.md` section, including `Known things to
+   improve`, and move that recorded entry through design rather than duplicating it as a fresh idea.
+   If none is named, automatic selection is limited to the available or resumable ideas: choose any
+   resumable entry under `Ideas being defined` or available entry under `New ideas`; the explicit
+   role invocation authorizes that selection. Idea age and other role queues do not constrain the
+   choice.
 2. Move a newly selected idea to `Ideas being defined`, then work with the user to understand its
    outcome, scope, exclusions, edge cases, compatibility, and acceptance criteria.
 3. Draft the feature specification first. Extend an existing FS when it already owns the capability;
