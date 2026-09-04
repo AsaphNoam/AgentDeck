@@ -15,17 +15,19 @@ back to that at every release (§16.7). Injected Current position plus Active ch
   FS-04.R44, so it keeps the superseded product manual beside the current skill.
 - **Review units:** The pre-2026-09-04 raw commit queue is retired. Its substantive changes were
   reviewed and their findings are closed; its later review records, finding-fix commits, release
-  records, and handoff/queue bookkeeping are administrative closure, not new review units.
-  Two units are available independently: the 2026-09-04 task launch-specification effort change and
-  the 2026-09-04 proposal Reject/Delete change. A review may take either; chronology and other role
-  queues do not constrain selection. The stage-agent grouping unit is reviewed and closed. The
-  workflow/queue repair unit is closed: its findings are fixed, and that fix commit is not a new
-  review unit.
+  records, and handoff/queue bookkeeping are administrative closure, not new review units. The
+  2026-09-04 task launch-specification effort unit is reviewed and remains open with three findings;
+  its later finding fixes remain part of that unit rather than becoming a new review unit. The
+  2026-09-04 proposal Reject/Delete change remains available for independent review. The stage-agent
+  grouping unit is reviewed and closed. The workflow/queue repair unit is closed: its findings are
+  fixed, and that fix commit is not a new review unit.
 - **Work units:** None waiting to start. `migrate-internal-actions-from-mcp.md` stays paused on its
   recorded transport blocker.
 - **Design units:** Existing entries under `Ideas being defined` may resume, and entries under `New
   ideas` are available to start. Neither is gated by work, review, or fix state.
-- **Open findings:** None.
+- **Open findings:** Three worth-fixing findings on the task launch-specification effort unit: align
+  TS-10.R23 with the shared helper topology, state the exact non-null `tasks.effort` schema, and
+  complete FS-16.A18's independent acceptance proof.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
   remain owed before claiming those adapters accept structured results.
 - **Usability state:** The Pipelines pages and dashboard grid were driven through a real Chromium on
@@ -35,19 +37,16 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 
 ## Active change
 
-**Change:** None. Stage-agent grouping is implemented, reviewed, and closed.
+**Change:** None. Task launch-specification effort is implemented and reviewed with three open
+findings.
 
-**Available by role:** `/review` may choose either review unit above; `/work` has no
+**Available by role:** `/review` may take the proposal Reject/Delete unit; `/fix` may take the task
+launch-specification effort findings; `/work` has no
 ready change waiting to start; `/design-feature` may choose any available or resumable idea, or any
-idea a person names from another `docs/ideas.md` section; `/fix` has no open findings. Selecting one
-role does not depend on clearing another role's queue.
+idea a person names from another `docs/ideas.md` section. Selecting one role does not depend on
+clearing another role's queue.
 
-Local implementation choices for those reviewers to confirm or raise. In the effort change: launch
-composition calls `selectLaunchTarget` and `resolveTargetEffort` in place rather than the composed
-`resolveLaunchSpec`, because a bound configuration source must be resolved between selecting the
-model and resolving the effort; and the `tasks.effort` column ships as `TEXT NOT NULL DEFAULT ''` to
-match the effort columns migrations 12 and 13 added, with TS-10 §3 reworded to that shipped shape
-rather than the "nullable" it drafted. In the proposal change: `declined_at` ships as
+Local implementation choices for the proposal reviewer to confirm or raise. `declined_at` ships as
 `TEXT NOT NULL DEFAULT ''` for the same reason, matching `consumed_at` from migration 15, and
 TS-02.R29 is reworded to that shipped shape; the list route returns every non-consumed record and
 the manager splits pending from declined rather than the store running two queries; the UI parses
@@ -64,6 +63,18 @@ Keep credentialed provider journeys as acceptance gates until a human authorizes
 Earlier entries are in the [archived handoff](../archive/state/HANDOFF-through-2026-09-03.md) and Git
 history.
 
+- **2026-09-04 — review: task launch-specification effort (INV §§2, 3, 7–11, 14–15, 17):** Runtime
+  behavior is sound across HTTP, MCP, persistence, dispatch, and the Tasks view, but TS-10.R23 still
+  claims launch composition calls the composed triple resolver when federation requires it to call
+  the shared selection and effort seams around source resolution; TS-10 §3 does not state the
+  shipped `TEXT NOT NULL DEFAULT ''` storage shape; and FS-16.A18 is not independently proven at the
+  composed provider boundary or against a bound-source override, with its materially touched tests
+  also lacking the exact acceptance id TS-06.R6 requires. The task-effort unit remains open with
+  three worth-fixing findings. Shared construction, persisted-value handling, read/migration safety,
+  UI errors, SQLite behavior, wiring, serialization, HTTP guarding, and effect ordering otherwise
+  satisfy their triggered invariants; classes 1, 4–6, 12–13, and 16 have no applicable changed
+  surface. Both Go variants, the tagged build, all UI tests, and the production UI build pass. The
+  proposal Reject/Delete review unit remains available independently.
 - **2026-09-04 — review: pipeline stages group their own agents (INV §§1, 2, 10, 11, 15, 17):** No
   findings. The stage label is composed once as the agent name, passed through the existing launch
   seam as the ordinary persisted group, and rendered by the existing dashboard grouping behavior;
@@ -236,7 +247,31 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-None open.
+- **Worth fixing** — task launch-specification effort, TS-10.R23 / INV §2, INV §10:
+  `docs/specs/tech/TS-10-work-dependency-control-plane.md:216` says one helper resolves the concrete
+  backend/model/effort triple and is called by both authoring paths and launch composition. A normal
+  launch instead calls `selectLaunchTarget` at `internal/server/launch.go:214`, resolves federation,
+  then calls `resolveTargetEffort` at line 296; only task authoring calls the composed
+  `resolveLaunchSpec`. That split is sound because the bound source must be resolved between model
+  selection and effort precedence, but the current architectural requirement describes a call
+  topology that does not ship and could steer a later change back toward duplicated or incorrectly
+  ordered resolution. Update R23 to require the two shared seams in sequence around federation, and
+  retain the existing precedence coverage.
+- **Worth fixing** — task launch-specification effort, TS-10 §3 / INV §9, INV §11:
+  `docs/specs/tech/TS-10-work-dependency-control-plane.md:233` says `tasks.effort` has an empty
+  default but omits the shipped `TEXT NOT NULL DEFAULT ''` contract at
+  `internal/state/schema.go:398`. A normal future migration or repair following the spec could
+  therefore admit `NULL`, while `scanTask` reads the column into a non-null Go string and would fail
+  that task's read. State the exact column shape in §3 and pin it with the existing schema-version
+  guard or a focused schema assertion.
+- **Worth fixing** — task launch-specification effort, FS-16.A18 / TS-06.R6 / INV §17:
+  `internal/server/task_dispatch_test.go:846` proves only the persisted agent projection, so it would
+  still pass if the provider-facing `runtime.LaunchSpec.Effort` were dropped, and it never creates a
+  bound source whose lower effort override must lose to the task's explicit effort. The materially
+  touched dispatcher and Tasks-view tests also contain no exact `FS-16.A18` comment, despite TS-06.R6.
+  Extend the task-dispatch integration test to capture the composed provider launch spec with a bound
+  override, assert the explicit task effort wins there, and tag the acceptance tests with the exact
+  acceptance id.
 
 ## Design consistency notes
 
