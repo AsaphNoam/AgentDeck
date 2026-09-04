@@ -16,9 +16,9 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 - **Review units:** The pre-2026-09-04 raw commit queue is retired. Its substantive changes were
   reviewed and their findings are closed; its later review records, finding-fix commits, release
   records, and handoff/queue bookkeeping are administrative closure, not new review units.
-  Three units are available independently: the 2026-09-04 task launch-specification effort change,
-  the 2026-09-04 proposal Reject/Delete change, and the 2026-09-04 stage-agent grouping change. A
-  review may take any of them; chronology and other role queues do not constrain selection. The
+  Two units are available independently: the 2026-09-04 task launch-specification effort change and
+  the 2026-09-04 proposal Reject/Delete change. A review may take either; chronology and other role
+  queues do not constrain selection. The stage-agent grouping unit is reviewed and closed. The
   workflow/queue repair unit is closed: its findings are fixed, and that fix commit is not a new
   review unit.
 - **Work units:** None waiting to start. `migrate-internal-actions-from-mcp.md` stays paused on its
@@ -35,9 +35,9 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 
 ## Active change
 
-**Change:** None. Stage-agent grouping is implemented and verified.
+**Change:** None. Stage-agent grouping is implemented, reviewed, and closed.
 
-**Available by role:** `/review` may choose any of the three review units above; `/work` has no
+**Available by role:** `/review` may choose either review unit above; `/work` has no
 ready change waiting to start; `/design-feature` may choose any available or resumable idea, or any
 idea a person names from another `docs/ideas.md` section; `/fix` has no open findings. Selecting one
 role does not depend on clearing another role's queue.
@@ -55,14 +55,7 @@ each listed record permissively and narrows it with `pipelineProposalSchema`, so
 not match its kind still lists with its kind and id and only its approval action is disabled
 (FS-14.R51); and on Templates the builder panel still renders above the template library, so A28's
 "library remains the surface's first content" is satisfied by the collapse rather than by
-reordering the page. In the grouping change: `LaunchStage` passes `execution.AgentName` straight
-through as `launchRequest.Group` rather than adding a `StageExecution` field, so the stage title and
-run name are composed exactly once in `stageExecution` (TS-09.R33, INV §2); FS-14.A33's release
-clause is verified by the existing ordinary-stop test in `internal/server/pipeline_handlers_test.go`
-rather than a new one, because **Release group** stops members through that same
-`stopAgentClaimed` path; and clearing the last `(planned)` items made FS-14 and TS-09 **Current**,
-which the specification checker requires and which also removed FS-14 §2's now-false paragraph
-about `(planned)` markers.
+reordering the page.
 
 Keep credentialed provider journeys as acceptance gates until a human authorizes real sessions.
 
@@ -71,6 +64,16 @@ Keep credentialed provider journeys as acceptance gates until a human authorizes
 Earlier entries are in the [archived handoff](../archive/state/HANDOFF-through-2026-09-03.md) and Git
 history.
 
+- **2026-09-04 — review: pipeline stages group their own agents (INV §§1, 2, 10, 11, 15, 17):** No
+  findings. The stage label is composed once as the agent name, passed through the existing launch
+  seam as the ordinary persisted group, and rendered by the existing dashboard grouping behavior;
+  the durable run/stage association remains the only membership authority. Retry coverage proves a
+  repeated stage reuses the label, the server boundary proves the label is stored, and the grid plus
+  ordinary-stop coverage proves the promised group and recovery behavior. Lifecycle, shared-helper,
+  wiring, boundary-meaning, effect-ordering, and independent-test invariants are satisfied; classes
+  3–9, 12–14, and 16 have no applicable changed surface. The full Go test matrix, tagged build, UI
+  tests, and UI production build pass. The stage-agent grouping review unit is closed; the other two
+  review units remain available.
 - **2026-09-04 — build: pipeline stages group their own agents (FS-14.R58, A33; TS-09.R33):** Every
   agent a run launches now arrives carrying its stage's label — the stage title and the run's
   display name — as its ordinary task group, so a stage's work reads as one collapsible dashboard
