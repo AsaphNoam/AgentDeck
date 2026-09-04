@@ -409,3 +409,25 @@ func TestPipelineRunsAddFrozenTitleAndExactTotalHeader(t *testing.T) {
 		t.Fatalf("run summaries = %+v", runs)
 	}
 }
+
+// FS-14.R58 / TS-09.R33: a stage launch stores the stage agent's own name as its
+// ordinary group label, so the dashboard's existing label-keyed sectioning puts a
+// stage's agents in one section with no pipeline awareness.
+func TestLaunchStageStoresTheStageLabelAsTheAgentGroup(t *testing.T) {
+	srv, _ := wakeTestServer(t)
+	id := "a_stage_group"
+	execution := pipeline.StageExecution{
+		AgentID: id, Generation: "g_stage_group", Role: "impl", Project: "tmpproj",
+		Backend: "claude", Model: "sonnet", AgentName: "Review — Ship", Assignment: "begin",
+	}
+	if err := srv.LaunchStage(context.Background(), execution); err != nil {
+		t.Fatalf("LaunchStage: %v", err)
+	}
+	agent, err := srv.stateStore.ReadAgent(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if agent.Group != execution.AgentName || agent.Name != execution.AgentName {
+		t.Fatalf("stage agent name=%q group=%q, want both %q", agent.Name, agent.Group, execution.AgentName)
+	}
+}

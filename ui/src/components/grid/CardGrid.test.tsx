@@ -809,4 +809,50 @@ describe("CardGrid", () => {
 
     await waitFor(() => expect(orders.at(-1)).toEqual(["a_2", "a_1"]));
   });
+
+  // FS-14.A33 / R58: a run's stage agents arrive carrying their stage's label, so
+  // the grid's ordinary label-keyed sectioning — with no pipeline awareness — puts a
+  // retried stage's two agents in one section and each other stage's agent in its own.
+  // Clearing the label with Move to group takes a card out of its section and leaves
+  // its run/stage association untouched, because the label is never identity (R16).
+  it("sections a run's stage agents by their stage label", async () => {
+    const stage = (id: string, stageID: string, attemptNo: number, group: string) =>
+      agent(id, {
+        group,
+        state: attemptNo === 1 ? "idle" : "busy",
+        pipeline: { run_id: "pr_1", run_name: "Ship", stage_id: stageID, attempt_id: `pa_${id}`, attempt_no: attemptNo },
+      });
+    seedGrid(["a_work", "a_review_1", "a_review_2", "a_moved"], {
+      a_work: stage("a_work", "work", 1, "Work — Ship"),
+      a_review_1: stage("a_review_1", "review", 1, "Review — Ship"),
+      a_review_2: stage("a_review_2", "review", 2, "Review — Ship"),
+      // A person moved this stage agent out of its section by hand.
+      a_moved: stage("a_moved", "work", 2, ""),
+    }, { "Work — Ship": { collapsed: true } });
+    renderWithQuery(<CardGrid />);
+
+    const headers = () => [...document.querySelectorAll('[data-ui="agent-group"] header')];
+    await waitFor(() => expect(headers()).toHaveLength(3));
+    expect(headers().map((h) => h.querySelector("strong")?.textContent))
+      .toEqual(["Review — Ship", "Work — Ship", "Ungrouped"]);
+
+    // The retried stage's section counts both its agents and summarizes their states;
+    // every named stage section offers Release group.
+    const review = headers()[0];
+    expect([...review.querySelectorAll('[data-slot="summary"]')].map((n) => n.textContent))
+      .toEqual(["2 agents", "1 idle · 1 busy"]);
+    expect(headers().slice(0, 2).every((h) => h.querySelector(".group-release"))).toBe(true);
+    expect(headers()[2].querySelector(".group-release")).toBeNull();
+
+    // Persisted collapse applies per stage section, so only the expanded ones mount cards.
+    expect([...document.querySelectorAll('[data-ui="agent-group"]')].map((s) => s.getAttribute("data-state")))
+      .toEqual(["expanded", "collapsed", "expanded"]);
+    expect(renderedIDs()).toEqual(["a_review_1", "a_review_2", "a_moved"]);
+
+    // The moved-out agent keeps the run/stage badge its association drives.
+    const ungrouped = document.querySelectorAll('[data-ui="agent-group"]')[2];
+    expect(ungrouped.querySelectorAll('[data-ui="agent-card"]')).toHaveLength(1);
+    const moved = ungrouped.querySelector('.pipeline-association[href="/pipelines/runs/pr_1"]');
+    expect(moved?.textContent).toBe("Ship · work · attempt 2");
+  });
 });

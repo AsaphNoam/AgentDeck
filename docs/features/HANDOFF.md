@@ -16,12 +16,13 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 - **Review units:** The pre-2026-09-04 raw commit queue is retired. Its substantive changes were
   reviewed and their findings are closed; its later review records, finding-fix commits, release
   records, and handoff/queue bookkeeping are administrative closure, not new review units.
-  Two units are available independently: the 2026-09-04 task launch-specification effort change and
-  the 2026-09-04 proposal Reject/Delete change. A review may take either; chronology and other role
-  queues do not constrain selection. The workflow/queue repair unit is closed: its findings are
-  fixed, and that fix commit is not a new review unit.
-- **Work units:** `pipeline-run-agent-groups.md` is waiting to start. It may start regardless of the
-  available review units.
+  Three units are available independently: the 2026-09-04 task launch-specification effort change,
+  the 2026-09-04 proposal Reject/Delete change, and the 2026-09-04 stage-agent grouping change. A
+  review may take any of them; chronology and other role queues do not constrain selection. The
+  workflow/queue repair unit is closed: its findings are fixed, and that fix commit is not a new
+  review unit.
+- **Work units:** None waiting to start. `migrate-internal-actions-from-mcp.md` stays paused on its
+  recorded transport blocker.
 - **Design units:** Existing entries under `Ideas being defined` may resume, and entries under `New
   ideas` are available to start. Neither is gated by work, review, or fix state.
 - **Open findings:** None.
@@ -34,10 +35,10 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 
 ## Active change
 
-**Change:** None. Proposal Reject/Delete is implemented and verified.
+**Change:** None. Stage-agent grouping is implemented and verified.
 
-**Available by role:** `/review` may choose either review unit above; `/work` may start
-`pipeline-run-agent-groups.md`; `/design-feature` may choose any available or resumable idea, or any
+**Available by role:** `/review` may choose any of the three review units above; `/work` has no
+ready change waiting to start; `/design-feature` may choose any available or resumable idea, or any
 idea a person names from another `docs/ideas.md` section; `/fix` has no open findings. Selecting one
 role does not depend on clearing another role's queue.
 
@@ -54,9 +55,15 @@ each listed record permissively and narrows it with `pipelineProposalSchema`, so
 not match its kind still lists with its kind and id and only its approval action is disabled
 (FS-14.R51); and on Templates the builder panel still renders above the template library, so A28's
 "library remains the surface's first content" is satisfied by the collapse rather than by
-reordering the page.
+reordering the page. In the grouping change: `LaunchStage` passes `execution.AgentName` straight
+through as `launchRequest.Group` rather than adding a `StageExecution` field, so the stage title and
+run name are composed exactly once in `stageExecution` (TS-09.R33, INV §2); FS-14.A33's release
+clause is verified by the existing ordinary-stop test in `internal/server/pipeline_handlers_test.go`
+rather than a new one, because **Release group** stops members through that same
+`stopAgentClaimed` path; and clearing the last `(planned)` items made FS-14 and TS-09 **Current**,
+which the specification checker requires and which also removed FS-14 §2's now-false paragraph
+about `(planned)` markers.
 
-Next ready change: [`pipeline-run-agent-groups.md`](../ready-changes/pipeline-run-agent-groups.md).
 Keep credentialed provider journeys as acceptance gates until a human authorizes real sessions.
 
 ## Changelog
@@ -64,6 +71,18 @@ Keep credentialed provider journeys as acceptance gates until a human authorizes
 Earlier entries are in the [archived handoff](../archive/state/HANDOFF-through-2026-09-03.md) and Git
 history.
 
+- **2026-09-04 — build: pipeline stages group their own agents (FS-14.R58, A33; TS-09.R33):** Every
+  agent a run launches now arrives carrying its stage's label — the stage title and the run's
+  display name — as its ordinary task group, so a stage's work reads as one collapsible dashboard
+  section with the count, per-state summary, persisted collapse, and **Release group** any group
+  has, and a retried or loop-revisited stage collects its later agents in the same section. The
+  whole mechanism is `LaunchStage` passing the string `stageExecution` already composes for the
+  agent's name as the existing `launchRequest.Group`, so the convention has one home and the name
+  and label cannot drift (INV §2). No new field, column, migration, API shape, or grid code, and no
+  pipeline awareness in the dashboard. FS-14.R16 is unchanged: the run/stage association stays the
+  only authority for run membership, and clearing a label removes an agent from a section, never
+  from its stage. With their last `(planned)` items shipped, FS-14 and TS-09 are back to
+  **Current**; the ready change file is removed.
 - **2026-09-04 — fix: workflow/queue repair findings (INV §10, INV §17):** `/design-feature` again
   takes an idea a person names from any `docs/ideas.md` section, including `Known things to
   improve`, and moves that recorded entry through design instead of duplicating it; automatic

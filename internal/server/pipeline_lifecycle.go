@@ -98,6 +98,9 @@ func (s *Server) LaunchStage(ctx context.Context, execution pipeline.StageExecut
 	_, ae := s.launchAgent(ctx, launchRequest{
 		Role: execution.Role, Project: execution.Project, Backend: execution.Backend,
 		Model: execution.Model, Effort: execution.Effort, Interface: "chat", Name: execution.AgentName,
+		// The stage agent's own name is also its ordinary group label, so a
+		// stage's agents land in one dashboard section (FS-14.R58, TS-09.R33).
+		Group: execution.AgentName,
 	}, launchOptions{AgentID: execution.AgentID, Generation: execution.Generation})
 	if ae != nil {
 		return errors.New(ae.Message)

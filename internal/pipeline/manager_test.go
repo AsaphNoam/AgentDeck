@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -452,5 +453,50 @@ func TestManagerCrashRecoveryRequiresTheConcreteGeneration(t *testing.T) {
 	}
 	if _, err := manager.Retry(context.Background(), crashed.Run.RunID, crashed.Run.Revision); err != nil {
 		t.Fatalf("Retry after crash: %v", err)
+	}
+}
+
+// FS-14.A33 / TS-09.R33: every stage agent carries its stage's label — the same
+// string it is named for — so a retried stage's two agents share one dashboard
+// section and each other stage's agent gets its own.
+func TestStageAgentsCarryTheirStageLabelAcrossARetry(t *testing.T) {
+	manager, lifecycle, _ := pipelineManagerFixture(t)
+	detail := startPipeline(t, manager, "request-grouping")
+	work := detail.Attempts[0]
+
+	if _, err := manager.Report(work.AgentID, work.AgentGeneration, StageReport{
+		Outcome: "success", Summary: "done", Outputs: map[string]string{"implementation": "change"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.OnTurnEnd(work.AgentID, work.AgentGeneration); err != nil {
+		t.Fatal(err)
+	}
+	detail, _ = manager.Detail(detail.Run.RunID)
+	review := detail.Attempts[len(detail.Attempts)-1]
+
+	// Crash the review stage so Retry mints a second agent for the same stage.
+	if err := manager.OnExit(review.AgentID, review.AgentGeneration, "process_exit"); err != nil {
+		t.Fatal(err)
+	}
+	crashed, _ := manager.Detail(detail.Run.RunID)
+	if crashed.Run.AttentionReason != "agent_crash" {
+		t.Fatalf("crashed run = %+v, want agent_crash", crashed.Run)
+	}
+	retried, err := manager.Retry(context.Background(), crashed.Run.RunID, crashed.Run.Revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second := retried.Attempts[len(retried.Attempts)-1]; second.AgentID == review.AgentID {
+		t.Fatalf("retry reused the crashed agent id %q", second.AgentID)
+	}
+
+	var labels []string
+	for _, launch := range lifecycle.launches {
+		labels = append(labels, launch.AgentName)
+	}
+	want := []string{"Work — Ship", "Review — Ship", "Review — Ship"}
+	if !reflect.DeepEqual(labels, want) {
+		t.Fatalf("stage labels = %q, want %q", labels, want)
 	}
 }

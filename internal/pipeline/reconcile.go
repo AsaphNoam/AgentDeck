@@ -383,6 +383,9 @@ func currentAttempt(detail RunDetail) (state.PipelineAttemptRecord, bool) {
 	return state.PipelineAttemptRecord{}, false
 }
 
+// stageExecution composes the stage title and run display name once as AgentName;
+// LaunchStage reuses that same string as the agent's ordinary group label, so the
+// two cannot drift apart under a later edit to either (TS-09.R33, INV §2).
 func stageExecution(detail RunDetail, attempt state.PipelineAttemptRecord, stage Stage) StageExecution {
 	return StageExecution{RunID: detail.Run.RunID, RunName: detail.Run.DisplayName, AttemptID: attempt.AttemptID,
 		StageID: stage.ID, StageTitle: stage.Title, Role: stage.Role, Project: detail.Run.Project,

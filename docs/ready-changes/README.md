@@ -43,9 +43,7 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-- [`pipeline-run-agent-groups.md`](pipeline-run-agent-groups.md) — have a run label each stage agent
-  it launches with its stage's name, so a stage's agents land in one ordinary dashboard group
-  instead of Ungrouped.
+None.
 
 ## Paused changes
 

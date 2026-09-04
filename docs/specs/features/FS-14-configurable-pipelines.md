@@ -1,6 +1,6 @@
 # FS-14 — Configurable pipeline runs
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/pipeline`, `internal/config`, `internal/state`, `internal/server`, `internal/messaging`, `internal/cli`, `ui/src/features/pipelines` · **Journeys:** J14
 **Absorbed:** —
 
@@ -20,9 +20,8 @@ free-form agent messaging.
 
 ## 2. Behavior
 
-Every requirement here reflects shipped behavior unless it is marked `(planned)`, which the feature's
-Partial status records; a `(planned)` requirement or acceptance item states behavior that is designed
-but not yet available. The product boundaries deliberately outside this feature are recorded in §6.
+Every requirement here reflects shipped behavior. The product boundaries deliberately outside this
+feature are recorded in §6.
 
 ### 2.1 Templates and starting a run
 
@@ -138,7 +137,7 @@ but not yet available. The product boundaries deliberately outside this feature 
   and stage association but does not replace those existing surfaces or use display names/group
   labels as identity.
 
-- **R58** `(planned)` — **A run's stage agents arrive already grouped.** Every agent a
+- **R58** — **A run's stage agents arrive already grouped.** Every agent a
   run launches is created carrying its stage's group label — the stage title and the run's display
   name, the same pair the stage agent is already named for — as its ordinary task group. A stage's
   agents therefore land in one collapsible dashboard section with the member count, per-state
@@ -682,13 +681,16 @@ but not yet available. The product boundaries deliberately outside this feature 
   outputs within that attempt's entry, and the run's named values are expanded without a click. An
   attempt that declared no output renders unchanged. — `ui/src/features/pipelines/RunBrowser.test.tsx`.
 
-- **A33** `(planned)` (R58) — A fake run whose second stage is retried creates each stage agent
+- **A33** (R58) — A fake run whose second stage is retried creates each stage agent
   with that stage's group label stored on it, putting the retried stage's two agents in one section
   and each other stage's agent in its own; those sections carry the member count, per-state summary,
   persisted collapse, and **Release group**; a member moved out with **Move to group** keeps both
   its run/stage card badge and its place on the run's page; and releasing a stage's group stops its
-  members and leaves the run paused with recovery actions rather than finished. — a pipeline launch
-  test asserting the composed group label plus `ui/src/components/grid/CardGrid.test.tsx`.
+  members and leaves the run paused with recovery actions rather than finished. —
+  `internal/pipeline/manager_test.go` for the label a retried stage composes,
+  `internal/server/pipeline_handlers_test.go` for that label reaching the agent's group and for the
+  ordinary stop that release uses leaving the run paused and retryable, and
+  `ui/src/components/grid/CardGrid.test.tsx` for the sections it produces.
 
 ## 6. Deviations & open decisions
 

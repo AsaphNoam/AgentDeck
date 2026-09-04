@@ -1,6 +1,6 @@
 # TS-09 — Pipeline control plane
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/pipeline`, `internal/config`, `internal/state`, `internal/server`, `internal/messaging`, `internal/cli`, `ui/src/features/pipelines`
 **Absorbed:** —
 
@@ -323,7 +323,7 @@ unchanged by them.
   collections after the server publishes the committed `pipeline_proposal_update`, and derives no
   proposal state from transcript tool results or browser-local pointers.
 
-- **R33 (planned)** — **The stage group label is the stage agent's own name, reused on
+- **R33** — **The stage group label is the stage agent's own name, reused on
   an existing field.** A stage's group label is `stage.Title + " — " + run.DisplayName`, which is the
   string `stageExecution` already composes as that stage agent's name
   (`internal/pipeline/reconcile.go`). It is computed once there and used for both, because writing
