@@ -17,16 +17,14 @@ follow the shared workflow; the workflow and specs take precedence over this lau
 A new interface, runtime, or driver completes the invariant §6 contract checklist line by line;
 silence on any line is a bug, not a default.
 
-`$ARGUMENTS`, if present, names a change or the human’s requested change. Otherwise use the
-handoff's active change. If there is no active change, inspect `docs/ready-changes/`:
-
-- with exactly one `Waiting to start` change, the user's explicit `/work` authorizes starting it;
-  move it into the handoff and proceed;
-- with two or more, list their names and ask the user to choose; do not prioritize one yourself;
-- with none, say that no implementable change is available.
+`$ARGUMENTS`, if present, names a change or the human’s requested change. Otherwise choose any
+available resumable unit in the handoff or `Waiting to start` change in `docs/ready-changes/`, and
+say which one you took. Several available changes are not a reason to ask, and pending design,
+review, or fix units do not block work. If none is available, say so.
 
 An explicitly named ready change is likewise authorized by `/work <name>`; verify that it exists,
 move it into the handoff, then proceed. Continue until the change is done, a real blocker occurs, or
-quota requires a safe exit. When substantive work finishes, record that completed change as the sole
-eligible review unit; administrative commits are not additional units. Close every session with the
-handoff update, commit rules, and human update.
+quota requires a safe exit. When substantive work finishes, add that completed change to the
+available review units without replacing or blocking units already there; administrative commits
+are not additional units. Close every session with the handoff update, commit rules, and human
+update.

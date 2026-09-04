@@ -13,13 +13,16 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 - **Release:** `v0.4.0` is published and verified on tag `5485cd7`. Credentialed Claude/Codex checks
   remain owed under TS-06.R21. A customized `agentdecker` role is deliberately not migrated under
   FS-04.R44, so it keeps the superseded product manual beside the current skill.
-- **Review state:** The pre-2026-09-04 raw commit queue is retired. Its substantive changes were
+- **Review units:** The pre-2026-09-04 raw commit queue is retired. Its substantive changes were
   reviewed and their findings are closed; its later review records, finding-fix commits, release
   records, and handoff/queue bookkeeping are administrative closure, not new review units.
-  Three units await independent review, oldest first: the 2026-09-04 workflow repair that introduced this
-  change-unit model and cleaned this handoff, then the 2026-09-04 task launch-specification effort
-  change, then the 2026-09-04 proposal Reject/Delete change. Do not review an older administrative
-  commit or take a later unit out of order.
+  Three units are available independently: the 2026-09-04 workflow/queue repair, the 2026-09-04 task
+  launch-specification effort change, and the 2026-09-04 proposal Reject/Delete change. A review may
+  take any one of them; chronology and other role queues do not constrain selection.
+- **Work units:** `pipeline-run-agent-groups.md` is waiting to start. It may start regardless of the
+  available review units.
+- **Design units:** Existing entries under `Ideas being defined` may resume, and entries under `New
+  ideas` are available to start. Neither is gated by work, review, or fix state.
 - **Open findings:** None.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
   remain owed before claiming those adapters accept structured results.
@@ -32,8 +35,9 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 
 **Change:** None. Proposal Reject/Delete is implemented and verified.
 
-**Next:** Independently review the three open units in order — the 2026-09-04 workflow repair first,
-then the task launch-specification effort change, then the proposal Reject/Delete change.
+**Available by role:** `/review` may choose any of the three review units above; `/work` may start
+`pipeline-run-agent-groups.md`; `/design-feature` may choose any available or resumable idea; `/fix`
+has no available findings. Selecting one role does not depend on clearing another role's queue.
 
 Local implementation choices for those reviewers to confirm or raise. In the effort change: launch
 composition calls `selectLaunchTarget` and `resolveTargetEffort` in place rather than the composed
@@ -96,14 +100,15 @@ history.
   explicit request when the task's agent is launched. The same design validates a task's backend,
   model, and effort at creation instead of letting a bad specification spend all three start
   attempts, and rejects an effort supplied with an existing-agent target. FS-16 and TS-10 moved to
-  Partial; the work is queued as `docs/ready-changes/task-launch-effort.md` and is not active.
+  Partial; the later implementation is now an available review unit.
 - **2026-09-04 — workflow repair: terminal review units (INV §10):** Review state now follows a
   substantive change from implementation through its review findings and fixes. Review reports,
   finding-fix commits, release records, and handoff/archive/queue bookkeeping cannot re-enter the
-  default review queue; default reviews take the earliest eligible unit only, and an empty queue
-  produces no state commit. Claude and Codex launchers carry the same rules, and the launcher check
-  enforces the exclusions, ordered selection, no-op exit, fix closure, and twin parity. The stale raw
-  commit ledger and settled finding were removed from this handoff.
+  review queue, and an empty queue produces no state commit. Role queues are independent and may
+  each hold multiple units; an invocation may choose any available unit without chronological or
+  cross-queue gating. Claude and Codex launchers carry the same rules, and the launcher check
+  enforces independent selection, administrative exclusions, no-op exit, fix closure, and twin
+  parity. The stale raw commit ledger and settled finding were removed from this handoff.
 
 ## Decisions needing your input
 

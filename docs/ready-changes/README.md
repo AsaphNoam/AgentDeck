@@ -11,7 +11,8 @@ are clear and implementation is wanted.
 A change is either:
 
 - **Waiting to start** — it is in this directory and is not in the handoff.
-- **In progress** — an agent has started it. `HANDOFF.md` names the change and records the next step.
+- **In progress** — an agent has started it. `HANDOFF.md` names the unit and records its next step;
+  other units may be in design, work, review, or fix at the same time.
 - **Paused** — it remains here with the decision or blocker needed to continue.
 - **Finished or cancelled** — remove the file; the specifications and Git history record the result.
 
@@ -45,9 +46,6 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 - [`pipeline-run-agent-groups.md`](pipeline-run-agent-groups.md) — have a run label each stage agent
   it launches with its stage's name, so a stage's agents land in one ordinary dashboard group
   instead of Ungrouped.
-- [`decline-pipeline-proposals.md`](decline-pipeline-proposals.md) — collapse pending pipeline
-  proposals and add Reject and Delete, with the durable mutation winning every race against a
-  Reject.
 
 ## Paused changes
 

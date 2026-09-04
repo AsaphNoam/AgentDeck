@@ -11,23 +11,24 @@ says how agents work with them.
    already injected that header, do not re-read it. Open the rest of [`HANDOFF.md`](HANDOFF.md) —
    review findings, blocked-on-human, acceptance gates — only when the header points at it or the
    task needs it, and read those sections by name rather than reading the file end to end.
-2. If a change is in progress, read its change file and the relevant feature, technical, and invariant
-   requirements before reading code. A `/work` request with no active change may start the sole
-   waiting ready change, or a ready change explicitly named in that request. If several ready changes
-   are waiting, ask the user to choose; do not prioritize one yourself. Outside that explicit request,
-   do not choose future work yourself.
+2. Read the change file and relevant feature, technical, and invariant requirements for the unit
+   selected by the invoked role before reading code. A role invocation may select any available unit
+   in that role's queue: use the unit the user names, otherwise choose one clearly recorded available
+   unit and say which one you took. Several available units are not a reason to ask or to block, and
+   pending design, work, review, or fix units never gate another role's queue. Outside an explicit
+   role request, do not choose future work yourself.
 3. **Isolate broad discovery.** Delegate an uncertain multi-file search, subsystem survey, or commit-
    range survey when its raw output would otherwise stay in the main context through substantial
    follow-up work. Give the child the question, paths, and answer shape; use Sonnet on Claude Code or
    Luna with `fork_turns: "none"` on Codex; take back a distilled result. Keep a known-path lookup,
    bounded search, targeted edit, and conversation-dependent judgment in this thread: a child has
    its own startup cost, so delegation is not automatically cheaper.
-4. **One change unit per run.** A unit is one substantive change from implementation through the
-   findings and fixes that close it. Separate sessions may implement, review, and fix that same unit;
-   those phases do not become new units. Review reports, finding-fix commits, release records, and
-   handoff, archive, or queue-only commits are administrative closure of their originating unit and
-   never enter the default review queue. A session does not start a second substantive change. A
-   user who asks for more than one unit in a run gets it; the limit is the default, not a refusal.
+4. **Independent role queues; one selected unit per run.** Design, work, review, and fix queues may
+   each contain multiple units, and no queue or chronology blocks another. An invocation selects one
+   available unit for its role and finishes that role's work on it before taking another unless the
+   user asks for more. A substantive change remains the same unit through its review findings and
+   fixes. Review reports, finding-fix commits, release records, and handoff, archive, or queue-only
+   commits are administrative closure of their originating unit and never enter the review queue.
 
 Use plain status words: **waiting to start**, **in progress**, **paused**, and **finished**.
 Requirement IDs such as `FS-05.A2` and `TS-03.R4` are kept because they are stable links to a
@@ -62,9 +63,10 @@ Work in small, complete pieces. For each piece:
 5. Before committing, check that the specifications describe what shipped, the active work state is
    accurate, and the diff has no unfinished or accidental changes.
 6. Commit the completed work, its specification update when needed, and the handoff update together
-   on `main`. When the substantive change finishes, name it as the sole eligible review unit in the
-   handoff; §8 governs a commit that closes existing review findings. Continue with the next piece
-   until the request is complete or there is a real reason to stop.
+   on `main`. When the substantive change finishes, add it to the available review units without
+   replacing or blocking units already there; §8 governs a commit that closes existing review
+   findings. Continue with the next piece until the request is complete or there is a real reason to
+   stop.
 
 Implement the smallest change that satisfies the requirement. Extend an existing seam, pattern, or
 interface before inventing a parallel one (INV §2 and its canonical-helpers registry), and do not
@@ -87,12 +89,11 @@ For a reversible local implementation choice, record a short note for the next i
 
 ## 4. Keep the handoff useful
 
-`HANDOFF.md` is current working state, not history. It contains one change in progress, its next
-small step, unresolved user questions, open review findings, the review state of the current or next
-substantive change unit, and a short changelog. Review state names either one open unit or says that
-no eligible unit is pending; it is not a raw inventory of every commit after a marker. Remove
-finished steps and resolved findings. Keep completed details in specifications, tests, commits, and
-Git history.
+`HANDOFF.md` is current working state, not history. It contains the available or resumable units for
+each role, their next small steps, unresolved user questions, open review findings tied to their
+originating units, and a short changelog. Review state lists substantive units independently; it is
+not a raw commit ledger or an ordered pipeline. Remove finished steps and resolved findings. Keep
+completed details in specifications, tests, commits, and Git history.
 
 When delegation is available, use it for bounded independent work such as a repository search, a focused audit, or an isolated test. The main agent remains responsible for interpreting requirements, combining the work, and doing final verification.
 
@@ -130,16 +131,17 @@ Use this shape:
 
 ## 7. Review work
 
-Review another agent's substantive change, not your own. Unless the user names a range, take only
-the earliest eligible unit named by the handoff. An eligible unit materially changes product code,
-shipped behavior or architecture requirements, build or release safety, or this workflow. Its range
-includes its implementation and any fixes made to findings on that implementation.
+Review another agent's substantive change, not your own. Use the unit or range the user names;
+otherwise choose any available review unit named by the handoff and say which one you took. An
+eligible unit materially changes product code, shipped behavior or architecture requirements, build
+or release safety, or this workflow. Its range includes its implementation and any fixes made to
+findings on that implementation.
 
 Do not create default review units for review reports, finding-fix commits, release publication
 records, or handoff, archive, and idea/ready-queue-only bookkeeping. Skip those commits when advancing
-review state. Do not review a later eligible unit out of order; this keeps one linear closure point
-instead of a side ledger of individually reviewed commits. If the handoff names no eligible unit,
-there is nothing to review. Read the relevant requirements before the diff.
+the selected unit's review state. Chronology does not constrain selection, and closing one unit does
+not affect the state of another. If the handoff names no eligible unit, there is nothing to review.
+Read the relevant requirements before the diff.
 
 Check both directions:
 
@@ -153,13 +155,14 @@ trigger, why it matters, relevant requirement ID when one exists, and a suggeste
 the bullet with either **Must fix** (a likely normal-use failure, data-loss risk, or requirement
 violation) or **Worth fixing** (useful but not urgent). Findings keep the selected unit open. A
 no-finding review closes it and creates no new review obligation; advance review state across that
-unit and any skipped administrative commits. Commit only the state file (§5).
+unit and its skipped administrative commits, leaving every other available unit unchanged. Commit
+only the state file (§5).
 
 ## 8. Fix review findings
 
-Handle the findings from **one review** in a run, **Must fix** first, one finding at a time. That
-review continues the originating change unit (§1.4): finish its findings, then stop rather than
-continuing into another unit or waiting change.
+Choose the findings from any one available review in a run, then handle its **Must fix** findings
+first, one finding at a time. That review continues its originating change unit (§1.4): finish its
+findings, then stop rather than continuing into another unit unless the user asks for more.
 
 1. Confirm the report is true by reading the code, the cited requirement, and the real path. Reproduce it with a failing test when practical. A finding that cites a committed skipped reproduction test (§12) starts by un-skipping it and confirming it fails.
 2. If it is false or already fixed, remove the finding and record the short evidence in the changelog and human update; do not change code.
@@ -197,10 +200,12 @@ When it runs, apply its task framing before presenting the proposed behavior in 
 results into the planned FS requirements and acceptance items, not into a separate UX artifact. If
 the trigger does not pass, continue without recording a UX ceremony or rationale.
 
-1. Use the idea named by the user. If none is named, take the first entry under `New ideas` in
-   `docs/ideas.md`; this explicit default is the only time an agent selects future work itself.
-2. Move the idea to `Ideas being defined` and work with the user to understand its outcome, scope,
-   exclusions, edge cases, compatibility, and acceptance criteria.
+1. Use the idea named by the user from either `New ideas` or `Ideas being defined`. If none is named,
+   choose any resumable entry under `Ideas being defined` or available entry under `New ideas`; the
+   explicit role invocation authorizes that selection. Idea age and other role queues do not
+   constrain the choice.
+2. Move a newly selected idea to `Ideas being defined`, then work with the user to understand its
+   outcome, scope, exclusions, edge cases, compatibility, and acceptance criteria.
 3. Draft the feature specification first. Extend an existing FS when it already owns the capability;
    create a new one only for a distinct capability. Mark every unshipped requirement `(planned)`.
 4. Explain the proposed feature behavior in the conversation before asking for confirmation: state
@@ -258,9 +263,10 @@ FS/TS/INV items it cites — before implementation starts. It is the §7 author/
 to a design: record findings, change nothing. Resolving findings is follow-up design-feature work
 with the human (§11), which removes each finding as it revises.
 
-`$ARGUMENTS` names the change; with exactly one waiting change, use it; with several, ask. Read the
-change file, every planned requirement it cites, the shipped requirements around them, and the
-matching invariant classes before judging. Then review through three lenses, in this order:
+`$ARGUMENTS` names the change; without arguments, choose any waiting change and say which one you
+took. Other design, work, review, or fix units do not block it. Read the change file, every planned
+requirement it cites, the shipped requirements around them, and the matching invariant classes
+before judging. Then review through three lenses, in this order:
 
 1. **Over-engineering.** Every planned requirement must earn its place from the confirmed user
    outcome, a real report, or a binding invariant. Abstraction layers, configuration surfaces,

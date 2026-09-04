@@ -15,9 +15,9 @@ change touches, and workflow §§3, §5–7, and §13
 completely, then follow the design-review process: over-engineering, extension over new mechanism,
 and unverified assumptions are the primary lenses.
 
-`$ARGUMENTS` names the waiting change in `docs/ready-changes/`; with exactly one waiting change,
-`/review-design` alone selects it; with several, ask. Do not change product code, specifications,
-or the change file.
+`$ARGUMENTS` names the waiting change in `docs/ready-changes/`; without arguments, choose any
+waiting change and say which one you took. Several waiting changes and other role queues do not
+block selection. Do not change product code, specifications, or the change file.
 
 Every finding names who experiences what, and when; one you cannot state that way is a consistency
 note, not a finding. Verify a failure against the tree before asserting it — a scenario the shipped

@@ -16,14 +16,17 @@ change** in `docs/features/HANDOFF.md`. Then read the relevant
 authoring sections of `docs/specs/README.md`, `docs/ideas.md`, `docs/ready-changes/README.md`, and
 `docs/features/AGENT-WORKFLOW.md` §11.
 
-- If `$ARGUMENTS` names an entry in `docs/ideas.md`, use that entry.
+- If `$ARGUMENTS` names an entry in `New ideas` or `Ideas being defined`, use that entry.
 - If `$ARGUMENTS` describes a fresh idea, use the prompt as the source.
-- If `$ARGUMENTS` is empty, use the first real entry under `## New ideas`, ignoring the example
-  code block. If that section is empty, ask the user for an idea.
+- If `$ARGUMENTS` is empty, choose any resumable entry under `## Ideas being defined` or real entry
+  under `## New ideas`, ignoring the example code block, and say which one you took. Other role
+  queues and idea age do not constrain selection. If neither section has an entry, ask the user for
+  an idea.
 - If a name could match more than one entry, ask which one the user means.
 
-Move an existing selected entry to `## Ideas being defined`, preserving its details. Add a concise
-entry there for a fresh idea. This is the only automatic selection rule; do not choose another idea.
+Move a selected new entry to `## Ideas being defined`, preserving its details; leave a resumed entry
+there. Add a concise entry there for a fresh idea. Work only that selected design unless the user
+asks for more.
 
 ## 2. Define the feature specification with the user
 
