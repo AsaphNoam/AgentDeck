@@ -63,8 +63,9 @@ Every role keeps the live handoff accurate and ends with a short, plain-language
 - Edit with the native patch/edit tool. Do not use Python, Perl, or shell heredoc replacement
   scripts that repeat old and new source in the transcript.
 - Preserve dirty-tree work unless the user explicitly authorizes discarding it.
-- One unit per run: one change, one review, or one review's findings — then close and report what
-  is still waiting (AGENT-WORKFLOW §1.4).
+- One change unit per run, from implementation through its review findings and fixes. Administrative
+  review, fix-closure, release-record, and handoff commits never become default review units
+  (AGENT-WORKFLOW §1.4).
 
 Response Format
 Answer first. No preamble, no restating my question, no "Great question."

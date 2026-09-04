@@ -27,5 +27,6 @@ handoff's active change. If there is no active change, inspect `docs/ready-chang
 
 An explicitly named ready change is likewise authorized by `/work <name>`; verify that it exists,
 move it into the handoff, then proceed. Continue until the change is done, a real blocker occurs, or
-quota requires a safe exit. Close every session with the handoff update, commit rules, and human
-update.
+quota requires a safe exit. When substantive work finishes, record that completed change as the sole
+eligible review unit; administrative commits are not additional units. Close every session with the
+handoff update, commit rules, and human update.

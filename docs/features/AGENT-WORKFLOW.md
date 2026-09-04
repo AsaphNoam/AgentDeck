@@ -22,12 +22,12 @@ says how agents work with them.
    Luna with `fork_turns: "none"` on Codex; take back a distilled result. Keep a known-path lookup,
    bounded search, targeted edit, and conversation-dependent judgment in this thread: a child has
    its own startup cost, so delegation is not automatically cheaper.
-4. **One unit per run.** A session handles one unit of work — one change, one review, one review's
-   findings — and finishes it. It does not continue into the next unit: not a second waiting change,
-   not a second unreviewed range, not a second review's findings. Finish the unit, record the state,
-   commit, name what is still waiting, and end the session. This prevents unrelated queued work from
-   accumulating in one context; it does not split a large change. A user who asks for more than one
-   unit in a run gets it; the limit is the default, not a refusal.
+4. **One change unit per run.** A unit is one substantive change from implementation through the
+   findings and fixes that close it. Separate sessions may implement, review, and fix that same unit;
+   those phases do not become new units. Review reports, finding-fix commits, release records, and
+   handoff, archive, or queue-only commits are administrative closure of their originating unit and
+   never enter the default review queue. A session does not start a second substantive change. A
+   user who asks for more than one unit in a run gets it; the limit is the default, not a refusal.
 
 Use plain status words: **waiting to start**, **in progress**, **paused**, and **finished**.
 Requirement IDs such as `FS-05.A2` and `TS-03.R4` are kept because they are stable links to a
@@ -62,7 +62,9 @@ Work in small, complete pieces. For each piece:
 5. Before committing, check that the specifications describe what shipped, the active work state is
    accurate, and the diff has no unfinished or accidental changes.
 6. Commit the completed work, its specification update when needed, and the handoff update together
-   on `main`. Continue with the next piece until the request is complete or there is a real reason to stop.
+   on `main`. When the substantive change finishes, name it as the sole eligible review unit in the
+   handoff; §8 governs a commit that closes existing review findings. Continue with the next piece
+   until the request is complete or there is a real reason to stop.
 
 Implement the smallest change that satisfies the requirement. Extend an existing seam, pattern, or
 interface before inventing a parallel one (INV §2 and its canonical-helpers registry), and do not
@@ -85,7 +87,12 @@ For a reversible local implementation choice, record a short note for the next i
 
 ## 4. Keep the handoff useful
 
-`HANDOFF.md` is current working state, not history. It contains one change in progress, its next small step, unresolved user questions, open review findings, the last reviewed code commit, and a short changelog. Remove finished steps and resolved findings. Keep completed details in specifications, tests, commits, and Git history.
+`HANDOFF.md` is current working state, not history. It contains one change in progress, its next
+small step, unresolved user questions, open review findings, the review state of the current or next
+substantive change unit, and a short changelog. Review state names either one open unit or says that
+no eligible unit is pending; it is not a raw inventory of every commit after a marker. Remove
+finished steps and resolved findings. Keep completed details in specifications, tests, commits, and
+Git history.
 
 When delegation is available, use it for bounded independent work such as a repository search, a focused audit, or an isolated test. The main agent remains responsible for interpreting requirements, combining the work, and doing final verification.
 
@@ -93,9 +100,11 @@ When delegation is available, use it for bounded independent work such as a repo
 
 Commit each completed, verified piece directly to `main`; this repository does not use per-change branches or pull requests. The message should say what changed and, where useful, cite the requirement IDs. Push only when the user or environment authorizes it.
 
-Every role ends in a commit, including roles that write no product code. Their state file is
-`HANDOFF.md`; where a section below says to commit only the state file, it means that file plus
-whatever that section explicitly allows.
+Every role that changes repository state ends in a commit, including roles that write no product
+code. Their state file is `HANDOFF.md`; where a section below says to commit only the state file, it
+means that file plus whatever that section explicitly allows. A state-only role commit is
+administrative closure, not a new review obligation. If a review finds no eligible unit, report that
+and make no empty state commit.
 
 At the end of a session, either leave a verified commit or clearly describe unfinished work in the handoff. Never pretend interrupted work is complete.
 
@@ -121,7 +130,16 @@ Use this shape:
 
 ## 7. Review work
 
-Review another agent's unreviewed code, not your own. Unless the user names a range, start after the last reviewed code commit and review **one unit**: the next change's implementation range, or a single commit where the range has no change boundary. Do not sweep the whole unreviewed backlog in one run (§1.4) — advance the reviewed marker across what you actually read and name the range still unreviewed. Read the relevant requirements before the diff.
+Review another agent's substantive change, not your own. Unless the user names a range, take only
+the earliest eligible unit named by the handoff. An eligible unit materially changes product code,
+shipped behavior or architecture requirements, build or release safety, or this workflow. Its range
+includes its implementation and any fixes made to findings on that implementation.
+
+Do not create default review units for review reports, finding-fix commits, release publication
+records, or handoff, archive, and idea/ready-queue-only bookkeeping. Skip those commits when advancing
+review state. Do not review a later eligible unit out of order; this keeps one linear closure point
+instead of a side ledger of individually reviewed commits. If the handoff names no eligible unit,
+there is nothing to review. Read the relevant requirements before the diff.
 
 Check both directions:
 
@@ -130,18 +148,28 @@ Check both directions:
 
 Also look for normal-use bugs: missing error handling at boundaries, realistic races, unsafe writes, dead code, and incomplete wiring. Unrequired complexity is likewise a finding: a new parallel mechanism or abstraction where an existing seam could extend, or code serving a case no requirement names. Ignore style preferences, demands for speculative edge-case handling, and micro-optimizations.
 
-Record each real finding in `## Review findings` in `HANDOFF.md` with its location, normal-use trigger, why it matters, relevant requirement ID when one exists, and a suggested test or fix. Start the bullet with either **Must fix** (a likely normal-use failure, data-loss risk, or requirement violation) or **Worth fixing** (useful but not urgent). Update the last reviewed commit only across a continuous range actually reviewed. Commit only the state file (§5).
+Record each real finding in `## Review findings` in `HANDOFF.md` with its location, normal-use
+trigger, why it matters, relevant requirement ID when one exists, and a suggested test or fix. Start
+the bullet with either **Must fix** (a likely normal-use failure, data-loss risk, or requirement
+violation) or **Worth fixing** (useful but not urgent). Findings keep the selected unit open. A
+no-finding review closes it and creates no new review obligation; advance review state across that
+unit and any skipped administrative commits. Commit only the state file (§5).
 
 ## 8. Fix review findings
 
 Handle the findings from **one review** in a run, **Must fix** first, one finding at a time. That
-review's findings are the unit (§1.4): finish them, then stop rather than continuing into another
-review's findings or another waiting change.
+review continues the originating change unit (§1.4): finish its findings, then stop rather than
+continuing into another unit or waiting change.
 
 1. Confirm the report is true by reading the code, the cited requirement, and the real path. Reproduce it with a failing test when practical. A finding that cites a committed skipped reproduction test (§12) starts by un-skipping it and confirming it fails.
 2. If it is false or already fixed, remove the finding and record the short evidence in the changelog and human update; do not change code.
 3. If it is real, fix it, add or keep a regression test, run the required checks, and update the relevant specification if the correct fix changes behavior or fills missing coverage.
 4. When the work is verified, remove the finding, update the handoff, and commit.
+
+When every finding from the review is closed, close the originating change unit. The finding-fix
+commit is part of that closure and does not become a new default review unit. A fix that adds
+unrelated behavior is a separate substantive change and must be recorded as one, not hidden inside
+the closure.
 
 If the correct fix needs a user decision or cannot pass the required checks, leave the finding open and follow §3.
 
@@ -533,9 +561,9 @@ behavior; when the release range needs one of those, that work happens first und
 
 1. **Fix the range and check readiness.** The previous release is the highest `vX.Y.Z` tag; the
    release range is that tag to `main`. Do not release from a dirty tree. Before proposing a version,
-   report the commits in range, the part of the range the handoff still lists as unreviewed, and
+   report the commits in range, any substantive change unit the handoff still lists as open for review, and
    every open review finding. An open **Must fix** finding blocks the release and goes back to §8. An
-   unreviewed range is a user decision under §3, not something to wave through.
+   open review unit is a user decision under §3, not something to wave through.
 
 2. **Refresh the shipped operator skill.** Read the range for anything that changes what an agent
    operating AgentDeck must know: agent-facing tool behavior and results, coordination and task
