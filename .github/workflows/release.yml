@@ -44,7 +44,7 @@ jobs:
         run: |
           set -euo pipefail
           go test ./internal/release ./internal/cli
-          go test -tags sqlite_fts5 ./internal/release ./internal/cli
+          go test -tags sqlite_fts5 ./internal/release ./internal/cli ./internal/archive ./internal/state ./internal/index
           go test -run '^TestBootstrapNonInteractiveDoesNotStartOrEditProfile$' ./internal/cli
       - name: Verify release archive and fresh installation
         env:
@@ -59,7 +59,9 @@ jobs:
           printf 'keep\n' > "$AGENTDECK_HOME/sentinel"
           archive="dist/release/agentdeck-${VERSION#v}-darwin-arm64.tar.gz"
           tar -xzf "$archive" -C "$RUNNER_TEMP"
-          "$RUNNER_TEMP/agentdeck-${VERSION#v}-darwin-arm64/libexec/agentdeck" release install --archive "$archive" --manifest dist/release/manifest.json
+          packaged="$RUNNER_TEMP/agentdeck-${VERSION#v}-darwin-arm64/libexec/agentdeck"
+          go version -m "$packaged" | grep -Eq $'^\tbuild\t-tags=(.*,)?sqlite_fts5(,.*)?$'
+          "$packaged" release install --archive "$archive" --manifest dist/release/manifest.json
           "$AGENTDECK_APP_ROOT/bin/agentdeck" --version
           test "$(cat "$AGENTDECK_HOME/sentinel")" = keep
       - name: Publish GitHub Release

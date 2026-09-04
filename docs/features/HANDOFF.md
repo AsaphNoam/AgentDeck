@@ -29,10 +29,10 @@ back to that at every release (§16.7). Injected Current position plus Active ch
   review of `5485cd7`, so neither advances the marker. **Next review unit:** release commit
   `5485cd7` (concurrently under review); the remaining unreviewed range is `5485cd7..50c242e` less
   `3d474b3` and `c689d6f`. Once `5485cd7`'s review lands, the marker moves through `c689d6f`.
-- **Open findings:** Two. One **Must fix** — release CI does not verify FTS5 tagging, which
-  TS-06.R21 requires and which both §16.6 and the `v0.4.0` changelog entry state as fact. One
-  **Worth fixing** from the review of `3d474b3`: the injected **Release**
-  bullet carries settled publication evidence that the changelog already holds. The generation race
+- **Open findings:** One **Worth fixing** from the review of `3d474b3`: the injected **Release**
+  bullet carries settled publication evidence that the changelog already holds. The **Must fix** on
+  release CI not verifying FTS5 tagging is fixed, so TS-06.R21 and §16.6 now describe a gate that
+  exists. The generation race
   in crash registration teardown and the contradiction in FS-02.A43's acceptance evidence from the
   review of `3c1dc96` are fixed. The four workflow-efficiency findings from the review of `7c9ee44`
   and the earlier product-code review's eight findings are also closed.
@@ -61,6 +61,26 @@ provider sessions.
 ## Changelog
 
 Earlier entries are in the [archived handoff](../archive/state/HANDOFF-through-2026-09-03.md).
+
+- **2026-09-04 — fix: release CI now verifies FTS5 tagging (TS-06.R21, TS-06.R2; INV §10 — ship the
+  wiring, kill the drift):** The **Must fix** was real. `go test -tags sqlite_fts5 ./internal/release
+  ./internal/cli` exercised no FTS5 code at all — neither package holds a `sqlite_fts5`-tagged file
+  or a `MATCH`/`bm25`/`snippet(` reference — and nothing anywhere asserted the tag on the artifact
+  that actually ships, so a `TAGS` edit or a stray untagged `go build` in `scripts/release/assemble.sh`
+  would have published an archive that CI passed and that failed at runtime on archive search. Two
+  edits close it in `.github/workflows/release.yml`. The tagged `go test` line now also runs
+  `./internal/archive ./internal/state ./internal/index`, which is where every FTS5 test lives, so the
+  tagged run proves the FTS5 path builds and works on the release runner. The archive-verification
+  step now asserts the tag on the packaged binary itself: after extraction it runs `go version -m` on
+  `libexec/agentdeck` and requires a `build -tags=` setting containing `sqlite_fts5`, tolerating a
+  multi-tag list so a future legitimate tag does not fail the gate for the wrong reason. Verified
+  both directions against real binaries — the check passes on the tagged `bin/agentdeck` and fails on
+  the untagged `bin/agentdeck-nofts` — plus the regex against tag-list variants, the exact tagged
+  `go test` invocation CI will run (all five packages pass), YAML parse, `bash -n` on the edited step,
+  and `git diff --check`. No specification changed: TS-06.R21 and workflow §16.6 already required
+  this gate, and the fix makes their claim true rather than aspirational, which is the INV §10 drift
+  the finding named. The `v0.4.0` archive itself was never re-verified — the gate protects releases
+  from this point forward.
 
 - **2026-09-03 — review: idea-backlog commit `c689d6f` (FS-17.R1–R8; TS-06.R21, TS-06.R2; INV
   §1–§15):** Reviewed the `docs/ideas.md` edit that marks the first agent-facing orchestration slice
@@ -361,26 +381,6 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 `claude-agent-acp`, OpenCode, and OpenHands are not installed globally.
 
 ## Review findings
-
-- **Must fix** — `.github/workflows/release.yml`, the *Verify release transaction coverage and
-  bootstrap journey* step (TS-06.R21, TS-06.R2; INV §10). Release CI does not verify FTS5 tagging.
-  The step runs `go test -tags sqlite_fts5 ./internal/release ./internal/cli`, but neither package
-  contains an FTS5-tagged file or exercises `MATCH` — every FTS5 test lives in `internal/archive`,
-  `internal/state`, and `internal/index` — and a `go test` build tag says nothing about the shipped
-  binary anyway. The published binary's only tag evidence is `TAGS := sqlite_fts5` in the Makefile;
-  `agentdeck --version` prints version, commit, and date only, so the fresh-install step cannot
-  confirm it either. Normal-use trigger: any change to the `make dist` build path — a
-  `TAGS` edit, a stray `go build` in `scripts/release/assemble.sh` — publishes an untagged archive
-  that CI passes, and archive search then fails at runtime on `MATCH`/`snippet`/`bm25`, which
-  TS-06.R2 calls a defect. Why it matters beyond the gap itself: TS-06.R21 and workflow §16.6 both
-  state release CI verifies FTS5 tagging, and the `v0.4.0` changelog entry repeats it as fact, so
-  the record currently claims a gate that does not exist. This predates the reviewed range —
-  `.github/workflows/` is byte-identical across `v0.3.0..v0.4.0` — and was surfaced while verifying
-  the handoff's TS-06.R21 claims. Fix: assert the tag on the packaged binary in the release job,
-  e.g. `go version -m` on `libexec/agentdeck` matching `-tags=sqlite_fts5` in its build settings, or
-  add the FTS5-tagged packages to the tagged `go test` invocation and a `MATCH` smoke query against
-  the installed binary. Either way the claim in §16.6 and TS-06.R21 becomes true rather than
-  aspirational.
 
 - **Worth fixing** — `HANDOFF.md` *Current position*, the **Release** bullet (from `3d474b3`;
   workflow §4 and §16.7; no INV class applies). The bullet restates the publication evidence — run id, "in
