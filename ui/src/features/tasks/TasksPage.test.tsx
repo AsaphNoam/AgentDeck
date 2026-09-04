@@ -141,6 +141,23 @@ describe("Tasks view", () => {
 		expect(lastRequest?.body).toMatchObject({ target_kind: "launch", arms: [{ source_kind: "pipeline_run", source_id: "pr_1", satisfying_outcomes: ["success", "failure"] }], attachments: [{ context_ref_id: "cx_1", label: "brief" }] });
 	 });
 
+	 // FS-16.R27 / A18 — the effort a person names beside backend and model
+	 // reaches the create request, and only for a launch target: an existing agent
+	 // already runs at its session's level.
+	 it("sends the effort it was given for a launch target", async () => {
+		renderPage();
+		await screen.findByText("New task");
+		fireEvent.change(screen.getByLabelText("Name"), { target: { value: "think hard" } });
+		fireEvent.change(screen.getByLabelText("Instruction"), { target: { value: "reason about it" } });
+		fireEvent.change(screen.getByLabelText("Effort (optional)"), { target: { value: "high" } });
+		fireEvent.click(screen.getByRole("button", { name: "Create task" }));
+		await waitFor(() => expect(lastRequest?.url).toBe("create"));
+		expect(lastRequest?.body).toMatchObject({ target_kind: "launch", effort: "high" });
+
+		fireEvent.change(screen.getByLabelText("Target"), { target: { value: "agent" } });
+		expect(screen.queryByLabelText("Effort (optional)")).not.toBeInTheDocument();
+	 });
+
   // Regression (review fix): narrowing Retry to `interrupted` also removed it
   // from a task parked by exhausted start attempts, whose only specified repair
   // it is. Re-arm is not a substitute — it never restores the allowance — so the

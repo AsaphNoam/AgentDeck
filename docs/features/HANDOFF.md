@@ -9,16 +9,16 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 
 ## Current position
 
-- **Active change:** None. The workflow repair requested on 2026-09-04 is implemented and verified.
+- **Active change:** None.
 - **Release:** `v0.4.0` is published and verified on tag `5485cd7`. Credentialed Claude/Codex checks
   remain owed under TS-06.R21. A customized `agentdecker` role is deliberately not migrated under
   FS-04.R44, so it keeps the superseded product manual beside the current skill.
 - **Review state:** The pre-2026-09-04 raw commit queue is retired. Its substantive changes were
   reviewed and their findings are closed; its later review records, finding-fix commits, release
-  records, and handoff/queue bookkeeping are administrative closure, not new review units. The only
-  eligible unit awaiting independent review is the 2026-09-04 workflow repair that introduced this
-  change-unit model and cleaned this handoff. Do not review an older administrative commit or start
-  a later unit out of order.
+  records, and handoff/queue bookkeeping are administrative closure, not new review units. Two units
+  await independent review, oldest first: the 2026-09-04 workflow repair that introduced this
+  change-unit model and cleaned this handoff, then the 2026-09-04 task launch-specification effort
+  change. Do not review an older administrative commit or take a later unit out of order.
 - **Open findings:** None.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
   remain owed before claiming those adapters accept structured results.
@@ -29,20 +29,36 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 
 ## Active change
 
-**Change:** None.
+**Change:** None. Task launch-specification effort is implemented and verified.
 
-**Next:** Independently review the 2026-09-04 workflow repair once. A no-finding review closes it
-without creating another review obligation; any findings and their fixes remain part of that same
-unit. After it closes, the proposal Reject/Delete change is ready to start as
-[`decline-pipeline-proposals.md`](../ready-changes/decline-pipeline-proposals.md). Its ordering
-decision is settled and must not be reopened during implementation. Keep credentialed provider
-journeys as acceptance gates until a human authorizes real sessions.
+**Next:** Independently review the two open units in order — the 2026-09-04 workflow repair first,
+then the task launch-specification effort change. Two local implementation choices in the effort
+change are the reviewer's to confirm or raise: launch composition calls `selectLaunchTarget` and
+`resolveTargetEffort` in place rather than the composed `resolveLaunchSpec`, because a bound
+configuration source must be resolved between selecting the model and resolving the effort; and the
+`tasks.effort` column ships as `TEXT NOT NULL DEFAULT ''` to match the effort columns migrations 12
+and 13 added, with TS-10 §3 reworded to that shipped shape rather than the "nullable" it drafted.
+The proposal Reject/Delete change
+([`decline-pipeline-proposals.md`](../ready-changes/decline-pipeline-proposals.md)) remains ready
+after both close; its ordering decision is settled. Keep credentialed provider journeys as
+acceptance gates until a human authorizes real sessions.
 
 ## Changelog
 
 Earlier entries are in the [archived handoff](../archive/state/HANDOFF-through-2026-09-03.md) and Git
 history.
 
+- **2026-09-04 — build: task launch-specification effort (FS-16.R2, R27–R28, A18; FS-09.R49, A22;
+  TS-10.R23, §3):** A task that launches its own agent can now name the reasoning effort that agent
+  runs at, over `create_task`, `POST /api/tasks`, and the Tasks create form. Migration 21 adds
+  `tasks.effort`; the dispatcher passes it as the existing `launchRequest.Effort`, so `resolveEffort`
+  and `config.ValidateModelEffort` stay the only precedence and validation code. The same change
+  validates a launch specification's backend, model, and effort when the task is created — resolving
+  the install defaults for an omitted field — instead of letting a bad specification spend all three
+  start attempts, and rejects an effort named beside an existing-agent target. Launch composition was
+  refactored onto the shared `selectLaunchTarget`/`resolveTargetEffort` seam the authoring paths use,
+  so selection and effort validation each exist once (INV §2). FS-16 and TS-10 are back to
+  **Current**; the ready change file is removed.
 - **2026-09-04 — design: pipeline stages group their own agents (FS-14.R58, TS-09.R33):** A run now
   labels every stage agent it launches with that stage's title and the run's display name as an
   ordinary task group, so a stage's work lands in one collapsible dashboard section with the

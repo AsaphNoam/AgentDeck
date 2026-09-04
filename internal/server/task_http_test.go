@@ -597,3 +597,169 @@ func TestAnAgentAttachesOnlyContextItCanRead(t *testing.T) {
 		t.Fatalf("a refused attachment created %d tasks", len(tasks))
 	}
 }
+
+// FS-16.R27–R28 / FS-09.R49, A22 / TS-10.R23 — a launch specification is checked
+// when the work is created, with the same field-level error and levels list a
+// launch returns, and a rejected create stores nothing.
+func TestCreateTaskChecksItsLaunchSpecification(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+
+	// The status is whatever a launch already returns for that code: an
+	// undeclared level is the field-level `invalid_field`, an unknown backend or
+	// model is `validation` (FS-09.A22).
+	cases := []struct {
+		name     string
+		request  map[string]any
+		wantCode int
+		wantWord string
+	}{
+		{"undeclared effort", map[string]any{"project": "tmpproj", "display_name": "x", "instruction": "x",
+			"target_kind": "launch", "role": "impl", "effort": "ludicrous"}, 400, "ludicrous"},
+		{"unknown model", map[string]any{"project": "tmpproj", "display_name": "x", "instruction": "x",
+			"target_kind": "launch", "role": "impl", "model": "ghost"}, 422, "unknown model"},
+		{"unknown backend", map[string]any{"project": "tmpproj", "display_name": "x", "instruction": "x",
+			"target_kind": "launch", "role": "impl", "backend": "ghost"}, 422, "unknown backend"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			resp, body := post(t, ts.URL+"/api/tasks", tc.request)
+			if resp.StatusCode != tc.wantCode {
+				t.Fatalf("status = %d, want %d: %s", resp.StatusCode, tc.wantCode, body)
+			}
+			if code := apiErrorCode(t, body); code == "" {
+				t.Fatalf("rejection carried no typed code: %s", body)
+			}
+			if !strings.Contains(string(body), tc.wantWord) {
+				t.Fatalf("rejection did not name the bad field value %q: %s", tc.wantWord, body)
+			}
+		})
+	}
+
+	// The creation-time refusal is the launch's own wording, not a second copy:
+	// it lists exactly the levels the selected model declares (FS-09.A22).
+	_, body := post(t, ts.URL+"/api/tasks", map[string]any{
+		"project": "tmpproj", "display_name": "x", "instruction": "x",
+		"target_kind": "launch", "role": "impl", "effort": "ludicrous",
+	})
+	backends, err := srv.configStore.ReadBackends()
+	if err != nil {
+		t.Fatalf("ReadBackends: %v", err)
+	}
+	levels := strings.Join(backends.Backends["claude"].Models["sonnet"].Efforts, ", ")
+	if !strings.Contains(string(body), levels) {
+		t.Fatalf("refusal did not list the model's levels %q: %s", levels, body)
+	}
+
+	// A valid specification is accepted and stores the requested level verbatim,
+	// so it stays FS-09.R41's explicit request when the task finally starts.
+	resp, created := post(t, ts.URL+"/api/tasks", map[string]any{
+		"project": "tmpproj", "display_name": "high work", "instruction": "think hard",
+		"target_kind": "launch", "role": "impl", "effort": "high",
+	})
+	if resp.StatusCode != 200 && resp.StatusCode != 201 {
+		t.Fatalf("valid effort was refused: %d %s", resp.StatusCode, created)
+	}
+	task := decodeTask(t, created)
+	stored, err := srv.stateStore.ReadTask(task.TaskID)
+	if err != nil {
+		t.Fatalf("ReadTask: %v", err)
+	}
+	if stored.Effort != "high" {
+		t.Fatalf("stored effort = %q, want %q", stored.Effort, "high")
+	}
+
+	tasks, err := srv.stateStore.ListTasks("tmpproj")
+	if err != nil {
+		t.Fatalf("ListTasks: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("rejected creates left %d tasks, want only the accepted one", len(tasks))
+	}
+}
+
+// FS-16.R27, R20 — an effort named beside an existing agent target is rejected
+// rather than silently dropped: that agent already runs at its session's level.
+func TestCreateTaskRejectsAnEffortOnAnExistingAgentTarget(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	agentID := launchThenStop(t, srv, ts)
+
+	resp, body := post(t, ts.URL+"/api/tasks", map[string]any{
+		"project": "tmpproj", "display_name": "x", "instruction": "x",
+		"target_kind": "agent", "target_agent_id": agentID, "effort": "high",
+	})
+	if resp.StatusCode != 422 {
+		t.Fatalf("status = %d, want 422: %s", resp.StatusCode, body)
+	}
+	if !strings.Contains(string(body), "effort") {
+		t.Fatalf("refusal did not name the effort field: %s", body)
+	}
+	tasks, err := srv.stateStore.ListTasks("tmpproj")
+	if err != nil {
+		t.Fatalf("ListTasks: %v", err)
+	}
+	if len(tasks) != 0 {
+		t.Fatalf("a rejected create left %d tasks, want none", len(tasks))
+	}
+}
+
+// FS-16.R27–R28 / FS-09.R49 / TS-10.R23 — the agent-facing authoring path runs
+// the same creation-time check as the HTTP one, over the same shared seam.
+func TestAgentCreatedTaskChecksItsLaunchSpecification(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	creator := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+	base := func() messaging.AgentTaskRequest {
+		return messaging.AgentTaskRequest{
+			CreatorAgentID: creator, CreatorGeneration: srv.registry.Generation(creator),
+			Project: "tmpproj", DisplayName: "x", Instruction: "do it", Role: "impl",
+		}
+	}
+
+	accepted, err := func() (state.Task, error) {
+		req := base()
+		req.Effort = "high"
+		return srv.CreateAgentTask(req)
+	}()
+	if err != nil {
+		t.Fatalf("a declared level was refused: %v", err)
+	}
+	if accepted.Effort != "high" {
+		t.Fatalf("stored effort = %q, want %q", accepted.Effort, "high")
+	}
+
+	for _, tc := range []struct {
+		name    string
+		mutate  func(*messaging.AgentTaskRequest)
+		wantSub string
+	}{
+		{"undeclared effort", func(r *messaging.AgentTaskRequest) { r.Effort = "ludicrous" }, "ludicrous"},
+		{"unknown model", func(r *messaging.AgentTaskRequest) { r.Model = "ghost" }, "unknown model"},
+		{"unknown backend", func(r *messaging.AgentTaskRequest) { r.Backend = "ghost" }, "unknown backend"},
+		{"effort with an existing target", func(r *messaging.AgentTaskRequest) {
+			r.TargetAgentID, r.Effort = creator, "high"
+		}, "effort"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := base()
+			tc.mutate(&req)
+			_, err := srv.CreateAgentTask(req)
+			var toolErr *messaging.ToolError
+			if !errors.As(err, &toolErr) {
+				t.Fatalf("error = %v, want a typed tool error", err)
+			}
+			if toolErr.Code != "validation" {
+				t.Fatalf("code = %q, want %q", toolErr.Code, "validation")
+			}
+			if !strings.Contains(toolErr.Message, tc.wantSub) {
+				t.Fatalf("message %q did not name %q", toolErr.Message, tc.wantSub)
+			}
+		})
+	}
+
+	tasks, err := srv.stateStore.ListTasks("tmpproj")
+	if err != nil {
+		t.Fatalf("ListTasks: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("rejected creates left %d tasks, want only the accepted one", len(tasks))
+	}
+}

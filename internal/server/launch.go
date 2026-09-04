@@ -209,23 +209,13 @@ func (s *Server) composeLaunchWithOptions(ctx context.Context, req launchRequest
 	}
 
 	// Defaults (§6.5): backend → the default backend; model → that backend's
-	// default_model; interface → chat.
-	backendID := req.Backend
-	if backendID == "" {
-		backendID = defaultBackendID(backends)
+	// default_model; interface → chat. Selection is the shared seam task creation
+	// also validates against (TS-10.R23).
+	target, ae := selectLaunchTarget(backends, req.Backend, req.Model)
+	if ae != nil {
+		return runtime.LaunchSpec{}, state.Agent{}, ae
 	}
-	backend, ok := backends.Backends[backendID]
-	if !ok {
-		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeValidation, "unknown backend: "+backendID)
-	}
-	modelID := req.Model
-	if modelID == "" {
-		modelID = backend.DefaultModel
-	}
-	model, ok := backend.Models[modelID]
-	if !ok {
-		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeValidation, "unknown model: "+modelID)
-	}
+	backendID, backend, modelID, model := target.BackendID, target.Backend, target.ModelID, target.Model
 	iface := req.Interface
 	if iface == "" {
 		iface = "chat"
@@ -303,12 +293,9 @@ func (s *Server) composeLaunchWithOptions(ctx context.Context, req launchRequest
 			acpModelID = ""
 		}
 	}
-	resolvedEffort, ae := resolveEffort(req.Effort, model, fedModel)
+	resolvedEffort, ae := resolveTargetEffort(target, req.Effort, fedModel)
 	if ae != nil {
 		return runtime.LaunchSpec{}, state.Agent{}, ae
-	}
-	if err := config.ValidateModelEffort(backend, model, resolvedEffort); err != nil {
-		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeInvalidField, err.Error())
 	}
 
 	agentID := options.AgentID
@@ -410,6 +397,70 @@ func appendUnique(values []string, candidate string) []string {
 		}
 	}
 	return append(values, candidate)
+}
+
+// launchTarget is the concrete backend and model a launch specification selects
+// once the install defaults fill in whatever the caller left out.
+type launchTarget struct {
+	BackendID string
+	Backend   config.Backend
+	ModelID   string
+	Model     config.Model
+}
+
+// selectLaunchTarget applies the launch defaults (§6.5) and rejects an unknown
+// backend or model. It is the only place that turns a requested backend/model
+// pair into catalog entries, so work created for a later launch is checked
+// against exactly what launch composition would select (TS-10.R23, INV §2).
+func selectLaunchTarget(backends config.BackendsConfig, backendID, modelID string) (launchTarget, *runtime.APIError) {
+	if backendID == "" {
+		backendID = defaultBackendID(backends)
+	}
+	backend, ok := backends.Backends[backendID]
+	if !ok {
+		return launchTarget{}, apiError(runtime.CodeValidation, "unknown backend: "+backendID)
+	}
+	if modelID == "" {
+		modelID = backend.DefaultModel
+	}
+	model, ok := backend.Models[modelID]
+	if !ok {
+		return launchTarget{}, apiError(runtime.CodeValidation, "unknown model: "+modelID)
+	}
+	return launchTarget{BackendID: backendID, Backend: backend, ModelID: modelID, Model: model}, nil
+}
+
+// resolveTargetEffort applies FS-09.R41's precedence and R42's capability check
+// to an already-selected target. fed is nil for a caller with no bound source to
+// consult, which is every caller that is not composing a launch right now.
+func resolveTargetEffort(target launchTarget, explicit string, fed *federationModel) (string, *runtime.APIError) {
+	resolved, ae := resolveEffort(explicit, target.Model, fed)
+	if ae != nil {
+		return "", ae
+	}
+	if err := config.ValidateModelEffort(target.Backend, target.Model, resolved); err != nil {
+		return "", apiError(runtime.CodeInvalidField, err.Error())
+	}
+	return resolved, nil
+}
+
+// resolveLaunchSpec resolves a launch specification to the concrete
+// backend/model/effort triple its launch would use, reading the catalog and
+// taking no transaction. Both task-authoring paths call it to reject a bad
+// specification when the work is created (FS-16.R28, FS-09.R49); launch
+// composition calls its two halves in place, because a bound configuration
+// source has to be resolved between selecting the model and resolving the
+// effort. Neither rule is implemented twice (TS-10.R23, INV §2).
+func resolveLaunchSpec(backends config.BackendsConfig, backendID, modelID, effort string) (launchTarget, string, *runtime.APIError) {
+	target, ae := selectLaunchTarget(backends, backendID, modelID)
+	if ae != nil {
+		return launchTarget{}, "", ae
+	}
+	resolved, ae := resolveTargetEffort(target, effort, nil)
+	if ae != nil {
+		return launchTarget{}, "", ae
+	}
+	return target, resolved, nil
 }
 
 // resolveEffort is the single launch-composition precedence seam: an explicit

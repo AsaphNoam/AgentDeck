@@ -231,7 +231,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   AgentDeck never substitutes a different level and never silently drops the request. A model whose
   declared levels are later edited does not retroactively change a frozen running or archived
   session (R4).
-- **R49** `(planned)` — Creating durable work that will launch an agent later is a
+- **R49** — Creating durable work that will launch an agent later is a
   fourth rejection point under R42. A task's launch specification may name an effort (FS-16.R27),
   and because the task may sit armed for hours the request is checked twice: once when the task is
   created, so the person or agent that asked for the level learns immediately that the model does
@@ -321,7 +321,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   without AgentDeck starting a login process or receiving credential bytes; Codex API-key readiness
   remains supported. *Verified by* credential-check tests and FS-04.A14's UI test.
 
-- **A22** `(planned)` (R49) — A task created with an effort its model does not declare is
+- **A22** (R49) — A task created with an effort its model does not declare is
   rejected at creation with the same field-level error and levels list that a launch returns, and a
   task created with a valid effort whose model later drops that level fails its start attempt rather
   than launching at a substituted one: HTTP and task-dispatch tests.

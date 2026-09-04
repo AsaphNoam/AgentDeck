@@ -1,6 +1,6 @@
 # FS-16 — Dependent work and armed starts
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/state`, `internal/server`, `internal/messaging`, `ui/src/features/tasks` · **Journeys:** —
 **Absorbed:** —
 
@@ -24,8 +24,8 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   survives restart, and is not deleted when its agent stops, crashes, or is archived. A task holds no
   copied transcript, no provider session, and no context payload.
 - **R2** — **A task names how it will be executed.** A task targets either one existing
-  chat agent or a launch specification (role, project, backend, model) from which AgentDeck creates a
-  new agent when the task starts. A task has at most one assigned agent at a time, and an agent holds
+  chat agent or a launch specification (role, project, backend, model, effort) from which AgentDeck
+  creates a new agent when the task starts. A task has at most one assigned agent at a time, and an agent holds
   at most one active task — one that is `starting` or `running` — at a time. That exclusivity is a
   durable claim taken atomically when the task is admitted, not a consequence of scheduling order, so
   two tasks admitted at the same moment for the same agent cannot both become active; the loser stays
@@ -192,7 +192,7 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   instruction or mail's status, because an agent told to check its messages will do exactly that and
   never find its task. The instruction carries no task id, arm set, context reference, or assignment
   text: the agent reads all of that through R11, which keeps the activation payload-free.
-- **R27** `(planned)` — **A launch specification names its reasoning effort.** The
+- **R27** — **A launch specification names its reasoning effort.** The
   launch specification a task targets (R2) carries an optional effort alongside role, project,
   backend, and model, so work an agent or a person schedules for later can ask for a cheap model at
   a low level or a hard problem at a high one. Both authoring surfaces offer it: the scoped
@@ -207,7 +207,7 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   into its session, so naming both an existing target and an effort is rejected under R20 rather
   than silently dropped. This adds no way to change an agent's effort mid-task and no effort field
   on an arm or an attachment.
-- **R28** `(planned)` — **A launch specification is checked when the work is created,
+- **R28** — **A launch specification is checked when the work is created,
   not only when it starts.** Creating a task that targets a launch specification validates its
   backend, model, and effort against the backend catalog then and there — resolving the install
   defaults for a field the caller omitted — and rejects an unknown backend, an unknown model, or an
@@ -419,7 +419,7 @@ Each names the verification that demonstrates it.
   cancel a task it created, still can after being stopped and resumed, and cannot cancel a task
   created by another agent, by a person, or named by a spoofed argument: concurrency and MCP
   authorization tests.
-- **A18** `(planned)` (R27, R28) — A launch-spec task created with an effort its model
+- **A18** (R27, R28) — A launch-spec task created with an effort its model
   declares launches its agent at that effort, asserted on the composed launch spec, and beats a
   bound source's effort override; the same task created without one resolves to the model's
   `default_effort` as it does today; an effort the model does not declare, an unknown model, and an

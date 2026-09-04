@@ -817,3 +817,119 @@ func TestRestartResolvesUnfinishedTasksFromTheirOwnRows(t *testing.T) {
 		t.Fatalf("dependency activations survived a restart: %+v", pending)
 	}
 }
+
+// newLaunchTaskWithEffort creates launch-spec work that names the reasoning
+// level its agent should run at (FS-16.R27).
+func newLaunchTaskWithEffort(t *testing.T, srv *Server, name, effort string) state.Task {
+	t.Helper()
+	id, err := srv.stateStore.NewTaskID()
+	if err != nil {
+		t.Fatalf("NewTaskID: %v", err)
+	}
+	task, err := srv.stateStore.CreateTask(state.Task{
+		TaskID: id, Project: "tmpproj", DisplayName: name,
+		Instruction:   "please do " + name,
+		TargetKind:    state.TargetLaunch,
+		Role:          "impl",
+		Effort:        effort,
+		CreatedByKind: "person",
+	})
+	if err != nil {
+		t.Fatalf("CreateTask %s: %v", name, err)
+	}
+	return task
+}
+
+// FS-16.R27 / FS-09.R41 / TS-10.R23 — the level a task stored reaches the agent
+// it launches as the explicitly requested effort, and a task that named none
+// resolves to the model's default exactly as any other launch does.
+func TestALaunchTaskStartsItsAgentAtTheStoredEffort(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		stored string
+		want   string
+	}{
+		{name: "stored effort", stored: "high", want: "high"},
+		{name: "no effort falls through to the model default", stored: "", want: "medium"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			srv, _, _ := activationTestServer(t)
+			task := newLaunchTaskWithEffort(t, srv, "effort work", tt.stored)
+
+			srv.dispatchReadyTasks(context.Background())
+			running := waitTaskState(t, srv, task.TaskID, state.TaskRunning)
+
+			agent, err := srv.stateStore.ReadAgent(running.AssignedAgentID)
+			if err != nil {
+				t.Fatalf("ReadAgent: %v", err)
+			}
+			if agent.Effort != tt.want {
+				t.Fatalf("task agent effort = %q, want %q", agent.Effort, tt.want)
+			}
+		})
+	}
+}
+
+// FS-16.R28 / FS-09.R49 / A22 — creation-time acceptance is not a promise the
+// launch will succeed. A task whose effort its model no longer declares spends a
+// start attempt instead of launching at a substituted level.
+func TestALaunchTaskWhoseEffortWasDroppedFailsItsStart(t *testing.T) {
+	srv, _, _ := activationTestServer(t)
+	task := newLaunchTaskWithEffort(t, srv, "stale effort", "high")
+
+	// The catalog is editable while work sits armed: drop the level the task
+	// already asked for, leaving the rest of the specification valid.
+	backends, err := srv.configStore.ReadBackends()
+	if err != nil {
+		t.Fatalf("ReadBackends: %v", err)
+	}
+	claude := backends.Backends["claude"]
+	sonnet := claude.Models["sonnet"]
+	sonnet.Efforts = []string{"low", "medium"}
+	sonnet.DefaultEffort = "medium"
+	claude.Models["sonnet"] = sonnet
+	backends.Backends["claude"] = claude
+	if err := srv.configStore.WriteBackends(backends); err != nil {
+		t.Fatalf("WriteBackends: %v", err)
+	}
+
+	// Each pass spends one of the bounded attempts rather than launching at a
+	// substituted level; the third parks the task with the reason (FS-16.R25).
+	for attempt := 1; attempt <= state.MaxTaskStartAttempts; attempt++ {
+		srv.dispatchReadyTasks(context.Background())
+		spent := waitTaskAttempts(t, srv, task.TaskID, attempt)
+		if spent.State == state.TaskRunning {
+			t.Fatalf("a task naming an undeclared level launched anyway: %+v", spent)
+		}
+	}
+	parked := waitTaskState(t, srv, task.TaskID, state.TaskDependencyFailed)
+	if !strings.Contains(parked.AttentionReason, "high") {
+		t.Fatalf("parked reason did not name the refused level: %q", parked.AttentionReason)
+	}
+	if agents, err := srv.stateStore.ListAgents(); err != nil {
+		t.Fatalf("ListAgents: %v", err)
+	} else if len(agents) != 0 {
+		t.Fatalf("a refused launch created %d agents, want none", len(agents))
+	}
+}
+
+// waitTaskAttempts blocks until the task has spent want start attempts, which
+// the dispatcher's start goroutine records asynchronously.
+func waitTaskAttempts(t *testing.T, srv *Server, taskID string, want int) state.Task {
+	t.Helper()
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		task, err := srv.stateStore.ReadTask(taskID)
+		if err != nil {
+			t.Fatalf("ReadTask: %v", err)
+		}
+		if task.StartAttemptCount >= want {
+			return task
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("task %s spent %d attempts, want %d (state %s, reason %q)",
+				taskID, task.StartAttemptCount, want, task.State, task.AttentionReason)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}

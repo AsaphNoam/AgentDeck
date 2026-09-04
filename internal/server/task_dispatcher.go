@@ -196,7 +196,7 @@ func (s *Server) startLaunchedTask(ctx context.Context, task state.Task) {
 
 	_, ae := s.launchAgent(ctx, launchRequest{
 		Role: task.Role, Project: task.Project, Backend: task.Backend, Model: task.Model,
-		Interface: "chat", Name: task.DisplayName,
+		Effort: task.Effort, Interface: "chat", Name: task.DisplayName,
 	}, launchOptions{AgentID: task.AssignedAgentID, Generation: task.AssignedGeneration})
 	if ae != nil {
 		s.failTaskStart(task, "launch failed: "+ae.Message)

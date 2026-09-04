@@ -24,6 +24,7 @@ export interface CreateTaskInput {
   role?: string;
   backend?: string;
   model?: string;
+  effort?: string;
   arms?: TaskArmInput[];
 	attachments?: { context_ref_id: string; label?: string; description?: string }[];
 }

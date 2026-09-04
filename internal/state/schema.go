@@ -388,4 +388,14 @@ CREATE TABLE project_worktrees (
 );
 `,
 	},
+	{
+		// A launch-spec task may name the reasoning level its agent runs at
+		// (FS-16.R27, TS-10 §3). Empty is the unrequested value, matching the
+		// effort columns migration 12 and 13 added, so launch composition resolves
+		// the level for a task exactly as it does for any other launch.
+		version: 21,
+		sql: `
+ALTER TABLE tasks ADD COLUMN effort TEXT NOT NULL DEFAULT '';
+`,
+	},
 }

@@ -191,6 +191,7 @@ function CreateTaskForm({ project }: { project: string }) {
 	const [targetAgentID, setTargetAgentID] = useState("");
 	const [backend, setBackend] = useState("");
 	const [model, setModel] = useState("");
+	const [effort, setEffort] = useState("");
 	const [sourceID, setSourceID] = useState("");
 	const [sourceKind, setSourceKind] = useState<"task" | "pipeline_run">("task");
 	const [outcomes, setOutcomes] = useState("success");
@@ -221,6 +222,7 @@ function CreateTaskForm({ project }: { project: string }) {
 			role: targetKind === "launch" ? chosenRole : undefined,
 			backend: targetKind === "launch" ? backend : undefined,
 			model: targetKind === "launch" ? model : undefined,
+			effort: targetKind === "launch" ? effort : undefined,
 			arms: [
 				...(sourceID.trim() ? [{ kind: "work_result" as const, source_kind: sourceKind, source_id: sourceID.trim(), satisfying_outcomes: outcomes.split(",").map((item) => item.trim()).filter(Boolean) }] : []),
 				...(signal.trim() ? [{ kind: "signal" as const, signal_name: signal.trim() }] : []),
@@ -253,6 +255,7 @@ function CreateTaskForm({ project }: { project: string }) {
         </label>
 		<label>Backend (optional)<input value={backend} onChange={(e) => setBackend(e.target.value)} /></label>
 		<label>Model (optional)<input value={model} onChange={(e) => setModel(e.target.value)} /></label>
+		<label>Effort (optional)<input value={effort} onChange={(e) => setEffort(e.target.value)} placeholder="a level the model declares" /></label>
 		</>}
 		<label>Wait for task or pipeline run (optional)<input value={sourceID} onChange={(e) => setSourceID(e.target.value)} placeholder="tk_… or pr_…" /></label>
 		<label>Prerequisite kind<select value={sourceKind} onChange={(e) => setSourceKind(e.target.value as "task" | "pipeline_run")}><option value="task">Task</option><option value="pipeline_run">Pipeline run</option></select></label>

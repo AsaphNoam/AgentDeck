@@ -45,6 +45,7 @@ export const taskSchema = z.object({
   role: z.string().optional().default(""),
   backend: z.string().optional().default(""),
   model: z.string().optional().default(""),
+  effort: z.string().optional().default(""),
   state: z.enum(TASK_STATES),
   outcome: z.string().optional().default(""),
   outcome_source: z.string().optional().default(""),

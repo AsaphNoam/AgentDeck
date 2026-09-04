@@ -377,3 +377,25 @@ func TestAnAssigneeReadsAttachedContextWithoutAGrant(t *testing.T) {
 		t.Fatalf("deleting a task disturbed the canonical reference: %v", res)
 	}
 }
+
+// FS-16.R27 / TS-10 §3 — the scoped tool offers a reasoning effort beside role,
+// backend, and model, and hands it to the control plane that validates it.
+func TestCreateTaskCarriesTheRequestedEffort(t *testing.T) {
+	f := newContextFixture(t)
+	liveAgent(t, f.store, "a_impl", "Atlas", "implementer", "my-app")
+	f.srv.RegisterSession("tok-impl", "a_impl", "gen-a_impl")
+	control := &stubTaskControl{}
+	f.srv.SetTaskControl(control)
+
+	impl := connect(t, f.srv, "tok-impl")
+	res, isErr := call(t, impl, "create_task", map[string]any{
+		"display_name": "think hard", "instruction": "reason about it",
+		"role": "implementer", "backend": "claude", "model": "opus", "effort": "high",
+	})
+	if isErr || res["ok"] != true {
+		t.Fatalf("create_task = %v", res)
+	}
+	if got := control.created; got.Effort != "high" || got.Backend != "claude" || got.Model != "opus" {
+		t.Fatalf("launch specification = %q/%q/%q, want claude/opus/high", got.Backend, got.Model, got.Effort)
+	}
+}

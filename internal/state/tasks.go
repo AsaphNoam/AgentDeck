@@ -90,6 +90,10 @@ type Task struct {
 	Role          string `json:"role,omitempty"`
 	Backend       string `json:"backend,omitempty"`
 	Model         string `json:"model,omitempty"`
+	// Effort is the explicitly requested reasoning level for the agent this task
+	// launches (FS-16.R27). Empty means unrequested, so launch composition
+	// resolves the level exactly as it does for any other launch (FS-09.R41).
+	Effort string `json:"effort,omitempty"`
 
 	State           string `json:"state"`
 	Outcome         string `json:"outcome,omitempty"`
@@ -327,11 +331,12 @@ func (s *Store) CreateTaskWithAttachments(task Task, attachments []TaskAttachmen
 
 	if _, err := tx.Exec(`
 INSERT INTO tasks(task_id, project, display_name, instruction, target_kind, target_agent_id,
-  role, backend, model, state, attention_reason, created_by_kind, created_by_agent_id,
+  role, backend, model, effort, state, attention_reason, created_by_kind, created_by_agent_id,
   created_by_generation, revision, ready_at, created_at, updated_at)
-VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		task.TaskID, task.Project, task.DisplayName, task.Instruction, task.TargetKind,
-		task.TargetAgentID, task.Role, task.Backend, task.Model, task.State, task.AttentionReason,
+		task.TargetAgentID, task.Role, task.Backend, task.Model, task.Effort, task.State,
+		task.AttentionReason,
 		task.CreatedByKind, task.CreatedByAgentID, task.CreatedByGeneration,
 		task.Revision, formatOptionalTime(task.ReadyAt), formatTime(task.CreatedAt),
 		formatTime(task.UpdatedAt)); err != nil {
@@ -627,7 +632,7 @@ FROM task_arms WHERE task_id = ? ORDER BY arm_id`, taskID)
 
 const taskSelect = `
 SELECT task_id, project, display_name, instruction, target_kind, target_agent_id, role, backend,
-  model, state, outcome, outcome_source, outcome_summary, outcome_details, attention_reason,
+  model, effort, state, outcome, outcome_source, outcome_summary, outcome_details, attention_reason,
   created_by_kind, created_by_agent_id, created_by_generation, assigned_agent_id,
   assigned_generation, runtime_claim, pending_release, start_attempt_id, start_attempt_count,
   revision, ready_at, start_claimed_at, created_at, updated_at, started_at, finished_at
@@ -640,7 +645,7 @@ func scanTask(row rowScanner) (Task, error) {
 	var readyAt, startClaimedAt, startedAt, finishedAt sql.NullString
 	var createdAt, updatedAt string
 	if err := row.Scan(&t.TaskID, &t.Project, &t.DisplayName, &t.Instruction, &t.TargetKind,
-		&t.TargetAgentID, &t.Role, &t.Backend, &t.Model, &t.State, &t.Outcome, &t.OutcomeSource,
+		&t.TargetAgentID, &t.Role, &t.Backend, &t.Model, &t.Effort, &t.State, &t.Outcome, &t.OutcomeSource,
 		&t.OutcomeSummary, &t.OutcomeDetails, &t.AttentionReason, &t.CreatedByKind,
 		&t.CreatedByAgentID, &t.CreatedByGeneration, &assignedAgentID, &t.AssignedGeneration,
 		&t.RuntimeClaim, &pendingRelease, &t.StartAttemptID, &t.StartAttemptCount, &t.Revision,

@@ -1,6 +1,6 @@
 # TS-10 — Work dependency control plane
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/state`, `internal/server`, `internal/messaging`, `ui/src/features/tasks`
 **Absorbed:** —
 
@@ -213,7 +213,7 @@ parallel copy of them.
   narrowing Retry to `interrupted` and silently stranding work parked by exhausted start
   attempts (INV §2).
 
-- **R23** `(planned)` — **A task's launch specification is validated by the launch
+- **R23** — **A task's launch specification is validated by the launch
   composer's own seam, in both places, and is never re-implemented.** The stored effort reaches the
   provider by setting the existing `launchRequest.Effort` on the call the dispatcher already makes,
   so `resolveEffort` and `config.ValidateModelEffort` stay the only precedence and validation code
@@ -232,8 +232,9 @@ parallel copy of them.
 
 - `tasks` — `task_id` TEXT PK, `project`, `display_name`, `instruction`, `target_kind`
   (`agent` | `launch`), `target_agent_id` nullable, launch fields (`role`, `backend`, `model`,
-  `effort` `(planned)`, one forward-only migration adding a nullable column; empty means the launch
-  composer resolves the level as it does for an unrequested one, FS-16.R27),
+  `effort`, one forward-only migration adding the column with the empty default the other effort
+  columns use; empty means the launch composer resolves the level as it does for an unrequested one,
+  FS-16.R27),
   `state` (`armed` | `ready` | `starting` | `running` | `interrupted` | `finished` |
   `dependency_failed`), `outcome` nullable (`success` | `failure` | `blocked` | `cancelled`),
   `outcome_source` nullable (`agent` | `person`), `outcome_summary`, `outcome_details`,
@@ -260,7 +261,7 @@ parallel copy of them.
 
 **MCP tools** on the existing `/mcp` server, all with server-derived caller identity:
 `create_task`, `get_assigned_task`, `report_task_result`, `cancel_task`. `create_task` gains an
-optional `effort` argument beside `role`, `backend`, and `model` `(planned)`; supplying it together
+optional `effort` argument beside `role`, `backend`, and `model`; supplying it together
 with `to` returns `validation`, as does a backend, model, or effort the catalog rejects at creation
 (FS-16.R27, R28). Stable outcome codes include
 `task_not_found`, `not_assigned`, `not_creator`, `already_reported`, `invalid_outcome`,
