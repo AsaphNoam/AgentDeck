@@ -378,7 +378,7 @@ func TestAnAssigneeReadsAttachedContextWithoutAGrant(t *testing.T) {
 	}
 }
 
-// FS-16.R27 / TS-10 §3 — the scoped tool offers a reasoning effort beside role,
+// FS-16.A18 (R27) / TS-10 §3 — the scoped tool offers a reasoning effort beside role,
 // backend, and model, and hands it to the control plane that validates it.
 func TestCreateTaskCarriesTheRequestedEffort(t *testing.T) {
 	f := newContextFixture(t)

@@ -141,7 +141,7 @@ describe("Tasks view", () => {
 		expect(lastRequest?.body).toMatchObject({ target_kind: "launch", arms: [{ source_kind: "pipeline_run", source_id: "pr_1", satisfying_outcomes: ["success", "failure"] }], attachments: [{ context_ref_id: "cx_1", label: "brief" }] });
 	 });
 
-	 // FS-16.R27 / A18 — the effort a person names beside backend and model
+	 // FS-16.A18 (R27) — the effort a person names beside backend and model
 	 // reaches the create request, and only for a launch target: an existing agent
 	 // already runs at its session's level.
 	 it("sends the effort it was given for a launch target", async () => {

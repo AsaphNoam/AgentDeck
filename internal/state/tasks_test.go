@@ -1,6 +1,7 @@
 package state
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"testing"
@@ -989,5 +990,46 @@ func TestRetryEligibleProjectionAgreesWithRetryTask(t *testing.T) {
 				t.Fatalf("RetryTask err = %v, but retry_eligible said %v", err, tc.want)
 			}
 		})
+	}
+}
+
+// TS-10 §3 / FS-16.R27 (INV §9, INV §11) — the effort columns are declared
+// `TEXT NOT NULL DEFAULT ''`, so no future migration or repair may admit a
+// `NULL` that the non-null Go string scans would fail to read. The oracle is the
+// migrated database itself, read back through PRAGMA rather than from the
+// migration text under test.
+func TestEffortColumnsAreNonNullWithAnEmptyDefault(t *testing.T) {
+	st, _ := newTestStore(t)
+
+	for _, table := range []string{"tasks", "agents", "sessions", "pipeline_attempts"} {
+		rows, err := st.DB().Query(`SELECT name, type, "notnull", dflt_value FROM pragma_table_info(?)`, table)
+		if err != nil {
+			t.Fatalf("table_info(%s): %v", table, err)
+		}
+		var seen bool
+		for rows.Next() {
+			var name, colType string
+			var notNull int
+			var dflt sql.NullString
+			if err := rows.Scan(&name, &colType, &notNull, &dflt); err != nil {
+				rows.Close()
+				t.Fatalf("scan table_info(%s): %v", table, err)
+			}
+			if name != "effort" {
+				continue
+			}
+			seen = true
+			if colType != "TEXT" || notNull != 1 || !dflt.Valid || dflt.String != `''` {
+				t.Errorf("%s.effort = %s notnull=%d default=%v, want TEXT notnull=1 default=''",
+					table, colType, notNull, dflt)
+			}
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			t.Fatalf("table_info(%s) rows: %v", table, err)
+		}
+		if !seen {
+			t.Errorf("%s has no effort column", table)
+		}
 	}
 }

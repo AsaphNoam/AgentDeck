@@ -16,8 +16,8 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 - **Review units:** The pre-2026-09-04 raw commit queue is retired. Its substantive changes were
   reviewed and their findings are closed; its later review records, finding-fix commits, release
   records, and handoff/queue bookkeeping are administrative closure, not new review units. The
-  2026-09-04 task launch-specification effort unit is reviewed and remains open with three findings;
-  its later finding fixes remain part of that unit rather than becoming a new review unit. The
+  2026-09-04 task launch-specification effort unit is closed: its three findings are fixed, and that
+  fix commit is part of the closure rather than a new review unit. The
   2026-09-04 proposal Reject/Delete change remains available for independent review. The stage-agent
   grouping unit is reviewed and closed. The workflow/queue repair unit is closed: its findings are
   fixed, and that fix commit is not a new review unit.
@@ -25,9 +25,7 @@ back to that at every release (§16.7). Injected Current position plus Active ch
   recorded transport blocker.
 - **Design units:** Existing entries under `Ideas being defined` may resume, and entries under `New
   ideas` are available to start. Neither is gated by work, review, or fix state.
-- **Open findings:** Three worth-fixing findings on the task launch-specification effort unit: align
-  TS-10.R23 with the shared helper topology, state the exact non-null `tasks.effort` schema, and
-  complete FS-16.A18's independent acceptance proof.
+- **Open findings:** None. The proposal Reject/Delete unit is unreviewed, so it has none yet.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
   remain owed before claiming those adapters accept structured results.
 - **Usability state:** The Pipelines pages and dashboard grid were driven through a real Chromium on
@@ -37,11 +35,10 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 
 ## Active change
 
-**Change:** None. Task launch-specification effort is implemented and reviewed with three open
-findings.
+**Change:** None. Task launch-specification effort is implemented, reviewed, and closed.
 
-**Available by role:** `/review` may take the proposal Reject/Delete unit; `/fix` may take the task
-launch-specification effort findings; `/work` has no
+**Available by role:** `/review` may take the proposal Reject/Delete unit; `/fix` has no open
+finding to take; `/work` has no
 ready change waiting to start; `/design-feature` may choose any available or resumable idea, or any
 idea a person names from another `docs/ideas.md` section. Selecting one role does not depend on
 clearing another role's queue.
@@ -63,6 +60,22 @@ Keep credentialed provider journeys as acceptance gates until a human authorizes
 Earlier entries are in the [archived handoff](../archive/state/HANDOFF-through-2026-09-03.md) and Git
 history.
 
+- **2026-09-04 — fix: task launch-specification effort findings (INV §2, INV §9, INV §11, INV
+  §17):** TS-10.R23 now describes the topology that ships: selecting the concrete backend/model
+  target and resolving the effort over it are two shared seams, launch composition calls the
+  selection seam, resolves the backend's bound configuration source, then calls the effort seam with
+  that source's override, and the two authoring paths call the one composed helper that runs both
+  back to back (INV §2). TS-10 §3 states the exact `TEXT NOT NULL DEFAULT ''` shape of the effort
+  columns and says why a nullable column would fail a task's read, and a new
+  `PRAGMA`-driven assertion in `internal/state` pins that shape on the migrated database rather than
+  on the migration text (INV §9, INV §11, INV §17). FS-16.A18 is now proven at the provider
+  boundary: a task-dispatch case captures the `session/set_config_option` call the adapter actually
+  receives against a bound source carrying a lower effort override, asserts the explicit task effort
+  wins there, and its second case leaves the task's effort unset so the override takes force —
+  making "beats the override" non-vacuous. That case fails when the provider-facing
+  `runtime.LaunchSpec.Effort` is dropped, which the pre-existing persisted-projection case did not.
+  Every materially touched dispatcher, HTTP, MCP, and Tasks-view test now carries the exact
+  `FS-16.A18` comment TS-06.R6 requires. The task launch-specification effort unit is closed.
 - **2026-09-04 — review: task launch-specification effort (INV §§2, 3, 7–11, 14–15, 17):** Runtime
   behavior is sound across HTTP, MCP, persistence, dispatch, and the Tasks view, but TS-10.R23 still
   claims launch composition calls the composed triple resolver when federation requires it to call
@@ -247,31 +260,7 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-- **Worth fixing** — task launch-specification effort, TS-10.R23 / INV §2, INV §10:
-  `docs/specs/tech/TS-10-work-dependency-control-plane.md:216` says one helper resolves the concrete
-  backend/model/effort triple and is called by both authoring paths and launch composition. A normal
-  launch instead calls `selectLaunchTarget` at `internal/server/launch.go:214`, resolves federation,
-  then calls `resolveTargetEffort` at line 296; only task authoring calls the composed
-  `resolveLaunchSpec`. That split is sound because the bound source must be resolved between model
-  selection and effort precedence, but the current architectural requirement describes a call
-  topology that does not ship and could steer a later change back toward duplicated or incorrectly
-  ordered resolution. Update R23 to require the two shared seams in sequence around federation, and
-  retain the existing precedence coverage.
-- **Worth fixing** — task launch-specification effort, TS-10 §3 / INV §9, INV §11:
-  `docs/specs/tech/TS-10-work-dependency-control-plane.md:233` says `tasks.effort` has an empty
-  default but omits the shipped `TEXT NOT NULL DEFAULT ''` contract at
-  `internal/state/schema.go:398`. A normal future migration or repair following the spec could
-  therefore admit `NULL`, while `scanTask` reads the column into a non-null Go string and would fail
-  that task's read. State the exact column shape in §3 and pin it with the existing schema-version
-  guard or a focused schema assertion.
-- **Worth fixing** — task launch-specification effort, FS-16.A18 / TS-06.R6 / INV §17:
-  `internal/server/task_dispatch_test.go:846` proves only the persisted agent projection, so it would
-  still pass if the provider-facing `runtime.LaunchSpec.Effort` were dropped, and it never creates a
-  bound source whose lower effort override must lose to the task's explicit effort. The materially
-  touched dispatcher and Tasks-view tests also contain no exact `FS-16.A18` comment, despite TS-06.R6.
-  Extend the task-dispatch integration test to capture the composed provider launch spec with a bound
-  override, assert the explicit task effort wins there, and tag the acceptance tests with the exact
-  acceptance id.
+None. Every reported finding is closed; the proposal Reject/Delete unit has not been reviewed yet.
 
 ## Design consistency notes
 

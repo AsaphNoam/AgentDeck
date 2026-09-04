@@ -220,8 +220,13 @@ parallel copy of them.
   and this plane adds no second copy of either (INV §2). Creation-time validation (FS-16.R28,
   FS-09.R49) calls the same `config.ValidateModelEffort` against the backend and model the launch
   composer would select — including the install defaults for an omitted field — rather than
-  reimplementing selection: one helper resolves a launch specification to a concrete
-  backend/model/effort triple and is called by the two authoring paths and by launch composition. It
+  reimplementing selection: selecting the concrete backend/model target and resolving the effort
+  over it are two shared seams, and every path runs both, in that order. Launch composition calls
+  the selection seam, resolves the backend's bound configuration source, then calls the effort seam
+  with that source's override, because a bound source has to be resolved between choosing the model
+  and applying effort precedence. The two authoring paths, which have no source to consult, call the
+  one composed helper that runs the same two seams back to back. Neither seam exists twice, and the
+  precedence and capability checks live only inside them. The composed helper
   reads the catalog and takes no transaction, so a task-creating request stays a single write. The
   check is advisory by construction: it runs against the catalog as it is at creation, and the
   authoritative check remains the one inside launch composition, which cannot be bypassed.
@@ -232,9 +237,11 @@ parallel copy of them.
 
 - `tasks` — `task_id` TEXT PK, `project`, `display_name`, `instruction`, `target_kind`
   (`agent` | `launch`), `target_agent_id` nullable, launch fields (`role`, `backend`, `model`,
-  `effort`, one forward-only migration adding the column with the empty default the other effort
-  columns use; empty means the launch composer resolves the level as it does for an unrequested one,
-  FS-16.R27),
+  `effort` declared exactly `TEXT NOT NULL DEFAULT ''`, one forward-only migration adding it with the same
+  non-null empty default the other effort columns use; empty means the launch composer resolves the
+  level as it does for an unrequested one, FS-16.R27. The column is never nullable, because task
+  reads scan it into a non-null string and a `NULL` would fail that task's read, so a later
+  migration or repair keeps the `NOT NULL DEFAULT` shape a schema assertion pins),
   `state` (`armed` | `ready` | `starting` | `running` | `interrupted` | `finished` |
   `dependency_failed`), `outcome` nullable (`success` | `failure` | `blocked` | `cancelled`),
   `outcome_source` nullable (`agent` | `person`), `outcome_summary`, `outcome_details`,

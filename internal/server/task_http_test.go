@@ -598,7 +598,7 @@ func TestAnAgentAttachesOnlyContextItCanRead(t *testing.T) {
 	}
 }
 
-// FS-16.R27–R28 / FS-09.R49, A22 / TS-10.R23 — a launch specification is checked
+// FS-16.A18 (R27–R28) / FS-09.R49, A22 / TS-10.R23 — a launch specification is checked
 // when the work is created, with the same field-level error and levels list a
 // launch returns, and a rejected create stores nothing.
 func TestCreateTaskChecksItsLaunchSpecification(t *testing.T) {
@@ -677,7 +677,7 @@ func TestCreateTaskChecksItsLaunchSpecification(t *testing.T) {
 	}
 }
 
-// FS-16.R27, R20 — an effort named beside an existing agent target is rejected
+// FS-16.A18 (R27, R20) — an effort named beside an existing agent target is rejected
 // rather than silently dropped: that agent already runs at its session's level.
 func TestCreateTaskRejectsAnEffortOnAnExistingAgentTarget(t *testing.T) {
 	srv, ts := wakeTestServer(t)
@@ -702,7 +702,7 @@ func TestCreateTaskRejectsAnEffortOnAnExistingAgentTarget(t *testing.T) {
 	}
 }
 
-// FS-16.R27–R28 / FS-09.R49 / TS-10.R23 — the agent-facing authoring path runs
+// FS-16.A18 (R27–R28) / FS-09.R49 / TS-10.R23 — the agent-facing authoring path runs
 // the same creation-time check as the HTTP one, over the same shared seam.
 func TestAgentCreatedTaskChecksItsLaunchSpecification(t *testing.T) {
 	srv, ts := wakeTestServer(t)

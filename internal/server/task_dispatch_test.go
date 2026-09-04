@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/agentdeck/agentdeck/internal/configsource"
 	"github.com/agentdeck/agentdeck/internal/pipeline"
 	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
@@ -840,7 +843,7 @@ func newLaunchTaskWithEffort(t *testing.T, srv *Server, name, effort string) sta
 	return task
 }
 
-// FS-16.R27 / FS-09.R41 / TS-10.R23 — the level a task stored reaches the agent
+// FS-16.A18 (R27) / FS-09.R41 / TS-10.R23 — the level a task stored reaches the agent
 // it launches as the explicitly requested effort, and a task that named none
 // resolves to the model's default exactly as any other launch does.
 func TestALaunchTaskStartsItsAgentAtTheStoredEffort(t *testing.T) {
@@ -870,7 +873,7 @@ func TestALaunchTaskStartsItsAgentAtTheStoredEffort(t *testing.T) {
 	}
 }
 
-// FS-16.R28 / FS-09.R49 / A22 — creation-time acceptance is not a promise the
+// FS-16.A18 (R28) / FS-09.R49, A22 — creation-time acceptance is not a promise the
 // launch will succeed. A task whose effort its model no longer declares spends a
 // start attempt instead of launching at a substituted level.
 func TestALaunchTaskWhoseEffortWasDroppedFailsItsStart(t *testing.T) {
@@ -931,5 +934,81 @@ func waitTaskAttempts(t *testing.T, srv *Server, taskID string, want int) state.
 				taskID, task.StartAttemptCount, want, task.State, task.AttentionReason)
 		}
 		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+// bindSourceEffortOverride binds the claude backend to a fixture Claude tree
+// whose AgentDeck-owned overrides name an effort, so a launch composed for the
+// seeded project has a source-level effort to lose to an explicit one.
+func bindSourceEffortOverride(t *testing.T, srv *Server, override string) {
+	t.Helper()
+	userHome := t.TempDir()
+	root := filepath.Join(userHome, ".claude")
+	if err := os.MkdirAll(root, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "settings.json"), []byte(`{}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	project, err := srv.configStore.ReadProject("tmpproj")
+	if err != nil {
+		t.Fatalf("ReadProject: %v", err)
+	}
+	srv.sourceMgr = configsource.NewManager(srv.configStore, map[string]configsource.Resolver{
+		configsource.ProviderClaude: configsource.NewClaudeResolver(userHome),
+	}, nil)
+	sources, _ := srv.readConfigSources()
+	canonicalRoot := canonicalPath(t, root)
+	sources.Sources["claude"] = config.SourceBinding{
+		Provider: configsource.ProviderClaude, Mode: configsource.ModeLinked, Root: canonicalRoot,
+		Claims:    []string{"launch_defaults"},
+		Overrides: config.SourceOverrides{Effort: &override},
+		Approved:  []string{canonicalRoot, canonicalPath(t, project.Cwd)},
+	}
+	if err := srv.configStore.WriteConfigSources(sources); err != nil {
+		t.Fatalf("WriteConfigSources: %v", err)
+	}
+}
+
+// FS-16.A18 (R27) / FS-09.R41 / TS-10.R23 (INV §2) — the effort a task stored
+// reaches the provider itself, read off the call the adapter actually receives
+// rather than off the persisted agent projection, and an explicit task effort
+// beats the effort override a bound configuration source carries. The
+// no-effort case proves the override is live, so "beats it" means something.
+func TestALaunchTaskEffortReachesTheProviderOverASourceOverride(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		stored string
+		want   string
+	}{
+		{name: "explicit task effort beats the source override", stored: "high", want: "high"},
+		{name: "no task effort leaves the source override in force", stored: "", want: "low"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			dump := filepath.Join(t.TempDir(), "effort_params.json")
+			t.Setenv("FAKEACP_EFFORT_DUMP", dump)
+
+			srv, _, _ := activationTestServer(t)
+			bindSourceEffortOverride(t, srv, "low")
+			task := newLaunchTaskWithEffort(t, srv, "effort work", tt.stored)
+
+			srv.dispatchReadyTasks(context.Background())
+			waitTaskState(t, srv, task.TaskID, state.TaskRunning)
+
+			raw, err := os.ReadFile(dump)
+			if err != nil {
+				t.Fatalf("read effort dump (the provider was never told an effort?): %v", err)
+			}
+			var params struct {
+				ConfigID string `json:"configId"`
+				Value    string `json:"value"`
+			}
+			if err := json.Unmarshal(raw, &params); err != nil {
+				t.Fatalf("unmarshal effort params: %v\n%s", err, raw)
+			}
+			if params.ConfigID != "effort" || params.Value != tt.want {
+				t.Fatalf("provider effort = %+v, want configId=effort value=%s", params, tt.want)
+			}
+		})
 	}
 }
