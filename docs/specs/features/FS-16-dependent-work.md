@@ -1,6 +1,6 @@
 # FS-16 — Dependent work and armed starts
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/state`, `internal/server`, `internal/messaging`, `ui/src/features/tasks` · **Journeys:** —
 **Absorbed:** —
 
@@ -192,6 +192,34 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   instruction or mail's status, because an agent told to check its messages will do exactly that and
   never find its task. The instruction carries no task id, arm set, context reference, or assignment
   text: the agent reads all of that through R11, which keeps the activation payload-free.
+- **R27** `(planned)` — **A launch specification names its reasoning effort.** The
+  launch specification a task targets (R2) carries an optional effort alongside role, project,
+  backend, and model, so work an agent or a person schedules for later can ask for a cheap model at
+  a low level or a hard problem at a high one. Both authoring surfaces offer it: the scoped
+  `create_task` tool and the task HTTP API accept an optional effort field, and the Tasks view
+  offers it beside its backend and model fields. The value is chosen once, when the task is created,
+  and is stored on the durable task row; it is not editable afterwards, because a task's execution
+  target is written once for the same reason its assignee is. When AgentDeck later launches that
+  task's agent, the stored value is the *explicitly requested effort* at the top of FS-09.R41's
+  precedence order, so it beats a bound configuration source's override and the model's
+  `default_effort`; a task that names no effort resolves exactly as it does today. Effort is
+  meaningless for a task targeting an existing agent, which is already running at the level frozen
+  into its session, so naming both an existing target and an effort is rejected under R20 rather
+  than silently dropped. This adds no way to change an agent's effort mid-task and no effort field
+  on an arm or an attachment.
+- **R28** `(planned)` — **A launch specification is checked when the work is created,
+  not only when it starts.** Creating a task that targets a launch specification validates its
+  backend, model, and effort against the backend catalog then and there — resolving the install
+  defaults for a field the caller omitted — and rejects an unknown backend, an unknown model, or an
+  effort the selected model does not declare with the typed, atomic error R20 requires, naming the
+  field. Today only the role is checked at creation, so a task naming a model that does not exist is
+  accepted and then spends all three of its start attempts failing to launch before parking as
+  `dependency_failed` (R25) — a diagnosis the creating agent never sees. Because a task may sit
+  armed for a long time and the catalog is editable, the same validation still runs at start: a
+  specification that was valid at creation and is invalid by the time the task is admitted fails
+  that start attempt exactly as it does today (R25, FS-09.R42). Creation-time acceptance is
+  therefore a promise that the request was well formed when it was made, never a guarantee that the
+  launch will succeed.
 - **R24** — **Every task records who created it.** A task durably records whether a person
   or an agent created it and, for an agent, that agent's stable id, captured server-side at creation
   from the caller's token. An agent may cancel only a task whose recorded creator is that same agent
@@ -391,6 +419,16 @@ Each names the verification that demonstrates it.
   cancel a task it created, still can after being stopped and resumed, and cannot cancel a task
   created by another agent, by a person, or named by a spoofed argument: concurrency and MCP
   authorization tests.
+- **A18** `(planned)` (R27, R28) — A launch-spec task created with an effort its model
+  declares launches its agent at that effort, asserted on the composed launch spec, and beats a
+  bound source's effort override; the same task created without one resolves to the model's
+  `default_effort` as it does today; an effort the model does not declare, an unknown model, and an
+  unknown backend are each rejected at creation with a typed field-named error that creates no task,
+  over both `create_task` and `POST /api/tasks`; naming an existing agent target together with an
+  effort is rejected the same way; and a task whose model's declared levels are edited to drop its
+  effort after creation fails its start attempt rather than launching at a substituted level: MCP,
+  HTTP, and task-dispatch tests, plus a Tasks-view test that the effort field round trips through
+  create.
 
 ## 6. Deviations & open decisions
 

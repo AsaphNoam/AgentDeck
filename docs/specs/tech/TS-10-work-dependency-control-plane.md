@@ -1,6 +1,6 @@
 # TS-10 — Work dependency control plane
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/state`, `internal/server`, `internal/messaging`, `ui/src/features/tasks`
 **Absorbed:** —
 
@@ -213,12 +213,27 @@ parallel copy of them.
   narrowing Retry to `interrupted` and silently stranding work parked by exhausted start
   attempts (INV §2).
 
+- **R23** `(planned)` — **A task's launch specification is validated by the launch
+  composer's own seam, in both places, and is never re-implemented.** The stored effort reaches the
+  provider by setting the existing `launchRequest.Effort` on the call the dispatcher already makes,
+  so `resolveEffort` and `config.ValidateModelEffort` stay the only precedence and validation code
+  and this plane adds no second copy of either (INV §2). Creation-time validation (FS-16.R28,
+  FS-09.R49) calls the same `config.ValidateModelEffort` against the backend and model the launch
+  composer would select — including the install defaults for an omitted field — rather than
+  reimplementing selection: one helper resolves a launch specification to a concrete
+  backend/model/effort triple and is called by the two authoring paths and by launch composition. It
+  reads the catalog and takes no transaction, so a task-creating request stays a single write. The
+  check is advisory by construction: it runs against the catalog as it is at creation, and the
+  authoritative check remains the one inside launch composition, which cannot be bypassed.
+
 ## 3. Interfaces & data shapes
 
 **Durable rows** (`internal/state`, one forward-only migration):
 
 - `tasks` — `task_id` TEXT PK, `project`, `display_name`, `instruction`, `target_kind`
-  (`agent` | `launch`), `target_agent_id` nullable, launch fields (`role`, `backend`, `model`),
+  (`agent` | `launch`), `target_agent_id` nullable, launch fields (`role`, `backend`, `model`,
+  `effort` `(planned)`, one forward-only migration adding a nullable column; empty means the launch
+  composer resolves the level as it does for an unrequested one, FS-16.R27),
   `state` (`armed` | `ready` | `starting` | `running` | `interrupted` | `finished` |
   `dependency_failed`), `outcome` nullable (`success` | `failure` | `blocked` | `cancelled`),
   `outcome_source` nullable (`agent` | `person`), `outcome_summary`, `outcome_details`,
@@ -244,7 +259,10 @@ parallel copy of them.
   `(agent_id, source_id) WHERE state='pending' AND kind='dependency'`.
 
 **MCP tools** on the existing `/mcp` server, all with server-derived caller identity:
-`create_task`, `get_assigned_task`, `report_task_result`, `cancel_task`. Stable outcome codes include
+`create_task`, `get_assigned_task`, `report_task_result`, `cancel_task`. `create_task` gains an
+optional `effort` argument beside `role`, `backend`, and `model` `(planned)`; supplying it together
+with `to` returns `validation`, as does a backend, model, or effort the catalog rejects at creation
+(FS-16.R27, R28). Stable outcome codes include
 `task_not_found`, `not_assigned`, `not_creator`, `already_reported`, `invalid_outcome`,
 `invalid_state`, `retry_requires_rearm`, `dependency_cycle`, `target_ineligible`, and `validation`; an
 unauthorized task and an unknown task are indistinguishable.

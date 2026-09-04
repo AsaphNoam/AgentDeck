@@ -43,6 +43,13 @@ journeys as acceptance gates until a human authorizes real sessions.
 Earlier entries are in the [archived handoff](../archive/state/HANDOFF-through-2026-09-03.md) and Git
 history.
 
+- **2026-09-04 — design: task launch-specification effort (FS-16.R27–R28, FS-09.R49, TS-10.R23):**
+  Specified an optional reasoning effort on a task's launch specification, offered by `create_task`,
+  `POST /api/tasks`, and the Tasks create form, stored on the task row and applied as FS-09.R41's
+  explicit request when the task's agent is launched. The same design validates a task's backend,
+  model, and effort at creation instead of letting a bad specification spend all three start
+  attempts, and rejects an effort supplied with an existing-agent target. FS-16 and TS-10 moved to
+  Partial; the work is queued as `docs/ready-changes/task-launch-effort.md` and is not active.
 - **2026-09-04 — workflow repair: terminal review units (INV §10):** Review state now follows a
   substantive change from implementation through its review findings and fixes. Review reports,
   finding-fix commits, release records, and handoff/archive/queue bookkeeping cannot re-enter the
