@@ -138,6 +138,22 @@ but not yet available. The product boundaries deliberately outside this feature 
   and stage association but does not replace those existing surfaces or use display names/group
   labels as identity.
 
+- **R58** `(planned)` — **A run's stage agents arrive already grouped.** Every agent a
+  run launches is created carrying its stage's group label — the stage title and the run's display
+  name, the same pair the stage agent is already named for — as its ordinary task group. A stage's
+  agents therefore land in one collapsible dashboard section with the member count, per-state
+  summary, persisted collapse, and **Release group** any group has (FS-02.R18–R20) instead of
+  scattering through Ungrouped, and a retried or loop-revisited stage collects its later agents in
+  the same section. Nothing about the group is special: it is the same visual label a person sets by
+  hand, and the run neither owns it nor defends it. A person may rename it, clear it, or move a
+  member out with **Move to group**, and nothing in the run notices. R16 is unchanged rather than
+  withdrawn: the immutable run/stage association a card shows and an API client reads stays the only
+  authority for what belongs to a run, and the group label is never identity — clearing it removes
+  an agent from a dashboard section, never from its stage. Releasing such a group stops its members
+  through the ordinary lifecycle path, which is not **Stop run** (R13): the run observes its current
+  stage agent stop without a result and pauses with its ordinary recovery actions (R12), and a later
+  stage may still be launched from that pause.
+
 - **R34** — A pipeline run that reaches a terminal state registers its outcome in the
   shared result layer so other work can depend on it: `success` when it completes with the final
   outcome `success`, `failure` for any other template-defined final outcome, and `cancelled` when it
@@ -665,6 +681,14 @@ but not yet available. The product boundaries deliberately outside this feature 
   outputs within that attempt's entry, and the run's named values are expanded without a click. An
   attempt that declared no output renders unchanged. — `ui/src/features/pipelines/RunBrowser.test.tsx`.
 
+- **A33** `(planned)` (R58) — A fake run whose second stage is retried creates each stage agent
+  with that stage's group label stored on it, putting the retried stage's two agents in one section
+  and each other stage's agent in its own; those sections carry the member count, per-state summary,
+  persisted collapse, and **Release group**; a member moved out with **Move to group** keeps both
+  its run/stage card badge and its place on the run's page; and releasing a stage's group stops its
+  members and leaves the run paused with recovery actions rather than finished. — a pipeline launch
+  test asserting the composed group label plus `ui/src/components/grid/CardGrid.test.tsx`.
+
 ## 6. Deviations & open decisions
 
 The shipped first version deliberately keeps these product boundaries:
@@ -719,6 +743,15 @@ The shipped first version deliberately keeps these product boundaries:
 - **Confirmed stage-permission boundary.** R52 states the FS-03.R40 carve-out in pipeline terms and
   adds nothing else: no per-template, per-run, or per-stage autonomy setting, no change to what a
   stage agent's role policy means for workspace tools, and no agent-facing tool or payload change.
+
+- **Confirmed run-grouping boundary.** R58 writes one ordinary group label at stage-agent
+  creation and adds nothing else: no pipeline-owned group concept, no group kind or badge on the
+  section, no automatic regrouping when a run advances or ends, no cleanup of the label when a run
+  is deleted, and no dashboard section derived from the run/stage join. Grouping is per stage rather
+  than per run, so a run of four stages shows four sections; a single section per run, and a section
+  that reads a run's live state, remain open product decisions. Two runs that share both a display
+  name and a stage title deliberately share one section, exactly as two hand-labelled groups of the
+  same name do.
 
 - **Confirmed proposal-decline boundary.** R49–R51 add a two-step decline (Reject, then Delete on
   the declined entry), a collapsed-by-default proposal summary, and nothing else. A decline is a

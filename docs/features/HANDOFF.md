@@ -43,6 +43,15 @@ journeys as acceptance gates until a human authorizes real sessions.
 Earlier entries are in the [archived handoff](../archive/state/HANDOFF-through-2026-09-03.md) and Git
 history.
 
+- **2026-09-04 — design: pipeline stages group their own agents (FS-14.R58, TS-09.R33):** A run now
+  labels every stage agent it launches with that stage's title and the run's display name as an
+  ordinary task group, so a stage's work lands in one collapsible dashboard section with the
+  existing count, collapse, and **Release group** behavior instead of scattering through Ungrouped.
+  The whole mechanism is one composed string on the existing `launchRequest.Group` at one call site;
+  a guard for reused agent ids and one for empty labels were both dropped after the code showed them
+  unreachable. FS-14.R16 is unchanged: the run/stage association stays the only authority for run
+  membership. FS-14 and TS-09 were already Partial; the work is queued as
+  `docs/ready-changes/pipeline-run-agent-groups.md` and is not active.
 - **2026-09-04 — design: task launch-specification effort (FS-16.R27–R28, FS-09.R49, TS-10.R23):**
   Specified an optional reasoning effort on a task's launch specification, offered by `create_task`,
   `POST /api/tasks`, and the Tasks create form, stored on the task row and applied as FS-09.R41's

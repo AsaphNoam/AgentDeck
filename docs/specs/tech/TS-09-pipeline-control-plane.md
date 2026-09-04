@@ -323,6 +323,28 @@ unchanged by them.
   collections after the server publishes the committed `pipeline_proposal_update`, and derives no
   proposal state from transcript tool results or browser-local pointers.
 
+- **R33 (planned)** — **The stage group label is the stage agent's own name, reused on
+  an existing field.** A stage's group label is `stage.Title + " — " + run.DisplayName`, which is the
+  string `stageExecution` already composes as that stage agent's name
+  (`internal/pipeline/reconcile.go`). It is computed once there and used for both, because writing
+  the convention a second time would be two paths building the same string and would let the group
+  and the agent name drift apart under a later edit to either (INV §2); `StageExecution` therefore
+  gains no field. `LaunchStage` passes that value as the existing `launchRequest.Group`
+  (`internal/server/pipeline_lifecycle.go`), where it lands on the same `state.Agent.Group` the
+  identity endpoint already writes. That is the whole mechanism: no new launch field, request or
+  response shape, durable column, migration, or grid code, and the dashboard's existing label-keyed
+  sectioning renders it with no pipeline awareness. A section header consequently repeats the text
+  of its single card until a retry or loop revisit adds a second agent, which is accepted rather than
+  worked around. No
+  guard is needed for a reused agent id, because the only path that reuses one is a blocked
+  continuation, which reconciles to `resume_blocked` and reaches `ContinueStage` — a resume that
+  reads the stored agent and never composes a launch request. No guard is needed for an empty label
+  either: a stage title is validated required, and an omitted run display name defaults to the
+  template title at run start, so both halves are non-empty — and the grid already renders an empty
+  or a literal `_ungrouped` label as the Ungrouped section in any case. R6 is
+  unchanged: the pipeline-state join stays the sole authority for run/stage association, and no read
+  path infers membership from a group label.
+
 ## 3. Interfaces & data shapes
 
 **Template JSON (logical version-1 shape):**

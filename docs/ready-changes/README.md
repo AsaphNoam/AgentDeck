@@ -45,6 +45,9 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 - [`task-launch-effort.md`](task-launch-effort.md) — let a task's launch specification name a
   reasoning effort, and validate the whole specification when the task is created rather than three
   start attempts later.
+- [`pipeline-run-agent-groups.md`](pipeline-run-agent-groups.md) — have a run label each stage agent
+  it launches with its stage's name, so a stage's agents land in one ordinary dashboard group
+  instead of Ungrouped.
 - [`decline-pipeline-proposals.md`](decline-pipeline-proposals.md) — collapse pending pipeline
   proposals and add Reject and Delete, with the durable mutation winning every race against a
   Reject.
