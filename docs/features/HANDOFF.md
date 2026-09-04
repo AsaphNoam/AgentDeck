@@ -18,14 +18,16 @@ back to that at every release (§16.7). Injected Current position plus Active ch
   records, and handoff/queue bookkeeping are administrative closure, not new review units. The
   2026-09-04 task launch-specification effort unit is closed: its three findings are fixed, and that
   fix commit is part of the closure rather than a new review unit. The
-  2026-09-04 proposal Reject/Delete change remains available for independent review. The stage-agent
-  grouping unit is reviewed and closed. The workflow/queue repair unit is closed: its findings are
-  fixed, and that fix commit is not a new review unit.
+  2026-09-04 proposal Reject/Delete change has been reviewed and remains open with two findings. The
+  stage-agent grouping unit is reviewed and closed. The workflow/queue repair unit is closed: its
+  findings are fixed, and that fix commit is not a new review unit.
 - **Work units:** None waiting to start. `migrate-internal-actions-from-mcp.md` stays paused on its
   recorded transport blocker.
 - **Design units:** Existing entries under `Ideas being defined` may resume, and entries under `New
   ideas` are available to start. Neither is gated by work, review, or fix state.
-- **Open findings:** None. The proposal Reject/Delete unit is unreviewed, so it has none yet.
+- **Open findings:** Two must-fix findings on the proposal Reject/Delete unit: stale Delete can erase
+  a consumed record, and a durable-state refetch can erase the refusal message with its proposal
+  card.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
   remain owed before claiming those adapters accept structured results.
 - **Usability state:** The Pipelines pages and dashboard grid were driven through a real Chromium on
@@ -37,21 +39,11 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 
 **Change:** None. Task launch-specification effort is implemented, reviewed, and closed.
 
-**Available by role:** `/review` may take the proposal Reject/Delete unit; `/fix` has no open
-finding to take; `/work` has no
+**Available by role:** `/review` has no unreviewed unit to take; `/fix` may take the two proposal
+Reject/Delete findings; `/work` has no
 ready change waiting to start; `/design-feature` may choose any available or resumable idea, or any
 idea a person names from another `docs/ideas.md` section. Selecting one role does not depend on
 clearing another role's queue.
-
-Local implementation choices for the proposal reviewer to confirm or raise. `declined_at` ships as
-`TEXT NOT NULL DEFAULT ''` for the same reason, matching `consumed_at` from migration 15, and
-TS-02.R29 is reworded to that shipped shape; the list route returns every non-consumed record and
-the manager splits pending from declined rather than the store running two queries; the UI parses
-each listed record permissively and narrows it with `pipelineProposalSchema`, so a payload that does
-not match its kind still lists with its kind and id and only its approval action is disabled
-(FS-14.R51); and on Templates the builder panel still renders above the template library, so A28's
-"library remains the surface's first content" is satisfied by the collapse rather than by
-reordering the page.
 
 Keep credentialed provider journeys as acceptance gates until a human authorizes real sessions.
 
@@ -60,6 +52,19 @@ Keep credentialed provider journeys as acceptance gates until a human authorizes
 Earlier entries are in the [archived handoff](../archive/state/HANDOFF-through-2026-09-03.md) and Git
 history.
 
+- **2026-09-04 — review: collapse, reject, and delete pending pipeline proposals (INV §§2, 5,
+  7–11, 13–17):** The storage shape, one-query projection, permissive per-record UI narrowing,
+  collapsed placement above the template library, route wiring, bounded summaries, and
+  post-commit event publication match the requirements. Two normal multi-tab paths remain wrong.
+  Delete's conditional claim accepts a row that approval already consumed after Reject, so a stale
+  Delete erases that consumed record instead of losing with the durable `consumed` state. Separately,
+  Reject/Delete failures live inside the proposal card while their settled hook awaits a durable
+  refetch; when that refetch removes or moves the card, the required refusal message disappears with
+  it. The tests omit the consumed-Delete state and model a consumed Reject refusal while incorrectly
+  keeping its proposal pending, so neither regression is exposed. The proposal unit remains open
+  with two must-fix findings. Focused state, pipeline, server, and UI tests pass; the broader server
+  package run is blocked in this sandbox by an unrelated IPv6 `httptest` listen denial. Invariant
+  classes 1, 3–4, 6, and 12 have no applicable changed surface.
 - **2026-09-04 — fix: task launch-specification effort findings (INV §2, INV §9, INV §11, INV
   §17):** TS-10.R23 now describes the topology that ships: selecting the concrete backend/model
   target and resolving the effort over it are two shared seams, launch composition calls the
@@ -260,7 +265,23 @@ the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installe
 
 ## Review findings
 
-None. Every reported finding is closed; the proposal Reject/Delete unit has not been reviewed yet.
+- **Must fix** (proposal Reject/Delete, INV §5/§17): `internal/state/pipelines.go:261` deletes any
+  row with a non-empty `declined_at`, but approval deliberately consumes a declined row without
+  clearing that column. In the normal multi-tab order Reject → approval → stale Delete, Delete
+  therefore succeeds and erases the consumed record instead of refusing with the durable
+  `consumed` state required by FS-14.R57 and TS-02.R29. Make the Delete claim require both
+  `declined_at != ''` and `consumed_at = ''`, then add a storage/server regression that declines,
+  consumes, attempts Delete, expects the typed consumed refusal, and proves the row remains durable.
+- **Must fix** (proposal Reject/Delete, INV §8/§17):
+  `ui/src/features/pipelines/AgentDeckerBuilder.tsx:200` owns mutation failure text inside each
+  `ProposalCard`, while `ui/src/api/pipelines.ts:193` and `:201` await invalidation/refetch on every
+  settled mutation. A real consumed/already-declined/gone/not-declined refusal changes which
+  collection contains the record or removes it; the refetch can therefore unmount or move the card
+  before its catch renders, silently discarding the explanation FS-14.R49/R57 requires. The current
+  UI refusal test returns `consumed` while incorrectly keeping the record pending, so it cannot
+  expose the loss. Keep mutation feedback on a parent surface that survives the durable refetch (or
+  hand it off before the card moves), and test each stale-state refusal with the subsequent list
+  response reflecting that actual state while the message remains visible.
 
 ## Design consistency notes
 
