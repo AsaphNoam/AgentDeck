@@ -20,7 +20,7 @@ How the loop uses this file:
   don't let it become a graveyard.
 
 Read the trigger index first, then read in full only the classes your diff actually touches. Reading
-all fifteen classes for a diff that touches one is waste, not diligence. Read one class with:
+all seventeen classes for a diff that touches one is waste, not diligence. Read one class with:
 
 ```bash
 awk '/^## 7\./{f=1} f&&/^## 8\./{exit} f' docs/features/INVARIANTS.md
@@ -37,14 +37,16 @@ awk '/^## 7\./{f=1} f&&/^## 8\./{exit} f' docs/features/INVARIANTS.md
 | 5 | Check-then-act needs an atomic claim | "if pending then resolve" / "if active then fire" across goroutines; `internal/runtime` concurrency |
 | 6 | A new interface/runtime joins every contract | a new interface, runtime, driver, or adapter — walk the checklist line by line |
 | 7 | Read paths don't swallow errors or amplify damage | iteration, repair, migration, or recovery code over records |
-| 8 | User-facing surfaces get parsed, bounded, in-vocabulary data | card previews, `status.detail`, toasts, any rendered agent or CLI output |
+| 8 | User-facing surfaces get parsed, bounded, in-vocabulary data | card previews, `status.detail`, toasts, rendered output, disabled controls, or a UI mutation's error/recovery path |
 | 9 | Liveness & durability primitives are weaker than they look | SQLite, file locks, signals, process liveness, timeouts, fsync |
 | 10 | Ship the wiring; kill the drift | a feature reachable from some surfaces but not all; docs or defaults left behind |
-| 11 | Cross-boundary serialization contracts | Go structs crossing to the UI; nil slices/maps; test mocks standing in for real payloads |
-| 12 | External-CLI invocations tolerate version and environment variance | any `exec.Command` of a user-installed tool — agent CLIs, probers, git |
+| 11 | Cross-boundary serialization and protocol contracts | Go structs crossing to the UI; nil slices/maps; ACP or streaming payload identity/status/error semantics |
+| 12 | External-CLI invocations tolerate version and environment variance | any `exec.Command` or adapter call to a user-installed tool — agent CLIs, probers, git |
 | 13 | Every referenced className has a defined selector | `ui/src` markup or `ui/src/styles/**` |
 | 14 | Loopback is not a security boundary | HTTP handlers, CORS, file paths from requests, anything reachable from a browser |
 | 15 | Commit local truth before releasing external side effects | an operation that makes work externally observable or lets a peer proceed |
+| 16 | Bound work and memory where they enter the system | external output, streams, queues, sweeps, retained maps/lists, goroutine fan-out, or per-client state |
+| 17 | Tests prove their contract independently | regression or acceptance tests, contract enumerations, mocks/fixtures, build tags, packaging or release gates |
 
 A class with no applicable surface in the diff is a result to state, not a step to skip — the index
 is enough to state it. Open the class body only when the trigger matches.
@@ -191,9 +193,11 @@ must explicitly walk this checklist — silence on any line is a bug, not a defa
 - [ ] **Fan-out/drain:** output readable by N viewers and drained when *zero* viewers are attached
       (a full kernel tty queue stalled an unobserved CLI indefinitely). Pattern:
       `internal/runtime/terminal/ptyhub.go` — one always-on reader per PTY, bounded scrollback
-      ring, non-blocking fan-out that drops slow subscribers. Never `dup()` a shared fd per viewer
-      (splits the stream), and never let a transient view's teardown close a long-lived fd it
-      doesn't solely own (a WS unmount once SIGHUP'd the live CLI).
+      ring, non-blocking fan-out that drops slow subscribers (§16). Never `dup()` a shared fd per
+      viewer (splits the stream), and never let a transient view's teardown close a long-lived fd
+      it doesn't solely own (a WS unmount once SIGHUP'd the live CLI). Keystrokes use binary
+      WebSocket frames; text frames are reserved for the `{cols,rows}` resize channel — a
+      text-frame keystroke is silently eaten (`ui/src/components/chat/TerminalTab.tsx`).
 - [ ] **Messaging:** either it can drain its mailbox (`check_messages`) or `ResolveRecipient`
       excludes it — an undrainable nudge loop once burned thousands of paid turns.
 - [ ] **Turn boundaries:** its turn signal is identified and wired into every per-turn reset
@@ -231,7 +235,9 @@ Paid for by (this one recurred **four times** as the same literal mistake):
 **Rule:** anything rendered to the human (card previews, `status.detail`, toasts) is parsed,
 human-meaningful, length-clamped at the write boundary, and drawn from the declared vocabulary.
 Every mutating UI action surfaces failure; every notification funnels through the one payload
-builder.
+builder. A disabled action names the condition that blocks it, and alternatives offered together
+state their different consequences beside the controls. A mutation's warning or success-adjacent
+feedback stays owned by a surface that remains mounted, or is handed off before that surface closes.
 
 Paid for by:
 - `internal/server/reconcile.go` wrote the raw NDJSON transcript line (unbounded JSON envelope)
@@ -245,6 +251,12 @@ Paid for by:
 - config-derived caches invalidated in the same handler that writes the config
   (`handlePutBackends` once left `onboardingCache` stale); DELETE UIs implement the 409
   confirm+force-retry loop the API contract requires.
+- Pipeline **Continue** was disabled until continuation text existed without saying what it needed,
+  while **Continue** and **Retry stage** were offered together without explaining that Retry creates
+  a fresh agent with bounded prior summaries (`ui/src/features/pipelines/RunBrowser.tsx`).
+- A successful project create/update stored a `cwd_not_found` warning and immediately closed the
+  editor that owned it. The editor now remains open on warnings and a successful create switches to
+  edit mode so acknowledgement cannot accidentally create a duplicate project.
 
 ## 9. Liveness & durability primitives are weaker than they look
 
@@ -263,18 +275,9 @@ Paid for by:
 - **In-memory accumulators feeding replace-style (DELETE+INSERT) writes** must lazily reseed from
   the durable table on first use per process — an empty-seeded buffer once wiped all FTS content
   after a restart (`seedLocked`, `internal/index/indexer.go`).
-- **Version/protocol gates fail, never warn-and-continue** — the ACP handshake once logged an
-  incompatible protocol version and proceeded (cleanup via `shutdown()` on refusal).
-- **Sentinel errors survive transport intact** — never re-wrap a sentinel into another concrete
-  type (`errors.Is` broke on a synthesized `*rpcError`; watch typed-nil traps). A status-bearing
-  streaming event is terminal only on an actual terminal status value (a missing status once
-  defaulted to "completed" and prematurely closed tool calls).
 - **Destructive CLI ops sharing the live server's DB hard-refuse on liveness** (`reindex` once only
   warned); manually-tracked version constants get a guard test asserting equality with the
   migrations slice.
-- **PTY WebSocket bridge framing:** keystrokes are binary frames; text frames are reserved for the
-  `{cols,rows}` resize channel — a text-frame keystroke is silently eaten
-  (`ui/src/components/chat/TerminalTab.tsx`).
 
 ## 10. Ship the wiring; kill the drift
 
@@ -292,20 +295,16 @@ Paid for by:
 - `.claude/skills` vs `.agents/skills` twin drift ("Codex **or** Codex" — since fixed).
 - Dead-code removal requires a tree-wide call-site check first; soft-cancel to an external peer
   needs a time-bounded escalation tier (grace → SIGINT) distinct from Stop's hard kill.
-- Every className shipped in a component must resolve to a defined selector — `npm run build` and
-  Testing Library are both blind to CSS, so a missing stylesheet is green everywhere and unusable
-  on screen. The onboarding wizard/dialogs shipped referencing `.dialog-overlay`/`.wizard-*`/
-  `.form-field` with no definitions anywhere (`353e940`). The `/usability-review` S2 sweep audits
-  this both directions (referenced-but-undefined, defined-but-unreferenced).
 
-## 11. Cross-boundary serialization contracts: nil marshals to `null`, and mocks must tell the truth
+## 11. Cross-boundary serialization and protocol contracts preserve meaning
 
 **Rule:** Go nil slices/maps marshal to JSON `null`, not `[]`/`{}`. Any collection field the UI
 iterates must be non-nil at the marshal boundary (initialize with `make`/literal, or
 `append([]T{}, …)` — **never** `append([]T(nil), …)`, which stays nil for empty input), and the UI
-API layer defends with `?? []` regardless. Symmetrically: **test doubles must mirror what the real
-marshaler emits, not the idealized contract** — an MSW mock returning `[]` where the server sends
-`null` makes every UI test pass against a server that doesn't exist.
+API layer defends with `?? []` regardless. Protocol success must also preserve the identity, status,
+and error semantics the caller relies on: sentinel errors survive transport intact; identity
+ownership follows the operation's contract even when a response omits an echo; and an absent status
+never acquires a terminal meaning by default.
 
 Paid for by:
 - `layoutFromConfig`/`toConfig` (`internal/server/handlers.go`) built `Order` via
@@ -316,10 +315,16 @@ Paid for by:
   reached `Object.entries` and replaced the whole dashboard with its error boundary. Fix: validate
   required nested collections on read, fall back server-side, and retain `?? {}` at the first UI
   consumer (`internal/config/backends.go`, `ui/src/features/settings/BackendsEditor.tsx`).
+- A successful ACP `session/load` response without an echoed `sessionId` was mistaken for failure,
+  so Codex resume fell through to `session/new` and abandoned its conversation history. On load
+  success the requested id stays authoritative; only a non-empty echoed id replaces it.
+- `errors.Is` broke when a sentinel was synthesized as another concrete `*rpcError`; typed nils
+  make the same mistake less obvious. A status-bearing streaming event with no status once
+  defaulted to `completed` and prematurely closed tool calls.
 
 **Canonical patterns:** `append([]T{}, src...)` at marshal boundaries; `?? []` / `?? {}` where the UI
 first touches a server collection; structurally validate required nested collections decoded from
-hand-editable files; when adding a response field, add the null-shape case to the mock.
+hand-editable files; validate required protocol identity/status fields before mutating runtime state.
 
 ## 12. External-CLI invocations must tolerate version and environment variance
 
@@ -327,12 +332,18 @@ hand-editable files; when adding a response field, add the null-shape case to th
 version the user has, not the one the author tested. Optional flags need a detect-and-retry
 fallback; output parsing is defensive (substring vocabulary, not exact format); a tool that can't
 be interrogated reports "unknown"/"skipped", **never** "failed" — a wrongly failed gate blocks the
-user harder than no gate at all.
+user harder than no gate at all. Exit zero or a successful RPC envelope is not semantic success:
+validate the required output shape, identity, and effective configuration before relying on it.
 
 Paid for by:
 - `internal/backend/credcheck/claude.go` ran `claude auth status --no-color`; older Claude builds
   don't have `--no-color`, so a logged-in user failed the onboarding credential check (`353e940`).
   Fix: retry without the flag on `unknown option` (`runClaudeAuthStatus`).
+- Older Git accepted an unknown `--path-format=absolute` option, echoed it on stdout, and exited
+  zero, so a worktree repository anchor became `--path-format=absolute\n.git`. Detect the echo,
+  retry without the optional flag, and normalize the fallback locally.
+- The ACP handshake once logged an incompatible protocol version and proceeded. Version gates fail
+  and run the normal shutdown path; they never warn and continue with an unsupported peer.
 
 **Canonical pattern:** `runClaudeAuthStatus` (`internal/backend/credcheck/claude.go`) — try with
 optional flags, sniff the error output, retry bare. The `/usability-review` S3 sweep audits every
@@ -420,6 +431,69 @@ Paid for by:
 **Canonical patterns:** durable event/outbox before notification; one transaction when stores share
 one database; otherwise compensating rollback or a caller-supplied idempotency key with a uniqueness
 constraint. Tests inject the failure after the first would-be side effect and retry the operation.
+
+---
+
+## 16. Bound work and memory where they enter the system
+
+**Rule:** any stream, queue, retained collection, background sweep, or fan-out receiving input of
+unknown size must be bounded at admission or capture. Trimming a value only after it accumulated
+does not bound memory. State the byte/item limit, in-flight concurrency limit, and lifetime that
+apply; admit only that much work, retain only what consumers need, and release it when its last
+owner or lifecycle ends (§4).
+
+Paid for by:
+- The mail-activation sweep selected every pending row and started one goroutine per row every two
+  seconds. It now selects `messaging.ActivationBatch` oldest rows and shares one in-flight cap across
+  sweeps, because a stopped-recipient wake can outlive the ticker (`internal/server/messaging_loops.go`).
+- Transcript reconciliation kept a permanent second copy of every event and copied the growing
+  array on every live delta. `rawByAgent` is now a short-lived append tail that exists only while an
+  authoritative fetch is in flight and is cleared on settle, last-surface removal, or agent removal
+  (`ui/src/store/transcriptStore.ts`).
+- A joining tab restarted the shared SSE stream for every tab while dead ports accumulated for the
+  worker's lifetime. The worker now replays one bounded retained snapshot to the joining port,
+  releases each port on goodbye/pagehide, and closes the stream with the last port
+  (`ui/src/api/sse-shared-worker.ts`).
+- Worktree setup used `CombinedOutput`, buffering arbitrary command output before clipping its
+  stored tail to 64 KiB. `setupOutputTail` enforces the byte bound while stdout/stderr are produced
+  and preserves a valid UTF-8 boundary (`internal/server/worktree.go`).
+
+**Canonical patterns:** bounded tail writers for external output; oldest-first limited queries plus
+a process-wide in-flight cap for sweeps; ref-counted registration with per-owner teardown; temporary
+reconciliation tails instead of permanent duplicate projections.
+
+---
+
+## 17. Tests must prove their contract independently
+
+**Rule:** a regression, acceptance, agreement, or release test must have an oracle independent of
+the implementation it is checking and must be capable of failing when the claimed contract breaks.
+Derive the expected surface from a separate authority such as registered producers, the wire
+boundary, artifact metadata, or an explicit requirement enumeration — never from a copy of the
+table or helper under test. A regression test is confirmed against the pre-fix behavior when that
+check is practical. Test doubles mirror the real producer's failure modes and serialized shapes,
+not the idealized contract.
+
+Paid for by:
+- The retry-classification guard compared one hand-maintained classifier table with another list
+  that omitted the same pipeline refusals. It passed while emitted errors had no declared class;
+  the replacement derives emitted literals from producer files and enumerates forwarded dynamic
+  pipeline codes (`internal/messaging/tool_result_contract_test.go`).
+- A mail-activation test asserted a condition that could not fail, leaving its stated guarantee
+  unproven until the assertion was made against the actual durable rows and provider prompts.
+- The AgentDecker migration's unreadable-file case exercised decode corruption instead, then
+  skipped the whole case as root. Corrupt content, a real read-I/O failure, and write failure now
+  have separate fixtures (`internal/config/config_test.go`).
+- Release CI passed `-tags sqlite_fts5` only to packages with no tagged implementation and never
+  inspected the shipped binary. The gate now tests the FTS packages and checks the packaged
+  executable's build metadata (`.github/workflows/release.yml`).
+- The server once marshaled an empty collection as `null` while its MSW double returned `[]`, so
+  every UI test passed against a payload the server did not produce (§11).
+
+**Canonical patterns:** enumerate producers independently from their policy table; drive the real
+wire/serialization boundary; make fixtures trigger the named OS or storage failure; inspect built
+artifacts rather than trusting build commands; for a bug regression, demonstrate the test fails on
+the old behavior before relying on it.
 
 ---
 
