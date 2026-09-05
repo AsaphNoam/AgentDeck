@@ -18,18 +18,20 @@ back to that at every release (§16.7). Injected Current position plus Active ch
   records, and handoff/queue bookkeeping are administrative closure, not new review units. The
   2026-09-04 task launch-specification effort unit is closed: its three findings are fixed, and that
   fix commit is part of the closure rather than a new review unit. The
-  2026-09-04 proposal Reject/Delete change has been reviewed and remains open with two findings. The
+  2026-09-04 proposal Reject/Delete unit is closed: both must-fix findings are fixed, and that fix
+  commit is part of the closure rather than a new review unit. The
   stage-agent grouping unit is reviewed and closed. The workflow/queue repair unit is closed: its
   findings are fixed, and that fix commit is not a new review unit.
 - **Work units:** None waiting to start. `migrate-internal-actions-from-mcp.md` stays paused on its
   recorded transport blocker.
 - **Design units:** Existing entries under `Ideas being defined` may resume, and entries under `New
-  ideas` are available to start. Neither is gated by work, review, or fix state.
-- **Open findings:** Two must-fix findings on the proposal Reject/Delete unit: stale Delete can erase
-  a consumed record, and a durable-state refetch can erase the refusal message with its proposal
-  card.
+  ideas` are available to start. Neither is gated by work, review, or fix state. The operator called
+  the permanently unaddressable pipeline agent broken on 2026-09-05; it is the newest `New ideas`
+  entry and changes FS-06.R22, so it needs `/design-feature` before any code.
+- **Open findings:** None.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
-  remain owed before claiming those adapters accept structured results.
+  are still unrun, so no agent may claim those adapters accept structured results — but they no
+  longer block any role (see **Acceptance gates**).
 - **Usability state:** The Pipelines pages and dashboard grid were driven through a real Chromium on
   2026-08-30 against a `make dist` build of the shipped tree; that run is closed except for the
   acceptance gates below.
@@ -37,21 +39,37 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 
 ## Active change
 
-**Change:** None. Task launch-specification effort is implemented, reviewed, and closed.
+**Change:** None. The proposal Reject/Delete unit is implemented, reviewed, fixed, and closed.
 
-**Available by role:** `/review` has no unreviewed unit to take; `/fix` may take the two proposal
-Reject/Delete findings; `/work` has no
+**Available by role:** `/review` has no unreviewed unit to take; `/fix` has no open findings; `/work`
+has no
 ready change waiting to start; `/design-feature` may choose any available or resumable idea, or any
 idea a person names from another `docs/ideas.md` section. Selecting one role does not depend on
 clearing another role's queue.
 
-Keep credentialed provider journeys as acceptance gates until a human authorizes real sessions.
+Credentialed provider journeys stay recorded as open acceptance gates, but on 2026-09-05 the
+operator ruled they block no role. Never report them as verified; do not wait on them either.
 
 ## Changelog
 
 Earlier entries are in the [archived handoff](../archive/state/HANDOFF-through-2026-09-03.md) and Git
 history.
 
+- **2026-09-05 — fix: proposal Reject/Delete findings (INV §5, INV §8, INV §17):** Delete's
+  conditional claim now requires `declined_at != '' AND consumed_at = ''`, so the ordinary
+  Reject → approval → stale Delete order loses with the durable `consumed` refusal instead of
+  erasing the record the approval consumed (INV §5); TS-02.R29 states that predicate and why the
+  unconsumed clause belongs in it, and its two neighbouring claims are corrected to the
+  empty-string convention the code actually uses. A storage regression declines, consumes, refuses
+  the Delete, and reads the row's own marks rather than the projection that hides a consumed record;
+  the server refusal table gains the consumed-Delete case and proves a second stale Delete still
+  answers `consumed` rather than gone (INV §17). Reject/Delete failure text moved from the proposal
+  card to the builder panel that outlives the durable refetch, and the panel stays mounted while a
+  message is unread, so a consumed refusal that empties both collections still explains itself
+  (INV §8). The UI cases now model the list state each refusal really produces — consumed in
+  neither collection, already-declined in the declined one — and all three fail against the previous
+  card-owned message. Both Go variants, the full server package, all UI tests, and the production UI
+  build pass. The proposal Reject/Delete unit is closed.
 - **2026-09-04 — review: collapse, reject, and delete pending pipeline proposals (INV §§2, 5,
   7–11, 13–17):** The storage shape, one-query projection, permissive per-record UI narrowing,
   collapsed placement above the template library, route wiring, bounded summaries, and
@@ -187,35 +205,24 @@ an explicit specification update. Remove an item when the human resolves it or q
 - **Failed pipeline-stage chat:** Confirm whether a pause after a failed launch or resume should
   keep withholding **Open agent**, matching restart recovery (FS-14.R48), or whether the chat should
   remain reachable with a wider continuation contract.
-- **Refused card drag feedback:** Confirm whether the cross-block refusal should remain an in-flight
-  pointer signal (FS-02.R53) or whether snap-back alone is the intended behavior. The shipped pointer
-  implementation is still owed its real-browser computed-cursor pass, which is an acceptance gate below.
-- **Detecting a pipeline stage that can no longer advance:** A run parked at `await_result` with a
-  silent stage agent is invisible today, and that cost the 2026-09-02 report about nineteen hours.
-  Fixing it needs your call on what qualifies, because a stage agent legitimately ends many turns
-  while its delegated children work: an idle stage agent with no running delegated tasks, an elapsed
-  time threshold, or an explicit heartbeat from the stage. Also say whether the result is a new
-  attention reason under FS-14.R29 — which puts it in the same notification category as blocked and
-  crash — or a weaker run-page disclosure like FS-14.R40's delegated-agent count.
-- **How long a stopped agent stays unaddressable after its pipeline stage:** FS-06.R22 excludes
-  pipeline-associated agents from the addressable set while stopped, and the association is a
-  `pipeline_attempts` row that lives as long as its run record. So an agent that ran one stage of a
-  run that finished weeks ago can never be sent a message or a task again unless someone resumes it
-  or deletes the run. The rule's stated reason — a pipeline stage agent was deliberately stopped by
-  its state machine, so no message may revive it — only applies while that state machine still owns
-  it. Confirm that the permanent version is intended, or scope the exclusion to a run that is still
-  active, which changes FS-06.R22 and `stoppedWakeGates`.
-- **Reactivating a worktree project after a consented checkout deletion:** FS-19 did not say what
-  happens, and the review found its two paths answered in opposite ways. The smaller reading shipped
-  on 2026-09-02 and is now stated in FS-19 §3: accepting the deletion ends AgentDeck's ownership, so
-  restoring the project later gives an ordinary missing-directory error and nothing is recreated —
-  recreating a checkout the person just chose to delete would undo their decision, and the branch is
-  still there to fork again from. Confirm, or say that restore should re-materialize the checkout,
-  which needs the ownership row to survive the deletion.
+Resolved on 2026-09-05: the refused card drag stays as shipped (FS-02.R53's in-flight pointer
+signal); worktree restore after a consented checkout deletion stays as shipped (FS-19 §3, no
+re-materialization); the stalled-`await_result` detection item is withdrawn, because the
+2026-09-02 report's nineteen hours were operator absence rather than a missing signal — reopen it
+only if a run is ever seen parked with a live, healthy, idle stage agent; and the permanently
+unaddressable pipeline agent is not a decision but a defect, now queued as a new idea in
+`docs/ideas.md`.
 
 ## Acceptance gates
 
 Gates closed on or before 2026-08-30 are in the archived handoff.
+
+**Not blocking as of 2026-09-05.** The operator decided that every gate below is presumed working
+and that real breakage will be reported as it is found. None of them have been run, so no agent may
+describe them as verified, passed, or closed, and specification status that depends on one — FS-08
+and TS-07 remain Partial, FS-17.A6/A9 and FS-03.A26 remain unmet — does not change. What does change
+is that no role waits on them: work, review, fix, design, and release may all proceed with these
+open. Restore blocking status only on an explicit operator instruction.
 
 - [ ] Run FS-03.A26/J14 with a pinned real chat provider: an AgentDeck stage-result action proceeds
   without a prompt, a file edit still prompts, and approval after more than three minutes continues
@@ -258,30 +265,16 @@ Gates closed on or before 2026-08-30 are in the archived handoff.
 
 ## Blocked on human
 
-Live-provider acceptance is waiting for human authorization because it invokes real provider sessions
-and creates disposable local configuration homes. On 2026-07-15 this machine has Claude Code 2.1.202,
-the retired `claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installed; the new
-`claude-agent-acp`, OpenCode, and OpenHands are not installed globally.
+Nothing. Live-provider acceptance still needs human authorization to run, because it invokes real
+provider sessions and creates disposable local configuration homes — but as of 2026-09-05 the
+operator chose not to run it and not to let it block any role, so it is an open acceptance gate
+rather than a blocker. On 2026-07-15 this machine has Claude Code 2.1.202, the retired
+`claude-code-acp`, Codex CLI 0.142.5, and `codex-acp` 1.1.2 installed; the new `claude-agent-acp`,
+OpenCode, and OpenHands are not installed globally.
 
 ## Review findings
 
-- **Must fix** (proposal Reject/Delete, INV §5/§17): `internal/state/pipelines.go:261` deletes any
-  row with a non-empty `declined_at`, but approval deliberately consumes a declined row without
-  clearing that column. In the normal multi-tab order Reject → approval → stale Delete, Delete
-  therefore succeeds and erases the consumed record instead of refusing with the durable
-  `consumed` state required by FS-14.R57 and TS-02.R29. Make the Delete claim require both
-  `declined_at != ''` and `consumed_at = ''`, then add a storage/server regression that declines,
-  consumes, attempts Delete, expects the typed consumed refusal, and proves the row remains durable.
-- **Must fix** (proposal Reject/Delete, INV §8/§17):
-  `ui/src/features/pipelines/AgentDeckerBuilder.tsx:200` owns mutation failure text inside each
-  `ProposalCard`, while `ui/src/api/pipelines.ts:193` and `:201` await invalidation/refetch on every
-  settled mutation. A real consumed/already-declined/gone/not-declined refusal changes which
-  collection contains the record or removes it; the refetch can therefore unmount or move the card
-  before its catch renders, silently discarding the explanation FS-14.R49/R57 requires. The current
-  UI refusal test returns `consumed` while incorrectly keeping the record pending, so it cannot
-  expose the loss. Keep mutation feedback on a parent surface that survives the durable refetch (or
-  hand it off before the card moves), and test each stale-state refusal with the subsequent list
-  response reflecting that actual state while the message remains visible.
+No open findings.
 
 ## Design consistency notes
 

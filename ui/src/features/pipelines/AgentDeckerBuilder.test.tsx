@@ -229,6 +229,15 @@ function stagedTemplateProposal(stages: number) {
   };
 }
 
+// The refusal the server sends when an approval consumed the record this action
+// was offered on (FS-14.R57, TS-03.R36).
+function consumedRefusal() {
+  return HttpResponse.json(
+    { error: { code: "conflict", message: "an approval already committed this proposal", details: { pipeline_code: "consumed" } } },
+    { status: 409 },
+  );
+}
+
 function proposalAges() {
   return [...document.querySelectorAll(".pipeline-proposal-age")].map((node) => node.textContent ?? "");
 }
@@ -352,11 +361,17 @@ describe("AgentDeckerBuilder reject and delete", () => {
   it("keeps a refused Reject visible and retryable with the state the server reports", async () => {
     let attempts = 0;
     server.use(
-      http.get("/api/pipeline-proposals", () => HttpResponse.json(collections([templateProposal]))),
+      // already_declined leaves the record durable in the declined collection, so
+      // the list the refusal refetches returns it there rather than pending.
+      http.get("/api/pipeline-proposals", () => HttpResponse.json(
+        attempts === 0
+          ? collections([templateProposal])
+          : collections([], [{ ...templateProposal, declined_at: "2026-09-04T10:00:00Z" }]),
+      )),
       http.post("/api/pipeline-proposals/:id/decline", () => {
         attempts++;
         return HttpResponse.json(
-          { error: { code: "conflict", message: "an approval already committed this proposal", details: { pipeline_code: "consumed" } } },
+          { error: { code: "conflict", message: "this proposal was already rejected", details: { pipeline_code: "already_declined" } } },
           { status: 409 },
         );
       }),
@@ -367,11 +382,42 @@ describe("AgentDeckerBuilder reject and delete", () => {
     </MemoryRouter></QueryClientProvider>);
 
     fireEvent.click(await screen.findByRole("button", { name: "Reject" }));
+    expect(await screen.findByText("this proposal was already rejected")).toBeInTheDocument();
+    // The entry moved to the declined list, where its remaining action is Delete,
+    // and the explanation for the move is still on the surface beside it.
+    await waitFor(() => expect(screen.getByText("Declined")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Delete" })).toBeEnabled();
+    expect(screen.getByText("this proposal was already rejected")).toBeInTheDocument();
+    expect(attempts).toBe(1);
+  });
+
+  // FS-14.R49/R57 with INV §8: a consumed refusal is exactly the case where the
+  // record leaves both collections, so the card that raised it unmounts while its
+  // settled mutation is still awaiting the durable refetch. The refusal message
+  // has to outlive that card, or the person is left with an offer that silently
+  // vanished and no statement of what happened to it.
+  it.each([
+    { action: "Reject", route: (mark: () => void) => http.post("/api/pipeline-proposals/:id/decline", () => { mark(); return consumedRefusal(); }) },
+    { action: "Delete", route: (mark: () => void) => http.delete("/api/pipeline-proposals/:id", () => { mark(); return consumedRefusal(); }) },
+  ])("explains a consumed $action after the record leaves every list", async ({ action, route }) => {
+    let refused = false;
+    const declined = action === "Delete" ? [{ ...templateProposal, declined_at: "2026-09-04T10:00:00Z" }] : [];
+    const pending = action === "Delete" ? [] : [templateProposal];
+    server.use(
+      // Consumption lists the record in neither collection, so the refetch this
+      // refusal awaits empties the surface the card was rendered on.
+      http.get("/api/pipeline-proposals", () => HttpResponse.json(refused ? collections() : collections(pending, declined))),
+      route(() => { refused = true; }),
+    );
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    render(<QueryClientProvider client={client}><MemoryRouter>
+      <AgentDeckerBuilder showLauncher={false} onTemplateProposal={() => {}} onRunProposal={() => {}} />
+    </MemoryRouter></QueryClientProvider>);
+
+    fireEvent.click(await screen.findByRole("button", { name: action }));
     expect(await screen.findByText("an approval already committed this proposal")).toBeInTheDocument();
-    const retry = screen.getByRole("button", { name: "Reject" });
-    expect(retry).toBeEnabled();
-    fireEvent.click(retry);
-    await waitFor(() => expect(attempts).toBe(2));
+    await waitFor(() => expect(screen.queryByRole("button", { name: action })).not.toBeInTheDocument());
+    expect(screen.getByText("an approval already committed this proposal")).toBeInTheDocument();
   });
 });
 

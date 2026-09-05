@@ -338,9 +338,12 @@ they are. The row's states are *pending* (`consumed_at` and `declined_at` both e
 state, so a deleted record leaves no tombstone and a later identical proposal inserts a new row
 (FS-14.R49/R50). Every transition is a single conditional statement whose `WHERE` names the state it
 expects, and the caller decides from the rows it affected rather than by reading first and writing
-after (INV §5): a decline matches `consumed_at IS NULL AND declined_at IS NULL`, a delete matches
-`declined_at IS NOT NULL`, and consumption matches `consumed_at IS NULL` alone — which is what lets
-an approved mutation consume a record another tab already declined, the ordering FS-14.R57 chose.
+after (INV §5): a decline matches `consumed_at = '' AND declined_at = ''`, a delete matches
+`declined_at != '' AND consumed_at = ''`, and consumption matches `consumed_at = ''` alone — which is
+what lets an approved mutation consume a record another tab already declined, the ordering FS-14.R57
+chose. Delete names the unconsumed state too because that same ordering leaves `declined_at` set on
+a consumed row: a delete claiming a decline alone would erase the record the approval consumed
+instead of losing with the durable consumed state FS-14.R49/R57 require it to report.
 Zero affected rows is the loser of a race and is reported as the state the row is actually in, never
 as success and never as a failure to write. Consumption stays keyed by the content-addressed id
 (TS-09.R26), so no proposal id travels through the template or start API and the approval path is

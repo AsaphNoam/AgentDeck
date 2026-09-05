@@ -274,6 +274,36 @@ func TestDeletingADeclinedPipelineProposalLeavesNoTombstone(t *testing.T) {
 	}
 }
 
+// FS-14.R57 / TS-02.R29: approval consumes a declined row without clearing its
+// decline, so the ordinary multi-tab order Reject → approval → stale Delete must
+// refuse with the durable consumed state and leave the record intact. Deleting on
+// declined_at alone erased the consumed record instead.
+func TestDeletingAConsumedProposalIsRefusedAndKeepsTheRecord(t *testing.T) {
+	store, _ := newTestStore(t)
+	now := time.Date(2026, 9, 4, 9, 0, 0, 0, time.UTC)
+	saveProposal(t, store, "pp_stale", now)
+	if _, err := store.DeclinePipelineProposal("pp_stale", now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if consumed, err := store.ConsumePipelineProposal("pp_stale", now.Add(2*time.Minute)); err != nil || !consumed {
+		t.Fatalf("consume after decline = %v err=%v, want the mutation to win", consumed, err)
+	}
+
+	if err := store.DeletePipelineProposal("pp_stale"); !errors.Is(err, ErrPipelineProposalConsumed) {
+		t.Fatalf("stale delete = %v, want ErrPipelineProposalConsumed", err)
+	}
+	// The consumed record is listed in neither collection, so durability is read
+	// from the row itself rather than from the projection that hides it.
+	var consumedAt, declinedAt string
+	if err := store.db.QueryRow(`SELECT consumed_at, declined_at FROM pipeline_proposals WHERE proposal_id = ?`, "pp_stale").
+		Scan(&consumedAt, &declinedAt); err != nil {
+		t.Fatalf("read pp_stale after refused delete: %v", err)
+	}
+	if consumedAt == "" || declinedAt == "" {
+		t.Fatalf("row = consumed_at %q declined_at %q, want both marks kept", consumedAt, declinedAt)
+	}
+}
+
 // FS-14.R50: declining refuses one offer, not its content. Proposing the same
 // content again after a reject returns exactly one pending offer rather than
 // leaving it silently declined, which would repeat the discoverability defect

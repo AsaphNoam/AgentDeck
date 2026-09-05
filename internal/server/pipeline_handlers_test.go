@@ -163,6 +163,19 @@ func TestPipelineProposalRefusalsNameTheRealState(t *testing.T) {
 	if _, err := srv.pipelineMgr.DeclineProposal(rejected.ProposalID); err != nil {
 		t.Fatal(err)
 	}
+	// Reject then approve is the ordinary multi-tab order: the approval consumes
+	// the declined record (FS-14.R57), so the Delete a stale view still offers has
+	// to lose with that state rather than erase what the approval consumed.
+	consumed, err := srv.pipelineMgr.ProposeTemplate("consumed-stage", apiTemplate())
+	if err != nil {
+		t.Fatalf("ProposeTemplate: %v", err)
+	}
+	if _, err := srv.pipelineMgr.DeclineProposal(consumed.ProposalID); err != nil {
+		t.Fatal(err)
+	}
+	if claimed, err := srv.stateStore.ConsumePipelineProposal(consumed.ProposalID, time.Now().UTC()); err != nil || !claimed {
+		t.Fatalf("consume after decline = %v err=%v", claimed, err)
+	}
 
 	for _, tc := range []struct {
 		name, method, path string
@@ -171,6 +184,7 @@ func TestPipelineProposalRefusalsNameTheRealState(t *testing.T) {
 	}{
 		{"decline an already rejected offer", http.MethodPost, "/api/pipeline-proposals/" + rejected.ProposalID + "/decline", http.StatusConflict, "already_declined"},
 		{"delete a still pending offer", http.MethodDelete, "/api/pipeline-proposals/" + pending.ProposalID, http.StatusConflict, "not_declined"},
+		{"delete an offer an approval consumed after the reject", http.MethodDelete, "/api/pipeline-proposals/" + consumed.ProposalID, http.StatusConflict, "consumed"},
 		{"decline an unknown offer", http.MethodPost, "/api/pipeline-proposals/pp_absent/decline", http.StatusNotFound, ""},
 		{"delete an unknown offer", http.MethodDelete, "/api/pipeline-proposals/pp_absent", http.StatusNotFound, ""},
 	} {
@@ -198,10 +212,16 @@ func TestPipelineProposalRefusalsNameTheRealState(t *testing.T) {
 		})
 	}
 
-	// A refused action leaves the entry visible with its action retryable.
+	// A refused action leaves the entry visible with its action retryable, and the
+	// consumed record the stale Delete targeted is still there: it answers with the
+	// same consumed state rather than the gone state a deletion would produce.
 	collections := listProposals(t, srv)
 	if len(collections.Pending) != 1 || len(collections.Declined) != 1 {
 		t.Fatalf("collections after refusals = %+v, want both entries still listed", collections)
+	}
+	rec := doRequest(t, srv.routes(), http.MethodDelete, "/api/pipeline-proposals/"+consumed.ProposalID, nil)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("second stale delete = %d %s, want the consumed record still refused", rec.Code, rec.Body.String())
 	}
 }
 

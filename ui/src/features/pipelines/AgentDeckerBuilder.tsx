@@ -43,6 +43,12 @@ export function AgentDeckerBuilder({
   const justLaunchedBuilder = useRef<string | null>(null);
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Reject and Delete refusals live on this panel rather than inside the card
+  // that raised them. Their hooks await the durable refetch before the mutation
+  // settles, and a real refusal (consumed, already declined, gone) moves or
+  // removes that card, so a message the card owned would be discarded exactly
+  // when it is the only explanation the person gets (INV §8, FS-14.R49/R57).
+  const [proposalFailure, setProposalFailure] = useState<string | null>(null);
   const proposals = usePipelineProposals();
   // A start proposal names its template by id alone, so the library is what
   // resolves that id to a title as it stands now (FS-14.R51).
@@ -131,7 +137,9 @@ export function AgentDeckerBuilder({
   const pendingProposals = (proposals.data?.pending ?? []).filter(ofThisKind);
   const declinedProposals = (proposals.data?.declined ?? []).filter(ofThisKind);
 
-  if (!showLauncher && pendingProposals.length === 0 && declinedProposals.length === 0) return null;
+  // A refusal that emptied both collections still has something to say, so the
+  // panel stays mounted while its message is unread.
+  if (!showLauncher && pendingProposals.length === 0 && declinedProposals.length === 0 && !proposalFailure) return null;
 
   return <section className="pipeline-panel pipeline-builder">
     {showLauncher && <div className="pipeline-panel-header">
@@ -165,19 +173,21 @@ export function AgentDeckerBuilder({
       <p>{!agentsHydrated ? "Loading builder session…" : builderRunning ? <>Builder session: <code>{builderID}</code></> : "The builder session has stopped. Its pending proposals remain available below."}</p>
       {builderRunning && <Link to={`/agent/${builderID}`}>Open AgentDecker chat</Link>}
     </div>}
+    {proposalFailure && <p className="form-error">{proposalFailure}</p>}
     {pendingProposals.length > 0 && <div className="pipeline-proposal-list">
       <h3>Pending exact proposals</h3>
       {pendingProposals.map((entry) => <ProposalCard
         key={entry.proposal_id}
         entry={entry}
         templates={templates.data}
+        onFailure={setProposalFailure}
         onTemplateProposal={onTemplateProposal}
         onRunProposal={onRunProposal}
       />)}
     </div>}
     {declinedProposals.length > 0 && <div className="pipeline-proposal-list pipeline-proposal-declined-list">
       <h3>Declined</h3>
-      {declinedProposals.map((entry) => <ProposalCard key={entry.proposal_id} entry={entry} templates={templates.data} />)}
+      {declinedProposals.map((entry) => <ProposalCard key={entry.proposal_id} entry={entry} templates={templates.data} onFailure={setProposalFailure} />)}
     </div>}
   </section>;
 }
@@ -189,16 +199,17 @@ export function AgentDeckerBuilder({
 function ProposalCard({
   entry,
   templates,
+  onFailure,
   onTemplateProposal,
   onRunProposal,
 }: {
   entry: PipelineListedProposal;
   templates: PipelineTemplateRecord[] | undefined;
+  onFailure: (message: string | null) => void;
   onTemplateProposal?: (proposal: Extract<PipelineProposal, { kind: "save_template" }>) => void;
   onRunProposal?: (proposal: Extract<PipelineProposal, { kind: "start_run" }>) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [failure, setFailure] = useState<string | null>(null);
   const decline = useDeclinePipelineProposal();
   const remove = useDeletePipelineProposal();
   const proposal = asPipelineProposal(entry);
@@ -206,14 +217,15 @@ function ProposalCard({
   const declined = Boolean(entry.declined_at);
   const busy = decline.isPending || remove.isPending;
 
-  // Every mutation surfaces its failure and stays retryable: the entry remains
-  // visible and the refetch that follows shows the durable state (INV §8).
+  // Every mutation surfaces its failure through the panel above, which outlives
+  // this card: the refetch that settles the mutation shows the durable state, and
+  // when that state moves or removes the entry the explanation still stands (INV §8).
   const act = async (run: () => Promise<unknown>) => {
-    setFailure(null);
+    onFailure(null);
     try {
       await run();
     } catch (reason) {
-      setFailure(reason instanceof Error ? reason.message : String(reason));
+      onFailure(reason instanceof Error ? reason.message : String(reason));
     }
   };
 
@@ -233,7 +245,6 @@ function ProposalCard({
       {expanded ? "Hide exact payload" : "Show exact payload"}
     </button>
     {expanded && <pre className="pipeline-proposal-payload">{JSON.stringify(entry.payload, null, 2)}</pre>}
-    {failure && <p className="form-error">{failure}</p>}
     <div className="pipeline-proposal-actions">
       {!declined && proposal?.kind === "save_template" && <button type="button" onClick={() => onTemplateProposal?.(proposal)}>Review exact Save proposal</button>}
       {!declined && proposal?.kind === "start_run" && <button type="button" onClick={() => onRunProposal?.(proposal)}>Review exact Start proposal</button>}

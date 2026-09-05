@@ -250,15 +250,19 @@ WHERE proposal_id = ? AND consumed_at = '' AND declined_at = ''`, formatTime(at)
 
 // DeletePipelineProposal removes a declined record permanently. Rejecting first
 // is what makes the removal deliberate, so the claim requires a decline rather
-// than accepting any row (FS-14.R49, TS-02.R29). Delete is a hard row delete and
-// leaves no tombstone, so a later identical proposal inserts a new record.
+// than accepting any row (FS-14.R49, TS-02.R29). It also requires the record to
+// be unconsumed: approval deliberately consumes a declined row without clearing
+// declined_at (FS-14.R57), so a Delete sent from a view older than that approval
+// would otherwise erase the consumed record instead of losing with the durable
+// consumed state. Delete is a hard row delete and leaves no tombstone, so a
+// later identical proposal inserts a new record.
 func (s *Store) DeletePipelineProposal(proposalID string) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("state: begin delete pipeline proposal: %w", err)
 	}
 	defer tx.Rollback()
-	result, err := tx.Exec(`DELETE FROM pipeline_proposals WHERE proposal_id = ? AND declined_at != ''`, proposalID)
+	result, err := tx.Exec(`DELETE FROM pipeline_proposals WHERE proposal_id = ? AND declined_at != '' AND consumed_at = ''`, proposalID)
 	if err != nil {
 		return fmt.Errorf("state: delete pipeline proposal: %w", err)
 	}
