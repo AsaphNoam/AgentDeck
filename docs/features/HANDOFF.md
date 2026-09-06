@@ -11,9 +11,11 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 ## Current position
 
 - **Active change:** None.
-- **Release:** `v0.4.1` is tagged locally and not yet pushed; nothing is published until `main` and
-  the tag are. The operator chose the patch number knowing the range also carries new user-visible
-  capability. Credentialed Claude/Codex checks remain owed under TS-06.R21. A customized
+- **Release:** `v0.4.1` is published and verified on tag `0454209`. Release run `34015979034`
+  succeeded in 3m2s and attached the archive, `install.sh`, and a `manifest.json` carrying the
+  archive's SHA-256; the `main` CI run passed alongside it. The operator chose the patch number
+  knowing the range also carries new user-visible capability. Credentialed Claude/Codex checks
+  remain owed under TS-06.R21 and were not run. A customized
   `agentdecker` role is deliberately not migrated under FS-04.R44, so it keeps the superseded
   product manual beside the current skill.
 - **Review units:** None. Every unit through the `v0.4.1` range is reviewed and closed. Review
@@ -66,7 +68,10 @@ Entries through the `v0.4.1` epoch are in the
   they needed none. README, `install.sh`, and `scripts/release/assemble.sh` claims were not
   falsified by the range. Both Go variants, `make check-specs`, all UI tests, and
   `make dist VERSION=0.4.1` pass; the built binary reports `0.4.1` and carries `sqlite_fts5`.
-  Credentialed Claude and Codex checks remain owed, not run.
+  Credentialed Claude and Codex checks remain owed, not run. Published from tag `0454209`: release
+  run `34015979034` verified archive contents, FTS5 tagging, pinned components, checksum rejection,
+  and a fresh installation (TS-06.R21), and the GitHub Release carries the archive, `install.sh`,
+  and the manifest with its SHA-256.
 
 ## Decisions needing your input
 
