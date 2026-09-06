@@ -21,8 +21,8 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 - **Review units:** None. Every unit through the `v0.4.1` range is reviewed and closed. Review
   records, finding-fix commits, release records, and handoff/archive/queue bookkeeping are
   administrative closure and never re-enter the queue.
-- **Work units:** None waiting to start. `migrate-internal-actions-from-mcp.md` stays paused on its
-  recorded transport blocker.
+- **Work units:** `dock-the-annotation-tray-and-quiet-its-prompt.md` is waiting to start (FS-13.R20–R23,
+  TS-08.R53–R54). `migrate-internal-actions-from-mcp.md` stays paused on its recorded transport blocker.
 - **Design units:** Existing entries under `Ideas being defined` may resume, and entries under `New
   ideas` are available to start. Neither is gated by work, review, or fix state. The operator called
   the permanently unaddressable pipeline agent broken on 2026-09-05; it is the newest `New ideas`
@@ -42,7 +42,7 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 fixed, and closed.
 
 **Available by role:** `/review` has no unreviewed unit to take; `/fix` has no open findings; `/work`
-has no
+may take `dock-the-annotation-tray-and-quiet-its-prompt.md`, the one
 ready change waiting to start; `/design-feature` may choose any available or resumable idea, or any
 idea a person names from another `docs/ideas.md` section. Selecting one role does not depend on
 clearing another role's queue.
@@ -56,6 +56,20 @@ Entries through the `v0.4.1` epoch are in the
 [archived handoff](../archive/state/HANDOFF-through-2026-09-06.md); earlier ones are in the
 [`v0.4.0` archive](../archive/state/HANDOFF-through-2026-09-03.md) and Git history.
 
+- **2026-09-07 — design: dock the annotation tray and quiet its prompt.** The operator's request to
+  move the annotation window right, enlarge it, make each draft readable, and cut annotation meta
+  from the conversation is specified as FS-13.R20–R23 / A12–A14 and TS-08.R53–R54, and waits in
+  `docs/ready-changes/dock-the-annotation-tray-and-quiet-its-prompt.md`. Decisions taken with the
+  operator: the tray docks as a right-hand column and falls back to today's overlay through a
+  container query on the transcript region — not a viewport media query — so the narrow dashboard
+  chat pane keeps the overlay inside a wide window; the column is collapsible and the flag rides the
+  existing per-source annotation-draft persistence; and the self-target annotation block is
+  suppressed at render time in `appendRenderedEvent`, which quiets transcripts recorded before it
+  ships and leaves the event, the endpoint, and the index untouched. Declined on 2026-09-06:
+  stripping the annotation card's `Event <seq>` anchor and resolving its raw target agent id
+  (FS-13 §6). The third complaint — that the annotation **New task** target lacks model/effort — was
+  withdrawn once `NewAgentModal` was shown to render Backend, Model, and Effort already. FS-13 and
+  TS-08 are now `Partial`. No product code changed.
 - **2026-09-06 — release: `v0.4.1`:** Cut from the range `v0.4.0..main`: a task's launch
   specification can name its reasoning effort and is validated when the task is created, pending
   pipeline proposals list collapsed and can be rejected and deleted, each pipeline stage's agents

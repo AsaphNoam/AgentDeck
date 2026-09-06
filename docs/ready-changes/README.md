@@ -43,7 +43,9 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-None.
+- [`dock-the-annotation-tray-and-quiet-its-prompt.md`](dock-the-annotation-tray-and-quiet-its-prompt.md)
+  — dock the pending annotation tray as a collapsible right-hand column with readable draft rows,
+  and stop drawing the self-target annotation block in the conversation.
 
 ## Paused changes
 

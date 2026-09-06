@@ -1,6 +1,6 @@
 # TS-08 — Frontend presentation architecture
 
-**Status:** Current
+**Status:** Partial
 **Code:** `ui/src`, `ui/package.json`, `ui/vite.config.ts`
 **Absorbed:** —
 
@@ -478,6 +478,52 @@ primitive seam; the rejected alternatives are recorded in §5.
   named-values disclosure on a finished run is open by default, matching the frozen-setup disclosure
   beside it. No API, schema, or store change is needed — the data is present and parsed today, which
   is why this is INV §10's own case rather than a feature addition.
+
+### 2.8 Docked annotation tray and annotation-block suppression
+
+- **R53 (planned)** — **The tray docks through the transcript region's own
+  grid and a container query; nothing measures anything.** FS-13.R20 is implemented by making
+  `.transcript-wrap` a container and a two-column grid whose second track exists only while drafts
+  are pending, with `.annotation-tray` leaving `position: absolute` for that track. The threshold is
+  a `@container` condition on `.transcript-wrap`, not a `@media` condition on the viewport, which is
+  the whole reason one rule serves both surfaces: the dashboard chat pane (R41/R45) is narrow inside
+  a wide window, so a viewport query would dock it and a container query does not. Below the
+  threshold the existing absolute overlay rules apply unchanged, so the fallback is the shipped
+  presentation rather than a second one. No `ResizeObserver`, element measurement, or
+  JavaScript-applied width participates (INV §1), and the two forms are one component in two CSS
+  states rather than two components, so the drafts, target selection, and send path cannot diverge
+  between them (INV §2). While docked, `.transcript-view`'s `max(--ad-space-6, 10vw)` horizontal
+  padding reduces, so the reflowed text column keeps its readable width instead of paying for the
+  tray twice. FS-13.R22's roomier draft row is CSS on the existing `.annotation-draft` selectors,
+  with the anchor promoted to its own heading element in `AnnotationTray.tsx`; every className
+  shipped has a defined selector in `ui/src/styles/features/agent.css` in the same change, because
+  the build and Testing Library are both blind to CSS (INV §13). The docked form and its collapsed
+  strip are exposed through the curated contract as `data-variant`/state on one registered
+  `annotation-tray` component added to `contract.json` in the same change; individual descendants
+  are not skin hooks (R8, R14). FS-13.R21's collapsed flag is a field on the existing per-source
+  annotation draft record in `annotationStore`, so it rides that store's shipped persistence,
+  30-day expiry, 20-source cap, and delete-with-agent path rather than adding a second browser
+  storage key or lifecycle (FS-13.R16, INV §1).
+
+- **R54 (planned)** — **Suppressing the annotation prompt is one more
+  rule in the shipped transcript projection, and it recognizes the block without respelling its
+  format.** FS-13.R23 is implemented inside `appendRenderedEvent` in
+  `ui/src/store/transcriptStore.ts` — the seam `foldTranscript` and the live append already share,
+  the same place `permission_resolved` folding lives — so bulk replay, archive replay, and a live
+  frame produce identical rendered lists by construction (INV §1/§2). Adding it to
+  `foldTranscript` alone would leave the live path drawing an event the reload then removes. A
+  `user_prompt` is dropped when the last already-rendered event is an `annotation` event whose
+  `target.kind` is `self` and the prompt's text begins with the block's sentinel header. All three
+  conditions are load-bearing: adjacency alone would swallow the message a person types right after
+  assigning a batch to another agent, and the `self` check is what makes the non-self case
+  structurally unreachable rather than merely unlikely. The sentinel is the only thing the client
+  borrows from `runtime.FormatAnnotationBlock` (`internal/runtime/event.go`); the client does not
+  reimplement the block's layout to compare against it, because a second spelling of that format
+  would drift the moment either side changed (INV §2). It lives as one named exported constant whose
+  comment cites the Go writer, and a Go test asserts the emitted block still starts with it, so the
+  cross-language pair is pinned rather than assumed. The rule touches presentation only: `rawByAgent`,
+  the transcript endpoint, the appended event, and the search index are untouched, and because the
+  decision is made at render time it applies to transcripts recorded before it shipped.
 
 ## 3. Interfaces & data shapes
 
