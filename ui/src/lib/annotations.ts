@@ -12,3 +12,11 @@ export function clipAnnotationExcerpt(value: string, limit = annotationExcerptLi
   const marker = [...annotationClippedMarker];
   return chars.slice(0, limit - marker.length).join("") + annotationClippedMarker;
 }
+
+// The first line of the machine annotation block `runtime.FormatAnnotationBlock`
+// writes (`internal/runtime/event.go`). It is the only part of that format the
+// client borrows: the transcript store recognizes a self-targeted send's prompt
+// by this prefix (FS-13.R23) instead of respelling the block's layout, which
+// would drift the moment either side changed. `internal/server` pins the pair by
+// reading this constant and asserting the emitted block still starts with it.
+export const annotationBlockSentinel = "[AgentDeck annotations]";

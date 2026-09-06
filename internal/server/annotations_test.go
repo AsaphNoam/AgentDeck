@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -169,5 +170,91 @@ func TestAnnotationAppendFailureDeliversNoMailAndRetrySendsOnce(t *testing.T) {
 	}
 	if got := mailCount(); got != 1 {
 		t.Fatalf("mail after the retry = %d; want exactly 1", got)
+	}
+}
+
+// annotationBlockSentinelFromUI reads the one constant the browser borrows from
+// FormatAnnotationBlock. Reading it here rather than restating it is the point:
+// the client recognizes a self-targeted send's prompt by this prefix alone
+// (FS-13.R23), so a change to the Go writer that moves the first line has to
+// fail a Go test instead of silently un-quieting every transcript.
+func annotationBlockSentinelFromUI(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join("..", "..", "ui", "src", "lib", "annotations.ts")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	match := regexp.MustCompile(`annotationBlockSentinel\s*=\s*"([^"]+)"`).FindSubmatch(raw)
+	if match == nil {
+		t.Fatalf("no annotationBlockSentinel declaration in %s", path)
+	}
+	return string(match[1])
+}
+
+// TS-08.R54 — the cross-language pair is pinned, not assumed.
+func TestAnnotationBlockStartsWithTheSentinelTheClientMatches(t *testing.T) {
+	block := runtime.FormatAnnotationBlock(runtime.AnnotationData{
+		Annotations: []runtime.Annotation{{Seq: 4, Excerpt: "target phrase", Instruction: "review this branch"}},
+		Target:      runtime.AnnotationTarget{Kind: "self"},
+	})
+	if sentinel := annotationBlockSentinelFromUI(t); !strings.HasPrefix(block, sentinel) {
+		t.Fatalf("annotation block %q does not start with the client's sentinel %q", block, sentinel)
+	}
+}
+
+// FS-13.A14 — quieting the duplicate prompt is display-only. The prompt event a
+// self-targeted send produces stays in the transcript the API serves, because
+// the agent acted on it and search, replay, and export all read from here.
+func TestSelfAnnotationTranscriptStillReturnsThePromptEvent(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+	waitForStatus(t, srv, id, "idle")
+
+	body := runtime.AnnotationData{
+		Annotations: []runtime.Annotation{{Seq: 1, Excerpt: "target phrase", Instruction: "review this branch"}},
+		Target:      runtime.AnnotationTarget{Kind: "self"},
+	}
+	raw, _ := json.Marshal(body)
+	resp, respBody := post(t, ts.URL+"/api/sessions/"+id+"/annotations", json.RawMessage(raw))
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("self annotation status = %d: %s", resp.StatusCode, respBody)
+	}
+
+	sentinel := annotationBlockSentinelFromUI(t)
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		events, err := transcript.ReadFile(srv.configStore.Home(), id, transcript.ReadOptions{})
+		if err != nil {
+			t.Fatalf("ReadFile: %v", err)
+		}
+		var annotated, prompted bool
+		for i, ev := range events {
+			if ev.Type != runtime.EvAnnotation {
+				continue
+			}
+			annotated = true
+			// The prompt the client hides is the one immediately after the
+			// annotation event; the endpoint must still hand it over.
+			for _, later := range events[i+1:] {
+				if later.Type != runtime.EvUserPrompt {
+					continue
+				}
+				var prompt runtime.UserPromptData
+				if err := json.Unmarshal(later.Data, &prompt); err != nil {
+					t.Fatalf("decode user prompt: %v", err)
+				}
+				if strings.HasPrefix(prompt.Text, sentinel) && strings.Contains(prompt.Text, "review this branch") {
+					prompted = true
+				}
+			}
+		}
+		if annotated && prompted {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("transcript never carried both the annotation event and its prompt: %#v", events)
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 }

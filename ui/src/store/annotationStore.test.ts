@@ -3,7 +3,7 @@ import { pruneTrays, useAnnotationStore } from "./annotationStore";
 
 beforeEach(() => {
   localStorage.clear();
-  useAnnotationStore.setState({ bySource: {}, overallBySource: {}, editedAt: {} });
+  useAnnotationStore.setState({ bySource: {}, overallBySource: {}, editedAt: {}, collapsedBySource: {} });
 });
 
 describe("annotationStore", () => {
@@ -19,6 +19,47 @@ describe("annotationStore", () => {
     expect(useAnnotationStore.getState().bySource.a_source).toBeUndefined();
     expect(useAnnotationStore.getState().overallBySource.a_source).toBeUndefined();
     expect(useAnnotationStore.getState().editedAt.a_source).toBeUndefined();
+  });
+
+  // FS-13.A12: the collapsed flag is part of the tray, not a second lifecycle.
+  // A tray that is discarded — or dropped with its agent, which routes through
+  // the same discard — must not leave a flag behind to collapse the next tray
+  // that reuses the id.
+  it("stores the collapsed flag with its tray and drops it with the tray", () => {
+    const store = useAnnotationStore.getState();
+    store.add("a_source", { seq: 7, excerpt: "selected line", instruction: "check this" });
+    store.setCollapsed("a_source", true);
+    expect(useAnnotationStore.getState().collapsedBySource.a_source).toBe(true);
+
+    // What a reload restores: the persisted record run back through the same prune.
+    const now = Date.now();
+    const rehydrated = pruneTrays({
+      bySource: useAnnotationStore.getState().bySource,
+      overallBySource: {},
+      editedAt: useAnnotationStore.getState().editedAt,
+      collapsedBySource: useAnnotationStore.getState().collapsedBySource,
+    }, now);
+    expect(rehydrated.collapsedBySource.a_source).toBe(true);
+
+    store.setCollapsed("a_source", false);
+    expect(useAnnotationStore.getState().collapsedBySource.a_source).toBe(false);
+    store.setCollapsed("a_source", true);
+    store.discard("a_source");
+    expect(useAnnotationStore.getState().collapsedBySource.a_source).toBeUndefined();
+  });
+
+  // An expired or capped-out tray takes its flag with it; keeping the flag alone
+  // would collapse a fresh tray for a source whose drafts were dropped.
+  it("does not rehydrate a collapsed flag whose tray was pruned", () => {
+    const now = Date.UTC(2026, 6, 25);
+    const pruned = pruneTrays({
+      bySource: { a_old: [{ seq: 1, excerpt: "line", instruction: "look" }] },
+      overallBySource: {},
+      editedAt: { a_old: now - 31 * 24 * 60 * 60 * 1000 },
+      collapsedBySource: { a_old: true },
+    }, now);
+    expect(pruned.bySource.a_old).toBeUndefined();
+    expect(pruned.collapsedBySource.a_old).toBeUndefined();
   });
 
   // FS-13.R16: nothing on the server owns a tray, so the stored set is bounded

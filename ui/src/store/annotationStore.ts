@@ -14,6 +14,11 @@ interface PersistedTrays {
   bySource: Record<string, AnnotationDraft[]>;
   overallBySource: Record<string, string>;
   editedAt: Record<string, number>;
+  // Whether the docked tray is reduced to its strip (FS-13.R21). It rides this
+  // record rather than a second browser key so it inherits the tray's expiry,
+  // cap, and delete-with-agent path instead of outliving the drafts it belongs
+  // to. Only the docked form exposes the control; the overlay ignores the flag.
+  collapsedBySource: Record<string, boolean>;
 }
 
 interface AnnotationStoreState extends PersistedTrays {
@@ -22,6 +27,7 @@ interface AnnotationStoreState extends PersistedTrays {
   remove: (sourceId: string, index: number) => void;
   discard: (sourceId: string) => void;
   setOverall: (sourceId: string, instruction: string) => void;
+  setCollapsed: (sourceId: string, collapsed: boolean) => void;
 }
 
 // pruneTrays applies FS-13.R16 to what a reload restored: drop empty trays, drop
@@ -35,12 +41,13 @@ export function pruneTrays(persisted: Partial<PersistedTrays>, now = Date.now())
     .filter((id) => (stored[id] ?? []).length > 0 && now - (editedAt[id] ?? now) <= maxTrayAgeMs)
     .sort((a, b) => (editedAt[b] ?? now) - (editedAt[a] ?? now))
     .slice(0, maxSources);
-  const next: PersistedTrays = { bySource: {}, overallBySource: {}, editedAt: {} };
+  const next: PersistedTrays = { bySource: {}, overallBySource: {}, editedAt: {}, collapsedBySource: {} };
   for (const id of keep) {
     next.bySource[id] = stored[id];
     next.editedAt[id] = editedAt[id] ?? now;
     const overall = persisted.overallBySource?.[id];
     if (overall) next.overallBySource[id] = overall;
+    if (persisted.collapsedBySource?.[id]) next.collapsedBySource[id] = true;
   }
   return next;
 }
@@ -51,6 +58,7 @@ export const useAnnotationStore = create<AnnotationStoreState>()(
       bySource: {},
       overallBySource: {},
       editedAt: {},
+      collapsedBySource: {},
       add: (sourceId, draft) => {
         const current = get().bySource[sourceId] ?? [];
         if (current.length >= maxDrafts) return false;
@@ -75,14 +83,19 @@ export const useAnnotationStore = create<AnnotationStoreState>()(
           const { [sourceId]: _drafts, ...bySource } = state.bySource;
           const { [sourceId]: _overall, ...overallBySource } = state.overallBySource;
           const { [sourceId]: _edited, ...editedAt } = state.editedAt;
-          return { bySource, overallBySource, editedAt };
+          const { [sourceId]: _collapsed, ...collapsedBySource } = state.collapsedBySource;
+          return { bySource, overallBySource, editedAt, collapsedBySource };
         }),
       setOverall: (sourceId, overall) =>
         set((state) => ({ overallBySource: { ...state.overallBySource, [sourceId]: overall }, editedAt: touch(state.editedAt, sourceId) })),
+      // Collapsing hides drafts; it does not edit them, so it deliberately
+      // leaves editedAt alone and lets the tray expire on its real last edit.
+      setCollapsed: (sourceId, collapsed) =>
+        set((state) => ({ collapsedBySource: { ...state.collapsedBySource, [sourceId]: collapsed } })),
     }),
     {
       name: "agentdeck-annotation-tray",
-      partialize: (state) => ({ bySource: state.bySource, overallBySource: state.overallBySource, editedAt: state.editedAt }),
+      partialize: (state) => ({ bySource: state.bySource, overallBySource: state.overallBySource, editedAt: state.editedAt, collapsedBySource: state.collapsedBySource }),
       merge: (persisted, current) => ({ ...current, ...pruneTrays((persisted ?? {}) as Partial<PersistedTrays>) }),
     },
   ),

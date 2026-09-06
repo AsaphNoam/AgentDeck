@@ -12,6 +12,8 @@ export function AnnotationTray({ sourceId, sourceActive }: { sourceId: string; s
   const remove = useAnnotationStore((state) => state.remove);
   const discard = useAnnotationStore((state) => state.discard);
   const setOverall = useAnnotationStore((state) => state.setOverall);
+  const collapsed = useAnnotationStore((state) => state.collapsedBySource[sourceId] ?? false);
+  const setCollapsed = useAnnotationStore((state) => state.setCollapsed);
   const agents = useAgentStore((state) => state.agents);
   const source = agents[sourceId];
   const recipients = Object.values(agents).filter((agent) => agent.agent_id !== sourceId && agent.running && agent.interface === "chat");
@@ -63,10 +65,26 @@ export function AnnotationTray({ sourceId, sourceActive }: { sourceId: string; s
   };
 
   return (
-    <aside className="annotation-tray" aria-label="Pending annotations">
+    // Docked column or floating overlay is decided by the transcript region's own
+    // width in CSS, so this renders one tray in one shape either way. The collapse
+    // control and the collapsed strip are likewise CSS states of that same markup:
+    // the overlay hides the control, so narrowing the window can never strand a
+    // person with a collapsed tray and no way to open it (FS-13.R20–R21).
+    <aside className="annotation-tray" data-ui="annotation-tray" data-state={collapsed ? "collapsed" : "expanded"} aria-label="Pending annotations">
       <header className="annotation-tray-header">
-        <div><strong>Pending annotations</strong><span>{drafts.length}/20</span></div>
-        <button type="button" className="annotation-link" onClick={() => discard(sourceId)} disabled={sending}>Discard all</button>
+        <div><strong className="annotation-tray-title">Pending annotations</strong><span>{drafts.length}/20</span></div>
+        <div>
+          <button
+            type="button"
+            className="annotation-tray-collapse"
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? "Expand pending annotations" : "Collapse pending annotations"}
+            onClick={() => setCollapsed(sourceId, !collapsed)}
+          >
+            {collapsed ? "‹" : "›"}
+          </button>
+          <button type="button" className="annotation-link annotation-tray-discard" onClick={() => discard(sourceId)} disabled={sending}>Discard all</button>
+        </div>
       </header>
       <div className="annotation-tray-body">
         <ol className="annotation-drafts">
@@ -108,7 +126,9 @@ function AnnotationDraftRow({ draft, index, sourceId, onRemove, onUpdate, disabl
   const anchor = draft.path ? `${draft.path}:${draft.start_line}${draft.end_line && draft.end_line !== draft.start_line ? `–${draft.end_line}` : ""}` : `Event ${draft.seq}`;
   return (
     <li className="annotation-draft">
-      <div className="annotation-draft-head"><strong>{anchor}</strong><button type="button" className="annotation-link" onClick={() => onRemove(sourceId, index)} disabled={disabled}>Remove</button></div>
+      {/* The anchor is what the reader scans for, so it is the row's heading
+          rather than bold text sharing a line with a control (FS-13.R22). */}
+      <div className="annotation-draft-head"><h3 className="annotation-draft-anchor">{anchor}</h3><button type="button" className="annotation-link" onClick={() => onRemove(sourceId, index)} disabled={disabled}>Remove</button></div>
       <blockquote>{draft.excerpt}</blockquote>
       <label>Instruction<textarea value={draft.instruction} maxLength={2000} onChange={(event) => onUpdate(sourceId, index, event.target.value)} disabled={disabled} /></label>
     </li>

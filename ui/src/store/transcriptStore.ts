@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { PermissionResolution, TranscriptEvent } from "../api/types";
+import { annotationBlockSentinel } from "../lib/annotations";
 
 interface TranscriptStoreState {
   byAgent: Record<string, TranscriptEvent[]>;
@@ -76,7 +77,29 @@ function markResolved(
   return next;
 }
 
+// A send to the current agent starts an ordinary prompt turn whose text is the
+// machine annotation block, so the transcript would show the same excerpts and
+// instructions twice: once as the annotation card, once as a wall of generated
+// prose the person never typed. Drop that one duplicate (FS-13.R23).
+//
+// All three conditions carry weight. Adjacency alone would swallow the message
+// someone types straight after assigning a batch to *another* agent, and the
+// `self` target is what makes the non-self case unreachable rather than merely
+// unlikely. Matching the block's first line rather than its whole layout keeps
+// this the only thing the client borrows from the Go writer.
+function suppressedAnnotationPrompt(events: TranscriptEvent[], event: TranscriptEvent) {
+  if (kindOf(event) !== "user_text" || !textOf(event).startsWith(annotationBlockSentinel)) return false;
+  const last = events[events.length - 1];
+  if (!last || kindOf(last) !== "annotation") return false;
+  return (last.target as { kind?: string } | undefined)?.kind === "self";
+}
+
 function appendRenderedEvent(events: TranscriptEvent[], event: TranscriptEvent) {
+  // Display-only: the caller still records the event in rawByAgent, the
+  // endpoint still returns it, and the agent still received the block verbatim.
+  // Because the decision is made here, on the seam replay and live append share,
+  // transcripts recorded before this shipped are quieted the same way.
+  if (suppressedAnnotationPrompt(events, event)) return;
   const last = events[events.length - 1];
   if (kindOf(event) === "assistant_text" && last && kindOf(last) === "assistant_text") {
     events[events.length - 1] = {

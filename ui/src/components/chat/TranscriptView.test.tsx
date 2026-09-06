@@ -3,12 +3,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { useAnnotationStore } from "../../store/annotationStore";
+import { foldTranscript, useTranscriptStore } from "../../store/transcriptStore";
+import { annotationBlockSentinel } from "../../lib/annotations";
 import { TranscriptView } from "./TranscriptView";
 
 afterEach(() => {
   cleanup();
   window.getSelection()?.removeAllRanges();
-  useAnnotationStore.setState({ bySource: {}, overallBySource: {}, editedAt: {} });
+  useAnnotationStore.setState({ bySource: {}, overallBySource: {}, editedAt: {}, collapsedBySource: {} });
+  useTranscriptStore.setState({ byAgent: {}, rawByAgent: {}, pending: {} });
 });
 
 const events = [{ kind: "assistant_text", seq: 7, text: "First line\nSecond line" }];
@@ -130,5 +133,65 @@ describe("TranscriptView annotation entry point", () => {
     fireEvent.click(screen.getByRole("button", { name: "Annotate whole event" }));
 
     expect(useAnnotationStore.getState().bySource.a1).toMatchObject([{ seq: 1 }]);
+  });
+});
+
+// FS-13.A14 (R23). Sending a batch to the current agent starts an ordinary
+// prompt turn whose text is the machine block, so the transcript would otherwise
+// show the same excerpts twice: once as the card, once as a wall of generated
+// prose the person never wrote.
+describe("TranscriptView self-annotation prompt", () => {
+  const block = `${annotationBlockSentinel}\n\n1. Transcript event 7\nExcerpt:\n---\nFirst line\n---\nInstruction: tighten this\n`;
+  const annotationEvent = {
+    type: "annotation",
+    seq: 8,
+    data: { annotations: [{ seq: 7, excerpt: "First line", instruction: "tighten this" }], target: { kind: "self" } },
+  };
+  const promptEvent = { type: "user_text", seq: 9, data: { text: block } };
+
+  function expectQuieted() {
+    expect(screen.getByText("Annotations assigned")).toBeInTheDocument();
+    expect(screen.getByText("tighten this")).toBeInTheDocument();
+    expect(screen.queryByText(annotationBlockSentinel, { exact: false })).toBeNull();
+  }
+
+  it("draws the card alone when the prompt arrives live", () => {
+    const append = useTranscriptStore.getState().appendMessage;
+    append("a1", annotationEvent);
+    append("a1", promptEvent);
+
+    renderTranscript(true, useTranscriptStore.getState().byAgent.a1);
+
+    expectQuieted();
+  });
+
+  // The same list on replay: a rule that lived on only one of the two paths
+  // would draw an event that the next reload then removes (INV §2).
+  it("draws the same list when the transcript is replayed", () => {
+    renderTranscript(true, foldTranscript([annotationEvent, promptEvent]));
+
+    expectQuieted();
+    expect(foldTranscript([annotationEvent, promptEvent])).toHaveLength(1);
+  });
+
+  // The three conditions are load-bearing. A batch assigned to another agent
+  // leaves the source free to keep talking, and that next message is ordinary
+  // prose that must still appear.
+  it("keeps a prompt that follows a batch assigned to another agent", () => {
+    const assigned = { ...annotationEvent, data: { ...annotationEvent.data, target: { kind: "agent", agent_id: "a2" } } };
+    renderTranscript(true, foldTranscript([assigned, { type: "user_text", seq: 9, data: { text: "carry on without me" } }]));
+
+    expect(screen.getByText("carry on without me")).toBeInTheDocument();
+  });
+
+  it("keeps a prompt that does not immediately follow its annotation event", () => {
+    const rendered = foldTranscript([
+      annotationEvent,
+      { type: "assistant_text", seq: 9, data: { text: "on it" } },
+      { ...promptEvent, seq: 10 },
+    ]);
+    renderTranscript(true, rendered);
+
+    expect(screen.getByText(annotationBlockSentinel, { exact: false })).toBeInTheDocument();
   });
 });

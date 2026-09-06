@@ -1,6 +1,6 @@
 # FS-13 — Annotate and assign
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src/components/chat/`, `ui/src/features/archive/`, `internal/server/`, `internal/runtime/`, `internal/state/` · **Journeys:** J13
 **Absorbed:** —
 
@@ -12,7 +12,7 @@ current agent, another running chat agent, or a newly launched agent. AgentDeck 
 annotation as structured, located context — captured excerpt, anchor, instruction, target — never as
 hand-pasted chat text. The chat surface belongs to FS-03, the archived view to FS-05, mail delivery
 to FS-06, and launch to FS-01; this spec owns the annotation interaction, its records, and its
-delivery behavior. The behavior below is shipped except where an item is tagged `(planned)`.
+delivery behavior. Every requirement below is shipped.
 
 ## 2. Behavior
 
@@ -79,7 +79,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 
 - **Tray:** empty → drafting (add/edit/remove entries) → sending → cleared on acknowledged send. A
   failed or rejected send returns to drafting with all content intact.
-- **Tray presentation (planned):** a drafting tray is docked or floating purely as a function of the
+- **Tray presentation:** a drafting tray is docked or floating purely as a function of the
   current transcript width (R20), so a resize moves it between the two forms without touching the
   drafts. A docked tray is additionally expanded or collapsed (R21); leaving the docked form and
   returning restores the remembered collapsed flag. Clearing the tray ends both.
@@ -130,7 +130,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   a click outside it, and after the action is taken. Events that cannot be annotated (R13 terminal
   surfaces, and the session, permission-resolution, turn-end, and annotation events) keep the
   browser's own menu.
-- **R20 (planned).** While a source session holds at least one pending draft and its transcript
+- **R20.** While a source session holds at least one pending draft and its transcript
   region is at least a defined width, the tray renders as a full-height column along the right edge
   of that region and the transcript reflows into the remaining width instead of being overlapped by
   it. The width is measured on the transcript region itself, not on the browser window, so the
@@ -138,16 +138,16 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   window while the agent page docks. Below the threshold the tray keeps that overlay unchanged.
   R18's guarantee — header, target selection, errors, and **Send annotations** stay visible while
   the draft list and overall instruction scroll — holds in both forms.
-- **R21 (planned).** A docked tray offers a collapse control that reduces it to a narrow strip
+- **R21.** A docked tray offers a collapse control that reduces it to a narrow strip
   naming the pending draft count and returns the freed width to the transcript; expanding restores
   the column. The collapsed flag is browser-local per source and is stored, expired, and capped with
   that source's tray (R3, R16), so it survives a reload, is invisible to other browsers and to the
   API, and creates no durable server data. The overlay form offers no collapse control. Sending or
   discarding the tray removes the column and returns the transcript to its full width.
-- **R22 (planned).** In the docked form each pending draft presents its anchor as its own heading
+- **R22.** In the docked form each pending draft presents its anchor as its own heading
   element, distinct from the draft's controls; presents its excerpt with room to wrap rather than
   clipped to the overlay's width; and presents an instruction field taller than the overlay's.
-- **R23 (planned).** In live chat and in archived replay, the transcript does not render the machine
+- **R23.** In live chat and in archived replay, the transcript does not render the machine
   annotation block a self-targeted send produces (R6): a user prompt event carrying that block and
   immediately following its own `annotation` event is not drawn, because that event's card already
   shows the same excerpts and instructions. The
@@ -192,15 +192,15 @@ Each acceptance item names its delivered verification.
   `ui/src/components/chat/renderers/DiffBlock.test.tsx`.
 - **A10** (R3–R4, R18) — A tray with three drafts renders them in the scrollable body and keeps its
   target and Send action in a separate fixed footer: `ui/src/components/chat/AnnotationTray.test.tsx`.
-- **A12 (planned)** (R20–R21) — With drafts pending, a wide transcript region renders the tray as a
+- **A12** (R20–R21) — With drafts pending, a wide transcript region renders the tray as a
   docked column beside the transcript and a narrow one renders the floating overlay; the collapse
   control reduces the column to its pending-count strip, expands again, and the collapsed flag
   survives a reload and is discarded with its tray:
   `ui/src/components/chat/AnnotationTray.test.tsx` and `ui/src/store/annotationStore.test.ts`.
-- **A13 (planned)** (R22) — A docked draft row renders its anchor as a heading element separate from
+- **A13** (R22) — A docked draft row renders its anchor as a heading element separate from
   its controls, alongside the excerpt and the instruction field:
   `ui/src/components/chat/AnnotationTray.test.tsx`.
-- **A14 (planned)** (R23) — A self-targeted send renders the annotation card and no user message
+- **A14** (R23) — A self-targeted send renders the annotation card and no user message
   carrying the annotation block, identically live and after a replay, while the transcript endpoint
   still returns that prompt event: `ui/src/components/chat/TranscriptView.test.tsx` and
   `internal/server/annotations_test.go`.
@@ -223,4 +223,7 @@ Each acceptance item names its delivered verification.
 
 Delivered anchors: annotation endpoint in `internal/server`;
 `annotation` event kind in `internal/runtime/event.go`; `runtime.FormatAnnotationBlock` used by prompt and mail delivery; tray and card components under `ui/src/components/chat/`; reserved-sender mail in
-`internal/state/messages.go`; index wiring in `internal/index/indexer.go`.
+`internal/state/messages.go`; index wiring in `internal/index/indexer.go`; the docked column, its
+container query, and the collapsed strip in `ui/src/styles/features/agent.css`; the collapsed flag on
+the tray record in `ui/src/store/annotationStore.ts`; prompt suppression in `appendRenderedEvent`
+(`ui/src/store/transcriptStore.ts`) against `annotationBlockSentinel` in `ui/src/lib/annotations.ts`.

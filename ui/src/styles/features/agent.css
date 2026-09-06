@@ -108,7 +108,18 @@
   height: 100%;
 }
 
+/* The transcript region is its own query container, and the annotation tray docks
+   into the second column only while it is a flow-level grid item. In the overlay
+   form the tray is absolutely positioned, so it is out of flow, the auto track
+   stays zero wide, and the transcript keeps the full region — the same markup in
+   two CSS states rather than two layouts (FS-13.R20, TS-08.R53). The threshold is
+   measured on this element, never on the viewport, so the dashboard's narrow chat
+   pane inside a wide window keeps the overlay. */
 .transcript-wrap {
+  container: transcript / inline-size;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr);
   height: 100%;
   min-height: 0;
   position: relative;
@@ -452,6 +463,19 @@
   padding-top: var(--ad-space-3);
 }
 
+/* Rendered in both forms but shown only while docked: the strip it produces
+   exists only there (FS-13.R21), and hiding it in CSS rather than dropping it
+   from the markup is what stops a narrowed window from stranding someone with a
+   collapsed tray and no control to reopen it. */
+.annotation-tray-collapse {
+  background: transparent;
+  border: 0;
+  color: var(--ad-action-secondary);
+  display: none;
+  min-height: auto;
+  padding: 0 var(--ad-space-1);
+}
+
 .annotation-link {
   background: transparent;
   border: 0;
@@ -478,6 +502,12 @@
 .annotation-draft {
   border: var(--ad-border-thin) solid var(--ad-border-default);
   padding: var(--ad-space-2);
+}
+
+.annotation-draft-anchor {
+  font-family: var(--ad-font-mono);
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
 }
 
 .annotation-draft label,
@@ -522,6 +552,64 @@
   left: 50%;
   position: absolute;
   transform: translateX(-50%);
+}
+
+/* Docked form (FS-13.R20–R22). Everything below is the same tray in a wider
+   place: the drafts, the target selection, and the send path are untouched, and
+   the transcript's outer padding shrinks so the reflowed text column keeps its
+   readable width instead of paying for the tray twice. */
+@container transcript (min-width: 860px) {
+  .transcript-view {
+    padding-inline: var(--ad-space-6);
+  }
+
+  .annotation-tray {
+    bottom: auto;
+    height: 100%;
+    margin-left: var(--ad-space-4);
+    max-height: none;
+    position: static;
+    right: auto;
+    width: min(30cqi, 460px);
+  }
+
+  .annotation-tray-collapse {
+    display: block;
+  }
+
+  .annotation-draft {
+    padding: var(--ad-space-3);
+  }
+
+  .annotation-draft blockquote {
+    overflow-wrap: anywhere;
+  }
+
+  .annotation-draft textarea {
+    min-height: 96px;
+  }
+
+  .annotation-tray[data-state="collapsed"] {
+    width: auto;
+  }
+
+  .annotation-tray[data-state="collapsed"] .annotation-tray-header {
+    flex-direction: column;
+    gap: var(--ad-space-3);
+  }
+
+  .annotation-tray[data-state="collapsed"] .annotation-tray-body,
+  .annotation-tray[data-state="collapsed"] .annotation-tray-footer,
+  .annotation-tray[data-state="collapsed"] .annotation-tray-title,
+  .annotation-tray[data-state="collapsed"] .annotation-tray-discard {
+    display: none;
+  }
+
+  /* The overlay it floats above still spans the whole region, but a docked tray
+     takes the right of it, so re-centre the button on the text it scrolls. */
+  .transcript-wrap:has(.annotation-tray) .jump-to-latest {
+    left: calc(50% - (min(30cqi, 460px) + var(--ad-space-4)) / 2);
+  }
 }
 
 .composer {

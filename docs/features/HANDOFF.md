@@ -18,16 +18,19 @@ back to that at every release (§16.7). Injected Current position plus Active ch
   remain owed under TS-06.R21 and were not run. A customized
   `agentdecker` role is deliberately not migrated under FS-04.R44, so it keeps the superseded
   product manual beside the current skill.
-- **Review units:** None. Every unit through the `v0.4.1` range is reviewed and closed. Review
-  records, finding-fix commits, release records, and handoff/archive/queue bookkeeping are
-  administrative closure and never re-enter the queue.
-- **Work units:** `dock-the-annotation-tray-and-quiet-its-prompt.md` is waiting to start (FS-13.R20–R23,
-  TS-08.R53–R54). `migrate-internal-actions-from-mcp.md` stays paused on its recorded transport blocker.
+- **Review units:** `dock-the-annotation-tray-and-quiet-its-prompt` is implemented and available to
+  review (FS-13.R20–R23/A12–A14, TS-08.R53–R54). Every earlier unit through the `v0.4.1` range is
+  reviewed and closed. Review records, finding-fix commits, release records, and
+  handoff/archive/queue bookkeeping are administrative closure and never re-enter the queue.
+- **Work units:** None waiting to start. `migrate-internal-actions-from-mcp.md` stays paused on its
+  recorded transport blocker.
 - **Design units:** Existing entries under `Ideas being defined` may resume, and entries under `New
   ideas` are available to start. Neither is gated by work, review, or fix state. The operator called
   the permanently unaddressable pipeline agent broken on 2026-09-05; it is the newest `New ideas`
   entry and changes FS-06.R22, so it needs `/design-feature` before any code.
-- **Open findings:** None.
+- **Open findings:** two from the 2026-09-07 Mermaid investigation, under **Review findings** — the
+  sanitizer erasing Mermaid's generated theme (must fix) and the forced diagram sizing (worth
+  fixing). `/fix` may take them.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
   are still unrun, so no agent may claim those adapters accept structured results — but they no
   longer block any role (see **Acceptance gates**).
@@ -38,14 +41,22 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 
 ## Active change
 
-**Change:** None. `v0.4.1` closed the epoch: every change in its range is implemented, reviewed,
-fixed, and closed.
+**Change:** None. `dock-the-annotation-tray-and-quiet-its-prompt` finished on 2026-09-07 and moved
+to the review queue.
 
-**Available by role:** `/review` has no unreviewed unit to take; `/fix` has no open findings; `/work`
-may take `dock-the-annotation-tray-and-quiet-its-prompt.md`, the one
-ready change waiting to start; `/design-feature` may choose any available or resumable idea, or any
-idea a person names from another `docs/ideas.md` section. Selecting one role does not depend on
-clearing another role's queue.
+**Available by role:** `/review` may take `dock-the-annotation-tray-and-quiet-its-prompt`; `/fix` may
+take either open Mermaid finding; `/work` has no ready change waiting to start; `/design-feature` may
+choose any available or resumable idea, or any idea a person names from another `docs/ideas.md`
+section. Selecting one role does not depend on clearing another role's queue.
+
+The docked tray's two forms are a container query on the transcript region, which neither jsdom nor
+Testing Library can evaluate, so the stylesheet is what the unit tests assert (INV §13). The rendered
+result was checked in real headless Chrome against the built CSS at 1180 px and 700 px regions,
+expanded and collapsed: the transcript reflows beside the column, the narrow region keeps the
+overlay, and the collapsed strip returns the width. That check caught a placement bug the whole test
+suite was blind to — an explicit grid area on **Jump to latest** pushed the transcript into the
+tray's column — and a stylesheet assertion now pins it. A real-browser pass over the docked tray on
+the running agent page still belongs to `/usability-review`.
 
 Credentialed provider journeys stay recorded as open acceptance gates, but on 2026-09-05 the
 operator ruled they block no role. Never report them as verified; do not wait on them either.
@@ -56,6 +67,26 @@ Entries through the `v0.4.1` epoch are in the
 [archived handoff](../archive/state/HANDOFF-through-2026-09-06.md); earlier ones are in the
 [`v0.4.0` archive](../archive/state/HANDOFF-through-2026-09-03.md) and Git history.
 
+- **2026-09-07 — work: dock the annotation tray and quiet its prompt.** The pending annotation tray
+  now becomes a full-height column on the right of a wide transcript, with the transcript reflowing
+  beside it instead of being covered; below the threshold it keeps the shipped floating overlay. The
+  form is decided by a container query on the transcript region rather than the viewport, so the
+  dashboard's narrow chat pane keeps the overlay inside a wide window, and nothing measures anything
+  (FS-13.R20, TS-08.R53). The column collapses to a strip naming the pending count and expands
+  again; that flag is a field on the existing per-source draft record, so it inherits the tray's
+  persistence, 30-day expiry, 20-source cap, and delete-with-agent path rather than adding a second
+  browser key (FS-13.R21). Each docked draft gained an anchor heading of its own, a roomier excerpt
+  that wraps, and a taller instruction field (FS-13.R22). Sending a batch to the current agent no
+  longer draws the machine annotation block underneath its own card: `appendRenderedEvent` drops a
+  `user_text` that begins with the block's first line and immediately follows a `self`-targeted
+  annotation event, on the one seam live append and replay share, so transcripts recorded before
+  this shipped are quieted too and the event, the endpoint, and the search index are untouched
+  (FS-13.R23, TS-08.R54). The block's first line is one exported client constant, and a Go test
+  reads it and asserts `runtime.FormatAnnotationBlock` still emits it, so the cross-language pair
+  cannot drift silently. FS-13 and TS-08 are now `Current`. Also fixed, outside this change: the two
+  Mermaid findings recorded earlier the same day used a finding prefix `scripts/check-specs.sh`
+  rejects, which left `make check-specs` — and therefore `make test` — failing on `main` for every
+  role; the prefix and a missing invariant tag were corrected without touching the findings.
 - **2026-09-07 — investigate bug: Mermaid diagrams render as black, oversized blocks.** Report,
   verbatim: “Mermaid is fucked up, is the chat in MD display? Would that make it better and solve
   the mermaid complications?” The reporter supplied no version, environment, example source, logs,
@@ -179,7 +210,7 @@ OpenCode, and OpenHands are not installed globally.
 
 ## Review findings
 
-- **Must fix — Confirmed:** `ui/src/components/chat/renderers/mermaid.ts` clears Mermaid's complete
+- **Must fix** — Confirmed (INV §8): `ui/src/components/chat/renderers/mermaid.ts` clears Mermaid's complete
   generated theme stylesheet for an ordinary diagram because `stripRemoteStyleReferences` treats
   safe same-document `url(#…)` SVG references as remote. A closed assistant `mermaid` fence then
   renders black nodes with invisible black text under Core, violating FS-03.R37 and TS-08.R40.
@@ -188,7 +219,7 @@ OpenCode, and OpenHands are not installed globally.
   sanitizer and independently asserts visible theme contrast, retained safe local references, and
   no network request. The existing mocked SVG cases do not contain Mermaid's normal stylesheet and
   therefore cannot catch this.
-- **Worth fixing — Confirmed:** `ui/src/styles/integrations.css` combines a forced `width: 100%`
+- **Worth fixing** — Confirmed (INV §8): `ui/src/styles/integrations.css` combines a forced `width: 100%`
   with a viewport-height cap after `removeDiagramRootWidthCap` removes Mermaid's intrinsic bound.
   The deterministic three-node fixture's `124 × 269` viewBox becomes a `768 × 672` SVG canvas and
   dominates the transcript instead of remaining a readable compact diagram, contrary to

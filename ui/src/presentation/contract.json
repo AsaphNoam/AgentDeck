@@ -265,6 +265,14 @@
         "unknown"
       ]
     },
+    "annotation-tray": {
+      "slots": [],
+      "states": [
+        "collapsed",
+        "expanded"
+      ],
+      "variants": []
+    },
     "tool-call": {
       "slots": [
         "trigger",

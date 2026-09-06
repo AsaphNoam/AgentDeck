@@ -1,6 +1,6 @@
 # TS-08 — Frontend presentation architecture
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src`, `ui/package.json`, `ui/vite.config.ts`
 **Absorbed:** —
 
@@ -481,7 +481,7 @@ primitive seam; the rejected alternatives are recorded in §5.
 
 ### 2.8 Docked annotation tray and annotation-block suppression
 
-- **R53 (planned)** — **The tray docks through the transcript region's own
+- **R53** — **The tray docks through the transcript region's own
   grid and a container query; nothing measures anything.** FS-13.R20 is implemented by making
   `.transcript-wrap` a container and a two-column grid whose second track exists only while drafts
   are pending, with `.annotation-tray` leaving `position: absolute` for that track. The threshold is
@@ -505,7 +505,7 @@ primitive seam; the rejected alternatives are recorded in §5.
   30-day expiry, 20-source cap, and delete-with-agent path rather than adding a second browser
   storage key or lifecycle (FS-13.R16, INV §1).
 
-- **R54 (planned)** — **Suppressing the annotation prompt is one more
+- **R54** — **Suppressing the annotation prompt is one more
   rule in the shipped transcript projection, and it recognizes the block without respelling its
   format.** FS-13.R23 is implemented inside `appendRenderedEvent` in
   `ui/src/store/transcriptStore.ts` — the seam `foldTranscript` and the live append already share,
@@ -721,6 +721,14 @@ boundary; the manifest remains the visual contract and arbitrary ids never becom
   sharing an expanded pane's grid row sit at the top of a tall row. `dense` packing and a fixed
   `grid-auto-rows` with a multi-row span would both fill that space, and both were rejected because
   they reassign the cells of the cards after the pane. A masonry-style layout is not available.
+
+- **The annotation tray's docked form is a registered component and a CSS state, not a
+  `data-variant`.** R53 exposes the docked form and its collapsed strip through the curated contract.
+  The collapsed strip is `data-state="collapsed"`/`"expanded"` on the registered `annotation-tray`
+  component, but the docked-versus-overlay form deliberately carries no `data-variant`: nothing in
+  the client knows which form is on screen, because the choice is a container query and R53 forbids
+  measuring. Setting a variant would require the `ResizeObserver` the same requirement rules out, so
+  a skin hooks the docked form through the container query it already lives in.
 
 - **Automatic expansion is deliberately not driven by notifications.** R49 rejects reusing the
   `notification` stream that already computes the same transition on the server, because that stream
