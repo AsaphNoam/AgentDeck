@@ -56,6 +56,23 @@ Entries through the `v0.4.1` epoch are in the
 [archived handoff](../archive/state/HANDOFF-through-2026-09-06.md); earlier ones are in the
 [`v0.4.0` archive](../archive/state/HANDOFF-through-2026-09-03.md) and Git history.
 
+- **2026-09-07 — investigate bug: Mermaid diagrams render as black, oversized blocks.** Report,
+  verbatim: “Mermaid is fucked up, is the chat in MD display? Would that make it better and solve
+  the mermaid complications?” The reporter supplied no version, environment, example source, logs,
+  or screenshot. Investigation used current `main` at `9b04b99`, the Core appearance, and the
+  deterministic Mermaid fixture in a real in-app Chromium against the Vite development server;
+  the browser console logged no warning or error. Assistant chat is already sanitized
+  GitHub-flavored Markdown through `react-markdown`; closed assistant `mermaid` fences alone take
+  the additional SVG-rendering path. The fixture reproduced a 794 px-wide by 734 px-tall region
+  whose nodes and text both computed black. The generated SVG retained a `<style>` element but its
+  content was empty. `stripRemoteStyleReferences` in `renderers/mermaid.ts` clears an entire style
+  carrier whenever its decoded CSS contains any `url(`, so Mermaid's ordinary same-document SVG
+  marker references are treated as remote and erase the complete generated theme. Separately, the
+  fixture SVG has a `124 × 269` viewBox but the integration forces it to full transcript width and
+  the viewport-height cap, producing the reproduced oversized 768 × 672 canvas. The focused
+  renderer suite and presentation checks pass because the Mermaid module is mocked and no test
+  runs a normal real-Mermaid SVG through the sanitizer or asserts the resulting geometry. Findings
+  are recorded below; no product code or specification changed.
 - **2026-09-07 — design: dock the annotation tray and quiet its prompt.** The operator's request to
   move the annotation window right, enlarge it, make each draft readable, and cut annotation meta
   from the conversation is specified as FS-13.R20–R23 / A12–A14 and TS-08.R53–R54, and waits in
@@ -162,7 +179,22 @@ OpenCode, and OpenHands are not installed globally.
 
 ## Review findings
 
-No open findings.
+- **Must fix — Confirmed:** `ui/src/components/chat/renderers/mermaid.ts` clears Mermaid's complete
+  generated theme stylesheet for an ordinary diagram because `stripRemoteStyleReferences` treats
+  safe same-document `url(#…)` SVG references as remote. A closed assistant `mermaid` fence then
+  renders black nodes with invisible black text under Core, violating FS-03.R37 and TS-08.R40.
+  Preserve the security boundary while distinguishing local fragment references from network-capable
+  URLs after CSS-escape decoding; add a regression that exercises real Mermaid output through the
+  sanitizer and independently asserts visible theme contrast, retained safe local references, and
+  no network request. The existing mocked SVG cases do not contain Mermaid's normal stylesheet and
+  therefore cannot catch this.
+- **Worth fixing — Confirmed:** `ui/src/styles/integrations.css` combines a forced `width: 100%`
+  with a viewport-height cap after `removeDiagramRootWidthCap` removes Mermaid's intrinsic bound.
+  The deterministic three-node fixture's `124 × 269` viewBox becomes a `768 × 672` SVG canvas and
+  dominates the transcript instead of remaining a readable compact diagram, contrary to
+  FS-03.R37/A22's bounded, readable-scale contract. Adjust the sizing rule to respect both available
+  width and bounded height without forcing a small or portrait diagram to fill the pane; add a real
+  browser geometry assertion for compact portrait and wide fixtures.
 
 ## Design consistency notes
 
