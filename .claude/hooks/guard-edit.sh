@@ -71,8 +71,15 @@ elif printf '%s' "$payload" | jq -e '.tool_input.old_string != null and .tool_in
   old=$(printf '%s' "$payload" | jq -r '.tool_input.old_string' 2>/dev/null) || exit 0
   new=$(printf '%s' "$payload" | jq -r '.tool_input.new_string' 2>/dev/null) || exit 0
   replace_all=$(printf '%s' "$payload" | jq -r '.tool_input.replace_all // false' 2>/dev/null) || exit 0
+  # Both branches splice with split/join. jq's string `index` reports a BYTE
+  # offset while `.[a:b]` slices by codepoint, so index arithmetic mangles any
+  # file containing multibyte characters — the handoff's em dashes made a
+  # legitimate edit look like a budget overflow.
   jq -Rsr --arg old "$old" --arg new "$new" --argjson replace_all "$replace_all" \
-    'if $old == "" then . elif $replace_all then split($old) | join($new) else (index($old) as $i | if $i == null then . else .[:$i] + $new + .[$i + ($old|length):] end) end' \
+    'if $old == "" then . elif $replace_all then split($old) | join($new)
+     else split($old) as $p
+       | if ($p | length) < 2 then . else $p[0] + $new + ($p[1:] | join($old)) end
+     end' \
     "$target" >"$tmp" 2>/dev/null || exit 0
 else
   exit 0

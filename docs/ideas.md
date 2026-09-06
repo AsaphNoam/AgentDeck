@@ -33,6 +33,20 @@ Example:
   agent needs approval, make it a link that opens that agent's conversation, so the user can jump
   straight to the pending permission instead of hunting for the right agent.
 
+- **A pipeline agent stays unmailable forever after its run ends.** `stoppedWakeGates`
+  (`internal/state/messages.go:44`) excludes any agent with a `pipeline_attempts` row from the
+  stopped-wakeable set, and that row survives as long as its `pipeline_runs` record. So once a
+  stage agent stops, no `send_message` or `create_task` can ever wake it again — including long
+  after the run reached `completed` or `stopped` — unless a person resumes it by hand or deletes
+  the run. FS-06.R22's stated reason is that the stage state machine deliberately stopped the
+  agent, which only holds while that state machine still owns it. The operator called this broken
+  on 2026-09-05. The fix should scope the exclusion to an attempt whose run is still active
+  (`state NOT IN ('completed','stopped')`, the same predicate `ListActivePipelineRuns` already
+  uses) rather than to the mere existence of an attempt row, and keep the exclusion's two
+  consumers — `AddressableAgents` and `StoppedWakeCandidates` — reading one shared SQL spelling
+  (INV §2). Check the FS-06.R29 refusal wording and the FS-15.R17 divergence it names at the same
+  time. Needs FS-06.R22 updated, not just code.
+
 ## Ideas being defined
 
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
