@@ -28,9 +28,7 @@ back to that at every release (§16.7). Injected Current position plus Active ch
   ideas` are available to start. Neither is gated by work, review, or fix state. The operator called
   the permanently unaddressable pipeline agent broken on 2026-09-05; it is the newest `New ideas`
   entry and changes FS-06.R22, so it needs `/design-feature` before any code.
-- **Open findings:** two from the 2026-09-07 Mermaid investigation, under **Review findings** — the
-  sanitizer erasing Mermaid's generated theme (must fix) and the forced diagram sizing (worth
-  fixing). `/fix` may take them.
+- **Open findings:** None.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
   are still unrun, so no agent may claim those adapters accept structured results — but they no
   longer block any role (see **Acceptance gates**).
@@ -44,8 +42,8 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 **Change:** None. `dock-the-annotation-tray-and-quiet-its-prompt` finished on 2026-09-07 and moved
 to the review queue.
 
-**Available by role:** `/review` may take `dock-the-annotation-tray-and-quiet-its-prompt`; `/fix` may
-take either open Mermaid finding; `/work` has no ready change waiting to start; `/design-feature` may
+**Available by role:** `/review` may take `dock-the-annotation-tray-and-quiet-its-prompt`; `/fix` has
+no open finding; `/work` has no ready change waiting to start; `/design-feature` may
 choose any available or resumable idea, or any idea a person names from another `docs/ideas.md`
 section. Selecting one role does not depend on clearing another role's queue.
 
@@ -67,6 +65,17 @@ Entries through the `v0.4.1` epoch are in the
 [archived handoff](../archive/state/HANDOFF-through-2026-09-06.md); earlier ones are in the
 [`v0.4.0` archive](../archive/state/HANDOFF-through-2026-09-03.md) and Git history.
 
+- **2026-09-07 — fix: restore Mermaid theme and bounded sizing (INV §8/§13/§17).** The diagram
+  sanitizer now preserves decoded `url(#fragment)` references used by Mermaid's generated SVG
+  markers and paint servers while continuing to drop every network-capable or malformed URL token.
+  A regression drives the real pinned Mermaid producer through DOMPurify and independently checks
+  retained theme contrast, safe local references, and no network request; focused cases retain the
+  escaped-fragment and hostile-URL boundaries. Diagram CSS no longer forces a compact SVG to fill
+  the transcript: it keeps Mermaid's intrinsic width cap while bounding both available width and
+  viewport height. The development matrix now includes compact portrait and wide fixtures; real
+  Chromium measured the portrait at its 124 × 269 intrinsic size and the wide fixture fitted to the
+  768 px available canvas without overflow. Both Mermaid findings are closed; no specification
+  changed because the fix restores FS-03.R37/A22 and TS-08.R40.
 - **2026-09-07 — work: dock the annotation tray and quiet its prompt.** The pending annotation tray
   now becomes a full-height column on the right of a wide transcript, with the transcript reflowing
   beside it instead of being covered; below the threshold it keeps the shipped floating overlay. The
@@ -210,22 +219,7 @@ OpenCode, and OpenHands are not installed globally.
 
 ## Review findings
 
-- **Must fix** — Confirmed (INV §8): `ui/src/components/chat/renderers/mermaid.ts` clears Mermaid's complete
-  generated theme stylesheet for an ordinary diagram because `stripRemoteStyleReferences` treats
-  safe same-document `url(#…)` SVG references as remote. A closed assistant `mermaid` fence then
-  renders black nodes with invisible black text under Core, violating FS-03.R37 and TS-08.R40.
-  Preserve the security boundary while distinguishing local fragment references from network-capable
-  URLs after CSS-escape decoding; add a regression that exercises real Mermaid output through the
-  sanitizer and independently asserts visible theme contrast, retained safe local references, and
-  no network request. The existing mocked SVG cases do not contain Mermaid's normal stylesheet and
-  therefore cannot catch this.
-- **Worth fixing** — Confirmed (INV §8): `ui/src/styles/integrations.css` combines a forced `width: 100%`
-  with a viewport-height cap after `removeDiagramRootWidthCap` removes Mermaid's intrinsic bound.
-  The deterministic three-node fixture's `124 × 269` viewBox becomes a `768 × 672` SVG canvas and
-  dominates the transcript instead of remaining a readable compact diagram, contrary to
-  FS-03.R37/A22's bounded, readable-scale contract. Adjust the sizing rule to respect both available
-  width and bounded height without forcing a small or portrait diagram to fill the pane; add a real
-  browser geometry assertion for compact portrait and wide fixtures.
+None.
 
 ## Design consistency notes
 

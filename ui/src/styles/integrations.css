@@ -55,7 +55,7 @@
   height: auto;
   margin-inline: auto;
   max-height: calc(100vh - var(--ad-space-12));
-  width: 100%;
+  max-width: 100%;
 }
 
 .mermaid-diagram-note {

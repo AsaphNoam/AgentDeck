@@ -81,7 +81,7 @@ describe("assistant diagram rendering", () => {
     expect(mermaid.render).toHaveBeenCalledTimes(1);
   });
 
-  it("removes Mermaid's intrinsic root width cap for host-owned responsive sizing", async () => {
+  it("keeps Mermaid's intrinsic width cap so compact diagrams are not forced full-width", async () => {
     mermaid.render.mockImplementation(async (id: string) => ({
       svg: `<svg id="${id}" width="100%" style="max-width: 124px;"><g /></svg>`,
     }));
@@ -89,8 +89,15 @@ describe("assistant diagram rendering", () => {
 
     await waitFor(() => expect(container.querySelector(".mermaid-diagram-figure svg")).not.toBeNull());
     const svg = container.querySelector(".mermaid-diagram-figure svg") as SVGSVGElement;
-    expect(svg.style.maxWidth).toBe("");
-    expect(svg.getAttribute("style")).toBeNull();
+    expect(svg.style.maxWidth).toBe("124px");
+  });
+
+  it("bounds diagram geometry without forcing the root SVG to fill its figure", () => {
+    const css = fs.readFileSync(path.resolve(__dirname, "../../../styles/integrations.css"), "utf8");
+    const svgRule = css.match(/\.mermaid-diagram-figure svg\s*\{([^}]+)\}/)?.[1] ?? "";
+    expect(svgRule).toContain("max-width: 100%");
+    expect(svgRule).toContain("max-height:");
+    expect(svgRule).not.toMatch(/(?:^|;)\s*width:\s*100%/);
   });
 
   it("keeps an open fence a code block and promotes it when the closing delta arrives", async () => {
@@ -143,6 +150,18 @@ describe("assistant diagram rendering", () => {
 
 // FS-03.A21
 describe("assistant diagram safety", () => {
+  it("retains safe same-document fragment references after CSS-escape decoding", async () => {
+    mermaid.render.mockImplementation(async (id: string) => ({
+      svg: `<svg id="${id}"><style>.edge { marker-end: u\\72 l('#arrow'); fill: url(#paint); }</style><path class="edge" /></svg>`,
+    }));
+    const { container } = renderAssistant(CLOSED);
+
+    await waitFor(() => expect(container.querySelector(".mermaid-diagram-figure svg")).not.toBeNull());
+    const theme = container.querySelector("style")?.textContent ?? "";
+    expect(theme).toContain("u\\72 l('#arrow')");
+    expect(theme).toContain("url(#paint)");
+  });
+
   it("strips scripts, HTML labels, handlers, and links from the rendered markup", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("no request expected"));
     mermaid.render.mockResolvedValue({

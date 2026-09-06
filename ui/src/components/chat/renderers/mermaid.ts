@@ -31,6 +31,7 @@ let purify: Purify | null = null;
 // browser re-tokenizes is how the escape got through in the first place, and the core theme emits
 // no such token, so nothing the product renders is lost (INV §8).
 const URL_BEARING = /url\(|@import|image-set\(|src\(/i;
+const LOCAL_FRAGMENT_URL = /url\(\s*(?:(["'])(#[^\s"'()]+)\1|(#[^\s"'()]+))\s*\)/gi;
 
 function decodeCSSEscapes(css: string): string {
   return css.replace(/\\(?:([0-9a-fA-F]{1,6})[ \t\n\r\f]?|([\s\S]))/g, (_match, hex: string | undefined, literal: string | undefined) => {
@@ -43,7 +44,12 @@ function decodeCSSEscapes(css: string): string {
 }
 
 function namesRemoteReference(css: string): boolean {
-  return URL_BEARING.test(decodeCSSEscapes(css));
+  const decoded = decodeCSSEscapes(css);
+  // SVG paint servers and markers use same-document fragments such as `url(#arrowhead)`.
+  // Remove only those exact tokens before looking for network-capable CSS references; quoted,
+  // escaped fragments are accepted after decoding, while schemes, paths, malformed tokens, and
+  // every other URL-bearing construct still drop the complete style carrier.
+  return URL_BEARING.test(decoded.replace(LOCAL_FRAGMENT_URL, ""));
 }
 
 function stripRemoteStyleReferences(node: Node) {
@@ -56,21 +62,11 @@ function stripRemoteInlineStyleReferences(node: Node) {
   if (namesRemoteReference(node.getAttribute("style") ?? "")) node.removeAttribute("style");
 }
 
-// Mermaid shrink-wraps the root SVG through an inline `max-width` equal to its intrinsic width.
-// The host owns responsive sizing, so remove only that generated cap after sanitization and leave
-// every other safe renderer style intact (TS-08.R40).
-function removeDiagramRootWidthCap(node: Node) {
-  if (!(node instanceof SVGSVGElement) || !node.id.startsWith("ad-diagram-")) return;
-  node.style.removeProperty("max-width");
-  if (!node.getAttribute("style")?.trim()) node.removeAttribute("style");
-}
-
 async function loadPurify(): Promise<Purify> {
   if (!purify) {
     const module = await import("dompurify");
     module.default.addHook("afterSanitizeElements", stripRemoteStyleReferences);
     module.default.addHook("afterSanitizeAttributes", stripRemoteInlineStyleReferences);
-    module.default.addHook("afterSanitizeAttributes", removeDiagramRootWidthCap);
     purify = module.default;
   }
   return purify;
