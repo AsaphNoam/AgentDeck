@@ -144,9 +144,12 @@ make the archive and the dashboard card claim a speed the agent never ran at. Th
 in its structural form: the one-shot request gets its own field that the persistence path recording
 what ran is blind to.
 
-Because the chat-header toggle (FS-03.R45) changes fast mode mid-session, `agents.fast` and
-`sessions.fast` are updated together on every apply through the same write path that switch runtime
-uses for the rest of the runtime identity, so the archive projection never lags the agent (INV §2).
+Because the chat header now changes fast mode *and* effort mid-session (FS-03.R45, FS-03.R47),
+`agents.fast`/`sessions.fast` and the existing `agents.effort`/`sessions.effort` are updated together
+on every apply through the same write path that switch runtime uses for the rest of the runtime
+identity, so the archive projection never lags the agent (INV §2). Effort needs no new column — R18's
+columns already hold it — only this second writer, which is why the live path reuses that write path
+instead of adding one.
 `0` means normal speed and existing rows adopt it without interpretation — which is also the correct
 reading for every agent that predates this field.
 

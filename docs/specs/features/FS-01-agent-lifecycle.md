@@ -49,7 +49,9 @@ orphaned processes.
   joins backend and model as part of the agent's runtime identity: it is reported on the session
   response and agent record, shown beside backend and model on the chat and archive headers,
   restored by resume (R11), carried by clone (R9), and changeable on a running agent through switch
-  runtime (R13) under the same native-resume versus primer rules a model swap follows.
+  runtime (R13) under the same native-resume versus primer rules a model swap follows. Switch runtime
+  keeps accepting effort unchanged; FS-03.R47 `(planned)` adds a second, cheaper way to change it on
+  a running chat agent that does not restart the process.
 - **R35 (planned)** — Launch accepts an optional **fast mode** alongside backend,
   model, and effort, from the New Agent modal, the `POST /api/sessions` body, and the CLI flag
   `--fast` (a boolean flag taking no operand, unlike `--effort`). Whether it is offered at all, how

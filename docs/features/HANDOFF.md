@@ -20,8 +20,10 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 - **Review units:** None open. `dock-the-annotation-tray-and-quiet-its-prompt` is reviewed,
   fixed, and closed; all earlier units through this release are closed. Review records, finding-fix
   commits, release records, and handoff/archive/queue bookkeeping are administrative closure.
-- **Work units:** `fast-mode-for-agents.md` is waiting to start (designed 2026-09-07, not active).
-  `migrate-internal-actions-from-mcp.md` stays paused on its recorded transport blocker.
+- **Work units:** `chat-session-configuration.md` is waiting to start (designed 2026-09-07, not
+  active). It carries a confirmed defect fix, not only new behavior: Codex chat agents ignore the
+  selected model and effort. `migrate-internal-actions-from-mcp.md` stays paused on its recorded
+  transport blocker.
 - **Design units:** Existing entries under `Ideas being defined` may resume, and entries under
   `New ideas` are available to start. Two entries from the 2026-09-07 agent-features request are
   part-decided and resumable: streaming agent thinking (decided live-only; rendering default and
@@ -39,8 +41,8 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 **Change:** None. The `v0.4.2` release closed the annotation-tray and Mermaid units.
 
 **Available by role:** `/review` has no unreviewed unit; `/fix` has no open findings; `/work` may
-start `fast-mode-for-agents.md`; `/design-feature` may choose an available or resumable idea, or an
-idea a person names from another `docs/ideas.md` section. Role queues are independent.
+start `chat-session-configuration.md`; `/design-feature` may choose an available or resumable idea,
+or an idea a person names from another `docs/ideas.md` section. Role queues are independent.
 
 **Changelog — 2026-09-07:** Designed fast mode to ready. Added FS-09.R50–R56 (per-model `fast`
 capability, chat-only claude/codex delivery, Codex autosync from `additional_speed_tiers`,
@@ -54,6 +56,21 @@ TS-10 moved Current → Partial with the index updated. Provider surfaces were v
 pinned binaries rather than assumed; the evidence is recorded in the ready change so a later
 adapter bump can re-check it. The same request's other two features stay under
 `Ideas being defined` with their verified findings.
+
+**Changelog — 2026-09-07 (second pass):** Widened the unit to `chat-session-configuration.md` after
+checking whether effort could use the same live mechanism. It can — both chat adapters apply effort
+to a live session — and checking it uncovered a defect: **`codex-acp` 1.1.2 reads no model from the
+ACP session request** (the pinned `NewSessionRequest` schema has no such field), so AgentDeck's
+`model[effort]` parameter has been going nowhere and every Codex chat agent has run the user's local
+Codex default model and reasoning effort. Confirmed live against the pinned adapter, not only by
+code reading; the probe is described in the ready change. `claude-acp` is unaffected — it uses
+`_meta`. Added FS-09.R57 (one ordered post-session step: model → effort → fast, ordering
+adapter-imposed), FS-09.R58 (Codex delivery moves post-session; records the defect), FS-03.R47
+(header effort applies on selection, superseding R23's effort clause), TS-04.R47 (retires R18's
+model-suffix mechanism), and acceptance FS-09.A26/A27, FS-03.A30. TS-03.R37 became one
+`session-config` route covering both live settings; TS-01.R28, TS-02.R30, and TS-08.R55 widened to
+match. `switch-runtime` keeps accepting effort unchanged, so no client breaks. Fixing the defect
+changes which model existing Codex agents run from their next launch or resume.
 
 Credentialed provider journeys and the real-browser checks below remain open acceptance gates, not
 blockers. Never report them as verified without running them.

@@ -102,6 +102,14 @@ switch re-apply the agent's stored **applied** value rather than re-resolving a 
 longer exists, which is also what keeps a switch from silently dropping a toggle the person made
 mid-session (FS-09.R56, INV §1).
 
+`LaunchSpec.ModelID` gains the same delivery split for `codex-acp` only: its model stops travelling
+as a session-creation parameter the pinned adapter never reads and is applied through the shared
+post-session helper instead (TS-04.R47, FS-09.R58). The composition seam is unchanged — the same
+resolved model, resolved the same way — so this is a delivery change inside the runtime boundary, not
+a second selection path. `claude-acp` keeps its existing metadata delivery, so the `model[effort]`
+accessor loses its only caller and is removed rather than left as a no-op a future adapter could
+re-enable by accident (INV §10).
+
 **R13.** Archive/restore is one server-owned lifecycle service, not an HTTP handler
 calling another handler or a UI-side sequence of Stop and config writes. One server-owned transition
 gate serializes archive/restore per project and per agent. Every path that can start a process —

@@ -527,16 +527,21 @@ primitive seam; the rejected alternatives are recorded in §5.
   the transcript endpoint, the appended event, and the search index are untouched, and because the
   decision is made at render time it applies to transcripts recorded before it shipped.
 
-- **R55 `(planned)` — The fast-mode toggle is a sibling of the runtime picker, not a
-  member of it.** The chat header's runtime picker is staged: its selections are local state
-  compared against the agent's current runtime, that comparison reveals **Switch**, and only Switch
-  sends anything. The fast-mode toggle (FS-03.R45) is the opposite — it applies on activation — so it
-  is held in its own state, is excluded from the picker's changed-versus-current comparison, and is
-  excluded from the switch request body. This is a correctness constraint, not a layout preference:
-  folding it into the picker's selection object would either send fast mode through switch-runtime,
-  which stops and restarts the CLI to change a session setting (FS-09.R56), or reveal **Switch** for
-  a change Switch does not carry. The two controls must also read as different kinds of control, so
-  a person who has learned "changes here need Switch" is not misled into pressing it (INV §8).
+- **R55 `(planned)` — The chat header holds two control groups with two different
+  apply models, and they must not share state.** The runtime picker is staged: backend and model are
+  local state compared against the agent's current runtime, that comparison reveals **Switch**, and
+  only Switch sends anything. The live settings — fast mode (FS-03.R45) and effort (FS-03.R47) — are
+  the opposite: they apply on change. Each live setting is held in its own state, excluded from the
+  picker's changed-versus-current comparison, and excluded from the switch request body. Effort
+  moving out of that comparison is the concrete change to shipped code: it is currently part of the
+  picker's selection object and part of what reveals **Switch**.
+
+  This is a correctness constraint, not a layout preference. Folding a live setting into the picker's
+  selection object would either send it through switch-runtime, which stops and restarts the CLI to
+  change something the provider accepts live (FS-09.R56, FS-03.R47), or reveal **Switch** for a
+  change Switch does not carry. The two groups must also read as different kinds of control, so a
+  person who has learned "changes here need Switch" is neither misled into pressing it for a setting
+  that already applied, nor left unsure whether an applied setting is still pending (INV §8).
 
   Its mutation follows the ordinary optimistic-free path this file already requires of consequential
   actions: the toggle shows in-flight, takes the server's returned applied value as truth rather than

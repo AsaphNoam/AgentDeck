@@ -189,7 +189,9 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   with the chosen `{backend, model, effort}`, which preserves the conversation through native resume
   or a primer (FS-01.R13). A `no_change` (equal to current), rejected, or rolled-back switch
   (FS-01.R26) surfaces an actionable error and returns the picker to the agent's current runtime
-  rather than presenting the unselected change as applied.
+  rather than presenting the unselected change as applied. **Effort's participation in this control
+  is superseded by R47 (planned):** effort leaves the staged picker and applies on selection. The
+  backend and model behavior above is unchanged.
 - **R24.** When the agent is not running — a stopped or archived session viewed under
   FS-05 — the header shows the runtime identity as static text with no editable picker or Switch
   control, matching switch runtime's running-only rule (FS-01.R13/R26). If the agent's current
@@ -225,6 +227,27 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   on its own during a provider rate-limit cooldown and re-enable it when the cooldown clears, and
   AgentDeck does not yet consume the session update that reports this, so a suspended Claude agent
   still shows fast mode on. The pinned Codex adapter reports no fast-mode state back at all.
+
+- **R47. (planned)** **Supersedes R23's effort clause.** For a running chat agent the
+  header's effort select applies on selection rather than staging a change behind **Switch**. It
+  reports its own outcome exactly as the fast-mode toggle does in R45 — in-flight while applying,
+  the server's returned value as truth, and on failure a return to the agent's actual effort with an
+  actionable error instead of a selection presented as applied — and the applied value becomes the
+  agent's stored effort, so resume, clone, switch, and the archive carry it. The select still appears
+  only for a model that declares efforts (FS-09.R37) and still resets when the backend or model
+  changes, because both of those are staged changes that have not been applied yet.
+
+  The header therefore reads as two groups with two honest meanings: backend and model stage a
+  change and reveal **Switch**, because changing them requires stopping and restarting the provider
+  process; effort and fast mode apply immediately, because the providers accept both as ordinary
+  session settings on a live session. A person who has learned "changes here need Switch" is not
+  misled into pressing it for a setting that has already taken effect, and no one pays a process
+  restart for a setting that does not need one.
+
+  Switch runtime keeps accepting effort unchanged (FS-01.R30, FS-09.R56), so no API client changes
+  and effort remains part of a combined backend/model/effort switch. Using it to change *only*
+  effort still restarts the process — more work than needed, retained deliberately rather than
+  removed, because narrowing a shipped request field would be a compatibility break for no gain.
 
 ### 2.6 Composer file and ACP command autocomplete
 
@@ -523,6 +546,13 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   the toggle never reveals **Switch** nor appears in a switch-runtime request body. *Verify by*
   `ChatPanel.test.tsx` and a server test asserting the applied value is persisted and that no
   process restart occurs.
+- **A30 (planned)** (R47) — Choosing an effort in the chat header applies it
+  without revealing or requiring **Switch**, leaves the agent running with the same process and
+  conversation, and persists as the agent's effort; a rejected apply returns the select to the
+  agent's actual effort with a visible error; changing backend or model still stages and still
+  reveals **Switch**, and that switch request still carries effort. *Verify by* `ChatPanel.test.tsx`
+  covering both groups, and a server test asserting the applied effort is persisted with no process
+  restart.
 - **A29 (planned)** (R46) — A model declaring no fast-mode capability renders no
   toggle; an agent launched asking for fast mode whose session did not offer it renders fast mode
   off with the model-does-not-offer-it reason rather than on; and a stopped or archived chat agent

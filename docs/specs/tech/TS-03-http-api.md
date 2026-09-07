@@ -158,15 +158,27 @@ the **applied** `fast` as a plain boolean, and the task and pipeline run-start b
 **requested** one; the two are different fields with different meanings and are never conflated
 (INV §3).
 
-Changing fast mode on a running agent is `POST /api/sessions/{id}/fast-mode` with a boolean body,
-following the shape of the eight existing `POST /api/sessions/{id}/…` action routes rather than
-overloading switch-runtime or inventing a general agent-mutation route (R20's rule). It returns the
-agent's applied fast mode. Its failures use the shared field-error envelope with the existing codes:
-the agent not running, the agent's model declaring no fast-mode capability, and the live session not
-advertising the option are each a distinct typed reason a person can act on, not a bare 400 or a
-generic 500 (INV §8). Being a new route under `/api/`, it inherits the `localOnly` guard unchanged
-(INV §14). Success republishes the agent so every connected client and the dashboard card converge
-without a refetch, exactly as rename and identity do (INV §1).
+Changing a live session setting on a running agent is one new route,
+`POST /api/sessions/{id}/session-config`, accepting an optional boolean `fast` and an optional string
+`effort` and applying what is present. One route rather than two because both settings travel the
+same adapter call, in the same order-sensitive helper (TS-04.R47), and splitting them would spell
+that call twice (INV §2). It follows the shape of the eight existing `POST /api/sessions/{id}/…`
+action routes rather than overloading switch-runtime or inventing a general agent-mutation route
+(R20's rule), and returns the agent's applied settings. Its failures use the shared field-error
+envelope with the existing codes: the agent not running, the agent's model declaring no capability
+for the requested setting, the live session not advertising the option, and a provider-rejected
+effort are each a distinct typed reason a person can act on, not a bare 400 or a generic 500
+(INV §8). Effort keeps its fail-closed posture here — a rejected effort changes nothing and returns
+the error — while an unavailable fast mode resolves to off, matching FS-09.R55 rather than inventing
+a third behavior for the live path. Being a new route under `/api/`, it inherits the `localOnly`
+guard unchanged (INV §14). Success republishes the agent so every connected client and the dashboard
+card converge without a refetch, exactly as rename and identity do (INV §1).
+
+`POST /api/sessions/{id}/switch-runtime` keeps accepting `effort` with unchanged semantics, so no
+existing client changes and a combined backend/model/effort switch stays one request. An effort-only
+switch still restarts the process; that redundancy is retained deliberately rather than narrowed,
+because removing a shipped request field is a compatibility break and the chat header no longer uses
+that path for effort anyway (FS-03.R47).
 
 **R20.** Project and agent archive use explicit action routes rather than overloading
 ordinary project replacement or Stop: `POST /api/projects/{project}/archive`, `POST

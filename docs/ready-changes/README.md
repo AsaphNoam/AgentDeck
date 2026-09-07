@@ -43,9 +43,9 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-- [`fast-mode-for-agents.md`](fast-mode-for-agents.md) — offer the providers' fast mode wherever
-  model and effort are already offered, plus a live chat-header toggle, reporting the fast mode that
-  actually applied rather than the one requested.
+- [`chat-session-configuration.md`](chat-session-configuration.md) — apply model, effort, and fast
+  mode as one ordered post-session step: adds fast mode, makes effort changeable without a process
+  restart, and fixes Codex chat agents silently ignoring the selected model and effort.
 
 ## Paused changes
 

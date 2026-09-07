@@ -252,6 +252,30 @@ Configuration-source federation for Claude/Codex is FS-08.
   (FS-03.R45), which the providers apply as an ordinary session setting with no process restart and
   no conversation rebuild — where switch runtime stops and restarts the CLI, which would be a
   disproportionate cost for a speed flag.
+- **R57 (planned)** — A chat agent's model, effort, and fast mode are applied as one
+  ordered session-configuration step after the session exists: **model, then effort, then fast
+  mode**. The order is load-bearing rather than stylistic, confirmed against a live pinned adapter:
+  setting the model resets effort to that model's own supported or default level, and it can remove
+  fast-mode capability outright, so applying either before the model silently discards it. Each
+  setting is sent only when the live session advertises the adapter's declared option identifier for
+  it (R55's gate, now covering all three), and each uses the value vocabulary the advertised option
+  offers. Effort keeps its fail-closed posture from R40 and R42 and fast mode keeps its fail-open
+  posture from R55; the shared step does not flatten them into one behavior, because an effort the
+  person chose and did not get is wrong while an unavailable speed boost is merely cheaper.
+- **R58 (planned)** — For `codex-acp`, the selected model and effort are delivered as
+  post-session configuration rather than as a session-creation parameter. **This corrects a defect:**
+  the ACP session-creation request carries no model field in the pinned protocol, and the pinned
+  `codex-acp` adapter reads none — a live check against the pinned adapter confirmed that a session
+  created while requesting one model at one level came up on the user's own Codex default model and
+  level instead, and that the same values applied cleanly as configuration options afterwards. Every
+  Codex chat agent has therefore been running the user's configured Codex default rather than the
+  model and effort chosen in AgentDeck, while `PUT /api/backends` validation, the New Agent picker,
+  and the recorded session identity all reported the chosen values. Fixing this changes which model
+  existing Codex agents run, from their next launch or resume onward; that is the behavior R7 and
+  R21 already specify and the New Agent screen already promises. `claude-acp` is unaffected and keeps
+  delivering its model through the session-creation metadata channel its adapter documents and reads.
+  `opencode-acp` and `openhands-acp` keep today's delivery unchanged, because whether their pinned
+  adapters read that parameter has not been checked and an unverified change is not a fix.
 - **R22** — Switch within one backend/model family attempts native resume. Switching to a different
   backend uses primer handoff. A failed target resume rolls back through the lifecycle rules in
   FS-01 rather than changing the backend catalog.
@@ -458,6 +482,21 @@ Configuration-source federation for Claude/Codex is FS-08.
   normal speed. No case fails the launch or leaves a partially registered agent. *Verify by*
   chat-runtime launch tests against `fakeacp` scenarios that do and do not advertise the option,
   asserting the exact outbound calls.
+- **A26 (planned)** (R57) — A chat launch choosing a model, an effort, and fast
+  mode issues its session-configuration calls in the order model, effort, fast mode, each carrying
+  the adapter's declared option identifier, and each omitted when the session does not advertise it;
+  a launch that reorders them is caught by a test asserting the call sequence, not only the call set,
+  because the adapter resets effort and fast capability when the model changes. An effort the session
+  rejects still fails the launch while a fast mode it does not offer does not. *Verify by*
+  chat-runtime launch tests asserting the ordered outbound calls against `fakeacp` scenarios that
+  advertise all three, only some, and none.
+- **A27 (planned)** (R58) — A `codex-acp` chat launch, resume, and switch each
+  deliver the selected model and effort as post-session configuration and send no model in the
+  session-creation request; the resulting agent's recorded model and effort match what was selected
+  rather than the adapter's reported default; and a `claude-acp` launch is byte-identical to today,
+  still carrying its model through session-creation metadata. *Verify by* runtime parameter tests
+  pinning both adapters' composed calls, and a `fakeacp` Codex scenario that reports a different
+  default model than the one requested — which fails against today's delivery and passes after it.
 - **A25 (planned)** (R52, R56) — A terminal launch requesting fast mode is rejected
   before any process starts; and a switch-runtime request neither accepts nor alters fast mode — an
   agent running fast that switches model within its backend is still running fast afterwards, and a

@@ -97,8 +97,10 @@ providers accept effort through three structurally different mechanisms, so the 
 *which* mechanism it uses and the runtime performs it; the runtime never branches on backend type
 inline (the rule `internal/backend/adapter.go` already states for argv, env, and resume):
 
-- **Model-suffix** (`codex-acp` chat) — the adapter encodes effort into the ACP model identifier as
-  `model[effort]`, the shape its pinned adapter parses. Because the model id is built in two places,
+- **Model-suffix** (`codex-acp` chat) — **retired by R47 `(planned)`: the pinned adapter parses no
+  model from the session request at all, so this mechanism delivered nothing.** Retained here for
+  citation resolution; R47 is the live rule. The adapter encodes effort into the ACP model identifier
+  as `model[effort]`, the shape its pinned adapter parses. Because the model id is built in two places,
   the suffix is composed by one `LaunchSpec` accessor consumed by **both** `sessionNewParams` and
   `sessionLoadParams`; INV §2 names this exact pair as having twice drifted on `model`, so effort
   must not become the third occurrence. An omitted effort yields the bare model id unchanged, so a
@@ -172,6 +174,38 @@ its usage cost, so FS-03.R45 requires AgentDeck's own wording and INV §8 requir
 in-vocabulary rather than passed through from an external tool. An absent, null, or unparseable
 `configOptions` is treated as advertising nothing, which fails open to normal speed under R45 rather
 than failing the session (INV §7).
+
+**R47 `(planned)` — One ordered post-session configuration step replaces
+model-suffix effort delivery.** R18's model-suffix mechanism is retired for `codex-acp`, and with it
+the `LaunchSpec` accessor that composed `model[effort]` for both `sessionNewParams` and
+`sessionLoadParams`. **The mechanism never worked.** The pinned ACP `NewSessionRequest` schema
+declares only `cwd`, `additionalDirectories`, `mcpServers`, and `_meta` — there is no `model` field —
+and the pinned `codex-acp` reads none, deriving the session's model and reasoning effort from its own
+thread-start response. A live check against the pinned adapter confirmed a session requesting one
+model at one level came up on the local Codex default instead, and that both values applied cleanly
+as configuration options afterwards. So AgentDeck was sending an out-of-schema parameter into a void;
+`claude-acp` was unaffected only because it receives its model through `_meta`, the extensibility
+channel the protocol does define and its adapter documents and reads.
+
+Model, effort, and fast mode therefore reach a chat session through one shared helper that applies
+them **in that order** after `session/new` or `session/load` returns, consumed by launch, resume, and
+switch alike. Ordering is a correctness constraint the adapter imposes: applying a model resets the
+session's effort to that model's supported-or-default level and recomputes its fast capability, so an
+effort or fast mode applied first is silently discarded. Each setting is sent only when the decoded
+advertisement (R46) contains the adapter's declared identifier for it, and identifiers stay
+adapter-declared because all three differ per adapter — `codex-acp` uses `model`, `reasoning_effort`,
+and `fast-mode`; `claude-acp` uses `model`, `effort`, and `fast`.
+
+The three keep their own failure postures inside the shared step, and the helper must not flatten
+them: effort stays fail-closed under R19 and FS-09.R40, model failure fails the launch for the same
+reason, and fast mode stays fail-open under R45. `claude-acp` keeps `_meta` model delivery unchanged
+and gains nothing here. `opencode-acp` and `openhands-acp` keep today's parameter unchanged, because
+whether their pinned adapters read it is unverified and changing delivery on an unverified adapter
+would trade a known-good path for an assumption — INV §12's rule, and the same rule that makes this
+requirement cite a live check rather than a code reading alone.
+
+Because effort now applies to a live session as well as at startup, the same helper serves the
+running-agent change in FS-03.R47 with no second spelling of the call (INV §2).
 
 **R19 — A provider-rejected effort fails the launch; it is never retried bare.**
 A pinned CLI may reject a level AgentDeck's catalog declares (hand-declared Claude levels, an older
