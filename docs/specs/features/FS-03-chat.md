@@ -1,6 +1,6 @@
 # FS-03 — Live chat & permission flow
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/runtime/` (`chat.go`, `permission.go`, `event.go`), `internal/server/sessions.go`, `internal/transcript/`, `ui/src/components/chat/`, `ui/src/store/transcriptStore.ts`, `ui/src/api/sse.ts` · **Journeys:** J3, J4, J7
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -199,6 +199,32 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   (`/project/<project>`) when that project is a current, non-archived catalog member, and otherwise
   the projects home (`/`). An agent naming a project the catalog no longer has (deleted or archived)
   never sends Back to an unavailable/archived route; it returns to the projects home instead.
+
+- **R45. (planned)** For a running chat agent whose model declares fast-mode
+  capability (FS-09.R50), the header presents a fast-mode toggle showing the agent's current fast
+  mode. The toggle is **not** part of the staged runtime picker in R23: it is presented separately,
+  it never contributes to the difference that reveals **Switch**, and it is never sent in a switch
+  request (FS-09.R56). Activating it applies immediately through its own request rather than
+  waiting for a further control, takes effect from the agent's next turn, and restarts no process
+  and rebuilds no conversation. The toggle reports its own outcome: it shows that a change is being
+  applied, confirms the new state on success, and on failure returns to the agent's actual fast mode
+  with an actionable error rather than presenting the unapplied change as active. The applied value
+  becomes the agent's stored fast mode, so resume, clone, and switch runtime carry it and the
+  archive records it. Because fast mode trades increased provider usage for speed, the control names
+  that trade in AgentDeck's own words rather than repeating a provider description — the pinned
+  adapters disagree, one naming the usage cost and the other not. It does not interrupt with a
+  confirmation: the change is one activation, immediately reversible, and affects only the turns
+  taken while it is on.
+- **R46. (planned)** The header states fast mode honestly in each case a person can
+  reach. A model that declares no fast-mode capability shows no toggle at all. An agent that asked
+  for fast mode at launch but whose live session did not offer it (FS-09.R55) shows fast mode off
+  with the reason that this model does not offer it, so a request that was accepted at launch is
+  never silently reported as active. A chat agent that is not running shows its fast mode as static
+  text beside backend, model, and effort, matching R24. **Known limitation:** the toggle reports the
+  fast mode AgentDeck applied and the person chose. The pinned Claude adapter can suspend fast mode
+  on its own during a provider rate-limit cooldown and re-enable it when the cooldown clears, and
+  AgentDeck does not yet consume the session update that reports this, so a suspended Claude agent
+  still shows fast mode on. The pinned Codex adapter reports no fast-mode state back at all.
 
 ### 2.6 Composer file and ACP command autocomplete
 
@@ -488,6 +514,20 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   agent attempts still raises a prompt that waits for them; leaving that prompt undecided for longer
   than three minutes and then approving it lets the stage continue rather than failing it.
   *Verify:* journey **J14** in `docs/features/USABILITY-REVIEW.md`.
+
+- **A28 (planned)** (R45) — For a running chat agent on a fast-declaring model the
+  header renders a fast-mode toggle; activating it applies without any further control, leaves the
+  agent running with the same conversation and the same process, and confirms the new state; the
+  agent's stored fast mode is the applied value afterwards; a rejected apply returns the toggle to
+  the agent's actual fast mode with a visible error rather than showing the change as active; and
+  the toggle never reveals **Switch** nor appears in a switch-runtime request body. *Verify by*
+  `ChatPanel.test.tsx` and a server test asserting the applied value is persisted and that no
+  process restart occurs.
+- **A29 (planned)** (R46) — A model declaring no fast-mode capability renders no
+  toggle; an agent launched asking for fast mode whose session did not offer it renders fast mode
+  off with the model-does-not-offer-it reason rather than on; and a stopped or archived chat agent
+  renders its fast mode as static text with no toggle. *Verify by* `ChatPanel.test.tsx` and
+  `ArchiveAgentPage` header tests.
 
 ## 6. Deviations & open decisions
 

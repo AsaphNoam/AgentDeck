@@ -81,6 +81,27 @@ derives from the selected adapter's `EffortDelivery` contract rather than a seco
 so the pipeline manager and HTTP handlers share one authority rather than each checking the catalog
 themselves.
 
+**R28 `(planned)` — Fast mode reuses the composition seam but splits requested from
+applied.** A single `resolveFast` joins `resolveEffort` on the shared composition seam in
+`internal/server/launch.go` and is the only place that applies FS-09.R54's precedence, which is
+short by design: explicit request, else off. There is no bound-source override and no model default
+to consult, so unlike `resolveEffort` it needs no federation argument. The requested value travels as
+one `Fast` field on `LaunchSpec`, so a path that forgets it loses fast mode entirely rather than
+resolving it differently (R9, and the R12 rule applied to a new field). Catalog-level capability —
+whether a model declares fast mode at all — stays in `internal/config` beside the effort validator,
+and its backend capability check derives from the adapter's fast-delivery contract rather than a
+second type allowlist, so HTTP handlers, the task creation path, and the pipeline manager share one
+authority (R12's rule, INV §2).
+
+What differs from every other `LaunchSpec` field is that the resolved request is **not** what gets
+persisted as identity. `LaunchSpec.Fast` is the request; the runtime reports back what it actually
+applied (TS-04.R45), and only that value is written to the agent and session rows (TS-02.R30). The
+composition seam therefore ends at the runtime boundary rather than at persistence, and no
+persistence path may read `LaunchSpec.Fast` — the structural form of INV §3. Ordinary resume and
+switch re-apply the agent's stored **applied** value rather than re-resolving a request that no
+longer exists, which is also what keeps a switch from silently dropping a toggle the person made
+mid-session (FS-09.R56, INV §1).
+
 **R13.** Archive/restore is one server-owned lifecycle service, not an HTTP handler
 calling another handler or a UI-side sequence of Stop and config writes. One server-owned transition
 gate serializes archive/restore per project and per agent. Every path that can start a process —

@@ -1,6 +1,6 @@
 # TS-08 — Frontend presentation architecture
 
-**Status:** Current
+**Status:** Partial
 **Code:** `ui/src`, `ui/package.json`, `ui/vite.config.ts`
 **Absorbed:** —
 
@@ -526,6 +526,25 @@ primitive seam; the rejected alternatives are recorded in §5.
   cross-language pair is pinned rather than assumed. The rule touches presentation only: `rawByAgent`,
   the transcript endpoint, the appended event, and the search index are untouched, and because the
   decision is made at render time it applies to transcripts recorded before it shipped.
+
+- **R55 `(planned)` — The fast-mode toggle is a sibling of the runtime picker, not a
+  member of it.** The chat header's runtime picker is staged: its selections are local state
+  compared against the agent's current runtime, that comparison reveals **Switch**, and only Switch
+  sends anything. The fast-mode toggle (FS-03.R45) is the opposite — it applies on activation — so it
+  is held in its own state, is excluded from the picker's changed-versus-current comparison, and is
+  excluded from the switch request body. This is a correctness constraint, not a layout preference:
+  folding it into the picker's selection object would either send fast mode through switch-runtime,
+  which stops and restarts the CLI to change a session setting (FS-09.R56), or reveal **Switch** for
+  a change Switch does not carry. The two controls must also read as different kinds of control, so
+  a person who has learned "changes here need Switch" is not misled into pressing it (INV §8).
+
+  Its mutation follows the ordinary optimistic-free path this file already requires of consequential
+  actions: the toggle shows in-flight, takes the server's returned applied value as truth rather than
+  assuming its own, and on failure returns to the agent's actual fast mode with the typed reason
+  rendered as product text — never leaving the control showing a state the server did not confirm
+  (INV §8, INV §1). Because the applied value also arrives on the republished agent, the toggle
+  derives from that agent field rather than holding a second copy that could drift from the card and
+  the archive header (INV §2).
 
 ## 3. Interfaces & data shapes
 

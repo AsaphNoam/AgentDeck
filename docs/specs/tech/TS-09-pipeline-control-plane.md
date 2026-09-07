@@ -1,6 +1,6 @@
 # TS-09 — Pipeline control plane
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/pipeline`, `internal/config`, `internal/state`, `internal/server`, `internal/messaging`, `internal/cli`, `ui/src/features/pipelines`
 **Absorbed:** —
 
@@ -188,6 +188,25 @@ starting and no stage process begins — the rule already applied to an unknown 
 launches, continuation, and recovery read effort from the frozen attempt through the shared lifecycle
 services, so a catalog or future assignment edit cannot change an in-flight attempt's level, and a
 retried or looped attempt reuses the snapshot's value rather than re-resolving it.
+
+**R34 `(planned)` — Per-stage fast mode is frozen assignment data; what ran is read
+from the stage agent.** A run's frozen assignment record gains an optional fast mode per stage
+beside its backend, model, and effort, and each created attempt copies that request beside its own
+identity through the same forward-only migration style and non-null decoding as the rest of the run
+state (TS-02.R17, TS-02.R30). Templates are untouched for R24's reason: fast mode is a run-time
+assignment, so the version-1 template schema, its canonical validator, and every stored template
+stay byte-identical. Start-time validation calls the same `internal/config` fast-capability check the
+manual launch path uses (TS-01.R28) inside the existing all-or-nothing start validation, so one
+stage assigned fast mode on a model that declares none prevents the entire run from starting and no
+stage process begins — R24's rule, unchanged.
+
+Reporting diverges from effort, and deliberately. The attempt row stores the **request**, which is
+what stage launches, continuation, and recovery re-execute so a catalog or assignment edit cannot
+change an in-flight attempt. What run supervision and the run snapshot **display** (FS-14.R59) is
+the applied fast mode read from that attempt's stage agent (TS-02.R30), because a stage whose live
+session did not advertise the option ran at normal speed without failing (FS-09.R55) and a record
+repeating the assignment would misreport what the run cost. The applied value is read from the
+agent rather than copied onto the attempt so it has exactly one writer (INV §2).
 
 **R25.** After acquiring TS-01.R13's exclusive project-archiving claim, project archive
 calls the pipeline manager before changing durable archive state. The manager atomically blocks future

@@ -1,6 +1,6 @@
 # TS-10 — Work dependency control plane
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/state`, `internal/server`, `internal/messaging`, `ui/src/features/tasks`
 **Absorbed:** —
 
@@ -230,6 +230,21 @@ parallel copy of them.
   reads the catalog and takes no transaction, so a task-creating request stays a single write. The
   check is advisory by construction: it runs against the catalog as it is at creation, and the
   authoritative check remains the one inside launch composition, which cannot be bypassed.
+
+- **R24 `(planned)`** — **A task's fast mode rides the same composer seam, and its
+  two-point check is capability-only.** The stored fast mode reaches the provider by setting the
+  existing launch request's `Fast` on the call the dispatcher already makes, so `resolveFast` and the
+  `internal/config` fast-capability validator stay the only precedence and validation code and this
+  plane adds no second copy of either (R23's rule, INV §2). Creation-time validation (FS-16.R29)
+  calls that same validator against the backend and model the launch composer would select, through
+  the identical composed helper R23 already defines — one more check inside the existing seam, not a
+  new path. What the two-point check can and cannot cover differs from effort, and the difference is
+  the point: it validates *catalog capability*, which is knowable at creation, and it does not and
+  cannot validate *session availability*, which only exists once a session is created. A task whose
+  model declares fast-mode capability but whose eventual session does not advertise the option runs
+  at normal speed and its attempt succeeds (FS-09.R55, TS-04.R45); the dispatcher records the
+  applied value on the created agent and never treats it as a start failure or a reason to consume a
+  start attempt.
 
 ## 3. Interfaces & data shapes
 

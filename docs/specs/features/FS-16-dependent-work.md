@@ -1,6 +1,6 @@
 # FS-16 — Dependent work and armed starts
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/state`, `internal/server`, `internal/messaging`, `ui/src/features/tasks` · **Journeys:** —
 **Absorbed:** —
 
@@ -207,6 +207,21 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   into its session, so naming both an existing target and an effort is rejected under R20 rather
   than silently dropped. This adds no way to change an agent's effort mid-task and no effort field
   on an arm or an attachment.
+- **R29 (planned)** — **A launch specification names its fast mode.** The
+  launch specification a task targets (R2) also carries an optional fast mode, under the same rules
+  R27 gives effort: both authoring surfaces accept it, it is chosen once at creation and stored on
+  the durable task row, it is not editable afterwards, and it is rejected under R20 when the task
+  targets an existing agent rather than silently dropped. When AgentDeck later launches that task's
+  agent, the stored value is the *explicitly requested fast mode* at the top of FS-09.R54's
+  precedence order; a task naming none launches at normal speed. Two consequences differ from
+  effort, and both follow from FS-09.R50/R55. A model that declares no fast-mode capability makes
+  the request invalid at creation and at admission under R28's two-point check, exactly as an
+  undeclared effort level is. But a model that *does* declare capability whose live session turns
+  out not to offer fast mode does **not** fail the task's launch: the agent starts at normal speed
+  and the task proceeds, because a nobody-watching background launch is precisely the case where
+  failing over an unavailable speed boost is least defensible. The task's agent records the fast
+  mode that applied, not the one requested, so its card and archive do not claim a speed it never
+  ran at.
 - **R28** — **A launch specification is checked when the work is created,
   not only when it starts.** Creating a task that targets a launch specification validates its
   backend, model, and effort against the backend catalog then and there — resolving the install
@@ -429,6 +444,17 @@ Each names the verification that demonstrates it.
   effort after creation fails its start attempt rather than launching at a substituted level: MCP,
   HTTP, and task-dispatch tests, plus a Tasks-view test that the effort field round trips through
   create.
+
+- **A19 (planned)** (R29) — A launch-spec task created with fast mode on a
+  declaring model launches its agent with fast mode requested, asserted on the composed launch spec;
+  fast mode on a model that declares no capability is rejected at creation with a typed field-named
+  error that creates no task, over both `create_task` and `POST /api/tasks`, and again at admission
+  if the declaration is dropped after creation; naming an existing agent target together with a fast
+  mode is rejected the same way; and a task whose model declares capability but whose live session
+  does not advertise the option still launches, runs at normal speed, and records its agent's
+  applied fast mode as off rather than failing the attempt. *Verify by* MCP, HTTP, and task-dispatch
+  tests, a dispatch test against a `fakeacp` scenario that withholds the option, and a Tasks-view
+  test that the fast-mode field round trips through create.
 
 ## 6. Deviations & open decisions
 

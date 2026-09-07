@@ -52,6 +52,49 @@ Example:
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
 
+- **Show the agent's thinking, not only its tool use.** Requested 2026-09-07: the Codex app shows
+  the steps and reasoning an agent takes; AgentDeck's transcript shows tool calls and final text
+  only. Verified 2026-09-07: this is a deliberate drop, not a provider gap —
+  `internal/runtime/acpmap.go:297` discards `agent_thought_chunk` **and** `plan` updates as
+  "dropped this phase", and both pinned adapters emit them (`codex-acp` maps
+  `item/reasoning/summaryTextDelta`, `item/reasoning/textDelta`, and
+  `item/reasoning/summaryPartAdded` to `agent_thought_chunk`, and `item/plan/delta` /
+  `turn/plan/updated` to plan updates; `claude-agent-acp` emits `agent_thought_chunk` too). So the
+  work is a new normalized event plus its persistence and rendering, not a protocol problem.
+  **Decided 2026-09-07:** thinking is **live-only** — streamed to the open chat and not persisted.
+  It therefore never reaches the durable transcript, the archive, the FTS index, FS-13 annotation
+  targets, or FS-15 context pulls, and reopening a conversation shows no reasoning. Still open:
+  default collapsed or expanded rendering, and whether `plan` ships in the same slice.
+
+- **Steer a running turn from the chat composer.** Requested 2026-09-07: type a follow-up while the
+  agent is working, as the Claude and Codex CLIs allow. Today `SendPrompt` refuses outright —
+  `ErrTurnInFlight` (`internal/runtime/chat.go:355`) becomes a `409` (`internal/server/sessions.go:554`)
+  and the composer shows Cancel instead of Send while busy (FS-03.R9,
+  `ui/src/components/chat/Composer.tsx:253`). Provider support verified 2026-09-07 and it is
+  **asymmetric**:
+  - `claude-agent-acp` 0.59.0 supports it natively: `Session.turnQueue` is a FIFO of in-flight
+    prompts, a second `session/prompt` is pushed to the SDK immediately and echoed back in
+    submission order, and the adapter carries explicit orphan/cancel accounting for queued turns.
+  - `codex-acp` 1.1.2 does **not** queue — it **supersedes**. `prompt()` clears
+    `sessionState.currentTurnId` on entry and calls `this.activePrompts.set(sessionId, activePrompt)`,
+    overwriting the entry belonging to the running prompt. The displaced prompt then fails
+    `promptShouldStop()` (`activePrompts.get(sessionId) !== activePrompt`), which routes its turn to
+    `interruptLateStartedTurn()`. A second concurrent `session/prompt` therefore interrupts the turn
+    in progress rather than following it — worse for steering than today's `409`.
+  - The Codex gap is adapter-side, not a Codex limitation. The Codex app-server protocol has
+    first-class `turn/steer` and `thread/queue` methods (both present in the `codex` 0.152.0 binary;
+    `codex queue --thread --message` is their CLI surface), and `codex-acp` 1.1.2 wires up neither —
+    its app-server method set is `turn/start`, `turn/interrupt`, `turn/completed`, `turn/started`,
+    `turn/diff/updated`, `turn/plan/updated`, `turn/moderationMetadata`. Codex steering arrives with
+    an adapter version bump, not a protocol redesign; re-check for `turn/steer` in `codex-acp`
+    before concluding Codex cannot steer.
+  So a portable design cannot assume queueing today. Open product decisions: whether steering is
+  adapter-native queueing (Claude only, honest capability split like FS-09.R39) or an AgentDeck-side
+  hold-until-idle that works everywhere but is deferred send rather than steering; whether a queued
+  steer can be withdrawn; and whether the relaxation is person-only — `ErrTurnInFlight` is currently
+  load-bearing for coordination and pipeline arbitration (`internal/server/messaging_loops.go:77`,
+  `:156`), so agent-initiated activations should almost certainly keep failing closed.
+
 - **Edit a sent chat message.** From the 2026-08-10 play session: like Codex, editing the most
   recent message edits it in place, and editing an older one forks the conversation from that point.
   Designing this on 2026-08-27 established that AgentDeck cannot give it the meaning Codex does, and

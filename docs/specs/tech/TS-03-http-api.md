@@ -147,6 +147,27 @@ bracketed provider model string each name their field and reason rather than ret
 (INV §8 — the class the onboarding `HTTP 400` findings came from). No new route is added, so every
 path continues to inherit the `localOnly` guard unchanged (INV §14).
 
+**R37 `(planned)` — Fast mode is an optional field on existing routes plus exactly one
+new action route.** `POST /api/sessions` accepts an optional boolean `fast` alongside
+`backend`/`model`/`effort`; omitting it preserves today's request and response bytes exactly, so no
+existing client changes. `POST /api/sessions/{id}/switch-runtime` does **not** accept it and ignores
+it if sent, because fast mode is not part of the switch tuple (FS-09.R56). `GET /api/backends` and
+`PUT /api/backends` carry each model's `fast` as a plain boolean that marshals as `false` and never
+`null` (INV §11 — the same shape rule `efforts` follows in R19). Session and agent responses report
+the **applied** `fast` as a plain boolean, and the task and pipeline run-start bodies carry the
+**requested** one; the two are different fields with different meanings and are never conflated
+(INV §3).
+
+Changing fast mode on a running agent is `POST /api/sessions/{id}/fast-mode` with a boolean body,
+following the shape of the eight existing `POST /api/sessions/{id}/…` action routes rather than
+overloading switch-runtime or inventing a general agent-mutation route (R20's rule). It returns the
+agent's applied fast mode. Its failures use the shared field-error envelope with the existing codes:
+the agent not running, the agent's model declaring no fast-mode capability, and the live session not
+advertising the option are each a distinct typed reason a person can act on, not a bare 400 or a
+generic 500 (INV §8). Being a new route under `/api/`, it inherits the `localOnly` guard unchanged
+(INV §14). Success republishes the agent so every connected client and the dashboard card converge
+without a refetch, exactly as rename and identity do (INV §1).
+
 **R20.** Project and agent archive use explicit action routes rather than overloading
 ordinary project replacement or Stop: `POST /api/projects/{project}/archive`, `POST
 /api/projects/{project}/restore`, `POST /api/sessions/{id}/archive`, and `POST

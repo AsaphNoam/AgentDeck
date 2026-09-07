@@ -1,6 +1,6 @@
 # FS-01 — Agent Lifecycle
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/server/{launch,resume,switch,sessions,groups}.go`, `internal/runtime/`, `internal/index/`, `internal/cli/launch.go` · **Journeys:** J3, J7, J11
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -50,6 +50,18 @@ orphaned processes.
   response and agent record, shown beside backend and model on the chat and archive headers,
   restored by resume (R11), carried by clone (R9), and changeable on a running agent through switch
   runtime (R13) under the same native-resume versus primer rules a model swap follows.
+- **R35 (planned)** — Launch accepts an optional **fast mode** alongside backend,
+  model, and effort, from the New Agent modal, the `POST /api/sessions` body, and the CLI flag
+  `--fast` (a boolean flag taking no operand, unlike `--effort`). Whether it is offered at all, how
+  it resolves, and what happens when the live session cannot honor it belong to the selected model's
+  declared capability (FS-09.R50/R54/R55). The **applied** fast mode joins backend, model, and
+  effort as part of the agent's runtime identity: it is reported on the session response and agent
+  record, shown on the chat and archive headers, restored by resume (R11), and carried by clone
+  (R9). It is the one part of that identity **not** changed through switch runtime (R13): fast mode
+  changes on a running agent through the chat-header toggle (FS-03.R45) instead, because the
+  providers accept it as an ordinary session setting while switch runtime stops and restarts the
+  CLI. A launch that requests fast mode for a terminal agent is rejected, because no Claude
+  terminal fast-mode mechanism exists (FS-09.R52).
 
 - **R31.** A **stopped** agent is an inactive, non-archived agent whose project is
   active: it remains visible on that project dashboard, retains its final live-status outcome, and
@@ -280,6 +292,14 @@ transitions:
   not-running `404`. *Verify:*
   `internal/server/wake_test.go::TestStopDuringWakeConflictsAndKeepsRegistration`,
   `TestReleaseGroupDuringWakeKeepsRegistration`, and `TestWakeGateFailureSurfacesTypedError`.
+
+- **A19 (planned)** (R35) — A modal launch, an API launch, and a CLI `--fast` launch
+  of the same role/project/backend/model produce an identical agent carrying the same applied fast
+  mode; `--fast` takes no operand; the applied fast mode appears on the session response, the chat
+  header, and the archive header; resume and clone carry it; a terminal launch requesting it is
+  rejected; and switch runtime leaves it unchanged. *Verify by* launch/CLI parity tests,
+  resume/clone tests, switch-runtime tests, `NewAgentModal.test.tsx`, and the chat/archive header UI
+  tests.
 
 ## 6. Deviations & open decisions
 

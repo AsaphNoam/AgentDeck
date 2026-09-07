@@ -111,6 +111,33 @@ Configuration-source federation for Claude/Codex is FS-08.
   existing entry, or changes a default. The ordinary Settings control can later turn continuing sync
   off. TS-07.R17 owns the accepted best-effort residue when catalog persistence precedes binding.
 
+- **R50 (planned)** — A model entry may declare optional **fast-mode capability**:
+  `fast`, a boolean. Absent or `false` means the model has no fast-mode capability and AgentDeck
+  offers no fast-mode choice for it anywhere, exactly as a model declaring no `efforts` gets no
+  effort choice under R35. Fast mode is a single on/off speed setting, not a level: AgentDeck
+  declares no speed vocabulary and there is no per-model default, because the providers describe
+  fast mode as trading increased usage for speed and the conservative resolution is off. `PUT
+  /api/backends` rejects `fast: true` on a model under a backend whose adapter declares no
+  fast-mode delivery (R52), using the shared field-error envelope and without partially persisting
+  the document — the same explicit-capability rule R39 applies to effort.
+- **R51 (planned)** — `GET /api/backends` reports each model's `fast`. Every surface
+  that chooses a launch runtime shows a fast-mode control only for a model that declares `fast`,
+  defaults it to off, and clears the selection when the backend or model changes — the same reset
+  rule R7 applies to the model and R37 applies to effort. Settings can turn a model's `fast`
+  declaration on and off.
+- **R52 (planned)** — Fast-mode capability is offered only for `claude-acp` and
+  `codex-acp` **chat**. Both adapters accept fast mode only as a post-session configuration option,
+  so there is exactly one delivery mechanism, unlike effort's three (TS-04.R18). Claude's
+  interactive executable exposes no fast-mode launch flag, so Claude **terminal** has no fast-mode
+  capability and a terminal launch never carries one; `opencode-acp` and `openhands-acp` expose no
+  mechanism at all.
+- **R53 (planned)** — A `codex-acp` backend with `autosync_models` (R28) also sets a
+  synced model's `fast` from the local cache's `additional_speed_tiers` containing `"fast"`. This
+  stays add-only under R28's rules: it never edits an existing model entry, including one that
+  already declares `fast`, and a cache entry without speed tiers simply contributes none. Claude's
+  configured-model sync in R45 does not discover fast-mode capability, so Claude declarations remain
+  hand-written, exactly as R38/R45 split effort discovery.
+
 ### Adapter and capability matrix
 
 - **R8** — All four backend types use the common ACP chat runtime and normalized transcript,
@@ -200,6 +227,31 @@ Configuration-source federation for Claude/Codex is FS-08.
   model-inheritance rule in FS-08.R17 rather than inventing a level. The resolved effort is frozen
   into the session snapshot beside the model, so resume and switch restore it and the archive
   records what actually ran.
+- **R54 (planned)** — Launch resolves fast mode in one precedence order: an
+  explicitly requested fast mode; else off. There is no configuration-source override and no model
+  default, so a launch that asks for nothing runs at normal speed and AgentDeck never turns on a
+  cost-increasing setting the person did not ask for. Unlike effort, what is frozen into the session
+  snapshot is the fast mode that **actually applied** (R55), not the one requested — so the chat
+  header, the dashboard card, and the archive stay truthful for a task- or pipeline-launched agent
+  whose request could not be honored and whose launch nobody watched.
+- **R55 (planned)** — Fast mode is applied only when the live session advertises it.
+  Both adapters return the session's available configuration options from session creation and
+  resume, and both surface fast mode only when the session's current model really supports it.
+  AgentDeck sends the fast-mode setting only when that advertisement includes it. A requested fast
+  mode the session does not advertise **does not fail the launch**: the agent starts and runs at
+  normal speed, its applied fast mode is off, and the chat header explains that this model does not
+  offer fast mode (FS-03.R46). This deliberately diverges from effort's fail-closed rule in R40,
+  because an unavailable speed boost leaves the agent cheaper and slower rather than wrong, and
+  killing a working launch over it is disproportionate. Gating on the advertisement also removes an
+  adapter disagreement rather than encoding it: the pinned Claude adapter rejects an unknown
+  fast-mode option outright while the pinned Codex adapter accepts the call and silently ignores it.
+- **R56 (planned)** — Fast mode is not part of the runtime-switch tuple. Switch
+  runtime continues to accept only interface, backend, model, and effort; it neither reads nor
+  changes fast mode, and a switch preserves the agent's current fast mode across the resumed
+  session. Fast mode changes on a running agent through the chat-header toggle instead
+  (FS-03.R45), which the providers apply as an ordinary session setting with no process restart and
+  no conversation rebuild — where switch runtime stops and restarts the CLI, which would be a
+  disproportionate cost for a speed flag.
 - **R22** — Switch within one backend/model family attempts native resume. Switching to a different
   backend uses primer handoff. A failed target resume rolls back through the lifecycle rules in
   FS-01 rather than changing the backend catalog.
@@ -388,6 +440,29 @@ Configuration-source federation for Claude/Codex is FS-08.
   generic transport-close sentinel; a fake adapter that never answers initialize times out and is
   terminated; both leave no running handle. *Verify by* focused chat-runtime startup tests shared by
   launch and resume.
+
+- **A23 (planned)** (R50–R53) — A catalog declaring per-model `fast` validates and
+  round trips; `fast: true` on a model under an `opencode-acp` or `openhands-acp` backend fails with
+  a named field and nothing is persisted; `GET /api/backends` reports the flag; New Agent offers a
+  fast-mode control only for a declaring model, defaults it to off, and clears it on backend or
+  model change; and `autosync_models` sets `fast` for a newly synced Codex model whose cache entry
+  lists the `fast` speed tier while leaving an existing entry's declaration and the catalog default
+  untouched. *Verify by* backend validation and config-handler tests, a Codex model-cache sync test
+  covering an entry with and without the tier, `BackendsEditor.test.tsx`, and
+  `NewAgentModal.test.tsx`.
+- **A24 (planned)** (R54, R55) — A chat launch requesting fast mode on a session
+  that advertises the fast-mode option sends exactly one fast-mode setting call carrying the
+  adapter's own option identifier and records the agent as running fast; a launch requesting it on a
+  session that does **not** advertise the option sends no such call, still produces a running agent,
+  and records its applied fast mode as off; a launch requesting nothing sends no call and runs at
+  normal speed. No case fails the launch or leaves a partially registered agent. *Verify by*
+  chat-runtime launch tests against `fakeacp` scenarios that do and do not advertise the option,
+  asserting the exact outbound calls.
+- **A25 (planned)** (R52, R56) — A terminal launch requesting fast mode is rejected
+  before any process starts; and a switch-runtime request neither accepts nor alters fast mode — an
+  agent running fast that switches model within its backend is still running fast afterwards, and a
+  switch body carrying a fast-mode field does not change it. *Verify by* launch validation tests and
+  switch-runtime tests.
 
 ## 6. Deviations & open decisions
 

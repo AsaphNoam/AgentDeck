@@ -120,6 +120,59 @@ when a session is loaded, so an unapplied effort silently reverts a resumed agen
 chose — INV §1's "state derived from the old side must be explicitly republished" at a lifecycle
 boundary.
 
+**R45 `(planned)` — Fast-mode delivery is adapter-declared, capability-gated, and
+fail-open.** Fast mode reuses R18's shape — the adapter declares the mechanism, the runtime performs
+it, and no code branches on backend type inline — but has exactly one mechanism and the opposite
+failure posture:
+
+- **Post-session config** (`claude-acp` chat, `codex-acp` chat) — both pinned adapters accept fast
+  mode only as a session configuration option after `session/new`/`session/load` returns. The
+  adapters use **different option identifiers** (`fast` and `fast-mode`), so the identifier is
+  adapter-declared exactly as R18 declares the effort option id, and never spelled at a call site.
+- **None** (`claude-acp` terminal, `opencode-acp`, `openhands-acp`) — the interactive Claude
+  executable exposes no fast-mode launch flag and the other two adapters expose no mechanism at all,
+  so these declare no fast-mode delivery and FS-09.R50/R52 reject a declaration at save time and a
+  request at launch, rather than at the provider.
+
+Three constraints separate this from effort. **The value shape is the adapter's, not
+AgentDeck's:** AgentDeck advertises no `session.configOptions.boolean` client capability, so both
+pinned adapters degrade to their two-value select and accept the strings `on`/`off`. The runtime
+sends that spelling and does not send a JSON boolean, which the pinned Claude adapter would accept
+and the pinned Codex adapter would too — but only the string form is guaranteed by the advertised
+option, and INV §12 makes the advertised form the one to use. **Application is gated on the live
+advertisement, not the catalog:** both adapters return the session's available configuration options
+from session creation and resume, and surface fast mode only when the session's current model
+supports it. The runtime sends the option only when that list contains the adapter's declared
+identifier. This is not defensive padding — it removes a real adapter disagreement rather than
+encoding it, because the pinned Claude adapter throws `Unknown config option` for an unadvertised id
+while the pinned Codex adapter accepts the call and silently ignores it, so an ungated call would
+mean two different things per provider. **Failure is open, not closed:** unlike R18's post-session
+effort call, a fast-mode option that is absent, rejected, or fails does **not** fail the launch
+(FS-09.R55). The runtime records the applied fast mode as off and continues, because an unavailable
+speed boost leaves the agent cheaper and slower rather than running at a setting nobody chose. R19's
+never-retry-bare rule therefore does not apply: there is nothing to retry, the conservative
+resolution *is* the fallback.
+
+Resume and switch re-apply fast mode through the same mechanism and the same shared helper as
+launch, for R18's reason and INV §1: the adapter re-derives its own fast-mode default when a session
+is loaded, so an unapplied fast mode silently reverts a resumed agent. Because the option must be
+read from both the `session/new` and the `session/load` result, the decode and the apply are each
+one helper consumed by both paths — INV §2 names that exact pair as having twice drifted on `model`
+and once been at risk on effort.
+
+**R46 `(planned)` — The session configuration option list is decoded in `acpmap.go`
+like every other ACP shape.** `session/new` and `session/load` return a `configOptions` array that
+AgentDeck currently discards. Reading it introduces a new ACP wire shape, and TS-01's isolation rule
+keeps every ACP shape decode in `internal/runtime/acpmap.go` so an adapter version bump has one blast
+radius. The decode yields a normalized "which option identifiers does this session advertise" answer
+for the runtime; it does not leak the ACP option structs, their `type`/`category`/`options`
+vocabulary, or their provider display copy past that boundary. Provider descriptions in particular
+are not surfaced to people: the pinned adapters disagree about whether fast mode's description names
+its usage cost, so FS-03.R45 requires AgentDeck's own wording and INV §8 requires user-facing text be
+in-vocabulary rather than passed through from an external tool. An absent, null, or unparseable
+`configOptions` is treated as advertising nothing, which fails open to normal speed under R45 rather
+than failing the session (INV §7).
+
 **R19 — A provider-rejected effort fails the launch; it is never retried bare.**
 A pinned CLI may reject a level AgentDeck's catalog declares (hand-declared Claude levels, an older
 CLI, a provider that withdrew a level). INV §12's usual detect-and-retry-without-the-optional-flag

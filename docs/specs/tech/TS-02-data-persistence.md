@@ -1,6 +1,6 @@
 # TS-02 — Data & persistence
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/config`, `internal/state`, `internal/transcript`, `internal/index`, `internal/archive`, `internal/configsource`, `internal/contextref`
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -123,6 +123,32 @@ requested-versus-resolved effort record for provenance and is not the authority 
 Every pipeline attempt likewise stores `effort TEXT NOT NULL DEFAULT ''` beside its backend/model;
 continuation and recovery execute that attempt's frozen identity rather than re-reading a run
 assignment. Empty retains the same "none resolved" meaning for existing attempts.
+
+**R30 `(planned)` — Fast mode is an additive catalog field stored as two distinct
+things: what was asked for, and what ran.** `backends.json` stays **version 2**: `fast` is an
+optional per-model boolean and the decoder ignores unknown keys, so a catalog written by a newer
+build still loads in an older one, which simply offers no fast mode — FS-09.R54's documented
+fallback rather than a corrupt read. No migration touches the file, and seeding continues never to
+rewrite an existing catalog.
+
+The **requested** fast mode is durable launch input and lives with the other durable launch inputs:
+`tasks.fast` and `pipeline_attempts.fast`, each declared exactly `INTEGER NOT NULL DEFAULT 0` in one
+forward-only migration, mirroring how the effort columns in R18 carry a task's and an attempt's
+frozen launch identity so continuation and recovery re-execute it without re-reading an assignment.
+
+The **applied** fast mode is what the session actually ran at and lives on the agent's identity:
+`agents.fast` and `sessions.fast`, same declaration, same migration. These are deliberately separate
+columns from the requested ones and are never written from a launch request — a requested fast mode
+the live session did not advertise resolves to applied-off (FS-09.R55), and collapsing the two would
+make the archive and the dashboard card claim a speed the agent never ran at. This is INV §3's rule
+in its structural form: the one-shot request gets its own field that the persistence path recording
+what ran is blind to.
+
+Because the chat-header toggle (FS-03.R45) changes fast mode mid-session, `agents.fast` and
+`sessions.fast` are updated together on every apply through the same write path that switch runtime
+uses for the rest of the runtime identity, so the archive projection never lags the agent (INV §2).
+`0` means normal speed and existing rows adopt it without interpretation — which is also the correct
+reading for every agent that predates this field.
 
 **R19 — Codex's isolated runtime profile is private, managed filesystem state.**
 `$AGENTDECK_HOME/codex/` is an owner-only Codex profile for `codex-acp` children (TS-04.R20/R21).

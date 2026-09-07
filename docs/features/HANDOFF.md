@@ -20,11 +20,14 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 - **Review units:** None open. `dock-the-annotation-tray-and-quiet-its-prompt` is reviewed,
   fixed, and closed; all earlier units through this release are closed. Review records, finding-fix
   commits, release records, and handoff/archive/queue bookkeeping are administrative closure.
-- **Work units:** None waiting to start. `migrate-internal-actions-from-mcp.md` stays paused on
-  its recorded transport blocker.
+- **Work units:** `fast-mode-for-agents.md` is waiting to start (designed 2026-09-07, not active).
+  `migrate-internal-actions-from-mcp.md` stays paused on its recorded transport blocker.
 - **Design units:** Existing entries under `Ideas being defined` may resume, and entries under
-  `New ideas` are available to start. The permanently unaddressable pipeline agent remains the
-  newest `New ideas` entry and needs `/design-feature` before code.
+  `New ideas` are available to start. Two entries from the 2026-09-07 agent-features request are
+  part-decided and resumable: streaming agent thinking (decided live-only; rendering default and
+  whether `plan` ships with it still open) and steering a running turn (open on whether steering is
+  Claude-native queueing or a portable hold-until-idle). The permanently unaddressable pipeline
+  agent remains the newest `New ideas` entry and needs `/design-feature` before code.
 - **Open findings:** Two usability findings from the 2026-09-07 v0.4.2 review: J2 incompatible
   CLI status is presented as a credential failure; J5 lower-row card menus clip lifecycle actions.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider
@@ -35,9 +38,22 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 
 **Change:** None. The `v0.4.2` release closed the annotation-tray and Mermaid units.
 
-**Available by role:** `/review` has no unreviewed unit; `/fix` has no open findings; `/work` has
-no ready change; `/design-feature` may choose an available or resumable idea, or an idea a person
-names from another `docs/ideas.md` section. Role queues are independent.
+**Available by role:** `/review` has no unreviewed unit; `/fix` has no open findings; `/work` may
+start `fast-mode-for-agents.md`; `/design-feature` may choose an available or resumable idea, or an
+idea a person names from another `docs/ideas.md` section. Role queues are independent.
+
+**Changelog — 2026-09-07:** Designed fast mode to ready. Added FS-09.R50–R56 (per-model `fast`
+capability, chat-only claude/codex delivery, Codex autosync from `additional_speed_tiers`,
+resolution, advertisement-gated application, exclusion from the switch tuple), FS-03.R45/R46
+(header toggle outside the staged picker; unavailable, not-running, and the recorded cooldown
+limitation), FS-01.R35, FS-16.R29, FS-14.R59, and acceptance FS-09.A23–A25, FS-03.A28/A29,
+FS-01.A19, FS-16.A19, FS-14.A34. Technical side: TS-04.R45/R46 (adapter-declared fast delivery,
+fail-open, and the `configOptions` decode staying in `acpmap.go`), TS-01.R28, TS-02.R30,
+TS-03.R37, TS-08.R55, TS-09.R34, TS-10.R24. FS-01, FS-03, FS-14, FS-16, TS-02, TS-08, TS-09, and
+TS-10 moved Current → Partial with the index updated. Provider surfaces were verified against the
+pinned binaries rather than assumed; the evidence is recorded in the ready change so a later
+adapter bump can re-check it. The same request's other two features stay under
+`Ideas being defined` with their verified findings.
 
 Credentialed provider journeys and the real-browser checks below remain open acceptance gates, not
 blockers. Never report them as verified without running them.
