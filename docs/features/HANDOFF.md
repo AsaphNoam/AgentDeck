@@ -11,11 +11,12 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 ## Current position
 
 - **Active change:** None.
-- **Release:** `v0.4.2` is cut locally from six commits after `v0.4.1`; the tag and `main` are not
-  pushed, so nothing is published until explicitly authorized. The range adds the docked annotation
-  tray, quieter self-target annotation transcripts, and Mermaid rendering fixes. It changes no
-  agent-facing behavior, so the embedded `operating-agentdeck` package was not refreshed. The
-  distributable binary reports `0.4.2` and carries `sqlite_fts5`.
+- **Release:** `v0.4.2` is published and verified on tag `f56755a`. Release run `34085524105`
+  succeeded in 4m5s, attached the macOS arm64 archive, `install.sh`, and `manifest.json`; main CI
+  run `34085523868` also passed. The range adds the docked annotation tray, quieter self-target
+  annotation transcripts, and Mermaid rendering fixes. It changes no agent-facing behavior, so the
+  embedded `operating-agentdeck` package was not refreshed. The distributable binary reports
+  `0.4.2` and carries `sqlite_fts5`.
 - **Review units:** None open. `dock-the-annotation-tray-and-quiet-its-prompt` is reviewed,
   fixed, and closed; all earlier units through this release are closed. Review records, finding-fix
   commits, release records, and handoff/archive/queue bookkeeping are administrative closure.
