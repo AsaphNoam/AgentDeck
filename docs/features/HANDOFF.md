@@ -18,9 +18,9 @@ back to that at every release (§16.7). Injected Current position plus Active ch
   remain owed under TS-06.R21 and were not run. A customized
   `agentdecker` role is deliberately not migrated under FS-04.R44, so it keeps the superseded
   product manual beside the current skill.
-- **Review units:** `dock-the-annotation-tray-and-quiet-its-prompt` is implemented and available to
-  review (FS-13.R20–R23/A12–A14, TS-08.R53–R54). Every earlier unit through the `v0.4.1` range is
-  reviewed and closed. Review records, finding-fix commits, release records, and
+- **Review units:** `dock-the-annotation-tray-and-quiet-its-prompt` was reviewed with two findings
+  and remains open (FS-13.R20–R23/A12–A14, TS-08.R53–R54). Every earlier unit through the `v0.4.1`
+  range is reviewed and closed. Review records, finding-fix commits, release records, and
   handoff/archive/queue bookkeeping are administrative closure and never re-enter the queue.
 - **Work units:** None waiting to start. `migrate-internal-actions-from-mcp.md` stays paused on its
   recorded transport blocker.
@@ -28,7 +28,9 @@ back to that at every release (§16.7). Injected Current position plus Active ch
   ideas` are available to start. Neither is gated by work, review, or fix state. The operator called
   the permanently unaddressable pipeline agent broken on 2026-09-05; it is the newest `New ideas`
   entry and changes FS-06.R22, so it needs `/design-feature` before any code.
-- **Open findings:** None.
+- **Open findings:** Two on `dock-the-annotation-tray-and-quiet-its-prompt`, under **Review
+  findings** — stale collapse state after removing the final draft (must fix), and contradictory
+  presentation-contract wording (worth fixing).
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
   are still unrun, so no agent may claim those adapters accept structured results — but they no
   longer block any role (see **Acceptance gates**).
@@ -39,11 +41,11 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 
 ## Active change
 
-**Change:** None. `dock-the-annotation-tray-and-quiet-its-prompt` finished on 2026-09-07 and moved
-to the review queue.
+**Change:** None. `dock-the-annotation-tray-and-quiet-its-prompt` was reviewed on 2026-09-07 and
+remains open for its two findings.
 
-**Available by role:** `/review` may take `dock-the-annotation-tray-and-quiet-its-prompt`; `/fix` has
-no open finding; `/work` has no ready change waiting to start; `/design-feature` may
+**Available by role:** `/review` has no unreviewed unit to take; `/fix` may take the two annotation
+tray findings; `/work` has no ready change waiting to start; `/design-feature` may
 choose any available or resumable idea, or any idea a person names from another `docs/ideas.md`
 section. Selecting one role does not depend on clearing another role's queue.
 
@@ -65,6 +67,14 @@ Entries through the `v0.4.1` epoch are in the
 [archived handoff](../archive/state/HANDOFF-through-2026-09-06.md); earlier ones are in the
 [`v0.4.0` archive](../archive/state/HANDOFF-through-2026-09-03.md) and Git history.
 
+- **2026-09-07 — review: docked annotation tray and quiet self-target prompt.** The shared live and
+  replay projection, container-query layout, presentation registration, and focused checks match
+  the planned behavior, but clearing a tray by removing its final draft leaves the browser-local
+  collapse flag behind (INV §1/§16). A later tray for that source can therefore reappear collapsed;
+  the store must clear all tray-owned state on that path and pin it with a regression. TS-08.R53
+  also says the docked form exposes a `data-variant` even though the implementation, contract, and
+  the spec's own recorded decision correctly expose only `data-state`; align that sentence with the
+  shipped contract (INV §10). The unit remains open for `/fix`.
 - **2026-09-07 — fix: restore Mermaid theme and bounded sizing (INV §8/§13/§17).** The diagram
   sanitizer now preserves decoded `url(#fragment)` references used by Mermaid's generated SVG
   markers and paint servers while continuing to drop every network-capable or malformed URL token.
@@ -219,7 +229,21 @@ OpenCode, and OpenHands are not installed globally.
 
 ## Review findings
 
-None.
+- **Must fix** (INV §1/§16): `ui/src/store/annotationStore.ts:76` filters the selected draft out
+  but, when that was the final draft, leaves `collapsedBySource[sourceId]` and the rest of the
+  tray-owned record in browser storage. Collapse a one-draft tray, narrow the transcript to its
+  overlay form, remove that final draft, then add another draft for the same source: on returning to
+  the docked width, the new tray unexpectedly reappears collapsed. This violates FS-13.R21's rule
+  that clearing the tray ends both the tray and its collapse state, and can retain unbounded orphan
+  flags until a reload prunes them. Make the final-remove path delete the full per-source tray record
+  just as `discard` does, and add a store regression that removes the final draft before adding a
+  fresh one for the same source.
+- **Worth fixing** (INV §10): `docs/specs/tech/TS-08-frontend-presentation.md:500` says the docked
+  form and collapsed strip are exposed as `data-variant`/state, while the same spec at line 725, the
+  shipped `AnnotationTray`, and `contract.json` deliberately define no variant because the container
+  query is not observable in JavaScript. This gives future skin work two contradictory normative
+  instructions. Change R53's sentence to say the registered component exposes only its collapsed
+  state, preserving the no-measurement decision; no product-code change is needed.
 
 ## Design consistency notes
 
