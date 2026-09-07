@@ -73,19 +73,16 @@ export const useAnnotationStore = create<AnnotationStoreState>()(
           },
           editedAt: touch(state.editedAt, sourceId),
         })),
+      // Removing the last draft empties the tray, so it ends the whole tray
+      // record the same way discarding does (FS-13.R21): a collapsed flag left
+      // behind would collapse the next tray this source opens.
       remove: (sourceId, index) =>
-        set((state) => ({
-          bySource: { ...state.bySource, [sourceId]: (state.bySource[sourceId] ?? []).filter((_, i) => i !== index) },
-          editedAt: touch(state.editedAt, sourceId),
-        })),
-      discard: (sourceId) =>
         set((state) => {
-          const { [sourceId]: _drafts, ...bySource } = state.bySource;
-          const { [sourceId]: _overall, ...overallBySource } = state.overallBySource;
-          const { [sourceId]: _edited, ...editedAt } = state.editedAt;
-          const { [sourceId]: _collapsed, ...collapsedBySource } = state.collapsedBySource;
-          return { bySource, overallBySource, editedAt, collapsedBySource };
+          const remaining = (state.bySource[sourceId] ?? []).filter((_, i) => i !== index);
+          if (remaining.length === 0) return dropSource(state, sourceId);
+          return { bySource: { ...state.bySource, [sourceId]: remaining }, editedAt: touch(state.editedAt, sourceId) };
         }),
+      discard: (sourceId) => set((state) => dropSource(state, sourceId)),
       setOverall: (sourceId, overall) =>
         set((state) => ({ overallBySource: { ...state.overallBySource, [sourceId]: overall }, editedAt: touch(state.editedAt, sourceId) })),
       // Collapsing hides drafts; it does not edit them, so it deliberately
@@ -100,6 +97,17 @@ export const useAnnotationStore = create<AnnotationStoreState>()(
     },
   ),
 );
+
+// dropSource ends one source's tray. Every per-source record goes together so
+// nothing — drafts, overall instruction, timestamp, collapsed flag — outlives
+// the tray it belongs to (FS-13.R16, FS-13.R21).
+function dropSource(state: PersistedTrays, sourceId: string): PersistedTrays {
+  const { [sourceId]: _drafts, ...bySource } = state.bySource;
+  const { [sourceId]: _overall, ...overallBySource } = state.overallBySource;
+  const { [sourceId]: _edited, ...editedAt } = state.editedAt;
+  const { [sourceId]: _collapsed, ...collapsedBySource } = state.collapsedBySource;
+  return { bySource, overallBySource, editedAt, collapsedBySource };
+}
 
 function touch(editedAt: Record<string, number>, sourceId: string) {
   return { ...editedAt, [sourceId]: Date.now() };

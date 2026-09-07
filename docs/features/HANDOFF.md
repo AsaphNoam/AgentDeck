@@ -18,8 +18,9 @@ back to that at every release (§16.7). Injected Current position plus Active ch
   remain owed under TS-06.R21 and were not run. A customized
   `agentdecker` role is deliberately not migrated under FS-04.R44, so it keeps the superseded
   product manual beside the current skill.
-- **Review units:** `dock-the-annotation-tray-and-quiet-its-prompt` was reviewed with two findings
-  and remains open (FS-13.R20–R23/A12–A14, TS-08.R53–R54). Every earlier unit through the `v0.4.1`
+- **Review units:** None open. `dock-the-annotation-tray-and-quiet-its-prompt` was reviewed on
+  2026-09-07, both findings were fixed, and the unit is closed (FS-13.R20–R23/A12–A14,
+  TS-08.R53–R54). Every earlier unit through the `v0.4.1`
   range is reviewed and closed. Review records, finding-fix commits, release records, and
   handoff/archive/queue bookkeeping are administrative closure and never re-enter the queue.
 - **Work units:** None waiting to start. `migrate-internal-actions-from-mcp.md` stays paused on its
@@ -28,9 +29,7 @@ back to that at every release (§16.7). Injected Current position plus Active ch
   ideas` are available to start. Neither is gated by work, review, or fix state. The operator called
   the permanently unaddressable pipeline agent broken on 2026-09-05; it is the newest `New ideas`
   entry and changes FS-06.R22, so it needs `/design-feature` before any code.
-- **Open findings:** Two on `dock-the-annotation-tray-and-quiet-its-prompt`, under **Review
-  findings** — stale collapse state after removing the final draft (must fix), and contradictory
-  presentation-contract wording (worth fixing).
+- **Open findings:** None.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider checks
   are still unrun, so no agent may claim those adapters accept structured results — but they no
   longer block any role (see **Acceptance gates**).
@@ -42,10 +41,10 @@ back to that at every release (§16.7). Injected Current position plus Active ch
 ## Active change
 
 **Change:** None. `dock-the-annotation-tray-and-quiet-its-prompt` was reviewed on 2026-09-07 and
-remains open for its two findings.
+closed the same day when both of its findings were fixed.
 
-**Available by role:** `/review` has no unreviewed unit to take; `/fix` may take the two annotation
-tray findings; `/work` has no ready change waiting to start; `/design-feature` may
+**Available by role:** `/review` has no unreviewed unit to take; `/fix` has no open findings;
+`/work` has no ready change waiting to start; `/design-feature` may
 choose any available or resumable idea, or any idea a person names from another `docs/ideas.md`
 section. Selecting one role does not depend on clearing another role's queue.
 
@@ -67,6 +66,16 @@ Entries through the `v0.4.1` epoch are in the
 [archived handoff](../archive/state/HANDOFF-through-2026-09-06.md); earlier ones are in the
 [`v0.4.0` archive](../archive/state/HANDOFF-through-2026-09-03.md) and Git history.
 
+- **2026-09-07 — fix: end the annotation tray when its last draft is removed (INV §1/§16, §10).**
+  Removing a tray's final draft now drops that source's whole browser-local record — drafts, overall
+  instruction, timestamp, and collapse flag — through the one helper `discard` also uses, so a later
+  tray for the same source no longer opens collapsed and no orphan flag waits for a reload to prune
+  it. A store regression removes the final draft, checks every per-source record is gone, and adds a
+  fresh draft; a companion case pins that removing one of several drafts leaves the tray and its
+  flag intact. TS-08.R53 now says the registered `annotation-tray` component carries its collapsed
+  state and no variant, matching the shipped component, `contract.json`, and the spec's own recorded
+  decision; FS-13.A12 names the final-remove path. Both findings are closed and the
+  `dock-the-annotation-tray-and-quiet-its-prompt` unit is closed with them.
 - **2026-09-07 — review: docked annotation tray and quiet self-target prompt.** The shared live and
   replay projection, container-query layout, presentation registration, and focused checks match
   the planned behavior, but clearing a tray by removing its final draft leaves the browser-local
@@ -229,21 +238,7 @@ OpenCode, and OpenHands are not installed globally.
 
 ## Review findings
 
-- **Must fix** (INV §1/§16): `ui/src/store/annotationStore.ts:76` filters the selected draft out
-  but, when that was the final draft, leaves `collapsedBySource[sourceId]` and the rest of the
-  tray-owned record in browser storage. Collapse a one-draft tray, narrow the transcript to its
-  overlay form, remove that final draft, then add another draft for the same source: on returning to
-  the docked width, the new tray unexpectedly reappears collapsed. This violates FS-13.R21's rule
-  that clearing the tray ends both the tray and its collapse state, and can retain unbounded orphan
-  flags until a reload prunes them. Make the final-remove path delete the full per-source tray record
-  just as `discard` does, and add a store regression that removes the final draft before adding a
-  fresh one for the same source.
-- **Worth fixing** (INV §10): `docs/specs/tech/TS-08-frontend-presentation.md:500` says the docked
-  form and collapsed strip are exposed as `data-variant`/state, while the same spec at line 725, the
-  shipped `AnnotationTray`, and `contract.json` deliberately define no variant because the container
-  query is not observable in JavaScript. This gives future skin work two contradictory normative
-  instructions. Change R53's sentence to say the registered component exposes only its collapsed
-  state, preserving the no-measurement decision; no product-code change is needed.
+None open.
 
 ## Design consistency notes
 

@@ -497,10 +497,12 @@ primitive seam; the rejected alternatives are recorded in §5.
   tray twice. FS-13.R22's roomier draft row is CSS on the existing `.annotation-draft` selectors,
   with the anchor promoted to its own heading element in `AnnotationTray.tsx`; every className
   shipped has a defined selector in `ui/src/styles/features/agent.css` in the same change, because
-  the build and Testing Library are both blind to CSS (INV §13). The docked form and its collapsed
-  strip are exposed through the curated contract as `data-variant`/state on one registered
-  `annotation-tray` component added to `contract.json` in the same change; individual descendants
-  are not skin hooks (R8, R14). FS-13.R21's collapsed flag is a field on the existing per-source
+  the build and Testing Library are both blind to CSS (INV §13). The tray is exposed through the curated
+  contract as one registered `annotation-tray` component added to `contract.json` in the same
+  change, carrying its collapsed state and no variant: the docked-versus-overlay form is a container
+  query nothing in the client can observe, so a skin hooks that form through the same query. The
+  collapsed strip is `data-state="collapsed"`/`"expanded"`; individual descendants are not skin
+  hooks (R8, R14). FS-13.R21's collapsed flag is a field on the existing per-source
   annotation draft record in `annotationStore`, so it rides that store's shipped persistence,
   30-day expiry, 20-source cap, and delete-with-agent path rather than adding a second browser
   storage key or lifecycle (FS-13.R16, INV §1).

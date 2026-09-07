@@ -195,7 +195,8 @@ Each acceptance item names its delivered verification.
 - **A12** (R20–R21) — With drafts pending, a wide transcript region renders the tray as a
   docked column beside the transcript and a narrow one renders the floating overlay; the collapse
   control reduces the column to its pending-count strip, expands again, and the collapsed flag
-  survives a reload and is discarded with its tray:
+  survives a reload and is discarded with its tray, including when the tray ends by having its
+  final draft removed:
   `ui/src/components/chat/AnnotationTray.test.tsx` and `ui/src/store/annotationStore.test.ts`.
 - **A13** (R22) — A docked draft row renders its anchor as a heading element separate from
   its controls, alongside the excerpt and the instruction field:

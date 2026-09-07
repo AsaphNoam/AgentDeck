@@ -48,6 +48,38 @@ describe("annotationStore", () => {
     expect(useAnnotationStore.getState().collapsedBySource.a_source).toBeUndefined();
   });
 
+  // FS-13.A12: removing the last draft empties the tray, which ends it just as
+  // discarding does. A flag left behind would collapse the tray the same source
+  // opens next, and the orphan records would sit in storage until a reload.
+  it("ends the tray when its final draft is removed", () => {
+    const store = useAnnotationStore.getState();
+    store.add("a_source", { seq: 7, excerpt: "selected line", instruction: "check this" });
+    store.setOverall("a_source", "Send a focused review");
+    store.setCollapsed("a_source", true);
+
+    store.remove("a_source", 0);
+    expect(useAnnotationStore.getState().bySource.a_source).toBeUndefined();
+    expect(useAnnotationStore.getState().overallBySource.a_source).toBeUndefined();
+    expect(useAnnotationStore.getState().editedAt.a_source).toBeUndefined();
+    expect(useAnnotationStore.getState().collapsedBySource.a_source).toBeUndefined();
+
+    store.add("a_source", { seq: 9, excerpt: "another line", instruction: "and this" });
+    expect(useAnnotationStore.getState().collapsedBySource.a_source).toBeUndefined();
+  });
+
+  // Removing one of several drafts leaves the rest of the tray alone.
+  it("keeps the tray and its collapsed flag while drafts remain", () => {
+    const store = useAnnotationStore.getState();
+    store.add("a_source", { seq: 7, excerpt: "selected line", instruction: "check this" });
+    store.add("a_source", { seq: 9, excerpt: "another line", instruction: "and this" });
+    store.setCollapsed("a_source", true);
+
+    store.remove("a_source", 0);
+    expect(useAnnotationStore.getState().bySource.a_source).toHaveLength(1);
+    expect(useAnnotationStore.getState().bySource.a_source[0].seq).toBe(9);
+    expect(useAnnotationStore.getState().collapsedBySource.a_source).toBe(true);
+  });
+
   // An expired or capped-out tray takes its flag with it; keeping the flag alone
   // would collapse a fresh tray for a source whose drafts were dropped.
   it("does not rehydrate a collapsed flag whose tray was pruned", () => {
