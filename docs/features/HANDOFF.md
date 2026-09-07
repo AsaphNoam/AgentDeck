@@ -25,7 +25,8 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 - **Design units:** Existing entries under `Ideas being defined` may resume, and entries under
   `New ideas` are available to start. The permanently unaddressable pipeline agent remains the
   newest `New ideas` entry and needs `/design-feature` before code.
-- **Open findings:** None.
+- **Open findings:** Two usability findings from the 2026-09-07 v0.4.2 review: J2 incompatible
+  CLI status is presented as a credential failure; J5 lower-row card menus clip lifecycle actions.
 - **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider
   checks remain unrun and must never be described as verified, but they do not block roles.
 - **Branch:** `main`.
@@ -72,7 +73,24 @@ let it block any role.
 
 ## Review findings
 
-None open.
+- **Must fix** — J2: incompatible CLI status is presented as a credential failure.
+  **Where:** `internal/backend/credcheck/claude.go:25-45`, surfaced by
+  `ui/src/features/onboarding/steps/BackendStep.tsx:44-46`. **Normal-use trigger:** from a fresh
+  onboarding home, an installed `claude-agent-acp` that prints `error: unknown option --cli` and
+  exits 2. **Why it matters:** the wizard tells the operator to repair credentials when the
+  provider is actually incompatible or un-interrogable, leaving the wrong setup gate and no useful
+  compatibility diagnosis. **Requirement:** `FS-04.A14`, `INV §12`. **Suggested fix/test:** classify
+  unsupported CLI/status failures separately from credential failures, keep setup retryable, and
+  add a J2 fixture test for an unknown option. Reproduced in
+  `.review/usability-20260907/run/shots/J2-old-cli-spot-replay.png`.
+- **Must fix** — J5: lower-row card context menus hide lifecycle actions below the viewport.
+  **Where:** dashboard card context menu at the default 1280×720 viewport. **Normal-use trigger:**
+  right-click a lower-row stopped card in a three-column grid. **Why it matters:** the fixed menu
+  starts at y=640, placing Resume at y=754 and Archive at y=907 with no clipping correction or menu
+  scroll; lifecycle actions become a dead-end until the operator finds a pointer-position workaround.
+  **Requirement:** J5, `FS-12.A8`, `INV §8`. **Suggested fix/test:** clamp or flip the menu into the viewport
+  and exercise lower-row menus across menu heights and the supported desktop floor. Reproduced in
+  `.review/usability-20260907/run/shots/J5-context-menu-clipped.png`.
 
 ## Design consistency notes
 
