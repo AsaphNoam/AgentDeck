@@ -29,14 +29,17 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   whether `plan` ships with it still open) and steering a running turn (open on whether steering is
   Claude-native queueing or a portable hold-until-idle). The permanently unaddressable pipeline
   agent remains the newest `New ideas` entry and needs `/design-feature` before code.
-- **Open findings:** Two usability findings from the 2026-09-07 v0.4.2 review: J2 incompatible
-  CLI status is presented as a credential failure; J5 lower-row card menus clip lifecycle actions.
-- **Bug reports:** BR-1 awaits investigation — why Codex chat silently ignored the selected model
-  and effort for ~10 weeks. The fix is implemented; the open question is the
-  process failure and whether the same class is live on other adapters. See **Bug reports awaiting
-  investigation** below.
-- **State:** Automated MCP contract verification is green. Pinned Claude/Codex live-provider
-  checks remain unrun and must never be described as verified, but they do not block roles.
+- **Open findings:** Two usability findings from the 2026-09-07 v0.4.2 review plus four Must-fix
+  and one Worth-fixing BR-1 postmortem findings: J2 incompatible CLI status, J5 clipped lower-row
+  card menus, live-gate finding durability, provider-contract oracles, effective-config
+  observability, the unresolved Claude model result, and the unverified OpenCode/OpenHands paths.
+- **Bug reports:** BR-1 is investigated. Codex chat silently ignored the selected model from its
+  first release and later ignored effort too; the implementation fix is available for review. The
+  postmortem corrects the earlier claim that the bug went unnoticed and records how a live Must-fix
+  finding was lost between design, implementation, and review. See **Bug investigation reports**.
+- **State:** Automated MCP contract verification is green. A historical credentialed provider run
+  on 2026-07-26 detected the BR-1 model failure; the current post-fix Claude/Codex acceptance matrix
+  remains open and must not be described as verified.
 - **Branch:** `main`.
 
 ## Active change
@@ -103,7 +106,9 @@ blockers. Never report them as verified without running them.
 verified, passed, or closed. The operator chose to let roles proceed with them open.
 
 - [ ] Pinned real-provider stage-result/file-edit approval journey (FS-03.A26/J14).
-- [ ] Credentialed Claude and Codex chat, MCP, resume, task, and reported-result checks.
+- [ ] Post-fix credentialed Claude and Codex chat, MCP, resume, task, effective-model/effort, and
+      reported-result checks. The historical 2026-07-26 run failed model precedence and is evidence,
+      not closure for the current implementation.
 - [ ] Pinned Claude terminal flags/hooks and live xterm journeys.
 - [ ] Pinned OpenCode/OpenHands launch and credential checks.
 - [ ] Real macOS native folder-panel checks (FS-04.A22/J2/J9/J16).
@@ -114,7 +119,7 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
 
 ## Blocked on human
 
-Nothing. Live-provider acceptance needs human authorization because it invokes real provider
+Nothing. Post-fix live-provider acceptance needs human authorization because it invokes real provider
 sessions and disposable local configuration homes, but the operator chose not to run it and not to
 let it block any role.
 
@@ -138,13 +143,64 @@ let it block any role.
   **Requirement:** J5, `FS-12.A8`, `INV §8`. **Suggested fix/test:** clamp or flip the menu into the viewport
   and exercise lower-row menus across menu heights and the supported desktop floor. Reproduced in
   `.review/usability-20260907/run/shots/J5-context-menu-clipped.png`.
+- **Must fix** — BR-1 finding state was not durable across concurrent roles (**confirmed**).
+  **Where:** `docs/archive/reviews/live-provider-acceptance-2026-07-26.md` recorded the exact Codex
+  model failure as a Must-fix on July 26, but the live acceptance session could not edit HANDOFF
+  while another session owned the shared docs. The report and a contradictory effort design were
+  then swept into `7d294fb` without the finding entering HANDOFF. **Why it matters:** the mandatory
+  read order made the archived report invisible to every later role, so an already-detected critical
+  defect was treated as an open gate for another six weeks. **Requirement:** workflow §§1.1/12,
+  `INV §1`, `INV §10`. **Suggested fix/test:** a failed live gate must be recorded in HANDOFF before
+  its role can close; if state-file ownership blocks that write, leave the role explicitly blocked
+  rather than archiving the only finding. A commit/review that contains an acceptance report must
+  reconcile every Must-fix in it with live state.
+- **Must fix** — provider-contract claims can still be proved by a self-authored oracle
+  (**confirmed**). **Where:** TS-04.R18 asserted a `model[effort]` request shape after inspecting
+  `codex-acp`'s internal `ModelId` parser without tracing `session/new` to `threadStart`; FS-09.A15
+  and `fakeacp` then checked only that AgentDeck emitted the asserted field. The fake accepts unknown
+  request members that the pinned ACP decoder drops. **Why it matters:** design, implementation, and
+  review can all agree and remain wrong about the external system. **Requirement:** `INV §11`,
+  `INV §12`, `INV §17`. **Suggested fix/test:** require provider-behavior statements to cite a
+  complete reachability trace or a recorded live probe, and add an independently derived contract
+  oracle that rejects out-of-schema standard fields instead of mirroring `sessionNewParams`.
+- **Must fix** — successful configuration calls are not checked against effective provider state
+  (**confirmed**). **Where:** `decodeSessionConfigOptions` retains option ids but discards
+  `currentValue`; `applySessionConfig` and `SetSessionConfig` ignore the required
+  `SetSessionConfigOptionResponse.configOptions`; `fakeacp` returns `{}`. **Why it matters:**
+  AgentDeck can again persist and display the requested model/effort after a peer accepts but ignores
+  it—the exact silent BR-1 symptom. **Requirement:** FS-09.A27, `INV §12`, `INV §17`.
+  **Suggested fix/test:** decode the independently reported effective values after model/effort
+  application, fail closed on a mismatch for required settings, and make the fake return the pinned
+  response shape with an injected ignored-value regression.
+- **Must fix** — Claude chat model honoring remains unresolved (**likely**, not confirmed current).
+  **Where:** the July 26 credentialed run against the pinned `claude-agent-acp` reported
+  `configOptions.model.currentValue` staying at the native default for `sonnet`, `haiku`, and `opus`
+  requests, including `_meta.claudeCode.options.model`. September's TS-04.R47 instead calls Claude
+  unaffected because the adapter source spreads that option into SDK query options; no provider-side
+  receipt reconciles those observations, and the Codex-only fix leaves Claude delivery unchanged.
+  **Why it matters:** a critical prior live failure is currently overwritten by a static-source
+  inference. **Requirement:** FS-09.A16/A27, `INV §12`. **Suggested fix/test:** rerun the pinned
+  Claude launch/resume matrix with a provider-authoritative model signal, record whether the July
+  result was reporting drift or execution drift, then correct delivery or observability accordingly.
+- **Worth fixing** — equivalent OpenCode/OpenHands fields remain unverified (**undetermined**).
+  **Where:** neither CLI is installed. OpenHands model delivery has a separate `LLM_MODEL` env path,
+  so it does not depend on the suspect ACP `model` member, but both adapters still receive an
+  out-of-schema top-level `systemPrompt`; OpenCode also still depends on the top-level `model`.
+  **Why it matters:** the same silent-ignore class may be live on surfaces explicitly advertised by
+  AgentDeck. **Requirement:** FS-09.A6, `INV §12`. **Suggested fix/test:** keep the claims gated until
+  each pinned CLI is installed and its model/prompt delivery is checked at the effective provider;
+  remove any redundant unsupported top-level fields once their real mechanism is known.
 
-## Bug reports awaiting investigation
+## Bug investigation reports
 
-### BR-1 — Codex chat ignored the selected model and effort for ~10 weeks
+### BR-1 — Codex chat ignored the selected model and effort for ~10 weeks (postmortem complete)
 
-**Investigation ask:** not the fix (that is implemented). Determine why this survived
-every review, test, and spec pass, and whether the same failure mode is live elsewhere.
+**Verdict.** The defect did not remain unnoticed for ten weeks. It entered Codex chat when that
+backend reused the generic ACP request in late June, was detected by a credentialed live-provider
+run on 2026-07-26, and was explicitly written as a Must-fix. The process then lost that finding while
+simultaneously designing effort on top of the broken mechanism. It survived about six more weeks
+after detection until the 2026-09-07 fast-mode design rediscovered it. The initial model defect
+shipped in v0.1.2 through v0.4.2; the later effort defect shipped in v0.2.0 through v0.4.2.
 
 **Defect.** ACP's `NewSessionRequest`/`LoadSessionRequest` declare exactly `cwd`,
 `additionalDirectories`, `mcpServers`, `_meta` (+`sessionId`). No `model`. AgentDeck sent
@@ -152,52 +208,76 @@ every review, test, and spec pass, and whether the same failure mode is live els
 `codex-acp` 1.1.2 reads no model from the request and takes model + reasoning effort from its own
 `threadStart`/`threadResume` response. Every Codex chat agent ran the local Codex default while New
 Agent, `PUT /api/backends` validation, and the persisted session identity all reported the operator's
-selection. `claude-acp` unaffected — it receives model via `_meta.claudeCode.options.model`, spread
-into SDK options at `dist/acp-agent.js:3753`.
+selection. Claude uses a different `_meta.claudeCode.options.model` path; source inspection shows it
+is spread into SDK options, but the contradictory July live result described below prevents calling
+Claude unaffected without a new provider-authoritative check.
 
-**Age.** Model param present since `775a1e6` (2026-06-27), extended to `session/load` in `981fbaf`
-(2026-07-01) and to source-inherited defaults in `c694ed0` (2026-07-11). Effort suffix added
-`8ec8c6e` (2026-07-30). Survived every review and release in that range, including v0.4.0–v0.4.2.
+**Timeline and escape chain.**
 
-**Detection.** Not by a test or review. Found on 2026-09-07 while designing fast mode, by reading the
-pinned adapter to answer an unrelated question (which config-option id it uses), then noticing
-`session/new` never reads `request.model`. Confirmed by driving the pinned binary over stdio:
-`session/new` with `model:"gpt-5.4-mini[xhigh]"` returned `currentModelId:"gpt-5.6-luna[high]"`;
-`set_config_option` `model` then `reasoning_effort` afterwards produced the requested pair.
+1. **Origin — 2026-06-27 to 2026-07-11.** The Phase 1 technical design invented a top-level ACP
+   `model`/`systemPrompt` request and called `session/new` authoritative without a schema or adapter
+   citation. `775a1e6` implemented it; Codex support reused it, `981fbaf` copied it to load, and
+   `c694ed0` made source precedence depend on it. The fake accepted every JSON member, so green tests
+   established only that code emitted its own assumption.
+2. **Missed near-neighbour — 2026-07-16.** The Codex-history session that fixed ignored
+   `systemPrompt` explicitly established that the pinned `NewSessionRequest` accepts only `cwd`,
+   `additionalDirectories`, `mcpServers`, and `_meta`. It removed the prompt field for Codex but did
+   not audit the adjacent `model` field. The fix and review were scoped to the reported symptom.
+3. **Actual detection — 2026-07-26.** A credentialed run found Codex always reporting the local
+   configured `gpt-5.6-terra[high]`, including when sent another `model[effort]`, and recorded this as
+   **Must fix** in `docs/archive/reviews/live-provider-acceptance-2026-07-26.md`. The owning Claude
+   conversation could not update HANDOFF because another live session was editing it, and explicitly
+   said the three findings still needed transfer.
+4. **Contradictory design in parallel — 2026-07-26/27.** Fourteen minutes after acceptance began,
+   another Claude conversation started effort design from the still-stale HANDOFF. It found the
+   internal `ModelId` parser for `model[effort]` but never traced the ACP `session/new` decoder or
+   request handler to `threadStart`. It converted “the adapter can parse this string internally” into
+   “the existing session request delivers it,” then wrote TS-04.R18 as a verified fact. On resuming
+   the next day it knew live-provider changes were mixed into the tree but did not reread HANDOFF or
+   open/reconcile the acceptance report.
+5. **State burial — 2026-07-27.** Catch-all commit `7d294fb` committed both the exact Must-fix report
+   and the contradictory effort design, while HANDOFF said no findings were open and that both
+   adapters had been verified. Because the report lived under `docs/archive/reviews`, the normal read
+   order no longer surfaced it.
+6. **Review escape — 2026-07-27.** The immediate Codex `/review` was explicitly asked to inspect all
+   changes from the prior 12 hours. It listed every file in `7d294fb` but never opened the newly added
+   acceptance report. It reviewed product code/specs, found unrelated issues, and concluded the effort
+   design was correct because the spec and code agreed. The contradictory evidence in the same commit
+   was therefore never reconciled.
+7. **Implementation and later reviews — 2026-07-30 onward.** `8ec8c6e` implemented exactly the
+   approved false spec: one helper appended `[effort]`, and tests asserted that `fakeacp` received the
+   outbound string. Reviews `aafd240`, `c507763`, and `b28a96c` checked lifecycle symmetry, teardown,
+   nullability, traceability, and spec conformance, but none used the already-recorded provider result
+   or an independent schema oracle. Each could honestly pass its chosen oracle while the real adapter
+   discarded the field.
+8. **Rediscovery — 2026-09-07.** Fast-mode design traced the pinned adapter's actual session request
+   handler, then drove it over stdio: `session/new` with `model:"gpt-5.4-mini[xhigh]"` returned
+   `currentModelId:"gpt-5.6-luna[high]"`; post-session `model` then `reasoning_effort` produced the
+   requested pair. FS-09.R58 / TS-04.R47 now use that reachable mechanism; implementation `c640b48`
+   is available for review, with the post-fix credentialed matrix still open.
 
-**Fix.** FS-09.R58 / TS-04.R47 — Codex model and effort now use post-session config options,
-retiring TS-04.R18's model-suffix mechanism.
+**Root cause.** The primary cause was an unverified external-contract assertion entering the
+normative technical spec. The enabling causes were a fake that shared that assertion, no effective
+configuration readback, and narrowly scoped reviews. The six-week post-detection escape was a
+separate state-management failure: a real Must-fix was archived instead of made live, then a commit
+and review preserved mutually exclusive conclusions without reading them together. Open live gates
+were not the cause—this particular gate ran and failed.
 
-**Leads on why it survived.** Stated as leads, not conclusions:
+**Other adapters.** OpenHands model selection uses `LLM_MODEL`, a separate process-environment path,
+so the Codex `model`-member failure does not govern it. OpenCode model delivery and both adapters'
+top-level `systemPrompt` remain undetermined because neither pinned CLI is installed. Claude is not
+closed: source inspection proves the pinned adapter forwards `_meta.claudeCode.options.model` into
+its SDK query, but the July live run reported the native default in `configOptions` for every
+requested model and had no provider-side receipt. Treat that as contradictory evidence requiring a
+new credentialed matrix, not as proof that Claude is either broken or unaffected.
 
-1. **FS-09.A15 asserts the outbound parameter, not the adapter's response to it.** Its oracle is
-   `fakeacp`, which AgentDeck authors. The fake encoded AgentDeck's assumption, so the test could
-   only ever confirm it. INV §17's trigger, unfired.
-2. **No check that outbound wire shapes conform to the pinned ACP schema — which the repo already
-   has.** `scripts/release/node_modules/@agentclientprotocol/sdk/schema/schema.json` (SDK 1.2.1)
-   carries the authoritative request definitions and confirms the missing `model` field. TS-04
-   traceability already cites that exact directory as evidence for R27, so the schema was cited for
-   one requirement while R18 asserted an unverified wire shape a few sections earlier. Caveat for
-   whoever acts on this: the path is gitignored and not committed, so a conformance check would
-   depend on the release tooling's install step or on vendoring the schema.
-3. **TS-04.R18 recorded "the shape its pinned adapter parses" as fact.** Unverified provider claims
-   entered a spec as normative, and reviews check diffs against specs — so the spec was the thing
-   that would have had to be doubted.
-4. **The symptom is invisible.** No error, no crash, no degraded run: a working agent on the wrong
-   model. Only cost and output quality differ, and the UI confirmed the wrong answer everywhere.
-5. **Live-provider gates are open by explicit decision.** See Acceptance gates above. The gate that
-   would have caught this is the one deliberately not run.
-6. **This exact class was already found once and fixed narrowly.** TS-04.R14 records that
-   `codex-acp` ignores an ACP `systemPrompt` — same adapter, same shape of discovery, same file. The
-   response was a Codex-specific carve-out, not a sweep for other unread fields.
-
-**Generalize before closing.** `sessionNewParams`/`sessionLoadParams` still send a top-level
-`systemPrompt` to `opencode-acp` and `openhands-acp` — also out-of-schema, also unverified, excluded
-for `codex-acp` only because lead 6 caught it there. Same for `model` on those two adapters, left
-untouched in the completed change for lack of evidence. Determine whether either is read. Then decide
-whether the durable answer is a conformance check against the pinned schema, a rule that
-provider-behavior claims in a TS cite evidence, or a fake-ACP that rejects what a real adapter
-rejects — the answer likely differs for each of the six leads.
+**Evidence.** Git commits `775a1e6`, `981fbaf`, `c694ed0`, `d0c7b4a`, `7d294fb`, `9d35042`,
+`8ec8c6e`, `aafd240`, `c507763`, `b28a96c`, `02daa6e`, and `c640b48`; the archived July 26 report;
+Claude histories `e43bb559-ca3f-49fd-b3e0-8f7c0ac7ad4f` (live acceptance) and
+`478a9918-e1c7-413a-a833-3e3c43844fa9` (effort design); Codex histories
+`019fa226-b1ef-7723-8b89-d6e490f793d5` (July 27 review),
+`019fb179-fab9-7c83-a1bf-dffad222e17e` (July 30 implementation), and
+`019f6a88-fce2-70a1-a269-1ef96287fb5b` (July 16 prompt fix).
 
 ## Design consistency notes
 
