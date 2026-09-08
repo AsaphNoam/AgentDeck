@@ -35,6 +35,11 @@ type RunningEntry struct {
 	DriverIDs map[string]string `json:"driver_ids,omitempty"`
 	HookToken string            `json:"-"`
 	StartedAt time.Time         `json:"started_at"`
+	// FastAvailable records whether this live session advertised the backend's
+	// fast-mode configuration option (FS-03.R46, TS-04.R46). It is session-scoped
+	// rather than identity-scoped: a session's current model decides it, so it is
+	// re-decoded on every launch and resume and vanishes with the row on stop.
+	FastAvailable bool `json:"fast_available"`
 }
 
 // Status is the live, frequently-updated state of an agent.
@@ -70,6 +75,11 @@ type AgentState struct {
 	TTY       string `json:"tty,omitempty"`
 	Driver    string `json:"driver,omitempty"`
 	StartedAt string `json:"started_at,omitempty"`
+	// FastAvailable is the live session's fast-mode advertisement, projected from
+	// the running row so the chat header can distinguish "off because the model
+	// does not offer it" from "off because the person chose it" (FS-03.R46).
+	// False for a stopped agent, which renders static text instead.
+	FastAvailable bool `json:"fast_available"`
 
 	State      string  `json:"state"`
 	Detail     string  `json:"detail"`

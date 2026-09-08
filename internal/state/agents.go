@@ -81,7 +81,11 @@ ON CONFLICT(agent_id) DO UPDATE SET
 	return nil
 }
 
-func (s *Store) UpdateAgentSessionSettings(agentID, effort string, fast bool) error {
+// UpdateAgentSessionSettings commits a live session-setting change to identity,
+// the frozen session snapshot, and the running row's fast-mode advertisement in
+// one transaction, so resume, the archive, and the chat header can never observe
+// a half-applied change (INV §15).
+func (s *Store) UpdateAgentSessionSettings(agentID, effort string, fast, fastAvailable bool) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("state: begin session settings: %w", err)
@@ -96,6 +100,11 @@ func (s *Store) UpdateAgentSessionSettings(agentID, effort string, fast bool) er
 	}
 	if _, err := tx.Exec(`UPDATE sessions SET effort = ?, fast = ? WHERE agent_id = ?`, effort, fast, agentID); err != nil {
 		return fmt.Errorf("state: update session settings: %w", err)
+	}
+	// Absent when the agent is not running, which is not an error: the header
+	// renders a stopped agent's settings as static text.
+	if _, err := tx.Exec(`UPDATE running SET fast_available = ? WHERE agent_id = ?`, fastAvailable, agentID); err != nil {
+		return fmt.Errorf("state: update session advertisement: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("state: commit session settings: %w", err)

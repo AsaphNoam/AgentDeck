@@ -15,15 +15,49 @@ const (
 )
 
 type acpSessionConfigOption struct {
-	ID       string `json:"id"`
-	ConfigID string `json:"configId"`
+	ID           string          `json:"id"`
+	ConfigID     string          `json:"configId"`
+	CurrentValue json.RawMessage `json:"currentValue"`
 }
 
-func decodeSessionConfigOptions(result json.RawMessage) map[string]struct{} {
+// sessionConfigAdvertisement is the normalized answer to "which configuration
+// options does this session offer, and what is each one effectively set to"
+// (TS-04.R46). It carries no ACP option structs, no type/category vocabulary,
+// and no provider display copy past this boundary (INV §8).
+type sessionConfigAdvertisement map[string]string
+
+func (a sessionConfigAdvertisement) has(id string) bool {
+	if id == "" {
+		return false
+	}
+	_, ok := a[id]
+	return ok
+}
+
+// replace overwrites the advertisement in place so every holder of the map sees
+// the peer's rebuilt option list. Applying a model resets which efforts exist and
+// whether fast mode exists at all (TS-04.R47), so a later lookup against the
+// pre-model list would gate the next setting on the wrong session state.
+func (a sessionConfigAdvertisement) replace(next sessionConfigAdvertisement) {
+	for id := range a {
+		delete(a, id)
+	}
+	for id, value := range next {
+		a[id] = value
+	}
+}
+
+// decodeSessionConfigOptions reads a `configOptions` array from any response that
+// carries one — `session/new`, `session/load`, and `session/set_config_option`
+// alike. The value is the peer's own report of the option's effective setting, so
+// a caller can check that a call it made was honored rather than only accepted
+// (INV §12). An absent, null, or unparseable list advertises nothing, which fails
+// open under TS-04.R45/R46 rather than failing the session (INV §7).
+func decodeSessionConfigOptions(result json.RawMessage) sessionConfigAdvertisement {
 	var response struct {
 		ConfigOptions []acpSessionConfigOption `json:"configOptions"`
 	}
-	out := map[string]struct{}{}
+	out := sessionConfigAdvertisement{}
 	if json.Unmarshal(result, &response) != nil {
 		return out
 	}
@@ -33,10 +67,41 @@ func decodeSessionConfigOptions(result json.RawMessage) map[string]struct{} {
 			id = option.ConfigID
 		}
 		if id != "" {
-			out[id] = struct{}{}
+			out[id] = normalizeConfigValue(option.CurrentValue)
 		}
 	}
 	return out
+}
+
+// normalizeConfigValue reduces a reported option value to the string vocabulary
+// AgentDeck sends. AgentDeck advertises no boolean client capability, so both
+// pinned adapters degrade to a two-value select and a string is the expected
+// form (TS-04.R45); a boolean or a wrapped select entry is folded to the same
+// spelling instead of being rejected, and any other shape reports nothing so the
+// caller treats the value as unreported rather than as a mismatch (INV §12).
+func normalizeConfigValue(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var text string
+	if json.Unmarshal(raw, &text) == nil {
+		return text
+	}
+	var flag bool
+	if json.Unmarshal(raw, &flag) == nil {
+		if flag {
+			return "on"
+		}
+		return "off"
+	}
+	var wrapped struct {
+		ID    string `json:"id"`
+		Value string `json:"value"`
+	}
+	if json.Unmarshal(raw, &wrapped) == nil && wrapped.ID != "" {
+		return wrapped.ID
+	}
+	return wrapped.Value
 }
 
 // CommandItem is one entry of a chat runtime's advertised ACP command snapshot,

@@ -881,12 +881,12 @@ func TestSetSessionConfigAppliesWithoutRestartingTheChatRuntime(t *testing.T) {
 
 	effort := "high"
 	fast := true
-	appliedEffort, appliedFast, err := c.SetSessionConfig(context.Background(), h.AgentID, &effort, &fast)
+	change, err := c.SetSessionConfig(context.Background(), h.AgentID, &effort, &fast)
 	if err != nil {
 		t.Fatalf("SetSessionConfig: %v", err)
 	}
-	if appliedEffort != effort || !appliedFast {
-		t.Fatalf("applied settings = %q, %v; want high, true", appliedEffort, appliedFast)
+	if change.Effort != effort || !change.EffortApplied || !change.Fast || !change.FastApplied {
+		t.Fatalf("applied settings = %+v; want effort high and fast on", change)
 	}
 	if current, err := c.store.ReadRunning(h.AgentID); err != nil || current.PID != h.Pid || current.SessionID != h.SessionID {
 		t.Fatalf("running identity changed: %+v err=%v", current, err)
@@ -908,6 +908,168 @@ func TestSetSessionConfigAppliesWithoutRestartingTheChatRuntime(t *testing.T) {
 	}
 	if got := strings.Join(ids, ","); got != "model,reasoning_effort,fast-mode" {
 		t.Fatalf("configuration calls = %s", got)
+	}
+}
+
+// FS-09.A26, TS-04.R46/R47, INV §12 — applying the model rebuilds what the
+// session offers, so the runtime must consult the option list the peer returned
+// rather than the one it read before the model was set. Live-confirmed against
+// claude-agent-acp 0.59.0: after setting the model, the effort and fast options
+// disappear and a later call is refused with `Unknown config option`. Against
+// the pre-fix runtime this passed silently, because the set-option response was
+// discarded and the stale advertisement still listed effort.
+func TestSessionConfigurationRereadsTheOptionListAfterAModelChange(t *testing.T) {
+	c, spec := newChatTest(t, "stream_text")
+	spec.BackendType = "codex-acp"
+	spec.ModelID = "gpt-5.4-mini"
+	spec.Effort = "high"
+	spec.Env = append(spec.Env, "FAKEACP_MODEL_DROPS=reasoning_effort")
+
+	_, err := c.Start(context.Background(), spec)
+	if !errors.Is(err, ErrSettingUnavailable) {
+		t.Fatalf("Start error = %v, want ErrSettingUnavailable once the model removes the effort option", err)
+	}
+	if _, err := c.store.ReadRunning(spec.Agent.AgentID); !errors.Is(err, state.ErrNotFound) {
+		t.Fatalf("running row = %v, want ErrNotFound: effort is fail-closed", err)
+	}
+}
+
+// FS-09.A27, INV §12 — a peer that answers success while its own rebuilt option
+// list reports a different effective value has ignored the setting. That is the
+// exact silent failure BR-1 shipped for Codex model delivery, so the RPC
+// envelope alone must not be accepted as proof the setting took.
+func TestSessionConfigurationRejectsAnAcceptedButIgnoredSetting(t *testing.T) {
+	c, spec := newChatTest(t, "stream_text")
+	spec.BackendType = "codex-acp"
+	spec.ModelID = "gpt-5.4-mini"
+	spec.Env = append(spec.Env, "FAKEACP_IGNORE_OPTION=model")
+
+	_, err := c.Start(context.Background(), spec)
+	if !errors.Is(err, ErrSettingIgnored) {
+		t.Fatalf("Start error = %v, want ErrSettingIgnored when the peer reports another model", err)
+	}
+}
+
+// FS-09.A24, FS-03.A29 — a launch requesting fast mode on a session that does
+// not advertise it still starts, records fast mode off, and records that the
+// session never offered it so the chat header can say so (FS-03.R46) instead of
+// showing an ordinary off toggle.
+func TestFastModeRequestedButNotAdvertisedRunsNormallyAndRecordsUnavailable(t *testing.T) {
+	c, spec := newChatTest(t, "stream_text")
+	spec.Fast = true // no FAKEACP_FAST_OPTION: the session advertises no fast option
+
+	h, err := c.Start(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { c.Stop(context.Background(), h.AgentID) })
+	if h.Fast {
+		t.Fatal("fast mode reported as applied though the session never advertised it")
+	}
+	running, err := c.store.ReadRunning(h.AgentID)
+	if err != nil {
+		t.Fatalf("ReadRunning: %v", err)
+	}
+	if running.FastAvailable {
+		t.Fatal("running row claims fast mode is available on a session that did not advertise it")
+	}
+}
+
+// FS-09.A24 — the same launch against a session that does advertise the option
+// applies it and records the advertisement, so the header renders a live toggle.
+func TestFastModeAdvertisedIsAppliedAndRecordedAvailable(t *testing.T) {
+	c, spec := newChatTest(t, "stream_text")
+	spec.Fast = true
+	spec.Env = append(spec.Env, "FAKEACP_FAST_OPTION=fast")
+
+	h, err := c.Start(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { c.Stop(context.Background(), h.AgentID) })
+	if !h.Fast {
+		t.Fatal("fast mode was advertised but not applied")
+	}
+	running, err := c.store.ReadRunning(h.AgentID)
+	if err != nil {
+		t.Fatalf("ReadRunning: %v", err)
+	}
+	if !running.FastAvailable {
+		t.Fatal("running row does not record the session's fast-mode advertisement")
+	}
+}
+
+// FS-03.A28/A30, INV §15 — a combined live change applies its settings one at a
+// time, so a fast-mode failure after a successful effort must still report the
+// effort that really applied. Reporting the whole request as a no-op left the
+// provider running the new effort while every durable record kept the old one.
+func TestSetSessionConfigReportsTheSettingsThatAppliedBeforeAFailure(t *testing.T) {
+	c, spec := newChatTest(t, "stream_text")
+	spec.BackendType = "codex-acp"
+	spec.ModelID = "gpt-5.4-mini"
+	spec.Env = append(spec.Env, "FAKEACP_FAST_OPTION=fast-mode", "FAKEACP_IGNORE_OPTION=fast-mode")
+
+	h, err := c.Start(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { c.Stop(context.Background(), h.AgentID) })
+
+	effort, fast := "high", true
+	change, err := c.SetSessionConfig(context.Background(), h.AgentID, &effort, &fast)
+	if err == nil {
+		t.Fatal("SetSessionConfig should fail when the provider ignores fast mode")
+	}
+	if !change.EffortApplied || change.Effort != "high" {
+		t.Fatalf("change = %+v; the effort that reached the provider must still be reported", change)
+	}
+	if change.FastApplied {
+		t.Fatalf("change = %+v; fast mode must not be reported as applied", change)
+	}
+	if !change.FastAvailable {
+		t.Fatalf("change = %+v; the option is still advertised, so the header must keep its live toggle", change)
+	}
+}
+
+// FS-03.A29, TS-03.R37 — the live path keeps fast mode fail-open: an
+// unadvertised speed tier resolves to off rather than erroring, and reports that
+// it is unavailable so the header explains why the toggle did not move.
+func TestSetSessionConfigResolvesUnavailableFastModeToOff(t *testing.T) {
+	c, spec := newChatTest(t, "stream_text")
+	h, err := c.Start(context.Background(), spec) // no fast option advertised
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { c.Stop(context.Background(), h.AgentID) })
+
+	fast := true
+	change, err := c.SetSessionConfig(context.Background(), h.AgentID, nil, &fast)
+	if err != nil {
+		t.Fatalf("SetSessionConfig: %v", err)
+	}
+	if change.Fast || !change.FastApplied || change.FastAvailable {
+		t.Fatalf("change = %+v; want fast resolved to off and reported unavailable", change)
+	}
+}
+
+// TS-03.R37 — effort stays fail-closed on the live path and names the reason the
+// route maps to its own envelope code.
+func TestSetSessionConfigRejectsAnUnavailableEffort(t *testing.T) {
+	c, spec := newChatTest(t, "stream_text")
+	spec.Env = append(spec.Env, "FAKEACP_MISSING_OPTION=effort")
+	h, err := c.Start(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { c.Stop(context.Background(), h.AgentID) })
+
+	effort := "high"
+	change, err := c.SetSessionConfig(context.Background(), h.AgentID, &effort, nil)
+	if !errors.Is(err, ErrSettingUnavailable) {
+		t.Fatalf("SetSessionConfig error = %v, want ErrSettingUnavailable", err)
+	}
+	if change.EffortApplied {
+		t.Fatalf("change = %+v; nothing reached the provider", change)
 	}
 }
 

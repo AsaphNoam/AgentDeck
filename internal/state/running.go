@@ -12,10 +12,10 @@ func (s *Store) ReadRunning(id string) (RunningEntry, error) {
 	var r RunningEntry
 	var startedAt, driverIDs string
 	err := s.db.QueryRow(`
-SELECT agent_id, pid, session_id, interface, tty, driver, driver_ids, hook_token, started_at
+SELECT agent_id, pid, session_id, interface, tty, driver, driver_ids, hook_token, started_at, fast_available
 FROM running
 WHERE agent_id = ?`, id).Scan(
-		&r.AgentID, &r.PID, &r.SessionID, &r.Interface, &r.TTY, &r.Driver, &driverIDs, &r.HookToken, &startedAt,
+		&r.AgentID, &r.PID, &r.SessionID, &r.Interface, &r.TTY, &r.Driver, &driverIDs, &r.HookToken, &startedAt, &r.FastAvailable,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return RunningEntry{}, ErrNotFound
@@ -34,8 +34,8 @@ WHERE agent_id = ?`, id).Scan(
 // WriteRunning inserts or updates a running entry.
 func (s *Store) WriteRunning(r RunningEntry) error {
 	_, err := s.db.Exec(`
-INSERT INTO running(agent_id, pid, session_id, interface, tty, driver, driver_ids, hook_token, started_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO running(agent_id, pid, session_id, interface, tty, driver, driver_ids, hook_token, started_at, fast_available)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(agent_id) DO UPDATE SET
     pid = excluded.pid,
     session_id = excluded.session_id,
@@ -44,8 +44,9 @@ ON CONFLICT(agent_id) DO UPDATE SET
     driver = excluded.driver,
     driver_ids = excluded.driver_ids,
     hook_token = excluded.hook_token,
-    started_at = excluded.started_at`,
-		r.AgentID, r.PID, r.SessionID, r.Interface, r.TTY, r.Driver, encodeDriverIDs(r.DriverIDs), r.HookToken, formatTime(r.StartedAt),
+    started_at = excluded.started_at,
+    fast_available = excluded.fast_available`,
+		r.AgentID, r.PID, r.SessionID, r.Interface, r.TTY, r.Driver, encodeDriverIDs(r.DriverIDs), r.HookToken, formatTime(r.StartedAt), r.FastAvailable,
 	)
 	if err != nil {
 		return fmt.Errorf("state: write running: %w", err)
@@ -56,7 +57,7 @@ ON CONFLICT(agent_id) DO UPDATE SET
 // ListRunning returns all running entries.
 func (s *Store) ListRunning() ([]RunningEntry, error) {
 	rows, err := s.db.Query(`
-SELECT agent_id, pid, session_id, interface, tty, driver, driver_ids, hook_token, started_at
+SELECT agent_id, pid, session_id, interface, tty, driver, driver_ids, hook_token, started_at, fast_available
 FROM running
 ORDER BY started_at, agent_id`)
 	if err != nil {
@@ -68,7 +69,7 @@ ORDER BY started_at, agent_id`)
 	for rows.Next() {
 		var r RunningEntry
 		var startedAt, driverIDs string
-		if err := rows.Scan(&r.AgentID, &r.PID, &r.SessionID, &r.Interface, &r.TTY, &r.Driver, &driverIDs, &r.HookToken, &startedAt); err != nil {
+		if err := rows.Scan(&r.AgentID, &r.PID, &r.SessionID, &r.Interface, &r.TTY, &r.Driver, &driverIDs, &r.HookToken, &startedAt, &r.FastAvailable); err != nil {
 			return nil, fmt.Errorf("state: scan running: %w", err)
 		}
 		r.DriverIDs = decodeDriverIDs(driverIDs)

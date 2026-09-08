@@ -17,8 +17,8 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   annotation transcripts, and Mermaid rendering fixes. It changes no agent-facing behavior, so the
   embedded `operating-agentdeck` package was not refreshed. The distributable binary reports
   `0.4.2` and carries `sqlite_fts5`.
-- **Review units:** `chat-session-configuration` is reviewed with open findings and available for
-  `/fix`. `dock-the-annotation-tray-and-quiet-its-prompt` is reviewed, fixed, and closed; all
+- **Review units:** `chat-session-configuration` is reviewed, fixed, and closed.
+  `dock-the-annotation-tray-and-quiet-its-prompt` is reviewed, fixed, and closed; all
   earlier units through this release are closed. Review records, finding-fix
   commits, release records, and handoff/archive/queue bookkeeping are administrative closure.
 - **Work units:** None waiting. `migrate-internal-actions-from-mcp.md` stays paused on its recorded
@@ -29,12 +29,11 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   whether `plan` ships with it still open) and steering a running turn (open on whether steering is
   Claude-native queueing or a portable hold-until-idle). The permanently unaddressable pipeline
   agent remains the newest `New ideas` entry and needs `/design-feature` before code.
-- **Open findings:** Two usability findings from the 2026-09-07 v0.4.2 review plus seven Must-fix
-  and three Worth-fixing implementation/postmortem findings: J2 incompatible CLI status, J5 clipped
-  lower-row card menus, live configuration races and partial updates, missing unavailable-fast
-  feedback, generic live-setting errors, incomplete acceptance coverage, live-gate finding
-  durability, provider-contract oracles, effective-config observability, the unresolved Claude model
-  result, and the unverified OpenCode/OpenHands paths.
+- **Open findings:** Two usability findings from the 2026-09-07 v0.4.2 review plus three Must-fix
+  and one Worth-fixing postmortem findings: J2 incompatible CLI status, J5 clipped lower-row card
+  menus, live-gate finding durability, provider-contract oracles, the **confirmed** Claude model
+  result, and the unverified OpenCode/OpenHands paths. The six
+  `chat-session-configuration` findings are closed.
 - **Bug reports:** BR-1 is investigated. Codex chat silently ignored the selected model from its
   first release and later ignored effort too; its implementation is reviewed with open findings.
   The postmortem corrects the earlier claim that the bug went unnoticed and records how a live
@@ -42,17 +41,43 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   reports**.
 - **State:** Automated MCP contract verification is green. A historical credentialed provider run
   on 2026-07-26 detected the BR-1 model failure; the current post-fix Claude/Codex acceptance matrix
-  remains open and must not be described as verified.
+  remains open and must not be described as verified. The 2026-09-08 fix run drove both pinned
+  adapters live for the session-configuration contract only; that probe is recorded under **Bug
+  investigation reports** and is not the acceptance matrix.
 - **Branch:** `main`.
 
 ## Active change
 
 **Change:** None.
 
-**Available by role:** `/review` has no unreviewed unit; `/fix` may select
-`chat-session-configuration`; `/work` has no waiting unit; `/design-feature` may choose an available
+**Available by role:** `/review` has no unreviewed unit; `/fix` may select the BR-1 postmortem
+findings; `/work` has no waiting unit; `/design-feature` may choose an available
 or resumable idea, or an idea a person names from another `docs/ideas.md` section. Role queues are
 independent.
+
+**Changelog — 2026-09-08 (fix):** Closed all six `chat-session-configuration` review findings
+(INV §1, §5, §8, §11, §12, §15, §17). The ACP configuration decode now keeps each option's reported
+`currentValue` and is re-read from every response that carries one, so applying a model consults the
+peer's rebuilt option list rather than the pre-model one, and a setting AgentDeck required is checked
+against the value the peer itself reports instead of the bare RPC envelope. The live
+`session-config` route takes the shared exclusive lifecycle claim, and a combined request that fails
+partway now persists what actually applied before returning the error. Runtime failures are typed
+(unsupported, unavailable, rejected, ignored) and mapped to distinct route envelopes instead of one
+`runtime_start_failed`. The live session's fast-mode advertisement is decoded per generation, stored
+on the `running` row (migration 24), projected into agent state, and rendered by the chat header, so
+a launch that asked for fast mode and did not get it now says the model does not offer it rather
+than showing a dead toggle. Added regression coverage with acceptance IDs for the rebuilt-option-list
+and ignored-setting paths, partial-apply persistence, lifecycle serialization, unavailable-fast
+header states, and task/pipeline requested-versus-applied fast mode; the option-list regression was
+confirmed to fail against the pre-fix discard. TS-02.R30, TS-03.R37, and TS-04.R46 updated. Full Go
+suite, SQLite-FTS variant, targeted `-race` runs, vet, all UI tests, UI build, style/presentation
+checks, and spec checks pass.
+
+**Both pinned adapters were driven live during this fix**, which resolved one open question and
+confirmed another. See **Bug investigation reports** for the recorded probes: Claude model delivery
+via `_meta` is broken (a session requesting `haiku` came up on the local default `opus`), and
+post-session configuration works for Claude as well as Codex. That is a finding in the BR-1
+postmortem unit, not this one, and it is left open with the evidence attached.
 
 **Changelog — 2026-09-08 (review):** Reviewed `chat-session-configuration` across its design and
 implementation range. The ordered provider-setting path discards the required updated option list,
@@ -76,34 +101,6 @@ process or native-session restart. Added fake-provider sequence coverage, a live
 test, catalog/migration/UI coverage, and the header state to the visual matrix. The full Go suite,
 SQLite-FTS suite, UI tests/build, and rendered desktop matrix check pass. Credentialed provider
 gates remain open as recorded below.
-
-**Changelog — 2026-09-07:** Designed fast mode to ready. Added FS-09.R50–R56 (per-model `fast`
-capability, chat-only claude/codex delivery, Codex autosync from `additional_speed_tiers`,
-resolution, advertisement-gated application, exclusion from the switch tuple), FS-03.R45/R46
-(header toggle outside the staged picker; unavailable, not-running, and the recorded cooldown
-limitation), FS-01.R35, FS-16.R29, FS-14.R59, and acceptance FS-09.A23–A25, FS-03.A28/A29,
-FS-01.A19, FS-16.A19, FS-14.A34. Technical side: TS-04.R45/R46 (adapter-declared fast delivery,
-fail-open, and the `configOptions` decode staying in `acpmap.go`), TS-01.R28, TS-02.R30,
-TS-03.R37, TS-08.R55, TS-09.R34, TS-10.R24. FS-01, FS-03, FS-14, FS-16, TS-02, TS-08, TS-09, and
-TS-10 moved Current → Partial with the index updated. Provider surfaces were verified against the
-pinned binaries rather than assumed; the evidence is recorded in the ready change so a later
-adapter bump can re-check it. The same request's other two features stay under
-`Ideas being defined` with their verified findings.
-
-**Changelog — 2026-09-07 (second pass):** Widened the unit to `chat-session-configuration.md` after
-checking whether effort could use the same live mechanism. It can — both chat adapters apply effort
-to a live session — and checking it uncovered a defect: **`codex-acp` 1.1.2 reads no model from the
-ACP session request** (the pinned `NewSessionRequest` schema has no such field), so AgentDeck's
-`model[effort]` parameter has been going nowhere and every Codex chat agent has run the user's local
-Codex default model and reasoning effort. Confirmed live against the pinned adapter, not only by
-code reading; the probe is described in the ready change. `claude-acp` is unaffected — it uses
-`_meta`. Added FS-09.R57 (one ordered post-session step: model → effort → fast, ordering
-adapter-imposed), FS-09.R58 (Codex delivery moves post-session; records the defect), FS-03.R47
-(header effort applies on selection, superseding R23's effort clause), TS-04.R47 (retires R18's
-model-suffix mechanism), and acceptance FS-09.A26/A27, FS-03.A30. TS-03.R37 became one
-`session-config` route covering both live settings; TS-01.R28, TS-02.R30, and TS-08.R55 widened to
-match. `switch-runtime` keeps accepting effort unchanged, so no client breaks. Fixing the defect
-changes which model existing Codex agents run from their next launch or resume.
 
 Credentialed provider journeys and the real-browser checks below remain open acceptance gates, not
 blockers. Never report them as verified without running them.
@@ -159,56 +156,6 @@ let it block any role.
   **Requirement:** J5, `FS-12.A8`, `INV §8`. **Suggested fix/test:** clamp or flip the menu into the viewport
   and exercise lower-row menus across menu heights and the supported desktop floor. Reproduced in
   `.review/usability-20260907/run/shots/J5-context-menu-clipped.png`.
-- **Must fix** — live session-setting writes are not serialized with lifecycle changes.
-  **Where:** `internal/server/session_config.go:25-81` reads the agent, mutates the runtime, and then
-  writes identity without taking the per-agent lifecycle claim or carrying a generation check.
-  **Normal-use trigger:** two API clients change a setting together, or a setting change overlaps
-  Stop, Resume, or Switch runtime. Runtime calls serialize only while holding `agentState.mu`; their
-  later database writes can complete in the reverse order or land after a new runtime generation
-  has replaced the old one. **Why it matters:** the provider can be running one effort/fast value
-  while the agent, session, archive, and next resume record another. **Requirement:** `TS-03.R37`,
-  `FS-03.R45/R47`, `INV §1`, `INV §5`, `INV §15`. **Suggested fix/test:** serialize the complete
-  provider-apply plus durable-write operation with lifecycle transitions, or use a generation-scoped
-  compare-and-update; add barrier tests for two concurrent updates and update-versus-switch.
-- **Must fix** — one live-setting request can partially apply and then report total failure.
-  **Where:** `internal/runtime/chat.go:851-869` applies effort before fast, while
-  `internal/server/session_config.go:65-78` persists neither value after any runtime error.
-  **Normal-use trigger:** a supported combined `{effort, fast}` request applies effort and the
-  provider then rejects the fast call. **Why it matters:** the response says failure and the stored
-  effort stays old, but the next provider turn already uses the new effort; UI rollback, archive,
-  and resume all assert the wrong state. **Requirement:** `TS-03.R37`, `FS-03.R45/R47`, `INV §1`,
-  `INV §15`. **Suggested fix/test:** either make the combined operation failure-atomic or reconcile
-  and persist the settings that actually applied before returning; inject effort-success followed
-  by fast-failure and assert provider, agent, and session agree.
-- **Must fix** — the chat header cannot state an unhonored fast request honestly.
-  **Where:** `ui/src/components/chat/ChatPanel.tsx:204-208` derives the control only from catalog
-  capability and the applied boolean; agent/session identity retains no requested-or-unavailable
-  state. **Normal-use trigger:** a launch asks for fast mode on a catalog-capable model but the live
-  session does not advertise it, the fail-open case the feature explicitly supports. **Why it
-  matters:** the header shows an ordinary enabled off toggle with no “model does not offer it”
-  reason; activating it silently returns to off, so the operator cannot distinguish an unavailable
-  speed tier from their own choice. **Requirement:** `FS-03.R46/A29`, `FS-09.R55`, `INV §8`.
-  **Suggested fix/test:** project enough live-availability state for the header to render the named
-  reason and disable or otherwise explain the unavailable control; cover the launch-requested but
-  unadvertised state in the panel and server tests.
-- **Worth fixing** — live setting failures collapse to one startup error.
-  **Where:** `internal/server/session_config.go:65-68` maps unsupported delivery, an unadvertised
-  option, and a provider rejection to `runtime_start_failed`. **Normal-use trigger:** the catalog
-  and live provider disagree about effort or fast availability, or the provider rejects a level.
-  **Why it matters:** API clients cannot distinguish the actionable field/live-availability reasons
-  the route contract promises, despite the response text sometimes retaining a useful fragment.
-  **Requirement:** `TS-03.R37`, `INV §8`, `INV §11`. **Suggested fix/test:** return typed runtime
-  errors and map each to the route's existing field/conflict envelopes; assert each status and code.
-- **Worth fixing** — the feature's acceptance suite omits required negative and background-launch
-  paths. **Where:** the materially touched tests contain no exact `FS-01.A19`, `FS-03.A28-A30`,
-  `FS-09.A23-A27`, `FS-14.A34`, or `FS-16.A19` ownership comments; runtime coverage advertises all
-  options, chat-header coverage tests only successful applies, and pipeline tests never execute a
-  fast assignment or the applied-off fallback. **Why it matters:** the suite passes while the
-  unavailable, rejected, and dynamically changed option cases above are broken, and it does not pin
-  task/pipeline requested-versus-applied behavior. **Requirement:** those acceptance items,
-  `TS-06.R6`, `INV §10`, `INV §17`. **Suggested fix/test:** add the named missing-option,
-  rejected-apply, stopped/archive, task-dispatch, and pipeline start/projection cases with exact
-  acceptance IDs; make the fake derive its changing responses from independently defined ACP shapes.
 - **Must fix** — BR-1 finding state was not durable across concurrent roles (**confirmed**).
   **Where:** `docs/archive/reviews/live-provider-acceptance-2026-07-26.md` recorded the exact Codex
   model failure as a Must-fix on July 26, but the live acceptance session could not edit HANDOFF
@@ -229,29 +176,26 @@ let it block any role.
   `INV §12`, `INV §17`. **Suggested fix/test:** require provider-behavior statements to cite a
   complete reachability trace or a recorded live probe, and add an independently derived contract
   oracle that rejects out-of-schema standard fields instead of mirroring `sessionNewParams`.
-- **Must fix** — successful configuration calls are not checked against effective provider state
-  (**confirmed and widened by review**). **Where:** `decodeSessionConfigOptions` retains option ids
-  but discards `currentValue`; `applySessionConfig` and `SetSessionConfig` ignore the required
-  `SetSessionConfigOptionResponse.configOptions`; `fakeacp` returns the invalid empty object `{}`.
-  The same discard freezes the pre-model option set even though both pinned adapters return a rebuilt
-  full set after a model change because available effort levels and fast capability can change.
-  **Why it matters:** AgentDeck can persist and display a requested model/effort after a peer accepts
-  but ignores it—the exact silent BR-1 symptom—and can reject or silently skip a valid effort/fast
-  setting by consulting the previous model's options. **Requirement:** `FS-09.R55/R57/A26/A27`,
-  `TS-04.R45-R47`, `INV §1`, `INV §11`, `INV §12`, `INV §17`. **Suggested fix/test:** decode and
-  replace the option set after every configuration response, verify required settings against the
-  independently reported `currentValue`, and make the fake return the pinned response shape with
-  model-dependent options plus injected ignored-value coverage.
-- **Must fix** — Claude chat model honoring remains unresolved (**likely**, not confirmed current).
-  **Where:** the July 26 credentialed run against the pinned `claude-agent-acp` reported
-  `configOptions.model.currentValue` staying at the native default for `sonnet`, `haiku`, and `opus`
-  requests, including `_meta.claudeCode.options.model`. September's TS-04.R47 instead calls Claude
-  unaffected because the adapter source spreads that option into SDK query options; no provider-side
-  receipt reconciles those observations, and the Codex-only fix leaves Claude delivery unchanged.
-  **Why it matters:** a critical prior live failure is currently overwritten by a static-source
-  inference. **Requirement:** FS-09.A16/A27, `INV §12`. **Suggested fix/test:** rerun the pinned
-  Claude launch/resume matrix with a provider-authoritative model signal, record whether the July
-  result was reporting drift or execution drift, then correct delivery or observability accordingly.
+- **Must fix** — Claude chat model delivery through `_meta` does not work (**confirmed live
+  2026-09-08**, upgraded from "likely"). **Where:** `sessionNewParams`/`sessionLoadParams` in
+  `internal/runtime/chat.go` deliver the Claude model as
+  `_meta.claudeCode.options.model`, which TS-04.R47 and FS-09.R58 both call unaffected and keep
+  unchanged. **Reproduction (recorded, not inferred):** driving the pinned `claude-agent-acp`
+  **0.59.0** directly over stdio, a `session/new` carrying
+  `_meta.claudeCode.options.model = "haiku"` returned a session whose own
+  `configOptions.model.currentValue` was `opus` — the local default — reproducing the July 26
+  result. The same session then accepted `session/set_config_option {configId:"model",
+  value:"haiku"}` and reported `model = "haiku"` back. So this is the identical defect class as
+  BR-1's Codex bug, on the other chat adapter, and it has the same fix. **Why it matters:** every
+  Claude chat agent runs the user's local Claude default rather than the model chosen in AgentDeck,
+  while the New Agent picker, session identity, and archive all report the chosen one.
+  **Requirement:** FS-09.R7/R21/A16/A27, TS-04.R47, `INV §12`. **Suggested fix:** extend R57's
+  ordered post-session step to deliver `claude-acp`'s model as a configuration option, exactly as
+  R58 already does for `codex-acp`, and retire the `_meta` model field. **This changes which model
+  existing Claude chat agents run, from their next launch or resume** — the same consequence R58
+  accepted for Codex — so it wants an explicit decision before it ships. Note the ordering
+  constraint is now live-verified: setting the Claude model to one without reasoning levels removes
+  the `effort` and `fast` options outright, which the 2026-09-08 fix already handles.
 - **Worth fixing** — equivalent OpenCode/OpenHands fields remain unverified (**undetermined**).
   **Where:** neither CLI is installed. OpenHands model delivery has a separate `LLM_MODEL` env path,
   so it does not depend on the suspect ACP `model` member, but both adapters still receive an
@@ -262,6 +206,40 @@ let it block any role.
   remove any redundant unsupported top-level fields once their real mechanism is known.
 
 ## Bug investigation reports
+
+### Live adapter probe — 2026-09-08 (session-configuration contract)
+
+Recorded during the `chat-session-configuration` fix run by driving each pinned binary directly over
+stdio with a JSON-RPC script. This is a **contract probe, not the credentialed acceptance matrix**;
+it exercises session setup and configuration options only, never a real prompt turn.
+
+`claude-agent-acp` **0.59.0** (note: the binary on PATH is `@agentclientprotocol/claude-agent-acp`,
+not `@zed-industries/claude-code-acp` — a source reading of the wrong package will describe a
+different, older protocol with no config options at all):
+
+- `session/new` returns `configOptions` with ids `mode`, `model`, `effort`, `fast`; each is
+  `type: "select"` with a **string** `currentValue` and a `value`/`name` option list. AgentDeck's
+  declared claude identifiers (`model`, `effort`, `fast`) and its `on`/`off` spelling are correct.
+- A `session/new` requesting `_meta.claudeCode.options.model = "haiku"` came up with
+  `model.currentValue = "opus"`, the local default. **Model delivery via `_meta` does not work**;
+  this reproduces the 2026-07-26 result and is now an open Must-fix above.
+- `session/set_config_option {configId:"model", value:"haiku"}` **succeeded** and returned the
+  rebuilt option list reporting `model = "haiku"`. Post-session model delivery works for Claude.
+- After that model change the rebuilt list contained only `mode` and `model`: **`effort` and `fast`
+  were gone**, and calling either then failed with `Unknown config option`. This is why FS-09.R57's
+  ordering is load-bearing and why the option list must be re-read after every call.
+
+`codex-acp` **1.1.2**:
+
+- `session/new` carrying the out-of-schema top-level `model: "gpt-5-codex[high]"` came up on the
+  local default `gpt-5.6-sol`, confirming BR-1 and FS-09.R58 directly.
+- `session/set_config_option {configId:"reasoning_effort", value:"high"}` returned the rebuilt full
+  option list with `reasoning_effort = "high"`. Setting a model value the local install does not
+  offer was refused with `Invalid params`, so model application is genuinely fail-closed.
+
+Both adapters therefore answer `session/set_config_option` with the **rebuilt full option list**,
+and `currentValue` is a usable independent oracle for "was this setting honored". The `fakeacp`
+double now mirrors that shape and those failure modes.
 
 ### BR-1 — Codex chat ignored the selected model and effort for ~10 weeks (postmortem complete)
 

@@ -9,6 +9,9 @@ export interface AgentState {
   model: string;
   effort?: string;
   fast: boolean;
+  /** Whether the live session offers fast mode at all (FS-03.R46). False for a
+   * stopped agent, which renders its settings as static text. */
+  fast_available: boolean;
   interface: string;
   group?: string;
   created_at: string;

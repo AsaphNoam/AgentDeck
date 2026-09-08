@@ -22,6 +22,19 @@ func (s *Server) handleSessionConfig(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError(runtime.CodeValidation, "effort or fast is required"))
 		return
 	}
+	// Take the shared exclusive per-agent claim (TS-01.R16, INV §5) across the
+	// whole read → apply → persist window. The runtime call alone serializes only
+	// while it holds the agent's own lock, so without this claim two concurrent
+	// setting changes can apply in one order and commit in the other, and a change
+	// overlapping Stop, Resume, or Switch can land its durable write after a new
+	// runtime generation has replaced the session it was applied to — leaving the
+	// provider running one value while the agent, session, archive, and next
+	// resume record another (INV §1, INV §15).
+	if !s.claimLifecycle(id) {
+		writeAPIError(w, apiError(runtime.CodeConflict, "a lifecycle transition is already in progress"))
+		return
+	}
+	defer s.releaseLifecycle(id)
 	agent, err := s.stateStore.ReadAgent(id)
 	if errors.Is(err, state.ErrNotFound) {
 		writeAPIError(w, apiError(runtime.CodeNotFound, "no such agent: "+id))
@@ -62,22 +75,50 @@ func (s *Server) handleSessionConfig(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	appliedEffort, appliedFast, err := s.registry.SetSessionConfig(r.Context(), id, req.Effort, req.Fast)
-	if err != nil {
-		writeAPIError(w, apiError(runtime.CodeRuntimeStartFailed, err.Error()))
-		return
+	// The settings reach the provider one at a time in an adapter-imposed order, so
+	// a failure partway through leaves the earlier ones live. Reconcile against
+	// what actually applied and persist that before reporting the failure,
+	// otherwise the response, the stored agent, the archive, and the next resume
+	// all disagree with the provider the next turn will run on (INV §15).
+	change, runErr := s.registry.SetSessionConfig(r.Context(), id, req.Effort, req.Fast)
+	appliedEffort, appliedFast := agent.Effort, agent.Fast
+	if change.EffortApplied {
+		appliedEffort = change.Effort
 	}
-	if req.Effort == nil {
-		appliedEffort = agent.Effort
+	if change.FastApplied {
+		appliedFast = change.Fast
 	}
-	if req.Fast == nil {
-		appliedFast = agent.Fast
-	}
-	if err := s.stateStore.UpdateAgentSessionSettings(id, appliedEffort, appliedFast); err != nil {
+	if err := s.stateStore.UpdateAgentSessionSettings(id, appliedEffort, appliedFast, change.FastAvailable); err != nil {
 		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
 		return
 	}
 	_, _ = s.stateMgr.Touch(id)
+	if runErr != nil {
+		writeAPIError(w, sessionConfigError(runErr))
+		return
+	}
 	agent.Effort, agent.Fast = appliedEffort, appliedFast
 	writeJSON(w, http.StatusOK, agent)
+}
+
+// sessionConfigError maps a runtime session-setting failure to the distinct,
+// actionable reason the route contract promises (TS-03.R37). Collapsing all of
+// them into one upstream-failure status left API clients unable to tell an
+// option this session does not offer from a level the provider refused, which is
+// the difference between "pick another model" and "pick another level" (INV §8).
+func sessionConfigError(err error) *runtime.APIError {
+	switch {
+	case errors.Is(err, runtime.ErrNoHandle), errors.Is(err, runtime.ErrNotImplemented):
+		return apiError(runtime.CodeAgentNotRunning, "agent is not a running chat session")
+	case errors.Is(err, runtime.ErrSettingUnsupported):
+		return apiError(runtime.CodeInvalidField, err.Error())
+	case errors.Is(err, runtime.ErrSettingUnavailable):
+		return apiError(runtime.CodeConflict, err.Error())
+	case errors.Is(err, runtime.ErrSettingRejected):
+		return apiError(runtime.CodeInvalidField, err.Error())
+	default:
+		// Includes ErrSettingIgnored: the provider answered success and did
+		// something else, which is an upstream fault rather than a bad request.
+		return apiError(runtime.CodeRuntimeStartFailed, err.Error())
+	}
 }

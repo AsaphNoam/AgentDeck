@@ -144,6 +144,17 @@ make the archive and the dashboard card claim a speed the agent never ran at. Th
 in its structural form: the one-shot request gets its own field that the persistence path recording
 what ran is blind to.
 
+A third thing is neither requested nor applied: **whether the live session offers fast mode at all**.
+That is decided by the session's current model, so it lives on the ephemeral `running` row as
+`fast_available INTEGER NOT NULL DEFAULT 1` and disappears with that row on stop, exactly as R7
+separates ephemeral process state from durable identity. It is re-decoded on every launch and resume
+from the session's advertisement (TS-04.R46), so it can never survive a boundary as stale derived
+state (INV §1), and the agent-state projection joins it so the chat header can distinguish "off
+because this model does not offer it" from "off because the person chose it" (FS-03.R46). The
+migration defaults pre-existing rows to advertised rather than unavailable: an unobserved
+advertisement must fail open to the previous behavior under FS-09.R55, never to a claim that a
+capable model offers nothing.
+
 Because the chat header now changes fast mode *and* effort mid-session (FS-03.R45, FS-03.R47),
 `agents.fast`/`sessions.fast` and the existing `agents.effort`/`sessions.effort` are updated together
 on every apply through the same write path that switch runtime uses for the rest of the runtime

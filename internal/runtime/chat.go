@@ -175,14 +175,17 @@ func (c *ChatRuntime) SetPersistence(home string, open TranscriptOpener, ix Pers
 
 // agentState is the live, in-memory state for one running agent.
 type agentState struct {
-	agentID       string
-	generation    string
-	cmd           *exec.Cmd
-	pgid          int
-	sessionID     string
-	transport     *Transport
-	adapter       backend.BackendAdapter
-	configOptions map[string]struct{}
+	agentID    string
+	generation string
+	cmd        *exec.Cmd
+	pgid       int
+	sessionID  string
+	transport  *Transport
+	adapter    backend.BackendAdapter
+	// configOptions is the live session's configuration advertisement, kept
+	// current by every set_config_option response because a model change rebuilds
+	// it (TS-04.R46). Guarded by mu, like every other live session field.
+	configOptions sessionConfigAdvertisement
 	hub           *Hub
 	stdin         interface{ Close() error }
 	stderr        *ringBuffer
@@ -313,12 +316,12 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 	}
 	as.sessionID = sess.SessionID
 	as.configOptions = decodeSessionConfigOptions(newRes)
-	appliedFast, err := applySessionConfig(ctx, as.transport, ad, spec, sess.SessionID, as.configOptions)
+	applied, err := applySessionConfig(ctx, as.transport, ad, spec, sess.SessionID, as.configOptions)
 	if err != nil {
 		as.shutdown()
 		return nil, err
 	}
-	spec.Agent.Fast = appliedFast
+	spec.Agent.Fast = applied.Fast
 	if err := c.openPersistence(as, spec, sess.SessionID); err != nil {
 		as.shutdown()
 		return nil, err
@@ -329,6 +332,7 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 	if err := c.store.WriteRunning(state.RunningEntry{
 		AgentID: as.agentID, PID: pgid, SessionID: sess.SessionID,
 		Interface: "chat", HookToken: spec.HookToken, StartedAt: now,
+		FastAvailable: applied.FastAvailable,
 	}); err != nil {
 		as.shutdown()
 		return nil, fmt.Errorf("runtime: write running: %w", err)
@@ -346,7 +350,7 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 	c.agents[as.agentID] = as
 	c.mu.Unlock()
 
-	return &Handle{AgentID: as.agentID, Pid: pgid, SessionID: sess.SessionID, Fast: appliedFast}, nil
+	return &Handle{AgentID: as.agentID, Pid: pgid, SessionID: sess.SessionID, Fast: applied.Fast}, nil
 }
 
 func (c *ChatRuntime) SendPrompt(ctx context.Context, agentID, text string) error {
@@ -625,7 +629,7 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 	// messaging MCP server Phase 5 depends on.
 	resolvedSessionID := ""
 	loaded := false
-	configOptions := map[string]struct{}{}
+	configOptions := sessionConfigAdvertisement{}
 	if sessionID != "" {
 		loadRes, loadErr := c.startupCall(ctx, as.transport, "session/load", sessionLoadParams(spec, sessionID))
 		switch {
@@ -638,7 +642,7 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 			// conversation history (the resume-history defect). Only a non-empty
 			// echoed id overrides the request.
 			loaded = true
-			configOptions = decodeSessionConfigOptions(loadRes)
+			configOptions.replace(decodeSessionConfigOptions(loadRes))
 			resolvedSessionID = sessionID
 			var res struct {
 				SessionID string `json:"sessionId"`
@@ -669,16 +673,16 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 			return nil, fmt.Errorf("runtime: session/new returned no sessionId")
 		}
 		resolvedSessionID = sess.SessionID
-		configOptions = decodeSessionConfigOptions(newRes)
+		configOptions.replace(decodeSessionConfigOptions(newRes))
 	}
 	as.sessionID = resolvedSessionID
 	as.configOptions = configOptions
-	appliedFast, err := applySessionConfig(ctx, as.transport, ad, spec, resolvedSessionID, configOptions)
+	applied, err := applySessionConfig(ctx, as.transport, ad, spec, resolvedSessionID, configOptions)
 	if err != nil {
 		as.shutdown()
 		return nil, err
 	}
-	spec.Agent.Fast = appliedFast
+	spec.Agent.Fast = applied.Fast
 
 	// Re-open the existing transcript in append mode (Open skips seq:0 meta for existing files).
 	if err := c.openPersistence(as, spec, resolvedSessionID); err != nil {
@@ -698,6 +702,7 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 	if err := c.store.WriteRunning(state.RunningEntry{
 		AgentID: as.agentID, PID: pgid, SessionID: resolvedSessionID,
 		Interface: "chat", HookToken: spec.HookToken, StartedAt: now,
+		FastAvailable: applied.FastAvailable,
 	}); err != nil {
 		as.shutdown()
 		return nil, fmt.Errorf("runtime: write running: %w", err)
@@ -715,7 +720,7 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 	c.agents[as.agentID] = as
 	c.mu.Unlock()
 
-	return &Handle{AgentID: as.agentID, Pid: pgid, SessionID: resolvedSessionID, Fast: appliedFast}, nil
+	return &Handle{AgentID: as.agentID, Pid: pgid, SessionID: resolvedSessionID, Fast: applied.Fast}, nil
 }
 
 func copyStringSet(source map[string]struct{}) map[string]struct{} {
@@ -826,49 +831,69 @@ func (c *ChatRuntime) lookup(agentID string) (*agentState, error) {
 	return as, nil
 }
 
-func (c *ChatRuntime) SetSessionConfig(ctx context.Context, agentID string, effort *string, fast *bool) (string, bool, error) {
+// SessionConfigChange reports what a live session-setting change actually
+// achieved. It is returned on failure as well as success, and that is the point:
+// the settings are applied one at a time in an order the adapter imposes, so a
+// rejected second setting leaves the first one live on the provider. Reporting
+// the whole request as a no-op would leave the provider running one effort while
+// the agent, session, archive, and next resume all record another (INV §15).
+type SessionConfigChange struct {
+	Effort        string
+	EffortApplied bool
+	Fast          bool
+	FastApplied   bool
+	// FastAvailable is the live advertisement after the change, so a caller can
+	// keep the header's explanation current (FS-03.R46).
+	FastAvailable bool
+}
+
+// SetSessionConfig applies effort and/or fast mode to a live chat session without
+// restarting the process or rebuilding the conversation (FS-03.R45/R47). It reuses
+// the same adapter-declared identifiers and the same honored-value check as the
+// launch path (TS-04.R47), and it keeps each setting's own failure posture:
+// effort is fail-closed, fast mode is fail-open.
+func (c *ChatRuntime) SetSessionConfig(ctx context.Context, agentID string, effort *string, fast *bool) (change SessionConfigChange, err error) {
 	as, err := c.lookup(agentID)
 	if err != nil {
-		return "", false, err
+		return SessionConfigChange{}, err
 	}
 	as.mu.Lock()
 	defer as.mu.Unlock()
 	_, effortID, fastID := as.adapter.SessionConfigIDs()
-	apply := func(id, value, label string) error {
-		if id == "" {
-			return fmt.Errorf("runtime: %s is unsupported", label)
-		}
-		if _, ok := as.configOptions[id]; !ok {
-			return fmt.Errorf("runtime: %s option is not available", label)
-		}
-		if _, err := as.transport.Call(ctx, "session/set_config_option", map[string]any{
-			"sessionId": as.sessionID, "configId": id, "value": value,
-		}); err != nil {
-			return fmt.Errorf("runtime: apply %s: %w", label, err)
-		}
-		return nil
-	}
-	appliedEffort := ""
+	// Report the advertisement as it stands at every exit, including the failure
+	// exits above: a caller that persists a partial change still needs the current
+	// availability, and an early return must not write it back as "unavailable".
+	defer func() { change.FastAvailable = as.configOptions.has(fastID) }()
+
 	if effort != nil {
-		if err := apply(effortID, *effort, "effort"); err != nil {
-			return "", false, err
+		if err := applyRequiredOption(ctx, as.transport, as.sessionID, effortID, *effort, as.configOptions); err != nil {
+			return change, err
 		}
-		appliedEffort = *effort
+		change.Effort, change.EffortApplied = *effort, true
 	}
-	appliedFast := false
-	if fast != nil {
-		if _, ok := as.configOptions[fastID]; ok && fastID != "" {
-			value := "off"
-			if *fast {
-				value = "on"
-			}
-			if err := apply(fastID, value, "fast mode"); err != nil {
-				return "", false, err
-			}
-			appliedFast = *fast
-		}
+	if fast == nil {
+		return change, nil
 	}
-	return appliedEffort, appliedFast, nil
+	if fastID == "" {
+		return change, fmt.Errorf("%w: fast mode", ErrSettingUnsupported)
+	}
+	if !as.configOptions.has(fastID) {
+		// Fail-open exactly as launch does (FS-09.R55): an unadvertised speed tier
+		// resolves to off rather than erroring, and FastAvailable tells the header
+		// to explain why the toggle did not move, instead of inventing a third
+		// behavior for the live path (TS-03.R37).
+		change.Fast, change.FastApplied = false, true
+		return change, nil
+	}
+	value := "off"
+	if *fast {
+		value = "on"
+	}
+	if err := setConfigOption(ctx, as.transport, as.sessionID, fastID, value, as.configOptions); err != nil {
+		return change, err
+	}
+	change.Fast, change.FastApplied = *fast, true
+	return change, nil
 }
 
 func (c *ChatRuntime) lookupByPID(pid int) (*agentState, error) {
@@ -1626,46 +1651,100 @@ func deliveredModelID(spec LaunchSpec) string {
 	return model
 }
 
-func applySessionConfig(ctx context.Context, transport *Transport, ad backend.BackendAdapter, spec LaunchSpec, sessionID string, advertised map[string]struct{}) (bool, error) {
-	modelID, effortID, fastID := ad.SessionConfigIDs()
-	apply := func(id, value, label string) error {
-		if id == "" {
-			return nil
-		}
-		if _, ok := advertised[id]; !ok {
-			return fmt.Errorf("runtime: %s option is not available", label)
-		}
-		if _, err := transport.Call(ctx, "session/set_config_option", map[string]any{"sessionId": sessionID, "configId": id, "value": value}); err != nil {
-			return fmt.Errorf("runtime: apply %s: %w", label, err)
-		}
-		return nil
+// setConfigOption sends one session configuration option and folds the peer's
+// answer back into the advertisement (TS-04.R46/R47).
+//
+// Two things make this more than a fire-and-forget call, both confirmed against
+// the pinned adapters rather than inferred from their source. First, the response
+// carries the peer's **rebuilt full option list**, and applying a model changes
+// which options exist at all: setting the pinned Claude adapter's model to one
+// without reasoning levels removes the `effort` and `fast` options outright, so a
+// later lookup against the pre-model list would send a setting the session now
+// rejects with `Unknown config option`. Second, a peer may answer success while
+// reporting a different effective value — the silent ignore BR-1 shipped — so the
+// independently reported currentValue, not the RPC envelope, decides whether the
+// setting was honored (INV §12).
+func setConfigOption(ctx context.Context, transport *Transport, sessionID, id, value string, advertised sessionConfigAdvertisement) error {
+	result, err := transport.Call(ctx, "session/set_config_option", map[string]any{
+		"sessionId": sessionID, "configId": id, "value": value,
+	})
+	if err != nil {
+		return fmt.Errorf("%w: %s: %s", ErrSettingRejected, id, err)
 	}
+	if rebuilt := decodeSessionConfigOptions(result); len(rebuilt) > 0 {
+		advertised.replace(rebuilt)
+	}
+	// An unreported value is not a mismatch: the peer is entitled to omit it, and
+	// treating silence as failure would fail launches that actually worked (INV §7).
+	if reported, ok := advertised[id]; ok && reported != "" && reported != value {
+		return fmt.Errorf("%w: %s is %q after requesting %q", ErrSettingIgnored, id, reported, value)
+	}
+	return nil
+}
+
+// applyRequiredOption applies a setting whose failure must not be absorbed:
+// model and effort both stay fail-closed under TS-04.R19/R47 and FS-09.R40,
+// because running at a level or on a model the person did not choose is wrong in
+// a way a slower agent is not.
+func applyRequiredOption(ctx context.Context, transport *Transport, sessionID, id, value string, advertised sessionConfigAdvertisement) error {
+	if id == "" {
+		return fmt.Errorf("%w: %s", ErrSettingUnsupported, value)
+	}
+	if !advertised.has(id) {
+		return fmt.Errorf("%w: %s", ErrSettingUnavailable, id)
+	}
+	return setConfigOption(ctx, transport, sessionID, id, value, advertised)
+}
+
+// sessionConfigResult is what the ordered session-configuration step actually
+// achieved, as distinct from what the launch requested (FS-09.R54).
+type sessionConfigResult struct {
+	// Fast is the fast mode that really applied, which the session snapshot
+	// freezes so an unwatched task- or pipeline-launched agent still records the
+	// truth.
+	Fast bool
+	// FastAvailable is the live session's fast-mode advertisement, read after the
+	// model is set because the model decides it. It lets the chat header say "this
+	// model does not offer fast mode" instead of showing an ordinary off toggle
+	// that silently springs back (FS-03.R46).
+	FastAvailable bool
+}
+
+// applySessionConfig performs the one ordered post-session configuration step —
+// model, then effort, then fast mode (FS-09.R57, TS-04.R47) — shared by launch,
+// resume, and switch. The order is a correctness constraint the adapters impose,
+// not a style choice: setting the model resets effort to that model's own default
+// and recomputes fast capability, so either applied first is silently discarded.
+func applySessionConfig(ctx context.Context, transport *Transport, ad backend.BackendAdapter, spec LaunchSpec, sessionID string, advertised sessionConfigAdvertisement) (sessionConfigResult, error) {
+	modelID, effortID, fastID := ad.SessionConfigIDs()
 	if spec.BackendType == "codex-acp" && spec.ModelID != "" {
-		if err := apply(modelID, spec.ModelID, "model"); err != nil {
-			return false, err
+		if err := applyRequiredOption(ctx, transport, sessionID, modelID, spec.ModelID, advertised); err != nil {
+			return sessionConfigResult{}, err
 		}
 	}
 	if spec.Effort != "" {
-		mode, _ := ad.EffortDelivery(spec.Agent.Interface)
-		if mode == backend.EffortPostSession {
-			if err := apply(effortID, spec.Effort, "effort"); err != nil {
-				return false, err
+		if mode, _ := ad.EffortDelivery(spec.Agent.Interface); mode == backend.EffortPostSession {
+			if err := applyRequiredOption(ctx, transport, sessionID, effortID, spec.Effort, advertised); err != nil {
+				return sessionConfigResult{}, err
 			}
 		}
 	}
-	if !spec.Fast {
-		return false, nil
+	// Read the advertisement only now: the model application above may have added
+	// or removed fast mode entirely (INV §1).
+	out := sessionConfigResult{FastAvailable: advertised.has(fastID)}
+	if !spec.Fast || !out.FastAvailable {
+		return out, nil
 	}
-	if fastID == "" {
-		return false, nil
+	// Fast mode is fail-open under FS-09.R55/TS-04.R45: an unavailable or refused
+	// speed boost leaves the agent cheaper and slower, which is not worth killing
+	// a working launch over. The agent records fast mode off and the header says why.
+	if err := setConfigOption(ctx, transport, sessionID, fastID, "on", advertised); err != nil {
+		slog.Warn("runtime: fast mode was requested but not applied; continuing at normal speed",
+			"agent", spec.Agent.AgentID, "err", err)
+		return out, nil
 	}
-	if _, ok := advertised[fastID]; !ok {
-		return false, nil
-	}
-	if err := apply(fastID, "on", "fast mode"); err != nil {
-		return false, nil
-	}
-	return true, nil
+	out.Fast = true
+	return out, nil
 }
 
 func mcpServerParam(m MCPServerSpec) map[string]any {

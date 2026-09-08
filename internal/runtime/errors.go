@@ -28,6 +28,29 @@ var (
 	ErrProtocolVersion = errors.New("runtime: incompatible ACP protocol version")
 )
 
+// Session-configuration sentinels (TS-03.R37). A live setting change fails for
+// four reasons a person can act on differently, so each is typed and the API
+// layer maps it to its own envelope code instead of collapsing all four into one
+// upstream-failure status (INV §8, INV §11).
+var (
+	// ErrSettingUnsupported: the adapter declares no delivery mechanism for the
+	// setting at all, so no session could ever accept it.
+	ErrSettingUnsupported = errors.New("runtime: setting is not supported by this backend")
+	// ErrSettingUnavailable: the adapter supports the setting but this live
+	// session does not advertise it — typically because its current model does
+	// not offer it. Live-confirmed against the pinned Claude adapter, which drops
+	// the effort and fast options entirely once the model is set to one that has
+	// neither.
+	ErrSettingUnavailable = errors.New("runtime: setting is not available on this session")
+	// ErrSettingRejected: the provider refused the requested value.
+	ErrSettingRejected = errors.New("runtime: provider rejected the setting")
+	// ErrSettingIgnored: the provider answered success but its own rebuilt option
+	// list reports a different effective value. This is the silent-ignore class
+	// BR-1 shipped, so accepting the RPC envelope as success is not enough
+	// (INV §12).
+	ErrSettingIgnored = errors.New("runtime: provider ignored the setting")
+)
+
 // Error code vocabulary (techspec §7.7). These are the project-wide error codes
 // surfaced in the API error envelope; each maps to a fixed HTTP status.
 const (

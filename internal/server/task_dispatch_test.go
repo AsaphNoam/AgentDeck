@@ -970,6 +970,91 @@ func bindSourceEffortOverride(t *testing.T, srv *Server, override string) {
 	}
 }
 
+// writeFastCapableBackend replaces the seeded catalog with one whose only model
+// declares fast-mode capability, which the seed deliberately does not.
+func writeFastCapableBackend(t *testing.T, srv *Server) {
+	t.Helper()
+	if err := srv.configStore.WriteBackends(config.BackendsConfig{Version: 2, Backends: map[string]config.Backend{
+		"claude": {Name: "Claude", Type: "claude-acp", Default: true, DefaultModel: "sonnet", Models: map[string]config.Model{
+			"sonnet": {Name: "Sonnet", Model: "sonnet", Fast: true},
+		}},
+	}}); err != nil {
+		t.Fatalf("WriteBackends: %v", err)
+	}
+}
+
+// newLaunchTaskWithFast creates a launch-spec task that requests fast mode.
+func newLaunchTaskWithFast(t *testing.T, srv *Server, name string) state.Task {
+	t.Helper()
+	id, err := srv.stateStore.NewTaskID()
+	if err != nil {
+		t.Fatalf("NewTaskID: %v", err)
+	}
+	task, err := srv.stateStore.CreateTask(state.Task{
+		TaskID: id, Project: "tmpproj", DisplayName: name,
+		Instruction:   "please do " + name,
+		TargetKind:    state.TargetLaunch,
+		Role:          "impl",
+		Backend:       "claude",
+		Model:         "sonnet",
+		Fast:          true,
+		CreatedByKind: "person",
+	})
+	if err != nil {
+		t.Fatalf("CreateTask %s: %v", name, err)
+	}
+	return task
+}
+
+// FS-16.A19 / FS-09.R54 / INV §3 — a task records the fast mode it *requested*
+// while the agent it launches records the fast mode that *actually applied*.
+// They are different fields with different meanings and must not be conflated:
+// nobody watches a task-launched agent start, so an unhonored request that was
+// written back as "on" would leave the card, the header, and the archive all
+// claiming a speed tier the session never gave it.
+func TestALaunchTaskRecordsRequestedFastWhileTheAgentRecordsWhatApplied(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		fastOption string
+		wantAgent  bool
+	}{
+		{name: "session advertises fast mode", fastOption: "fast", wantAgent: true},
+		{name: "session does not advertise it", fastOption: "", wantAgent: false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("FAKEACP_FAST_OPTION", tt.fastOption)
+			srv, _, _ := activationTestServer(t)
+			writeFastCapableBackend(t, srv)
+			task := newLaunchTaskWithFast(t, srv, "fast work")
+
+			srv.dispatchReadyTasks(context.Background())
+			waitTaskState(t, srv, task.TaskID, state.TaskRunning)
+
+			stored, err := srv.stateStore.ReadTask(task.TaskID)
+			if err != nil {
+				t.Fatalf("ReadTask: %v", err)
+			}
+			if !stored.Fast {
+				t.Fatal("the task no longer records the fast mode it requested")
+			}
+			agent, err := srv.stateStore.ReadAgent(stored.AssignedAgentID)
+			if err != nil {
+				t.Fatalf("ReadAgent: %v", err)
+			}
+			if agent.Fast != tt.wantAgent {
+				t.Fatalf("agent fast = %v, want %v (the value the live session applied)", agent.Fast, tt.wantAgent)
+			}
+			session, err := srv.stateStore.ReadSession(stored.AssignedAgentID)
+			if err != nil {
+				t.Fatalf("ReadSession: %v", err)
+			}
+			if session.Fast != tt.wantAgent {
+				t.Fatalf("session snapshot fast = %v, want %v: resume must restore what ran", session.Fast, tt.wantAgent)
+			}
+		})
+	}
+}
+
 // FS-16.A18 (R27) / FS-09.R41 / TS-10.R23 (INV §2) — the effort a task stored
 // reaches the provider itself, read off the call the adapter actually receives
 // rather than off the persisted agent projection, and an explicit task effort

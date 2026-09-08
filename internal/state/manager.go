@@ -437,7 +437,7 @@ func (m *Manager) recompute(agentID string) (AgentStateUpdate, error) {
 	row := m.store.db.QueryRow(`
 SELECT
     a.agent_id, a.name, a.role, a.project, a.backend, a.model, a.effort, a.fast, a.interface, a.grp, a.created_at, a.archived,
-    r.pid, r.session_id, r.tty, r.driver, r.started_at,
+    r.pid, r.session_id, r.tty, r.driver, r.started_at, r.fast_available,
     st.state, st.detail, st.last_trace, st.busy_since, st.context_pct
 FROM agents a
 LEFT JOIN running r ON r.agent_id = a.agent_id
@@ -447,12 +447,13 @@ WHERE a.agent_id = ?`, agentID)
 	var out AgentState
 	var pid sql.NullInt64
 	var sessionID, tty, driver, startedAt sql.NullString
+	var fastAvailable sql.NullBool
 	var state, detail, lastTrace, busySince sql.NullString
 	var contextPct sql.NullFloat64
 	err := row.Scan(
 		&out.AgentID, &out.Name, &out.Role, &out.Project, &out.Backend, &out.Model, &out.Effort, &out.Fast,
 		&out.Interface, &out.Group, &out.CreatedAt, &out.Archived,
-		&pid, &sessionID, &tty, &driver, &startedAt,
+		&pid, &sessionID, &tty, &driver, &startedAt, &fastAvailable,
 		&state, &detail, &lastTrace, &busySince, &contextPct,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -484,6 +485,9 @@ WHERE a.agent_id = ?`, agentID)
 	if startedAt.Valid {
 		out.StartedAt = startedAt.String
 	}
+	// Absent only when there is no running row, which the header already renders
+	// as static text; a live row always carries the decoded advertisement.
+	out.FastAvailable = fastAvailable.Valid && fastAvailable.Bool
 	if state.Valid && state.String != "" {
 		out.State = state.String
 	}

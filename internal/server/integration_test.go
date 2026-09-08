@@ -207,6 +207,122 @@ func TestLiveSessionConfigurationPersistsWithoutRestart(t *testing.T) {
 	}
 }
 
+// newLiveConfigServer builds the codex-backed chat server the live
+// session-configuration tests below share, and launches one running agent.
+func newLiveConfigServer(t *testing.T) (*Server, *httptest.Server, sessionResponse) {
+	t.Helper()
+	fake := buildFakeACP(t)
+	t.Setenv("FAKEACP_SCENARIO", "stream_text")
+	t.Setenv("FAKEACP_FAST_OPTION", "fast-mode")
+
+	srv := testServer(t, true)
+	srv.registry.Chat().SetCommand(fake)
+	if err := srv.configStore.WriteProject("tmpproj", config.Project{Title: "Tmp", Cwd: t.TempDir()}); err != nil {
+		t.Fatalf("WriteProject: %v", err)
+	}
+	if err := srv.configStore.WriteRole("impl", config.Role{Title: "Impl", SystemPrompt: "be helpful"}); err != nil {
+		t.Fatalf("WriteRole: %v", err)
+	}
+	if err := srv.configStore.WriteBackends(config.BackendsConfig{Version: 2, Backends: map[string]config.Backend{
+		"codex": {Name: "Codex", Type: "codex-acp", Default: true, DefaultModel: "gpt-5", Models: map[string]config.Model{
+			"gpt-5": {Name: "GPT-5", Model: "gpt-5", Efforts: []string{"low", "high"}, DefaultEffort: "high", Fast: true},
+		}},
+	}}); err != nil {
+		t.Fatalf("WriteBackends: %v", err)
+	}
+	ts := httptest.NewServer(srv.routes())
+	t.Cleanup(ts.Close)
+	t.Cleanup(func() { srv.registry.Shutdown(context.Background()) })
+
+	resp, body := post(t, ts.URL+"/api/sessions", map[string]any{
+		"role": "impl", "project": "tmpproj", "backend": "codex", "model": "gpt-5", "effort": "high",
+	})
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("launch status = %d: %s", resp.StatusCode, body)
+	}
+	var launched sessionResponse
+	if err := json.Unmarshal(body, &launched); err != nil {
+		t.Fatalf("decode launch: %v", err)
+	}
+	return srv, ts, launched
+}
+
+// TS-03.R37, INV §15 — a combined live change reaches the provider one setting
+// at a time, so when the second one fails the first is already live. The route
+// must persist what actually applied before reporting the failure; returning a
+// total failure left the provider running the new effort while the agent,
+// session snapshot, archive, and next resume all recorded the old one.
+func TestLiveSessionConfigurationPersistsThePartThatApplied(t *testing.T) {
+	t.Setenv("FAKEACP_IGNORE_OPTION", "fast-mode")
+	srv, ts, launched := newLiveConfigServer(t)
+	id := launched.Agent.AgentID
+
+	resp, body := post(t, ts.URL+"/api/sessions/"+id+"/session-config", map[string]any{"effort": "low", "fast": true})
+	if resp.StatusCode != http.StatusBadGateway {
+		t.Fatalf("status = %d: %s; a provider that reports another value is an upstream fault", resp.StatusCode, body)
+	}
+	if code := apiErrorCode(t, body); code != runtime.CodeRuntimeStartFailed {
+		t.Fatalf("error code = %q, want %q", code, runtime.CodeRuntimeStartFailed)
+	}
+	agent, err := srv.stateStore.ReadAgent(id)
+	if err != nil {
+		t.Fatalf("ReadAgent: %v", err)
+	}
+	if agent.Effort != "low" {
+		t.Fatalf("stored effort = %q, want low: it is already live on the provider", agent.Effort)
+	}
+	if agent.Fast {
+		t.Fatal("stored fast mode is on though the provider ignored the call")
+	}
+	snapshot, err := srv.stateStore.ReadSession(id)
+	if err != nil || snapshot.Effort != "low" || snapshot.Fast {
+		t.Fatalf("session snapshot = %+v err=%v; resume must restore what really applied", snapshot, err)
+	}
+}
+
+// TS-01.R16, INV §1/§5 — the live setting change takes the same exclusive
+// per-agent claim as stop, resume, and switch runtime. Without it, two changes
+// could apply in one order and commit in the other, and a change overlapping a
+// switch could write its result against a runtime generation that no longer
+// exists.
+func TestLiveSessionConfigurationIsSerializedWithLifecycleTransitions(t *testing.T) {
+	srv, ts, launched := newLiveConfigServer(t)
+	id := launched.Agent.AgentID
+
+	// Stand in for a concurrent stop/resume/switch that already owns the agent.
+	if !srv.claimLifecycle(id) {
+		t.Fatal("claimLifecycle should succeed on an idle agent")
+	}
+	resp, body := post(t, ts.URL+"/api/sessions/"+id+"/session-config", map[string]any{"effort": "low"})
+	srv.releaseLifecycle(id)
+
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("status = %d: %s; want 409 while a lifecycle transition holds the agent", resp.StatusCode, body)
+	}
+	if code := apiErrorCode(t, body); code != runtime.CodeConflict {
+		t.Fatalf("error code = %q, want %q", code, runtime.CodeConflict)
+	}
+	agent, err := srv.stateStore.ReadAgent(id)
+	if err != nil || agent.Effort != "high" {
+		t.Fatalf("stored effort = %+v err=%v; a refused change must alter nothing", agent, err)
+	}
+}
+
+// FS-03.A29 — the agent snapshot the chat header renders from carries the live
+// session's fast-mode advertisement, so the header can say "this model does not
+// offer it" instead of showing an ordinary off toggle that springs back.
+func TestAgentSnapshotProjectsTheLiveFastModeAdvertisement(t *testing.T) {
+	srv, _, launched := newLiveConfigServer(t)
+
+	update, err := srv.stateMgr.Touch(launched.Agent.AgentID)
+	if err != nil {
+		t.Fatalf("Touch: %v", err)
+	}
+	if !update.FastAvailable {
+		t.Fatal("snapshot does not report the advertised fast-mode option")
+	}
+}
+
 // TestLaunchPromptPermissionFlow drives the full HTTP surface against the fake
 // CLI: POST /sessions → /api/events → prompt → permission_request → permission
 // approve → sentinel created → turn_end (techspec §10.3, Appendix A).

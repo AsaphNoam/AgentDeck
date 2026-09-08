@@ -174,6 +174,21 @@ a third behavior for the live path. Being a new route under `/api/`, it inherits
 guard unchanged (INV §14). Success republishes the agent so every connected client and the dashboard
 card converge without a refetch, exactly as rename and identity do (INV §1).
 
+The route takes the **shared exclusive per-agent lifecycle claim** (TS-01.R16) across its whole
+read → apply → persist window, and returns the same `conflict` envelope stop, resume, and switch
+runtime return when another transition owns the agent. The runtime call alone serializes only while
+it holds the agent's own lock, so without the claim two concurrent changes could reach the provider
+in one order and commit their durable writes in the other, and a change overlapping a switch could
+commit against a runtime generation that no longer exists (INV §1, INV §5).
+
+Because the settings reach the provider **one at a time** in the order TS-04.R47 imposes, a combined
+request can apply its first setting and then fail on its second. The route reconciles against what
+actually applied and persists that **before** returning the failure, rather than reporting the whole
+request as a no-op: the earlier setting is already live on the provider and the next turn will use
+it, so leaving the old value stored would make the response, the agent, the session snapshot, the
+archive, and the next resume all disagree with the running provider (INV §15). The response body on
+failure is the error envelope; the applied state reaches clients through the agent republication.
+
 `POST /api/sessions/{id}/switch-runtime` keeps accepting `effort` with unchanged semantics, so no
 existing client changes and a combined backend/model/effort switch stays one request. An effort-only
 switch still restarts the process; that redundancy is retained deliberately rather than narrowed,

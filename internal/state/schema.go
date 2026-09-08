@@ -419,4 +419,15 @@ ALTER TABLE pipeline_attempts ADD COLUMN fast INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE tasks ADD COLUMN fast INTEGER NOT NULL DEFAULT 0;
 `,
 	},
+	{
+		// Whether the live session advertises fast mode is session-scoped, not
+		// identity-scoped, so it lives on the running row and disappears with it
+		// (FS-03.R46, INV §1). Pre-migration rows default to advertised: an
+		// unobserved advertisement must fail open to today's behavior under
+		// FS-09.R55, never to "this model does not offer fast mode".
+		version: 24,
+		sql: `
+ALTER TABLE running ADD COLUMN fast_available INTEGER NOT NULL DEFAULT 1;
+`,
+	},
 }

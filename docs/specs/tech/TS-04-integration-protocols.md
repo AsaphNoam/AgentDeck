@@ -175,6 +175,19 @@ in-vocabulary rather than passed through from an external tool. An absent, null,
 `configOptions` is treated as advertising nothing, which fails open to normal speed under R45 rather
 than failing the session (INV §7).
 
+The decode also retains each option's reported **`currentValue`**, and the option list is re-read
+from **every** response that carries one — including `session/set_config_option`, whose response
+schema requires the rebuilt full set — replacing the previous list rather than merging into it. Both
+are load-bearing, and both were confirmed by driving the pinned adapters rather than by reading their
+sources. Setting a model **changes which options exist**: against the pinned Claude adapter, setting
+the model to one with no reasoning levels removes the `effort` and `fast` options outright, and a
+subsequent call for either is refused with `Unknown config option`. A runtime that kept the
+pre-model list would send exactly that refused call. And a peer may answer success while its own
+rebuilt list reports a different effective value, which is the silent ignore BR-1 shipped, so
+`currentValue` — not the RPC envelope — decides whether a setting AgentDeck required was honored
+(INV §12, INV §17). A value the peer does not report is treated as unreported rather than as a
+mismatch, so an adapter that legitimately omits it does not fail an otherwise good launch (INV §7).
+
 **R47 — One ordered post-session configuration step replaces
 model-suffix effort delivery.** R18's model-suffix mechanism is retired for `codex-acp`, and with it
 the `LaunchSpec` accessor that composed `model[effort]` for both `sessionNewParams` and

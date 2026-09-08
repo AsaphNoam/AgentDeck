@@ -202,9 +202,20 @@ export function ChatPanel() {
                 </div>
               )}
               {currentModel?.fast && (
+                // The catalog says this model can go fast, but only the live
+                // session knows whether it really offers the speed tier — a
+                // launch that asked for it and did not get it is a case the
+                // feature deliberately allows (FS-09.R55). Showing an ordinary
+                // enabled off toggle there would let the person flip a control
+                // that silently springs back, so the unavailable case names its
+                // reason and disables the control instead (FS-03.R46, INV §8).
                 <label className="form-field">
                   <span>Speed</span>
-                  <span><input type="checkbox" checked={liveFast} disabled={switching || !!applyingSetting || stagedRuntime} onChange={(event) => void applySetting({ fast: event.target.checked }, "fast")} /> {applyingSetting === "fast" ? "Applying…" : "Fast mode — higher provider usage"}</span>
+                  {agent.fast_available ? (
+                    <span><input type="checkbox" checked={liveFast} disabled={switching || !!applyingSetting || stagedRuntime} onChange={(event) => void applySetting({ fast: event.target.checked }, "fast")} /> {applyingSetting === "fast" ? "Applying…" : "Fast mode — higher provider usage"}</span>
+                  ) : (
+                    <span><input type="checkbox" checked={false} disabled /> Fast mode — this model does not offer it</span>
+                  )}
                 </label>
               )}
               </fieldset>

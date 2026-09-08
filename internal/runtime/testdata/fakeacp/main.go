@@ -109,6 +109,7 @@ func handle(msg *rpcMessage) {
 		// session is created. Emit it BEFORE the response so the runtime's ordered
 		// read loop has stored the snapshot by the time session/new returns.
 		emitAvailableCommands()
+		initConfigOptions()
 		respond(*msg.ID, map[string]any{"sessionId": sessionID, "configOptions": fakeConfigOptions()})
 	case "session/load":
 		// If asked, dump the raw load params so tests can assert that the
@@ -116,6 +117,7 @@ func handle(msg *rpcMessage) {
 		if dump := os.Getenv("FAKEACP_LOAD_DUMP"); dump != "" {
 			_ = os.WriteFile(dump, msg.Params, 0o600)
 		}
+		initConfigOptions()
 		if os.Getenv("FAKEACP_LOAD_EMPTY") != "" {
 			// ACP session/load keeps the requested sessionId authoritative; the
 			// pinned codex-acp adapter therefore returns an empty result on success.
@@ -134,11 +136,27 @@ func handle(msg *rpcMessage) {
 		if dump := os.Getenv("FAKEACP_EFFORT_DUMP"); dump != "" {
 			_ = os.WriteFile(dump, msg.Params, 0o600)
 		}
+		var setParams struct {
+			ConfigID string `json:"configId"`
+			Value    string `json:"value"`
+		}
+		_ = json.Unmarshal(msg.Params, &setParams)
 		if os.Getenv("FAKEACP_EFFORT_FAIL") != "" {
 			respondErr(*msg.ID, -32000, "effort rejected")
 			return
 		}
-		respond(*msg.ID, map[string]any{})
+		// The pinned Claude adapter refuses an option the session does not offer
+		// rather than ignoring it, so an unadvertised id is an error, not a no-op.
+		configMu.Lock()
+		_, advertised := configValues[setParams.ConfigID]
+		configMu.Unlock()
+		if !advertised {
+			respondErr(*msg.ID, -32603, "Unknown config option: "+setParams.ConfigID)
+			return
+		}
+		applyConfigOption(setParams.ConfigID, setParams.Value)
+		// SetSessionConfigOptionResponse requires the full rebuilt option list.
+		respond(*msg.ID, map[string]any{"configOptions": fakeConfigOptions()})
 	case "session/prompt":
 		id := *msg.ID
 		if dump := os.Getenv("FAKEACP_PROMPT_DUMP"); dump != "" {
@@ -174,16 +192,91 @@ func handle(msg *rpcMessage) {
 	}
 }
 
-func fakeConfigOptions() []map[string]any {
-	ids := []string{"model", "effort", "reasoning_effort"}
-	if os.Getenv("FAKEACP_FAST_OPTION") != "" {
-		ids = append(ids, os.Getenv("FAKEACP_FAST_OPTION"))
+// Session configuration state. Both pinned adapters model configuration options
+// as a select carrying a string currentValue, and both answer
+// session/set_config_option with the REBUILT full option list rather than an
+// acknowledgement — verified live against claude-agent-acp 0.59.0 and
+// codex-acp 1.1.2, not read off their sources. The double reproduces that shape
+// (and its failure modes) so a test cannot pass against a payload the real
+// adapters never send (INV §17).
+var (
+	configMu     sync.Mutex
+	configValues = map[string]string{}
+	configOrder  []string
+)
+
+const (
+	// Deliberately different from anything a test asks for, so a runtime that
+	// skips a call or ignores the reported value cannot accidentally look correct.
+	fakeDefaultModel  = "provider-default-model"
+	fakeDefaultEffort = "default"
+)
+
+func initConfigOptions() {
+	configMu.Lock()
+	defer configMu.Unlock()
+	configOrder = nil
+	configValues = map[string]string{}
+	add := func(id, value string) {
+		if id == "" || id == os.Getenv("FAKEACP_MISSING_OPTION") {
+			return
+		}
+		configOrder = append(configOrder, id)
+		configValues[id] = value
 	}
-	out := make([]map[string]any, 0, len(ids))
-	for _, id := range ids {
-		out = append(out, map[string]any{"id": id})
+	add("model", fakeDefaultModel)
+	add("effort", fakeDefaultEffort)
+	add("reasoning_effort", fakeDefaultEffort)
+	add(os.Getenv("FAKEACP_FAST_OPTION"), "off")
+}
+
+// fakeConfigOptions renders the current option set in the pinned adapters' shape.
+func fakeConfigOptions() []map[string]any {
+	configMu.Lock()
+	defer configMu.Unlock()
+	out := make([]map[string]any, 0, len(configOrder))
+	for _, id := range configOrder {
+		out = append(out, map[string]any{
+			"id": id, "name": id, "type": "select", "currentValue": configValues[id],
+			"options": []map[string]any{{"value": configValues[id], "name": configValues[id]}},
+		})
 	}
 	return out
+}
+
+// applyConfigOption mutates the session the way the real adapters do.
+func applyConfigOption(id, value string) {
+	configMu.Lock()
+	defer configMu.Unlock()
+	if _, ok := configValues[id]; !ok {
+		return
+	}
+	// FAKEACP_IGNORE_OPTION accepts the call and keeps the old value: the silent
+	// ignore BR-1 shipped, where the RPC envelope says success and the provider
+	// runs something else.
+	if id == os.Getenv("FAKEACP_IGNORE_OPTION") {
+		return
+	}
+	configValues[id] = value
+	if id != "model" {
+		return
+	}
+	// Setting the model rebuilds what the session offers. The pinned Claude
+	// adapter drops the effort and fast options outright for a model that has
+	// neither, which is why the order in FS-09.R57 is load-bearing.
+	for _, dropped := range strings.Split(os.Getenv("FAKEACP_MODEL_DROPS"), ",") {
+		if dropped == "" {
+			continue
+		}
+		delete(configValues, dropped)
+		kept := configOrder[:0]
+		for _, existing := range configOrder {
+			if existing != dropped {
+				kept = append(kept, existing)
+			}
+		}
+		configOrder = kept
+	}
 }
 
 // runScenario replays a named sequence and returns the prompt stopReason.

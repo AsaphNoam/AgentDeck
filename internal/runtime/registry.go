@@ -238,14 +238,17 @@ func (r *Registry) SendPrompt(ctx context.Context, agentID, text string) error {
 	return rt.SendPrompt(ctx, agentID, text)
 }
 
-func (r *Registry) SetSessionConfig(ctx context.Context, agentID string, effort *string, fast *bool) (string, bool, error) {
+// SetSessionConfig routes a live session-setting change to the owning chat
+// runtime. The change it returns is meaningful even alongside an error, because a
+// combined request applies its settings one at a time (see SessionConfigChange).
+func (r *Registry) SetSessionConfig(ctx context.Context, agentID string, effort *string, fast *bool) (SessionConfigChange, error) {
 	rt, err := r.ownerFor(agentID)
 	if err != nil {
-		return "", false, err
+		return SessionConfigChange{}, err
 	}
 	chat, ok := rt.(*ChatRuntime)
 	if !ok {
-		return "", false, ErrNotImplemented
+		return SessionConfigChange{}, ErrNotImplemented
 	}
 	return chat.SetSessionConfig(ctx, agentID, effort, fast)
 }

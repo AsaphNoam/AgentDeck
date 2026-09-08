@@ -266,7 +266,7 @@ describe("ChatPanel runtime picker", () => {
   it("shows and applies fast mode only for a capable current model", async () => {
     mocks.useBackends.mockReturnValue({ data: backends });
     mocks.setSessionConfig.mockResolvedValue({ ...liveAgent("a_live"), backend: "codex", model: "gpt-5", effort: "high", fast: true });
-    useAgentStore.setState({ agents: { a_live: { ...liveAgent("a_live"), backend: "codex", model: "gpt-5", effort: "high", fast: false } }, order: ["a_live"], hydrated: true, hydrating: false });
+    useAgentStore.setState({ agents: { a_live: { ...liveAgent("a_live"), backend: "codex", model: "gpt-5", effort: "high", fast: false, fast_available: true } }, order: ["a_live"], hydrated: true, hydrating: false });
 
     renderPanel("a_live");
     const fast = await screen.findByRole("checkbox", { name: /Fast mode/ });
@@ -274,5 +274,37 @@ describe("ChatPanel runtime picker", () => {
 
     await waitFor(() => expect(mocks.setSessionConfig).toHaveBeenCalledWith("a_live", { fast: true }));
     expect(fast).toBeChecked();
+  });
+
+  // FS-03.A29 / R46: a launch may ask for fast mode on a catalog-capable model
+  // and not get it, because only the live session knows whether its current model
+  // really offers the speed tier (FS-09.R55). The header must say so rather than
+  // render an ordinary enabled off toggle that silently springs back, which left
+  // the person unable to tell an unavailable tier from their own choice.
+  it("explains fast mode the live session does not offer instead of offering a dead toggle", async () => {
+    mocks.useBackends.mockReturnValue({ data: backends });
+    useAgentStore.setState({ agents: { a_live: { ...liveAgent("a_live"), backend: "codex", model: "gpt-5", effort: "high", fast: false, fast_available: false } }, order: ["a_live"], hydrated: true, hydrating: false });
+
+    renderPanel("a_live");
+
+    const fast = await screen.findByRole("checkbox", { name: /Fast mode/ });
+    expect(fast).toBeDisabled();
+    expect(fast).not.toBeChecked();
+    expect(screen.getByText(/this model does not offer it/)).toBeInTheDocument();
+
+    fireEvent.click(fast);
+    expect(mocks.setSessionConfig).not.toHaveBeenCalled();
+  });
+
+  // FS-03.A29: a stopped chat agent renders its settings as static text, so the
+  // unavailable-fast explanation never leaks into a surface with no live session.
+  it("renders a stopped agent's fast mode as static text", () => {
+    mocks.useBackends.mockReturnValue({ data: backends });
+    useAgentStore.setState({ agents: { a_live: { ...liveAgent("a_live"), backend: "codex", model: "gpt-5", running: false, fast: true, fast_available: false } }, order: ["a_live"], hydrated: true, hydrating: false });
+
+    renderPanel("a_live");
+
+    expect(screen.getByText("Fast mode")).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: /Fast mode/ })).toBeNull();
   });
 });
