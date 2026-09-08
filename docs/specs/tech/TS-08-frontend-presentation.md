@@ -1,6 +1,6 @@
 # TS-08 — Frontend presentation architecture
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src`, `ui/package.json`, `ui/vite.config.ts`
 **Absorbed:** —
 
@@ -527,7 +527,7 @@ primitive seam; the rejected alternatives are recorded in §5.
   the transcript endpoint, the appended event, and the search index are untouched, and because the
   decision is made at render time it applies to transcripts recorded before it shipped.
 
-- **R55 `(planned)` — The chat header holds two control groups with two different
+- **R55 — The chat header holds two control groups with two different
   apply models, and they must not share state.** The runtime picker is staged: backend and model are
   local state compared against the agent's current runtime, that comparison reveals **Switch**, and
   only Switch sends anything. The live settings — fast mode (FS-03.R45) and effort (FS-03.R47) — are

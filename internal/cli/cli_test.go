@@ -191,14 +191,14 @@ func TestIsLaunchArg(t *testing.T) {
 }
 
 func TestParseLaunch(t *testing.T) {
-	la, err := parseLaunch([]string{"implementer@my-app", "--backend", "claude", "--model", "sonnet-4-6", "--effort", "high", "--name", "Atlas", "--group", "auth"})
+	la, err := parseLaunch([]string{"implementer@my-app", "--backend", "claude", "--model", "sonnet-4-6", "--effort", "high", "--fast", "--name", "Atlas", "--group", "auth"})
 	if err != nil {
 		t.Fatalf("parseLaunch: %v", err)
 	}
 	if la.Role != "implementer" || la.Project != "my-app" {
 		t.Fatalf("role/project = %q/%q", la.Role, la.Project)
 	}
-	if la.Backend != "claude" || la.Model != "sonnet-4-6" || la.Effort != "high" || la.Name != "Atlas" || la.Group != "auth" {
+	if la.Backend != "claude" || la.Model != "sonnet-4-6" || la.Effort != "high" || !la.Fast || la.Name != "Atlas" || la.Group != "auth" {
 		t.Fatalf("flags parsed wrong: %+v", la)
 	}
 	if la.Interface != "chat" {
@@ -207,7 +207,7 @@ func TestParseLaunch(t *testing.T) {
 	// Parity: the CLI body carries exactly the fields the REST launch endpoint
 	// reads, so CLI and modal produce an identical agent (techspec §6.5).
 	b := la.body()
-	if b.Role != "implementer" || b.Project != "my-app" || b.Backend != "claude" || b.Group != "auth" {
+	if b.Role != "implementer" || b.Project != "my-app" || b.Backend != "claude" || b.Group != "auth" || !b.Fast {
 		t.Fatalf("launch body mismatch: %+v", b)
 	}
 }

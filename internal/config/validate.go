@@ -274,6 +274,12 @@ func ValidateBackendsConfig(b *BackendsConfig) *ValidationErrors {
 					Message: fmt.Sprintf("backend type %q does not support effort selection", bk.Type),
 				})
 			}
+			if m.Fast && !adapter.SupportsFast(bk.Type, "chat") {
+				errs = append(errs, FieldError{
+					Field: fmt.Sprintf("backends.%s.models.%s.fast", id, mID), Code: "unsupported",
+					Message: fmt.Sprintf("backend type %q does not support fast mode", bk.Type),
+				})
+			}
 			seenEfforts := map[string]bool{}
 			for index, effort := range m.Efforts {
 				field := fmt.Sprintf("backends.%s.models.%s.efforts.%d", id, mID, index)
@@ -312,6 +318,19 @@ func ValidateModelEffort(backend Backend, model Model, effort string) error {
 	}
 	if !model.SupportsEffort(effort) {
 		return fmt.Errorf("effort %q is not declared by this model (available: %s)", effort, strings.Join(model.Efforts, ", "))
+	}
+	return nil
+}
+
+func ValidateModelFast(backend Backend, model Model, fast bool) error {
+	if !fast {
+		return nil
+	}
+	if !adapter.SupportsFast(backend.Type, "chat") {
+		return fmt.Errorf("backend type %q does not support fast mode", backend.Type)
+	}
+	if !model.Fast {
+		return fmt.Errorf("fast mode is not declared by this model")
 	}
 	return nil
 }

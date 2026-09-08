@@ -103,6 +103,10 @@ export function ModelRow({ modelId, model, isDefault, radioGroup, onSetDefault, 
               </select>
             </label>
           )}
+          <label className="form-field">
+            <span>Fast mode capability</span>
+            <span><input type="checkbox" checked={model.fast ?? false} onChange={(e) => onChange({ ...model, fast: e.target.checked })} /> This model can use the adapter's faster, higher-usage mode</span>
+          </label>
           {pairs.map((pair, i) => (
             <div key={i} className="env-row">
               <input

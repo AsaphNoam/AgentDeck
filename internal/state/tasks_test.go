@@ -994,7 +994,7 @@ func TestRetryEligibleProjectionAgreesWithRetryTask(t *testing.T) {
 }
 
 // TS-10 §3 / FS-16.R27 (INV §9, INV §11) — the effort columns are declared
-// `TEXT NOT NULL DEFAULT ''`, so no future migration or repair may admit a
+// `TEXT NOT NULL DEFAULT ”`, so no future migration or repair may admit a
 // `NULL` that the non-null Go string scans would fail to read. The oracle is the
 // migrated database itself, read back through PRAGMA rather than from the
 // migration text under test.
@@ -1030,6 +1030,23 @@ func TestEffortColumnsAreNonNullWithAnEmptyDefault(t *testing.T) {
 		}
 		if !seen {
 			t.Errorf("%s has no effort column", table)
+		}
+	}
+}
+
+func TestFastColumnsAreNonNullAndOffByDefault(t *testing.T) {
+	st, _ := newTestStore(t)
+
+	for _, table := range []string{"tasks", "agents", "sessions", "pipeline_attempts"} {
+		var colType string
+		var notNull int
+		var dflt sql.NullString
+		err := st.DB().QueryRow(`SELECT type, "notnull", dflt_value FROM pragma_table_info(?) WHERE name = 'fast'`, table).Scan(&colType, &notNull, &dflt)
+		if err != nil {
+			t.Fatalf("table_info(%s.fast): %v", table, err)
+		}
+		if colType != "INTEGER" || notNull != 1 || !dflt.Valid || dflt.String != "0" {
+			t.Errorf("%s.fast = %s notnull=%d default=%v, want INTEGER notnull=1 default=0", table, colType, notNull, dflt)
 		}
 	}
 }

@@ -284,6 +284,7 @@ export interface LaunchParams {
   backend?: string;
   model?: string;
   effort?: string;
+  fast?: boolean;
   interface: "chat" | "terminal";
 }
 

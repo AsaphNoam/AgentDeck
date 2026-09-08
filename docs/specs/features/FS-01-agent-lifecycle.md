@@ -1,6 +1,6 @@
 # FS-01 — Agent Lifecycle
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/server/{launch,resume,switch,sessions,groups}.go`, `internal/runtime/`, `internal/index/`, `internal/cli/launch.go` · **Journeys:** J3, J7, J11
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -50,9 +50,9 @@ orphaned processes.
   response and agent record, shown beside backend and model on the chat and archive headers,
   restored by resume (R11), carried by clone (R9), and changeable on a running agent through switch
   runtime (R13) under the same native-resume versus primer rules a model swap follows. Switch runtime
-  keeps accepting effort unchanged; FS-03.R47 `(planned)` adds a second, cheaper way to change it on
+  keeps accepting effort unchanged; FS-03.R47 adds a second, cheaper way to change it on
   a running chat agent that does not restart the process.
-- **R35 (planned)** — Launch accepts an optional **fast mode** alongside backend,
+- **R35** — Launch accepts an optional **fast mode** alongside backend,
   model, and effort, from the New Agent modal, the `POST /api/sessions` body, and the CLI flag
   `--fast` (a boolean flag taking no operand, unlike `--effort`). Whether it is offered at all, how
   it resolves, and what happens when the live session cannot honor it belong to the selected model's
@@ -295,7 +295,7 @@ transitions:
   `internal/server/wake_test.go::TestStopDuringWakeConflictsAndKeepsRegistration`,
   `TestReleaseGroupDuringWakeKeepsRegistration`, and `TestWakeGateFailureSurfacesTypedError`.
 
-- **A19 (planned)** (R35) — A modal launch, an API launch, and a CLI `--fast` launch
+- **A19** (R35) — A modal launch, an API launch, and a CLI `--fast` launch
   of the same role/project/backend/model produce an identical agent carrying the same applied fast
   mode; `--fast` takes no operand; the applied fast mode appears on the session response, the chat
   header, and the archive header; resume and clone carry it; a terminal launch requesting it is

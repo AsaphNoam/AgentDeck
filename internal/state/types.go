@@ -14,6 +14,7 @@ type Agent struct {
 	Backend   string    `json:"backend"`
 	Model     string    `json:"model"`
 	Effort    string    `json:"effort"`
+	Fast      bool      `json:"fast"`
 	Interface string    `json:"interface"`
 	CreatedAt time.Time `json:"created_at"`
 	Group     string    `json:"group,omitempty"`
@@ -58,6 +59,7 @@ type AgentState struct {
 	Backend   string `json:"backend"`
 	Model     string `json:"model"`
 	Effort    string `json:"effort"`
+	Fast      bool   `json:"fast"`
 	Interface string `json:"interface"`
 	Group     string `json:"group,omitempty"`
 	CreatedAt string `json:"created_at"`
@@ -201,6 +203,7 @@ type PipelineAttemptRecord struct {
 	Backend           string          `json:"backend"`
 	Model             string          `json:"model"`
 	Effort            string          `json:"effort"`
+	Fast              bool            `json:"fast"`
 	State             string          `json:"state"`
 	AssignmentText    string          `json:"assignment_text"`
 	AssignmentHash    string          `json:"assignment_hash"`
@@ -239,6 +242,7 @@ type PipelineAgentSnapshot struct {
 	Running       bool
 	State         string
 	Detail        string
+	Fast          bool
 }
 
 // PipelineDelegatedTask is the narrow task projection for pipeline run detail.

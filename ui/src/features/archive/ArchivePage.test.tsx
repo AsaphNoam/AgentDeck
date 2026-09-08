@@ -100,7 +100,7 @@ describe("ArchivePage", () => {
     renderArchive();
     await screen.findByText("Atlas");
     expect(screen.getByText("implementer · my-app")).toBeInTheDocument();
-    expect(screen.getByText("claude · sonnet-4-6")).toBeInTheDocument();
+    expect(screen.getByText("claude · sonnet-4-6 · Normal speed")).toBeInTheDocument();
   });
 
   it("filters results when search changes", async () => {

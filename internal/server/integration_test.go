@@ -149,6 +149,64 @@ func post(t *testing.T, url string, body any) (*http.Response, []byte) {
 	return resp, data
 }
 
+func TestLiveSessionConfigurationPersistsWithoutRestart(t *testing.T) {
+	fake := buildFakeACP(t)
+	t.Setenv("FAKEACP_SCENARIO", "stream_text")
+	t.Setenv("FAKEACP_FAST_OPTION", "fast-mode")
+
+	srv := testServer(t, true)
+	srv.registry.Chat().SetCommand(fake)
+	if err := srv.configStore.WriteProject("tmpproj", config.Project{Title: "Tmp", Cwd: t.TempDir()}); err != nil {
+		t.Fatalf("WriteProject: %v", err)
+	}
+	if err := srv.configStore.WriteRole("impl", config.Role{Title: "Impl", SystemPrompt: "be helpful"}); err != nil {
+		t.Fatalf("WriteRole: %v", err)
+	}
+	if err := srv.configStore.WriteBackends(config.BackendsConfig{Version: 2, Backends: map[string]config.Backend{
+		"codex": {Name: "Codex", Type: "codex-acp", Default: true, DefaultModel: "gpt-5", Models: map[string]config.Model{
+			"gpt-5": {Name: "GPT-5", Model: "gpt-5", Efforts: []string{"low", "high"}, DefaultEffort: "high", Fast: true},
+		}},
+	}}); err != nil {
+		t.Fatalf("WriteBackends: %v", err)
+	}
+
+	ts := httptest.NewServer(srv.routes())
+	defer ts.Close()
+	t.Cleanup(func() { srv.registry.Shutdown(context.Background()) })
+	resp, body := post(t, ts.URL+"/api/sessions", map[string]any{"role": "impl", "project": "tmpproj", "backend": "codex", "model": "gpt-5", "effort": "high", "fast": true})
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("launch status = %d: %s", resp.StatusCode, body)
+	}
+	var launched sessionResponse
+	if err := json.Unmarshal(body, &launched); err != nil {
+		t.Fatalf("decode launch: %v", err)
+	}
+	before, err := srv.stateStore.ReadRunning(launched.Agent.AgentID)
+	if err != nil {
+		t.Fatalf("ReadRunning before apply: %v", err)
+	}
+
+	resp, body = post(t, ts.URL+"/api/sessions/"+launched.Agent.AgentID+"/session-config", map[string]any{"effort": "low", "fast": false})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("session config status = %d: %s", resp.StatusCode, body)
+	}
+	var applied state.Agent
+	if err := json.Unmarshal(body, &applied); err != nil {
+		t.Fatalf("decode session config: %v", err)
+	}
+	if applied.Effort != "low" || applied.Fast {
+		t.Fatalf("applied identity = effort %q fast %v", applied.Effort, applied.Fast)
+	}
+	after, err := srv.stateStore.ReadRunning(applied.AgentID)
+	if err != nil || before.PID != after.PID || before.SessionID != after.SessionID {
+		t.Fatalf("runtime restarted: before=%+v after=%+v err=%v", before, after, err)
+	}
+	snapshot, err := srv.stateStore.ReadSession(applied.AgentID)
+	if err != nil || snapshot.Effort != "low" || snapshot.Fast {
+		t.Fatalf("session snapshot = %+v err=%v", snapshot, err)
+	}
+}
+
 // TestLaunchPromptPermissionFlow drives the full HTTP surface against the fake
 // CLI: POST /sessions → /api/events → prompt → permission_request → permission
 // approve → sentinel created → turn_end (techspec §10.3, Appendix A).

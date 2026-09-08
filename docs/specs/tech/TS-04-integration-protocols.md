@@ -97,7 +97,7 @@ providers accept effort through three structurally different mechanisms, so the 
 *which* mechanism it uses and the runtime performs it; the runtime never branches on backend type
 inline (the rule `internal/backend/adapter.go` already states for argv, env, and resume):
 
-- **Model-suffix** (`codex-acp` chat) — **retired by R47 `(planned)`: the pinned adapter parses no
+- **Model-suffix** (`codex-acp` chat) — **retired by R47: the pinned adapter parses no
   model from the session request at all, so this mechanism delivered nothing.** Retained here for
   citation resolution; R47 is the live rule. The adapter encodes effort into the ACP model identifier
   as `model[effort]`, the shape its pinned adapter parses. Because the model id is built in two places,
@@ -122,7 +122,7 @@ when a session is loaded, so an unapplied effort silently reverts a resumed agen
 chose — INV §1's "state derived from the old side must be explicitly republished" at a lifecycle
 boundary.
 
-**R45 `(planned)` — Fast-mode delivery is adapter-declared, capability-gated, and
+**R45 — Fast-mode delivery is adapter-declared, capability-gated, and
 fail-open.** Fast mode reuses R18's shape — the adapter declares the mechanism, the runtime performs
 it, and no code branches on backend type inline — but has exactly one mechanism and the opposite
 failure posture:
@@ -162,7 +162,7 @@ read from both the `session/new` and the `session/load` result, the decode and t
 one helper consumed by both paths — INV §2 names that exact pair as having twice drifted on `model`
 and once been at risk on effort.
 
-**R46 `(planned)` — The session configuration option list is decoded in `acpmap.go`
+**R46 — The session configuration option list is decoded in `acpmap.go`
 like every other ACP shape.** `session/new` and `session/load` return a `configOptions` array that
 AgentDeck currently discards. Reading it introduces a new ACP wire shape, and TS-01's isolation rule
 keeps every ACP shape decode in `internal/runtime/acpmap.go` so an adapter version bump has one blast
@@ -175,7 +175,7 @@ in-vocabulary rather than passed through from an external tool. An absent, null,
 `configOptions` is treated as advertising nothing, which fails open to normal speed under R45 rather
 than failing the session (INV §7).
 
-**R47 `(planned)` — One ordered post-session configuration step replaces
+**R47 — One ordered post-session configuration step replaces
 model-suffix effort delivery.** R18's model-suffix mechanism is retired for `codex-acp`, and with it
 the `LaunchSpec` accessor that composed `model[effort]` for both `sessionNewParams` and
 `sessionLoadParams`. **The mechanism never worked.** The pinned ACP `NewSessionRequest` schema

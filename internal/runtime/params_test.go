@@ -142,16 +142,16 @@ func TestSessionParamsOmitModelWhenInherited(t *testing.T) {
 	})
 }
 
-// Effort is part of the Codex ACP model identifier. Both session paths must use
-// the same composed value so a resumed/switch agent keeps its selected level.
-func TestCodexSessionParamsCarryEffortSuffix(t *testing.T) {
+// Codex ignores model fields on session creation/load; both values are applied
+// through the advertised post-session configuration contract instead.
+func TestCodexSessionParamsOmitModelAndEffort(t *testing.T) {
 	spec := LaunchSpec{Cwd: "/work", BackendType: "codex-acp", ModelID: "gpt-5", Effort: "high"}
 	for name, params := range map[string]map[string]any{
 		"session/new":  sessionNewParams(spec),
 		"session/load": sessionLoadParams(spec, "sess-123"),
 	} {
-		if got := params["model"]; got != "gpt-5[high]" {
-			t.Fatalf("%s model = %v, want gpt-5[high]", name, got)
+		if got, ok := params["model"]; ok {
+			t.Fatalf("%s model = %v, want omitted", name, got)
 		}
 	}
 }

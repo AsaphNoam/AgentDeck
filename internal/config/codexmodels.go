@@ -24,7 +24,8 @@ type codexModelEntry struct {
 	SupportedReasoningLevels []struct {
 		Effort string `json:"effort"`
 	} `json:"supported_reasoning_levels"`
-	DefaultReasoningLevel string `json:"default_reasoning_level"`
+	DefaultReasoningLevel string   `json:"default_reasoning_level"`
+	AdditionalSpeedTiers  []string `json:"additional_speed_tiers"`
 }
 
 // CodexModelCatalogPath returns the Codex CLI model cache path, honoring
@@ -74,7 +75,14 @@ func ReadCodexModelCatalog(path string) (map[string]Model, error) {
 		if !(Model{Efforts: efforts}).SupportsEffort(defaultEffort) {
 			defaultEffort = ""
 		}
-		out[m.Slug] = Model{Name: name, Model: m.Slug, Efforts: efforts, DefaultEffort: defaultEffort}
+		fast := false
+		for _, tier := range m.AdditionalSpeedTiers {
+			if tier == "fast" {
+				fast = true
+				break
+			}
+		}
+		out[m.Slug] = Model{Name: name, Model: m.Slug, Efforts: efforts, DefaultEffort: defaultEffort, Fast: fast}
 	}
 	return out, nil
 }

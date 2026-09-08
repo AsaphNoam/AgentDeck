@@ -1,6 +1,6 @@
 # TS-09 — Pipeline control plane
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/pipeline`, `internal/config`, `internal/state`, `internal/server`, `internal/messaging`, `internal/cli`, `ui/src/features/pipelines`
 **Absorbed:** —
 
@@ -189,7 +189,7 @@ launches, continuation, and recovery read effort from the frozen attempt through
 services, so a catalog or future assignment edit cannot change an in-flight attempt's level, and a
 retried or looped attempt reuses the snapshot's value rather than re-resolving it.
 
-**R34 `(planned)` — Per-stage fast mode is frozen assignment data; what ran is read
+**R34 — Per-stage fast mode is frozen assignment data; what ran is read
 from the stage agent.** A run's frozen assignment record gains an optional fast mode per stage
 beside its backend, model, and effort, and each created attempt copies that request beside its own
 identity through the same forward-only migration style and non-null decoding as the rest of the run

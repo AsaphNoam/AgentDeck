@@ -9,6 +9,7 @@ import { ChatPanel, initialTab } from "./ChatPanel";
 
 const mocks = vi.hoisted(() => ({
   getTranscript: vi.fn(async (id: string) => ({ agent_id: id, events: [] })),
+  setSessionConfig: vi.fn(),
   switchRuntime: vi.fn(),
   useBackends: vi.fn(),
   useProjects: vi.fn(),
@@ -16,6 +17,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../api/client", () => ({
   getTranscript: mocks.getTranscript,
+  setSessionConfig: mocks.setSessionConfig,
   switchRuntime: mocks.switchRuntime,
 }));
 
@@ -37,6 +39,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   mocks.switchRuntime.mockReset();
+  mocks.setSessionConfig.mockReset();
   mocks.useBackends.mockReset();
   mocks.useProjects.mockReset();
   useAgentStore.setState({ agents: {}, order: [], hydrated: false, hydrating: false });
@@ -90,7 +93,7 @@ const backends = {
     },
     codex: {
       name: "Codex", type: "codex-acp" as const, default_model: "gpt-5",
-      models: { "gpt-5": { name: "GPT-5", model: "gpt-5", efforts: ["low", "high"], default_effort: "high" } },
+      models: { "gpt-5": { name: "GPT-5", model: "gpt-5", efforts: ["low", "high"], default_effort: "high", fast: true } },
     },
   },
 };
@@ -245,5 +248,31 @@ describe("ChatPanel runtime picker", () => {
     expect(screen.queryByRole("button", { name: "Switch" })).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Backend"), { target: { value: "codex" } });
     expect(screen.getByRole("button", { name: "Switch" })).toBeEnabled();
+  });
+
+  it("applies effort immediately without staging a runtime switch", async () => {
+    mocks.useBackends.mockReturnValue({ data: backends });
+    mocks.setSessionConfig.mockResolvedValue({ ...liveAgent("a_live"), backend: "codex", model: "gpt-5", effort: "low" });
+    useAgentStore.setState({ agents: { a_live: { ...liveAgent("a_live"), backend: "codex", model: "gpt-5", effort: "high" } }, order: ["a_live"], hydrated: true, hydrating: false });
+
+    renderPanel("a_live");
+    fireEvent.change(await screen.findByLabelText("Effort"), { target: { value: "low" } });
+
+    await waitFor(() => expect(mocks.setSessionConfig).toHaveBeenCalledWith("a_live", { effort: "low" }));
+    expect(mocks.switchRuntime).not.toHaveBeenCalled();
+    expect((screen.getByLabelText("Effort") as HTMLSelectElement).value).toBe("low");
+  });
+
+  it("shows and applies fast mode only for a capable current model", async () => {
+    mocks.useBackends.mockReturnValue({ data: backends });
+    mocks.setSessionConfig.mockResolvedValue({ ...liveAgent("a_live"), backend: "codex", model: "gpt-5", effort: "high", fast: true });
+    useAgentStore.setState({ agents: { a_live: { ...liveAgent("a_live"), backend: "codex", model: "gpt-5", effort: "high", fast: false } }, order: ["a_live"], hydrated: true, hydrating: false });
+
+    renderPanel("a_live");
+    const fast = await screen.findByRole("checkbox", { name: /Fast mode/ });
+    fireEvent.click(fast);
+
+    await waitFor(() => expect(mocks.setSessionConfig).toHaveBeenCalledWith("a_live", { fast: true }));
+    expect(fast).toBeChecked();
   });
 });

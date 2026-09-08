@@ -25,6 +25,7 @@ export interface CreateTaskInput {
   backend?: string;
   model?: string;
   effort?: string;
+  fast?: boolean;
   arms?: TaskArmInput[];
 	attachments?: { context_ref_id: string; label?: string; description?: string }[];
 }

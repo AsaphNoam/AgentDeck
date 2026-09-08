@@ -11,6 +11,10 @@
     gap: var(--ad-space-4);
   }
 
+  .visual-matrix-section > .chat-header {
+    width: 100%;
+  }
+
   .visual-matrix-section > h2,
   .visual-matrix-columns h2 {
     border-bottom: var(--ad-border-thin) solid var(--ad-border-strong);

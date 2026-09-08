@@ -72,6 +72,9 @@ func (s *Server) ValidateStage(_ context.Context, execution pipeline.StageExecut
 	if err := config.ValidateModelEffort(backend, model, execution.Effort); err != nil {
 		return err
 	}
+	if err := config.ValidateModelFast(backend, model, execution.Fast); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -97,7 +100,7 @@ func (s *Server) LaunchStage(ctx context.Context, execution pipeline.StageExecut
 	}
 	_, ae := s.launchAgent(ctx, launchRequest{
 		Role: execution.Role, Project: execution.Project, Backend: execution.Backend,
-		Model: execution.Model, Effort: execution.Effort, Interface: "chat", Name: execution.AgentName,
+		Model: execution.Model, Effort: execution.Effort, Fast: execution.Fast, Interface: "chat", Name: execution.AgentName,
 		// The stage agent's own name is also its ordinary group label, so a
 		// stage's agents land in one dashboard section (FS-14.R58, TS-09.R33).
 		Group: execution.AgentName,
@@ -169,13 +172,20 @@ func (s *Server) ContinueStage(ctx context.Context, execution pipeline.StageExec
 	agent.Backend = execution.Backend
 	agent.Model = execution.Model
 	agent.Effort = execution.Effort
+	agent.Fast = execution.Fast
 	agent.Interface = "chat"
 	spec, ae := s.composeResumeSpecContext(ctx, agent, snapshot, backend, model, execution.Generation, nil)
 	if ae != nil {
 		return errors.New(ae.Message)
 	}
-	if _, err := s.registry.Resume(ctx, spec); err != nil {
+	handle, err := s.registry.Resume(ctx, spec)
+	if err != nil {
 		s.teardownAgentRegistration(agent.AgentID)
+		return err
+	}
+	agent.Fast = handle.Fast
+	if err := s.stateStore.WriteAgent(agent); err != nil {
+		_ = s.stopStageLocked(ctx, agent.AgentID)
 		return err
 	}
 	if err := s.registry.SendPrompt(ctx, agent.AgentID, execution.Assignment); err != nil {

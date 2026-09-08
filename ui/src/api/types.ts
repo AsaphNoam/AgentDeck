@@ -8,6 +8,7 @@ export interface AgentState {
   backend: string;
   model: string;
   effort?: string;
+  fast: boolean;
   interface: string;
   group?: string;
   created_at: string;
@@ -134,6 +135,7 @@ export interface ArchiveResult {
   backend: string;
   model: string;
   effort?: string;
+  fast: boolean;
   interface: string;
   group?: string;
   created_at: string;

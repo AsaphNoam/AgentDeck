@@ -51,7 +51,7 @@ describe("ArchiveAgentPage switched session identity", () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText("agentdeck · claude · sonnet")).toBeInTheDocument();
+    expect(await screen.findByText("agentdeck · claude · sonnet · Normal speed")).toBeInTheDocument();
     expect(screen.queryByText("agentdeck · codex · gpt-5.6-sol")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Atlas" })).toBeInTheDocument();
     expect(document.querySelector("time")?.getAttribute("datetime")).toBe("2026-07-24T12:30:00Z");
@@ -71,7 +71,7 @@ describe("ArchiveAgentPage", () => {
     expect(await screen.findByText("Sure, I'll do that.")).toBeInTheDocument();
     expect(document.querySelectorAll("article.assistant-message")).toHaveLength(1);
     expect(screen.getByRole("heading", { name: "Atlas" })).toBeInTheDocument();
-    expect(screen.getByText("agentdeck · codex · gpt-5.6-sol")).toBeInTheDocument();
+    expect(screen.getByText("agentdeck · codex · gpt-5.6-sol · Normal speed")).toBeInTheDocument();
     expect(screen.getByText(/Archived · read-only/)).toBeInTheDocument();
     expect(document.querySelector("time")?.getAttribute("datetime")).toBe("2026-07-24T12:30:00Z");
   });

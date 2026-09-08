@@ -20,7 +20,7 @@ func (s *Store) PipelineAgentSnapshots(agentIDs []string) (map[string]PipelineAg
 		args[i] = id
 	}
 	rows, err := s.db.Query(`
-SELECT a.agent_id, a.name, s.agent_id IS NOT NULL, r.agent_id IS NOT NULL,
+SELECT a.agent_id, a.name, a.fast, s.agent_id IS NOT NULL, r.agent_id IS NOT NULL,
        COALESCE(s.state, ''), COALESCE(s.detail, '')
 FROM agents a
 LEFT JOIN status s ON s.agent_id = a.agent_id
@@ -33,7 +33,7 @@ ORDER BY a.agent_id`, args...)
 	defer rows.Close()
 	for rows.Next() {
 		var snapshot PipelineAgentSnapshot
-		if err := rows.Scan(&snapshot.AgentID, &snapshot.Name, &snapshot.StatusFound,
+		if err := rows.Scan(&snapshot.AgentID, &snapshot.Name, &snapshot.Fast, &snapshot.StatusFound,
 			&snapshot.Running, &snapshot.State, &snapshot.Detail); err != nil {
 			return nil, fmt.Errorf("state: scan pipeline agent snapshot: %w", err)
 		}

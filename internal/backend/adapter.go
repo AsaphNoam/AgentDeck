@@ -61,6 +61,10 @@ type BackendAdapter interface {
 	// given AgentDeck interface. The identifier is a session option id or argv
 	// flag as appropriate; an empty mode means the backend has no mechanism.
 	EffortDelivery(agentInterface string) (mode, identifier string)
+
+	// SessionConfigIDs declares post-session option identifiers. Empty values
+	// mean the adapter does not support that setting through live ACP config.
+	SessionConfigIDs() (model, effort, fast string)
 }
 
 const (
@@ -120,6 +124,15 @@ func SupportsEffort(backendType string) bool {
 	return false
 }
 
+func SupportsFast(backendType, agentInterface string) bool {
+	adapter, ok := For(backendType)
+	if !ok || agentInterface != "chat" {
+		return false
+	}
+	_, _, fast := adapter.SessionConfigIDs()
+	return fast != ""
+}
+
 // claudeACP is the adapter for the official claude-agent-acp package.
 type claudeACP struct{}
 
@@ -168,6 +181,7 @@ func (claudeACP) EffortDelivery(agentInterface string) (string, string) {
 	}
 	return EffortPostSession, "effort"
 }
+func (claudeACP) SessionConfigIDs() (string, string, string) { return "model", "effort", "fast" }
 
 // codexACP is the adapter for the codex-acp backend. It speaks ACP over stdio
 // like claude-acp, so it reuses the chat runtime transport; only the binary,
@@ -217,7 +231,10 @@ func (codexACP) HookLaunchArgs(settingsPath string) []string {
 	return nil
 }
 
-func (codexACP) EffortDelivery(string) (string, string) { return EffortModelSuffix, "" }
+func (codexACP) EffortDelivery(string) (string, string) { return EffortPostSession, "reasoning_effort" }
+func (codexACP) SessionConfigIDs() (string, string, string) {
+	return "model", "reasoning_effort", "fast-mode"
+}
 
 // opencodeACP is the adapter for the OpenCode CLI (`opencode acp`). It speaks
 // ACP over stdio like the other backends, so the chat runtime is unchanged; the
@@ -249,10 +266,11 @@ func (opencodeACP) CanSwitchModelOnResume() bool { return true }
 
 // OpenCode has no AgentDeck hook surface; chat status derives from the ACP
 // stream like every chat agent.
-func (opencodeACP) HookMap() map[string]string             { return nil }
-func (opencodeACP) UnsupportedHookEvents() []string        { return unsupported(nil) }
-func (opencodeACP) HookLaunchArgs(string) []string         { return nil }
-func (opencodeACP) EffortDelivery(string) (string, string) { return EffortNone, "" }
+func (opencodeACP) HookMap() map[string]string                 { return nil }
+func (opencodeACP) UnsupportedHookEvents() []string            { return unsupported(nil) }
+func (opencodeACP) HookLaunchArgs(string) []string             { return nil }
+func (opencodeACP) EffortDelivery(string) (string, string)     { return EffortNone, "" }
+func (opencodeACP) SessionConfigIDs() (string, string, string) { return "", "", "" }
 
 // ExtraEnv injects the yolo permission config for skip=true (techspec §2.3):
 // OPENCODE_CONFIG_CONTENT carries a full config JSON so the CLI auto-allows
@@ -292,10 +310,11 @@ func (openhandsACP) ResolveResumeID(prevSessionID string, sameBackend bool) stri
 
 func (openhandsACP) CanSwitchModelOnResume() bool { return true }
 
-func (openhandsACP) HookMap() map[string]string             { return nil }
-func (openhandsACP) UnsupportedHookEvents() []string        { return unsupported(nil) }
-func (openhandsACP) HookLaunchArgs(string) []string         { return nil }
-func (openhandsACP) EffortDelivery(string) (string, string) { return EffortNone, "" }
+func (openhandsACP) HookMap() map[string]string                 { return nil }
+func (openhandsACP) UnsupportedHookEvents() []string            { return unsupported(nil) }
+func (openhandsACP) HookLaunchArgs(string) []string             { return nil }
+func (openhandsACP) EffortDelivery(string) (string, string)     { return EffortNone, "" }
+func (openhandsACP) SessionConfigIDs() (string, string, string) { return "", "", "" }
 
 // ExtraEnv sets LLM_MODEL from the resolved model id (OpenHands selects the
 // model via env, not the ACP session param — techspec §2.2).

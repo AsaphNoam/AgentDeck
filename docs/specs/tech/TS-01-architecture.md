@@ -81,7 +81,7 @@ derives from the selected adapter's `EffortDelivery` contract rather than a seco
 so the pipeline manager and HTTP handlers share one authority rather than each checking the catalog
 themselves.
 
-**R28 `(planned)` — Fast mode reuses the composition seam but splits requested from
+**R28 — Fast mode reuses the composition seam but splits requested from
 applied.** A single `resolveFast` joins `resolveEffort` on the shared composition seam in
 `internal/server/launch.go` and is the only place that applies FS-09.R54's precedence, which is
 short by design: explicit request, else off. There is no bound-source override and no model default

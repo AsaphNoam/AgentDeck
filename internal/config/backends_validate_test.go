@@ -228,6 +228,22 @@ func TestValidateModelEffortUsesAdapterDelivery(t *testing.T) {
 	}
 }
 
+func TestValidateModelFastUsesCatalogAndAdapterCapability(t *testing.T) {
+	capable := Model{Model: "gpt-5", Fast: true}
+	if err := ValidateModelFast(Backend{Type: "codex-acp"}, capable, true); err != nil {
+		t.Fatalf("declared Codex fast capability rejected: %v", err)
+	}
+	if err := ValidateModelFast(Backend{Type: "opencode-acp"}, capable, true); err == nil {
+		t.Fatal("unsupported OpenCode fast capability was accepted")
+	}
+	if err := ValidateModelFast(Backend{Type: "codex-acp"}, Model{Model: "gpt-5"}, true); err == nil {
+		t.Fatal("undeclared model fast capability was accepted")
+	}
+	if err := ValidateModelFast(Backend{Type: "claude-acp"}, Model{}, false); err != nil {
+		t.Fatalf("disabled fast mode should not require capability: %v", err)
+	}
+}
+
 func TestValidateBackendsConfig_RejectsInvalidEffortDeclarations(t *testing.T) {
 	tests := []struct {
 		name  string

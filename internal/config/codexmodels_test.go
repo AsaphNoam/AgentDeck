@@ -60,7 +60,7 @@ func TestReadCodexModelCatalogImportsEfforts(t *testing.T) {
 	  "models": [
 	    {"slug": "gpt-eff", "display_name": "GPT Eff", "visibility": "list",
 	     "supported_reasoning_levels": [{"effort": "low"}, {"effort": "high"}],
-	     "default_reasoning_level": "high"},
+	     "default_reasoning_level": "high", "additional_speed_tiers": ["fast"]},
 	    {"slug": "gpt-none", "display_name": "GPT None", "visibility": "list"},
 	    {"slug": "gpt-baddefault", "display_name": "GPT Bad", "visibility": "list",
 	     "supported_reasoning_levels": [{"effort": "low"}],
@@ -71,10 +71,10 @@ func TestReadCodexModelCatalogImportsEfforts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read catalog: %v", err)
 	}
-	if got := cat["gpt-eff"]; len(got.Efforts) != 2 || got.Efforts[0] != "low" || got.Efforts[1] != "high" || got.DefaultEffort != "high" {
-		t.Fatalf("gpt-eff efforts = %+v, want [low high] default high", got)
+	if got := cat["gpt-eff"]; len(got.Efforts) != 2 || got.Efforts[0] != "low" || got.Efforts[1] != "high" || got.DefaultEffort != "high" || !got.Fast {
+		t.Fatalf("gpt-eff capabilities = %+v, want [low high], default high, and fast", got)
 	}
-	if got := cat["gpt-none"]; len(got.Efforts) != 0 || got.DefaultEffort != "" {
+	if got := cat["gpt-none"]; len(got.Efforts) != 0 || got.DefaultEffort != "" || got.Fast {
 		t.Fatalf("gpt-none efforts = %+v, want none", got)
 	}
 	if got := cat["gpt-baddefault"]; got.DefaultEffort != "" {

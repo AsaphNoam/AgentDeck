@@ -62,6 +62,7 @@ export const pipelineRuntimeAssignmentSchema = z.object({
   backend: z.string(),
   model: z.string(),
   effort: z.string().optional().default(""),
+  fast: z.boolean().optional().default(false),
 });
 
 export const pipelineStartRequestSchema = z.object({
@@ -147,6 +148,7 @@ export const pipelineRunDetailSchema = z.object({
       preview: z.string(),
       route: z.enum(["live", "archive", "unavailable"]),
       available: z.boolean(),
+      fast: z.boolean().optional().default(false),
     }).nullable(),
     delegated_agents: z.array(z.object({
       agent_id: z.string(),
@@ -156,6 +158,7 @@ export const pipelineRunDetailSchema = z.object({
       preview: z.string(),
       route: z.enum(["live", "archive", "unavailable"]),
       available: z.boolean(),
+      fast: z.boolean().optional().default(false),
       task_id: z.string(),
       display_name: z.string(),
       task_state: z.string().optional().default(""),

@@ -14,6 +14,31 @@ const (
 	maxCommandText    = 2000
 )
 
+type acpSessionConfigOption struct {
+	ID       string `json:"id"`
+	ConfigID string `json:"configId"`
+}
+
+func decodeSessionConfigOptions(result json.RawMessage) map[string]struct{} {
+	var response struct {
+		ConfigOptions []acpSessionConfigOption `json:"configOptions"`
+	}
+	out := map[string]struct{}{}
+	if json.Unmarshal(result, &response) != nil {
+		return out
+	}
+	for _, option := range response.ConfigOptions {
+		id := option.ID
+		if id == "" {
+			id = option.ConfigID
+		}
+		if id != "" {
+			out[id] = struct{}{}
+		}
+	}
+	return out
+}
+
 // CommandItem is one entry of a chat runtime's advertised ACP command snapshot,
 // projected verbatim to the composer command picker (TS-03.R24). InputHint is the
 // unstructured `input.hint` when the adapter supplies one.

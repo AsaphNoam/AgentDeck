@@ -36,10 +36,10 @@ func (s *Store) ReadAgent(id string) (Agent, error) {
 	var a Agent
 	var createdAt string
 	err := s.db.QueryRow(`
-SELECT agent_id, name, role, project, backend, model, effort, interface, created_at, grp, archived
+SELECT agent_id, name, role, project, backend, model, effort, fast, interface, created_at, grp, archived
 FROM agents
 WHERE agent_id = ?`, id).Scan(
-		&a.AgentID, &a.Name, &a.Role, &a.Project, &a.Backend, &a.Model, &a.Effort,
+		&a.AgentID, &a.Name, &a.Role, &a.Project, &a.Backend, &a.Model, &a.Effort, &a.Fast,
 		&a.Interface, &createdAt, &a.Group, &a.Archived,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -58,8 +58,8 @@ WHERE agent_id = ?`, id).Scan(
 // WriteAgent inserts or updates an agent.
 func (s *Store) WriteAgent(a Agent) error {
 	_, err := s.db.Exec(`
-INSERT INTO agents(agent_id, name, role, project, backend, model, effort, interface, created_at, grp, archived)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO agents(agent_id, name, role, project, backend, model, effort, fast, interface, created_at, grp, archived)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(agent_id) DO UPDATE SET
     name = excluded.name,
     role = excluded.role,
@@ -67,11 +67,12 @@ ON CONFLICT(agent_id) DO UPDATE SET
     backend = excluded.backend,
     model = excluded.model,
 	 effort = excluded.effort,
+	 fast = excluded.fast,
     interface = excluded.interface,
     created_at = excluded.created_at,
     grp = excluded.grp,
     archived = excluded.archived`,
-		a.AgentID, a.Name, a.Role, a.Project, a.Backend, a.Model, a.Effort, a.Interface,
+		a.AgentID, a.Name, a.Role, a.Project, a.Backend, a.Model, a.Effort, a.Fast, a.Interface,
 		formatTime(a.CreatedAt), a.Group, a.Archived,
 	)
 	if err != nil {
@@ -80,10 +81,32 @@ ON CONFLICT(agent_id) DO UPDATE SET
 	return nil
 }
 
+func (s *Store) UpdateAgentSessionSettings(agentID, effort string, fast bool) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("state: begin session settings: %w", err)
+	}
+	defer tx.Rollback()
+	result, err := tx.Exec(`UPDATE agents SET effort = ?, fast = ? WHERE agent_id = ?`, effort, fast, agentID)
+	if err != nil {
+		return fmt.Errorf("state: update agent settings: %w", err)
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return ErrNotFound
+	}
+	if _, err := tx.Exec(`UPDATE sessions SET effort = ?, fast = ? WHERE agent_id = ?`, effort, fast, agentID); err != nil {
+		return fmt.Errorf("state: update session settings: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("state: commit session settings: %w", err)
+	}
+	return nil
+}
+
 // ListAgents returns agents ordered by created_at.
 func (s *Store) ListAgents() ([]Agent, error) {
 	rows, err := s.db.Query(`
-SELECT agent_id, name, role, project, backend, model, effort, interface, created_at, grp, archived
+SELECT agent_id, name, role, project, backend, model, effort, fast, interface, created_at, grp, archived
 FROM agents
 ORDER BY created_at, agent_id`)
 	if err != nil {
@@ -96,7 +119,7 @@ ORDER BY created_at, agent_id`)
 		var a Agent
 		var createdAt string
 		if err := rows.Scan(
-			&a.AgentID, &a.Name, &a.Role, &a.Project, &a.Backend, &a.Model, &a.Effort,
+			&a.AgentID, &a.Name, &a.Role, &a.Project, &a.Backend, &a.Model, &a.Effort, &a.Fast,
 			&a.Interface, &createdAt, &a.Group, &a.Archived,
 		); err != nil {
 			return nil, fmt.Errorf("state: scan agent: %w", err)

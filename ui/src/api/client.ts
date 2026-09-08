@@ -44,11 +44,20 @@ export function launchAgent(body: {
   backend?: string;
   model?: string;
   effort?: string;
+  fast?: boolean;
   interface?: string;
   name?: string;
   group?: string;
 }) {
   return json<{ agent: { agent_id: string; name: string } }>("/api/sessions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export function setSessionConfig(agentId: string, body: { effort?: string; fast?: boolean }) {
+  return json<{ effort?: string; fast: boolean }>(`/api/sessions/${agentId}/session-config`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

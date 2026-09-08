@@ -125,7 +125,7 @@ export function CardContextMenu() {
         Switch runtime
       </button>
       <button type="button" data-slot="item" title="Launch a new agent with this one's role, project, backend, and model" onClick={() => {
-        launchAgent({ role: agent.role, project: agent.project, backend: agent.backend, model: agent.model, effort: agent.effort, interface: agent.interface, group: agent.group }).catch((err) => pushError("Clone failed", err instanceof Error ? err.message : String(err)));
+        launchAgent({ role: agent.role, project: agent.project, backend: agent.backend, model: agent.model, effort: agent.effort, fast: agent.fast, interface: agent.interface, group: agent.group }).catch((err) => pushError("Clone failed", err instanceof Error ? err.message : String(err)));
         close();
       }}>
         Clone

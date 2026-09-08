@@ -253,7 +253,13 @@ func (s *Server) handleSwitchRuntime(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 5. Resume under the target runtime (registry dispatches by target interface).
-	if _, err := s.registry.Resume(r.Context(), spec); err != nil {
+	handle, err := s.registry.Resume(r.Context(), spec)
+	if err != nil {
+		s.rollbackSwitch(r.Context(), w, agent, prev.SessionID, err)
+		return
+	}
+	target.Fast = handle.Fast
+	if err := s.stateStore.WriteAgent(target); err != nil {
 		s.rollbackSwitch(r.Context(), w, agent, prev.SessionID, err)
 		return
 	}
@@ -438,6 +444,7 @@ func (s *Server) composeSwitchSpecContext(ctx context.Context, target state.Agen
 		BackendType:    be.Type,
 		ModelID:        model.Model,
 		Effort:         target.Effort,
+		Fast:           target.Fast,
 		Env:            composeChildEnv(be.Type, s.configStore.Home(), be.Env, model.Env, s.hookEnv(target, token), projectResourcesEnv(resourceDir)),
 		SkipPerms:      snap.SkipPermissions,
 		HookToken:      token,

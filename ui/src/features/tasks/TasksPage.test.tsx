@@ -59,6 +59,9 @@ const server = setupServer(
   http.get("/api/projects", () => HttpResponse.json({ "my-app": { title: "My App", cwd: "/tmp" } })),
   http.get("/api/roles", () => HttpResponse.json({ agentdecker: { title: "AgentDecker" }, impl: { title: "Impl" } })),
   http.get("/api/config", () => HttpResponse.json({ default_role: "impl" })),
+  http.get("/api/backends", () => HttpResponse.json({ version: 2, backends: {
+    codex: { name: "Codex", type: "codex-acp", default: true, default_model: "gpt-5", models: { "gpt-5": { name: "GPT-5", model: "gpt-5", fast: true } } },
+  } })),
   http.get("/api/tasks", () => HttpResponse.json({ tasks: [baseTask, parked] })),
   http.post("/api/tasks/:id/retry", async ({ params }) => {
     lastRequest = { url: `retry:${params.id}`, body: null };
@@ -156,6 +159,20 @@ describe("Tasks view", () => {
 
 		fireEvent.change(screen.getByLabelText("Target"), { target: { value: "agent" } });
 		expect(screen.queryByLabelText("Effort (optional)")).not.toBeInTheDocument();
+	 });
+
+	 it("offers fast mode only for a capable launch model and sends it", async () => {
+		renderPage();
+		await screen.findByText("New task");
+		fireEvent.change(screen.getByLabelText("Name"), { target: { value: "move quickly" } });
+		fireEvent.change(screen.getByLabelText("Instruction"), { target: { value: "do it" } });
+		fireEvent.click(await screen.findByRole("checkbox", { name: /Fast mode/ }));
+		fireEvent.click(screen.getByRole("button", { name: "Create task" }));
+		await waitFor(() => expect(lastRequest?.url).toBe("create"));
+		expect(lastRequest?.body).toMatchObject({ target_kind: "launch", fast: true });
+
+		fireEvent.change(screen.getByLabelText("Target"), { target: { value: "agent" } });
+		expect(screen.queryByRole("checkbox", { name: /Fast mode/ })).not.toBeInTheDocument();
 	 });
 
   // Regression (review fix): narrowing Retry to `interrupted` also removed it

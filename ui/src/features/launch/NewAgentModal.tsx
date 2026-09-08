@@ -44,6 +44,7 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
   const [backendId, setBackendId] = useState(defaultBackendId);
   const [modelId, setModelId] = useState("");
   const [effort, setEffort] = useState("");
+  const [fast, setFast] = useState(false);
   const [agentInterface, setAgentInterface] = useState<"chat" | "terminal">("chat");
   const [terminalAvailable, setTerminalAvailable] = useState(true);
   const [launchError, setLaunchError] = useState<string | null>(null);
@@ -90,6 +91,7 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
     const runtime = resetRuntimeForBackend(backendsData, backendId);
     setModelId(runtime.model);
     setEffort(runtime.effort);
+    setFast(false);
   }, [backendId, backendsData]);
 
   useEffect(() => {
@@ -104,6 +106,7 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
 
   useEffect(() => {
     setEffort(resetRuntimeForModel(backendsData, backendId, modelId).effort);
+    setFast(false);
   }, [backendId, modelId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Federation preflight: if the chosen backend has a linked configuration source
@@ -125,13 +128,14 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
   // A backend that can't run terminal must not leave a stale terminal selection.
   useEffect(() => {
     if (!canTerminal && agentInterface === "terminal") setAgentInterface("chat");
+    if (agentInterface === "terminal") setFast(false);
   }, [canTerminal, agentInterface]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setLaunchError(null);
     launch.mutate(
-      { name: name || undefined, role, project, backend: backendId || undefined, model: modelId || undefined, effort: effort || undefined, interface: agentInterface },
+      { name: name || undefined, role, project, backend: backendId || undefined, model: modelId || undefined, effort: effort || undefined, fast, interface: agentInterface },
       {
         onSuccess: (result) => {
           onLaunched?.(result.agent.agent_id);
@@ -170,6 +174,13 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
                   {effortLevels.map((level) => <option key={level} value={level}>{level}</option>)}
                 </select>
               </div>
+            )}
+
+            {selectedModel?.fast && agentInterface === "chat" && (
+              <label className="form-field">
+                <span>Speed</span>
+                <span><input type="checkbox" checked={fast} onChange={(e) => setFast(e.target.checked)} /> Fast mode — faster responses with higher provider usage</span>
+              </label>
             )}
 
             <div className="form-field">

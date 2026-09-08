@@ -292,6 +292,7 @@ func (s *Server) resumeSessionWithHooksAndNotice(ctx context.Context, id string,
 		Backend:   backendID,
 		Model:     modelKey,
 		Effort:    effort,
+		Fast:      agent.Fast,
 		Interface: iface,
 		CreatedAt: agent.CreatedAt,
 		Group:     agent.Group,
@@ -324,12 +325,18 @@ func (s *Server) resumeSessionWithHooksAndNotice(ctx context.Context, id string,
 
 	// 7. Resume via the registry (double-resume is guarded by the registry sentinel
 	//    inside the claim taken above).
-	if _, err := s.registry.Resume(ctx, spec); err != nil {
+	handle, err := s.registry.Resume(ctx, spec)
+	if err != nil {
 		// composeResumeSpec wrote the hook-settings file too (via
 		// composeHookRegistration) — tear down all three artifacts, not just
 		// token + MCP, so a failed resume leaves nothing behind (launch parity).
 		s.teardownAgentRegistration(id)
 		return resumeStartError(err)
+	}
+	resumeAgent.Fast = handle.Fast
+	if err := s.stateStore.WriteAgent(resumeAgent); err != nil {
+		_ = s.stopAgentClaimed(ctx, id)
+		return apiError(runtime.CodeInternal, "write applied session configuration: "+err.Error())
 	}
 	if after != nil {
 		if err := after(); err != nil {
@@ -499,6 +506,7 @@ func (s *Server) composeResumeSpecContext(ctx context.Context, agent state.Agent
 		BackendType:    be.Type,
 		ModelID:        model.Model,
 		Effort:         agent.Effort,
+		Fast:           agent.Fast,
 		Env:            composeChildEnv(be.Type, s.configStore.Home(), be.Env, model.Env, s.hookEnv(agent, token), projectResourcesEnv(resourceDir)),
 		SkipPerms:      snap.SkipPermissions,
 		HookToken:      token,

@@ -29,6 +29,7 @@ type launchRequest struct {
 	Backend   string `json:"backend"`
 	Model     string `json:"model"`
 	Effort    string `json:"effort"`
+	Fast      bool   `json:"fast"`
 	Interface string `json:"interface"`
 	Driver    string `json:"driver"` // terminal driver: ""/"xterm" | "tmux" | "iterm2" (§3.5)
 	Name      string `json:"name"`
@@ -127,13 +128,20 @@ func (s *Server) launchAgent(ctx context.Context, req launchRequest, options lau
 		return sessionResponse{}, apiError(runtime.CodeInternal, "write identity: "+err.Error())
 	}
 
-	if _, err := s.registry.Launch(ctx, spec); err != nil {
+	handle, err := s.registry.Launch(ctx, spec)
+	if err != nil {
 		// Roll back identity + any partial rows + all registration artifacts.
 		_ = s.stateStore.DeleteRunning(agent.AgentID)
 		_ = s.stateStore.DeleteStatus(agent.AgentID)
 		_ = s.stateStore.DeleteAgent(agent.AgentID)
 		s.teardownAgentRegistration(agent.AgentID)
 		return sessionResponse{}, launchStartError(err)
+	}
+	agent.Fast = handle.Fast
+	if err := s.stateStore.WriteAgent(agent); err != nil {
+		_ = s.registry.Stop(ctx, agent.AgentID)
+		s.teardownAgentRegistration(agent.AgentID)
+		return sessionResponse{}, apiError(runtime.CodeInternal, "write applied session configuration: "+err.Error())
 	}
 
 	// Runtime inserted running + status rows during Start.
@@ -297,6 +305,12 @@ func (s *Server) composeLaunchWithOptions(ctx context.Context, req launchRequest
 	if ae != nil {
 		return runtime.LaunchSpec{}, state.Agent{}, ae
 	}
+	if err := config.ValidateModelFast(backend, model, req.Fast); err != nil {
+		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeInvalidField, err.Error())
+	}
+	if iface == "terminal" && req.Fast {
+		return runtime.LaunchSpec{}, state.Agent{}, apiError(runtime.CodeInvalidField, "fast mode is unavailable for terminal agents")
+	}
 
 	agentID := options.AgentID
 	if agentID == "" {
@@ -345,6 +359,7 @@ func (s *Server) composeLaunchWithOptions(ctx context.Context, req launchRequest
 		BackendType:  backend.Type,
 		ModelID:      acpModelID,
 		Effort:       resolvedEffort,
+		Fast:         req.Fast,
 		Driver:       driver,
 		Env:          composeChildEnv(backend.Type, s.configStore.Home(), backend.Env, model.Env, hookEnv, projectResourcesEnv(resourceDir)),
 		SkipPerms:    resolveSkip(s.cfg.SkipPermissions, role.SkipPermissions),

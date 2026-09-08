@@ -182,7 +182,7 @@ function TimelineAttempt({ data, attemptID, appended, current, attention }: { da
     <details open={expanded} onToggle={(event) => setExpanded(event.currentTarget.open)}>
       <summary>
         <span className="pipeline-stage-number">{item.attempt_no}</span>
-        <span className="pipeline-attempt-identity"><strong>{stage?.title ?? item.stage_id}</strong><small>Visit {item.visit_no} · {[item.backend, item.model, effort].filter(Boolean).join(" · ")}</small></span>
+        <span className="pipeline-attempt-identity"><strong>{stage?.title ?? item.stage_id}</strong><small>Visit {item.visit_no} · {[item.backend, item.model, effort, agents?.stage_agent?.fast ? "Fast mode" : "Normal speed"].filter(Boolean).join(" · ")}</small></span>
         <span className={`pipeline-state pipeline-state-${outcome}`}>{humanize(outcome)}</span>
         <span className="pipeline-disclosure-chevron" aria-hidden="true">⌄</span>
       </summary>

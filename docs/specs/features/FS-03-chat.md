@@ -1,6 +1,6 @@
 # FS-03 — Live chat & permission flow
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/runtime/` (`chat.go`, `permission.go`, `event.go`), `internal/server/sessions.go`, `internal/transcript/`, `ui/src/components/chat/`, `ui/src/store/transcriptStore.ts`, `ui/src/api/sse.ts` · **Journeys:** J3, J4, J7
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -190,7 +190,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   or a primer (FS-01.R13). A `no_change` (equal to current), rejected, or rolled-back switch
   (FS-01.R26) surfaces an actionable error and returns the picker to the agent's current runtime
   rather than presenting the unselected change as applied. **Effort's participation in this control
-  is superseded by R47 (planned):** effort leaves the staged picker and applies on selection. The
+  is superseded by R47:** effort leaves the staged picker and applies on selection. The
   backend and model behavior above is unchanged.
 - **R24.** When the agent is not running — a stopped or archived session viewed under
   FS-05 — the header shows the runtime identity as static text with no editable picker or Switch
@@ -202,7 +202,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   the projects home (`/`). An agent naming a project the catalog no longer has (deleted or archived)
   never sends Back to an unavailable/archived route; it returns to the projects home instead.
 
-- **R45. (planned)** For a running chat agent whose model declares fast-mode
+- **R45.** For a running chat agent whose model declares fast-mode
   capability (FS-09.R50), the header presents a fast-mode toggle showing the agent's current fast
   mode. The toggle is **not** part of the staged runtime picker in R23: it is presented separately,
   it never contributes to the difference that reveals **Switch**, and it is never sent in a switch
@@ -217,7 +217,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   adapters disagree, one naming the usage cost and the other not. It does not interrupt with a
   confirmation: the change is one activation, immediately reversible, and affects only the turns
   taken while it is on.
-- **R46. (planned)** The header states fast mode honestly in each case a person can
+- **R46.** The header states fast mode honestly in each case a person can
   reach. A model that declares no fast-mode capability shows no toggle at all. An agent that asked
   for fast mode at launch but whose live session did not offer it (FS-09.R55) shows fast mode off
   with the reason that this model does not offer it, so a request that was accepted at launch is
@@ -228,7 +228,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   AgentDeck does not yet consume the session update that reports this, so a suspended Claude agent
   still shows fast mode on. The pinned Codex adapter reports no fast-mode state back at all.
 
-- **R47. (planned)** **Supersedes R23's effort clause.** For a running chat agent the
+- **R47.** **Supersedes R23's effort clause.** For a running chat agent the
   header's effort select applies on selection rather than staging a change behind **Switch**. It
   reports its own outcome exactly as the fast-mode toggle does in R45 — in-flight while applying,
   the server's returned value as truth, and on failure a return to the agent's actual effort with an
@@ -538,7 +538,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   than three minutes and then approving it lets the stage continue rather than failing it.
   *Verify:* journey **J14** in `docs/features/USABILITY-REVIEW.md`.
 
-- **A28 (planned)** (R45) — For a running chat agent on a fast-declaring model the
+- **A28** (R45) — For a running chat agent on a fast-declaring model the
   header renders a fast-mode toggle; activating it applies without any further control, leaves the
   agent running with the same conversation and the same process, and confirms the new state; the
   agent's stored fast mode is the applied value afterwards; a rejected apply returns the toggle to
@@ -546,14 +546,14 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   the toggle never reveals **Switch** nor appears in a switch-runtime request body. *Verify by*
   `ChatPanel.test.tsx` and a server test asserting the applied value is persisted and that no
   process restart occurs.
-- **A30 (planned)** (R47) — Choosing an effort in the chat header applies it
+- **A30** (R47) — Choosing an effort in the chat header applies it
   without revealing or requiring **Switch**, leaves the agent running with the same process and
   conversation, and persists as the agent's effort; a rejected apply returns the select to the
   agent's actual effort with a visible error; changing backend or model still stages and still
   reveals **Switch**, and that switch request still carries effort. *Verify by* `ChatPanel.test.tsx`
   covering both groups, and a server test asserting the applied effort is persisted with no process
   restart.
-- **A29 (planned)** (R46) — A model declaring no fast-mode capability renders no
+- **A29** (R46) — A model declaring no fast-mode capability renders no
   toggle; an agent launched asking for fast mode whose session did not offer it renders fast mode
   off with the model-does-not-offer-it reason rather than on; and a stopped or archived chat agent
   renders its fast mode as static text with no toggle. *Verify by* `ChatPanel.test.tsx` and

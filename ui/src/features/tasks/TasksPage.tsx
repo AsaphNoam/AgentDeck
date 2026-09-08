@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Badge, Button, PageHeader, Surface } from "../../components/ui";
-import { useConfig, useProjects, useRoles } from "../../api/config";
+import { useBackends, useConfig, useProjects, useRoles } from "../../api/config";
 import {
   useCancelTask,
   useCreateTask,
@@ -183,6 +183,7 @@ function CreateTaskForm({ project }: { project: string }) {
   const create = useCreateTask(project);
   const { data: roles } = useRoles();
   const { data: config } = useConfig();
+  const { data: backends } = useBackends();
   const [name, setName] = useState("");
   const [instruction, setInstruction] = useState("");
   const [role, setRole] = useState("");
@@ -192,6 +193,7 @@ function CreateTaskForm({ project }: { project: string }) {
 	const [backend, setBackend] = useState("");
 	const [model, setModel] = useState("");
 	const [effort, setEffort] = useState("");
+	const [fast, setFast] = useState(false);
 	const [sourceID, setSourceID] = useState("");
 	const [sourceKind, setSourceKind] = useState<"task" | "pipeline_run">("task");
 	const [outcomes, setOutcomes] = useState("success");
@@ -204,6 +206,9 @@ function CreateTaskForm({ project }: { project: string }) {
   const roleNames = Object.keys(roles ?? {});
   const configuredRole = config?.default_role && roleNames.includes(config.default_role) ? config.default_role : "";
   const chosenRole = role || configuredRole || roleNames[0] || "";
+  const defaultBackendID = Object.entries(backends?.backends ?? {}).find(([, item]) => item.default)?.[0] ?? "";
+  const effectiveBackend = backends?.backends[backend || defaultBackendID];
+  const effectiveModel = effectiveBackend?.models[model || effectiveBackend.default_model];
 
   return (
     <Surface className="task-create" data-slot="create">
@@ -223,6 +228,7 @@ function CreateTaskForm({ project }: { project: string }) {
 			backend: targetKind === "launch" ? backend : undefined,
 			model: targetKind === "launch" ? model : undefined,
 			effort: targetKind === "launch" ? effort : undefined,
+			fast: targetKind === "launch" ? fast : undefined,
 			arms: [
 				...(sourceID.trim() ? [{ kind: "work_result" as const, source_kind: sourceKind, source_id: sourceID.trim(), satisfying_outcomes: outcomes.split(",").map((item) => item.trim()).filter(Boolean) }] : []),
 				...(signal.trim() ? [{ kind: "signal" as const, signal_name: signal.trim() }] : []),
@@ -253,9 +259,10 @@ function CreateTaskForm({ project }: { project: string }) {
             {roleNames.map((name) => <option key={name} value={name}>{name}</option>)}
           </select>
         </label>
-		<label>Backend (optional)<input value={backend} onChange={(e) => setBackend(e.target.value)} /></label>
-		<label>Model (optional)<input value={model} onChange={(e) => setModel(e.target.value)} /></label>
+		<label>Backend (optional)<input value={backend} onChange={(e) => { setBackend(e.target.value); setFast(false); }} /></label>
+		<label>Model (optional)<input value={model} onChange={(e) => { setModel(e.target.value); setFast(false); }} /></label>
 		<label>Effort (optional)<input value={effort} onChange={(e) => setEffort(e.target.value)} placeholder="a level the model declares" /></label>
+		{effectiveModel?.fast && <label><input type="checkbox" checked={fast} onChange={(e) => setFast(e.target.checked)} /> Fast mode — higher provider usage</label>}
 		</>}
 		<label>Wait for task or pipeline run (optional)<input value={sourceID} onChange={(e) => setSourceID(e.target.value)} placeholder="tk_… or pr_…" /></label>
 		<label>Prerequisite kind<select value={sourceKind} onChange={(e) => setSourceKind(e.target.value as "task" | "pipeline_run")}><option value="task">Task</option><option value="pipeline_run">Pipeline run</option></select></label>

@@ -104,6 +104,29 @@ export function VisualMatrix() {
         </Surface>
       </section>
 
+      <section className="visual-matrix-section">
+        <h2>Chat session configuration</h2>
+        <header className="chat-header" data-slot="header">
+          <Link to="/">Back</Link>
+          <div data-slot="identity">
+            <h1>Nova</h1>
+            <div className="chat-runtime-picker">
+              <fieldset className="chat-runtime-staged">
+                <legend>Runtime</legend>
+                <label className="form-field"><span>Backend</span><select defaultValue="codex"><option value="codex">Codex (codex)</option></select></label>
+                <label className="form-field"><span>Model</span><select defaultValue="gpt-5"><option value="gpt-5">GPT-5 (gpt-5)</option></select></label>
+              </fieldset>
+              <fieldset className="chat-session-settings">
+                <legend>Session settings</legend>
+                <label className="form-field"><span>Effort</span><select defaultValue="high"><option value="low">low</option><option value="high">high</option></select></label>
+                <label className="form-field"><span>Speed</span><span><input type="checkbox" defaultChecked /> Fast mode — higher provider usage</span></label>
+              </fieldset>
+            </div>
+          </div>
+          <div data-slot="context"><ContextBar value={0.34} /></div>
+        </header>
+      </section>
+
       <section className="visual-matrix-section" data-ui="dashboard">
         <h2>Dashboard states</h2>
         <div className="visual-matrix-agent-grid" data-slot="groups">

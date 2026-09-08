@@ -17,6 +17,7 @@ type SessionSnapshot struct {
 	Backend      string
 	Model        string
 	Effort       string
+	Fast         bool
 	Interface    string
 	Group        string
 	Cwd          string
@@ -54,11 +55,11 @@ func (s *Store) ReadSession(agentID string) (SessionSnapshot, error) {
 	var addDirsJSON string
 	var launchConfigJSON string
 	err := s.db.QueryRow(`
-SELECT agent_id, name, role, project, backend, model, effort, interface, grp, cwd, system_prompt,
+SELECT agent_id, name, role, project, backend, model, effort, fast, interface, grp, cwd, system_prompt,
        env_keys, skip_permissions, add_dirs, launch_config_json, last_session_id, last_seq, last_context_pct, created_at
 FROM sessions WHERE agent_id = ?`, agentID).Scan(
 		&snap.AgentID, &snap.Name, &snap.Role, &snap.Project,
-		&snap.Backend, &snap.Model, &snap.Effort, &snap.Interface, &snap.Group,
+		&snap.Backend, &snap.Model, &snap.Effort, &snap.Fast, &snap.Interface, &snap.Group,
 		&snap.Cwd, &snap.SystemPrompt, &envKeysJSON, &snap.SkipPermissions, &addDirsJSON, &launchConfigJSON,
 		&snap.LastSessionID, &snap.LastSeq, &snap.LastContextPct, &snap.CreatedAt,
 	)
@@ -82,7 +83,7 @@ FROM sessions WHERE agent_id = ?`, agentID).Scan(
 // filtered by role and/or project (empty = wildcard), ordered by updated_at DESC.
 func (s *Store) ListInactiveSessions(role, project string) ([]SessionSnapshot, error) {
 	q := `
-SELECT s.agent_id, s.name, s.role, s.project, s.backend, s.model, s.effort, s.interface, s.grp,
+SELECT s.agent_id, s.name, s.role, s.project, s.backend, s.model, s.effort, s.fast, s.interface, s.grp,
        s.cwd, s.system_prompt, s.env_keys, s.skip_permissions, s.add_dirs, s.launch_config_json,
        s.last_session_id, s.last_seq, s.last_context_pct, s.created_at
 FROM sessions s
@@ -110,7 +111,7 @@ WHERE r.agent_id IS NULL`
 		var envKeysJSON, addDirsJSON, launchConfigJSON string
 		if err := rows.Scan(
 			&snap.AgentID, &snap.Name, &snap.Role, &snap.Project,
-			&snap.Backend, &snap.Model, &snap.Effort, &snap.Interface, &snap.Group,
+			&snap.Backend, &snap.Model, &snap.Effort, &snap.Fast, &snap.Interface, &snap.Group,
 			&snap.Cwd, &snap.SystemPrompt, &envKeysJSON, &snap.SkipPermissions, &addDirsJSON, &launchConfigJSON,
 			&snap.LastSessionID, &snap.LastSeq, &snap.LastContextPct, &snap.CreatedAt,
 		); err != nil {

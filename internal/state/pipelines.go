@@ -645,13 +645,13 @@ func insertPipelineAttemptExec(exec pipelineAttemptExecer, attempt PipelineAttem
 	_, err := exec.Exec(`
 INSERT INTO pipeline_attempts(
   attempt_id, run_id, stage_id, attempt_no, visit_no, parent_attempt_id,
-  agent_id, agent_generation, backend, model, effort, state, assignment_text,
+  agent_id, agent_generation, backend, model, effort, fast, state, assignment_text,
   assignment_hash, assignment_version, report_outcome, report_summary,
   report_details, report_checks, report_outputs_json, reported_at,
   quiescent_at, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+) VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		attempt.AttemptID, attempt.RunID, attempt.StageID, attempt.AttemptNo, attempt.VisitNo, attempt.ParentAttemptID,
-		attempt.AgentID, attempt.AgentGeneration, attempt.Backend, attempt.Model, attempt.Effort, attempt.State, attempt.AssignmentText,
+		attempt.AgentID, attempt.AgentGeneration, attempt.Backend, attempt.Model, attempt.Effort, attempt.Fast, attempt.State, attempt.AssignmentText,
 		attempt.AssignmentHash, attempt.AssignmentVersion, attempt.ReportOutcome, attempt.ReportSummary,
 		attempt.ReportDetails, attempt.ReportChecks, string(attempt.ReportOutputs), nullableTime(attempt.ReportedAt),
 		nullableTime(attempt.QuiescentAt), formatTime(attempt.CreatedAt), formatTime(attempt.UpdatedAt),
@@ -911,7 +911,7 @@ func (s *Store) ReadPipelineAttempt(attemptID string) (PipelineAttemptRecord, er
 func readPipelineAttemptQuery(q pipelineRunQueryer, attemptID string) (PipelineAttemptRecord, error) {
 	row := q.QueryRow(`
 SELECT attempt_id, run_id, stage_id, attempt_no, visit_no, COALESCE(parent_attempt_id, ''),
-       agent_id, agent_generation, backend, model, effort, state, assignment_text,
+       agent_id, agent_generation, backend, model, effort, fast, state, assignment_text,
        assignment_hash, assignment_version, report_outcome, report_summary,
        report_details, report_checks, report_outputs_json, reported_at,
        quiescent_at, created_at, updated_at
@@ -972,7 +972,7 @@ func scanPipelineAttempt(row rowScanner) (PipelineAttemptRecord, error) {
 	var reportedAt, quiescentAt sql.NullString
 	err := row.Scan(
 		&attempt.AttemptID, &attempt.RunID, &attempt.StageID, &attempt.AttemptNo, &attempt.VisitNo, &attempt.ParentAttemptID,
-		&attempt.AgentID, &attempt.AgentGeneration, &attempt.Backend, &attempt.Model, &attempt.Effort, &attempt.State, &attempt.AssignmentText,
+		&attempt.AgentID, &attempt.AgentGeneration, &attempt.Backend, &attempt.Model, &attempt.Effort, &attempt.Fast, &attempt.State, &attempt.AssignmentText,
 		&attempt.AssignmentHash, &attempt.AssignmentVersion, &attempt.ReportOutcome, &attempt.ReportSummary,
 		&attempt.ReportDetails, &attempt.ReportChecks, &outputs, &reportedAt, &quiescentAt, &createdAt, &updatedAt,
 	)
@@ -1009,7 +1009,7 @@ func scanPipelineAttempt(row rowScanner) (PipelineAttemptRecord, error) {
 func (s *Store) ListPipelineAttempts(runID string) ([]PipelineAttemptRecord, error) {
 	rows, err := s.db.Query(`
 SELECT attempt_id, run_id, stage_id, attempt_no, visit_no, COALESCE(parent_attempt_id, ''),
-       agent_id, agent_generation, backend, model, effort, state, assignment_text,
+       agent_id, agent_generation, backend, model, effort, fast, state, assignment_text,
        assignment_hash, assignment_version, report_outcome, report_summary,
        report_details, report_checks, report_outputs_json, reported_at,
        quiescent_at, created_at, updated_at

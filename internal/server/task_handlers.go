@@ -37,6 +37,7 @@ type createTaskRequest struct {
 	Backend       string `json:"backend,omitempty"`
 	Model         string `json:"model,omitempty"`
 	Effort        string `json:"effort,omitempty"`
+	Fast          bool   `json:"fast"`
 
 	Arms        []createArmRequest        `json:"arms,omitempty"`
 	Attachments []createAttachmentRequest `json:"attachments,omitempty"`
@@ -141,7 +142,7 @@ func (s *Server) composeTask(req createTaskRequest) (state.Task, *runtime.APIErr
 		if agent.Archived {
 			return state.Task{}, apiError(runtime.CodeValidation, "target agent is archived")
 		}
-		if ae := rejectEffortOnExistingTarget(req.Effort); ae != nil {
+		if ae := rejectLiveSettingsOnExistingTarget(req.Effort, req.Fast); ae != nil {
 			return state.Task{}, ae
 		}
 		task.TargetAgentID = agent.AgentID
@@ -155,13 +156,13 @@ func (s *Server) composeTask(req createTaskRequest) (state.Task, *runtime.APIErr
 			s.log.Error("read task role", "role", req.Role, "err", err)
 			return state.Task{}, apiError(runtime.CodeInternal, "The task operation could not be completed.")
 		}
-		if ae := s.validateTaskLaunchSpec(req.Backend, req.Model, req.Effort); ae != nil {
+		if ae := s.validateTaskLaunchSpec(req.Backend, req.Model, req.Effort, req.Fast); ae != nil {
 			return state.Task{}, ae
 		}
 		// The requested effort is stored verbatim, not the level it resolves to
 		// today: it is FS-09.R41's explicit request, which must still beat a bound
 		// source's override whenever the task actually starts (FS-16.R27).
-		task.Role, task.Backend, task.Model, task.Effort = req.Role, req.Backend, req.Model, req.Effort
+		task.Role, task.Backend, task.Model, task.Effort, task.Fast = req.Role, req.Backend, req.Model, req.Effort, req.Fast
 	default:
 		return state.Task{}, apiError(runtime.CodeValidation, "target_kind must be agent or launch")
 	}
@@ -570,14 +571,20 @@ func (s *Server) rereadTask(task state.Task) state.Task {
 // The check is advisory by construction: the catalog stays editable while a task
 // sits armed, so the authoritative check remains the one inside launch
 // composition, which cannot be bypassed.
-func (s *Server) validateTaskLaunchSpec(backendID, modelID, effort string) *runtime.APIError {
+func (s *Server) validateTaskLaunchSpec(backendID, modelID, effort string, fast bool) *runtime.APIError {
 	backends, err := s.readBackendsOrDefault()
 	if err != nil {
 		s.log.Error("read backends for task launch spec", "err", err)
 		return apiError(runtime.CodeInternal, "The task operation could not be completed.")
 	}
-	_, _, ae := resolveLaunchSpec(backends, backendID, modelID, effort)
-	return ae
+	target, _, ae := resolveLaunchSpec(backends, backendID, modelID, effort)
+	if ae != nil {
+		return ae
+	}
+	if err := config.ValidateModelFast(target.Backend, target.Model, fast); err != nil {
+		return apiError(runtime.CodeInvalidField, err.Error())
+	}
+	return nil
 }
 
 // taskSpecToolError maps a launch-specification refusal onto the agent-facing
@@ -595,11 +602,14 @@ func taskSpecToolError(ae *runtime.APIError) error {
 // agent target. That agent is already running at the level frozen into its
 // session and this plane adds no way to change it mid-task, so the request is
 // rejected rather than silently dropped (FS-16.R27, R20).
-func rejectEffortOnExistingTarget(effort string) *runtime.APIError {
-	if strings.TrimSpace(effort) == "" {
-		return nil
+func rejectLiveSettingsOnExistingTarget(effort string, fast bool) *runtime.APIError {
+	if strings.TrimSpace(effort) != "" {
+		return apiError(runtime.CodeValidation, "effort applies only to a launch target; the target agent already runs at its session's level")
 	}
-	return apiError(runtime.CodeValidation, "effort applies only to a launch target; the target agent already runs at its session's level")
+	if fast {
+		return apiError(runtime.CodeValidation, "fast mode applies only to a launch target; the target agent already runs at its session's setting")
+	}
+	return nil
 }
 
 // CreateAgentTask creates a task on behalf of a token-bound agent (FS-16.R12,
@@ -632,7 +642,7 @@ func (s *Server) CreateAgentTask(req messaging.AgentTaskRequest) (state.Task, er
 		if agent.Project != req.Project || agent.Interface != "chat" || agent.Archived {
 			return state.Task{}, &messaging.ToolError{Code: "target_ineligible", Message: "that agent cannot be assigned work"}
 		}
-		if ae := rejectEffortOnExistingTarget(req.Effort); ae != nil {
+		if ae := rejectLiveSettingsOnExistingTarget(req.Effort, req.Fast); ae != nil {
 			return state.Task{}, &messaging.ToolError{Code: "validation", Message: ae.Message}
 		}
 		task.TargetKind, task.TargetAgentID = state.TargetAgent, agent.AgentID
@@ -644,11 +654,12 @@ func (s *Server) CreateAgentTask(req messaging.AgentTaskRequest) (state.Task, er
 		if _, err := s.configStore.ReadRole(role); err != nil {
 			return state.Task{}, &messaging.ToolError{Code: "validation", Message: "unknown role: " + role}
 		}
-		if ae := s.validateTaskLaunchSpec(req.Backend, req.Model, req.Effort); ae != nil {
+		if ae := s.validateTaskLaunchSpec(req.Backend, req.Model, req.Effort, req.Fast); ae != nil {
 			return state.Task{}, taskSpecToolError(ae)
 		}
 		task.TargetKind, task.Role, task.Backend, task.Model = state.TargetLaunch, role, req.Backend, req.Model
 		task.Effort = req.Effort
+		task.Fast = req.Fast
 	}
 	if len(req.Attachments) > maxTaskAttachments {
 		return state.Task{}, &messaging.ToolError{Code: "validation", Message: "too many attachments"}

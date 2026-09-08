@@ -408,4 +408,15 @@ ALTER TABLE tasks ADD COLUMN effort TEXT NOT NULL DEFAULT '';
 ALTER TABLE pipeline_proposals ADD COLUMN declined_at TEXT NOT NULL DEFAULT '';
 `,
 	},
+	{
+		// Chat session configuration separates requested fast mode on durable work
+		// from the applied value recorded on agent/session identity.
+		version: 23,
+		sql: `
+ALTER TABLE agents ADD COLUMN fast INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE sessions ADD COLUMN fast INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE pipeline_attempts ADD COLUMN fast INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE tasks ADD COLUMN fast INTEGER NOT NULL DEFAULT 0;
+`,
+	},
 }

@@ -147,7 +147,7 @@ bracketed provider model string each name their field and reason rather than ret
 (INV §8 — the class the onboarding `HTTP 400` findings came from). No new route is added, so every
 path continues to inherit the `localOnly` guard unchanged (INV §14).
 
-**R37 `(planned)` — Fast mode is an optional field on existing routes plus exactly one
+**R37 — Fast mode is an optional field on existing routes plus exactly one
 new action route.** `POST /api/sessions` accepts an optional boolean `fast` alongside
 `backend`/`model`/`effort`; omitting it preserves today's request and response bytes exactly, so no
 existing client changes. `POST /api/sessions/{id}/switch-runtime` does **not** accept it and ignores

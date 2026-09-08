@@ -1,6 +1,6 @@
 # TS-10 — Work dependency control plane
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/state`, `internal/server`, `internal/messaging`, `ui/src/features/tasks`
 **Absorbed:** —
 
@@ -231,7 +231,7 @@ parallel copy of them.
   check is advisory by construction: it runs against the catalog as it is at creation, and the
   authoritative check remains the one inside launch composition, which cannot be bypassed.
 
-- **R24 `(planned)`** — **A task's fast mode rides the same composer seam, and its
+- **R24** — **A task's fast mode rides the same composer seam, and its
   two-point check is capability-only.** The stored fast mode reaches the provider by setting the
   existing launch request's `Fast` on the call the dispatcher already makes, so `resolveFast` and the
   `internal/config` fast-capability validator stay the only precedence and validation code and this

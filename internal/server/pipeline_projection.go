@@ -27,6 +27,7 @@ type pipelineAgentSummary struct {
 	Preview   string `json:"preview"`
 	Route     string `json:"route"`
 	Available bool   `json:"available"`
+	Fast      bool   `json:"fast"`
 }
 
 type pipelineDelegatedAgent struct {
@@ -121,6 +122,7 @@ func pipelineAgentCard(snapshot state.PipelineAgentSnapshot, agentID, fallbackNa
 		return summary
 	}
 	summary.Running = snapshot.Running
+	summary.Fast = snapshot.Fast
 	summary.State = snapshot.State
 	if summary.State == "" {
 		summary.State = "unknown"

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import * as Tabs from "@radix-ui/react-tabs";
-import { switchRuntime } from "../../api/client";
+import { setSessionConfig, switchRuntime } from "../../api/client";
 import { useBackends, useProjects } from "../../api/config";
 import type { AgentState } from "../../api/types";
 import { sseClient } from "../../api/sse";
@@ -50,6 +50,8 @@ export function ChatPanel() {
   const [runtime, setRuntime] = useState<RuntimeSelection>(() => agent ? runtimeSelection(agent) : { backend: "", model: "", effort: "" });
   const [switchError, setSwitchError] = useState<string | null>(null);
   const [switching, setSwitching] = useState(false);
+  const [applyingSetting, setApplyingSetting] = useState<"effort" | "fast" | null>(null);
+  const [liveFast, setLiveFast] = useState(agent?.fast ?? false);
 
   // The agent often isn't in the store yet at mount (it hydrates over SSE), so
   // the useState initializer above can't see its interface. Once it loads, apply
@@ -69,8 +71,9 @@ export function ChatPanel() {
   useEffect(() => {
     if (!agent) return;
     setRuntime(runtimeSelection(agent));
+    setLiveFast(agent.fast ?? false);
     setSwitchError(null);
-  }, [agent?.backend, agent?.model, agent?.effort]);
+  }, [agent?.backend, agent?.model, agent?.effort, agent?.fast]);
 
   useEffect(() => {
     return sseClient.registerOpenAgent(id);
@@ -125,9 +128,28 @@ export function ChatPanel() {
   const selectedBackend = backends?.backends[runtime.backend];
   const selectedModel = selectedBackend?.models[runtime.model];
   const currentRuntime = runtimeSelection(agent);
-  const runtimeChanged = runtime.backend !== currentRuntime.backend || runtime.model !== currentRuntime.model || runtime.effort !== currentRuntime.effort;
+  const runtimeChanged = runtime.backend !== currentRuntime.backend || runtime.model !== currentRuntime.model;
   const runtimeListed = !!selectedBackend && !!selectedModel;
   const editableRuntime = agent.running && agent.interface === "chat";
+  const currentModel = backends?.backends[agent.backend]?.models[agent.model];
+  const stagedRuntime = runtime.backend !== agent.backend || runtime.model !== agent.model;
+
+  const applySetting = async (body: { effort?: string; fast?: boolean }, kind: "effort" | "fast") => {
+    if (applyingSetting) return;
+    setApplyingSetting(kind);
+    setSwitchError(null);
+    try {
+      const applied = await setSessionConfig(agent.agent_id, body);
+      if (kind === "effort" && applied.effort !== undefined) setRuntime((current) => ({ ...current, effort: applied.effort ?? "" }));
+      if (kind === "fast") setLiveFast(applied.fast);
+    } catch (error) {
+      setRuntime(currentRuntime);
+      setLiveFast(agent.fast);
+      setSwitchError(runtimeErrorMessage(error));
+    } finally {
+      setApplyingSetting(null);
+    }
+  };
 
   const submitRuntimeSwitch = async () => {
     if (!runtimeChanged || !runtimeListed || switching) return;
@@ -151,6 +173,8 @@ export function ChatPanel() {
           <h1>{agent.name}</h1>
           {editableRuntime ? (
             <div className="chat-runtime-picker">
+              <fieldset className="chat-runtime-staged">
+                <legend>Runtime</legend>
               <div className="form-field">
                 <label htmlFor="chat-runtime-backend">Backend</label>
                 <select id="chat-runtime-backend" value={runtime.backend} disabled={!backends || switching} onChange={(event) => setRuntime(resetRuntimeForBackend(backends, event.target.value))}>
@@ -165,19 +189,29 @@ export function ChatPanel() {
                   {Object.entries(selectedBackend?.models ?? {}).map(([id, model]) => <option key={id} value={id}>{model.name} ({id})</option>)}
                 </select>
               </div>
+              {runtimeChanged && <button className="chat-runtime-switch" type="button" disabled={!runtimeListed || switching} onClick={() => void submitRuntimeSwitch()}>{switching ? "Switching…" : "Switch"}</button>}
+              </fieldset>
+              <fieldset className="chat-session-settings">
+                <legend>Session settings</legend>
               {(selectedModel?.efforts ?? []).length > 0 && (
                 <div className="form-field">
                   <label htmlFor="chat-runtime-effort">Effort</label>
-                  <select id="chat-runtime-effort" value={runtime.effort} disabled={switching} onChange={(event) => setRuntime((current) => ({ ...current, effort: event.target.value }))}>
+                  <select id="chat-runtime-effort" value={runtime.effort} disabled={switching || !!applyingSetting} onChange={(event) => stagedRuntime ? setRuntime((current) => ({ ...current, effort: event.target.value })) : void applySetting({ effort: event.target.value }, "effort")}>
                     {selectedModel!.efforts!.map((effort) => <option key={effort} value={effort}>{effort}</option>)}
                   </select>
                 </div>
               )}
-              {runtimeChanged && <button className="chat-runtime-switch" type="button" disabled={!runtimeListed || switching} onClick={() => void submitRuntimeSwitch()}>{switching ? "Switching…" : "Switch"}</button>}
+              {currentModel?.fast && (
+                <label className="form-field">
+                  <span>Speed</span>
+                  <span><input type="checkbox" checked={liveFast} disabled={switching || !!applyingSetting || stagedRuntime} onChange={(event) => void applySetting({ fast: event.target.checked }, "fast")} /> {applyingSetting === "fast" ? "Applying…" : "Fast mode — higher provider usage"}</span>
+                </label>
+              )}
+              </fieldset>
               {switchError && <p className="form-error" role="alert">{switchError}</p>}
             </div>
           ) : (
-            <span>{[agent.backend, agent.model, agent.effort].filter(Boolean).join(" · ")}</span>
+            <><span>{[agent.backend, agent.model, agent.effort].filter(Boolean).join(" · ")}</span><span>{agent.fast ? "Fast mode" : "Normal speed"}</span></>
           )}
         </div>
         <div data-slot="context"><ContextBar value={agent.context_pct} /></div>

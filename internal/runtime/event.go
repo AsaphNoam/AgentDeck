@@ -189,6 +189,7 @@ type SessionMetaData struct {
 	Backend         string   `json:"backend"`
 	Model           string   `json:"model"`
 	Effort          string   `json:"effort"`
+	Fast            bool     `json:"fast"`
 	Interface       string   `json:"interface"`
 	Group           string   `json:"group,omitempty"`
 	Cwd             string   `json:"cwd"`

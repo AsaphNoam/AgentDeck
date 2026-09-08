@@ -43,6 +43,26 @@
   margin-top: var(--ad-space-2);
 }
 
+.chat-runtime-staged,
+.chat-session-settings {
+  align-items: end;
+  border: var(--ad-border-thin) solid var(--ad-border-strong);
+  border-radius: var(--ad-radius-small);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-2);
+  margin: 0;
+  padding: var(--ad-space-2);
+}
+
+.chat-runtime-staged legend,
+.chat-session-settings legend {
+  color: var(--ad-text-muted);
+  font-family: var(--ad-font-mono);
+  font-size: 0.68rem;
+  padding: 0 var(--ad-space-1);
+}
+
 .chat-runtime-picker .form-field {
   min-width: 8rem;
 }

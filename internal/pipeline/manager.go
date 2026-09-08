@@ -85,7 +85,7 @@ func (m *Manager) Start(ctx context.Context, request StartRequest) (RunDetail, b
 	assignment := request.Assignments[first.ID]
 	attempt := &state.PipelineAttemptRecord{
 		AttemptID: attemptID, RunID: runID, StageID: first.ID, AttemptNo: 1, VisitNo: 1,
-		AgentID: agentID, AgentGeneration: attemptID, Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort,
+		AgentID: agentID, AgentGeneration: attemptID, Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort, Fast: assignment.Fast,
 		State: "queued", AssignmentText: assignmentText, AssignmentHash: assignmentHash,
 		AssignmentVersion: assignmentVersion, ReportOutputs: json.RawMessage(`{}`), CreatedAt: now, UpdatedAt: now,
 	}
@@ -218,7 +218,7 @@ func (m *Manager) validateStart(ctx context.Context, request *StartRequest) (Tem
 			continue
 		}
 		if m.lifecycle != nil {
-			if err := m.lifecycle.ValidateStage(ctx, StageExecution{StageID: stage.ID, StageTitle: stage.Title, Role: stage.Role, Project: request.Project, Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort}); err != nil {
+			if err := m.lifecycle.ValidateStage(ctx, StageExecution{StageID: stage.ID, StageTitle: stage.Title, Role: stage.Role, Project: request.Project, Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort, Fast: assignment.Fast}); err != nil {
 				add("assignments."+stage.ID, "unavailable", err.Error())
 			}
 		}

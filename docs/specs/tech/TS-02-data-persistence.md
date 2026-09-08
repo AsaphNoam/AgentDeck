@@ -1,6 +1,6 @@
 # TS-02 — Data & persistence
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/config`, `internal/state`, `internal/transcript`, `internal/index`, `internal/archive`, `internal/configsource`, `internal/contextref`
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -124,7 +124,7 @@ Every pipeline attempt likewise stores `effort TEXT NOT NULL DEFAULT ''` beside 
 continuation and recovery execute that attempt's frozen identity rather than re-reading a run
 assignment. Empty retains the same "none resolved" meaning for existing attempts.
 
-**R30 `(planned)` — Fast mode is an additive catalog field stored as two distinct
+**R30 — Fast mode is an additive catalog field stored as two distinct
 things: what was asked for, and what ran.** `backends.json` stays **version 2**: `fast` is an
 optional per-model boolean and the decoder ignores unknown keys, so a catalog written by a newer
 build still loads in an older one, which simply offers no fast mode — FS-09.R54's documented

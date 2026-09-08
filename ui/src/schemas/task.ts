@@ -46,6 +46,7 @@ export const taskSchema = z.object({
   backend: z.string().optional().default(""),
   model: z.string().optional().default(""),
   effort: z.string().optional().default(""),
+  fast: z.boolean().optional().default(false),
   state: z.enum(TASK_STATES),
   outcome: z.string().optional().default(""),
   outcome_source: z.string().optional().default(""),

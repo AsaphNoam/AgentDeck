@@ -1,6 +1,6 @@
 # FS-14 — Configurable pipeline runs
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/pipeline`, `internal/config`, `internal/state`, `internal/server`, `internal/messaging`, `internal/cli`, `ui/src/features/pipelines` · **Journeys:** J14
 **Absorbed:** —
 
@@ -41,7 +41,7 @@ feature are recorded in §6.
   for the same reason backend and model do — it is a run-time assignment, not stage semantics — and
   each stage's resolved effort is frozen into the run snapshot and shown in run supervision beside
   its effective backend and model.
-- **R59. (planned)** Run setup also assigns an optional fast mode to each stage,
+- **R59.** Run setup also assigns an optional fast mode to each stage,
   alongside that stage's backend, model, and effort and under the same rules
   (FS-09.R50/R54/R55): the control appears only for a stage whose assigned model declares fast-mode
   capability, and requesting fast mode for a stage whose model declares none prevents the run from
@@ -702,7 +702,7 @@ feature are recorded in §6.
   ordinary stop that release uses leaving the run paused and retryable, and
   `ui/src/components/grid/CardGrid.test.tsx` for the sections it produces.
 
-- **A34 (planned)** (R59) — Run setup offers a fast-mode control only for a stage
+- **A34** (R59) — Run setup offers a fast-mode control only for a stage
   whose assigned model declares fast-mode capability; a run started with per-stage fast modes
   launches each stage agent requesting its assignment; a fast mode assigned to a stage whose model
   declares none keeps the dialog open with the named field and starts no run; and run supervision

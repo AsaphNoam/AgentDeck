@@ -159,6 +159,7 @@ type AgentTaskRequest struct {
 	Backend       string
 	Model         string
 	Effort        string
+	Fast          bool
 	Arms          []state.TaskArm
 	Attachments   []state.TaskAttachment
 }
@@ -194,6 +195,7 @@ type createTaskArgs struct {
 	Backend string           `json:"backend,omitempty" jsonschema:"optional backend for a new agent"`
 	Model   string           `json:"model,omitempty" jsonschema:"optional model for a new agent"`
 	Effort  string           `json:"effort,omitempty" jsonschema:"optional reasoning effort for a new agent; must be a level the chosen model declares"`
+	Fast    bool             `json:"fast,omitempty" jsonschema:"request fast mode for a new agent; the chosen model must declare it"`
 	Arms    []createArmInput `json:"arms,omitempty" jsonschema:"prerequisites that must all be satisfied before this starts"`
 	// Attachments are context_ref_ids you can already read; the assignee reads
 	// them through its own assignment, not through a share to it.
@@ -235,7 +237,7 @@ func (s *Server) handleCreateTask(_ context.Context, req *mcp.CallToolRequest, i
 	request := AgentTaskRequest{
 		CreatorAgentID: creator.AgentID, CreatorGeneration: identity.Generation,
 		Project: creator.Project, DisplayName: input.DisplayName, Instruction: input.Instruction,
-		Role: input.Role, Backend: input.Backend, Model: input.Model, Effort: input.Effort,
+		Role: input.Role, Backend: input.Backend, Model: input.Model, Effort: input.Effort, Fast: input.Fast,
 	}
 	if strings.TrimSpace(input.To) != "" {
 		addressable, err := s.addressableAgents()

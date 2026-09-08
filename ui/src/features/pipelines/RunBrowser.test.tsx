@@ -305,10 +305,10 @@ describe("looping timeline", () => {
       .toEqual(["Work", "Review", "Work", "Review"]);
     expect(entries.map((entry) => entry.querySelector("small")?.textContent))
       .toEqual([
-        "Visit 1 · codex · gpt-5.6-sol",
-        "Visit 1 · codex · gpt-5.6-sol",
-        "Visit 2 · codex · gpt-5.6-sol",
-        "Visit 2 · codex · gpt-5.6-sol",
+        "Visit 1 · codex · gpt-5.6-sol · Normal speed",
+        "Visit 1 · codex · gpt-5.6-sol · Normal speed",
+        "Visit 2 · codex · gpt-5.6-sol · Normal speed",
+        "Visit 2 · codex · gpt-5.6-sol · Normal speed",
       ]);
     expect(entries.slice(0, 3).map((entry) => entry.querySelector(".pipeline-state")?.textContent))
       .toEqual(["success", "failure", "success"]);

@@ -238,6 +238,18 @@ func (r *Registry) SendPrompt(ctx context.Context, agentID, text string) error {
 	return rt.SendPrompt(ctx, agentID, text)
 }
 
+func (r *Registry) SetSessionConfig(ctx context.Context, agentID string, effort *string, fast *bool) (string, bool, error) {
+	rt, err := r.ownerFor(agentID)
+	if err != nil {
+		return "", false, err
+	}
+	chat, ok := rt.(*ChatRuntime)
+	if !ok {
+		return "", false, ErrNotImplemented
+	}
+	return chat.SetSessionConfig(ctx, agentID, effort, fast)
+}
+
 // AppendAnnotation dispatches a structured dashboard annotation through the
 // live chat runtime. Terminal runtimes are intentionally excluded.
 func (r *Registry) AppendAnnotation(agentID string, data AnnotationData) (Event, error) {

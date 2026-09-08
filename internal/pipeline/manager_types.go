@@ -11,6 +11,7 @@ type RuntimeAssignment struct {
 	Backend string `json:"backend"`
 	Model   string `json:"model"`
 	Effort  string `json:"effort"`
+	Fast    bool   `json:"fast"`
 }
 
 type StartRequest struct {
@@ -34,6 +35,7 @@ type StageExecution struct {
 	Backend    string
 	Model      string
 	Effort     string
+	Fast       bool
 	AgentID    string
 	Generation string
 	AgentName  string

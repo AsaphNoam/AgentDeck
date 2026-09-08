@@ -89,6 +89,7 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/sessions/{id}/archive", s.handleArchiveAgentAction)
 	api("POST /api/sessions/{id}/restore", s.handleRestoreAgentAction)
 	api("POST /api/sessions/{id}/switch-runtime", s.handleSwitchRuntime)
+	api("POST /api/sessions/{id}/session-config", s.handleSessionConfig)
 	api("GET /api/sessions/{id}/files", s.handleFiles)
 	api("GET /api/sessions/{id}/commands", s.handleCommands)
 	api("GET /api/sessions/{id}/file-search", s.handleFileSearch)

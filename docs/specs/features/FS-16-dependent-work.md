@@ -1,6 +1,6 @@
 # FS-16 — Dependent work and armed starts
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/state`, `internal/server`, `internal/messaging`, `ui/src/features/tasks` · **Journeys:** —
 **Absorbed:** —
 
@@ -207,7 +207,7 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   into its session, so naming both an existing target and an effort is rejected under R20 rather
   than silently dropped. This adds no way to change an agent's effort mid-task and no effort field
   on an arm or an attachment.
-- **R29 (planned)** — **A launch specification names its fast mode.** The
+- **R29** — **A launch specification names its fast mode.** The
   launch specification a task targets (R2) also carries an optional fast mode, under the same rules
   R27 gives effort: both authoring surfaces accept it, it is chosen once at creation and stored on
   the durable task row, it is not editable afterwards, and it is rejected under R20 when the task
@@ -445,7 +445,7 @@ Each names the verification that demonstrates it.
   HTTP, and task-dispatch tests, plus a Tasks-view test that the effort field round trips through
   create.
 
-- **A19 (planned)** (R29) — A launch-spec task created with fast mode on a
+- **A19** (R29) — A launch-spec task created with fast mode on a
   declaring model launches its agent with fast mode requested, asserted on the composed launch spec;
   fast mode on a model that declares no capability is rejected at creation with a typed field-named
   error that creates no task, over both `create_task` and `POST /api/tasks`, and again at admission

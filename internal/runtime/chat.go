@@ -175,16 +175,18 @@ func (c *ChatRuntime) SetPersistence(home string, open TranscriptOpener, ix Pers
 
 // agentState is the live, in-memory state for one running agent.
 type agentState struct {
-	agentID    string
-	generation string
-	cmd        *exec.Cmd
-	pgid       int
-	sessionID  string
-	transport  *Transport
-	hub        *Hub
-	stdin      interface{ Close() error }
-	stderr     *ringBuffer
-	stderrDone chan struct{}
+	agentID       string
+	generation    string
+	cmd           *exec.Cmd
+	pgid          int
+	sessionID     string
+	transport     *Transport
+	adapter       backend.BackendAdapter
+	configOptions map[string]struct{}
+	hub           *Hub
+	stdin         interface{ Close() error }
+	stderr        *ringBuffer
+	stderrDone    chan struct{}
 
 	ctx    context.Context // turn-scoped base context, cancelled on Stop
 	cancel context.CancelFunc
@@ -270,6 +272,7 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 		toolNames:        map[string]string{},
 		pending:          map[string]*pendingPerm{},
 		resolved:         map[string]struct{}{},
+		adapter:          ad,
 	}
 	as.transport = NewTransport(stdin,
 		func(method string, params json.RawMessage) { c.onNotification(as, method, params) },
@@ -309,10 +312,13 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 		return nil, fmt.Errorf("runtime: session/new returned no sessionId")
 	}
 	as.sessionID = sess.SessionID
-	if err := applyPostSessionEffort(ctx, as.transport, ad, spec, sess.SessionID); err != nil {
+	as.configOptions = decodeSessionConfigOptions(newRes)
+	appliedFast, err := applySessionConfig(ctx, as.transport, ad, spec, sess.SessionID, as.configOptions)
+	if err != nil {
 		as.shutdown()
 		return nil, err
 	}
+	spec.Agent.Fast = appliedFast
 	if err := c.openPersistence(as, spec, sess.SessionID); err != nil {
 		as.shutdown()
 		return nil, err
@@ -340,7 +346,7 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 	c.agents[as.agentID] = as
 	c.mu.Unlock()
 
-	return &Handle{AgentID: as.agentID, Pid: pgid, SessionID: sess.SessionID}, nil
+	return &Handle{AgentID: as.agentID, Pid: pgid, SessionID: sess.SessionID, Fast: appliedFast}, nil
 }
 
 func (c *ChatRuntime) SendPrompt(ctx context.Context, agentID, text string) error {
@@ -583,6 +589,7 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 		pending:          map[string]*pendingPerm{},
 		resolved:         map[string]struct{}{},
 		contextPct:       spec.LastContextPct,
+		adapter:          ad,
 	}
 	as.transport = NewTransport(stdin,
 		func(method string, params json.RawMessage) { c.onNotification(as, method, params) },
@@ -618,6 +625,7 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 	// messaging MCP server Phase 5 depends on.
 	resolvedSessionID := ""
 	loaded := false
+	configOptions := map[string]struct{}{}
 	if sessionID != "" {
 		loadRes, loadErr := c.startupCall(ctx, as.transport, "session/load", sessionLoadParams(spec, sessionID))
 		switch {
@@ -630,6 +638,7 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 			// conversation history (the resume-history defect). Only a non-empty
 			// echoed id overrides the request.
 			loaded = true
+			configOptions = decodeSessionConfigOptions(loadRes)
 			resolvedSessionID = sessionID
 			var res struct {
 				SessionID string `json:"sessionId"`
@@ -660,12 +669,16 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 			return nil, fmt.Errorf("runtime: session/new returned no sessionId")
 		}
 		resolvedSessionID = sess.SessionID
+		configOptions = decodeSessionConfigOptions(newRes)
 	}
 	as.sessionID = resolvedSessionID
-	if err := applyPostSessionEffort(ctx, as.transport, ad, spec, resolvedSessionID); err != nil {
+	as.configOptions = configOptions
+	appliedFast, err := applySessionConfig(ctx, as.transport, ad, spec, resolvedSessionID, configOptions)
+	if err != nil {
 		as.shutdown()
 		return nil, err
 	}
+	spec.Agent.Fast = appliedFast
 
 	// Re-open the existing transcript in append mode (Open skips seq:0 meta for existing files).
 	if err := c.openPersistence(as, spec, resolvedSessionID); err != nil {
@@ -702,7 +715,7 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 	c.agents[as.agentID] = as
 	c.mu.Unlock()
 
-	return &Handle{AgentID: as.agentID, Pid: pgid, SessionID: resolvedSessionID}, nil
+	return &Handle{AgentID: as.agentID, Pid: pgid, SessionID: resolvedSessionID, Fast: appliedFast}, nil
 }
 
 func copyStringSet(source map[string]struct{}) map[string]struct{} {
@@ -811,6 +824,51 @@ func (c *ChatRuntime) lookup(agentID string) (*agentState, error) {
 		return nil, ErrNoHandle
 	}
 	return as, nil
+}
+
+func (c *ChatRuntime) SetSessionConfig(ctx context.Context, agentID string, effort *string, fast *bool) (string, bool, error) {
+	as, err := c.lookup(agentID)
+	if err != nil {
+		return "", false, err
+	}
+	as.mu.Lock()
+	defer as.mu.Unlock()
+	_, effortID, fastID := as.adapter.SessionConfigIDs()
+	apply := func(id, value, label string) error {
+		if id == "" {
+			return fmt.Errorf("runtime: %s is unsupported", label)
+		}
+		if _, ok := as.configOptions[id]; !ok {
+			return fmt.Errorf("runtime: %s option is not available", label)
+		}
+		if _, err := as.transport.Call(ctx, "session/set_config_option", map[string]any{
+			"sessionId": as.sessionID, "configId": id, "value": value,
+		}); err != nil {
+			return fmt.Errorf("runtime: apply %s: %w", label, err)
+		}
+		return nil
+	}
+	appliedEffort := ""
+	if effort != nil {
+		if err := apply(effortID, *effort, "effort"); err != nil {
+			return "", false, err
+		}
+		appliedEffort = *effort
+	}
+	appliedFast := false
+	if fast != nil {
+		if _, ok := as.configOptions[fastID]; ok && fastID != "" {
+			value := "off"
+			if *fast {
+				value = "on"
+			}
+			if err := apply(fastID, value, "fast mode"); err != nil {
+				return "", false, err
+			}
+			appliedFast = *fast
+		}
+	}
+	return appliedEffort, appliedFast, nil
 }
 
 func (c *ChatRuntime) lookupByPID(pid int) (*agentState, error) {
@@ -1125,6 +1183,7 @@ func runtimeMeta(spec LaunchSpec, sessionID string) SessionMetaData {
 		Backend:         spec.Agent.Backend,
 		Model:           spec.Agent.Model,
 		Effort:          spec.Effort,
+		Fast:            spec.Agent.Fast,
 		Interface:       spec.Agent.Interface,
 		Group:           spec.Agent.Group,
 		Cwd:             spec.Cwd,
@@ -1552,6 +1611,9 @@ func sessionLoadParams(spec LaunchSpec, sessionID string) map[string]any {
 }
 
 func deliveredModelID(spec LaunchSpec) string {
+	if spec.BackendType == "codex-acp" {
+		return ""
+	}
 	model := spec.ModelID
 	if model == "" || spec.Effort == "" {
 		return model
@@ -1564,25 +1626,46 @@ func deliveredModelID(spec LaunchSpec) string {
 	return model
 }
 
-// applyPostSessionEffort configures Claude after the native session exists. A
-// failed request is a launch failure: callers shut down before registering a
-// running agent, keeping the generation-scoped teardown path authoritative.
-func applyPostSessionEffort(ctx context.Context, transport *Transport, ad backend.BackendAdapter, spec LaunchSpec, sessionID string) error {
-	if spec.Effort == "" {
+func applySessionConfig(ctx context.Context, transport *Transport, ad backend.BackendAdapter, spec LaunchSpec, sessionID string, advertised map[string]struct{}) (bool, error) {
+	modelID, effortID, fastID := ad.SessionConfigIDs()
+	apply := func(id, value, label string) error {
+		if id == "" {
+			return nil
+		}
+		if _, ok := advertised[id]; !ok {
+			return fmt.Errorf("runtime: %s option is not available", label)
+		}
+		if _, err := transport.Call(ctx, "session/set_config_option", map[string]any{"sessionId": sessionID, "configId": id, "value": value}); err != nil {
+			return fmt.Errorf("runtime: apply %s: %w", label, err)
+		}
 		return nil
 	}
-	mode, optionID := ad.EffortDelivery(spec.Agent.Interface)
-	if mode != backend.EffortPostSession {
-		return nil
+	if spec.BackendType == "codex-acp" && spec.ModelID != "" {
+		if err := apply(modelID, spec.ModelID, "model"); err != nil {
+			return false, err
+		}
 	}
-	if _, err := transport.Call(ctx, "session/set_config_option", map[string]any{
-		"sessionId": sessionID,
-		"configId":  optionID,
-		"value":     spec.Effort,
-	}); err != nil {
-		return fmt.Errorf("runtime: apply effort: %w", err)
+	if spec.Effort != "" {
+		mode, _ := ad.EffortDelivery(spec.Agent.Interface)
+		if mode == backend.EffortPostSession {
+			if err := apply(effortID, spec.Effort, "effort"); err != nil {
+				return false, err
+			}
+		}
 	}
-	return nil
+	if !spec.Fast {
+		return false, nil
+	}
+	if fastID == "" {
+		return false, nil
+	}
+	if _, ok := advertised[fastID]; !ok {
+		return false, nil
+	}
+	if err := apply(fastID, "on", "fast mode"); err != nil {
+		return false, nil
+	}
+	return true, nil
 }
 
 func mcpServerParam(m MCPServerSpec) map[string]any {

@@ -41,6 +41,7 @@ type LaunchSpec struct {
 	BackendType               string // "claude-acp" | "codex-acp"
 	ModelID                   string // provider model id, e.g. "claude-sonnet-4-6"
 	Effort                    string // resolved provider level; empty means omit
+	Fast                      bool   // requested fast mode; runtime reports what applied
 	// Driver selects the terminal TerminalDriver ("" | "xterm" | "tmux" | "iterm2");
 	// ignored by the chat runtime. Empty defaults to the cross-platform xterm/PTY
 	// driver. The server validates availability against the capability probe before
@@ -162,6 +163,7 @@ type Handle struct {
 	AgentID   string
 	Pid       int    // == pgid; written to the running row in state.db
 	SessionID string // ephemeral CLI session id, written to the running row in state.db
+	Fast      bool   // fast mode actually applied by the live session
 
 	// Internal process/stream plumbing (stdin writer, event hub, pending-permission
 	// map, cancel fn, …) is added in later subphases.

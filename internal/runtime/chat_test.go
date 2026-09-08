@@ -832,6 +832,85 @@ func TestChatEffortPostSessionApplied(t *testing.T) {
 	}
 }
 
+func TestCodexSessionConfigurationIsOrderedAndFastIsApplied(t *testing.T) {
+	c, spec := newChatTest(t, "stream_text")
+	spec.BackendType = "codex-acp"
+	spec.ModelID = "gpt-5.4-mini"
+	spec.Effort = "high"
+	spec.Fast = true
+	logPath := filepath.Join(t.TempDir(), "config.ndjson")
+	spec.Env = append(spec.Env, "FAKEACP_FAST_OPTION=fast-mode", "FAKEACP_CONFIG_LOG="+logPath)
+	h, err := c.Start(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { c.Stop(context.Background(), h.AgentID) })
+	if !h.Fast {
+		t.Fatal("fast mode was not reported as applied")
+	}
+	raw, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ids []string
+	for _, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
+		var call struct {
+			ConfigID string `json:"configId"`
+		}
+		if err := json.Unmarshal([]byte(line), &call); err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, call.ConfigID)
+	}
+	if got := strings.Join(ids, ","); got != "model,reasoning_effort,fast-mode" {
+		t.Fatalf("configuration order = %s", got)
+	}
+}
+
+func TestSetSessionConfigAppliesWithoutRestartingTheChatRuntime(t *testing.T) {
+	c, spec := newChatTest(t, "stream_text")
+	spec.BackendType = "codex-acp"
+	spec.ModelID = "gpt-5.4-mini"
+	logPath := filepath.Join(t.TempDir(), "config.ndjson")
+	spec.Env = append(spec.Env, "FAKEACP_FAST_OPTION=fast-mode", "FAKEACP_CONFIG_LOG="+logPath)
+	h, err := c.Start(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { c.Stop(context.Background(), h.AgentID) })
+
+	effort := "high"
+	fast := true
+	appliedEffort, appliedFast, err := c.SetSessionConfig(context.Background(), h.AgentID, &effort, &fast)
+	if err != nil {
+		t.Fatalf("SetSessionConfig: %v", err)
+	}
+	if appliedEffort != effort || !appliedFast {
+		t.Fatalf("applied settings = %q, %v; want high, true", appliedEffort, appliedFast)
+	}
+	if current, err := c.store.ReadRunning(h.AgentID); err != nil || current.PID != h.Pid || current.SessionID != h.SessionID {
+		t.Fatalf("running identity changed: %+v err=%v", current, err)
+	}
+
+	raw, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ids []string
+	for _, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
+		var call struct {
+			ConfigID string `json:"configId"`
+		}
+		if err := json.Unmarshal([]byte(line), &call); err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, call.ConfigID)
+	}
+	if got := strings.Join(ids, ","); got != "model,reasoning_effort,fast-mode" {
+		t.Fatalf("configuration calls = %s", got)
+	}
+}
+
 // TestChatEffortPostSessionFailureLeavesNoAgent guards FS-09.A15's teardown
 // clause: a rejected post-session effort option fails the launch and registers
 // no running agent (the option precedes WriteRunning, so nothing survives).

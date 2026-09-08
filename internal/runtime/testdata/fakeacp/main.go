@@ -109,7 +109,7 @@ func handle(msg *rpcMessage) {
 		// session is created. Emit it BEFORE the response so the runtime's ordered
 		// read loop has stored the snapshot by the time session/new returns.
 		emitAvailableCommands()
-		respond(*msg.ID, map[string]any{"sessionId": sessionID})
+		respond(*msg.ID, map[string]any{"sessionId": sessionID, "configOptions": fakeConfigOptions()})
 	case "session/load":
 		// If asked, dump the raw load params so tests can assert that the
 		// fresh MCP registration is carried on the load path (not just new).
@@ -119,12 +119,18 @@ func handle(msg *rpcMessage) {
 		if os.Getenv("FAKEACP_LOAD_EMPTY") != "" {
 			// ACP session/load keeps the requested sessionId authoritative; the
 			// pinned codex-acp adapter therefore returns an empty result on success.
-			respond(*msg.ID, map[string]any{})
+			respond(*msg.ID, map[string]any{"configOptions": fakeConfigOptions()})
 			return
 		}
 		// Legacy fixture shape retained for existing parameter-path coverage.
-		respond(*msg.ID, map[string]any{"sessionId": "fake-sess-loaded"})
+		respond(*msg.ID, map[string]any{"sessionId": "fake-sess-loaded", "configOptions": fakeConfigOptions()})
 	case "session/set_config_option":
+		if logPath := os.Getenv("FAKEACP_CONFIG_LOG"); logPath != "" {
+			if f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600); err == nil {
+				_, _ = f.Write(append(bytes.ReplaceAll(msg.Params, []byte("\n"), []byte(" ")), '\n'))
+				_ = f.Close()
+			}
+		}
 		if dump := os.Getenv("FAKEACP_EFFORT_DUMP"); dump != "" {
 			_ = os.WriteFile(dump, msg.Params, 0o600)
 		}
@@ -166,6 +172,18 @@ func handle(msg *rpcMessage) {
 	default:
 		respondErr(*msg.ID, -32601, "method not found: "+msg.Method)
 	}
+}
+
+func fakeConfigOptions() []map[string]any {
+	ids := []string{"model", "effort", "reasoning_effort"}
+	if os.Getenv("FAKEACP_FAST_OPTION") != "" {
+		ids = append(ids, os.Getenv("FAKEACP_FAST_OPTION"))
+	}
+	out := make([]map[string]any, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, map[string]any{"id": id})
+	}
+	return out
 }
 
 // runScenario replays a named sequence and returns the prompt stopReason.

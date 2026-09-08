@@ -66,6 +66,7 @@ type Model struct {
 	Env           map[string]string `json:"env,omitempty"`            // per-model env; overrides backend env
 	Efforts       []string          `json:"efforts"`                  // provider-declared reasoning levels
 	DefaultEffort string            `json:"default_effort,omitempty"` // one of Efforts
+	Fast          bool              `json:"fast"`
 }
 
 // SupportsEffort reports whether effort is one of the model's declared provider
