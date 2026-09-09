@@ -36,8 +36,11 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   option-list replacement, and the unverified OpenCode/OpenHands paths. The six original
   `chat-session-configuration` findings are closed. The claimed Claude model-delivery finding was
   retracted after a provider-authoritative prompt probe disproved it.
-- **Bug reports:** BR-1 is investigated. Codex chat silently ignored the selected model from its
-  first release and later ignored effort too; its implementation is reviewed with open findings.
+- **Bug reports:** BR-1 and BR-2 are investigated. BR-1: Codex chat silently ignored the selected
+  model from its first release and later ignored effort too; its implementation is reviewed with
+  open findings. BR-2: v0.4.2 can import GPT-6-Astra from a newer personal Codex cache while its
+  packaged adapter runs Codex 0.144.4, so the selectable model fails at prompt time; the immediate
+  release pin and the cross-version catalog/runtime gap are open findings.
   Current pinned Claude model delivery through `_meta` works; its ACP model `currentValue` can be
   stale and is not an execution-model oracle.
   The postmortem corrects the earlier claim that the bug went unnoticed and records how a live
@@ -59,6 +62,15 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 findings or the open `chat-session-configuration` Worth-fixing finding; `/work` has no waiting unit;
 `/design-feature` may choose an available or resumable idea, or an idea a person names from another
 `docs/ideas.md` section. Role queues are independent.
+
+**Changelog — 2026-09-09 (bug investigation):** Confirmed BR-2. v0.4.2 pins its private Codex CLI
+to 0.144.4, while model autosync reads the personal Codex cache produced by a potentially newer
+CLI. The pinned `codex-acp` uses its bundled Codex unless `CODEX_PATH` is set, so an imported
+`gpt-6-astra` can be selectable even though the process that handles the prompt predates Astra
+support. Official Codex 0.153.1 added configurable Astra support. AgentDeck already preserves
+`CODEX_PATH`, and Settings can carry it through the generic Codex backend environment editor, but
+there is no dedicated compatibility surface. Recorded one immediate Must-fix and one systemic
+Worth-fixing; no provider prompt was sent and no reproduction test was committed.
 
 **Changelog — 2026-09-09 (review):** Explicitly re-reviewed the `chat-session-configuration`
 finding-fix range `edb909a..8a01ebf`. The six original findings are materially addressed: rebuilt
@@ -158,6 +170,35 @@ let it block any role.
 
 ## Review findings
 
+- **Must fix** — the v0.4.2 private Codex runtime predates GPT-6-Astra support (**confirmed**).
+  **Where:** `scripts/release/package.json:11-12` and its lockfile pin `@openai/codex` 0.144.4;
+  `scripts/release/assemble.sh:17-24,54-69` installs and verifies that exact private CLI, and
+  `codex-acp` 1.1.2 starts its bundled dependency when `CODEX_PATH` is absent. **Normal-use
+  trigger:** select an imported `gpt-6-astra` model in AgentDeck 0.4.2 and send a prompt. **Why it
+  matters:** Codex warns that model metadata is missing and the provider rejects the request with
+  HTTP 400 requiring a newer Codex, so an offered chat configuration cannot run. Official Codex
+  0.153.1 added configurable Astra support; 0.153.4 fixed its bundled-picker visibility. The
+  locally installed newer CLI is intentionally not selected by the private release runtime.
+  **Requirement:** `FS-09.R7/R21/R58`, `TS-06.R14/R22`, `INV §12`. **Suggested fix/test:** update
+  the direct Codex pin, lockfile, assembly constant, manifests, and fixtures to a reviewed compatible
+  release; prove the assembled archive reports that version and complete a credentialed Astra
+  prompt through the packaged adapter before claiming support.
+- **Worth fixing** — Codex model discovery and execution use different version authorities
+  (**confirmed spec gap**). **Where:** `internal/config/codexmodels.go:31-86` imports every visible
+  model from `${CODEX_HOME:-~/.codex}/models_cache.json`, while `internal/release/wrapper.go:10-25`
+  and the pinned adapter execute the release-private Codex. `FS-09.R47` explicitly says import does
+  not claim future availability but defines no compatibility check or actionable degraded state.
+  **Normal-use trigger:** the personal Codex CLI/cache advances beyond AgentDeck's pinned runtime
+  and advertises a newly introduced model. **Why it matters:** this can recur after any model/runtime
+  rollout: AgentDeck presents the model as selectable and discovers incompatibility only after an
+  attempted session or prompt. A local workaround exists but is obscure: `codex-acp` 1.1.2 honors
+  `CODEX_PATH`, AgentDeck preserves that variable, and Settings' generic **Backend env** editor can
+  set it to an absolute compatible Codex executable. **Requirement:** coverage gap between
+  `FS-09.R28/R47` and `TS-06.R14/R15/R22`; `INV §8`, `INV §10`, `INV §12`. **Suggested fix/test:**
+  specify one compatibility policy (discover from the execution runtime, filter/mark models by the
+  packaged version, or expose a first-class validated Codex executable override), show the effective
+  runtime/version before launch, and test a personal cache that is newer than the packaged CLI.
+
 - **Must fix** — J2: incompatible CLI status is presented as a credential failure.
   **Where:** `internal/backend/credcheck/claude.go:25-45`, surfaced by
   `ui/src/features/onboarding/steps/BackendStep.tsx:44-46`. **Normal-use trigger:** from a fresh
@@ -222,6 +263,47 @@ let it block any role.
   remove any redundant unsupported top-level fields once their real mechanism is known.
 
 ## Bug investigation reports
+
+### BR-2 — GPT-6-Astra is selectable but the packaged Codex is too old
+
+**Report (verbatim).** “AgentDeck 0.4.2 lets me select gpt-6-astra, but sending a chat fails with
+‘Model metadata not found’ followed by HTTP 400: ‘The model requires a newer version of Codex.’ Its
+bundled codex-acp adapter launches Codex 0.144.4, despite 0.153.4 being installed locally. Astra
+support requires 0.153.1+. The adapter already supports CODEX_PATH, so exposing that override could
+provide a local workaround.” No separate log file was supplied. The reported environment is
+AgentDeck 0.4.2 with a local Codex 0.153.4 installation.
+
+**Verdict.** This is a **confirmed code defect** in the v0.4.2 release pin and a **confirmed spec
+gap** in the relationship between model discovery and execution. The exact provider turn was not
+re-run because that would consume a credentialed request, but the incompatible executable path is
+proven from the tagged release inputs and the adapter's installed implementation. The reporter's
+minimum-version statement is corroborated by the official Codex 0.153.1 release, which added
+configurable GPT-6-Astra support; the official 0.153.4 release then made Astra visible in the bundled
+model picker.
+
+**Trace.** Model autosync reads the personal `${CODEX_HOME:-~/.codex}/models_cache.json` and imports
+every visible slug, so a cache written by Codex 0.153.4 can add `gpt-6-astra` to AgentDeck. Launch
+then resolves `codex-acp` from the private release runtime. With no `CODEX_PATH`, `codex-acp` 1.1.2
+does not search for the user's newer Codex; it resolves and spawns its bundled `@openai/codex`
+dependency. v0.4.2's package manifest, lockfile, assembly constant, and release manifest all pin that
+dependency to 0.144.4. AgentDeck applies the selected model through ACP after session creation, and
+the prompt is therefore handled by the old Codex app server. The warning and HTTP 400 are consistent
+with that old process lacking Astra metadata and server support. This path also explains the
+otherwise surprising split: selection is sourced from the new personal cache, while execution is
+sourced from the old private runtime.
+
+**Workaround.** `codex-acp` 1.1.2 documents and implements `CODEX_PATH`; AgentDeck does not strip it,
+and backend/model environment values flow into launch, resume, and switch. In 0.4.2, set
+`CODEX_PATH` under **Settings → Codex → Backend env** to the absolute path of a Codex executable
+whose `--version` is at least 0.153.1, then restart the affected agent. A shell-only export may not
+reach a GUI-launched dashboard, so the saved backend environment is the reliable existing path.
+
+**Evidence.** `scripts/release/package.json`, `scripts/release/package-lock.json`,
+`scripts/release/assemble.sh`, `internal/release/wrapper.go`, `internal/config/codexmodels.go`,
+`internal/server/launch.go`, `internal/runtime/chat.go`, and the installed
+`@agentclientprotocol/codex-acp` 1.1.2 README/implementation; official Codex releases 0.153.1 and
+0.153.4. No skipped reproduction test was added because a faithful prompt-time oracle requires the
+packaged runtime plus real provider credentials.
 
 ### Live adapter probe — 2026-09-08 (session-configuration contract)
 
