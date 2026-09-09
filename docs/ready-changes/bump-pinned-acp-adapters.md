@@ -1,6 +1,6 @@
 # Bump the pinned ACP adapters
 
-**State:** Waiting to start
+**State:** Finished
 **Why:** Prerequisite for steering (`queue-a-follow-up-while-busy.md`), which needs the
 `_session/steering` extension that both current adapters implement and both pinned versions predate.
 Kept separate on 2026-09-09 at the operator's direction, because BR-1 and BR-2 both came from
@@ -76,3 +76,13 @@ specify, run against the real adapters rather than `fakeacp`.
 Nothing to decide. Note that a credentialed provider run needs human authorization, and the operator
 has previously chosen not to let that block roles; here it is the point of the change, so a bump
 landed without it should say so plainly rather than claim verification.
+
+## Completion evidence
+
+The release-private runtime now pins Claude ACP 0.75.1 and Codex ACP 1.10.0. A clean npm install
+resolves one `@openai/codex`, at 0.153.4, and release assembly rejects any future nested second copy.
+Static inspection of the installed adapters confirms protocol v1, the existing configuration ids,
+permission-option vocabulary, MCP HTTP registration paths, usage and available-command updates, and
+both steering advertisements. The full automated Go matrix and `make dist` pass. The credentialed
+Claude/Codex chat, resume, MCP, model, effort, and fast-mode journeys were not authorized or run and
+remain an acceptance gate.

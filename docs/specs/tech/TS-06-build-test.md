@@ -120,8 +120,10 @@ and Codex login/chat checks remain manual gates and cannot be represented as rel
 **R22** — The release runtime declares and lockfiles the exact direct `@openai/codex`
 dependency required for Codex native `login status`, exposes its executable through the private
 wrapper PATH, exports that same direct executable as the wrapper's default `CODEX_PATH`, and validates
-it alongside both ACP adapters before packaging. This prevents the adapter's own older compatible
-dependency range from silently selecting a different Codex than the release manifest names. An
+it alongside both ACP adapters before packaging. The lockfile and assembled runtime resolve exactly
+one `@openai/codex` package at that direct version; assembly rejects a nested second copy. This
+prevents an adapter dependency range from silently selecting a different Codex than the release
+manifest names. An
 explicit ambient, backend, or model `CODEX_PATH` still overrides the default. Source and release
 command-tree tests prove `agentdeck auth claude|codex` is present; release tests also prove the
 private Codex readiness command and adapter override resolve without a globally installed Codex CLI.
@@ -180,7 +182,7 @@ shared target guarantees.
 - Symlink-free npm command packaging preserves package-relative module resolution:
   `TestCreateArchiveKeepsSymlinkedCommandTargetContext`.
 - Private Codex CLI pin (R22): `scripts/release/package.json` + lockfile declare `@openai/codex`
-  directly, `scripts/release/assemble.sh` validates the executable before packaging, and
+  directly, `scripts/release/assemble.sh` validates the single resolved package and executable before packaging, and
   `requiredLayout`/`verifyInternalManifest` in `internal/release/manifest.go` enforce it; the wrapper
   supplies the same executable to the adapter through its documented `CODEX_PATH` override. Proven
   by `TestPrivateCodexResolvesWithoutGlobalInstall`, `TestRequiredLayoutAndManifestComponentsAgree`,

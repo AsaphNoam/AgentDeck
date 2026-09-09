@@ -27,7 +27,7 @@ EMBED_DIR="internal/server/ui/dist"
 # deliberately and re-run the gated real-provider acceptance checks (FS-09.A7).
 # Install it (Node required) with: INSTALL_ACP=1 ./install.sh
 CLAUDE_ACP_PKG="@agentclientprotocol/claude-agent-acp"
-CLAUDE_ACP_VERSION="0.59.0"
+CLAUDE_ACP_VERSION="0.75.1"
 
 VERSION="${VERSION:-0.1.0}"
 COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo none)"

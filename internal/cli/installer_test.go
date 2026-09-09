@@ -54,7 +54,7 @@ esac
 	}
 	if err := release.WriteInternalManifest(versionDir, release.InternalManifest{
 		Version: version, Target: release.Target,
-		Components: map[string]string{"node": "22.0.0", "claude-agent-acp": "0.59.0", "codex-acp": "1.1.2", "codex": "0.153.4", "agentdeck": version},
+		Components: map[string]string{"node": "22.0.0", "claude-agent-acp": "0.75.1", "codex-acp": "1.10.0", "codex": "0.153.4", "agentdeck": version},
 	}); err != nil {
 		t.Fatal(err)
 	}

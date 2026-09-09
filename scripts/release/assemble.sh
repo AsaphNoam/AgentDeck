@@ -14,8 +14,8 @@ NODE_VERSION="${NODE_VERSION:-22.22.0}"
 # the private runtime input reproducible; changing it is a deliberate release
 # dependency update and requires refreshing the matching Node archive.
 NODE_SHA256="5ed4db0fcf1eaf84d91ad12462631d73bf4576c1377e192d222e48026a902640"
-CLAUDE_ACP_VERSION="0.59.0"
-CODEX_ACP_VERSION="1.1.2"
+CLAUDE_ACP_VERSION="0.75.1"
+CODEX_ACP_VERSION="1.10.0"
 # The Codex CLI is a direct runtime dependency, not just codex-acp's transitive
 # one: it is the executable that performs `codex login` and answers
 # `codex login status`, so onboarding readiness must not depend on where the
@@ -57,6 +57,11 @@ cp scripts/release/package.json scripts/release/package-lock.json "$stage/runtim
 [ -x "$stage/runtime/node_modules/.bin/claude-agent-acp" ] || die "Claude ACP adapter was not installed"
 [ -x "$stage/runtime/node_modules/.bin/codex-acp" ] || die "Codex ACP adapter was not installed"
 [ -x "$stage/runtime/node_modules/.bin/codex" ] || die "Codex CLI was not installed"
+
+# The direct Codex pin and codex-acp's range must dedupe. A nested second copy
+# recreates the catalog/runtime contradiction that the private pin closes.
+codex_package_count="$(find "$stage/runtime/node_modules" -path '*/@openai/codex/package.json' -type f | wc -l | tr -d ' ')"
+[ "$codex_package_count" = "1" ] || die "private runtime resolved ${codex_package_count} Codex packages; expected exactly one"
 
 # Prove the readiness executable actually runs from the private runtime before
 # packaging: a present-but-unrunnable codex would only surface later as a

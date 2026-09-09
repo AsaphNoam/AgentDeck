@@ -13,14 +13,14 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 - **Active change:** None.
 - **Release:** `v0.4.2` is published and verified on tag `f56755a`; its release and CI runs passed and
   the distributable reports `0.4.2` with `sqlite_fts5`. Range details are in the state archive.
-- **Review units:** `chat-session-configuration` was explicitly re-reviewed through its finding-fix
+- **Review units:** `bump-pinned-acp-adapters.md` is available for review.
+  `chat-session-configuration` was explicitly re-reviewed through its finding-fix
   commit; one Worth-fixing protocol replacement finding is open. The BR-3 resume-replay unit,
   `dock-the-annotation-tray-and-quiet-its-prompt`, and all earlier units through this release are
   closed. Review records, finding-fix commits, release records, and handoff/archive/queue
   bookkeeping are administrative closure.
-- **Work units:** `bump-pinned-acp-adapters.md` is waiting to start (designed 2026-09-09); it also
-  resolves BR-2's structural half. `queue-a-follow-up-while-busy.md` (Send queues, Steer injects) is
-  paused on that bump. `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
+- **Work units:** `queue-a-follow-up-while-busy.md` (Send queues, Steer injects) is waiting to start.
+  `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
 - **Design units:** Existing entries under `Ideas being defined` may resume, and entries under
   `New ideas` are available to start. One entry from the 2026-09-07 agent-features request remains
   part-decided and resumable: streaming agent thinking (decided live-only; rendering default and
@@ -36,8 +36,8 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   model from its first release and later ignored effort too; its implementation is reviewed with
   open findings. BR-2: v0.4.2 can import GPT-6-Astra from a newer personal Codex cache while its
   packaged adapter runs Codex 0.144.4, so the selectable model fails at prompt time; the immediate
-  release pin is fixed, while the cross-version catalog/runtime gap remains open and is addressed
-  structurally by the waiting adapter-bump unit.
+  release pin is fixed and the adapter/direct-CLI dependency contradiction is closed by the adapter
+  bump. The broader personal-cache versus packaged-runtime compatibility finding remains open.
   BR-3 is fixed and closed: resume held no gate over ACP `session/load`, so provider-replayed
   history was published as fresh live events and an open transcript scrolled through old work. The
   runtime now suppresses replay for the duration of that call (TS-04.R50). The report named no
@@ -59,11 +59,17 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 
 **Change:** None.
 
-**Available by role:** `/review` has no unreviewed unit; `/fix` may select the BR-1 postmortem
-findings, the J2/J5 usability findings, the BR-2 systemic finding, or the open
-`chat-session-configuration` Worth-fixing finding; `/work` has no waiting unit;
-`/design-feature` may choose an available or resumable idea, or an idea a person names from another
-`docs/ideas.md` section. Role queues are independent.
+**Available by role:** `/review` may select `bump-pinned-acp-adapters.md`; `/work` may select
+`queue-a-follow-up-while-busy.md`; `/fix` may select any one open finding unit; `/design-feature`
+may choose an available or resumable idea. Role queues are independent.
+
+**Changelog — 2026-09-10 (work):** Finished `bump-pinned-acp-adapters.md`. The release runtime now
+pins Claude ACP 0.75.1 and Codex ACP 1.10.0; the Codex adapter dedupes onto the direct Codex 0.153.4
+pin, and assembly now rejects a second nested Codex package. Version fixtures and the source-install
+Claude pin were refreshed. Static inspection confirms the existing protocol, configuration,
+permission, MCP, usage, command, and steering surfaces. The full automated matrix and distributable
+build pass. No credentialed provider journey was authorized or run, so that acceptance gate remains
+open and none of those live behaviors is claimed verified.
 
 **Changelog — 2026-09-09 (fix):** Closed BR-3's Must-fix and its unit (INV §1, INV §11). ACP lets an
 adapter restore native context by replaying prior `session/update` frames during `session/load`, and
