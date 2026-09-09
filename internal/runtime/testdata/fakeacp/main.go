@@ -118,6 +118,9 @@ func handle(msg *rpcMessage) {
 			_ = os.WriteFile(dump, msg.Params, 0o600)
 		}
 		initConfigOptions()
+		// A real adapter may restore native context by replaying the prior
+		// conversation as session/update frames before it answers session/load.
+		emitLoadHistory()
 		if os.Getenv("FAKEACP_LOAD_EMPTY") != "" {
 			// ACP session/load keeps the requested sessionId authoritative; the
 			// pinned codex-acp adapter therefore returns an empty result on success.
@@ -504,6 +507,34 @@ func emitAvailableCommands() {
 		"sessionUpdate":     "available_commands_update",
 		"availableCommands": cmds,
 	})
+}
+
+// emitLoadHistory replays FAKEACP_LOAD_HISTORY prior turns as session/update
+// frames during session/load, the way an adapter restores provider-native
+// context. Each turn carries an assistant chunk and a completed tool call, so a
+// test can prove several event kinds are gated, not just assistant text.
+func emitLoadHistory() {
+	turns, err := strconv.Atoi(os.Getenv("FAKEACP_LOAD_HISTORY"))
+	if err != nil || turns <= 0 {
+		return
+	}
+	for i := 1; i <= turns; i++ {
+		id := "history-tool-" + strconv.Itoa(i)
+		emitChunk("replayed answer " + strconv.Itoa(i))
+		emitUpdate(map[string]any{
+			"sessionUpdate": "tool_call",
+			"toolCallId":    id,
+			"title":         "Read",
+			"rawInput":      map[string]any{"file_path": "/tmp/history.txt"},
+			"status":        "in_progress",
+		})
+		emitUpdate(map[string]any{
+			"sessionUpdate": "tool_call_update",
+			"toolCallId":    id,
+			"status":        "completed",
+			"content":       []any{map[string]any{"type": "content", "content": map[string]any{"type": "text", "text": "old file body"}}},
+		})
+	}
 }
 
 func emitChunk(text string) {

@@ -215,6 +215,14 @@ type agentState struct {
 	// cancelEscalated is set only when the current turn ignored cooperative
 	// cancellation and the fallback SIGINT was delivered successfully.
 	cancelEscalated bool
+	// loadReplay is set only while ACP session/load is restoring provider-native
+	// context. A provider is allowed to replay the prior conversation as
+	// session/update frames during that call; those frames describe history
+	// AgentDeck already holds, not new activity, so they must not cross the
+	// runtime boundary as live transcript events (TS-04.R50, FS-03.R3/R35,
+	// INV §1, §11).
+	loadReplay        bool
+	loadReplayDropped int
 }
 
 // pendingPerm is a withheld session/request_permission awaiting a decision.
@@ -594,6 +602,10 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 		resolved:         map[string]struct{}{},
 		contextPct:       spec.LastContextPct,
 		adapter:          ad,
+		// The notification callback is installed before session/load runs, so the
+		// replay gate has to be closed from construction — a provider that starts
+		// replaying immediately must not race an assignment made later.
+		loadReplay: true,
 	}
 	as.transport = NewTransport(stdin,
 		func(method string, params json.RawMessage) { c.onNotification(as, method, params) },
@@ -659,6 +671,17 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 			slog.Warn("runtime: session/load failed; starting a new session",
 				"agent", as.agentID, "session", sessionID, "err", loadErr)
 		}
+	}
+	// Load has returned, so any further session/update is new activity. The
+	// transport dispatches frames in read order on one goroutine, so every
+	// replay frame the adapter wrote before its response is already handled.
+	as.mu.Lock()
+	as.loadReplay = false
+	dropped := as.loadReplayDropped
+	as.mu.Unlock()
+	if dropped > 0 {
+		slog.Info("runtime: suppressed provider history replay on resume",
+			"agent", as.agentID, "session", sessionID, "events", dropped)
 	}
 	if !loaded {
 		newRes, err := c.startupCall(ctx, as.transport, "session/new", sessionNewParams(spec))
@@ -935,6 +958,23 @@ func (c *ChatRuntime) onNotification(as *agentState, method string, params json.
 		c.republishContextPct(as)
 		return
 	}
+	// While session/load restores provider-native context, a replayed frame is
+	// the conversation AgentDeck already rendered and persisted, not new work.
+	// Emitting it would assign a fresh sequence, append a duplicate to the
+	// durable transcript, publish it as live activity that drags an open
+	// transcript through old turns, and let a replayed turn boundary drive the
+	// agent's status (TS-04.R50, FS-03.R3/R35, INV §1, §11). The provider keeps
+	// its own restored context either way; only AgentDeck's view is gated.
+	as.mu.Lock()
+	replay := as.loadReplay
+	if replay {
+		as.loadReplayDropped++
+	}
+	as.mu.Unlock()
+	if replay {
+		return
+	}
+
 	for _, m := range mapSessionUpdate(params) {
 		c.emit(as, m.Type, m.Data)
 		c.applyEventStatus(as, m)

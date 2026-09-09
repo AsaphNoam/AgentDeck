@@ -795,6 +795,80 @@ func TestResumeSuccessfulLoadWithoutSessionIDKeepsPriorSession(t *testing.T) {
 	}
 }
 
+// Regression for BR-3: an adapter may restore provider-native context by
+// replaying prior session/update frames during session/load. Those frames are
+// conversation AgentDeck already holds, so waking a stopped agent must publish
+// only the new prompt and its turn — never republish history as live activity
+// that drags an open transcript through old work (FS-03.R3/R35, TS-04.R50,
+// INV §1, INV §11).
+func TestResumeSuppressesProviderHistoryReplay(t *testing.T) {
+	c, spec := newChatTest(t, "stream_text")
+	ctx := context.Background()
+	spec.Env = append(spec.Env, "FAKEACP_LOAD_HISTORY=3")
+
+	var sinkMu sync.Mutex
+	var published []Event
+	c.SetEventSink(func(ev Event) {
+		sinkMu.Lock()
+		published = append(published, ev)
+		sinkMu.Unlock()
+	})
+
+	h, err := c.Resume(ctx, spec, "prior-session-id")
+	if err != nil {
+		t.Fatalf("Resume: %v", err)
+	}
+	t.Cleanup(func() { c.Stop(ctx, h.AgentID) })
+
+	// The resume boundary marker is the only thing a wake may publish before the
+	// person's prompt is even accepted.
+	sinkMu.Lock()
+	afterResume := append([]Event{}, published...)
+	sinkMu.Unlock()
+	for _, ev := range afterResume {
+		if ev.Type != EvSessionMeta {
+			t.Fatalf("resume published %q before any prompt; provider history replay must not cross the runtime boundary", ev.Type)
+		}
+	}
+
+	ch, unsub, err := c.Subscribe(h.AgentID)
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+	defer unsub()
+	if err := c.SendPrompt(ctx, h.AgentID, "what next?"); err != nil {
+		t.Fatalf("SendPrompt: %v", err)
+	}
+	evs := drainTurn(t, ch)
+	if len(evs) == 0 || evs[len(evs)-1].Type != EvTurnEnd {
+		t.Fatalf("wake turn = %+v, want it to end in turn_end", evs)
+	}
+	if evs[0].Type != EvUserPrompt {
+		t.Fatalf("wake turn first event = %q, want the new user message", evs[0].Type)
+	}
+	// The provider still answers with its restored context: the turn runs
+	// normally even though AgentDeck recorded none of the replay.
+	var texts int
+	for _, ev := range evs {
+		if ev.Type == EvAssistantText {
+			texts++
+		}
+	}
+	if texts == 0 {
+		t.Fatalf("wake turn produced no assistant text: %+v", evs)
+	}
+
+	transcript, err := c.Transcript(h.AgentID)
+	if err != nil {
+		t.Fatalf("Transcript: %v", err)
+	}
+	for _, ev := range transcript {
+		if strings.Contains(string(ev.Data), "replayed answer") || strings.Contains(string(ev.Data), "history-tool-") {
+			t.Fatalf("replayed history entered the transcript as %q: %s", ev.Type, ev.Data)
+		}
+	}
+}
+
 // TestChatEffortPostSessionApplied guards FS-09.A15/R40: for a claude-acp chat
 // agent the resolved effort is delivered by a post-session
 // `session/set_config_option` call carrying the adapter's option id and value.

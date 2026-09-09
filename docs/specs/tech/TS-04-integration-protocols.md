@@ -315,6 +315,22 @@ backend plus failed stage. Claude maps recognized captured stderr to a small rec
 stderr is never returned over the API and falls back to adapter/authentication verification
 guidance. Launch and resume share this boundary.
 
+**R50 — Provider history replayed during `session/load` never becomes an AgentDeck event.** ACP
+permits an adapter to restore native context by emitting `session/update` notifications while
+`session/load` is in flight; the pinned Codex adapter does this. Those frames describe the
+conversation AgentDeck already recorded, so the resume path holds a replay gate from the moment the
+notification callback is installed until the `session/load` call returns, and no `session/update`
+mapped to a normalized transcript event crosses the boundary while it is held: no sequence is
+allocated, nothing is appended to the durable transcript, nothing is published to subscribers or the
+global sink, and no replayed turn boundary drives agent status. Without the gate an open chat
+re-renders and auto-follows its whole history as fresh live activity on wake, breaking FS-03.R3 and
+FS-03.R35 (INV §1, INV §11). The gate covers only AgentDeck's view — the provider keeps its restored
+context and answers the wake prompt with it. Replace-only live session state decoded from the same
+notification (R24 available commands, R25 context usage) is not a transcript event and is accepted
+during load as normal. `session/new` replays nothing, so the launch path holds no gate. The number of
+suppressed frames is logged once per resume, because a provider that replays is otherwise invisible
+in AgentDeck's own records.
+
 **R23 `(planned)` — Optional-integration version tolerance is probed.** An adapter flag or metadata
 extension known to vary by pinned CLI version will use an explicit capability probe or a documented
 unsupported-option retry only when dropping it cannot change the user's requested runtime behavior.
@@ -701,6 +717,9 @@ global resource list.
 - ACP/runtime: `internal/runtime/chat.go`, `transport.go`, `event.go`, `permission.go`.
 - Available commands (R24): decode in `internal/runtime/acpmap.go`, replace-only snapshot on
   the live `agentState`, registry read projection, and fake-ACP new/load/replacement regressions.
+- Load replay gate (R50): the `loadReplay` claim on `agentState`, held across `session/load` in
+  `ChatRuntime.Resume` and read in `ChatRuntime.onNotification`; fake-ACP `FAKEACP_LOAD_HISTORY`
+  replay and `TestResumeSuppressesProviderHistoryReplay`.
 - Context usage (R25): `decodeContextUsage`, `ChatRuntime.onNotification`,
   `ChatRuntime.republishContextPct`, `TestContextUsageFromRealClaudeAdapterShapes`, and
   `TestUsageUpdateRepublishesContextPctMidTurn`.

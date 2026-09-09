@@ -11,17 +11,13 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 ## Current position
 
 - **Active change:** None.
-- **Release:** `v0.4.2` is published and verified on tag `f56755a`. Release run `34085524105`
-  succeeded in 4m5s, attached the macOS arm64 archive, `install.sh`, and `manifest.json`; main CI
-  run `34085523868` also passed. The range adds the docked annotation tray, quieter self-target
-  annotation transcripts, and Mermaid rendering fixes. It changes no agent-facing behavior, so the
-  embedded `operating-agentdeck` package was not refreshed. The distributable binary reports
-  `0.4.2` and carries `sqlite_fts5`.
+- **Release:** `v0.4.2` is published and verified on tag `f56755a`; its release and CI runs passed and
+  the distributable reports `0.4.2` with `sqlite_fts5`. Range details are in the state archive.
 - **Review units:** `chat-session-configuration` was explicitly re-reviewed through its finding-fix
-  commit; one Worth-fixing protocol replacement finding is open.
-  `dock-the-annotation-tray-and-quiet-its-prompt` is reviewed, fixed, and closed; all
-  earlier units through this release are closed. Review records, finding-fix
-  commits, release records, and handoff/archive/queue bookkeeping are administrative closure.
+  commit; one Worth-fixing protocol replacement finding is open. The BR-3 resume-replay unit,
+  `dock-the-annotation-tray-and-quiet-its-prompt`, and all earlier units through this release are
+  closed. Review records, finding-fix commits, release records, and handoff/archive/queue
+  bookkeeping are administrative closure.
 - **Work units:** `bump-pinned-acp-adapters.md` is waiting to start (designed 2026-09-09); it also
   resolves BR-2's structural half. `queue-a-follow-up-while-busy.md` (Send queues, Steer injects) is
   paused on that bump. `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
@@ -30,10 +26,10 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   part-decided and resumable: streaming agent thinking (decided live-only; rendering default and
   whether `plan` ships with it still open). The permanently unaddressable pipeline
   agent remains the newest `New ideas` entry and needs `/design-feature` before code.
-- **Open findings:** Two usability findings from the 2026-09-07 v0.4.2 review plus three Must-fix and
+- **Open findings:** Two usability findings from the 2026-09-07 v0.4.2 review plus two Must-fix and
   two Worth-fixing bug/session-configuration findings: J2 incompatible CLI status, J5 clipped
   lower-row card menus, live-gate finding durability, provider-contract oracles, explicit-empty ACP
-  option-list replacement, stopped-agent history replay, and the unverified OpenCode/OpenHands paths. The six original
+  option-list replacement, and the unverified OpenCode/OpenHands paths. The six original
   `chat-session-configuration` findings are closed. The claimed Claude model-delivery finding was
   retracted after a provider-authoritative prompt probe disproved it.
 - **Bug reports:** BR-1 through BR-3 are investigated. BR-1: Codex chat silently ignored the selected
@@ -42,9 +38,10 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   packaged adapter runs Codex 0.144.4, so the selectable model fails at prompt time; the immediate
   release pin is fixed, while the cross-version catalog/runtime gap remains open and is addressed
   structurally by the waiting adapter-bump unit.
-  BR-3: waking a stopped agent can publish provider-restored history as fresh live events, making a
-  long transcript visibly scroll through old work before the new turn; the runtime defect is
-  confirmed and its match to the backend-unspecified field report is probable.
+  BR-3 is fixed and closed: resume held no gate over ACP `session/load`, so provider-replayed
+  history was published as fresh live events and an open transcript scrolled through old work. The
+  runtime now suppresses replay for the duration of that call (TS-04.R50). The report named no
+  backend or version, so the field match stays probable rather than reproduced.
   Current pinned Claude model delivery through `_meta` works; its ACP model `currentValue` can be
   stale and is not an execution-model oracle.
   The postmortem corrects the earlier claim that the bug went unnoticed and records how a live
@@ -63,9 +60,23 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 **Change:** None.
 
 **Available by role:** `/review` has no unreviewed unit; `/fix` may select the BR-1 postmortem
-findings, BR-3, or the open `chat-session-configuration` Worth-fixing finding; `/work` has no waiting unit;
+findings, the J2/J5 usability findings, the BR-2 systemic finding, or the open
+`chat-session-configuration` Worth-fixing finding; `/work` has no waiting unit;
 `/design-feature` may choose an available or resumable idea, or an idea a person names from another
 `docs/ideas.md` section. Role queues are independent.
+
+**Changelog — 2026-09-09 (fix):** Closed BR-3's Must-fix and its unit (INV §1, INV §11). ACP lets an
+adapter restore native context by replaying prior `session/update` frames during `session/load`, and
+resume held no gate over that call, so every replayed frame was sequenced, persisted, published live,
+and allowed to drive agent status — which is why an open chat visibly scrolled through old work on
+wake. Resume now holds a replay claim from callback installation until `session/load` returns:
+transcript events are suppressed for that window, replace-only live state (available commands,
+context usage) is still accepted, and the suppressed count is logged. `session/new` replays nothing,
+so launch is unchanged. New `TS-04.R50` records the rule. `fakeacp` gained a `FAKEACP_LOAD_HISTORY`
+scenario and `TestResumeSuppressesProviderHistoryReplay`, confirmed to fail pre-fix with exactly the
+reported symptom. No UI change was needed — append and bottom-follow are correct once the runtime
+stops mislabeling history as live. Both Go variants, a focused `-race` run on resume, vet, build, and
+spec checks pass. Settled 2026-09-08 entries moved to the `v0.4.2` state archive for header budget.
 
 **Changelog — 2026-09-09 (fix):** Closed BR-2's immediate Must-fix. The release-private Codex CLI
 is pinned to 0.153.4 throughout the manifest, lockfile, assembly checks, and release fixtures. The
@@ -76,85 +87,21 @@ release/CLI tests and the full closure matrix pass; no credentialed Astra prompt
 acceptance gate remains open. The systemic model-catalog/runtime gap remains a Worth-fixing finding,
 with `bump-pinned-acp-adapters.md` queued as its structural follow-up.
 
-**Changelog — 2026-09-09 (bug investigation):** Confirmed BR-2. v0.4.2 pins its private Codex CLI
-to 0.144.4, while model autosync reads the personal Codex cache produced by a potentially newer
-CLI. The pinned `codex-acp` uses its bundled Codex unless `CODEX_PATH` is set, so an imported
-`gpt-6-astra` can be selectable even though the process that handles the prompt predates Astra
-support. Official Codex 0.153.1 added configurable Astra support. AgentDeck already preserves
-`CODEX_PATH`, and Settings can carry it through the generic Codex backend environment editor, but
-there is no dedicated compatibility surface. Recorded one immediate Must-fix and one systemic
-Worth-fixing; no provider prompt was sent and no reproduction test was committed.
+**Changelog — 2026-09-09 (bug investigation):** Confirmed BR-2 — model discovery reads the personal
+Codex cache while execution uses the older release-private CLI, so an imported `gpt-6-astra` was
+selectable but unusable. Recorded one immediate Must-fix (now closed) and one systemic Worth-fixing;
+no provider prompt was sent and no reproduction test was committed. Full trace under **Bug
+investigation reports**.
 
-**Changelog — 2026-09-09 (bug investigation):** Diagnosed BR-3, the stopped-agent wake that visibly
-scrolls through old conversation history. The resume transport accepts `session/update` frames while
-`session/load` is restoring provider history, and the ordinary notification path publishes every
-replayed frame as a fresh live transcript event. The open browser then appends each frame and its
-bottom-follow effect advances through the replay. A 39-event real-browser wake against `fakeacp` did
-not reproduce because that test adapter emits no load history; the field attribution remains
-probable because the report did not identify the backend/version or include logs. Recorded one
-Must-fix; no reproduction test was committed.
+**Changelog — 2026-09-09 (review):** Re-reviewed the `chat-session-configuration` finding-fix range
+`edb909a..8a01ebf`. All six original findings are materially addressed; one Worth-fixing protocol
+edge remains (empty rebuilt option list, recorded under **Review findings**). Retracted the fix run's
+Claude Must-fix: a credentialed prompt probe observed the requested model in SDK `system/init.model`,
+the assistant message, and `modelUsage` for Haiku and Sonnet even though ACP still reported stale
+`opus`, so adapter-local `currentValue` is configuration evidence, not an execution oracle. The
+provider-oracle postmortem finding records that recurrence. Checks pass; the full provider acceptance
+matrix remains open.
 
-**Changelog — 2026-09-09 (review):** Explicitly re-reviewed the `chat-session-configuration`
-finding-fix range `edb909a..8a01ebf`. The six original findings are materially addressed: rebuilt
-option advertisements are consumed, live changes share the lifecycle claim, partial applies are
-persisted, runtime failures are typed, fast availability is projected to the header, and the
-missing task/pipeline and negative UI coverage exists. One Worth-fixing protocol edge remains:
-`setConfigOption` ignores an explicit empty rebuilt `configOptions` list and therefore retains stale
-options despite TS-04.R46's replace-not-merge requirement. Retracted the fix run's Claude Must-fix:
-its setup-only probe treated adapter-local `configOptions.model.currentValue` as an execution oracle,
-while a credentialed prompt probe observed the requested model in raw SDK `system/init.model`, the
-assistant message's `model`, and result `modelUsage` for both Haiku and Sonnet even though ACP still
-reported stale `opus`. The existing provider-oracle postmortem finding now records this recurrence.
-Focused runtime/state/server tests, the ChatPanel test plus presentation/style prechecks, and spec
-checks pass; the server suite required loopback permission. The full provider acceptance matrix
-remains open.
-
-**Changelog — 2026-09-08 (fix):** Closed all six `chat-session-configuration` review findings
-(INV §1, §5, §8, §11, §12, §15, §17). The ACP configuration decode now keeps each option's reported
-`currentValue` and is re-read from every response that carries one, so applying a model consults the
-peer's rebuilt option list rather than the pre-model one, and a setting AgentDeck required is checked
-against the value the peer itself reports instead of the bare RPC envelope. The live
-`session-config` route takes the shared exclusive lifecycle claim, and a combined request that fails
-partway now persists what actually applied before returning the error. Runtime failures are typed
-(unsupported, unavailable, rejected, ignored) and mapped to distinct route envelopes instead of one
-`runtime_start_failed`. The live session's fast-mode advertisement is decoded per generation, stored
-on the `running` row (migration 24), projected into agent state, and rendered by the chat header, so
-a launch that asked for fast mode and did not get it now says the model does not offer it rather
-than showing a dead toggle. Added regression coverage with acceptance IDs for the rebuilt-option-list
-and ignored-setting paths, partial-apply persistence, lifecycle serialization, unavailable-fast
-header states, and task/pipeline requested-versus-applied fast mode; the option-list regression was
-confirmed to fail against the pre-fix discard. TS-02.R30, TS-03.R37, and TS-04.R46 updated. Full Go
-suite, SQLite-FTS variant, targeted `-race` runs, vet, all UI tests, UI build, style/presentation
-checks, and spec checks pass.
-
-**Both pinned adapters were driven live during this fix**, but only for setup/configuration calls.
-See **Bug investigation reports** for the recorded probes. Post-session configuration works at the
-ACP adapter layer for Claude as well as Codex. The run's stronger Claude model-delivery conclusion
-was retracted by the 2026-09-09 review because it never sent a prompt and relied on a stale
-adapter-local field.
-
-**Changelog — 2026-09-08 (review):** Reviewed `chat-session-configuration` across its design and
-implementation range. The ordered provider-setting path discards the required updated option list,
-the live mutation is not serialized with lifecycle changes, a combined request can partially apply,
-and the UI cannot explain an unhonored fast request. Error typing and required task/pipeline and
-negative UI acceptance coverage are also incomplete. The unit stays open for fix. CLI and launch
-surface propagation, requested-versus-applied persistence, migrations, archive/index projections,
-terminal rejection, and task/pipeline wiring had no additional finding. The invariant sweep found
-no class-6 surface because the change extends existing adapters and runtimes rather than adding one;
-all other triggered classes were checked. Both Go variants, Go vet, all UI tests, the UI build, style
-checks, presentation contract, and spec checks pass; these findings are gaps the current suite does
-not exercise.
-
-**Changelog — 2026-09-08:** Implemented `chat-session-configuration`. Fast mode now flows through
-the model catalog, launch API and CLI, task and pipeline assignments, applied agent/session state,
-archive projections, and capability-gated UI controls. Chat launches and resumes apply one ordered
-model → effort → fast session-configuration sequence; Codex no longer relies on the ignored ACP
-session model parameter. The chat header separates staged backend/model controls from immediate
-effort/fast settings, and `POST /api/sessions/{id}/session-config` persists live changes without a
-process or native-session restart. Added fake-provider sequence coverage, a live-route persistence
-test, catalog/migration/UI coverage, and the header state to the visual matrix. The full Go suite,
-SQLite-FTS suite, UI tests/build, and rendered desktop matrix check pass. Credentialed provider
-gates remain open as recorded below.
 
 Credentialed provider journeys and the real-browser checks below remain open acceptance gates, not
 blockers. Never report them as verified without running them.
@@ -191,23 +138,6 @@ sessions and disposable local configuration homes, but the operator chose not to
 let it block any role.
 
 ## Review findings
-
-- **Must fix** — native resume publishes provider history replay as fresh live transcript events
-  (**confirmed defect; probable match to BR-3**). **Where:** `internal/runtime/chat.go:598-634`
-  installs the ordinary notification callback before `session/load`; `onNotification` at
-  `internal/runtime/chat.go:910-940` maps every `session/update` through `emit`, whose global sink
-  publishes it even during startup; `ui/src/api/sse.ts:121-135` appends every published event, and
-  `ui/src/components/chat/TranscriptView.tsx:46-49` bottom-follows every events change. **Normal-use
-  trigger:** submit a prompt to a stopped chat agent whose ACP adapter replays prior updates while
-  loading a sufficiently long native session. **Why it matters:** the already-rendered conversation
-  is emitted again as live activity, making the transcript visibly travel through old work before
-  reaching the new prompt and temporarily duplicating history; this violates the promise that wake
-  shows the new user message plus ordinary busy progression. **Requirement:** `FS-03.R3/R4/R35`,
-  `INV §1`, `INV §11`. **Suggested fix/test:** distinguish startup/load replay from live turn
-  updates at the runtime boundary and suppress it from AgentDeck transcript emission while retaining
-  provider-native context; add a fake ACP load scenario that emits a multi-turn history and assert
-  wake publishes only the newly accepted prompt/turn events while the provider still answers with
-  restored context.
 
 - **Worth fixing** — Codex model discovery and execution use different version authorities
   (**confirmed spec gap**). **Where:** `internal/config/codexmodels.go:31-86` imports every visible
@@ -289,40 +219,6 @@ let it block any role.
   remove any redundant unsupported top-level fields once their real mechanism is known.
 
 ## Bug investigation reports
-
-### BR-3 — waking a stopped agent scrolls through the whole conversation
-
-**Report (verbatim).** “Sending a message in a stopped agent makes it scroll through the entire
-conversation, mainly a weird UI bug”. No AgentDeck version, backend, operating environment, or logs
-were supplied.
-
-**Verdict.** This is a **confirmed code defect** on the native-resume path and a **probable** match
-for the field symptom. The governing behavior says a stopped composer is a wake surface and should
-show the newly submitted user message plus ordinary busy progression; transcript auto-follow applies
-to new events, not replayed copies of history. The exact field combination is not confirmed because
-the report does not identify which adapter/version produced it.
-
-**Trace.** Resume constructs the transport and installs `onNotification` before calling ACP
-`session/load`. A provider is allowed to restore native context by emitting prior `session/update`
-frames during that call; the pinned Codex adapter is already recorded as replaying prior history on
-load. AgentDeck has no startup/load phase gate in `onNotification`: every mapped update calls
-`emit`, which assigns a fresh AgentDeck sequence and forwards it through the runtime's global sink.
-The open chat's SSE handler appends each such event to the existing rendered transcript, and
-`TranscriptView` sets `scrollTop` to the growing `scrollHeight` after each event while the reader is
-at the bottom. That composition explains the visible traversal and makes the apparently visual bug
-a runtime/UI boundary defect: old provider context is mislabeled as new AgentDeck activity.
-
-**Reproduction evidence.** An isolated real-browser run opened a stopped 39-event conversation,
-submitted a wake prompt, and sampled the transcript transition. It stayed at the bottom and did not
-traverse history because the repository's `fakeacp` `session/load` returns success without emitting
-history. This negative control rules out the generic optimistic-send and CSS scroll code by itself;
-it does not exercise the provider replay condition. No skipped test was added because the existing
-fake adapter has no load-replay scenario; the finding specifies that scenario as the fix session's
-regression test.
-
-**Evidence.** `FS-03.R3/R35/A18`, `internal/runtime/chat.go` (`Resume`, `onNotification`, `emit`),
-`ui/src/api/sse.ts`, `ui/src/components/chat/TranscriptView.tsx`, the pinned-adapter resume record in
-`docs/archive/reviews/live-provider-acceptance-2026-07-26.md`, and the isolated browser fixture run.
 
 ### BR-2 — GPT-6-Astra is selectable but the packaged Codex is too old
 
