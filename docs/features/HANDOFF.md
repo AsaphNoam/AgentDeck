@@ -22,8 +22,9 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   `dock-the-annotation-tray-and-quiet-its-prompt` is reviewed, fixed, and closed; all
   earlier units through this release are closed. Review records, finding-fix
   commits, release records, and handoff/archive/queue bookkeeping are administrative closure.
-- **Work units:** `queue-a-follow-up-while-busy.md` is waiting to start (designed 2026-09-09).
-  `migrate-internal-actions-from-mcp.md` stays paused on its recorded transport blocker.
+- **Work units:** `bump-pinned-acp-adapters.md` is waiting to start (designed 2026-09-09); it also
+  resolves BR-2's structural half. `queue-a-follow-up-while-busy.md` (Send queues, Steer injects) is
+  paused on that bump. `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
 - **Design units:** Existing entries under `Ideas being defined` may resume, and entries under
   `New ideas` are available to start. One entry from the 2026-09-07 agent-features request remains
   part-decided and resumable: streaming agent thinking (decided live-only; rendering default and

@@ -243,6 +243,28 @@ and `thread/queue`, which `codex-acp` 1.1.2 wires up to neither. Adopting one is
 capability-gated requirement and a stronger product promise than R48's, not a drop-in replacement for
 this hold.
 
+**R49 `(planned)` — Steering is the `_session/steering` extension, gated on its
+advertised capability, never on a version number.** Both current adapters implement the same agreed
+ACP steering extension: request method `_session/steering`, advertised at handshake as
+`initialize` response `_meta.steering.supported`. AgentDeck detects it from that advertisement and
+from nothing else — not the adapter version, not the backend type — because the advertisement is the
+contract the adapters themselves publish, and inferring provider capability from anything weaker is
+the BR-1 failure mode. An adapter that does not advertise it exposes no Steer control (FS-03.R50);
+queueing (R48) stays available everywhere and is unaffected.
+
+The adapter owns the hard part and AgentDeck must not reimplement it: it injects into the live turn
+and, when no turn is steerable — the turn ended between the client's decision and the call — starts a
+new turn from the same prompt instead, returning which of the two happened. AgentDeck reports that
+outcome (FS-03.R50) rather than inferring it from transcript timing, and does not add its own
+retry-as-a-new-prompt path, which would double-send against an adapter that already fell back
+(INV §2). A refusal — content the current model cannot accept — is surfaced, not downgraded to a
+queue.
+
+**Version dependency, stated rather than assumed:** the versions AgentDeck currently pins predate
+this extension. Steering is unreachable until the pinned adapters move, which is a separate change
+with its own compatibility verification; this requirement describes behavior gated on the
+advertisement, so it degrades to "no Steer control" on the current pins rather than breaking them.
+
 **R19 — A provider-rejected effort fails the launch; it is never retried bare.**
 A pinned CLI may reject a level AgentDeck's catalog declares (hand-declared Claude levels, an older
 CLI, a provider that withdrew a level). INV §12's usual detect-and-retry-without-the-optional-flag

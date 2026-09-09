@@ -43,11 +43,15 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-- [`queue-a-follow-up-while-busy.md`](queue-a-follow-up-while-busy.md) — accept a chat message while
-  the agent is working, hold one, and deliver it as the next turn; AgentDeck-side, person-only.
+- [`bump-pinned-acp-adapters.md`](bump-pinned-acp-adapters.md) — move both pinned ACP adapters
+  forward with their own compatibility verification; unblocks steering and resolves BR-2's
+  contradictory Codex CLI resolution.
 
 ## Paused changes
 
+- [`queue-a-follow-up-while-busy.md`](queue-a-follow-up-while-busy.md) — Send queues a follow-up,
+  Steer injects it into the running turn; paused on `bump-pinned-acp-adapters.md`, which the Steer
+  half needs.
 - [`migrate-internal-actions-from-mcp.md`](migrate-internal-actions-from-mcp.md) — replace only
   AgentDeck's internal MCP action delivery with the packaged direct-action command, preserving
   provider/user MCP support; waiting for a safe direct transport supported by packaged Codex/ACP.

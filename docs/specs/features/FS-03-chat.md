@@ -94,11 +94,9 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   — not yet sent, not yet seen by the agent — and it enters the durable transcript only when it is
   actually sent, so replay and search never contain a message the agent never received.
 
-  What this promises is bounded on purpose: the queued message runs **after** the current turn, not
-  inside it. It does not redirect work in progress, cancel a tool call, or reach the model any sooner
-  than the turn's end. This is the behavior the Claude and Codex CLIs give for a message typed while
-  they are working, and both pinned ACP adapters process prompts as strictly sequential turns — no
-  mid-turn injection exists to offer. A person who wants to stop what is happening uses Cancel.
+  Queueing promises delivery **after** the current turn, not inside it: it does not redirect work in
+  progress. Redirecting is the separate, explicit action in R50. A person who wants to stop what is
+  happening entirely still uses Cancel.
 
   Holding is AgentDeck's, not the provider's, so it behaves identically on every backend rather than
   only where an adapter happens to queue. **Only a person's chat message queues.** An agent-initiated
@@ -114,6 +112,26 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   same rule R36 already applies to drafts racing an in-flight send. A held message does not survive a
   dashboard restart; it is live state, not durable work, and the release-to-composer path is what
   keeps that from silently losing typed text in the ordinary case.
+
+- **R50. (planned)** **Steer the turn that is running.** Beside Send, a chat agent
+  whose runtime advertises steering offers **Steer**, which delivers the message into the in-flight
+  turn immediately rather than holding it. The agent can act on it while it works — the point is
+  redirecting an agent heading the wrong way, without discarding the turn as Cancel would. A steered
+  message is not held: it reaches the agent at once and enters the transcript as an ordinary user
+  message inside the running turn, because the agent really did receive it there.
+
+  Send and Steer are two deliberate choices with two meanings, not one control with a fallback. Send
+  is the safe default and is always present; Steer is offered only where the runtime advertises the
+  capability, and never appears as a disabled or failing control elsewhere (FS-09.R26's
+  explicit-capability rule). With the composer empty and a message already held, Steer delivers that
+  held message immediately instead, so a person who queued and then changed their mind about waiting
+  is not made to retype it.
+
+  Steering is best-effort by nature and says so: a turn can end between the click and the delivery.
+  When that happens the message is delivered as its own next turn rather than lost, and the person is
+  told which of the two happened rather than left to infer it from the transcript. A message the
+  runtime refuses — content the current model cannot accept — leaves the composer intact with the
+  reason, and never silently downgrades to a queue.
 
 ### 2.3 Streaming and recovery
 
@@ -583,6 +601,15 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   against a busy agent. *Verify by* chat-runtime tests over a `fakeacp` turn, a transcript/index test
   asserting the held message is absent before send and present once after, and dispatcher/pipeline
   tests asserting the refusal is unchanged.
+- **A33 (planned)** (R50) — Against a runtime advertising steering, **Steer**
+  delivers into the running turn without ending it, and the message appears once in that turn's
+  transcript; against a runtime that does not advertise it, no Steer control is rendered at all while
+  Send still queues; Steer with an empty composer and a message held delivers the held one and clears
+  the hold; a turn that ends between click and delivery results in the message running as its own
+  next turn with that outcome reported rather than silently dropped; and a refused message leaves the
+  composer's text in place with the reason. *Verify by* chat-runtime tests over `fakeacp` scenarios
+  that advertise and withhold steering plus one that ends the turn mid-call, and `ChatPanel.test.tsx`
+  for control presence and the two outcome messages.
 - **A32 (planned)** (R49) — Cancelling a turn with a message held sends it as the
   next turn; stopping the agent with an empty composer returns the text to that agent's composer
   draft; stopping it with text already in the composer discards the held message and leaves the typed
