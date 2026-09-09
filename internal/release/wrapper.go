@@ -21,7 +21,11 @@ set -e
 here="$(cd "$(dirname "$0")" && pwd -P)"
 root="$(cd "$here/.." && pwd -P)"
 PATH="$root/runtime/node/bin:$root/runtime/node_modules/.bin:$PATH"
-export PATH
+# codex-acp otherwise resolves its own semver-pinned Codex dependency, which can
+# lag behind AgentDeck's direct private Codex pin. Keep the direct executable as
+# the release default while allowing an explicit process/backend/model override.
+CODEX_PATH="${CODEX_PATH:-$root/runtime/node_modules/.bin/codex}"
+export PATH CODEX_PATH
 exec "$root/libexec/agentdeck" "$@"
 `
 

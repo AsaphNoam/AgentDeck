@@ -21,7 +21,7 @@ CODEX_ACP_VERSION="1.1.2"
 # `codex login status`, so onboarding readiness must not depend on where the
 # adapter happens to hoist it (TS-06.R22). Keep in step with
 # scripts/release/package.json.
-CODEX_CLI_VERSION="0.144.4"
+CODEX_CLI_VERSION="0.153.4"
 TARGET="darwin-arm64"
 OUT_DIR="${OUT_DIR:-$ROOT/dist/release}"
 

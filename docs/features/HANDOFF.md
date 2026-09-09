@@ -40,7 +40,8 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   model from its first release and later ignored effort too; its implementation is reviewed with
   open findings. BR-2: v0.4.2 can import GPT-6-Astra from a newer personal Codex cache while its
   packaged adapter runs Codex 0.144.4, so the selectable model fails at prompt time; the immediate
-  release pin and the cross-version catalog/runtime gap are open findings.
+  release pin is fixed, while the cross-version catalog/runtime gap remains open and is addressed
+  structurally by the waiting adapter-bump unit.
   BR-3: waking a stopped agent can publish provider-restored history as fresh live events, making a
   long transcript visibly scroll through old work before the new turn; the runtime defect is
   confirmed and its match to the backend-unspecified field report is probable.
@@ -65,6 +66,15 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 findings, BR-3, or the open `chat-session-configuration` Worth-fixing finding; `/work` has no waiting unit;
 `/design-feature` may choose an available or resumable idea, or an idea a person names from another
 `docs/ideas.md` section. Role queues are independent.
+
+**Changelog — 2026-09-09 (fix):** Closed BR-2's immediate Must-fix. The release-private Codex CLI
+is pinned to 0.153.4 throughout the manifest, lockfile, assembly checks, and release fixtures. The
+release wrapper now defaults `CODEX_PATH` to that exact direct private executable, so codex-acp
+1.1.2 cannot silently launch its nested 0.144.x dependency; an explicit environment override is
+still preserved. TS-06.R22 and wrapper coverage record the executable-authority contract. Focused
+release/CLI tests and the full closure matrix pass; no credentialed Astra prompt was sent, so that
+acceptance gate remains open. The systemic model-catalog/runtime gap remains a Worth-fixing finding,
+with `bump-pinned-acp-adapters.md` queued as its structural follow-up.
 
 **Changelog — 2026-09-09 (bug investigation):** Confirmed BR-2. v0.4.2 pins its private Codex CLI
 to 0.144.4, while model autosync reads the personal Codex cache produced by a potentially newer
@@ -199,19 +209,6 @@ let it block any role.
   wake publishes only the newly accepted prompt/turn events while the provider still answers with
   restored context.
 
-- **Must fix** — the v0.4.2 private Codex runtime predates GPT-6-Astra support (**confirmed**).
-  **Where:** `scripts/release/package.json:11-12` and its lockfile pin `@openai/codex` 0.144.4;
-  `scripts/release/assemble.sh:17-24,54-69` installs and verifies that exact private CLI, and
-  `codex-acp` 1.1.2 starts its bundled dependency when `CODEX_PATH` is absent. **Normal-use
-  trigger:** select an imported `gpt-6-astra` model in AgentDeck 0.4.2 and send a prompt. **Why it
-  matters:** Codex warns that model metadata is missing and the provider rejects the request with
-  HTTP 400 requiring a newer Codex, so an offered chat configuration cannot run. Official Codex
-  0.153.1 added configurable Astra support; 0.153.4 fixed its bundled-picker visibility. The
-  locally installed newer CLI is intentionally not selected by the private release runtime.
-  **Requirement:** `FS-09.R7/R21/R58`, `TS-06.R14/R22`, `INV §12`. **Suggested fix/test:** update
-  the direct Codex pin, lockfile, assembly constant, manifests, and fixtures to a reviewed compatible
-  release; prove the assembled archive reports that version and complete a credentialed Astra
-  prompt through the packaged adapter before claiming support.
 - **Worth fixing** — Codex model discovery and execution use different version authorities
   (**confirmed spec gap**). **Where:** `internal/config/codexmodels.go:31-86` imports every visible
   model from `${CODEX_HOME:-~/.codex}/models_cache.json`, while `internal/release/wrapper.go:10-25`

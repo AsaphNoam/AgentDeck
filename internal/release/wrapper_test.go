@@ -9,8 +9,9 @@ import (
 )
 
 // buildRunnableVersion assembles a version whose libexec/agentdeck is a shell
-// script that reports the PATH it runs under and which `node` it resolves, so a
-// test can prove the private runtime is on PATH (TS-06.R15, FS-10.A2).
+// script that reports the PATH and CODEX_PATH it runs under and which `node` it
+// resolves, so a test can prove the private runtime is selected (TS-06.R15/R22,
+// FS-10.A2).
 func buildRunnableVersion(t *testing.T, l *Layout, version string) string {
 	t.Helper()
 	name := VersionDirName(version)
@@ -37,7 +38,7 @@ func buildRunnableVersion(t *testing.T, l *Layout, version string) string {
 	if err := os.MkdirAll(libexec, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	report := "#!/bin/sh\necho \"PATH=$PATH\"\necho \"NODE=$(command -v node)\"\necho \"CODEX=$(command -v codex)\"\necho \"ARGS=$*\"\n"
+	report := "#!/bin/sh\necho \"PATH=$PATH\"\necho \"NODE=$(command -v node)\"\necho \"CODEX=$(command -v codex)\"\necho \"CODEX_PATH=$CODEX_PATH\"\necho \"ARGS=$*\"\n"
 	if err := os.WriteFile(filepath.Join(libexec, "agentdeck"), []byte(report), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -50,8 +51,9 @@ func buildRunnableVersion(t *testing.T, l *Layout, version string) string {
 	return name
 }
 
-// The shim → wrapper → libexec chain prepends the private runtime to PATH and
-// resolves `node` to the bundled copy (FS-10.A2, TS-06.R15).
+// The shim → wrapper → libexec chain prepends the private runtime to PATH,
+// resolves `node` to the bundled copy, and directs codex-acp to the exact
+// manifest-pinned Codex executable (FS-10.A2, TS-06.R15/R22).
 func TestShimRunsPrivateRuntime(t *testing.T) {
 	l := newLayout(t)
 	name := buildRunnableVersion(t, l, "1.0.0")
@@ -97,11 +99,39 @@ func TestShimRunsPrivateRuntime(t *testing.T) {
 				t.Fatalf("node resolved to %q, want the private %q", got, filepath.Join(wantNodeDir, "node"))
 			}
 		}
+		if strings.HasPrefix(line, "CODEX_PATH=") {
+			if got := strings.TrimPrefix(line, "CODEX_PATH="); got != filepath.Join(wantAdapterDir, "codex") {
+				t.Fatalf("CODEX_PATH = %q, want the private %q", got, filepath.Join(wantAdapterDir, "codex"))
+			}
+		}
 		if strings.HasPrefix(line, "ARGS=") {
 			if got := strings.TrimPrefix(line, "ARGS="); got != "extra-arg" {
 				t.Fatalf("args not forwarded: %q", got)
 			}
 		}
+	}
+}
+
+// An explicit Codex executable remains a supported escape hatch for a provider
+// compatibility issue; the release default must not overwrite it (TS-06.R22).
+func TestShimPreservesExplicitCodexPath(t *testing.T) {
+	l := newLayout(t)
+	name := buildRunnableVersion(t, l, "1.0.0")
+	if err := l.Activate(name); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.WriteShim(); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := exec.Command(l.ShimPath())
+	cmd.Env = append(os.Environ(), "CODEX_PATH=/custom/codex")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("shim run: %v\n%s", err, out)
+	}
+	if !strings.Contains(string(out), "CODEX_PATH=/custom/codex\n") {
+		t.Fatalf("explicit CODEX_PATH was not preserved:\n%s", out)
 	}
 }
 

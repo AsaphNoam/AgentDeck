@@ -38,7 +38,7 @@ func buildArchive(t *testing.T, version string) (string, string) {
 	}
 	if err := release.WriteInternalManifest(dir, release.InternalManifest{Version: version, Target: release.Target, Components: map[string]string{
 		"node": "22.0.0", "claude-agent-acp": "0.59.0", "codex-acp": "1.1.2",
-		"codex": "0.144.4", "agentdeck": version,
+		"codex": "0.153.4", "agentdeck": version,
 	}}); err != nil {
 		t.Fatal(err)
 	}

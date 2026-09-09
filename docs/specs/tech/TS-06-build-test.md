@@ -119,11 +119,14 @@ and Codex login/chat checks remain manual gates and cannot be represented as rel
 
 **R22** — The release runtime declares and lockfiles the exact direct `@openai/codex`
 dependency required for Codex native `login status`, exposes its executable through the private
-wrapper PATH, and validates that executable alongside both ACP adapters before packaging. Source and
-release command-tree tests prove `agentdeck auth claude|codex` is present; release tests also prove
-the private Codex readiness command resolves without a globally installed Codex CLI. Existing
-installed release directories remain immutable: a command absent from an older version requires an
-explicit reinstall/update to a newer release.
+wrapper PATH, exports that same direct executable as the wrapper's default `CODEX_PATH`, and validates
+it alongside both ACP adapters before packaging. This prevents the adapter's own older compatible
+dependency range from silently selecting a different Codex than the release manifest names. An
+explicit ambient, backend, or model `CODEX_PATH` still overrides the default. Source and release
+command-tree tests prove `agentdeck auth claude|codex` is present; release tests also prove the
+private Codex readiness command and adapter override resolve without a globally installed Codex CLI.
+Existing installed release directories remain immutable: a command absent from an older version
+requires an explicit reinstall/update to a newer release.
 
 **R23 (planned) — The action client is the exact running AgentDeck binary.** Source and release
 launches resolve `os.Executable()` to an absolute path and inject that immutable/current-version
@@ -178,9 +181,10 @@ shared target guarantees.
   `TestCreateArchiveKeepsSymlinkedCommandTargetContext`.
 - Private Codex CLI pin (R22): `scripts/release/package.json` + lockfile declare `@openai/codex`
   directly, `scripts/release/assemble.sh` validates the executable before packaging, and
-  `requiredLayout`/`verifyInternalManifest` in `internal/release/manifest.go` enforce it. Proven by
-  `TestPrivateCodexResolvesWithoutGlobalInstall`, `TestRequiredLayoutAndManifestComponentsAgree`, and
-  `TestAuthCommandIsPresentForEveryProvider`.
+  `requiredLayout`/`verifyInternalManifest` in `internal/release/manifest.go` enforce it; the wrapper
+  supplies the same executable to the adapter through its documented `CODEX_PATH` override. Proven
+  by `TestPrivateCodexResolvesWithoutGlobalInstall`, `TestRequiredLayoutAndManifestComponentsAgree`,
+  and `TestAuthCommandIsPresentForEveryProvider`.
 - Spec lint: `scripts/check-specs.sh`.
 - Role-launcher contract: `scripts/check-launcher-contract.sh`, with
   `scripts/check-launcher-contract-test.sh` proving each guarded rule fails on a launcher or
