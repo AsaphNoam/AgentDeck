@@ -110,6 +110,26 @@ a second selection path. `claude-acp` keeps its existing metadata delivery, so t
 accessor loses its only caller and is removed rather than left as a no-op a future adapter could
 re-enable by accident (INV §10).
 
+**R29 `(planned)` — Queueing is an opt-in caller capability, never a property of
+`SendPrompt`.** `SendPrompt` is shared by five callers: the person's chat prompt handler, the
+annotation delivery path, the task dispatcher, and two pipeline-lifecycle transitions. Three of those
+consume `ErrTurnInFlight` as arbitration — the dispatcher and pipeline paths pause work on it — so
+adding a queue inside `SendPrompt` would silently let a pipeline run past the gate that paused it.
+`SendPrompt` therefore keeps its exact fail-closed contract, and holding is a **separate runtime
+entry point** that only the person's chat prompt handler calls (FS-03.R48). Annotation delivery keeps
+`SendPrompt`, because it is a batch handoff rather than a conversational follow-up and its refusal is
+already surfaced to the person.
+
+The hold is per-agent live runtime state of at most one message, so it is bounded by construction
+(INV §16) and dies with the agent's registration under the existing generation-scoped teardown
+(INV §4) — nothing to persist, nothing to reap. Deciding between "send now" and "hold" is a
+check-then-act over the same `turnActive` flag the turn gate reads, so it takes that flag's lock and
+resolves in one critical section; a hold that raced a `turn_end` would otherwise sit until the next
+turn or double-send (INV §5, the class `internal/runtime` concurrency already pays for). Release is
+driven from the single place that already ends a turn, so cancel and normal completion cannot grow
+divergent delivery paths (INV §2), and a stop or crash releases the hold through the same teardown
+rather than a second cleanup (INV §4).
+
 **R13.** Archive/restore is one server-owned lifecycle service, not an HTTP handler
 calling another handler or a UI-side sequence of Stop and config writes. One server-owned transition
 gate serializes archive/restore per project and per agent. Every path that can start a process —

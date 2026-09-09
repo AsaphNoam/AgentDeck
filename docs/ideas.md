@@ -66,35 +66,6 @@ the relevant feature and technical specifications; it does not change product co
   targets, or FS-15 context pulls, and reopening a conversation shows no reasoning. Still open:
   default collapsed or expanded rendering, and whether `plan` ships in the same slice.
 
-- **Steer a running turn from the chat composer.** Requested 2026-09-07: type a follow-up while the
-  agent is working, as the Claude and Codex CLIs allow. Today `SendPrompt` refuses outright —
-  `ErrTurnInFlight` (`internal/runtime/chat.go:355`) becomes a `409` (`internal/server/sessions.go:554`)
-  and the composer shows Cancel instead of Send while busy (FS-03.R9,
-  `ui/src/components/chat/Composer.tsx:253`). Provider support verified 2026-09-07 and it is
-  **asymmetric**:
-  - `claude-agent-acp` 0.59.0 supports it natively: `Session.turnQueue` is a FIFO of in-flight
-    prompts, a second `session/prompt` is pushed to the SDK immediately and echoed back in
-    submission order, and the adapter carries explicit orphan/cancel accounting for queued turns.
-  - `codex-acp` 1.1.2 does **not** queue — it **supersedes**. `prompt()` clears
-    `sessionState.currentTurnId` on entry and calls `this.activePrompts.set(sessionId, activePrompt)`,
-    overwriting the entry belonging to the running prompt. The displaced prompt then fails
-    `promptShouldStop()` (`activePrompts.get(sessionId) !== activePrompt`), which routes its turn to
-    `interruptLateStartedTurn()`. A second concurrent `session/prompt` therefore interrupts the turn
-    in progress rather than following it — worse for steering than today's `409`.
-  - The Codex gap is adapter-side, not a Codex limitation. The Codex app-server protocol has
-    first-class `turn/steer` and `thread/queue` methods (both present in the `codex` 0.152.0 binary;
-    `codex queue --thread --message` is their CLI surface), and `codex-acp` 1.1.2 wires up neither —
-    its app-server method set is `turn/start`, `turn/interrupt`, `turn/completed`, `turn/started`,
-    `turn/diff/updated`, `turn/plan/updated`, `turn/moderationMetadata`. Codex steering arrives with
-    an adapter version bump, not a protocol redesign; re-check for `turn/steer` in `codex-acp`
-    before concluding Codex cannot steer.
-  So a portable design cannot assume queueing today. Open product decisions: whether steering is
-  adapter-native queueing (Claude only, honest capability split like FS-09.R39) or an AgentDeck-side
-  hold-until-idle that works everywhere but is deferred send rather than steering; whether a queued
-  steer can be withdrawn; and whether the relaxation is person-only — `ErrTurnInFlight` is currently
-  load-bearing for coordination and pipeline arbitration (`internal/server/messaging_loops.go:77`,
-  `:156`), so agent-initiated activations should almost certainly keep failing closed.
-
 - **Edit a sent chat message.** From the 2026-08-10 play session: like Codex, editing the most
   recent message edits it in place, and editing an older one forks the conversation from that point.
   Designing this on 2026-08-27 established that AgentDeck cannot give it the meaning Codex does, and

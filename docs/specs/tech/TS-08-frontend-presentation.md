@@ -1,6 +1,6 @@
 # TS-08 — Frontend presentation architecture
 
-**Status:** Current
+**Status:** Partial
 **Code:** `ui/src`, `ui/package.json`, `ui/vite.config.ts`
 **Absorbed:** —
 
@@ -550,6 +550,20 @@ primitive seam; the rejected alternatives are recorded in §5.
   (INV §8, INV §1). Because the applied value also arrives on the republished agent, the toggle
   derives from that agent field rather than holding a second copy that could drift from the card and
   the archive header (INV §2).
+
+- **R56 `(planned)` — A held message is a transcript-tail affordance, not a
+  transcript event.** The pending follow-up (FS-03.R48) renders at the end of the transcript beside
+  the R29 waiting indicator, from client state keyed to the agent, and is never merged into the
+  event list `foldTranscript` builds. Keeping it out of that list is what makes it structurally
+  impossible for a live render and a reload to disagree about it (INV §1/§2, the rule this file
+  already applies to the annotation-block fold): the server sends no event for a message it has not
+  delivered, so the only truthful place for it is beside the list.
+
+  It must read as not-yet-sent rather than as a sent message awaiting reply — the failure mode is a
+  person believing the agent has already seen it — and it carries its own withdraw affordance
+  (INV §8). Release on stop reuses the existing per-agent draft store rather than a second text
+  store, and applies R36's newer-draft rule: write the released text only into an empty composer for
+  that agent, never over text typed since (INV §2).
 
 ## 3. Interfaces & data shapes
 

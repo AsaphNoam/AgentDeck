@@ -195,6 +195,20 @@ switch still restarts the process; that redundancy is retained deliberately rath
 because removing a shipped request field is a compatibility break and the chat header no longer uses
 that path for effort anyway (FS-03.R47).
 
+**R38 `(planned)` — Queueing changes the prompt route's outcome, not its shape.**
+`POST /api/sessions/{id}/prompt` stops returning `409 conflict` for a busy chat agent and returns the
+same `202 {accepted, agent_id}` it returns today, with a field naming whether the message was sent or
+held so a client can render the pending state without inferring it from agent status. No new route
+and no request-body change: the route is already the person's path and the agent-facing callers reach
+the runtime in-process (TS-01.R29), so person-only holding needs no authorization concept, only the
+existing route boundary. Withdrawing the held message is `DELETE` on the same path, which is the
+resource-shaped spelling of the one operation the hold adds; it is a no-op returning the same body
+when nothing is held, so a double-withdraw is not an error (INV §8).
+
+The `409` remains reachable and meaningful: a terminal agent, and any caller reaching the runtime
+without the hold capability, still receive it. Clients that today treat `409` as "retry later" keep
+working — they simply stop seeing it on the chat path.
+
 **R20.** Project and agent archive use explicit action routes rather than overloading
 ordinary project replacement or Stop: `POST /api/projects/{project}/archive`, `POST
 /api/projects/{project}/restore`, `POST /api/sessions/{id}/archive`, and `POST

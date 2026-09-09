@@ -22,13 +22,12 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   `dock-the-annotation-tray-and-quiet-its-prompt` is reviewed, fixed, and closed; all
   earlier units through this release are closed. Review records, finding-fix
   commits, release records, and handoff/archive/queue bookkeeping are administrative closure.
-- **Work units:** None waiting. `migrate-internal-actions-from-mcp.md` stays paused on its recorded
-  transport blocker.
+- **Work units:** `queue-a-follow-up-while-busy.md` is waiting to start (designed 2026-09-09).
+  `migrate-internal-actions-from-mcp.md` stays paused on its recorded transport blocker.
 - **Design units:** Existing entries under `Ideas being defined` may resume, and entries under
-  `New ideas` are available to start. Two entries from the 2026-09-07 agent-features request are
+  `New ideas` are available to start. One entry from the 2026-09-07 agent-features request remains
   part-decided and resumable: streaming agent thinking (decided live-only; rendering default and
-  whether `plan` ships with it still open) and steering a running turn (open on whether steering is
-  Claude-native queueing or a portable hold-until-idle). The permanently unaddressable pipeline
+  whether `plan` ships with it still open). The permanently unaddressable pipeline
   agent remains the newest `New ideas` entry and needs `/design-feature` before code.
 - **Open findings:** Two usability findings from the 2026-09-07 v0.4.2 review plus two Must-fix and
   two Worth-fixing BR-1/session-configuration findings: J2 incompatible CLI status, J5 clipped

@@ -43,7 +43,8 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-None.
+- [`queue-a-follow-up-while-busy.md`](queue-a-follow-up-while-busy.md) — accept a chat message while
+  the agent is working, hold one, and deliver it as the next turn; AgentDeck-side, person-only.
 
 ## Paused changes
 

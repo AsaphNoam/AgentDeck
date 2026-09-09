@@ -220,6 +220,29 @@ requirement cite a live check rather than a code reading alone.
 Because effort now applies to a live session as well as at startup, the same helper serves the
 running-agent change in FS-03.R47 with no second spelling of the call (INV §2).
 
+**R48 `(planned)` — AgentDeck holds a queued prompt itself; no adapter queue is
+used.** Both pinned chat adapters process prompts as strictly sequential turns, and neither exposes
+mid-turn injection, so the strongest portable promise is "runs as the next turn" (FS-03.R48) and the
+holding mechanism is free to be AgentDeck's. It is, for three reasons that are properties of the
+pinned adapters rather than preference:
+
+- **The native queues disagree, and one is destructive.** `claude-agent-acp` 0.59.0 keeps a FIFO
+  `turnQueue`, pushing each prompt to the SDK immediately and echoing it back in submission order.
+  `codex-acp` 1.1.2 does the opposite: `prompt()` clears the session's current turn id and overwrites
+  the single per-session active prompt, so the displaced one fails its stop check and its turn is
+  interrupted. Pushing a second prompt to Codex would kill the turn the person is waiting on.
+- **A pushed prompt cannot be withdrawn.** The Claude adapter's orphan/zombie result accounting
+  exists precisely because a cancelled queued turn's message has already reached the SDK. Holding
+  host-side keeps withdrawal (FS-03.R48) a local state change instead of an accounting problem.
+- **One behavior beats four.** Holding above the adapter gives `opencode-acp` and `openhands-acp` the
+  same behavior without checking whether their pinned adapters queue, superseded, or reject — the
+  INV §12 posture that BR-1 exists because AgentDeck did not take.
+
+A future adapter may gain a real steering primitive: the Codex app-server already has `turn/steer`
+and `thread/queue`, which `codex-acp` 1.1.2 wires up to neither. Adopting one is a separate
+capability-gated requirement and a stronger product promise than R48's, not a drop-in replacement for
+this hold.
+
 **R19 — A provider-rejected effort fails the launch; it is never retried bare.**
 A pinned CLI may reject a level AgentDeck's catalog declares (hand-declared Claude levels, an older
 CLI, a provider that withdrew a level). INV §12's usual detect-and-retry-without-the-optional-flag
