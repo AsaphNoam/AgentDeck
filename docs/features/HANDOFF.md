@@ -29,17 +29,20 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   part-decided and resumable: streaming agent thinking (decided live-only; rendering default and
   whether `plan` ships with it still open). The permanently unaddressable pipeline
   agent remains the newest `New ideas` entry and needs `/design-feature` before code.
-- **Open findings:** Two usability findings from the 2026-09-07 v0.4.2 review plus two Must-fix and
-  two Worth-fixing BR-1/session-configuration findings: J2 incompatible CLI status, J5 clipped
+- **Open findings:** Two usability findings from the 2026-09-07 v0.4.2 review plus three Must-fix and
+  two Worth-fixing bug/session-configuration findings: J2 incompatible CLI status, J5 clipped
   lower-row card menus, live-gate finding durability, provider-contract oracles, explicit-empty ACP
-  option-list replacement, and the unverified OpenCode/OpenHands paths. The six original
+  option-list replacement, stopped-agent history replay, and the unverified OpenCode/OpenHands paths. The six original
   `chat-session-configuration` findings are closed. The claimed Claude model-delivery finding was
   retracted after a provider-authoritative prompt probe disproved it.
-- **Bug reports:** BR-1 and BR-2 are investigated. BR-1: Codex chat silently ignored the selected
+- **Bug reports:** BR-1 through BR-3 are investigated. BR-1: Codex chat silently ignored the selected
   model from its first release and later ignored effort too; its implementation is reviewed with
   open findings. BR-2: v0.4.2 can import GPT-6-Astra from a newer personal Codex cache while its
   packaged adapter runs Codex 0.144.4, so the selectable model fails at prompt time; the immediate
   release pin and the cross-version catalog/runtime gap are open findings.
+  BR-3: waking a stopped agent can publish provider-restored history as fresh live events, making a
+  long transcript visibly scroll through old work before the new turn; the runtime defect is
+  confirmed and its match to the backend-unspecified field report is probable.
   Current pinned Claude model delivery through `_meta` works; its ACP model `currentValue` can be
   stale and is not an execution-model oracle.
   The postmortem corrects the earlier claim that the bug went unnoticed and records how a live
@@ -58,7 +61,7 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 **Change:** None.
 
 **Available by role:** `/review` has no unreviewed unit; `/fix` may select the BR-1 postmortem
-findings or the open `chat-session-configuration` Worth-fixing finding; `/work` has no waiting unit;
+findings, BR-3, or the open `chat-session-configuration` Worth-fixing finding; `/work` has no waiting unit;
 `/design-feature` may choose an available or resumable idea, or an idea a person names from another
 `docs/ideas.md` section. Role queues are independent.
 
@@ -70,6 +73,15 @@ support. Official Codex 0.153.1 added configurable Astra support. AgentDeck alre
 `CODEX_PATH`, and Settings can carry it through the generic Codex backend environment editor, but
 there is no dedicated compatibility surface. Recorded one immediate Must-fix and one systemic
 Worth-fixing; no provider prompt was sent and no reproduction test was committed.
+
+**Changelog — 2026-09-09 (bug investigation):** Diagnosed BR-3, the stopped-agent wake that visibly
+scrolls through old conversation history. The resume transport accepts `session/update` frames while
+`session/load` is restoring provider history, and the ordinary notification path publishes every
+replayed frame as a fresh live transcript event. The open browser then appends each frame and its
+bottom-follow effect advances through the replay. A 39-event real-browser wake against `fakeacp` did
+not reproduce because that test adapter emits no load history; the field attribution remains
+probable because the report did not identify the backend/version or include logs. Recorded one
+Must-fix; no reproduction test was committed.
 
 **Changelog — 2026-09-09 (review):** Explicitly re-reviewed the `chat-session-configuration`
 finding-fix range `edb909a..8a01ebf`. The six original findings are materially addressed: rebuilt
@@ -169,6 +181,23 @@ let it block any role.
 
 ## Review findings
 
+- **Must fix** — native resume publishes provider history replay as fresh live transcript events
+  (**confirmed defect; probable match to BR-3**). **Where:** `internal/runtime/chat.go:598-634`
+  installs the ordinary notification callback before `session/load`; `onNotification` at
+  `internal/runtime/chat.go:910-940` maps every `session/update` through `emit`, whose global sink
+  publishes it even during startup; `ui/src/api/sse.ts:121-135` appends every published event, and
+  `ui/src/components/chat/TranscriptView.tsx:46-49` bottom-follows every events change. **Normal-use
+  trigger:** submit a prompt to a stopped chat agent whose ACP adapter replays prior updates while
+  loading a sufficiently long native session. **Why it matters:** the already-rendered conversation
+  is emitted again as live activity, making the transcript visibly travel through old work before
+  reaching the new prompt and temporarily duplicating history; this violates the promise that wake
+  shows the new user message plus ordinary busy progression. **Requirement:** `FS-03.R3/R4/R35`,
+  `INV §1`, `INV §11`. **Suggested fix/test:** distinguish startup/load replay from live turn
+  updates at the runtime boundary and suppress it from AgentDeck transcript emission while retaining
+  provider-native context; add a fake ACP load scenario that emits a multi-turn history and assert
+  wake publishes only the newly accepted prompt/turn events while the provider still answers with
+  restored context.
+
 - **Must fix** — the v0.4.2 private Codex runtime predates GPT-6-Astra support (**confirmed**).
   **Where:** `scripts/release/package.json:11-12` and its lockfile pin `@openai/codex` 0.144.4;
   `scripts/release/assemble.sh:17-24,54-69` installs and verifies that exact private CLI, and
@@ -262,6 +291,40 @@ let it block any role.
   remove any redundant unsupported top-level fields once their real mechanism is known.
 
 ## Bug investigation reports
+
+### BR-3 — waking a stopped agent scrolls through the whole conversation
+
+**Report (verbatim).** “Sending a message in a stopped agent makes it scroll through the entire
+conversation, mainly a weird UI bug”. No AgentDeck version, backend, operating environment, or logs
+were supplied.
+
+**Verdict.** This is a **confirmed code defect** on the native-resume path and a **probable** match
+for the field symptom. The governing behavior says a stopped composer is a wake surface and should
+show the newly submitted user message plus ordinary busy progression; transcript auto-follow applies
+to new events, not replayed copies of history. The exact field combination is not confirmed because
+the report does not identify which adapter/version produced it.
+
+**Trace.** Resume constructs the transport and installs `onNotification` before calling ACP
+`session/load`. A provider is allowed to restore native context by emitting prior `session/update`
+frames during that call; the pinned Codex adapter is already recorded as replaying prior history on
+load. AgentDeck has no startup/load phase gate in `onNotification`: every mapped update calls
+`emit`, which assigns a fresh AgentDeck sequence and forwards it through the runtime's global sink.
+The open chat's SSE handler appends each such event to the existing rendered transcript, and
+`TranscriptView` sets `scrollTop` to the growing `scrollHeight` after each event while the reader is
+at the bottom. That composition explains the visible traversal and makes the apparently visual bug
+a runtime/UI boundary defect: old provider context is mislabeled as new AgentDeck activity.
+
+**Reproduction evidence.** An isolated real-browser run opened a stopped 39-event conversation,
+submitted a wake prompt, and sampled the transcript transition. It stayed at the bottom and did not
+traverse history because the repository's `fakeacp` `session/load` returns success without emitting
+history. This negative control rules out the generic optimistic-send and CSS scroll code by itself;
+it does not exercise the provider replay condition. No skipped test was added because the existing
+fake adapter has no load-replay scenario; the finding specifies that scenario as the fix session's
+regression test.
+
+**Evidence.** `FS-03.R3/R35/A18`, `internal/runtime/chat.go` (`Resume`, `onNotification`, `emit`),
+`ui/src/api/sse.ts`, `ui/src/components/chat/TranscriptView.tsx`, the pinned-adapter resume record in
+`docs/archive/reviews/live-provider-acceptance-2026-07-26.md`, and the isolated browser fixture run.
 
 ### BR-2 — GPT-6-Astra is selectable but the packaged Codex is too old
 
