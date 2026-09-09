@@ -17,7 +17,8 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   annotation transcripts, and Mermaid rendering fixes. It changes no agent-facing behavior, so the
   embedded `operating-agentdeck` package was not refreshed. The distributable binary reports
   `0.4.2` and carries `sqlite_fts5`.
-- **Review units:** `chat-session-configuration` is reviewed, fixed, and closed.
+- **Review units:** `chat-session-configuration` was explicitly re-reviewed through its finding-fix
+  commit; one Worth-fixing protocol replacement finding is open.
   `dock-the-annotation-tray-and-quiet-its-prompt` is reviewed, fixed, and closed; all
   earlier units through this release are closed. Review records, finding-fix
   commits, release records, and handoff/archive/queue bookkeeping are administrative closure.
@@ -29,21 +30,25 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   whether `plan` ships with it still open) and steering a running turn (open on whether steering is
   Claude-native queueing or a portable hold-until-idle). The permanently unaddressable pipeline
   agent remains the newest `New ideas` entry and needs `/design-feature` before code.
-- **Open findings:** Two usability findings from the 2026-09-07 v0.4.2 review plus three Must-fix
-  and one Worth-fixing postmortem findings: J2 incompatible CLI status, J5 clipped lower-row card
-  menus, live-gate finding durability, provider-contract oracles, the **confirmed** Claude model
-  result, and the unverified OpenCode/OpenHands paths. The six
-  `chat-session-configuration` findings are closed.
+- **Open findings:** Two usability findings from the 2026-09-07 v0.4.2 review plus two Must-fix and
+  two Worth-fixing BR-1/session-configuration findings: J2 incompatible CLI status, J5 clipped
+  lower-row card menus, live-gate finding durability, provider-contract oracles, explicit-empty ACP
+  option-list replacement, and the unverified OpenCode/OpenHands paths. The six original
+  `chat-session-configuration` findings are closed. The claimed Claude model-delivery finding was
+  retracted after a provider-authoritative prompt probe disproved it.
 - **Bug reports:** BR-1 is investigated. Codex chat silently ignored the selected model from its
   first release and later ignored effort too; its implementation is reviewed with open findings.
+  Current pinned Claude model delivery through `_meta` works; its ACP model `currentValue` can be
+  stale and is not an execution-model oracle.
   The postmortem corrects the earlier claim that the bug went unnoticed and records how a live
   Must-fix finding was lost between design, implementation, and review. See **Bug investigation
   reports**.
 - **State:** Automated MCP contract verification is green. A historical credentialed provider run
-  on 2026-07-26 detected the BR-1 model failure; the current post-fix Claude/Codex acceptance matrix
-  remains open and must not be described as verified. The 2026-09-08 fix run drove both pinned
-  adapters live for the session-configuration contract only; that probe is recorded under **Bug
-  investigation reports** and is not the acceptance matrix.
+  on 2026-07-26 detected the BR-1 model failure; the full post-fix Claude/Codex acceptance matrix
+  remains open and must not be described as verified. A 2026-09-09 credentialed Claude prompt probe
+  did verify current effective-model delivery for Haiku and Sonnet. The 2026-09-08 fix run drove
+  both pinned adapters live for the session-configuration contract only; neither limited probe is
+  the full acceptance matrix.
 - **Branch:** `main`.
 
 ## Active change
@@ -51,9 +56,24 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 **Change:** None.
 
 **Available by role:** `/review` has no unreviewed unit; `/fix` may select the BR-1 postmortem
-findings; `/work` has no waiting unit; `/design-feature` may choose an available
-or resumable idea, or an idea a person names from another `docs/ideas.md` section. Role queues are
-independent.
+findings or the open `chat-session-configuration` Worth-fixing finding; `/work` has no waiting unit;
+`/design-feature` may choose an available or resumable idea, or an idea a person names from another
+`docs/ideas.md` section. Role queues are independent.
+
+**Changelog — 2026-09-09 (review):** Explicitly re-reviewed the `chat-session-configuration`
+finding-fix range `edb909a..8a01ebf`. The six original findings are materially addressed: rebuilt
+option advertisements are consumed, live changes share the lifecycle claim, partial applies are
+persisted, runtime failures are typed, fast availability is projected to the header, and the
+missing task/pipeline and negative UI coverage exists. One Worth-fixing protocol edge remains:
+`setConfigOption` ignores an explicit empty rebuilt `configOptions` list and therefore retains stale
+options despite TS-04.R46's replace-not-merge requirement. Retracted the fix run's Claude Must-fix:
+its setup-only probe treated adapter-local `configOptions.model.currentValue` as an execution oracle,
+while a credentialed prompt probe observed the requested model in raw SDK `system/init.model`, the
+assistant message's `model`, and result `modelUsage` for both Haiku and Sonnet even though ACP still
+reported stale `opus`. The existing provider-oracle postmortem finding now records this recurrence.
+Focused runtime/state/server tests, the ChatPanel test plus presentation/style prechecks, and spec
+checks pass; the server suite required loopback permission. The full provider acceptance matrix
+remains open.
 
 **Changelog — 2026-09-08 (fix):** Closed all six `chat-session-configuration` review findings
 (INV §1, §5, §8, §11, §12, §15, §17). The ACP configuration decode now keeps each option's reported
@@ -73,11 +93,11 @@ confirmed to fail against the pre-fix discard. TS-02.R30, TS-03.R37, and TS-04.R
 suite, SQLite-FTS variant, targeted `-race` runs, vet, all UI tests, UI build, style/presentation
 checks, and spec checks pass.
 
-**Both pinned adapters were driven live during this fix**, which resolved one open question and
-confirmed another. See **Bug investigation reports** for the recorded probes: Claude model delivery
-via `_meta` is broken (a session requesting `haiku` came up on the local default `opus`), and
-post-session configuration works for Claude as well as Codex. That is a finding in the BR-1
-postmortem unit, not this one, and it is left open with the evidence attached.
+**Both pinned adapters were driven live during this fix**, but only for setup/configuration calls.
+See **Bug investigation reports** for the recorded probes. Post-session configuration works at the
+ACP adapter layer for Claude as well as Codex. The run's stronger Claude model-delivery conclusion
+was retracted by the 2026-09-09 review because it never sent a prompt and relied on a stale
+adapter-local field.
 
 **Changelog — 2026-09-08 (review):** Reviewed `chat-session-configuration` across its design and
 implementation range. The ordered provider-setting path discards the required updated option list,
@@ -171,31 +191,27 @@ let it block any role.
   (**confirmed**). **Where:** TS-04.R18 asserted a `model[effort]` request shape after inspecting
   `codex-acp`'s internal `ModelId` parser without tracing `session/new` to `threadStart`; FS-09.A15
   and `fakeacp` then checked only that AgentDeck emitted the asserted field. The fake accepts unknown
-  request members that the pinned ACP decoder drops. **Why it matters:** design, implementation, and
-  review can all agree and remain wrong about the external system. **Requirement:** `INV §11`,
+  request members that the pinned ACP decoder drops. The same oracle error recurred in the 2026-09-08
+  finding-fix: it called ACP `configOptions.model.currentValue` an independent effective-model oracle
+  and declared Claude `_meta` delivery broken without sending a prompt. A real prompt then showed
+  stale `currentValue = opus` alongside requested Haiku/Sonnet in SDK init, assistant, and usage
+  signals. **Why it matters:** design, implementation, review, and an adapter-local readback can all
+  agree and remain wrong about the external provider; following the false Claude finding would add a
+  redundant delivery path and change launch failure/order behavior. **Requirement:** `INV §11`,
   `INV §12`, `INV §17`. **Suggested fix/test:** require provider-behavior statements to cite a
-  complete reachability trace or a recorded live probe, and add an independently derived contract
+  complete reachability trace or a credentialed prompt receipt; label ACP `currentValue` as adapter
+  configuration evidence, not provider execution evidence; and add an independently derived contract
   oracle that rejects out-of-schema standard fields instead of mirroring `sessionNewParams`.
-- **Must fix** — Claude chat model delivery through `_meta` does not work (**confirmed live
-  2026-09-08**, upgraded from "likely"). **Where:** `sessionNewParams`/`sessionLoadParams` in
-  `internal/runtime/chat.go` deliver the Claude model as
-  `_meta.claudeCode.options.model`, which TS-04.R47 and FS-09.R58 both call unaffected and keep
-  unchanged. **Reproduction (recorded, not inferred):** driving the pinned `claude-agent-acp`
-  **0.59.0** directly over stdio, a `session/new` carrying
-  `_meta.claudeCode.options.model = "haiku"` returned a session whose own
-  `configOptions.model.currentValue` was `opus` — the local default — reproducing the July 26
-  result. The same session then accepted `session/set_config_option {configId:"model",
-  value:"haiku"}` and reported `model = "haiku"` back. So this is the identical defect class as
-  BR-1's Codex bug, on the other chat adapter, and it has the same fix. **Why it matters:** every
-  Claude chat agent runs the user's local Claude default rather than the model chosen in AgentDeck,
-  while the New Agent picker, session identity, and archive all report the chosen one.
-  **Requirement:** FS-09.R7/R21/A16/A27, TS-04.R47, `INV §12`. **Suggested fix:** extend R57's
-  ordered post-session step to deliver `claude-acp`'s model as a configuration option, exactly as
-  R58 already does for `codex-acp`, and retire the `_meta` model field. **This changes which model
-  existing Claude chat agents run, from their next launch or resume** — the same consequence R58
-  accepted for Codex — so it wants an explicit decision before it ships. Note the ordering
-  constraint is now live-verified: setting the Claude model to one without reasoning levels removes
-  the `effort` and `fast` options outright, which the 2026-09-08 fix already handles.
+- **Worth fixing** — an explicit empty rebuilt ACP option list does not replace the previous list.
+  **Where:** `internal/runtime/chat.go:1674-1676` replaces the cached advertisement only when
+  `len(rebuilt) > 0`, although ACP's required `SetSessionConfigOptionResponse.configOptions` is a
+  full array and `[]` is a valid full set. **Normal-use trigger:** an adapter accepts a setting and
+  responds that the session now offers no configuration options. **Why it matters:** AgentDeck keeps
+  advertising removed options and can send a later setting the peer no longer accepts; it also
+  stores stale fast availability in the running row and header. **Requirement:** TS-04.R46,
+  `INV §1`, `INV §11`. **Suggested fix/test:** decode presence separately from contents and replace
+  on every present array, including `[]`; add a sequence test whose first set response empties the
+  list and whose next requested option must be unavailable.
 - **Worth fixing** — equivalent OpenCode/OpenHands fields remain unverified (**undetermined**).
   **Where:** neither CLI is installed. OpenHands model delivery has a separate `LLM_MODEL` env path,
   so it does not depend on the suspect ACP `model` member, but both adapters still receive an
@@ -220,9 +236,10 @@ different, older protocol with no config options at all):
 - `session/new` returns `configOptions` with ids `mode`, `model`, `effort`, `fast`; each is
   `type: "select"` with a **string** `currentValue` and a `value`/`name` option list. AgentDeck's
   declared claude identifiers (`model`, `effort`, `fast`) and its `on`/`off` spelling are correct.
-- A `session/new` requesting `_meta.claudeCode.options.model = "haiku"` came up with
-  `model.currentValue = "opus"`, the local default. **Model delivery via `_meta` does not work**;
-  this reproduces the 2026-07-26 result and is now an open Must-fix above.
+- A `session/new` requesting `_meta.claudeCode.options.model = "haiku"` returned
+  `model.currentValue = "opus"`, the local default. This proves the adapter's initial configuration
+  advertisement is stale; because this setup-only probe sent no prompt, it does **not** prove which
+  model Claude executes. The original stronger conclusion was retracted on 2026-09-09.
 - `session/set_config_option {configId:"model", value:"haiku"}` **succeeded** and returned the
   rebuilt option list reporting `model = "haiku"`. Post-session model delivery works for Claude.
 - After that model change the rebuilt list contained only `mode` and `model`: **`effort` and `fast`
@@ -237,9 +254,28 @@ different, older protocol with no config options at all):
   option list with `reasoning_effort = "high"`. Setting a model value the local install does not
   offer was refused with `Invalid params`, so model application is genuinely fail-closed.
 
-Both adapters therefore answer `session/set_config_option` with the **rebuilt full option list**,
-and `currentValue` is a usable independent oracle for "was this setting honored". The `fakeacp`
-double now mirrors that shape and those failure modes.
+Both adapters therefore answer `session/set_config_option` with the **rebuilt full option list**.
+`currentValue` is useful adapter-configuration evidence, but is not an independent provider-execution
+oracle. The `fakeacp` double now mirrors that adapter-level shape and those failure modes.
+
+### Claude provider-authoritative model probe — 2026-09-09
+
+The review followed the setup-only probe with one real prompt for each requested model against the
+current pinned `claude-agent-acp` **0.59.0** (vendored Claude Code 2.1.207). It enabled the adapter's
+raw SDK messages and inspected three provider-facing signals rather than the ACP configuration
+picker:
+
+- requested `haiku`: ACP still advertised stale `model.currentValue = "opus"`, while raw SDK
+  `system/init.model`, the assistant API message's `model`, and result `modelUsage` all identified
+  `claude-haiku-4-5-20251001`;
+- requested `sonnet`: ACP still advertised stale `model.currentValue = "opus"`, while SDK init and
+  the assistant message identified `claude-sonnet-5`; result usage included `claude-sonnet-5` plus
+  an auxiliary Haiku entry.
+
+Current Claude model delivery through `_meta.claudeCode.options.model` therefore works as designed.
+The ACP `currentValue` discrepancy is adapter bookkeeping, not evidence that the prompt used Opus.
+This does not retroactively prove the 2026-07-26 run (Claude Code 2.1.202) used the requested model,
+and it does not close the broader provider acceptance matrix.
 
 ### BR-1 — Codex chat ignored the selected model and effort for ~10 weeks (postmortem complete)
 
@@ -257,8 +293,8 @@ shipped in v0.1.2 through v0.4.2; the later effort defect shipped in v0.2.0 thro
 `threadStart`/`threadResume` response. Every Codex chat agent ran the local Codex default while New
 Agent, `PUT /api/backends` validation, and the persisted session identity all reported the operator's
 selection. Claude uses a different `_meta.claudeCode.options.model` path; source inspection shows it
-is spread into SDK options, but the contradictory July live result described below prevents calling
-Claude unaffected without a new provider-authoritative check.
+is spread into SDK options, and the 2026-09-09 provider-authoritative prompt probe confirms that path
+currently selects the requested model despite a stale ACP `currentValue`.
 
 **Timeline and escape chain.**
 
@@ -313,11 +349,11 @@ were not the cause—this particular gate ran and failed.
 
 **Other adapters.** OpenHands model selection uses `LLM_MODEL`, a separate process-environment path,
 so the Codex `model`-member failure does not govern it. OpenCode model delivery and both adapters'
-top-level `systemPrompt` remain undetermined because neither pinned CLI is installed. Claude is not
-closed: source inspection proves the pinned adapter forwards `_meta.claudeCode.options.model` into
-its SDK query, but the July live run reported the native default in `configOptions` for every
-requested model and had no provider-side receipt. Treat that as contradictory evidence requiring a
-new credentialed matrix, not as proof that Claude is either broken or unaffected.
+top-level `systemPrompt` remain undetermined because neither pinned CLI is installed. Current pinned
+Claude is closed for model delivery only: source inspection proves the adapter forwards
+`_meta.claudeCode.options.model` into its SDK query, and the 2026-09-09 credentialed prompt probe
+observed requested Haiku/Sonnet in provider-facing model signals. The July run had only the stale ACP
+configuration field, so its historical execution model remains unknown rather than contradictory.
 
 **Evidence.** Git commits `775a1e6`, `981fbaf`, `c694ed0`, `d0c7b4a`, `7d294fb`, `9d35042`,
 `8ec8c6e`, `aafd240`, `c507763`, `b28a96c`, `02daa6e`, and `c640b48`; the archived July 26 report;
