@@ -400,6 +400,27 @@ describe("Composer queued follow-up and steering", () => {
     expect(await screen.findByText("That turn had already ended — sent as a new turn.")).toBeInTheDocument();
   });
 
+  // Skipped reproduction for the open HANDOFF finding: current Steer accepts a
+  // second click while the first request is pending and delivers both messages.
+  it.skip("submits one steer while the first request is still in flight", async () => {
+    let steerRequests = 0;
+    let finishSteer: (() => void) | undefined;
+    server.use(http.post("/api/sessions/:id/steer", async () => {
+      steerRequests++;
+      await new Promise<void>((resolve) => { finishSteer = resolve; });
+      return HttpResponse.json({ accepted: true, agent_id: "a_1", outcome: "steered" }, { status: 202 });
+    }));
+
+    render(<Composer agentId="a_1" busy steerable />);
+    type(screen.getByRole("textbox") as HTMLTextAreaElement, "use the other file");
+    const steerButton = screen.getByRole("button", { name: "Steer" });
+    fireEvent.click(steerButton);
+    fireEvent.click(steerButton);
+
+    await waitFor(() => expect(steerRequests).toBe(1));
+    finishSteer?.();
+  });
+
   it("steers the held message when the composer is empty, and keeps typed text on a refusal", async () => {
     let steerBodies: string[] = [];
     server.use(

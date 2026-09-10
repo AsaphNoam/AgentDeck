@@ -113,6 +113,24 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
 
 ## Review findings
 
+- **Must fix** — Steer accepts duplicate submission while its first request is in flight
+  (**confirmed by reproduction test**). **Field report (verbatim):** “The steer message feature
+  makes messages appear in double while the agent is working.” AgentDeck version/commit and
+  environment were not supplied; no logs were supplied. **Where:**
+  `ui/src/components/chat/Composer.tsx:223-245,336-338` starts an unrestricted request on every
+  click and leaves the Steer control enabled; `ui/src/api/client.ts:131-139` sends each as an
+  independent `POST`; `internal/runtime/chat.go:481-492` delivers and records each accepted call.
+  The skipped reproduction in `ui/src/components/chat/Composer.test.tsx` holds the first response,
+  clicks Steer twice, and receives two requests where one is required. **Normal-use trigger:** a
+  person double-clicks Steer, or clicks again before a slow adapter response returns. **Why it
+  matters:** the adapter receives the correction twice and AgentDeck emits two distinct durable
+  `user_text` events, so the duplicate is both visible and actionable rather than a display-only
+  artifact. **Requirement:** `FS-03.R50/A33`, `TS-03.R39`; `INV §5`, `INV §17`. **Suggested fix/test:**
+  give Steer one client-side in-flight claim, disable the control until the request settles, unskip
+  the reproduction, and assert one HTTP request and one delivered transcript event. If one physical
+  click still reproduces after that guard, capture Network requests and SSE sequence numbers to
+  distinguish duplicate DOM submission from a provider/runtime event defect.
+
 - **Must fix** — An adapter-started steering turn escapes AgentDeck's turn lifecycle
   (**confirmed implementation and test-contract gap**). **Where:** `internal/runtime/chat.go:437-484`
   accepts `startedNewTurn`, emits only the user event, and leaves `turnActive` and status ownership
