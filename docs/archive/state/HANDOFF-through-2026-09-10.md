@@ -242,3 +242,33 @@ Claude histories `e43bb559-ca3f-49fd-b3e0-8f7c0ac7ad4f` (live acceptance) and
 `019fb179-fab9-7c83-a1bf-dffad222e17e` (July 30 implementation), and
 `019f6a88-fce2-70a1-a269-1ef96287fb5b` (July 16 prompt fix).
 
+## Post-release entries settled on 2026-09-10
+
+Archived on 2026-09-10 for the same reason as the range above: keeping the live handoff header
+inside its session-start budget. These three entries are settled; the units they name are closed in
+[`../../features/HANDOFF.md`](../../features/HANDOFF.md).
+
+**Changelog — 2026-09-10 (workflow):** Code review and bug investigation now attach one exact fix
+model recommendation to each grouped fix unit: trivial/easy uses Claude Sonnet or Codex Luna, medium
+uses Codex Terra or Claude Opus, and difficult uses Codex Sol. The unit takes the level of its most
+difficult open fix because one agent handles the group; the band remains independent from finding
+severity and is repeated in the human update. The specification checker rejects per-item, missing,
+duplicate, or mismatched recommendations; launcher contract and mutation checks protect the mirrored
+role instructions. Existing findings were grouped and classified under the corrected rule.
+
+**Changelog — 2026-09-10 (fix):** Closed the `usability-20260907` unit's two Must-fix findings
+(FS-04.R34/A14, TS-04.R15, FS-12.R41/A17; `INV §8`, `INV §12`, `INV §2`, `INV §10`, `INV §17`).
+J2: an installed Claude adapter that rejects the readiness argv now reports
+`skipped`/`cli_incompatible` with compatibility guidance instead of a credential failure, so
+onboarding no longer sends the operator to repair working credentials. J5: pointer-anchored menus
+measure themselves and clamp into the viewport through one shared `useMenuPlacement` helper, with a
+scroll floor for menus taller than the viewport. The helper also replaces the same unclamped
+positioning in the project-card, project-background, and annotation menus — same defect class, one
+helper rather than four copies (`INV §2`, `INV §10`) — and that widening is recorded here rather
+than hidden in the closure. The originating unit is closed.
+
+**Usability review — 2026-09-10:** The current-tree browser follow-up found no new usability
+finding. J2 compatibility guidance and J5 lower-row menu placement passed; the full matrix and its
+unrun real-provider/native-OS gates are recorded in
+[`../reviews/usability-review-run-2026-09-10.md`](../reviews/usability-review-run-2026-09-10.md).
+

@@ -30,7 +30,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-01 | [features/FS-01-agent-lifecycle.md](features/FS-01-agent-lifecycle.md) | Current | Launch, stop, cancel, resume, clone, rename, switch runtime, crash handling, identity, wake on message |
 | FS-02 | [features/FS-02-dashboard.md](features/FS-02-dashboard.md) | Current | Card grid, live status, layout/density, task groups, notifications, project creation |
 | FS-03 | [features/FS-03-chat.md](features/FS-03-chat.md) | Partial | Streaming chat panel, tool calls/diffs, permission prompts, transcript view, header runtime picker, composer file/skill mentions, browser-local drafts, queued follow-up and steering |
-| FS-04 | [features/FS-04-configuration-onboarding.md](features/FS-04-configuration-onboarding.md) | Current | Roles/projects/backends CRUD, backend creation, settings UI, onboarding wizard, appearance preference, directory browsing, and exact AgentDecker prompt migration |
+| FS-04 | [features/FS-04-configuration-onboarding.md](features/FS-04-configuration-onboarding.md) | Partial | Roles/projects/backends CRUD, backend creation, settings UI, onboarding wizard, appearance preference, directory browsing, exact AgentDecker prompt migration, and planned per-role seed-prompt correction |
 | FS-05 | [features/FS-05-archive-tracking.md](features/FS-05-archive-tracking.md) | Partial | Session archive, full-text search, resume from archive, file/command tracking |
 | FS-06 | [features/FS-06-coordination.md](features/FS-06-coordination.md) | Current | Agent-to-agent messaging, explicit mail activation, budgets, unread indicators, stopped-agent wake |
 | FS-07 | [features/FS-07-terminal.md](features/FS-07-terminal.md) | Partial | Terminal interface, drivers (xterm/tmux/iTerm2), terminal-agent boundaries |
@@ -44,7 +44,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-15 | [features/FS-15-context-links.md](features/FS-15-context-links.md) | Current | Target-neutral durable context references, direct grants, personal discovery state, and bounded pull retrieval |
 | FS-16 | [features/FS-16-dependent-work.md](features/FS-16-dependent-work.md) | Current | Durable tasks with explicit outcomes, prerequisite arms, host-started armed work, and task context attachments |
 | FS-17 | [features/FS-17-agent-tool-results.md](features/FS-17-agent-tool-results.md) | Partial | Agent-facing action contract: shipped MCP retry/result behavior and planned direct command delivery |
-| FS-18 | [features/FS-18-agent-facing-knowledge.md](features/FS-18-agent-facing-knowledge.md) | Current | Thin AgentDecker role, shared operating skill, progressive references, discovery fallback, and exact legacy-prompt migration |
+| FS-18 | [features/FS-18-agent-facing-knowledge.md](features/FS-18-agent-facing-knowledge.md) | Partial | Thin AgentDecker role, shared operating skill, progressive references, discovery fallback, exact legacy-prompt migration, and planned removal of polling instructions from seeded role prompts |
 | FS-19 | [features/FS-19-worktree-projects.md](features/FS-19-worktree-projects.md) | Current | Worktree projects: fork a repo-backed project into an isolated owned Git worktree, base-branch and setup-command settings, disposable-checkout recovery, conservative cleanup |
 
 ### Technical specs
@@ -83,12 +83,12 @@ Potential work that has not reached an FS/TS update belongs only in `docs/ideas.
 | Capability group | Relevant feature specs | Delivery state |
 |---|---|---|
 | Core agent operation | FS-00 product concepts; FS-01 lifecycle; FS-02 dashboard; FS-03 chat | Shipped; FS-03's file viewer is `(planned)` |
-| Configuration and providers | FS-04 configuration/onboarding; FS-09 backends | Shipped core; FS-09 expansion remains Partial |
+| Configuration and providers | FS-04 configuration/onboarding; FS-09 backends | Shipped core; FS-04's per-role seed-prompt correction and FS-09's expansion remain Partial |
 | Durable supervision | FS-05 archive/tracking; FS-06 coordination; FS-13 annotations | Shipped; FS-05's tracked-path links are `(planned)` |
 | Configurable pipelines | FS-14 templates, sequential runs, recovery, and supervision | Shipped |
 | Dependent work | FS-16 durable tasks, prerequisite arms, host-started work, task context | Shipped |
 | Extension boundaries | FS-07 terminal; FS-08 federation | Shipped core with explicitly tagged planned work; Partial |
-| Agent-facing contracts and knowledge | FS-17 tool result contract; FS-18 operator knowledge | Tool results and shared operator knowledge shipped |
+| Agent-facing contracts and knowledge | FS-17 tool result contract; FS-18 operator knowledge | Tool results and shared operator knowledge shipped; FS-18's seed-prompt polling removal is `(planned)` |
 | Isolated parallel work | FS-19 worktree projects (fork, disposable checkout, consented cleanup) | Shipped |
 
 ---

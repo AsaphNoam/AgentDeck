@@ -1,6 +1,6 @@
 # FS-18 — Agent-Facing AgentDeck Knowledge
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/agentknowledge`, `internal/config`, `internal/server`, `internal/runtime`, `internal/cli` · **Journeys:** —
 **Absorbed:** the AgentDeck knowledgebase idea in [`../../ideas.md`](../../ideas.md)
 
@@ -81,6 +81,20 @@ shadows the skill, an agent can read that bundled path directly. The fallback in
 contents into the prompt, adds no precedence system for user/project skills, and changes no existing
 operation or authorization.
 
+**R12 (planned) — No seeded role prompt tells an agent to look for work on its own.**
+Every turn AgentDeck itself starts already names the tool that turn requires, so no shipped role
+prompt instructs an agent to open a turn by checking coordination state, to check its mail when it
+is "woken with no new instruction", or to treat `check_messages` or `get_assigned_task` as a
+standing habit. Concretely, the shipped `teammate` prompt keeps its assignment-queue stance without
+the per-turn coordination check, and the shipped `implementer`, `reviewer`, and `researcher` prompts
+drop their trailing mail-check instruction; `agentdecker` (R2) and `pm` already satisfy this and do
+not change. No tool, argument, result, authorization, or lifecycle behavior changes — an agent still
+calls `check_messages` and `get_assigned_task`, because the activation that started its turn told it
+to. This extends the R2 cleanup, which reached only the PM and teammate prompts, to the remaining
+polling text, and restores R3's split: which tool a host-owned turn requires belongs to that
+activation, and how to call it belongs to the tool definition. FS-06.R24 and FS-16.R6 already forbid
+the polling this text asks for. R13 owns whether an existing install receives the corrected prompts.
+
 ### 2.2 Compatibility and lifecycle timing
 
 **R7 — Only the exact historical AgentDecker prompt migrates, and only after package
@@ -91,7 +105,21 @@ title, role id, `skip_permissions`, and every other role field. A one-byte edit,
 different role, missing role, unreadable role, or unavailable package is untouched; users of those
 roles may edit them manually. A later successful dashboard start retries the exact comparison and
 migration. The migration is one-time, idempotent compatibility work rather than a managed-role or
-recurring synchronization mechanism.
+recurring synchronization mechanism. R13 (planned) widens this exception from AgentDecker alone to
+every role AgentDeck seeds and supersedes this item when it ships.
+
+**R13 (planned) — The same exact-match correction reaches every seeded role, not only
+AgentDecker.** A dashboard start that verified the package replaces only the `system_prompt` field
+of a seeded role whose stored prompt bytes exactly equal a prompt AgentDeck previously shipped for
+that same role id. Everything R7 and R10 already guarantee is unchanged and now applies per role: no
+substring, whitespace-normalized, title-, or age-based matching; a prompt the user edited by even one
+byte stays untouched; a role AgentDeck does not seed is out of scope; and every other field of every
+role is preserved byte-for-byte. Each role is considered independently, so a missing, unreadable,
+undecodable, or unwritable role leaves that role unchanged with a bounded warning and neither blocks
+the other roles nor blocks startup, and a later verified start retries. This stays bounded catch-up
+keyed to bytes AgentDeck itself shipped: it does not make roles managed, does not re-apply after the
+user edits a prompt, and produces no unsolicited provider prompt, transcript event, restart, or
+lifecycle transition (R8). FS-04.R47 owns the seeding exception and TS-11.R13 owns its mechanics.
 
 **R8 — Knowledge refresh is process-bound, not a hot reload.** A verified package is
 refreshed when the dashboard starts. AgentDeck does not restart a running process, inject a new
@@ -106,7 +134,9 @@ reads the stable bundled path; AgentDeck makes no hot-reload claim.
   package → success makes it available to later process composition; failure logs a warning and
   leaves it unavailable for that dashboard process without blocking AgentDeck.
 - **Role:** absent, non-matching prompt, or unavailable package → unchanged; verified package plus
-  exact historical prompt → R2 prompt; later startup → unchanged.
+  exact historical prompt → R2 prompt; later startup → unchanged. Under R13 (planned) the same
+  three transitions apply independently to each seeded role, with that role's current shipped
+  prompt as the end state.
 - **Process:** running with its existing context → no unsolicited change; next launch, resume, or
   switch → current package is discoverable only when that dashboard process verified installation.
 
@@ -175,12 +205,30 @@ unchanged. A successful later startup restores the full R1/R6 overlay and perfor
 migration once. Package refresh or role migration causes no unsolicited provider prompt, transcript
 event, restart, or lifecycle transition.
 
+**A9 (planned)** (R12, R13) — The four corrected seed prompts contain no instruction to
+open a turn by checking coordination state, to check mail when woken without an instruction, or to
+call `check_messages`/`get_assigned_task` as a habit, and `teammate` still states its
+assignment-queue stance while `implementer`/`reviewer`/`researcher` keep every other bullet.
+*Verified:* a seed-content test asserting the absence of those instructions per role and byte
+equality against the shipped constants. Migration is proven per role with fixtures: an exact
+previously shipped prompt for each of the four roles migrates to the current text with all other
+fields preserved byte-for-byte; a one-byte edit, an empty or custom prompt, a role AgentDeck does not
+seed, a missing role, an undecodable role file, and a read or write I/O error each leave that role
+unchanged; a failure on one role still migrates the remaining ones and does not fail startup; an
+unavailable package leaves all four unchanged and a later verified start migrates them once; and
+re-running the pass is idempotent. *Verified:* `internal/config` migration tests and
+`internal/cli/knowledge_test.go`.
+
 ## 6. Deviations & open decisions
 
 - No UI, REST endpoint, MCP documentation tool, agent-facing release command, mutable knowledge
   store, or new runtime interface is introduced.
 - Customized AgentDecker roles remain user-owned even if they contain a stale copy of product
-  knowledge. AgentDeck does not infer that they should migrate.
+  knowledge. AgentDeck does not infer that they should migrate. R13 widens the exact-match
+  correction to the other seeded roles on the same terms and does not weaken this: a role whose
+  prompt the user touched is still user-owned and is never rewritten.
+- R12 corrects the shipped prompts only. It adds no rule that a user-authored role prompt may not
+  ask an agent to poll, and AgentDeck neither validates nor warns about such text.
 - AgentDeck development and release-maintenance instructions belong to the repository's release
   workflow or its development skill, not to the shipped operator skill.
 
@@ -193,5 +241,7 @@ registrations in `internal/messaging/messaging.go`. Acceptance coverage lives in
 `internal/agentknowledge/package_test.go`, `internal/config/config_test.go`,
 `internal/cli/knowledge_test.go`, `internal/server/knowledge_overlay_test.go`, and runtime/terminal
 parameter tests. Pinned credentialed provider discovery remains a manual release gate when logged-in
-Claude and Codex providers are available. Governing requirements: FS-04.R1–R4/R13–R15; FS-06;
-FS-14–FS-17; TS-11; and INV §1, §2, §4, §6, §8, §10, §11, and §15.
+Claude and Codex providers are available. R12's corrected prompt text and R13's digest table both
+live in `internal/config/seed.go`. Governing requirements: FS-04.R1–R4/R13–R15/R47; FS-06.R24;
+FS-14–FS-17 including FS-16.R6; TS-11 and its R13; and INV §1, §2, §4, §6, §8, §10, §11, §15,
+and §17.

@@ -91,6 +91,23 @@ other field. Unavailable package state leaves the role untouched; a later start 
 decode, or write failure likewise leaves the role unchanged, emits a bounded warning, and does not
 block startup. This one-time convenience never broadens normal configuration readiness. The legacy
 prompt text is not retained as a second knowledge source, parsed, normalized, or fuzzy-matched.
+R13 (planned) generalizes this from one role and one digest to a table and supersedes this item when
+it ships.
+
+**R13 (planned) — One migration helper reads a code-owned digest table covering every
+seeded role.** `Store.MigrateLegacyAgentDecker` becomes one role-agnostic entry point over a
+code-owned table mapping each seeded role id to the digests of prompts previously shipped for that
+id. The replacement text is read from `seedRoles()` rather than restated, so the current prompt has
+exactly one authority and the table cannot drift from it (INV §2, INV §10). The per-role body keeps
+R6's semantics unchanged: package `Available=true` gates the whole pass; the role is read, SHA-256 is
+computed over its stored system-prompt bytes, and only an exact match replaces the field through the
+ordinary atomic role writer. Per-role read, decode, or write failure emits one bounded warning and
+continues to the next role rather than aborting the pass or startup (INV §8); `prepareAgentKnowledge`
+keeps its single warn-and-continue call site rather than growing one call per role. Each role id maps
+to a list of digests so an install several releases behind is still corrected. A table entry whose
+digest equals that role's *current* seeded prompt would silently no-op, so a test recomputes every
+digest from the shipped constants and fails if any entry names a role absent from `seedRoles()` or
+matches that role's current prompt (INV §10, INV §17).
 
 **R7 — Tool definitions retain local mechanics; the skill owns cross-tool judgment.**
 All existing agent-facing tool names, argument and result shapes, validation, authority, effects,
@@ -178,6 +195,9 @@ SQLite state, REST/SSE data, or MCP arguments.
   byte-for-byte verification prevents source and provider-view drift.
 - **INV §15:** the complete verified package is committed before any launch can consume it; a
   failed commit suppresses the overlay rather than suppressing AgentDeck startup.
+- **INV §17:** R13's digest table is proven against the shipped seed constants rather than against a
+  restated copy of them, so a stale or self-matching entry fails a test instead of silently
+  migrating nothing.
 
 ## 5. Deviations & open decisions
 
@@ -194,7 +214,9 @@ SQLite state, REST/SSE data, or MCP arguments.
 Anchors: embedded assets and verified publication in `internal/agentknowledge`; exact digest
 migration in `internal/config/seed.go`; `server.applyKnowledgeOverlay`; the runtime-only effective
 launch fields consumed by ACP and terminal runtimes; local tool definitions in
-`internal/messaging/messaging.go`; and `cli.prepareAgentKnowledge`. Governing seams: FS-18;
-FS-04.R13–R15; TS-01.R5–R6/R9;
+`internal/messaging/messaging.go`; and `cli.prepareAgentKnowledge`. R13's table and per-role pass
+replace the single-digest path at `internal/config/seed.go` and keep its one call site in
+`internal/cli/dashboard.go`. Governing seams: FS-18;
+FS-04.R13–R15/R47; TS-01.R5–R6/R9;
 TS-02.R3–R5; TS-04.R6–R7/R14/R17/R28–R31; TS-06.R3–R7/R11; TS-09; TS-10; FS-17; and INV §1, §2,
-§4, §6, §8, §10, and §15.
+§4, §6, §8, §10, §15, and §17.

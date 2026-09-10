@@ -1,6 +1,6 @@
 # FS-04 — Configuration & Onboarding
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/config/`, `internal/server/config_handlers.go`, `internal/server/directory_picker.go`, `ui/src/features/settings/`, `ui/src/features/onboarding/` · **Journeys:** J2, J9
 **Absorbed:** [`phase-3-config-onboarding.md`](../../archive/phases/phase-3-config-onboarding.md)
 
@@ -189,7 +189,19 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   replacement is FS-18.R2's thin prompt; every other field and every non-exact, unreadable, or
   install-failed role remains untouched. A later verified startup retries normally. This does not
   make the role managed or create recurring seed synchronization; TS-11.R6 owns the comparison and
-  atomic write.
+  atomic write. R47 (planned) widens this exception to every seeded role and supersedes this item
+  when it ships.
+- **R47 (planned) — The exact-prompt exception to R14 covers every seeded role.** After
+  ordinary absent-only seeding and successful shared-skill package verification, startup may replace
+  only the `system_prompt` field of any seeded role whose prompt bytes match one of the code-owned
+  digests of prompts AgentDeck previously shipped for that same role id. The replacement is that
+  role's current shipped seed prompt, taken from the same seed authority a fresh home writes, so no
+  second copy of the text can drift from it. Every other field, every non-exact prompt, every role
+  AgentDeck does not seed, and every unreadable or install-failed role remains untouched; one role's
+  failure does not stop the others or startup, and a later verified startup retries normally. This
+  remains a bounded catch-up rather than managed roles or recurring seed synchronization.
+  FS-18.R12–R13 own the corrected prompt content and its user-visible limits; TS-11.R13 owns the
+  comparison, the digest table, and the atomic write.
 
 ### 2.7 Onboarding wizard
 
@@ -377,6 +389,12 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   global fields untouched; an absent or invalid on-disk value reads as the default, while a
   non-numeric, zero, or negative submitted value is rejected without changing the stored budget. —
   config API tests.
+- **A27 (planned)** (R47) — The exact-prompt replacement runs for every seeded role, not
+  only `agentdecker`: a stored prompt matching a previously shipped digest for its own role id is
+  replaced with that role's current seeded prompt while every other field is preserved
+  byte-for-byte, and a digest belonging to a different role never matches. Absent-only seeding
+  (R14, A7) is otherwise unchanged, so a populated home is still never clobbered. — `internal/config`
+  seed and migration tests; FS-18.A9 covers the per-role failure isolation and package gating.
 
 ## 6. Deviations & open decisions
 

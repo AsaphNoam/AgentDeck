@@ -12,41 +12,33 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 
 ## Current position
 
-- **Active change:** None. `v0.4.3` closed the release epoch; the next role picks from the queues
-  below.
-- **Release:** `v0.4.3` is tagged on this commit and ships chat session configuration, fast mode
-  across launch/tasks/pipeline stages, the held follow-up and Steer, the BR-3 resume-replay fix, and
-  the Claude 0.75.1 / codex-acp 1.10.0 / Codex 0.153.4 adapter bump. Publication state is recorded in
-  **Active change**. `v0.4.2` and earlier ranges are in the state archive.
+- **Active change:** None; the next role picks from the queues below.
+- **Release:** `v0.4.3` is tagged and published; **Release state** and the release record carry its
+  contents. `v0.4.2` and earlier are in the state archive.
 - **Review units:** `queue-a-follow-up-while-busy` (Send queues, Steer injects) stays open with one
-  Must-fix finding. `fix-model-recommendations` awaits independent review once committed. The
-  `usability-20260907` unit is closed — its J2 and J5 Must-fixes were its only open findings. Every
-  other unit through this release is closed. The remaining open findings belong to the BR-1 and BR-2
-  investigations, not to a review unit awaiting closure. Review records, finding-fix commits,
-  release records, and handoff/archive bookkeeping are administrative closure.
-- **Work units:** `open-a-file-from-chat.md` is waiting to start with nothing unresolved.
-  `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker; the ACP wait-list in
-  `docs/ideas.md` records the other capabilities held behind an adapter contract.
-- **Design units:** Entries under `Ideas being defined` may resume, and entries under `New ideas` are
-  available to start. Streaming agent thinking stays part-decided (live-only decided; rendering
-  default and whether `plan` ships with it still open). The permanently unaddressable pipeline agent
-  is the newest `New ideas` entry and needs `/design-feature` before code.
-- **Open findings:** One Must-fix remains on the queue/steer unit — the adapter-started steering turn escapes AgentDeck's
-  turn lifecycle. No longer blocked: the operator decided on 2026-09-10 not to hide Steer, which
-  selects host ownership of the adapter-started turn; see the finding for the resulting approach and
-  structural work. Also open: live-gate finding durability, provider-contract oracles, the Codex
+  Must-fix. `fix-model-recommendations` awaits independent review once committed. Every other unit
+  through this release is closed, including `usability-20260907`; the remaining open findings belong
+  to BR-1 and BR-2, not to a unit awaiting closure.
+- **Work units:** `open-a-file-from-chat.md` and `stop-telling-agents-to-poll.md` are waiting to
+  start with nothing unresolved. `migrate-internal-actions-from-mcp.md` stays paused on its transport
+  blocker; the ACP wait-list in `docs/ideas.md` holds the rest behind an adapter contract.
+- **Design units:** `Ideas being defined` entries may resume; `New ideas` entries are available.
+  Streaming agent thinking stays part-decided (live-only decided; rendering default and whether
+  `plan` ships still open). The permanently unaddressable pipeline agent is the newest `New ideas`
+  entry and needs `/design-feature` before code.
+- **Open findings:** One Must-fix remains on the queue/steer unit — the adapter-started steering turn
+  escapes AgentDeck's turn lifecycle. Not blocked: the operator decided on 2026-09-10 not to hide
+  Steer, selecting host ownership of that turn; the finding records the resulting approach. Also
+  open: live-gate finding durability, provider-contract oracles, the Codex
   discovery-versus-execution version authority left by BR-2, and the unverified OpenCode/OpenHands
-  paths. The `usability-20260907` J2 and J5 Must-fixes are closed and removed. See **Review findings**.
-- **Bug reports:** BR-1, BR-2, and BR-3 are investigated and their reports are archived with this
-  release. BR-3 is fixed and closed. BR-1's Codex model/effort defect is fixed and reviewed, with the
-  durability and oracle findings still open. BR-2's release pin is fixed by the adapter bump; its
-  personal-cache-versus-packaged-runtime compatibility finding remains open. Pinned Claude model
-  delivery through `_meta` works; an ACP model `currentValue` can be stale and is not an
-  execution-model oracle.
+  paths. See **Review findings**.
+- **Bug reports:** BR-1, BR-2, and BR-3 are investigated and archived with this release; BR-3 is
+  fixed and closed. BR-1's Codex model/effort defect is fixed and reviewed and BR-2's release pin is
+  fixed by the adapter bump; their still-open findings are listed above. Pinned Claude model delivery
+  through `_meta` works; an ACP model `currentValue` can be stale and is no execution-model oracle.
 - **State:** Automated MCP contract verification is green. The full post-fix Claude/Codex acceptance
-  matrix remains open and must not be described as verified; the 2026-09-08 and 2026-09-09 probes
-  were limited contract and model-delivery checks, not that matrix. Real Claude and Codex steering is
-  unexercised.
+  matrix remains open and must not be called verified; the 2026-09-08/09 probes were limited contract
+  and model-delivery checks, not that matrix. Real Claude and Codex steering is unexercised.
 - **Branch:** `main`.
 
 ## Active change
@@ -83,42 +75,33 @@ detection), the readable root is the session working directory alone, Git-ignore
 readable, a dashboard-pane link opens the agent screen, and archived sessions read from their
 recorded directory. No product code changed.
 
-**Changelog — 2026-09-10 (workflow):** Code review and bug investigation now attach one exact fix
-model recommendation to each grouped fix unit: trivial/easy uses Claude Sonnet or Codex Luna, medium
-uses Codex Terra or Claude Opus, and difficult uses Codex Sol. The unit takes the level of its most
-difficult open fix because one agent handles the group; the band remains independent from finding
-severity and is repeated in the human update. The specification checker rejects per-item, missing,
-duplicate, or mismatched recommendations; launcher contract and mutation checks protect the mirrored
-role instructions. Existing findings were grouped and classified under the corrected rule.
+**Changelog — 2026-09-10 (design):** Designed **stop telling agents to poll for work** and made it
+ready to start:
+[`stop-telling-agents-to-poll.md`](../ready-changes/stop-telling-agents-to-poll.md). The request was
+to remove a 60-second update requirement; none exists — the only one AgentDeck ever had was
+FS-06.R10's stuck nudge marker, deleted in `648a9fc` when durable mail activation replaced the
+polling nudger. The real remnant, confirmed by the operator: four seeded prompts in
+`internal/config/seed.go` still tell agents to find work themselves — `teammate` opens its loop with
+a per-turn coordination check, and `implementer`/`reviewer`/`researcher` each end with a mail check
+for being "woken with no new instruction", a case `internal/runtime/activation_kinds.go:27` makes
+impossible. Planned: FS-18.R12/A9 (corrected prompt text); FS-18.R13 with FS-04.R47/A27 (the
+exact-match correction widens from `agentdecker` to every seeded role, so existing installs are
+corrected and a prompt edited by one byte stays user-owned); TS-11.R13 (one role-agnostic pass over a
+code-owned digest table, replacement read from `seedRoles()`, per-role failure isolated, digests
+re-derived in a test). FS-04 and FS-18 moved Current → Partial. Three settled entries were archived
+for budget. No product code changed.
 
-**Changelog — 2026-09-10 (fix):** Closed the `usability-20260907` unit's two Must-fix findings
-(FS-04.R34/A14, TS-04.R15, FS-12.R41/A17; `INV §8`, `INV §12`, `INV §2`, `INV §10`, `INV §17`).
-J2: an installed Claude adapter that rejects the readiness argv now reports
-`skipped`/`cli_incompatible` with compatibility guidance instead of a credential failure, so
-onboarding no longer sends the operator to repair working credentials. J5: pointer-anchored menus
-measure themselves and clamp into the viewport through one shared `useMenuPlacement` helper, with a
-scroll floor for menus taller than the viewport. The helper also replaces the same unclamped
-positioning in the project-card, project-background, and annotation menus — same defect class, one
-helper rather than four copies (`INV §2`, `INV §10`) — and that widening is recorded here rather
-than hidden in the closure. The originating unit is closed.
-
-**Usability review — 2026-09-10:** The current-tree browser follow-up found no new usability
-finding. J2 compatibility guidance and J5 lower-row menu placement passed; the full matrix and its
-unrun real-provider/native-OS gates are recorded in
-[`usability-review-run-2026-09-10.md`](../archive/reviews/usability-review-run-2026-09-10.md).
-
-**Release state:** `v0.4.3` is published and verified on tag `8ad5261`. Both the release and CI runs
-passed, the local distributable reports `0.4.3` with `sqlite_fts5`, and the GitHub Release carries
-the darwin/arm64 archive, `install.sh`, and a manifest declaring version `0.4.3` with its SHA-256.
+**Release state:** `v0.4.3` is published and verified on tag `8ad5261`. Release and CI runs passed,
+the local distributable reports `0.4.3` with `sqlite_fts5`, and the GitHub Release carries the
+darwin/arm64 archive, `install.sh`, and a manifest declaring `0.4.3` with its SHA-256.
 The release shipped with five open Must-fix findings on the operator's explicit decision; one
-remains, listed under **Review findings**, and none was closed by the release itself. The credentialed Claude and
-Codex journeys under **Acceptance gates** are owed and this release did not run them — real steering
-in particular has never been exercised against a provider.
+remains, listed under **Review findings**. The credentialed Claude and Codex journeys under
+**Acceptance gates** are owed; real steering has never been exercised against a provider.
 
 **Available by role:** `/review` may take `fix-model-recommendations`; `/work` may start
-`open-a-file-from-chat.md`; `/fix` may select any one open finding unit — `queue-a-follow-up-while-busy` (difficult,
-Sol), BR-1 (difficult, Sol), or BR-2 (medium, Terra/Opus); `/design-feature` may choose an available
-or resumable idea. Role queues are independent.
+`open-a-file-from-chat.md` or `stop-telling-agents-to-poll.md`; `/fix` may take one open finding unit
+— `queue-a-follow-up-while-busy` (difficult, Sol), BR-1 (difficult, Sol), or BR-2 (medium,
+Terra/Opus); `/design-feature` may choose an available or resumable idea. Queues are independent.
 
 ## Decisions needing your input
 
