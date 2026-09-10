@@ -262,6 +262,7 @@
         "turn",
         "backend-switch",
         "annotation",
+        "held",
         "unknown"
       ]
     },

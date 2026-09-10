@@ -1,6 +1,6 @@
 # FS-03 — Live chat & permission flow
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/runtime/` (`chat.go`, `permission.go`, `event.go`), `internal/server/sessions.go`, `internal/transcript/`, `ui/src/components/chat/`, `ui/src/store/transcriptStore.ts`, `ui/src/api/sse.ts` · **Journeys:** J3, J4, J7
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -86,7 +86,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   agent leaves `busy` — on `turn_end`, on error, or when a permission request pauses it to
   `waiting_input` (where the pending prompt and Cancel control already convey the wait).
 
-- **R48. (planned)** **Queue one follow-up while the agent is working.** A person may
+- **R48.** **Queue one follow-up while the agent is working.** A person may
   submit a chat message to a `busy` or `waiting_input` chat agent instead of being refused. AgentDeck
   holds it and sends it as an ordinary prompt when the current turn ends, so it becomes the next
   turn. At most one message is held per agent: submitting another **replaces** it, and the composer
@@ -103,7 +103,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   prompt — a mail wake, a task assignment, a pipeline stage instruction — still fails closed when a
   turn is in flight, because those callers use that refusal to arbitrate (FS-06, FS-14, FS-16); a
   queue there would let a run continue past the gate that paused it.
-- **R49. (planned)** The held message resolves on exactly three events. On **turn
+- **R49.** The held message resolves on exactly three events. On **turn
   end** it is sent, and the ordinary busy progression follows. On **cancel** it is sent as the next
   turn, because cancelling is a deliberate "stop that, do this instead" and discarding the person's
   already-submitted correction is the opposite of what they asked for. On **stop, crash, or archive**
@@ -113,7 +113,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   dashboard restart; it is live state, not durable work, and the release-to-composer path is what
   keeps that from silently losing typed text in the ordinary case.
 
-- **R50. (planned)** **Steer the turn that is running.** Beside Send, a chat agent
+- **R50.** **Steer the turn that is running.** Beside Send, a chat agent
   whose runtime advertises steering offers **Steer**, which delivers the message into the in-flight
   turn immediately rather than holding it. The agent can act on it while it works — the point is
   redirecting an agent heading the wrong way, without discarding the turn as Cancel would. A steered
@@ -593,29 +593,32 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   the toggle never reveals **Switch** nor appears in a switch-runtime request body. *Verify by*
   `ChatPanel.test.tsx` and a server test asserting the applied value is persisted and that no
   process restart occurs.
-- **A31 (planned)** (R48) — Sending to a `busy` chat agent is accepted rather
+- **A31** (R48) — Sending to a `busy` chat agent is accepted rather
   than refused, holds exactly one message, and delivers it as the next turn once the current turn
   ends, in the agent's transcript exactly once; a second send replaces the held one rather than
   queueing two; the held message is absent from the durable transcript and the search index until it
   is sent; and a task assignment, pipeline stage instruction, and mail wake each still fail closed
-  against a busy agent. *Verify by* chat-runtime tests over a `fakeacp` turn, a transcript/index test
-  asserting the held message is absent before send and present once after, and dispatcher/pipeline
-  tests asserting the refusal is unchanged.
-- **A33 (planned)** (R50) — Against a runtime advertising steering, **Steer**
+  against a busy agent. *Verify by* chat-runtime tests over a `fakeacp` turn that assert the held
+  message reaches neither the provider nor the runtime transcript before release and runs exactly
+  once after it, the prompt-route tests in `internal/server/queue_steer_test.go`, and the existing
+  dispatcher/pipeline tests asserting the refusal is unchanged.
+- **A33** (R50) — Against a runtime advertising steering, **Steer**
   delivers into the running turn without ending it, and the message appears once in that turn's
   transcript; against a runtime that does not advertise it, no Steer control is rendered at all while
   Send still queues; Steer with an empty composer and a message held delivers the held one and clears
   the hold; a turn that ends between click and delivery results in the message running as its own
   next turn with that outcome reported rather than silently dropped; and a refused message leaves the
   composer's text in place with the reason. *Verify by* chat-runtime tests over `fakeacp` scenarios
-  that advertise and withhold steering plus one that ends the turn mid-call, and `ChatPanel.test.tsx`
-  for control presence and the two outcome messages.
-- **A32 (planned)** (R49) — Cancelling a turn with a message held sends it as the
+  that advertise and withhold steering plus one that reports the adapter's new-turn outcome,
+  `ChatPanel.test.tsx` for control presence, and `Composer.test.tsx` for the two outcome messages,
+  the empty-composer promotion, and the refusal.
+- **A32** (R49) — Cancelling a turn with a message held sends it as the
   next turn; stopping the agent with an empty composer returns the text to that agent's composer
   draft; stopping it with text already in the composer discards the held message and leaves the typed
-  text untouched; and a dashboard restart clears the held message. *Verify by* `ChatPanel.test.tsx`
-  and `Composer.test.tsx` for the two stop branches against the existing draft store, and a
-  runtime test for cancel-then-send.
+  text untouched; and a dashboard restart clears the held message. *Verify by* `Composer.test.tsx`
+  for the two stop branches against the existing draft store, and a runtime test for
+  cancel-then-send. Restart needs no test of its own: the hold is an in-memory field on both sides,
+  so neither the runtime nor the browser store can carry it across a restart.
 - **A30** (R47) — Choosing an effort in the chat header applies it
   without revealing or requiring **Switch**, leaves the agent running with the same process and
   conversation, and persists as the agent's effort; a rejected apply returns the select to the

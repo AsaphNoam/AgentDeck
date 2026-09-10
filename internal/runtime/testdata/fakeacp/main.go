@@ -98,7 +98,14 @@ func handle(msg *rpcMessage) {
 				ver = n
 			}
 		}
-		respond(*msg.ID, map[string]any{"protocolVersion": ver, "agentCapabilities": map[string]any{}})
+		res := map[string]any{"protocolVersion": ver, "agentCapabilities": map[string]any{}}
+		// Both current pinned adapters advertise the steering extension in the
+		// initialize response's top-level `_meta`. Withholding it is the other
+		// half of the contract under test: a client must then offer no Steer.
+		if os.Getenv("FAKEACP_STEERING") != "" {
+			res["_meta"] = map[string]any{"steering": map[string]any{"supported": true}}
+		}
+		respond(*msg.ID, res)
 	case "session/new":
 		// If asked, record that session/new was invoked so a resume test can
 		// prove a successful session/load did NOT fall back to a fresh session.
@@ -160,6 +167,26 @@ func handle(msg *rpcMessage) {
 		applyConfigOption(setParams.ConfigID, setParams.Value)
 		// SetSessionConfigOptionResponse requires the full rebuilt option list.
 		respond(*msg.ID, map[string]any{"configOptions": fakeConfigOptions()})
+	case "_session/steering":
+		// The adapter owns the injected-vs-new-turn choice and reports it; the
+		// scenario picks which one this run exercises. FAKEACP_STEER_LOG records
+		// the params so a test can prove the steered text crossed the wire without
+		// a second session/prompt.
+		if logPath := os.Getenv("FAKEACP_STEER_LOG"); logPath != "" {
+			if f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600); err == nil {
+				_, _ = f.Write(append(bytes.ReplaceAll(msg.Params, []byte("\n"), []byte(" ")), '\n'))
+				_ = f.Close()
+			}
+		}
+		outcome := os.Getenv("FAKEACP_STEER_OUTCOME")
+		if outcome == "" {
+			outcome = "injected"
+		}
+		if outcome == "reject" {
+			respondErr(*msg.ID, -32602, "unsupported steering input")
+			return
+		}
+		respond(*msg.ID, map[string]any{"outcome": outcome})
 	case "session/prompt":
 		id := *msg.ID
 		if dump := os.Getenv("FAKEACP_PROMPT_DUMP"); dump != "" {
@@ -368,6 +395,26 @@ func runScenario(name string) string {
 			}
 		}
 		return "end_turn"
+
+	case "hold_turn":
+		// A turn that stays open until the test releases it and that honors
+		// session/cancel — the two ways a turn ends while a follow-up is held
+		// (FS-03.R49). Once the hold file exists every later turn runs straight
+		// through, which is what lets the released message run as the next turn.
+		emitChunk("working")
+		hold := os.Getenv("FAKEACP_HOLD_FILE")
+		for {
+			if hold != "" {
+				if _, err := os.Stat(hold); err == nil {
+					return "end_turn"
+				}
+			}
+			select {
+			case <-cancelCh:
+				return "cancelled"
+			case <-time.After(5 * time.Millisecond):
+			}
+		}
 
 	case "permission", "permission_approve", "permission_deny", "permission_timeout":
 		return permissionScenario()

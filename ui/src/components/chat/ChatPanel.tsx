@@ -7,6 +7,7 @@ import type { AgentState } from "../../api/types";
 import { sseClient } from "../../api/sse";
 import { useAgentStore } from "../../store/agentStore";
 import { useAnnotationStore } from "../../store/annotationStore";
+import { useHeldStore } from "../../store/heldStore";
 import { useTranscriptStore } from "../../store/transcriptStore";
 import { ContextBar } from "../grid/ContextBar";
 import { Composer } from "./Composer";
@@ -44,6 +45,8 @@ export function ChatPanel() {
   const pendingAnnotations = useAnnotationStore((state) => state.bySource[id]?.length ?? 0);
   const discardAnnotations = useAnnotationStore((state) => state.discard);
   const events = useTranscriptStore((state) => state.byAgent[id] ?? []);
+  const held = useHeldStore((state) => state.byAgent[id]);
+  const releaseHeld = useHeldStore((state) => state.release);
   const { data: backends } = useBackends();
   const { data: projects } = useProjects();
   const [tab, setTab] = useState(() => initialTab(params.get("tab"), agent?.interface));
@@ -78,6 +81,17 @@ export function ChatPanel() {
   useEffect(() => {
     return sseClient.registerOpenAgent(id);
   }, [id]);
+
+  // A held message stops being pending the moment the server actually sends it,
+  // which is when it enters the durable transcript as an ordinary user prompt.
+  // Matching the sequenced server event rather than the local echo is what keeps
+  // the pending tail from clearing before delivery (FS-03.R48, TS-08.R56).
+  useEffect(() => {
+    if (!held) return;
+    const delivered = events.some((event) =>
+      (event.kind ?? event.type) === "user_text" && event.seq != null && String(event.text ?? "") === held);
+    if (delivered) releaseHeld(id);
+  }, [events, held, id, releaseHeld]);
 
   // Reveal a transcript event from the Files tab's "Diff" action: switch to the
   // transcript tab (its content is unmounted while another tab is active), then
@@ -252,7 +266,14 @@ export function ChatPanel() {
       {agent.interface === "terminal" ? (
         <p className="terminal-readonly" data-slot="composer">Terminal agents receive input in the terminal tab.</p>
       ) : (
-        <div data-slot="composer"><Composer agentId={id} busy={agent.state === "busy" || agent.state === "waiting_input"} /></div>
+        <div data-slot="composer">
+          <Composer
+            agentId={id}
+            busy={agent.state === "busy" || agent.state === "waiting_input"}
+            running={agent.running}
+            steerable={agent.steering_available}
+          />
+        </div>
       )}
     </section>
   );

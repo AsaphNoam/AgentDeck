@@ -79,6 +79,8 @@ func (s *Server) routes() http.Handler {
 	api("GET /api/sessions/{id}", s.handleSessionDetail)
 	api("GET /api/sessions/{id}/transcript", s.handleTranscript)
 	api("POST /api/sessions/{id}/prompt", s.handlePrompt)
+	api("DELETE /api/sessions/{id}/prompt", s.handleWithdrawPrompt)
+	api("POST /api/sessions/{id}/steer", s.handleSteer)
 	api("POST /api/sessions/{id}/annotations", s.handleAnnotations)
 	api("POST /api/sessions/{id}/cancel", s.handleCancel)
 	api("POST /api/sessions/{id}/stop", s.handleStop)

@@ -4,6 +4,8 @@ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/re
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
 import { Composer } from "./Composer";
+import { getChatDraft } from "./drafts";
+import { useHeldStore } from "../../store/heldStore";
 
 // Files returned by the mock file-search, narrowed by the q param so the test can
 // assert query filtering (FS-03.R30/A15).
@@ -41,6 +43,7 @@ beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  useHeldStore.setState({ byAgent: {} });
   server.resetHandlers();
   promptBodies = [];
   failFileSearch = false;
@@ -306,5 +309,143 @@ describe("Composer autocomplete", () => {
     fireEvent.keyDown(ta, { key: "Enter" });
     await waitFor(() => expect(promptBodies.length).toBe(1));
     expect(JSON.parse(promptBodies[0]).text).toBe("send this");
+  });
+});
+
+// FS-03.A31/A32/A33 — the composer half of the two deliberate actions on a busy
+// agent: Send queues and is withdrawable, Steer delivers into the running turn
+// and only where the live session advertises it, and a lost agent returns the
+// held text without ever overwriting text typed since.
+describe("Composer queued follow-up and steering", () => {
+  it("holds a message sent to a busy agent instead of echoing it into the transcript", async () => {
+    server.use(http.post("/api/sessions/:id/prompt", async ({ request }) => {
+      promptBodies.push(await request.text());
+      return HttpResponse.json({ accepted: true, agent_id: "a_1", delivery: "held" }, { status: 202 });
+    }));
+    render(<Composer agentId="a_1" busy />);
+    const ta = screen.getByRole("textbox") as HTMLTextAreaElement;
+
+    type(ta, "also check the tests");
+    fireEvent.keyDown(ta, { key: "Enter" });
+
+    await waitFor(() => expect(useHeldStore.getState().byAgent.a_1).toBe("also check the tests"));
+    expect(ta.value).toBe("");
+    // Send stays present on a busy agent; Cancel is still offered beside it.
+    expect(screen.getByRole("button", { name: "Send" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+  });
+
+  it("withdraws the held message through the prompt resource", async () => {
+    let withdrawn = 0;
+    server.use(
+      http.post("/api/sessions/:id/prompt", () =>
+        HttpResponse.json({ accepted: true, agent_id: "a_1", delivery: "held" }, { status: 202 })),
+      http.delete("/api/sessions/:id/prompt", () => {
+        withdrawn++;
+        return HttpResponse.json({ accepted: true, agent_id: "a_1", delivery: "withdrawn" });
+      }),
+    );
+    render(<Composer agentId="a_1" busy />);
+    const ta = screen.getByRole("textbox") as HTMLTextAreaElement;
+    type(ta, "never mind");
+    fireEvent.keyDown(ta, { key: "Enter" });
+    await waitFor(() => expect(useHeldStore.getState().byAgent.a_1).toBe("never mind"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Withdraw queued" }));
+    await waitFor(() => expect(useHeldStore.getState().byAgent.a_1).toBeUndefined());
+    expect(withdrawn).toBe(1);
+  });
+
+  it("offers Steer only where the live session advertises it", () => {
+    const view = render(<Composer agentId="a_1" busy steerable={false} />);
+    expect(screen.queryByRole("button", { name: "Steer" })).not.toBeInTheDocument();
+    view.unmount();
+
+    render(<Composer agentId="a_1" busy steerable />);
+    expect(screen.getByRole("button", { name: "Steer" })).toBeInTheDocument();
+  });
+
+  it("reports which of the two things the adapter did with a steered message", async () => {
+    let outcome = "steered";
+    server.use(http.post("/api/sessions/:id/steer", () =>
+      HttpResponse.json({ accepted: true, agent_id: "a_1", outcome }, { status: 202 })));
+
+    const view = render(<Composer agentId="a_1" busy steerable />);
+    const ta = screen.getByRole("textbox") as HTMLTextAreaElement;
+    type(ta, "use the other file");
+    fireEvent.click(screen.getByRole("button", { name: "Steer" }));
+    expect(await screen.findByText("Delivered into the running turn.")).toBeInTheDocument();
+    expect(ta.value).toBe("");
+    view.unmount();
+
+    outcome = "new_turn";
+    render(<Composer agentId="a_1" busy steerable />);
+    type(screen.getByRole("textbox") as HTMLTextAreaElement, "too late");
+    fireEvent.click(screen.getByRole("button", { name: "Steer" }));
+    expect(await screen.findByText("That turn had already ended — sent as a new turn.")).toBeInTheDocument();
+  });
+
+  it("steers the held message when the composer is empty, and keeps typed text on a refusal", async () => {
+    let steerBodies: string[] = [];
+    server.use(
+      http.post("/api/sessions/:id/prompt", () =>
+        HttpResponse.json({ accepted: true, agent_id: "a_1", delivery: "held" }, { status: 202 })),
+      http.post("/api/sessions/:id/steer", async ({ request }) => {
+        const body = await request.text();
+        steerBodies.push(body);
+        if (JSON.parse(body).text !== "") {
+          return HttpResponse.json({ error: { code: "internal", message: "the model cannot accept that" } }, { status: 500 });
+        }
+        return HttpResponse.json({ accepted: true, agent_id: "a_1", outcome: "steered" }, { status: 202 });
+      }),
+    );
+    render(<Composer agentId="a_1" busy steerable />);
+    const ta = screen.getByRole("textbox") as HTMLTextAreaElement;
+
+    type(ta, "queued first");
+    fireEvent.keyDown(ta, { key: "Enter" });
+    await waitFor(() => expect(useHeldStore.getState().byAgent.a_1).toBe("queued first"));
+
+    // Empty composer + a held message: Steer delivers the held one.
+    fireEvent.click(screen.getByRole("button", { name: "Steer" }));
+    await waitFor(() => expect(useHeldStore.getState().byAgent.a_1).toBeUndefined());
+    expect(JSON.parse(steerBodies[0]).text).toBe("");
+
+    // A refused steer leaves the composer's text exactly where it was.
+    type(ta, "not acceptable");
+    fireEvent.click(screen.getByRole("button", { name: "Steer" }));
+    await waitFor(() => expect(screen.getByText(/Could not steer/)).toBeInTheDocument());
+    expect(ta.value).toBe("not acceptable");
+  });
+
+  it("returns a held message to an empty composer when the agent stops, and discards it over typed text", async () => {
+    server.use(http.post("/api/sessions/:id/prompt", () =>
+      HttpResponse.json({ accepted: true, agent_id: "a_1", delivery: "held" }, { status: 202 })));
+
+    const view = render(<Composer agentId="a_1" busy running />);
+    const ta = screen.getByRole("textbox") as HTMLTextAreaElement;
+    type(ta, "held text");
+    fireEvent.keyDown(ta, { key: "Enter" });
+    await waitFor(() => expect(useHeldStore.getState().byAgent.a_1).toBe("held text"));
+
+    view.rerender(<Composer agentId="a_1" busy={false} running={false} />);
+    await waitFor(() => expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("held text"));
+    expect(useHeldStore.getState().byAgent.a_1).toBeUndefined();
+    expect(getChatDraft("a_1")).toBe("held text");
+    view.unmount();
+
+    // Same stop, but the person has since typed: their text wins and the held
+    // message is discarded rather than overwriting it.
+    const second = render(<Composer agentId="a_2" busy running />);
+    const ta2 = screen.getByRole("textbox") as HTMLTextAreaElement;
+    type(ta2, "queue me");
+    fireEvent.keyDown(ta2, { key: "Enter" });
+    await waitFor(() => expect(useHeldStore.getState().byAgent.a_2).toBe("queue me"));
+    type(ta2, "typed since");
+
+    second.rerender(<Composer agentId="a_2" busy={false} running={false} />);
+    await waitFor(() => expect(useHeldStore.getState().byAgent.a_2).toBeUndefined());
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("typed since");
+    expect(getChatDraft("a_2")).toBe("typed since");
   });
 });

@@ -220,7 +220,7 @@ requirement cite a live check rather than a code reading alone.
 Because effort now applies to a live session as well as at startup, the same helper serves the
 running-agent change in FS-03.R47 with no second spelling of the call (INV §2).
 
-**R48 `(planned)` — AgentDeck holds a queued prompt itself; no adapter queue is
+**R48 — AgentDeck holds a queued prompt itself; no adapter queue is
 used.** Both pinned chat adapters process ordinary prompts as strictly sequential turns. Their
 advertised steering extension is a separate operation, not an ordinary-prompt queue, so the
 strongest portable Send promise is "runs as the next turn" (FS-03.R48) and the holding mechanism is
@@ -247,7 +247,7 @@ The historical `codex-acp` 1.1.2 adapter wired neither Codex app-server `turn/st
 extension, but still provides no portable, withdrawable ordinary-prompt queue; steering is a
 stronger product promise than R48's hold, not a drop-in replacement for it.
 
-**R49 `(planned)` — Steering is the `_session/steering` extension, gated on its
+**R49 — Steering is the `_session/steering` extension, gated on its
 advertised capability, never on a version number.** Both current adapters implement the same agreed
 ACP steering extension: request method `_session/steering`, advertised at handshake as
 `initialize` response `_meta.steering.supported`. AgentDeck detects it from that advertisement and

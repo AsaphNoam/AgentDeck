@@ -430,4 +430,17 @@ ALTER TABLE tasks ADD COLUMN fast INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE running ADD COLUMN fast_available INTEGER NOT NULL DEFAULT 1;
 `,
 	},
+	{
+		// Whether the live session's adapter advertises the ACP steering extension
+		// is decided at that session's handshake, so it lives on the running row
+		// beside fast_available and disappears with it (FS-03.R50, TS-02.R31).
+		// Pre-migration rows default to NOT advertised — the opposite direction
+		// from fast_available: an unobserved steering advertisement must fail
+		// closed to "no Steer control" under FS-09.R26's explicit-capability rule,
+		// never to a control that would fail at the adapter.
+		version: 25,
+		sql: `
+ALTER TABLE running ADD COLUMN steering_available INTEGER NOT NULL DEFAULT 0;
+`,
+	},
 }

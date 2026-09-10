@@ -164,6 +164,24 @@ instead of adding one.
 `0` means normal speed and existing rows adopt it without interpretation — which is also the correct
 reading for every agent that predates this field.
 
+**R31 — Steering availability is ephemeral session state; a held follow-up is
+not persisted at all.** Whether the live session's adapter advertises the ACP steering extension is
+decided at that session's handshake (TS-04.R49), so it takes R30's ephemeral shape rather than a
+durable one: `running.steering_available INTEGER NOT NULL DEFAULT 0`, re-decoded on every launch and
+resume, joined into the agent-state projection so the chat composer can offer **Steer** only where it
+works (FS-03.R50), and gone with the row on stop. The migration defaults pre-existing rows to *not*
+advertised, the opposite direction from `fast_available`: an unobserved fast-mode advertisement fails
+open to the previous behavior, while an unobserved steering advertisement must fail closed to "no
+Steer control", because FS-09.R26's explicit-capability rule forbids rendering a control that would
+fail at the adapter.
+
+The queued follow-up itself (FS-03.R48) gets **no** column, file, or transcript row while it is held.
+It is at most one message per agent of live runtime state that dies with the process (TS-01.R29); it
+enters the durable transcript and the search index through the ordinary user-prompt path only when it
+is actually sent, so replay and search never contain a message the agent never received. Persisting it
+would also put one-shot request data into a field the recording path reads back, which is INV §3's
+rule in the same structural form R30 applies to requested-versus-applied fast mode.
+
 **R19 — Codex's isolated runtime profile is private, managed filesystem state.**
 `$AGENTDECK_HOME/codex/` is an owner-only Codex profile for `codex-acp` children (TS-04.R20/R21).
 It contains the child's own session/history store plus a one-way managed mirror of personal Codex

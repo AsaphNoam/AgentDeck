@@ -223,6 +223,15 @@ type agentState struct {
 	// INV §1, §11).
 	loadReplay        bool
 	loadReplayDropped int
+	// steering records whether this session's adapter advertised the ACP steering
+	// extension at handshake (TS-04.R49). Decided once per process from that
+	// advertisement alone, never from the adapter version or the backend type.
+	steering bool
+	// held is the person's queued follow-up: at most one message per agent, live
+	// state only (FS-03.R48, TS-01.R29, TS-02.R31). Submitting another replaces
+	// it, turn end delivers it, and it dies with this agentState on stop or crash
+	// — there is nothing to persist and nothing to reap (INV §4, §16).
+	held string
 }
 
 // pendingPerm is a withheld session/request_permission awaiting a decision.
@@ -311,6 +320,7 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 		as.shutdown()
 		return nil, err
 	}
+	as.setSteering(decodeSteeringSupport(initRes))
 	newRes, err := c.startupCall(ctx, as.transport, "session/new", sessionNewParams(spec))
 	if err != nil {
 		return nil, c.startupFailure(as, spec.BackendType, "session/new", err)
@@ -340,7 +350,7 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 	if err := c.store.WriteRunning(state.RunningEntry{
 		AgentID: as.agentID, PID: pgid, SessionID: sess.SessionID,
 		Interface: "chat", HookToken: spec.HookToken, StartedAt: now,
-		FastAvailable: applied.FastAvailable,
+		FastAvailable: applied.FastAvailable, SteeringAvailable: as.steeringSupported(),
 	}); err != nil {
 		as.shutdown()
 		return nil, fmt.Errorf("runtime: write running: %w", err)
@@ -366,17 +376,208 @@ func (c *ChatRuntime) SendPrompt(ctx context.Context, agentID, text string) erro
 	if err != nil {
 		return err
 	}
+	turnID, claimed := as.claimTurn()
+	if !claimed {
+		return ErrTurnInFlight
+	}
+	return c.runPromptTurn(as, text, turnID)
+}
+
+// SendPromptOrHold is the person's chat prompt path, and only that path
+// (FS-03.R48, TS-01.R29). It is deliberately a separate entry point from
+// SendPrompt: the task dispatcher and the two pipeline transitions consume
+// ErrTurnInFlight as arbitration, so a queue inside the shared call would let a
+// run continue past the gate that paused it. Reports whether the message was
+// held rather than sent.
+func (c *ChatRuntime) SendPromptOrHold(ctx context.Context, agentID, text string) (bool, error) {
+	as, err := c.lookup(agentID)
+	if err != nil {
+		return false, err
+	}
+	turnID, held := as.claimTurnOrHold(text)
+	if held {
+		return true, nil
+	}
+	return false, c.runPromptTurn(as, text, turnID)
+}
+
+// WithdrawHeld drops the agent's held follow-up, if any (FS-03.R48). It is
+// idempotent by construction: withdrawing nothing is success, so a double
+// withdraw is never an error (TS-03.R38).
+func (c *ChatRuntime) WithdrawHeld(agentID string) error {
+	as, err := c.lookup(agentID)
+	if err != nil {
+		return err
+	}
+	as.mu.Lock()
+	as.held = ""
+	as.mu.Unlock()
+	return nil
+}
+
+// SteerOutcome is what the adapter did with a steered message (TS-04.R49). The
+// adapter owns the choice and reports it; AgentDeck never infers it from
+// transcript timing and never adds a retry-as-a-new-prompt path of its own,
+// which would double-send against an adapter that already fell back.
+type SteerOutcome string
+
+const (
+	// SteerInjected: the message joined the turn that was already running.
+	SteerInjected SteerOutcome = "steered"
+	// SteerNewTurn: the turn ended between the decision and the call, so the
+	// adapter started a fresh turn from the same message rather than losing it.
+	SteerNewTurn SteerOutcome = "new_turn"
+)
+
+// Steer delivers text into the agent's running turn through the adapter's ACP
+// steering extension (FS-03.R50, TS-04.R49). Empty text promotes the agent's
+// held follow-up, which is the only way to send one: taking it and steering it is
+// one operation here rather than a client-side withdraw-then-steer that could
+// drop the text between two requests.
+func (c *ChatRuntime) Steer(ctx context.Context, agentID, text string) (SteerOutcome, error) {
+	as, err := c.lookup(agentID)
+	if err != nil {
+		return "", err
+	}
 
 	as.mu.Lock()
-	if as.turnActive {
+	if !as.steering {
 		as.mu.Unlock()
-		return ErrTurnInFlight
+		return "", ErrSteeringUnsupported
+	}
+	promoted := text == ""
+	if promoted {
+		// Take the hold under the same lock it is written and released under, so a
+		// concurrent withdraw or turn-end delivery cannot let one message both
+		// steer and run as its own turn (INV §5).
+		if as.held == "" {
+			as.mu.Unlock()
+			return "", ErrNothingHeld
+		}
+		text = as.held
+		as.held = ""
+	}
+	as.mu.Unlock()
+
+	res, callErr := as.transport.Call(ctx, steeringMethod, map[string]any{
+		"sessionId": as.sessionID,
+		"prompt":    []map[string]any{{"type": "text", "text": text}},
+	})
+	outcome, err := mapSteerResult(res, callErr)
+	if err == nil {
+		// The agent really did receive it — injected into the running turn or as
+		// the turn the adapter started — so it belongs in the durable transcript
+		// as an ordinary user message on the same path every other prompt takes
+		// (FS-03.R50, INV §2). A refusal deliberately writes nothing.
+		c.emit(as, EvUserPrompt, UserPromptData{Text: text})
+	}
+	if err != nil && promoted {
+		// A refusal must leave the person's message where they can still see and
+		// act on it. The composer holds a message the person typed; a promoted one
+		// only exists here, so put it back unless something newer took its place.
+		as.mu.Lock()
+		if as.held == "" {
+			as.held = text
+		}
+		as.mu.Unlock()
+	}
+	return outcome, err
+}
+
+// steeringMethod is the agreed ACP steering extension request, advertised at
+// handshake as initialize._meta.steering.supported (TS-04.R49).
+const steeringMethod = "_session/steering"
+
+// mapSteerResult turns the adapter's answer into the two outcomes the product
+// reports. Anything else — the adapter's own "failed", the "promptRequired"
+// fallback AgentDeck deliberately never opts into, a missing field, or an
+// unreadable body — is an error carrying what the adapter said, never a silent
+// downgrade to a queue (FS-03.R50, INV §12).
+func mapSteerResult(res json.RawMessage, callErr error) (SteerOutcome, error) {
+	if callErr != nil {
+		return "", callErr
+	}
+	var body struct {
+		Outcome string `json:"outcome"`
+	}
+	if err := json.Unmarshal(res, &body); err != nil {
+		return "", fmt.Errorf("runtime: steering returned an unreadable result: %w", err)
+	}
+	switch body.Outcome {
+	case "injected":
+		return SteerInjected, nil
+	case "startedNewTurn":
+		return SteerNewTurn, nil
+	case "":
+		return "", fmt.Errorf("runtime: steering returned no outcome")
+	default:
+		return "", fmt.Errorf("runtime: the agent could not accept that message (%s)", body.Outcome)
+	}
+}
+
+// decodeSteeringSupport reads the adapter's steering advertisement from the
+// initialize response: `_meta.steering.supported` (TS-04.R49). Detection comes
+// from that advertisement and nothing else — not the adapter version, not the
+// backend type — and an absent, malformed, or wrongly-typed value reads as
+// unsupported, so an unknown adapter degrades to Send-only rather than exposing
+// a control it would reject (INV §12).
+func decodeSteeringSupport(initRes json.RawMessage) bool {
+	var body struct {
+		Meta struct {
+			Steering struct {
+				Supported bool `json:"supported"`
+			} `json:"steering"`
+		} `json:"_meta"`
+	}
+	if err := json.Unmarshal(initRes, &body); err != nil {
+		return false
+	}
+	return body.Meta.Steering.Supported
+}
+
+// claimTurn takes the per-agent turn gate for a new turn. Deciding and claiming
+// happen in one critical section so two callers can never both start a turn
+// (INV §5).
+func (as *agentState) claimTurn() (string, bool) {
+	as.mu.Lock()
+	defer as.mu.Unlock()
+	return as.claimTurnLocked()
+}
+
+// claimTurnOrHold is claimTurn's person-facing variant: it takes the gate when
+// the agent is free and otherwise holds the text as the next turn. The choice
+// between the two reads the same turnActive flag the gate is taken under, in the
+// same critical section, so a hold cannot race a turn_end and be left sitting
+// until the turn after next (TS-01.R29, INV §5).
+func (as *agentState) claimTurnOrHold(text string) (string, bool) {
+	as.mu.Lock()
+	defer as.mu.Unlock()
+	turnID, claimed := as.claimTurnLocked()
+	if claimed {
+		return turnID, false
+	}
+	// At most one held message per agent: a second submission replaces it rather
+	// than stacking a second queued turn (FS-03.R48, INV §16).
+	as.held = text
+	return "", true
+}
+
+func (as *agentState) claimTurnLocked() (string, bool) {
+	if as.turnActive {
+		return "", false
 	}
 	as.turnActive = true
 	as.cancelEscalated = false
 	as.resolved = map[string]struct{}{}
-	turnID := as.nextTurnIDLocked()
-	as.mu.Unlock()
+	return as.nextTurnIDLocked(), true
+}
+
+// runPromptTurn drives one provider turn for text under a gate the caller has
+// already claimed. Every caller that claims the gate reaches this function, and
+// this function releases the claim on every failure branch, so the launch, hold
+// release, and steer promotion paths cannot grow divergent turn bookkeeping
+// (INV §2).
+func (c *ChatRuntime) runPromptTurn(as *agentState, text, turnID string) error {
 	if err := c.store.ResetTurnBudget(as.agentID, turnID); err != nil {
 		as.mu.Lock()
 		as.turnActive = false
@@ -416,9 +617,7 @@ func (c *ChatRuntime) SendPrompt(ctx context.Context, agentID, text string) erro
 			as.cancelEscalated = false
 			as.mu.Unlock()
 			c.emit(as, EvError, ErrorData{Scope: "protocol", Message: err.Error(), Fatal: false})
-			td := TurnEndData{StopReason: "error", ContextPct: as.lastPct()}
-			c.applyTurnEndStatus(as, td)
-			c.emit(as, EvTurnEnd, td)
+			c.finishTurn(as, TurnEndData{StopReason: "error", ContextPct: as.lastPct()})
 			return
 		}
 		td, hasPct := mapPromptResult(res)
@@ -432,13 +631,51 @@ func (c *ChatRuntime) SendPrompt(ctx context.Context, agentID, text string) erro
 		}
 		as.mu.Unlock()
 
-		// Write the idle status row before emitting turn_end so a client that
-		// reacts to turn_end never observes a stale busy row.
-		c.applyTurnEndStatus(as, td)
-		c.emit(as, EvTurnEnd, td)
+		c.finishTurn(as, td)
 	}()
 
 	return nil
+}
+
+// finishTurn settles a turn the runtime owns: it writes the idle status row
+// before emitting turn_end so a client reacting to turn_end never observes a
+// stale busy row, then releases any held follow-up. Both the ordinary prompt and
+// the activation turn end here, so cancel and normal completion cannot grow
+// divergent delivery paths (FS-03.R49, INV §2). The crash path deliberately does
+// not: its held message has no next turn to run in and dies with the agent.
+func (c *ChatRuntime) finishTurn(as *agentState, td TurnEndData) {
+	c.applyTurnEndStatus(as, td)
+	c.emit(as, EvTurnEnd, td)
+	c.deliverHeld(as)
+}
+
+// deliverHeld runs the agent's held follow-up as the next turn. Taking the
+// message and claiming the gate is one critical section, so a message can never
+// be both delivered here and sent by a racing caller (INV §5). A cancelled turn
+// reaches this the same way a completed one does, which is what makes cancel
+// "stop that, do this instead" rather than a discard (FS-03.R49).
+func (c *ChatRuntime) deliverHeld(as *agentState) {
+	as.mu.Lock()
+	if as.held == "" || as.stopped {
+		as.mu.Unlock()
+		return
+	}
+	turnID, claimed := as.claimTurnLocked()
+	if !claimed {
+		// Another turn already owns the gate; the message stays held and goes out
+		// when that turn ends instead of being dropped.
+		as.mu.Unlock()
+		return
+	}
+	text := as.held
+	as.held = ""
+	as.mu.Unlock()
+	if err := c.runPromptTurn(as, text, turnID); err != nil {
+		// runPromptTurn already released the gate. Nobody is waiting on a return
+		// value here, so the person learns about it the only way that is visible:
+		// as a turn error in their transcript (INV §8).
+		c.emit(as, EvError, ErrorData{Scope: "protocol", Message: "queued message failed to send: " + err.Error(), Fatal: false})
+	}
 }
 
 func (c *ChatRuntime) Stop(ctx context.Context, agentID string) error {
@@ -633,6 +870,9 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 		as.shutdown()
 		return nil, err
 	}
+	// Re-decoded here, not carried across the boundary: resume spawns a new
+	// adapter process whose advertisement is its own (INV §1).
+	as.setSteering(decodeSteeringSupport(initRes))
 
 	// Try session/load to restore native context; fall back to session/new.
 	// The load params must carry the current cwd + freshly-minted MCP servers
@@ -725,7 +965,7 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 	if err := c.store.WriteRunning(state.RunningEntry{
 		AgentID: as.agentID, PID: pgid, SessionID: resolvedSessionID,
 		Interface: "chat", HookToken: spec.HookToken, StartedAt: now,
-		FastAvailable: applied.FastAvailable,
+		FastAvailable: applied.FastAvailable, SteeringAvailable: as.steeringSupported(),
 	}); err != nil {
 		as.shutdown()
 		return nil, fmt.Errorf("runtime: write running: %w", err)
@@ -821,9 +1061,7 @@ func (c *ChatRuntime) StartActivation(ctx context.Context, agentID, kind string,
 			as.cancelEscalated = false
 			as.mu.Unlock()
 			c.emit(as, EvError, ErrorData{Scope: "protocol", Message: err.Error(), Fatal: false})
-			td := TurnEndData{StopReason: "error", ContextPct: as.lastPct()}
-			c.applyTurnEndStatus(as, td)
-			c.emit(as, EvTurnEnd, td)
+			c.finishTurn(as, TurnEndData{StopReason: "error", ContextPct: as.lastPct()})
 			return
 		}
 		td, hasPct := mapPromptResult(res)
@@ -836,8 +1074,7 @@ func (c *ChatRuntime) StartActivation(ctx context.Context, agentID, kind string,
 			td.ContextPct = as.contextPct
 		}
 		as.mu.Unlock()
-		c.applyTurnEndStatus(as, td)
-		c.emit(as, EvTurnEnd, td)
+		c.finishTurn(as, td)
 	}()
 	return true, nil
 }
@@ -1443,6 +1680,18 @@ func clip(s string, n int) string {
 		return s
 	}
 	return s[:n]
+}
+
+func (as *agentState) steeringSupported() bool {
+	as.mu.Lock()
+	defer as.mu.Unlock()
+	return as.steering
+}
+
+func (as *agentState) setSteering(supported bool) {
+	as.mu.Lock()
+	as.steering = supported
+	as.mu.Unlock()
 }
 
 func (as *agentState) lastPct() float64 {

@@ -1,6 +1,6 @@
 # TS-08 — Frontend presentation architecture
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src`, `ui/package.json`, `ui/vite.config.ts`
 **Absorbed:** —
 
@@ -551,7 +551,7 @@ primitive seam; the rejected alternatives are recorded in §5.
   derives from that agent field rather than holding a second copy that could drift from the card and
   the archive header (INV §2).
 
-- **R56 `(planned)` — A held message is a transcript-tail affordance, not a
+- **R56 — A held message is a transcript-tail affordance, not a
   transcript event.** The pending follow-up (FS-03.R48) renders at the end of the transcript beside
   the R29 waiting indicator, from client state keyed to the agent, and is never merged into the
   event list `foldTranscript` builds. Keeping it out of that list is what makes it structurally

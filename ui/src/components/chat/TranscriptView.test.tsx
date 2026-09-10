@@ -1,8 +1,10 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import * as client from "../../api/client";
 import { useAnnotationStore } from "../../store/annotationStore";
+import { useHeldStore } from "../../store/heldStore";
 import { foldTranscript, useTranscriptStore } from "../../store/transcriptStore";
 import { annotationBlockSentinel } from "../../lib/annotations";
 import { TranscriptView } from "./TranscriptView";
@@ -12,6 +14,7 @@ afterEach(() => {
   window.getSelection()?.removeAllRanges();
   useAnnotationStore.setState({ bySource: {}, overallBySource: {}, editedAt: {}, collapsedBySource: {} });
   useTranscriptStore.setState({ byAgent: {}, rawByAgent: {}, pending: {} });
+  useHeldStore.setState({ byAgent: {} });
 });
 
 const events = [{ kind: "assistant_text", seq: 7, text: "First line\nSecond line" }];
@@ -193,5 +196,39 @@ describe("TranscriptView self-annotation prompt", () => {
     renderTranscript(true, rendered);
 
     expect(screen.getByText(annotationBlockSentinel, { exact: false })).toBeInTheDocument();
+  });
+});
+
+// TS-08.R56 — the queued follow-up is a transcript-tail affordance, not a
+// transcript event: it renders beside the list the fold builds, reads as
+// not-yet-sent, and carries its own withdraw control.
+describe("TranscriptView pending follow-up", () => {
+  it("renders nothing when no message is held", () => {
+    renderTranscript(true, events, true);
+
+    expect(screen.queryByText(/^Queued/)).toBeNull();
+  });
+
+  it("shows a held message as queued and outside the folded event list", () => {
+    useHeldStore.getState().hold("a1", "also update the docs");
+    renderTranscript(true, events, true);
+
+    expect(screen.getByText("Queued — sends when this turn ends")).toBeInTheDocument();
+    expect(screen.getByText("also update the docs")).toBeInTheDocument();
+    // It is beside the list, not an item in it — a live render and a reload
+    // cannot disagree about something the fold never sees.
+    expect(document.querySelector('[data-variant="held"]')?.closest(".transcript-item")).toBeNull();
+    expect(useTranscriptStore.getState().byAgent.a1).toBeUndefined();
+  });
+
+  it("keeps the message visible when withdrawing it fails", async () => {
+    useHeldStore.getState().hold("a1", "still queued");
+    const failing = vi.spyOn(client, "withdrawPrompt").mockRejectedValue(new Error("gone"));
+    renderTranscript(true, events, true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Withdraw" }));
+    expect(await screen.findByText("Could not withdraw — it may already have been sent.")).toBeInTheDocument();
+    expect(useHeldStore.getState().byAgent.a1).toBe("still queued");
+    failing.mockRestore();
   });
 });

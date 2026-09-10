@@ -12,6 +12,10 @@ export interface AgentState {
   /** Whether the live session offers fast mode at all (FS-03.R46). False for a
    * stopped agent, which renders its settings as static text. */
   fast_available: boolean;
+  /** Whether the live session's adapter advertises steering (FS-03.R50). False
+   * for a stopped agent and for any adapter without the extension, both of which
+   * render no Steer control rather than a disabled one. */
+  steering_available: boolean;
   interface: string;
   group?: string;
   created_at: string;

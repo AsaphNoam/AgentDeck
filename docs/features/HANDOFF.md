@@ -2,6 +2,7 @@
 
 **Live agent state.** Read the **Current position** and **Active change** below, then open the
 requirements they name. Settled state is archived in
+[`../archive/state/HANDOFF-through-2026-09-09.md`](../archive/state/HANDOFF-through-2026-09-09.md),
 [`../archive/state/HANDOFF-through-2026-09-07.md`](../archive/state/HANDOFF-through-2026-09-07.md),
 [`../archive/state/HANDOFF-through-2026-09-06.md`](../archive/state/HANDOFF-through-2026-09-06.md),
 [`../archive/state/HANDOFF-through-2026-09-03.md`](../archive/state/HANDOFF-through-2026-09-03.md),
@@ -13,13 +14,14 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 - **Active change:** None.
 - **Release:** `v0.4.2` is published and verified on tag `f56755a`; its release and CI runs passed and
   the distributable reports `0.4.2` with `sqlite_fts5`. Range details are in the state archive.
-- **Review units:** `chat-session-configuration` was explicitly re-reviewed through its finding-fix
-  commit; one Worth-fixing protocol replacement finding is open. The BR-3 resume-replay unit,
+- **Review units:** `queue-a-follow-up-while-busy` (Send queues, Steer injects) is available and
+  unreviewed. `chat-session-configuration` was explicitly re-reviewed through its finding-fix commit;
+  one Worth-fixing protocol replacement finding is open. The BR-3 resume-replay unit,
   `dock-the-annotation-tray-and-quiet-its-prompt`, and all earlier units through this release are
   closed. Review records, finding-fix commits, release records, and handoff/archive/queue
   bookkeeping are administrative closure.
-- **Work units:** `queue-a-follow-up-while-busy.md` (Send queues, Steer injects) is waiting to start.
-  `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
+- **Work units:** None waiting to start. `migrate-internal-actions-from-mcp.md` stays paused on its
+  transport blocker.
 - **Design units:** Existing entries under `Ideas being defined` may resume, and entries under
   `New ideas` are available to start. One entry from the 2026-09-07 agent-features request remains
   part-decided and resumable: streaming agent thinking (decided live-only; rendering default and
@@ -58,73 +60,33 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 
 **Change:** None.
 
-**Available by role:** `/review` has no unreviewed unit; `/work` may select
-`queue-a-follow-up-while-busy.md`; `/fix` may select any one open finding unit;
-`/design-feature` may choose an available or resumable idea. Role
-queues are independent.
+**Available by role:** `/review` may select `queue-a-follow-up-while-busy`; `/work` has no unit
+waiting to start; `/fix` may select any one open finding unit; `/design-feature` may choose an
+available or resumable idea. Role queues are independent.
 
-**Changelog — 2026-09-10 (fix):** Closed the pinned-adapter specification finding and its
-`bump-pinned-acp-adapters.md` unit (INV §2, INV §10, INV §11, INV §12). TS-04 now distinguishes
-historical 0.59.0/1.1.2 observations from current 0.75.1/1.10.0 evidence for prompt queueing,
-commands, activation, tool identity, and steering. R49 now records that steering is reachable behind
-the advertised capability, and `queue-a-follow-up-while-busy.md` is ready rather than blocked. The
-credentialed provider acceptance matrix remains open and is not claimed verified.
+**Changelog — 2026-09-10 (work):** Finished `queue-a-follow-up-while-busy` (FS-03.R48–R50,
+TS-01.R29, TS-02.R31, TS-03.R38/R39, TS-04.R48/R49, TS-08.R56; INV §1, §2, §4, §5, §8, §12, §16).
+Send to a busy chat agent holds one message as live runtime state instead of returning `409`, and it
+is delivered from the single place both the prompt turn and the activation turn already end — so
+cancel sends it without a second path. Holding is a separate entry point, `SendPromptOrHold`, so the
+dispatcher, pipeline, and annotation callers keep `SendPrompt`'s exact fail-closed contract. `DELETE`
+on the prompt path withdraws. Steer is `POST /api/sessions/{id}/steer` over the adapters'
+`_session/steering` extension, gated only on the handshake advertisement, decoded into the new
+ephemeral `running.steering_available` (migration 25, defaulting closed) and projected onto the agent
+payload; an empty steer promotes the held message in one server-side take-and-deliver and restores it
+on refusal. The client mirror is an in-memory store rendered as a transcript-tail affordance, never
+merged into the folded event list. Two notes for review rather than questions: an adapter answering
+`startedNewTurn` runs a turn AgentDeck cannot see end, so status could stay `busy` (the window is the
+sub-millisecond gap between our gate clearing and the adapter settling, and TS-04.R49 forbids our own
+new-prompt path); and the memory-only mirror TS-08.R56 requires means a browser reload loses the
+pending affordance and its withdraw control while the server still holds and will still deliver the
+message. Both Go variants, a focused `-race` run on the hold/steer paths, spec checks, the UI suite,
+and the distributable rebuild pass. No credentialed provider journey was authorized or run, so real
+Claude and Codex steering remains an open acceptance gate and is not claimed verified.
 
-**Changelog — 2026-09-10 (review):** Reviewed `bump-pinned-acp-adapters.md`. The package pins,
-lockfile, source-install pin, release fixtures, single-Codex assembly gate, and executable probe are
-consistent with the release-runtime requirements. One Worth-fixing specification finding remains:
-the steering requirement still says the current pins predate the extension and several ACP
-compatibility statements still label the retired versions as pinned. The unit stays open for fix.
-The invariant sweep applied §§2, 10, 11, 12, and 17; §§1 and 3–9 and 13–16 had no surface in this
-dependency-and-packaging diff. Both Go variants, spec checks, the UI production build, and the
-distributable rebuild pass. Credentialed provider journeys were not authorized or run and remain an
-open acceptance gate.
-
-**Changelog — 2026-09-10 (work):** Finished `bump-pinned-acp-adapters.md`. The release runtime now
-pins Claude ACP 0.75.1 and Codex ACP 1.10.0; the Codex adapter dedupes onto the direct Codex 0.153.4
-pin, and assembly now rejects a second nested Codex package. Version fixtures and the source-install
-Claude pin were refreshed. Static inspection confirms the existing protocol, configuration,
-permission, MCP, usage, command, and steering surfaces. The full automated matrix and distributable
-build pass. No credentialed provider journey was authorized or run, so that acceptance gate remains
-open and none of those live behaviors is claimed verified.
-
-**Changelog — 2026-09-09 (fix):** Closed BR-3's Must-fix and its unit (INV §1, INV §11). ACP lets an
-adapter restore native context by replaying prior `session/update` frames during `session/load`, and
-resume held no gate over that call, so every replayed frame was sequenced, persisted, published live,
-and allowed to drive agent status — which is why an open chat visibly scrolled through old work on
-wake. Resume now holds a replay claim from callback installation until `session/load` returns:
-transcript events are suppressed for that window, replace-only live state (available commands,
-context usage) is still accepted, and the suppressed count is logged. `session/new` replays nothing,
-so launch is unchanged. New `TS-04.R50` records the rule. `fakeacp` gained a `FAKEACP_LOAD_HISTORY`
-scenario and `TestResumeSuppressesProviderHistoryReplay`, confirmed to fail pre-fix with exactly the
-reported symptom. No UI change was needed — append and bottom-follow are correct once the runtime
-stops mislabeling history as live. Both Go variants, a focused `-race` run on resume, vet, build, and
-spec checks pass. Settled 2026-09-08 entries moved to the `v0.4.2` state archive for header budget.
-
-**Changelog — 2026-09-09 (fix):** Closed BR-2's immediate Must-fix. The release-private Codex CLI
-is pinned to 0.153.4 throughout the manifest, lockfile, assembly checks, and release fixtures. The
-release wrapper now defaults `CODEX_PATH` to that exact direct private executable, so codex-acp
-1.1.2 cannot silently launch its nested 0.144.x dependency; an explicit environment override is
-still preserved. TS-06.R22 and wrapper coverage record the executable-authority contract. Focused
-release/CLI tests and the full closure matrix pass; no credentialed Astra prompt was sent, so that
-acceptance gate remains open. The systemic model-catalog/runtime gap remains a Worth-fixing finding,
-with `bump-pinned-acp-adapters.md` queued as its structural follow-up.
-
-**Changelog — 2026-09-09 (bug investigation):** Confirmed BR-2 — model discovery reads the personal
-Codex cache while execution uses the older release-private CLI, so an imported `gpt-6-astra` was
-selectable but unusable. Recorded one immediate Must-fix (now closed) and one systemic Worth-fixing;
-no provider prompt was sent and no reproduction test was committed. Full trace under **Bug
-investigation reports**.
-
-**Changelog — 2026-09-09 (review):** Re-reviewed the `chat-session-configuration` finding-fix range
-`edb909a..8a01ebf`. All six original findings are materially addressed; one Worth-fixing protocol
-edge remains (empty rebuilt option list, recorded under **Review findings**). Retracted the fix run's
-Claude Must-fix: a credentialed prompt probe observed the requested model in SDK `system/init.model`,
-the assistant message, and `modelUsage` for Haiku and Sonnet even though ACP still reported stale
-`opus`, so adapter-local `currentValue` is configuration evidence, not an execution oracle. The
-provider-oracle postmortem finding records that recurrence. Checks pass; the full provider acceptance
-matrix remains open.
-
+Settled 2026-09-09 and 2026-09-10 adapter-bump entries moved to
+[`../archive/state/HANDOFF-through-2026-09-09.md`](../archive/state/HANDOFF-through-2026-09-09.md)
+for header budget.
 
 Credentialed provider journeys and the real-browser checks below remain open acceptance gates, not
 blockers. Never report them as verified without running them.

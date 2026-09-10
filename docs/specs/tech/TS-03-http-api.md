@@ -195,7 +195,7 @@ switch still restarts the process; that redundancy is retained deliberately rath
 because removing a shipped request field is a compatibility break and the chat header no longer uses
 that path for effort anyway (FS-03.R47).
 
-**R38 `(planned)` — Queueing changes the prompt route's outcome, not its shape.**
+**R38 — Queueing changes the prompt route's outcome, not its shape.**
 `POST /api/sessions/{id}/prompt` stops returning `409 conflict` for a busy chat agent and returns the
 same `202 {accepted, agent_id}` it returns today, with a field naming whether the message was sent or
 held so a client can render the pending state without inferring it from agent status. No new route
@@ -208,6 +208,26 @@ when nothing is held, so a double-withdraw is not an error (INV §8).
 The `409` remains reachable and meaningful: a terminal agent, and any caller reaching the runtime
 without the hold capability, still receive it. Clients that today treat `409` as "retry later" keep
 working — they simply stop seeing it on the chat path.
+
+**R39 — Steer is its own route because it is its own operation, and its
+availability travels on the agent.** Send and Steer are two deliberate actions with two meanings
+(FS-03.R50), so Steer is `POST /api/sessions/{id}/steer` with the same `{text}` body as the prompt
+route, not a mode flag on it: overloading one route would make a client's intent — "after this turn"
+versus "into this turn" — a parameter the server could silently reinterpret. It returns `202 {accepted,
+agent_id, outcome}` where `outcome` is `steered` when the adapter injected into the running turn and
+`new_turn` when the turn had already ended and the adapter started a fresh one, so the client reports
+which happened instead of inferring it from transcript timing (TS-04.R49). An empty `text` steers the
+message currently held for that agent and is the only way to send one, so promoting a held message is
+a single server-side take-and-deliver rather than a client-side withdraw-then-steer that could drop
+the text between two requests; an empty `text` with nothing held is `409 conflict`. A runtime that does
+not advertise steering is `409 conflict` — the route exists on every chat agent because capability is a
+property of the live session, not of the URL — and an adapter refusal (content the current model
+cannot accept) surfaces as `500 internal` carrying the adapter's own reason, never as a silent
+downgrade to a queue.
+
+Clients learn the capability the same way they learn fast-mode availability: `steering_available`
+joins the agent payload from the live session's row (TS-02.R31) and every `state_update` carries it,
+so no client polls a capability endpoint and a stopped agent reports `false` (INV §2).
 
 **R20.** Project and agent archive use explicit action routes rather than overloading
 ordinary project replacement or Stop: `POST /api/projects/{project}/archive`, `POST

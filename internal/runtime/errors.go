@@ -26,6 +26,14 @@ var (
 	// ErrProtocolVersion: the adapter negotiated an ACP protocol version outside
 	// the pinned [minACPVersion, maxACPVersion] range (techspec §12.1).
 	ErrProtocolVersion = errors.New("runtime: incompatible ACP protocol version")
+	// ErrSteeringUnsupported: this live session's adapter did not advertise the
+	// ACP steering extension, so there is no Steer control to reach this path
+	// (FS-03.R50, TS-04.R49).
+	ErrSteeringUnsupported = errors.New("runtime: this agent's adapter does not support steering")
+	// ErrNothingHeld: a steer with no text asked to promote the agent's held
+	// follow-up and there is none — typically because the turn ended and it was
+	// already delivered (FS-03.R50).
+	ErrNothingHeld = errors.New("runtime: no message is held for this agent")
 )
 
 // Session-configuration sentinels (TS-03.R37). A live setting change fails for

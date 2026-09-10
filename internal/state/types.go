@@ -40,6 +40,11 @@ type RunningEntry struct {
 	// rather than identity-scoped: a session's current model decides it, so it is
 	// re-decoded on every launch and resume and vanishes with the row on stop.
 	FastAvailable bool `json:"fast_available"`
+	// SteeringAvailable records whether this live session's adapter advertised the
+	// ACP steering extension at handshake (FS-03.R50, TS-04.R49). Session-scoped
+	// for the same reason as FastAvailable: it is re-decoded on every launch and
+	// resume and vanishes with the row on stop.
+	SteeringAvailable bool `json:"steering_available"`
 }
 
 // Status is the live, frequently-updated state of an agent.
@@ -80,6 +85,12 @@ type AgentState struct {
 	// does not offer it" from "off because the person chose it" (FS-03.R46).
 	// False for a stopped agent, which renders static text instead.
 	FastAvailable bool `json:"fast_available"`
+	// SteeringAvailable is the live session's steering advertisement, projected
+	// from the running row so the composer offers Steer only where the adapter
+	// implements it (FS-03.R50, TS-03.R39). False for a stopped agent and for any
+	// adapter that does not advertise the extension, which render no Steer control
+	// rather than a disabled one.
+	SteeringAvailable bool `json:"steering_available"`
 
 	State      string  `json:"state"`
 	Detail     string  `json:"detail"`

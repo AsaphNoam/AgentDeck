@@ -179,6 +179,44 @@
   padding: var(--ad-space-2) 0;
 }
 
+/* The queued follow-up (FS-03.R48). It sits beside the event list, not in it, and
+   must read as not-yet-sent: dashed, muted, and labelled, so it is never mistaken
+   for a message the agent has already seen (TS-08.R56). */
+.transcript-held {
+  border: var(--ad-border-thin) dashed var(--ad-border-strong);
+  border-radius: var(--ad-radius-small);
+  display: grid;
+  gap: var(--ad-space-1);
+  margin-bottom: var(--ad-space-3);
+  padding: var(--ad-space-2);
+}
+
+.transcript-held-label {
+  color: var(--ad-text-muted);
+  font-family: var(--ad-font-mono);
+  font-size: 0.7rem;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.transcript-held-text {
+  color: var(--ad-text-muted);
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.transcript-held-withdraw {
+  justify-self: start;
+  min-height: auto;
+  padding: var(--ad-space-1) var(--ad-space-2);
+}
+
+/* Colour and size come from the shared error rule in components/primitives.css;
+   only the tail's own layout belongs here. */
+.transcript-held-error {
+  margin: 0;
+}
+
 .spinner {
   animation: ad-spin 0.7s linear infinite;
   border: var(--ad-border-thick) solid var(--ad-border-default);
@@ -711,14 +749,36 @@
   font-size: 0.72rem;
 }
 
+/* Send is always present; Steer, Withdraw, and Cancel join it only in the states
+   that make them meaningful (FS-03.R48, FS-03.R50). */
+.composer-actions {
+  display: grid;
+  gap: var(--ad-space-1);
+}
+
 .composer button {
   align-self: stretch;
   background: var(--ad-action-primary);
   min-width: 100px;
 }
 
-.composer-error {
+/* Send stays the primary action; the situational ones read as secondary so the
+   safe default is not visually outranked by them. */
+.composer-steer,
+.composer-withdraw,
+.composer-cancel {
+  background: var(--ad-surface-raised);
+}
+
+.composer-error,
+.composer-notice {
   grid-column: 1 / -1;
+}
+
+.composer-notice {
+  color: var(--ad-text-muted);
+  font-size: 0.78rem;
+  margin: 0;
 }
 
 .terminal-readonly,

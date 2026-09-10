@@ -238,6 +238,53 @@ func (r *Registry) SendPrompt(ctx context.Context, agentID, text string) error {
 	return rt.SendPrompt(ctx, agentID, text)
 }
 
+// SendPromptOrHold routes the person's chat prompt, which queues behind a
+// running turn instead of being refused (FS-03.R48). Only a chat agent holds:
+// every other owner keeps the plain fail-closed SendPrompt, so a terminal agent's
+// behavior and the agent-facing callers' arbitration are both unchanged
+// (TS-01.R29). Reports whether the message was held rather than sent.
+func (r *Registry) SendPromptOrHold(ctx context.Context, agentID, text string) (bool, error) {
+	rt, err := r.ownerFor(agentID)
+	if err != nil {
+		return false, err
+	}
+	chat, ok := rt.(*ChatRuntime)
+	if !ok {
+		return false, rt.SendPrompt(ctx, agentID, text)
+	}
+	return chat.SendPromptOrHold(ctx, agentID, text)
+}
+
+// WithdrawHeld drops the held follow-up on the owning chat runtime. A non-chat
+// owner never holds, so withdrawing from one is the same no-op success that
+// withdrawing nothing from a chat agent is (TS-03.R38).
+func (r *Registry) WithdrawHeld(agentID string) error {
+	rt, err := r.ownerFor(agentID)
+	if err != nil {
+		return err
+	}
+	chat, ok := rt.(*ChatRuntime)
+	if !ok {
+		return nil
+	}
+	return chat.WithdrawHeld(agentID)
+}
+
+// Steer routes a steer to the owning chat runtime. A terminal owner advertises no
+// steering, so it yields the same ErrSteeringUnsupported an unadvertising adapter
+// does rather than a separate not-implemented shape (FS-03.R50).
+func (r *Registry) Steer(ctx context.Context, agentID, text string) (SteerOutcome, error) {
+	rt, err := r.ownerFor(agentID)
+	if err != nil {
+		return "", err
+	}
+	chat, ok := rt.(*ChatRuntime)
+	if !ok {
+		return "", ErrSteeringUnsupported
+	}
+	return chat.Steer(ctx, agentID, text)
+}
+
 // SetSessionConfig routes a live session-setting change to the owning chat
 // runtime. The change it returns is meaningful even alongside an error, because a
 // combined request applies its settings one at a time (see SessionConfigChange).

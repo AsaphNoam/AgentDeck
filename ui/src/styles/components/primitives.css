@@ -168,6 +168,7 @@ button:disabled {
 .ad-field-error,
 .form-error,
 .composer-error,
+.transcript-held-error,
 .permission-error {
   color: var(--ad-state-error);
   font-size: 0.78rem;

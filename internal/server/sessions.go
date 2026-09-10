@@ -36,7 +36,11 @@ func (s *Server) handlePrompt(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError(runtime.CodeValidation, "text is required"))
 		return
 	}
-	err := s.registry.SendPrompt(r.Context(), id, body.Text)
+	// This is the person's path, so it queues behind a running turn rather than
+	// refusing (FS-03.R48). The agent-facing callers reach the runtime in-process
+	// and keep the fail-closed SendPrompt, which is why holding needs no
+	// authorization concept here beyond the route boundary (TS-01.R29, TS-03.R38).
+	held, err := s.registry.SendPromptOrHold(r.Context(), id, body.Text)
 	// A prompt to a stopped chat agent wakes it and is then delivered in the woken
 	// session (FS-01.R33, TS-03.R25). The wake runs inside this request, so the
 	// caller simply waits out the resume; ACP's per-stage deadlines bound it
@@ -48,14 +52,85 @@ func (s *Server) handlePrompt(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if woken {
-			err = s.registry.SendPrompt(r.Context(), id, body.Text)
+			held, err = s.registry.SendPromptOrHold(r.Context(), id, body.Text)
 		}
 	}
 	if err != nil {
 		writeAPIError(w, sessionOpError(err))
 		return
 	}
-	writeJSON(w, http.StatusAccepted, map[string]any{"accepted": true, "agent_id": id})
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"accepted": true, "agent_id": id, "delivery": promptDelivery(held),
+	})
+}
+
+// promptDelivery names what happened to a submitted prompt so a client renders
+// the pending state from the answer rather than inferring it from agent status
+// (TS-03.R38).
+func promptDelivery(held bool) string {
+	if held {
+		return "held"
+	}
+	return "sent"
+}
+
+// handleWithdrawPrompt implements DELETE /api/sessions/{id}/prompt: the one
+// operation the hold adds, spelled as a resource (TS-03.R38). Withdrawing when
+// nothing is held returns the same body, so a double withdraw is not an error.
+func (s *Server) handleWithdrawPrompt(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if err := s.registry.WithdrawHeld(id); err != nil {
+		writeAPIError(w, sessionOpError(err))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"accepted": true, "agent_id": id, "delivery": "withdrawn",
+	})
+}
+
+// handleSteer implements POST /api/sessions/{id}/steer (TS-03.R39, FS-03.R50).
+// An empty text steers the held follow-up, which is the only way to send one.
+func (s *Server) handleSteer(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var body struct {
+		Text string `json:"text"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeAPIError(w, apiError(runtime.CodeValidation, "invalid JSON body"))
+		return
+	}
+	// Unlike the prompt route, empty is meaningful here and whitespace-only is
+	// not: it means "steer what is held", so only the text is trimmed for that
+	// test, never the message itself (FS-03.R31's verbatim-delivery rule).
+	text := body.Text
+	if strings.TrimSpace(text) == "" {
+		text = ""
+	}
+	outcome, err := s.registry.Steer(r.Context(), id, text)
+	if err != nil {
+		writeAPIError(w, steerError(err))
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"accepted": true, "agent_id": id, "outcome": string(outcome),
+	})
+}
+
+// steerError maps a steer failure to an APIError. An adapter that does not
+// advertise steering and an empty steer with nothing held are both conflicts
+// against the live session's state; an adapter refusal carries its own reason
+// upstream rather than being downgraded to a queue (TS-03.R39, INV §8).
+func steerError(err error) *runtime.APIError {
+	switch {
+	case errors.Is(err, runtime.ErrNoHandle):
+		return apiError(runtime.CodeNotFound, "agent not started")
+	case errors.Is(err, runtime.ErrSteeringUnsupported):
+		return apiError(runtime.CodeConflict, "this agent's adapter does not support steering")
+	case errors.Is(err, runtime.ErrNothingHeld):
+		return apiError(runtime.CodeConflict, "no message is held for this agent")
+	default:
+		return apiError(runtime.CodeInternal, err.Error())
+	}
 }
 
 // handleAnnotations accepts one point-in-time review batch. New-task delivery

@@ -12,6 +12,8 @@ import { AnnotationCard } from "./renderers/AnnotationCard";
 import { AnnotationTray } from "./AnnotationTray";
 import { AnnotationContextMenu, type AnnotationMenuState } from "./AnnotationContextMenu";
 import { useAnnotationStore } from "../../store/annotationStore";
+import { useHeldStore } from "../../store/heldStore";
+import { withdrawHeldMessage } from "../../lib/heldMessage";
 
 export function TranscriptView({ agentId, events, sourceActive = false, annotationsEnabled = true, busy = false }: { agentId: string; events: TranscriptEvent[]; sourceActive?: boolean; annotationsEnabled?: boolean; busy?: boolean }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -19,6 +21,9 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
   const [atBottom, setAtBottom] = useState(true);
   const [menu, setMenu] = useState<AnnotationMenuState | null>(null);
   const addAnnotation = useAnnotationStore((state) => state.add);
+  // The queued follow-up renders beside the event list, never inside it: the
+  // server sends no event for a message it has not delivered (TS-08.R56).
+  const held = useHeldStore((state) => state.byAgent[agentId]);
 
   // Annotating is a right-click action on the event under the pointer: it captures the
   // highlighted text when there is a selection inside that event, otherwise the whole event.
@@ -86,6 +91,7 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
             <span>Working…</span>
           </div>
         )}
+        {held !== undefined && <HeldMessage agentId={agentId} text={held} />}
       </div>
       {!atBottom && (
         <button type="button" className="jump-to-latest" onClick={jumpToLatest}>
@@ -94,6 +100,32 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
       )}
       {annotationsEnabled && <AnnotationTray sourceId={agentId} sourceActive={sourceActive} />}
       <AnnotationContextMenu menu={menu} onClose={() => setMenu(null)} />
+    </div>
+  );
+}
+
+// HeldMessage is the pending tail: the message the person submitted while the
+// agent was working, which is not yet sent and not yet seen by the agent. It must
+// read that way rather than as a sent message awaiting a reply — the failure mode
+// is believing the agent already has it — and it carries its own withdraw
+// affordance (FS-03.R48, TS-08.R56, INV §8).
+function HeldMessage({ agentId, text }: { agentId: string; text: string }) {
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="transcript-held" data-ui="transcript" data-variant="held">
+      <p className="transcript-held-label">Queued — sends when this turn ends</p>
+      <p className="transcript-held-text">{text}</p>
+      <button
+        type="button"
+        className="transcript-held-withdraw"
+        onClick={() => {
+          setError(null);
+          withdrawHeldMessage(agentId).catch(() => setError("Could not withdraw — it may already have been sent."));
+        }}
+      >
+        Withdraw
+      </button>
+      {error && <p className="transcript-held-error" role="alert">{error}</p>}
     </div>
   );
 }

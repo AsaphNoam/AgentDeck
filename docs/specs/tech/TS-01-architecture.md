@@ -110,7 +110,7 @@ a second selection path. `claude-acp` keeps its existing metadata delivery, so t
 accessor loses its only caller and is removed rather than left as a no-op a future adapter could
 re-enable by accident (INV §10).
 
-**R29 `(planned)` — Queueing is an opt-in caller capability, never a property of
+**R29 — Queueing is an opt-in caller capability, never a property of
 `SendPrompt`.** `SendPrompt` is shared by five callers: the person's chat prompt handler, the
 annotation delivery path, the task dispatcher, and two pipeline-lifecycle transitions. Three of those
 consume `ErrTurnInFlight` as arbitration — the dispatcher and pipeline paths pause work on it — so

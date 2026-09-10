@@ -5,6 +5,8 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { useAgentStore } from "../../store/agentStore";
 import { useAnnotationStore } from "../../store/annotationStore";
+import { useHeldStore } from "../../store/heldStore";
+import { useTranscriptStore } from "../../store/transcriptStore";
 import { ChatPanel, initialTab } from "./ChatPanel";
 
 const mocks = vi.hoisted(() => ({
@@ -44,6 +46,8 @@ afterEach(() => {
   mocks.useProjects.mockReset();
   useAgentStore.setState({ agents: {}, order: [], hydrated: false, hydrating: false });
   useAnnotationStore.setState({ bySource: {}, overallBySource: {}, editedAt: {} });
+  useHeldStore.setState({ byAgent: {} });
+  useTranscriptStore.setState({ byAgent: {}, rawByAgent: {}, pending: {} });
 });
 
 // initialTab drives which tab a chat panel opens on. The load-bearing case for
@@ -306,5 +310,43 @@ describe("ChatPanel runtime picker", () => {
 
     expect(screen.getByText("Fast mode")).toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: /Fast mode/ })).toBeNull();
+  });
+});
+
+// FS-03.A31/A33 — the panel decides when a queued message stops being pending
+// and whether the Steer control exists at all, both from the live session's own
+// report rather than from anything the client inferred.
+describe("ChatPanel queued follow-up and steering", () => {
+  it("clears the pending message only when the server's own event delivers it", async () => {
+    useAgentStore.setState({ agents: { a_live: { ...liveAgent("a_live"), state: "busy" } }, order: ["a_live"], hydrated: true, hydrating: false });
+    useHeldStore.getState().hold("a_live", "then run the tests");
+    useTranscriptStore.setState({ byAgent: { a_live: [{ kind: "user_text", text: "then run the tests" }] } });
+
+    renderPanel("a_live");
+
+    // The local echo carries no seq, so it is not evidence of delivery.
+    expect(await screen.findByText("Queued — sends when this turn ends")).toBeInTheDocument();
+    expect(useHeldStore.getState().byAgent.a_live).toBe("then run the tests");
+
+    useTranscriptStore.setState({ byAgent: { a_live: [{ kind: "user_text", seq: 12, text: "then run the tests" }] } });
+    await waitFor(() => expect(useHeldStore.getState().byAgent.a_live).toBeUndefined());
+  });
+
+  it("renders no Steer control for a session that does not advertise it", async () => {
+    useAgentStore.setState({ agents: { a_live: { ...liveAgent("a_live"), state: "busy", steering_available: false } }, order: ["a_live"], hydrated: true, hydrating: false });
+
+    renderPanel("a_live");
+
+    expect(await screen.findByRole("button", { name: "Send" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Steer" })).toBeNull();
+  });
+
+  it("renders Steer beside Send for a session that advertises it", async () => {
+    useAgentStore.setState({ agents: { a_live: { ...liveAgent("a_live"), state: "busy", steering_available: true } }, order: ["a_live"], hydrated: true, hydrating: false });
+
+    renderPanel("a_live");
+
+    expect(await screen.findByRole("button", { name: "Steer" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send" })).toBeInTheDocument();
   });
 });

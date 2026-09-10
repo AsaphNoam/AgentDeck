@@ -103,8 +103,31 @@ export function stopAgent(agentId: string) {
   return json<unknown>(`/api/sessions/${agentId}/stop`, { method: "POST" });
 }
 
+/** What the server did with a submitted prompt (TS-03.R38): ran it now, or held
+ * it as the next turn because the agent was working. */
+export type PromptDelivery = "sent" | "held";
+
+/** What the adapter did with a steered message (TS-03.R39): injected it into the
+ * running turn, or started a fresh turn because that one had already ended. */
+export type SteerOutcome = "steered" | "new_turn";
+
 export function sendPrompt(agentId: string, text: string) {
-  return json<unknown>(`/api/sessions/${agentId}/prompt`, {
+  return json<{ accepted: true; agent_id: string; delivery: PromptDelivery }>(`/api/sessions/${agentId}/prompt`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+}
+
+/** Withdraws the agent's held follow-up. A no-op when nothing is held. */
+export function withdrawPrompt(agentId: string) {
+  return json<{ accepted: true; agent_id: string }>(`/api/sessions/${agentId}/prompt`, { method: "DELETE" });
+}
+
+/** Steers the running turn. An empty text delivers the held message instead,
+ * which is the only way to send one (TS-03.R39). */
+export function steerPrompt(agentId: string, text: string) {
+  return json<{ accepted: true; agent_id: string; outcome: SteerOutcome }>(`/api/sessions/${agentId}/steer`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text }),

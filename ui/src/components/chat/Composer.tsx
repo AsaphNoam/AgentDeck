@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { cancelTurn, getAvailableCommands, searchSessionFiles, sendPrompt } from "../../api/client";
+import { cancelTurn, getAvailableCommands, searchSessionFiles, sendPrompt, steerPrompt } from "../../api/client";
 import type { AvailableCommand } from "../../api/types";
+import { withdrawHeldMessage } from "../../lib/heldMessage";
+import { useHeldStore } from "../../store/heldStore";
 import { useTranscriptStore } from "../../store/transcriptStore";
 import { chatDraftRevision, discardChatDraft, getChatDraft, setChatDraft } from "./drafts";
 
@@ -49,9 +51,20 @@ function filterCommands(commands: AvailableCommand[], query: string): PickerItem
     }));
 }
 
-export function Composer({ agentId, busy }: { agentId: string; busy: boolean }) {
+export function Composer({ agentId, busy, running = true, steerable = false }: {
+  agentId: string;
+  busy: boolean;
+  running?: boolean;
+  steerable?: boolean;
+}) {
   const [text, setText] = useState(() => getChatDraft(agentId));
   const [error, setError] = useState<string | null>(null);
+  // Steer's outcome is best-effort by nature and the two outcomes mean different
+  // things, so it is reported rather than left to be inferred (FS-03.R50).
+  const [notice, setNotice] = useState<string | null>(null);
+  const held = useHeldStore((state) => state.byAgent[agentId]);
+  const hold = useHeldStore((state) => state.hold);
+  const releaseHeld = useHeldStore((state) => state.release);
   const [trigger, setTrigger] = useState<Trigger | null>(null);
   const [items, setItems] = useState<PickerItem[]>([]);
   const [highlight, setHighlight] = useState(0);
@@ -68,11 +81,28 @@ export function Composer({ agentId, busy }: { agentId: string; busy: boolean }) 
   useEffect(() => {
     setText(getChatDraft(agentId));
     setError(null);
+    setNotice(null);
     setTrigger(null);
     setItems([]);
     setHighlight(0);
     setDismissedStart(null);
   }, [agentId]);
+
+  // Stop, crash, or archive leaves no next turn for a held message, so it comes
+  // back as the person's own text — but only into an empty composer, never over
+  // text typed since, which is R36's newer-draft rule applied to the same store
+  // (FS-03.R49, TS-08.R56).
+  useEffect(() => {
+    if (running || !held) return;
+    if (text === "") {
+      setText(held);
+      setChatDraft(agentId, held);
+    }
+    releaseHeld(agentId);
+    // `text` is read, not depended on: this runs on the lifecycle boundary, and
+    // re-running it on every keystroke would race the person's own typing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agentId, running, held, releaseHeld]);
 
   const open = trigger !== null && trigger.start !== dismissedStart;
   const hasSuggestions = open && items.length > 0;
@@ -147,7 +177,11 @@ export function Composer({ agentId, busy }: { agentId: string; busy: boolean }) 
     const prompt = text;
     if (!prompt.trim()) return;
     setError(null);
-    append(agentId, { kind: "user_text", text: prompt, message_id: `local-${Date.now()}` });
+    setNotice(null);
+    // A busy agent queues the message, and a queued message is not in the
+    // transcript until the server actually sends it — so there is nothing to
+    // echo yet, and the pending tail carries it instead (FS-03.R48, TS-08.R56).
+    if (!busy) append(agentId, { kind: "user_text", text: prompt, message_id: `local-${Date.now()}` });
     // Capture the draft generation this send owns. If the person edits the draft
     // for this agent while the request is in flight, the completion must leave
     // that newer draft alone instead of discarding or overwriting it (INV §1/§5).
@@ -157,7 +191,11 @@ export function Composer({ agentId, busy }: { agentId: string; busy: boolean }) 
     try {
       // A stopped chat agent is woken by this same request (FS-03.R35), so the
       // composer submits normally and only the reply takes longer to start.
-      await sendPrompt(agentId, prompt);
+      const result = await sendPrompt(agentId, prompt);
+      // The server's answer decides whether this ran or is waiting, so the
+      // pending state is rendered from what happened rather than inferred from
+      // agent status (TS-03.R38).
+      if (result.delivery === "held") hold(agentId, prompt);
       // Only clear the draft we actually sent; a newer same-agent draft survives.
       if (chatDraftRevision(agentId) === draftRev) discardChatDraft(agentId);
     } catch (err) {
@@ -175,6 +213,46 @@ export function Composer({ agentId, busy }: { agentId: string; busy: boolean }) 
         setError(`Failed to send — ${reason}. Your message was restored.`);
         setText(prompt);
       }
+    }
+  };
+
+  // Steer delivers into the turn that is running instead of queueing behind it.
+  // With the composer empty and a message already held, it delivers that one, so
+  // a person who queued and then changed their mind about waiting does not
+  // retype it (FS-03.R50).
+  const steer = async () => {
+    const typed = text.trim() ? text : "";
+    if (!typed && !held) return;
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await steerPrompt(agentId, typed);
+      if (typed) {
+        setText("");
+        setTrigger(null);
+        discardChatDraft(agentId);
+      } else {
+        releaseHeld(agentId);
+      }
+      setNotice(result.outcome === "steered"
+        ? "Delivered into the running turn."
+        : "That turn had already ended — sent as a new turn.");
+    } catch (err) {
+      // A refused message is not downgraded to a queue and not discarded: the
+      // composer keeps exactly what the person typed, with the reason (INV §8).
+      const reason = err instanceof Error && err.message ? err.message : "the agent may have stopped";
+      setError(`Could not steer — ${reason}.`);
+    }
+  };
+
+  const withdraw = async () => {
+    setError(null);
+    setNotice(null);
+    try {
+      await withdrawHeldMessage(agentId);
+    } catch (err) {
+      const reason = err instanceof Error && err.message ? err.message : "the agent may have stopped";
+      setError(`Could not withdraw — ${reason}. It may already have been sent.`);
     }
   };
 
@@ -250,19 +328,32 @@ export function Composer({ agentId, busy }: { agentId: string; busy: boolean }) 
           </ul>
         )}
       </div>
-      {busy ? (
-        <button
-          type="button"
-          onClick={() => {
-            setError(null);
-            cancelTurn(agentId).catch(() => setError("Failed to cancel — the turn may have already finished."));
-          }}
-        >
-          Cancel
-        </button>
-      ) : (
+      {/* Send is always present and is the safe default; Steer appears only where
+          the live session advertises it, and never as a disabled control where it
+          does not (FS-03.R50, FS-09.R26). */}
+      <div className="composer-actions">
         <button type="submit">Send</button>
-      )}
+        {busy && steerable && (
+          <button type="button" className="composer-steer" onClick={() => void steer()}>Steer</button>
+        )}
+        {held && (
+          <button type="button" className="composer-withdraw" onClick={() => void withdraw()}>Withdraw queued</button>
+        )}
+        {busy && (
+          <button
+            type="button"
+            className="composer-cancel"
+            onClick={() => {
+              setError(null);
+              setNotice(null);
+              cancelTurn(agentId).catch(() => setError("Failed to cancel — the turn may have already finished."));
+            }}
+          >
+            Cancel
+          </button>
+        )}
+      </div>
+      {notice && <p className="composer-notice" role="status">{notice}</p>}
       {error && <p className="composer-error">{error}</p>}
     </form>
   );
