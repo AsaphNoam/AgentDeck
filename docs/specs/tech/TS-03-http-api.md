@@ -217,8 +217,9 @@ availability travels on the agent.** Send and Steer are two deliberate actions w
 route, not a mode flag on it: overloading one route would make a client's intent — "after this turn"
 versus "into this turn" — a parameter the server could silently reinterpret. It returns `202 {accepted,
 agent_id, outcome}` where `outcome` is `steered` when the adapter injected into the running turn and
-`new_turn` when the turn had already ended and the adapter started a fresh one, so the client reports
-which happened instead of inferring it from transcript timing (TS-04.R49). An empty `text` steers the
+`new_turn` when the turn had already ended and AgentDeck accepted the text for a fresh host-owned
+turn, so the client reports which happened instead of inferring it from transcript timing
+(TS-04.R49/R51). An empty `text` steers the
 message currently held for that agent and is the only way to send one, so promoting a held message is
 a single server-side take-and-deliver rather than a client-side withdraw-then-steer that could drop
 the text between two requests; an empty `text` with nothing held is `409 conflict`. A runtime that does
@@ -552,6 +553,14 @@ reloads the collections through this route rather than reconstructing them from 
   already refuses one. No route is added for directory listing, writing, or downloading, and the
   existing tracking and search routes are unchanged.
 
+**R41 (planned) — The steer route preserves one host-owned lifecycle.** When the
+adapter returns `promptRequired`, `POST /api/sessions/{id}/steer` submits the unchanged text through
+the ordinary prompt path exactly once and returns the existing `202 {accepted, agent_id,
+outcome:new_turn}` shape. The route does not retry `startedNewTurn`, because that adapter outcome may
+already have consumed the text and started work outside AgentDeck's turn gate. A runtime that cannot
+provide the no-consumption idle fallback is not compatible with the planned steering lifecycle;
+Steer availability remains capability-advertised rather than inferred from the adapter version.
+
 ## 3. Interfaces & data shapes
 
 Feature-owned request/response fields are specified in the owning FS, including FS-14 for pipeline
@@ -597,6 +606,9 @@ integers instead of silently applying defaults.
 ## 6. Traceability
 
 - Route inventory: `internal/server/routes.go`.
+- **Steer lifecycle (R39/R41, planned):** `internal/server/sessions.go`
+  preserves the existing steer response shape while routing `promptRequired` through the ordinary
+  prompt seam; `internal/server/queue_steer_test.go` covers the public `new_turn` outcome.
 - Errors/middleware: `internal/server/apierror.go`, `middleware.go`, `security.go`.
 - SSE/bus: `internal/server/sse.go`, `internal/bus/bus.go`, `ui/src/api/sse.ts`.
 - Terminal upgrade: `internal/server/terminal.go`.

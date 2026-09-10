@@ -21,15 +21,18 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   to BR-1 and BR-2, not to a unit awaiting closure. `stop-telling-agents-to-poll` shipped without
   entering this queue on the operator's explicit 2026-09-10 instruction; it can be added later.
 - **Work units:** `open-a-file-from-chat.md` is waiting to start with nothing unresolved.
-  `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker; the ACP wait-list in
-  `docs/ideas.md` holds the rest behind an adapter contract.
+  `steering-host-owned-fallback.md` is waiting to start with the Codex adapter contract as its only
+  implementation dependency. `migrate-internal-actions-from-mcp.md` stays paused on its transport
+  blocker; the ACP wait-list in `docs/ideas.md` holds the rest behind an adapter contract.
 - **Design units:** `Ideas being defined` entries may resume; `New ideas` entries are available.
   Streaming agent thinking stays part-decided (live-only decided; rendering default and whether
   `plan` ships still open). The permanently unaddressable pipeline agent is the newest `New ideas`
   entry and needs `/design-feature` before code.
 - **Open findings:** One Must-fix remains on the queue/steer unit — the adapter-started steering turn
-  escapes AgentDeck's turn lifecycle. Not blocked: the operator decided on 2026-09-10 not to hide
-  Steer, selecting host ownership of that turn; the finding records the resulting approach. Also
+  escapes AgentDeck's turn lifecycle. The selected fix is a host-owned `promptRequired` fallback
+  for the idle race, with an equivalent Codex adapter contract required before cross-backend work
+  can ship; Steer remains visible whenever it is advertised. A separate injected-steer lifetime
+  edge case is outside this finding. Also
   open: live-gate finding durability, provider-contract oracles, the Codex
   discovery-versus-execution version authority left by BR-2, and the unverified OpenCode/OpenHands
   paths. See **Review findings**.
@@ -98,7 +101,7 @@ remains, listed under **Review findings**. The credentialed Claude and Codex jou
 **Acceptance gates** are owed; real steering has never been exercised against a provider.
 
 **Available by role:** `/review` may take `fix-model-recommendations`; `/work` may start
-`open-a-file-from-chat.md`; `/fix` may take one open finding unit
+`steering-host-owned-fallback.md` or `open-a-file-from-chat.md`; `/fix` may take one open finding unit
 — `queue-a-follow-up-while-busy` (difficult, Sol), BR-1 (difficult, Sol), or BR-2 (medium,
 Terra/Opus); `/design-feature` may choose an available or resumable idea. Queues are independent.
 
@@ -147,26 +150,16 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
   indicator, and let the next Send call ordinary `session/prompt` concurrently instead of holding
   it; Claude may native-queue it and Codex may supersede the detached turn. The current specs also
   forbid AgentDeck's own retry but do not define how the adapter-started turn rejoins the host gate.
-  **Requirement:** `FS-03.R48/R50/A33`, `TS-01.R29`, `TS-04.R49`; `INV §5`, `INV §11`, `INV §12`,
-  `INV §17`. **Suggested fix/test:** first specify the ownership/completion contract for
-  `startedNewTurn` (or use the adapters' host-owned `promptRequired` mode and an ordinary host turn),
-  then make the fake peer keep that turn active through output and completion and assert status,
-  Send-holding, Cancel, and exactly one terminal event.
-  **Operator decision — 2026-09-10: do not hide Steer.** Steer stays available on every adapter that
-  advertises it, including Codex. That rules out the hide-for-Codex option and, with it, the
-  `promptRequired`-only fix: the pinned adapters are npm-pinned published packages with no vendored
-  source (`scripts/release/package.json`), so a local adapter contract change would mean forking or
-  publishing `codex-acp`, and `codex-acp` 1.10.0's `startNewTurnFromSteering` returns
-  `startedNewTurn` unconditionally with no `promptRequired` mode. Claude 0.75.1 gates
-  `promptRequired` behind opt-in request `_meta.steering.idleBehavior`, so opting in there would
-  still leave Codex on the detached path and would add a second contract rather than removing one.
-  **Therefore the remaining fix is host ownership of the adapter-started turn:** claim the existing
-  turn gate on `startedNewTurn` and complete it from the session's turn-end notification instead of
-  an RPC result. Note the structural work this implies — `runPromptTurn` currently owns completion by
-  blocking on its own `session/prompt` Call (`internal/runtime/chat.go:599-625`), and a detached turn
-  has no such outstanding request, so the gate needs a notification-driven release path that still
-  yields exactly one terminal event and an answerable Cancel (`INV §2`, `INV §5`, `INV §17`; needs
-  focused `-race` coverage).
+  **Requirement:** `FS-03.R48/R50/R56/A33/A38`, `TS-01.R29/R30`, `TS-03.R39/R41`,
+  `TS-04.R49/R51`; `INV §2`, `INV §5`, `INV §11`, `INV §12`, `INV §17`.
+  **Selected fix/test:** when the adapter handles Steer with no active provider turn, it must return
+  no-consumption `promptRequired`; AgentDeck resubmits the unchanged text through the ordinary
+  prompt seam and reports the public `new_turn` outcome. Do not retry `startedNewTurn`, because its
+  content may already be consumed. Steer stays available on every adapter that advertises it,
+  including Codex, so the Codex adapter must gain the equivalent contract through a compatible
+  release or an explicitly maintained patch. The fake peer must exercise the completion race and
+  assert status, Send-holding, Cancel, and exactly one terminal event. A separate
+  injected-steer-outlives-prompt case is not part of this finding.
 
 ### BR-2 — **Fix model:** medium — Codex Terra or Claude Opus.
 

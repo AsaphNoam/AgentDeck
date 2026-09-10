@@ -133,6 +133,14 @@ already-held successor before publishing completion, so a newer submission canno
 queued message. A read-only runtime snapshot exposes the hold and its acceptance sequence for
 browser rehydration without persisting it; a dashboard restart still clears the live field.
 
+**R30 (planned) — Every turn reached through Steer has one AgentDeck owner.** An
+injected message remains under the current ordinary `session/prompt` turn gate. When steering finds
+no active provider turn, the adapter's no-consumption `promptRequired` outcome enters the same
+ordinary prompt path with the unchanged message; the runtime claims the gate before resubmitting and
+releases it through the existing terminal path. No detached provider request, second completion
+path, or retry of `startedNewTurn` is permitted, so Send holding, Cancel, status, and terminal-event
+ownership stay in the existing runtime seam (FS-03.R56, TS-04.R51; INV §2, §5, §11, §17).
+
 **R13.** Archive/restore is one server-owned lifecycle service, not an HTTP handler
 calling another handler or a UI-side sequence of Stop and config writes. One server-owned transition
 gate serializes archive/restore per project and per agent. Every path that can start a process —
@@ -479,5 +487,8 @@ lost.
 - Dashboard process logging: `newDashboardLogger` and the scoped process-default logger in
   `internal/cli/dashboard.go` (R15), with mode/append/sink regressions in `internal/cli/cli_test.go`.
 - Regression anchors: `TestSwitchRuntimeKeepsTargetRegistration`, `TestCrashTearsDownAgentRegistration`, `TestSessionParamsOmitModelWhenInherited`.
+- **Steering lifecycle (R30, planned):** `internal/runtime/chat.go` keeps injected
+  and host-owned fallback turns on the ordinary turn gate; `internal/runtime/queue_steer_test.go`
+  and the fake ACP completion-race scenario prove one owner and one terminal path.
 - Planned agent-facing knowledge package and lifecycle overlay: TS-11, which extends the R6/R9
   composition seam without changing frozen user configuration.

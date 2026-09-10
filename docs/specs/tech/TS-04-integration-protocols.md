@@ -258,12 +258,11 @@ contract the adapters themselves publish, and inferring provider capability from
 the BR-1 failure mode. An adapter that does not advertise it exposes no Steer control (FS-03.R50);
 queueing (R48) stays available everywhere and is unaffected.
 
-The adapter owns the hard part and AgentDeck must not reimplement it: it injects into the live turn
-and, when no turn is steerable — the turn ended between the client's decision and the call — starts a
-new turn from the same prompt instead, returning which of the two happened. AgentDeck reports that
-outcome (FS-03.R50) rather than inferring it from transcript timing, and does not add its own
-retry-as-a-new-prompt path, which would double-send against an adapter that already fell back
-(INV §2). A refusal — content the current model cannot accept — is surfaced, not downgraded to a
+The adapter owns the active-turn injection and AgentDeck must not reimplement it. The
+currently pinned adapters also have a legacy idle path: when no turn is steerable — the turn ended
+between the client's decision and the call — they start a detached new turn and return which path
+they took. That path is the known lifecycle deviation; the planned host-owned replacement is
+TS-04.R51. A refusal — content the current model cannot accept — is surfaced, not downgraded to a
 queue.
 
 **Version evidence, stated rather than assumed:** the retired 0.59.0 Claude and 1.1.2 Codex pins
@@ -337,6 +336,16 @@ notification (R24 available commands, R25 context usage) is not a transcript eve
 during load as normal. `session/new` replays nothing, so the launch path holds no gate. The number of
 suppressed frames is logged once per resume, because a provider that replays is otherwise invisible
 in AgentDeck's own records.
+
+**R51 (planned) — Idle steering returns control to the host.** The active-turn
+`_session/steering` path returns `injected`, and its completion stays attached to the outstanding
+`session/prompt`. If the adapter receives steering when no turn is active, it returns
+`promptRequired` and guarantees that it did not enqueue, inject, or otherwise consume the supplied
+content; AgentDeck resubmits that exact content through `session/prompt`. `startedNewTurn` is a
+legacy detached-turn outcome and is not a safe retry signal or a completion owner for AgentDeck.
+The pinned Codex adapter must gain this equivalent contract (through a compatible release or an
+explicitly maintained adapter patch) before the planned host-owned behavior can ship; the steering
+advertisement still controls whether Steer is shown.
 
 **R23 `(planned)` — Optional-integration version tolerance is probed.** An adapter flag or metadata
 extension known to vary by pinned CLI version will use an explicit capability probe or a documented
@@ -742,6 +751,10 @@ global resource list.
 - Adapters: `internal/backend/adapter.go`; credential checks in `internal/backend/credcheck`;
   official Claude session metadata and Codex `CODEX_CONFIG` prompt delivery are pinned by runtime
   parameter/environment tests.
+- **Steering lifecycle (R49/R51, planned):** `_session/steering` handling in
+  `internal/runtime/chat.go`, adapter capability and response mapping in `internal/runtime/acpmap.go`,
+  and the fake ACP steering scenarios prove active injection, no-consumption idle fallback, and
+  rejection of detached `startedNewTurn` as a host completion contract.
 - Codex isolated profile (R20/R21): final `CODEX_HOME` composition in
   `internal/server/{launch,resume,switch}.go` via `composeEnv`, one-way profile refresh under
   `internal/config`, applied in `internal/runtime/chat.go` spawn; AgentDeck's own home read stays in

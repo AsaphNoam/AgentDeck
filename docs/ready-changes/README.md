@@ -43,8 +43,8 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-- [`queue-a-follow-up-while-busy.md`](queue-a-follow-up-while-busy.md) — Send queues a follow-up and
-  Steer injects it into the running turn; its adapter prerequisite is complete.
+- [`steering-host-owned-fallback.md`](steering-host-owned-fallback.md) — an idle Steer fallback
+  returns control to AgentDeck so the replacement turn has a normal host-owned lifecycle.
 - [`open-a-file-from-chat.md`](open-a-file-from-chat.md) — a filepath link an agent wrote opens a
   read-only file viewer beside the transcript instead of navigating away to the dashboard.
 

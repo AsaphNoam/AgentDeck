@@ -434,6 +434,15 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   row, transcript event, archive content, search document, or browser-stored value is added, and no
   agent-facing surface changes — an agent cannot open the viewer, be shown it, or learn it exists.
 
+- **R56 (planned) — A steer that loses the active turn remains host-owned.** If the
+  adapter handles a Steer request after no provider turn is still active, it returns a
+  no-consumption `promptRequired` outcome instead of launching a detached turn. AgentDeck then sends
+  the unchanged message through the ordinary prompt path exactly once, so the normal busy,
+  waiting, cancellation, and terminal lifecycle applies and the public outcome remains `new_turn`.
+  AgentDeck never retries `startedNewTurn`: that outcome means the adapter may already have consumed
+  the message. Steer remains available wherever the runtime advertises it; an advertised adapter
+  must provide this host-owned fallback before the planned behavior ships.
+
 
 ## 3. States & transitions
 
@@ -725,6 +734,14 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   successfully; and each outcome renders as its stated reason in the viewer while the transcript
   stays usable. *Verify by* `internal/server/fileread_test.go` and
   `ui/src/components/chat/FileViewer.test.tsx`.
+- **A38 (planned)** (R56) — A fake adapter whose active turn settles before it
+  handles a Steer request returns `promptRequired` without emitting a detached turn; AgentDeck
+  submits the unchanged text once through the ordinary prompt path, reports `new_turn`, keeps the
+  agent busy until that prompt's terminal event, and lets Send and Cancel arbitrate against that
+  host-owned turn. The transcript contains one user message and one terminal outcome. A provider
+  that returns `startedNewTurn` is covered as an incompatible legacy contract, not as a passing
+  fallback. *Verify by* focused runtime and route tests over a fake ACP scenario plus the Composer
+  outcome test.
 
 
 ## 6. Deviations & open decisions
@@ -793,6 +810,11 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `ui/src/components/chat/ChatPanel.test.tsx` (R23/R24/R27),
   `ui/src/components/chat/renderers/ToolResult.test.tsx` (R25), and
   `ui/src/components/chat/TranscriptView.test.tsx` (R29 waiting indicator).
+- **Steering lifecycle (R50/R56, A33/A38):** `internal/runtime/chat.go` owns the
+  active-turn gate and steer handoff; `internal/runtime/queue_steer_test.go` and the fake ACP
+  scenarios cover active injection, the no-consumption idle fallback, Send arbitration, Cancel, and
+  exactly-once terminal delivery. `internal/server/queue_steer_test.go` and
+  `ui/src/components/chat/Composer.test.tsx` cover the public outcome and message presentation.
 - **Composer autocomplete regression tests:** `ui/src/components/chat/Composer.test.tsx`
   (R30–R33 picker/insert/unavailable-source), `internal/runtime/acpmap_test.go`
   (`TestDecodeAvailableCommands`, `TestAvailableCommandsSnapshotReplaceOnly`, R24 snapshot),
