@@ -2,7 +2,7 @@
 
 **State:** Finished
 **Why:** Prerequisite for steering (`queue-a-follow-up-while-busy.md`), which needs the
-`_session/steering` extension that both current adapters implement and both pinned versions predate.
+`_session/steering` extension that both target adapters implement and both former pins predated.
 Kept separate on 2026-09-09 at the operator's direction, because BR-1 and BR-2 both came from
 adapter-version assumptions and a two-adapter version jump deserves its own verification rather than
 riding along with a feature.

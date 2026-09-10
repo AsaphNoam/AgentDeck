@@ -13,9 +13,7 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 - **Active change:** None.
 - **Release:** `v0.4.2` is published and verified on tag `f56755a`; its release and CI runs passed and
   the distributable reports `0.4.2` with `sqlite_fts5`. Range details are in the state archive.
-- **Review units:** `bump-pinned-acp-adapters.md` is reviewed with one Worth-fixing specification
-  finding and available for `/fix`.
-  `chat-session-configuration` was explicitly re-reviewed through its finding-fix
+- **Review units:** `chat-session-configuration` was explicitly re-reviewed through its finding-fix
   commit; one Worth-fixing protocol replacement finding is open. The BR-3 resume-replay unit,
   `dock-the-annotation-tray-and-quiet-its-prompt`, and all earlier units through this release are
   closed. Review records, finding-fix commits, release records, and handoff/archive/queue
@@ -28,10 +26,9 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   whether `plan` ships with it still open). The permanently unaddressable pipeline
   agent remains the newest `New ideas` entry and needs `/design-feature` before code.
 - **Open findings:** Two usability findings from the 2026-09-07 v0.4.2 review plus the open
-  bug/session-configuration and adapter-bump findings: J2 incompatible CLI status, J5 clipped
+  bug/session-configuration findings: J2 incompatible CLI status, J5 clipped
   lower-row card menus, live-gate finding durability, provider-contract oracles, explicit-empty ACP
-  option-list replacement, the unverified OpenCode/OpenHands paths, and stale pinned-adapter
-  compatibility statements. The six original
+  option-list replacement, and the unverified OpenCode/OpenHands paths. The six original
   `chat-session-configuration` findings are closed. The claimed Claude model-delivery finding was
   retracted after a provider-authoritative prompt probe disproved it.
 - **Bug reports:** BR-1 through BR-3 are investigated. BR-1: Codex chat silently ignored the selected
@@ -62,9 +59,16 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 **Change:** None.
 
 **Available by role:** `/review` has no unreviewed unit; `/work` may select
-`queue-a-follow-up-while-busy.md`; `/fix` may select any one open finding unit, including
-`bump-pinned-acp-adapters.md`; `/design-feature` may choose an available or resumable idea. Role
+`queue-a-follow-up-while-busy.md`; `/fix` may select any one open finding unit;
+`/design-feature` may choose an available or resumable idea. Role
 queues are independent.
+
+**Changelog — 2026-09-10 (fix):** Closed the pinned-adapter specification finding and its
+`bump-pinned-acp-adapters.md` unit (INV §2, INV §10, INV §11, INV §12). TS-04 now distinguishes
+historical 0.59.0/1.1.2 observations from current 0.75.1/1.10.0 evidence for prompt queueing,
+commands, activation, tool identity, and steering. R49 now records that steering is reachable behind
+the advertised capability, and `queue-a-follow-up-while-busy.md` is ready rather than blocked. The
+credentialed provider acceptance matrix remains open and is not claimed verified.
 
 **Changelog — 2026-09-10 (review):** Reviewed `bump-pinned-acp-adapters.md`. The package pins,
 lockfile, source-install pin, release fixtures, single-Codex assembly gate, and executable probe are
@@ -157,20 +161,6 @@ sessions and disposable local configuration homes, but the operator chose not to
 let it block any role.
 
 ## Review findings
-
-- **Worth fixing** — normative ACP compatibility evidence still treats the retired adapter versions
-  as current. **Where:** `docs/specs/tech/TS-04-integration-protocols.md:263-266` says the versions
-  AgentDeck currently pins predate `_session/steering` and make steering unreachable, although this
-  change pins versions that advertise it. The same spec still labels 0.59.0/1.1.2 evidence as
-  "pinned" at lines 229-242, 353-356, 394-400, and 530-534; the waiting steering change still calls
-  the adapter bump a blocker at `docs/ready-changes/queue-a-follow-up-while-busy.md:26-31`.
-  **Normal-use trigger:** the next `/work` session implements queued follow-up and steering from the
-  mandatory spec/change read order. **Why it matters:** it receives contradictory authority about
-  whether steering is reachable and may preserve a dead blocker or reason from behavior of versions
-  no longer shipped. **Requirement:** `TS-04.R49`, `INV §2`, `INV §10`, `INV §11`, `INV §12`.
-  **Suggested fix/test:** update R49 and the waiting change to state that the bump is complete; label
-  old-version observations historical where still relevant, and record current-version evidence for
-  each compatibility claim that the new pins continue to support.
 
 - **Worth fixing** — Codex model discovery and execution use different version authorities
   (**confirmed spec gap**). **Where:** `internal/config/codexmodels.go:31-86` imports every visible

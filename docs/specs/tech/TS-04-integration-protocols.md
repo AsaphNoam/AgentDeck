@@ -221,16 +221,20 @@ Because effort now applies to a live session as well as at startup, the same hel
 running-agent change in FS-03.R47 with no second spelling of the call (INV §2).
 
 **R48 `(planned)` — AgentDeck holds a queued prompt itself; no adapter queue is
-used.** Both pinned chat adapters process prompts as strictly sequential turns, and neither exposes
-mid-turn injection, so the strongest portable promise is "runs as the next turn" (FS-03.R48) and the
-holding mechanism is free to be AgentDeck's. It is, for three reasons that are properties of the
-pinned adapters rather than preference:
+used.** Both pinned chat adapters process ordinary prompts as strictly sequential turns. Their
+advertised steering extension is a separate operation, not an ordinary-prompt queue, so the
+strongest portable Send promise is "runs as the next turn" (FS-03.R48) and the holding mechanism is
+free to be AgentDeck's. It is, for three reasons that are properties of the adapters rather than
+preference:
 
-- **The native queues disagree, and one is destructive.** `claude-agent-acp` 0.59.0 keeps a FIFO
+- **The native queues disagree, and one is destructive.** The historical
+  `claude-agent-acp` 0.59.0 implementation keeps a FIFO
   `turnQueue`, pushing each prompt to the SDK immediately and echoing it back in submission order.
-  `codex-acp` 1.1.2 does the opposite: `prompt()` clears the session's current turn id and overwrites
-  the single per-session active prompt, so the displaced one fails its stop check and its turn is
-  interrupted. Pushing a second prompt to Codex would kill the turn the person is waiting on.
+  Historical `codex-acp` 1.1.2 does the opposite: `prompt()` clears the session's current turn id
+  and overwrites the single per-session active prompt, so the displaced one fails its stop check and
+  its turn is interrupted. Static inspection of the current 0.75.1/1.10.0 pins confirms that Claude
+  retains `turnQueue` and Codex retains one active prompt per session with supersession checks.
+  Pushing a second ordinary prompt to Codex would kill the turn the person is waiting on.
 - **A pushed prompt cannot be withdrawn.** The Claude adapter's orphan/zombie result accounting
   exists precisely because a cancelled queued turn's message has already reached the SDK. Holding
   host-side keeps withdrawal (FS-03.R48) a local state change instead of an accounting problem.
@@ -238,10 +242,10 @@ pinned adapters rather than preference:
   same behavior without checking whether their pinned adapters queue, superseded, or reject — the
   INV §12 posture that BR-1 exists because AgentDeck did not take.
 
-A future adapter may gain a real steering primitive: the Codex app-server already has `turn/steer`
-and `thread/queue`, which `codex-acp` 1.1.2 wires up to neither. Adopting one is a separate
-capability-gated requirement and a stronger product promise than R48's, not a drop-in replacement for
-this hold.
+The historical `codex-acp` 1.1.2 adapter wired neither Codex app-server `turn/steer` nor
+`thread/queue`. The current 1.10.0 adapter exposes steering through R49's capability-gated ACP
+extension, but still provides no portable, withdrawable ordinary-prompt queue; steering is a
+stronger product promise than R48's hold, not a drop-in replacement for it.
 
 **R49 `(planned)` — Steering is the `_session/steering` extension, gated on its
 advertised capability, never on a version number.** Both current adapters implement the same agreed
@@ -260,10 +264,11 @@ retry-as-a-new-prompt path, which would double-send against an adapter that alre
 (INV §2). A refusal — content the current model cannot accept — is surfaced, not downgraded to a
 queue.
 
-**Version dependency, stated rather than assumed:** the versions AgentDeck currently pins predate
-this extension. Steering is unreachable until the pinned adapters move, which is a separate change
-with its own compatibility verification; this requirement describes behavior gated on the
-advertisement, so it degrades to "no Steer control" on the current pins rather than breaking them.
+**Version evidence, stated rather than assumed:** the retired 0.59.0 Claude and 1.1.2 Codex pins
+predated this extension. The current 0.75.1 and 1.10.0 pins both advertise and implement it, so
+steering is reachable once AgentDeck implements this planned requirement. Capability advertisement,
+not those version numbers, remains the runtime gate; an adapter without the advertisement degrades
+to "no Steer control" rather than breaking Send.
 
 **R19 — A provider-rejected effort fails the launch; it is never retried bare.**
 A pinned CLI may reject a level AgentDeck's catalog declares (hand-declared Claude levels, an older
@@ -352,7 +357,9 @@ do not discover provider commands independently and do not infer a skill taxonom
 names without the invocation slash, so UI selection inserts `/<name>` as ordinary prompt text; a
 Codex skill name beginning `$` becomes `/$<skill>`. Pinned evidence: Claude adapter 0.59.0 sends the
 snapshot after new/load/resume and on `commands_changed`; Codex adapter 1.1.2 sends built-ins plus
-cwd/additional-directory-discovered `$` skills. The ACP v1 command contract and both pinned adapter
+cwd/additional-directory-discovered `$` skills. Those versions are historical evidence; static
+inspection confirms that the current Claude 0.75.1 and Codex 1.10.0 pins retain the same
+`available_commands_update` behavior. The ACP v1 command contract and current pinned adapter
 implementations are the compatibility authority, not provider-specific parsing in AgentDeck.
 
 **R25 — ACP context usage follows the adapter's context channel.** The pinned Claude adapter's
@@ -393,15 +400,16 @@ contract above this notice is unaffected and still ships.
 
 **R27 — Provider activation is a deliberate prompt bridge, not a control
 notification.** The pinned ACP v1 surface and packaged adapters expose no portable notification that
-wakes an idle model or initiates tool use: `claude-agent-acp` 0.59.0 and `codex-acp` 1.1.2 both use
-`session/prompt` as the inference entrypoint and accept only `session/cancel` as a relevant
-client-to-agent session notification. ACP `mcp/message` is an unstable transport wrapper, not a
-semantic wake; the pinned Codex adapter advertises ACP-MCP transport unsupported, and ordinary MCP
-resource/list/progress notifications do not start a model turn. AgentDeck therefore implements a
-claimed activation by one ordinary `session/prompt` carrying a short, code-owned, kind-specific
-instruction. For `mail`, it says only that mail work is available and directs the agent to the
-existing `check_messages` tool; no message body, subject, sender, transcript, artifact, or context
-reference is embedded.
+wakes an idle model or initiates tool use. Historical `claude-agent-acp` 0.59.0 and
+`codex-acp` 1.1.2 evidence established `session/prompt` as the inference entrypoint; static
+inspection confirms the current 0.75.1 and 1.10.0 pins retain that entrypoint and no semantic wake
+capability. Steering is not a wake primitive. ACP `mcp/message` is an unstable transport wrapper,
+not a semantic wake; the current pinned Codex adapter advertises ACP-MCP transport unsupported, and
+ordinary MCP resource/list/progress notifications do not start a model turn. AgentDeck therefore
+implements a claimed activation by one ordinary `session/prompt` carrying a short, code-owned,
+kind-specific instruction. For `mail`, it says only that mail work is available and directs the
+agent to the existing `check_messages` tool; no message body, subject, sender, transcript, artifact,
+or context reference is embedded.
 
 The runtime must durably run TS-01.R21's kind-owned pre-side-effect transition before writing that
 prompt frame; for `mail`, this is FS-06's non-replayable attempted boundary. It emits no synthetic
@@ -527,11 +535,14 @@ global resource list.
   not from `toolCall.kind`, not from `rawInput`, not from the reason text, and never from whether the
   agent belongs to a pipeline or a task. A request whose identity is absent, unparseable, or matches
   a tool of the same name on a **different** MCP server takes the ordinary gate. Evidence for the
-  supplied shape, recorded because the design depends on it: pinned `claude-agent-acp` 0.59.0 falls
+  supplied shape, recorded because the design depends on it: historical
+  `claude-agent-acp` 0.59.0 falls
   to the default branch of `toolInfoFromToolUse` for any non-built-in tool and sets `title` to the
-  raw tool name (`dist/tools.js`), and pinned `codex-acp` builds the same `mcp__<server>__<tool>`
-  form. Each supported backend's actual shape is confirmed under the credentialed gate before that
-  backend is claimed (FS-09.A7, INV §12); an unconfirmed backend prompts rather than exempting.
+  raw tool name (`dist/tools.js`), while historical `codex-acp` 1.1.2 builds the same
+  `mcp__<server>__<tool>` form. Static inspection confirms the current 0.75.1 and 1.10.0 pins retain
+  those identity shapes. Each supported backend's actual shape is confirmed under the credentialed
+  gate before that backend is claimed (FS-09.A7, INV §12); an unconfirmed backend prompts rather
+  than exempting.
 
 - **R43 — The exemption answers with a single-use allow and creates no
   provider-side rule.** The exemption responds by selecting the adapter's single-use allow option,
