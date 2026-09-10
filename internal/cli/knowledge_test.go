@@ -27,7 +27,7 @@ func TestPrepareAgentKnowledgeFailureThenRetry(t *testing.T) {
 	if err := store.EnsureLayout(); err != nil {
 		t.Fatal(err)
 	}
-	legacyData, err := os.ReadFile(filepath.Join("..", "config", "testdata", "legacy_agentdecker_prompt.txt"))
+	legacyData, err := os.ReadFile(filepath.Join("..", "config", "testdata", "superseded_agentdecker_prompt.txt"))
 	if err != nil {
 		t.Fatal(err)
 	}

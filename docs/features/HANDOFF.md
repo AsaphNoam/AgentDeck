@@ -18,10 +18,11 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 - **Review units:** `queue-a-follow-up-while-busy` (Send queues, Steer injects) stays open with one
   Must-fix. `fix-model-recommendations` awaits independent review once committed. Every other unit
   through this release is closed, including `usability-20260907`; the remaining open findings belong
-  to BR-1 and BR-2, not to a unit awaiting closure.
-- **Work units:** `open-a-file-from-chat.md` and `stop-telling-agents-to-poll.md` are waiting to
-  start with nothing unresolved. `migrate-internal-actions-from-mcp.md` stays paused on its transport
-  blocker; the ACP wait-list in `docs/ideas.md` holds the rest behind an adapter contract.
+  to BR-1 and BR-2, not to a unit awaiting closure. `stop-telling-agents-to-poll` shipped without
+  entering this queue on the operator's explicit 2026-09-10 instruction; it can be added later.
+- **Work units:** `open-a-file-from-chat.md` is waiting to start with nothing unresolved.
+  `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker; the ACP wait-list in
+  `docs/ideas.md` holds the rest behind an adapter contract.
 - **Design units:** `Ideas being defined` entries may resume; `New ideas` entries are available.
   Streaming agent thinking stays part-decided (live-only decided; rendering default and whether
   `plan` ships still open). The permanently unaddressable pipeline agent is the newest `New ideas`
@@ -75,21 +76,19 @@ detection), the readable root is the session working directory alone, Git-ignore
 readable, a dashboard-pane link opens the agent screen, and archived sessions read from their
 recorded directory. No product code changed.
 
-**Changelog — 2026-09-10 (design):** Designed **stop telling agents to poll for work** and made it
-ready to start:
-[`stop-telling-agents-to-poll.md`](../ready-changes/stop-telling-agents-to-poll.md). The request was
-to remove a 60-second update requirement; none exists — the only one AgentDeck ever had was
-FS-06.R10's stuck nudge marker, deleted in `648a9fc` when durable mail activation replaced the
-polling nudger. The real remnant, confirmed by the operator: four seeded prompts in
-`internal/config/seed.go` still tell agents to find work themselves — `teammate` opens its loop with
-a per-turn coordination check, and `implementer`/`reviewer`/`researcher` each end with a mail check
-for being "woken with no new instruction", a case `internal/runtime/activation_kinds.go:27` makes
-impossible. Planned: FS-18.R12/A9 (corrected prompt text); FS-18.R13 with FS-04.R47/A27 (the
-exact-match correction widens from `agentdecker` to every seeded role, so existing installs are
-corrected and a prompt edited by one byte stays user-owned); TS-11.R13 (one role-agnostic pass over a
-code-owned digest table, replacement read from `seedRoles()`, per-role failure isolated, digests
-re-derived in a test). FS-04 and FS-18 moved Current → Partial. Three settled entries were archived
-for budget. No product code changed.
+**Changelog — 2026-09-10 (design + work):** Shipped **stop telling agents to poll for work**
+(FS-18.R12/R13/A9, FS-04.R47/A27, TS-11.R13; `INV §2`, `INV §7`, `INV §8`, `INV §10`, `INV §17`).
+The request named a 60-second update requirement that does not exist; the real remnant was four
+seeded prompts telling agents to find work themselves. `teammate` no longer opens its loop with a
+per-turn coordination check, and `implementer`/`reviewer`/`researcher` dropped their "woken with no
+new instruction" mail check — a case `internal/runtime/activation_kinds.go:27` makes impossible.
+`MigrateLegacyAgentDecker` became `MigrateSupersededRolePrompts`: one sorted pass over
+`supersededRolePromptDigests` with replacement text read from `seedRoles()`, where a per-role read,
+decode, or write failure is joined and skipped rather than aborting the pass. Existing installs are
+corrected; a prompt edited by one byte stays user-owned. `testdata/superseded_*_prompt.txt` holds the
+pre-change bytes as the digest oracle, and those same bytes fail the new banned-phrase guard.
+FS-18.R7, FS-04.R44, and TS-11.R6 are superseded, not weakened; FS-04 and FS-18 stay Current. Three
+settled entries were archived for budget.
 
 **Release state:** `v0.4.3` is published and verified on tag `8ad5261`. Release and CI runs passed,
 the local distributable reports `0.4.3` with `sqlite_fts5`, and the GitHub Release carries the
@@ -99,7 +98,7 @@ remains, listed under **Review findings**. The credentialed Claude and Codex jou
 **Acceptance gates** are owed; real steering has never been exercised against a provider.
 
 **Available by role:** `/review` may take `fix-model-recommendations`; `/work` may start
-`open-a-file-from-chat.md` or `stop-telling-agents-to-poll.md`; `/fix` may take one open finding unit
+`open-a-file-from-chat.md`; `/fix` may take one open finding unit
 — `queue-a-follow-up-while-busy` (difficult, Sol), BR-1 (difficult, Sol), or BR-2 (medium,
 Terra/Opus); `/design-feature` may choose an available or resumable idea. Queues are independent.
 

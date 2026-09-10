@@ -47,9 +47,6 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
   Steer injects it into the running turn; its adapter prerequisite is complete.
 - [`open-a-file-from-chat.md`](open-a-file-from-chat.md) — a filepath link an agent wrote opens a
   read-only file viewer beside the transcript instead of navigating away to the dashboard.
-- [`stop-telling-agents-to-poll.md`](stop-telling-agents-to-poll.md) — four seeded role prompts stop
-  instructing agents to check coordination or mail on their own, and existing installs get the
-  corrected text by exact-digest match.
 
 ## Paused changes
 

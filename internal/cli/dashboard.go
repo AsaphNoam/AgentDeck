@@ -125,8 +125,8 @@ func prepareAgentKnowledge(cfgStore *config.Store, log *slog.Logger) agentknowle
 		log.Warn("install AgentDeck operator skill; continuing without it", "err", err)
 		return knowledge
 	}
-	if _, err := cfgStore.MigrateLegacyAgentDecker(); err != nil {
-		log.Warn("migrate legacy AgentDecker prompt", "err", err)
+	if _, err := cfgStore.MigrateSupersededRolePrompts(); err != nil {
+		log.Warn("migrate superseded seed role prompts", "err", err)
 	}
 	return knowledge
 }

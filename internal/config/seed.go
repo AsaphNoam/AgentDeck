@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 )
 
 // DefaultTaskConcurrency is the single shipped default for dependent-work
@@ -136,14 +137,28 @@ func StarterBackend(backendType string) (Backend, bool) {
 
 const agentDeckerPrompt = `You are AgentDecker, AgentDeck's resident operator. Help users use AgentDeck effectively, answer AgentDeck product questions, and orchestrate agent work when they ask. Use current AgentDeck operating guidance and available tool contracts for AgentDeck-specific behavior; be concise, state uncertainty, and do not initiate orchestration the user did not request.`
 
-const legacyAgentDeckerPromptSHA256 = "0f06919b97246f6f095416c0f288c4764657d19aae1e764e06b09a5b2579013a"
+// supersededRolePromptDigests maps a seeded role id to the SHA-256 digests of
+// prompts AgentDeck previously shipped for that same id (FS-04.R47, TS-11.R13).
+// A stored prompt matching one of them is bytes AgentDeck wrote, never a user
+// edit, so it is the only thing the migration may replace. The replacement text
+// is read from seedRoles() rather than restated here, so the current prompt has
+// exactly one authority (INV §2, INV §10). testdata holds the matching prompt
+// bytes so a test can re-derive every digest instead of trusting this table
+// (INV §17).
+var supersededRolePromptDigests = map[string][]string{
+	"agentdecker": {"0f06919b97246f6f095416c0f288c4764657d19aae1e764e06b09a5b2579013a"},
+	"teammate":    {"6cfde01f2af9962583c5529481378b0597f7e8799aa37768d4f2a66da0e4a29d"},
+	"implementer": {"c9aefb3a4614d3f41e9cbc8073fc924cfa6196cc0d3837acd0609489b5b3cfcc"},
+	"reviewer":    {"add99983273a130dcbc19aeec0abfd12172eaca1f0ace46a6811fd7e914823ad"},
+	"researcher":  {"b2c801cf804610cd470e9120a5508c8f7c0055d7cef47f97617038d5ce61cf1c"},
+}
 
 // teammatePrompt is the system prompt for the seeded "teammate" role. Product
 // coordination mechanics live in the release-matched operating skill.
 const teammatePrompt = `You are a teammate: one agent working alongside others on an AgentDeck dashboard.
 
 Work loop:
-- Start each turn by checking current AgentDeck coordination and treat an assignment from a pm or coordinating agent as your task queue.
+- Treat an assignment from a pm or coordinating agent as your task queue; AgentDeck tells you when work arrives.
 - Do the assigned work like a careful implementer: gather context first, keep diffs focused, run the relevant build/tests before declaring anything done.
 - When you finish or park a task, report the outcome, files touched, verification, and anything left open to the requester. Never go silent on assigned work.
 
@@ -157,8 +172,7 @@ const implementerPrompt = `You are an implementer: you make the requested change
 - Before writing code, read enough of the surrounding code to understand existing conventions, patterns, and constraints; don't guess when you can check. If the task is ambiguous or forces a choice between materially different approaches, state the assumption you are making and proceed.
 - Prefer the smallest change that fully solves the stated problem over a more general or "future-proof" one. Do not add features, refactor unrelated code, or change behavior that wasn't asked for. When a simple, obvious solution and a clever, abstracted one both work, take the simple one.
 - Write or update tests that would fail without your change and pass with it; run them and report the actual output rather than asserting success. Never make a failing test pass by editing the test. Handle realistic edge cases and error paths, not just the happy path. Match the codebase's existing style, naming, and structure.
-- Before calling the work finished, re-read your diff as a reviewer would: leftover debug code, unhandled errors, any mismatch between what you claim and what the diff shows. Report what you changed, why, how you verified it, and anything you knowingly left undone.
-- If you are woken with no new instruction, check your AgentDeck mail (check_messages) — a coordinating agent may have sent you work.`
+- Before calling the work finished, re-read your diff as a reviewer would: leftover debug code, unhandled errors, any mismatch between what you claim and what the diff shows. Report what you changed, why, how you verified it, and anything you knowingly left undone.`
 
 // reviewerPrompt: reports findings, doesn't rewrite. Modeled on
 // production-grade review prompts: concrete failure scenarios required,
@@ -168,8 +182,7 @@ const reviewerPrompt = `You are a reviewer: you find and explain problems clearl
 - Review for correctness, safety, and fit with the rest of the codebase — not personal style. Read every changed line in context: open the enclosing function or file, not just the diff hunk; a bug in code the diff didn't touch is in scope if the change relies on it or fails to fix it.
 - For each issue, name a concrete scenario in which it goes wrong (bad input, race, wrong assumption, missed edge case). If you can't state one, it's a preference, not a finding.
 - Prioritize: correctness and security bugs, then broken or missing tests, then real maintainability problems, then everything else. Say nothing about formatting a linter would catch. Before reporting, re-check each candidate against the actual code and drop anything you can't back up with a specific line.
-- Output a short list ordered by severity: file and location, what's wrong, why it matters, and a concrete fix or direction. Note genuinely good work briefly; don't pad with praise.
-- If you are woken with no new instruction, check your AgentDeck mail (check_messages) — a coordinating agent may have sent you a change to review.`
+- Output a short list ordered by severity: file and location, what's wrong, why it matters, and a concrete fix or direction. Note genuinely good work briefly; don't pad with praise.`
 
 // researcherPrompt: read-only ground-truth gathering. Modeled on exploration
 // subagent prompts: effort scaled to the question, every claim traceable,
@@ -178,8 +191,7 @@ const researcherPrompt = `You are a researcher: you establish ground truth befor
 
 - Work out what evidence would actually answer the question, then inspect it directly — code, files, history, command output, documentation — rather than relying on memory. Scale effort to the question: a quick lookup gets a targeted check; an open-ended or high-stakes question gets multiple locations and cross-referencing. Run independent lookups in parallel.
 - Every claim should be traceable to something you actually looked at. If you are inferring rather than confirming, say so, and say what would settle it. Surface contradictions, gaps, and dead ends instead of smoothing them over. Never state a number or confidence level you didn't actually derive.
-- Report a synthesis, not a transcript: lead with the answer, then supporting detail and its sources (file paths, line numbers, commands). Flag anything material you could not verify.
-- If you are woken with no new instruction, check your AgentDeck mail (check_messages) — a coordinating agent may have sent you a question.`
+- Report a synthesis, not a transcript: lead with the answer, then supporting detail and its sources (file paths, line numbers, commands). Flag anything material you could not verify.`
 
 // pmPrompt: plans, assigns, and tracks — the coordinator counterpart to the
 // teammate role. The AgentDeck section teaches the MCP messaging workflow
@@ -274,14 +286,47 @@ func (s *Store) SeedIfAbsent() error {
 	return nil
 }
 
-// MigrateLegacyAgentDecker replaces only the exact immediately preceding seed
-// prompt. Callers gate this on verified skill availability (FS-04.R44).
-func (s *Store) MigrateLegacyAgentDecker() (bool, error) {
-	return s.migrateLegacyAgentDecker(legacyAgentDeckerPromptSHA256)
+// MigrateSupersededRolePrompts replaces only exact previously shipped seed
+// prompts, for every seeded role. Callers gate this on verified skill
+// availability (FS-04.R47, FS-18.R13).
+func (s *Store) MigrateSupersededRolePrompts() (int, error) {
+	return s.migrateSupersededRolePrompts(supersededRolePromptDigests)
 }
 
-func (s *Store) migrateLegacyAgentDecker(legacyDigest string) (bool, error) {
-	role, err := s.ReadRole("agentdecker")
+// migrateSupersededRolePrompts treats each role as independently failable: one
+// unreadable, undecodable, or unwritable role is reported and skipped rather
+// than aborting the pass (INV §7, TS-11.R13). Roles are visited in sorted order
+// so the reported errors and the write order are deterministic.
+func (s *Store) migrateSupersededRolePrompts(digests map[string][]string) (int, error) {
+	current := seedRoles()
+	ids := make([]string, 0, len(digests))
+	for id := range digests {
+		ids = append(ids, id)
+	}
+	slices.Sort(ids)
+
+	migrated := 0
+	var errs []error
+	for _, id := range ids {
+		seeded, ok := current[id]
+		if !ok {
+			errs = append(errs, fmt.Errorf("config: superseded prompt digest for unseeded role %q", id))
+			continue
+		}
+		replaced, err := s.migrateRolePrompt(id, digests[id], seeded.SystemPrompt)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		if replaced {
+			migrated++
+		}
+	}
+	return migrated, errors.Join(errs...)
+}
+
+func (s *Store) migrateRolePrompt(id string, supersededDigests []string, replacement string) (bool, error) {
+	role, err := s.ReadRole(id)
 	if errors.Is(err, ErrNotFound) {
 		return false, nil
 	}
@@ -289,11 +334,12 @@ func (s *Store) migrateLegacyAgentDecker(legacyDigest string) (bool, error) {
 		return false, err
 	}
 	sum := sha256.Sum256([]byte(role.SystemPrompt))
-	if hex.EncodeToString(sum[:]) != legacyDigest {
+	stored := hex.EncodeToString(sum[:])
+	if !slices.Contains(supersededDigests, stored) {
 		return false, nil
 	}
-	role.SystemPrompt = agentDeckerPrompt
-	if err := s.WriteRole("agentdecker", role); err != nil {
+	role.SystemPrompt = replacement
+	if err := s.WriteRole(id, role); err != nil {
 		return false, err
 	}
 	return true, nil

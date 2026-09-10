@@ -82,32 +82,26 @@ helper deduplicates its three additions, including across repeated resume/switch
 one-shot switch primer. Session metadata and snapshots always persist the unmodified frozen base
 fields, so a later unavailable startup cannot recover an overlay from durable state.
 
-**R6 — Legacy role migration uses one exact code-owned digest after package
-verification.** After ordinary `SeedIfAbsent` handling, startup attempts and verifies package
-installation first. Only `Available=true` permits reading the `agentdecker` role, computing SHA-256
-over its stored system-prompt bytes, and replacing that field when it equals the single digest of
-the immediately preceding shipped seed prompt. The ordinary atomic role writer preserves every
-other field. Unavailable package state leaves the role untouched; a later start retries. Read,
-decode, or write failure likewise leaves the role unchanged, emits a bounded warning, and does not
-block startup. This one-time convenience never broadens normal configuration readiness. The legacy
-prompt text is not retained as a second knowledge source, parsed, normalized, or fuzzy-matched.
-R13 (planned) generalizes this from one role and one digest to a table and supersedes this item when
-it ships.
+**R6 — superseded 2026-09-10.** The single-role, single-digest migration is generalized to a table
+by R13, which keeps every guarantee below and widens only its scope: the superseded prompt text is
+still not retained as a second knowledge source, parsed, normalized, or fuzzy-matched.
 
-**R13 (planned) — One migration helper reads a code-owned digest table covering every
-seeded role.** `Store.MigrateLegacyAgentDecker` becomes one role-agnostic entry point over a
-code-owned table mapping each seeded role id to the digests of prompts previously shipped for that
-id. The replacement text is read from `seedRoles()` rather than restated, so the current prompt has
-exactly one authority and the table cannot drift from it (INV §2, INV §10). The per-role body keeps
-R6's semantics unchanged: package `Available=true` gates the whole pass; the role is read, SHA-256 is
-computed over its stored system-prompt bytes, and only an exact match replaces the field through the
-ordinary atomic role writer. Per-role read, decode, or write failure emits one bounded warning and
-continues to the next role rather than aborting the pass or startup (INV §8); `prepareAgentKnowledge`
-keeps its single warn-and-continue call site rather than growing one call per role. Each role id maps
-to a list of digests so an install several releases behind is still corrected. A table entry whose
-digest equals that role's *current* seeded prompt would silently no-op, so a test recomputes every
-digest from the shipped constants and fails if any entry names a role absent from `seedRoles()` or
-matches that role's current prompt (INV §10, INV §17).
+**R13 — One migration helper reads a code-owned digest table covering every
+seeded role.** `Store.MigrateSupersededRolePrompts` is one role-agnostic entry point over
+`supersededRolePromptDigests`, a code-owned table mapping each seeded role id to the digests of
+prompts previously shipped for that id. The replacement text is read from `seedRoles()` rather than
+restated, so the current prompt has exactly one authority and the table cannot drift from it
+(INV §2, INV §10). The per-role body keeps R6's semantics: package `Available=true` gates the whole
+pass; the role is read, SHA-256 is computed over its stored system-prompt bytes, and only an exact
+match replaces the field through the ordinary atomic role writer. Roles are visited in sorted order,
+and per-role read, decode, or write failure is joined into the returned error while the pass
+continues to the next role rather than aborting (INV §7, INV §8); `prepareAgentKnowledge` keeps its
+single warn-and-continue call site rather than growing one call per role, and the returned count is
+the number actually corrected. Each role id maps to a list of digests so an install several releases
+behind is still corrected. A table entry naming a role `seedRoles()` does not seed is reported rather
+than skipped silently, and an entry whose digest equals that role's *current* seeded prompt would
+silently no-op, so a test re-derives every digest from the fixture bytes in
+`internal/config/testdata/superseded_*_prompt.txt` and fails on either defect (INV §10, INV §17).
 
 **R7 — Tool definitions retain local mechanics; the skill owns cross-tool judgment.**
 All existing agent-facing tool names, argument and result shapes, validation, authority, effects,
@@ -142,7 +136,7 @@ construction. Secure-path, publication, or verification failure returns `Availab
 bounded warning to the ordinary startup log/stderr sinks, and permits dashboard startup. The shared
 composition helper then adds no managed `AddDirs`, `AGENTDECK_SKILL_DIR`, or package-use prompt for
 any launch path, even if a prior cache remains on disk. AgentDeck neither claims nor natively
-advertises the package for that dashboard process, and R6's migration does not run. The next
+advertises the package for that dashboard process, and R13's migration does not run. The next
 dashboard start retries installation and then migration; there is no background repair, network
 fetch, telemetry, or hot-reload loop.
 

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -439,76 +440,190 @@ func TestSeedIfAbsentNoClobber(t *testing.T) {
 	}
 }
 
-// FS-18.A5, FS-04.A24: only an exact historical prompt migrates, and every
-// non-prompt field survives the ordinary atomic role write.
-func TestMigrateLegacyAgentDeckerExactOnly(t *testing.T) {
-	s := newTestStore(t)
-	if err := s.EnsureLayout(); err != nil {
+// supersededPromptFixture returns the previously shipped prompt bytes for a
+// role. The fixtures are the independent oracle for the digest table: a digest
+// is only trusted because these bytes hash to it (INV §17).
+func supersededPromptFixture(t *testing.T, id string) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("testdata", "superseded_"+id+"_prompt.txt"))
+	if err != nil {
 		t.Fatal(err)
 	}
-	legacy := "legacy AgentDecker prompt"
-	sum := sha256.Sum256([]byte(legacy))
-	legacyDigest := hex.EncodeToString(sum[:])
+	return strings.TrimSuffix(string(data), "\n")
+}
 
-	for _, tc := range []struct {
-		name    string
-		prompt  string
-		migrate bool
-	}{
-		{name: "exact", prompt: legacy, migrate: true},
-		{name: "one byte edit", prompt: legacy + "!"},
-		{name: "empty", prompt: ""},
-		{name: "custom", prompt: "my prompt"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			originalSkip := boolPtr(true)
-			original := Role{Title: "Custom title", SystemPrompt: tc.prompt, SkipPermissions: originalSkip}
-			if err := s.WriteRole("agentdecker", original); err != nil {
-				t.Fatal(err)
+func supersededFixtureIDs() []string {
+	return []string{"agentdecker", "teammate", "implementer", "reviewer", "researcher"}
+}
+
+// FS-18.A9, FS-04.A27: every shipped digest is re-derived from the fixture
+// bytes rather than trusted, the table names only seeded roles, and no entry
+// matches its role's current prompt — an entry that did would silently migrate
+// nothing (INV §10, INV §17).
+func TestSupersededDigestTableMatchesSeededRoles(t *testing.T) {
+	seeded := seedRoles()
+	for id, digests := range supersededRolePromptDigests {
+		role, ok := seeded[id]
+		if !ok {
+			t.Fatalf("digest table names role %q, which seedRoles() does not seed", id)
+		}
+		sum := sha256.Sum256([]byte(role.SystemPrompt))
+		currentDigest := hex.EncodeToString(sum[:])
+		if len(digests) == 0 {
+			t.Fatalf("role %q has an empty digest list", id)
+		}
+		for _, digest := range digests {
+			if digest == currentDigest {
+				t.Fatalf("role %q lists its current prompt as superseded; the entry can never migrate anything", id)
 			}
-			migrated, err := s.migrateLegacyAgentDecker(legacyDigest)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if migrated != tc.migrate {
-				t.Fatalf("migrated = %v, want %v", migrated, tc.migrate)
-			}
-			got, err := s.ReadRole("agentdecker")
-			if err != nil {
-				t.Fatal(err)
-			}
-			wantPrompt := tc.prompt
-			if tc.migrate {
-				wantPrompt = agentDeckerPrompt
-			}
-			if got.Title != original.Title || got.SystemPrompt != wantPrompt || got.SkipPermissions == nil || !*got.SkipPermissions {
-				t.Fatalf("role fields after migration = %+v", got)
-			}
-		})
+		}
+	}
+	for _, id := range supersededFixtureIDs() {
+		sum := sha256.Sum256([]byte(supersededPromptFixture(t, id)))
+		got := hex.EncodeToString(sum[:])
+		if !slices.Contains(supersededRolePromptDigests[id], got) {
+			t.Fatalf("fixture digest for %q = %s, not in the shipped table %v", id, got, supersededRolePromptDigests[id])
+		}
 	}
 }
 
-// FS-18.A5, FS-04.A24: a corrupt role or a role the migration cannot read or
-// rewrite remains unchanged, so startup can report the failure without damaging
-// user configuration (INV §8/§10).
-func TestMigrateLegacyAgentDeckerLeavesRoleUnchangedOnIOFailure(t *testing.T) {
-	legacy := "legacy AgentDecker prompt"
-	sum := sha256.Sum256([]byte(legacy))
-	legacyDigest := hex.EncodeToString(sum[:])
+// FS-18.A9: the corrected prompts no longer tell an agent to look for work on
+// its own. The banned text is enumerated from the requirement rather than
+// copied from the constants under test (INV §17).
+func TestSeededPromptsDoNotInstructPolling(t *testing.T) {
+	banned := []string{
+		"check_messages",
+		"get_assigned_task",
+		"Start each turn by checking",
+		"woken with no new instruction",
+	}
+	for id, role := range seedRoles() {
+		for _, phrase := range banned {
+			if strings.Contains(role.SystemPrompt, phrase) {
+				t.Errorf("seeded role %q prompt contains %q; AgentDeck's activation names the tool a host-owned turn needs", id, phrase)
+			}
+		}
+	}
+	if teammate := seedRoles()["teammate"].SystemPrompt; !strings.Contains(teammate, "task queue") {
+		t.Error("teammate lost its assignment-queue stance")
+	}
+}
+
+// FS-18.A9, FS-04.A27: only an exact previously shipped prompt migrates, for
+// every seeded role, and every non-prompt field survives the atomic role write.
+// A digest belonging to another role never matches.
+func TestMigrateSupersededRolePromptsExactOnly(t *testing.T) {
+	seeded := seedRoles()
+	for _, id := range supersededFixtureIDs() {
+		superseded := supersededPromptFixture(t, id)
+		for _, tc := range []struct {
+			name    string
+			prompt  string
+			migrate bool
+		}{
+			{name: "exact", prompt: superseded, migrate: true},
+			{name: "one byte edit", prompt: superseded + "!"},
+			{name: "empty", prompt: ""},
+			{name: "custom", prompt: "my prompt"},
+			{name: "another role's superseded prompt", prompt: supersededPromptFixture(t, otherFixtureID(id))},
+		} {
+			t.Run(id+"/"+tc.name, func(t *testing.T) {
+				s := newTestStore(t)
+				if err := s.EnsureLayout(); err != nil {
+					t.Fatal(err)
+				}
+				original := Role{Title: "Custom title", SystemPrompt: tc.prompt, SkipPermissions: boolPtr(true)}
+				if err := s.WriteRole(id, original); err != nil {
+					t.Fatal(err)
+				}
+				migrated, err := s.MigrateSupersededRolePrompts()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if want := boolToInt(tc.migrate); migrated != want {
+					t.Fatalf("migrated = %d, want %d", migrated, want)
+				}
+				got, err := s.ReadRole(id)
+				if err != nil {
+					t.Fatal(err)
+				}
+				wantPrompt := tc.prompt
+				if tc.migrate {
+					wantPrompt = seeded[id].SystemPrompt
+				}
+				if got.Title != original.Title || got.SystemPrompt != wantPrompt || got.SkipPermissions == nil || !*got.SkipPermissions {
+					t.Fatalf("role fields after migration = %+v", got)
+				}
+			})
+		}
+	}
+}
+
+func otherFixtureID(id string) string {
+	if id == "agentdecker" {
+		return "teammate"
+	}
+	return "agentdecker"
+}
+
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// FS-18.A9: a role the migration cannot read or rewrite remains unchanged and
+// does not stop the other roles from being corrected (INV §7, INV §8).
+func TestMigrateSupersededRolePromptsIsolatesPerRoleFailure(t *testing.T) {
+	seeded := seedRoles()
+
+	// writeOthers seeds every other role with its superseded prompt so the pass
+	// has real work to finish after the broken role fails.
+	writeOthers := func(t *testing.T, s *Store, broken string) {
+		t.Helper()
+		for _, id := range supersededFixtureIDs() {
+			if id == broken {
+				continue
+			}
+			if err := s.WriteRole(id, Role{Title: "Custom title", SystemPrompt: supersededPromptFixture(t, id)}); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	assertOthersMigrated := func(t *testing.T, s *Store, broken string) {
+		t.Helper()
+		for _, id := range supersededFixtureIDs() {
+			if id == broken {
+				continue
+			}
+			got, err := s.ReadRole(id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.SystemPrompt != seeded[id].SystemPrompt {
+				t.Fatalf("role %q was not migrated after %q failed", id, broken)
+			}
+		}
+	}
 
 	t.Run("corrupt role", func(t *testing.T) {
 		s := newTestStore(t)
 		if err := s.EnsureLayout(); err != nil {
 			t.Fatal(err)
 		}
-		path := s.rolePath("agentdecker")
+		writeOthers(t, s, "teammate")
+		path := s.rolePath("teammate")
 		before := []byte("{not json")
 		if err := os.WriteFile(path, before, 0o600); err != nil {
 			t.Fatal(err)
 		}
-		migrated, err := s.migrateLegacyAgentDecker(legacyDigest)
-		if migrated || err == nil {
-			t.Fatalf("migration = %v, %v; want false and a reported error", migrated, err)
+		migrated, err := s.MigrateSupersededRolePrompts()
+		if err == nil {
+			t.Fatal("want a reported decode error")
+		}
+		if want := len(supersededFixtureIDs()) - 1; migrated != want {
+			t.Fatalf("migrated = %d, want %d", migrated, want)
 		}
 		after, err := os.ReadFile(path)
 		if err != nil {
@@ -517,6 +632,7 @@ func TestMigrateLegacyAgentDeckerLeavesRoleUnchangedOnIOFailure(t *testing.T) {
 		if !bytes.Equal(before, after) {
 			t.Fatalf("role bytes changed by a failed migration:\nbefore %s\nafter  %s", before, after)
 		}
+		assertOthersMigrated(t, s, "teammate")
 	})
 
 	t.Run("read failure", func(t *testing.T) {
@@ -524,18 +640,23 @@ func TestMigrateLegacyAgentDeckerLeavesRoleUnchangedOnIOFailure(t *testing.T) {
 		if err := s.EnsureLayout(); err != nil {
 			t.Fatal(err)
 		}
-		path := s.rolePath("agentdecker")
+		writeOthers(t, s, "reviewer")
+		path := s.rolePath("reviewer")
 		if err := os.Mkdir(path, 0o700); err != nil {
 			t.Fatal(err)
 		}
-		migrated, err := s.migrateLegacyAgentDecker(legacyDigest)
-		if migrated || err == nil {
-			t.Fatalf("migration = %v, %v; want false and a reported read error", migrated, err)
+		migrated, err := s.MigrateSupersededRolePrompts()
+		if err == nil {
+			t.Fatal("want a reported read error")
+		}
+		if want := len(supersededFixtureIDs()) - 1; migrated != want {
+			t.Fatalf("migrated = %d, want %d", migrated, want)
 		}
 		info, err := os.Stat(path)
 		if err != nil || !info.IsDir() {
 			t.Fatalf("unreadable role path changed: info=%v err=%v", info, err)
 		}
+		assertOthersMigrated(t, s, "reviewer")
 	})
 
 	t.Run("write failure", func(t *testing.T) {
@@ -546,7 +667,7 @@ func TestMigrateLegacyAgentDeckerLeavesRoleUnchangedOnIOFailure(t *testing.T) {
 		if err := s.EnsureLayout(); err != nil {
 			t.Fatal(err)
 		}
-		if err := s.WriteRole("agentdecker", Role{Title: "Custom title", SystemPrompt: legacy, SkipPermissions: boolPtr(true)}); err != nil {
+		if err := s.WriteRole("agentdecker", Role{Title: "Custom title", SystemPrompt: supersededPromptFixture(t, "agentdecker"), SkipPermissions: boolPtr(true)}); err != nil {
 			t.Fatal(err)
 		}
 		dir := filepath.Dir(s.rolePath("agentdecker"))
@@ -559,9 +680,9 @@ func TestMigrateLegacyAgentDeckerLeavesRoleUnchangedOnIOFailure(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		migrated, err := s.migrateLegacyAgentDecker(legacyDigest)
-		if migrated || err == nil {
-			t.Fatalf("migration = %v, %v; want false and a reported error", migrated, err)
+		migrated, err := s.MigrateSupersededRolePrompts()
+		if migrated != 0 || err == nil {
+			t.Fatalf("migration = %d, %v; want 0 and a reported error", migrated, err)
 		}
 		after, err := os.ReadFile(s.rolePath("agentdecker"))
 		if err != nil {
@@ -573,41 +694,59 @@ func TestMigrateLegacyAgentDeckerLeavesRoleUnchangedOnIOFailure(t *testing.T) {
 	})
 }
 
-func TestProductionLegacyAgentDeckerDigestMigratesExactFixture(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join("testdata", "legacy_agentdecker_prompt.txt"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	legacy := strings.TrimSuffix(string(data), "\n")
-	sum := sha256.Sum256([]byte(legacy))
-	if got := hex.EncodeToString(sum[:]); got != legacyAgentDeckerPromptSHA256 {
-		t.Fatalf("production legacy digest = %s, fixture digest = %s", legacyAgentDeckerPromptSHA256, got)
-	}
-	s := newTestStore(t)
-	original := Role{Title: "Customized title", SystemPrompt: legacy, SkipPermissions: boolPtr(true)}
-	if err := s.WriteRole("agentdecker", original); err != nil {
-		t.Fatal(err)
-	}
-	migrated, err := s.MigrateLegacyAgentDecker()
-	if err != nil || !migrated {
-		t.Fatalf("production migration = %v, %v", migrated, err)
-	}
-	got, err := s.ReadRole("agentdecker")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Title != original.Title || got.SystemPrompt != agentDeckerPrompt || got.SkipPermissions == nil || !*got.SkipPermissions {
-		t.Fatalf("migrated production fixture = %+v", got)
-	}
-}
-
-func TestMigrateLegacyAgentDeckerMissingRoleIsNoOp(t *testing.T) {
+// FS-18.A9: the pass is idempotent and a home with no role files is a no-op.
+func TestMigrateSupersededRolePromptsMissingRolesAndIdempotence(t *testing.T) {
 	s := newTestStore(t)
 	if err := s.EnsureLayout(); err != nil {
 		t.Fatal(err)
 	}
-	if migrated, err := s.MigrateLegacyAgentDecker(); err != nil || migrated {
-		t.Fatalf("missing role migration = %v, %v", migrated, err)
+	if migrated, err := s.MigrateSupersededRolePrompts(); err != nil || migrated != 0 {
+		t.Fatalf("missing role migration = %d, %v", migrated, err)
+	}
+	if err := s.WriteRole("researcher", Role{Title: "Custom title", SystemPrompt: supersededPromptFixture(t, "researcher")}); err != nil {
+		t.Fatal(err)
+	}
+	if migrated, err := s.MigrateSupersededRolePrompts(); err != nil || migrated != 1 {
+		t.Fatalf("first pass = %d, %v", migrated, err)
+	}
+	if migrated, err := s.MigrateSupersededRolePrompts(); err != nil || migrated != 0 {
+		t.Fatalf("second pass = %d, %v; want an idempotent no-op", migrated, err)
+	}
+}
+
+// FS-04.A7: the migration never widens absent-only seeding — a role AgentDeck
+// does not seed is out of scope even if its prompt matches a shipped digest.
+func TestMigrateSupersededRolePromptsSkipsUnseededRole(t *testing.T) {
+	s := newTestStore(t)
+	if err := s.EnsureLayout(); err != nil {
+		t.Fatal(err)
+	}
+	custom := Role{Title: "Mine", SystemPrompt: supersededPromptFixture(t, "reviewer")}
+	if err := s.WriteRole("my-reviewer", custom); err != nil {
+		t.Fatal(err)
+	}
+	if migrated, err := s.MigrateSupersededRolePrompts(); err != nil || migrated != 0 {
+		t.Fatalf("unseeded role migration = %d, %v", migrated, err)
+	}
+	got, err := s.ReadRole("my-reviewer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.SystemPrompt != custom.SystemPrompt {
+		t.Fatal("an unseeded role was rewritten by the seed-prompt migration")
+	}
+}
+
+// TS-11.R13: a digest naming a role AgentDeck does not seed is a table defect,
+// reported rather than silently ignored.
+func TestMigrateSupersededRolePromptsReportsUnseededTableEntry(t *testing.T) {
+	s := newTestStore(t)
+	if err := s.EnsureLayout(); err != nil {
+		t.Fatal(err)
+	}
+	migrated, err := s.migrateSupersededRolePrompts(map[string][]string{"not-a-seeded-role": {"deadbeef"}})
+	if migrated != 0 || err == nil {
+		t.Fatalf("unseeded table entry = %d, %v; want 0 and a reported error", migrated, err)
 	}
 }
 
