@@ -62,6 +62,11 @@ positioning in the project-card, project-background, and annotation menus — sa
 helper rather than four copies (`INV §2`, `INV §10`) — and that widening is recorded here rather
 than hidden in the closure. The originating unit is closed.
 
+**Usability review — 2026-09-10:** The current-tree browser follow-up found no new usability
+finding. J2 compatibility guidance and J5 lower-row menu placement passed; the full matrix and its
+unrun real-provider/native-OS gates are recorded in
+[`usability-review-run-2026-09-10.md`](../archive/reviews/usability-review-run-2026-09-10.md).
+
 **Release state:** `v0.4.3` is published and verified on tag `8ad5261`. Both the release and CI runs
 passed, the local distributable reports `0.4.3` with `sqlite_fts5`, and the GitHub Release carries
 the darwin/arm64 archive, `install.sh`, and a manifest declaring version `0.4.3` with its SHA-256.
