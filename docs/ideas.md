@@ -107,8 +107,6 @@ the relevant feature and technical specifications; it does not change product co
     through a task. Largest new authority surface; no threat model yet.
   - **Group fan-out.** Multiple arms already give fan-in/join; creating several related tasks as one
     unit does not exist. TS-10 §5 excludes it.
-  - **Declared tool output schemas.** Deferred until the pinned Claude and Codex adapters' handling
-    of `outputSchema` is verified.
 - **Real-provider acceptance.** Run the credentialed OpenCode/OpenHands and Claude/Codex federation
   checks, then reconcile any observed provider incompatibility before making release claims.
 - **AgentDeck product knowledge MCP.** Define a versioned, non-secret `agentdeck_docs` topic service
@@ -121,6 +119,51 @@ the relevant feature and technical specifications; it does not change product co
   explicit threat model and UI/CLI handshake design.
 - **Operational CLI.** Complete the specification for dashboard control, install/update, pidfile
   concurrency, and actionable startup diagnostics.
+
+## ACP Wait-list
+
+These are capabilities AgentDeck implements above ACP, or has deliberately deferred, because the
+pinned adapter contract is missing or unverified. An adapter release is a reason to recheck the
+capability; it is not by itself authority to remove the fallback or ship the deferred feature.
+
+- **Steering.** The pinned adapters predate `_session/steering`; the target Claude 0.75.1 and Codex
+  1.10.0 adapters advertise it. The adapter bump makes steering reachable, while the separate
+  `queue-a-follow-up-while-busy.md` unit owns the product behavior and UI.
+- **Host-held queued Send.** AgentDeck holds a busy agent's next prompt because the pinned Claude
+  adapter queues while the pinned Codex adapter supersedes and interrupts the active turn. Keep the
+  host-side hold even after steering exists: Send must remain portable, withdrawable, and distinct
+  from Steer.
+- **Internal actions without MCP.** AgentDeck's fifteen coordination actions remain on its scoped,
+  authenticated HTTP MCP server. `migrate-internal-actions-from-mcp.md` is paused until packaged
+  Codex/ACP exposes a narrowly scoped direct transport reachable under the default sandbox. Codex
+  ACP 1.10.0 still advertises ACP MCP transport unsupported and HTTP supported, so this bump does
+  not clear the gate.
+- **Semantic agent wake.** Mail and task activation use a short, host-generated `session/prompt`
+  because ACP exposes no portable notification that wakes an idle model. Replace this bridge only
+  if an adapter advertises a semantic wake capability; steering is not that capability.
+- **MCP resources and templates for context.** Context links stay exposed as bounded MCP tools. MCP
+  `resources/list` and `resources/read`, and ACP `Resource`/`ResourceLink` delivery, remain deferred
+  until their behavior passes real Claude and Codex provider checks; prompt-level resource-link
+  support alone does not satisfy that gate.
+- **Declared MCP tool output schemas.** Structured tool results ship without declared
+  `outputSchema`. Add schemas only after the pinned Claude and Codex adapters' handling of them is
+  verified against real providers.
+- **Codex session model and effort delivery.** AgentDeck applies model and effort through ordered
+  post-session configuration because Codex ACP session creation has no model field. Keep this path
+  until a replacement is both advertised and provider-verified.
+- **Codex system-prompt delivery.** AgentDeck injects its prompt overlay through
+  `CODEX_CONFIG.developer_instructions` because Codex ACP does not consume generic ACP
+  `systemPrompt`. Keep and reverify the overlay on every adapter bump until the adapter exposes a
+  proven portable replacement.
+- **Codex executable authority.** The release wrapper defaults `CODEX_PATH` to AgentDeck's directly
+  pinned private Codex executable because codex-acp 1.1.2 otherwise resolves an older nested CLI.
+  The 1.10.0 bump should make this default non-load-bearing through dependency deduplication, but
+  explicit `CODEX_PATH` overrides remain supported and the assembled tree must prove there is one
+  Codex at the pinned version.
+- **New adapter-native surfaces.** The target adapters also expose combinations of session fork,
+  provider management, native subagent sessions, background-task control, and session goals.
+  AgentDeck's durable tasks and pipelines are separate product control planes, not compatibility
+  shims to delete. Each native surface needs its own capability-gated product decision before use.
 
 ## Known things to improve
 
